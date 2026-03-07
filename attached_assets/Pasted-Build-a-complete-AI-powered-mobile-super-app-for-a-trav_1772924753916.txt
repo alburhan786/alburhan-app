@@ -1,0 +1,333 @@
+Build a complete AI-powered mobile super app for a travel company named:
+
+AL BURHAN TOURS & TRAVELS
+
+Business:
+Hajj and Umrah travel services company from India with 35+ years experience organizing pilgrimage packages.
+
+Goal:
+Allow pilgrims to browse Hajj and Umrah packages, authenticate securely, book packages online, make payments, and receive automated updates via WhatsApp, SMS, and RCS.
+
+Platform:
+Cross-platform mobile app:
+- Android
+- iOS
+
+Use modern technologies:
+React Native + Node.js + Express + MongoDB
+
+App Package Name:
+com.alburhantravels.hajjumrah
+
+-------------------------------------------------
+
+AUTHENTICATION SYSTEM
+
+Implement secure authentication with:
+
+1. WhatsApp OTP
+2. SMS OTP
+3. RCS OTP
+
+User login flow:
+
+User enters phone number
+↓
+OTP sent via:
+WhatsApp API
+SMS Gateway
+RCS messaging
+↓
+User enters OTP
+↓
+OTP verified
+↓
+User logged in
+
+Store user profile including:
+Name
+Phone
+Email
+Passport Number
+Nationality
+City
+
+-------------------------------------------------
+
+HOME DASHBOARD
+
+Create a smart home screen with:
+
+• Banner slider for Hajj 2027
+• Ramadan Umrah packages
+• Featured Umrah offers
+• Quick action buttons
+
+Buttons:
+
+Book Hajj 2027
+Book Umrah Package
+Package Details
+Contact Agent
+Download Brochure
+
+-------------------------------------------------
+
+HAJJ 2027 PACKAGE MODULE
+
+Create full package information system.
+
+Example package:
+
+Hajj 2027 Standard Package
+
+Include:
+
+Departure city
+Departure date
+Return date
+Airline
+Hotel in Makkah
+Hotel in Madinah
+Distance from Haram
+Room type
+Meal plan
+Transport
+Ziyarat tours
+
+Add sections:
+
+Package Inclusions
+Package Exclusions
+Documents Required
+
+Add:
+
+Book Now button
+
+-------------------------------------------------
+
+UMRAH PACKAGE MARKETPLACE
+
+Categories:
+
+Economy Umrah
+Standard Umrah
+Deluxe Umrah
+Luxury Umrah
+Ramadan Umrah
+
+Filters:
+
+Price
+Hotel star rating
+Distance from Haram
+Travel dates
+Departure airport
+
+-------------------------------------------------
+
+BOOKING SYSTEM
+
+Create online booking form.
+
+Fields:
+
+Full Name
+Mobile Number
+Email
+City
+Passport Number
+Number of Travelers
+Package Selected
+Travel Date
+
+Allow upload:
+
+Passport copy
+Photo
+
+Booking status:
+
+Pending
+Confirmed
+Visa Processing
+Completed
+
+-------------------------------------------------
+
+ONLINE PAYMENT SYSTEM
+
+Integrate payment gateway:
+
+Razorpay
+
+Payment methods:
+
+UPI
+Credit Card
+Debit Card
+Net Banking
+
+After payment:
+
+Generate invoice automatically.
+
+-------------------------------------------------
+
+INVOICE SYSTEM
+
+Generate digital invoice including:
+
+Customer Name
+Package Name
+Amount Paid
+Booking ID
+Payment Status
+
+Send invoice automatically via:
+
+WhatsApp API
+SMS
+RCS
+
+-------------------------------------------------
+
+BOOKING CONFIRMATION
+
+After booking send confirmation message via:
+
+WhatsApp
+SMS
+RCS
+
+Message example:
+
+Assalamu Alaikum,
+
+Your Hajj 2027 booking with
+AL BURHAN TOURS & TRAVELS
+has been confirmed.
+
+Booking ID: ####
+
+Our team will contact you shortly.
+
+-------------------------------------------------
+
+AUTOMATED TRAVEL UPDATES
+
+Before departure send automatic updates:
+
+1. Visa issued notification
+2. Air ticket details
+3. Flight schedule
+4. Room allotment
+5. Bus allotment
+6. Departure reminder
+
+Send updates via:
+
+WhatsApp API
+SMS
+RCS
+
+-------------------------------------------------
+
+DOCUMENT CENTER
+
+Allow users to download:
+
+Hajj guide
+Umrah guide
+Packing checklist
+Visa requirements
+
+-------------------------------------------------
+
+MEDIA GALLERY
+
+Sections:
+
+Makkah photos
+Madinah photos
+Hotel images
+Pilgrim journey videos
+
+-------------------------------------------------
+
+LIVE AGENT CHAT
+
+Add in-app chat system.
+
+Users can talk to travel agent.
+
+Messages also synced with WhatsApp.
+
+-------------------------------------------------
+
+ADMIN PANEL
+
+Create admin dashboard where admin can:
+
+Add packages
+Edit packages
+Upload hotel images
+Upload brochures
+Manage bookings
+Send notifications
+Upload visa updates
+Upload flight details
+Upload room allotment
+Upload bus allotment
+
+-------------------------------------------------
+
+USER PROFILE
+
+Users can manage:
+
+Profile
+Passport details
+Booking history
+Documents
+Payment history
+
+-------------------------------------------------
+
+NOTIFICATIONS SYSTEM
+
+Push notifications for:
+
+Hajj updates
+Visa approval
+Flight schedule
+Departure reminder
+Package offers
+
+-------------------------------------------------
+
+COMPANY DETAILS
+
+Company Name:
+AL BURHAN TOURS & TRAVELS
+
+Registered Address:
+Shop No 8 Khanka Masjid Complex
+Sanwara Road
+Burhanpur 450331
+Madhya Pradesh
+India
+
+Phone:
++91 9893225590
++91 9893989786
+
+Website:
+https://www.alburhantravels.com
+
+-------------------------------------------------
+
+FINAL OBJECTIVE
+
+Create a professional pilgrimage travel super app similar to global travel platforms but specialized for Hajj and Umrah bookings, with strong automation for pilgrim communication through WhatsApp, SMS, and RCS.
