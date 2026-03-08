@@ -38,12 +38,20 @@ import React, { useState, useEffect } from 'react';
       }
     };
 
-    const formatPrice = (price: string) => {
+    const formatPrice = (price: string | number) => {
       return new Intl.NumberFormat('en-IN', {
         style: 'currency',
         currency: 'INR',
         maximumFractionDigits: 0,
-      }).format(parseFloat(price));
+      }).format(typeof price === 'number' ? price : parseFloat(price));
+    };
+
+    const roomPriceLabels: Record<string, string> = {
+      double: 'Double Sharing',
+      triple: 'Triple Sharing',
+      quad: 'Quad Sharing',
+      sharing: '5 Sharing',
+      '6_sharing': '6 Sharing',
     };
 
     const formatDate = (date: string) => {
@@ -93,6 +101,11 @@ import React, { useState, useEffect } from 'react';
               <View style={styles.typeBadge}>
                 <Text style={styles.badgeText}>{pkg.type.toUpperCase()}</Text>
               </View>
+              {pkg.category && (
+                <View style={[styles.typeBadge, { backgroundColor: '#6366f1' }]}>
+                  <Text style={styles.badgeText}>{pkg.category}</Text>
+                </View>
+              )}
               {pkg.featured && (
                 <View style={styles.featuredBadge}>
                   <Text style={styles.badgeText}>★ FEATURED</Text>
@@ -129,6 +142,49 @@ import React, { useState, useEffect } from 'react';
               </View>
             </View>
           </View>
+
+          {pkg.roomPrices && Object.keys(pkg.roomPrices).length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Room Pricing</Text>
+              <View style={styles.detailsCard}>
+                {Object.entries(pkg.roomPrices).map(([key, val]: [string, any], idx: number) => (
+                  <React.Fragment key={key}>
+                    {idx > 0 && <View style={styles.divider} />}
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>{roomPriceLabels[key] || key}</Text>
+                      <Text style={[styles.detailValue, { color: Colors.primary, fontWeight: 'bold' as const }]}>
+                        {formatPrice(val)}
+                      </Text>
+                    </View>
+                  </React.Fragment>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {(pkg.flight || pkg.food || pkg.tent || pkg.transport || pkg.muallim) && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Services</Text>
+              <View style={styles.detailsCard}>
+                {[
+                  { label: 'Flight', value: pkg.flight },
+                  { label: 'Muallim', value: pkg.muallim },
+                  { label: 'Tent / Mina', value: pkg.tent },
+                  { label: 'Transport', value: pkg.transport },
+                  { label: 'Meals', value: pkg.food },
+                  { label: 'Room Sharing', value: pkg.roomSharing },
+                ].filter(s => s.value).map((s, idx, arr) => (
+                  <React.Fragment key={s.label}>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>{s.label}</Text>
+                      <Text style={[styles.detailValue, { flex: 1, textAlign: 'right' as const, marginLeft: 16 }]}>{s.value}</Text>
+                    </View>
+                    {idx < arr.length - 1 && <View style={styles.divider} />}
+                  </React.Fragment>
+                ))}
+              </View>
+            </View>
+          )}
 
           {pkg.hotelDetails && (
             <View style={styles.section}>

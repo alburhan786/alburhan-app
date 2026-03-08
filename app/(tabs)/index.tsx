@@ -181,6 +181,9 @@ export default function HomeScreen() {
                 </View>
 
                 <Text style={styles.packageName}>{pkg.name}</Text>
+                {pkg.category && (
+                  <Text style={styles.categoryText}>{pkg.category}</Text>
+                )}
                 <Text style={styles.packageDescription} numberOfLines={2}>
                   {pkg.description}
                 </Text>
@@ -350,6 +353,12 @@ export default function HomeScreen() {
       fontSize: 18,
       fontWeight: 'bold',
       color: Colors.text,
+      marginBottom: 4,
+    },
+    categoryText: {
+      fontSize: 13,
+      color: '#6366f1',
+      fontWeight: '600' as const,
       marginBottom: 8,
     },
     packageDescription: {

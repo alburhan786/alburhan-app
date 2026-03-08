@@ -1,6 +1,6 @@
 run = "npm start"
   language = "nodejs"
-modules = ["nodejs-20"]
+modules = ["nodejs-20", "postgresql-16"]
 
   [deployment]
   run = ["npm", "start"]
