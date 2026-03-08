@@ -19,6 +19,9 @@ import { Colors } from '../../constants/Colors';
 
 const DOC_TYPES = [
   { value: 'passport', label: 'Passport', icon: 'document-text-outline' as const },
+  { value: 'pancard', label: 'PAN Card', icon: 'card-outline' as const },
+  { value: 'aadhar', label: 'Aadhar Card', icon: 'finger-print-outline' as const },
+  { value: 'digital_photo', label: 'Digital Photo (35x45mm)', icon: 'camera-outline' as const },
   { value: 'visa', label: 'Visa', icon: 'airplane-outline' as const },
   { value: 'ticket', label: 'Ticket', icon: 'ticket-outline' as const },
   { value: 'id_proof', label: 'ID Proof', icon: 'card-outline' as const },
@@ -73,30 +76,47 @@ export default function ProfileScreen() {
 
       const file = result.assets[0];
 
+      const uploadFile = async (docType: string) => {
+        setUploading(true);
+        try {
+          const response = await documentService.uploadDocument({
+            userId: user.id,
+            type: docType,
+            fileName: file.name,
+            fileUri: file.uri,
+          });
+          if (response.success) {
+            Alert.alert('Success', 'Document uploaded successfully');
+            loadDocuments();
+          } else {
+            Alert.alert('Error', response.error || 'Upload failed');
+          }
+        } catch (error: any) {
+          Alert.alert('Error', error.message || 'Upload failed');
+        } finally {
+          setUploading(false);
+        }
+      };
+
       Alert.alert(
         'Select Document Type',
         'What type of document is this?',
         DOC_TYPES.map(dt => ({
-          text: dt.label,
-          onPress: async () => {
-            setUploading(true);
-            try {
-              const response = await documentService.uploadDocument({
-                userId: user.id,
-                type: dt.value,
-                fileName: file.name,
-                fileUri: file.uri,
-              });
-              if (response.success) {
-                Alert.alert('Success', 'Document uploaded successfully');
-                loadDocuments();
-              } else {
-                Alert.alert('Error', response.error || 'Upload failed');
-              }
-            } catch (error: any) {
-              Alert.alert('Error', error.message || 'Upload failed');
-            } finally {
-              setUploading(false);
+          text: dt.value === 'digital_photo'
+            ? `${dt.label}\n(35x45mm, 400x514px, JPG <60KB, White BG, Face 70-80%)`
+            : dt.label,
+          onPress: () => {
+            if (dt.value === 'digital_photo') {
+              Alert.alert(
+                'Digital Photo Requirements',
+                '• Dimension: 35mm x 45mm\n• Resolution: 400 x 514 pixels\n• Format: JPG, max 60KB\n• Face size: 70-80% of photo\n• Background: White\n• Borderless\n\nProceed with upload?',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Upload', onPress: () => uploadFile(dt.value) },
+                ]
+              );
+            } else {
+              uploadFile(dt.value);
             }
           },
         }))

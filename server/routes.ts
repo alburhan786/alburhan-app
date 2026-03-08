@@ -537,7 +537,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           hotelDetails: { makkah: { name: "Clock Tower (Abraj Al Bait)", rating: 5, distance: "0 meters from Haram" }, madinah: { name: "Maden Hotel / Similar", rating: 4, distance: "150 meters from Haram" } },
           flight: "Saudi Airlines - Direct Flight", transport: "Luxury A/C Buses", food: "Full Board – Continental Meals",
           muallim: "Premium Muallim Service", tent: "VIP Gypsum Board Tents (A/C) with Buffet Meals", roomSharing: "4 / 3 / 2",
-          availableSeats: 50, departureDate: new Date("2026-05-21"), returnDate: new Date("2026-06-03"), featured: true,
+          availableSeats: 50, departureDate: new Date("2027-05-21"), returnDate: new Date("2027-06-03"), featured: true,
         },
         {
           type: "hajj", name: "Burhan Elite Plus", category: "Premium Hajj Package",
@@ -549,7 +549,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           hotelDetails: { makkah: { name: "Azka Al Maqam / Similar", rating: 5, distance: "0 meters from Haram" }, madinah: { name: "Maden Hotel / Similar", rating: 4, distance: "150 meters from Haram" } },
           flight: "Saudi Airlines - Direct Flight", transport: "Luxury A/C Buses", food: "Indian + Continental Meals",
           muallim: "Premium Muallim Service", tent: "VIP Air Conditioned Tents", roomSharing: "5 / 4 / 3 / 2",
-          availableSeats: 50, departureDate: new Date("2026-05-21"), returnDate: new Date("2026-06-03"), featured: true,
+          availableSeats: 50, departureDate: new Date("2027-05-21"), returnDate: new Date("2027-06-03"), featured: true,
         },
         {
           type: "hajj", name: "Burhan Comfort Plus", category: "Executive Hajj Package",
@@ -561,7 +561,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           hotelDetails: { makkah: { name: "Le Meridien Tower (Saja Makkah)", rating: 5, distance: "1.5 km shuttle service" }, madinah: { name: "Maden Hotel / Similar", rating: 4, distance: "150 meters from Haram" } },
           flight: "Saudi Airlines - Direct Flight", transport: "Luxury A/C Buses", food: "Full Board – Continental Meals",
           muallim: "Premium Muallim Service", tent: "VIP Air Conditioned Tents", roomSharing: "5 / 4 / 3 / 2",
-          availableSeats: 60, departureDate: new Date("2026-05-21"), returnDate: new Date("2026-06-03"), featured: true,
+          availableSeats: 60, departureDate: new Date("2027-05-21"), returnDate: new Date("2027-06-03"), featured: true,
         },
         {
           type: "hajj", name: "Burhan Comfort", category: "Standard Hajj Package",
@@ -573,7 +573,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           hotelDetails: { makkah: { name: "Esarah - Setten Area", rating: 4, distance: "< 4 km from Haram" }, madinah: { name: "Maden Hotel / Similar", rating: 4, distance: "150 meters from Haram" } },
           flight: "Saudi Airlines - Direct Flight", transport: "Luxury A/C Buses", food: "Indian + Continental Meals",
           muallim: "Premium Muallim Service", tent: "VIP Air Conditioned Tents", roomSharing: "5 / 4 / 3 / 2",
-          availableSeats: 60, departureDate: new Date("2026-05-21"), returnDate: new Date("2026-06-03"), featured: false,
+          availableSeats: 60, departureDate: new Date("2027-05-21"), returnDate: new Date("2027-06-03"), featured: false,
         },
         {
           type: "hajj", name: "Burhan Economy Plus", category: "Economy Hajj Package",
@@ -585,7 +585,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           hotelDetails: { makkah: { name: "Esarah - Setten Area", rating: 3, distance: "< 4 km from Haram" }, madinah: { name: "Nozol Royal Inn / Similar", rating: 3, distance: "150 meters from Haram" } },
           flight: "Saudi Airlines - Direct Flight", transport: "Luxury A/C Buses", food: "Indian + Continental Meals",
           muallim: "Category A Muallim", tent: "Premium Gypsum Board Tents (A/C)", roomSharing: "5 / 4 / 3 / 2",
-          availableSeats: 80, departureDate: new Date("2026-05-21"), returnDate: new Date("2026-06-03"), featured: false,
+          availableSeats: 80, departureDate: new Date("2027-05-21"), returnDate: new Date("2027-06-03"), featured: false,
         },
         {
           type: "hajj", name: "Burhan Budget Saver", category: "Budget Hajj Package",
@@ -597,7 +597,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           hotelDetails: { makkah: { name: "Esarah - Setten Area", rating: 3, distance: "< 4 km from Haram" }, madinah: { name: "Nozol Royal Inn / Similar", rating: 3, distance: "150 meters from Haram" } },
           flight: "Air India - Direct Flight", transport: "Luxury A/C Buses", food: "Indian + Continental Meals",
           muallim: "Category A Muallim", tent: "Premium Gypsum Board Tents (A/C)", roomSharing: "6 Sharing",
-          availableSeats: 100, departureDate: new Date("2026-05-21"), returnDate: new Date("2026-06-03"), featured: false,
+          availableSeats: 100, departureDate: new Date("2027-05-21"), returnDate: new Date("2027-06-03"), featured: false,
         },
       ]).returning();
       res.json({ success: true, message: "Database seeded successfully", packages: seededPackages });
