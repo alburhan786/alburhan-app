@@ -31,23 +31,21 @@ async function sendSmsFast2SMS(phone: string, message: string): Promise<boolean>
 }
 
 async function sendWhatsAppBotBee(phone: string, message: string): Promise<boolean> {
-  let apiKey = process.env.BOTBEE_WHATSAPP_API_KEY;
+  const apiKey = process.env.BOTBEE_WHATSAPP_API_KEY;
   if (!apiKey) {
     console.log("[BotBee] API key not configured, skipping WhatsApp");
     return false;
   }
-  if (apiKey.startsWith(".") && !apiKey.startsWith("2.")) {
-    apiKey = "2" + apiKey;
-  }
   const phoneNumberId = "965912196611113";
+  const phoneNumber = phone.startsWith("91") ? phone : `91${phone}`;
   try {
     const formData = new URLSearchParams();
     formData.append("apiToken", apiKey);
     formData.append("phone_number_id", phoneNumberId);
-    formData.append("phone_number", `91${phone}`);
+    formData.append("phone_number", phoneNumber);
     formData.append("message", message);
 
-    const response = await fetch("https://app.botbee.io/api/v1/whatsapp/send", {
+    const response = await fetch("https://api.botbee.io/api/v1/whatsapp/send", {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
