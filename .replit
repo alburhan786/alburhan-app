@@ -60,4 +60,10 @@ waitForPort = 8081
 
 [workflows.workflow.metadata]
 outputType = "console"
+
+[userenv]
+
+[userenv.shared]
+BOTBEE_API_TOKEN = "18586|wNNF04uDdR6fFHZwBPpcPQcMDQJ1yqauLNaxWkHP6eaed2ba"
+BOTBEE_PHONE_NUMBER_ID = "965912196611113"
   

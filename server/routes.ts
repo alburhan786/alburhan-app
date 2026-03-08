@@ -31,12 +31,12 @@ async function sendSmsFast2SMS(phone: string, message: string): Promise<boolean>
 }
 
 async function sendWhatsAppBotBee(phone: string, message: string): Promise<boolean> {
-  const apiKey = process.env.BOTBEE_WHATSAPP_API_KEY;
+  const apiKey = process.env.BOTBEE_API_TOKEN || process.env.BOTBEE_WHATSAPP_API_KEY;
   if (!apiKey) {
     console.log("[BotBee] API key not configured, skipping WhatsApp");
     return false;
   }
-  const phoneNumberId = "965912196611113";
+  const phoneNumberId = process.env.BOTBEE_PHONE_NUMBER_ID || "965912196611113";
   const phoneNumber = phone.startsWith("91") ? phone : `91${phone}`;
   try {
     const formData = new URLSearchParams();
@@ -45,16 +45,25 @@ async function sendWhatsAppBotBee(phone: string, message: string): Promise<boole
     formData.append("phone_number", phoneNumber);
     formData.append("message", message);
 
-    const response = await fetch("https://api.botbee.io/api/v1/whatsapp/send", {
+    const response = await fetch("https://app.botbee.io/api/v1/whatsapp/send", {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
       },
       body: formData.toString(),
     });
-    const data = await response.json();
-    console.log("[BotBee] Response:", JSON.stringify(data));
-    return data.status === "1";
+    const text = await response.text();
+    try {
+      const data = JSON.parse(text);
+      console.log("[BotBee] Response:", JSON.stringify(data));
+      if (data.status === "0" && data.message?.includes("24 hour")) {
+        console.log("[BotBee] 24-hour window restriction - user needs to message the business first");
+      }
+      return data.status === "1";
+    } catch {
+      console.log("[BotBee] Non-JSON response:", text.substring(0, 200));
+      return false;
+    }
   } catch (error) {
     console.error("[BotBee] Error:", error);
     return false;
