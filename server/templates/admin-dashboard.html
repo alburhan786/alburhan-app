@@ -95,6 +95,7 @@
     <button onclick="showSection('documents', this)">Documents</button>
     <button onclick="showSection('notifications', this)">Notifications</button>
     <button onclick="showSection('packages', this)">Packages</button>
+    <button onclick="showSection('create-invoice', this)">Create Invoice</button>
   </div>
 
   <div class="content">
@@ -194,6 +195,89 @@
       <div class="card">
         <h2>Packages</h2>
         <div class="table-wrap" id="all-packages"></div>
+      </div>
+    </div>
+
+    <div id="section-create-invoice" class="section">
+      <div class="card">
+        <h2>Create Invoice (Offline Booking)</h2>
+        <p style="color:#6b7280;font-size:14px;margin-bottom:20px">Generate an invoice for walk-in or offline customers who book without using the app.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+          <div>
+            <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Customer Name *</label>
+            <input type="text" id="inv-name" placeholder="Full name" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px" />
+          </div>
+          <div>
+            <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Phone Number *</label>
+            <input type="text" id="inv-phone" placeholder="e.g. 9893989786" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px" />
+          </div>
+          <div>
+            <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Email</label>
+            <input type="email" id="inv-email" placeholder="email@example.com" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px" />
+          </div>
+          <div>
+            <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Address</label>
+            <input type="text" id="inv-address" placeholder="Full address" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px" />
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+          <div>
+            <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Package *</label>
+            <select id="inv-package" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;background:white" onchange="updateInvRoomOptions()">
+              <option value="">Select package...</option>
+            </select>
+          </div>
+          <div>
+            <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Room Type</label>
+            <select id="inv-room" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;background:white" onchange="updateInvRate()">
+              <option value="">Select room...</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px">
+          <div>
+            <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">No. of Persons *</label>
+            <input type="number" id="inv-persons" value="1" min="1" max="20" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px" onchange="updateInvRate()" />
+          </div>
+          <div>
+            <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Rate per Person (₹) *</label>
+            <input type="number" id="inv-rate" placeholder="0" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px" onchange="updateInvTotal()" />
+          </div>
+          <div>
+            <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Total Amount (₹)</label>
+            <input type="number" id="inv-total" placeholder="0" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;background:#f3f4f6" readonly />
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+          <div>
+            <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Received Amount (₹)</label>
+            <input type="number" id="inv-paid" value="0" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px" />
+          </div>
+          <div>
+            <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Traveler Names (comma separated)</label>
+            <input type="text" id="inv-travelers" placeholder="e.g. Ahmed Khan, Sara Khan" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px" />
+          </div>
+        </div>
+        <div style="margin-bottom:16px">
+          <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Special Requests</label>
+          <textarea id="inv-requests" rows="2" placeholder="Any special requirements..." style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;resize:vertical"></textarea>
+        </div>
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <button class="btn btn-confirm" onclick="createOfflineInvoice()" id="create-inv-btn" style="padding:12px 32px;font-size:15px;background:#047857">
+            Create Invoice & Booking
+          </button>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#374151;cursor:pointer">
+            <input type="checkbox" id="inv-send-sms" checked /> Send Invoice Link via SMS
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#374151;cursor:pointer">
+            <input type="checkbox" id="inv-send-whatsapp" checked /> Send via WhatsApp
+          </label>
+        </div>
+        <div id="inv-result" style="margin-top:16px"></div>
+      </div>
+      <div class="card">
+        <h2>Generated Invoices</h2>
+        <div class="table-wrap" id="all-invoices"></div>
       </div>
     </div>
   </div>
@@ -586,6 +670,174 @@
       btn.textContent = 'Send to All Customers (SMS + WhatsApp + Email)';
     }
 
+    var cachedPackages = [];
+    var roomLabels = { double: 'Double Sharing', triple: 'Triple Sharing', quad: 'Quad Sharing', sharing: '5 Sharing', '6_sharing': '6 Sharing' };
+
+    async function populatePackageDropdown() {
+      var data = await fetchJSON('/api/packages');
+      if (!data.success) return;
+      cachedPackages = data.packages;
+      var sel = document.getElementById('inv-package');
+      sel.innerHTML = '<option value="">-- Select Package --</option>';
+      for (var i = 0; i < cachedPackages.length; i++) {
+        var p = cachedPackages[i];
+        sel.innerHTML += '<option value="' + p.id + '">' + p.name + ' (' + p.type.toUpperCase() + ') - ' + formatPrice(p.price) + '</option>';
+      }
+    }
+
+    function updateInvRoomOptions() {
+      var pkgId = document.getElementById('inv-package').value;
+      var sel = document.getElementById('inv-room');
+      sel.innerHTML = '<option value="">-- Select Room --</option>';
+      if (!pkgId) return;
+      var pkg = cachedPackages.find(function(p) { return p.id == pkgId; });
+      if (!pkg || !pkg.roomPrices) {
+        sel.innerHTML += '<option value="standard">Standard - ' + formatPrice(pkg.price) + '</option>';
+        document.getElementById('inv-rate').value = Math.round(parseFloat(pkg.price));
+        updateInvTotal();
+        return;
+      }
+      var rp = pkg.roomPrices;
+      for (var key in rp) {
+        var label = roomLabels[key] || key;
+        sel.innerHTML += '<option value="' + key + '">' + label + ' - ' + formatPrice(rp[key]) + '</option>';
+      }
+    }
+
+    function updateInvRate() {
+      var pkgId = document.getElementById('inv-package').value;
+      var roomKey = document.getElementById('inv-room').value;
+      if (!pkgId) return;
+      var pkg = cachedPackages.find(function(p) { return p.id == pkgId; });
+      if (!pkg) return;
+      if (roomKey && pkg.roomPrices && pkg.roomPrices[roomKey]) {
+        document.getElementById('inv-rate').value = Math.round(pkg.roomPrices[roomKey]);
+      } else {
+        document.getElementById('inv-rate').value = Math.round(parseFloat(pkg.price));
+      }
+      updateInvTotal();
+    }
+
+    function updateInvTotal() {
+      var rate = parseFloat(document.getElementById('inv-rate').value) || 0;
+      var persons = parseInt(document.getElementById('inv-persons').value) || 1;
+      document.getElementById('inv-total').value = rate * persons;
+    }
+
+    async function createOfflineInvoice() {
+      var name = document.getElementById('inv-name').value.trim();
+      var phone = document.getElementById('inv-phone').value.trim();
+      var email = document.getElementById('inv-email').value.trim();
+      var address = document.getElementById('inv-address').value.trim();
+      var packageId = document.getElementById('inv-package').value;
+      var roomType = document.getElementById('inv-room').value;
+      var persons = parseInt(document.getElementById('inv-persons').value) || 1;
+      var rate = parseFloat(document.getElementById('inv-rate').value) || 0;
+      var totalAmount = parseFloat(document.getElementById('inv-total').value) || 0;
+      var paidAmount = parseFloat(document.getElementById('inv-paid').value) || 0;
+      var travelersStr = document.getElementById('inv-travelers').value.trim();
+      var specialRequests = document.getElementById('inv-requests').value.trim();
+      var sendSms = document.getElementById('inv-send-sms').checked;
+      var sendWhatsapp = document.getElementById('inv-send-whatsapp').checked;
+
+      if (!name || !phone || !packageId || rate <= 0) {
+        alert('Please fill in Customer Name, Phone, Package, and Rate.');
+        return;
+      }
+
+      var travelers = [];
+      if (travelersStr) {
+        var names = travelersStr.split(',');
+        for (var i = 0; i < names.length; i++) {
+          travelers.push({ name: names[i].trim(), age: 0, gender: '', passportNumber: '', passportExpiry: '' });
+        }
+      }
+      while (travelers.length < persons) {
+        travelers.push({ name: name + (travelers.length > 0 ? ' +' + travelers.length : ''), age: 0, gender: '', passportNumber: '', passportExpiry: '' });
+      }
+
+      var roomLabel = roomLabels[roomType] || roomType || '';
+
+      var btn = document.getElementById('create-inv-btn');
+      btn.disabled = true;
+      btn.textContent = 'Creating...';
+      document.getElementById('inv-result').innerHTML = '<p style="color:#6b7280">Creating booking and generating invoice...</p>';
+
+      try {
+        var data = await fetchJSON('/api/admin/create-offline-invoice', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contactName: name,
+            contactPhone: phone,
+            contactEmail: email || name.toLowerCase().replace(/\s/g, '') + '@offline.local',
+            address: address || 'Walk-in Customer',
+            packageId: parseInt(packageId),
+            numberOfPeople: persons,
+            totalAmount: totalAmount.toString(),
+            paidAmount: paidAmount.toString(),
+            travelers: travelers,
+            roomType: roomLabel,
+            specialRequests: specialRequests,
+            sendSms: sendSms,
+            sendWhatsapp: sendWhatsapp
+          })
+        });
+
+        if (data.success) {
+          var invoiceUrl = window.location.origin + '/invoice/' + data.bookingId;
+          document.getElementById('inv-result').innerHTML =
+            '<div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:12px;padding:20px;margin-top:12px">' +
+            '<p style="color:#047857;font-weight:700;font-size:16px;margin-bottom:8px">Invoice Created Successfully!</p>' +
+            '<p style="margin-bottom:4px"><strong>Invoice No:</strong> ' + data.invoiceNumber + '</p>' +
+            '<p style="margin-bottom:4px"><strong>Booking ID:</strong> #' + data.bookingId + '</p>' +
+            '<p style="margin-bottom:12px"><strong>Total (with GST + TCS):</strong> ' + formatPrice(data.grandTotal) + '</p>' +
+            '<div style="display:flex;gap:10px;flex-wrap:wrap">' +
+            '<a href="' + invoiceUrl + '" target="_blank" class="btn btn-confirm" style="text-decoration:none;display:inline-block;padding:10px 20px">View Invoice</a>' +
+            '<a href="https://wa.me/' + phone + '?text=' + encodeURIComponent('Assalamu Alaikum, Your invoice ' + data.invoiceNumber + ' from AL BURHAN TOURS & TRAVELS. View here: ' + invoiceUrl) + '" target="_blank" class="btn" style="background:#25D366;color:white;text-decoration:none;display:inline-block;padding:10px 20px">Share on WhatsApp</a>' +
+            '</div>' +
+            (data.notificationStatus ? '<p style="margin-top:10px;font-size:12px;color:#6b7280">' + data.notificationStatus + '</p>' : '') +
+            '</div>';
+          loadBookings();
+          loadInvoices();
+        } else {
+          document.getElementById('inv-result').innerHTML = '<p style="color:#dc2626">Error: ' + (data.error || 'Failed to create invoice') + '</p>';
+        }
+      } catch (err) {
+        document.getElementById('inv-result').innerHTML = '<p style="color:#dc2626">Error: ' + err.message + '</p>';
+      }
+      btn.disabled = false;
+      btn.textContent = 'Create Invoice & Booking';
+    }
+
+    async function loadInvoices() {
+      var data = await fetchJSON('/api/admin/bookings');
+      if (!data.success) return;
+      var list = data.bookings.filter(function(b) { return b.invoiceNumber; });
+      if (list.length === 0) {
+        document.getElementById('all-invoices').innerHTML = '<p style="color:#6b7280;text-align:center;padding:20px">No invoices generated yet. Create one above.</p>';
+        return;
+      }
+      var html = '<table><thead><tr><th>Invoice No.</th><th>Customer</th><th>Phone</th><th>Amount</th><th>Paid</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead><tbody>';
+      for (var i = 0; i < list.length; i++) {
+        var b = list[i];
+        html += '<tr>' +
+          '<td><strong>' + b.invoiceNumber + '</strong></td>' +
+          '<td>' + (b.contactName || '-') + '</td>' +
+          '<td>' + (b.contactPhone || '-') + '</td>' +
+          '<td>' + formatPrice(b.totalAmount) + '</td>' +
+          '<td>' + formatPrice(b.paidAmount) + '</td>' +
+          '<td><span class="badge ' + getBadgeClass(b.paymentStatus) + '">' + b.paymentStatus + '</span></td>' +
+          '<td>' + formatDate(b.bookingDate) + '</td>' +
+          '<td>' +
+            '<a href="/invoice/' + b.id + '" target="_blank" class="btn" style="background:#047857;color:#fff;text-decoration:none;display:inline-block">View</a> ' +
+            '<a href="https://wa.me/' + (b.contactPhone || '').replace(/[^0-9]/g, '') + '?text=' + encodeURIComponent('Invoice ' + b.invoiceNumber + ': ' + window.location.origin + '/invoice/' + b.id) + '" target="_blank" class="btn" style="background:#25D366;color:#fff;text-decoration:none;display:inline-block">WhatsApp</a>' +
+          '</td></tr>';
+      }
+      html += '</tbody></table>';
+      document.getElementById('all-invoices').innerHTML = html;
+    }
+
     function loadAll() {
       loadStats();
       loadBookings();
@@ -594,6 +846,8 @@
       loadDocuments();
       loadPackages();
       populateCustomerDropdown();
+      populatePackageDropdown();
+      loadInvoices();
     }
 
     loadAll();

@@ -477,6 +477,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "{{SGST_AMOUNT}}": formatINR(sgst),
         "{{GST_TOTAL}}": formatINR(gstAmount),
         "{{AMOUNT_IN_WORDS}}": numberToWords(grandTotal),
+        "{{SHARE_URL}}": encodeURIComponent(`https://${process.env.REPLIT_DEV_DOMAIN || 'localhost:5000'}/invoice/${bookingId}`),
       };
 
       for (const [key, value] of Object.entries(replacements)) {
@@ -973,6 +974,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true, document });
     } catch (error: any) {
       console.error("[Admin Upload] Error:", error);
+      res.status(400).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post("/api/admin/create-offline-invoice", async (req, res) => {
+    try {
+      const {
+        contactName, contactPhone, contactEmail, address,
+        packageId, numberOfPeople, totalAmount, paidAmount,
+        travelers, roomType, specialRequests,
+        sendSms, sendWhatsapp
+      } = req.body;
+
+      if (!contactName || !contactPhone || !packageId || !totalAmount) {
+        return res.status(400).json({ success: false, error: "Name, phone, package, and amount are required" });
+      }
+
+      let existingUser = await db.select().from(users).where(eq(users.phone, contactPhone));
+      let userId: number;
+
+      if (existingUser.length > 0) {
+        userId = existingUser[0].id;
+      } else {
+        const hashedPassword = await bcrypt.hash("offline_" + Date.now(), 10);
+        const [newUser] = await db.insert(users).values({
+          name: contactName,
+          email: contactEmail || contactName.toLowerCase().replace(/\s/g, '') + Date.now() + "@offline.local",
+          phone: contactPhone,
+          password: hashedPassword,
+        }).returning();
+        userId = newUser.id;
+      }
+
+      const invoiceNum = generateInvoiceNumber(0);
+
+      const [booking] = await db.insert(bookings).values({
+        userId,
+        packageId: parseInt(packageId as string),
+        numberOfPeople: numberOfPeople || 1,
+        totalAmount,
+        status: parseFloat(paidAmount || "0") >= parseFloat(totalAmount) ? "confirmed" : "pending",
+        paymentStatus: parseFloat(paidAmount || "0") >= parseFloat(totalAmount) ? "completed" : parseFloat(paidAmount || "0") > 0 ? "partial" : "pending",
+        paidAmount: paidAmount || "0",
+        travelers: travelers || [{ name: contactName, age: 0, gender: "", passportNumber: "", passportExpiry: "" }],
+        contactName,
+        contactPhone,
+        contactEmail: contactEmail || "",
+        address: address || "",
+        specialRequests: specialRequests || null,
+        invoiceNumber: "",
+        roomType: roomType || null,
+      }).returning();
+
+      const actualInvoiceNum = generateInvoiceNumber(booking.id);
+      await db.update(bookings).set({ invoiceNumber: actualInvoiceNum }).where(eq(bookings.id, booking.id));
+
+      if (parseFloat(paidAmount || "0") > 0) {
+        await db.insert(payments).values({
+          bookingId: booking.id,
+          amount: paidAmount,
+          paymentMethod: "offline",
+          transactionId: "OFFLINE_" + Date.now(),
+          status: "success",
+        });
+      }
+
+      const domain = process.env.REPLIT_DEV_DOMAIN || "localhost:5000";
+      const invoiceUrl = `https://${domain}/invoice/${booking.id}`;
+      const totalAmt = parseFloat(totalAmount);
+      const tcsAmount = totalAmt * 0.05;
+      const grandTotal = totalAmt + tcsAmount;
+
+      let notificationStatus = "";
+      const message = `Assalamu Alaikum ${contactName},\nYour booking with AL BURHAN TOURS & TRAVELS has been created.\n\nInvoice No: ${actualInvoiceNum}\nAmount: Rs ${formatINR(grandTotal)} (incl. GST+TCS)\n\nView Invoice: ${invoiceUrl}\n\nJazakAllah Khair.`;
+
+      if (sendSms) {
+        const smsOk = await sendSmsFast2SMS(contactPhone, message);
+        notificationStatus += smsOk ? "SMS sent. " : "SMS failed. ";
+      }
+      if (sendWhatsapp) {
+        const waOk = await sendWhatsAppBotBee(contactPhone, message);
+        notificationStatus += waOk ? "WhatsApp sent. " : "WhatsApp failed/skipped. ";
+      }
+
+      res.json({
+        success: true,
+        bookingId: booking.id,
+        invoiceNumber: actualInvoiceNum,
+        grandTotal,
+        notificationStatus,
+      });
+    } catch (error: any) {
+      console.error("[Offline Invoice] Error:", error);
       res.status(400).json({ success: false, error: error.message });
     }
   });

@@ -194,6 +194,9 @@
     </div>
   </div>
 
-  <button class="print-btn no-print" onclick="window.print()">🖨️ Print / Download PDF</button>
+  <div class="no-print" style="text-align:center; padding: 16px; display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
+    <button class="print-btn" onclick="window.print()" style="margin:0;">Print / Save as PDF</button>
+    <a href="https://wa.me/?text=Invoice%20{{INVOICE_NUMBER}}%20-%20View%20here%3A%20{{SHARE_URL}}" target="_blank" class="print-btn" style="margin:0;background:#25D366;text-decoration:none;display:inline-block;">Share on WhatsApp</a>
+  </div>
 </body>
 </html>

@@ -59,8 +59,9 @@ AL BURHAN Tours & Travels is a cross-platform mobile application for booking Haj
   - `POST /api/admin/upload-document` — upload visa/ticket for customer + auto-notify via SMS/WhatsApp/Email
   - `POST /api/admin/broadcast-notification` — send message to all customers via SMS/WhatsApp/Email
   - `GET /api/notifications/user/:userId` — user notification history
-  - `GET /invoice/:bookingId` — professional tax invoice page (GST + TCS, printable)
-  - `GET /admin` — admin dashboard HTML page (7 tabs: Dashboard, Bookings, Customers, Payments, Documents, Notifications, Packages)
+  - `GET /invoice/:bookingId` — professional tax invoice page (GST + TCS, printable PDF via browser print)
+  - `POST /api/admin/create-offline-invoice` — create booking + invoice for walk-in/offline customers
+  - `GET /admin` — admin dashboard HTML page (8 tabs: Dashboard, Bookings, Customers, Payments, Documents, Notifications, Packages, Create Invoice)
 
 ### Integrations
 
