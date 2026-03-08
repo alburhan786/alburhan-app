@@ -215,22 +215,68 @@ function configureExpoAndLanding(app: express.Application) {
       return next();
     }
 
-    if (req.path !== "/" && req.path !== "/manifest") {
-      return next();
-    }
-
     const platform = req.header("expo-platform");
-    if (platform && (platform === "ios" || platform === "android")) {
+    if ((req.path === "/" || req.path === "/manifest") && platform && (platform === "ios" || platform === "android")) {
       return serveExpoManifest(platform, req, res);
     }
 
-    if (req.path === "/") {
+    if (req.path === "/" && !platform) {
       return serveLandingPage({
         req,
         res,
         landingPageTemplate,
         appName,
       });
+    }
+
+    if (process.env.NODE_ENV !== "production") {
+      const metroPaths = [
+        "/node_modules/",
+        "/assets/",
+        "/.expo/",
+        "/logs",
+        "/inspector",
+        "/symbolicate",
+        "/reload",
+        "/status",
+        "/hot",
+        "/message",
+      ];
+      const shouldProxy = metroPaths.some(p => req.path.startsWith(p)) ||
+        req.path.endsWith(".bundle") ||
+        req.path.endsWith(".map") ||
+        req.query.platform;
+
+      if (shouldProxy) {
+        const metroUrl = `http://localhost:8081${req.originalUrl}`;
+        const headers: Record<string, string> = {};
+        const headersToForward = ["accept", "user-agent", "expo-platform", "content-type"];
+        for (const h of headersToForward) {
+          const val = req.header(h);
+          if (val) headers[h] = val;
+        }
+
+        fetch(metroUrl, {
+          method: req.method,
+          headers,
+          body: req.method !== "GET" && req.method !== "HEAD" ? JSON.stringify(req.body) : undefined,
+        })
+          .then(async (metroRes) => {
+            metroRes.headers.forEach((value, key) => {
+              if (key.toLowerCase() !== "transfer-encoding") {
+                res.setHeader(key, value);
+              }
+            });
+            res.status(metroRes.status);
+            const buffer = await metroRes.arrayBuffer();
+            res.send(Buffer.from(buffer));
+          })
+          .catch((err) => {
+            log(`Metro proxy error for ${req.path}: ${err}`);
+            res.status(502).json({ error: "Could not connect to Metro bundler" });
+          });
+        return;
+      }
     }
 
     next();
