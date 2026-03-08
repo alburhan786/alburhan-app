@@ -56,14 +56,18 @@ AL BURHAN Tours & Travels is a cross-platform mobile application for booking Haj
   - `GET /api/admin/customers` — all customers
   - `GET /api/admin/payments` — all payments
   - `PUT /api/admin/bookings/:id/status` — update booking status
-  - `GET /admin` — admin dashboard HTML page
+  - `POST /api/admin/upload-document` — upload visa/ticket for customer + auto-notify via SMS/WhatsApp/Email
+  - `POST /api/admin/broadcast-notification` — send message to all customers via SMS/WhatsApp/Email
+  - `GET /api/notifications/user/:userId` — user notification history
+  - `GET /admin` — admin dashboard HTML page (7 tabs: Dashboard, Bookings, Customers, Payments, Documents, Notifications, Packages)
 
 ### Integrations
 
-- **Fast2SMS** — OTP delivery via SMS (route=q quick SMS)
-- **BotBee WhatsApp** — OTP and notification delivery via WhatsApp
+- **Fast2SMS** — OTP delivery + notification via SMS (route=q quick SMS)
+- **BotBee WhatsApp** — OTP + notification delivery via WhatsApp
 - **Razorpay** — Real payment gateway (order creation + signature verification)
-- **Notifications** — Multi-channel (SMS + WhatsApp) for booking/payment events
+- **Nodemailer** — Email notifications (Gmail SMTP, requires EMAIL_USER + EMAIL_PASS)
+- **Notifications** — Multi-channel (SMS + WhatsApp + Email) for booking/payment/document events
 
 ### Database (PostgreSQL)
 
@@ -114,6 +118,8 @@ AL BURHAN Tours & Travels is a cross-platform mobile application for booking Haj
 | BOTBEE_WHATSAPP_API_KEY | BotBee API key for WhatsApp messaging |
 | RAZORPAY_KEY_ID | Razorpay payment gateway key ID |
 | RAZORPAY_KEY_SECRET | Razorpay payment gateway key secret |
+| EMAIL_USER | Gmail address for sending email notifications |
+| EMAIL_PASS | Gmail app password for email notifications |
 
 ### Mobile Proxy Architecture
 

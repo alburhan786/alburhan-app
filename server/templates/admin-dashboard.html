@@ -93,6 +93,7 @@
     <button onclick="showSection('customers', this)">Customers</button>
     <button onclick="showSection('payments', this)">Payments</button>
     <button onclick="showSection('documents', this)">Documents</button>
+    <button onclick="showSection('notifications', this)">Notifications</button>
     <button onclick="showSection('packages', this)">Packages</button>
   </div>
 
@@ -128,8 +129,64 @@
 
     <div id="section-documents" class="section">
       <div class="card">
+        <h2>Upload Visa / Ticket for Customer</h2>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px" id="admin-upload-form">
+          <div>
+            <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Customer</label>
+            <select id="upload-customer" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;background:white">
+              <option value="">Loading customers...</option>
+            </select>
+          </div>
+          <div>
+            <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Document Type</label>
+            <select id="upload-doc-type" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;background:white">
+              <option value="visa">Visa</option>
+              <option value="ticket">Ticket</option>
+              <option value="passport">Passport</option>
+              <option value="pancard">PAN Card</option>
+              <option value="aadhar">Aadhar Card</option>
+              <option value="digital_photo">Digital Photo</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div>
+            <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">File</label>
+            <input type="file" id="upload-file" accept=".jpg,.jpeg,.png,.pdf,.doc,.docx" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:8px;font-size:14px" />
+          </div>
+          <div style="display:flex;align-items:flex-end">
+            <button class="btn btn-confirm" onclick="adminUploadDocument()" id="upload-btn" style="padding:10px 28px;font-size:15px">
+              Upload & Notify Customer
+            </button>
+          </div>
+        </div>
+        <div id="upload-status" style="margin-bottom:16px"></div>
+      </div>
+      <div class="card">
         <h2>Uploaded Documents</h2>
         <div class="table-wrap" id="all-documents"></div>
+      </div>
+    </div>
+
+    <div id="section-notifications" class="section">
+      <div class="card">
+        <h2>Send Notification to All Customers</h2>
+        <p style="color:#6b7280;font-size:14px;margin-bottom:16px">Send a message to all registered customers via SMS, WhatsApp, and Email simultaneously.</p>
+        <div style="margin-bottom:16px">
+          <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Subject (for Email)</label>
+          <input type="text" id="notif-subject" placeholder="e.g. Important Update - Hajj 2027" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px" />
+        </div>
+        <div style="margin-bottom:16px">
+          <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Message</label>
+          <textarea id="notif-message" rows="5" placeholder="Assalamu Alaikum, ..." style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;resize:vertical"></textarea>
+        </div>
+        <button class="btn btn-confirm" onclick="sendBroadcastNotification()" id="broadcast-btn" style="padding:12px 32px;font-size:15px">
+          Send to All Customers (SMS + WhatsApp + Email)
+        </button>
+        <div id="broadcast-status" style="margin-top:16px"></div>
+      </div>
+      <div class="card">
+        <h2>Notification History</h2>
+        <div id="notif-results" style="color:#6b7280;font-size:14px">Send a notification above to see results here.</div>
       </div>
     </div>
 
@@ -429,6 +486,105 @@
       }
     }
 
+    var cachedCustomers = [];
+
+    async function populateCustomerDropdown() {
+      var data = await fetchJSON('/api/admin/customers');
+      if (!data.success) return;
+      cachedCustomers = data.customers;
+      var sel = document.getElementById('upload-customer');
+      sel.innerHTML = '<option value="">-- Select Customer --</option>';
+      for (var i = 0; i < cachedCustomers.length; i++) {
+        var c = cachedCustomers[i];
+        sel.innerHTML += '<option value="' + c.id + '">' + c.name + ' (' + c.phone + ')</option>';
+      }
+    }
+
+    async function adminUploadDocument() {
+      var userId = document.getElementById('upload-customer').value;
+      var docType = document.getElementById('upload-doc-type').value;
+      var fileInput = document.getElementById('upload-file');
+      var statusDiv = document.getElementById('upload-status');
+
+      if (!userId) { alert('Please select a customer'); return; }
+      if (!fileInput.files || !fileInput.files[0]) { alert('Please select a file'); return; }
+
+      var btn = document.getElementById('upload-btn');
+      btn.disabled = true;
+      btn.textContent = 'Uploading & Sending Notifications...';
+      statusDiv.innerHTML = '<div style="padding:12px;background:#fef3c7;border-radius:8px;color:#92400e">Uploading document and sending notifications via SMS, WhatsApp & Email...</div>';
+
+      var formData = new FormData();
+      formData.append('userId', userId);
+      formData.append('type', docType);
+      formData.append('file', fileInput.files[0]);
+
+      try {
+        var resp = await fetch(API + '/api/admin/upload-document', { method: 'POST', body: formData });
+        var result = await resp.json();
+        if (result.success) {
+          var custName = cachedCustomers.find(function(c) { return c.id == userId; });
+          statusDiv.innerHTML = '<div style="padding:12px;background:#d1fae5;border-radius:8px;color:#065f46">' +
+            '<strong>Success!</strong> ' + docType.toUpperCase() + ' uploaded for ' + (custName ? custName.name : 'User #' + userId) + '.<br>' +
+            'Notifications sent via SMS, WhatsApp & Email.</div>';
+          fileInput.value = '';
+          loadDocuments();
+        } else {
+          statusDiv.innerHTML = '<div style="padding:12px;background:#fee2e2;border-radius:8px;color:#991b1b">Error: ' + (result.error || 'Upload failed') + '</div>';
+        }
+      } catch (e) {
+        statusDiv.innerHTML = '<div style="padding:12px;background:#fee2e2;border-radius:8px;color:#991b1b">Error: ' + e.message + '</div>';
+      }
+      btn.disabled = false;
+      btn.textContent = 'Upload & Notify Customer';
+    }
+
+    async function sendBroadcastNotification() {
+      var subject = document.getElementById('notif-subject').value;
+      var message = document.getElementById('notif-message').value;
+      var statusDiv = document.getElementById('broadcast-status');
+      var resultsDiv = document.getElementById('notif-results');
+
+      if (!message.trim()) { alert('Please enter a message'); return; }
+
+      var btn = document.getElementById('broadcast-btn');
+      btn.disabled = true;
+      btn.textContent = 'Sending to all customers...';
+      statusDiv.innerHTML = '<div style="padding:12px;background:#fef3c7;border-radius:8px;color:#92400e">Sending notifications to all customers via SMS, WhatsApp & Email. This may take a moment...</div>';
+
+      try {
+        var resp = await fetch(API + '/api/admin/broadcast-notification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subject: subject, message: message })
+        });
+        var result = await resp.json();
+        if (result.success) {
+          statusDiv.innerHTML = '<div style="padding:12px;background:#d1fae5;border-radius:8px;color:#065f46">' +
+            '<strong>Done!</strong> Sent to ' + result.sent + ' of ' + result.total + ' customers.</div>';
+
+          if (result.results && result.results.length > 0) {
+            var tbl = '<table><thead><tr><th>Customer</th><th>SMS</th><th>WhatsApp</th><th>Email</th></tr></thead><tbody>';
+            for (var i = 0; i < result.results.length; i++) {
+              var r = result.results[i];
+              tbl += '<tr><td>' + r.name + '</td>' +
+                '<td>' + (r.sms ? '<span style="color:#059669">Sent</span>' : '<span style="color:#dc2626">Failed</span>') + '</td>' +
+                '<td>' + (r.whatsapp ? '<span style="color:#059669">Sent</span>' : '<span style="color:#dc2626">Failed</span>') + '</td>' +
+                '<td>' + (r.email ? '<span style="color:#059669">Sent</span>' : '<span style="color:#dc2626">Failed</span>') + '</td></tr>';
+            }
+            tbl += '</tbody></table>';
+            resultsDiv.innerHTML = tbl;
+          }
+        } else {
+          statusDiv.innerHTML = '<div style="padding:12px;background:#fee2e2;border-radius:8px;color:#991b1b">Error: ' + (result.error || 'Send failed') + '</div>';
+        }
+      } catch (e) {
+        statusDiv.innerHTML = '<div style="padding:12px;background:#fee2e2;border-radius:8px;color:#991b1b">Error: ' + e.message + '</div>';
+      }
+      btn.disabled = false;
+      btn.textContent = 'Send to All Customers (SMS + WhatsApp + Email)';
+    }
+
     function loadAll() {
       loadStats();
       loadBookings();
@@ -436,6 +592,7 @@
       loadPayments();
       loadDocuments();
       loadPackages();
+      populateCustomerDropdown();
     }
 
     loadAll();

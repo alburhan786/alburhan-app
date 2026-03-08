@@ -3,10 +3,11 @@ import { createServer, type Server } from "node:http";
 import { createHmac } from "node:crypto";
 import { db } from "./db";
 import { users, packages, bookings, payments, notifications, documents } from "@shared/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import multer from "multer";
 import { Client as ObjectStorageClient } from "@replit/object-storage";
+import nodemailer from "nodemailer";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -79,6 +80,33 @@ async function sendWhatsAppBotBee(phone: string, message: string): Promise<boole
     }
   } catch (error) {
     console.error("[BotBee] Error:", error);
+    return false;
+  }
+}
+
+async function sendEmail(to: string, subject: string, htmlBody: string): Promise<boolean> {
+  try {
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+      console.log("[Email] EMAIL_USER or EMAIL_PASS not configured, skipping email");
+      return false;
+    }
+    await transporter.sendMail({
+      from: `"AL BURHAN TOURS & TRAVELS" <${process.env.EMAIL_USER}>`,
+      to,
+      subject,
+      html: htmlBody,
+    });
+    console.log(`[Email] Sent to ${to}`);
+    return true;
+  } catch (error) {
+    console.error("[Email] Error:", error);
     return false;
   }
 }
@@ -733,6 +761,143 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ success: false, error: "Booking not found" });
       }
       res.json({ success: true, booking: updated });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post("/api/admin/upload-document", upload.single("file"), async (req: any, res) => {
+    try {
+      const { userId, type } = req.body;
+      if (!userId || !type) {
+        return res.status(400).json({ success: false, error: "userId and type are required" });
+      }
+      const file = req.file;
+      if (!file) {
+        return res.status(400).json({ success: false, error: "File is required" });
+      }
+      const ALLOWED_EXTENSIONS = new Set(["jpg", "jpeg", "png", "gif", "webp", "bmp", "pdf", "doc", "docx"]);
+      const ext = (file.originalname || "file").split(".").pop()?.toLowerCase() || "";
+      if (!ALLOWED_EXTENSIONS.has(ext)) {
+        return res.status(400).json({ success: false, error: `File type .${ext} not allowed` });
+      }
+      const client = getStorageClient();
+      if (!client) {
+        return res.status(500).json({ success: false, error: "Object storage not configured" });
+      }
+      const randomId = Date.now().toString(36) + Math.random().toString(36).substring(2, 14);
+      const storagePath = `public/documents/${userId}/${randomId}.${ext}`;
+      const uploadResult = await client.uploadFromBytes(storagePath, file.buffer);
+      if (!uploadResult.ok) {
+        return res.status(500).json({ success: false, error: "File storage failed" });
+      }
+      const fileUrl = `/api/files/${storagePath}`;
+      const [document] = await db.insert(documents).values({
+        userId: parseInt(userId),
+        bookingId: req.body.bookingId ? parseInt(req.body.bookingId) : null,
+        type,
+        fileName: file.originalname || "document",
+        fileUrl,
+      }).returning();
+      console.log(`[Admin Upload] ${type} for user #${userId}: ${storagePath}`);
+
+      const [targetUser] = await db.select().from(users).where(eq(users.id, parseInt(userId)));
+      if (targetUser) {
+        const docLabel = type === "visa" ? "Visa" : type === "ticket" ? "Ticket" : type;
+        const message = `Assalamu Alaikum ${targetUser.name}, Your ${docLabel} document has been uploaded by AL BURHAN TOURS & TRAVELS. Please check your profile in the app to view it. JazakAllah Khair.`;
+        const emailHtml = `
+          <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">
+            <div style="background:#047857;color:white;padding:20px;border-radius:8px 8px 0 0;text-align:center">
+              <h2 style="margin:0">AL BURHAN TOURS & TRAVELS</h2>
+            </div>
+            <div style="background:#f0fdf4;padding:24px;border:1px solid #d1fae5">
+              <p>Assalamu Alaikum <strong>${targetUser.name}</strong>,</p>
+              <p>Your <strong>${docLabel}</strong> document has been uploaded to your profile.</p>
+              <p>Please open the AL BURHAN app and check your Profile > Documents section to view and download it.</p>
+              <p style="margin-top:20px;color:#6b7280;font-size:13px">JazakAllah Khair<br>AL BURHAN TOURS & TRAVELS Team</p>
+            </div>
+          </div>`;
+
+        const smsResult = await sendSmsFast2SMS(targetUser.phone, message);
+        const whatsappResult = await sendWhatsAppBotBee(targetUser.phone, message);
+        const emailResult = await sendEmail(targetUser.email, `Your ${docLabel} Document - AL BURHAN TOURS`, emailHtml);
+
+        await db.insert(notifications).values({
+          userId: parseInt(userId),
+          type: "document_uploaded",
+          channel: "all",
+          message,
+          status: (smsResult || whatsappResult || emailResult) ? "sent" : "pending",
+        });
+        console.log(`[Notification] Doc upload for user #${userId} - SMS:${smsResult} WhatsApp:${whatsappResult} Email:${emailResult}`);
+      }
+
+      res.json({ success: true, document });
+    } catch (error: any) {
+      console.error("[Admin Upload] Error:", error);
+      res.status(400).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post("/api/admin/broadcast-notification", async (req, res) => {
+    try {
+      const { subject, message } = req.body;
+      if (!message) {
+        return res.status(400).json({ success: false, error: "Message is required" });
+      }
+      const allUsers = await db.select().from(users);
+      if (allUsers.length === 0) {
+        return res.json({ success: true, message: "No customers to notify", sent: 0 });
+      }
+
+      const emailSubject = subject || "Important Update - AL BURHAN TOURS & TRAVELS";
+      const emailHtml = `
+        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">
+          <div style="background:#047857;color:white;padding:20px;border-radius:8px 8px 0 0;text-align:center">
+            <h2 style="margin:0">AL BURHAN TOURS & TRAVELS</h2>
+          </div>
+          <div style="background:#f0fdf4;padding:24px;border:1px solid #d1fae5">
+            <p>${message.replace(/\n/g, "<br>")}</p>
+            <p style="margin-top:20px;color:#6b7280;font-size:13px">JazakAllah Khair<br>AL BURHAN TOURS & TRAVELS Team</p>
+          </div>
+        </div>`;
+
+      let sentCount = 0;
+      const results: Array<{ userId: number; name: string; sms: boolean; whatsapp: boolean; email: boolean }> = [];
+
+      for (const u of allUsers) {
+        const smsResult = await sendSmsFast2SMS(u.phone, message);
+        const whatsappResult = await sendWhatsAppBotBee(u.phone, message);
+        const emailResult = await sendEmail(u.email, emailSubject, emailHtml);
+
+        const anySent = smsResult || whatsappResult || emailResult;
+        if (anySent) sentCount++;
+
+        await db.insert(notifications).values({
+          userId: u.id,
+          type: "broadcast",
+          channel: "all",
+          message,
+          status: anySent ? "sent" : "pending",
+        });
+
+        results.push({ userId: u.id, name: u.name, sms: smsResult, whatsapp: whatsappResult, email: emailResult });
+        console.log(`[Broadcast] User #${u.id} (${u.name}) - SMS:${smsResult} WhatsApp:${whatsappResult} Email:${emailResult}`);
+      }
+
+      res.json({ success: true, total: allUsers.length, sent: sentCount, results });
+    } catch (error: any) {
+      console.error("[Broadcast] Error:", error);
+      res.status(400).json({ success: false, error: error.message });
+    }
+  });
+
+  app.get("/api/notifications/user/:userId", async (req, res) => {
+    try {
+      const userNotifications = await db.select().from(notifications)
+        .where(eq(notifications.userId, parseInt(req.params.userId)))
+        .orderBy(desc(notifications.sentAt));
+      res.json({ success: true, notifications: userNotifications });
     } catch (error: any) {
       res.status(400).json({ success: false, error: error.message });
     }
