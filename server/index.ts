@@ -68,13 +68,25 @@ function setupBodyParsing(app: express.Application) {
     next();
   });
 
-  app.use("/api", express.json({
-    verify: (req, _res, buf) => {
-      req.rawBody = buf;
-    },
-  }));
+  app.use("/api", (req: Request, res: Response, next: NextFunction) => {
+    const contentType = req.headers["content-type"] || "";
+    if (contentType.includes("multipart/form-data")) {
+      return next();
+    }
+    express.json({
+      verify: (req2, _res, buf) => {
+        (req2 as any).rawBody = buf;
+      },
+    })(req, res, next);
+  });
 
-  app.use("/api", express.urlencoded({ extended: false }));
+  app.use("/api", (req: Request, res: Response, next: NextFunction) => {
+    const contentType = req.headers["content-type"] || "";
+    if (contentType.includes("multipart/form-data")) {
+      return next();
+    }
+    express.urlencoded({ extended: false })(req, res, next);
+  });
 }
 
 function setupRequestLogging(app: express.Application) {

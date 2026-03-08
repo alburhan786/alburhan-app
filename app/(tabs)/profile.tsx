@@ -85,7 +85,7 @@ export default function ProfileScreen() {
                 userId: user.id,
                 type: dt.value,
                 fileName: file.name,
-                fileUrl: file.uri,
+                fileUri: file.uri,
               });
               if (response.success) {
                 Alert.alert('Success', 'Document uploaded successfully');
@@ -134,7 +134,7 @@ export default function ProfileScreen() {
         <View style={styles.docInfo}>
           <Text style={styles.docName} numberOfLines={1}>{doc.fileName}</Text>
           <Text style={styles.docDate}>
-            {new Date(doc.createdAt).toLocaleDateString('en-IN')}
+            {doc.uploadedAt ? new Date(doc.uploadedAt).toLocaleDateString('en-IN') : '-'}
           </Text>
         </View>
         <View style={styles.docBadge}>

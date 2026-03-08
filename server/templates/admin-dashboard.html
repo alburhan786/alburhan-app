@@ -279,6 +279,17 @@
       document.getElementById('all-payments').innerHTML = '<table><thead><tr><th>ID</th><th>Booking</th><th>Amount</th><th>Method</th><th>Transaction ID</th><th>Status</th><th>Date</th></tr></thead><tbody>' + rows + '</tbody></table>';
     }
 
+    function isImageFile(fileName) {
+      if (!fileName) return false;
+      var ext = fileName.split('.').pop().toLowerCase();
+      return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].indexOf(ext) !== -1;
+    }
+
+    function isAccessibleUrl(url) {
+      if (!url) return false;
+      return url.startsWith('/api/files/') || url.startsWith('http://') || url.startsWith('https://');
+    }
+
     async function loadDocuments() {
       var data = await fetchJSON('/api/admin/documents');
       if (!data.success) return;
@@ -294,17 +305,40 @@
         var d = docs[i];
         var customerName = d.userName || ('User #' + d.userId);
         var bookingRef = d.bookingId ? '#' + d.bookingId : '-';
-        var fileLink = d.fileUrl ? '<a href="' + d.fileUrl + '" target="_blank" class="doc-link">' + (d.fileName || 'View File') + '</a>' : (d.fileName || '-');
+        var fileCell = '';
+        var accessible = isAccessibleUrl(d.fileUrl);
+
+        if (accessible && isImageFile(d.fileName)) {
+          fileCell = '<div style="display:flex;align-items:center;gap:8px">' +
+            '<img src="' + d.fileUrl + '" style="width:50px;height:50px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb;cursor:pointer" onclick="viewDocImage(\'' + d.fileUrl + '\',\'' + (d.fileName || '').replace(/'/g, "\\'") + '\')" />' +
+            '<a href="' + d.fileUrl + '" target="_blank" class="doc-link">' + (d.fileName || 'View') + '</a></div>';
+        } else if (accessible) {
+          fileCell = '<a href="' + d.fileUrl + '" target="_blank" class="doc-link">' + (d.fileName || 'View File') + '</a>';
+        } else {
+          fileCell = '<span style="color:#9ca3af;font-size:12px">' + (d.fileName || '-') + ' <em>(local file - re-upload needed)</em></span>';
+        }
+
         rows += '<tr>' +
           '<td>#' + d.id + '</td>' +
           '<td><strong>' + customerName + '</strong></td>' +
           '<td>' + bookingRef + '</td>' +
           '<td><span class="doc-type">' + (d.type || '-') + '</span></td>' +
-          '<td>' + fileLink + '</td>' +
+          '<td>' + fileCell + '</td>' +
           '<td>' + formatDateTime(d.uploadedAt) + '</td>' +
           '</tr>';
       }
-      document.getElementById('all-documents').innerHTML = '<table><thead><tr><th>ID</th><th>Customer</th><th>Booking</th><th>Type</th><th>File</th><th>Uploaded</th></tr></thead><tbody>' + rows + '</tbody></table>';
+      document.getElementById('all-documents').innerHTML = '<table><thead><tr><th>ID</th><th>Customer</th><th>Booking</th><th>Type</th><th>File / Preview</th><th>Uploaded</th></tr></thead><tbody>' + rows + '</tbody></table>';
+    }
+
+    function viewDocImage(url, name) {
+      document.getElementById('modal-container').innerHTML =
+        '<div class="modal-overlay" onclick="if(event.target===this)closeModal()">' +
+        '<div class="modal" style="text-align:center">' +
+        '<button class="close-btn" onclick="closeModal()">&times;</button>' +
+        '<h2>' + name + '</h2>' +
+        '<img src="' + url + '" style="max-width:100%;max-height:70vh;border-radius:8px;margin-top:16px" />' +
+        '<div style="margin-top:16px"><a href="' + url + '" target="_blank" class="btn btn-confirm" style="text-decoration:none;padding:10px 24px">Open Full Size</a></div>' +
+        '</div></div>';
     }
 
     async function loadPackages() {

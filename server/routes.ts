@@ -5,6 +5,19 @@ import { db } from "./db";
 import { users, packages, bookings, payments, notifications, documents } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
 import bcrypt from "bcryptjs";
+import multer from "multer";
+import { Client as ObjectStorageClient } from "@replit/object-storage";
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+
+let storageClient: ObjectStorageClient | null = null;
+function getStorageClient(): ObjectStorageClient | null {
+  if (storageClient) return storageClient;
+  const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
+  if (!bucketId) return null;
+  storageClient = new ObjectStorageClient({ bucketId });
+  return storageClient;
+}
 
 const otpStore = new Map<string, { otp: string; expiresAt: number }>();
 
@@ -420,19 +433,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/documents/upload", async (req, res) => {
+  const ALLOWED_EXTENSIONS = new Set(["jpg", "jpeg", "png", "gif", "webp", "bmp", "pdf", "doc", "docx"]);
+
+  app.post("/api/documents/upload", upload.single("file"), async (req: any, res) => {
     try {
-      const { userId, bookingId, type, fileName, fileUrl } = req.body;
+      const { userId, bookingId, type, fileName } = req.body;
+      if (!userId || !type) {
+        return res.status(400).json({ success: false, error: "userId and type are required" });
+      }
+
+      let fileUrl = req.body.fileUrl || "";
+      const file = req.file;
+
+      if (file) {
+        const ext = ((fileName || file.originalname || "file").split(".").pop() || "").toLowerCase();
+        if (!ALLOWED_EXTENSIONS.has(ext)) {
+          return res.status(400).json({ success: false, error: `File type .${ext} not allowed. Accepted: ${[...ALLOWED_EXTENSIONS].join(", ")}` });
+        }
+
+        const client = getStorageClient();
+        if (client) {
+          const randomId = Date.now().toString(36) + Math.random().toString(36).substring(2, 14);
+          const storagePath = `public/documents/${userId}/${randomId}.${ext}`;
+          const uploadResult = await client.uploadFromBytes(storagePath, file.buffer);
+          if (uploadResult.ok) {
+            fileUrl = `/api/files/${storagePath}`;
+            console.log(`[Upload] File stored: ${storagePath}`);
+          } else {
+            console.error("[Upload] Storage error:", uploadResult);
+            return res.status(500).json({ success: false, error: "File storage failed" });
+          }
+        } else {
+          return res.status(500).json({ success: false, error: "Object storage not configured" });
+        }
+      }
+
       const [document] = await db.insert(documents).values({
         userId: parseInt(userId),
         bookingId: bookingId ? parseInt(bookingId) : null,
         type,
-        fileName,
+        fileName: fileName || (file ? file.originalname : "unknown"),
         fileUrl,
       }).returning();
       res.json({ success: true, document });
     } catch (error: any) {
+      console.error("[Upload] Error:", error);
       res.status(400).json({ success: false, error: error.message });
+    }
+  });
+
+  app.get("/api/files/public/documents/:userId/:filename", async (req, res) => {
+    try {
+      const client = getStorageClient();
+      if (!client) {
+        return res.status(500).json({ error: "Storage not configured" });
+      }
+      const storagePath = `public/documents/${req.params.userId}/${req.params.filename}`;
+      const result = await client.downloadAsBytes(storagePath);
+      if (!result.ok || !result.value) {
+        return res.status(404).json({ error: "File not found" });
+      }
+      const ext = req.params.filename.split(".").pop()?.toLowerCase() || "";
+      const mimeTypes: Record<string, string> = {
+        jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif",
+        pdf: "application/pdf", doc: "application/msword",
+        docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      };
+      res.setHeader("Content-Type", mimeTypes[ext] || "application/octet-stream");
+      res.setHeader("Content-Disposition", `inline; filename="${req.params.filename}"`);
+      res.send(Buffer.from(result.value));
+    } catch (error: any) {
+      console.error("[Files] Download error:", error);
+      res.status(500).json({ error: "Could not retrieve file" });
     }
   });
 

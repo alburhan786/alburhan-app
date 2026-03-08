@@ -128,9 +128,41 @@ export const documentService = {
     bookingId?: number;
     type: string;
     fileName: string;
-    fileUrl: string;
+    fileUri: string;
   }) {
-    return request("POST", "/api/documents/upload", data);
+    try {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/documents/upload", baseUrl);
+
+      const formData = new FormData();
+      formData.append("userId", data.userId.toString());
+      formData.append("type", data.type);
+      formData.append("fileName", data.fileName);
+      if (data.bookingId) formData.append("bookingId", data.bookingId.toString());
+
+      const ext = data.fileName.split(".").pop()?.toLowerCase() || "bin";
+      const mimeMap: Record<string, string> = {
+        jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif",
+        pdf: "application/pdf", doc: "application/msword",
+      };
+      const mimeType = mimeMap[ext] || "application/octet-stream";
+
+      formData.append("file", {
+        uri: data.fileUri,
+        name: data.fileName,
+        type: mimeType,
+      } as any);
+
+      const res = await fetch(url.toString(), {
+        method: "POST",
+        body: formData,
+      });
+      const json = await res.json();
+      return json;
+    } catch (error) {
+      console.error("Document upload failed:", error);
+      return { success: false, error: "Upload failed" };
+    }
   },
 
   async getUserDocuments(userId: number) {

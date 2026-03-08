@@ -46,7 +46,10 @@ AL BURHAN Tours & Travels is a cross-platform mobile application for booking Haj
   - `POST /api/bookings`, `GET /api/bookings/user/:userId`, `GET /api/bookings/:id`
   - `POST /api/payments/create-order` — creates real Razorpay order
   - `POST /api/payments/verify` — verifies Razorpay signature (HMAC SHA256)
-  - `POST /api/documents/upload` and `GET /api/documents/user/:userId`
+  - `POST /api/documents/upload` — multipart file upload to Replit Object Storage
+  - `GET /api/documents/user/:userId` — list user documents
+  - `GET /api/files/public/documents/:userId/:filename` — serve uploaded files from Object Storage
+  - `GET /api/admin/documents` — all documents with user names
   - `POST /api/seed` — seeds 4 sample packages
   - `GET /api/admin/stats` — dashboard statistics
   - `GET /api/admin/bookings` — all bookings
@@ -97,6 +100,8 @@ AL BURHAN Tours & Travels is a cross-platform mobile application for booking Haj
 - @react-native-picker/picker (filter dropdowns)
 - react-native-webview (Razorpay checkout)
 - expo-document-picker (document uploads)
+- multer (multipart file uploads)
+- @replit/object-storage (cloud file storage)
 
 ### Environment Variables
 
