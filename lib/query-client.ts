@@ -1,10 +1,7 @@
 import { fetch } from "expo/fetch";
+import { Platform } from "react-native";
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
-/**
- * Gets the base URL for the Express API server (e.g., "http://localhost:3000")
- * @returns {string} The API base URL
- */
 export function getApiUrl(): string {
   let host = process.env.EXPO_PUBLIC_DOMAIN;
 
@@ -13,6 +10,11 @@ export function getApiUrl(): string {
       return `${window.location.protocol}//${window.location.hostname}:5000`;
     }
     return "https://localhost:5000";
+  }
+
+  if (Platform.OS !== "web") {
+    const hostOnly = host.replace(/:5000$/, "").replace(/:443$/, "");
+    return `https://${hostOnly}`;
   }
 
   try {
