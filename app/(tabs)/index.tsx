@@ -194,8 +194,8 @@ export default function HomeScreen() {
                     <Text style={styles.detailValue}>{pkg.duration}</Text>
                   </View>
                   <View style={styles.detailItem}>
-                    <Text style={styles.detailLabel}>Available Seats</Text>
-                    <Text style={styles.detailValue}>{pkg.availableSeats}</Text>
+                    <Text style={styles.detailLabel}>Departure</Text>
+                    <Text style={styles.detailValue}>{new Date(pkg.departureDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
                   </View>
                 </View>
 

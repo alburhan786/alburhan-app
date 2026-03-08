@@ -22,8 +22,6 @@ const DOC_TYPES = [
   { value: 'pancard', label: 'PAN Card', icon: 'card-outline' as const },
   { value: 'aadhar', label: 'Aadhar Card', icon: 'finger-print-outline' as const },
   { value: 'digital_photo', label: 'Digital Photo (35x45mm)', icon: 'camera-outline' as const },
-  { value: 'visa', label: 'Visa', icon: 'airplane-outline' as const },
-  { value: 'ticket', label: 'Ticket', icon: 'ticket-outline' as const },
   { value: 'id_proof', label: 'ID Proof', icon: 'card-outline' as const },
   { value: 'medical', label: 'Medical', icon: 'medkit-outline' as const },
   { value: 'other', label: 'Other', icon: 'folder-outline' as const },

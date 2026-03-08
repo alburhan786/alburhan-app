@@ -133,13 +133,6 @@ import React, { useState, useEffect } from 'react';
                 <Text style={styles.detailLabel}>Return</Text>
                 <Text style={styles.detailValue}>{formatDate(pkg.returnDate)}</Text>
               </View>
-              <View style={styles.divider} />
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Available Seats</Text>
-                <Text style={[styles.detailValue, { color: Colors.success }]}>
-                  {pkg.availableSeats} seats
-                </Text>
-              </View>
             </View>
           </View>
 
