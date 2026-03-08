@@ -107,7 +107,46 @@ function getAppName(): string {
   }
 }
 
-function serveExpoManifest(platform: string, res: Response) {
+async function serveExpoManifest(platform: string, req: Request, res: Response) {
+  if (process.env.NODE_ENV !== "production") {
+    try {
+      const metroUrl = `http://localhost:8081`;
+      const headers: Record<string, string> = {
+        "expo-platform": platform,
+      };
+      const headersToForward = [
+        "expo-dev-client-id",
+        "expo-runtime-version",
+        "expo-expect-signature",
+        "expo-protocol-version",
+        "expo-sfv-version",
+        "accept",
+        "user-agent",
+      ];
+      for (const h of headersToForward) {
+        const val = req.header(h);
+        if (val) headers[h] = val;
+      }
+
+      const metroRes = await fetch(`${metroUrl}${req.path}`, { headers });
+
+      if (!metroRes.ok) {
+        log(`Metro manifest proxy error: ${metroRes.status}`);
+        return res.status(metroRes.status).json({ error: "Metro manifest request failed" });
+      }
+
+      metroRes.headers.forEach((value, key) => {
+        res.setHeader(key, value);
+      });
+
+      const body = await metroRes.text();
+      return res.send(body);
+    } catch (err) {
+      log(`Metro proxy error: ${err}`);
+      return res.status(502).json({ error: "Could not connect to Metro bundler" });
+    }
+  }
+
   const manifestPath = path.resolve(
     process.cwd(),
     "static-build",
@@ -182,7 +221,7 @@ function configureExpoAndLanding(app: express.Application) {
 
     const platform = req.header("expo-platform");
     if (platform && (platform === "ios" || platform === "android")) {
-      return serveExpoManifest(platform, res);
+      return serveExpoManifest(platform, req, res);
     }
 
     if (req.path === "/") {
