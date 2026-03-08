@@ -2,15 +2,20 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getApiUrl } from "@/lib/query-client";
 
 async function request(method: string, path: string, data?: any) {
-  const baseUrl = getApiUrl();
-  const url = new URL(path, baseUrl);
-  const res = await fetch(url.toString(), {
-    method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
-  });
-  const json = await res.json();
-  return json;
+  try {
+    const baseUrl = getApiUrl();
+    const url = new URL(path, baseUrl);
+    const res = await fetch(url.toString(), {
+      method,
+      headers: data ? { "Content-Type": "application/json" } : {},
+      body: data ? JSON.stringify(data) : undefined,
+    });
+    const json = await res.json();
+    return json;
+  } catch (error) {
+    console.error(`API request failed: ${method} ${path}`, error);
+    return { success: false, error: "Network request failed" };
+  }
 }
 
 export const authService = {

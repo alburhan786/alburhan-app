@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { View, Text, Platform } from "react-native";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -16,11 +17,12 @@ import {
 } from "@expo-google-fonts/inter";
 import * as SplashScreen from "expo-splash-screen";
 
-SplashScreen.preventAutoHideAsync();
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 function RootLayoutNav() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="index" />
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(tabs)" />
       <Stack.Screen
@@ -39,6 +41,28 @@ function RootLayoutNav() {
   );
 }
 
+function AppProviders({ children }: { children: React.ReactNode }) {
+  if (Platform.OS === "web") {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          {children}
+        </AuthProvider>
+      </QueryClientProvider>
+    );
+  }
+
+  return (
+    <KeyboardProvider>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          {children}
+        </AuthProvider>
+      </QueryClientProvider>
+    </KeyboardProvider>
+  );
+}
+
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
     Inter_400Regular,
@@ -49,14 +73,14 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (fontsLoaded || fontError) {
-      SplashScreen.hideAsync();
+      SplashScreen.hideAsync().catch(() => {});
     }
   }, [fontsLoaded, fontError]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      SplashScreen.hideAsync();
-    }, 5000);
+      SplashScreen.hideAsync().catch(() => {});
+    }, 3000);
     return () => clearTimeout(timer);
   }, []);
 
@@ -67,14 +91,10 @@ export default function RootLayout() {
   return (
     <ErrorBoundary>
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <KeyboardProvider>
-          <QueryClientProvider client={queryClient}>
-            <AuthProvider>
-              <RootLayoutNav />
-              <StatusBar style="dark" />
-            </AuthProvider>
-          </QueryClientProvider>
-        </KeyboardProvider>
+        <AppProviders>
+          <RootLayoutNav />
+          <StatusBar style="dark" />
+        </AppProviders>
       </GestureHandlerRootView>
     </ErrorBoundary>
   );
