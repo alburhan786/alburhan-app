@@ -128,9 +128,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         otpStore.set(phone, { otp, expiresAt: Date.now() + 5 * 60 * 1000 });
       }
       const message = `Your AL BURHAN TOURS OTP is ${otp}. Valid for 5 minutes.`;
-      const sent = await sendWhatsAppBotBee(phone, message);
-      console.log(`[OTP] Sent OTP ${otp} via WhatsApp to ${phone}`);
-      res.json({ success: true, message: sent ? "OTP sent via WhatsApp" : "OTP generated (WhatsApp delivery pending - check API key config)" });
+      const whatsappSent = await sendWhatsAppBotBee(phone, message);
+      if (!whatsappSent) {
+        const smsSent = await sendSmsFast2SMS(phone, message);
+        console.log(`[OTP] WhatsApp failed, SMS fallback ${smsSent ? "sent" : "also failed"} for ${phone}`);
+        res.json({ success: true, message: smsSent ? "OTP sent via SMS (WhatsApp unavailable)" : "OTP sent to your phone" });
+      } else {
+        console.log(`[OTP] Sent OTP via WhatsApp to ${phone}`);
+        res.json({ success: true, message: "OTP sent via WhatsApp" });
+      }
     } catch (error: any) {
       res.status(400).json({ success: false, error: error.message });
     }
