@@ -268,6 +268,7 @@
         for (var i = 0; i < list.length; i++) {
           var b = list[i];
           var actions = '<button class="btn btn-confirm" onclick="viewBooking(' + b.id + ')">View</button>';
+          actions += '<a href="/invoice/' + b.id + '" target="_blank" class="btn" style="background:#047857;color:#fff;text-decoration:none;display:inline-block;margin-left:4px;">Invoice</a>';
           if (b.status === 'pending') {
             actions += '<button class="btn btn-confirm" onclick="updateStatus(' + b.id + ', \'confirmed\')">Confirm</button>';
             actions += '<button class="btn btn-cancel" onclick="updateStatus(' + b.id + ', \'cancelled\')">Cancel</button>';

@@ -1,9 +1,11 @@
 import type { Express } from "express";
 import { createServer, type Server } from "node:http";
 import { createHmac } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { db } from "./db";
 import { users, packages, bookings, payments, notifications, documents } from "@shared/schema";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, sum } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import multer from "multer";
 import { Client as ObjectStorageClient } from "@replit/object-storage";
@@ -24,6 +26,33 @@ const otpStore = new Map<string, { otp: string; expiresAt: number }>();
 
 function generateOtp(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+function numberToWords(num: number): string {
+  if (num === 0) return "Zero";
+  const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
+    "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+  const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+  function convert(n: number): string {
+    if (n < 20) return ones[n];
+    if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 ? " " + ones[n % 10] : "");
+    if (n < 1000) return ones[Math.floor(n / 100)] + " Hundred" + (n % 100 ? " " + convert(n % 100) : "");
+    if (n < 100000) return convert(Math.floor(n / 1000)) + " Thousand" + (n % 1000 ? " " + convert(n % 1000) : "");
+    if (n < 10000000) return convert(Math.floor(n / 100000)) + " Lakh" + (n % 100000 ? " " + convert(n % 100000) : "");
+    return convert(Math.floor(n / 10000000)) + " Crore" + (n % 10000000 ? " " + convert(n % 10000000) : "");
+  }
+  return convert(Math.round(num)) + " Rupees Only";
+}
+
+function formatINR(n: number): string {
+  return n.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+
+function generateInvoiceNumber(bookingId: number): string {
+  const now = new Date();
+  const yy = now.getFullYear().toString().slice(-2);
+  const mm = (now.getMonth() + 1).toString().padStart(2, "0");
+  return `ABTTH${yy}${mm}${bookingId.toString().padStart(2, "0")}`;
 }
 
 async function sendSmsFast2SMS(phone: string, message: string): Promise<boolean> {
@@ -367,6 +396,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/invoice/:bookingId", async (req, res) => {
+    try {
+      const bookingId = parseInt(req.params.bookingId);
+      const [booking] = await db.select().from(bookings).where(eq(bookings.id, bookingId));
+      if (!booking) return res.status(404).send("Invoice not found");
+
+      const [pkg] = await db.select().from(packages).where(eq(packages.id, booking.packageId));
+      const [user] = await db.select().from(users).where(eq(users.id, booking.userId));
+
+      const allPayments = await db.select().from(payments)
+        .where(eq(payments.bookingId, bookingId));
+      const totalPaid = allPayments.reduce((s, p) => s + parseFloat(p.amount), 0);
+
+      let invoiceNum = booking.invoiceNumber;
+      if (!invoiceNum) {
+        invoiceNum = generateInvoiceNumber(bookingId);
+        await db.update(bookings).set({ invoiceNumber: invoiceNum }).where(eq(bookings.id, bookingId));
+      }
+
+      const totalAmount = parseFloat(booking.totalAmount);
+      const numberOfPeople = booking.numberOfPeople;
+      const ratePerPerson = totalAmount / numberOfPeople;
+
+      const gstRate = 0.05;
+      const tcsRate = 0.05;
+      const baseAmount = totalAmount / (1 + gstRate);
+      const gstAmount = totalAmount - baseAmount;
+      const cgst = gstAmount / 2;
+      const sgst = gstAmount / 2;
+      const tcsAmount = totalAmount * tcsRate;
+      const grandTotal = totalAmount + tcsAmount;
+
+      const bookingDate = booking.bookingDate ? new Date(booking.bookingDate) : new Date();
+      const dueDate = new Date(bookingDate);
+      dueDate.setDate(dueDate.getDate() + 30);
+
+      const serviceName = pkg ? `${pkg.type === 'hajj' ? 'Hajj' : 'Umrah'} - ${pkg.name}` : 'Tour Service';
+      const roomLabel = booking.roomType || '';
+
+      let serviceRows = '';
+      for (let i = 0; i < numberOfPeople; i++) {
+        const traveler = booking.travelers && booking.travelers[i];
+        const travelerName = traveler ? traveler.name : `Person ${i + 1}`;
+        serviceRows += `
+          <tr>
+            <td>${i + 1}</td>
+            <td>
+              <div class="service-name">${serviceName}</div>
+              <div class="service-desc">${travelerName}${roomLabel ? ' | ' + roomLabel : ''}</div>
+            </td>
+            <td>998555</td>
+            <td style="text-align:right">₹ ${formatINR(ratePerPerson)}</td>
+            <td style="text-align:right">₹ ${formatINR(gstAmount / numberOfPeople)}</td>
+            <td style="text-align:right">₹ ${formatINR(ratePerPerson + gstAmount / numberOfPeople)}</td>
+          </tr>`;
+      }
+
+      const previousBalance = 0;
+      const currentBalance = grandTotal - totalPaid;
+
+      let template = readFileSync(join(__dirname, "templates", "invoice.html"), "utf-8");
+      const replacements: Record<string, string> = {
+        "{{INVOICE_NUMBER}}": invoiceNum,
+        "{{INVOICE_DATE}}": bookingDate.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" }),
+        "{{DUE_DATE}}": dueDate.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" }),
+        "{{CUSTOMER_NAME}}": booking.contactName || user?.name || "",
+        "{{CUSTOMER_ADDRESS}}": booking.address || "",
+        "{{CUSTOMER_PHONE}}": booking.contactPhone || user?.phone || "",
+        "{{CUSTOMER_EMAIL}}": booking.contactEmail || user?.email || "",
+        "{{SERVICE_ROWS}}": serviceRows,
+        "{{TCS_AMOUNT}}": `₹ ${formatINR(tcsAmount)}`,
+        "{{TAX_TOTAL}}": `${formatINR(gstAmount + tcsAmount)}`,
+        "{{GRAND_TOTAL}}": `${formatINR(grandTotal)}`,
+        "{{RECEIVED_AMOUNT}}": formatINR(totalPaid),
+        "{{PREVIOUS_BALANCE}}": formatINR(previousBalance),
+        "{{CURRENT_BALANCE}}": formatINR(currentBalance),
+        "{{TAXABLE_VALUE}}": formatINR(baseAmount),
+        "{{CGST_AMOUNT}}": formatINR(cgst),
+        "{{SGST_AMOUNT}}": formatINR(sgst),
+        "{{GST_TOTAL}}": formatINR(gstAmount),
+        "{{AMOUNT_IN_WORDS}}": numberToWords(grandTotal),
+      };
+
+      for (const [key, value] of Object.entries(replacements)) {
+        template = template.split(key).join(value);
+      }
+
+      res.send(template);
+    } catch (error: any) {
+      console.error("[Invoice] Error:", error);
+      res.status(500).send("Error generating invoice");
+    }
+  });
+
   app.post("/api/payments/create-order", async (req, res) => {
     try {
       const { bookingId, amount } = req.body;
@@ -637,13 +760,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   async function sendNotifications(userId: number, bookingId: number, type: string) {
     const [user] = await db.select().from(users).where(eq(users.id, userId));
     if (!user) return;
+
+    const domain = process.env.REPLIT_DEV_DOMAIN || process.env.REPL_SLUG + "." + process.env.REPL_OWNER + ".repl.co";
+    const invoiceUrl = `https://${domain}/invoice/${bookingId}`;
+
+    let invoiceNum = "";
+    try {
+      const [bk] = await db.select().from(bookings).where(eq(bookings.id, bookingId));
+      if (bk) {
+        invoiceNum = bk.invoiceNumber || generateInvoiceNumber(bookingId);
+        if (!bk.invoiceNumber) {
+          await db.update(bookings).set({ invoiceNumber: invoiceNum }).where(eq(bookings.id, bookingId));
+        }
+      }
+    } catch (e) {}
+
     let message = "";
     switch (type) {
       case "booking_created":
-        message = `Assalamu Alaikum, Your booking #${bookingId} with AL BURHAN TOURS & TRAVELS has been created. Our team will contact you shortly.`;
+        message = `Assalamu Alaikum,\nYour booking #${bookingId} with AL BURHAN TOURS & TRAVELS has been created successfully.\n\nInvoice No: ${invoiceNum}\nView Invoice: ${invoiceUrl}\n\nOur team will contact you shortly. JazakAllah Khair.`;
         break;
       case "payment_success":
-        message = `Assalamu Alaikum, Payment received for booking #${bookingId}. Your booking is now confirmed! JazakAllah Khair.`;
+        message = `Assalamu Alaikum,\nPayment received for booking #${bookingId}. Your booking is now confirmed!\n\nUpdated Invoice: ${invoiceUrl}\n\nJazakAllah Khair - AL BURHAN TOURS & TRAVELS`;
         break;
     }
 

@@ -7,11 +7,14 @@ import React, { useState, useEffect } from 'react';
     TouchableOpacity,
     ActivityIndicator,
     Alert,
+    Linking,
   } from 'react-native';
   import { useRouter } from 'expo-router';
+  import { Ionicons } from '@expo/vector-icons';
   import { bookingService } from '../../services/api';
   import { useAuth } from '../../contexts/AuthContext';
   import { Colors } from '../../constants/Colors';
+  import { getApiUrl } from '../../lib/query-client';
 
   export default function BookingsScreen() {
     const [bookings, setBookings] = useState<any[]>([]);
@@ -176,16 +179,30 @@ import React, { useState, useEffect } from 'react';
                   </View>
                 </View>
 
-                {booking.paymentStatus !== 'completed' && (
+                <View style={styles.actionRow}>
                   <TouchableOpacity
-                    style={styles.payButton}
-                    onPress={() => router.push(`/booking/${booking.id}`)}
+                    style={styles.invoiceButton}
+                    onPress={() => {
+                      const baseUrl = getApiUrl();
+                      const url = new URL(`/invoice/${booking.id}`, baseUrl).toString();
+                      Linking.openURL(url);
+                    }}
                   >
-                    <Text style={styles.payButtonText}>
-                      Complete Payment
-                    </Text>
+                    <Ionicons name="document-text-outline" size={16} color={Colors.primary} />
+                    <Text style={styles.invoiceButtonText}>View Invoice</Text>
                   </TouchableOpacity>
-                )}
+
+                  {booking.paymentStatus !== 'completed' && (
+                    <TouchableOpacity
+                      style={[styles.payButton, { flex: 1 }]}
+                      onPress={() => router.push(`/booking/${booking.id}`)}
+                    >
+                      <Text style={styles.payButtonText}>
+                        Complete Payment
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </TouchableOpacity>
             ))
           )}
@@ -309,6 +326,28 @@ import React, { useState, useEffect } from 'react';
       color: '#FFFFFF',
       fontSize: 12,
       fontWeight: 'bold',
+    },
+    actionRow: {
+      flexDirection: 'row',
+      gap: 10,
+      marginTop: 4,
+    },
+    invoiceButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+      borderWidth: 1.5,
+      borderColor: Colors.primary,
+      backgroundColor: '#ECFDF5',
+    },
+    invoiceButtonText: {
+      color: Colors.primary,
+      fontSize: 14,
+      fontWeight: '600' as const,
     },
     payButton: {
       backgroundColor: Colors.secondary,

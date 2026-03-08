@@ -208,7 +208,7 @@ function configureExpoAndLanding(app: express.Application) {
         return next();
       }
 
-      if (req.path === "/admin") {
+      if (req.path === "/admin" || req.path.startsWith("/invoice/")) {
         return next();
       }
 

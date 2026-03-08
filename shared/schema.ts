@@ -61,6 +61,8 @@ import { pgTable, text, serial, integer, boolean, timestamp, decimal, json } fro
     contactEmail: text("contact_email").notNull(),
     address: text("address").notNull(),
     specialRequests: text("special_requests"),
+    invoiceNumber: text("invoice_number"),
+    roomType: text("room_type"),
     bookingDate: timestamp("booking_date").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   });

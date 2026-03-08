@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tax Invoice - {{INVOICE_NUMBER}}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: #f5f5f5; color: #333; }
+    .invoice-container { max-width: 800px; margin: 20px auto; background: #fff; border: 1px solid #ddd; }
+    .invoice-header { padding: 20px 24px; border-bottom: 2px solid #047857; display: flex; justify-content: space-between; align-items: flex-start; }
+    .company-info h1 { font-size: 20px; color: #047857; font-weight: 700; }
+    .company-info p { font-size: 11px; color: #555; line-height: 1.5; }
+    .invoice-badge { background: #047857; color: #fff; padding: 4px 14px; border-radius: 4px; font-size: 12px; font-weight: 600; display: inline-block; margin-bottom: 8px; }
+    .invoice-meta { text-align: right; }
+    .invoice-meta table { font-size: 12px; border-collapse: collapse; }
+    .invoice-meta td { padding: 3px 8px; }
+    .invoice-meta td:first-child { font-weight: 600; color: #555; text-align: right; }
+    .bill-to { padding: 16px 24px; background: #f0fdf4; border-bottom: 1px solid #ddd; }
+    .bill-to h3 { font-size: 12px; color: #047857; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px; }
+    .bill-to p { font-size: 12px; line-height: 1.6; }
+    .items-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .items-table th { background: #047857; color: #fff; padding: 10px 12px; text-align: left; font-weight: 600; }
+    .items-table th:last-child, .items-table td:last-child { text-align: right; }
+    .items-table th:nth-child(4), .items-table td:nth-child(4),
+    .items-table th:nth-child(5), .items-table td:nth-child(5) { text-align: right; }
+    .items-table td { padding: 10px 12px; border-bottom: 1px solid #eee; }
+    .items-table .service-name { font-weight: 600; }
+    .items-table .service-desc { font-size: 11px; color: #777; }
+    .totals-section { padding: 0 24px 16px; }
+    .totals-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .totals-table td { padding: 8px 12px; border-bottom: 1px solid #eee; }
+    .totals-table .label { text-align: right; width: 70%; font-weight: 500; color: #555; }
+    .totals-table .value { text-align: right; width: 30%; font-weight: 600; }
+    .totals-table .total-row td { background: #f0fdf4; font-size: 14px; font-weight: 700; color: #047857; border-top: 2px solid #047857; }
+    .totals-table .balance-row td { background: #fef3c7; font-weight: 700; color: #92400e; }
+    .gst-breakdown { padding: 16px 24px; border-top: 1px solid #ddd; }
+    .gst-breakdown h4 { font-size: 12px; color: #047857; margin-bottom: 8px; }
+    .gst-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    .gst-table th { background: #e6f7ef; padding: 6px 10px; text-align: center; font-weight: 600; border: 1px solid #ccc; }
+    .gst-table td { padding: 6px 10px; text-align: center; border: 1px solid #ccc; }
+    .amount-words { padding: 12px 24px; background: #f9fafb; border-top: 1px solid #ddd; font-size: 12px; }
+    .amount-words strong { color: #047857; }
+    .bottom-section { display: flex; padding: 16px 24px; border-top: 1px solid #ddd; gap: 20px; }
+    .bank-details { flex: 1; }
+    .bank-details h4 { font-size: 12px; color: #047857; margin-bottom: 8px; text-transform: uppercase; }
+    .bank-details table { font-size: 11px; }
+    .bank-details td { padding: 2px 8px 2px 0; }
+    .bank-details td:first-child { font-weight: 600; color: #555; }
+    .terms-section { flex: 1.2; }
+    .terms-section h4 { font-size: 12px; color: #047857; margin-bottom: 8px; text-transform: uppercase; }
+    .terms-section p { font-size: 9.5px; color: #666; line-height: 1.6; }
+    .signatory { text-align: right; padding: 16px 24px; border-top: 1px solid #ddd; }
+    .signatory p { font-size: 11px; color: #555; }
+    .signatory .company { font-weight: 700; color: #047857; font-size: 12px; }
+    .footer { padding: 12px 24px; background: #047857; color: #fff; text-align: center; font-size: 11px; }
+    .print-btn { display: block; margin: 16px auto; padding: 12px 40px; background: #047857; color: #fff; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; font-weight: 600; }
+    .print-btn:hover { background: #065f46; }
+    @media print {
+      body { background: #fff; }
+      .invoice-container { margin: 0; border: none; box-shadow: none; }
+      .print-btn, .no-print { display: none !important; }
+    }
+    @media (max-width: 600px) {
+      .invoice-header { flex-direction: column; gap: 12px; }
+      .invoice-meta { text-align: left; }
+      .bottom-section { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <div class="invoice-container">
+    <div class="invoice-header">
+      <div class="company-info">
+        <div class="invoice-badge">TAX INVOICE</div>
+        <h1>ALBURHAN TOURS & TRAVELS</h1>
+        <p>8/5 KHANSA MASJID COMPLEX SHANWARA ROAD<br>
+        BURHANPUR, Madhya Pradesh, 450331</p>
+        <p>GSTIN: 23AAVFA3225C1ZW &nbsp;&nbsp; Mobile: 9893989786</p>
+        <p>PAN: AAVFA3225C</p>
+        <p>Email: alburhantravels@gmail.com</p>
+      </div>
+      <div class="invoice-meta">
+        <table>
+          <tr><td>Invoice No.</td><td><strong>{{INVOICE_NUMBER}}</strong></td></tr>
+          <tr><td>Invoice Date</td><td>{{INVOICE_DATE}}</td></tr>
+          <tr><td>Due Date</td><td>{{DUE_DATE}}</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="bill-to">
+      <h3>Bill To</h3>
+      <p><strong>{{CUSTOMER_NAME}}</strong></p>
+      <p>{{CUSTOMER_ADDRESS}}</p>
+      <p>Mobile: {{CUSTOMER_PHONE}} &nbsp; | &nbsp; Email: {{CUSTOMER_EMAIL}}</p>
+    </div>
+
+    <table class="items-table">
+      <thead>
+        <tr>
+          <th style="width:40px">S.NO</th>
+          <th>SERVICES</th>
+          <th style="width:80px">SAC</th>
+          <th style="width:100px">RATE</th>
+          <th style="width:80px">TAX</th>
+          <th style="width:100px">AMOUNT</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{SERVICE_ROWS}}
+        <tr>
+          <td colspan="4"></td>
+          <td style="text-align:right; font-size:11px; color:#555;">TCS @5.0%</td>
+          <td style="text-align:right;">{{TCS_AMOUNT}}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="totals-section">
+      <table class="totals-table">
+        <tr><td class="label">TOTAL</td><td class="value">₹ {{TAX_TOTAL}}</td><td class="value" style="width:120px;">₹ {{GRAND_TOTAL}}</td></tr>
+        <tr><td class="label">RECEIVED AMOUNT</td><td class="value"></td><td class="value">₹ {{RECEIVED_AMOUNT}}</td></tr>
+        <tr><td class="label">PREVIOUS BALANCE</td><td class="value"></td><td class="value">₹ {{PREVIOUS_BALANCE}}</td></tr>
+        <tr class="balance-row"><td class="label">CURRENT BALANCE</td><td class="value"></td><td class="value">₹ {{CURRENT_BALANCE}}</td></tr>
+      </table>
+    </div>
+
+    <div class="gst-breakdown">
+      <h4>GST Breakdown</h4>
+      <table class="gst-table">
+        <thead>
+          <tr>
+            <th>HSN/SAC</th>
+            <th>Taxable Value</th>
+            <th>CGST Rate</th>
+            <th>CGST Amount</th>
+            <th>SGST Rate</th>
+            <th>SGST Amount</th>
+            <th>Total Tax</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>998555</td>
+            <td>₹ {{TAXABLE_VALUE}}</td>
+            <td>2.5%</td>
+            <td>₹ {{CGST_AMOUNT}}</td>
+            <td>2.5%</td>
+            <td>₹ {{SGST_AMOUNT}}</td>
+            <td>₹ {{GST_TOTAL}}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="amount-words">
+      <strong>Total Amount (in words):</strong> {{AMOUNT_IN_WORDS}}
+    </div>
+
+    <div class="bottom-section">
+      <div class="bank-details">
+        <h4>Bank Details</h4>
+        <table>
+          <tr><td>Name</td><td>HDFC BANK LTD</td></tr>
+          <tr><td>IFSC Code</td><td>HDFC0001749</td></tr>
+          <tr><td>Account No.</td><td>50200011397336</td></tr>
+          <tr><td>Bank</td><td>HDFC Bank, BURHANPUR</td></tr>
+        </table>
+      </div>
+      <div class="terms-section">
+        <h4>Terms and Conditions</h4>
+        <p><strong>Booking and Payment:</strong><br>
+        a. Customers are required to complete the booking form and provide accurate information.<br>
+        b. A deposit is due upon booking, with the remaining balance payable as specified in the package details.<br>
+        c. Cancellations are subject to our cancellation policy, which will be provided upon booking.</p>
+        <p style="margin-top:6px;"><strong>GST 5% and TCS 5% are applicable.</strong></p>
+        <p style="margin-top:6px;"><strong>Itinerary and Services:</strong><br>
+        a. Al Burhan Tours and Travels will provide a detailed itinerary for the Hajj or Umrah tour.<br>
+        b. The package includes accommodation, transportation, meals, and guided tours, as specified in the itinerary.</p>
+        <p style="margin-top:6px;"><strong>Travel Documents and Insurance:</strong><br>
+        a. Customers are responsible for obtaining and maintaining valid travel documents, including passports, and health certificates, excluding visas which will be provided by the company as required.</p>
+      </div>
+    </div>
+
+    <div class="signatory">
+      <p style="margin-bottom:30px;">&nbsp;</p>
+      <p class="company">Authorised Signatory For</p>
+      <p class="company">ALBURHAN TOURS & TRAVELS</p>
+    </div>
+
+    <div class="footer">
+      AL BURHAN TOURS & TRAVELS | GSTIN: 23AAVFA3225C1ZW | Phone: +91 9893989786 | www.alburhantravels.com
+    </div>
+  </div>
+
+  <button class="print-btn no-print" onclick="window.print()">🖨️ Print / Download PDF</button>
+</body>
+</html>
