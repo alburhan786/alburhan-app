@@ -196,6 +196,10 @@ function configureExpoAndLanding(app: express.Application) {
         return next();
       }
 
+      if (req.path === "/admin") {
+        return next();
+      }
+
       const platform = req.header("expo-platform");
 
       if (req.path === "/" && !platform) {

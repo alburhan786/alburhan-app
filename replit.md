@@ -48,6 +48,12 @@ AL BURHAN Tours & Travels is a cross-platform mobile application for booking Haj
   - `POST /api/payments/verify` — verifies Razorpay signature (HMAC SHA256)
   - `POST /api/documents/upload` and `GET /api/documents/user/:userId`
   - `POST /api/seed` — seeds 4 sample packages
+  - `GET /api/admin/stats` — dashboard statistics
+  - `GET /api/admin/bookings` — all bookings
+  - `GET /api/admin/customers` — all customers
+  - `GET /api/admin/payments` — all payments
+  - `PUT /api/admin/bookings/:id/status` — update booking status
+  - `GET /admin` — admin dashboard HTML page
 
 ### Integrations
 
@@ -81,6 +87,7 @@ AL BURHAN Tours & Travels is a cross-platform mobile application for booking Haj
 | `contexts/AuthContext.tsx` | Authentication context provider (login, register, OTP methods) |
 | `constants/Colors.ts` | Theme colors |
 | `lib/query-client.ts` | React Query client with default fetcher + getApiUrl() |
+| `server/templates/admin-dashboard.html` | Admin dashboard (bookings, customers, payments, packages) |
 
 ### Dependencies
 

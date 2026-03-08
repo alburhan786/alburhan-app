@@ -547,6 +547,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   }
 
+  app.get("/api/admin/bookings", async (req, res) => {
+    try {
+      const allBookings = await db.select().from(bookings).orderBy(desc(bookings.bookingDate));
+      res.json({ success: true, bookings: allBookings });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: error.message });
+    }
+  });
+
+  app.get("/api/admin/customers", async (req, res) => {
+    try {
+      const allUsers = await db.select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        phone: users.phone,
+        createdAt: users.createdAt,
+      }).from(users).orderBy(desc(users.createdAt));
+      res.json({ success: true, customers: allUsers });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: error.message });
+    }
+  });
+
+  app.get("/api/admin/payments", async (req, res) => {
+    try {
+      const allPayments = await db.select().from(payments).orderBy(desc(payments.paymentDate));
+      res.json({ success: true, payments: allPayments });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: error.message });
+    }
+  });
+
+  app.get("/api/admin/stats", async (req, res) => {
+    try {
+      const allBookings = await db.select().from(bookings);
+      const allUsers = await db.select().from(users);
+      const allPayments = await db.select().from(payments);
+
+      const totalRevenue = allPayments
+        .filter(p => p.status === "success")
+        .reduce((sum, p) => sum + parseFloat(p.amount), 0);
+
+      const pendingBookings = allBookings.filter(b => b.status === "pending").length;
+      const confirmedBookings = allBookings.filter(b => b.status === "confirmed").length;
+
+      res.json({
+        success: true,
+        stats: {
+          totalBookings: allBookings.length,
+          totalCustomers: allUsers.length,
+          totalRevenue,
+          pendingBookings,
+          confirmedBookings,
+          totalPayments: allPayments.length,
+        },
+      });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: error.message });
+    }
+  });
+
+  app.put("/api/admin/bookings/:id/status", async (req, res) => {
+    try {
+      const { status } = req.body;
+      if (!status) {
+        return res.status(400).json({ success: false, error: "Status is required" });
+      }
+      const [updated] = await db.update(bookings).set({
+        status,
+        updatedAt: new Date(),
+      }).where(eq(bookings.id, parseInt(req.params.id))).returning();
+      if (!updated) {
+        return res.status(404).json({ success: false, error: "Booking not found" });
+      }
+      res.json({ success: true, booking: updated });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: error.message });
+    }
+  });
+
+  app.get("/admin", (req, res) => {
+    const templatePath = require("path").resolve(process.cwd(), "server", "templates", "admin-dashboard.html");
+    const fs = require("fs");
+    if (fs.existsSync(templatePath)) {
+      res.sendFile(templatePath);
+    } else {
+      res.status(404).send("Admin dashboard not found");
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

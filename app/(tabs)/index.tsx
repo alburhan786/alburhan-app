@@ -201,9 +201,9 @@ export default function HomeScreen() {
                     <Text style={styles.priceLabel}>Starting from</Text>
                     <Text style={styles.price}>{formatPrice(pkg.price)}</Text>
                   </View>
-                  <TouchableOpacity style={styles.viewButton}>
+                  <View style={styles.viewButton}>
                     <Text style={styles.viewButtonText}>View Details →</Text>
-                  </TouchableOpacity>
+                  </View>
                 </View>
               </TouchableOpacity>
             ))}
