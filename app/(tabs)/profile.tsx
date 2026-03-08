@@ -9,6 +9,7 @@ import {
   FlatList,
   ActivityIndicator,
   Platform,
+  Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -257,16 +258,81 @@ export default function ProfileScreen() {
             </View>
           )}
 
-          <TouchableOpacity
-            style={styles.actionCard}
-            onPress={() => Alert.alert('Support', 'Contact us at: support@alburhan.com\nPhone: +91 1234567890')}
-          >
-            <View style={styles.actionLeft}>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Contact Us</Text>
+
+          <View style={styles.contactCard}>
+            <TouchableOpacity style={styles.contactRow} onPress={() => Linking.openURL('tel:+919893989786')}>
+              <Ionicons name="call" size={20} color={Colors.primary} />
+              <View style={styles.contactInfo}>
+                <Text style={styles.contactLabel}>Primary</Text>
+                <Text style={styles.contactValue}>+91 9893989786</Text>
+              </View>
+            </TouchableOpacity>
+
+            <View style={styles.divider} />
+
+            <TouchableOpacity style={styles.contactRow} onPress={() => Linking.openURL('tel:+919893225590')}>
               <Ionicons name="call-outline" size={20} color={Colors.primary} />
-              <Text style={styles.actionText}>Contact Support</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={Colors.primary} />
-          </TouchableOpacity>
+              <View style={styles.contactInfo}>
+                <Text style={styles.contactLabel}>Secondary</Text>
+                <Text style={styles.contactValue}>+91 9893225590</Text>
+              </View>
+            </TouchableOpacity>
+
+            <View style={styles.divider} />
+
+            <TouchableOpacity style={styles.contactRow} onPress={() => Linking.openURL('https://wa.me/919893989786')}>
+              <Ionicons name="logo-whatsapp" size={20} color="#25D366" />
+              <View style={styles.contactInfo}>
+                <Text style={styles.contactLabel}>WhatsApp Chat</Text>
+                <Text style={styles.contactValue}>+91 9893989786</Text>
+              </View>
+            </TouchableOpacity>
+
+            <View style={styles.divider} />
+
+            <TouchableOpacity style={styles.contactRow} onPress={() => Linking.openURL('mailto:support@alburhantravels.com')}>
+              <Ionicons name="mail" size={20} color={Colors.primary} />
+              <View style={styles.contactInfo}>
+                <Text style={styles.contactLabel}>Email</Text>
+                <Text style={styles.contactValue}>support@alburhantravels.com</Text>
+              </View>
+            </TouchableOpacity>
+
+            <View style={styles.divider} />
+
+            <TouchableOpacity style={styles.contactRow} onPress={() => Linking.openURL('https://www.alburhantravels.com')}>
+              <Ionicons name="globe" size={20} color={Colors.primary} />
+              <View style={styles.contactInfo}>
+                <Text style={styles.contactLabel}>Website</Text>
+                <Text style={styles.contactValue}>www.alburhantravels.com</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Follow Us</Text>
+
+          <View style={styles.socialRow}>
+            <TouchableOpacity style={styles.socialButton} onPress={() => Linking.openURL('https://instagram.com/alburhantravels')}>
+              <Ionicons name="logo-instagram" size={26} color="#E1306C" />
+              <Text style={styles.socialLabel}>Instagram</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.socialButton} onPress={() => Linking.openURL('https://facebook.com/alburhantravels')}>
+              <Ionicons name="logo-facebook" size={26} color="#1877F2" />
+              <Text style={styles.socialLabel}>Facebook</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.socialButton} onPress={() => Linking.openURL('https://youtube.com/@alburhantravels')}>
+              <Ionicons name="logo-youtube" size={26} color="#FF0000" />
+              <Text style={styles.socialLabel}>YouTube</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.section}>
@@ -459,6 +525,47 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 11,
     fontWeight: '600' as const,
+  },
+  contactCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 12,
+    padding: 4,
+  },
+  contactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    gap: 14,
+  },
+  contactInfo: {
+    flex: 1,
+  },
+  contactLabel: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
+  contactValue: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: Colors.text,
+    marginTop: 2,
+  },
+  socialRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  socialButton: {
+    flex: 1,
+    backgroundColor: Colors.card,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    gap: 8,
+  },
+  socialLabel: {
+    fontSize: 12,
+    fontWeight: '600' as const,
+    color: Colors.text,
   },
   logoutButton: {
     backgroundColor: Colors.error,
