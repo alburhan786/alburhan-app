@@ -1,6 +1,7 @@
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
+import { registerChatRoutes } from "./replit_integrations/chat";
 import * as fs from "fs";
 import * as path from "path";
 import { createProxyMiddleware } from "http-proxy-middleware";
@@ -362,6 +363,7 @@ function setupErrorHandler(app: express.Application) {
 
   const metroProxy = configureExpoAndLanding(app);
 
+  registerChatRoutes(app);
   const server = await registerRoutes(app);
 
   setupErrorHandler(app);

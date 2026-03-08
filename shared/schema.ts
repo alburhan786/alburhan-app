@@ -116,4 +116,6 @@ import { pgTable, text, serial, integer, boolean, timestamp, decimal, json } fro
   export type Payment = typeof payments.$inferSelect;
   export type Notification = typeof notifications.$inferSelect;
   export type Document = typeof documents.$inferSelect;
+
+  export * from "./models/chat";
   

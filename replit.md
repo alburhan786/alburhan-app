@@ -70,6 +70,7 @@ AL BURHAN Tours & Travels is a cross-platform mobile application for booking Haj
 - **Razorpay** — Real payment gateway (order creation + signature verification)
 - **Nodemailer** — Email notifications (Gmail SMTP, requires EMAIL_USER + EMAIL_PASS)
 - **Notifications** — Multi-channel (SMS + WhatsApp + Email) for booking/payment/document events
+- **OpenAI (Replit AI Integrations)** — AI travel assistant chatbot with streaming responses
 
 ### Database (PostgreSQL)
 
@@ -87,7 +88,10 @@ AL BURHAN Tours & Travels is a cross-platform mobile application for booking Haj
 | `server/db.ts` | Database connection |
 | `shared/schema.ts` | Drizzle schema definitions |
 | `app/_layout.tsx` | Root layout with providers (fonts, error boundary, query client, auth) |
-| `app/(tabs)/_layout.tsx` | Tab navigation (Home, Bookings, Profile) |
+| `app/(tabs)/_layout.tsx` | Tab navigation (Home, Assistant, Bookings, Profile) |
+| `app/(tabs)/assistant.tsx` | AI travel assistant chat screen (streaming responses) |
+| `server/replit_integrations/chat/` | Chat API routes and storage (OpenAI integration) |
+| `shared/models/chat.ts` | Drizzle schema for conversations and messages tables |
 | `app/(auth)/login.tsx` | Login screen (email/password + OTP login) |
 | `app/(auth)/register.tsx` | Registration with OTP verification (SMS/WhatsApp) |
 | `app/booking/[id].tsx` | Booking detail with Razorpay WebView checkout |
@@ -108,6 +112,8 @@ AL BURHAN Tours & Travels is a cross-platform mobile application for booking Haj
 - expo-document-picker (document uploads)
 - multer (multipart file uploads)
 - @replit/object-storage (cloud file storage)
+- openai (AI chat via Replit AI Integrations)
+- drizzle-zod, zod (schema validation)
 
 ### Environment Variables
 
@@ -122,6 +128,8 @@ AL BURHAN Tours & Travels is a cross-platform mobile application for booking Haj
 | RAZORPAY_KEY_SECRET | Razorpay payment gateway key secret |
 | EMAIL_USER | Gmail address for sending email notifications |
 | EMAIL_PASS | Gmail app password for email notifications |
+| AI_INTEGRATIONS_OPENAI_BASE_URL | OpenAI API base URL (auto-set by Replit AI Integrations) |
+| AI_INTEGRATIONS_OPENAI_API_KEY | OpenAI API key (auto-set by Replit AI Integrations) |
 
 ### Mobile Proxy Architecture
 
