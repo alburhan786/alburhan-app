@@ -15,15 +15,17 @@
     .nav button:hover { color: white; background: rgba(255,255,255,0.1); }
     .nav button.active { color: white; border-bottom-color: #D97706; background: rgba(255,255,255,0.05); }
     .content { max-width: 1200px; margin: 0 auto; padding: 24px; }
-    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
     .stat-card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
     .stat-card .label { font-size: 13px; color: #6b7280; margin-bottom: 8px; font-weight: 500; }
     .stat-card .value { font-size: 28px; font-weight: 700; color: #047857; }
     .stat-card .value.orange { color: #D97706; }
     .stat-card .value.blue { color: #2563eb; }
     .stat-card .value.red { color: #dc2626; }
+    .stat-card .value.purple { color: #7c3aed; }
     .card { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); margin-bottom: 24px; }
     .card h2 { font-size: 18px; font-weight: 700; margin-bottom: 16px; color: #047857; }
+    .table-wrap { overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; font-size: 14px; }
     th { text-align: left; padding: 12px 16px; background: #f9fafb; border-bottom: 2px solid #e5e7eb; font-weight: 600; color: #374151; white-space: nowrap; }
     td { padding: 12px 16px; border-bottom: 1px solid #f3f4f6; }
@@ -41,6 +43,8 @@
     .btn-confirm:hover { background: #065f46; }
     .btn-cancel { background: #dc2626; color: white; }
     .btn-cancel:hover { background: #b91c1c; }
+    .btn-view { background: #2563eb; color: white; }
+    .btn-view:hover { background: #1d4ed8; }
     .btn-group { display: flex; gap: 8px; }
     .section { display: none; }
     .section.active { display: block; }
@@ -60,6 +64,9 @@
     .empty-state p { font-size: 16px; }
     .refresh-btn { background: #047857; color: white; border: none; padding: 8px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
     .refresh-btn:hover { background: #065f46; }
+    .doc-type { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; text-transform: uppercase; background: #ede9fe; color: #5b21b6; }
+    .doc-link { color: #2563eb; text-decoration: none; font-weight: 500; }
+    .doc-link:hover { text-decoration: underline; }
     @media (max-width: 768px) {
       .content { padding: 16px; }
       .stats-grid { grid-template-columns: repeat(2, 1fr); }
@@ -85,6 +92,7 @@
     <button onclick="showSection('bookings', this)">Bookings</button>
     <button onclick="showSection('customers', this)">Customers</button>
     <button onclick="showSection('payments', this)">Payments</button>
+    <button onclick="showSection('documents', this)">Documents</button>
     <button onclick="showSection('packages', this)">Packages</button>
   </div>
 
@@ -93,35 +101,42 @@
       <div class="stats-grid" id="stats-grid"></div>
       <div class="card">
         <h2>Recent Bookings</h2>
-        <div id="recent-bookings"></div>
+        <div class="table-wrap" id="recent-bookings"></div>
       </div>
     </div>
 
     <div id="section-bookings" class="section">
       <div class="card">
         <h2>All Bookings</h2>
-        <div id="all-bookings"></div>
+        <div class="table-wrap" id="all-bookings"></div>
       </div>
     </div>
 
     <div id="section-customers" class="section">
       <div class="card">
         <h2>All Customers</h2>
-        <div id="all-customers"></div>
+        <div class="table-wrap" id="all-customers"></div>
       </div>
     </div>
 
     <div id="section-payments" class="section">
       <div class="card">
         <h2>Payment History</h2>
-        <div id="all-payments"></div>
+        <div class="table-wrap" id="all-payments"></div>
+      </div>
+    </div>
+
+    <div id="section-documents" class="section">
+      <div class="card">
+        <h2>Uploaded Documents</h2>
+        <div class="table-wrap" id="all-documents"></div>
       </div>
     </div>
 
     <div id="section-packages" class="section">
       <div class="card">
         <h2>Packages</h2>
-        <div id="all-packages"></div>
+        <div class="table-wrap" id="all-packages"></div>
       </div>
     </div>
   </div>
@@ -137,44 +152,53 @@
 
     function formatDate(d) {
       if (!d) return '-';
-      return new Date(d).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' });
+      var date = new Date(d);
+      if (isNaN(date.getTime())) return '-';
+      return date.toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' });
+    }
+
+    function formatDateTime(d) {
+      if (!d) return '-';
+      var date = new Date(d);
+      if (isNaN(date.getTime())) return '-';
+      return date.toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     }
 
     function getBadgeClass(status) {
-      const map = { pending: 'badge-pending', confirmed: 'badge-confirmed', cancelled: 'badge-cancelled', completed: 'badge-completed', partial: 'badge-partial', success: 'badge-success', failed: 'badge-failed' };
+      var map = { pending: 'badge-pending', confirmed: 'badge-confirmed', cancelled: 'badge-cancelled', completed: 'badge-completed', partial: 'badge-partial', success: 'badge-success', failed: 'badge-failed' };
       return map[status] || 'badge-pending';
     }
 
     function showSection(name, btn) {
-      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-      document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.section').forEach(function(s) { s.classList.remove('active'); });
+      document.querySelectorAll('.nav button').forEach(function(b) { b.classList.remove('active'); });
       document.getElementById('section-' + name).classList.add('active');
       if (btn) btn.classList.add('active');
     }
 
     async function fetchJSON(url) {
-      const res = await fetch(API + url);
+      var res = await fetch(API + url);
       return res.json();
     }
 
     async function loadStats() {
-      const data = await fetchJSON('/api/admin/stats');
+      var data = await fetchJSON('/api/admin/stats');
       if (!data.success) return;
-      const s = data.stats;
-      document.getElementById('stats-grid').innerHTML = `
-        <div class="stat-card"><div class="label">Total Bookings</div><div class="value">${s.totalBookings}</div></div>
-        <div class="stat-card"><div class="label">Total Customers</div><div class="value blue">${s.totalCustomers}</div></div>
-        <div class="stat-card"><div class="label">Total Revenue</div><div class="value">${formatPrice(s.totalRevenue)}</div></div>
-        <div class="stat-card"><div class="label">Pending Bookings</div><div class="value orange">${s.pendingBookings}</div></div>
-        <div class="stat-card"><div class="label">Confirmed Bookings</div><div class="value">${s.confirmedBookings}</div></div>
-        <div class="stat-card"><div class="label">Total Payments</div><div class="value blue">${s.totalPayments}</div></div>
-      `;
+      var s = data.stats;
+      document.getElementById('stats-grid').innerHTML =
+        '<div class="stat-card"><div class="label">Total Bookings</div><div class="value">' + s.totalBookings + '</div></div>' +
+        '<div class="stat-card"><div class="label">Total Customers</div><div class="value blue">' + s.totalCustomers + '</div></div>' +
+        '<div class="stat-card"><div class="label">Total Revenue</div><div class="value">' + formatPrice(s.totalRevenue) + '</div></div>' +
+        '<div class="stat-card"><div class="label">Pending Bookings</div><div class="value orange">' + s.pendingBookings + '</div></div>' +
+        '<div class="stat-card"><div class="label">Confirmed Bookings</div><div class="value">' + s.confirmedBookings + '</div></div>' +
+        '<div class="stat-card"><div class="label">Total Payments</div><div class="value blue">' + s.totalPayments + '</div></div>' +
+        '<div class="stat-card"><div class="label">Documents</div><div class="value purple">' + (s.totalDocuments || 0) + '</div></div>';
     }
 
     async function loadBookings() {
-      const data = await fetchJSON('/api/admin/bookings');
+      var data = await fetchJSON('/api/admin/bookings');
       if (!data.success) return;
-      const bookings = data.bookings;
+      var bookings = data.bookings;
 
       if (bookings.length === 0) {
         document.getElementById('recent-bookings').innerHTML = '<div class="empty-state"><p>No bookings yet</p></div>';
@@ -182,166 +206,174 @@
         return;
       }
 
-      const renderTable = (list) => `
-        <table>
-          <thead><tr><th>ID</th><th>Contact</th><th>Phone</th><th>Travelers</th><th>Total</th><th>Paid</th><th>Status</th><th>Payment</th><th>Date</th><th>Actions</th></tr></thead>
-          <tbody>
-            ${list.map(b => `
-              <tr>
-                <td><strong>#${b.id}</strong></td>
-                <td>${b.contactName || '-'}</td>
-                <td>${b.contactPhone || '-'}</td>
-                <td>${b.numberOfPeople}</td>
-                <td>${formatPrice(b.totalAmount)}</td>
-                <td>${formatPrice(b.paidAmount)}</td>
-                <td><span class="badge ${getBadgeClass(b.status)}">${b.status}</span></td>
-                <td><span class="badge ${getBadgeClass(b.paymentStatus)}">${b.paymentStatus}</span></td>
-                <td>${formatDate(b.bookingDate)}</td>
-                <td>
-                  <div class="btn-group">
-                    <button class="btn btn-confirm" onclick="viewBooking(${b.id})">View</button>
-                    ${b.status === 'pending' ? `<button class="btn btn-confirm" onclick="updateStatus(${b.id}, 'confirmed')">Confirm</button><button class="btn btn-cancel" onclick="updateStatus(${b.id}, 'cancelled')">Cancel</button>` : ''}
-                  </div>
-                </td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      `;
+      function renderTable(list) {
+        var rows = '';
+        for (var i = 0; i < list.length; i++) {
+          var b = list[i];
+          var actions = '<button class="btn btn-confirm" onclick="viewBooking(' + b.id + ')">View</button>';
+          if (b.status === 'pending') {
+            actions += '<button class="btn btn-confirm" onclick="updateStatus(' + b.id + ', \'confirmed\')">Confirm</button>';
+            actions += '<button class="btn btn-cancel" onclick="updateStatus(' + b.id + ', \'cancelled\')">Cancel</button>';
+          }
+          rows += '<tr>' +
+            '<td><strong>#' + b.id + '</strong></td>' +
+            '<td>' + (b.contactName || '-') + '</td>' +
+            '<td>' + (b.contactPhone || '-') + '</td>' +
+            '<td>' + b.numberOfPeople + '</td>' +
+            '<td>' + formatPrice(b.totalAmount) + '</td>' +
+            '<td>' + formatPrice(b.paidAmount) + '</td>' +
+            '<td><span class="badge ' + getBadgeClass(b.status) + '">' + b.status + '</span></td>' +
+            '<td><span class="badge ' + getBadgeClass(b.paymentStatus) + '">' + b.paymentStatus + '</span></td>' +
+            '<td>' + formatDate(b.bookingDate) + '</td>' +
+            '<td><div class="btn-group">' + actions + '</div></td>' +
+            '</tr>';
+        }
+        return '<table><thead><tr><th>ID</th><th>Contact</th><th>Phone</th><th>Travelers</th><th>Total</th><th>Paid</th><th>Status</th><th>Payment</th><th>Date</th><th>Actions</th></tr></thead><tbody>' + rows + '</tbody></table>';
+      }
 
       document.getElementById('recent-bookings').innerHTML = renderTable(bookings.slice(0, 5));
       document.getElementById('all-bookings').innerHTML = renderTable(bookings);
     }
 
     async function loadCustomers() {
-      const data = await fetchJSON('/api/admin/customers');
+      var data = await fetchJSON('/api/admin/customers');
       if (!data.success) return;
-      const customers = data.customers;
+      var customers = data.customers;
 
       if (customers.length === 0) {
         document.getElementById('all-customers').innerHTML = '<div class="empty-state"><p>No customers yet</p></div>';
         return;
       }
 
-      document.getElementById('all-customers').innerHTML = `
-        <table>
-          <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Joined</th></tr></thead>
-          <tbody>
-            ${customers.map(c => `
-              <tr>
-                <td>#${c.id}</td>
-                <td><strong>${c.name}</strong></td>
-                <td>${c.email}</td>
-                <td>${c.phone}</td>
-                <td>${formatDate(c.createdAt)}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      `;
+      var rows = '';
+      for (var i = 0; i < customers.length; i++) {
+        var c = customers[i];
+        rows += '<tr><td>#' + c.id + '</td><td><strong>' + c.name + '</strong></td><td>' + c.email + '</td><td>' + c.phone + '</td><td>' + formatDate(c.createdAt) + '</td></tr>';
+      }
+      document.getElementById('all-customers').innerHTML = '<table><thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Joined</th></tr></thead><tbody>' + rows + '</tbody></table>';
     }
 
     async function loadPayments() {
-      const data = await fetchJSON('/api/admin/payments');
+      var data = await fetchJSON('/api/admin/payments');
       if (!data.success) return;
-      const payments = data.payments;
+      var payments = data.payments;
 
       if (payments.length === 0) {
         document.getElementById('all-payments').innerHTML = '<div class="empty-state"><p>No payments yet</p></div>';
         return;
       }
 
-      document.getElementById('all-payments').innerHTML = `
-        <table>
-          <thead><tr><th>ID</th><th>Booking</th><th>Amount</th><th>Method</th><th>Transaction ID</th><th>Status</th><th>Date</th></tr></thead>
-          <tbody>
-            ${payments.map(p => `
-              <tr>
-                <td>#${p.id}</td>
-                <td>#${p.bookingId}</td>
-                <td><strong>${formatPrice(p.amount)}</strong></td>
-                <td>${p.paymentMethod}</td>
-                <td style="font-size:12px;word-break:break-all">${p.transactionId || p.razorpayPaymentId || '-'}</td>
-                <td><span class="badge ${getBadgeClass(p.status)}">${p.status}</span></td>
-                <td>${formatDate(p.paymentDate)}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      `;
+      var rows = '';
+      for (var i = 0; i < payments.length; i++) {
+        var p = payments[i];
+        rows += '<tr>' +
+          '<td>#' + p.id + '</td>' +
+          '<td>#' + p.bookingId + '</td>' +
+          '<td><strong>' + formatPrice(p.amount) + '</strong></td>' +
+          '<td>' + p.paymentMethod + '</td>' +
+          '<td style="font-size:12px;word-break:break-all">' + (p.transactionId || p.razorpayPaymentId || '-') + '</td>' +
+          '<td><span class="badge ' + getBadgeClass(p.status) + '">' + p.status + '</span></td>' +
+          '<td>' + formatDateTime(p.paymentDate) + '</td>' +
+          '</tr>';
+      }
+      document.getElementById('all-payments').innerHTML = '<table><thead><tr><th>ID</th><th>Booking</th><th>Amount</th><th>Method</th><th>Transaction ID</th><th>Status</th><th>Date</th></tr></thead><tbody>' + rows + '</tbody></table>';
+    }
+
+    async function loadDocuments() {
+      var data = await fetchJSON('/api/admin/documents');
+      if (!data.success) return;
+      var docs = data.documents;
+
+      if (!docs || docs.length === 0) {
+        document.getElementById('all-documents').innerHTML = '<div class="empty-state"><p>No documents uploaded yet</p></div>';
+        return;
+      }
+
+      var rows = '';
+      for (var i = 0; i < docs.length; i++) {
+        var d = docs[i];
+        var customerName = d.userName || ('User #' + d.userId);
+        var bookingRef = d.bookingId ? '#' + d.bookingId : '-';
+        var fileLink = d.fileUrl ? '<a href="' + d.fileUrl + '" target="_blank" class="doc-link">' + (d.fileName || 'View File') + '</a>' : (d.fileName || '-');
+        rows += '<tr>' +
+          '<td>#' + d.id + '</td>' +
+          '<td><strong>' + customerName + '</strong></td>' +
+          '<td>' + bookingRef + '</td>' +
+          '<td><span class="doc-type">' + (d.type || '-') + '</span></td>' +
+          '<td>' + fileLink + '</td>' +
+          '<td>' + formatDateTime(d.uploadedAt) + '</td>' +
+          '</tr>';
+      }
+      document.getElementById('all-documents').innerHTML = '<table><thead><tr><th>ID</th><th>Customer</th><th>Booking</th><th>Type</th><th>File</th><th>Uploaded</th></tr></thead><tbody>' + rows + '</tbody></table>';
     }
 
     async function loadPackages() {
-      const data = await fetchJSON('/api/packages');
+      var data = await fetchJSON('/api/packages');
       if (!data.success) return;
-      const pkgs = data.packages;
+      var pkgs = data.packages;
 
-      document.getElementById('all-packages').innerHTML = `
-        <table>
-          <thead><tr><th>ID</th><th>Name</th><th>Type</th><th>Price</th><th>Duration</th><th>Seats</th><th>Departure</th><th>Featured</th></tr></thead>
-          <tbody>
-            ${pkgs.map(p => `
-              <tr>
-                <td>#${p.id}</td>
-                <td><strong>${p.name}</strong></td>
-                <td><span class="badge ${p.type === 'hajj' ? 'badge-confirmed' : 'badge-completed'}">${p.type.toUpperCase()}</span></td>
-                <td>${formatPrice(p.price)}</td>
-                <td>${p.duration}</td>
-                <td>${p.availableSeats}</td>
-                <td>${formatDate(p.departureDate)}</td>
-                <td>${p.featured ? 'Yes' : 'No'}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      `;
+      var rows = '';
+      for (var i = 0; i < pkgs.length; i++) {
+        var p = pkgs[i];
+        rows += '<tr>' +
+          '<td>#' + p.id + '</td>' +
+          '<td><strong>' + p.name + '</strong></td>' +
+          '<td><span class="badge ' + (p.type === 'hajj' ? 'badge-confirmed' : 'badge-completed') + '">' + p.type.toUpperCase() + '</span></td>' +
+          '<td>' + formatPrice(p.price) + '</td>' +
+          '<td>' + p.duration + '</td>' +
+          '<td>' + p.availableSeats + '</td>' +
+          '<td>' + formatDate(p.departureDate) + '</td>' +
+          '<td>' + (p.featured ? 'Yes' : 'No') + '</td>' +
+          '</tr>';
+      }
+      document.getElementById('all-packages').innerHTML = '<table><thead><tr><th>ID</th><th>Name</th><th>Type</th><th>Price</th><th>Duration</th><th>Seats</th><th>Departure</th><th>Featured</th></tr></thead><tbody>' + rows + '</tbody></table>';
     }
 
     async function viewBooking(id) {
-      const data = await fetchJSON('/api/bookings/' + id);
+      var data = await fetchJSON('/api/bookings/' + id);
       if (!data.success) return;
-      const b = data.booking;
-      const travelers = b.travelers || [];
+      var b = data.booking;
+      var travelers = b.travelers || [];
 
-      document.getElementById('modal-container').innerHTML = `
-        <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
-          <div class="modal">
-            <button class="close-btn" onclick="closeModal()">&times;</button>
-            <h2>Booking #${b.id} Details</h2>
-            <div class="detail-grid">
-              <div class="detail-item"><div class="dlabel">Status</div><div class="dvalue"><span class="badge ${getBadgeClass(b.status)}">${b.status.toUpperCase()}</span></div></div>
-              <div class="detail-item"><div class="dlabel">Payment Status</div><div class="dvalue"><span class="badge ${getBadgeClass(b.paymentStatus)}">${b.paymentStatus.toUpperCase()}</span></div></div>
-              <div class="detail-item"><div class="dlabel">Contact Name</div><div class="dvalue">${b.contactName || '-'}</div></div>
-              <div class="detail-item"><div class="dlabel">Phone</div><div class="dvalue">${b.contactPhone || '-'}</div></div>
-              <div class="detail-item"><div class="dlabel">Email</div><div class="dvalue">${b.contactEmail || '-'}</div></div>
-              <div class="detail-item"><div class="dlabel">Address</div><div class="dvalue">${b.address || '-'}</div></div>
-              <div class="detail-item"><div class="dlabel">Number of Travelers</div><div class="dvalue">${b.numberOfPeople}</div></div>
-              <div class="detail-item"><div class="dlabel">Booking Date</div><div class="dvalue">${formatDate(b.bookingDate)}</div></div>
-              <div class="detail-item"><div class="dlabel">Total Amount</div><div class="dvalue" style="color:#047857;font-size:18px">${formatPrice(b.totalAmount)}</div></div>
-              <div class="detail-item"><div class="dlabel">Paid Amount</div><div class="dvalue" style="color:#059669">${formatPrice(b.paidAmount)}</div></div>
-              <div class="detail-item"><div class="dlabel">Remaining</div><div class="dvalue" style="color:#dc2626">${formatPrice(parseFloat(b.totalAmount) - parseFloat(b.paidAmount))}</div></div>
-              <div class="detail-item"><div class="dlabel">Special Requests</div><div class="dvalue">${b.specialRequests || 'None'}</div></div>
-            </div>
-            ${travelers.length > 0 ? `
-              <div class="travelers-list">
-                <h3 style="margin-bottom:12px;color:#047857">Travelers</h3>
-                ${travelers.map((t, i) => `
-                  <div class="traveler-card">
-                    <div class="tname">Traveler ${i + 1}: ${t.name}</div>
-                    <div class="tinfo">Age: ${t.age} | Gender: ${t.gender || '-'} | Passport: ${t.passportNumber || '-'} | Expiry: ${t.passportExpiry || '-'}</div>
-                  </div>
-                `).join('')}
-              </div>
-            ` : ''}
-            <div style="margin-top:20px;display:flex;gap:12px">
-              ${b.status === 'pending' ? `
-                <button class="btn btn-confirm" onclick="updateStatus(${b.id}, 'confirmed');closeModal()">Confirm Booking</button>
-                <button class="btn btn-cancel" onclick="updateStatus(${b.id}, 'cancelled');closeModal()">Cancel Booking</button>
-              ` : ''}
-            </div>
-          </div>
-        </div>
-      `;
+      var travelersHtml = '';
+      if (travelers.length > 0) {
+        travelersHtml = '<div class="travelers-list"><h3 style="margin-bottom:12px;color:#047857">Travelers</h3>';
+        for (var i = 0; i < travelers.length; i++) {
+          var t = travelers[i];
+          travelersHtml += '<div class="traveler-card"><div class="tname">Traveler ' + (i + 1) + ': ' + t.name + '</div>' +
+            '<div class="tinfo">Age: ' + t.age + ' | Gender: ' + (t.gender || '-') + ' | Passport: ' + (t.passportNumber || '-') + ' | Expiry: ' + (t.passportExpiry || '-') + '</div></div>';
+        }
+        travelersHtml += '</div>';
+      }
+
+      var actionsHtml = '';
+      if (b.status === 'pending') {
+        actionsHtml = '<button class="btn btn-confirm" onclick="updateStatus(' + b.id + ', \'confirmed\');closeModal()">Confirm Booking</button>' +
+          '<button class="btn btn-cancel" onclick="updateStatus(' + b.id + ', \'cancelled\');closeModal()">Cancel Booking</button>';
+      }
+
+      document.getElementById('modal-container').innerHTML =
+        '<div class="modal-overlay" onclick="if(event.target===this)closeModal()">' +
+        '<div class="modal">' +
+        '<button class="close-btn" onclick="closeModal()">&times;</button>' +
+        '<h2>Booking #' + b.id + ' Details</h2>' +
+        '<div class="detail-grid">' +
+        '<div class="detail-item"><div class="dlabel">Status</div><div class="dvalue"><span class="badge ' + getBadgeClass(b.status) + '">' + b.status.toUpperCase() + '</span></div></div>' +
+        '<div class="detail-item"><div class="dlabel">Payment Status</div><div class="dvalue"><span class="badge ' + getBadgeClass(b.paymentStatus) + '">' + b.paymentStatus.toUpperCase() + '</span></div></div>' +
+        '<div class="detail-item"><div class="dlabel">Contact Name</div><div class="dvalue">' + (b.contactName || '-') + '</div></div>' +
+        '<div class="detail-item"><div class="dlabel">Phone</div><div class="dvalue">' + (b.contactPhone || '-') + '</div></div>' +
+        '<div class="detail-item"><div class="dlabel">Email</div><div class="dvalue">' + (b.contactEmail || '-') + '</div></div>' +
+        '<div class="detail-item"><div class="dlabel">Address</div><div class="dvalue">' + (b.address || '-') + '</div></div>' +
+        '<div class="detail-item"><div class="dlabel">Number of Travelers</div><div class="dvalue">' + b.numberOfPeople + '</div></div>' +
+        '<div class="detail-item"><div class="dlabel">Booking Date</div><div class="dvalue">' + formatDate(b.bookingDate) + '</div></div>' +
+        '<div class="detail-item"><div class="dlabel">Total Amount</div><div class="dvalue" style="color:#047857;font-size:18px">' + formatPrice(b.totalAmount) + '</div></div>' +
+        '<div class="detail-item"><div class="dlabel">Paid Amount</div><div class="dvalue" style="color:#059669">' + formatPrice(b.paidAmount) + '</div></div>' +
+        '<div class="detail-item"><div class="dlabel">Remaining</div><div class="dvalue" style="color:#dc2626">' + formatPrice(parseFloat(b.totalAmount) - parseFloat(b.paidAmount)) + '</div></div>' +
+        '<div class="detail-item"><div class="dlabel">Special Requests</div><div class="dvalue">' + (b.specialRequests || 'None') + '</div></div>' +
+        '</div>' +
+        travelersHtml +
+        '<div style="margin-top:20px;display:flex;gap:12px">' + actionsHtml + '</div>' +
+        '</div></div>';
     }
 
     function closeModal() {
@@ -349,12 +381,12 @@
     }
 
     async function updateStatus(id, status) {
-      const res = await fetch(API + '/api/admin/bookings/' + id + '/status', {
+      var res = await fetch(API + '/api/admin/bookings/' + id + '/status', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
+        body: JSON.stringify({ status: status })
       });
-      const data = await res.json();
+      var data = await res.json();
       if (data.success) {
         alert('Booking #' + id + ' updated to ' + status.toUpperCase());
         loadAll();
@@ -368,6 +400,7 @@
       loadBookings();
       loadCustomers();
       loadPayments();
+      loadDocuments();
       loadPackages();
     }
 

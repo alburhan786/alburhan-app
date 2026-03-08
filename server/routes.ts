@@ -580,11 +580,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/admin/documents", async (req, res) => {
+    try {
+      const allDocs = await db.select({
+        id: documents.id,
+        userId: documents.userId,
+        bookingId: documents.bookingId,
+        type: documents.type,
+        fileName: documents.fileName,
+        fileUrl: documents.fileUrl,
+        uploadedAt: documents.uploadedAt,
+        userName: users.name,
+      }).from(documents)
+        .leftJoin(users, eq(documents.userId, users.id))
+        .orderBy(desc(documents.uploadedAt));
+      res.json({ success: true, documents: allDocs });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: error.message });
+    }
+  });
+
   app.get("/api/admin/stats", async (req, res) => {
     try {
       const allBookings = await db.select().from(bookings);
       const allUsers = await db.select().from(users);
       const allPayments = await db.select().from(payments);
+      const allDocs = await db.select().from(documents);
 
       const totalRevenue = allPayments
         .filter(p => p.status === "success")
@@ -602,6 +623,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           pendingBookings,
           confirmedBookings,
           totalPayments: allPayments.length,
+          totalDocuments: allDocs.length,
         },
       });
     } catch (error: any) {
