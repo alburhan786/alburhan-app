@@ -207,19 +207,6 @@ export default function HomeScreen() {
 
             return (
               <View style={styles.packagesSection}>
-                {(filterType === 'all' || filterType === 'hajj') && hajjPackages.length > 0 && (
-                  <View>
-                    <View style={styles.groupHeader}>
-                      <View style={styles.groupBadge}>
-                        <Text style={styles.groupBadgeText}>HAJJ 2027</Text>
-                      </View>
-                      <Text style={styles.groupSubtitle}>Al Burhan Hajj Premium Collection</Text>
-                      <Text style={styles.groupInfo}>{hajjPackages.length} package{hajjPackages.length !== 1 ? 's' : ''} • Departure: May 2027</Text>
-                    </View>
-                    {hajjPackages.map(renderCard)}
-                  </View>
-                )}
-
                 {(filterType === 'all' || filterType === 'umrah') && umrahPackages.length > 0 && (
                   <View>
                     <View style={styles.groupHeader}>
@@ -230,6 +217,19 @@ export default function HomeScreen() {
                       <Text style={styles.groupInfo}>{umrahPackages.length} package{umrahPackages.length !== 1 ? 's' : ''}</Text>
                     </View>
                     {umrahPackages.map(renderCard)}
+                  </View>
+                )}
+
+                {(filterType === 'all' || filterType === 'hajj') && hajjPackages.length > 0 && (
+                  <View>
+                    <View style={styles.groupHeader}>
+                      <View style={styles.groupBadge}>
+                        <Text style={styles.groupBadgeText}>HAJJ 2027</Text>
+                      </View>
+                      <Text style={styles.groupSubtitle}>Al Burhan Hajj Premium Collection</Text>
+                      <Text style={styles.groupInfo}>{hajjPackages.length} package{hajjPackages.length !== 1 ? 's' : ''} • Departure: May 2027</Text>
+                    </View>
+                    {hajjPackages.map(renderCard)}
                   </View>
                 )}
 
