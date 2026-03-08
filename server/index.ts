@@ -234,14 +234,17 @@ function configureExpoAndLanding(app: express.Application) {
               try {
                 const manifest = JSON.parse(body);
 
+                const hostWithPort = `${devDomain}:443`;
+
                 if (manifest.extra?.expoClient) {
-                  manifest.extra.expoClient.hostUri = devDomain;
+                  manifest.extra.expoClient.hostUri = hostWithPort;
                 }
                 if (manifest.extra?.expoGo) {
-                  manifest.extra.expoGo.debuggerHost = devDomain;
+                  manifest.extra.expoGo.debuggerHost = hostWithPort;
                 }
 
                 body = JSON.stringify(manifest);
+                log(`Manifest rewritten: hostUri=${hostWithPort}`);
               } catch {
                 log("Could not parse manifest for URL rewriting");
               }
