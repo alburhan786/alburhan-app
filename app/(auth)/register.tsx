@@ -1,218 +1,404 @@
 import React, { useState } from 'react';
-  import {
-    View,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    StyleSheet,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-  } from 'react-native';
-  import { useRouter } from 'expo-router';
-  import { useAuth } from '../../contexts/AuthContext';
-  import { Colors } from '../../constants/Colors';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  ActivityIndicator,
+} from 'react-native';
+import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../../contexts/AuthContext';
+import { Colors } from '../../constants/Colors';
 
-  export default function RegisterScreen() {
-    const [name, setName] = useState('');
-    const [email, setEmail] = useState('');
-    const [phone, setPhone] = useState('');
-    const [password, setPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
-    const [loading, setLoading] = useState(false);
-    const { register } = useAuth();
-    const router = useRouter();
+type Step = 'details' | 'otp';
 
-    const handleRegister = async () => {
-      if (!name || !email || !phone || !password || !confirmPassword) {
-        Alert.alert('Error', 'Please fill in all fields');
-        return;
+export default function RegisterScreen() {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [otp, setOtp] = useState('');
+  const [step, setStep] = useState<Step>('details');
+  const [loading, setLoading] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpMessage, setOtpMessage] = useState('');
+  const { sendOtp, sendWhatsAppOtp, verifyOtp } = useAuth();
+  const router = useRouter();
+
+  const handleSendOtp = async (method: 'sms' | 'whatsapp') => {
+    if (!name || !email || !phone || !password || !confirmPassword) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+    if (password !== confirmPassword) {
+      Alert.alert('Error', 'Passwords do not match');
+      return;
+    }
+    if (password.length < 6) {
+      Alert.alert('Error', 'Password must be at least 6 characters');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      let response;
+      if (method === 'whatsapp') {
+        response = await sendWhatsAppOtp(phone);
+      } else {
+        response = await sendOtp(phone);
       }
+      setOtpSent(true);
+      setStep('otp');
+      setOtpMessage(response.message || 'OTP sent successfully');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to send OTP');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      if (password !== confirmPassword) {
-        Alert.alert('Error', 'Passwords do not match');
-        return;
-      }
+  const handleVerifyAndRegister = async () => {
+    if (!otp || otp.length !== 6) {
+      Alert.alert('Error', 'Please enter a valid 6-digit OTP');
+      return;
+    }
 
-      if (password.length < 6) {
-        Alert.alert('Error', 'Password must be at least 6 characters');
-        return;
-      }
+    setLoading(true);
+    try {
+      await verifyOtp(phone, otp, { name, email, password });
+      router.replace('/(tabs)');
+    } catch (error: any) {
+      Alert.alert('Verification Failed', error.message || 'Invalid OTP');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      setLoading(true);
-      try {
-        await register({ name, email, phone, password });
-        router.replace('/(tabs)');
-      } catch (error: any) {
-        Alert.alert('Registration Failed', error.message || 'Could not create account');
-      } finally {
-        setLoading(false);
-      }
-    };
+  const renderDetailsStep = () => (
+    <>
+      <TextInput
+        style={styles.input}
+        placeholder="Full Name"
+        value={name}
+        onChangeText={setName}
+        placeholderTextColor={Colors.textSecondary}
+      />
 
-    return (
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      <TextInput
+        style={styles.input}
+        placeholder="Email"
+        value={email}
+        onChangeText={setEmail}
+        keyboardType="email-address"
+        autoCapitalize="none"
+        placeholderTextColor={Colors.textSecondary}
+      />
+
+      <TextInput
+        style={styles.input}
+        placeholder="Phone Number"
+        value={phone}
+        onChangeText={setPhone}
+        keyboardType="phone-pad"
+        placeholderTextColor={Colors.textSecondary}
+      />
+
+      <TextInput
+        style={styles.input}
+        placeholder="Password"
+        value={password}
+        onChangeText={setPassword}
+        secureTextEntry
+        placeholderTextColor={Colors.textSecondary}
+      />
+
+      <TextInput
+        style={styles.input}
+        placeholder="Confirm Password"
+        value={confirmPassword}
+        onChangeText={setConfirmPassword}
+        secureTextEntry
+        placeholderTextColor={Colors.textSecondary}
+      />
+
+      <TouchableOpacity
+        style={[styles.button, loading && styles.buttonDisabled]}
+        onPress={() => handleSendOtp('sms')}
+        disabled={loading}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.header}>
-            <Text style={styles.logo}>AL BURHAN</Text>
-            <Text style={styles.subtitle}>Tours & Travels</Text>
+        {loading ? (
+          <ActivityIndicator color="#FFFFFF" size="small" />
+        ) : (
+          <View style={styles.buttonRow}>
+            <Ionicons name="chatbubble-outline" size={20} color="#FFFFFF" />
+            <Text style={styles.buttonText}>Send OTP via SMS</Text>
           </View>
+        )}
+      </TouchableOpacity>
 
-          <View style={styles.form}>
-            <Text style={styles.title}>Create Account</Text>
-            
-            <TextInput
-              style={styles.input}
-              placeholder="Full Name"
-              value={name}
-              onChangeText={setName}
-              placeholderTextColor={Colors.textSecondary}
-            />
-
-            <TextInput
-              style={styles.input}
-              placeholder="Email"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              placeholderTextColor={Colors.textSecondary}
-            />
-
-            <TextInput
-              style={styles.input}
-              placeholder="Phone Number"
-              value={phone}
-              onChangeText={setPhone}
-              keyboardType="phone-pad"
-              placeholderTextColor={Colors.textSecondary}
-            />
-
-            <TextInput
-              style={styles.input}
-              placeholder="Password"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              placeholderTextColor={Colors.textSecondary}
-            />
-
-            <TextInput
-              style={styles.input}
-              placeholder="Confirm Password"
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              secureTextEntry
-              placeholderTextColor={Colors.textSecondary}
-            />
-
-            <TouchableOpacity
-              style={[styles.button, loading && styles.buttonDisabled]}
-              onPress={handleRegister}
-              disabled={loading}
-            >
-              <Text style={styles.buttonText}>
-                {loading ? 'Creating Account...' : 'Register'}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.linkButton}
-              onPress={() => router.back()}
-            >
-              <Text style={styles.linkText}>
-                Already have an account? <Text style={styles.linkTextBold}>Sign In</Text>
-              </Text>
-            </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.whatsappButton, loading && styles.buttonDisabled]}
+        onPress={() => handleSendOtp('whatsapp')}
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator color="#FFFFFF" size="small" />
+        ) : (
+          <View style={styles.buttonRow}>
+            <Ionicons name="logo-whatsapp" size={20} color="#FFFFFF" />
+            <Text style={styles.buttonText}>Send OTP via WhatsApp</Text>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    );
-  }
+        )}
+      </TouchableOpacity>
+    </>
+  );
 
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: Colors.background,
-    },
-    scrollContent: {
-      flexGrow: 1,
-      justifyContent: 'center',
-      padding: 24,
-    },
-    header: {
-      alignItems: 'center',
-      marginBottom: 32,
-    },
-    logo: {
-      fontSize: 36,
-      fontWeight: 'bold',
-      color: Colors.primary,
-      letterSpacing: 2,
-    },
-    subtitle: {
-      fontSize: 18,
-      color: Colors.secondary,
-      fontWeight: '600',
-      marginTop: 4,
-    },
-    form: {
-      backgroundColor: Colors.card,
-      borderRadius: 16,
-      padding: 24,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 8,
-      elevation: 3,
-    },
-    title: {
-      fontSize: 24,
-      fontWeight: 'bold',
-      color: Colors.text,
-      marginBottom: 24,
-      textAlign: 'center',
-    },
-    input: {
-      backgroundColor: Colors.background,
-      borderWidth: 1,
-      borderColor: Colors.border,
-      borderRadius: 12,
-      padding: 16,
-      fontSize: 16,
-      color: Colors.text,
-      marginBottom: 16,
-    },
-    button: {
-      backgroundColor: Colors.primary,
-      borderRadius: 12,
-      padding: 16,
-      alignItems: 'center',
-      marginTop: 8,
-    },
-    buttonDisabled: {
-      opacity: 0.6,
-    },
-    buttonText: {
-      color: '#FFFFFF',
-      fontSize: 16,
-      fontWeight: 'bold',
-    },
-    linkButton: {
-      marginTop: 16,
-      alignItems: 'center',
-    },
-    linkText: {
-      color: Colors.textSecondary,
-      fontSize: 14,
-    },
-    linkTextBold: {
-      color: Colors.primary,
-      fontWeight: 'bold',
-    },
-  });
-  
+  const renderOtpStep = () => (
+    <>
+      {otpMessage ? (
+        <View style={styles.otpMessageContainer}>
+          <Ionicons name="checkmark-circle" size={20} color={Colors.success} />
+          <Text style={styles.otpMessageText}>{otpMessage}</Text>
+        </View>
+      ) : null}
+
+      <Text style={styles.otpLabel}>Enter the 6-digit OTP sent to {phone}</Text>
+
+      <TextInput
+        style={[styles.input, styles.otpInput]}
+        placeholder="Enter OTP"
+        value={otp}
+        onChangeText={setOtp}
+        keyboardType="number-pad"
+        maxLength={6}
+        placeholderTextColor={Colors.textSecondary}
+      />
+
+      <TouchableOpacity
+        style={[styles.button, loading && styles.buttonDisabled]}
+        onPress={handleVerifyAndRegister}
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator color="#FFFFFF" size="small" />
+        ) : (
+          <View style={styles.buttonRow}>
+            <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" />
+            <Text style={styles.buttonText}>Verify & Register</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+
+      <View style={styles.resendRow}>
+        <TouchableOpacity
+          style={styles.resendButton}
+          onPress={() => handleSendOtp('sms')}
+          disabled={loading}
+        >
+          <Text style={styles.resendText}>Resend SMS</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.resendButton}
+          onPress={() => handleSendOtp('whatsapp')}
+          disabled={loading}
+        >
+          <Text style={styles.resendText}>Resend WhatsApp</Text>
+        </TouchableOpacity>
+      </View>
+
+      <TouchableOpacity
+        style={styles.backButton}
+        onPress={() => { setStep('details'); setOtp(''); }}
+      >
+        <Ionicons name="arrow-back" size={18} color={Colors.primary} />
+        <Text style={styles.backButtonText}>Change Details</Text>
+      </TouchableOpacity>
+    </>
+  );
+
+  return (
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.header}>
+          <Text style={styles.logo}>AL BURHAN</Text>
+          <Text style={styles.subtitle}>Tours & Travels</Text>
+        </View>
+
+        <View style={styles.form}>
+          <Text style={styles.title}>
+            {step === 'details' ? 'Create Account' : 'Verify OTP'}
+          </Text>
+
+          {step === 'details' ? renderDetailsStep() : renderOtpStep()}
+
+          <TouchableOpacity
+            style={styles.linkButton}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.linkText}>
+              Already have an account? <Text style={styles.linkTextBold}>Sign In</Text>
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    padding: 24,
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  logo: {
+    fontSize: 36,
+    fontWeight: 'bold' as const,
+    color: Colors.primary,
+    letterSpacing: 2,
+  },
+  subtitle: {
+    fontSize: 18,
+    color: Colors.secondary,
+    fontWeight: '600' as const,
+    marginTop: 4,
+  },
+  form: {
+    backgroundColor: Colors.card,
+    borderRadius: 16,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold' as const,
+    color: Colors.text,
+    marginBottom: 24,
+    textAlign: 'center' as const,
+  },
+  input: {
+    backgroundColor: Colors.background,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    color: Colors.text,
+    marginBottom: 16,
+  },
+  otpInput: {
+    fontSize: 24,
+    letterSpacing: 8,
+    textAlign: 'center' as const,
+  },
+  otpLabel: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    textAlign: 'center' as const,
+    marginBottom: 16,
+  },
+  otpMessageContainer: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    backgroundColor: '#ECFDF5',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    gap: 8,
+  },
+  otpMessageText: {
+    fontSize: 13,
+    color: Colors.success,
+    flex: 1,
+  },
+  button: {
+    backgroundColor: Colors.primary,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center' as const,
+    marginTop: 8,
+  },
+  whatsappButton: {
+    backgroundColor: '#25D366',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center' as const,
+    marginTop: 8,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+  buttonRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+  },
+  buttonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold' as const,
+  },
+  resendRow: {
+    flexDirection: 'row' as const,
+    justifyContent: 'center' as const,
+    gap: 16,
+    marginTop: 16,
+  },
+  resendButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  resendText: {
+    color: Colors.primary,
+    fontSize: 14,
+    fontWeight: '600' as const,
+  },
+  backButton: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    marginTop: 12,
+    gap: 4,
+  },
+  backButtonText: {
+    color: Colors.primary,
+    fontSize: 14,
+    fontWeight: '500' as const,
+  },
+  linkButton: {
+    marginTop: 16,
+    alignItems: 'center' as const,
+  },
+  linkText: {
+    color: Colors.textSecondary,
+    fontSize: 14,
+  },
+  linkTextBold: {
+    color: Colors.primary,
+    fontWeight: 'bold' as const,
+  },
+});

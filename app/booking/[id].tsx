@@ -1,134 +1,230 @@
-import React, { useState, useEffect } from 'react';
-  import {
-    View,
-    Text,
-    ScrollView,
-    TouchableOpacity,
-    StyleSheet,
-    Alert,
-    ActivityIndicator,
-    TextInput,
-  } from 'react-native';
-  import { useLocalSearchParams, useRouter } from 'expo-router';
-  import { bookingService, paymentService } from '../../services/api';
-  import { Colors } from '../../constants/Colors';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+  TextInput,
+  Modal,
+  Platform,
+} from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { WebView } from 'react-native-webview';
+import { bookingService, paymentService } from '../../services/api';
+import { Colors } from '../../constants/Colors';
+import { getApiUrl } from '../../lib/query-client';
 
-  export default function BookingDetailsScreen() {
-    const { id } = useLocalSearchParams();
-    const [booking, setBooking] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
-    const [paymentAmount, setPaymentAmount] = useState('');
-    const [processing, setProcessing] = useState(false);
-    const router = useRouter();
+export default function BookingDetailsScreen() {
+  const { id } = useLocalSearchParams();
+  const [booking, setBooking] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [processing, setProcessing] = useState(false);
+  const [showPaymentWebView, setShowPaymentWebView] = useState(false);
+  const [razorpayHtml, setRazorpayHtml] = useState('');
+  const [currentOrderId, setCurrentOrderId] = useState('');
+  const router = useRouter();
 
-    useEffect(() => {
-      loadBooking();
-    }, [id]);
+  useEffect(() => {
+    loadBooking();
+  }, [id]);
 
-    const loadBooking = async () => {
-      try {
-        const response = await bookingService.getBookingById(parseInt(id as string));
-        if (response.success) {
-          setBooking(response.booking);
-          const remaining = parseFloat(response.booking.totalAmount) - parseFloat(response.booking.paidAmount);
-          setPaymentAmount(remaining.toString());
+  const loadBooking = async () => {
+    try {
+      const response = await bookingService.getBookingById(parseInt(id as string));
+      if (response.success) {
+        setBooking(response.booking);
+        const remaining = parseFloat(response.booking.totalAmount) - parseFloat(response.booking.paidAmount);
+        setPaymentAmount(remaining.toString());
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Could not load booking');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatPrice = (price: string) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 0,
+    }).format(parseFloat(price));
+  };
+
+  const formatDate = (date: string) => {
+    return new Date(date).toLocaleDateString('en-IN', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  };
+
+  const buildRazorpayHtml = (orderId: string, amount: number, keyId: string) => {
+    const amountInPaise = Math.round(amount * 100);
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <style>
+    body {
+      margin: 0; padding: 0;
+      display: flex; justify-content: center; align-items: center;
+      min-height: 100vh;
+      background: #F0FDF4;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    .loading { text-align: center; color: #047857; font-size: 18px; }
+    .spinner { border: 4px solid #E5E7EB; border-top: 4px solid #047857; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 16px; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="loading">
+    <div class="spinner"></div>
+    <p>Opening Payment Gateway...</p>
+  </div>
+  <script>
+    var options = {
+      key: "${keyId}",
+      amount: ${amountInPaise},
+      currency: "INR",
+      name: "AL BURHAN TOURS",
+      description: "Booking #${booking?.id} Payment",
+      order_id: "${orderId}",
+      handler: function(response) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: "payment_success",
+          razorpay_payment_id: response.razorpay_payment_id,
+          razorpay_order_id: response.razorpay_order_id,
+          razorpay_signature: response.razorpay_signature
+        }));
+      },
+      prefill: {
+        name: "${booking?.contactName || ''}",
+        email: "${booking?.contactEmail || ''}",
+        contact: "${booking?.contactPhone || ''}"
+      },
+      theme: { color: "#047857" },
+      modal: {
+        ondismiss: function() {
+          window.ReactNativeWebView.postMessage(JSON.stringify({ type: "payment_cancelled" }));
         }
-      } catch (error) {
-        Alert.alert('Error', 'Could not load booking');
-      } finally {
-        setLoading(false);
       }
     };
+    var rzp = new Razorpay(options);
+    rzp.on('payment.failed', function(response) {
+      window.ReactNativeWebView.postMessage(JSON.stringify({
+        type: "payment_failed",
+        error: response.error.description
+      }));
+    });
+    rzp.open();
+  </script>
+</body>
+</html>`;
+  };
 
-    const formatPrice = (price: string) => {
-      return new Intl.NumberFormat('en-IN', {
-        style: 'currency',
-        currency: 'INR',
-        maximumFractionDigits: 0,
-      }).format(parseFloat(price));
-    };
+  const handlePayment = async () => {
+    const amount = parseFloat(paymentAmount);
+    const remaining = parseFloat(booking.totalAmount) - parseFloat(booking.paidAmount);
 
-    const formatDate = (date: string) => {
-      return new Date(date).toLocaleDateString('en-IN', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      });
-    };
+    if (!amount || amount <= 0) {
+      Alert.alert('Error', 'Please enter a valid amount');
+      return;
+    }
 
-    const handlePayment = async () => {
-      const amount = parseFloat(paymentAmount);
-      const remaining = parseFloat(booking.totalAmount) - parseFloat(booking.paidAmount);
+    if (amount > remaining) {
+      Alert.alert('Error', `Amount cannot exceed remaining balance of ${formatPrice(remaining.toString())}`);
+      return;
+    }
 
-      if (!amount || amount <= 0) {
-        Alert.alert('Error', 'Please enter a valid amount');
-        return;
-      }
+    setProcessing(true);
+    try {
+      const orderResponse = await paymentService.createOrder(booking.id, amount);
 
-      if (amount > remaining) {
-        Alert.alert('Error', `Amount cannot exceed remaining balance of ${formatPrice(remaining.toString())}`);
-        return;
-      }
-
-      setProcessing(true);
-      try {
-        // Create Razorpay order
-        const orderResponse = await paymentService.createOrder(booking.id, amount);
-        
-        if (orderResponse.success) {
-          // Simulate payment success (in real app, Razorpay SDK would be used)
+      if (orderResponse.success) {
+        if (orderResponse.keyId) {
+          const html = buildRazorpayHtml(orderResponse.orderId, amount, orderResponse.keyId);
+          setRazorpayHtml(html);
+          setCurrentOrderId(orderResponse.orderId);
+          setShowPaymentWebView(true);
+        } else {
           Alert.alert(
-            'Payment Simulation',
-            `This is a demo. In production, Razorpay payment gateway would be integrated here.\n\nAmount: ${formatPrice(amount.toString())}`,
-            [
-              {
-                text: 'Simulate Success',
-                onPress: async () => {
-                  try {
-                    const verifyResponse = await paymentService.verifyPayment({
-                      bookingId: booking.id,
-                      razorpayOrderId: orderResponse.orderId,
-                      razorpayPaymentId: `pay_${Date.now()}`,
-                      razorpaySignature: 'demo_signature',
-                      amount: amount.toString(),
-                    });
-
-                    if (verifyResponse.success) {
-                      Alert.alert('Success', 'Payment completed successfully!', [
-                        { text: 'OK', onPress: loadBooking }
-                      ]);
-                    }
-                  } catch (error: any) {
-                    Alert.alert('Error', error.message);
-                  }
-                },
-              },
-              { text: 'Cancel', style: 'cancel' },
-            ]
+            'Razorpay Not Configured',
+            'Razorpay API keys are not set. Payment gateway is unavailable.',
+            [{ text: 'OK' }]
           );
         }
-      } catch (error: any) {
-        Alert.alert('Error', error.message || 'Payment failed');
-      } finally {
-        setProcessing(false);
       }
-    };
-
-    if (loading) {
-      return (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-        </View>
-      );
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Payment failed');
+    } finally {
+      setProcessing(false);
     }
+  };
 
-    if (!booking) {
-      return null;
+  const handleWebViewMessage = async (event: any) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+
+      if (data.type === 'payment_success') {
+        setShowPaymentWebView(false);
+        setProcessing(true);
+        try {
+          const verifyResponse = await paymentService.verifyPayment({
+            bookingId: booking.id,
+            razorpayOrderId: data.razorpay_order_id,
+            razorpayPaymentId: data.razorpay_payment_id,
+            razorpaySignature: data.razorpay_signature,
+            amount: paymentAmount,
+          });
+
+          if (verifyResponse.success) {
+            Alert.alert('Payment Successful', 'Your payment has been verified and confirmed!', [
+              { text: 'OK', onPress: loadBooking }
+            ]);
+          } else {
+            Alert.alert('Verification Failed', verifyResponse.error || 'Payment verification failed');
+          }
+        } catch (error: any) {
+          Alert.alert('Error', error.message || 'Payment verification failed');
+        } finally {
+          setProcessing(false);
+        }
+      } else if (data.type === 'payment_failed') {
+        setShowPaymentWebView(false);
+        Alert.alert('Payment Failed', data.error || 'Payment was not completed');
+      } else if (data.type === 'payment_cancelled') {
+        setShowPaymentWebView(false);
+      }
+    } catch (e) {
+      console.error('WebView message parse error:', e);
     }
+  };
 
-    const remainingAmount = parseFloat(booking.totalAmount) - parseFloat(booking.paidAmount);
-
+  if (loading) {
     return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    );
+  }
+
+  if (!booking) {
+    return null;
+  }
+
+  const remainingAmount = parseFloat(booking.totalAmount) - parseFloat(booking.paidAmount);
+
+  return (
+    <View style={{ flex: 1 }}>
       <ScrollView style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.bookingId}>Booking #{booking.id}</Text>
@@ -221,7 +317,7 @@ import React, { useState, useEffect } from 'react';
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Make Payment</Text>
             <View style={styles.card}>
-              <Text style={styles.inputLabel}>Payment Amount (₹)</Text>
+              <Text style={styles.inputLabel}>Payment Amount</Text>
               <TextInput
                 style={styles.input}
                 value={paymentAmount}
@@ -234,46 +330,105 @@ import React, { useState, useEffect } from 'react';
                 onPress={handlePayment}
                 disabled={processing}
               >
-                <Text style={styles.payButtonText}>
-                  {processing ? 'Processing...' : 'Pay Now'}
-                </Text>
+                {processing ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <View style={styles.payButtonRow}>
+                    <Ionicons name="card-outline" size={20} color="#FFFFFF" />
+                    <Text style={styles.payButtonText}>Pay with Razorpay</Text>
+                  </View>
+                )}
               </TouchableOpacity>
-              <Text style={styles.note}>
-                💡 Note: In production, this will integrate with Razorpay payment gateway
-              </Text>
             </View>
           </View>
         )}
 
         <View style={{ height: 40 }} />
       </ScrollView>
-    );
-  }
 
-  const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: Colors.background },
-    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    header: { backgroundColor: Colors.card, padding: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.border },
-    bookingId: { fontSize: 20, fontWeight: 'bold', color: Colors.text },
-    statusBadge: { backgroundColor: Colors.primary, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
-    statusText: { color: '#FFFFFF', fontSize: 12, fontWeight: 'bold' },
-    section: { padding: 16 },
-    sectionTitle: { fontSize: 18, fontWeight: 'bold', color: Colors.text, marginBottom: 12 },
-    card: { backgroundColor: Colors.card, borderRadius: 12, padding: 16, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
-    row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, alignItems: 'center' },
-    label: { fontSize: 14, color: Colors.textSecondary, flex: 1 },
-    value: { fontSize: 14, fontWeight: '600', color: Colors.text, flex: 1, textAlign: 'right' },
-    boldLabel: { fontWeight: 'bold', fontSize: 16, color: Colors.text },
-    boldValue: { fontWeight: 'bold', fontSize: 16 },
-    travelerTitle: { fontSize: 16, fontWeight: 'bold', color: Colors.text, marginBottom: 8 },
-    divider: { height: 1, backgroundColor: Colors.border, marginVertical: 8 },
-    paymentBadge: { backgroundColor: Colors.warning, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 6 },
-    paymentText: { color: '#FFFFFF', fontSize: 12, fontWeight: 'bold' },
-    inputLabel: { fontSize: 14, color: Colors.text, marginBottom: 8, fontWeight: '600' },
-    input: { backgroundColor: Colors.background, borderRadius: 8, padding: 12, fontSize: 16, color: Colors.text, marginBottom: 16, borderWidth: 1, borderColor: Colors.border },
-    payButton: { backgroundColor: Colors.secondary, padding: 16, borderRadius: 8, alignItems: 'center', marginBottom: 12 },
-    payButtonDisabled: { opacity: 0.6 },
-    payButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
-    note: { fontSize: 12, color: Colors.textSecondary, textAlign: 'center', fontStyle: 'italic' },
-  });
-  
+      <Modal
+        visible={showPaymentWebView}
+        animationType="slide"
+        onRequestClose={() => setShowPaymentWebView(false)}
+      >
+        <View style={styles.webViewContainer}>
+          <View style={styles.webViewHeader}>
+            <TouchableOpacity
+              onPress={() => setShowPaymentWebView(false)}
+              style={styles.webViewCloseButton}
+            >
+              <Ionicons name="close" size={24} color={Colors.text} />
+            </TouchableOpacity>
+            <Text style={styles.webViewTitle}>Razorpay Payment</Text>
+            <View style={{ width: 40 }} />
+          </View>
+          {Platform.OS === 'web' ? (
+            <View style={styles.webFallback}>
+              <Ionicons name="card-outline" size={48} color={Colors.primary} />
+              <Text style={styles.webFallbackTitle}>Payment Gateway</Text>
+              <Text style={styles.webFallbackText}>
+                Razorpay checkout opens in a WebView on mobile devices. On web, please use the mobile app for payment.
+              </Text>
+              <TouchableOpacity
+                style={styles.webFallbackButton}
+                onPress={() => setShowPaymentWebView(false)}
+              >
+                <Text style={styles.webFallbackButtonText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <WebView
+              source={{ html: razorpayHtml }}
+              onMessage={handleWebViewMessage}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
+              startInLoadingState={true}
+              renderLoading={() => (
+                <View style={styles.webViewLoading}>
+                  <ActivityIndicator size="large" color={Colors.primary} />
+                </View>
+              )}
+            />
+          )}
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: Colors.background },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  header: { backgroundColor: Colors.card, padding: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.border },
+  bookingId: { fontSize: 20, fontWeight: 'bold' as const, color: Colors.text },
+  statusBadge: { backgroundColor: Colors.primary, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
+  statusText: { color: '#FFFFFF', fontSize: 12, fontWeight: 'bold' as const },
+  section: { padding: 16 },
+  sectionTitle: { fontSize: 18, fontWeight: 'bold' as const, color: Colors.text, marginBottom: 12 },
+  card: { backgroundColor: Colors.card, borderRadius: 12, padding: 16, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+  row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, alignItems: 'center' },
+  label: { fontSize: 14, color: Colors.textSecondary, flex: 1 },
+  value: { fontSize: 14, fontWeight: '600' as const, color: Colors.text, flex: 1, textAlign: 'right' as const },
+  boldLabel: { fontWeight: 'bold' as const, fontSize: 16, color: Colors.text },
+  boldValue: { fontWeight: 'bold' as const, fontSize: 16 },
+  travelerTitle: { fontSize: 16, fontWeight: 'bold' as const, color: Colors.text, marginBottom: 8 },
+  divider: { height: 1, backgroundColor: Colors.border, marginVertical: 8 },
+  paymentBadge: { backgroundColor: Colors.warning, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 6 },
+  paymentText: { color: '#FFFFFF', fontSize: 12, fontWeight: 'bold' as const },
+  inputLabel: { fontSize: 14, color: Colors.text, marginBottom: 8, fontWeight: '600' as const },
+  input: { backgroundColor: Colors.background, borderRadius: 8, padding: 12, fontSize: 16, color: Colors.text, marginBottom: 16, borderWidth: 1, borderColor: Colors.border },
+  payButton: { backgroundColor: '#3399CC', padding: 16, borderRadius: 8, alignItems: 'center', marginBottom: 12 },
+  payButtonDisabled: { opacity: 0.6 },
+  payButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  payButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' as const },
+  webViewContainer: { flex: 1, backgroundColor: Colors.background },
+  webViewHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 56 : 16, paddingBottom: 12, backgroundColor: Colors.card, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  webViewCloseButton: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
+  webViewTitle: { fontSize: 17, fontWeight: '600' as const, color: Colors.text },
+  webViewLoading: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center' },
+  webFallback: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
+  webFallbackTitle: { fontSize: 20, fontWeight: 'bold' as const, color: Colors.text, marginTop: 16 },
+  webFallbackText: { fontSize: 14, color: Colors.textSecondary, textAlign: 'center' as const, marginTop: 8, lineHeight: 20 },
+  webFallbackButton: { backgroundColor: Colors.primary, paddingHorizontal: 32, paddingVertical: 12, borderRadius: 8, marginTop: 24 },
+  webFallbackButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' as const },
+});

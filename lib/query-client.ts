@@ -12,17 +12,19 @@ export function getApiUrl(): string {
     return "https://localhost:5000";
   }
 
-  if (Platform.OS !== "web") {
+  if (Platform.OS === "web") {
+    if (typeof window !== "undefined" && window.location) {
+      if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+        return `http://${window.location.hostname}:5000`;
+      }
+      return `${window.location.protocol}//${window.location.hostname}`;
+    }
     const hostOnly = host.replace(/:5000$/, "").replace(/:443$/, "");
     return `https://${hostOnly}`;
   }
 
-  try {
-    let url = new URL(`https://${host}`);
-    return url.href;
-  } catch {
-    return `https://${host}`;
-  }
+  const hostOnly = host.replace(/:5000$/, "").replace(/:443$/, "");
+  return `https://${hostOnly}`;
 }
 
 async function throwIfResNotOk(res: Response) {

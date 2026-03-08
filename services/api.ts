@@ -35,6 +35,38 @@ export const authService = {
     return response;
   },
 
+  async sendOtp(phone: string) {
+    return request("POST", "/api/auth/send-otp", { phone });
+  },
+
+  async sendWhatsAppOtp(phone: string) {
+    return request("POST", "/api/auth/send-whatsapp-otp", { phone });
+  },
+
+  async verifyOtp(phone: string, otp: string, userData: { name: string; email: string; password: string }) {
+    const response = await request("POST", "/api/auth/verify-otp", {
+      phone,
+      otp,
+      ...userData,
+    });
+    if (response.success) {
+      await AsyncStorage.setItem("user", JSON.stringify(response.user));
+    }
+    return response;
+  },
+
+  async loginWithOtp(phone: string) {
+    return request("POST", "/api/auth/login-with-otp", { phone });
+  },
+
+  async verifyLoginOtp(phone: string, otp: string) {
+    const response = await request("POST", "/api/auth/verify-login-otp", { phone, otp });
+    if (response.success) {
+      await AsyncStorage.setItem("user", JSON.stringify(response.user));
+    }
+    return response;
+  },
+
   async logout() {
     await AsyncStorage.removeItem("user");
   },

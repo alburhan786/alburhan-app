@@ -1,9 +1,61 @@
 import type { Express } from "express";
 import { createServer, type Server } from "node:http";
+import { createHmac } from "node:crypto";
 import { db } from "./db";
 import { users, packages, bookings, payments, notifications, documents } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
 import bcrypt from "bcryptjs";
+
+const otpStore = new Map<string, { otp: string; expiresAt: number }>();
+
+function generateOtp(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+async function sendSmsFast2SMS(phone: string, message: string): Promise<boolean> {
+  const apiKey = process.env.FAST2SMS_API_KEY;
+  if (!apiKey) {
+    console.log("[Fast2SMS] API key not configured, skipping SMS");
+    return false;
+  }
+  try {
+    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=q&message=${encodeURIComponent(message)}&language=english&flash=0&numbers=${phone}`;
+    const response = await fetch(url, { method: "GET" });
+    const data = await response.json();
+    console.log("[Fast2SMS] Response:", JSON.stringify(data));
+    return data.return === true;
+  } catch (error) {
+    console.error("[Fast2SMS] Error:", error);
+    return false;
+  }
+}
+
+async function sendWhatsAppBotBee(phone: string, message: string): Promise<boolean> {
+  const apiKey = process.env.BOTBEE_WHATSAPP_API_KEY;
+  if (!apiKey) {
+    console.log("[BotBee] API key not configured, skipping WhatsApp");
+    return false;
+  }
+  try {
+    const response = await fetch("https://app.botbee.io/api/v1/whatsapp/send-message", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        phone: `91${phone}`,
+        message,
+      }),
+    });
+    const data = await response.json();
+    console.log("[BotBee] Response:", JSON.stringify(data));
+    return true;
+  } catch (error) {
+    console.error("[BotBee] Error:", error);
+    return false;
+  }
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/register", async (req, res) => {
@@ -33,6 +85,140 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validPassword = await bcrypt.compare(password, user.password);
       if (!validPassword) {
         return res.status(401).json({ success: false, error: "Invalid credentials" });
+      }
+      const { password: _, ...userWithoutPassword } = user;
+      res.json({ success: true, user: userWithoutPassword });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post("/api/auth/send-otp", async (req, res) => {
+    try {
+      const { phone } = req.body;
+      if (!phone) {
+        return res.status(400).json({ success: false, error: "Phone number is required" });
+      }
+      const otp = generateOtp();
+      otpStore.set(phone, { otp, expiresAt: Date.now() + 5 * 60 * 1000 });
+      const message = `Your AL BURHAN TOURS OTP is ${otp}. Valid for 5 minutes.`;
+      const sent = await sendSmsFast2SMS(phone, message);
+      console.log(`[OTP] Generated OTP ${otp} for phone ${phone}`);
+      res.json({ success: true, message: sent ? "OTP sent via SMS" : "OTP generated (SMS delivery pending - check API key config)" });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post("/api/auth/send-whatsapp-otp", async (req, res) => {
+    try {
+      const { phone } = req.body;
+      if (!phone) {
+        return res.status(400).json({ success: false, error: "Phone number is required" });
+      }
+      const existing = otpStore.get(phone);
+      let otp: string;
+      if (existing && existing.expiresAt > Date.now()) {
+        otp = existing.otp;
+      } else {
+        otp = generateOtp();
+        otpStore.set(phone, { otp, expiresAt: Date.now() + 5 * 60 * 1000 });
+      }
+      const message = `Your AL BURHAN TOURS OTP is ${otp}. Valid for 5 minutes.`;
+      const sent = await sendWhatsAppBotBee(phone, message);
+      console.log(`[OTP] Sent OTP ${otp} via WhatsApp to ${phone}`);
+      res.json({ success: true, message: sent ? "OTP sent via WhatsApp" : "OTP generated (WhatsApp delivery pending - check API key config)" });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post("/api/auth/verify-otp", async (req, res) => {
+    try {
+      const { phone, otp, name, email, password } = req.body;
+      if (!phone || !otp) {
+        return res.status(400).json({ success: false, error: "Phone and OTP are required" });
+      }
+      if (!name || !email || !password) {
+        return res.status(400).json({ success: false, error: "Name, email, and password are required" });
+      }
+      const stored = otpStore.get(phone);
+      if (!stored) {
+        return res.status(400).json({ success: false, error: "No OTP found for this phone. Please request a new OTP." });
+      }
+      if (Date.now() > stored.expiresAt) {
+        otpStore.delete(phone);
+        return res.status(400).json({ success: false, error: "OTP has expired. Please request a new OTP." });
+      }
+      if (stored.otp !== otp) {
+        return res.status(400).json({ success: false, error: "Invalid OTP" });
+      }
+      otpStore.delete(phone);
+      const existingEmail = await db.select().from(users).where(eq(users.email, email));
+      if (existingEmail.length > 0) {
+        return res.status(400).json({ success: false, error: "An account with this email already exists" });
+      }
+      const existingPhone = await db.select().from(users).where(eq(users.phone, phone));
+      if (existingPhone.length > 0) {
+        return res.status(400).json({ success: false, error: "An account with this phone number already exists" });
+      }
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const [user] = await db.insert(users).values({
+        name,
+        email,
+        phone,
+        password: hashedPassword,
+      }).returning();
+      const { password: _, ...userWithoutPassword } = user;
+      res.json({ success: true, user: userWithoutPassword });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post("/api/auth/login-with-otp", async (req, res) => {
+    try {
+      const { phone } = req.body;
+      if (!phone) {
+        return res.status(400).json({ success: false, error: "Phone number is required" });
+      }
+      const [user] = await db.select().from(users).where(eq(users.phone, phone));
+      if (!user) {
+        return res.status(404).json({ success: false, error: "No account found with this phone number" });
+      }
+      const otp = generateOtp();
+      otpStore.set(`login_${phone}`, { otp, expiresAt: Date.now() + 5 * 60 * 1000 });
+      const message = `Your AL BURHAN TOURS login OTP is ${otp}. Valid for 5 minutes.`;
+      const sent = await sendSmsFast2SMS(phone, message);
+      await sendWhatsAppBotBee(phone, message);
+      console.log(`[OTP] Login OTP ${otp} for phone ${phone}`);
+      res.json({ success: true, message: "OTP sent" });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post("/api/auth/verify-login-otp", async (req, res) => {
+    try {
+      const { phone, otp } = req.body;
+      if (!phone || !otp) {
+        return res.status(400).json({ success: false, error: "Phone and OTP are required" });
+      }
+      const stored = otpStore.get(`login_${phone}`);
+      if (!stored) {
+        return res.status(400).json({ success: false, error: "No OTP found. Please request a new OTP." });
+      }
+      if (Date.now() > stored.expiresAt) {
+        otpStore.delete(`login_${phone}`);
+        return res.status(400).json({ success: false, error: "OTP has expired. Please request a new OTP." });
+      }
+      if (stored.otp !== otp) {
+        return res.status(400).json({ success: false, error: "Invalid OTP" });
+      }
+      otpStore.delete(`login_${phone}`);
+      const [user] = await db.select().from(users).where(eq(users.phone, phone));
+      if (!user) {
+        return res.status(404).json({ success: false, error: "User not found" });
       }
       const { password: _, ...userWithoutPassword } = user;
       res.json({ success: true, user: userWithoutPassword });
@@ -124,8 +310,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/payments/create-order", async (req, res) => {
     try {
       const { bookingId, amount } = req.body;
-      const orderId = `order_${Date.now()}`;
-      res.json({ success: true, orderId, amount, currency: "INR" });
+      const keyId = process.env.RAZORPAY_KEY_ID;
+      const keySecret = process.env.RAZORPAY_KEY_SECRET;
+
+      if (!keyId || !keySecret) {
+        return res.status(500).json({ success: false, error: "Payment gateway not configured. Please contact support." });
+      }
+
+      const amountInPaise = Math.round(parseFloat(amount) * 100);
+      const auth = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
+
+      const response = await fetch("https://api.razorpay.com/v1/orders", {
+        method: "POST",
+        headers: {
+          "Authorization": `Basic ${auth}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          amount: amountInPaise,
+          currency: "INR",
+          receipt: `booking_${bookingId}`,
+        }),
+      });
+
+      const order = await response.json();
+      if (!response.ok) {
+        console.error("[Razorpay] Order creation failed:", order);
+        return res.status(400).json({ success: false, error: order.error?.description || "Failed to create Razorpay order" });
+      }
+
+      console.log("[Razorpay] Order created:", order.id);
+      res.json({ success: true, orderId: order.id, amount: order.amount, currency: order.currency, keyId });
     } catch (error: any) {
       res.status(400).json({ success: false, error: error.message });
     }
@@ -134,6 +349,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/payments/verify", async (req, res) => {
     try {
       const { bookingId, razorpayOrderId, razorpayPaymentId, razorpaySignature, amount } = req.body;
+
+      const keySecret = process.env.RAZORPAY_KEY_SECRET;
+      if (!keySecret) {
+        return res.status(500).json({ success: false, error: "Payment verification unavailable. Server configuration error." });
+      }
+      if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
+        return res.status(400).json({ success: false, error: "Missing payment details for verification." });
+      }
+      const expectedSignature = createHmac("sha256", keySecret)
+        .update(`${razorpayOrderId}|${razorpayPaymentId}`)
+        .digest("hex");
+      if (expectedSignature !== razorpaySignature) {
+        return res.status(400).json({ success: false, error: "Invalid payment signature. Payment verification failed." });
+      }
+      console.log("[Razorpay] Signature verified successfully");
+
       const [payment] = await db.insert(payments).values({
         bookingId: parseInt(bookingId),
         amount,
@@ -280,16 +511,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message = `Assalamu Alaikum, Payment received for booking #${bookingId}. Your booking is now confirmed! JazakAllah Khair.`;
         break;
     }
-    console.log(`[WhatsApp/BotBee] To ${user.phone}: ${message}`);
-    console.log(`[RCS/Lemin] To ${user.phone}: ${message}`);
-    console.log(`[SMS/Fast2SMS] To ${user.phone}: ${message}`);
+
+    const whatsappResult = await sendWhatsAppBotBee(user.phone, message);
+    console.log(`[WhatsApp/BotBee] To ${user.phone}: ${whatsappResult ? "sent" : "failed/skipped"}`);
+
+    const smsResult = await sendSmsFast2SMS(user.phone, message);
+    console.log(`[SMS/Fast2SMS] To ${user.phone}: ${smsResult ? "sent" : "failed/skipped"}`);
+
     await db.insert(notifications).values({
       userId,
       bookingId,
       type: "multi_channel",
       channel: "all",
       message,
-      status: "sent",
+      status: whatsappResult || smsResult ? "sent" : "pending",
     });
   }
 

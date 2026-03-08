@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect } from "react";
+import React, { createContext, useState, useContext, useEffect, useMemo } from "react";
 import { authService } from "@/services/api";
 
 interface User {
@@ -15,6 +15,11 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (data: { name: string; email: string; phone: string; password: string }) => Promise<void>;
   logout: () => Promise<void>;
+  sendOtp: (phone: string) => Promise<{ success: boolean; message?: string; error?: string }>;
+  sendWhatsAppOtp: (phone: string) => Promise<{ success: boolean; message?: string; error?: string }>;
+  verifyOtp: (phone: string, otp: string, userData: { name: string; email: string; password: string }) => Promise<void>;
+  loginWithOtp: (phone: string) => Promise<{ success: boolean; message?: string; error?: string }>;
+  verifyLoginOtp: (phone: string, otp: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -56,13 +61,60 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const sendOtp = async (phone: string) => {
+    const response = await authService.sendOtp(phone);
+    if (!response.success) {
+      throw new Error(response.error || "Failed to send OTP");
+    }
+    return response;
+  };
+
+  const sendWhatsAppOtp = async (phone: string) => {
+    const response = await authService.sendWhatsAppOtp(phone);
+    if (!response.success) {
+      throw new Error(response.error || "Failed to send WhatsApp OTP");
+    }
+    return response;
+  };
+
+  const verifyOtp = async (phone: string, otp: string, userData: { name: string; email: string; password: string }) => {
+    const response = await authService.verifyOtp(phone, otp, userData);
+    if (response.success) {
+      setUser(response.user);
+    } else {
+      throw new Error(response.error || "OTP verification failed");
+    }
+  };
+
+  const loginWithOtp = async (phone: string) => {
+    const response = await authService.loginWithOtp(phone);
+    if (!response.success) {
+      throw new Error(response.error || "Failed to send login OTP");
+    }
+    return response;
+  };
+
+  const verifyLoginOtp = async (phone: string, otp: string) => {
+    const response = await authService.verifyLoginOtp(phone, otp);
+    if (response.success) {
+      setUser(response.user);
+    } else {
+      throw new Error(response.error || "OTP verification failed");
+    }
+  };
+
   const logout = async () => {
     await authService.logout();
     setUser(null);
   };
 
+  const value = useMemo(() => ({
+    user, loading, login, register, logout,
+    sendOtp, sendWhatsAppOtp, verifyOtp, loginWithOtp, verifyLoginOtp,
+  }), [user, loading]);
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
