@@ -121,9 +121,9 @@ export default function HomeScreen() {
                     onValueChange={setFilterType}
                     style={styles.picker}
                   >
-                    <Picker.Item label="All" value="all" />
-                    <Picker.Item label="Hajj" value="hajj" />
-                    <Picker.Item label="Umrah" value="umrah" />
+                    <Picker.Item label="All Packages" value="all" />
+                    <Picker.Item label="Hajj 2027" value="hajj" />
+                    <Picker.Item label="Umrah 2026" value="umrah" />
                   </Picker>
                 </View>
               </View>
@@ -156,23 +156,17 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          <View style={styles.packagesSection}>
-            <Text style={styles.sectionTitle}>
-              {filteredPackages.length} Package{filteredPackages.length !== 1 ? 's' : ''} Available
-            </Text>
+          {(() => {
+            const hajjPackages = filteredPackages.filter(p => p.type === 'hajj');
+            const umrahPackages = filteredPackages.filter(p => p.type === 'umrah');
 
-            {filteredPackages.map((pkg) => (
+            const renderCard = (pkg: any) => (
               <TouchableOpacity
                 key={pkg.id}
                 style={styles.packageCard}
                 onPress={() => router.push(`/package/${pkg.id}`)}
               >
                 <View style={styles.packageHeader}>
-                  <View style={styles.packageBadge}>
-                    <Text style={styles.packageBadgeText}>
-                      {pkg.type.toUpperCase()}
-                    </Text>
-                  </View>
                   {pkg.featured && (
                     <View style={styles.featuredBadge}>
                       <Text style={styles.featuredText}>★ Featured</Text>
@@ -209,16 +203,46 @@ export default function HomeScreen() {
                   </View>
                 </View>
               </TouchableOpacity>
-            ))}
+            );
 
-            {filteredPackages.length === 0 && (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyStateText}>
-                  No packages found matching your filters
-                </Text>
+            return (
+              <View style={styles.packagesSection}>
+                {(filterType === 'all' || filterType === 'hajj') && hajjPackages.length > 0 && (
+                  <View>
+                    <View style={styles.groupHeader}>
+                      <View style={styles.groupBadge}>
+                        <Text style={styles.groupBadgeText}>HAJJ 2027</Text>
+                      </View>
+                      <Text style={styles.groupSubtitle}>Al Burhan Hajj Premium Collection</Text>
+                      <Text style={styles.groupInfo}>{hajjPackages.length} package{hajjPackages.length !== 1 ? 's' : ''} • Departure: May 2027</Text>
+                    </View>
+                    {hajjPackages.map(renderCard)}
+                  </View>
+                )}
+
+                {(filterType === 'all' || filterType === 'umrah') && umrahPackages.length > 0 && (
+                  <View>
+                    <View style={styles.groupHeader}>
+                      <View style={[styles.groupBadge, { backgroundColor: '#2563eb' }]}>
+                        <Text style={styles.groupBadgeText}>UMRAH 2026</Text>
+                      </View>
+                      <Text style={styles.groupSubtitle}>Umrah Packages</Text>
+                      <Text style={styles.groupInfo}>{umrahPackages.length} package{umrahPackages.length !== 1 ? 's' : ''}</Text>
+                    </View>
+                    {umrahPackages.map(renderCard)}
+                  </View>
+                )}
+
+                {filteredPackages.length === 0 && (
+                  <View style={styles.emptyState}>
+                    <Text style={styles.emptyStateText}>
+                      No packages found matching your filters
+                    </Text>
+                  </View>
+                )}
               </View>
-            )}
-          </View>
+            );
+          })()}
         </ScrollView>
       </View>
     );
@@ -310,6 +334,39 @@ export default function HomeScreen() {
       fontWeight: 'bold',
       color: Colors.text,
       marginBottom: 16,
+    },
+    groupHeader: {
+      marginBottom: 16,
+      marginTop: 8,
+      padding: 16,
+      backgroundColor: Colors.card,
+      borderRadius: 16,
+      borderLeftWidth: 4,
+      borderLeftColor: Colors.primary,
+    },
+    groupBadge: {
+      backgroundColor: Colors.primary,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 8,
+      alignSelf: 'flex-start',
+      marginBottom: 8,
+    },
+    groupBadgeText: {
+      color: '#FFFFFF',
+      fontSize: 16,
+      fontWeight: 'bold' as const,
+      letterSpacing: 1.5,
+    },
+    groupSubtitle: {
+      fontSize: 15,
+      fontWeight: '600' as const,
+      color: Colors.text,
+      marginBottom: 4,
+    },
+    groupInfo: {
+      fontSize: 13,
+      color: Colors.textSecondary,
     },
     packageCard: {
       backgroundColor: Colors.card,
