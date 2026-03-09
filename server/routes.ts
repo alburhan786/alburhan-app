@@ -101,12 +101,21 @@ async function sendWhatsAppBotBee(phone: string, message: string): Promise<boole
     console.log("[BotBee] API key not configured, skipping WhatsApp");
     return false;
   }
-  const apiUrl = process.env.BOTBEE_API_URL || "https://app.botbee.io/api/v1";
   const phoneNumberId = process.env.BOTBEE_PHONE_NUMBER_ID || "965912196611113";
   const phoneNumber = phone.startsWith("91") ? phone : `91${phone}`;
   try {
-    const url = `${apiUrl}/whatsapp/send?apiToken=${encodeURIComponent(apiKey)}&phone_number_id=${phoneNumberId}&message=${encodeURIComponent(message)}&phone_number=${phoneNumber}`;
-    const response = await fetch(url, { method: "GET" });
+    const response = await fetch("https://app.botbee.io/api/v1/whatsapp/send", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        apiToken: apiKey,
+        phone_number_id: phoneNumberId,
+        message: message,
+        phone_number: phoneNumber,
+      }),
+    });
     const text = await response.text();
     try {
       const data = JSON.parse(text);
