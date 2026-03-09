@@ -65,7 +65,7 @@ AL BURHAN Tours & Travels is a cross-platform mobile application for booking Haj
 
 ### Integrations
 
-- **Fast2SMS** — OTP delivery + notification via SMS (route=q quick SMS)
+- **Fast2SMS** — OTP delivery via dedicated OTP route (with quick route fallback) + notification SMS via quick route
 - **BotBee WhatsApp** — OTP + notification delivery via WhatsApp
 - **Razorpay** — Real payment gateway (order creation + signature verification)
 - **Nodemailer** — Email notifications (Gmail SMTP, requires EMAIL_USER + EMAIL_PASS)
@@ -93,7 +93,7 @@ AL BURHAN Tours & Travels is a cross-platform mobile application for booking Haj
 | `server/replit_integrations/chat/` | Chat API routes and storage (OpenAI integration) |
 | `shared/models/chat.ts` | Drizzle schema for conversations and messages tables |
 | `app/(auth)/login.tsx` | Login screen (email/password + OTP login) |
-| `app/(auth)/register.tsx` | Registration with OTP verification (SMS/WhatsApp) |
+| `app/(auth)/register.tsx` | Registration (direct email/password or OTP verification via SMS/WhatsApp) |
 | `app/booking/[id].tsx` | Booking detail with Razorpay WebView checkout |
 | `app/(tabs)/profile.tsx` | Profile with document upload/management |
 | `services/api.ts` | API service functions (auth, OTP, bookings, payments, documents) |

@@ -55,6 +55,33 @@ function generateInvoiceNumber(bookingId: number): string {
   return `ABTTH${yy}${mm}${bookingId.toString().padStart(2, "0")}`;
 }
 
+async function sendOtpSmsFast2SMS(phone: string, otpCode: string): Promise<boolean> {
+  const apiKey = process.env.FAST2SMS_API_KEY;
+  if (!apiKey) {
+    console.log("[Fast2SMS] API key not configured, skipping OTP SMS");
+    return false;
+  }
+  try {
+    const otpUrl = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=otp&variables_values=${otpCode}&flash=0&numbers=${phone}`;
+    const otpResponse = await fetch(otpUrl, { method: "GET" });
+    const otpData = await otpResponse.json();
+    console.log("[Fast2SMS OTP Route] Response:", JSON.stringify(otpData));
+    if (otpData.return === true) {
+      return true;
+    }
+    console.log("[Fast2SMS OTP Route] Failed, trying quick route as fallback...");
+    const message = `Your AL BURHAN TOURS verification code is ${otpCode}. Valid for 5 minutes. Do not share this code.`;
+    const quickUrl = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=q&message=${encodeURIComponent(message)}&language=english&flash=0&numbers=${phone}`;
+    const quickResponse = await fetch(quickUrl, { method: "GET" });
+    const quickData = await quickResponse.json();
+    console.log("[Fast2SMS Quick Route] Response:", JSON.stringify(quickData));
+    return quickData.return === true;
+  } catch (error) {
+    console.error("[Fast2SMS] Error:", error);
+    return false;
+  }
+}
+
 async function sendSmsFast2SMS(phone: string, message: string): Promise<boolean> {
   const apiKey = process.env.FAST2SMS_API_KEY;
   if (!apiKey) {
@@ -195,8 +222,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const otp = generateOtp();
       otpStore.set(phone, { otp, expiresAt: Date.now() + 5 * 60 * 1000 });
-      const message = `Your AL BURHAN TOURS OTP is ${otp}. Valid for 5 minutes.`;
-      const sent = await sendSmsFast2SMS(phone, message);
+      const sent = await sendOtpSmsFast2SMS(phone, otp);
       console.log(`[OTP] Generated OTP ${otp} for phone ${phone}, SMS sent: ${sent}`);
       if (!sent) {
         return res.status(500).json({ success: false, error: "Failed to send SMS. Please try WhatsApp or register directly with email." });
@@ -221,15 +247,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         otp = generateOtp();
         otpStore.set(phone, { otp, expiresAt: Date.now() + 5 * 60 * 1000 });
       }
-      const message = `Your AL BURHAN TOURS OTP is ${otp}. Valid for 5 minutes.`;
-      const whatsappSent = await sendWhatsAppBotBee(phone, message);
+      const whatsappMessage = `Your AL BURHAN TOURS OTP is ${otp}. Valid for 5 minutes.`;
+      const whatsappSent = await sendWhatsAppBotBee(phone, whatsappMessage);
       if (!whatsappSent) {
-        const smsSent = await sendSmsFast2SMS(phone, message);
+        const smsSent = await sendOtpSmsFast2SMS(phone, otp);
         console.log(`[OTP] WhatsApp failed, SMS fallback ${smsSent ? "sent" : "also failed"} for ${phone}`);
         if (!smsSent) {
           return res.status(500).json({ success: false, error: "Failed to send OTP via WhatsApp and SMS. Please register directly with email instead." });
         }
-        res.json({ success: true, message: "OTP sent via SMS (WhatsApp unavailable - send a message to our WhatsApp business number first)" });
+        res.json({ success: true, message: "OTP sent via SMS (WhatsApp unavailable)" });
       } else {
         console.log(`[OTP] Sent OTP via WhatsApp to ${phone}`);
         res.json({ success: true, message: "OTP sent via WhatsApp" });
@@ -294,9 +320,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const otp = generateOtp();
       otpStore.set(`login_${phone}`, { otp, expiresAt: Date.now() + 5 * 60 * 1000 });
-      const message = `Your AL BURHAN TOURS login OTP is ${otp}. Valid for 5 minutes.`;
-      const smsSent = await sendSmsFast2SMS(phone, message);
-      const whatsappSent = await sendWhatsAppBotBee(phone, message);
+      const whatsappMessage = `Your AL BURHAN TOURS login OTP is ${otp}. Valid for 5 minutes.`;
+      const smsSent = await sendOtpSmsFast2SMS(phone, otp);
+      const whatsappSent = await sendWhatsAppBotBee(phone, whatsappMessage);
       console.log(`[OTP] Login OTP ${otp} for phone ${phone}, SMS: ${smsSent}, WhatsApp: ${whatsappSent}`);
       if (!smsSent && !whatsappSent) {
         return res.status(500).json({ success: false, error: "Failed to send OTP. Please use email and password to sign in." });
