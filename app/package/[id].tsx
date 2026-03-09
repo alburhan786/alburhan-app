@@ -9,6 +9,8 @@ import React, { useState, useEffect } from 'react';
     Alert,
   } from 'react-native';
   import { useLocalSearchParams, useRouter } from 'expo-router';
+  import { LinearGradient } from 'expo-linear-gradient';
+  import { MaterialCommunityIcons } from '@expo/vector-icons';
   import { packageService } from '../../services/api';
   import { useAuth } from '../../contexts/AuthContext';
   import { Colors } from '../../constants/Colors';
@@ -210,6 +212,31 @@ import React, { useState, useEffect } from 'react';
               ))}
             </View>
           </View>
+
+          {pkg.name?.includes('Shifting') && (
+            <View style={styles.section}>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => router.push('/travel-kit')}
+              >
+                <LinearGradient
+                  colors={['#047857', '#059669', '#10B981']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.travelKitBanner}
+                >
+                  <View style={styles.travelKitIcon}>
+                    <MaterialCommunityIcons name="gift-outline" size={28} color="#047857" />
+                  </View>
+                  <View style={styles.travelKitInfo}>
+                    <Text style={styles.travelKitTitle}>Complimentary Travel Kit</Text>
+                    <Text style={styles.travelKitSubtitle}>15 premium items included FREE</Text>
+                  </View>
+                  <MaterialCommunityIcons name="chevron-right" size={24} color="rgba(255,255,255,0.8)" />
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {pkg.exclusions && pkg.exclusions.length > 0 && (
             <View style={styles.section}>
@@ -437,6 +464,39 @@ import React, { useState, useEffect } from 'react';
       color: '#FFFFFF',
       fontSize: 16,
       fontWeight: 'bold',
+    },
+    travelKitBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 16,
+      borderRadius: 16,
+      shadowColor: '#047857',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.2,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+    travelKitIcon: {
+      width: 48,
+      height: 48,
+      borderRadius: 14,
+      backgroundColor: 'rgba(255,255,255,0.9)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 14,
+    },
+    travelKitInfo: {
+      flex: 1,
+    },
+    travelKitTitle: {
+      fontSize: 16,
+      fontWeight: '700' as const,
+      color: '#FFFFFF',
+      marginBottom: 2,
+    },
+    travelKitSubtitle: {
+      fontSize: 13,
+      color: 'rgba(255,255,255,0.8)',
     },
   });
   

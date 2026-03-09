@@ -37,6 +37,10 @@ function RootLayoutNav() {
         name="booking/[id]"
         options={{ headerShown: true, title: "Booking Details", headerTintColor: "#047857" }}
       />
+      <Stack.Screen
+        name="travel-kit"
+        options={{ headerShown: true, title: "Complimentary Travel Kit", headerTintColor: "#047857" }}
+      />
     </Stack>
   );
 }
