@@ -9,12 +9,16 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  Linking,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
 import { packageService, seedDatabase } from "@/services/api";
 import { Colors } from "@/constants/Colors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+const WHATSAPP_BUSINESS_LINK = 'https://wa.me/919893989786?text=Assalamu%20Alaikum%20I%20want%20to%20register%20for%20Hajj%20packages';
 
 export default function HomeScreen() {
     const [packages, setPackages] = useState<any[]>([]);
@@ -247,6 +251,14 @@ export default function HomeScreen() {
             );
           })()}
         </ScrollView>
+
+        <TouchableOpacity
+          style={[styles.whatsappFab, { bottom: Platform.OS === 'web' ? 50 : 20 }]}
+          onPress={() => Linking.openURL(WHATSAPP_BUSINESS_LINK)}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="logo-whatsapp" size={28} color="#FFFFFF" />
+        </TouchableOpacity>
       </View>
     );
   }
@@ -482,6 +494,21 @@ export default function HomeScreen() {
       fontSize: 16,
       color: Colors.textSecondary,
       textAlign: 'center',
+    },
+    whatsappFab: {
+      position: 'absolute' as const,
+      right: 20,
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: '#25D366',
+      justifyContent: 'center' as const,
+      alignItems: 'center' as const,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 6,
+      elevation: 8,
     },
   });
   
