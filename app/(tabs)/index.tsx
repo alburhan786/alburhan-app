@@ -103,8 +103,21 @@ export default function HomeScreen() {
     return (
       <View style={styles.container}>
         <View style={[styles.header, { paddingTop: Platform.OS === "web" ? 67 : insets.top + 16 }]}>
-          <Text style={styles.headerTitle}>AL BURHAN</Text>
-          <Text style={styles.headerSubtitle}>Tours & Travels</Text>
+          <View style={styles.headerTop}>
+            <View style={{ flex: 1 }} />
+            <View style={styles.headerCenter}>
+              <Text style={styles.headerTitle}>AL BURHAN</Text>
+              <Text style={styles.headerSubtitle}>Tours & Travels</Text>
+            </View>
+            <View style={styles.headerActions}>
+              <TouchableOpacity onPress={() => router.push('/(tabs)/bookings')} style={styles.headerBtn}>
+                <Ionicons name="document-text-outline" size={22} color="#FFFFFF" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} style={styles.headerBtn}>
+                <Ionicons name="person-outline" size={22} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
 
         <ScrollView style={styles.content}>
@@ -276,7 +289,29 @@ export default function HomeScreen() {
     header: {
       backgroundColor: Colors.primary,
       padding: 20,
-      alignItems: "center",
+      paddingBottom: 16,
+    },
+    headerTop: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    headerCenter: {
+      flex: 2,
+      alignItems: 'center',
+    },
+    headerActions: {
+      flex: 1,
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      gap: 8,
+    },
+    headerBtn: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: 'rgba(255,255,255,0.15)',
+      justifyContent: 'center' as const,
+      alignItems: 'center' as const,
     },
     headerTitle: {
       fontSize: 28,

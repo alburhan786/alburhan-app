@@ -7,10 +7,12 @@ import React, { useState, useEffect } from 'react';
     TouchableOpacity,
     ActivityIndicator,
     Alert,
+    Linking,
+    Share,
   } from 'react-native';
   import { useLocalSearchParams, useRouter } from 'expo-router';
   import { LinearGradient } from 'expo-linear-gradient';
-  import { MaterialCommunityIcons } from '@expo/vector-icons';
+  import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
   import { packageService } from '../../services/api';
   import { useAuth } from '../../contexts/AuthContext';
   import { Colors } from '../../constants/Colors';
@@ -62,6 +64,65 @@ import React, { useState, useEffect } from 'react';
         month: 'long',
         day: 'numeric',
       });
+    };
+
+    const generateWhatsAppMessage = () => {
+      if (!pkg) return '';
+      const lines = [
+        `*${pkg.name}*`,
+        pkg.category ? `_${pkg.category}_` : '',
+        '',
+        `*Al Burhan Tours & Travels*`,
+        '',
+        `Duration: ${pkg.duration}`,
+        `Departure: ${formatDate(pkg.departureDate)}`,
+        `Return: ${formatDate(pkg.returnDate)}`,
+        '',
+        `*Starting from: ${formatPrice(pkg.price)}*`,
+        '',
+      ];
+      if (pkg.hotelDetails) {
+        lines.push('*Hotels:*');
+        lines.push(`Makkah: ${pkg.hotelDetails.makkah.name} (${pkg.hotelDetails.makkah.distance})`);
+        lines.push(`Madinah: ${pkg.hotelDetails.madinah.name} (${pkg.hotelDetails.madinah.distance})`);
+        lines.push('');
+      }
+      if (pkg.inclusions?.length) {
+        lines.push('*Inclusions:*');
+        pkg.inclusions.slice(0, 6).forEach((item: string) => lines.push(`✓ ${item}`));
+        if (pkg.inclusions.length > 6) lines.push(`... and ${pkg.inclusions.length - 6} more`);
+        lines.push('');
+      }
+      lines.push('_All packages exclude 5% GST_');
+      lines.push('');
+      lines.push('For booking & enquiry:');
+      lines.push('📞 +91 98939 89786');
+      lines.push('🌐 Al Burhan Tours & Travels');
+      return lines.filter(l => l !== undefined).join('\n');
+    };
+
+    const handleShareWhatsApp = async () => {
+      try {
+        const message = generateWhatsAppMessage();
+        const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
+        const supported = await Linking.canOpenURL(url);
+        if (supported) {
+          await Linking.openURL(url);
+        } else {
+          Alert.alert('WhatsApp Not Available', 'WhatsApp is not installed on this device. Use the share button to send via other apps.');
+        }
+      } catch (error) {
+        Alert.alert('Error', 'Could not open WhatsApp. Please try the share button instead.');
+      }
+    };
+
+    const handleShare = async () => {
+      const message = generateWhatsAppMessage();
+      try {
+        await Share.share({ message });
+      } catch (error) {
+        console.error('Share error:', error);
+      }
     };
 
     const handleBookNow = () => {
@@ -251,6 +312,19 @@ import React, { useState, useEffect } from 'react';
               </View>
             </View>
           )}
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Share Package</Text>
+            <View style={styles.shareRow}>
+              <TouchableOpacity style={styles.whatsappShareBtn} onPress={handleShareWhatsApp}>
+                <Ionicons name="logo-whatsapp" size={20} color="#FFFFFF" />
+                <Text style={styles.whatsappShareText}>Send on WhatsApp</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
+                <Ionicons name="share-outline" size={20} color={Colors.primary} />
+              </TouchableOpacity>
+            </View>
+          </View>
 
           <View style={{ height: 100 }} />
         </ScrollView>
@@ -464,6 +538,40 @@ import React, { useState, useEffect } from 'react';
       color: '#FFFFFF',
       fontSize: 16,
       fontWeight: 'bold',
+    },
+    shareRow: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    whatsappShareBtn: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      backgroundColor: '#25D366',
+      paddingVertical: 14,
+      borderRadius: 12,
+      shadowColor: '#25D366',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.3,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    whatsappShareText: {
+      color: '#FFFFFF',
+      fontSize: 15,
+      fontWeight: '700' as const,
+    },
+    shareBtn: {
+      width: 48,
+      height: 48,
+      borderRadius: 12,
+      backgroundColor: Colors.card,
+      borderWidth: 1,
+      borderColor: Colors.border,
+      justifyContent: 'center',
+      alignItems: 'center',
     },
     travelKitBanner: {
       flexDirection: 'row',

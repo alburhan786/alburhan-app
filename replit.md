@@ -23,7 +23,7 @@ AL BURHAN Tours & Travels is a cross-platform mobile application for booking Haj
 - **Framework**: React Native with Expo SDK 54
 - **Navigation**: Expo Router (file-based routing)
   - `app/(auth)/` — login and register screens (email/password + OTP via SMS/WhatsApp)
-  - `app/(tabs)/` — main tab layout (Home, Bookings, Profile with document uploads)
+  - `app/(tabs)/` — main tab layout (Packages, Hotels, Videos, Brochures, Contact) + hidden tabs (Assistant, Bookings, Profile)
   - `app/package/[id]` — package detail screen
   - `app/booking/create` — booking creation flow
   - `app/booking/[id]` — booking detail with real Razorpay payment via WebView
@@ -88,8 +88,13 @@ AL BURHAN Tours & Travels is a cross-platform mobile application for booking Haj
 | `server/db.ts` | Database connection |
 | `shared/schema.ts` | Drizzle schema definitions |
 | `app/_layout.tsx` | Root layout with providers (fonts, error boundary, query client, auth) |
-| `app/(tabs)/_layout.tsx` | Tab navigation (Home, Assistant, Bookings, Profile) |
+| `app/(tabs)/_layout.tsx` | Tab navigation (Packages, Hotels, Videos, Brochures, Contact) |
+| `app/(tabs)/hotels.tsx` | Hotels tab — shows all hotels from packages grouped by city |
+| `app/(tabs)/videos.tsx` | Videos tab — Hajj/Umrah YouTube video cards |
+| `app/(tabs)/brochures.tsx` | Brochures tab — package summary cards with WhatsApp share |
+| `app/(tabs)/contact.tsx` | Contact tab — phone, WhatsApp, email, address, social links |
 | `app/(tabs)/assistant.tsx` | AI travel assistant chat screen (streaming responses) |
+| `app/travel-kit.tsx` | Complimentary travel kit page (15 items with icons) |
 | `server/replit_integrations/chat/` | Chat API routes and storage (OpenAI integration) |
 | `shared/models/chat.ts` | Drizzle schema for conversations and messages tables |
 | `app/(auth)/login.tsx` | Login screen (email/password + OTP login) |
