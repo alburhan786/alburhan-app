@@ -10,11 +10,14 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import { Colors } from '../../constants/Colors';
+
+const WHATSAPP_BUSINESS_LINK = 'https://wa.me/919893989786?text=Assalamu%20Alaikum%20I%20want%20to%20register%20for%20Hajj%20packages';
 
 type Step = 'details' | 'otp';
 type RegisterMode = 'direct' | 'otp';
@@ -203,6 +206,14 @@ export default function RegisterScreen() {
                 <Text style={styles.buttonText}>Send OTP via WhatsApp</Text>
               </View>
             )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.whatsappHelpButton}
+            onPress={() => Linking.openURL(WHATSAPP_BUSINESS_LINK)}
+          >
+            <Ionicons name="information-circle-outline" size={16} color="#25D366" />
+            <Text style={styles.whatsappHelpText}>Message us on WhatsApp first to receive OTP</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -404,6 +415,19 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center' as const,
     marginTop: 8,
+  },
+  whatsappHelpButton: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    marginTop: 10,
+    paddingVertical: 6,
+    gap: 6,
+  },
+  whatsappHelpText: {
+    color: '#25D366',
+    fontSize: 12,
+    fontWeight: '500' as const,
   },
   buttonDisabled: {
     opacity: 0.6,
