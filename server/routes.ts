@@ -62,20 +62,15 @@ async function sendOtpSmsFast2SMS(phone: string, otpCode: string): Promise<boole
     return false;
   }
   try {
-    const otpUrl = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=otp&variables_values=${otpCode}&flash=0&numbers=${phone}`;
-    const otpResponse = await fetch(otpUrl, { method: "GET" });
-    const otpData = await otpResponse.json();
-    console.log("[Fast2SMS OTP Route] Response:", JSON.stringify(otpData));
-    if (otpData.return === true) {
+    const dltUrl = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=dlt&sender_id=ALBURH&message=164844&variables_values=${otpCode}|&numbers=${phone}&flash=0`;
+    const dltResponse = await fetch(dltUrl, { method: "GET" });
+    const dltData = await dltResponse.json();
+    console.log("[Fast2SMS DLT Route] Response:", JSON.stringify(dltData));
+    if (dltData.return === true) {
       return true;
     }
-    console.log("[Fast2SMS OTP Route] Failed, trying quick route as fallback...");
-    const message = `Your AL BURHAN TOURS verification code is ${otpCode}. Valid for 5 minutes. Do not share this code.`;
-    const quickUrl = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=q&message=${encodeURIComponent(message)}&language=english&flash=0&numbers=${phone}`;
-    const quickResponse = await fetch(quickUrl, { method: "GET" });
-    const quickData = await quickResponse.json();
-    console.log("[Fast2SMS Quick Route] Response:", JSON.stringify(quickData));
-    return quickData.return === true;
+    console.log("[Fast2SMS DLT Route] Failed:", dltData.message);
+    return false;
   } catch (error) {
     console.error("[Fast2SMS] Error:", error);
     return false;
