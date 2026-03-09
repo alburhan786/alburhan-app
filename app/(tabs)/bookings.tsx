@@ -8,6 +8,7 @@ import React, { useState, useEffect } from 'react';
     ActivityIndicator,
     Alert,
     Linking,
+    Platform,
   } from 'react-native';
   import { useRouter } from 'expo-router';
   import { Ionicons } from '@expo/vector-icons';
@@ -19,14 +20,18 @@ import React, { useState, useEffect } from 'react';
   export default function BookingsScreen() {
     const [bookings, setBookings] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
-    const { user } = useAuth();
+    const { user, loading: authLoading } = useAuth();
     const router = useRouter();
 
     useEffect(() => {
+      if (authLoading) return;
       if (user) {
+        setLoading(true);
         loadBookings();
+      } else {
+        setLoading(false);
       }
-    }, [user]);
+    }, [user, authLoading]);
 
     const loadBookings = async () => {
       try {
@@ -94,9 +99,31 @@ import React, { useState, useEffect } from 'react';
       );
     }
 
+    if (!user) {
+      return (
+        <View style={styles.container}>
+          <View style={[styles.header, { paddingTop: Platform.OS === "web" ? 67 : undefined }]}>
+            <Text style={styles.headerTitle}>My Bookings</Text>
+          </View>
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyStateTitle}>Login Required</Text>
+            <Text style={styles.emptyStateText}>
+              Please login to view your bookings
+            </Text>
+            <TouchableOpacity
+              style={styles.browseButton}
+              onPress={() => router.push('/(auth)/login')}
+            >
+              <Text style={styles.browseButtonText}>Login</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
+
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: Platform.OS === "web" ? 67 : undefined }]}>
           <Text style={styles.headerTitle}>My Bookings</Text>
         </View>
 

@@ -153,9 +153,7 @@ import React, { useState, useEffect } from 'react';
                   style={styles.input}
                   value={traveler.name}
                   onChangeText={(val) => {
-                    const newTravelers = [...travelers];
-                    newTravelers[index].name = val;
-                    setTravelers(newTravelers);
+                    setTravelers(prev => prev.map((t, i) => i === index ? { ...t, name: val } : t));
                   }}
                   placeholder="Full Name"
                 />
@@ -163,9 +161,7 @@ import React, { useState, useEffect } from 'react';
                   style={styles.input}
                   value={traveler.age}
                   onChangeText={(val) => {
-                    const newTravelers = [...travelers];
-                    newTravelers[index].age = val;
-                    setTravelers(newTravelers);
+                    setTravelers(prev => prev.map((t, i) => i === index ? { ...t, age: val } : t));
                   }}
                   keyboardType="number-pad"
                   placeholder="Age"
@@ -174,9 +170,7 @@ import React, { useState, useEffect } from 'react';
                   style={styles.input}
                   value={traveler.passportNumber}
                   onChangeText={(val) => {
-                    const newTravelers = [...travelers];
-                    newTravelers[index].passportNumber = val;
-                    setTravelers(newTravelers);
+                    setTravelers(prev => prev.map((t, i) => i === index ? { ...t, passportNumber: val } : t));
                   }}
                   placeholder="Passport Number"
                 />
@@ -184,9 +178,7 @@ import React, { useState, useEffect } from 'react';
                   style={styles.input}
                   value={traveler.passportExpiry}
                   onChangeText={(val) => {
-                    const newTravelers = [...travelers];
-                    newTravelers[index].passportExpiry = val;
-                    setTravelers(newTravelers);
+                    setTravelers(prev => prev.map((t, i) => i === index ? { ...t, passportExpiry: val } : t));
                   }}
                   placeholder="Passport Expiry (YYYY-MM-DD)"
                 />

@@ -163,16 +163,38 @@ export default function ProfileScreen() {
     );
   };
 
+  if (!user) {
+    return (
+      <View style={styles.container}>
+        <View style={[styles.header, { paddingTop: Platform.OS === "web" ? 67 : undefined }]}>
+          <Text style={styles.headerTitle}>Profile</Text>
+        </View>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 }}>
+          <Text style={{ fontSize: 20, fontWeight: 'bold' as const, color: Colors.text, marginBottom: 8 }}>Login Required</Text>
+          <Text style={{ fontSize: 16, color: Colors.textSecondary, textAlign: 'center' as const, marginBottom: 24 }}>
+            Please login to view your profile
+          </Text>
+          <TouchableOpacity
+            style={{ backgroundColor: Colors.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 }}
+            onPress={() => router.push('/(auth)/login')}
+          >
+            <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' as const }}>Login</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: Platform.OS === "web" ? 67 : undefined }]}>
         <View style={styles.avatarContainer}>
           <Text style={styles.avatarText}>
-            {user?.name.charAt(0).toUpperCase()}
+            {user.name.charAt(0).toUpperCase()}
           </Text>
         </View>
-        <Text style={styles.headerTitle}>{user?.name}</Text>
-        <Text style={styles.headerSubtitle}>{user?.email}</Text>
+        <Text style={styles.headerTitle}>{user.name}</Text>
+        <Text style={styles.headerSubtitle}>{user.email}</Text>
       </View>
 
       <ScrollView style={styles.content}>

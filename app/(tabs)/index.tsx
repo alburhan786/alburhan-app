@@ -37,12 +37,15 @@ export default function HomeScreen() {
 
     const loadPackages = async () => {
       try {
-        // First try to seed the database
-        await seedDatabase();
-        
         const response = await packageService.getPackages();
-        if (response.success) {
+        if (response.success && response.packages.length > 0) {
           setPackages(response.packages);
+        } else {
+          await seedDatabase();
+          const retryResponse = await packageService.getPackages();
+          if (retryResponse.success) {
+            setPackages(retryResponse.packages);
+          }
         }
       } catch (error) {
         console.error('Error loading packages:', error);
