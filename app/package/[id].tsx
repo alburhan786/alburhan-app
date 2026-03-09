@@ -213,7 +213,7 @@ import React, { useState, useEffect } from 'react';
             </View>
           </View>
 
-          {pkg.name?.includes('Shifting') && (
+          {pkg.type === 'hajj' && (
             <View style={styles.section}>
               <TouchableOpacity
                 activeOpacity={0.85}
