@@ -17,6 +17,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Colors } from '../../constants/Colors';
 
 type Step = 'details' | 'otp';
+type RegisterMode = 'direct' | 'otp';
 
 export default function RegisterScreen() {
   const [name, setName] = useState('');
@@ -29,22 +30,42 @@ export default function RegisterScreen() {
   const [loading, setLoading] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [otpMessage, setOtpMessage] = useState('');
-  const { sendOtp, sendWhatsAppOtp, verifyOtp } = useAuth();
+  const [registerMode, setRegisterMode] = useState<RegisterMode>('direct');
+  const { register, sendOtp, sendWhatsAppOtp, verifyOtp } = useAuth();
   const router = useRouter();
 
-  const handleSendOtp = async (method: 'sms' | 'whatsapp') => {
+  const validateFields = () => {
     if (!name || !email || !phone || !password || !confirmPassword) {
       Alert.alert('Error', 'Please fill in all fields');
-      return;
+      return false;
     }
     if (password !== confirmPassword) {
       Alert.alert('Error', 'Passwords do not match');
-      return;
+      return false;
     }
     if (password.length < 6) {
       Alert.alert('Error', 'Password must be at least 6 characters');
-      return;
+      return false;
     }
+    return true;
+  };
+
+  const handleDirectRegister = async () => {
+    if (!validateFields()) return;
+
+    setLoading(true);
+    try {
+      await register({ name, email, phone, password });
+      router.replace('/(tabs)');
+    } catch (error: any) {
+      Alert.alert('Registration Failed', error.message || 'Could not create account');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendOtp = async (method: 'sms' | 'whatsapp') => {
+    if (!validateFields()) return;
 
     setLoading(true);
     try {
@@ -128,35 +149,70 @@ export default function RegisterScreen() {
         placeholderTextColor={Colors.textSecondary}
       />
 
-      <TouchableOpacity
-        style={[styles.button, loading && styles.buttonDisabled]}
-        onPress={() => handleSendOtp('sms')}
-        disabled={loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="#FFFFFF" size="small" />
-        ) : (
-          <View style={styles.buttonRow}>
-            <Ionicons name="chatbubble-outline" size={20} color="#FFFFFF" />
-            <Text style={styles.buttonText}>Send OTP via SMS</Text>
-          </View>
-        )}
-      </TouchableOpacity>
+      {registerMode === 'direct' ? (
+        <>
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={handleDirectRegister}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <View style={styles.buttonRow}>
+                <Ionicons name="person-add-outline" size={20} color="#FFFFFF" />
+                <Text style={styles.buttonText}>Create Account</Text>
+              </View>
+            )}
+          </TouchableOpacity>
 
-      <TouchableOpacity
-        style={[styles.whatsappButton, loading && styles.buttonDisabled]}
-        onPress={() => handleSendOtp('whatsapp')}
-        disabled={loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="#FFFFFF" size="small" />
-        ) : (
-          <View style={styles.buttonRow}>
-            <Ionicons name="logo-whatsapp" size={20} color="#FFFFFF" />
-            <Text style={styles.buttonText}>Send OTP via WhatsApp</Text>
-          </View>
-        )}
-      </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.switchModeButton}
+            onPress={() => setRegisterMode('otp')}
+          >
+            <Text style={styles.switchModeText}>Register with OTP verification instead</Text>
+          </TouchableOpacity>
+        </>
+      ) : (
+        <>
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={() => handleSendOtp('sms')}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <View style={styles.buttonRow}>
+                <Ionicons name="chatbubble-outline" size={20} color="#FFFFFF" />
+                <Text style={styles.buttonText}>Send OTP via SMS</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.whatsappButton, loading && styles.buttonDisabled]}
+            onPress={() => handleSendOtp('whatsapp')}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <View style={styles.buttonRow}>
+                <Ionicons name="logo-whatsapp" size={20} color="#FFFFFF" />
+                <Text style={styles.buttonText}>Send OTP via WhatsApp</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.switchModeButton}
+            onPress={() => setRegisterMode('direct')}
+          >
+            <Text style={styles.switchModeText}>Register directly without OTP</Text>
+          </TouchableOpacity>
+        </>
+      )}
     </>
   );
 
@@ -361,6 +417,16 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold' as const,
+  },
+  switchModeButton: {
+    alignItems: 'center' as const,
+    marginTop: 16,
+    paddingVertical: 8,
+  },
+  switchModeText: {
+    color: Colors.primary,
+    fontSize: 13,
+    fontWeight: '500' as const,
   },
   resendRow: {
     flexDirection: 'row' as const,

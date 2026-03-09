@@ -144,6 +144,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/register", async (req, res) => {
     try {
       const { name, email, phone, password } = req.body;
+      if (!name || !email || !phone || !password) {
+        return res.status(400).json({ success: false, error: "All fields are required" });
+      }
+      const existingEmail = await db.select().from(users).where(eq(users.email, email));
+      if (existingEmail.length > 0) {
+        return res.status(400).json({ success: false, error: "An account with this email already exists" });
+      }
+      const existingPhone = await db.select().from(users).where(eq(users.phone, phone));
+      if (existingPhone.length > 0) {
+        return res.status(400).json({ success: false, error: "An account with this phone number already exists" });
+      }
       const hashedPassword = await bcrypt.hash(password, 10);
       const [user] = await db.insert(users).values({
         name,
@@ -186,8 +197,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       otpStore.set(phone, { otp, expiresAt: Date.now() + 5 * 60 * 1000 });
       const message = `Your AL BURHAN TOURS OTP is ${otp}. Valid for 5 minutes.`;
       const sent = await sendSmsFast2SMS(phone, message);
-      console.log(`[OTP] Generated OTP ${otp} for phone ${phone}`);
-      res.json({ success: true, message: sent ? "OTP sent via SMS" : "OTP generated (SMS delivery pending - check API key config)" });
+      console.log(`[OTP] Generated OTP ${otp} for phone ${phone}, SMS sent: ${sent}`);
+      if (!sent) {
+        return res.status(500).json({ success: false, error: "Failed to send SMS. Please try WhatsApp or register directly with email." });
+      }
+      res.json({ success: true, message: "OTP sent via SMS" });
     } catch (error: any) {
       res.status(400).json({ success: false, error: error.message });
     }
@@ -212,7 +226,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!whatsappSent) {
         const smsSent = await sendSmsFast2SMS(phone, message);
         console.log(`[OTP] WhatsApp failed, SMS fallback ${smsSent ? "sent" : "also failed"} for ${phone}`);
-        res.json({ success: true, message: smsSent ? "OTP sent via SMS (WhatsApp unavailable)" : "OTP sent to your phone" });
+        if (!smsSent) {
+          return res.status(500).json({ success: false, error: "Failed to send OTP via WhatsApp and SMS. Please register directly with email instead." });
+        }
+        res.json({ success: true, message: "OTP sent via SMS (WhatsApp unavailable - send a message to our WhatsApp business number first)" });
       } else {
         console.log(`[OTP] Sent OTP via WhatsApp to ${phone}`);
         res.json({ success: true, message: "OTP sent via WhatsApp" });
@@ -278,10 +295,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const otp = generateOtp();
       otpStore.set(`login_${phone}`, { otp, expiresAt: Date.now() + 5 * 60 * 1000 });
       const message = `Your AL BURHAN TOURS login OTP is ${otp}. Valid for 5 minutes.`;
-      const sent = await sendSmsFast2SMS(phone, message);
-      await sendWhatsAppBotBee(phone, message);
-      console.log(`[OTP] Login OTP ${otp} for phone ${phone}`);
-      res.json({ success: true, message: "OTP sent" });
+      const smsSent = await sendSmsFast2SMS(phone, message);
+      const whatsappSent = await sendWhatsAppBotBee(phone, message);
+      console.log(`[OTP] Login OTP ${otp} for phone ${phone}, SMS: ${smsSent}, WhatsApp: ${whatsappSent}`);
+      if (!smsSent && !whatsappSent) {
+        return res.status(500).json({ success: false, error: "Failed to send OTP. Please use email and password to sign in." });
+      }
+      const method = whatsappSent ? "WhatsApp" : "SMS";
+      res.json({ success: true, message: `OTP sent via ${method}` });
     } catch (error: any) {
       res.status(400).json({ success: false, error: error.message });
     }
