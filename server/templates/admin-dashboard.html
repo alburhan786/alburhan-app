@@ -6,46 +6,65 @@
   <title>AL BURHAN TOURS - Admin Dashboard</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #F0FDF4; color: #1a1a1a; }
-    .header { background: #047857; color: white; padding: 20px 32px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
-    .header h1 { font-size: 22px; font-weight: 700; }
-    .header span { font-size: 13px; color: #D97706; }
-    .nav { background: #065f46; display: flex; gap: 0; padding: 0 32px; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f5f1; color: #1a1a1a; }
+    .header { background: linear-gradient(135deg, #047857 0%, #065f46 50%, #064e3b 100%); color: white; padding: 20px 32px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 12px rgba(4,120,87,0.3); }
+    .header h1 { font-size: 22px; font-weight: 700; letter-spacing: 0.5px; }
+    .header span { font-size: 13px; color: #fbbf24; font-weight: 600; }
+    .nav { background: linear-gradient(90deg, #065f46, #047857); display: flex; gap: 0; padding: 0 32px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
     .nav button { background: none; border: none; color: #a7f3d0; padding: 14px 24px; font-size: 14px; font-weight: 600; cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.2s; }
-    .nav button:hover { color: white; background: rgba(255,255,255,0.1); }
-    .nav button.active { color: white; border-bottom-color: #D97706; background: rgba(255,255,255,0.05); }
-    .content { max-width: 1200px; margin: 0 auto; padding: 24px; }
+    .nav button:hover { color: white; background: rgba(255,255,255,0.12); }
+    .nav button.active { color: white; border-bottom-color: #fbbf24; background: rgba(255,255,255,0.08); }
+    .content { max-width: 1280px; margin: 0 auto; padding: 24px; }
     .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
-    .stat-card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
-    .stat-card .label { font-size: 13px; color: #6b7280; margin-bottom: 8px; font-weight: 500; }
-    .stat-card .value { font-size: 28px; font-weight: 700; color: #047857; }
+    .stat-card { background: white; border-radius: 14px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border-left: 4px solid #047857; transition: transform 0.2s, box-shadow 0.2s; }
+    .stat-card:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.1); }
+    .stat-card:nth-child(2) { border-left-color: #2563eb; }
+    .stat-card:nth-child(3) { border-left-color: #D97706; }
+    .stat-card:nth-child(4) { border-left-color: #f59e0b; }
+    .stat-card:nth-child(5) { border-left-color: #10b981; }
+    .stat-card:nth-child(6) { border-left-color: #6366f1; }
+    .stat-card:nth-child(7) { border-left-color: #8b5cf6; }
+    .stat-card .label { font-size: 12px; color: #6b7280; margin-bottom: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-card .value { font-size: 28px; font-weight: 800; color: #047857; }
     .stat-card .value.orange { color: #D97706; }
     .stat-card .value.blue { color: #2563eb; }
     .stat-card .value.red { color: #dc2626; }
     .stat-card .value.purple { color: #7c3aed; }
-    .card { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); margin-bottom: 24px; }
-    .card h2 { font-size: 18px; font-weight: 700; margin-bottom: 16px; color: #047857; }
-    .table-wrap { overflow-x: auto; }
+    .card { background: white; border-radius: 14px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 24px; border: 1px solid #e5e7eb; }
+    .card h2 { font-size: 18px; font-weight: 700; margin-bottom: 16px; color: #047857; display: flex; align-items: center; gap: 8px; }
+    .card h2::before { content: ''; display: inline-block; width: 4px; height: 20px; background: linear-gradient(180deg, #047857, #10b981); border-radius: 2px; }
+    .table-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid #e5e7eb; }
     table { width: 100%; border-collapse: collapse; font-size: 14px; }
-    th { text-align: left; padding: 12px 16px; background: #f9fafb; border-bottom: 2px solid #e5e7eb; font-weight: 600; color: #374151; white-space: nowrap; }
-    td { padding: 12px 16px; border-bottom: 1px solid #f3f4f6; }
-    tr:hover td { background: #f0fdf4; }
-    .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; text-transform: uppercase; }
-    .badge-pending { background: #fef3c7; color: #92400e; }
-    .badge-confirmed { background: #d1fae5; color: #065f46; }
-    .badge-cancelled { background: #fee2e2; color: #991b1b; }
-    .badge-completed { background: #dbeafe; color: #1e40af; }
-    .badge-partial { background: #fef3c7; color: #92400e; }
-    .badge-success { background: #d1fae5; color: #065f46; }
-    .badge-failed { background: #fee2e2; color: #991b1b; }
-    .btn { padding: 6px 16px; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
-    .btn-confirm { background: #047857; color: white; }
-    .btn-confirm:hover { background: #065f46; }
-    .btn-cancel { background: #dc2626; color: white; }
-    .btn-cancel:hover { background: #b91c1c; }
-    .btn-view { background: #2563eb; color: white; }
-    .btn-view:hover { background: #1d4ed8; }
-    .btn-group { display: flex; gap: 8px; }
+    th { text-align: left; padding: 14px 16px; background: linear-gradient(135deg, #047857, #065f46); color: white; font-weight: 600; white-space: nowrap; font-size: 13px; text-transform: uppercase; letter-spacing: 0.3px; }
+    th:first-child { border-radius: 0; }
+    th:last-child { border-radius: 0; }
+    td { padding: 12px 16px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+    tbody tr { transition: background 0.15s; }
+    tbody tr:nth-child(even) { background: #f8fdf9; }
+    tbody tr:nth-child(odd) { background: #ffffff; }
+    tbody tr:hover { background: #ecfdf5 !important; }
+    .badge { display: inline-block; padding: 5px 14px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+    .badge-pending { background: linear-gradient(135deg, #fef3c7, #fde68a); color: #92400e; border: 1px solid #fcd34d; }
+    .badge-confirmed { background: linear-gradient(135deg, #d1fae5, #a7f3d0); color: #065f46; border: 1px solid #6ee7b7; }
+    .badge-cancelled { background: linear-gradient(135deg, #fee2e2, #fecaca); color: #991b1b; border: 1px solid #fca5a5; }
+    .badge-completed { background: linear-gradient(135deg, #dbeafe, #bfdbfe); color: #1e40af; border: 1px solid #93c5fd; }
+    .badge-partial { background: linear-gradient(135deg, #ffedd5, #fed7aa); color: #9a3412; border: 1px solid #fdba74; }
+    .badge-success { background: linear-gradient(135deg, #d1fae5, #a7f3d0); color: #065f46; border: 1px solid #6ee7b7; }
+    .badge-failed { background: linear-gradient(135deg, #fee2e2, #fecaca); color: #991b1b; border: 1px solid #fca5a5; }
+    .btn { padding: 7px 16px; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 4px; }
+    .btn-confirm { background: linear-gradient(135deg, #047857, #059669); color: white; box-shadow: 0 1px 3px rgba(4,120,87,0.3); }
+    .btn-confirm:hover { background: linear-gradient(135deg, #065f46, #047857); transform: translateY(-1px); box-shadow: 0 2px 6px rgba(4,120,87,0.4); }
+    .btn-cancel { background: linear-gradient(135deg, #dc2626, #ef4444); color: white; box-shadow: 0 1px 3px rgba(220,38,38,0.3); }
+    .btn-cancel:hover { background: linear-gradient(135deg, #b91c1c, #dc2626); }
+    .btn-view { background: linear-gradient(135deg, #2563eb, #3b82f6); color: white; box-shadow: 0 1px 3px rgba(37,99,235,0.3); }
+    .btn-view:hover { background: linear-gradient(135deg, #1d4ed8, #2563eb); }
+    .btn-invoice { background: linear-gradient(135deg, #7c3aed, #8b5cf6); color: white; box-shadow: 0 1px 3px rgba(124,58,237,0.3); }
+    .btn-invoice:hover { background: linear-gradient(135deg, #6d28d9, #7c3aed); }
+    .btn-whatsapp { background: linear-gradient(135deg, #25D366, #20c05c); color: white; box-shadow: 0 1px 3px rgba(37,211,102,0.3); }
+    .btn-whatsapp:hover { background: linear-gradient(135deg, #1fb855, #25D366); }
+    .btn-download { background: linear-gradient(135deg, #0891b2, #06b6d4); color: white; box-shadow: 0 1px 3px rgba(8,145,178,0.3); }
+    .btn-download:hover { background: linear-gradient(135deg, #0e7490, #0891b2); }
+    .btn-group { display: flex; gap: 6px; flex-wrap: wrap; }
     .section { display: none; }
     .section.active { display: block; }
     .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -53,28 +72,46 @@
     .detail-item .dlabel { font-size: 12px; color: #6b7280; font-weight: 500; margin-bottom: 4px; }
     .detail-item .dvalue { font-size: 15px; font-weight: 600; color: #1a1a1a; }
     .travelers-list { margin-top: 16px; }
-    .traveler-card { background: #f9fafb; border-radius: 8px; padding: 12px 16px; margin-bottom: 8px; }
+    .traveler-card { background: linear-gradient(135deg, #f0fdf4, #ecfdf5); border-radius: 10px; padding: 12px 16px; margin-bottom: 8px; border: 1px solid #d1fae5; }
     .traveler-card .tname { font-weight: 600; color: #047857; }
     .traveler-card .tinfo { font-size: 13px; color: #6b7280; margin-top: 4px; }
-    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000; }
-    .modal { background: white; border-radius: 16px; padding: 32px; max-width: 700px; width: 90%; max-height: 85vh; overflow-y: auto; }
+    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(4px); }
+    .modal { background: white; border-radius: 16px; padding: 32px; max-width: 700px; width: 90%; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
     .modal h2 { margin-bottom: 20px; }
     .modal .close-btn { float: right; background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280; }
     .empty-state { text-align: center; padding: 60px 20px; color: #6b7280; }
     .empty-state p { font-size: 16px; }
-    .refresh-btn { background: #047857; color: white; border: none; padding: 8px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
-    .refresh-btn:hover { background: #065f46; }
-    .doc-type { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; text-transform: uppercase; background: #ede9fe; color: #5b21b6; }
-    .doc-link { color: #2563eb; text-decoration: none; font-weight: 500; }
-    .doc-link:hover { text-decoration: underline; }
+    .refresh-btn { background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #78350f; border: none; padding: 8px 20px; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 2px 6px rgba(245,158,11,0.3); }
+    .refresh-btn:hover { background: linear-gradient(135deg, #f59e0b, #d97706); transform: translateY(-1px); }
+    .doc-type { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; }
+    .doc-type-visa { background: linear-gradient(135deg, #dbeafe, #bfdbfe); color: #1e40af; border: 1px solid #93c5fd; }
+    .doc-type-ticket { background: linear-gradient(135deg, #fce7f3, #fbcfe8); color: #9d174d; border: 1px solid #f9a8d4; }
+    .doc-type-passport { background: linear-gradient(135deg, #ede9fe, #ddd6fe); color: #5b21b6; border: 1px solid #c4b5fd; }
+    .doc-type-pancard { background: linear-gradient(135deg, #fef3c7, #fde68a); color: #92400e; border: 1px solid #fcd34d; }
+    .doc-type-aadhar { background: linear-gradient(135deg, #ffedd5, #fed7aa); color: #9a3412; border: 1px solid #fdba74; }
+    .doc-type-default { background: linear-gradient(135deg, #f3f4f6, #e5e7eb); color: #374151; border: 1px solid #d1d5db; }
+    .doc-link { color: #2563eb; text-decoration: none; font-weight: 600; }
+    .doc-link:hover { text-decoration: underline; color: #1d4ed8; }
+    .doc-preview { display: flex; align-items: center; gap: 12px; }
+    .doc-thumb { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; border: 2px solid #e5e7eb; cursor: pointer; transition: transform 0.2s, border-color 0.2s; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+    .doc-thumb:hover { transform: scale(1.08); border-color: #047857; }
+    .doc-file-icon { width: 56px; height: 56px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; text-transform: uppercase; }
+    .doc-file-icon.pdf { background: linear-gradient(135deg, #fee2e2, #fecaca); color: #dc2626; border: 2px solid #fca5a5; }
+    .doc-file-icon.doc { background: linear-gradient(135deg, #dbeafe, #bfdbfe); color: #2563eb; border: 2px solid #93c5fd; }
+    .doc-file-icon.other { background: linear-gradient(135deg, #f3f4f6, #e5e7eb); color: #6b7280; border: 2px solid #d1d5db; }
+    .doc-info { display: flex; flex-direction: column; gap: 4px; }
+    .doc-name { font-weight: 600; font-size: 13px; color: #1f2937; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .doc-actions { display: flex; gap: 6px; margin-top: 2px; }
     @media (max-width: 768px) {
       .content { padding: 16px; }
       .stats-grid { grid-template-columns: repeat(2, 1fr); }
       .detail-grid { grid-template-columns: 1fr; }
       table { font-size: 12px; }
-      th, td { padding: 8px; }
+      th, td { padding: 8px 10px; }
       .nav { overflow-x: auto; padding: 0 16px; }
       .nav button { white-space: nowrap; padding: 12px 16px; font-size: 13px; }
+      .doc-thumb { width: 40px; height: 40px; }
+      .doc-file-icon { width: 40px; height: 40px; font-size: 10px; }
     }
   </style>
 </head>
@@ -104,6 +141,10 @@
       <div class="card">
         <h2>Recent Bookings</h2>
         <div class="table-wrap" id="recent-bookings"></div>
+      </div>
+      <div class="card">
+        <h2>Recent Invoices</h2>
+        <div class="table-wrap" id="recent-invoices"></div>
       </div>
     </div>
 
@@ -287,6 +328,11 @@
   <script>
     const API = window.location.origin;
 
+    function esc(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+
     function formatPrice(amount) {
       return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(parseFloat(amount || 0));
     }
@@ -352,15 +398,15 @@
         for (var i = 0; i < list.length; i++) {
           var b = list[i];
           var actions = '<button class="btn btn-confirm" onclick="viewBooking(' + b.id + ')">View</button>';
-          actions += '<a href="/invoice/' + b.id + '" target="_blank" class="btn" style="background:#047857;color:#fff;text-decoration:none;display:inline-block;margin-left:4px;">Invoice</a>';
+          actions += '<a href="/invoice/' + b.id + '" target="_blank" class="btn btn-invoice" style="text-decoration:none">Invoice</a>';
           if (b.status === 'pending') {
             actions += '<button class="btn btn-confirm" onclick="updateStatus(' + b.id + ', \'confirmed\')">Confirm</button>';
             actions += '<button class="btn btn-cancel" onclick="updateStatus(' + b.id + ', \'cancelled\')">Cancel</button>';
           }
           rows += '<tr>' +
             '<td><strong>#' + b.id + '</strong></td>' +
-            '<td>' + (b.contactName || '-') + '</td>' +
-            '<td>' + (b.contactPhone || '-') + '</td>' +
+            '<td>' + esc(b.contactName || '-') + '</td>' +
+            '<td>' + esc(b.contactPhone || '-') + '</td>' +
             '<td>' + b.numberOfPeople + '</td>' +
             '<td>' + formatPrice(b.totalAmount) + '</td>' +
             '<td>' + formatPrice(b.paidAmount) + '</td>' +
@@ -390,7 +436,7 @@
       var rows = '';
       for (var i = 0; i < customers.length; i++) {
         var c = customers[i];
-        rows += '<tr><td>#' + c.id + '</td><td><strong>' + c.name + '</strong></td><td>' + c.email + '</td><td>' + c.phone + '</td><td>' + formatDate(c.createdAt) + '</td></tr>';
+        rows += '<tr><td>#' + c.id + '</td><td><strong>' + esc(c.name) + '</strong></td><td>' + esc(c.email) + '</td><td>' + esc(c.phone) + '</td><td>' + formatDate(c.createdAt) + '</td></tr>';
       }
       document.getElementById('all-customers').innerHTML = '<table><thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Joined</th></tr></thead><tbody>' + rows + '</tbody></table>';
     }
@@ -432,6 +478,30 @@
       return url.startsWith('/api/files/') || url.startsWith('http://') || url.startsWith('https://');
     }
 
+    function getDocTypeClass(type) {
+      var t = (type || '').toLowerCase();
+      if (t === 'visa') return 'doc-type-visa';
+      if (t === 'ticket') return 'doc-type-ticket';
+      if (t === 'passport') return 'doc-type-passport';
+      if (t === 'pancard' || t === 'pan card') return 'doc-type-pancard';
+      if (t === 'aadhar' || t === 'aadhar card') return 'doc-type-aadhar';
+      return 'doc-type-default';
+    }
+
+    function getFileExtension(fileName) {
+      if (!fileName) return '';
+      return fileName.split('.').pop().toLowerCase();
+    }
+
+    function isPdfFile(fileName) {
+      return getFileExtension(fileName) === 'pdf';
+    }
+
+    function isDocFile(fileName) {
+      var ext = getFileExtension(fileName);
+      return ext === 'doc' || ext === 'docx';
+    }
+
     async function loadDocuments() {
       var data = await fetchJSON('/api/admin/documents');
       if (!data.success) return;
@@ -445,26 +515,57 @@
       var rows = '';
       for (var i = 0; i < docs.length; i++) {
         var d = docs[i];
-        var customerName = d.userName || ('User #' + d.userId);
+        var customerName = esc(d.userName || ('User #' + d.userId));
         var bookingRef = d.bookingId ? '#' + d.bookingId : '-';
         var fileCell = '';
         var accessible = isAccessibleUrl(d.fileUrl);
+        var ext = getFileExtension(d.fileName);
+        var safeName = esc(d.fileName || 'file');
+        var safeUrl = esc(d.fileUrl || '');
 
         if (accessible && isImageFile(d.fileName)) {
-          fileCell = '<div style="display:flex;align-items:center;gap:8px">' +
-            '<img src="' + d.fileUrl + '" style="width:50px;height:50px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb;cursor:pointer" onclick="viewDocImage(\'' + d.fileUrl + '\',\'' + (d.fileName || '').replace(/'/g, "\\'") + '\')" />' +
-            '<a href="' + d.fileUrl + '" target="_blank" class="doc-link">' + (d.fileName || 'View') + '</a></div>';
+          fileCell = '<div class="doc-preview">' +
+            '<img src="' + safeUrl + '" class="doc-thumb" onclick="viewDocImage(\'' + safeUrl + '\',\'' + safeName + '\')" title="Click to preview" />' +
+            '<div class="doc-info">' +
+            '<span class="doc-name">' + safeName + '</span>' +
+            '<div class="doc-actions">' +
+            '<a href="' + safeUrl + '" target="_blank" class="btn btn-view" style="padding:4px 10px;font-size:11px">View</a>' +
+            '<a href="' + safeUrl + '" download class="btn btn-download" style="padding:4px 10px;font-size:11px">Download</a>' +
+            '</div></div></div>';
+        } else if (accessible && isPdfFile(d.fileName)) {
+          fileCell = '<div class="doc-preview">' +
+            '<div class="doc-file-icon pdf">PDF</div>' +
+            '<div class="doc-info">' +
+            '<span class="doc-name">' + safeName + '</span>' +
+            '<div class="doc-actions">' +
+            '<a href="' + safeUrl + '" target="_blank" class="btn btn-view" style="padding:4px 10px;font-size:11px">Open</a>' +
+            '<a href="' + safeUrl + '" download class="btn btn-download" style="padding:4px 10px;font-size:11px">Download</a>' +
+            '</div></div></div>';
+        } else if (accessible && isDocFile(d.fileName)) {
+          fileCell = '<div class="doc-preview">' +
+            '<div class="doc-file-icon doc">DOC</div>' +
+            '<div class="doc-info">' +
+            '<span class="doc-name">' + safeName + '</span>' +
+            '<div class="doc-actions">' +
+            '<a href="' + safeUrl + '" download class="btn btn-download" style="padding:4px 10px;font-size:11px">Download</a>' +
+            '</div></div></div>';
         } else if (accessible) {
-          fileCell = '<a href="' + d.fileUrl + '" target="_blank" class="doc-link">' + (d.fileName || 'View File') + '</a>';
+          fileCell = '<div class="doc-preview">' +
+            '<div class="doc-file-icon other">' + esc(ext || '?').toUpperCase() + '</div>' +
+            '<div class="doc-info">' +
+            '<span class="doc-name">' + safeName + '</span>' +
+            '<div class="doc-actions">' +
+            '<a href="' + safeUrl + '" target="_blank" class="btn btn-view" style="padding:4px 10px;font-size:11px">Open</a>' +
+            '</div></div></div>';
         } else {
-          fileCell = '<span style="color:#9ca3af;font-size:12px">' + (d.fileName || '-') + ' <em>(local file - re-upload needed)</em></span>';
+          fileCell = '<span style="color:#9ca3af;font-size:12px">' + safeName + ' <em>(re-upload needed)</em></span>';
         }
 
         rows += '<tr>' +
-          '<td>#' + d.id + '</td>' +
+          '<td><strong>#' + d.id + '</strong></td>' +
           '<td><strong>' + customerName + '</strong></td>' +
           '<td>' + bookingRef + '</td>' +
-          '<td><span class="doc-type">' + (d.type || '-') + '</span></td>' +
+          '<td><span class="doc-type ' + getDocTypeClass(d.type) + '">' + (d.type || '-') + '</span></td>' +
           '<td>' + fileCell + '</td>' +
           '<td>' + formatDateTime(d.uploadedAt) + '</td>' +
           '</tr>';
@@ -764,7 +865,7 @@
       document.getElementById('inv-result').innerHTML = '<p style="color:#6b7280">Creating booking and generating invoice...</p>';
 
       try {
-        var data = await fetchJSON('/api/admin/create-offline-invoice', {
+        var resp = await fetch(API + '/api/admin/create-offline-invoice', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -783,6 +884,7 @@
             sendWhatsapp: sendWhatsapp
           })
         });
+        var data = await resp.json();
 
         if (data.success) {
           var invoiceUrl = window.location.origin + '/invoice/' + data.bookingId;
@@ -810,32 +912,45 @@
       btn.textContent = 'Create Invoice & Booking';
     }
 
+    function renderInvoiceTable(list, limit) {
+      var items = limit ? list.slice(0, limit) : list;
+      if (items.length === 0) {
+        return '<div class="empty-state"><p>No invoices generated yet</p></div>';
+      }
+      var html = '<table><thead><tr><th>Invoice No.</th><th>Customer</th><th>Phone</th><th>Amount</th><th>Paid</th><th>Balance</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead><tbody>';
+      for (var i = 0; i < items.length; i++) {
+        var b = items[i];
+        var total = parseFloat(b.totalAmount) || 0;
+        var paid = parseFloat(b.paidAmount) || 0;
+        var balance = total - paid;
+        var balanceColor = balance > 0 ? '#dc2626' : '#059669';
+        html += '<tr>' +
+          '<td><strong style="color:#7c3aed">' + esc(b.invoiceNumber) + '</strong></td>' +
+          '<td><strong>' + esc(b.contactName || '-') + '</strong></td>' +
+          '<td>' + esc(b.contactPhone || '-') + '</td>' +
+          '<td style="font-weight:600;color:#047857">' + formatPrice(b.totalAmount) + '</td>' +
+          '<td style="font-weight:600;color:#059669">' + formatPrice(b.paidAmount) + '</td>' +
+          '<td style="font-weight:700;color:' + balanceColor + '">' + formatPrice(balance) + '</td>' +
+          '<td><span class="badge ' + getBadgeClass(b.paymentStatus) + '">' + b.paymentStatus + '</span></td>' +
+          '<td>' + formatDate(b.bookingDate) + '</td>' +
+          '<td><div class="btn-group">' +
+            '<a href="/invoice/' + b.id + '" target="_blank" class="btn btn-invoice" style="text-decoration:none">View</a>' +
+            '<a href="https://wa.me/' + (b.contactPhone || '').replace(/[^0-9]/g, '') + '?text=' + encodeURIComponent('Assalamu Alaikum, Your invoice ' + b.invoiceNumber + ' from AL BURHAN TOURS. View: ' + window.location.origin + '/invoice/' + b.id) + '" target="_blank" class="btn btn-whatsapp" style="text-decoration:none">WhatsApp</a>' +
+          '</div></td></tr>';
+      }
+      html += '</tbody></table>';
+      return html;
+    }
+
     async function loadInvoices() {
       var data = await fetchJSON('/api/admin/bookings');
       if (!data.success) return;
       var list = data.bookings.filter(function(b) { return b.invoiceNumber; });
-      if (list.length === 0) {
-        document.getElementById('all-invoices').innerHTML = '<p style="color:#6b7280;text-align:center;padding:20px">No invoices generated yet. Create one above.</p>';
-        return;
+      document.getElementById('all-invoices').innerHTML = renderInvoiceTable(list);
+      var recentEl = document.getElementById('recent-invoices');
+      if (recentEl) {
+        recentEl.innerHTML = renderInvoiceTable(list, 5);
       }
-      var html = '<table><thead><tr><th>Invoice No.</th><th>Customer</th><th>Phone</th><th>Amount</th><th>Paid</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead><tbody>';
-      for (var i = 0; i < list.length; i++) {
-        var b = list[i];
-        html += '<tr>' +
-          '<td><strong>' + b.invoiceNumber + '</strong></td>' +
-          '<td>' + (b.contactName || '-') + '</td>' +
-          '<td>' + (b.contactPhone || '-') + '</td>' +
-          '<td>' + formatPrice(b.totalAmount) + '</td>' +
-          '<td>' + formatPrice(b.paidAmount) + '</td>' +
-          '<td><span class="badge ' + getBadgeClass(b.paymentStatus) + '">' + b.paymentStatus + '</span></td>' +
-          '<td>' + formatDate(b.bookingDate) + '</td>' +
-          '<td>' +
-            '<a href="/invoice/' + b.id + '" target="_blank" class="btn" style="background:#047857;color:#fff;text-decoration:none;display:inline-block">View</a> ' +
-            '<a href="https://wa.me/' + (b.contactPhone || '').replace(/[^0-9]/g, '') + '?text=' + encodeURIComponent('Invoice ' + b.invoiceNumber + ': ' + window.location.origin + '/invoice/' + b.id) + '" target="_blank" class="btn" style="background:#25D366;color:#fff;text-decoration:none;display:inline-block">WhatsApp</a>' +
-          '</td></tr>';
-      }
-      html += '</tbody></table>';
-      document.getElementById('all-invoices').innerHTML = html;
     }
 
     function loadAll() {
