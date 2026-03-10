@@ -20,7 +20,8 @@ const CONTACT_INFO = {
   whatsapp: "+919893989786",
   email: "info@alburhantravels.com",
   website: "www.alburhantravels.com",
-  address: "Al Burhan Tours & Travels\n8-5, Khanka Masjid Complex\nSanwara Road, Burhanpur\n450331, Madhya Pradesh, India",
+  address: "8-5, Khanka Masjid Complex\nLalbagh Rd, Goti Maholla\nBurhanpur, Madhya Pradesh 450331",
+  mapsUrl: "https://maps.google.com/?q=866J%2B34Q,Burhanpur,Madhya+Pradesh",
   officeHours: "Mon - Sat: 10:00 AM - 7:00 PM",
   social: {
     facebook: "https://facebook.com/alburhantours",
@@ -204,22 +205,19 @@ export default function ContactScreen() {
           </View>
         </ContactCard>
 
-        <View style={styles.mapPlaceholder}>
-          <Ionicons name="map-outline" size={48} color={Colors.textSecondary} />
-          <Text style={styles.mapPlaceholderText}>Bhopal, Madhya Pradesh</Text>
-          <TouchableOpacity
-            style={styles.directionsButton}
-            onPress={() =>
-              Linking.openURL(
-                "https://maps.google.com/?q=Bhopal+Madhya+Pradesh+India"
-              )
-            }
-            activeOpacity={0.7}
-          >
+        <TouchableOpacity
+          style={styles.mapPlaceholder}
+          onPress={() => Linking.openURL(CONTACT_INFO.mapsUrl)}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="location" size={48} color={Colors.primary} />
+          <Text style={styles.mapPlaceholderText}>Al Burhan Tours & Travels</Text>
+          <Text style={styles.mapSubText}>Khanka Masjid Complex, Burhanpur</Text>
+          <View style={styles.directionsButton}>
             <Ionicons name="navigate-outline" size={16} color="#FFFFFF" />
-            <Text style={styles.directionsButtonText}>Get Directions</Text>
-          </TouchableOpacity>
-        </View>
+            <Text style={styles.directionsButtonText}>Open in Google Maps</Text>
+          </View>
+        </TouchableOpacity>
       </ScrollView>
     </View>
   );
@@ -374,8 +372,14 @@ const styles = StyleSheet.create({
   },
   mapPlaceholderText: {
     fontSize: 15,
+    color: Colors.text,
+    fontWeight: "600" as const,
+    marginTop: 4,
+  },
+  mapSubText: {
+    fontSize: 13,
     color: Colors.textSecondary,
-    fontWeight: "500" as const,
+    marginTop: 2,
   },
   directionsButton: {
     flexDirection: "row",
