@@ -13,95 +13,65 @@ import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constants/Colors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+const YOUTUBE_CHANNEL_URL = "https://www.youtube.com/@alburhantravels";
+
 interface VideoItem {
   id: string;
   title: string;
   description: string;
   youtubeId: string;
-  category: "hajj-guide" | "umrah-guide" | "promo" | "testimonial";
+  category: "hajj" | "transport" | "hotel" | "ziyarat";
   duration: string;
 }
 
 const VIDEOS: VideoItem[] = [
   {
     id: "1",
-    title: "Complete Hajj Guide 2027",
-    description: "Step-by-step guide covering all rituals of Hajj from Ihram to Tawaf al-Wida",
-    youtubeId: "bx6gHqIavUk",
-    category: "hajj-guide",
-    duration: "25:30",
+    title: "Hotel Makkah – Hajj 2019",
+    description: "Tour of our Makkah hotel accommodation during Hajj 2019 with Al Burhan Tours & Travels",
+    youtubeId: "KGROa5Si-Uo",
+    category: "hotel",
+    duration: "1:08",
   },
   {
     id: "2",
-    title: "Umrah Step by Step",
-    description: "Learn the complete Umrah process with detailed explanations of each step",
-    youtubeId: "s4XqGBwzwRE",
-    category: "umrah-guide",
-    duration: "18:45",
+    title: "Private AC Bus – Hajj 2019",
+    description: "Our private AC bus transport from Al Burhan Tours & Travels during Hajj 2019",
+    youtubeId: "I4JvmRI-jGg",
+    category: "transport",
+    duration: "0:14",
   },
   {
     id: "3",
-    title: "Al Burhan Tours - Premium Hajj Experience",
-    description: "See our world-class Hajj packages with 5-star hotels and VIP services",
-    youtubeId: "9mZCa2ECEXI",
-    category: "promo",
-    duration: "4:20",
+    title: "Hotel Makkah Restaurant – Hajj 2019",
+    description: "Inside look at our Makkah hotel restaurant and meals from Al Burhan Tours & Travels",
+    youtubeId: "k4LZ5KHk4ZY",
+    category: "hotel",
+    duration: "1:23",
   },
   {
     id: "4",
-    title: "Packing Guide for Hajj & Umrah",
-    description: "Essential items to pack for your sacred journey - complete checklist",
-    youtubeId: "GsR1YjpGN5U",
-    category: "hajj-guide",
-    duration: "12:15",
-  },
-  {
-    id: "5",
-    title: "Madinah Ziyarat Guide",
-    description: "Explore the holy sites of Madinah including Masjid Nabawi and historical locations",
-    youtubeId: "TS5IGVx3jfg",
-    category: "umrah-guide",
-    duration: "20:00",
-  },
-  {
-    id: "6",
-    title: "Al Burhan Umrah 2026 Packages",
-    description: "Discover our exclusive Umrah packages with premium accommodation near Haram",
-    youtubeId: "q2K1MWtFwzY",
-    category: "promo",
-    duration: "3:45",
-  },
-  {
-    id: "7",
-    title: "Duas for Hajj & Umrah",
-    description: "Important supplications to recite during your pilgrimage journey",
-    youtubeId: "7Kf2q-KBdWI",
-    category: "hajj-guide",
-    duration: "30:00",
-  },
-  {
-    id: "8",
-    title: "Our Pilgrims Share Their Experience",
-    description: "Hear from our satisfied customers about their journey with Al Burhan Tours",
-    youtubeId: "wCrtk-pyP0I",
-    category: "testimonial",
-    duration: "8:30",
+    title: "Ziyarat Madinah Munawwarah",
+    description: "Holy sites tour of Madinah Munawwarah with Al Burhan Tours & Travels",
+    youtubeId: "BLIjSpRd4Q4",
+    category: "ziyarat",
+    duration: "0:27",
   },
 ];
 
 const CATEGORY_LABELS: Record<string, string> = {
   all: "All Videos",
-  "hajj-guide": "Hajj Guides",
-  "umrah-guide": "Umrah Guides",
-  promo: "Our Packages",
-  testimonial: "Testimonials",
+  hajj: "Hajj",
+  hotel: "Hotels",
+  transport: "Transport",
+  ziyarat: "Ziyarat",
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
-  "hajj-guide": "#047857",
-  "umrah-guide": "#2563eb",
-  promo: "#D97706",
-  testimonial: "#7C3AED",
+  hajj: "#047857",
+  hotel: "#2563eb",
+  transport: "#D97706",
+  ziyarat: "#7C3AED",
 };
 
 export default function VideosScreen() {
@@ -231,6 +201,19 @@ export default function VideosScreen() {
             <Text style={styles.emptyText}>No videos in this category</Text>
           </View>
         )}
+
+        <TouchableOpacity
+          style={styles.channelButton}
+          onPress={() => Linking.openURL(YOUTUBE_CHANNEL_URL)}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="logo-youtube" size={24} color="#FFFFFF" />
+          <View style={styles.channelBtnInfo}>
+            <Text style={styles.channelBtnTitle}>@alburhantravels</Text>
+            <Text style={styles.channelBtnSub}>Subscribe to our YouTube Channel</Text>
+          </View>
+          <Ionicons name="open-outline" size={18} color="rgba(255,255,255,0.7)" />
+        </TouchableOpacity>
 
         <View style={{ height: Platform.OS === "web" ? 34 : 20 }} />
       </ScrollView>
@@ -384,5 +367,33 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.textSecondary,
     textAlign: "center" as const,
+  },
+  channelButton: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    backgroundColor: "#FF0000",
+    marginTop: 8,
+    marginBottom: 8,
+    padding: 16,
+    borderRadius: 14,
+    gap: 12,
+    shadowColor: "#FF0000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  channelBtnInfo: {
+    flex: 1,
+  },
+  channelBtnTitle: {
+    fontSize: 16,
+    fontWeight: "700" as const,
+    color: "#FFFFFF",
+    marginBottom: 2,
+  },
+  channelBtnSub: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.8)",
   },
 });
