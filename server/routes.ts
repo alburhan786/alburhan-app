@@ -542,7 +542,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ success: false, error: "Payment gateway not configured. Please contact support." });
       }
 
-      const amountInPaise = Math.round(parseFloat(amount) * 100);
+      const parsedAmount = parseFloat(amount);
+      if (parsedAmount > 500000) {
+        return res.status(400).json({ success: false, error: "Maximum ₹5,00,000 per transaction. Please pay in installments." });
+      }
+      if (parsedAmount <= 0) {
+        return res.status(400).json({ success: false, error: "Invalid payment amount." });
+      }
+
+      const amountInPaise = Math.round(parsedAmount * 100);
       const auth = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
 
       const response = await fetch("https://api.razorpay.com/v1/orders", {

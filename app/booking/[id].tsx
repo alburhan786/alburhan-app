@@ -33,13 +33,15 @@ export default function BookingDetailsScreen() {
     loadBooking();
   }, [id]);
 
+  const MAX_PER_TXN = 500000;
+
   const loadBooking = async () => {
     try {
       const response = await bookingService.getBookingById(parseInt(id as string));
       if (response.success) {
         setBooking(response.booking);
         const remaining = parseFloat(response.booking.totalAmount) - parseFloat(response.booking.paidAmount);
-        setPaymentAmount(remaining.toString());
+        setPaymentAmount(Math.min(remaining, MAX_PER_TXN).toString());
       }
     } catch (error) {
       Alert.alert('Error', 'Could not load booking');
@@ -317,14 +319,47 @@ export default function BookingDetailsScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Make Payment</Text>
             <View style={styles.card}>
-              <Text style={styles.inputLabel}>Payment Amount</Text>
+              <View style={styles.installmentNote}>
+                <Ionicons name="information-circle-outline" size={16} color={Colors.primary} />
+                <Text style={styles.installmentNoteText}>
+                  Max ₹5,00,000 per transaction. Pay in installments for larger amounts.
+                </Text>
+              </View>
+
+              <Text style={styles.inputLabel}>Select or Enter Amount</Text>
+              <View style={styles.presetRow}>
+                {[25000, 50000, 100000, 200000, 500000].map((preset) => {
+                  const isDisabled = preset > remainingAmount;
+                  const isSelected = paymentAmount === preset.toString();
+                  return (
+                    <TouchableOpacity
+                      key={preset}
+                      style={[styles.presetBtn, isSelected && styles.presetBtnActive, isDisabled && styles.presetBtnDisabled]}
+                      onPress={() => !isDisabled && setPaymentAmount(preset.toString())}
+                      disabled={isDisabled}
+                    >
+                      <Text style={[styles.presetBtnText, isSelected && styles.presetBtnTextActive]}>
+                        ₹{preset >= 100000 ? `${preset / 100000}L` : `${preset / 1000}K`}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+                <TouchableOpacity
+                  style={[styles.presetBtn, paymentAmount === Math.min(remainingAmount, 500000).toString() && remainingAmount <= 500000 && styles.presetBtnActive]}
+                  onPress={() => setPaymentAmount(Math.min(remainingAmount, 500000).toString())}
+                >
+                  <Text style={[styles.presetBtnText, paymentAmount === Math.min(remainingAmount, 500000).toString() && remainingAmount <= 500000 && styles.presetBtnTextActive]}>Full</Text>
+                </TouchableOpacity>
+              </View>
+
               <TextInput
                 style={styles.input}
                 value={paymentAmount}
                 onChangeText={setPaymentAmount}
                 keyboardType="numeric"
-                placeholder="Enter amount"
+                placeholder="Or enter custom amount"
               />
+
               <TouchableOpacity
                 style={[styles.payButton, processing && styles.payButtonDisabled]}
                 onPress={handlePayment}
@@ -415,6 +450,14 @@ const styles = StyleSheet.create({
   divider: { height: 1, backgroundColor: Colors.border, marginVertical: 8 },
   paymentBadge: { backgroundColor: Colors.warning, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 6 },
   paymentText: { color: '#FFFFFF', fontSize: 12, fontWeight: 'bold' as const },
+  installmentNote: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#EFF6FF', borderRadius: 8, padding: 10, marginBottom: 14 },
+  installmentNoteText: { fontSize: 12, color: Colors.primary, flex: 1, lineHeight: 16 },
+  presetRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
+  presetBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.background },
+  presetBtnActive: { borderColor: Colors.primary, backgroundColor: Colors.primary + '15' },
+  presetBtnDisabled: { opacity: 0.35 },
+  presetBtnText: { fontSize: 13, color: Colors.textSecondary, fontWeight: '600' as const },
+  presetBtnTextActive: { color: Colors.primary },
   inputLabel: { fontSize: 14, color: Colors.text, marginBottom: 8, fontWeight: '600' as const },
   input: { backgroundColor: Colors.background, borderRadius: 8, padding: 12, fontSize: 16, color: Colors.text, marginBottom: 16, borderWidth: 1, borderColor: Colors.border },
   payButton: { backgroundColor: '#3399CC', padding: 16, borderRadius: 8, alignItems: 'center', marginBottom: 12 },
