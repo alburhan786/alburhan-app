@@ -286,11 +286,11 @@ export default function ProfileScreen() {
           <Text style={styles.sectionTitle}>Contact Us</Text>
 
           <View style={styles.contactCard}>
-            <TouchableOpacity style={styles.contactRow} onPress={() => Linking.openURL('tel:+919893989786')}>
+            <TouchableOpacity style={styles.contactRow} onPress={() => Linking.openURL('tel:+918989701701')}>
               <Ionicons name="call" size={20} color={Colors.primary} />
               <View style={styles.contactInfo}>
                 <Text style={styles.contactLabel}>Primary</Text>
-                <Text style={styles.contactValue}>+91 9893989786</Text>
+                <Text style={styles.contactValue}>+91 8989701701</Text>
               </View>
             </TouchableOpacity>
 
@@ -306,11 +306,11 @@ export default function ProfileScreen() {
 
             <View style={styles.divider} />
 
-            <TouchableOpacity style={styles.contactRow} onPress={() => Linking.openURL('https://wa.me/919893989786')}>
+            <TouchableOpacity style={styles.contactRow} onPress={() => Linking.openURL('https://wa.me/918989701701?text=Assalamu%20Alaikum%20I%20want%20to%20register%20for%20Hajj%202027%20package%20with%20Al%20Burhan%20Tours%20and%20Travels')}>
               <Ionicons name="logo-whatsapp" size={20} color="#25D366" />
               <View style={styles.contactInfo}>
                 <Text style={styles.contactLabel}>WhatsApp Chat</Text>
-                <Text style={styles.contactValue}>+91 9893989786</Text>
+                <Text style={styles.contactValue}>+91 8989701701</Text>
               </View>
             </TouchableOpacity>
 

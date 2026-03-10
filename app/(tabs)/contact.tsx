@@ -14,10 +14,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const CONTACT_INFO = {
   phones: [
-    { label: "Main Office", number: "+91 98939 89786" },
-    { label: "Booking Enquiry", number: "+91 98939 89786" },
+    { label: "Main Office", number: "+91 8989701701" },
+    { label: "Booking Enquiry", number: "+91 8989701701" },
   ],
-  whatsapp: "+919893989786",
+  whatsapp: "+918989701701",
   email: "info@alburhantours.com",
   website: "www.alburhantours.com",
   address: "Al Burhan Tours & Travels\nBhopal, Madhya Pradesh\nIndia",
@@ -91,7 +91,7 @@ export default function ContactScreen() {
 
   const handleWhatsApp = () => {
     Linking.openURL(
-      `https://wa.me/${CONTACT_INFO.whatsapp}?text=Assalamu%20Alaikum%2C%20I%20would%20like%20to%20enquire%20about%20your%20packages.`
+      `https://wa.me/918989701701?text=Assalamu%20Alaikum%20I%20want%20to%20register%20for%20Hajj%202027%20package%20with%20Al%20Burhan%20Tours%20and%20Travels`
     );
   };
 

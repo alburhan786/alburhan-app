@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import { Colors } from '../../constants/Colors';
 
-const WHATSAPP_BUSINESS_LINK = 'https://wa.me/919893989786?text=Assalamu%20Alaikum%20I%20want%20to%20register%20for%20Hajj%20packages';
+const WHATSAPP_BUSINESS_LINK = 'https://wa.me/918989701701?text=Assalamu%20Alaikum%20I%20want%20to%20register%20for%20Hajj%202027%20package%20with%20Al%20Burhan%20Tours%20and%20Travels';
 
 type Step = 'details' | 'otp';
 type RegisterMode = 'direct' | 'otp';
