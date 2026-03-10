@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "AL BURHAN Tours",
-    "slug": "alburhan-tours",
+    "name": "AL BURHAN TOURS",
+    "slug": "alburhantours",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "alburhan",
+    "scheme": "alburhantours",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -15,10 +15,10 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.alburhantravels.hajjumrah"
+      "bundleIdentifier": "com.alburhantours.app"
     },
     "android": {
-      "package": "com.alburhantravels.hajjumrah",
+      "package": "com.alburhantours.app",
       "adaptiveIcon": {
         "backgroundColor": "#047857",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
