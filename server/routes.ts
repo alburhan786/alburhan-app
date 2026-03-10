@@ -1254,6 +1254,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  const serveTemplate = (templateName: string) => (req: any, res: any) => {
+    const fs = require("fs");
+    const templatePath = require("path").resolve(process.cwd(), "server", "templates", templateName);
+    if (fs.existsSync(templatePath)) {
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.sendFile(templatePath);
+    } else {
+      res.status(404).send("Page not found");
+    }
+  };
+
+  app.get("/privacy-policy", serveTemplate("privacy-policy.html"));
+  app.get("/terms-and-conditions", serveTemplate("terms-and-conditions.html"));
+  app.get("/refund-policy", serveTemplate("refund-policy.html"));
+  app.get("/delete-account", serveTemplate("delete-account.html"));
+
+  app.delete("/api/user/delete-account", async (req, res) => {
+    try {
+      const { phone, userId } = req.body;
+      let userToDelete: any = null;
+
+      if (userId) {
+        const [found] = await db.select().from(users).where(eq(users.id, userId));
+        userToDelete = found;
+      } else if (phone) {
+        const cleanPhone = phone.replace(/\D/g, "").replace(/^91/, "");
+        const [found] = await db.select().from(users).where(eq(users.phone, cleanPhone));
+        userToDelete = found;
+      }
+
+      if (!userToDelete) {
+        return res.status(404).json({ success: false, error: "No account found with this phone number." });
+      }
+
+      const userBookings = await db.select().from(bookings).where(eq(bookings.userId, userToDelete.id));
+      for (const booking of userBookings) {
+        await db.delete(payments).where(eq(payments.bookingId, booking.id));
+        await db.delete(documents).where(eq(documents.bookingId, booking.id));
+      }
+      await db.delete(bookings).where(eq(bookings.userId, userToDelete.id));
+      await db.delete(users).where(eq(users.id, userToDelete.id));
+
+      console.log(`[Account Deletion] User ${userToDelete.id} (${userToDelete.phone}) deleted`);
+      res.json({ success: true, message: "Account and all associated data have been permanently deleted." });
+    } catch (error) {
+      console.error("[Account Deletion] Error:", error);
+      res.status(500).json({ success: false, error: "Failed to delete account. Please try again." });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

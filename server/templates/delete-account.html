@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Delete Account – Al Burhan Tours & Travels</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f9fafb; color: #222; line-height: 1.7; }
+    header { background: #047857; padding: 20px 24px; }
+    header div { color: #fff; }
+    header h1 { font-size: 18px; font-weight: 700; }
+    header p { font-size: 12px; opacity: 0.85; }
+    .container { max-width: 560px; margin: 40px auto; padding: 0 20px 60px; }
+    .card { background: #fff; border-radius: 12px; padding: 32px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
+    h2 { font-size: 22px; font-weight: 700; color: #dc2626; margin-bottom: 8px; }
+    .subtitle { font-size: 14px; color: #6b7280; margin-bottom: 28px; }
+    label { display: block; font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 6px; }
+    input { width: 100%; padding: 12px 14px; border: 1.5px solid #d1d5db; border-radius: 8px; font-size: 15px; color: #111; outline: none; transition: border 0.2s; margin-bottom: 18px; }
+    input:focus { border-color: #047857; }
+    .warning { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 14px 16px; margin-bottom: 24px; }
+    .warning p { font-size: 13px; color: #b91c1c; margin: 0; }
+    .warning strong { display: block; margin-bottom: 4px; font-size: 14px; }
+    ul { padding-left: 18px; margin: 8px 0 0; }
+    ul li { font-size: 13px; color: #b91c1c; margin-bottom: 4px; }
+    button { width: 100%; padding: 14px; background: #dc2626; color: #fff; font-size: 16px; font-weight: 600; border: none; border-radius: 8px; cursor: pointer; transition: background 0.2s; }
+    button:hover { background: #b91c1c; }
+    button:disabled { background: #9ca3af; cursor: not-allowed; }
+    .success { display: none; text-align: center; padding: 32px 16px; }
+    .success svg { margin-bottom: 16px; }
+    .success h3 { font-size: 20px; color: #047857; margin-bottom: 8px; }
+    .success p { color: #6b7280; font-size: 14px; }
+    .error-msg { display: none; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 12px 14px; margin-bottom: 16px; font-size: 14px; color: #b91c1c; }
+    .alt { margin-top: 24px; text-align: center; font-size: 13px; color: #6b7280; }
+    .alt a { color: #047857; text-decoration: none; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Al Burhan Tours & Travels</h1>
+      <p>Hajj &amp; Umrah Specialists</p>
+    </div>
+  </header>
+  <div class="container">
+    <div class="card" id="formSection">
+      <h2>Delete My Account</h2>
+      <p class="subtitle">Enter your registered phone number to permanently delete your account.</p>
+
+      <div class="warning">
+        <strong>⚠️ This action is irreversible</strong>
+        <p>Deleting your account will permanently remove:</p>
+        <ul>
+          <li>Your profile and contact information</li>
+          <li>All booking records and history</li>
+          <li>All uploaded documents (passport, visa, etc.)</li>
+          <li>All payment records</li>
+        </ul>
+      </div>
+
+      <div class="error-msg" id="errorMsg"></div>
+
+      <label for="phone">Registered Phone Number</label>
+      <input type="tel" id="phone" placeholder="e.g. 9893225590" maxlength="15" />
+
+      <label for="reason">Reason for deletion (optional)</label>
+      <input type="text" id="reason" placeholder="e.g. No longer need the service" />
+
+      <button id="deleteBtn" onclick="requestDelete()">Delete My Account</button>
+
+      <p class="alt">Changed your mind? <a href="javascript:history.back()">Go Back</a></p>
+    </div>
+
+    <div class="success" id="successSection">
+      <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+        <circle cx="32" cy="32" r="32" fill="#D1FAE5"/>
+        <path d="M20 32l8 8 16-16" stroke="#047857" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <h3>Account Deletion Requested</h3>
+      <p>Your account and all associated data have been permanently deleted.<br><br>If you have any pending bookings, please contact us at<br><a href="mailto:info@alburhantravels.com" style="color:#047857">info@alburhantravels.com</a><br>or call <a href="tel:+919893225590" style="color:#047857">+91 9893225590</a></p>
+    </div>
+  </div>
+
+  <script>
+    async function requestDelete() {
+      const phone = document.getElementById('phone').value.trim().replace(/\D/g, '');
+      const reason = document.getElementById('reason').value.trim();
+      const btn = document.getElementById('deleteBtn');
+      const errorMsg = document.getElementById('errorMsg');
+
+      errorMsg.style.display = 'none';
+
+      if (!phone || phone.length < 10) {
+        errorMsg.textContent = 'Please enter a valid 10-digit phone number.';
+        errorMsg.style.display = 'block';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Deleting...';
+
+      try {
+        const response = await fetch('/api/user/delete-account', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone, reason })
+        });
+        const data = await response.json();
+        if (data.success) {
+          document.getElementById('formSection').style.display = 'none';
+          document.getElementById('successSection').style.display = 'block';
+        } else {
+          errorMsg.textContent = data.error || 'No account found with this phone number.';
+          errorMsg.style.display = 'block';
+          btn.disabled = false;
+          btn.textContent = 'Delete My Account';
+        }
+      } catch (e) {
+        errorMsg.textContent = 'Something went wrong. Please try again or contact us directly.';
+        errorMsg.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Delete My Account';
+      }
+    }
+  </script>
+</body>
+</html>

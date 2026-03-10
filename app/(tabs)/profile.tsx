@@ -17,6 +17,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { useAuth } from '../../contexts/AuthContext';
 import { documentService } from '../../services/api';
 import { Colors } from '../../constants/Colors';
+import { getApiUrl } from '../../lib/query-client';
 
 const DOC_TYPES = [
   { value: 'passport', label: 'Passport', icon: 'document-text-outline' as const },
@@ -123,6 +124,45 @@ export default function ProfileScreen() {
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Could not pick document');
     }
+  };
+
+  const openPolicyUrl = (path: string) => {
+    const base = getApiUrl().replace('/api', '');
+    Linking.openURL(`${base}${path}`);
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'This will permanently delete your account and all your data including bookings and documents. This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const url = new URL('/api/user/delete-account', getApiUrl());
+              const response = await fetch(url.toString(), {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: user?.id }),
+              });
+              const data = await response.json();
+              if (data.success) {
+                Alert.alert('Account Deleted', 'Your account has been permanently deleted.', [
+                  { text: 'OK', onPress: () => logout() }
+                ]);
+              } else {
+                Alert.alert('Error', data.error || 'Failed to delete account.');
+              }
+            } catch {
+              Alert.alert('Error', 'Something went wrong. Please try again.');
+            }
+          }
+        }
+      ]
+    );
   };
 
   const handleLogout = () => {
@@ -358,11 +398,42 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Legal</Text>
+          <View style={styles.contactCard}>
+            <TouchableOpacity style={styles.policyRow} onPress={() => openPolicyUrl('/privacy-policy')}>
+              <Ionicons name="shield-checkmark-outline" size={18} color={Colors.primary} />
+              <Text style={styles.policyLabel}>Privacy Policy</Text>
+              <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} />
+            </TouchableOpacity>
+            <View style={styles.divider} />
+            <TouchableOpacity style={styles.policyRow} onPress={() => openPolicyUrl('/terms-and-conditions')}>
+              <Ionicons name="document-text-outline" size={18} color={Colors.primary} />
+              <Text style={styles.policyLabel}>Terms & Conditions</Text>
+              <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} />
+            </TouchableOpacity>
+            <View style={styles.divider} />
+            <TouchableOpacity style={styles.policyRow} onPress={() => openPolicyUrl('/refund-policy')}>
+              <Ionicons name="return-down-back-outline" size={18} color={Colors.primary} />
+              <Text style={styles.policyLabel}>Refund & Cancellation Policy</Text>
+              <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.section}>
           <TouchableOpacity
             style={styles.logoutButton}
             onPress={handleLogout}
           >
             <Text style={styles.logoutButtonText}>Logout</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.deleteAccountButton}
+            onPress={handleDeleteAccount}
+          >
+            <Ionicons name="trash-outline" size={16} color={Colors.error} />
+            <Text style={styles.deleteAccountText}>Delete My Account</Text>
           </TouchableOpacity>
         </View>
 
@@ -589,16 +660,44 @@ const styles = StyleSheet.create({
     fontWeight: '600' as const,
     color: Colors.text,
   },
+  policyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 13,
+    gap: 12,
+  },
+  policyLabel: {
+    flex: 1,
+    fontSize: 14,
+    color: Colors.text,
+    fontWeight: '500' as const,
+  },
   logoutButton: {
     backgroundColor: Colors.error,
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
+    marginBottom: 12,
   },
   logoutButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold' as const,
+  },
+  deleteAccountButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderWidth: 1.5,
+    borderColor: Colors.error,
+    borderRadius: 12,
+  },
+  deleteAccountText: {
+    color: Colors.error,
+    fontSize: 15,
+    fontWeight: '600' as const,
   },
   footer: {
     alignItems: 'center',
