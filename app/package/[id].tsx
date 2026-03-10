@@ -96,7 +96,7 @@ import React, { useState, useEffect } from 'react';
       lines.push('_All packages exclude 5% GST_');
       lines.push('');
       lines.push('For booking & enquiry:');
-      lines.push('📞 +91 8989701701');
+      lines.push('📞 +91 9893989786');
       lines.push('🌐 Al Burhan Tours & Travels');
       return lines.filter(l => l !== undefined).join('\n');
     };

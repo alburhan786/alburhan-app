@@ -14,18 +14,18 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const CONTACT_INFO = {
   phones: [
-    { label: "Main Office", number: "+91 8989701701" },
-    { label: "Booking Enquiry", number: "+91 8989701701" },
+    { label: "Main Office", number: "+91 9893225590" },
+    { label: "Booking Enquiry", number: "+91 9893989786" },
   ],
-  whatsapp: "+918989701701",
-  email: "info@alburhantours.com",
-  website: "www.alburhantours.com",
-  address: "Al Burhan Tours & Travels\nBhopal, Madhya Pradesh\nIndia",
+  whatsapp: "+919893989786",
+  email: "info@alburhantravels.com",
+  website: "www.alburhantravels.com",
+  address: "Al Burhan Tours & Travels\n8-5, Khanka Masjid Complex\nSanwara Road, Burhanpur\n450331, Madhya Pradesh, India",
   officeHours: "Mon - Sat: 10:00 AM - 7:00 PM",
   social: {
     facebook: "https://facebook.com/alburhantours",
     instagram: "https://instagram.com/alburhantours",
-    youtube: "https://youtube.com/@alburhantours",
+    youtube: "https://youtube.com/@alburhantravels",
   },
 };
 
@@ -91,7 +91,7 @@ export default function ContactScreen() {
 
   const handleWhatsApp = () => {
     Linking.openURL(
-      `https://wa.me/918989701701?text=Assalamu%20Alaikum%20I%20want%20to%20register%20for%20Hajj%202027%20package%20with%20Al%20Burhan%20Tours%20and%20Travels`
+      `https://wa.me/919893989786?text=Assalamu%20Alaikum%20I%20want%20to%20register%20for%20Hajj%202027%20package%20with%20Al%20Burhan%20Tours%20and%20Travels`
     );
   };
 

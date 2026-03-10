@@ -17,7 +17,7 @@ import { Colors } from "@/constants/Colors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 
-const WHATSAPP_PHONE = "918989701701";
+const WHATSAPP_PHONE = "919893989786";
 
 export default function BrochuresScreen() {
   const [packages, setPackages] = useState<any[]>([]);
