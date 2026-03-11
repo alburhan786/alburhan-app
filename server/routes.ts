@@ -62,8 +62,22 @@ async function sendOtpSmsFast2SMS(phone: string, otpCode: string): Promise<boole
     return false;
   }
   try {
-    const dltUrl = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=dlt&sender_id=ALBURH&message=164844&variables_values=${otpCode}|&numbers=${phone}&flash=0`;
-    const dltResponse = await fetch(dltUrl, { method: "GET" });
+    const payload = {
+      route: "dlt",
+      sender_id: "ALBURH",
+      message: "211052",
+      variables_values: `${otpCode}||`,
+      numbers: phone,
+      flash: "0"
+    };
+    const dltResponse = await fetch("https://www.fast2sms.com/dev/bulkV2", {
+      method: "POST",
+      headers: {
+        authorization: apiKey,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
     const dltData = await dltResponse.json();
     console.log("[Fast2SMS DLT Route] Response:", JSON.stringify(dltData));
     if (dltData.return === true) {
