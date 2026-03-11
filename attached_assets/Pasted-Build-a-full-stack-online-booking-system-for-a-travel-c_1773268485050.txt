@@ -1,0 +1,247 @@
+Build a full-stack online booking system for a travel company named
+"Al Burhan Tours & Travels".
+
+The system must support a booking approval workflow where customers request bookings and the admin approves them before payment.
+
+TECH STACK
+Frontend: React / Next.js
+Backend: Node.js + Express
+Database: MongoDB
+Authentication: OTP login using Fast2SMS
+Payment Gateway: Razorpay
+Messaging: WhatsApp (BotBee API), SMS (Fast2SMS)
+
+------------------------------------------------
+
+BOOKING WORKFLOW
+
+1. Customer opens package page.
+2. Customer clicks "Request Booking".
+3. Customer enters details:
+
+Name
+Mobile Number
+Email
+Number of Pilgrims
+Passport details
+Preferred departure date
+Package selected
+
+4. System creates booking with status:
+
+PENDING APPROVAL
+
+5. Admin dashboard shows new booking request.
+
+Admin options:
+Accept Booking
+Reject Booking
+
+------------------------------------------------
+
+IF ADMIN ACCEPTS BOOKING
+
+Booking status changes to:
+
+APPROVED
+
+System sends message to customer:
+
+"Your booking request has been approved. Please complete payment to confirm your booking."
+
+Customer receives notification via:
+
+Email
+SMS
+WhatsApp
+RCS message
+
+------------------------------------------------
+
+PAYMENT PROCESS
+
+Customer logs in to dashboard.
+
+Customer clicks:
+
+"Pay Now"
+
+Payment methods via Razorpay:
+
+UPI
+Credit Card
+Debit Card
+Net Banking
+
+------------------------------------------------
+
+AFTER PAYMENT SUCCESS
+
+Booking status becomes:
+
+CONFIRMED
+
+System automatically:
+
+Generate Invoice PDF
+Send confirmation notifications
+
+Customer receives:
+
+Booking Confirmation
+Invoice
+Payment receipt
+
+via:
+
+Email
+SMS
+WhatsApp
+RCS
+
+------------------------------------------------
+
+FUTURE TRAVEL NOTIFICATIONS
+
+Admin can upload:
+
+Flight ticket
+Visa copy
+Room allotment
+Bus allotment
+
+System automatically sends updates to customer via:
+
+Email
+SMS
+WhatsApp
+RCS
+
+------------------------------------------------
+
+CUSTOMER DASHBOARD
+
+Customer can:
+
+View bookings
+Upload documents
+
+Passport
+PAN Card
+Aadhaar
+Passport photo
+
+Supported formats:
+
+PDF
+JPG
+PNG
+
+Customer can:
+
+Download invoice
+Check visa status
+Check travel updates
+
+------------------------------------------------
+
+ADMIN DASHBOARD
+
+Admin can:
+
+Create packages
+Edit packages
+Accept / reject booking requests
+Upload documents
+Generate invoices
+Send notifications
+Manage customers
+Track payments
+Create offline bookings
+
+------------------------------------------------
+
+NOTIFICATION INTEGRATION
+
+Integrate the following APIs.
+
+BOTBEE WhatsApp API
+
+BOTBEE_API_KEY
+BOTBEE_PHONE_NUMBER_ID
+BOTBEE_BUSINESS_ID
+
+FAST2SMS API
+
+FAST2SMS_API_KEY
+FAST2SMS_SENDER_ID = ALBURH
+
+Send messages automatically for:
+
+Booking approval
+Payment confirmation
+Invoice
+Flight details
+Visa updates
+Departure reminder
+
+------------------------------------------------
+
+OTP LOGIN FLOW
+
+User enters mobile number
+↓
+System generates OTP
+↓
+OTP sent via Fast2SMS
+↓
+User enters OTP
+↓
+OTP verified
+↓
+Login successful
+
+------------------------------------------------
+
+PACKAGE DATABASE
+
+Store packages in MongoDB using JSON structure.
+
+Include:
+
+Umrah Packages
+Ramadan Umrah Packages
+Hajj Packages 2027
+Special Hajj Package
+
+All prices exclude 5% GST.
+
+------------------------------------------------
+
+WEBSITE DESIGN
+
+Use Islamic luxury design.
+
+Colors:
+
+Dark Green
+Gold
+White
+
+Hero banner:
+
+Kaaba background
+
+Headline:
+
+Trusted Hajj, Umrah & Ziyarat Travel Services – 35+ Years Experience
+
+------------------------------------------------
+
+ADDITIONAL FEATURES
+
+WhatsApp floating chat button
+Blog for Hajj & Umrah guide
+SEO optimized pages
+Google Maps location
+Inquiry form
