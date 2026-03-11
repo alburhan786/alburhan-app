@@ -1,0 +1,24 @@
+packages:
+  "framer-motion": "For premium, smooth page transitions and micro-interactions"
+  "react-hook-form": "For robust form state management"
+  "@hookform/resolvers": "For Zod schema validation with forms"
+  "date-fns": "For elegant date formatting"
+  "recharts": "For admin dashboard analytics charts"
+  "clsx": "For conditional class names"
+  "tailwind-merge": "For merging tailwind classes safely"
+
+images:
+  - path: "artifacts/alburhan/public/images/logo.png"
+    description: "Elegant luxury logo for 'Al Burhan Tours', featuring an abstract geometric Islamic star in gold on a transparent background."
+    aspect_ratio: "1:1"
+  - path: "artifacts/alburhan/public/images/islamic-pattern-bg.png"
+    description: "Subtle, dark emerald green geometric Islamic pattern background, luxurious and seamless, dark luxury aesthetic."
+    aspect_ratio: "16:9"
+  - path: "artifacts/alburhan/public/images/gold-accent.png"
+    description: "A horizontal thin elegant gold divider line with a glowing center, abstract luxury."
+    aspect_ratio: "16:9"
+
+notes:
+  - "Assuming standard monorepo structure where @workspace/api-client-react provides all generated TanStack hooks."
+  - "Razorpay SDK will be loaded dynamically via script tag in the frontend."
+  - "Authentication assumes session cookies handled by the browser automatically (credentials: 'include' is implicit in the generated hooks)."

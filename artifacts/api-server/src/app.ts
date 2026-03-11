@@ -1,12 +1,28 @@
 import express, { type Express } from "express";
 import cors from "cors";
-import router from "./routes";
+import session from "express-session";
+import router from "./routes/index.js";
 
 const app: Express = express();
 
-app.use(cors());
+app.use(cors({
+  origin: true,
+  credentials: true,
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+app.use(session({
+  secret: process.env.SESSION_SECRET || "alburhan-tours-secret-key-2024",
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: false,
+    httpOnly: true,
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    sameSite: "lax",
+  },
+}));
 
 app.use("/api", router);
 

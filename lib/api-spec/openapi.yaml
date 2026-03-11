@@ -1,22 +1,37 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Al Burhan Tours & Travels - Booking System API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication via OTP
+  - name: packages
+    description: Travel packages
+  - name: bookings
+    description: Booking management
+  - name: payments
+    description: Payment processing via Razorpay
+  - name: documents
+    description: Document uploads
+  - name: notifications
+    description: Notifications management
+  - name: admin
+    description: Admin operations
+  - name: inquiry
+    description: Public inquiry form
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +39,551 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/send-otp:
+    post:
+      operationId: sendOtp
+      tags: [auth]
+      summary: Send OTP to mobile number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendOtpRequest"
+      responses:
+        "200":
+          description: OTP sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendOtpResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/verify-otp:
+    post:
+      operationId: verifyOtp
+      tags: [auth]
+      summary: Verify OTP and login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyOtpRequest"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid OTP
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout user
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user info
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /packages:
+    get:
+      operationId: listPackages
+      tags: [packages]
+      summary: List all travel packages
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [umrah, ramadan_umrah, hajj, special_hajj]
+        - name: active
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: List of packages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Package"
+
+    post:
+      operationId: createPackage
+      tags: [packages]
+      summary: Create a new package (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePackageRequest"
+      responses:
+        "201":
+          description: Package created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Package"
+
+  /packages/{id}:
+    get:
+      operationId: getPackage
+      tags: [packages]
+      summary: Get a single package
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Package details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Package"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    put:
+      operationId: updatePackage
+      tags: [packages]
+      summary: Update a package (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePackageRequest"
+      responses:
+        "200":
+          description: Package updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Package"
+
+    delete:
+      operationId: deletePackage
+      tags: [packages]
+      summary: Delete a package (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Package deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /bookings:
+    get:
+      operationId: listBookings
+      tags: [bookings]
+      summary: List bookings (admin sees all, customer sees own)
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, approved, rejected, confirmed, cancelled]
+        - name: page
+          in: query
+          schema:
+            type: number
+        - name: limit
+          in: query
+          schema:
+            type: number
+      responses:
+        "200":
+          description: List of bookings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingListResponse"
+
+    post:
+      operationId: createBooking
+      tags: [bookings]
+      summary: Create a booking request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBookingRequest"
+      responses:
+        "201":
+          description: Booking created with pending status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+
+  /bookings/{id}:
+    get:
+      operationId: getBooking
+      tags: [bookings]
+      summary: Get booking details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Booking details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /bookings/{id}/approve:
+    post:
+      operationId: approveBooking
+      tags: [bookings]
+      summary: Approve a booking (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Booking approved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+
+  /bookings/{id}/reject:
+    post:
+      operationId: rejectBooking
+      tags: [bookings]
+      summary: Reject a booking (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+      responses:
+        "200":
+          description: Booking rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+
+  /bookings/{id}/invoice:
+    get:
+      operationId: getInvoice
+      tags: [bookings]
+      summary: Get invoice for a booking
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Invoice data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+
+  /bookings/offline:
+    post:
+      operationId: createOfflineBooking
+      tags: [bookings]
+      summary: Create an offline booking (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOfflineBookingRequest"
+      responses:
+        "201":
+          description: Offline booking created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+
+  /payments/create-order:
+    post:
+      operationId: createPaymentOrder
+      tags: [payments]
+      summary: Create a Razorpay payment order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePaymentOrderRequest"
+      responses:
+        "200":
+          description: Razorpay order created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentOrder"
+
+  /payments/verify:
+    post:
+      operationId: verifyPayment
+      tags: [payments]
+      summary: Verify and confirm payment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyPaymentRequest"
+      responses:
+        "200":
+          description: Payment verified, booking confirmed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+
+  /documents/upload-url:
+    post:
+      operationId: getUploadUrl
+      tags: [documents]
+      summary: Get a pre-signed URL to upload a document
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadUrlRequest"
+      responses:
+        "200":
+          description: Upload URL generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadUrlResponse"
+
+  /documents/{bookingId}:
+    get:
+      operationId: listDocuments
+      tags: [documents]
+      summary: List documents for a booking
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of documents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Document"
+
+  /documents:
+    post:
+      operationId: saveDocument
+      tags: [documents]
+      summary: Save uploaded document metadata
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveDocumentRequest"
+      responses:
+        "201":
+          description: Document saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+
+  /documents/{id}/delete:
+    delete:
+      operationId: deleteDocument
+      tags: [documents]
+      summary: Delete a document
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /notifications/send:
+    post:
+      operationId: sendNotification
+      tags: [notifications]
+      summary: Send a custom notification to a customer (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendNotificationRequest"
+      responses:
+        "200":
+          description: Notification sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /admin/stats:
+    get:
+      operationId: getAdminStats
+      tags: [admin]
+      summary: Get dashboard statistics
+      responses:
+        "200":
+          description: Stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminStats"
+
+  /admin/customers:
+    get:
+      operationId: listCustomers
+      tags: [admin]
+      summary: List all customers
+      responses:
+        "200":
+          description: Customers list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+
+  /inquiry:
+    post:
+      operationId: submitInquiry
+      tags: [inquiry]
+      summary: Submit a public inquiry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InquiryRequest"
+      responses:
+        "200":
+          description: Inquiry submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /admin/inquiries:
+    get:
+      operationId: listInquiries
+      tags: [admin]
+      summary: List all inquiries (admin)
+      responses:
+        "200":
+          description: Inquiries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Inquiry"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +594,599 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        error:
+          type: string
+      required:
+        - message
+
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+
+    SendOtpRequest:
+      type: object
+      properties:
+        mobile:
+          type: string
+      required:
+        - mobile
+
+    SendOtpResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        requestId:
+          type: string
+      required:
+        - message
+
+    VerifyOtpRequest:
+      type: object
+      properties:
+        mobile:
+          type: string
+        otp:
+          type: string
+      required:
+        - mobile
+        - otp
+
+    AuthResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+        token:
+          type: string
+      required:
+        - message
+        - user
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        mobile:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [customer, admin]
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - mobile
+        - role
+
+    Package:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+          enum: [umrah, ramadan_umrah, hajj, special_hajj]
+        description:
+          type: string
+        duration:
+          type: string
+        pricePerPerson:
+          type: number
+        gstPercent:
+          type: number
+        includes:
+          type: array
+          items:
+            type: string
+        highlights:
+          type: array
+          items:
+            type: string
+        departureDates:
+          type: array
+          items:
+            type: string
+        maxPilgrims:
+          type: number
+        imageUrl:
+          type: string
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - type
+        - pricePerPerson
+        - gstPercent
+        - isActive
+
+    CreatePackageRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [umrah, ramadan_umrah, hajj, special_hajj]
+        description:
+          type: string
+        duration:
+          type: string
+        pricePerPerson:
+          type: number
+        gstPercent:
+          type: number
+          default: 5
+        includes:
+          type: array
+          items:
+            type: string
+        highlights:
+          type: array
+          items:
+            type: string
+        departureDates:
+          type: array
+          items:
+            type: string
+        maxPilgrims:
+          type: number
+        imageUrl:
+          type: string
+        isActive:
+          type: boolean
+          default: true
+      required:
+        - name
+        - type
+        - pricePerPerson
+
+    Pilgrim:
+      type: object
+      properties:
+        name:
+          type: string
+        passportNumber:
+          type: string
+        passportExpiry:
+          type: string
+        dateOfBirth:
+          type: string
+      required:
+        - name
+
+    CreateBookingRequest:
+      type: object
+      properties:
+        packageId:
+          type: string
+        customerName:
+          type: string
+        customerMobile:
+          type: string
+        customerEmail:
+          type: string
+        numberOfPilgrims:
+          type: number
+        pilgrims:
+          type: array
+          items:
+            $ref: "#/components/schemas/Pilgrim"
+        preferredDepartureDate:
+          type: string
+        notes:
+          type: string
+      required:
+        - packageId
+        - customerName
+        - customerMobile
+        - numberOfPilgrims
+        - preferredDepartureDate
+
+    CreateOfflineBookingRequest:
+      type: object
+      properties:
+        packageId:
+          type: string
+        customerName:
+          type: string
+        customerMobile:
+          type: string
+        customerEmail:
+          type: string
+        numberOfPilgrims:
+          type: number
+        pilgrims:
+          type: array
+          items:
+            $ref: "#/components/schemas/Pilgrim"
+        preferredDepartureDate:
+          type: string
+        notes:
+          type: string
+        paymentStatus:
+          type: string
+          enum: [pending, paid]
+        paymentAmount:
+          type: number
+        paymentMethod:
+          type: string
+      required:
+        - customerName
+        - customerMobile
+        - numberOfPilgrims
+
+    Booking:
+      type: object
+      properties:
+        id:
+          type: string
+        bookingNumber:
+          type: string
+        packageId:
+          type: string
+        packageName:
+          type: string
+        customerId:
+          type: string
+        customerName:
+          type: string
+        customerMobile:
+          type: string
+        customerEmail:
+          type: string
+        numberOfPilgrims:
+          type: number
+        pilgrims:
+          type: array
+          items:
+            $ref: "#/components/schemas/Pilgrim"
+        preferredDepartureDate:
+          type: string
+        status:
+          type: string
+          enum: [pending, approved, rejected, confirmed, cancelled]
+        totalAmount:
+          type: number
+        gstAmount:
+          type: number
+        finalAmount:
+          type: number
+        paymentId:
+          type: string
+        razorpayOrderId:
+          type: string
+        razorpayPaymentId:
+          type: string
+        invoiceNumber:
+          type: string
+        rejectionReason:
+          type: string
+        notes:
+          type: string
+        isOffline:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - bookingNumber
+        - customerName
+        - customerMobile
+        - numberOfPilgrims
+        - status
+        - createdAt
+
+    BookingListResponse:
+      type: object
+      properties:
+        bookings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Booking"
+        total:
+          type: number
+        page:
+          type: number
+        limit:
+          type: number
+      required:
+        - bookings
+        - total
+
+    Invoice:
+      type: object
+      properties:
+        invoiceNumber:
+          type: string
+        bookingNumber:
+          type: string
+        customerName:
+          type: string
+        customerMobile:
+          type: string
+        customerEmail:
+          type: string
+        packageName:
+          type: string
+        numberOfPilgrims:
+          type: number
+        pricePerPerson:
+          type: number
+        totalAmount:
+          type: number
+        gstAmount:
+          type: number
+        finalAmount:
+          type: number
+        paymentDate:
+          type: string
+        departureDate:
+          type: string
+        status:
+          type: string
+        companyName:
+          type: string
+        companyAddress:
+          type: string
+        companyPhone:
+          type: string
+        companyEmail:
+          type: string
+      required:
+        - invoiceNumber
+        - bookingNumber
+        - customerName
+        - packageName
+        - finalAmount
+
+    CreatePaymentOrderRequest:
+      type: object
+      properties:
+        bookingId:
+          type: string
+      required:
+        - bookingId
+
+    PaymentOrder:
+      type: object
+      properties:
+        orderId:
+          type: string
+        amount:
+          type: number
+        currency:
+          type: string
+        bookingId:
+          type: string
+        razorpayKeyId:
+          type: string
+      required:
+        - orderId
+        - amount
+        - currency
+        - bookingId
+        - razorpayKeyId
+
+    VerifyPaymentRequest:
+      type: object
+      properties:
+        bookingId:
+          type: string
+        razorpayOrderId:
+          type: string
+        razorpayPaymentId:
+          type: string
+        razorpaySignature:
+          type: string
+      required:
+        - bookingId
+        - razorpayOrderId
+        - razorpayPaymentId
+        - razorpaySignature
+
+    UploadUrlRequest:
+      type: object
+      properties:
+        bookingId:
+          type: string
+        fileName:
+          type: string
+        fileType:
+          type: string
+        documentType:
+          type: string
+          enum: [passport, pan_card, aadhaar, passport_photo, flight_ticket, visa, room_allotment, bus_allotment, other]
+      required:
+        - bookingId
+        - fileName
+        - fileType
+        - documentType
+
+    UploadUrlResponse:
+      type: object
+      properties:
+        uploadUrl:
+          type: string
+        fileKey:
+          type: string
+        documentId:
+          type: string
+      required:
+        - uploadUrl
+        - fileKey
+
+    Document:
+      type: object
+      properties:
+        id:
+          type: string
+        bookingId:
+          type: string
+        documentType:
+          type: string
+          enum: [passport, pan_card, aadhaar, passport_photo, flight_ticket, visa, room_allotment, bus_allotment, other]
+        fileName:
+          type: string
+        fileKey:
+          type: string
+        fileUrl:
+          type: string
+        uploadedBy:
+          type: string
+          enum: [customer, admin]
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - bookingId
+        - documentType
+        - fileName
+
+    SaveDocumentRequest:
+      type: object
+      properties:
+        bookingId:
+          type: string
+        documentType:
+          type: string
+          enum: [passport, pan_card, aadhaar, passport_photo, flight_ticket, visa, room_allotment, bus_allotment, other]
+        fileName:
+          type: string
+        fileKey:
+          type: string
+        fileUrl:
+          type: string
+      required:
+        - bookingId
+        - documentType
+        - fileName
+        - fileKey
+
+    SendNotificationRequest:
+      type: object
+      properties:
+        customerId:
+          type: string
+        mobile:
+          type: string
+        message:
+          type: string
+        channels:
+          type: array
+          items:
+            type: string
+            enum: [sms, whatsapp, email]
+        subject:
+          type: string
+        email:
+          type: string
+      required:
+        - message
+        - channels
+
+    AdminStats:
+      type: object
+      properties:
+        totalBookings:
+          type: number
+        pendingBookings:
+          type: number
+        approvedBookings:
+          type: number
+        confirmedBookings:
+          type: number
+        rejectedBookings:
+          type: number
+        totalRevenue:
+          type: number
+        totalCustomers:
+          type: number
+        totalPackages:
+          type: number
+        recentBookings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Booking"
+      required:
+        - totalBookings
+        - pendingBookings
+        - approvedBookings
+        - confirmedBookings
+        - rejectedBookings
+        - totalRevenue
+        - totalCustomers
+        - totalPackages
+
+    InquiryRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        mobile:
+          type: string
+        email:
+          type: string
+        message:
+          type: string
+        packageInterest:
+          type: string
+      required:
+        - name
+        - mobile
+        - message
+
+    Inquiry:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        mobile:
+          type: string
+        email:
+          type: string
+        message:
+          type: string
+        packageInterest:
+          type: string
+        isRead:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - mobile
+        - message
+        - createdAt
