@@ -132,7 +132,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [umrah, ramadan_umrah, hajj, special_hajj]
+            enum: [umrah, ramadan_umrah, hajj, special_hajj, iraq_ziyarat, baitul_muqaddas, syria_ziyarat, jordan_heritage]
         - name: active
           in: query
           schema:
@@ -685,7 +685,7 @@ components:
           type: string
         type:
           type: string
-          enum: [umrah, ramadan_umrah, hajj, special_hajj]
+          enum: [umrah, ramadan_umrah, hajj, special_hajj, iraq_ziyarat, baitul_muqaddas, syria_ziyarat, jordan_heritage]
         description:
           type: string
         duration:
@@ -730,7 +730,7 @@ components:
           type: string
         type:
           type: string
-          enum: [umrah, ramadan_umrah, hajj, special_hajj]
+          enum: [umrah, ramadan_umrah, hajj, special_hajj, iraq_ziyarat, baitul_muqaddas, syria_ziyarat, jordan_heritage]
         description:
           type: string
         duration:

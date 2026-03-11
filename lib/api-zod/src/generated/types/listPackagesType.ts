@@ -14,4 +14,8 @@ export const ListPackagesType = {
   ramadan_umrah: "ramadan_umrah",
   hajj: "hajj",
   special_hajj: "special_hajj",
+  iraq_ziyarat: "iraq_ziyarat",
+  baitul_muqaddas: "baitul_muqaddas",
+  syria_ziyarat: "syria_ziyarat",
+  jordan_heritage: "jordan_heritage",
 } as const;

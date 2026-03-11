@@ -4,11 +4,18 @@ import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { useListPackages } from "@workspace/api-client-react";
 import { formatCurrency } from "@/lib/utils";
-import { MapPin, Calendar, Clock, ArrowRight } from "lucide-react";
+import { MapPin, Calendar, Clock, ArrowRight, Star, Quote } from "lucide-react";
 
 export default function Home() {
   const { data: packages = [] } = useListPackages({ active: true });
   const featuredPackages = packages.slice(0, 3);
+
+  const ziyaratTours = [
+    { name: "Iraq Ziyarat", desc: "Najaf, Karbala, Kazmain, Samarra", icon: "🕌" },
+    { name: "Baitul Muqaddas", desc: "Spiritual journey to Jerusalem", icon: "✨" },
+    { name: "Syria Ziyarat", desc: "Sacred shrines in Damascus", icon: "🕋" },
+    { name: "Jordan Heritage", desc: "Islamic historical sites", icon: "🏛️" }
+  ];
 
   return (
     <MainLayout>
@@ -124,34 +131,120 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Experience Section */}
+      {/* Ziyarat Tours Section */}
+      <section className="py-24 relative bg-white">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-serif font-bold text-primary mb-4">Ziyarat Tours</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">Discover the rich Islamic heritage and sacred sites across the Middle East with our specialized Ziyarat tours.</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {ziyaratTours.map((tour, i) => (
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1 }}
+                key={tour.name}
+                className="group relative bg-muted/30 rounded-2xl p-8 border border-border/50 hover:border-accent hover:shadow-xl transition-all duration-300 flex flex-col items-center text-center"
+              >
+                <div className="text-5xl mb-6 group-hover:scale-110 transition-transform duration-300">{tour.icon}</div>
+                <h3 className="text-xl font-serif font-bold text-primary mb-2">{tour.name}</h3>
+                <p className="text-muted-foreground mb-6 text-sm">{tour.desc}</p>
+                <Link href="/ziyarat" className="mt-auto">
+                  <Button variant="link" className="text-accent p-0 font-semibold group-hover:text-primary transition-colors">
+                    Explore <ArrowRight size={16} className="ml-1" />
+                  </Button>
+                </Link>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Why Choose Al Burhan Section */}
       <section className="py-24 relative overflow-hidden bg-primary text-white">
         <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: `url(${import.meta.env.BASE_URL}images/islamic-pattern-bg.png)`, backgroundSize: '400px' }} />
-        <div className="container mx-auto px-4 relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-          <div>
-            <h2 className="text-4xl md:text-5xl font-serif font-bold mb-6">Why Choose Al Burhan?</h2>
-            <p className="text-white/80 text-lg mb-8 leading-relaxed">With over three decades of organizing spiritual journeys, we ensure every aspect of your pilgrimage is handled with utmost care, respect, and professionalism.</p>
-            <ul className="space-y-6">
-              {[
-                "35+ Years of Trusted Experience",
-                "Premium Accommodation near Haram",
-                "Dedicated Knowledgeable Guides (Aalims)",
-                "Seamless Visa & Flight Processing"
-              ].map((item, i) => (
-                <li key={i} className="flex items-center gap-4 text-lg">
-                  <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center text-accent shrink-0">
-                    ✓
-                  </div>
-                  {item}
-                </li>
-              ))}
-            </ul>
+        <div className="container mx-auto px-4 relative z-10">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-serif font-bold mb-4">Why Choose Al Burhan?</h2>
+            <p className="text-white/80 max-w-2xl mx-auto text-lg">Decades of trust and commitment to providing the ultimate spiritual journey.</p>
           </div>
-          <div className="relative">
-             <div className="absolute -inset-4 bg-accent/20 blur-2xl rounded-full" />
-             {/* decorative image showing beautiful islamic architecture */}
-             <img src="https://pixabay.com/get/g4f9692cf559978449c5769bc1aa58ff37b61a59dc9b1ad941bbaa2ef3a52647778f02445b71f0c570d2353f63ab5c46b7c70c600399819ba0c78789ae46cb6ff_1280.jpg" alt="Experience" className="relative z-10 rounded-2xl border-4 border-accent/30 shadow-2xl" />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            {[
+              { title: "35+ Years Experience", desc: "Trusted legacy in travel", num: "35+" },
+              { title: "10,000+ Happy Pilgrims", desc: "Successfully guided", num: "10k+" },
+              { title: "Expert Religious Guides", desc: "Knowledgeable Aalims", num: "Expert" },
+              { title: "24/7 Customer Support", desc: "Always here for you", num: "24/7" }
+            ].map((point, i) => (
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1 }}
+                key={i}
+                className="bg-white/10 backdrop-blur-md rounded-2xl p-8 text-center border border-white/20 hover:bg-white/20 transition-all duration-300"
+              >
+                <div className="text-3xl font-bold text-accent mb-4">{point.num}</div>
+                <h4 className="text-xl font-serif font-bold text-white mb-2">{point.title}</h4>
+                <p className="text-white/70 text-sm">{point.desc}</p>
+              </motion.div>
+            ))}
           </div>
+        </div>
+      </section>
+
+      {/* Testimonials Section */}
+      <section className="py-24 bg-muted/20">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-serif font-bold text-primary mb-4">What Our Pilgrims Say</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">Read the experiences of those who traveled with us.</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {[
+              { name: "Ahmed Khan", text: "Al Burhan made our Hajj journey incredibly smooth. The guides were extremely knowledgeable and supportive throughout the spiritual process.", rating: 5 },
+              { name: "Fatima Shaikh", text: "The arrangements for our Umrah were flawless. Hotels were very close to the Haram, and the entire team was helpful 24/7.", rating: 5 },
+              { name: "Mohammed Ali", text: "We recently went for Iraq Ziyarat. Everything from flights to local transport was well organized. Highly recommended!", rating: 5 }
+            ].map((testimonial, i) => (
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1 }}
+                key={i}
+                className="bg-white rounded-2xl p-8 shadow-lg shadow-black/5 border border-border/50 relative"
+              >
+                <Quote className="absolute top-6 right-6 text-accent/20 w-12 h-12" />
+                <div className="flex gap-1 mb-6">
+                  {[...Array(testimonial.rating)].map((_, j) => (
+                    <Star key={j} className="w-5 h-5 fill-accent text-accent" />
+                  ))}
+                </div>
+                <p className="text-muted-foreground mb-6 italic leading-relaxed">"{testimonial.text}"</p>
+                <div className="font-bold text-primary">{testimonial.name}</div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Quick WhatsApp Inquiry Section */}
+      <section className="bg-[#25D366] py-16 relative overflow-hidden">
+        <div className="absolute inset-0 opacity-10 pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/arabesque.png')]" />
+        <div className="container mx-auto px-4 relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
+          <div className="text-white text-center md:text-left">
+            <h2 className="text-3xl md:text-4xl font-bold mb-2">Have Questions About Your Journey?</h2>
+            <p className="text-white/90 text-lg">Message us directly on WhatsApp for instant support and booking inquiries.</p>
+          </div>
+          <a href="https://wa.me/919893225590" target="_blank" rel="noreferrer">
+            <Button size="lg" className="bg-white text-[#25D366] hover:bg-white/90 rounded-full px-8 py-6 text-lg font-bold shadow-xl hover:scale-105 transition-transform">
+              Chat on WhatsApp
+            </Button>
+          </a>
         </div>
       </section>
     </MainLayout>

@@ -6,6 +6,11 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Home from "@/pages/public/Home";
 import Packages from "@/pages/public/Packages";
 import PackageDetail from "@/pages/public/PackageDetail";
+import Ziyarat from "@/pages/public/Ziyarat";
+import Blog from "@/pages/public/Blog";
+import About from "@/pages/public/About";
+import Contact from "@/pages/public/Contact";
+import { PrivacyPolicy, TermsConditions, CancellationPolicy, RefundPolicy } from "@/pages/public/Legal";
 import Login from "@/pages/auth/Login";
 import CustomerDashboard from "@/pages/customer/Dashboard";
 import AdminDashboard from "@/pages/admin/Dashboard";
@@ -42,8 +47,14 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/packages" component={Packages} />
       <Route path="/packages/:id" component={PackageDetail} />
-      <Route path="/about" component={() => <MainLayout><div className="py-20 text-center font-serif text-3xl">About Us Content Coming Soon</div></MainLayout>} />
-      <Route path="/contact" component={() => <MainLayout><div className="py-20 text-center font-serif text-3xl">Contact Content Coming Soon</div></MainLayout>} />
+      <Route path="/ziyarat" component={Ziyarat} />
+      <Route path="/blog" component={Blog} />
+      <Route path="/about" component={About} />
+      <Route path="/contact" component={Contact} />
+      <Route path="/privacy" component={PrivacyPolicy} />
+      <Route path="/terms" component={TermsConditions} />
+      <Route path="/cancellation" component={CancellationPolicy} />
+      <Route path="/refund" component={RefundPolicy} />
       <Route path="/login" component={Login} />
 
       {/* Customer Routes */}

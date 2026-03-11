@@ -2,7 +2,7 @@ import { pgTable, text, timestamp, numeric, integer, boolean, pgEnum, jsonb } fr
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
-export const packageTypeEnum = pgEnum("package_type", ["umrah", "ramadan_umrah", "hajj", "special_hajj"]);
+export const packageTypeEnum = pgEnum("package_type", ["umrah", "ramadan_umrah", "hajj", "special_hajj", "iraq_ziyarat", "baitul_muqaddas", "syria_ziyarat", "jordan_heritage"]);
 
 export const packagesTable = pgTable("packages", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),

@@ -70,14 +70,34 @@ export const GetMeResponse = zod.object({
  * @summary List all travel packages
  */
 export const ListPackagesQueryParams = zod.object({
-  type: zod.enum(["umrah", "ramadan_umrah", "hajj", "special_hajj"]).optional(),
+  type: zod
+    .enum([
+      "umrah",
+      "ramadan_umrah",
+      "hajj",
+      "special_hajj",
+      "iraq_ziyarat",
+      "baitul_muqaddas",
+      "syria_ziyarat",
+      "jordan_heritage",
+    ])
+    .optional(),
   active: zod.coerce.boolean().optional(),
 });
 
 export const ListPackagesResponseItem = zod.object({
   id: zod.string(),
   name: zod.string(),
-  type: zod.enum(["umrah", "ramadan_umrah", "hajj", "special_hajj"]),
+  type: zod.enum([
+    "umrah",
+    "ramadan_umrah",
+    "hajj",
+    "special_hajj",
+    "iraq_ziyarat",
+    "baitul_muqaddas",
+    "syria_ziyarat",
+    "jordan_heritage",
+  ]),
   description: zod.string().optional(),
   duration: zod.string().optional(),
   pricePerPerson: zod.number(),
@@ -100,7 +120,16 @@ export const createPackageBodyIsActiveDefault = true;
 
 export const CreatePackageBody = zod.object({
   name: zod.string(),
-  type: zod.enum(["umrah", "ramadan_umrah", "hajj", "special_hajj"]),
+  type: zod.enum([
+    "umrah",
+    "ramadan_umrah",
+    "hajj",
+    "special_hajj",
+    "iraq_ziyarat",
+    "baitul_muqaddas",
+    "syria_ziyarat",
+    "jordan_heritage",
+  ]),
   description: zod.string().optional(),
   duration: zod.string().optional(),
   pricePerPerson: zod.number(),
@@ -123,7 +152,16 @@ export const GetPackageParams = zod.object({
 export const GetPackageResponse = zod.object({
   id: zod.string(),
   name: zod.string(),
-  type: zod.enum(["umrah", "ramadan_umrah", "hajj", "special_hajj"]),
+  type: zod.enum([
+    "umrah",
+    "ramadan_umrah",
+    "hajj",
+    "special_hajj",
+    "iraq_ziyarat",
+    "baitul_muqaddas",
+    "syria_ziyarat",
+    "jordan_heritage",
+  ]),
   description: zod.string().optional(),
   duration: zod.string().optional(),
   pricePerPerson: zod.number(),
@@ -149,7 +187,16 @@ export const updatePackageBodyIsActiveDefault = true;
 
 export const UpdatePackageBody = zod.object({
   name: zod.string(),
-  type: zod.enum(["umrah", "ramadan_umrah", "hajj", "special_hajj"]),
+  type: zod.enum([
+    "umrah",
+    "ramadan_umrah",
+    "hajj",
+    "special_hajj",
+    "iraq_ziyarat",
+    "baitul_muqaddas",
+    "syria_ziyarat",
+    "jordan_heritage",
+  ]),
   description: zod.string().optional(),
   duration: zod.string().optional(),
   pricePerPerson: zod.number(),
@@ -165,7 +212,16 @@ export const UpdatePackageBody = zod.object({
 export const UpdatePackageResponse = zod.object({
   id: zod.string(),
   name: zod.string(),
-  type: zod.enum(["umrah", "ramadan_umrah", "hajj", "special_hajj"]),
+  type: zod.enum([
+    "umrah",
+    "ramadan_umrah",
+    "hajj",
+    "special_hajj",
+    "iraq_ziyarat",
+    "baitul_muqaddas",
+    "syria_ziyarat",
+    "jordan_heritage",
+  ]),
   description: zod.string().optional(),
   duration: zod.string().optional(),
   pricePerPerson: zod.number(),

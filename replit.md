@@ -36,7 +36,7 @@ artifacts/
 ├── alburhan/           # React + Vite frontend (serves at /)
 │   ├── src/
 │   │   ├── pages/
-│   │   │   ├── public/        # Home, Packages, PackageDetail
+│   │   │   ├── public/        # Home, Packages, PackageDetail, Ziyarat, Blog, About, Contact, Legal
 │   │   │   ├── auth/          # Login (OTP flow)
 │   │   │   ├── customer/      # Customer dashboard
 │   │   │   └── admin/         # Admin dashboard, bookings, packages

@@ -1,0 +1,326 @@
+Build a modern, premium, and fully automated travel booking website and e-commerce platform for a travel company named:
+
+AL BURHAN TOURS & TRAVELS
+
+Company Information
+Company Name: Al Burhan Tours & Travels
+Industry: Hajj, Umrah & Ziyarat Travel Services
+Experience: 35+ Years in Hajj & Umrah Services
+
+Contact Numbers:
++91 9893225590
++91 9893989786
+
+Website:
+www.alburhantravels.com
+
+Primary Services
+The platform must support booking for:
+
+• Hajj Packages
+• Umrah Packages
+• Ramadan Umrah Packages
+• Iraq Ziyarat Tours
+• Baitul Muqaddas (Jerusalem) Tours
+• Syria Ziyarat Tours
+• Jordan Islamic Heritage Tours
+
+------------------------------------------------
+
+TECHNOLOGY STACK
+
+Frontend
+Next.js or React
+Tailwind CSS
+
+Backend
+Node.js + Express
+
+Database
+MongoDB
+
+Authentication
+OTP Login via SMS
+
+Payment Gateway
+Razorpay
+
+Messaging Integration
+WhatsApp API (BotBee)
+SMS API
+
+------------------------------------------------
+
+DESIGN STYLE
+
+Create a premium Islamic travel design.
+
+Color Theme
+Dark Green
+Gold
+White
+
+Style
+Elegant Islamic look
+Luxury travel agency style
+Modern UI/UX
+Mobile responsive
+Fast loading
+SEO optimized
+
+Images to use
+Kaaba (Makkah)
+Masjid Nabawi (Madinah)
+Karbala Shrine
+Najaf Shrine
+Baitul Muqaddas
+Islamic architecture
+
+------------------------------------------------
+
+WEBSITE STRUCTURE
+
+Home Page
+
+Hero banner
+Kaaba background image
+
+Headline
+Trusted Hajj, Umrah & Ziyarat Travel Services – 35+ Years Experience
+
+Sections
+• Hajj Packages
+• Umrah Packages
+• Iraq Ziyarat Tours
+• Baitul Muqaddas Tours
+• Syria & Jordan Tours
+• Why choose Al Burhan Tours
+• Customer testimonials
+• Quick WhatsApp inquiry
+
+------------------------------------------------
+
+HAJJ PACKAGES PAGE
+
+Include:
+
+• Hajj 2027 Packages
+• Flight information
+• Hotel details (Makkah & Madinah)
+• Package inclusions
+• Price
+• Book Now button
+
+------------------------------------------------
+
+UMRAH PACKAGES PAGE
+
+Include:
+
+• Economy Umrah Packages
+• Standard Umrah Packages
+• VIP Umrah Packages
+• Ramadan Umrah Packages
+
+------------------------------------------------
+
+ZIYARAT TOURS PAGE
+
+Create tour sections for:
+
+Iraq Ziyarat
+• Najaf
+• Karbala
+• Kazmain
+• Samarra
+
+Baitul Muqaddas Tour
+Syria Ziyarat
+Jordan Islamic Heritage Tour
+
+Each tour must include
+
+• itinerary
+• hotel
+• flight
+• price
+• booking button
+
+------------------------------------------------
+
+ONLINE BOOKING SYSTEM
+
+Create a complete booking system.
+
+Users must be able to:
+
+• create account
+• login with OTP
+• book travel packages
+• make payment online
+• upload travel documents
+
+------------------------------------------------
+
+PAYMENT SYSTEM
+
+Integrate Razorpay payment gateway.
+
+Allow payments via
+
+• UPI
+• Credit Card
+• Debit Card
+• Net Banking
+
+After payment:
+
+Automatically generate invoice.
+
+------------------------------------------------
+
+CUSTOMER DASHBOARD
+
+Users can login and manage bookings.
+
+Customers can upload documents
+
+• Passport
+• PAN Card
+• Aadhaar Card
+• Passport photo
+• Blood group information
+
+Supported file types
+
+• PDF
+• JPG
+• PNG
+
+Users can:
+
+• check booking status
+• download invoice
+• receive travel updates
+
+------------------------------------------------
+
+NOTIFICATION SYSTEM
+
+Automatically send notifications via:
+
+• SMS
+• WhatsApp
+• RCS
+
+Send:
+
+• booking confirmation
+• invoice
+• flight details
+• ticket
+• visa update
+• travel reminder
+
+------------------------------------------------
+
+WHATSAPP AUTOMATION
+
+Integrate BotBee WhatsApp API.
+
+Automated WhatsApp messages:
+
+• booking confirmation
+• invoice
+• flight details
+• visa updates
+• travel reminders
+
+------------------------------------------------
+
+ADMIN DASHBOARD
+
+Admin must be able to:
+
+• create travel packages
+• edit packages
+• manage bookings
+• verify documents
+• send invoices
+• update visa status
+• upload flight tickets
+
+Admin must support offline booking.
+
+For offline booking:
+
+• create invoice
+• send invoice via WhatsApp
+• send SMS confirmation
+
+------------------------------------------------
+
+SOCIAL MEDIA INTEGRATION
+
+Add icons and links for
+
+• WhatsApp Chat
+• Instagram
+• Facebook
+• YouTube
+
+Include “Follow Us” section.
+
+------------------------------------------------
+
+ADDITIONAL FEATURES
+
+• WhatsApp floating chat button
+• Blog section (Hajj & Umrah guide)
+• Google Maps location
+• Package inquiry form
+• SEO optimized pages
+
+------------------------------------------------
+
+LEGAL PAGES
+
+Create pages for:
+
+• About Us
+• Terms & Conditions
+• Privacy Policy
+• Cancellation Policy
+• Refund Policy
+
+------------------------------------------------
+
+SECURITY
+
+• OTP login authentication
+• secure payment processing
+• encrypted document storage
+
+------------------------------------------------
+
+FOOTER
+
+Include:
+
+Company logo
+Contact numbers
+
++91 9893225590
++91 9893989786
+
+Quick links
+Social media icons
+
+WhatsApp
+Instagram
+Facebook
+YouTube
+
+Copyright
+
+© Al Burhan Tours & Travels
