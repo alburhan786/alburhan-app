@@ -17,6 +17,7 @@ import { WebView } from 'react-native-webview';
 import { bookingService, paymentService } from '../../services/api';
 import { Colors } from '../../constants/Colors';
 import { getApiUrl } from '../../lib/query-client';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function BookingDetailsScreen() {
   const { id } = useLocalSearchParams();
@@ -28,6 +29,7 @@ export default function BookingDetailsScreen() {
   const [razorpayHtml, setRazorpayHtml] = useState('');
   const [currentOrderId, setCurrentOrderId] = useState('');
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     loadBooking();
@@ -164,6 +166,8 @@ export default function BookingDetailsScreen() {
             [{ text: 'OK' }]
           );
         }
+      } else {
+        Alert.alert('Payment Error', orderResponse.error || 'Could not initiate payment. Please try again.');
       }
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Payment failed');
@@ -387,7 +391,7 @@ export default function BookingDetailsScreen() {
         onRequestClose={() => setShowPaymentWebView(false)}
       >
         <View style={styles.webViewContainer}>
-          <View style={styles.webViewHeader}>
+          <View style={[styles.webViewHeader, { paddingTop: Platform.OS === 'web' ? 16 : insets.top + 8 }]}>
             <TouchableOpacity
               onPress={() => setShowPaymentWebView(false)}
               style={styles.webViewCloseButton}
@@ -465,7 +469,7 @@ const styles = StyleSheet.create({
   payButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   payButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' as const },
   webViewContainer: { flex: 1, backgroundColor: Colors.background },
-  webViewHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 56 : 16, paddingBottom: 12, backgroundColor: Colors.card, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  webViewHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 12, backgroundColor: Colors.card, borderBottomWidth: 1, borderBottomColor: Colors.border },
   webViewCloseButton: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
   webViewTitle: { fontSize: 17, fontWeight: '600' as const, color: Colors.text },
   webViewLoading: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center' },

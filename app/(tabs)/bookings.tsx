@@ -16,12 +16,14 @@ import React, { useState, useEffect } from 'react';
   import { useAuth } from '../../contexts/AuthContext';
   import { Colors } from '../../constants/Colors';
   import { getApiUrl } from '../../lib/query-client';
+  import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
   export default function BookingsScreen() {
     const [bookings, setBookings] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const { user, loading: authLoading } = useAuth();
     const router = useRouter();
+    const insets = useSafeAreaInsets();
 
     useEffect(() => {
       if (authLoading) return;
@@ -102,7 +104,7 @@ import React, { useState, useEffect } from 'react';
     if (!user) {
       return (
         <View style={styles.container}>
-          <View style={[styles.header, { paddingTop: Platform.OS === "web" ? 67 : undefined }]}>
+          <View style={[styles.header, { paddingTop: Platform.OS === "web" ? 67 : insets.top + 16 }]}>
             <Text style={styles.headerTitle}>My Bookings</Text>
           </View>
           <View style={styles.emptyState}>
@@ -123,7 +125,7 @@ import React, { useState, useEffect } from 'react';
 
     return (
       <View style={styles.container}>
-        <View style={[styles.header, { paddingTop: Platform.OS === "web" ? 67 : undefined }]}>
+        <View style={[styles.header, { paddingTop: Platform.OS === "web" ? 67 : insets.top + 16 }]}>
           <Text style={styles.headerTitle}>My Bookings</Text>
         </View>
 

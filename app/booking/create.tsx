@@ -7,11 +7,12 @@ import React, { useState, useEffect } from 'react';
     TouchableOpacity,
     StyleSheet,
     Alert,
+    ActivityIndicator,
     KeyboardAvoidingView,
     Platform,
   } from 'react-native';
   import { useLocalSearchParams, useRouter } from 'expo-router';
-  import { packageService, bookingService, paymentService } from '../../services/api';
+  import { packageService, bookingService } from '../../services/api';
   import { useAuth } from '../../contexts/AuthContext';
   import { Colors } from '../../constants/Colors';
 
@@ -33,12 +34,15 @@ import React, { useState, useEffect } from 'react';
 
     useEffect(() => {
       loadPackage();
+    }, [packageId]);
+
+    useEffect(() => {
       if (user) {
         setContactName(user.name);
         setContactEmail(user.email);
         setContactPhone(user.phone);
       }
-    }, [packageId]);
+    }, [user]);
 
     useEffect(() => {
       const count = parseInt(numberOfPeople) || 1;
@@ -117,7 +121,11 @@ import React, { useState, useEffect } from 'react';
     };
 
     if (!pkg) {
-      return null;
+      return (
+        <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+        </View>
+      );
     }
 
     const totalAmount = parseFloat(pkg.price) * parseInt(numberOfPeople || '1');
