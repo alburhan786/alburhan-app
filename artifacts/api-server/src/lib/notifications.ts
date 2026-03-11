@@ -2,25 +2,56 @@ import axios from "axios";
 
 const FAST2SMS_API_KEY = process.env.FAST2SMS_API_KEY;
 const FAST2SMS_SENDER_ID = "ALBURH";
+const FAST2SMS_DLT_TEMPLATE_ID = "164844";
 
 const BOTBEE_API_KEY = process.env.BOTBEE_API_KEY;
 const BOTBEE_PHONE_NUMBER_ID = process.env.BOTBEE_PHONE_NUMBER_ID;
+const BOTBEE_API_URL = "https://app.botbee.io/api/v1/whatsapp/send";
+
+function toFast2SMSPhone(mobile: string): string {
+  const clean = mobile.replace(/\D/g, "");
+  if (clean.startsWith("91") && clean.length === 12) return clean.slice(2);
+  return clean;
+}
+
+function toBotBeePhone(mobile: string): string {
+  const clean = mobile.replace(/\D/g, "");
+  if (clean.length === 10) return `91${clean}`;
+  if (clean.startsWith("+")) return clean.slice(1);
+  return clean;
+}
+
+export async function sendOtpSMS(mobile: string, otp: string): Promise<boolean> {
+  if (!FAST2SMS_API_KEY) {
+    console.log("[OTP-SMS] API key not set — OTP:", otp, "for:", mobile);
+    return true;
+  }
+  try {
+    const phone = toFast2SMSPhone(mobile);
+    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${FAST2SMS_API_KEY}&route=dlt&sender_id=${FAST2SMS_SENDER_ID}&message=${FAST2SMS_DLT_TEMPLATE_ID}&variables_values=${otp}|&numbers=${phone}&flash=0`;
+    const response = await axios.get(url);
+    console.log("[OTP-SMS] Sent to", mobile, response.data);
+    return true;
+  } catch (err: any) {
+    console.error("[OTP-SMS] Error:", err?.response?.data || err.message);
+    return false;
+  }
+}
 
 export async function sendSMS(mobile: string, message: string): Promise<boolean> {
   if (!FAST2SMS_API_KEY) {
-    console.log("[SMS] API key not set, skipping:", mobile, message);
+    console.log("[SMS] API key not set — message:", message, "for:", mobile);
     return false;
   }
   try {
+    const phone = toFast2SMSPhone(mobile);
     const response = await axios.post(
       "https://www.fast2sms.com/dev/bulkV2",
       {
-        route: "v3",
-        sender_id: FAST2SMS_SENDER_ID,
-        message,
-        language: "english",
+        route: "otp",
+        variables_values: message,
         flash: 0,
-        numbers: mobile,
+        numbers: phone,
       },
       {
         headers: {
@@ -37,56 +68,23 @@ export async function sendSMS(mobile: string, message: string): Promise<boolean>
   }
 }
 
-export async function sendOtpSMS(mobile: string, otp: string): Promise<boolean> {
-  if (!FAST2SMS_API_KEY) {
-    console.log("[OTP-SMS] API key not set, OTP is:", otp, "for mobile:", mobile);
-    return true;
-  }
-  try {
-    const response = await axios.post(
-      "https://www.fast2sms.com/dev/bulkV2",
-      {
-        route: "otp",
-        variables_values: otp,
-        flash: 0,
-        numbers: mobile,
-      },
-      {
-        headers: {
-          authorization: FAST2SMS_API_KEY,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-    console.log("[OTP-SMS] Sent to", mobile, response.data);
-    return true;
-  } catch (err: any) {
-    console.error("[OTP-SMS] Error:", err?.response?.data || err.message);
-    return false;
-  }
-}
-
 export async function sendWhatsApp(mobile: string, message: string): Promise<boolean> {
   if (!BOTBEE_API_KEY || !BOTBEE_PHONE_NUMBER_ID) {
     console.log("[WhatsApp] API not configured, skipping:", mobile, message);
     return false;
   }
   try {
-    const phone = mobile.startsWith("+") ? mobile : `+91${mobile}`;
+    const phone = toBotBeePhone(mobile);
     const response = await axios.post(
-      `https://api.botbee.ai/v1/messages`,
+      BOTBEE_API_URL,
       {
-        messaging_product: "whatsapp",
-        to: phone,
-        type: "text",
-        text: { body: message },
+        apiToken: BOTBEE_API_KEY,
+        phone_number_id: BOTBEE_PHONE_NUMBER_ID,
+        message,
+        phone_number: phone,
       },
       {
-        headers: {
-          Authorization: `Bearer ${BOTBEE_API_KEY}`,
-          "Content-Type": "application/json",
-          "X-Phone-Number-ID": BOTBEE_PHONE_NUMBER_ID,
-        },
+        headers: { "Content-Type": "application/json" },
       }
     );
     console.log("[WhatsApp] Sent to", mobile, response.data);
@@ -108,11 +106,11 @@ export async function sendBookingApprovalNotification(opts: {
   customerName: string;
   bookingNumber: string;
 }) {
-  const message = `Dear ${opts.customerName}, your booking request #${opts.bookingNumber} with Al Burhan Tours & Travels has been APPROVED. Please login to your dashboard and complete payment to confirm your booking. For help, call us at +91-XXXXXXXXXX.`;
+  const message = `Assalamu Alaikum ${opts.customerName},\n\nYour booking request #${opts.bookingNumber} with Al Burhan Tours & Travels has been APPROVED.\n\nPlease login to your dashboard and complete payment to confirm your booking.\n\nFor help call us:\n+91 9893225590\n+91 9893989786\n\nJazak Allah Khair!`;
   await Promise.allSettled([
     sendSMS(opts.mobile, message),
     sendWhatsApp(opts.mobile, message),
-    opts.email ? sendEmail(opts.email, "Booking Approved - Al Burhan Tours & Travels", message) : Promise.resolve(),
+    opts.email ? sendEmail(opts.email, "Booking Approved – Al Burhan Tours & Travels", message) : Promise.resolve(),
   ]);
 }
 
@@ -123,12 +121,12 @@ export async function sendBookingRejectionNotification(opts: {
   bookingNumber: string;
   reason?: string | null;
 }) {
-  const reasonText = opts.reason ? ` Reason: ${opts.reason}.` : "";
-  const message = `Dear ${opts.customerName}, we regret to inform you that your booking request #${opts.bookingNumber} with Al Burhan Tours & Travels has been rejected.${reasonText} Please contact us for more information.`;
+  const reasonText = opts.reason ? `\n\nReason: ${opts.reason}` : "";
+  const message = `Assalamu Alaikum ${opts.customerName},\n\nWe regret to inform you that your booking request #${opts.bookingNumber} with Al Burhan Tours & Travels could not be processed at this time.${reasonText}\n\nPlease contact us for more information:\n+91 9893225590\n+91 9893989786`;
   await Promise.allSettled([
     sendSMS(opts.mobile, message),
     sendWhatsApp(opts.mobile, message),
-    opts.email ? sendEmail(opts.email, "Booking Update - Al Burhan Tours & Travels", message) : Promise.resolve(),
+    opts.email ? sendEmail(opts.email, "Booking Update – Al Burhan Tours & Travels", message) : Promise.resolve(),
   ]);
 }
 
@@ -140,10 +138,10 @@ export async function sendPaymentConfirmationNotification(opts: {
   amount: string;
   invoiceNumber: string;
 }) {
-  const message = `Dear ${opts.customerName}, your payment of INR ${opts.amount} for booking #${opts.bookingNumber} has been received. Your booking is now CONFIRMED! Invoice #${opts.invoiceNumber} has been generated. Jazak Allah Khair! - Al Burhan Tours & Travels`;
+  const message = `Assalamu Alaikum ${opts.customerName},\n\nYour payment of INR ${opts.amount} for booking #${opts.bookingNumber} has been received.\n\nYour booking is now CONFIRMED!\nInvoice: #${opts.invoiceNumber}\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 9893225590 | +91 9893989786`;
   await Promise.allSettled([
     sendSMS(opts.mobile, message),
     sendWhatsApp(opts.mobile, message),
-    opts.email ? sendEmail(opts.email, "Booking Confirmed - Al Burhan Tours & Travels", message) : Promise.resolve(),
+    opts.email ? sendEmail(opts.email, "Booking Confirmed – Al Burhan Tours & Travels", message) : Promise.resolve(),
   ]);
 }

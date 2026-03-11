@@ -40,9 +40,8 @@ export function MainLayout({ children }: { children: ReactNode }) {
       {/* Navbar */}
       <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-lg border-b border-border/50 shadow-sm">
         <div className="container mx-auto px-4 h-20 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3">
-            <img src={`${import.meta.env.BASE_URL}images/logo.png`} alt="Al Burhan" className="h-12 w-12 object-contain" />
-            <span className="font-serif text-2xl font-bold text-primary">Al Burhan<span className="text-accent">.</span></span>
+          <Link href="/" className="flex items-center">
+            <img src={`${import.meta.env.BASE_URL}images/logo.png`} alt="Al Burhan Tours & Travels" className="h-14 w-auto object-contain" />
           </Link>
 
           {/* Desktop Nav */}
@@ -143,9 +142,8 @@ export function MainLayout({ children }: { children: ReactNode }) {
         <div className="container mx-auto px-4 relative z-10">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-12 mb-12">
             <div className="col-span-1 md:col-span-4">
-              <Link href="/" className="flex items-center gap-3 mb-6">
-                <img src={`${import.meta.env.BASE_URL}images/logo.png`} alt="Al Burhan" className="h-10 w-10 brightness-0 invert" />
-                <span className="font-serif text-3xl font-bold text-white">Al Burhan<span className="text-accent">.</span></span>
+              <Link href="/" className="flex items-center mb-6">
+                <img src={`${import.meta.env.BASE_URL}images/logo.png`} alt="Al Burhan Tours & Travels" className="h-16 w-auto object-contain brightness-0 invert" />
               </Link>
               <p className="text-primary-foreground/70 max-w-md leading-relaxed mb-6">
                 Guiding you on your sacred journey with 35+ years of trusted experience in providing premium Hajj, Umrah & Ziyarat services.
