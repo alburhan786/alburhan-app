@@ -62,15 +62,35 @@ async function sendOtpSmsFast2SMS(phone: string, otpCode: string): Promise<boole
     return false;
   }
   try {
+    const dltUrl = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=dlt&sender_id=ALBURH&message=164844&variables_values=${otpCode}|&numbers=${phone}&flash=0`;
+    const dltResponse = await fetch(dltUrl, { method: "GET" });
+    const dltData = await dltResponse.json();
+    console.log("[Fast2SMS DLT Route] Response:", JSON.stringify(dltData));
+    if (dltData.return === true) return true;
+    console.log("[Fast2SMS DLT Route] Failed:", dltData.message);
+    return false;
+  } catch (error) {
+    console.error("[Fast2SMS] Error:", error);
+    return false;
+  }
+}
+
+async function sendBookingDltSms(phone: string, bookingRef: string): Promise<boolean> {
+  const apiKey = process.env.FAST2SMS_API_KEY;
+  if (!apiKey) {
+    console.log("[Fast2SMS] API key not configured, skipping booking SMS");
+    return false;
+  }
+  try {
     const payload = {
       route: "dlt",
       sender_id: "ALBURH",
       message: "211052",
-      variables_values: `${otpCode}||`,
+      variables_values: `${bookingRef}||`,
       numbers: phone,
       flash: "0"
     };
-    const dltResponse = await fetch("https://www.fast2sms.com/dev/bulkV2", {
+    const response = await fetch("https://www.fast2sms.com/dev/bulkV2", {
       method: "POST",
       headers: {
         authorization: apiKey,
@@ -78,15 +98,13 @@ async function sendOtpSmsFast2SMS(phone: string, otpCode: string): Promise<boole
       },
       body: JSON.stringify(payload)
     });
-    const dltData = await dltResponse.json();
-    console.log("[Fast2SMS DLT Route] Response:", JSON.stringify(dltData));
-    if (dltData.return === true) {
-      return true;
-    }
-    console.log("[Fast2SMS DLT Route] Failed:", dltData.message);
+    const data = await response.json();
+    console.log("[Fast2SMS Booking DLT] Response:", JSON.stringify(data));
+    if (data.return === true) return true;
+    console.log("[Fast2SMS Booking DLT] Failed:", data.message);
     return false;
   } catch (error) {
-    console.error("[Fast2SMS] Error:", error);
+    console.error("[Fast2SMS Booking DLT] Error:", error);
     return false;
   }
 }
@@ -912,8 +930,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const whatsappResult = await sendWhatsAppBotBee(user.phone, message);
     console.log(`[WhatsApp/BotBee] To ${user.phone}: ${whatsappResult ? "sent" : "failed/skipped"}`);
 
-    const smsResult = await sendSmsFast2SMS(user.phone, message);
-    console.log(`[SMS/Fast2SMS] To ${user.phone}: ${smsResult ? "sent" : "failed/skipped"}`);
+    const smsResult = await sendBookingDltSms(user.phone, invoiceNum || bookingId.toString());
+    console.log(`[SMS/Fast2SMS Booking DLT] To ${user.phone}: ${smsResult ? "sent" : "failed/skipped"}`);
 
     await db.insert(notifications).values({
       userId,
