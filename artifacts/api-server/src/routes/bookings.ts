@@ -103,15 +103,16 @@ router.get("/", requireAuth as any, async (req: AuthenticatedRequest, res) => {
   let conditions: any[] = [];
   if (query.status) conditions.push(eq(bookingsTable.status, query.status as any));
   if (req.user?.role !== "admin") {
-    const users = await db.select().from(usersTable).where(eq(usersTable.mobile, req.user!.mobile)).limit(1);
-    if (users[0]) {
-      conditions.push(eq(bookingsTable.customerMobile, req.user!.mobile));
-    }
+    conditions.push(eq(bookingsTable.customerMobile, req.user!.mobile));
   }
 
-  const bookings = await db
-    .select()
+  const rows = await db
+    .select({
+      booking: bookingsTable,
+      package: packagesTable,
+    })
     .from(bookingsTable)
+    .leftJoin(packagesTable, eq(bookingsTable.packageId, packagesTable.id))
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(desc(bookingsTable.createdAt))
     .limit(limit)
@@ -123,7 +124,16 @@ router.get("/", requireAuth as any, async (req: AuthenticatedRequest, res) => {
     .where(conditions.length > 0 ? and(...conditions) : undefined);
 
   res.json({
-    bookings: bookings.map(formatBooking),
+    bookings: rows.map(({ booking, package: pkg }) => ({
+      ...formatBooking(booking),
+      packageDetails: pkg ? {
+        duration: pkg.duration,
+        includes: pkg.includes,
+        highlights: pkg.highlights,
+        departureDates: pkg.departureDates,
+        imageUrl: pkg.imageUrl,
+      } : null,
+    })),
     total: Number(totalCount),
     page,
     limit,
@@ -264,8 +274,8 @@ router.get("/:id/invoice", requireAuth as any, async (req: AuthenticatedRequest,
     status: b.status,
     companyName: "Al Burhan Tours & Travels",
     companyAddress: "Mumbai, Maharashtra, India",
-    companyPhone: "+91-XXXXXXXXXX",
-    companyEmail: "info@alburhantours.com",
+    companyPhone: "+91 9893225590 / +91 9893989786",
+    companyEmail: "info@alburhantravels.com",
   });
 });
 

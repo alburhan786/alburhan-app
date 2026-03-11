@@ -3,6 +3,8 @@ import { useGetMe, useSendOtp, useVerifyOtp, useLogout, User } from "@workspace/
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 
+const BASE_URL = import.meta.env.BASE_URL ?? "/";
+
 export function useAuth() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
@@ -11,18 +13,23 @@ export function useAuth() {
   const { data: user, isLoading, error } = useGetMe({
     query: {
       retry: false,
-      staleTime: 1000 * 60 * 5, // 5 minutes
+      staleTime: 1000 * 60 * 5,
     }
   });
 
   const sendOtpMutation = useSendOtp();
+
   const verifyOtpMutation = useVerifyOtp({
     mutation: {
-      onSuccess: (data) => {
+      onSuccess: (data: any) => {
         queryClient.setQueryData(['/api/auth/me'], data.user);
+        if (data.isNewUser) {
+          // handled in Login.tsx (step 3)
+          return;
+        }
         toast({
           title: "Welcome back!",
-          description: "You have successfully logged in.",
+          description: `Assalamu Alaikum${data.user?.name ? `, ${data.user.name}` : ""}! You have logged in.`,
         });
         if (data.user.role === 'admin') {
           setLocation("/admin/dashboard");
@@ -54,6 +61,24 @@ export function useAuth() {
     }
   });
 
+  const updateProfile = async (data: { name?: string; email?: string }) => {
+    const apiBase = BASE_URL.endsWith("/") ? BASE_URL.slice(0, -1) : BASE_URL;
+    const resp = await fetch(`${apiBase}/api/auth/profile`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (!resp.ok) throw new Error("Failed to update profile");
+    const updated = await resp.json();
+    queryClient.setQueryData(['/api/auth/me'], updated);
+    toast({
+      title: "Welcome to Al Burhan Tours!",
+      description: `Assalamu Alaikum, ${updated.name}! Your profile is set up.`,
+    });
+    return updated;
+  };
+
   return {
     user: user as User | undefined,
     isLoading,
@@ -64,6 +89,7 @@ export function useAuth() {
     verifyOtp: verifyOtpMutation.mutateAsync,
     isVerifyingOtp: verifyOtpMutation.isPending,
     logout: logoutMutation.mutate,
-    isLoggingOut: logoutMutation.isPending
+    isLoggingOut: logoutMutation.isPending,
+    updateProfile,
   };
 }

@@ -1,28 +1,97 @@
 import { Router } from "express";
 import { db, documentsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { GetUploadUrlBody, SaveDocumentBody } from "@workspace/api-zod";
 import { requireAuth, type AuthenticatedRequest } from "../lib/auth.js";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const UPLOADS_DIR = path.join(__dirname, "../../../../uploads");
+
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
+  filename: (_req, file, cb) => {
+    const unique = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    cb(null, `${unique}_${file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, "_")}`);
+  },
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = ["image/jpeg", "image/jpg", "image/png", "image/webp", "application/pdf"];
+    if (allowed.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only JPG, PNG, WebP, and PDF files are allowed"));
+    }
+  },
+});
+
+const VALID_DOCUMENT_TYPES = [
+  "passport", "pan_card", "aadhaar", "passport_photo",
+  "flight_ticket", "visa", "room_allotment", "bus_allotment",
+  "medical_certificate", "other"
+];
 
 const router = Router();
 
-router.post("/upload-url", requireAuth as any, async (req: AuthenticatedRequest, res) => {
-  const parsed = GetUploadUrlBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ message: "Invalid request" });
+router.post(
+  "/upload",
+  requireAuth as any,
+  upload.single("file"),
+  async (req: AuthenticatedRequest, res) => {
+    if (!req.file) {
+      res.status(400).json({ message: "No file provided" });
+      return;
+    }
+
+    const { bookingId, documentType } = req.body;
+
+    if (!bookingId || !documentType) {
+      res.status(400).json({ message: "bookingId and documentType are required" });
+      return;
+    }
+
+    if (!VALID_DOCUMENT_TYPES.includes(documentType)) {
+      res.status(400).json({ message: "Invalid document type" });
+      return;
+    }
+
+    const fileKey = `uploads/${req.file.filename}`;
+    const fileUrl = `/api/documents/files/${req.file.filename}`;
+
+    const [doc] = await db.insert(documentsTable).values({
+      bookingId,
+      documentType: documentType as any,
+      fileName: req.file.originalname,
+      fileKey,
+      fileUrl,
+      uploadedBy: req.user?.role === "admin" ? "admin" : "customer",
+    }).returning();
+
+    res.status(201).json({
+      ...doc,
+      createdAt: doc.createdAt?.toISOString?.(),
+    });
+  }
+);
+
+router.get("/files/:filename", (req, res) => {
+  const filename = path.basename(req.params.filename);
+  const filePath = path.join(UPLOADS_DIR, filename);
+  if (!fs.existsSync(filePath)) {
+    res.status(404).json({ message: "File not found" });
     return;
   }
-  const { bookingId, fileName, fileType, documentType } = parsed.data;
-
-  const fileKey = `bookings/${bookingId}/${documentType}/${Date.now()}_${fileName}`;
-
-  const docId = crypto.randomUUID();
-
-  res.json({
-    uploadUrl: `/api/documents/direct-upload/${docId}`,
-    fileKey,
-    documentId: docId,
-  });
+  res.sendFile(filePath);
 });
 
 router.get("/:bookingId", requireAuth as any, async (req: AuthenticatedRequest, res) => {
@@ -38,29 +107,12 @@ router.get("/:bookingId", requireAuth as any, async (req: AuthenticatedRequest, 
   })));
 });
 
-router.post("/", requireAuth as any, async (req: AuthenticatedRequest, res) => {
-  const parsed = SaveDocumentBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ message: "Invalid request" });
-    return;
-  }
-  const data = parsed.data;
-  const [doc] = await db.insert(documentsTable).values({
-    bookingId: data.bookingId,
-    documentType: data.documentType as any,
-    fileName: data.fileName,
-    fileKey: data.fileKey,
-    fileUrl: data.fileUrl ?? null,
-    uploadedBy: req.user?.role === "admin" ? "admin" : "customer",
-  }).returning();
-
-  res.status(201).json({
-    ...doc,
-    createdAt: doc.createdAt?.toISOString?.(),
-  });
-});
-
 router.delete("/:id", requireAuth as any, async (req: AuthenticatedRequest, res) => {
+  const docs = await db.select().from(documentsTable).where(eq(documentsTable.id, req.params.id));
+  if (docs[0]?.fileKey) {
+    const filePath = path.join(UPLOADS_DIR, path.basename(docs[0].fileKey));
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  }
   await db.delete(documentsTable).where(eq(documentsTable.id, req.params.id));
   res.json({ message: "Document deleted" });
 });
