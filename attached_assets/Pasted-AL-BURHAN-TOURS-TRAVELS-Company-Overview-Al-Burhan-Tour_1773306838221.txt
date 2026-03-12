@@ -1,0 +1,324 @@
+AL BURHAN TOURS & TRAVELS
+
+Company Overview:
+Al Burhan Tours & Travels is a trusted Hajj and Umrah travel company from India with over 35 years of experience helping pilgrims travel to Makkah and Madinah.
+
+The app should function like a combination of:
+• MakeMyTrip
+• Booking.com
+• Nusuk
+
+but focused entirely on Hajj and Umrah pilgrimage services.
+
+Generate a scalable mobile application for:
+
+• Android
+• iOS
+
+with a cloud-based admin dashboard.
+
+-------------------------------------
+
+APP NAME
+
+Al Burhan Hajj & Umrah
+
+Tagline:
+
+Your Trusted Companion for the Sacred Journey
+
+-------------------------------------
+
+DESIGN SYSTEM
+
+Use a premium Islamic design style.
+
+Color palette:
+
+Primary: Emerald Green
+Secondary: Gold
+Background: White
+Text: Dark Grey
+
+Add subtle Islamic geometric patterns and mosque silhouettes in backgrounds.
+
+Use elegant typography and modern UI similar to luxury travel apps.
+
+-------------------------------------
+
+CORE APP MODULES
+
+1️⃣ SMART HOME DASHBOARD
+
+The home screen should include:
+
+• rotating hero banners
+• featured Umrah packages
+• Hajj 2027 highlight
+• Ramadan Umrah promotion
+• last seat alerts
+
+Add quick action buttons:
+
+Book Umrah  
+Hajj 2027 Packages  
+Ramadan Packages  
+Hotels Near Haram  
+Talk to Agent  
+Download Brochure
+
+Add dynamic recommendations powered by AI.
+
+-------------------------------------
+
+2️⃣ HAJJ PACKAGE SYSTEM
+
+Create a dedicated Hajj section with filters.
+
+Filters include:
+
+• Departure city
+• Budget range
+• Hotel category
+• Package duration
+• Distance from Haram
+• Flight type
+
+Each Hajj package should include:
+
+Package name  
+Departure city  
+Departure date  
+Return date  
+Airline information  
+Hotel in Makkah  
+Hotel in Madinah  
+Distance from Haram  
+Room type  
+Meal plan  
+Transport details  
+Ziyarat tours
+
+Buttons:
+
+View details  
+Book now  
+WhatsApp inquiry  
+Download brochure
+
+-------------------------------------
+
+3️⃣ UMRAH PACKAGE MARKETPLACE
+
+Build a searchable Umrah marketplace similar to travel booking platforms.
+
+Categories:
+
+Economy Umrah  
+Standard Umrah  
+Deluxe Umrah  
+Luxury Umrah  
+Group Umrah  
+Ramadan Umrah
+
+Add advanced filters:
+
+Price  
+Hotel rating  
+Distance to Haram  
+Departure airport  
+Travel dates
+
+Each package must show:
+
+Hotel photos  
+Map location  
+Amenities  
+Flight details  
+Visa service  
+Group leader details
+
+-------------------------------------
+
+4️⃣ HOTEL DISCOVERY
+
+Create a module for:
+
+Hotels near Haram in Makkah and Madinah.
+
+Allow users to:
+
+• browse hotel listings
+• view photos
+• see distance from Haram
+• check amenities
+• view ratings
+
+-------------------------------------
+
+5️⃣ AI PILGRIMAGE ASSISTANT
+
+Build an AI assistant trained on:
+
+• Hajj rituals
+• Umrah rituals
+• Ihram rules
+• Tawaf instructions
+• Ziyarat locations
+• visa requirements
+• travel preparation
+
+AI assistant name:
+
+Burhan AI Guide
+
+The AI should provide:
+
+• travel guidance
+• package recommendations
+• booking assistance
+
+-------------------------------------
+
+6️⃣ LIVE AGENT CHAT
+
+Add:
+
+• WhatsApp integration
+• in-app live chat
+
+Agent numbers:
+
++91 9893225590  
++91 9893989786
+
+-------------------------------------
+
+7️⃣ PACKAGE BOOKING ENGINE
+
+Users should be able to book packages with:
+
+Full name  
+Phone number  
+Email  
+City  
+Passport number  
+Number of travelers  
+Travel dates  
+Package selection
+
+Allow passport upload.
+
+-------------------------------------
+
+8️⃣ PILGRIM PROFILE SYSTEM
+
+Users can create accounts and manage:
+
+• profile
+• passport info
+• saved packages
+• booking history
+• travel documents
+
+-------------------------------------
+
+9️⃣ DOCUMENT CENTER
+
+Provide downloadable resources:
+
+• Hajj guide PDF
+• Umrah guide
+• packing checklist
+• visa instructions
+
+-------------------------------------
+
+🔟 MEDIA GALLERY
+
+Include:
+
+• Makkah photos
+• Madinah photos
+• hotel photos
+• Umrah journey videos
+• customer testimonials
+
+-------------------------------------
+
+11️⃣ ADMIN CONTROL PANEL
+
+Create a powerful admin dashboard.
+
+Admin can:
+
+• add/edit packages
+• upload brochures
+• upload hotel images
+• manage bookings
+• manage users
+• manage chatbot knowledge
+• manage notifications
+
+-------------------------------------
+
+12️⃣ PUSH NOTIFICATIONS
+
+Send alerts for:
+
+• Hajj updates
+• Umrah promotions
+• Ramadan packages
+• last seat alerts
+
+-------------------------------------
+
+13️⃣ MULTI LANGUAGE SUPPORT
+
+Include:
+
+English  
+Urdu  
+Hindi
+
+-------------------------------------
+
+14️⃣ PAYMENT SYSTEM
+
+Support secure payments:
+
+UPI  
+Debit card  
+Credit card  
+Bank transfer
+
+-------------------------------------
+
+15️⃣ TRUST & AUTHORITY SECTION
+
+Display company credibility:
+
+Al Burhan Tours & Travels
+
+35+ Years Experience
+
+Registered with:
+
+Ministry of Minority Affairs  
+Government of India
+
+Ministry of Hajj & Umrah  
+Kingdom of Saudi Arabia
+
+-------------------------------------
+
+16️⃣ CONTACT INFORMATION
+
+Company:
+
+Al Burhan Tours & Travels
+
+Phone:
+
++91 9893225590  
++91 989398978...
