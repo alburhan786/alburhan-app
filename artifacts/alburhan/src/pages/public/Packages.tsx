@@ -1,48 +1,124 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useListPackages } from "@workspace/api-client-react";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
 import { Link } from "wouter";
-import { Calendar, Clock, MapPin, Search } from "lucide-react";
+import { Star, Search } from "lucide-react";
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+
+const CATEGORY_LABELS: Record<string, string> = {
+  umrah: "UMRAH 2026",
+  ramadan_umrah: "RAMADAN UMRAH 2027",
+  hajj: "HAJJ 2027",
+  special_hajj: "SPECIAL HAJJ",
+  iraq_ziyarat: "IRAQ ZIYARAT",
+  baitul_muqaddas: "BAITUL MUQADDAS",
+  syria_ziyarat: "SYRIA ZIYARAT",
+  jordan_heritage: "JORDAN HERITAGE",
+};
+
+const CATEGORY_COLORS: Record<string, string> = {
+  umrah: "#2563EB",
+  ramadan_umrah: "#7C3AED",
+  hajj: "#16A34A",
+  special_hajj: "#059669",
+  iraq_ziyarat: "#B45309",
+  baitul_muqaddas: "#0E7490",
+  syria_ziyarat: "#9D174D",
+  jordan_heritage: "#B45309",
+};
+
+const CATEGORY_SUBTITLES: Record<string, string> = {
+  umrah: "Umrah Packages",
+  ramadan_umrah: "Ramadan Umrah Packages",
+  hajj: "Al Burhan Hajj Premium Collection",
+  special_hajj: "Special Hajj Packages",
+  iraq_ziyarat: "Iraq Ziyarat Packages",
+  baitul_muqaddas: "Baitul Muqaddas Packages",
+  syria_ziyarat: "Syria Ziyarat Packages",
+  jordan_heritage: "Jordan Heritage Packages",
+};
+
+const CATEGORY_NOTES: Record<string, string> = {
+  hajj: "Departure: May 2027",
+  ramadan_umrah: "Departure: Jan–Feb 2027",
+};
+
+const TYPE_DISPLAY: Record<string, string> = {
+  umrah: "Premium Umrah",
+  ramadan_umrah: "Ramadan Umrah",
+  hajj: "Hajj Package",
+  special_hajj: "Special Hajj Package",
+  iraq_ziyarat: "Iraq Ziyarat",
+  baitul_muqaddas: "Baitul Muqaddas",
+  syria_ziyarat: "Syria Ziyarat",
+  jordan_heritage: "Jordan Heritage",
+};
+
+const filterTabs = [
+  { id: 'all', label: 'All' },
+  { id: 'umrah', label: 'Umrah' },
+  { id: 'ramadan_umrah', label: 'Ramadan Umrah' },
+  { id: 'hajj', label: 'Hajj 2027' },
+  { id: 'iraq_ziyarat', label: 'Iraq Ziyarat' },
+  { id: 'baitul_muqaddas', label: 'Baitul Muqaddas' },
+  { id: 'syria_ziyarat', label: 'Syria Ziyarat' },
+  { id: 'jordan_heritage', label: 'Jordan Heritage' },
+];
 
 export default function Packages() {
   const { data: packages = [], isLoading } = useListPackages({ active: true });
   const [filter, setFilter] = useState<string>('all');
+  const [search, setSearch] = useState('');
 
-  const filterTabs = [
-    { id: 'all', label: 'All Packages' },
-    { id: 'umrah', label: 'Umrah' },
-    { id: 'ramadan_umrah', label: 'Ramadan Umrah' },
-    { id: 'hajj', label: 'Hajj 2027' },
-    { id: 'iraq_ziyarat', label: 'Iraq Ziyarat' },
-    { id: 'baitul_muqaddas', label: 'Baitul Muqaddas' },
-    { id: 'syria_ziyarat', label: 'Syria Ziyarat' },
-    { id: 'jordan_heritage', label: 'Jordan Heritage' }
-  ];
+  const filtered = packages.filter(p => {
+    const matchType = filter === 'all' || p.type === filter || (filter === 'hajj' && p.type.includes('hajj'));
+    const matchSearch = !search || p.name.toLowerCase().includes(search.toLowerCase()) || (p.description || '').toLowerCase().includes(search.toLowerCase());
+    return matchType && matchSearch;
+  });
 
-  const filteredPackages = filter === 'all' 
-    ? packages 
-    : packages.filter(p => p.type.toLowerCase() === filter.replace('_', ' ').toLowerCase() || p.type === filter || (filter === 'hajj' && p.type.includes('hajj')));
+  const grouped = filtered.reduce<Record<string, typeof filtered>>((acc, pkg) => {
+    const key = pkg.type;
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(pkg);
+    return acc;
+  }, {});
+
+  const categoryOrder = ['umrah', 'ramadan_umrah', 'hajj', 'special_hajj', 'iraq_ziyarat', 'baitul_muqaddas', 'syria_ziyarat', 'jordan_heritage'];
+  const sortedKeys = Object.keys(grouped).sort((a, b) => categoryOrder.indexOf(a) - categoryOrder.indexOf(b));
 
   return (
     <MainLayout>
-      <div className="bg-primary pt-20 pb-32 text-center relative overflow-hidden">
-        <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: `url(${import.meta.env.BASE_URL}images/islamic-pattern-bg.png)` }} />
-        <h1 className="text-4xl md:text-5xl font-serif font-bold text-white mb-4 relative z-10">Our Sacred Packages</h1>
-        <p className="text-white/80 max-w-2xl mx-auto relative z-10">Carefully curated journeys tailored to provide spiritual peace and physical comfort.</p>
+      {/* App-style green header */}
+      <div className="bg-primary px-4 pt-8 pb-6 text-center">
+        <h1 className="text-2xl font-bold text-white tracking-wide">AL BURHAN</h1>
+        <p className="text-accent text-sm font-medium">Tours & Travels</p>
+        <p className="text-white/70 text-xs mt-1 italic">Your Journey to the Holy Lands</p>
       </div>
 
-      <div className="container mx-auto px-4 -mt-16 relative z-20 pb-24">
-        {/* Filters */}
-        <div className="bg-white rounded-2xl shadow-xl p-4 md:p-6 mb-12 flex flex-wrap gap-3 justify-center">
+      <div className="px-4 py-4 bg-background min-h-screen">
+        {/* Search bar — matches app */}
+        <div className="relative mb-4">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+          <input
+            className="w-full pl-10 pr-4 py-3 rounded-xl border border-border bg-white text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 font-mono tracking-wide shadow-sm"
+            placeholder="Search packages..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+
+        {/* Type filter — horizontal scroll */}
+        <div className="flex gap-2 overflow-x-auto pb-3 mb-6 scrollbar-none">
           {filterTabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setFilter(tab.id)}
-              className={`px-5 py-2.5 rounded-full text-sm font-semibold transition-all ${filter === tab.id ? 'bg-primary text-white shadow-md' : 'bg-muted text-foreground hover:bg-primary/10 hover:text-primary'}`}
+              className={`px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap border transition-all ${
+                filter === tab.id
+                  ? 'bg-primary text-white border-primary shadow-sm'
+                  : 'bg-white text-foreground border-border hover:border-primary/50'
+              }`}
             >
               {tab.label}
             </button>
@@ -50,71 +126,99 @@ export default function Packages() {
         </div>
 
         {isLoading ? (
-          <div className="flex justify-center py-20"><div className="animate-spin w-12 h-12 border-4 border-primary border-t-transparent rounded-full" /></div>
+          <div className="flex justify-center py-20">
+            <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full" />
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="text-center py-24 bg-white rounded-2xl border border-border shadow-sm">
+            <Search className="w-14 h-14 mx-auto mb-4 opacity-20" />
+            <p className="text-xl font-bold text-primary mb-2">No Packages Found</p>
+            <p className="text-muted-foreground text-sm mb-6">Try a different search or filter.</p>
+            <Button variant="outline" onClick={() => { setFilter('all'); setSearch(''); }}>View All</Button>
+          </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <AnimatePresence mode="popLayout">
-              {filteredPackages.map((pkg, i) => (
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ duration: 0.3, delay: i * 0.05 }}
-                  key={pkg.id}
-                  layout
-                >
-                  <Card className="overflow-hidden h-full flex flex-col hover:shadow-2xl transition-shadow duration-300 border-border/50 group">
-                    <div className="relative h-56 overflow-hidden">
-                      <div className="absolute top-4 left-4 z-10 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold text-primary shadow-sm uppercase">
-                        {pkg.type.replace('_', ' ')}
-                      </div>
-                      {/* stock package visual */}
-                      <img 
-                        src={pkg.imageUrl || "https://images.unsplash.com/photo-1584551246679-0daf3d275d0f?w=800&q=80"} 
-                        alt={pkg.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
-                      />
+          <div className="space-y-8">
+            {sortedKeys.map(type => {
+              const pkgs = grouped[type];
+              const color = CATEGORY_COLORS[type] || '#2563EB';
+              const label = CATEGORY_LABELS[type] || type.toUpperCase().replace('_', ' ');
+              const subtitle = CATEGORY_SUBTITLES[type] || '';
+              const note = CATEGORY_NOTES[type] || '';
+              return (
+                <div key={type}>
+                  {/* Section header — matches app exactly */}
+                  <div className="bg-white rounded-2xl px-4 py-3 mb-3 border border-border/50 shadow-sm flex items-start gap-3">
+                    <div className="w-1 rounded-full self-stretch" style={{ backgroundColor: color, minHeight: 40 }} />
+                    <div>
+                      <span
+                        className="inline-block px-3 py-1 rounded-full text-white text-xs font-bold mb-1"
+                        style={{ backgroundColor: color }}
+                      >
+                        {label}
+                      </span>
+                      <p className="font-bold text-foreground text-sm">{subtitle}</p>
+                      <p className="text-muted-foreground text-xs">{pkgs.length} package{pkgs.length !== 1 ? 's' : ''}{note ? ` · ${note}` : ''}</p>
                     </div>
-                    <div className="p-6 flex flex-col flex-grow">
-                      <h3 className="text-2xl font-serif font-bold text-primary mb-3">{pkg.name}</h3>
-                      <div className="flex flex-wrap gap-4 text-sm text-muted-foreground mb-4">
-                        <span className="flex items-center gap-1.5"><Clock size={16} className="text-accent" /> {pkg.duration || 'TBD'}</span>
-                        {pkg.departureDates && pkg.departureDates.length > 0 && (
-                          <span className="flex items-center gap-1.5"><Calendar size={16} className="text-accent" /> {pkg.departureDates[0]}</span>
-                        )}
-                      </div>
-                      <div className="mt-auto pt-6 border-t border-border/50">
-                        <div className="flex items-end justify-between mb-6">
-                          <div>
-                            <p className="text-xs text-muted-foreground mb-1">Starting from</p>
-                            <p className="text-2xl font-bold text-foreground">{formatCurrency(pkg.pricePerPerson)}</p>
+                  </div>
+
+                  {/* Package cards */}
+                  <div className="space-y-3">
+                    {pkgs.map(pkg => (
+                      <div key={pkg.id} className="bg-white rounded-2xl border border-border/60 shadow-sm overflow-hidden">
+                        <div className="p-4">
+                          {/* Featured badge */}
+                          {pkg.featured && (
+                            <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-white text-xs font-semibold mb-2" style={{ backgroundColor: 'hsl(33, 90%, 48%)' }}>
+                              <Star size={10} fill="white" /> Featured
+                            </div>
+                          )}
+
+                          {/* Title */}
+                          <h3 className="font-bold text-foreground text-base leading-snug mb-0.5">{pkg.name}</h3>
+
+                          {/* Category label — blue like app */}
+                          <p className="text-xs font-semibold mb-2" style={{ color }}>
+                            {TYPE_DISPLAY[pkg.type] || pkg.type.replace('_', ' ')}
+                          </p>
+
+                          {/* Description — 2 lines truncated */}
+                          {pkg.description && (
+                            <p className="text-muted-foreground text-xs leading-relaxed mb-3 line-clamp-2">{pkg.description}</p>
+                          )}
+
+                          {/* Duration + Departure — two columns */}
+                          <div className="grid grid-cols-2 gap-3 mb-3">
+                            <div>
+                              <p className="text-muted-foreground text-xs mb-0.5">Duration</p>
+                              <p className="font-semibold text-sm text-foreground">{pkg.duration || 'TBD'}</p>
+                            </div>
+                            {pkg.departureDates && pkg.departureDates.length > 0 && (
+                              <div>
+                                <p className="text-muted-foreground text-xs mb-0.5">Departure</p>
+                                <p className="font-semibold text-sm text-foreground">{pkg.departureDates[0]}</p>
+                              </div>
+                            )}
                           </div>
-                          <div className="text-right text-xs text-muted-foreground">
-                            + {pkg.gstPercent}% GST
+
+                          {/* Divider */}
+                          <div className="border-t border-border/50 pt-3 flex items-end justify-between">
+                            <div>
+                              <p className="text-muted-foreground text-xs mb-0.5">Starting from</p>
+                              <p className="text-xl font-bold text-foreground">{formatCurrency(pkg.pricePerPerson)}</p>
+                            </div>
+                            <Link href={`/packages/${pkg.id}`}>
+                              <button className="px-4 py-2 rounded-xl text-white text-sm font-semibold bg-primary hover:bg-primary/90 transition-colors">
+                                View Details →
+                              </button>
+                            </Link>
                           </div>
                         </div>
-                        <Link href={`/packages/${pkg.id}`} className="block">
-                          <Button className="w-full bg-primary-foreground text-primary border border-primary hover:bg-primary hover:text-white transition-colors">
-                            View Details
-                          </Button>
-                        </Link>
                       </div>
-                    </div>
-                  </Card>
-                </motion.div>
-              ))}
-            </AnimatePresence>
-            {filteredPackages.length === 0 && (
-              <motion.div 
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                className="col-span-full text-center py-24 bg-white rounded-2xl border border-border/50 text-muted-foreground shadow-sm"
-              >
-                <Search className="w-16 h-16 mx-auto mb-4 opacity-20" />
-                <p className="text-2xl font-serif font-bold text-primary mb-2">No Packages Found</p>
-                <p>We couldn't find any packages matching this category currently.</p>
-                <Button variant="outline" className="mt-6" onClick={() => setFilter('all')}>View All Packages</Button>
-              </motion.div>
-            )}
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

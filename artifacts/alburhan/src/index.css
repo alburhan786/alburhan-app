@@ -38,41 +38,39 @@
 }
 
 :root {
-  /* Islamic Luxury Palette */
-  /* Background: Crisp warm white */
-  --background: 40 33% 98%;
-  /* Foreground: Very dark green */
-  --foreground: 158 90% 10%;
-  
-  /* Primary: Deep Emerald Green */
-  --primary: 158 85% 14%;
-  --primary-foreground: 40 33% 98%;
-  
-  /* Accent: Rich Gold */
-  --accent: 43 67% 52%;
-  --accent-foreground: 158 90% 10%;
-  
-  /* Secondary: Soft Gold/Beige */
-  --secondary: 43 30% 92%;
-  --secondary-foreground: 158 85% 14%;
-  
-  /* Card: Pure White with tiny warmth */
+  /* Background: Light mint green — matches mobile app */
+  --background: 138 60% 97%;
+  --foreground: 158 60% 10%;
+
+  /* Primary: Forest green — matches app header */
+  --primary: 152 42% 30%;
+  --primary-foreground: 0 0% 100%;
+
+  /* Accent: Warm orange/amber — matches app Featured badge & "Tours & Travels" */
+  --accent: 33 90% 48%;
+  --accent-foreground: 0 0% 100%;
+
+  /* Secondary */
+  --secondary: 138 30% 93%;
+  --secondary-foreground: 152 42% 25%;
+
+  /* Card: Pure white */
   --card: 0 0% 100%;
-  --card-foreground: 158 90% 10%;
-  --card-border: 43 20% 90%;
-  
-  /* Muted: Soft grayish green */
-  --muted: 158 10% 94%;
-  --muted-foreground: 158 20% 40%;
-  
+  --card-foreground: 158 60% 10%;
+  --card-border: 138 20% 88%;
+
+  /* Muted */
+  --muted: 138 20% 93%;
+  --muted-foreground: 152 15% 45%;
+
   /* Utilities */
-  --border: 43 20% 85%;
-  --input: 43 20% 85%;
-  --ring: 43 67% 52%;
-  
+  --border: 138 20% 86%;
+  --input: 138 20% 86%;
+  --ring: 152 42% 30%;
+
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
-  
+
   --radius: 0.75rem;
 }
 
@@ -81,21 +79,19 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground antialiased font-sans selection:bg-accent/30 selection:text-primary;
-  }
-  h1, h2, h3, h4, h5, h6 {
-    @apply font-serif tracking-tight text-primary;
+    @apply bg-background text-foreground antialiased font-sans;
   }
 }
 
 @layer utilities {
-  .glass-panel {
-    @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-xl shadow-primary/5;
+  .app-header {
+    background-color: hsl(152, 42%, 28%);
   }
-  .gold-gradient {
-    @apply bg-gradient-to-r from-[#BF953F] via-[#FCF6BA] to-[#B38728];
+  .category-blue {
+    color: #2563eb;
   }
-  .gold-text-gradient {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-[#BF953F] via-[#D4AF37] to-[#AA771C];
+  .featured-badge {
+    background-color: hsl(33, 90%, 48%);
+    color: white;
   }
 }
