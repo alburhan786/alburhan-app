@@ -39,9 +39,9 @@ export function MainLayout({ children }: { children: ReactNode }) {
 
       {/* Navbar */}
       <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-lg border-b border-border/50 shadow-sm">
-        <div className="container mx-auto px-4 h-20 flex items-center justify-between">
+        <div className="container mx-auto px-4 h-24 flex items-center justify-between">
           <Link href="/" className="flex items-center">
-            <img src={`${import.meta.env.BASE_URL}images/logo.png`} alt="Al Burhan Tours & Travels" className="h-14 w-auto object-contain" />
+            <img src={`${import.meta.env.BASE_URL}images/logo.png`} alt="Al Burhan Tours & Travels" className="h-20 w-auto object-contain" />
           </Link>
 
           {/* Desktop Nav */}
