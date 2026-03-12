@@ -1,0 +1,144 @@
+{
+  "company": "Al Burhan Tours & Travels",
+
+  "umrah_packages": [
+
+    {
+      "package_name": "Premium Umrah Package",
+      "hotel_makkah": "Azka Safa Hotel",
+      "hotel_makkah_category": "3 Star",
+      "distance_makkah": "200 meters from Haram",
+      "hotel_madinah": "Rose Holiday Hotel",
+      "hotel_madinah_category": "3 Star",
+      "distance_madinah": "100 meters from Masjid Nabawi",
+      "departure_frequency": "Every Week",
+      "return_frequency": "Every Week",
+      "price_inr": 150000
+    },
+
+    {
+      "package_name": "Economy Umrah Package",
+      "duration": "14 Nights / 15 Days",
+      "hotel_makkah": "Durrat O Sallah",
+      "hotel_makkah_category": "1 Star",
+      "distance_makkah": "600 meters (12 minutes walk)",
+      "room_sharing": "5 Person Sharing",
+      "hotel_madinah": "Guest Time Hotel",
+      "hotel_madinah_category": "2 Star",
+      "distance_madinah": "200 meters from Masjid Nabawi",
+      "departure_frequency": "Every 15 Days",
+      "return_frequency": "Every 15 Days",
+      "price_inr": 90000
+    },
+
+    {
+      "package_name": "Ramadan Umrah Special – Last 20 Days",
+      "duration": "20 Days",
+      "departure_date": "28 January 2027",
+      "hotel_makkah": "Kayan Al Raya Hotel Ajiyad",
+      "hotel_makkah_category": "1 Star",
+      "distance_makkah": "500 meters from Haram",
+      "room_sharing": "4 / 5 Sharing",
+      "hotel_madinah": "Arjwan Sada Hotel",
+      "distance_madinah": "300 meters from Masjid Nabawi",
+      "room_sharing_madinah": "4 / 5 Sharing",
+      "price_inr": 140000
+    },
+
+    {
+      "package_name": "Ramadan Umrah Full Month Package",
+      "duration": "32 Days",
+      "departure_date": "9 January 2027",
+      "makkah_stay": "22 Days",
+      "madinah_stay": "12 Days",
+      "hotel_makkah": "Zohratu Sallah Hotel Bir Balila Ajiyad",
+      "distance_makkah": "600 meters from Haram",
+      "room_sharing": "5 / 6 Sharing",
+      "hotel_madinah": "Lulu Madinah Hotel",
+      "distance_madinah": "300 meters from Masjid Nabawi",
+      "room_sharing_madinah": "4 / 5 Sharing",
+      "airline": "Akasa Air",
+      "baggage": "30 KG + Zamzam",
+      "meals": "Sahoor, Iftar, Dinner",
+      "transport": "AC Bus Jeddah – Makkah – Madinah – Jeddah",
+      "ziyara": [
+        "Makkah Ziyarat",
+        "Madinah Ziyarat"
+      ],
+      "price_inr": 180000
+    }
+
+  ],
+
+  "hajj_packages_2027": {
+
+    "departure_date": "11 May 2027",
+
+    "packages": [
+      "Burhan Royal Elite",
+      "Burhan Elite Plus",
+      "Burhan Comfort Plus",
+      "Burhan Comfort",
+      "Burhan Economy Plus",
+      "Burhan Budget Saver"
+    ]
+  },
+
+  "special_hajj_package": {
+
+    "package_name": "Burhan Budget Saver Shifting",
+    "category": "Most Popular Hajj Package 2027",
+    "duration": "40 Days",
+    "departure_date": "05 May 2027",
+    "return_date": "20 June 2027",
+
+    "moulim": "Category D – New Mina",
+
+    "makkah_before_hajj": {
+      "stay": "10 Days",
+      "hotel": "Azizia Area",
+      "distance": "5 km from Haram"
+    },
+
+    "makkah_after_hajj": {
+      "stay": "15 Days",
+      "hotel": "Grand Masa Hotel",
+      "category": "3 Star",
+      "distance": "400 meters from Haram"
+    },
+
+    "madinah_stay": {
+      "days": 9,
+      "hotel": "Haya Plaza Hotel",
+      "category": "3 Star",
+      "distance": "100 meters from Masjid Nabawi"
+    },
+
+    "transport": "AC Bus",
+
+    "ziyara": [
+      "Makkah Ziyarat",
+      "Madinah Ziyarat",
+      "Taif",
+      "Badar"
+    ],
+
+    "complimentary_items": [
+      "24 inch PP bag",
+      "20 inch PP bag",
+      "Backpack",
+      "Mina / Arafat bag",
+      "Passport pouch",
+      "Shoe bag",
+      "Umbrella",
+      "Sunglasses",
+      "Electric neck fan",
+      "Muzdalifah sleeping mat",
+      "Janamaz",
+      "Tasbeeh",
+      "Printed Hajj & Umrah guide",
+      "Ihram belt",
+      "Ihram"
+    ]
+  }
+}
