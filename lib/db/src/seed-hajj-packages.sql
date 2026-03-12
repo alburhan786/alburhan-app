@@ -1,7 +1,4 @@
 -- Seed script: Insert 6 individual Hajj 2027 packages
--- These replace the old generic "Hajj 2027 Packages" entry
-
-DELETE FROM packages WHERE name = 'Hajj 2027 Packages' AND type = 'hajj';
 
 INSERT INTO packages (id, name, type, description, duration, price_per_person, gst_percent, includes, highlights, departure_dates, featured, is_active, created_at, updated_at)
 VALUES
