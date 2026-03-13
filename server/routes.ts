@@ -76,23 +76,23 @@ async function sendOtpSmsFast2SMS(phone: string, otpCode: string): Promise<boole
   }
 }
 
-async function sendBookingDltSms(phone: string, bookingRef: string): Promise<boolean> {
+async function sendBookingDltSms(phone: string, invoiceNumber: string, invoiceUrl: string): Promise<boolean> {
   const apiKey = process.env.FAST2SMS_API_KEY;
   if (!apiKey) {
-    console.log("[Fast2SMS] API key not configured, skipping booking SMS");
+    console.log("[Fast2SMS DLT] API key not configured, skipping booking SMS");
     return false;
   }
   try {
-    const message = `Your booking ${bookingRef} with AL BURHAN TOURS & TRAVELS has been confirmed. JazakAllah Khair.`;
-    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=q&message=${encodeURIComponent(message)}&language=english&flash=0&numbers=${phone}`;
+    const variables = `${invoiceNumber}|${invoiceUrl}|`;
+    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=dlt&sender_id=ABURHA&message=211052&variables_values=${encodeURIComponent(variables)}&flash=0&numbers=${phone}`;
     const response = await fetch(url, { method: "GET" });
     const data = await response.json();
-    console.log("[Fast2SMS Booking] Response:", JSON.stringify(data));
+    console.log("[Fast2SMS DLT Booking] Response:", JSON.stringify(data));
     if (data.return === true) return true;
-    console.log("[Fast2SMS Booking] Failed:", data.message);
+    console.log("[Fast2SMS DLT Booking] Failed:", data.message);
     return false;
   } catch (error) {
-    console.error("[Fast2SMS Booking] Error:", error);
+    console.error("[Fast2SMS DLT Booking] Error:", error);
     return false;
   }
 }
@@ -991,8 +991,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         break;
     }
 
-    const smsResult = await sendSmsFast2SMS(user.phone, message);
-    console.log(`[SMS/Fast2SMS] To ${user.phone}: ${smsResult ? "sent" : "failed/skipped"}`);
+    const smsResult = await sendBookingDltSms(user.phone, invoiceNum, invoiceUrl);
+    console.log(`[SMS DLT Booking] To ${user.phone}: ${smsResult ? "sent" : "failed/skipped"}`);
+    if (!smsResult) {
+      const smsFallback = await sendSmsFast2SMS(user.phone, message);
+      console.log(`[SMS Quick Fallback] To ${user.phone}: ${smsFallback ? "sent" : "failed"}`);
+    }
 
     const whatsappResult = await sendWhatsAppConfirmationTemplate(
       user.phone, customerName, packageName, `INR ${amountPaid}`, invoiceUrl
@@ -1267,8 +1271,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const message = `Assalamu Alaikum\n\nDear *${contactName}*\n\nYour booking with *Al Burhan Tours & Travels* has been confirmed.\n\nPackage: ${offlinePackageName}\nAmount Paid: ₹${formatINR(parseFloat(paidAmount || "0"))}\n\nYour invoice is attached below.\n${invoiceUrl}\n\nFor assistance please contact:\n9893225590\n9893989786\n\n*Al Burhan Tours & Travels*`;
 
       if (sendSms) {
-        const smsOk = await sendSmsFast2SMS(contactPhone, message);
-        notificationStatus += smsOk ? "SMS sent. " : "SMS failed. ";
+        const smsOk = await sendBookingDltSms(contactPhone, actualInvoiceNum, invoiceUrl);
+        if (smsOk) {
+          notificationStatus += "SMS sent. ";
+        } else {
+          const smsFallback = await sendSmsFast2SMS(contactPhone, message);
+          notificationStatus += smsFallback ? "SMS sent. " : "SMS failed. ";
+        }
       }
       if (sendWhatsapp) {
         const waOfflineOk = await sendWhatsAppConfirmationTemplate(
@@ -1411,6 +1420,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await db.delete(payments).where(eq(payments.bookingId, booking.id));
         await db.delete(documents).where(eq(documents.bookingId, booking.id));
       }
+      await db.delete(notifications).where(eq(notifications.userId, userToDelete.id));
       await db.delete(bookings).where(eq(bookings.userId, userToDelete.id));
       await db.delete(users).where(eq(users.id, userToDelete.id));
 
