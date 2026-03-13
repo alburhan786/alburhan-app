@@ -62,16 +62,15 @@ async function sendOtpSmsFast2SMS(phone: string, otpCode: string): Promise<boole
     return false;
   }
   try {
-    const message = `Your AL BURHAN TOURS & TRAVELS OTP is ${otpCode}. Valid for 5 minutes. Do not share with anyone.`;
-    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=q&message=${encodeURIComponent(message)}&language=english&flash=0&numbers=${phone}`;
+    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=dlt&sender_id=ALBURH&message=164844&variables_values=${encodeURIComponent(otpCode + "|")}&flash=0&numbers=${phone}`;
     const response = await fetch(url, { method: "GET" });
     const data = await response.json();
-    console.log("[Fast2SMS OTP] Response:", JSON.stringify(data));
+    console.log("[Fast2SMS OTP DLT] Response:", JSON.stringify(data));
     if (data.return === true) return true;
-    console.log("[Fast2SMS OTP] Failed:", data.message);
+    console.log("[Fast2SMS OTP DLT] Failed:", data.message);
     return false;
   } catch (error) {
-    console.error("[Fast2SMS OTP] Error:", error);
+    console.error("[Fast2SMS OTP DLT] Error:", error);
     return false;
   }
 }
