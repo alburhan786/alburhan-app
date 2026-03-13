@@ -115,20 +115,73 @@ async function sendSmsFast2SMS(phone: string, message: string): Promise<boolean>
   }
 }
 
-async function sendWhatsAppBotBee(phone: string, message: string): Promise<boolean> {
+const WHATSAPP_HEADER_IMAGE = "https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Kaaba_mirror_edit_jj.jpg/640px-Kaaba_mirror_edit_jj.jpg";
+const WHATSAPP_PHONE_NUMBER_ID = "965912196611113";
+
+async function sendWhatsAppTemplate(
+  phone: string,
+  templateName: string,
+  languageCode: string,
+  components: any[]
+): Promise<boolean> {
+  const token = process.env.META_WHATSAPP_TOKEN;
+  if (!token) {
+    console.log("[Meta WhatsApp] Token not configured, skipping template");
+    return false;
+  }
+  const to = phone.startsWith("91") ? phone : `91${phone}`;
+  try {
+    const response = await fetch(
+      `https://graph.facebook.com/v18.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messaging_product: "whatsapp",
+          to,
+          type: "template",
+          template: { name: templateName, language: { code: languageCode }, components },
+        }),
+      }
+    );
+    const data = await response.json() as any;
+    console.log(`[Meta WhatsApp Template] ${templateName} to ${to}:`, JSON.stringify(data));
+    return !!(data.messages?.[0]?.id);
+  } catch (error) {
+    console.error("[Meta WhatsApp Template] Error:", error);
+    return false;
+  }
+}
+
+async function sendWhatsAppOtpTemplate(phone: string, otpCode: string): Promise<boolean> {
+  return sendWhatsAppTemplate(phone, "alburhan_login_otp", "en_US", [
+    { type: "body", parameters: [{ type: "text", text: otpCode }] },
+    { type: "button", sub_type: "url", index: 0, parameters: [{ type: "text", text: otpCode }] },
+  ]);
+}
+
+async function sendWhatsAppBookingTemplate(phone: string, customerName: string): Promise<boolean> {
+  return sendWhatsAppTemplate(phone, "booking", "en_GB", [
+    { type: "header", parameters: [{ type: "image", image: { link: WHATSAPP_HEADER_IMAGE } }] },
+    { type: "body", parameters: [{ type: "text", text: customerName }] },
+  ]);
+}
+
+async function sendWhatsAppBotBee(phone: string, message: string): Promise<{ sent: boolean; blocked: boolean }> {
   const apiKey = process.env.BOTBEE_API_KEY || process.env.BOTBEE_API_TOKEN || process.env.BOTBEE_WHATSAPP_API_KEY;
   if (!apiKey) {
     console.log("[BotBee] API key not configured, skipping WhatsApp");
-    return false;
+    return { sent: false, blocked: false };
   }
-  const phoneNumberId = process.env.BOTBEE_PHONE_NUMBER_ID || "965912196611113";
+  const phoneNumberId = process.env.BOTBEE_PHONE_NUMBER_ID || WHATSAPP_PHONE_NUMBER_ID;
   const phoneNumber = phone.startsWith("91") ? phone : `91${phone}`;
   try {
     const response = await fetch("https://app.botbee.io/api/v1/whatsapp/send", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         apiToken: apiKey,
         phone_number_id: phoneNumberId,
@@ -140,17 +193,18 @@ async function sendWhatsAppBotBee(phone: string, message: string): Promise<boole
     try {
       const data = JSON.parse(text);
       console.log("[BotBee] Response:", JSON.stringify(data));
-      if (data.status === "0" && data.message?.includes("24 hour")) {
-        console.log("[BotBee] 24-hour window restriction - user needs to message the business first");
+      const blocked = data.status === "0" && data.message?.includes("24 hour");
+      if (blocked) {
+        console.log("[BotBee] 24-hour window restriction — will use template fallback");
       }
-      return data.status === "1";
+      return { sent: data.status === "1", blocked };
     } catch {
       console.log("[BotBee] Non-JSON response:", text.substring(0, 200));
-      return false;
+      return { sent: false, blocked: false };
     }
   } catch (error) {
     console.error("[BotBee] Error:", error);
-    return false;
+    return { sent: false, blocked: false };
   }
 }
 
@@ -261,19 +315,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         otp = generateOtp();
         otpStore.set(phone, { otp, expiresAt: Date.now() + 5 * 60 * 1000 });
       }
-      const whatsappMessage = `Your AL BURHAN TOURS OTP is ${otp}. Valid for 5 minutes.`;
-      const whatsappSent = await sendWhatsAppBotBee(phone, whatsappMessage);
-      if (!whatsappSent) {
-        const smsSent = await sendOtpSmsFast2SMS(phone, otp);
-        console.log(`[OTP] WhatsApp failed, SMS fallback ${smsSent ? "sent" : "also failed"} for ${phone}`);
-        if (!smsSent) {
-          return res.status(500).json({ success: false, error: "Failed to send OTP via WhatsApp and SMS. Please register directly with email instead." });
-        }
-        res.json({ success: true, message: "OTP sent via SMS (WhatsApp unavailable)" });
-      } else {
-        console.log(`[OTP] Sent OTP via WhatsApp to ${phone}`);
-        res.json({ success: true, message: "OTP sent via WhatsApp" });
+      const whatsappSent = await sendWhatsAppOtpTemplate(phone, otp);
+      const smsSent = await sendOtpSmsFast2SMS(phone, otp);
+      console.log(`[OTP] Registration OTP for ${phone} — WhatsApp template: ${whatsappSent}, SMS: ${smsSent}`);
+      if (!whatsappSent && !smsSent) {
+        return res.status(500).json({ success: false, error: "Failed to send OTP via WhatsApp and SMS. Please register directly with email instead." });
       }
+      const method = whatsappSent ? "WhatsApp" : "SMS";
+      res.json({ success: true, message: `OTP sent via ${method}` });
     } catch (error: any) {
       res.status(400).json({ success: false, error: error.message });
     }
@@ -334,10 +383,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const otp = generateOtp();
       otpStore.set(`login_${phone}`, { otp, expiresAt: Date.now() + 5 * 60 * 1000 });
-      const whatsappMessage = `Your AL BURHAN TOURS login OTP is ${otp}. Valid for 5 minutes.`;
       const smsSent = await sendOtpSmsFast2SMS(phone, otp);
-      const whatsappSent = await sendWhatsAppBotBee(phone, whatsappMessage);
-      console.log(`[OTP] Login OTP ${otp} for phone ${phone}, SMS: ${smsSent}, WhatsApp: ${whatsappSent}`);
+      const whatsappSent = await sendWhatsAppOtpTemplate(phone, otp);
+      console.log(`[OTP] Login OTP for ${phone} — SMS: ${smsSent}, WhatsApp template: ${whatsappSent}`);
       if (!smsSent && !whatsappSent) {
         return res.status(500).json({ success: false, error: "Failed to send OTP. Please use email and password to sign in." });
       }
@@ -926,8 +974,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const smsResult = await sendSmsFast2SMS(user.phone, message);
     console.log(`[SMS/Fast2SMS] To ${user.phone}: ${smsResult ? "sent" : "failed/skipped"}`);
 
-    const whatsappResult = await sendWhatsAppBotBee(user.phone, message);
-    console.log(`[WhatsApp/BotBee] To ${user.phone}: ${whatsappResult ? "sent" : "failed/skipped (24-hour window)"}`);
+    const waResult = await sendWhatsAppBotBee(user.phone, message);
+    let whatsappResult = waResult.sent;
+    if (!waResult.sent && waResult.blocked) {
+      console.log(`[WhatsApp] Free-form blocked — falling back to booking template for ${user.phone}`);
+      whatsappResult = await sendWhatsAppBookingTemplate(user.phone, customerName);
+    }
+    console.log(`[WhatsApp] To ${user.phone}: ${whatsappResult ? "sent" : "failed"}`);
 
     await db.insert(notifications).values({
       userId,
@@ -1095,7 +1148,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           </div>`;
 
         const smsResult = await sendSmsFast2SMS(targetUser.phone, message);
-        const whatsappResult = await sendWhatsAppBotBee(targetUser.phone, message);
+        const waDocResult = await sendWhatsAppBotBee(targetUser.phone, message);
+        let whatsappResult = waDocResult.sent;
+        if (!waDocResult.sent && waDocResult.blocked) {
+          whatsappResult = await sendWhatsAppBookingTemplate(targetUser.phone, targetUser.name);
+        }
         const emailResult = await sendEmail(targetUser.email, `Your ${docLabel} Document - AL BURHAN TOURS`, emailHtml);
 
         await db.insert(notifications).values({
@@ -1197,8 +1254,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         notificationStatus += smsOk ? "SMS sent. " : "SMS failed. ";
       }
       if (sendWhatsapp) {
-        const waOk = await sendWhatsAppBotBee(contactPhone, message);
-        notificationStatus += waOk ? "WhatsApp sent. " : "WhatsApp failed/skipped. ";
+        const waOfflineResult = await sendWhatsAppBotBee(contactPhone, message);
+        let waOfflineOk = waOfflineResult.sent;
+        if (!waOfflineResult.sent && waOfflineResult.blocked) {
+          waOfflineOk = await sendWhatsAppBookingTemplate(contactPhone, contactName);
+        }
+        notificationStatus += waOfflineOk ? "WhatsApp sent. " : "WhatsApp failed/skipped. ";
       }
 
       res.json({
@@ -1242,7 +1303,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       for (const u of allUsers) {
         const smsResult = await sendSmsFast2SMS(u.phone, message);
-        const whatsappResult = await sendWhatsAppBotBee(u.phone, message);
+        const waBroadcast = await sendWhatsAppBotBee(u.phone, message);
+        let whatsappResult = waBroadcast.sent;
+        if (!waBroadcast.sent && waBroadcast.blocked) {
+          whatsappResult = await sendWhatsAppBookingTemplate(u.phone, u.name);
+        }
         const emailResult = await sendEmail(u.email, emailSubject, emailHtml);
 
         const anySent = smsResult || whatsappResult || emailResult;

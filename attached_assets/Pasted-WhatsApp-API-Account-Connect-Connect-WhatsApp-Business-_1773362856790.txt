@@ -1,0 +1,743 @@
+WhatsApp API : Account Connect
+Connect WhatsApp Business Account
+
+API End-point : POST
+https://app.botbee.io/api/v1/whatsapp/account/connect
+apiToken
+Your api key
+String|Required
+user_id
+User ID of WhatsApp account owner
+Integer|Required
+whatsapp_business_account_id
+WhatsApp Business Account ID
+String|Required
+access_token
+Access Token
+String|Required
+GET Request Example
+https://app.botbee.io/api/v1/whatsapp/account/connect?apiToken=API-KEY&user_id=USER-ID&whatsapp_business_account_id=WHATSAPP-BUSINESS-ACCOUNT-ID&access_token=ACCESS-TOKEN
+POST Request Example
+curl -X POST \
+'https://app.botbee.io/api/v1/whatsapp/account/connect' \
+-d 'apiToken=API-KEY' \
+-d 'user_id=USER-ID' \
+-d 'whatsapp_business_account_id=WHATSAPP-BUSINESS-ACCOUNT-ID' \
+-d 'access_token=ACCESS-TOKEN'
+Sample Response
+{"status":"1","message":"Whatsapp account has been connect successfully."}
+WhatsApp API : Send Message
+Send WhatsApp message to any mobile number
+
+API End-point : Send Message (GET/POST)
+https://app.botbee.io/api/v1/whatsapp/send
+apiToken
+Your api key
+String|Required
+phone_number_id
+WhatsApp account phone number ID
+String|Required
+message
+Text message content (need url encoded value for GET request)
+String|Required
+phone_number
+Must start with country code and only numeric characters are allowed
+String|Required
+GET Request Example
+https://app.botbee.io/api/v1/whatsapp/send?apiToken=API-KEY&phone_number_id=PHONE-NUMBER-ID&message=TEXT-MESSAGE&phone_number=PHONE-NUMBER
+POST Request Example
+curl -X POST \
+'https://app.botbee.io/api/v1/whatsapp/send' \
+-d 'apiToken=API-KEY' \
+-d 'phone_number_id=PHONE-NUMBER-ID' \
+-d 'message=TEXT-MESSAGE' \
+-d 'phone_number=PHONE-NUMBER'
+Sample Response
+{"status":"1", "wa_message_id":"wamid.HBgNODgwMTcyMzMwOTAwMxUCABEYEjlGQkY3MEFEMEVGODhCNDkxNQA=", "message":"Message sent successfully."}
+
+{"status":"0","message":"Subscriber limit has been exceeded. You cannot have more subscribers."}
+Generate API End-point : Send Template Message (GET/POST)
+WhatsApp Account
+
+Alburhan Tours and Travels (+918989701701)
+Select Message Template *
+ system_abandoned_cart_reminder_new [Marketing]
+ system_abandoned_cart_reminder_coupon_new [Marketing]
+ system_cod_order_verification_new [Utility]
+ system_order_success_notification_new [Utility]
+ system_booking_reminder_new [Marketing]
+ ramdan [Marketing]
+ umrah [Marketing]
+ ramdanmubarak [Marketing]
+ booking [Utility]
+ payment [Utility]
+ alburhan_fb_wa_call [Marketing]
+ otp_login [Authentication]
+ alburhan_login_otp [Authentication]
+WhatsApp API : Get Conversation
+Get Conversation of particular subscriber
+
+API End-point : GET/POST
+https://app.botbee.io/api/v1/whatsapp/get/conversation
+apiToken
+Your api key
+String|Required
+phone_number_id
+Your whatsapp phone number id
+String|Required
+phone_number
+Subscriber phone number
+String|Required
+limit
+Fetch number of conversation message.
+Number|Required
+offset
+Offset of pagination.
+Number|Optional
+GET Request Example
+https://app.botbee.io/api/v1/whatsapp/get/conversation?apiToken=API-KEY&phone_number_id=PHONE-NUMBER-ID&phone_number=PHONE-NUMBER&limit=10&offset=1
+POST Request Example
+curl -X POST \
+'https://app.botbee.io/api/v1/whatsapp/get/conversation' \
+-d 'apiToken=API-KEY' \
+-d 'phone_number_id=PHONE-NUMBER-ID' \
+-d 'phone_number=PHONE-NUMBER' \
+-d 'limit=10' \
+-d 'offset=1'
+Sample Response
+{"status":"1","message":[{"id":8XX3,"whatsapp_bot_subscriber_subscriber_id":"0123456789-23","whatsapp_bot_id":23,"sender":"bot","agent_name":null,"message_content":"{\"delay_in_reply\":0,\"messaging_product\":\"whatsapp\",\"recipient_type\":\"individual\",\"to\":\"0123456789\",\"type\":\"interactive\",\"interactive\":{\"header\":{\"type\":\"text\",\"text\":\"Order gateway\"},\"body\":{\"text\":\"How would you like to purchase it?\"},\"type\":\"button\",\"action\":{\"buttons\":[{\"type\":\"reply\",\"reply\":{\"id\":\"5lvomLOuENXIe6D::gPeAiDDmVQR_jTR\",\"title\":\"Paypal pay\"}},{\"type\":\"reply\",\"reply\":{\"id\":\"YES_START_CHAT_WITH_HUMAN::CBaLoC4yTMyIljZ\",\"title\":\"COD\"}}]}}}","conversation_time":"2024-07-28 13:21:03","wa_message_id":"wamid.HBgNODgwMTcyMzMwOTAwMxUCABEYEjlGQkY3MEFEMEVGODhCNDkxNQA=","reaction_data":null,"message_status":null,"delivery_status_updated_at":"2024-07-28 13:21:03","failed_reason":""}]}
+WhatsApp API : Get Post Back List
+Get Post Back List
+
+API End-point : GET/POST
+https://app.botbee.io/api/v1/whatsapp/get/post-back-list
+apiToken
+Your api key
+String|Required
+phone_number_id
+Your whatsapp phone number id
+String|Required
+GET Request Example
+https://app.botbee.io/api/v1/whatsapp/get/post-back-list?apiToken=API-KEY&phone_number_id=PHONE-NUMBER-ID
+POST Request Example
+curl -X POST \
+'https://app.botbee.io/api/v1/whatsapp/get/post-back-list' \
+-d 'apiToken=API-KEY' \
+-d 'phone_number_id=PHONE-NUMBER-ID'
+Sample Response
+{"status":"1","message":[{"id":671,"user_id":1,"postback_id":"QUICK_REPLY_LOCATION_REPLY_BOT","whatsapp_bot_id":95,"use_status":"0","status":"1","whatsapp_bot_setting_id":1770,"bot_name":"Location quick reply","is_template":"1","template_jsoncode":"[{\"messaging_product\":\"whatsapp\",\"to\":\"replace_id\",\"type\":\"text\",\"text\":{\"body\":\"Thank you for sharing your location. It has been received. Thank you for being here with us today.\",\"preview_url\":true}}]","template_name":"Location quick reply","template_for":"location-quick-reply","template_id":null,"inherit_from_template":"0","whatsapp_bot_label_ids":"","whatsapp_bot_remove_label_ids":"","remove_sequence_campaign_id":0,"team_assign_role_id":0,"team_assign_user_id":0,"broadcast_sequence_campaign_id":0,"visual_flow_type":"flow","postback_type":"main","whatsapp_bot_visual_flow_builder_campaign_id":1358,"google_sheet_ids":"","updated_at":"2024-07-14 05:25:55","row_type":"static","custom_field_id":0,"custom_field_index":"","custom_field_index_title":"","generateGoogleMeetLink":null,"googleCalendarId":null,"googleMeetToCustomFieldId":null}]}
+WhatsApp API : Get Delivery Message Status
+Get message statuses from API
+
+API End-point : GET/POST
+https://app.botbee.io/api/v1/whatsapp/get/message-status
+apiToken
+Your api key
+String|Required
+wa_message_id
+WhatsApp message ID to check status
+String|Required
+whatsapp_bot_id
+WhatsApp bot ID
+Number|Required
+GET Request Example
+https://app.botbee.io/api/v1/whatsapp/get/message-status?apiToken=API-KEY&wa_message_id=WAMID.XXXXX&whatsapp_bot_id=123
+POST Request Example
+curl -X POST \
+'https://app.botbee.io/api/v1/whatsapp/get/message-status' \
+-d 'apiToken=API-KEY' \
+-d 'wa_message_id=WAMID.XXXXX' \
+-d 'whatsapp_bot_id=123'
+Sample Response
+{"status":"1","message":{"message_status":"delivered","delivery_status_updated_at":"2024-07-28 13:21:03","read_time":null,"failed_time":null,"failed_reason":""}}
+WhatsApp API : Bot Template Get
+Get Whatsapp Bot template
+
+API End-point : Get Template (GET/POST)
+https://app.botbee.io/api/v1/whatsapp/template/list
+apiToken
+Your api key
+String|Required
+phone_number_id
+WhatsApp account phone number ID
+String|Required
+GET Request Example
+https://app.botbee.io/api/v1/whatsapp/template/list?apiToken=API-KEY&phone_number_id=PHONE-NUMBER-ID
+POST Request Example
+curl -X POST \
+'https://app.botbee.io/api/v1/whatsapp/template/list' \
+-d 'apiToken=API-KEY' \
+-d 'phone_number_id=PHONE-NUMBER-ID'
+Sample Response
+{"status":"1","message":{"id":48,"template_id":"437509121867805","whatsapp_business_id":11,"template_name":"ada","template_type":"single","locale":"en_US","header_type":"media","header_subtype":"image","header_content":"","body_content":"To send an interactive message template, make a POST call to \/PHONE_NUMBER_ID\/","footer_content":"","button_content":"[]","template_json":"{\"name\":\"template_23_1666095188\",\"language\":\"en_US\",\"category\":\"transactional\",\"components\":[{\"type\":\"header\",\"format\":\"image\",\"example\":{\"header_handle\":[\"https:\\\/\\\/example.com\\\/assets\\\/images\\\/template\\\/image.jpg\"]}},{\"type\":\"body\",\"text\":\"To send an interactive message template, make a POST call to \\\/PHONE_NUMBER_ID\\\/\"}],\"access_token\":\"EAAHFAlhZBSyEBAIRZCsHKZA5ZAdOWMRL7AwuuCBKd3tZChAQQ1PHojPUS5k76aMVyzzxG9bYp2JQ57aLMfQBCZCpvXKac4KLDZAhejOuw1zkNCxGjvK7J5YwNmZBwTTd8Iig2YDq0vGZBoS20ipsLB4scbOOh0WmQrj7oLI9ZC5rFlsFC9mYctgQKIyJCvZBfgn5pGE1YPiBllrqwZDZD\"}","button_type":"none","variable_map":"{\"header\":[],\"body\":[]}","updated_at":"2022-10-18 12:13:09","user_id":1,"status":"Rejected","system_template":"0","map_needed":"0","check_wp_type":"general"}}
+WhatsApp API : Trigger Bot Flow
+Trigger your bot to any mobile number
+
+API End-point : Trigger Bot Flow (GET/POST)
+https://app.botbee.io/api/v1/whatsapp/trigger-bot
+apiToken
+Your api key
+String|Required
+phone_number_id
+WhatsApp account phone number ID
+String|Required
+bot_flow_unique_id
+Bot Flow Unique ID
+String|Required
+phone_number
+Must start with country code and only numeric characters are allowed
+String|Required
+GET Request Example
+https://app.botbee.io/api/v1/whatsapp/trigger-bot?apiToken=API-KEY&phone_number_id=PHONE-NUMBER-ID&bot_flow_unique_id=BOT-FLOW-UNIQUE-ID&phone_number=PHONE-NUMBER
+POST Request Example
+curl -X POST \
+'https://app.botbee.io/api/v1/whatsapp/trigger-bot' \
+-d 'apiToken=API-KEY' \
+-d 'phone_number_id=PHONE-NUMBER-ID' \
+-d 'bot_flow_unique_id=BOT-FLOW-UNIQUE-ID' \
+-d 'phone_number=PHONE-NUMBER'
+Sample Response
+{"status":"1","message":"Bot has been trigger successfully."}
+WhatsApp API : Subscriber Get
+Get Subscriber Using Chat ID (Phone Number
+
+API End-point : POST
+https://app.botbee.io/api/v1/whatsapp/subscriber/get
+apiToken
+Your api key
+String|Required
+phone_number_id
+WhatsApp account phone number ID
+String|Required
+phone_number
+Subscriber phone number
+String|Required
+GET Request Example
+https://app.botbee.io/api/v1/whatsapp/subscriber/get?apiToken=API-KEY&phone_number_id=PHONE-NUMBER-ID&phone_number=PHONE-NUMBER
+POST Request Example
+curl -X POST \
+'https://app.botbee.io/api/v1/whatsapp/subscriber/get' \
+-d 'apiToken=API-KEY' \
+-d 'phone_number_id=PHONE-NUMBER-ID' \
+-d 'phone_number=PHONE-NUMBER'
+Sample Response
+{"status":"1","message":[{"subscriber_id":144,"chat_id":"0123456789","first_name":"john","last_name":"Doe","email":"test@gmail.com","gender":"Male","label_names":"Label1,Label2"}]}
+WhatsApp API : Subscriber List
+List of Subscribers
+
+API End-point : GET/POST
+https://app.botbee.io/api/v1/whatsapp/subscriber/list
+apiToken
+Your api key
+String|Required
+phone_number_id
+Your whatsapp phone number id
+String|Required
+limit
+Fetch number of subscribers.
+Number|Required
+offset
+Offset of pagination.
+Number|Optional
+orderBy
+Set this to 1 to sort the subscriber list by their most recent message (latest first). Set to 0 to keep the default order.
+Number|Optional
+GET Request Example
+https://app.botbee.io/api/v1/whatsapp/subscriber/list?apiToken=API-KEY&phone_number_id=PHONE-NUMBER-ID&limit=10&offset=1&orderBy=0
+POST Request Example
+curl -X POST \
+'https://app.botbee.io/api/v1/whatsapp/subscriber/list' \
+-d 'apiToken=API-KEY' \
+-d 'phone_number_id=PHONE-NUMBER-ID' \
+-d 'limit=10' \
+-d 'offset=1' \
+-d 'orderBy=0'
+Sample Response
+{"status":"1","message":[{"subscriber_id":144,"chat_id":"0123456789","first_name":"John","last_name":"Doe","email":"test@gmail.com","gender":"male","label_names":"One ,two"},{"subscriber_id":157,"chat_id":"0123456789","first_name":"john","last_name":"Doe","email":"null","gender":"Male","label_names":"ChatTest,remove tag,One"}]}
+WhatsApp API : Subscriber Create
+Create a Subscriber/Contact
+
+API End-point : POST
+https://app.botbee.io/api/v1/whatsapp/subscriber/create
+apiToken
+Your api key
+String|Required
+phoneNumberID
+WhatsApp account phone number ID
+String|Required
+name
+Name of your subscriber
+String|Required
+phoneNumber
+Subscriber phone number with country code (without + sign)
+String|Required
+GET Request Example
+https://app.botbee.io/api/v1/whatsapp/subscriber/create?apiToken=API-KEY&phoneNumberID=PHONE-NUMBER-ID&name=NAME&phoneNumber=MOBILE
+POST Request Example
+curl -X POST \
+'https://app.botbee.io/api/v1/whatsapp/subscriber/create' \
+-d 'apiToken=API-KEY' \
+-d 'phoneNumberID=PHONE-NUMBER-ID' \
+-d 'name=NAME' \
+-d 'phoneNumber=MOBILE'
+Sample Response
+{"status":"1","mesasge":"WhatsApp subscriber has been created."}
+
+{"status":"0","message":"WhatsApp account not found."}
+
+{"status":"0","message":"Subscriber limit has been exceeded. You cannot have more subscribers."}
+
+{"status":"0","message":"Something went wrong or subscriber already exist."}
+WhatsApp API : Subscriber Update
+Update an Existing Subscriber
+
+API End-point : POST
+https://app.botbee.io/api/v1/whatsapp/subscriber/update
+apiToken
+Your api key
+String|Required
+phone_number_id
+WhatsApp account phone number ID
+String|Required
+phone_number
+Subscriber phone number
+String|Required
+first_name
+First name of your subscriber
+String|Optional
+last_name
+Last name of your subscriber
+String|Optional
+gender
+Gender of your subscriber
+String|Optional
+label_ids
+Label ids with comma separated like (1,4,5)
+String|Optional
+GET Request Example
+https://app.botbee.io/api/v1/whatsapp/subscriber/update?apiToken=API-KEY&phone_number_id=PHONE-NUMBER-ID&phone_number=PHONE-NUMBER&first_name=FIRST-NAME&last_name=LAST-NAME&gender=GENDER&label_ids=LABEL-IDS
+POST Request Example
+curl -X POST \
+'https://app.botbee.io/api/v1/whatsapp/subscriber/update' \
+-d 'apiToken=API-KEY' \
+-d 'phone_number_id=PHONE-NUMBER-ID' \
+-d 'phone_number=PHONE-NUMBER' \
+-d 'first_name=FIRST-NAME' \
+-d 'last_name=LAST-NAME' \
+-d 'gender=GENDER' \
+-d 'label_ids=LABEL-IDS'
+Sample Response
+{"status":"1","message":"Subscriber Updated Successfully."}
+WhatsApp API : Delete Subscriber
+Delete Whatsapp Subscriber
+
+API End-point : Delete Subscriber (GET/POST)
+https://app.botbee.io/api/v1/whatsapp/subscriber/delete
+apiToken
+Your api key
+String|Required
+phone_number_id
+WhatsApp account phone number ID
+String|Required
+phone_number
+Must start with country code and only numeric characters are allowed
+String|Required
+GET Request Example
+https://app.botbee.io/api/v1/whatsapp/subscriber/delete?apiToken=API-KEY&phone_number_id=PHONE-NUMBER-ID&phone_number=PHONE-NUMBER
+POST Request Example
+curl -X POST \
+'https://app.botbee.io/api/v1/whatsapp/subscriber/delete' \
+-d 'apiToken=API-KEY' \
+-d 'phone_number_id=PHONE-NUMBER-ID' \
+-d 'phone_number=PHONE-NUMBER'
+Sample Response
+{"status":"1","message":"Subscriber has been deleted successfully."}
+WhatsApp API : Reset User Input Flow
+Reset User Input Flow
+
+API End-point : POST
+https://app.botbee.io/api/v1/whatsapp/subscriber/reset/user-input-flow
+apiToken
+Your api key
+String|Required
+phone_number_id
+WhatsApp account phone number ID
+String|Required
+phone_number
+Subscriber phone number
+String|Required
+GET Request Example
+https://app.botbee.io/api/v1/whatsapp/subscriber/reset/user-input-flow?apiToken=API-KEY&phone_number_id=PHONE-NUMBER-ID&phone_number=PHONE-NUMBER
+POST Request Example
+curl -X POST \
+'https://app.botbee.io/api/v1/whatsapp/subscriber/reset/user-input-flow' \
+-d 'apiToken=API-KEY' \
+-d 'phone_number_id=PHONE-NUMBER-ID' \
+-d 'phone_number=PHONE-NUMBER'
+Sample Response
+{"status":"1","message":"Reset User Input Flow successfully."}
+WhatsApp API : Subscriber Assign Chat to Team
+Assign a Subscriber`s Chat to a Team Member
+
+API End-point : POST
+https://app.botbee.io/api/v1/whatsapp/subscriber/chat/assign-to-team-member
+apiToken
+Your api key
+String|Required
+phone_number_id
+Your whatsapp phone number id
+String|Required
+phone_number
+Subscriber phone number
+String|Required
+team_member_id
+Team Member ID
+Integer|Required
+GET Request Example
+https://app.botbee.io/api/v1/whatsapp/subscriber/chat/assign-to-team-member?apiToken=API-KEY&phone_number_id=PHONE-NUMBER-ID&phone_number=PHONE-NUMBER&team_member_id=TEAM-MEMBER-ID
+POST Request Example
+curl -X POST \
+'https://app.botbee.io/api/v1/whatsapp/subscriber/chat/assign-to-team-member' \
+-d 'apiToken=API-KEY' \
+-d 'phone_number_id=PHONE-NUMBER-ID' \
+-d 'phone_number=PHONE-NUMBER' \
+-d 'team_member_id=TEAM-MEMBER-ID'
+Sample Response
+{"status":"1","message":"Successfully Assign Agent to Conversation."}
+WhatsApp API : Subscriber Assign Custom Fields
+Assign Custom Field To Subscriber
+
+API End-point : POST
+https://app.botbee.io/api/v1/whatsapp/subscriber/chat/assign-custom-fields
+apiToken
+Your api key
+String|Required
+phone_number_id
+Your whatsapp phone number id
+String|Required
+phone_number
+Subscriber phone number
+String|Required
+custom_fields
+Custom fileds name and value in json format.
+JSON|Required
+POST Request Example
+curl -X POST \
+'https://app.botbee.io/api/v1/whatsapp/subscriber/chat/assign-custom-fields' \
+-d 'apiToken=API-KEY' \
+-d 'phone_number_id=PHONE-NUMBER-ID' \
+-d 'phone_number=PHONE-NUMBER' \
+-d 'custom_fields={"custom_filed_name1": "custom_field_value1","custom_filed_name2": "custom_field_value2"}'
+Sample Response
+{"status":"1","message":"Subscriber changes have been saved successfully."}
+WhatsApp API : Custom Fields List
+Get List of Custom Fields
+
+API End-point : POST
+https://app.botbee.io/api/v1/whatsapp/subscriber/custom-fields/list
+apiToken
+Your api key
+String|Required
+POST Request Example
+curl -X POST \
+'https://app.botbee.io/api/v1/whatsapp/subscriber/custom-fields/list' \
+-d 'apiToken=API-KEY'
+Sample Response
+{"status":"1","message":"Custom fields retrieved successfully","data":[{"id":1,"name":"customer_name","reply_type":"text"},{"id":2,"name":"customer_email","reply_type":"email"}]}
+WhatsApp API : Subscriber Assign Labels
+Assign Labels To Subscriber
+
+API End-point : POST
+https://app.botbee.io/api/v1/whatsapp/subscriber/chat/assign-labels
+apiToken
+Your api key
+String|Required
+phone_number_id
+Your whatsapp phone number id
+String|Required
+phone_number
+Subscriber phone number
+String|Required
+label_ids
+Label ids with comma separated like (1,4,5)
+String|Required
+POST Request Example
+curl -X POST \
+'https://app.botbee.io/api/v1/whatsapp/subscriber/chat/assign-labels' \
+-d 'apiToken=API-KEY' \
+-d 'phone_number_id=PHONE-NUMBER-ID' \
+-d 'phone_number=PHONE-NUMBER' \
+-d 'label_ids=LABEL-IDS'
+Sample Response
+{"status":"1","message":"Labels have been assigned successfully."}
+WhatsApp API : Subscriber Remove Labels
+Remove Labels To Subscriber
+
+API End-point : POST
+https://app.botbee.io/api/v1/whatsapp/subscriber/chat/remove-labels
+apiToken
+Your api key
+String|Required
+phone_number_id
+Your whatsapp phone number id
+String|Required
+phone_number
+Subscriber phone number
+String|Required
+label_ids
+Label ids with comma separated like (1,4,5)
+String|Required
+POST Request Example
+curl -X POST \
+'https://app.botbee.io/api/v1/whatsapp/subscriber/chat/remove-labels' \
+-d 'apiToken=API-KEY' \
+-d 'phone_number_id=PHONE-NUMBER-ID' \
+-d 'phone_number=PHONE-NUMBER' \
+-d 'label_ids=LABEL-IDS'
+Sample Response
+{"status":"1","message":"Labels have been assigned successfully."}
+WhatsApp API : Subscriber Assign Sequences
+Assign Sequences To Subscriber
+
+API End-point : POST
+https://app.botbee.io/api/v1/whatsapp/subscriber/chat/assign-sequence
+apiToken
+Your api key
+String|Required
+phone_number_id
+Your whatsapp phone number id
+String|Required
+phone_number
+Subscriber phone number
+String|Required
+sequence_ids
+Label ids with comma separated like (1,4,5)
+String|Required
+POST Request Example
+curl -X POST \
+'https://app.botbee.io/api/v1/whatsapp/subscriber/chat/assign-sequence' \
+-d 'apiToken=API-KEY' \
+-d 'phone_number_id=PHONE-NUMBER-ID' \
+-d 'phone_number=PHONE-NUMBER' \
+-d 'sequence_ids=SEQUENCE-IDS'
+Sample Response
+{"status":"1","message":"Sequences have been assigned successfully."}
+WhatsApp API : Subscriber Remove Sequences
+Remove Sequence To Subscriber
+
+API End-point : POST
+https://app.botbee.io/api/v1/whatsapp/subscriber/chat/remove-sequence
+apiToken
+Your api key
+String|Required
+phone_number_id
+Your whatsapp phone number id
+String|Required
+phone_number
+Subscriber phone number
+String|Required
+sequence_ids
+Sequence ids with comma separated like (1,4,5)
+String|Required
+POST Request Example
+curl -X POST \
+'https://app.botbee.io/api/v1/whatsapp/subscriber/chat/remove-sequence' \
+-d 'apiToken=API-KEY' \
+-d 'phone_number_id=PHONE-NUMBER-ID' \
+-d 'phone_number=PHONE-NUMBER' \
+-d 'sequence_ids=SEQUENCE-IDS'
+Sample Response
+{"status":"1","message":"Sequences have been removed successfully."}
+WhatsApp API : Add Notes To Subscriber
+Add Notes To Subscriber
+
+API End-point : POST
+https://app.botbee.io/api/v1/whatsapp/subscriber/chat/add-notes
+apiToken
+Your api key
+String|Required
+phone_number_id
+Your whatsapp phone number id
+String|Required
+phone_number
+Subscriber phone number
+String|Required
+note_text
+Note text
+String|Required
+POST Request Example
+curl -X POST \
+'https://app.botbee.io/api/v1/whatsapp/subscriber/chat/add-notes' \
+-d 'apiToken=API-KEY' \
+-d 'phone_number_id=PHONE-NUMBER-ID' \
+-d 'phone_number=PHONE-NUMBER' \
+-d 'note_text=NOTE-TEXT'
+Sample Response
+{"status":"1","message":"Notes have been added successfully."}
+WhatsApp API : Label List
+List of Labels
+
+API End-point : GET/POST
+https://app.botbee.io/api/v1/whatsapp/label/list
+apiToken
+Your api key
+String|Required
+phone_number_id
+Your whatsapp phone number id
+String|Required
+GET Request Example
+https://app.botbee.io/api/v1/whatsapp/label/list?apiToken=API-KEY&phone_number_id=PHONE-NUMBER-ID
+POST Request Example
+curl -X POST \
+'https://app.botbee.io/api/v1/whatsapp/label/list' \
+-d 'apiToken=API-KEY' \
+-d 'phone_number_id=PHONE-NUMBER-ID'
+Sample Response
+{"status":"1","message":[{"id":1,"label_name":"Your label name","status":"1"}]}
+WhatsApp API : Label Create
+Create a Label
+
+API End-point : GET/POST
+https://app.botbee.io/api/v1/whatsapp/label/create
+apiToken
+Your api key
+String|Required
+phone_number_id
+Your whatsapp phone number id
+String|Required
+label_name
+Label Name
+String|Required
+GET Request Example
+https://app.botbee.io/api/v1/whatsapp/label/create?apiToken=API-KEY&phone_number_id=PHONE-NUMBER-ID&label_name=LABEL-NAME
+POST Request Example
+curl -X POST \
+'https://app.botbee.io/api/v1/whatsapp/label/create' \
+-d 'apiToken=API-KEY' \
+-d 'phone_number_id=PHONE-NUMBER-ID' \
+-d 'label_name=LABEL-NAME'
+Sample Response
+{"status":"1","message":"Label has been created successfully."}
+WhatsApp API : Catalog List
+Catalog List
+
+API End-point : GET/POST
+https://app.botbee.io/api/v1/whatsapp/catalog/list
+apiToken
+Your api key
+String|Required
+GET Request Example
+https://app.botbee.io/api/v1/whatsapp/catalog/list?apiToken=API-KEY
+POST Request Example
+curl -X POST \
+'https://app.botbee.io/api/v1/whatsapp/catalog/list' \
+-d 'apiToken=API-KEY'
+Sample Response
+{"status":true,"message":[{"catalog_id":"1429267xxxx5095","catalog_name":"The White","catalog_url":"https:xxxxx","checkout_settings":"{"tax_percentage":"5.5","shipping_charge":"20"}"}]}
+WhatsApp Catalog : Sync
+Catalog Sync
+
+API End-point : POST
+https://app.botbee.io/api/v1/whatsapp/catalog/sync
+apiToken
+Your api key
+String|Required
+whatsapp_catalog_id
+Your whatsapp catalog id
+String|Required
+POST Request Example
+curl -X POST \
+'https://app.botbee.io/api/v1/whatsapp/catalog/sync' \
+-d 'apiToken=API-KEY' \
+-d 'whatsapp_catalog_id=WHATSAPP-CATALOG-ID'
+Sample Response
+{"status":"1","message":"Catalog products have been synced successfully."}
+WhatsApp API : Catalog Order List
+Catalog List
+
+API End-point : GET/POST
+https://app.botbee.io/api/v1/whatsapp/catalog/order/list
+apiToken
+Your api key
+String|Required
+whatsapp_catalog_id
+Your whatsapp catalog id
+String|Optional
+GET Request Example
+https://app.botbee.io/api/v1/whatsapp/catalog/order/list?apiToken=API-KEY&whatsapp_catalog_id=WHATSAPP-CATALOG-ID
+POST Request Example
+curl -X POST \
+'https://app.botbee.io/api/v1/whatsapp/catalog/order/list' \
+-d 'apiToken=API-KEY' \
+-d 'whatsapp_catalog_id=WHATSAPP-CATALOG-ID'
+Sample Response
+{"status":"1","message":[{"order_unique_id":"172310467380123456789","catalog_id":"762561142206860","chat_id":"0123456789","catalog_name":"Catalog Name","first_name":"John","cart_total":4300,"cart_currency":"USD","cart_status_raw":"Submitted","ordered_at":"2024-08-08 08:11:13","updated_at":"2024-08-08 08:30:40","payment_amount":4300,"payment_method":"Cash on Delivery","shipping_address":"{\"name\":\"John Doe\",\"phone_number\":\"0123456789\",\"email\":\"test@gmail.com\",\"address\":\"pti road\"}","checkout_account_email":null,"checkout_amount":"0","checkout_timestamp":null,"transaction_id":"PD1723104673012345678933FAD1","paid_at":"2024-08-08 08:30:40","status_changed_at":"2024-08-08 08:30:40"}]}
+WhatsApp API : Catalog Order Status Change
+Change Catalog Order Status
+
+API End-point : GET/POST
+https://app.botbee.io/api/v1/whatsapp/catalog/order/status-change
+apiToken
+Your api key
+String|Required
+order_unique_id
+Your Catalog Order ID
+String|Required
+cart_status
+Status value should be Approved|Completed|Shipped|Delivered|Refunded
+String|Required
+GET Request Example
+https://app.botbee.io/api/v1/whatsapp/catalog/order/status-change?apiToken=API-KEY&order_unique_id=ORDER-UNIQUE-ID&cart_status=CART-STATUS
+POST Request Example
+curl -X POST \
+'https://app.botbee.io/api/v1/whatsapp/catalog/order/status-change' \
+-d 'apiToken=API-KEY' \
+-d 'order_unique_id=ORDER-UNIQUE-ID' \
+-d 'cart_status=CART-STATUS'
+Sample Response
+{"status":true,"message":"Cart status has been updated successfully"}
+User API : Get Direct Login Url
+An Unique and Secure One-time Login URL
+
+API End-point : GET/POST
+https://app.botbee.io/api/v1/user/get/direct-login-url
+apiToken
+Your api key
+String|Required
+email
+Email of your user
+Email|Required
+name
+Name of your user
+String|Optional
+mobile
+User phone number
+String|Optional
+package_id
+Package Id
+Integer|Required for new user
+expired_date
+Package Expired date like (2023-09-12)
+String|Required for new user
+status
+Status of user active(1) inactive(0)
+String|Optional
+create_on_fail
+Set Value 1 for If user not found, create new user with this data or Set(0) it will return User not found error
+Boolean|Optional
+GET Request Example
+https://app.botbee.io/api/v1/user/get/direct-login-url?apiToken=API-KEY&email=EMAIL&name=NAME&mobile=MOBILE&package_id=NAME&expired_date=EXPIRED-DATE&status=STATUS&create_on_fail=1
+POST Request Example
+curl -X POST \
+'https://app.botbee.io/api/v1/user/get/direct-login-url' \
+-d 'apiToken=API-KEY' \
+-d 'email=EMAIL' \
+-d 'name=NAME' \
+-d 'mobile=MOBILE' \
+-d 'package_id=NAME' \
+-d 'expired_date=EXPIRED-DATE' \
+-d 'status=STATUS' \
+-d 'create_on_fail=1'
+Sample Response
+{"status":"1","message":{"email":"user@domain.com","password":"xxxxxxxxxx","login_url":"https://app.botbee.io/login","direct_login_url":"https://app.botbee.io/direct-login/xxxxxxxxxx"}}
+2026 © BotBee
