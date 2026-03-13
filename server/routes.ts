@@ -62,16 +62,15 @@ async function sendOtpSmsFast2SMS(phone: string, otpCode: string): Promise<boole
     return false;
   }
   try {
-    const message = `Your AL BURHAN TOURS & TRAVELS OTP is ${otpCode}. Valid for 5 minutes. Do not share with anyone.`;
-    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=q&message=${encodeURIComponent(message)}&language=english&flash=0&numbers=${phone}`;
+    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=otp&variables_values=${encodeURIComponent(otpCode)}&flash=0&numbers=${phone}`;
     const response = await fetch(url, { method: "GET" });
     const data = await response.json();
-    console.log("[Fast2SMS OTP] Response:", JSON.stringify(data));
+    console.log("[Fast2SMS OTP DLT] Response:", JSON.stringify(data));
     if (data.return === true) return true;
-    console.log("[Fast2SMS OTP] Failed:", data.message);
+    console.log("[Fast2SMS OTP DLT] Failed:", data.message);
     return false;
   } catch (error) {
-    console.error("[Fast2SMS OTP] Error:", error);
+    console.error("[Fast2SMS OTP DLT] Error:", error);
     return false;
   }
 }
@@ -97,22 +96,8 @@ async function sendBookingDltSms(phone: string, invoiceNumber: string, invoiceUr
   }
 }
 
-async function sendSmsFast2SMS(phone: string, message: string): Promise<boolean> {
-  const apiKey = process.env.FAST2SMS_API_KEY;
-  if (!apiKey) {
-    console.log("[Fast2SMS] API key not configured, skipping SMS");
-    return false;
-  }
-  try {
-    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=q&message=${encodeURIComponent(message)}&language=english&flash=0&numbers=${phone}`;
-    const response = await fetch(url, { method: "GET" });
-    const data = await response.json();
-    console.log("[Fast2SMS] Response:", JSON.stringify(data));
-    return data.return === true;
-  } catch (error) {
-    console.error("[Fast2SMS] Error:", error);
-    return false;
-  }
+async function sendSmsFast2SMS(_phone: string, _message: string): Promise<boolean> {
+  return false;
 }
 
 const WHATSAPP_HEADER_IMAGE = "https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Kaaba_mirror_edit_jj.jpg/640px-Kaaba_mirror_edit_jj.jpg";
