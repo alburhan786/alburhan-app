@@ -62,27 +62,28 @@ async function sendOtpSmsFast2SMS(phone: string, otpCode: string): Promise<boole
     return false;
   }
   try {
-    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=otp&variables_values=${encodeURIComponent(otpCode)}&flash=0&numbers=${phone}`;
+    const message = `Your AL BURHAN TOURS & TRAVELS OTP is ${otpCode}. Valid for 5 minutes. Do not share with anyone.`;
+    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=q&message=${encodeURIComponent(message)}&language=english&flash=0&numbers=${phone}`;
     const response = await fetch(url, { method: "GET" });
     const data = await response.json();
-    console.log("[Fast2SMS OTP DLT] Response:", JSON.stringify(data));
+    console.log("[Fast2SMS OTP] Response:", JSON.stringify(data));
     if (data.return === true) return true;
-    console.log("[Fast2SMS OTP DLT] Failed:", data.message);
+    console.log("[Fast2SMS OTP] Failed:", data.message);
     return false;
   } catch (error) {
-    console.error("[Fast2SMS OTP DLT] Error:", error);
+    console.error("[Fast2SMS OTP] Error:", error);
     return false;
   }
 }
 
-async function sendBookingDltSms(phone: string, invoiceNumber: string, invoiceUrl: string): Promise<boolean> {
+async function sendBookingDltSms(phone: string, var1: string, invoiceNumber: string): Promise<boolean> {
   const apiKey = process.env.FAST2SMS_API_KEY;
   if (!apiKey) {
     console.log("[Fast2SMS DLT] API key not configured, skipping booking SMS");
     return false;
   }
   try {
-    const variables = `${invoiceNumber}|${invoiceUrl}|`;
+    const variables = `${var1}|${invoiceNumber}|`;
     const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=dlt&sender_id=ABURHA&message=211052&variables_values=${encodeURIComponent(variables)}&flash=0&numbers=${phone}`;
     const response = await fetch(url, { method: "GET" });
     const data = await response.json();
@@ -979,7 +980,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const dltVar1 = type === "payment_success"
       ? amountPaid.replace(/,/g, "")
       : invoiceNum;
-    const smsResult = await sendBookingDltSms(user.phone, dltVar1, invoiceUrl);
+    const smsResult = await sendBookingDltSms(user.phone, dltVar1, invoiceNum);
     console.log(`[SMS DLT] To ${user.phone}: ${smsResult ? "sent" : "failed"}`);
 
     const whatsappResult = await sendWhatsAppConfirmationTemplate(
@@ -1257,7 +1258,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (sendSms) {
         const offlinePaidAmt = parseFloat(paidAmount || "0");
         const offlineDltVar1 = offlinePaidAmt > 0 ? String(Math.round(offlinePaidAmt)) : actualInvoiceNum;
-        const smsOk = await sendBookingDltSms(contactPhone, offlineDltVar1, invoiceUrl);
+        const smsOk = await sendBookingDltSms(contactPhone, offlineDltVar1, actualInvoiceNum);
         console.log(`[SMS DLT Offline] To ${contactPhone}: ${smsOk ? "sent" : "failed"}`);
         notificationStatus += smsOk ? "SMS sent. " : "SMS failed. ";
       }
