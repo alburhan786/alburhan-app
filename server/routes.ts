@@ -170,6 +170,26 @@ async function sendWhatsAppBookingTemplate(phone: string, customerName: string):
   ]);
 }
 
+async function sendWhatsAppConfirmationTemplate(
+  phone: string,
+  customerName: string,
+  packageName: string,
+  amountPaid: string,
+  invoiceUrl: string
+): Promise<boolean> {
+  return sendWhatsAppTemplate(phone, "conformation", "en_GB", [
+    {
+      type: "body",
+      parameters: [
+        { type: "text", text: customerName },
+        { type: "text", text: packageName },
+        { type: "text", text: amountPaid },
+        { type: "text", text: invoiceUrl },
+      ],
+    },
+  ]);
+}
+
 async function sendWhatsAppBotBee(phone: string, message: string): Promise<{ sent: boolean; blocked: boolean }> {
   const apiKey = process.env.BOTBEE_API_KEY || process.env.BOTBEE_API_TOKEN || process.env.BOTBEE_WHATSAPP_API_KEY;
   if (!apiKey) {
@@ -974,13 +994,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const smsResult = await sendSmsFast2SMS(user.phone, message);
     console.log(`[SMS/Fast2SMS] To ${user.phone}: ${smsResult ? "sent" : "failed/skipped"}`);
 
-    const waResult = await sendWhatsAppBotBee(user.phone, message);
-    let whatsappResult = waResult.sent;
-    if (!waResult.sent && waResult.blocked) {
-      console.log(`[WhatsApp] Free-form blocked — falling back to booking template for ${user.phone}`);
-      whatsappResult = await sendWhatsAppBookingTemplate(user.phone, customerName);
-    }
-    console.log(`[WhatsApp] To ${user.phone}: ${whatsappResult ? "sent" : "failed"}`);
+    const whatsappResult = await sendWhatsAppConfirmationTemplate(
+      user.phone, customerName, packageName, `INR ${amountPaid}`, invoiceUrl
+    );
+    console.log(`[WhatsApp Confirmation Template] To ${user.phone}: ${whatsappResult ? "sent" : "failed"}`);
 
     await db.insert(notifications).values({
       userId,
@@ -1254,11 +1271,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         notificationStatus += smsOk ? "SMS sent. " : "SMS failed. ";
       }
       if (sendWhatsapp) {
-        const waOfflineResult = await sendWhatsAppBotBee(contactPhone, message);
-        let waOfflineOk = waOfflineResult.sent;
-        if (!waOfflineResult.sent && waOfflineResult.blocked) {
-          waOfflineOk = await sendWhatsAppBookingTemplate(contactPhone, contactName);
-        }
+        const waOfflineOk = await sendWhatsAppConfirmationTemplate(
+          contactPhone,
+          contactName,
+          offlinePackageName,
+          `INR ${formatINR(parseFloat(paidAmount || "0"))}`,
+          invoiceUrl
+        );
         notificationStatus += waOfflineOk ? "WhatsApp sent. " : "WhatsApp failed/skipped. ";
       }
 
