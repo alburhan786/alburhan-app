@@ -82,7 +82,9 @@ async function sendBookingDltSms(phone: string, invoiceNum: string): Promise<boo
     return false;
   }
   try {
-    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=dlt&sender_id=ALBURH&message=211052&variables_values=${encodeURIComponent(invoiceNum + "||")}&flash=0&numbers=${phone}`;
+    const variables = invoiceNum + "||";
+    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=dlt&sender_id=ALBURH&message=211052&variables_values=${encodeURIComponent(variables)}&flash=0&numbers=${phone}`;
+    console.log(`[Fast2SMS DLT Booking] Sending to ${phone} | variables_values="${variables}" | encoded=${encodeURIComponent(variables)}`);
     const response = await fetch(url, { method: "GET" });
     const data = await response.json();
     console.log("[Fast2SMS DLT Booking] Response:", JSON.stringify(data));
