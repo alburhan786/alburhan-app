@@ -895,6 +895,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const invoiceUrl = `https://${domain}/invoice/${bookingId}`;
 
     let invoiceNum = "";
+    let packageName = "Hajj/Umrah Package";
+    let amountPaid = "0";
+    let customerName = user.name;
+
     try {
       const [bk] = await db.select().from(bookings).where(eq(bookings.id, bookingId));
       if (bk) {
@@ -902,16 +906,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!bk.invoiceNumber) {
           await db.update(bookings).set({ invoiceNumber: invoiceNum }).where(eq(bookings.id, bookingId));
         }
+        amountPaid = formatINR(parseFloat(bk.paidAmount || "0"));
+        customerName = bk.contactName || user.name;
+        const [pkg] = await db.select().from(packages).where(eq(packages.id, bk.packageId));
+        if (pkg) packageName = pkg.name;
       }
     } catch (e) {}
 
     let message = "";
     switch (type) {
       case "booking_created":
-        message = `Assalamu Alaikum,\nYour booking #${bookingId} with AL BURHAN TOURS & TRAVELS has been created successfully.\n\nInvoice No: ${invoiceNum}\nView Invoice: ${invoiceUrl}\n\nOur team will contact you shortly. JazakAllah Khair.`;
+        message = `Assalamu Alaikum\n\nDear *${customerName}*\n\nYour booking with *Al Burhan Tours & Travels* has been created successfully.\n\nPackage: ${packageName}\nInvoice No: ${invoiceNum}\n\nView Invoice:\n${invoiceUrl}\n\nOur team will contact you shortly.\n\nFor assistance please contact:\n9893225590\n9893989786\n\n*Al Burhan Tours & Travels*`;
         break;
       case "payment_success":
-        message = `Assalamu Alaikum,\nPayment received for booking #${bookingId}. Your booking is now confirmed!\n\nUpdated Invoice: ${invoiceUrl}\n\nJazakAllah Khair - AL BURHAN TOURS & TRAVELS`;
+        message = `Assalamu Alaikum\n\nDear *${customerName}*\n\nYour booking with *Al Burhan Tours & Travels* has been confirmed.\n\nPackage: ${packageName}\nAmount Paid: ₹${amountPaid}\n\nYour invoice is attached below.\n${invoiceUrl}\n\nFor assistance please contact:\n9893225590\n9893989786\n\n*Al Burhan Tours & Travels*`;
         break;
     }
 
@@ -1175,8 +1183,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tcsAmount = totalAmt * 0.05;
       const grandTotal = totalAmt + tcsAmount;
 
+      let offlinePackageName = "Hajj/Umrah Package";
+      try {
+        const [offlinePkg] = await db.select().from(packages).where(eq(packages.id, parseInt(packageId as string)));
+        if (offlinePkg) offlinePackageName = offlinePkg.name;
+      } catch (e) {}
+
       let notificationStatus = "";
-      const message = `Assalamu Alaikum ${contactName},\nYour booking with AL BURHAN TOURS & TRAVELS has been created.\n\nInvoice No: ${actualInvoiceNum}\nAmount: Rs ${formatINR(grandTotal)} (incl. GST+TCS)\n\nView Invoice: ${invoiceUrl}\n\nJazakAllah Khair.`;
+      const message = `Assalamu Alaikum\n\nDear *${contactName}*\n\nYour booking with *Al Burhan Tours & Travels* has been confirmed.\n\nPackage: ${offlinePackageName}\nAmount Paid: ₹${formatINR(parseFloat(paidAmount || "0"))}\n\nYour invoice is attached below.\n${invoiceUrl}\n\nFor assistance please contact:\n9893225590\n9893989786\n\n*Al Burhan Tours & Travels*`;
 
       if (sendSms) {
         const smsOk = await sendSmsFast2SMS(contactPhone, message);
