@@ -554,12 +554,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (let i = 0; i < numberOfPeople; i++) {
         const traveler = booking.travelers && booking.travelers[i];
         const travelerName = traveler ? traveler.name : `Person ${i + 1}`;
+        const dob = traveler?.dateOfBirth ? `DOB: ${traveler.dateOfBirth}` : '';
+        const passport = traveler?.passportNumber ? `Passport: ${traveler.passportNumber}` : '';
+        const details = [dob, passport, roomLabel].filter(Boolean).join(' | ');
         serviceRows += `
           <tr>
             <td>${i + 1}</td>
             <td>
               <div class="service-name">${serviceName}</div>
-              <div class="service-desc">${travelerName}${roomLabel ? ' | ' + roomLabel : ''}</div>
+              <div class="service-desc">${travelerName}${details ? '<br><small style="color:#6b7280">' + details + '</small>' : ''}</div>
             </td>
             <td>998555</td>
             <td style="text-align:right">₹ ${formatINR(ratePerPerson)}</td>

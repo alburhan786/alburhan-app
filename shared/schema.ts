@@ -53,6 +53,7 @@ import { pgTable, text, serial, integer, boolean, timestamp, decimal, json } fro
       name: string;
       age: number;
       gender: string;
+      dateOfBirth: string;
       passportNumber: string;
       passportExpiry: string;
     }>>().notNull(),
@@ -60,6 +61,10 @@ import { pgTable, text, serial, integer, boolean, timestamp, decimal, json } fro
     contactPhone: text("contact_phone").notNull(),
     contactEmail: text("contact_email").notNull(),
     address: text("address").notNull(),
+    city: text("city"),
+    district: text("district"),
+    state: text("state"),
+    pincode: text("pincode"),
     specialRequests: text("special_requests"),
     invoiceNumber: text("invoice_number"),
     roomType: text("room_type"),
