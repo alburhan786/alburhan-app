@@ -991,11 +991,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         break;
     }
 
-    const smsResult = await sendBookingDltSms(user.phone, invoiceNum, invoiceUrl);
-    console.log(`[SMS DLT Booking] To ${user.phone}: ${smsResult ? "sent" : "failed/skipped"}`);
-    if (!smsResult) {
-      const smsFallback = await sendSmsFast2SMS(user.phone, message);
-      console.log(`[SMS Quick Fallback] To ${user.phone}: ${smsFallback ? "sent" : "failed"}`);
+    const smsResult = await sendSmsFast2SMS(user.phone, message);
+    console.log(`[SMS Quick] To ${user.phone}: ${smsResult ? "sent" : "failed"}`);
+    if (type === "payment_success") {
+      const amountForDlt = amountPaid.replace(/,/g, "");
+      sendBookingDltSms(user.phone, amountForDlt, invoiceUrl).then(ok =>
+        console.log(`[SMS DLT Booking] To ${user.phone}: ${ok ? "sent" : "failed/skipped"}`)
+      ).catch(() => {});
     }
 
     const whatsappResult = await sendWhatsAppConfirmationTemplate(
@@ -1271,12 +1273,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const message = `Assalamu Alaikum\n\nDear *${contactName}*\n\nYour booking with *Al Burhan Tours & Travels* has been confirmed.\n\nPackage: ${offlinePackageName}\nAmount Paid: ₹${formatINR(parseFloat(paidAmount || "0"))}\n\nYour invoice is attached below.\n${invoiceUrl}\n\nFor assistance please contact:\n9893225590\n9893989786\n\n*Al Burhan Tours & Travels*`;
 
       if (sendSms) {
-        const smsOk = await sendBookingDltSms(contactPhone, actualInvoiceNum, invoiceUrl);
-        if (smsOk) {
-          notificationStatus += "SMS sent. ";
-        } else {
-          const smsFallback = await sendSmsFast2SMS(contactPhone, message);
-          notificationStatus += smsFallback ? "SMS sent. " : "SMS failed. ";
+        const smsOk = await sendSmsFast2SMS(contactPhone, message);
+        notificationStatus += smsOk ? "SMS sent. " : "SMS failed. ";
+        const offlinePaidAmt = parseFloat(paidAmount || "0");
+        if (offlinePaidAmt > 0) {
+          sendBookingDltSms(contactPhone, String(Math.round(offlinePaidAmt)), invoiceUrl).then(ok =>
+            console.log(`[SMS DLT Offline] To ${contactPhone}: ${ok ? "sent" : "failed"}`)
+          ).catch(() => {});
         }
       }
       if (sendWhatsapp) {
