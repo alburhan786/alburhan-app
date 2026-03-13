@@ -75,14 +75,14 @@ async function sendOtpSmsFast2SMS(phone: string, otpCode: string): Promise<boole
   }
 }
 
-async function sendBookingDltSms(phone: string): Promise<boolean> {
+async function sendBookingDltSms(phone: string, invoiceNum: string): Promise<boolean> {
   const apiKey = process.env.FAST2SMS_API_KEY;
   if (!apiKey) {
     console.log("[Fast2SMS DLT] API key not configured, skipping booking SMS");
     return false;
   }
   try {
-    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=dlt&sender_id=ABURHA&message=211052&variables_values=%20%7C%7C&flash=0&numbers=${phone}`;
+    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=dlt&sender_id=ALBURH&message=211052&variables_values=${encodeURIComponent(invoiceNum + "||")}&flash=0&numbers=${phone}`;
     const response = await fetch(url, { method: "GET" });
     const data = await response.json();
     console.log("[Fast2SMS DLT Booking] Response:", JSON.stringify(data));
@@ -975,7 +975,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         break;
     }
 
-    const smsResult = await sendBookingDltSms(user.phone);
+    const smsResult = await sendBookingDltSms(user.phone, invoiceNum);
     console.log(`[SMS DLT] To ${user.phone}: ${smsResult ? "sent" : "failed"}`);
 
     const whatsappResult = await sendWhatsAppConfirmationTemplate(
@@ -1251,7 +1251,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const message = `Assalamu Alaikum\n\nDear *${contactName}*\n\nYour booking with *Al Burhan Tours & Travels* has been confirmed.\n\nPackage: ${offlinePackageName}\nAmount Paid: ₹${formatINR(parseFloat(paidAmount || "0"))}\n\nYour invoice is attached below.\n${invoiceUrl}\n\nFor assistance please contact:\n9893225590\n9893989786\n\n*Al Burhan Tours & Travels*`;
 
       if (sendSms) {
-        const smsOk = await sendBookingDltSms(contactPhone);
+        const smsOk = await sendBookingDltSms(contactPhone, actualInvoiceNum);
         console.log(`[SMS DLT Offline] To ${contactPhone}: ${smsOk ? "sent" : "failed"}`);
         notificationStatus += smsOk ? "SMS sent. " : "SMS failed. ";
       }
