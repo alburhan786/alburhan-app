@@ -175,8 +175,8 @@ export default function PrintIdCards() {
                         <div style={{ fontSize: "5pt", color: "#999" }}>{group.groupName}</div>
                       )}
                     </div>
-                    <div style={{ background: DARK, color: GOLD, padding: "1mm 2mm", fontSize: "6pt", textAlign: "center", fontWeight: 800, borderRadius: "0 0 3px 3px", margin: "0 -3mm", textTransform: "uppercase", letterSpacing: "0.3px" }}>
-                      M. Altaf: 0547090786 | M. Wasim: 0568780786
+                    <div style={{ background: DARK, color: GOLD, padding: "1mm 2mm", fontSize: "4.5pt", textAlign: "center", fontWeight: 800, borderRadius: "0 0 3px 3px", margin: "0 -3mm", textTransform: "uppercase", letterSpacing: "0.2px" }}>
+                      Mohammed Altaf: 0547090786 | Mohammed Wasim: 0568780786
                     </div>
                   </div>
                 </div>
@@ -241,7 +241,7 @@ export default function PrintIdCards() {
 
                     <div style={{ background: DARK, color: "#fff", padding: "1.2mm 2mm", fontSize: "3.8pt", textAlign: "center", lineHeight: 1.5, borderRadius: "0 0 3px 3px", margin: "1.5mm -3mm 0" }}>
                       <div>Khanka Masjid, Sanwara Rd, Burhanpur 450331 M.P.</div>
-                      <div style={{ color: GOLD, fontWeight: 800, fontSize: "5.5pt", letterSpacing: "0.3px", textTransform: "uppercase" }}>M. Altaf: 0547090786 | M. Wasim: 0568780786</div>
+                      <div style={{ color: GOLD, fontWeight: 800, fontSize: "5pt", letterSpacing: "0.2px", textTransform: "uppercase" }}>Mohammed Altaf: 0547090786 | Mohammed Wasim: 0568780786</div>
                     </div>
                   </div>
                 </div>

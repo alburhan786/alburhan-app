@@ -146,7 +146,7 @@ export default function PrintLuggage() {
             </div>
 
             <div style={{ position: "relative", zIndex: 2, background: DARK, color: GOLD, padding: "2.5mm 5mm", fontSize: "8pt", textAlign: "center", fontWeight: 600, letterSpacing: "0.3px" }}>
-              M. Altaf: 0547090786 | M. Wasim: 0568780786
+              Mohammed Altaf: 0547090786 | Mohammed Wasim: 0568780786
             </div>
           </div>
         </div>
