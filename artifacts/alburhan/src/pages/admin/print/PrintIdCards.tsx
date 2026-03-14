@@ -63,26 +63,18 @@ function WaveShapesBack() {
 function LogoHeader({ size }: { size?: "small" }) {
   const isSmall = size === "small";
   const flagImgSize = isSmall ? "7mm" : "9mm";
-  const logoSize = isSmall ? "9mm" : "12mm";
   const nameSize = isSmall ? "7pt" : "9pt";
   const tagSize = isSmall ? "3.5pt" : "4.5pt";
   const indiaSize = isSmall ? "4pt" : "5pt";
   return (
-    <div style={{ display: "flex", alignItems: "flex-start", gap: "2mm", marginBottom: isSmall ? "1mm" : "1.5mm" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: "2mm", marginBottom: isSmall ? "1mm" : "1.5mm" }}>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
         <img src={BASE + "images/india_flag.jpg"} alt="" style={{ width: flagImgSize, height: flagImgSize, borderRadius: "50%", objectFit: "cover" }} />
         <div style={{ fontSize: indiaSize, fontWeight: 700, color: DARK, letterSpacing: "0.5px", marginTop: "0.3mm", lineHeight: 1 }}>INDIA</div>
       </div>
-      <div style={{ flex: 1, textAlign: "center", minWidth: 0 }}>
-        <div style={{ display: "flex", justifyContent: "center" }}>
-          <img src={BASE + "images/logo.png"} alt="" style={{ height: logoSize, objectFit: "contain" }} />
-        </div>
-        <div style={{ fontSize: nameSize, fontWeight: 900, color: DARK, letterSpacing: "0.5px", lineHeight: 1.1, marginTop: "0.5mm" }}>AL-BURHAN</div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "1mm", marginTop: "0.3mm" }}>
-          <div style={{ width: "3mm", height: "0.3mm", background: GOLD }} />
-          <div style={{ fontSize: tagSize, fontWeight: 700, color: GOLD, letterSpacing: "1px", lineHeight: 1 }}>TOURS & TRAVELS</div>
-          <div style={{ width: "3mm", height: "0.3mm", background: GOLD }} />
-        </div>
+      <div style={{ textAlign: "left" }}>
+        <div style={{ fontSize: nameSize, fontWeight: 900, color: DARK, letterSpacing: "0.5px", lineHeight: 1.1 }}>AL-BURHAN</div>
+        <div style={{ fontSize: tagSize, fontWeight: 700, color: GOLD, letterSpacing: "0.5px", lineHeight: 1.2 }}>TOURS & TRAVELS</div>
       </div>
     </div>
   );
@@ -146,6 +138,7 @@ export default function PrintIdCards() {
             {page.map(p => (
               <div key={`front-${p.id}`} className="id-card">
                 <WaveShapes />
+                <img src={BASE + "images/logo.png"} alt="" style={{ position: "absolute", bottom: "8mm", right: "2mm", width: "10mm", height: "10mm", objectFit: "contain", zIndex: 2, opacity: 0.85 }} />
 
                 <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", height: "100%", padding: "2.5mm 3mm 0" }}>
                   <LogoHeader />
@@ -202,6 +195,7 @@ export default function PrintIdCards() {
             {page.map(p => (
               <div key={`back-${p.id}`} className="id-card">
                 <WaveShapesBack />
+                <img src={BASE + "images/logo.png"} alt="" style={{ position: "absolute", bottom: "8mm", right: "2mm", width: "8mm", height: "8mm", objectFit: "contain", zIndex: 2, opacity: 0.85 }} />
 
                 <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", height: "100%", padding: "2.5mm 3mm 0" }}>
                   <LogoHeader size="small" />
