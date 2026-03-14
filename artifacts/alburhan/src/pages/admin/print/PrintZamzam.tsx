@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useRoute } from "wouter";
+import { PrintHeader } from "./PrintHeader";
 
 const API = import.meta.env.VITE_API_URL || "";
 const BASE = import.meta.env.BASE_URL || "/";
@@ -55,6 +56,7 @@ export default function PrintZamzam() {
 
       {pages.map((page, pi) => (
         <div key={pi} className={pi < pages.length - 1 ? "page-break" : ""}>
+          <PrintHeader title="Zamzam Water Labels" subtitle={`${group.groupName} — ${group.year}`} />
           <div className="zamzam-grid">
             {page.map(p => (
               <div key={p.id} className="zamzam-sticker">

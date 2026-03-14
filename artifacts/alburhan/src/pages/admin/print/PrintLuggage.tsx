@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useRoute } from "wouter";
+import { PrintHeader } from "./PrintHeader";
 
 const API = import.meta.env.VITE_API_URL || "";
 const BASE = import.meta.env.BASE_URL || "/";
@@ -58,6 +59,7 @@ export default function PrintLuggage() {
 
       {pages.map((page, pi) => (
         <div key={pi} className={pi < pages.length - 1 ? "page-break" : ""}>
+          <PrintHeader title="Luggage Stickers" subtitle={`${group.groupName} — ${group.year}`} />
           <div className="stickers-grid">
             {page.map(p => (
               <div key={p.id} className="sticker">
