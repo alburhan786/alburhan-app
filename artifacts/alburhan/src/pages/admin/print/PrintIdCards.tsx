@@ -3,6 +3,7 @@ import { useRoute } from "wouter";
 import { Barcode } from "@/components/print/Barcode";
 
 const API = import.meta.env.VITE_API_URL || "";
+const BASE = import.meta.env.BASE_URL || "/";
 
 interface Pilgrim {
   id: string; serialNumber: number; fullName: string; passportNumber?: string;
@@ -13,7 +14,7 @@ interface Group {
   hotels?: { makkah?: { name?: string; address?: string }; madinah?: { name?: string; address?: string } };
 }
 
-const DARK = "#0A3D2A";
+const DARK = "#052316";
 const GOLD = "#C9A84C";
 const GOLD_LIGHT = "#E8D48B";
 
@@ -56,6 +57,23 @@ function WaveShapesBack() {
         background: `linear-gradient(135deg, ${GOLD}, ${GOLD_LIGHT})`, borderRadius: "0 100% 0 0", zIndex: 0,
       }} />
     </>
+  );
+}
+
+function LogoHeader({ size }: { size?: "small" }) {
+  const logoSize = size === "small" ? "7mm" : "8mm";
+  const nameSize = size === "small" ? "7pt" : "8pt";
+  const tagSize = size === "small" ? "4.5pt" : "5pt";
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "1.5mm", marginBottom: "1.5mm" }}>
+      <div style={{ width: logoSize, height: logoSize, borderRadius: "50%", background: DARK, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden", border: `1px solid ${GOLD}` }}>
+        <img src={BASE + "images/logo.png"} alt="" style={{ width: "85%", height: "85%", objectFit: "contain", filter: "brightness(1.8) contrast(1.2)" }} />
+      </div>
+      <div>
+        <div style={{ fontSize: nameSize, fontWeight: 800, color: DARK, letterSpacing: "0.5px", lineHeight: 1.2 }}>AL BURHAN</div>
+        <div style={{ fontSize: tagSize, color: "#777", letterSpacing: "0.3px", lineHeight: 1.2 }}>TOURS & TRAVELS</div>
+      </div>
+    </div>
   );
 }
 
@@ -119,11 +137,7 @@ export default function PrintIdCards() {
                 <WaveShapes />
 
                 <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", height: "100%", padding: "2.5mm 3mm 0" }}>
-                  <div style={{ marginBottom: "1mm" }}>
-                    <div style={{ fontSize: "6pt", fontWeight: 800, color: DARK, letterSpacing: "0.5px" }}>AL BURHAN</div>
-                    <div style={{ fontSize: "4pt", color: "#888", letterSpacing: "0.3px" }}>TOURS & TRAVELS</div>
-                    <div style={{ fontSize: "3.5pt", color: "#aaa" }}>Burhanpur, M.P.</div>
-                  </div>
+                  <LogoHeader />
 
                   <div style={{ display: "flex", justifyContent: "center", marginBottom: "1.5mm" }}>
                     {p.photoUrl ? (
@@ -135,7 +149,7 @@ export default function PrintIdCards() {
 
                   <div style={{ textAlign: "center", marginBottom: "1mm" }}>
                     <div style={{ fontSize: "8pt", fontWeight: 800, color: DARK, lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.fullName}</div>
-                    <div style={{ fontSize: "5pt", color: GOLD, fontWeight: 700, marginTop: "0.5mm" }}>HAJJ {group.year}</div>
+                    <div style={{ fontSize: "5.5pt", color: GOLD, fontWeight: 700, marginTop: "0.5mm" }}>HAJJ 2027</div>
                   </div>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.8mm", fontSize: "5.5pt", flex: 1 }}>
@@ -156,13 +170,13 @@ export default function PrintIdCards() {
                   <div style={{ marginTop: "auto" }}>
                     <div style={{ display: "flex", justifyContent: "center", overflow: "hidden", marginBottom: "0.5mm" }}>
                       {p.passportNumber ? (
-                        <Barcode value={p.passportNumber} height={12} width={0.8} fontSize={0} />
+                        <Barcode value={p.passportNumber} height={18} width={1.2} fontSize={0} />
                       ) : (
                         <div style={{ fontSize: "5pt", color: "#999" }}>{group.groupName}</div>
                       )}
                     </div>
-                    <div style={{ background: DARK, color: GOLD, padding: "0.8mm 2mm", fontSize: "3.8pt", textAlign: "center", fontWeight: 600, borderRadius: "0 0 3px 3px", margin: "0 -3mm" }}>
-                      Emergency: 0547090786 / 0568780786
+                    <div style={{ background: DARK, color: GOLD, padding: "1mm 2mm", fontSize: "6pt", textAlign: "center", fontWeight: 800, borderRadius: "0 0 3px 3px", margin: "0 -3mm", textTransform: "uppercase", letterSpacing: "0.3px" }}>
+                      EMERGENCY: 0547090786 / 0568780786
                     </div>
                   </div>
                 </div>
@@ -179,11 +193,7 @@ export default function PrintIdCards() {
                 <WaveShapesBack />
 
                 <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", height: "100%", padding: "2.5mm 3mm 0" }}>
-                  <div style={{ marginBottom: "2mm" }}>
-                    <div style={{ fontSize: "6pt", fontWeight: 800, color: DARK, letterSpacing: "0.5px" }}>AL BURHAN</div>
-                    <div style={{ fontSize: "4pt", color: "#888", letterSpacing: "0.3px" }}>TOURS & TRAVELS</div>
-                    <div style={{ fontSize: "3.5pt", color: "#aaa" }}>Burhanpur, M.P.</div>
-                  </div>
+                  <LogoHeader size="small" />
 
                   <div style={{ display: "flex", flexDirection: "column", gap: "1.2mm", fontSize: "5.5pt", lineHeight: 1.4 }}>
                     <div style={{ display: "flex", alignItems: "flex-start", gap: "1.5mm" }}>
@@ -225,7 +235,7 @@ export default function PrintIdCards() {
 
                     <div style={{ background: DARK, color: "#fff", padding: "1.2mm 2mm", fontSize: "3.8pt", textAlign: "center", lineHeight: 1.5, borderRadius: "0 0 3px 3px", margin: "2mm -3mm 0" }}>
                       <div>Khanka Masjid, Sanwara Rd, Burhanpur 450331 M.P.</div>
-                      <div style={{ color: GOLD, fontWeight: 600 }}>Tel: 9893225590 | Emergency: 0547090786</div>
+                      <div style={{ color: GOLD, fontWeight: 800, fontSize: "5pt", letterSpacing: "0.3px" }}>Tel: 9893225590 | EMERGENCY: 0547090786</div>
                     </div>
                   </div>
                 </div>
