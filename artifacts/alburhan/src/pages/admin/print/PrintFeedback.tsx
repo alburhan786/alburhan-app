@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useRoute } from "wouter";
+import { PrintHeader } from "./PrintHeader";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -48,16 +49,7 @@ export default function PrintFeedback() {
       </div>
 
       <div style={{ padding: "2mm", fontFamily: "'Inter', Arial, sans-serif", maxWidth: "210mm", margin: "0 auto" }}>
-        <div style={{ textAlign: "center", marginBottom: "6mm", borderBottom: "3px solid #0A3D2A", paddingBottom: "5mm" }}>
-          <div style={{ fontWeight: 800, fontSize: "20pt", color: "#0A3D2A", letterSpacing: "0.5px" }}>Al Burhan Tours & Travels</div>
-          <div style={{ fontSize: "8pt", color: "#888", marginTop: "1mm" }}>Office No. 3, 1st Floor, Haj House, Mumbai — 400001</div>
-          <div style={{ fontSize: "14pt", fontWeight: 700, marginTop: "4mm", color: "#333" }}>Customer Feedback Form</div>
-          <div style={{ fontSize: "9pt", color: "#666", marginTop: "1mm" }}>
-            {group.groupName} — {group.year}
-            {group.departureDate && ` | ${group.departureDate}`}
-            {group.returnDate && ` to ${group.returnDate}`}
-          </div>
-        </div>
+        <PrintHeader title="Customer Feedback Form" subtitle={`${group.groupName} — ${group.year}${group.departureDate ? ` | ${group.departureDate}` : ""}${group.returnDate ? ` to ${group.returnDate}` : ""}`} />
 
         <div style={{ marginBottom: "6mm" }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4mm", fontSize: "10pt" }}>
@@ -144,7 +136,7 @@ export default function PrintFeedback() {
         </div>
 
         <div style={{ marginTop: "8mm", textAlign: "center", fontSize: "7pt", color: "#aaa", borderTop: "1px solid #e0e0e0", paddingTop: "3mm" }}>
-          Thank you for your valuable feedback. It helps us serve you better. — Al Burhan Tours & Travels, Mumbai
+          Thank you for your valuable feedback. It helps us serve you better. — Al Burhan Tours & Travels, Burhanpur
         </div>
       </div>
     </>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useRoute } from "wouter";
+import { PrintHeader } from "./PrintHeader";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -52,17 +53,11 @@ export default function PrintAirlineList() {
       </div>
 
       <div style={{ padding: "4mm", fontFamily: "'Inter', Arial, sans-serif" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "5mm", borderBottom: "3px solid #1a2744", paddingBottom: "4mm" }}>
-          <div>
-            <div style={{ fontWeight: 800, fontSize: "18pt", color: "#0A3D2A" }}>Al Burhan Tours & Travels</div>
-            <div style={{ fontSize: "13pt", fontWeight: 700, marginTop: "1mm", color: "#1a2744" }}>Airline Passenger Manifest</div>
-          </div>
-          <div style={{ textAlign: "right", fontSize: "8.5pt", color: "#333", lineHeight: 1.8 }}>
-            <div>Group: <b>{group.groupName}</b></div>
-            {group.flightNumber && <div>Flight: <b style={{ color: "#1a2744", fontSize: "10pt" }}>{group.flightNumber}</b></div>}
-            {group.departureDate && <div>Departure: <b>{group.departureDate}</b></div>}
-            <div>From: <b>{group.departureCity || "Mumbai (BOM)"}</b></div>
-          </div>
+        <PrintHeader title="Airline Passenger Manifest" subtitle={`${group.groupName} (${group.year})`} />
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: "6mm", fontSize: "8.5pt", color: "#333", lineHeight: 1.8, marginTop: "-3mm", marginBottom: "4mm" }}>
+          {group.flightNumber && <div>Flight: <b style={{ color: "#1a2744", fontSize: "10pt" }}>{group.flightNumber}</b></div>}
+          {group.departureDate && <div>Departure: <b>{group.departureDate}</b></div>}
+          <div>From: <b>{group.departureCity || "Burhanpur"}</b></div>
         </div>
 
         <table style={{ width: "100%", borderCollapse: "collapse" }}>

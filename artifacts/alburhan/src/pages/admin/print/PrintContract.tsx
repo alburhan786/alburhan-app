@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useRoute } from "wouter";
+import { PrintHeader } from "./PrintHeader";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -38,12 +39,7 @@ export default function PrintContract() {
 
   const renderContract = (pilgrim: Pilgrim, idx: number) => (
     <div key={pilgrim.id} style={{ ...s, maxWidth: "210mm", margin: "0 auto", padding: "2mm", pageBreakAfter: idx < pilgrims.length - 1 ? "always" : "auto" }}>
-      <div style={{ textAlign: "center", marginBottom: "8mm", borderBottom: "3px double #0A3D2A", paddingBottom: "5mm" }}>
-        <div style={{ fontWeight: 800, fontSize: "20pt", color: "#0A3D2A" }}>AL BURHAN TOURS & TRAVELS</div>
-        <div style={{ fontSize: "8pt", color: "#888", marginTop: "1mm" }}>Office No. 3, 1st Floor, Haj House, 7-A Maulana Azad Road, Mumbai — 400001</div>
-        <div style={{ fontSize: "8pt", color: "#888" }}>Phone: +91 9893225590 / +91 9893989786 | Email: info@alburhantravels.com</div>
-        <div style={{ fontSize: "15pt", fontWeight: 700, marginTop: "5mm", color: "#333", letterSpacing: "1px" }}>BOOKING AGREEMENT / CONTRACT</div>
-      </div>
+      <PrintHeader title="BOOKING AGREEMENT / CONTRACT" />
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2mm 6mm", fontSize: "9pt", marginBottom: "5mm", padding: "3mm 4mm", background: "#f5faf7", borderRadius: "4px", border: "1px solid #e0e0e0" }}>
         <div><span style={{ color: "#666" }}>Agreement Date:</span> <b>{new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })}</b></div>
@@ -124,7 +120,7 @@ export default function PrintContract() {
         <li>The Pilgrim must comply with all rules and regulations of the Kingdom of Saudi Arabia.</li>
         <li>Any additional expenses incurred by the Pilgrim during the trip (shopping, personal calls, extra meals) are not covered.</li>
         <li>The Company reserves the right to cancel or modify the itinerary if circumstances require.</li>
-        <li>All disputes are subject to the jurisdiction of courts in Mumbai, Maharashtra.</li>
+        <li>All disputes are subject to the jurisdiction of courts in Burhanpur, Madhya Pradesh.</li>
       </ol>
 
       <div style={heading}>7. Acknowledgment</div>

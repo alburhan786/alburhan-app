@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useRoute } from "wouter";
+import { PrintHeader } from "./PrintHeader";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -52,16 +53,13 @@ export default function PrintHotelList() {
       </div>
 
       <div style={{ padding: "4mm", fontFamily: "'Inter', Arial, sans-serif" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "5mm", borderBottom: "3px solid #0A3D2A", paddingBottom: "4mm" }}>
-          <div>
-            <div style={{ fontWeight: 800, fontSize: "18pt", color: "#0A3D2A" }}>Al Burhan Tours & Travels</div>
-            <div style={{ fontSize: "13pt", fontWeight: 700, marginTop: "1mm" }}>Hotel Room List — {group.groupName} ({group.year})</div>
-          </div>
-          <div style={{ textAlign: "right", fontSize: "8pt", color: "#666", lineHeight: 1.6 }}>
+        <PrintHeader title="Hotel Room List" subtitle={`${group.groupName} (${group.year})`} />
+        {(group.hotels?.makkah?.name || group.hotels?.madinah?.name) && (
+          <div style={{ textAlign: "right", fontSize: "8pt", color: "#666", lineHeight: 1.6, marginTop: "-3mm", marginBottom: "4mm" }}>
             {group.hotels?.makkah?.name && <div>Makkah: <b>{group.hotels.makkah.name}</b></div>}
             {group.hotels?.madinah?.name && <div>Madinah: <b>{group.hotels.madinah.name}</b></div>}
           </div>
-        </div>
+        )}
 
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>

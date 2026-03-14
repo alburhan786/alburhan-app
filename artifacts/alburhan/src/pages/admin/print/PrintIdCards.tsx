@@ -3,6 +3,7 @@ import { useRoute } from "wouter";
 import { Barcode } from "@/components/print/Barcode";
 
 const API = import.meta.env.VITE_API_URL || "";
+const BASE = import.meta.env.BASE_URL || "/";
 
 interface Pilgrim {
   id: string; serialNumber: number; fullName: string; passportNumber?: string;
@@ -84,9 +85,10 @@ export default function PrintIdCards() {
             {page.map(p => (
               <div key={`front-${p.id}`} className="id-card">
                 <div className="card-header">
-                  <div style={{ zIndex: 1 }}>
-                    <div style={{ fontSize: "8pt", fontWeight: 700, letterSpacing: "0.5px" }}>AL BURHAN</div>
-                    <div style={{ fontSize: "5pt", opacity: 0.85, letterSpacing: "0.8px" }}>TOURS & TRAVELS</div>
+                  <img src={`${BASE}images/logo.png`} alt="" style={{ height: "10mm", objectFit: "contain", zIndex: 1, marginRight: "1.5mm" }} />
+                  <div style={{ zIndex: 1, flex: 1 }}>
+                    <div style={{ fontSize: "7pt", fontWeight: 700, letterSpacing: "0.5px" }}>AL BURHAN</div>
+                    <div style={{ fontSize: "4.5pt", opacity: 0.85, letterSpacing: "0.8px" }}>TOURS & TRAVELS</div>
                   </div>
                   <div style={{ zIndex: 1, textAlign: "right" }}>
                     <div style={{ fontSize: "7pt", color: "#C9A84C", fontWeight: 700 }}>HAJJ {group.year}</div>
@@ -134,9 +136,10 @@ export default function PrintIdCards() {
             {page.map(p => (
               <div key={`back-${p.id}`} className="id-card" style={{ display: "flex", flexDirection: "column" }}>
                 <div className="card-header">
+                  <img src={`${BASE}images/logo.png`} alt="" style={{ height: "10mm", objectFit: "contain", zIndex: 1, marginRight: "1.5mm" }} />
                   <div style={{ zIndex: 1 }}>
                     <div style={{ fontSize: "7.5pt", fontWeight: 700 }}>AL BURHAN TOURS & TRAVELS</div>
-                    <div style={{ fontSize: "5pt", opacity: 0.8 }}>Mumbai, Maharashtra, India</div>
+                    <div style={{ fontSize: "5pt", opacity: 0.8 }}>Burhanpur, M.P., India</div>
                   </div>
                 </div>
 

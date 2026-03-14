@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useRoute } from "wouter";
+import { PrintHeader } from "./PrintHeader";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -47,11 +48,7 @@ export default function PrintBusList() {
       </div>
 
       <div style={{ padding: "4mm", fontFamily: "'Inter', Arial, sans-serif" }}>
-        <div style={{ textAlign: "center", marginBottom: "6mm", borderBottom: "3px solid #0A3D2A", paddingBottom: "4mm" }}>
-          <div style={{ fontWeight: 800, fontSize: "18pt", color: "#0A3D2A", letterSpacing: "0.5px" }}>Al Burhan Tours & Travels</div>
-          <div style={{ fontSize: "13pt", fontWeight: 700, marginTop: "2mm", color: "#333" }}>Bus Seating List — {group.groupName} ({group.year})</div>
-          {group.flightNumber && <div style={{ fontSize: "9pt", marginTop: "1mm", color: "#666" }}>Flight: {group.flightNumber}</div>}
-        </div>
+        <PrintHeader title="Bus Seating List" subtitle={`${group.groupName} (${group.year})${group.flightNumber ? ` | Flight: ${group.flightNumber}` : ""}`} />
 
         <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "'Inter', Arial, sans-serif", fontSize: "8.5pt" }}>
           <thead>

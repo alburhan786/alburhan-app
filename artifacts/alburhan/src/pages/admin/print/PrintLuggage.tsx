@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useRoute } from "wouter";
 
 const API = import.meta.env.VITE_API_URL || "";
+const BASE = import.meta.env.BASE_URL || "/";
 
 interface Pilgrim {
   id: string; serialNumber: number; fullName: string; photoUrl?: string;
@@ -61,9 +62,12 @@ export default function PrintLuggage() {
             {page.map(p => (
               <div key={p.id} className="sticker">
                 <div style={{ background: "linear-gradient(135deg, #0A3D2A, #145a3a)", color: "#fff", padding: "3mm 4mm", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: "11pt", letterSpacing: "0.5px" }}>Al Burhan Tours & Travels</div>
-                    <div style={{ fontSize: "7pt", opacity: 0.8 }}>Mumbai, India</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "2mm" }}>
+                    <img src={`${BASE}images/logo.png`} alt="" style={{ height: "12mm", objectFit: "contain" }} />
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: "11pt", letterSpacing: "0.5px" }}>Al Burhan Tours & Travels</div>
+                      <div style={{ fontSize: "7pt", opacity: 0.8 }}>Burhanpur, M.P.</div>
+                    </div>
                   </div>
                   <div style={{ textAlign: "right" }}>
                     <div style={{ fontSize: "16pt", fontWeight: 800, color: "#C9A84C" }}>#{p.serialNumber}</div>

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useRoute } from "wouter";
 
 const API = import.meta.env.VITE_API_URL || "";
+const BASE = import.meta.env.BASE_URL || "/";
 
 interface Pilgrim { id: string; serialNumber: number; fullName: string; }
 interface Group { id: string; groupName: string; year: number; }
@@ -63,7 +64,7 @@ export default function PrintZamzam() {
                 }}>
                   <div style={{ position: "absolute", top: "-4mm", right: "-4mm", width: "20mm", height: "20mm", background: "rgba(201,168,76,0.15)", borderRadius: "50%" }} />
                   <div style={{ position: "absolute", bottom: "-6mm", left: "-4mm", width: "16mm", height: "16mm", background: "rgba(201,168,76,0.1)", borderRadius: "50%" }} />
-                  <div style={{ fontSize: "6pt", opacity: 0.8, letterSpacing: "2px", marginBottom: "1mm", position: "relative" }}>☪</div>
+                  <img src={`${BASE}images/logo.png`} alt="" style={{ height: "8mm", objectFit: "contain", position: "relative", marginBottom: "1mm" }} />
                   <div style={{ fontSize: "22pt", fontWeight: 900, letterSpacing: "4px", lineHeight: 1, position: "relative" }}>ZAMZAM</div>
                   <div style={{ fontSize: "6pt", opacity: 0.8, marginTop: "1.5mm", letterSpacing: "1px", position: "relative" }}>HOLY WATER</div>
                 </div>
@@ -79,7 +80,7 @@ export default function PrintZamzam() {
                 </div>
 
                 <div style={{ background: "#0A3D2A", color: "#C9A84C", padding: "2mm", textAlign: "center", fontSize: "6pt", fontWeight: 600, letterSpacing: "0.5px" }}>
-                  AL BURHAN TOURS & TRAVELS — MUMBAI
+                  AL BURHAN TOURS & TRAVELS — BURHANPUR
                 </div>
               </div>
             ))}

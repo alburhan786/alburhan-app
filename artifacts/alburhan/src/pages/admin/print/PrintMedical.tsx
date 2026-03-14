@@ -3,6 +3,7 @@ import { useRoute } from "wouter";
 import { Barcode } from "@/components/print/Barcode";
 
 const API = import.meta.env.VITE_API_URL || "";
+const BASE = import.meta.env.BASE_URL || "/";
 
 interface Pilgrim {
   id: string; serialNumber: number; fullName: string; passportNumber?: string;
@@ -69,9 +70,12 @@ export default function PrintMedical() {
             {page.map(p => (
               <div key={p.id} className="med-sticker">
                 <div style={{ background: "linear-gradient(135deg, #c0392b, #e74c3c)", color: "#fff", padding: "3mm 4mm", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: "10pt", letterSpacing: "0.5px" }}>Al Burhan Tours & Travels</div>
-                    <div style={{ fontSize: "7pt", opacity: 0.85, fontWeight: 600, letterSpacing: "1px" }}>MEDICAL INFORMATION</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "2mm" }}>
+                    <img src={`${BASE}images/logo.png`} alt="" style={{ height: "10mm", objectFit: "contain" }} />
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: "10pt", letterSpacing: "0.5px" }}>Al Burhan Tours & Travels</div>
+                      <div style={{ fontSize: "7pt", opacity: 0.85, fontWeight: 600, letterSpacing: "1px" }}>MEDICAL INFORMATION</div>
+                    </div>
                   </div>
                   <div style={{ fontSize: "8pt", fontWeight: 700 }}>{p.coverNumber || `#${p.serialNumber}`}</div>
                 </div>
