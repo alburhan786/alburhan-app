@@ -21,6 +21,8 @@ import type {
   AuthResponse,
   Booking,
   BookingListResponse,
+  BroadcastRequest,
+  BroadcastResponse,
   CreateBookingRequest,
   CreateOfflineBookingRequest,
   CreatePackageRequest,
@@ -29,6 +31,8 @@ import type {
   DeletePilgrim200,
   Document,
   ErrorResponse,
+  GetBookingsReportParams,
+  GetPaymentsReport200Item,
   GroupPilgrim,
   GroupPilgrimInput,
   HajjGroup,
@@ -2249,6 +2253,353 @@ export function useListCustomers<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getListCustomersQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Send broadcast message to customers (admin)
+ */
+export const getSendBroadcastUrl = () => {
+  return `/api/admin/broadcast`;
+};
+
+export const sendBroadcast = async (
+  broadcastRequest: BroadcastRequest,
+  options?: RequestInit,
+): Promise<BroadcastResponse> => {
+  return customFetch<BroadcastResponse>(getSendBroadcastUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(broadcastRequest),
+  });
+};
+
+export const getSendBroadcastMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof sendBroadcast>>,
+    TError,
+    { data: BodyType<BroadcastRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof sendBroadcast>>,
+  TError,
+  { data: BodyType<BroadcastRequest> },
+  TContext
+> => {
+  const mutationKey = ["sendBroadcast"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof sendBroadcast>>,
+    { data: BodyType<BroadcastRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return sendBroadcast(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SendBroadcastMutationResult = NonNullable<
+  Awaited<ReturnType<typeof sendBroadcast>>
+>;
+export type SendBroadcastMutationBody = BodyType<BroadcastRequest>;
+export type SendBroadcastMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Send broadcast message to customers (admin)
+ */
+export const useSendBroadcast = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof sendBroadcast>>,
+    TError,
+    { data: BodyType<BroadcastRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof sendBroadcast>>,
+  TError,
+  { data: BodyType<BroadcastRequest> },
+  TContext
+> => {
+  return useMutation(getSendBroadcastMutationOptions(options));
+};
+
+/**
+ * @summary Get bookings report (admin)
+ */
+export const getGetBookingsReportUrl = (params?: GetBookingsReportParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/admin/reports/bookings?${stringifiedParams}`
+    : `/api/admin/reports/bookings`;
+};
+
+export const getBookingsReport = async (
+  params?: GetBookingsReportParams,
+  options?: RequestInit,
+): Promise<Booking[]> => {
+  return customFetch<Booking[]>(getGetBookingsReportUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetBookingsReportQueryKey = (
+  params?: GetBookingsReportParams,
+) => {
+  return [`/api/admin/reports/bookings`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetBookingsReportQueryOptions = <
+  TData = Awaited<ReturnType<typeof getBookingsReport>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetBookingsReportParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getBookingsReport>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetBookingsReportQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getBookingsReport>>
+  > = ({ signal }) => getBookingsReport(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getBookingsReport>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetBookingsReportQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getBookingsReport>>
+>;
+export type GetBookingsReportQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get bookings report (admin)
+ */
+
+export function useGetBookingsReport<
+  TData = Awaited<ReturnType<typeof getBookingsReport>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetBookingsReportParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getBookingsReport>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetBookingsReportQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get payments report (admin)
+ */
+export const getGetPaymentsReportUrl = () => {
+  return `/api/admin/reports/payments`;
+};
+
+export const getPaymentsReport = async (
+  options?: RequestInit,
+): Promise<GetPaymentsReport200Item[]> => {
+  return customFetch<GetPaymentsReport200Item[]>(getGetPaymentsReportUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetPaymentsReportQueryKey = () => {
+  return [`/api/admin/reports/payments`] as const;
+};
+
+export const getGetPaymentsReportQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPaymentsReport>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getPaymentsReport>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetPaymentsReportQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getPaymentsReport>>
+  > = ({ signal }) => getPaymentsReport({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPaymentsReport>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPaymentsReportQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPaymentsReport>>
+>;
+export type GetPaymentsReportQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get payments report (admin)
+ */
+
+export function useGetPaymentsReport<
+  TData = Awaited<ReturnType<typeof getPaymentsReport>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getPaymentsReport>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPaymentsReportQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get public invoice by booking number (no auth)
+ */
+export const getGetPublicInvoiceUrl = (bookingNumber: string) => {
+  return `/api/bookings/by-number/${bookingNumber}/invoice-public`;
+};
+
+export const getPublicInvoice = async (
+  bookingNumber: string,
+  options?: RequestInit,
+): Promise<Invoice> => {
+  return customFetch<Invoice>(getGetPublicInvoiceUrl(bookingNumber), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetPublicInvoiceQueryKey = (bookingNumber: string) => {
+  return [`/api/bookings/by-number/${bookingNumber}/invoice-public`] as const;
+};
+
+export const getGetPublicInvoiceQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPublicInvoice>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  bookingNumber: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPublicInvoice>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetPublicInvoiceQueryKey(bookingNumber);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getPublicInvoice>>
+  > = ({ signal }) =>
+    getPublicInvoice(bookingNumber, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!bookingNumber,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPublicInvoice>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPublicInvoiceQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPublicInvoice>>
+>;
+export type GetPublicInvoiceQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Get public invoice by booking number (no auth)
+ */
+
+export function useGetPublicInvoice<
+  TData = Awaited<ReturnType<typeof getPublicInvoice>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  bookingNumber: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPublicInvoice>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPublicInvoiceQueryOptions(bookingNumber, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

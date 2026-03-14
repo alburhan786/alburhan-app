@@ -158,8 +158,10 @@ export async function sendPaymentConfirmationNotification(opts: {
   bookingNumber: string;
   amount: string;
   invoiceNumber: string;
+  invoiceUrl?: string;
 }) {
-  const message = `Assalamu Alaikum ${opts.customerName},\n\nYour payment of INR ${opts.amount} for booking #${opts.bookingNumber} has been received.\n\nYour booking is now CONFIRMED!\nInvoice: #${opts.invoiceNumber}\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 9893225590 | +91 9893989786`;
+  const invoiceLine = opts.invoiceUrl ? `\n\nView/Download Invoice:\n${opts.invoiceUrl}` : "";
+  const message = `Assalamu Alaikum ${opts.customerName},\n\nYour payment of INR ${opts.amount} for booking #${opts.bookingNumber} has been received.\n\nYour booking is now CONFIRMED!\nInvoice: #${opts.invoiceNumber}${invoiceLine}\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 9893225590 | +91 9893989786`;
   await Promise.allSettled([
     sendSMS(opts.mobile, message),
     sendWhatsApp(opts.mobile, message),

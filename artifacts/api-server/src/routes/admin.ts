@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { db, bookingsTable, usersTable, packagesTable, inquiriesTable } from "@workspace/db";
-import { eq, count, sum, desc } from "drizzle-orm";
+import { eq, count, sum, desc, and, sql } from "drizzle-orm";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
+import { sendSMS, sendWhatsApp } from "../lib/notifications.js";
 
 const router = Router();
 
@@ -60,6 +61,80 @@ router.get("/inquiries", requireAdmin as any, async (_req: AuthenticatedRequest,
   res.json(inquiries.map(i => ({
     ...i,
     createdAt: i.createdAt?.toISOString?.(),
+  })));
+});
+
+router.post("/broadcast", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  const { message, audience } = req.body;
+  if (!message || !audience) {
+    res.status(400).json({ message: "Message and audience are required" });
+    return;
+  }
+
+  let mobiles: string[] = [];
+
+  if (audience === "all") {
+    const customers = await db.select({ mobile: usersTable.mobile }).from(usersTable).where(eq(usersTable.role, "customer"));
+    mobiles = customers.map(c => c.mobile);
+  } else if (audience === "pending_payment") {
+    const bookings = await db.select({ mobile: bookingsTable.customerMobile }).from(bookingsTable).where(eq(bookingsTable.status, "approved"));
+    mobiles = [...new Set(bookings.map(b => b.mobile))];
+  } else if (audience === "confirmed") {
+    const bookings = await db.select({ mobile: bookingsTable.customerMobile }).from(bookingsTable).where(eq(bookingsTable.status, "confirmed"));
+    mobiles = [...new Set(bookings.map(b => b.mobile))];
+  } else {
+    res.status(400).json({ message: "Invalid audience. Use: all, pending_payment, confirmed" });
+    return;
+  }
+
+  const results = await Promise.allSettled(
+    mobiles.flatMap(m => [sendWhatsApp(m, message), sendSMS(m, message)])
+  );
+  const sent = results.filter(r => r.status === "fulfilled" && (r as any).value).length;
+
+  res.json({ message: `Broadcast sent to ${mobiles.length} recipients (${sent} deliveries)`, recipientCount: mobiles.length });
+});
+
+router.get("/reports/bookings", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  const { from, to } = req.query;
+  let conditions: any[] = [];
+  if (from) conditions.push(sql`${bookingsTable.createdAt} >= ${new Date(from as string)}`);
+  if (to) conditions.push(sql`${bookingsTable.createdAt} <= ${new Date(to as string)}`);
+
+  const bookings = await db
+    .select()
+    .from(bookingsTable)
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .orderBy(desc(bookingsTable.createdAt));
+
+  res.json(bookings.map(b => ({
+    ...b,
+    totalAmount: b.totalAmount ? Number(b.totalAmount) : null,
+    gstAmount: b.gstAmount ? Number(b.gstAmount) : null,
+    finalAmount: b.finalAmount ? Number(b.finalAmount) : null,
+    createdAt: b.createdAt?.toISOString?.(),
+    updatedAt: b.updatedAt?.toISOString?.(),
+  })));
+});
+
+router.get("/reports/payments", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
+  const bookings = await db
+    .select()
+    .from(bookingsTable)
+    .where(eq(bookingsTable.status, "confirmed"))
+    .orderBy(desc(bookingsTable.updatedAt));
+
+  res.json(bookings.map(b => ({
+    bookingNumber: b.bookingNumber,
+    customerName: b.customerName,
+    customerMobile: b.customerMobile,
+    packageName: b.packageName,
+    invoiceNumber: b.invoiceNumber,
+    totalAmount: b.totalAmount ? Number(b.totalAmount) : null,
+    gstAmount: b.gstAmount ? Number(b.gstAmount) : null,
+    finalAmount: b.finalAmount ? Number(b.finalAmount) : null,
+    paymentDate: b.updatedAt?.toISOString?.(),
+    razorpayPaymentId: b.razorpayPaymentId,
   })));
 });
 

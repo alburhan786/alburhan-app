@@ -141,6 +141,8 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
     .where(eq(bookingsTable.id, bookingId))
     .returning();
 
+  const invoiceUrl = `${req.protocol}://${req.get("host")?.replace(/\/api$/, "")}/alburhan/invoice/${booking.bookingNumber}`;
+
   sendPaymentConfirmationNotification({
     mobile: booking.customerMobile,
     email: booking.customerEmail,
@@ -148,6 +150,7 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
     bookingNumber: booking.bookingNumber,
     amount: booking.finalAmount ? String(Number(booking.finalAmount).toLocaleString("en-IN")) : "N/A",
     invoiceNumber,
+    invoiceUrl,
   }).catch(console.error);
 
   res.json({

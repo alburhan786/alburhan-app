@@ -552,6 +552,89 @@ paths:
                 items:
                   $ref: "#/components/schemas/User"
 
+  /admin/broadcast:
+    post:
+      operationId: sendBroadcast
+      tags: [admin]
+      summary: Send broadcast message to customers (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BroadcastRequest"
+      responses:
+        "200":
+          description: Broadcast sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BroadcastResponse"
+
+  /admin/reports/bookings:
+    get:
+      operationId: getBookingsReport
+      tags: [admin]
+      summary: Get bookings report (admin)
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+        - name: to
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Bookings report data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Booking"
+
+  /admin/reports/payments:
+    get:
+      operationId: getPaymentsReport
+      tags: [admin]
+      summary: Get payments report (admin)
+      responses:
+        "200":
+          description: Payments report data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+
+  /bookings/by-number/{bookingNumber}/invoice-public:
+    get:
+      operationId: getPublicInvoice
+      tags: [bookings]
+      summary: Get public invoice by booking number (no auth)
+      parameters:
+        - name: bookingNumber
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Invoice data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /inquiry:
     post:
       operationId: submitInquiry
@@ -1460,6 +1543,28 @@ components:
         - totalRevenue
         - totalCustomers
         - totalPackages
+
+    BroadcastRequest:
+      type: object
+      properties:
+        message:
+          type: string
+        audience:
+          type: string
+          enum: [all, pending_payment, confirmed]
+      required:
+        - message
+        - audience
+
+    BroadcastResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        recipientCount:
+          type: number
+      required:
+        - message
 
     InquiryRequest:
       type: object

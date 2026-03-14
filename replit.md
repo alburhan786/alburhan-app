@@ -36,10 +36,10 @@ artifacts/
 ├── alburhan/           # React + Vite frontend (serves at /)
 │   ├── src/
 │   │   ├── pages/
-│   │   │   ├── public/        # Home, Packages, PackageDetail, Ziyarat, Blog, About, Contact, Legal
+│   │   │   ├── public/        # Home, Packages, PackageDetail, Ziyarat, Blog, About, Contact, Legal, Invoice
 │   │   │   ├── auth/          # Login (OTP flow)
 │   │   │   ├── customer/      # Customer dashboard
-│   │   │   └── admin/         # Admin dashboard, bookings, packages
+│   │   │   └── admin/         # Admin dashboard (quick actions: offline booking, broadcast, reports), bookings, packages
 │   │   ├── components/
 │   │   │   └── layout/        # MainLayout, AdminLayout
 │   │   └── hooks/
@@ -58,7 +58,7 @@ artifacts/
         │   ├── gallery.ts      # Image gallery CRUD (admin upload, public list)
         │   ├── groups.ts       # Hajj groups + pilgrims CRUD + photo upload
         │   ├── notifications.ts# Send SMS/WhatsApp to customers
-        │   ├── admin.ts        # Stats + customer list + inquiries
+        │   ├── admin.ts        # Stats + customer list + inquiries + broadcast + reports
         │   └── inquiry.ts      # Public inquiry form
         └── lib/
             ├── auth.ts         # Session middleware, requireAuth/requireAdmin

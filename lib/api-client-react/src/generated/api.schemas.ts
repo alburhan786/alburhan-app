@@ -388,6 +388,25 @@ export interface AdminStats {
   recentBookings?: Booking[];
 }
 
+export type BroadcastRequestAudience =
+  (typeof BroadcastRequestAudience)[keyof typeof BroadcastRequestAudience];
+
+export const BroadcastRequestAudience = {
+  all: "all",
+  pending_payment: "pending_payment",
+  confirmed: "confirmed",
+} as const;
+
+export interface BroadcastRequest {
+  message: string;
+  audience: BroadcastRequestAudience;
+}
+
+export interface BroadcastResponse {
+  message: string;
+  recipientCount?: number;
+}
+
 export interface InquiryRequest {
   name: string;
   mobile: string;
@@ -530,6 +549,13 @@ export const ListBookingsStatus = {
 export type RejectBookingBody = {
   reason?: string;
 };
+
+export type GetBookingsReportParams = {
+  from?: string;
+  to?: string;
+};
+
+export type GetPaymentsReport200Item = { [key: string]: unknown };
 
 export type DeleteGroup200 = {
   message?: string;

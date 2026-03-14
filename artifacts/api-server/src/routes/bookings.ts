@@ -256,6 +256,27 @@ router.post("/:id/reject", requireAdmin as any, async (req: AuthenticatedRequest
   res.json(formatBooking(updated));
 });
 
+router.get("/by-number/:bookingNumber/invoice-public", async (req, res) => {
+  const bookings = await db.select().from(bookingsTable).where(eq(bookingsTable.bookingNumber, req.params.bookingNumber)).limit(1);
+  if (!bookings[0]) {
+    res.status(404).json({ message: "Booking not found" });
+    return;
+  }
+  const b = bookings[0];
+  if (b.status !== "confirmed") {
+    res.status(400).json({ message: "Invoice only available for confirmed bookings" });
+    return;
+  }
+
+  let pkg = null;
+  if (b.packageId) {
+    const pkgs = await db.select().from(packagesTable).where(eq(packagesTable.id, b.packageId)).limit(1);
+    pkg = pkgs[0] ?? null;
+  }
+
+  res.json(buildInvoiceResponse(b, pkg));
+});
+
 router.get("/:id/invoice", requireAuth as any, async (req: AuthenticatedRequest, res) => {
   const bookings = await db.select().from(bookingsTable).where(eq(bookingsTable.id, req.params.id)).limit(1);
   if (!bookings[0]) {
@@ -267,7 +288,18 @@ router.get("/:id/invoice", requireAuth as any, async (req: AuthenticatedRequest,
     res.status(400).json({ message: "Invoice only available for confirmed bookings" });
     return;
   }
-  res.json({
+
+  let pkg = null;
+  if (b.packageId) {
+    const pkgs = await db.select().from(packagesTable).where(eq(packagesTable.id, b.packageId)).limit(1);
+    pkg = pkgs[0] ?? null;
+  }
+
+  res.json(buildInvoiceResponse(b, pkg));
+});
+
+function buildInvoiceResponse(b: any, pkg: any) {
+  return {
     invoiceNumber: b.invoiceNumber,
     bookingNumber: b.bookingNumber,
     customerName: b.customerName,
@@ -282,11 +314,20 @@ router.get("/:id/invoice", requireAuth as any, async (req: AuthenticatedRequest,
     paymentDate: b.updatedAt?.toISOString?.(),
     departureDate: b.preferredDepartureDate,
     status: b.status,
-    companyName: "Al Burhan Tours & Travels",
-    companyAddress: "Mumbai, Maharashtra, India",
+    pilgrims: b.pilgrims ?? [],
+    sacCode: "998555",
+    gstPercent: pkg ? Number(pkg.gstPercent) : 5,
+    companyName: "AL BURHAN TOURS & TRAVELS",
+    companyAddress: "Office No. 3, 1st Floor, Haj House, 7-A Maulana Azad Road, Near Crawford Market, Mumbai - 400001, Maharashtra, India",
     companyPhone: "+91 9893225590 / +91 9893989786",
     companyEmail: "info@alburhantravels.com",
-  });
-});
+    gstin: "27AXXPXXXXXX1ZX",
+    pan: "AXXPXXXXXX",
+    bankName: "HDFC BANK LTD",
+    bankBranch: "Mumbai Main Branch",
+    bankAccount: "50200113931336",
+    bankIfsc: "HDFC0001769",
+  };
+}
 
 export default router;

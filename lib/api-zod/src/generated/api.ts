@@ -867,6 +867,108 @@ export const ListCustomersResponseItem = zod.object({
 export const ListCustomersResponse = zod.array(ListCustomersResponseItem);
 
 /**
+ * @summary Send broadcast message to customers (admin)
+ */
+export const SendBroadcastBody = zod.object({
+  message: zod.string(),
+  audience: zod.enum(["all", "pending_payment", "confirmed"]),
+});
+
+export const SendBroadcastResponse = zod.object({
+  message: zod.string(),
+  recipientCount: zod.number().optional(),
+});
+
+/**
+ * @summary Get bookings report (admin)
+ */
+export const GetBookingsReportQueryParams = zod.object({
+  from: zod.coerce.string().optional(),
+  to: zod.coerce.string().optional(),
+});
+
+export const GetBookingsReportResponseItem = zod.object({
+  id: zod.string(),
+  bookingNumber: zod.string(),
+  packageId: zod.string().optional(),
+  packageName: zod.string().optional(),
+  customerId: zod.string().optional(),
+  customerName: zod.string(),
+  customerMobile: zod.string(),
+  customerEmail: zod.string().optional(),
+  numberOfPilgrims: zod.number(),
+  pilgrims: zod
+    .array(
+      zod.object({
+        name: zod.string(),
+        passportNumber: zod.string().optional(),
+        passportExpiry: zod.string().optional(),
+        dateOfBirth: zod.string().optional(),
+      }),
+    )
+    .optional(),
+  preferredDepartureDate: zod.string().optional(),
+  status: zod.enum([
+    "pending",
+    "approved",
+    "rejected",
+    "confirmed",
+    "cancelled",
+  ]),
+  totalAmount: zod.number().optional(),
+  gstAmount: zod.number().optional(),
+  finalAmount: zod.number().optional(),
+  paymentId: zod.string().optional(),
+  razorpayOrderId: zod.string().optional(),
+  razorpayPaymentId: zod.string().optional(),
+  invoiceNumber: zod.string().optional(),
+  rejectionReason: zod.string().optional(),
+  notes: zod.string().optional(),
+  isOffline: zod.boolean().optional(),
+  createdAt: zod.date(),
+  updatedAt: zod.date().optional(),
+});
+export const GetBookingsReportResponse = zod.array(
+  GetBookingsReportResponseItem,
+);
+
+/**
+ * @summary Get payments report (admin)
+ */
+export const GetPaymentsReportResponseItem = zod.object({}).passthrough();
+export const GetPaymentsReportResponse = zod.array(
+  GetPaymentsReportResponseItem,
+);
+
+/**
+ * @summary Get public invoice by booking number (no auth)
+ */
+export const GetPublicInvoiceParams = zod.object({
+  bookingNumber: zod.coerce.string(),
+});
+
+export const GetPublicInvoiceResponse = zod.object({
+  invoiceNumber: zod.string(),
+  bookingNumber: zod.string(),
+  customerName: zod.string(),
+  customerMobile: zod.string().optional(),
+  customerEmail: zod.string().optional(),
+  packageName: zod.string(),
+  numberOfPilgrims: zod.number().optional(),
+  pricePerPerson: zod.number().optional(),
+  totalAmount: zod.number().optional(),
+  gstAmount: zod.number().optional(),
+  finalAmount: zod.number(),
+  paymentDate: zod.string().optional(),
+  departureDate: zod.string().optional(),
+  status: zod.string().optional(),
+  companyName: zod.string().optional(),
+  companyAddress: zod.string().optional(),
+  companyPhone: zod.string().optional(),
+  companyEmail: zod.string().optional(),
+});
+
+/**
  * @summary Submit a public inquiry
  */
 export const SubmitInquiryBody = zod.object({
