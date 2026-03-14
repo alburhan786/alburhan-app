@@ -36,7 +36,7 @@ export default function PrintIdCards() {
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
 
   const pages: Pilgrim[][] = [];
-  for (let i = 0; i < pilgrims.length; i += 6) pages.push(pilgrims.slice(i, i + 6));
+  for (let i = 0; i < pilgrims.length; i += 3) pages.push(pilgrims.slice(i, i + 3));
 
   return (
     <>
