@@ -61,23 +61,28 @@ function WaveShapesBack() {
 }
 
 function LogoHeader({ size }: { size?: "small" }) {
-  const logoSize = size === "small" ? "11mm" : "14mm";
-  const nameSize = size === "small" ? "8pt" : "10pt";
-  const tagSize = size === "small" ? "4pt" : "5pt";
-  const gap = size === "small" ? "0.5mm" : "0.8mm";
-  const flagSize = size === "small" ? "8pt" : "10pt";
+  const isSmall = size === "small";
+  const flagImgSize = isSmall ? "7mm" : "9mm";
+  const logoSize = isSmall ? "9mm" : "12mm";
+  const nameSize = isSmall ? "7pt" : "9pt";
+  const tagSize = isSmall ? "3.5pt" : "4.5pt";
+  const indiaSize = isSmall ? "4pt" : "5pt";
   return (
-    <div style={{ textAlign: "center", marginBottom: size === "small" ? "1mm" : "1.5mm" }}>
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "1.5mm" }}>
-        <span style={{ fontSize: flagSize, lineHeight: 1 }}>🇮🇳</span>
-        <img src={BASE + "images/logo.png"} alt="" style={{ height: logoSize, objectFit: "contain" }} />
-        <span style={{ fontSize: flagSize, lineHeight: 1 }}>🇮🇳</span>
+    <div style={{ display: "flex", alignItems: "flex-start", gap: "2mm", marginBottom: isSmall ? "1mm" : "1.5mm" }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
+        <img src={BASE + "images/india_flag.jpg"} alt="" style={{ width: flagImgSize, height: flagImgSize, borderRadius: "50%", objectFit: "cover" }} />
+        <div style={{ fontSize: indiaSize, fontWeight: 700, color: DARK, letterSpacing: "0.5px", marginTop: "0.3mm", lineHeight: 1 }}>INDIA</div>
       </div>
-      <div style={{ fontSize: nameSize, fontWeight: 900, color: DARK, letterSpacing: "1px", lineHeight: 1.1, marginTop: gap }}>AL-BURHAN</div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "1.5mm", marginTop: "0.3mm" }}>
-        <div style={{ width: "4mm", height: "0.3mm", background: GOLD }} />
-        <div style={{ fontSize: tagSize, fontWeight: 700, color: GOLD, letterSpacing: "1.5px", lineHeight: 1 }}>TOURS & TRAVELS</div>
-        <div style={{ width: "4mm", height: "0.3mm", background: GOLD }} />
+      <div style={{ flex: 1, textAlign: "center", minWidth: 0 }}>
+        <div style={{ display: "flex", justifyContent: "center" }}>
+          <img src={BASE + "images/logo.png"} alt="" style={{ height: logoSize, objectFit: "contain" }} />
+        </div>
+        <div style={{ fontSize: nameSize, fontWeight: 900, color: DARK, letterSpacing: "0.5px", lineHeight: 1.1, marginTop: "0.5mm" }}>AL-BURHAN</div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "1mm", marginTop: "0.3mm" }}>
+          <div style={{ width: "3mm", height: "0.3mm", background: GOLD }} />
+          <div style={{ fontSize: tagSize, fontWeight: 700, color: GOLD, letterSpacing: "1px", lineHeight: 1 }}>TOURS & TRAVELS</div>
+          <div style={{ width: "3mm", height: "0.3mm", background: GOLD }} />
+        </div>
       </div>
     </div>
   );
