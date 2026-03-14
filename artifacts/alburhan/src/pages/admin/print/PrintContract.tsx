@@ -56,7 +56,29 @@ export default function PrintContract() {
 
       <p>This Agreement is entered into between <b>Al Burhan Tours & Travels</b> (hereinafter referred to as "the Company") and <b>{pilgrim.fullName}</b> (hereinafter referred to as "the Pilgrim") for the services outlined below.</p>
 
-      <div style={heading}>1. Services Included</div>
+      <div style={heading}>1. Package & Amount</div>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "9pt", marginBottom: "3mm" }}>
+        <tbody>
+          <tr>
+            <td style={{ border: "1px solid #ddd", padding: "2mm 4mm", width: "35%", background: "#f5faf7", fontWeight: 600 }}>Package Name</td>
+            <td style={{ border: "1px solid #ddd", padding: "2mm 4mm" }}>{group!.groupName}</td>
+          </tr>
+          <tr>
+            <td style={{ border: "1px solid #ddd", padding: "2mm 4mm", background: "#f5faf7", fontWeight: 600 }}>Total Package Amount (per person)</td>
+            <td style={{ border: "1px solid #ddd", padding: "2mm 4mm" }}>₹ _______________</td>
+          </tr>
+          <tr>
+            <td style={{ border: "1px solid #ddd", padding: "2mm 4mm", background: "#f5faf7", fontWeight: 600 }}>GST (5%)</td>
+            <td style={{ border: "1px solid #ddd", padding: "2mm 4mm" }}>₹ _______________</td>
+          </tr>
+          <tr>
+            <td style={{ border: "1px solid #ddd", padding: "2mm 4mm", background: "#f5faf7", fontWeight: 700 }}>Grand Total Payable</td>
+            <td style={{ border: "1px solid #ddd", padding: "2mm 4mm", fontWeight: 700 }}>₹ _______________</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div style={heading}>2. Services Included</div>
       <p>The Company shall provide the following services as part of the <b>{group!.groupName}</b> package:</p>
       <ul style={{ paddingLeft: "6mm", margin: "2mm 0" }}>
         <li>Return airfare (Economy class) — India to Saudi Arabia and back</li>
@@ -72,12 +94,12 @@ export default function PrintContract() {
 
       {group!.departureDate && (
         <>
-          <div style={heading}>2. Travel Dates</div>
+          <div style={heading}>3. Travel Dates</div>
           <p>Departure: <b>{group!.departureDate}</b>{group!.returnDate ? <> | Return: <b>{group!.returnDate}</b></> : null}. Dates are subject to change based on airline schedule and government regulations.</p>
         </>
       )}
 
-      <div style={heading}>3. Payment Terms</div>
+      <div style={heading}>4. Payment Terms</div>
       <ul style={{ paddingLeft: "6mm", margin: "2mm 0" }}>
         <li>A non-refundable advance of <b>₹25,000/-</b> is required at the time of booking to confirm the seat.</li>
         <li>Second installment of <b>50%</b> of the total package cost is due 60 days before departure.</li>
@@ -86,7 +108,7 @@ export default function PrintContract() {
         <li>All applicable GST (5%) will be charged as per government norms (SAC Code: 998555).</li>
       </ul>
 
-      <div style={heading}>4. Cancellation Policy</div>
+      <div style={heading}>5. Cancellation Policy</div>
       <ul style={{ paddingLeft: "6mm", margin: "2mm 0" }}>
         <li>Cancellation more than 60 days before departure: Advance amount forfeited.</li>
         <li>Cancellation 30–60 days before departure: 50% of total package cost will be charged.</li>
@@ -94,7 +116,7 @@ export default function PrintContract() {
         <li>Once the visa process has begun, the payment is non-refundable.</li>
       </ul>
 
-      <div style={heading}>5. Terms & Conditions</div>
+      <div style={heading}>6. Terms & Conditions</div>
       <ol style={{ paddingLeft: "6mm", margin: "2mm 0", fontSize: "9pt" }}>
         <li>The Pilgrim must possess a valid passport with at least 6 months validity from the date of travel.</li>
         <li>The Company is not responsible for delays caused by airlines, government authorities, or force majeure events.</li>
@@ -105,7 +127,7 @@ export default function PrintContract() {
         <li>All disputes are subject to the jurisdiction of courts in Mumbai, Maharashtra.</li>
       </ol>
 
-      <div style={heading}>6. Acknowledgment</div>
+      <div style={heading}>7. Acknowledgment</div>
       <p>I, <b>{pilgrim.fullName}</b>, have read and understood the above terms and conditions. I agree to abide by them and confirm my booking with Al Burhan Tours & Travels for the <b>{group!.groupName}</b> package.</p>
 
       <div style={{ display: "flex", justifyContent: "space-between", marginTop: "16mm", paddingTop: "2mm" }}>

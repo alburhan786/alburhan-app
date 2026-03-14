@@ -5,11 +5,11 @@ const API = import.meta.env.VITE_API_URL || "";
 
 interface Pilgrim {
   id: string; serialNumber: number; fullName: string; passportNumber?: string;
-  dateOfBirth?: string; gender?: string;
+  dateOfBirth?: string; gender?: string; city?: string;
 }
 interface Group {
   id: string; groupName: string; year: number; departureDate?: string;
-  flightNumber?: string;
+  returnDate?: string; flightNumber?: string; departureCity?: string;
 }
 
 export default function PrintAirlineList() {
@@ -61,6 +61,7 @@ export default function PrintAirlineList() {
             <div>Group: <b>{group.groupName}</b></div>
             {group.flightNumber && <div>Flight: <b style={{ color: "#1a2744", fontSize: "10pt" }}>{group.flightNumber}</b></div>}
             {group.departureDate && <div>Departure: <b>{group.departureDate}</b></div>}
+            <div>From: <b>{group.departureCity || "Mumbai (BOM)"}</b></div>
           </div>
         </div>
 
@@ -73,6 +74,7 @@ export default function PrintAirlineList() {
               <th style={thStyle}>Date of Birth</th>
               <th style={{ ...thStyle, textAlign: "center" }}>Gender</th>
               <th style={thStyle}>Nationality</th>
+              <th style={thStyle}>City</th>
               <th style={thStyle}>Flight No.</th>
               <th style={thStyle}>Departure Date</th>
             </tr>
@@ -86,6 +88,7 @@ export default function PrintAirlineList() {
                 <td style={tdStyle}>{p.dateOfBirth || "—"}</td>
                 <td style={{ ...tdStyle, textAlign: "center" }}>{p.gender || "—"}</td>
                 <td style={tdStyle}>Indian</td>
+                <td style={tdStyle}>{p.city || "—"}</td>
                 <td style={{ ...tdStyle, fontWeight: 600 }}>{group.flightNumber || "—"}</td>
                 <td style={tdStyle}>{group.departureDate || "—"}</td>
               </tr>
