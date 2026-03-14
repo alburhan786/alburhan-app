@@ -44,6 +44,15 @@ function AnimatedCounter({ target, suffix = "" }: { target: number; suffix?: str
   return <div ref={ref}>{count.toLocaleString()}{suffix}</div>;
 }
 
+const testimonials = [
+  { name: "Ahmed Khan", text: "Al Burhan made our Hajj journey incredibly smooth. The guides were extremely knowledgeable and supportive throughout the spiritual process.", rating: 5, initial: "AK" },
+  { name: "Fatima Shaikh", text: "The arrangements for our Umrah were flawless. Hotels were very close to the Haram, and the entire team was helpful 24/7.", rating: 5, initial: "FS" },
+  { name: "Mohammed Ali", text: "We recently went for Iraq Ziyarat. Everything from flights to local transport was well organized. Highly recommended!", rating: 5, initial: "MA" },
+  { name: "Ayesha Begum", text: "Best travel company for pilgrimage. Their 35 years of experience truly shows in their service quality and attention to detail.", rating: 5, initial: "AB" },
+  { name: "Hussain Mirza", text: "Excellent Umrah arrangements. From visa processing to hotel bookings, everything was taken care of perfectly.", rating: 5, initial: "HM" },
+  { name: "Zainab Khatoon", text: "We felt safe and well-guided throughout our journey. Al Burhan treats every pilgrim like family.", rating: 5, initial: "ZK" },
+];
+
 export default function Home() {
   const { data: packages = [] } = useListPackages({ active: true });
   const featuredPackages = packages.slice(0, 3);
@@ -157,16 +166,21 @@ export default function Home() {
         >
           <div className="glass-dark rounded-2xl px-10 py-5 border border-white/10 flex items-center gap-10">
             {[
-              { num: "35+", label: "Years Experience" },
-              { num: "10K+", label: "Happy Pilgrims" },
-              { num: "100+", label: "Packages" },
-              { num: "5★", label: "Rating" },
+              { value: 35, suffix: "+", label: "Years Experience" },
+              { value: 10000, suffix: "+", label: "Happy Pilgrims" },
+              { value: 100, suffix: "+", label: "Packages" },
             ].map((stat, i) => (
               <div key={i} className="text-center">
-                <div className="text-2xl font-bold text-gold">{stat.num}</div>
+                <div className="text-2xl font-bold text-gold">
+                  <AnimatedCounter target={stat.value} suffix={stat.suffix} />
+                </div>
                 <div className="text-white/50 text-xs tracking-wide mt-1">{stat.label}</div>
               </div>
             ))}
+            <div className="text-center">
+              <div className="text-2xl font-bold text-gold">5★</div>
+              <div className="text-white/50 text-xs tracking-wide mt-1">Rating</div>
+            </div>
           </div>
         </motion.div>
       </section>
@@ -175,16 +189,21 @@ export default function Home() {
         <div className="container mx-auto px-4">
           <div className="glass rounded-2xl shadow-xl border border-border/30 p-4 grid grid-cols-4 gap-6">
             {[
-              { num: "35+", label: "Years" },
-              { num: "10K+", label: "Pilgrims" },
-              { num: "100+", label: "Packages" },
-              { num: "5★", label: "Rating" },
+              { value: 35, suffix: "+", label: "Years" },
+              { value: 10000, suffix: "+", label: "Pilgrims" },
+              { value: 100, suffix: "+", label: "Packages" },
             ].map((stat, i) => (
               <div key={i} className="text-center">
-                <div className="text-lg font-bold text-primary">{stat.num}</div>
+                <div className="text-lg font-bold text-primary">
+                  <AnimatedCounter target={stat.value} suffix={stat.suffix} />
+                </div>
                 <div className="text-muted-foreground text-[10px] tracking-wide">{stat.label}</div>
               </div>
             ))}
+            <div className="text-center">
+              <div className="text-lg font-bold text-primary">5★</div>
+              <div className="text-muted-foreground text-[10px] tracking-wide">Rating</div>
+            </div>
           </div>
         </div>
       </section>
@@ -330,10 +349,10 @@ export default function Home() {
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
             {[
-              { icon: Award, title: "35+ Years", desc: "Trusted legacy in Hajj & Umrah travel", value: 35 },
-              { icon: Users, title: "10,000+ Pilgrims", desc: "Successfully guided on sacred journeys", value: 10000 },
-              { icon: Star, title: "Expert Guides", desc: "Knowledgeable Aalims & scholars", value: 50 },
-              { icon: Shield, title: "24/7 Support", desc: "Always here for you, anywhere", value: 24 }
+              { icon: Award, title: "35+ Years", desc: "Trusted legacy in Hajj & Umrah travel", value: 35, suffix: "+" },
+              { icon: Users, title: "10,000+ Pilgrims", desc: "Successfully guided on sacred journeys", value: 10000, suffix: "+" },
+              { icon: Star, title: "Expert Guides", desc: "Knowledgeable Aalims & scholars", value: 50, suffix: "+" },
+              { icon: Shield, title: "24/7 Support", desc: "Always here for you, anywhere", value: 24, suffix: "/7" }
             ].map((point, i) => (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -346,7 +365,10 @@ export default function Home() {
                 <div className="w-14 h-14 rounded-xl bg-gold/20 flex items-center justify-center mx-auto mb-5 group-hover:scale-110 transition-transform">
                   <point.icon className="text-gold" size={26} />
                 </div>
-                <h4 className="text-lg font-bold text-white mb-2">{point.title}</h4>
+                <div className="text-3xl font-bold text-gold mb-2">
+                  <AnimatedCounter target={point.value} suffix={point.suffix} />
+                </div>
+                <h4 className="text-base font-bold text-white mb-1">{point.title}</h4>
                 <p className="text-white/40 text-sm">{point.desc}</p>
               </motion.div>
             ))}
@@ -354,7 +376,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="py-24 bg-gradient-to-b from-white to-muted/30">
+      <section className="py-24 bg-gradient-to-b from-white to-muted/30 overflow-hidden">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
@@ -363,29 +385,23 @@ export default function Home() {
               <p className="text-muted-foreground max-w-xl mx-auto">Real experiences from those who traveled with us.</p>
             </motion.div>
           </div>
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {[
-              { name: "Ahmed Khan", text: "Al Burhan made our Hajj journey incredibly smooth. The guides were extremely knowledgeable and supportive throughout the spiritual process.", rating: 5, initial: "AK" },
-              { name: "Fatima Shaikh", text: "The arrangements for our Umrah were flawless. Hotels were very close to the Haram, and the entire team was helpful 24/7.", rating: 5, initial: "FS" },
-              { name: "Mohammed Ali", text: "We recently went for Iraq Ziyarat. Everything from flights to local transport was well organized. Highly recommended!", rating: 5, initial: "MA" }
-            ].map((testimonial, i) => (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
+        <div className="relative w-full overflow-hidden">
+          <div className="flex gap-6 animate-marquee">
+            {[...testimonials, ...testimonials].map((testimonial, i) => (
+              <div
                 key={i}
-                className="bg-white rounded-2xl p-8 shadow-lg shadow-black/[0.03] border border-border/50 relative group hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+                className="bg-white rounded-2xl p-7 shadow-lg shadow-black/[0.03] border border-border/50 relative min-w-[340px] max-w-[340px] shrink-0"
               >
-                <Quote className="absolute top-6 right-6 text-primary/[0.06] w-16 h-16" />
-                <div className="flex gap-1 mb-5">
+                <Quote className="absolute top-5 right-5 text-primary/[0.06] w-12 h-12" />
+                <div className="flex gap-1 mb-4">
                   {[...Array(testimonial.rating)].map((_, j) => (
                     <Star key={j} className="w-4 h-4 fill-accent text-accent" />
                   ))}
                 </div>
-                <p className="text-muted-foreground mb-6 italic leading-relaxed text-sm">"{testimonial.text}"</p>
-                <div className="flex items-center gap-3 border-t border-border/50 pt-5">
+                <p className="text-muted-foreground mb-5 italic leading-relaxed text-sm">"{testimonial.text}"</p>
+                <div className="flex items-center gap-3 border-t border-border/50 pt-4">
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
                     {testimonial.initial}
                   </div>
@@ -394,7 +410,7 @@ export default function Home() {
                     <div className="text-xs text-muted-foreground">Verified Pilgrim</div>
                   </div>
                 </div>
-              </motion.div>
+              </div>
             ))}
           </div>
         </div>

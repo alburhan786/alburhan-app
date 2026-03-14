@@ -10,12 +10,52 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { usePayment } from "@/hooks/use-payment";
 import { formatCurrency } from "@/lib/utils";
-import { ChevronLeft, Star, Check, X, Share2, Plane, Building2, MapPin, UtensilsCrossed, Bus, FileText, Users, Calendar, Clock, CreditCard, ArrowRight, Shield, Phone } from "lucide-react";
+import { ChevronLeft, ChevronDown, Star, Check, X, Share2, Plane, Building2, MapPin, UtensilsCrossed, Bus, FileText, Users, Calendar, Clock, CreditCard, ArrowRight, Shield, Phone } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+
+function getItinerary(type: string, duration: string | null | undefined) {
+  const days = parseInt(duration || "14") || 14;
+  const itineraries: Record<string, { day: string; title: string; desc: string }[]> = {
+    umrah: [
+      { day: "Day 1", title: "Departure & Arrival in Madinah", desc: "Board your flight from India to Madinah. Upon arrival, transfer to your hotel near Masjid-e-Nabawi. Rest and freshen up." },
+      { day: "Day 2-4", title: "Madinah Ziyarat", desc: "Visit Masjid-e-Nabawi, Roza-e-Rasool (S.A.W), Jannat-ul-Baqi, Masjid Quba, Masjid Qiblatain, Uhud Mountain, and other sacred sites in Madinah." },
+      { day: `Day 5`, title: "Transfer to Makkah", desc: "After Fajr prayer, board the bus to Makkah. Check-in to your hotel near Masjid-ul-Haram." },
+      { day: `Day 5`, title: "Umrah Rituals", desc: "Perform Umrah: Ihram, Tawaf around the Holy Kaaba, Sa'ee between Safa and Marwah, and Halq/Taqseer." },
+      { day: `Day 6-${Math.max(days - 2, 8)}`, title: "Makkah Stay & Ziyarat", desc: "Daily prayers at Masjid-ul-Haram. Visit Jabal-e-Noor (Cave Hira), Jabal-e-Rehmat, Mina, Muzdalifah, Arafat, and other historic sites." },
+      { day: `Day ${Math.max(days - 1, 9)}`, title: "Free Day & Shopping", desc: "Free time for additional Tawaf, personal prayers, and shopping for souvenirs and gifts." },
+      { day: `Day ${days}`, title: "Departure", desc: "Check out from hotel. Transfer to Jeddah Airport for your return flight to India." },
+    ],
+    ramadan_umrah: [
+      { day: "Day 1", title: "Departure & Arrival", desc: "Board your flight from India. Arrive in Madinah and transfer to your hotel near Masjid-e-Nabawi." },
+      { day: "Day 2-5", title: "Madinah During Ramadan", desc: "Experience the blessed month of Ramadan in Madinah. Daily Taraweeh prayers at Masjid-e-Nabawi, Iftar arrangements, and Madinah Ziyarat." },
+      { day: "Day 6", title: "Transfer to Makkah", desc: "Travel to Makkah. Check-in near Masjid-ul-Haram. Perform Umrah rituals." },
+      { day: "Day 7-12", title: "Ramadan in Makkah", desc: "Special Ramadan prayers, Taraweeh, and Tahajjud at Masjid-ul-Haram. Daily Iftar and Suhoor arrangements near the Haram." },
+      { day: "Day 13-14", title: "Last Days & Departure", desc: "Final prayers and Tawaf-e-Wida. Transfer to airport for return journey." },
+    ],
+    hajj: [
+      { day: "Day 1-3", title: "Arrival & Makkah Stay", desc: "Arrive in Jeddah/Makkah. Transfer to hotel. Perform Tawaf-e-Qudoom and initial prayers at Masjid-ul-Haram." },
+      { day: "Day 4-7", title: "Pre-Hajj Preparation", desc: "Hajj training sessions, Makkah Ziyarat, and spiritual preparation for the sacred pilgrimage." },
+      { day: "8th Dhul Hijjah", title: "Mina (Yawm al-Tarwiyah)", desc: "Don Ihram and proceed to Mina. Pray Dhuhr, Asr, Maghrib, Isha, and Fajr at Mina camps." },
+      { day: "9th Dhul Hijjah", title: "Arafat & Muzdalifah", desc: "Stand at Arafat (Wuquf) — the most important pillar of Hajj. After sunset, proceed to Muzdalifah for overnight stay." },
+      { day: "10th Dhul Hijjah", title: "Eid ul-Adha & Jamarat", desc: "Pelt Jamrat al-Aqabah, sacrifice, shave/trim hair, perform Tawaf-e-Ifadah and Sa'ee." },
+      { day: "11-12th Dhul Hijjah", title: "Days of Tashreeq", desc: "Stay in Mina. Pelt all three Jamarat on both days. Return to Makkah hotel." },
+      { day: "Post-Hajj", title: "Madinah Visit", desc: "Travel to Madinah for Ziyarat. Visit Masjid-e-Nabawi, Roza-e-Rasool (S.A.W), and other sacred sites." },
+      { day: "Final Day", title: "Tawaf-e-Wida & Departure", desc: "Perform farewell Tawaf. Transfer to airport for return flight to India." },
+    ],
+    iraq_ziyarat: [
+      { day: "Day 1", title: "Arrival in Najaf", desc: "Arrive at Najaf Airport. Transfer to hotel. Visit the holy shrine of Imam Ali (A.S)." },
+      { day: "Day 2", title: "Najaf Ziyarat", desc: "Visit Wadi-us-Salaam cemetery, Masjid-e-Kufa, Masjid-e-Sahla, and other sacred sites in Najaf." },
+      { day: "Day 3-4", title: "Karbala Ziyarat", desc: "Travel to Karbala. Visit the holy shrines of Imam Hussain (A.S) and Hazrat Abbas (A.S). Explore surrounding historical sites." },
+      { day: "Day 5", title: "Kazmain & Samarra", desc: "Visit Kazmain shrine of Imam Musa Kazim (A.S) and Imam Jawad (A.S). Proceed to Samarra for Imam Hadi (A.S) and Imam Askari (A.S) shrines." },
+      { day: "Day 6-7", title: "Baghdad & Departure", desc: "Explore Baghdad's Islamic sites. Final Ziyarat and shopping. Transfer to airport for return." },
+    ],
+  };
+  return itineraries[type] || itineraries.umrah || [];
+}
 
 const bookingSchema = z.object({
   customerName: z.string().min(2, "Name is required"),
@@ -64,6 +104,59 @@ function DetailRow({ icon: Icon, label, value }: { icon: LucideIcon; label: stri
       </div>
       <span className="font-semibold text-sm text-foreground text-right max-w-[55%]">{value}</span>
     </div>
+  );
+}
+
+function ItineraryAccordion({ type, duration }: { type: string; duration: string | null | undefined }) {
+  const itinerary = getItinerary(type, duration);
+  const [openIdx, setOpenIdx] = useState<number | null>(0);
+
+  if (itinerary.length === 0) return null;
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.27 }}>
+      <h2 className="font-bold text-foreground text-lg mb-4 flex items-center gap-2">
+        <div className="w-1 h-6 rounded-full bg-primary" />
+        Day-by-Day Itinerary
+      </h2>
+      <div className="bg-white rounded-2xl border border-border/60 overflow-hidden shadow-sm divide-y divide-border/40">
+        {itinerary.map((item, i) => (
+          <div key={i}>
+            <button
+              onClick={() => setOpenIdx(openIdx === i ? null : i)}
+              className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-muted/30 transition-colors"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-primary/8 flex flex-col items-center justify-center shrink-0">
+                  <span className="text-[10px] text-primary/60 font-medium uppercase leading-none">{item.day.split(' ')[0]}</span>
+                  <span className="text-sm font-bold text-primary leading-tight">{item.day.split(' ').slice(1).join(' ')}</span>
+                </div>
+                <span className="font-semibold text-foreground text-sm">{item.title}</span>
+              </div>
+              <ChevronDown
+                size={18}
+                className={`text-muted-foreground shrink-0 transition-transform duration-300 ${openIdx === i ? 'rotate-180' : ''}`}
+              />
+            </button>
+            <AnimatePresence>
+              {openIdx === i && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.25 }}
+                  className="overflow-hidden"
+                >
+                  <div className="px-5 pb-4 pl-[4.75rem]">
+                    <p className="text-muted-foreground text-sm leading-relaxed">{item.desc}</p>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        ))}
+      </div>
+    </motion.div>
   );
 }
 
@@ -345,6 +438,8 @@ export default function PackageDetail() {
                   </div>
                 </motion.div>
               )}
+
+              <ItineraryAccordion type={pkg.type} duration={pkg.duration} />
 
               <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
                 <h2 className="font-bold text-foreground text-lg mb-4 flex items-center gap-2">
