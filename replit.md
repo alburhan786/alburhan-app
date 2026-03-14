@@ -137,6 +137,17 @@ Packages have a `details` JSONB column for structured fields:
   - **Bus List**: A4 portrait table with bus assignments and contact info
 - Emergency contacts on printed docs: Saudi 0547090786, India 0568780786
 
+## Design Theme
+
+- **Fonts**: Playfair Display (serif headings) + Inter (sans body text)
+- **Primary color**: Dark green (hsl 158, 45%, 22%)
+- **Accent/Gold**: hsl(40, 76%, 54%) + gold gradient (#C9A84C to #E8D48B)
+- **Dark green**: #0A3D2A (hero backgrounds, footer)
+- **Deep green**: #0D2E1F (top banner)
+- **Style**: Glassmorphism header, dark immersive heroes, gold accents, pill navigation
+- **Layout**: Responsive with mobile-first approach, sticky sidebar on package detail (desktop)
+- **Animations**: Framer Motion for section reveals, hover effects, page transitions
+
 ## Database Commands
 
 - Push schema: `pnpm --filter @workspace/db run push`

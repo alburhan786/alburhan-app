@@ -1,9 +1,9 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,600&family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
 @theme inline {
-  --font-sans: 'Plus Jakarta Sans', sans-serif;
+  --font-sans: 'Inter', system-ui, sans-serif;
   --font-serif: 'Playfair Display', serif;
 
   --color-background: hsl(var(--background));
@@ -35,38 +35,36 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+  --color-gold: #C9A84C;
+  --color-gold-light: #E8D48B;
+  --color-dark-green: #0A3D2A;
+  --color-deep-green: #0D2E1F;
 }
 
 :root {
-  /* Background: Light mint green — matches mobile app */
-  --background: 138 60% 97%;
-  --foreground: 158 60% 10%;
+  --background: 150 20% 98%;
+  --foreground: 160 30% 8%;
 
-  /* Primary: Forest green — matches app header */
-  --primary: 152 42% 30%;
+  --primary: 158 45% 22%;
   --primary-foreground: 0 0% 100%;
 
-  /* Accent: Warm orange/amber — matches app Featured badge & "Tours & Travels" */
-  --accent: 33 90% 48%;
+  --accent: 40 76% 54%;
   --accent-foreground: 0 0% 100%;
 
-  /* Secondary */
-  --secondary: 138 30% 93%;
-  --secondary-foreground: 152 42% 25%;
+  --secondary: 150 15% 94%;
+  --secondary-foreground: 158 40% 20%;
 
-  /* Card: Pure white */
   --card: 0 0% 100%;
-  --card-foreground: 158 60% 10%;
-  --card-border: 138 20% 88%;
+  --card-foreground: 160 30% 8%;
+  --card-border: 150 15% 90%;
 
-  /* Muted */
-  --muted: 138 20% 93%;
-  --muted-foreground: 152 15% 45%;
+  --muted: 150 12% 94%;
+  --muted-foreground: 160 10% 42%;
 
-  /* Utilities */
-  --border: 138 20% 86%;
-  --input: 138 20% 86%;
-  --ring: 152 42% 30%;
+  --border: 150 12% 88%;
+  --input: 150 12% 88%;
+  --ring: 158 45% 22%;
 
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
@@ -81,17 +79,59 @@
   body {
     @apply bg-background text-foreground antialiased font-sans;
   }
+  h1, h2, h3, h4, h5, h6 {
+    text-wrap: balance;
+  }
 }
 
 @layer utilities {
   .app-header {
-    background-color: hsl(152, 42%, 28%);
+    background-color: hsl(158, 45%, 20%);
   }
   .category-blue {
     color: #2563eb;
   }
   .featured-badge {
-    background-color: hsl(33, 90%, 48%);
+    background-color: hsl(40, 76%, 54%);
     color: white;
   }
+  .glass {
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(20px) saturate(1.8);
+    -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  }
+  .glass-dark {
+    background: rgba(10, 61, 42, 0.85);
+    backdrop-filter: blur(20px) saturate(1.8);
+    -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  }
+  .gold-gradient {
+    background: linear-gradient(135deg, #C9A84C 0%, #E8D48B 50%, #C9A84C 100%);
+  }
+  .gold-text {
+    background: linear-gradient(135deg, #C9A84C 0%, #E8D48B 50%, #C9A84C 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .text-shadow-hero {
+    text-shadow: 0 2px 20px rgba(0,0,0,0.4), 0 4px 40px rgba(0,0,0,0.2);
+  }
+  .shimmer {
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%);
+    background-size: 200% 100%;
+    animation: shimmer 3s ease-in-out infinite;
+  }
+  .scrollbar-none::-webkit-scrollbar { display: none; }
+  .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
 }

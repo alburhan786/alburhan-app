@@ -10,11 +10,12 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { usePayment } from "@/hooks/use-payment";
 import { formatCurrency } from "@/lib/utils";
-import { ChevronLeft, Star, Check, X, Share2, Plane, Building2, MapPin, UtensilsCrossed, Bus, FileText, Users, Calendar, Clock, CreditCard } from "lucide-react";
+import { ChevronLeft, Star, Check, X, Share2, Plane, Building2, MapPin, UtensilsCrossed, Bus, FileText, Users, Calendar, Clock, CreditCard, ArrowRight, Shield, Phone } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { motion } from "framer-motion";
 
 const bookingSchema = z.object({
   customerName: z.string().min(2, "Name is required"),
@@ -54,9 +55,11 @@ const TYPE_KEY: Record<string, string> = {
 
 function DetailRow({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 last:border-b-0">
-      <div className="flex items-center gap-2.5">
-        <Icon size={16} className="text-primary/70" />
+    <div className="flex items-center justify-between px-5 py-3.5 border-b border-border/40 last:border-b-0 hover:bg-muted/30 transition-colors">
+      <div className="flex items-center gap-3">
+        <div className="w-8 h-8 rounded-lg bg-primary/8 flex items-center justify-center">
+          <Icon size={15} className="text-primary/70" />
+        </div>
         <span className="text-muted-foreground text-sm">{label}</span>
       </div>
       <span className="font-semibold text-sm text-foreground text-right max-w-[55%]">{value}</span>
@@ -179,13 +182,13 @@ export default function PackageDetail() {
   const details: PackageDetails = pkg.details || {};
   const exclusions = ["5% GST", "Personal expenses", "Travel insurance", "Qurbani"];
 
-  const renderBottomCTA = () => {
+  const renderCTAButton = () => {
     if (approvedBooking) {
       return (
         <button
           onClick={handlePayNow}
           disabled={isPaymentLoading}
-          className="px-8 py-3 bg-primary text-white font-bold rounded-2xl text-base shadow-lg hover:bg-primary/90 transition-colors flex items-center gap-2 disabled:opacity-60"
+          className="w-full py-4 gold-gradient text-dark-green font-bold rounded-xl text-base shadow-lg hover:opacity-90 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
         >
           <CreditCard size={18} />
           {isPaymentLoading ? "Processing..." : "Pay Now"}
@@ -194,300 +197,361 @@ export default function PackageDetail() {
     }
     if (pendingBooking) {
       return (
-        <button
-          disabled
-          className="px-8 py-3 bg-amber-500 text-white font-bold rounded-2xl text-base shadow-lg opacity-80 cursor-not-allowed"
-        >
-          Booking Pending
-        </button>
-      );
-    }
-    if (!isAuthenticated) {
-      return (
-        <button
-          onClick={handleBookNow}
-          className="px-8 py-3 bg-primary text-white font-bold rounded-2xl text-base shadow-lg hover:bg-primary/90 transition-colors"
-        >
-          Login to Book
+        <button disabled className="w-full py-4 bg-amber-500 text-white font-bold rounded-xl text-base shadow-lg opacity-80 cursor-not-allowed">
+          Booking Under Review
         </button>
       );
     }
     return (
       <button
         onClick={handleBookNow}
-        className="px-8 py-3 bg-primary text-white font-bold rounded-2xl text-base shadow-lg hover:bg-primary/90 transition-colors"
+        className="w-full py-4 bg-primary text-white font-bold rounded-xl text-base shadow-lg hover:bg-primary/90 transition-colors"
       >
-        Book Now
+        {!isAuthenticated ? "Login to Book" : "Book This Package"}
       </button>
     );
   };
 
   return (
     <MainLayout>
-      <div className="bg-white border-b border-border sticky top-[96px] z-40 flex items-center justify-between px-4 py-3">
-        <Link href="/packages">
-          <button className="flex items-center gap-1 text-sm font-medium text-foreground hover:text-primary transition-colors">
-            <ChevronLeft size={18} /> Packages
-          </button>
-        </Link>
-        <span className="text-primary font-semibold text-sm">Package Details</span>
-        <div className="w-20" />
-      </div>
+      <section className="relative bg-dark-green overflow-hidden">
+        <div className="absolute inset-0">
+          <img
+            src={pkg.imageUrl || "https://images.unsplash.com/photo-1584551246679-0daf3d275d0f?w=1200&q=80"}
+            alt={pkg.name}
+            className="w-full h-full object-cover opacity-30"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-dark-green via-dark-green/80 to-dark-green/50" />
+        </div>
+        <div className="container mx-auto px-4 relative z-10 py-8 pb-12">
+          <Link href="/packages">
+            <button className="flex items-center gap-1.5 text-sm font-medium text-white/70 hover:text-white transition-colors mb-6">
+              <ChevronLeft size={16} /> Back to Packages
+            </button>
+          </Link>
+
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <div className="flex flex-wrap gap-2 mb-4">
+              <span className="px-3 py-1 rounded-lg bg-white/15 backdrop-blur-sm text-white text-xs font-bold border border-white/10">
+                {TYPE_KEY[pkg.type] || pkg.type.toUpperCase()}
+              </span>
+              <span className="px-3 py-1 rounded-lg bg-gold/20 text-gold text-xs font-semibold border border-gold/20">
+                {TYPE_DISPLAY[pkg.type] || pkg.type.replace('_', ' ')}
+              </span>
+              {pkg.featured && (
+                <span className="px-3 py-1 rounded-lg gold-gradient text-dark-green text-xs font-bold flex items-center gap-1">
+                  <Star size={10} fill="currentColor" /> FEATURED
+                </span>
+              )}
+            </div>
+            <h1 className="text-3xl md:text-4xl font-serif font-bold text-white mb-3">{pkg.name}</h1>
+            {pkg.description && (
+              <p className="text-white/60 text-sm leading-relaxed max-w-2xl">{pkg.description}</p>
+            )}
+          </motion.div>
+        </div>
+      </section>
 
       <div className="bg-background min-h-screen pb-32">
-        <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-
-          <div className="flex flex-wrap gap-2">
-            <span className="px-3 py-1 rounded-full bg-primary text-white text-xs font-bold">
-              {TYPE_KEY[pkg.type] || pkg.type.toUpperCase()}
-            </span>
-            <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold">
-              {TYPE_DISPLAY[pkg.type] || pkg.type.replace('_', ' ')}
-            </span>
-            {pkg.featured && (
-              <span className="px-3 py-1 rounded-full text-white text-xs font-bold flex items-center gap-1" style={{ backgroundColor: 'hsl(33, 90%, 48%)' }}>
-                <Star size={10} fill="white" /> FEATURED
-              </span>
-            )}
-          </div>
-
-          <div>
-            <h1 className="text-2xl font-bold text-foreground mb-3 font-sans">{pkg.name}</h1>
-            {pkg.description && (
-              <p className="text-muted-foreground text-sm leading-relaxed">{pkg.description}</p>
-            )}
-          </div>
-
-          <div>
-            <h2 className="font-bold text-foreground text-base mb-3">Package Details</h2>
-            <div className="bg-white rounded-2xl border border-border/60 overflow-hidden shadow-sm">
-              <DetailRow icon={Clock} label="Duration" value={pkg.duration || 'TBD'} />
-              {details.airline && (
-                <DetailRow icon={Plane} label="Airline" value={details.airline} />
-              )}
-              {details.departureCities && details.departureCities.length > 0 && (
-                <DetailRow icon={MapPin} label="Departure Cities" value={details.departureCities.join(', ')} />
-              )}
-              {pkg.departureDates && pkg.departureDates.length > 0 && (
-                <DetailRow icon={Calendar} label="Departure Date" value={pkg.departureDates[0]} />
-              )}
-              {details.returnDate && (
-                <DetailRow icon={Calendar} label="Return Date" value={details.returnDate} />
-              )}
-              {details.visa && (
-                <DetailRow icon={FileText} label="Visa" value={details.visa} />
-              )}
-              {details.transport && (
-                <DetailRow icon={Bus} label="Transport" value={details.transport} />
-              )}
-              {details.mealPlan && (
-                <DetailRow icon={UtensilsCrossed} label="Meals" value={details.mealPlan} />
-              )}
-              {details.roomType && (
-                <DetailRow icon={Users} label="Room Type" value={details.roomType} />
-              )}
-              {details.hotelMakkah && (
-                <DetailRow icon={Building2} label="Hotel (Makkah)" value={`${details.hotelMakkah}${details.hotelCategoryMakkah ? ` – ${details.hotelCategoryMakkah}` : ''}`} />
-              )}
-              {details.distanceMakkah && (
-                <DetailRow icon={MapPin} label="Distance (Haram)" value={details.distanceMakkah} />
-              )}
-              {details.hotelMadinah && (
-                <DetailRow icon={Building2} label="Hotel (Madinah)" value={`${details.hotelMadinah}${details.hotelCategoryMadinah ? ` – ${details.hotelCategoryMadinah}` : ''}`} />
-              )}
-              {details.distanceMadinah && (
-                <DetailRow icon={MapPin} label="Distance (Masjid Nabawi)" value={details.distanceMadinah} />
-              )}
-              <DetailRow icon={FileText} label="GST" value={`${pkg.gstPercent}% (excluded)`} />
-            </div>
-          </div>
-
-          <div>
-            <h2 className="font-bold text-foreground text-base mb-3">Room Pricing</h2>
-            <div className="bg-white rounded-2xl border border-border/60 overflow-hidden shadow-sm">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
-                <span className="text-muted-foreground text-sm">Quad Sharing (4 persons)</span>
-                <span className="font-semibold text-sm text-primary">{formatCurrency(pkg.pricePerPerson)}</span>
-              </div>
-              <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
-                <span className="text-muted-foreground text-sm">Triple Sharing (3 persons)</span>
-                <span className="font-semibold text-sm text-primary">{formatCurrency(Math.round(pkg.pricePerPerson * 1.15))}</span>
-              </div>
-              <div className="flex items-center justify-between px-4 py-3">
-                <span className="text-muted-foreground text-sm">Double Sharing (2 persons)</span>
-                <span className="font-semibold text-sm text-primary">{formatCurrency(Math.round(pkg.pricePerPerson * 1.3))}</span>
-              </div>
-            </div>
-          </div>
-
-          {pkg.includes && pkg.includes.length > 0 && (
-            <div>
-              <h2 className="font-bold text-foreground text-base mb-3">Inclusions</h2>
-              <div className="bg-white rounded-2xl border border-border/60 p-4 shadow-sm space-y-3">
-                {pkg.includes.map((inc, i) => (
-                  <div key={i} className="flex items-start gap-3">
-                    <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                      <Check size={12} className="text-primary" strokeWidth={3} />
-                    </div>
-                    <span className="text-foreground text-sm">{inc}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {pkg.highlights && pkg.highlights.length > 0 && (
-            <div>
-              <h2 className="font-bold text-foreground text-base mb-3">Highlights</h2>
-              <div className="bg-white rounded-2xl border border-border/60 p-4 shadow-sm space-y-3">
-                {pkg.highlights.map((h, i) => (
-                  <div key={i} className="flex items-start gap-3">
-                    <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 text-primary font-bold text-xs bg-primary/10">
-                      {i + 1}
-                    </div>
-                    <span className="text-foreground text-sm">{h}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div>
-            <h2 className="font-bold text-foreground text-base mb-3">Exclusions</h2>
-            <div className="bg-white rounded-2xl border border-border/60 p-4 shadow-sm space-y-3">
-              {exclusions.map((exc, i) => (
-                <div key={i} className="flex items-start gap-3">
-                  <div className="w-5 h-5 rounded-full bg-red-100 flex items-center justify-center shrink-0 mt-0.5">
-                    <X size={12} className="text-red-500" strokeWidth={3} />
-                  </div>
-                  <span className="text-foreground text-sm">{exc}</span>
+        <div className="container mx-auto px-4 py-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 space-y-6">
+              <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+                <h2 className="font-bold text-foreground text-lg mb-4 flex items-center gap-2">
+                  <div className="w-1 h-6 rounded-full bg-primary" />
+                  Package Details
+                </h2>
+                <div className="bg-white rounded-2xl border border-border/60 overflow-hidden shadow-sm">
+                  <DetailRow icon={Clock} label="Duration" value={pkg.duration || 'TBD'} />
+                  {details.airline && <DetailRow icon={Plane} label="Airline" value={details.airline} />}
+                  {details.departureCities && details.departureCities.length > 0 && (
+                    <DetailRow icon={MapPin} label="Departure Cities" value={details.departureCities.join(', ')} />
+                  )}
+                  {pkg.departureDates && pkg.departureDates.length > 0 && (
+                    <DetailRow icon={Calendar} label="Departure Date" value={pkg.departureDates[0]} />
+                  )}
+                  {details.returnDate && <DetailRow icon={Calendar} label="Return Date" value={details.returnDate} />}
+                  {details.visa && <DetailRow icon={FileText} label="Visa" value={details.visa} />}
+                  {details.transport && <DetailRow icon={Bus} label="Transport" value={details.transport} />}
+                  {details.mealPlan && <DetailRow icon={UtensilsCrossed} label="Meals" value={details.mealPlan} />}
+                  {details.roomType && <DetailRow icon={Users} label="Room Type" value={details.roomType} />}
+                  {details.hotelMakkah && (
+                    <DetailRow icon={Building2} label="Hotel (Makkah)" value={`${details.hotelMakkah}${details.hotelCategoryMakkah ? ` – ${details.hotelCategoryMakkah}` : ''}`} />
+                  )}
+                  {details.distanceMakkah && <DetailRow icon={MapPin} label="Distance (Haram)" value={details.distanceMakkah} />}
+                  {details.hotelMadinah && (
+                    <DetailRow icon={Building2} label="Hotel (Madinah)" value={`${details.hotelMadinah}${details.hotelCategoryMadinah ? ` – ${details.hotelCategoryMadinah}` : ''}`} />
+                  )}
+                  {details.distanceMadinah && <DetailRow icon={MapPin} label="Distance (Masjid Nabawi)" value={details.distanceMadinah} />}
+                  <DetailRow icon={FileText} label="GST" value={`${pkg.gstPercent}% (excluded)`} />
                 </div>
-              ))}
-            </div>
-          </div>
+              </motion.div>
 
-          <div>
-            <h2 className="font-bold text-foreground text-base mb-3">Share Package</h2>
-            <div className="flex gap-3">
-              <button
-                onClick={handleWhatsAppShare}
-                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-[#25D366] text-white text-sm font-semibold"
-              >
-                <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-                Send on WhatsApp
-              </button>
-              <button
-                onClick={handleShare}
-                className="w-12 h-12 rounded-xl border border-border bg-white flex items-center justify-center text-foreground hover:bg-muted transition-colors"
-              >
-                <Share2 size={18} />
-              </button>
+              <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
+                <h2 className="font-bold text-foreground text-lg mb-4 flex items-center gap-2">
+                  <div className="w-1 h-6 rounded-full bg-accent" />
+                  Room Pricing
+                </h2>
+                <div className="bg-white rounded-2xl border border-border/60 overflow-hidden shadow-sm">
+                  {[
+                    { label: "Quad Sharing (4 persons)", mult: 1 },
+                    { label: "Triple Sharing (3 persons)", mult: 1.15 },
+                    { label: "Double Sharing (2 persons)", mult: 1.3 },
+                  ].map((room, i) => (
+                    <div key={i} className="flex items-center justify-between px-5 py-4 border-b border-border/40 last:border-b-0 hover:bg-muted/30 transition-colors">
+                      <span className="text-muted-foreground text-sm">{room.label}</span>
+                      <span className="font-bold text-primary text-base">{formatCurrency(Math.round(pkg.pricePerPerson * room.mult))}</span>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+
+              {pkg.includes && pkg.includes.length > 0 && (
+                <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+                  <h2 className="font-bold text-foreground text-lg mb-4 flex items-center gap-2">
+                    <div className="w-1 h-6 rounded-full bg-emerald-500" />
+                    Inclusions
+                  </h2>
+                  <div className="bg-white rounded-2xl border border-border/60 p-5 shadow-sm">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {pkg.includes.map((inc, i) => (
+                        <div key={i} className="flex items-start gap-3">
+                          <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center shrink-0 mt-0.5">
+                            <Check size={11} className="text-emerald-600" strokeWidth={3} />
+                          </div>
+                          <span className="text-foreground text-sm">{inc}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {pkg.highlights && pkg.highlights.length > 0 && (
+                <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
+                  <h2 className="font-bold text-foreground text-lg mb-4 flex items-center gap-2">
+                    <div className="w-1 h-6 rounded-full bg-amber-500" />
+                    Highlights
+                  </h2>
+                  <div className="bg-white rounded-2xl border border-border/60 p-5 shadow-sm space-y-3">
+                    {pkg.highlights.map((h, i) => (
+                      <div key={i} className="flex items-start gap-3">
+                        <div className="w-6 h-6 rounded-lg bg-accent/10 flex items-center justify-center shrink-0 mt-0.5 text-accent font-bold text-xs">
+                          {i + 1}
+                        </div>
+                        <span className="text-foreground text-sm">{h}</span>
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+
+              <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+                <h2 className="font-bold text-foreground text-lg mb-4 flex items-center gap-2">
+                  <div className="w-1 h-6 rounded-full bg-red-400" />
+                  Exclusions
+                </h2>
+                <div className="bg-white rounded-2xl border border-border/60 p-5 shadow-sm">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {exclusions.map((exc, i) => (
+                      <div key={i} className="flex items-start gap-3">
+                        <div className="w-5 h-5 rounded-full bg-red-100 flex items-center justify-center shrink-0 mt-0.5">
+                          <X size={11} className="text-red-500" strokeWidth={3} />
+                        </div>
+                        <span className="text-foreground text-sm">{exc}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+
+            <div className="lg:col-span-1">
+              <div className="lg:sticky lg:top-28 space-y-5">
+                <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+                  <div className="bg-white rounded-2xl border border-border/60 p-6 shadow-lg shadow-black/[0.04]">
+                    <div className="text-center mb-5">
+                      <p className="text-muted-foreground text-xs uppercase tracking-wider mb-1">Starting from</p>
+                      <p className="text-4xl font-bold text-primary">{formatCurrency(pkg.pricePerPerson)}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        per person + {pkg.gstPercent}% GST
+                        {details.airline && <span className="ml-1">| {details.airline}</span>}
+                      </p>
+                      {(details.hotelCategoryMakkah || details.hotelCategoryMadinah) && (
+                        <div className="flex gap-1.5 mt-3 justify-center">
+                          {details.hotelCategoryMakkah && (
+                            <span className="px-2 py-0.5 rounded-lg bg-amber-100 text-amber-700 text-[10px] font-bold">
+                              {'★'} {details.hotelCategoryMakkah}
+                            </span>
+                          )}
+                          {details.hotelCategoryMadinah && (
+                            <span className="px-2 py-0.5 rounded-lg bg-amber-100 text-amber-700 text-[10px] font-bold">
+                              {'★'} {details.hotelCategoryMadinah}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-3 mb-6">
+                      {pkg.duration && (
+                        <div className="flex items-center gap-2.5 text-sm">
+                          <Clock size={14} className="text-muted-foreground" />
+                          <span className="text-muted-foreground">Duration:</span>
+                          <span className="ml-auto font-medium">{pkg.duration}</span>
+                        </div>
+                      )}
+                      {pkg.departureDates && pkg.departureDates.length > 0 && (
+                        <div className="flex items-center gap-2.5 text-sm">
+                          <Calendar size={14} className="text-muted-foreground" />
+                          <span className="text-muted-foreground">Departure:</span>
+                          <span className="ml-auto font-medium">{pkg.departureDates[0]}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {renderCTAButton()}
+
+                    <div className="mt-4 flex gap-2">
+                      <button
+                        onClick={handleWhatsAppShare}
+                        className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-[#25D366]/10 text-[#25D366] text-sm font-medium hover:bg-[#25D366]/20 transition-colors"
+                      >
+                        <Phone size={15} />
+                        WhatsApp
+                      </button>
+                      <button
+                        onClick={handleShare}
+                        className="w-12 h-12 rounded-xl border border-border bg-muted/30 flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors"
+                      >
+                        <Share2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+
+                <div className="bg-primary/5 rounded-2xl border border-primary/10 p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Shield size={16} className="text-primary" />
+                    <span className="text-sm font-semibold text-primary">Trust & Safety</span>
+                  </div>
+                  <ul className="space-y-2 text-xs text-muted-foreground">
+                    <li className="flex items-center gap-2"><Check size={12} className="text-primary" /> Government Licensed Operator</li>
+                    <li className="flex items-center gap-2"><Check size={12} className="text-primary" /> 35+ Years of Experience</li>
+                    <li className="flex items-center gap-2"><Check size={12} className="text-primary" /> 24/7 Customer Support</li>
+                    <li className="flex items-center gap-2"><Check size={12} className="text-primary" /> Secure Payment Gateway</li>
+                  </ul>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-border px-4 py-3 flex items-center justify-between shadow-2xl">
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-lg border-t border-border px-4 py-3 flex items-center justify-between shadow-2xl lg:hidden">
         <div>
           <p className="text-muted-foreground text-xs">Starting from</p>
           <p className="text-xl font-bold text-foreground">{formatCurrency(pkg.pricePerPerson)}</p>
-          <p className="text-xs text-muted-foreground">
-            + {pkg.gstPercent}% GST
-            {details.airline && <span className="ml-2 text-primary">| {details.airline}</span>}
-          </p>
-          {(details.hotelCategoryMakkah || details.hotelCategoryMadinah) && (
-            <div className="flex gap-1.5 mt-1">
-              {details.hotelCategoryMakkah && (
-                <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-bold">
-                  {'★'} {details.hotelCategoryMakkah}
-                </span>
-              )}
-              {details.hotelCategoryMadinah && (
-                <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-bold">
-                  {'★'} {details.hotelCategoryMadinah}
-                </span>
-              )}
-            </div>
-          )}
+          <p className="text-xs text-muted-foreground">+ {pkg.gstPercent}% GST</p>
         </div>
 
-        {renderBottomCTA()}
-
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
-          <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="font-bold text-xl text-foreground">Complete Your Booking</DialogTitle>
-              <p className="text-muted-foreground text-sm">{pkg.name}</p>
-            </DialogHeader>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 mt-2">
-              <div>
-                <Label className="font-semibold mb-2 block">Number of Travelers</Label>
-                <Input
-                  type="number" min="1"
-                  {...register("numberOfPilgrims", {
-                    onChange: (e) => {
-                      const val = parseInt(e.target.value) || 1;
-                      const diff = val - fields.length;
-                      if (diff > 0) for (let i = 0; i < diff; i++) append({ name: '', passportNumber: '' });
-                      else if (diff < 0) for (let i = 0; i < -diff; i++) remove(fields.length - 1);
-                    }
-                  })}
-                />
-              </div>
-
-              <div>
-                <Label className="font-semibold mb-3 block">Traveler Details</Label>
-                {fields.map((field, index) => (
-                  <div key={field.id} className="bg-muted/30 rounded-xl p-4 space-y-3 mb-3">
-                    <p className="font-semibold text-sm">Traveler {index + 1}</p>
-                    <Input {...register(`pilgrims.${index}.name`)} placeholder="Full name (as per passport)" />
-                    {errors.pilgrims?.[index]?.name && <p className="text-xs text-destructive">{errors.pilgrims[index]?.name?.message}</p>}
-                    <Input {...register(`pilgrims.${index}.passportNumber`)} placeholder="Passport number (optional)" />
-                  </div>
-                ))}
-              </div>
-
-              <div>
-                <Label className="font-semibold mb-2 block">Contact Details</Label>
-                <div className="space-y-3">
-                  <Input {...register("customerName")} placeholder="Full name" defaultValue={user?.name || ''} />
-                  {errors.customerName && <p className="text-xs text-destructive">{errors.customerName.message}</p>}
-                  <Input {...register("customerMobile")} placeholder="Mobile number" type="tel" defaultValue={user?.mobile || ''} />
-                  {errors.customerMobile && <p className="text-xs text-destructive">{errors.customerMobile.message}</p>}
-                  <Input {...register("customerEmail")} placeholder="Email (optional)" type="email" defaultValue={user?.email || ''} />
-                </div>
-              </div>
-
-              <div>
-                <Label className="font-semibold mb-2 block">Preferred Departure Date</Label>
-                <select
-                  {...register("preferredDepartureDate")}
-                  className="w-full h-10 px-3 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                >
-                  <option value="">Select date</option>
-                  {pkg.departureDates?.map((d) => <option key={d} value={d}>{d}</option>)}
-                  <option value="Flexible">Flexible / Other</option>
-                </select>
-                {errors.preferredDepartureDate && <p className="text-xs text-destructive">{errors.preferredDepartureDate.message}</p>}
-              </div>
-
-              <div>
-                <Label className="font-semibold mb-2 block">Special Requests (optional)</Label>
-                <textarea
-                  {...register("notes")}
-                  className="w-full min-h-[70px] rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                  placeholder="Any special requirements?"
-                />
-              </div>
-
-              <Button type="submit" className="w-full bg-primary text-white h-12 text-base font-bold rounded-xl" disabled={createBooking.isPending}>
-                {createBooking.isPending ? "Submitting..." : "Submit Booking Request"}
-              </Button>
-              <p className="text-center text-xs text-muted-foreground">No payment required at this step</p>
-            </form>
-          </DialogContent>
-        </Dialog>
+        {approvedBooking ? (
+          <button
+            onClick={handlePayNow}
+            disabled={isPaymentLoading}
+            className="px-8 py-3 gold-gradient text-dark-green font-bold rounded-xl text-base shadow-lg flex items-center gap-2 disabled:opacity-60"
+          >
+            <CreditCard size={16} />
+            {isPaymentLoading ? "..." : "Pay Now"}
+          </button>
+        ) : pendingBooking ? (
+          <button disabled className="px-6 py-3 bg-amber-500 text-white font-bold rounded-xl text-sm opacity-80 cursor-not-allowed">
+            Pending
+          </button>
+        ) : (
+          <button
+            onClick={handleBookNow}
+            className="px-8 py-3 bg-primary text-white font-bold rounded-xl text-base shadow-lg hover:bg-primary/90 transition-colors"
+          >
+            {!isAuthenticated ? "Login" : "Book Now"}
+          </button>
+        )}
       </div>
+
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-bold text-xl text-foreground">Complete Your Booking</DialogTitle>
+            <p className="text-muted-foreground text-sm">{pkg.name}</p>
+          </DialogHeader>
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 mt-2">
+            <div>
+              <Label className="font-semibold mb-2 block">Number of Travelers</Label>
+              <Input
+                type="number" min="1"
+                {...register("numberOfPilgrims", {
+                  onChange: (e) => {
+                    const val = parseInt(e.target.value) || 1;
+                    const diff = val - fields.length;
+                    if (diff > 0) for (let i = 0; i < diff; i++) append({ name: '', passportNumber: '' });
+                    else if (diff < 0) for (let i = 0; i < -diff; i++) remove(fields.length - 1);
+                  }
+                })}
+              />
+            </div>
+
+            <div>
+              <Label className="font-semibold mb-3 block">Traveler Details</Label>
+              {fields.map((field, index) => (
+                <div key={field.id} className="bg-muted/30 rounded-xl p-4 space-y-3 mb-3">
+                  <p className="font-semibold text-sm">Traveler {index + 1}</p>
+                  <Input {...register(`pilgrims.${index}.name`)} placeholder="Full name (as per passport)" />
+                  {errors.pilgrims?.[index]?.name && <p className="text-xs text-destructive">{errors.pilgrims[index]?.name?.message}</p>}
+                  <Input {...register(`pilgrims.${index}.passportNumber`)} placeholder="Passport number (optional)" />
+                </div>
+              ))}
+            </div>
+
+            <div>
+              <Label className="font-semibold mb-2 block">Contact Details</Label>
+              <div className="space-y-3">
+                <Input {...register("customerName")} placeholder="Full name" defaultValue={user?.name || ''} />
+                {errors.customerName && <p className="text-xs text-destructive">{errors.customerName.message}</p>}
+                <Input {...register("customerMobile")} placeholder="Mobile number" type="tel" defaultValue={user?.mobile || ''} />
+                {errors.customerMobile && <p className="text-xs text-destructive">{errors.customerMobile.message}</p>}
+                <Input {...register("customerEmail")} placeholder="Email (optional)" type="email" defaultValue={user?.email || ''} />
+              </div>
+            </div>
+
+            <div>
+              <Label className="font-semibold mb-2 block">Preferred Departure Date</Label>
+              <select
+                {...register("preferredDepartureDate")}
+                className="w-full h-10 px-3 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                <option value="">Select date</option>
+                {pkg.departureDates?.map((d) => <option key={d} value={d}>{d}</option>)}
+                <option value="Flexible">Flexible / Other</option>
+              </select>
+              {errors.preferredDepartureDate && <p className="text-xs text-destructive">{errors.preferredDepartureDate.message}</p>}
+            </div>
+
+            <div>
+              <Label className="font-semibold mb-2 block">Special Requests (optional)</Label>
+              <textarea
+                {...register("notes")}
+                className="w-full min-h-[70px] rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                placeholder="Any special requirements?"
+              />
+            </div>
+
+            <Button type="submit" className="w-full bg-primary text-white h-12 text-base font-bold rounded-xl" disabled={createBooking.isPending}>
+              {createBooking.isPending ? "Submitting..." : "Submit Booking Request"}
+            </Button>
+            <p className="text-center text-xs text-muted-foreground">No payment required at this step</p>
+          </form>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }

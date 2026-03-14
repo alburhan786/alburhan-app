@@ -3,8 +3,9 @@ import { useListPackages } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
 import { Link } from "wouter";
-import { Star, Search } from "lucide-react";
+import { Star, Search, Clock, MapPin, ArrowRight, Sparkles } from "lucide-react";
 import { useState } from "react";
+import { motion } from "framer-motion";
 
 const CATEGORY_LABELS: Record<string, string> = {
   umrah: "UMRAH 2026",
@@ -56,7 +57,7 @@ const TYPE_DISPLAY: Record<string, string> = {
 };
 
 const filterTabs = [
-  { id: 'all', label: 'All' },
+  { id: 'all', label: 'All Packages' },
   { id: 'umrah', label: 'Umrah' },
   { id: 'ramadan_umrah', label: 'Ramadan Umrah' },
   { id: 'hajj', label: 'Hajj 2027' },
@@ -89,35 +90,39 @@ export default function Packages() {
 
   return (
     <MainLayout>
-      {/* App-style green header */}
-      <div className="bg-primary px-4 pt-8 pb-6 text-center">
-        <h1 className="text-2xl font-bold text-white tracking-wide">AL BURHAN</h1>
-        <p className="text-accent text-sm font-medium">Tours & Travels</p>
-        <p className="text-white/70 text-xs mt-1 italic">Your Journey to the Holy Lands</p>
-      </div>
+      <section className="relative bg-dark-green py-16 md:py-20 overflow-hidden">
+        <div className="absolute inset-0 opacity-[0.04] pointer-events-none" style={{ backgroundImage: `url(${import.meta.env.BASE_URL}images/islamic-pattern-bg.png)`, backgroundSize: '300px' }} />
+        <div className="container mx-auto px-4 relative z-10 text-center">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <span className="text-gold text-sm font-semibold uppercase tracking-widest">Al Burhan Tours & Travels</span>
+            <h1 className="text-4xl md:text-5xl font-serif font-bold text-white mt-3 mb-4">Our Packages</h1>
+            <p className="text-white/50 max-w-lg mx-auto">Browse our curated collection of Hajj, Umrah & Ziyarat packages designed for your spiritual journey.</p>
+          </motion.div>
+        </div>
+      </section>
 
-      <div className="px-4 py-4 bg-background min-h-screen">
-        {/* Search bar — matches app */}
-        <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-          <input
-            className="w-full pl-10 pr-4 py-3 rounded-xl border border-border bg-white text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 font-mono tracking-wide shadow-sm"
-            placeholder="Search packages..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
+      <div className="container mx-auto px-4 py-8 min-h-screen">
+        <div className="flex flex-col md:flex-row gap-4 mb-8 -mt-8 relative z-10">
+          <div className="relative flex-1">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
+            <input
+              className="w-full pl-12 pr-4 py-3.5 rounded-xl border border-border bg-white text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-lg shadow-black/5 font-sans"
+              placeholder="Search packages by name or description..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          </div>
         </div>
 
-        {/* Type filter — horizontal scroll */}
-        <div className="flex gap-2 overflow-x-auto pb-3 mb-6 scrollbar-none">
+        <div className="flex gap-2 overflow-x-auto pb-4 mb-8 scrollbar-none">
           {filterTabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setFilter(tab.id)}
-              className={`px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap border transition-all ${
+              className={`px-5 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap border transition-all duration-200 ${
                 filter === tab.id
-                  ? 'bg-primary text-white border-primary shadow-sm'
-                  : 'bg-white text-foreground border-border hover:border-primary/50'
+                  ? 'bg-primary text-white border-primary shadow-md shadow-primary/20'
+                  : 'bg-white text-foreground/70 border-border hover:border-primary/30 hover:text-primary'
               }`}
             >
               {tab.label}
@@ -132,12 +137,12 @@ export default function Packages() {
         ) : filtered.length === 0 ? (
           <div className="text-center py-24 bg-white rounded-2xl border border-border shadow-sm">
             <Search className="w-14 h-14 mx-auto mb-4 opacity-20" />
-            <p className="text-xl font-bold text-primary mb-2">No Packages Found</p>
+            <p className="text-xl font-bold text-foreground mb-2">No Packages Found</p>
             <p className="text-muted-foreground text-sm mb-6">Try a different search or filter.</p>
             <Button variant="outline" onClick={() => { setFilter('all'); setSearch(''); }}>View All</Button>
           </div>
         ) : (
-          <div className="space-y-8">
+          <div className="space-y-10">
             {sortedKeys.map(type => {
               const pkgs = grouped[type];
               const color = CATEGORY_COLORS[type] || '#2563EB';
@@ -145,78 +150,81 @@ export default function Packages() {
               const subtitle = CATEGORY_SUBTITLES[type] || '';
               const note = CATEGORY_NOTES[type] || '';
               return (
-                <div key={type}>
-                  {/* Section header — matches app exactly */}
-                  <div className="bg-white rounded-2xl px-4 py-3 mb-3 border border-border/50 shadow-sm flex items-start gap-3">
-                    <div className="w-1 rounded-full self-stretch" style={{ backgroundColor: color, minHeight: 40 }} />
+                <motion.div
+                  key={type}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                >
+                  <div className="flex items-center gap-4 mb-5">
+                    <div className="w-1.5 h-12 rounded-full" style={{ backgroundColor: color }} />
                     <div>
-                      <span
-                        className="inline-block px-3 py-1 rounded-full text-white text-xs font-bold mb-1"
-                        style={{ backgroundColor: color }}
-                      >
-                        {label}
-                      </span>
-                      <p className="font-bold text-foreground text-sm">{subtitle}</p>
-                      <p className="text-muted-foreground text-xs">{pkgs.length} package{pkgs.length !== 1 ? 's' : ''}{note ? ` · ${note}` : ''}</p>
+                      <div className="flex items-center gap-2.5">
+                        <span
+                          className="inline-block px-3.5 py-1 rounded-lg text-white text-xs font-bold tracking-wide"
+                          style={{ backgroundColor: color }}
+                        >
+                          {label}
+                        </span>
+                        <span className="text-muted-foreground text-xs">{pkgs.length} package{pkgs.length !== 1 ? 's' : ''}{note ? ` · ${note}` : ''}</span>
+                      </div>
+                      <p className="font-semibold text-foreground text-sm mt-1">{subtitle}</p>
                     </div>
                   </div>
 
-                  {/* Package cards */}
-                  <div className="space-y-3">
-                    {pkgs.map(pkg => (
-                      <div key={pkg.id} className="bg-white rounded-2xl border border-border/60 shadow-sm overflow-hidden">
-                        <div className="p-4">
-                          {/* Featured badge */}
-                          {pkg.featured && (
-                            <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-white text-xs font-semibold mb-2" style={{ backgroundColor: 'hsl(33, 90%, 48%)' }}>
-                              <Star size={10} fill="white" /> Featured
-                            </div>
-                          )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {pkgs.map((pkg, idx) => (
+                      <motion.div
+                        key={pkg.id}
+                        initial={{ opacity: 0, y: 15 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
+                        transition={{ delay: idx * 0.05 }}
+                      >
+                        <Link href={`/packages/${pkg.id}`}>
+                          <div className="bg-white rounded-2xl border border-border/60 overflow-hidden hover:shadow-xl hover:shadow-black/[0.06] hover:-translate-y-1 transition-all duration-300 group cursor-pointer h-full flex flex-col" style={{ borderLeftWidth: 3, borderLeftColor: color }}>
+                            <div className="p-5 flex-1 flex flex-col">
+                              {pkg.featured && (
+                                <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-white text-xs font-semibold mb-3 w-fit" style={{ backgroundColor: 'hsl(40, 76%, 54%)' }}>
+                                  <Star size={10} fill="white" /> Featured
+                                </div>
+                              )}
 
-                          {/* Title */}
-                          <h3 className="font-bold text-foreground text-base leading-snug mb-0.5">{pkg.name}</h3>
+                              <h3 className="font-bold text-foreground text-base leading-snug mb-1 group-hover:text-primary transition-colors">{pkg.name}</h3>
 
-                          {/* Category label — blue like app */}
-                          <p className="text-xs font-semibold mb-2" style={{ color }}>
-                            {TYPE_DISPLAY[pkg.type] || pkg.type.replace('_', ' ')}
-                          </p>
+                              <p className="text-xs font-semibold mb-3" style={{ color }}>
+                                {TYPE_DISPLAY[pkg.type] || pkg.type.replace('_', ' ')}
+                              </p>
 
-                          {/* Description — 2 lines truncated */}
-                          {pkg.description && (
-                            <p className="text-muted-foreground text-xs leading-relaxed mb-3 line-clamp-2">{pkg.description}</p>
-                          )}
+                              {pkg.description && (
+                                <p className="text-muted-foreground text-xs leading-relaxed mb-4 line-clamp-2 flex-1">{pkg.description}</p>
+                              )}
 
-                          {/* Duration + Departure — two columns */}
-                          <div className="grid grid-cols-2 gap-3 mb-3">
-                            <div>
-                              <p className="text-muted-foreground text-xs mb-0.5">Duration</p>
-                              <p className="font-semibold text-sm text-foreground">{pkg.duration || 'TBD'}</p>
-                            </div>
-                            {pkg.departureDates && pkg.departureDates.length > 0 && (
-                              <div>
-                                <p className="text-muted-foreground text-xs mb-0.5">Departure</p>
-                                <p className="font-semibold text-sm text-foreground">{pkg.departureDates[0]}</p>
+                              <div className="flex items-center gap-3 text-xs text-muted-foreground mb-4">
+                                {pkg.duration && (
+                                  <span className="flex items-center gap-1"><Clock size={13} className="text-accent" /> {pkg.duration}</span>
+                                )}
+                                {pkg.departureDates && pkg.departureDates.length > 0 && (
+                                  <span className="flex items-center gap-1"><MapPin size={13} className="text-accent" /> {pkg.departureDates[0]}</span>
+                                )}
                               </div>
-                            )}
-                          </div>
 
-                          {/* Divider */}
-                          <div className="border-t border-border/50 pt-3 flex items-end justify-between">
-                            <div>
-                              <p className="text-muted-foreground text-xs mb-0.5">Starting from</p>
-                              <p className="text-xl font-bold text-foreground">{formatCurrency(pkg.pricePerPerson)}</p>
+                              <div className="border-t border-border/50 pt-4 flex items-end justify-between mt-auto">
+                                <div>
+                                  <p className="text-muted-foreground text-[10px] uppercase tracking-wider mb-0.5">Starting from</p>
+                                  <p className="text-xl font-bold text-foreground">{formatCurrency(pkg.pricePerPerson)}</p>
+                                </div>
+                                <span className="text-primary text-sm font-semibold flex items-center gap-1 group-hover:gap-2 transition-all">
+                                  Details <ArrowRight size={14} />
+                                </span>
+                              </div>
                             </div>
-                            <Link href={`/packages/${pkg.id}`}>
-                              <button className="px-4 py-2 rounded-xl text-white text-sm font-semibold bg-primary hover:bg-primary/90 transition-colors">
-                                View Details →
-                              </button>
-                            </Link>
                           </div>
-                        </div>
-                      </div>
+                        </Link>
+                      </motion.div>
                     ))}
                   </div>
-                </div>
+                </motion.div>
               );
             })}
           </div>
