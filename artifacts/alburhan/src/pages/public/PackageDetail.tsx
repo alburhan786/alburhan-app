@@ -382,6 +382,20 @@ export default function PackageDetail() {
             + {pkg.gstPercent}% GST
             {details.airline && <span className="ml-2 text-primary">| {details.airline}</span>}
           </p>
+          {(details.hotelCategoryMakkah || details.hotelCategoryMadinah) && (
+            <div className="flex gap-1.5 mt-1">
+              {details.hotelCategoryMakkah && (
+                <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-bold">
+                  {'★'} {details.hotelCategoryMakkah}
+                </span>
+              )}
+              {details.hotelCategoryMadinah && (
+                <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-bold">
+                  {'★'} {details.hotelCategoryMadinah}
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         {renderBottomCTA()}
