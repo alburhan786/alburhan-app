@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useRoute } from "wouter";
-import { PrintHeader } from "./PrintHeader";
 
 const API = import.meta.env.VITE_API_URL || "";
 const BASE = import.meta.env.BASE_URL || "/";
@@ -11,6 +10,10 @@ interface Pilgrim {
   passportNumber?: string;
 }
 interface Group { id: string; groupName: string; year: number; maktabNumber?: string; }
+
+const DARK = "#0A3D2A";
+const GOLD = "#C9A84C";
+const GOLD_LIGHT = "#E8D48B";
 
 export default function PrintLuggage() {
   const [, params] = useRoute("/admin/groups/:groupId/print/luggage");
@@ -33,92 +36,118 @@ export default function PrintLuggage() {
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
 
   const relations = ["Self", "Wife", "Husband", "Mother", "Father", "Son", "Daughter", "Brother", "Sister"];
-  const pages: Pilgrim[][] = [];
-  for (let i = 0; i < pilgrims.length; i += 2) pages.push(pilgrims.slice(i, i + 2));
 
   return (
     <>
       <style>{`
         @media print {
-          @page { size: A4 portrait; margin: 8mm; }
+          @page { size: A4 portrait; margin: 10mm; }
           body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
           .no-print { display: none !important; }
         }
         * { box-sizing: border-box; }
-        .sticker {
-          width: 100%; border: 2px solid #0A3D2A; border-radius: 8px; overflow: hidden;
-          page-break-inside: avoid; font-family: 'Inter', Arial, sans-serif;
+        .luggage-sticker {
+          width: 150mm; height: 190mm;
+          border: 1.5px solid ${DARK}; border-radius: 6px; overflow: hidden;
+          page-break-inside: avoid; page-break-after: always;
+          font-family: 'Inter', Arial, sans-serif;
+          background: #fff; position: relative;
+          margin: 0 auto 5mm;
         }
-        .stickers-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; padding: 3mm; }
-        .page-break { page-break-after: always; }
+        .luggage-sticker:last-child { page-break-after: auto; }
       `}</style>
 
       <div className="no-print" style={{ padding: "16px", background: "#fef3c7", textAlign: "center" }}>
-        <button onClick={() => window.print()} style={{ padding: "10px 24px", background: "#0A3D2A", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", marginRight: "12px" }}>Print Luggage Stickers</button>
+        <button onClick={() => window.print()} style={{ padding: "10px 24px", background: DARK, color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", marginRight: "12px" }}>Print Luggage Stickers</button>
         <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
       </div>
 
-      {pages.map((page, pi) => (
-        <div key={pi} className={pi < pages.length - 1 ? "page-break" : ""}>
-          <PrintHeader title="Luggage Stickers" subtitle={`${group.groupName} — ${group.year}`} />
-          <div className="stickers-grid">
-            {page.map(p => (
-              <div key={p.id} className="sticker">
-                <div style={{ background: "linear-gradient(135deg, #0A3D2A, #145a3a)", color: "#fff", padding: "3mm 4mm", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "2mm" }}>
-                    <img src={`${BASE}images/logo.png`} alt="" style={{ height: "12mm", objectFit: "contain" }} />
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: "11pt", letterSpacing: "0.5px" }}>Al Burhan Tours & Travels</div>
-                      <div style={{ fontSize: "7pt", opacity: 0.8 }}>Burhanpur, M.P.</div>
-                    </div>
-                  </div>
-                  <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: "16pt", fontWeight: 800, color: "#C9A84C" }}>#{p.serialNumber}</div>
-                    <div style={{ fontSize: "7pt", opacity: 0.8 }}>{group.year}</div>
-                  </div>
+      {pilgrims.map(p => (
+        <div key={p.id} className="luggage-sticker">
+          <div style={{ position: "relative", overflow: "hidden", height: "100%", display: "flex", flexDirection: "column" }}>
+            <div style={{
+              position: "absolute", top: "-15mm", right: "-10mm",
+              width: "70mm", height: "70mm",
+              background: DARK, borderRadius: "0 0 0 60%", zIndex: 0,
+            }} />
+            <div style={{
+              position: "absolute", bottom: "-10mm", left: "-8mm",
+              width: "55mm", height: "55mm",
+              background: `linear-gradient(135deg, ${GOLD}, ${GOLD_LIGHT})`,
+              borderRadius: "0 60% 0 0", zIndex: 0,
+            }} />
+
+            <div style={{ position: "relative", zIndex: 1, padding: "5mm 6mm 3mm", display: "flex", alignItems: "center", gap: "3mm" }}>
+              <img src={`${BASE}images/logo.png`} alt="" style={{ height: "14mm", objectFit: "contain" }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, fontSize: "13pt", color: DARK, letterSpacing: "0.5px" }}>Al Burhan Tours & Travels</div>
+                <div style={{ fontSize: "8pt", color: "#666" }}>Burhanpur, M.P.</div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: "22pt", fontWeight: 800, color: "#fff" }}>#{String(p.serialNumber).padStart(3, "0")}</div>
+                <div style={{ fontSize: "8pt", color: "#fff", opacity: 0.9 }}>HAJJ {group.year}</div>
+              </div>
+            </div>
+
+            <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", alignItems: "center", padding: "4mm 6mm 2mm", flex: 1 }}>
+              <div style={{ marginBottom: "3mm" }}>
+                {p.photoUrl ? (
+                  <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "42mm", height: "42mm", objectFit: "cover", borderRadius: "50%", border: `3px solid ${GOLD}`, boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }} />
+                ) : (
+                  <div style={{ width: "42mm", height: "42mm", background: "#f0f0f0", borderRadius: "50%", border: `3px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10pt", color: "#aaa" }}>PHOTO</div>
+                )}
+              </div>
+
+              <div style={{ fontSize: "18pt", fontWeight: 800, color: DARK, textAlign: "center", lineHeight: 1.2, marginBottom: "4mm", maxWidth: "130mm", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.fullName}</div>
+
+              <div style={{
+                width: "100%", background: "#f9f9f9", borderRadius: "4px",
+                padding: "3mm 5mm", marginBottom: "3mm",
+                display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2mm 6mm",
+                fontSize: "10pt",
+              }}>
+                <div>
+                  <div style={{ fontSize: "6pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.5px" }}>Passport</div>
+                  <div style={{ fontWeight: 700, fontFamily: "monospace", letterSpacing: "0.5px" }}>{p.passportNumber || "—"}</div>
                 </div>
-
-                <div style={{ display: "flex", padding: "4mm", gap: "4mm" }}>
-                  <div style={{ width: "28mm", flexShrink: 0 }}>
-                    {p.photoUrl ? (
-                      <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "28mm", height: "34mm", objectFit: "cover", borderRadius: "4px", border: "2px solid #0A3D2A" }} />
-                    ) : (
-                      <div style={{ width: "28mm", height: "34mm", background: "#f0f0f0", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "4px", border: "2px solid #ccc", fontSize: "7pt", color: "#aaa" }}>PHOTO</div>
-                    )}
-                  </div>
-
-                  <div style={{ flex: 1, fontSize: "9pt", lineHeight: 1.6 }}>
-                    <div style={{ fontWeight: 800, fontSize: "13pt", color: "#0A3D2A", marginBottom: "2mm", lineHeight: 1.2 }}>{p.fullName}</div>
-                    <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "0.5mm 3mm", fontSize: "8.5pt" }}>
-                      <span style={{ color: "#666" }}>Group:</span><span style={{ fontWeight: 600 }}>{group.groupName}</span>
-                      <span style={{ color: "#666" }}>Passport:</span><span style={{ fontWeight: 600, fontFamily: "monospace", letterSpacing: "0.5px" }}>{p.passportNumber || "—"}</span>
-                      <span style={{ color: "#666" }}>Maktab:</span><span style={{ fontWeight: 600 }}>{group.maktabNumber || "—"}</span>
-                      <span style={{ color: "#666" }}>City:</span><span style={{ fontWeight: 600 }}>{p.city || "—"}</span>
-                      <span style={{ color: "#666" }}>India:</span><span style={{ fontWeight: 600 }}>{p.mobileIndia || "—"}</span>
-                      <span style={{ color: "#666" }}>Saudi:</span><span style={{ fontWeight: 600 }}>{p.mobileSaudi || "—"}</span>
-                    </div>
-                  </div>
+                <div>
+                  <div style={{ fontSize: "6pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.5px" }}>Maktab</div>
+                  <div style={{ fontWeight: 700 }}>{group.maktabNumber || "—"}</div>
                 </div>
-
-                <div style={{ padding: "0 4mm 2mm" }}>
-                  <div style={{ display: "flex", gap: "2mm", flexWrap: "wrap" }}>
-                    {relations.map(r => (
-                      <span key={r} style={{
-                        padding: "1mm 3mm", borderRadius: "3px", fontSize: "7pt",
-                        background: p.relation === r ? "#0A3D2A" : "#f5f5f5",
-                        color: p.relation === r ? "#fff" : "#888",
-                        fontWeight: p.relation === r ? 700 : 400,
-                        border: p.relation === r ? "none" : "1px solid #ddd",
-                      }}>{r}</span>
-                    ))}
-                  </div>
+                <div>
+                  <div style={{ fontSize: "6pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.5px" }}>City</div>
+                  <div style={{ fontWeight: 700 }}>{p.city || "—"}</div>
                 </div>
-
-                <div style={{ background: "#0A3D2A", color: "#C9A84C", padding: "1.5mm 4mm", fontSize: "7pt", textAlign: "center", fontWeight: 600, letterSpacing: "0.3px" }}>
-                  Emergency: 0547090786 / 0568780786
+                <div>
+                  <div style={{ fontSize: "6pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.5px" }}>Group</div>
+                  <div style={{ fontWeight: 700 }}>{group.groupName}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: "6pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.5px" }}>India Mobile</div>
+                  <div style={{ fontWeight: 700 }}>{p.mobileIndia || "—"}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: "6pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.5px" }}>Saudi Mobile</div>
+                  <div style={{ fontWeight: 700 }}>{p.mobileSaudi || "—"}</div>
                 </div>
               </div>
-            ))}
+
+              <div style={{ display: "flex", gap: "2mm", flexWrap: "wrap", justifyContent: "center", marginBottom: "3mm" }}>
+                {relations.map(r => (
+                  <span key={r} style={{
+                    padding: "1.5mm 4mm", borderRadius: "3px", fontSize: "8pt",
+                    background: p.relation === r ? DARK : "#f5f5f5",
+                    color: p.relation === r ? GOLD : "#888",
+                    fontWeight: p.relation === r ? 700 : 400,
+                    border: p.relation === r ? "none" : "1px solid #ddd",
+                  }}>{r}</span>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ position: "relative", zIndex: 2, background: DARK, color: GOLD, padding: "2.5mm 5mm", fontSize: "8pt", textAlign: "center", fontWeight: 600, letterSpacing: "0.3px" }}>
+              Emergency: 0547090786 / 0568780786
+            </div>
           </div>
         </div>
       ))}

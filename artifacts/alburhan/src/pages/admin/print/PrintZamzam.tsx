@@ -1,12 +1,16 @@
 import { useState, useEffect } from "react";
 import { useRoute } from "wouter";
-import { PrintHeader } from "./PrintHeader";
+import { Barcode } from "@/components/print/Barcode";
 
 const API = import.meta.env.VITE_API_URL || "";
 const BASE = import.meta.env.BASE_URL || "/";
 
 interface Pilgrim { id: string; serialNumber: number; fullName: string; photoUrl?: string; }
 interface Group { id: string; groupName: string; year: number; }
+
+const DARK = "#0A3D2A";
+const GOLD = "#C9A84C";
+const GOLD_LIGHT = "#E8D48B";
 
 export default function PrintZamzam() {
   const [, params] = useRoute("/admin/groups/:groupId/print/zamzam");
@@ -28,74 +32,80 @@ export default function PrintZamzam() {
 
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
 
-  const pages: Pilgrim[][] = [];
-  for (let i = 0; i < pilgrims.length; i += 6) pages.push(pilgrims.slice(i, i + 6));
-
   return (
     <>
       <style>{`
         @media print {
-          @page { size: A4 portrait; margin: 8mm; }
+          @page { size: A4 portrait; margin: 10mm; }
           body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
           .no-print { display: none !important; }
         }
         * { box-sizing: border-box; }
-        .zamzam-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; padding: 3mm; }
-        .page-break { page-break-after: always; }
         .zamzam-sticker {
-          border: 2px solid #0A3D2A; border-radius: 8px; overflow: hidden;
-          page-break-inside: avoid; font-family: 'Inter', Arial, sans-serif; height: 88mm;
-          display: flex; flex-direction: column;
+          width: 150mm; height: 190mm;
+          border: 1.5px solid ${DARK}; border-radius: 6px; overflow: hidden;
+          page-break-inside: avoid; page-break-after: always;
+          font-family: 'Inter', Arial, sans-serif;
+          background: #fff; position: relative;
+          margin: 0 auto 5mm;
         }
+        .zamzam-sticker:last-child { page-break-after: auto; }
       `}</style>
 
       <div className="no-print" style={{ padding: "16px", background: "#fef3c7", textAlign: "center" }}>
-        <button onClick={() => window.print()} style={{ padding: "10px 24px", background: "#0A3D2A", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", marginRight: "12px" }}>Print Zamzam Stickers</button>
+        <button onClick={() => window.print()} style={{ padding: "10px 24px", background: DARK, color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", marginRight: "12px" }}>Print Zamzam Stickers</button>
         <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
       </div>
 
-      {pages.map((page, pi) => (
-        <div key={pi} className={pi < pages.length - 1 ? "page-break" : ""}>
-          <PrintHeader title="Zamzam Water Labels" subtitle={`${group.groupName} — ${group.year}`} />
-          <div className="zamzam-grid">
-            {page.map(p => (
-              <div key={p.id} className="zamzam-sticker">
-                <div style={{
-                  background: "linear-gradient(135deg, #0A3D2A, #1a6b45)",
-                  color: "#fff", padding: "5mm 5mm 4mm", textAlign: "center", position: "relative", overflow: "hidden",
-                }}>
-                  <div style={{ position: "absolute", top: "-4mm", right: "-4mm", width: "20mm", height: "20mm", background: "rgba(201,168,76,0.15)", borderRadius: "50%" }} />
-                  <div style={{ position: "absolute", bottom: "-6mm", left: "-4mm", width: "16mm", height: "16mm", background: "rgba(201,168,76,0.1)", borderRadius: "50%" }} />
-                  <img src={`${BASE}images/logo.png`} alt="" style={{ height: "8mm", objectFit: "contain", position: "relative", marginBottom: "1mm" }} />
-                  <div style={{ fontSize: "22pt", fontWeight: 900, letterSpacing: "4px", lineHeight: 1, position: "relative" }}>ZAMZAM</div>
-                  <div style={{ fontSize: "6pt", opacity: 0.8, marginTop: "1.5mm", letterSpacing: "1px", position: "relative" }}>HOLY WATER</div>
-                </div>
+      {pilgrims.map(p => (
+        <div key={p.id} className="zamzam-sticker">
+          <div style={{ position: "relative", overflow: "hidden", height: "100%", display: "flex", flexDirection: "column" }}>
+            <div style={{
+              position: "absolute", top: "-15mm", right: "-10mm",
+              width: "70mm", height: "70mm",
+              background: DARK, borderRadius: "0 0 0 60%", zIndex: 0,
+            }} />
+            <div style={{
+              position: "absolute", bottom: "-10mm", left: "-8mm",
+              width: "55mm", height: "55mm",
+              background: `linear-gradient(135deg, ${GOLD}, ${GOLD_LIGHT})`,
+              borderRadius: "0 60% 0 0", zIndex: 0,
+            }} />
 
-                <div style={{ flex: 1, display: "flex", justifyContent: "center", alignItems: "center", padding: "4mm 5mm", gap: "4mm" }}>
-                  <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
-                    <div style={{ fontSize: "6pt", color: "#888", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "1mm" }}>Serial No.</div>
-                    <div style={{ fontSize: "20pt", fontWeight: 800, color: "#0A3D2A", lineHeight: 1 }}>#{String(p.serialNumber).padStart(3, "0")}</div>
+            <div style={{
+              position: "relative", zIndex: 1,
+              padding: "6mm 6mm 4mm", textAlign: "center",
+            }}>
+              <img src={`${BASE}images/logo.png`} alt="" style={{ height: "14mm", objectFit: "contain", marginBottom: "2mm" }} />
+              <div style={{ fontSize: "28pt", fontWeight: 900, letterSpacing: "5px", color: DARK, lineHeight: 1 }}>ZAMZAM</div>
+              <div style={{ fontSize: "9pt", color: GOLD, fontWeight: 700, letterSpacing: "2px", marginTop: "2mm" }}>HOLY WATER</div>
+            </div>
 
-                    <div style={{ width: "80%", height: "1px", background: "#e0e0e0", margin: "3mm 0" }} />
-
-                    <div style={{ fontSize: "11pt", fontWeight: 700, color: "#333", lineHeight: 1.2, marginBottom: "2mm" }}>{p.fullName}</div>
-                    <div style={{ fontSize: "8pt", color: "#666" }}>{group.groupName} — {group.year}</div>
-                  </div>
-
-                  <div style={{ flexShrink: 0 }}>
-                    {p.photoUrl ? (
-                      <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "18mm", height: "22mm", objectFit: "cover", borderRadius: "3px", border: "1.5px solid #0A3D2A" }} />
-                    ) : (
-                      <div style={{ width: "18mm", height: "22mm", background: "#f0f0f0", borderRadius: "3px", border: "1.5px solid #ccc", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "5pt", color: "#aaa" }}>PHOTO</div>
-                    )}
-                  </div>
-                </div>
-
-                <div style={{ background: "#0A3D2A", color: "#C9A84C", padding: "2mm", textAlign: "center", fontSize: "6pt", fontWeight: 600, letterSpacing: "0.5px" }}>
-                  AL BURHAN TOURS & TRAVELS — BURHANPUR
-                </div>
+            <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", alignItems: "center", flex: 1, padding: "2mm 6mm" }}>
+              <div style={{ marginBottom: "4mm" }}>
+                {p.photoUrl ? (
+                  <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "42mm", height: "42mm", objectFit: "cover", borderRadius: "50%", border: `3px solid ${GOLD}`, boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }} />
+                ) : (
+                  <div style={{ width: "42mm", height: "42mm", background: "#f0f0f0", borderRadius: "50%", border: `3px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10pt", color: "#aaa" }}>PHOTO</div>
+                )}
               </div>
-            ))}
+
+              <div style={{ fontSize: "7pt", color: "#888", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "1mm" }}>Serial No.</div>
+              <div style={{ fontSize: "26pt", fontWeight: 800, color: DARK, lineHeight: 1, marginBottom: "4mm" }}>#{String(p.serialNumber).padStart(3, "0")}</div>
+
+              <div style={{ width: "60%", height: "1px", background: "#e0e0e0", marginBottom: "4mm" }} />
+
+              <div style={{ fontSize: "16pt", fontWeight: 700, color: "#333", lineHeight: 1.2, textAlign: "center", marginBottom: "3mm", maxWidth: "130mm", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.fullName}</div>
+              <div style={{ fontSize: "10pt", color: "#666", marginBottom: "4mm" }}>{group.groupName} — {group.year}</div>
+
+              <div style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
+                <Barcode value={`ZAM${String(p.serialNumber).padStart(3, "0")}`} height={30} width={1.8} fontSize={0} />
+              </div>
+            </div>
+
+            <div style={{ position: "relative", zIndex: 2, background: DARK, color: GOLD, padding: "2.5mm 5mm", fontSize: "8pt", textAlign: "center", fontWeight: 600, letterSpacing: "0.3px" }}>
+              AL BURHAN TOURS & TRAVELS — BURHANPUR &nbsp;|&nbsp; Emergency: 0547090786 / 0568780786
+            </div>
           </div>
         </div>
       ))}
