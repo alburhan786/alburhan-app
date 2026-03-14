@@ -25,6 +25,8 @@ tags:
     description: Admin operations
   - name: inquiry
     description: Public inquiry form
+  - name: groups
+    description: Hajj groups and pilgrim management (admin only)
 
 paths:
   /healthz:
@@ -583,6 +585,253 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Inquiry"
+
+  /groups:
+    get:
+      tags: [groups]
+      operationId: listGroups
+      summary: List all Hajj groups (admin only)
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: List of groups with pilgrim counts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HajjGroupWithCount"
+    post:
+      tags: [groups]
+      operationId: createGroup
+      summary: Create a new Hajj group (admin only)
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HajjGroupInput"
+      responses:
+        "201":
+          description: Group created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HajjGroup"
+
+  /groups/{id}:
+    get:
+      tags: [groups]
+      operationId: getGroup
+      summary: Get a single group (admin only)
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Group details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HajjGroup"
+    put:
+      tags: [groups]
+      operationId: updateGroup
+      summary: Update a group (admin only)
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HajjGroupInput"
+      responses:
+        "200":
+          description: Group updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HajjGroup"
+    delete:
+      tags: [groups]
+      operationId: deleteGroup
+      summary: Delete a group and its pilgrims (admin only)
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Group deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /groups/{groupId}/pilgrims:
+    get:
+      tags: [groups]
+      operationId: listPilgrims
+      summary: List pilgrims in a group (admin only)
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of pilgrims
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Pilgrim"
+    post:
+      tags: [groups]
+      operationId: createPilgrim
+      summary: Add a pilgrim to a group (admin only)
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PilgrimInput"
+      responses:
+        "201":
+          description: Pilgrim created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pilgrim"
+
+  /groups/{groupId}/pilgrims/{pilgrimId}:
+    put:
+      tags: [groups]
+      operationId: updatePilgrim
+      summary: Update a pilgrim (admin only)
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: pilgrimId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PilgrimInput"
+      responses:
+        "200":
+          description: Pilgrim updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pilgrim"
+    delete:
+      tags: [groups]
+      operationId: deletePilgrim
+      summary: Delete a pilgrim (admin only)
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: pilgrimId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Pilgrim deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /groups/{groupId}/pilgrims/{pilgrimId}/photo:
+    post:
+      tags: [groups]
+      operationId: uploadPilgrimPhoto
+      summary: Upload pilgrim photo (admin only)
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: pilgrimId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                photo:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Photo uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pilgrim"
 
 components:
   schemas:
@@ -1256,3 +1505,202 @@ components:
         - mobile
         - message
         - createdAt
+
+    HotelInfo:
+      type: object
+      properties:
+        name:
+          type: string
+        address:
+          type: string
+        checkIn:
+          type: string
+        checkOut:
+          type: string
+
+    HotelsData:
+      type: object
+      properties:
+        makkah:
+          $ref: "#/components/schemas/HotelInfo"
+        madinah:
+          $ref: "#/components/schemas/HotelInfo"
+
+    HajjGroupInput:
+      type: object
+      properties:
+        groupName:
+          type: string
+        year:
+          type: integer
+        departureDate:
+          type: string
+          nullable: true
+        returnDate:
+          type: string
+          nullable: true
+        flightNumber:
+          type: string
+          nullable: true
+        maktabNumber:
+          type: string
+          nullable: true
+        hotels:
+          $ref: "#/components/schemas/HotelsData"
+        notes:
+          type: string
+          nullable: true
+      required:
+        - groupName
+        - year
+
+    HajjGroup:
+      type: object
+      properties:
+        id:
+          type: string
+        groupName:
+          type: string
+        year:
+          type: integer
+        departureDate:
+          type: string
+          nullable: true
+        returnDate:
+          type: string
+          nullable: true
+        flightNumber:
+          type: string
+          nullable: true
+        maktabNumber:
+          type: string
+          nullable: true
+        hotels:
+          $ref: "#/components/schemas/HotelsData"
+        notes:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - groupName
+        - year
+
+    HajjGroupWithCount:
+      allOf:
+        - $ref: "#/components/schemas/HajjGroup"
+        - type: object
+          properties:
+            pilgrimCount:
+              type: integer
+
+    PilgrimInput:
+      type: object
+      properties:
+        fullName:
+          type: string
+        passportNumber:
+          type: string
+        visaNumber:
+          type: string
+        dateOfBirth:
+          type: string
+        gender:
+          type: string
+        bloodGroup:
+          type: string
+        mobileIndia:
+          type: string
+        mobileSaudi:
+          type: string
+        address:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        roomNumber:
+          type: string
+        busNumber:
+          type: string
+        relation:
+          type: string
+        coverNumber:
+          type: string
+        serialNumber:
+          type: integer
+      required:
+        - fullName
+
+    Pilgrim:
+      type: object
+      properties:
+        id:
+          type: string
+        groupId:
+          type: string
+        serialNumber:
+          type: integer
+        fullName:
+          type: string
+        passportNumber:
+          type: string
+          nullable: true
+        visaNumber:
+          type: string
+          nullable: true
+        dateOfBirth:
+          type: string
+          nullable: true
+        gender:
+          type: string
+          nullable: true
+        bloodGroup:
+          type: string
+          nullable: true
+        photoUrl:
+          type: string
+          nullable: true
+        mobileIndia:
+          type: string
+          nullable: true
+        mobileSaudi:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        city:
+          type: string
+          nullable: true
+        state:
+          type: string
+          nullable: true
+        roomNumber:
+          type: string
+          nullable: true
+        busNumber:
+          type: string
+          nullable: true
+        relation:
+          type: string
+          nullable: true
+        coverNumber:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - groupId
+        - serialNumber
+        - fullName

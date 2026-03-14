@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useRoute } from "wouter";
+import { Barcode } from "@/components/print/Barcode";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -70,8 +71,8 @@ export default function PrintMedical() {
                   </div>
                   <div style={{ padding: "4mm", fontSize: "9pt", lineHeight: 1.7 }}>
                     {p.passportNumber && (
-                      <div style={{ marginBottom: "2mm", fontFamily: "monospace", letterSpacing: "2px", fontSize: "10pt", textAlign: "center", padding: "2mm", background: "#f8f8f8", borderRadius: "3px" }}>
-                        {p.passportNumber}
+                      <div style={{ marginBottom: "2mm", textAlign: "center", padding: "1.5mm", background: "#f8f8f8", borderRadius: "3px", overflow: "hidden" }}>
+                        <Barcode value={p.passportNumber} height={20} width={1.2} fontSize={7} displayValue />
                       </div>
                     )}
                     <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "1mm 4mm", fontSize: "8.5pt" }}>

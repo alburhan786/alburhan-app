@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useRoute } from "wouter";
+import { Barcode } from "@/components/print/Barcode";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -32,8 +33,6 @@ export default function PrintIdCards() {
 
   if (!group) return <div className="p-8 text-center">Loading...</div>;
 
-  const cards = pilgrims.map(p => ({ pilgrim: p, side: "front" as const }));
-
   return (
     <>
       <style>{`
@@ -62,27 +61,33 @@ export default function PrintIdCards() {
             <div className="cards-grid" style={{ padding: "2mm" }}>
               {page.map(p => (
                 <div key={`front-${p.id}`} className="id-card" style={{ display: "flex", flexDirection: "column", fontSize: "7pt", background: "#fff" }}>
-                  <div style={{ background: "#1a5632", color: "#fff", padding: "2mm 3mm", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ background: "#1a5632", color: "#fff", padding: "1.5mm 3mm", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div style={{ fontWeight: "bold", fontSize: "8pt" }}>Al Burhan Tours & Travels</div>
                     <div style={{ fontSize: "6pt" }}>#{p.serialNumber}</div>
                   </div>
-                  <div style={{ display: "flex", flex: 1, padding: "2mm" }}>
-                    <div style={{ width: "22mm", marginRight: "2mm", flexShrink: 0 }}>
+                  <div style={{ display: "flex", flex: 1, padding: "1.5mm" }}>
+                    <div style={{ width: "20mm", marginRight: "2mm", flexShrink: 0 }}>
                       {p.photoUrl ? (
-                        <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "22mm", height: "28mm", objectFit: "cover", border: "1px solid #ddd" }} />
+                        <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "20mm", height: "25mm", objectFit: "cover", border: "1px solid #ddd" }} />
                       ) : (
-                        <div style={{ width: "22mm", height: "28mm", background: "#f0f0f0", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid #ddd", fontSize: "6pt", color: "#999" }}>Photo</div>
+                        <div style={{ width: "20mm", height: "25mm", background: "#f0f0f0", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid #ddd", fontSize: "6pt", color: "#999" }}>Photo</div>
                       )}
                     </div>
-                    <div style={{ flex: 1, fontSize: "6.5pt", lineHeight: 1.4 }}>
-                      <div style={{ fontWeight: "bold", fontSize: "8pt", marginBottom: "1mm" }}>{p.fullName}</div>
-                      {p.passportNumber && <div>PP: <span style={{ fontFamily: "monospace", letterSpacing: "1px" }}>{p.passportNumber}</span></div>}
-                      {p.visaNumber && <div>Visa: <span style={{ fontFamily: "monospace", letterSpacing: "1px" }}>{p.visaNumber}</span></div>}
-                      {group.hotels?.makkah?.name && <div style={{ marginTop: "1mm" }}>Makkah: {group.hotels.makkah.name}</div>}
-                      {group.hotels?.madinah?.name && <div>Madinah: {group.hotels.madinah.name}</div>}
+                    <div style={{ flex: 1, fontSize: "6pt", lineHeight: 1.3, overflow: "hidden" }}>
+                      <div style={{ fontWeight: "bold", fontSize: "7.5pt", marginBottom: "0.5mm" }}>{p.fullName}</div>
+                      {p.passportNumber && (
+                        <div style={{ marginBottom: "0.5mm" }}>
+                          <div style={{ fontSize: "5pt", color: "#666" }}>PASSPORT</div>
+                          <div style={{ overflow: "hidden", maxHeight: "8mm" }}><Barcode value={p.passportNumber} height={14} width={0.8} fontSize={5} /></div>
+                        </div>
+                      )}
+                      {group.hotels?.makkah?.name && <div style={{ fontSize: "5.5pt" }}>Makkah: {group.hotels.makkah.name}</div>}
+                      {group.hotels?.makkah?.address && <div style={{ fontSize: "5pt", color: "#555" }}>{group.hotels.makkah.address}</div>}
+                      {group.hotels?.madinah?.name && <div style={{ fontSize: "5.5pt" }}>Madinah: {group.hotels.madinah.name}</div>}
+                      {group.hotels?.madinah?.address && <div style={{ fontSize: "5pt", color: "#555" }}>{group.hotels.madinah.address}</div>}
                     </div>
                   </div>
-                  <div style={{ background: "#f8f8f8", padding: "1.5mm 3mm", borderTop: "1px solid #eee", fontSize: "6pt", display: "flex", justifyContent: "space-between" }}>
+                  <div style={{ background: "#f8f8f8", padding: "1mm 3mm", borderTop: "1px solid #eee", fontSize: "5.5pt", display: "flex", justifyContent: "space-between" }}>
                     <span>Emergency: 0547090786</span>
                     <span>India: 0568780786</span>
                   </div>
@@ -93,27 +98,39 @@ export default function PrintIdCards() {
             <div className="cards-grid" style={{ padding: "2mm", marginTop: "4mm" }}>
               {page.map(p => (
                 <div key={`back-${p.id}`} className="id-card" style={{ display: "flex", flexDirection: "column", fontSize: "7pt", background: "#fff" }}>
-                  <div style={{ background: "#1a5632", color: "#fff", padding: "2mm 3mm", fontWeight: "bold", fontSize: "8pt" }}>
-                    Al Burhan Tours & Travels — Hotel Details
+                  <div style={{ background: "#1a5632", color: "#fff", padding: "1.5mm 3mm", fontWeight: "bold", fontSize: "7.5pt" }}>
+                    Al Burhan Tours & Travels
                   </div>
-                  <div style={{ flex: 1, padding: "3mm", fontSize: "7pt", lineHeight: 1.6 }}>
+                  <div style={{ flex: 1, padding: "2mm", fontSize: "6.5pt", lineHeight: 1.5 }}>
                     <div style={{ fontWeight: "bold", marginBottom: "1mm" }}>{p.fullName} (#{p.serialNumber})</div>
+                    {p.passportNumber && (
+                      <div style={{ marginBottom: "1mm" }}>
+                        <span style={{ fontSize: "5.5pt", color: "#666" }}>PP: </span>
+                        <span style={{ fontFamily: "monospace", letterSpacing: "1px" }}>{p.passportNumber}</span>
+                      </div>
+                    )}
+                    {p.visaNumber && (
+                      <div style={{ marginBottom: "1.5mm" }}>
+                        <div style={{ fontSize: "5pt", color: "#666" }}>VISA</div>
+                        <div style={{ overflow: "hidden", maxHeight: "8mm" }}><Barcode value={p.visaNumber} height={14} width={0.8} fontSize={5} /></div>
+                      </div>
+                    )}
                     {group.hotels?.makkah && (
-                      <div style={{ marginBottom: "2mm" }}>
-                        <div style={{ fontWeight: "bold", color: "#1a5632" }}>Makkah Hotel:</div>
+                      <div style={{ marginBottom: "1.5mm" }}>
+                        <div style={{ fontWeight: "bold", color: "#1a5632", fontSize: "6pt" }}>Makkah Hotel:</div>
                         <div>{group.hotels.makkah.name}</div>
-                        {group.hotels.makkah.address && <div>{group.hotels.makkah.address}</div>}
+                        {group.hotels.makkah.address && <div style={{ fontSize: "6pt", color: "#555" }}>{group.hotels.makkah.address}</div>}
                       </div>
                     )}
                     {group.hotels?.madinah && (
                       <div>
-                        <div style={{ fontWeight: "bold", color: "#1a5632" }}>Madinah Hotel:</div>
+                        <div style={{ fontWeight: "bold", color: "#1a5632", fontSize: "6pt" }}>Madinah Hotel:</div>
                         <div>{group.hotels.madinah.name}</div>
-                        {group.hotels.madinah.address && <div>{group.hotels.madinah.address}</div>}
+                        {group.hotels.madinah.address && <div style={{ fontSize: "6pt", color: "#555" }}>{group.hotels.madinah.address}</div>}
                       </div>
                     )}
                   </div>
-                  <div style={{ background: "#f8f8f8", padding: "1.5mm 3mm", borderTop: "1px solid #eee", fontSize: "6pt", textAlign: "center" }}>
+                  <div style={{ background: "#f8f8f8", padding: "1mm 3mm", borderTop: "1px solid #eee", fontSize: "5.5pt", textAlign: "center" }}>
                     {group.groupName} — {group.year} | Maktab: {group.maktabNumber || "N/A"}
                   </div>
                 </div>
