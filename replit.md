@@ -55,6 +55,7 @@ artifacts/
         │   ├── bookings.ts     # Booking management + approve/reject
         │   ├── payments.ts     # Razorpay order + verify
         │   ├── documents.ts    # File upload management
+        │   ├── gallery.ts      # Image gallery CRUD (admin upload, public list)
         │   ├── notifications.ts# Send SMS/WhatsApp to customers
         │   ├── admin.ts        # Stats + customer list + inquiries
         │   └── inquiry.ts      # Public inquiry form
@@ -72,6 +73,7 @@ lib/
     ├── packages.ts
     ├── bookings.ts
     ├── documents.ts
+    ├── gallery.ts
     └── inquiries.ts
 ```
 

@@ -7,6 +7,8 @@ import Home from "@/pages/public/Home";
 import Packages from "@/pages/public/Packages";
 import PackageDetail from "@/pages/public/PackageDetail";
 import Ziyarat from "@/pages/public/Ziyarat";
+import Hotels from "@/pages/public/Hotels";
+import AIAssistant from "@/pages/public/AIAssistant";
 import Blog from "@/pages/public/Blog";
 import About from "@/pages/public/About";
 import Contact from "@/pages/public/Contact";
@@ -16,6 +18,7 @@ import CustomerDashboard from "@/pages/customer/Dashboard";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import PackagesManager from "@/pages/admin/PackagesManager";
 import BookingsManager from "@/pages/admin/BookingsManager";
+import GalleryManager from "@/pages/admin/GalleryManager";
 import NotFound from "@/pages/not-found";
 import { useAuth } from "@/hooks/use-auth";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -48,6 +51,8 @@ function Router() {
       <Route path="/packages" component={Packages} />
       <Route path="/packages/:id" component={PackageDetail} />
       <Route path="/ziyarat" component={Ziyarat} />
+      <Route path="/hotels" component={Hotels} />
+      <Route path="/ai-assistant" component={AIAssistant} />
       <Route path="/blog" component={Blog} />
       <Route path="/about" component={About} />
       <Route path="/contact" component={Contact} />
@@ -64,6 +69,7 @@ function Router() {
       <Route path="/admin/dashboard" component={() => <AdminRoute component={AdminDashboard} />} />
       <Route path="/admin/packages" component={() => <AdminRoute component={PackagesManager} />} />
       <Route path="/admin/bookings" component={() => <AdminRoute component={BookingsManager} />} />
+      <Route path="/admin/gallery" component={() => <AdminRoute component={GalleryManager} />} />
       <Route path="/admin/customers" component={() => <AdminRoute component={() => <div className="p-8 text-2xl font-serif">Customers Manager (Coming Soon)</div>} />} />
       <Route path="/admin/inquiries" component={() => <AdminRoute component={() => <div className="p-8 text-2xl font-serif">Inquiries Manager (Coming Soon)</div>} />} />
 

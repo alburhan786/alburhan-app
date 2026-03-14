@@ -8,6 +8,7 @@ import documentsRouter from "./documents.js";
 import notificationsRouter from "./notifications.js";
 import adminRouter from "./admin.js";
 import inquiryRouter from "./inquiry.js";
+import galleryRouter from "./gallery.js";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use("/documents", documentsRouter);
 router.use("/notifications", notificationsRouter);
 router.use("/admin", adminRouter);
 router.use("/inquiry", inquiryRouter);
+router.use("/gallery", galleryRouter);
 
 export default router;

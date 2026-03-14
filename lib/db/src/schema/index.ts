@@ -4,3 +4,4 @@ export * from "./packages";
 export * from "./bookings";
 export * from "./documents";
 export * from "./inquiries";
+export * from "./gallery";
