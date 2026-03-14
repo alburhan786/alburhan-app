@@ -1,0 +1,291 @@
+For Al Burhan Tours & Travels, the most powerful final system you can add is a Hajj & Umrah Operations Management System (Group Leader + Admin + Pilgrim ecosystem).
+This will make your company work like large international Hajj operators.
+
+Below is a complete prompt for Replit AI to build the full operations system.
+
+⸻
+
+Replit Prompt — Hajj & Umrah Operations Management System
+
+Create a complete Hajj & Umrah operations management system for Al Burhan Tours & Travels (alburhantravels.com).
+
+The system must include Admin CRM + Pilgrim Dashboard + Group Leader Mobile App + QR Check-in System.
+
+The goal is to manage large Hajj / Umrah groups efficiently.
+
+⸻
+
+System Components
+
+1️⃣ Admin CRM Panel
+2️⃣ Pilgrim Dashboard
+3️⃣ Group Leader Mobile Interface
+4️⃣ QR Code Check-in System
+5️⃣ WhatsApp Automation
+
+⸻
+
+1️⃣ Admin CRM (Travel Office)
+
+Admin can manage:
+
+• Customers
+• Pilgrim lists
+• Packages
+• Payments
+• Documents
+• Flights
+• Hotels
+• Buses
+
+Admin can generate:
+
+• ID cards
+• Luggage tags
+• Zam Zam tags
+• Passport confirmation letters
+
+Admin dashboard shows:
+
+• Total pilgrims
+• Upcoming departures
+• Visa status
+• Payment status
+
+⸻
+
+2️⃣ Pilgrim Dashboard
+
+Pilgrims login using:
+
+Mobile number + WhatsApp OTP.
+
+Pilgrim can:
+
+• upload passport
+• upload photo
+• download ticket
+• download visa
+• download ID card
+• view hotel room
+• view bus number
+
+Pilgrim can print:
+
+• luggage sticker
+• zam zam tag
+
+⸻
+
+3️⃣ Group Leader Mobile Dashboard
+
+Create a mobile-friendly interface for group leaders.
+
+Group leader can see:
+
+• list of pilgrims
+• hotel room list
+• bus passenger list
+
+Search pilgrims by:
+
+Name
+Passport number
+Room number
+
+⸻
+
+4️⃣ QR Code Check-in System
+
+Each pilgrim receives a QR code on their ID card.
+
+QR contains:
+
+Pilgrim ID
+Name
+Passport number
+Package
+
+When scanned by group leader:
+
+System shows:
+
+Photo
+Name
+Room number
+Bus number
+
+Group leader can mark:
+
+✔ Present
+✔ Missing
+
+Use cases:
+
+Airport check-in
+Hotel check-in
+Bus boarding
+Ziyarat tour attendance
+
+⸻
+
+5️⃣ Bus Attendance Tracking
+
+Group leader scans QR before bus departure.
+
+System shows passenger list.
+
+Example:
+
+Bus 1
+Driver: Ahmed
+
+Passengers:
+
+Ali ✔
+Hassan ✔
+Mohammed ❌
+
+Admin can see missing pilgrims.
+
+⸻
+
+6️⃣ Hotel Room Management
+
+Admin assigns rooms.
+
+Room view example:
+
+Hotel: Swissotel Makkah
+
+Room 1201
+
+Ali
+Hassan
+Mohammed
+Yusuf
+
+Group leader can check room list.
+
+⸻
+
+7️⃣ WhatsApp Automation
+
+Integrate BotBee WhatsApp API.
+
+Automatically send:
+
+Booking confirmation
+Payment invoice
+Flight details
+Hotel room details
+Bus number
+Visa approval
+
+Example message:
+
+Assalamu Alaikum
+
+Dear {{name}}
+
+Your hotel room has been assigned.
+
+Hotel: {{hotel}}
+Room: {{room}}
+
+Al Burhan Tours & Travels
+
+
+⸻
+
+8️⃣ Emergency System
+
+Add emergency contact panel.
+
+Pilgrim can click:
+
+Emergency Help
+
+Shows:
+
+Group Leader Phone
+Office Phone
+Saudi Contact Number
+
+⸻
+
+9️⃣ Reports
+
+Generate reports:
+
+Pilgrim list
+Passport status
+Visa status
+Room allocation
+Bus list
+
+Export:
+
+PDF
+Excel
+
+⸻
+
+🔟 Security
+
+Use:
+
+Admin login
+Staff login
+Group leader login
+Pilgrim login
+
+OTP authentication via WhatsApp.
+
+⸻
+
+Branding
+
+Company:
+
+Al Burhan Tours & Travels
+
+Emergency numbers:
+
+9893225590
+9893989786
+
+Logo used on:
+
+ID cards
+Documents
+Dashboard
+Luggage tags
+
+⸻
+
+Final Result
+
+A complete digital Hajj & Umrah management platform where:
+
+Admin manages operations
+Pilgrims access travel info
+Group leaders track pilgrims
+WhatsApp automation sends updates
+
+This system can manage thousands of pilgrims easily.
+
+⸻
+
+✅ If you want, I can also create the next level upgrade used by Saudi Hajj operators:
+
+Live Pilgrim Tracking System
+
+Features:
+
+• GPS bus tracking
+• Real-time pilgrim attendance
+• Live map of buses
+• Emergency alert system
+
+This will make Al Burhan Tours & Travels a world-class Hajj management platform.
