@@ -618,6 +618,8 @@ export const CreateOfflineBookingBody = zod.object({
     )
     .optional(),
   preferredDepartureDate: zod.string().optional(),
+  roomType: zod.enum(["sharing", "double", "triple", "quad"]).optional(),
+  advanceAmount: zod.number().optional(),
   notes: zod.string().optional(),
   paymentStatus: zod.enum(["pending", "paid"]).optional(),
   paymentAmount: zod.number().optional(),

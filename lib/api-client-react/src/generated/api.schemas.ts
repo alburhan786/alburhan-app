@@ -167,6 +167,16 @@ export interface CreateBookingRequest {
   notes?: string;
 }
 
+export type CreateOfflineBookingRequestRoomType =
+  (typeof CreateOfflineBookingRequestRoomType)[keyof typeof CreateOfflineBookingRequestRoomType];
+
+export const CreateOfflineBookingRequestRoomType = {
+  sharing: "sharing",
+  double: "double",
+  triple: "triple",
+  quad: "quad",
+} as const;
+
 export type CreateOfflineBookingRequestPaymentStatus =
   (typeof CreateOfflineBookingRequestPaymentStatus)[keyof typeof CreateOfflineBookingRequestPaymentStatus];
 
@@ -183,6 +193,8 @@ export interface CreateOfflineBookingRequest {
   numberOfPilgrims: number;
   pilgrims?: Pilgrim[];
   preferredDepartureDate?: string;
+  roomType?: CreateOfflineBookingRequestRoomType;
+  advanceAmount?: number;
   notes?: string;
   paymentStatus?: CreateOfflineBookingRequestPaymentStatus;
   paymentAmount?: number;

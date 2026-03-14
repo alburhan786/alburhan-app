@@ -1238,6 +1238,11 @@ components:
             $ref: "#/components/schemas/Pilgrim"
         preferredDepartureDate:
           type: string
+        roomType:
+          type: string
+          enum: [sharing, double, triple, quad]
+        advanceAmount:
+          type: number
         notes:
           type: string
         paymentStatus:

@@ -141,7 +141,10 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
     .where(eq(bookingsTable.id, bookingId))
     .returning();
 
-  const invoiceUrl = `${req.protocol}://${req.get("host")?.replace(/\/api$/, "")}/alburhan/invoice/${booking.bookingNumber}`;
+  const baseUrl = process.env.REPLIT_DEV_DOMAIN
+    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+    : `${req.protocol}://${req.get("host")?.replace(/\/api$/, "")}`;
+  const invoiceUrl = `${baseUrl}/invoice/${booking.bookingNumber}`;
 
   sendPaymentConfirmationNotification({
     mobile: booking.customerMobile,

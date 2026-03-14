@@ -118,6 +118,9 @@ export default function Invoice() {
                     <p><span className="text-gray-500">Invoice No:</span> <span className="font-semibold">{invoice.invoiceNumber}</span></p>
                     <p><span className="text-gray-500">Invoice Date:</span> <span className="font-semibold">{formatInvoiceDate(invoice.paymentDate)}</span></p>
                     <p><span className="text-gray-500">Booking No:</span> <span className="font-semibold">{invoice.bookingNumber}</span></p>
+                    {invoice.dueDate && (
+                      <p><span className="text-gray-500">Due Date:</span> <span className="font-semibold">{formatInvoiceDate(invoice.dueDate)}</span></p>
+                    )}
                     {invoice.departureDate && (
                       <p><span className="text-gray-500">Departure:</span> <span className="font-semibold">{formatInvoiceDate(invoice.departureDate)}</span></p>
                     )}
@@ -132,6 +135,9 @@ export default function Invoice() {
                       <p><span className="text-gray-500">Email:</span> {invoice.customerEmail}</p>
                     )}
                     <p><span className="text-gray-500">Pilgrims:</span> {invoice.numberOfPilgrims}</p>
+                    {invoice.roomType && (
+                      <p><span className="text-gray-500">Room Type:</span> <span className="capitalize">{invoice.roomType}</span></p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -175,6 +181,18 @@ export default function Invoice() {
                     <span>Total:</span>
                     <span className="text-[#0A3D2A] font-mono">₹ {invoice.finalAmount ? formatINR(invoice.finalAmount) : "—"}</span>
                   </div>
+                  {invoice.advanceAmount != null && invoice.advanceAmount > 0 && (
+                    <>
+                      <div className="flex justify-between py-2 text-sm border-t border-gray-100">
+                        <span className="text-gray-500">Advance Paid:</span>
+                        <span className="font-mono text-green-700">- ₹ {formatINR(invoice.advanceAmount)}</span>
+                      </div>
+                      <div className="flex justify-between py-2 text-sm font-semibold">
+                        <span>Balance Due:</span>
+                        <span className="font-mono text-red-700">₹ {invoice.finalAmount ? formatINR(invoice.finalAmount - invoice.advanceAmount) : "—"}</span>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 

@@ -86,6 +86,8 @@ router.post("/offline", requireAdmin as any, async (req: AuthenticatedRequest, r
     numberOfPilgrims: data.numberOfPilgrims,
     pilgrims: (data.pilgrims ?? []) as Array<{ name: string; passportNumber?: string; passportExpiry?: string; dateOfBirth?: string }>,
     preferredDepartureDate: data.preferredDepartureDate ?? null,
+    roomType: data.roomType ?? null,
+    advanceAmount: data.advanceAmount ? String(data.advanceAmount) : null,
     status: isPaid ? "confirmed" : "approved",
     totalAmount: totalAmount ? String(totalAmount) : null,
     gstAmount: gstAmount ? String(gstAmount) : null,
@@ -94,8 +96,6 @@ router.post("/offline", requireAdmin as any, async (req: AuthenticatedRequest, r
     isOffline: true,
     invoiceNumber: isPaid ? generateInvoiceNumber() : null,
   }).returning();
-
-  const packageName = packageData?.name ?? "Travel Package";
   if (isPaid) {
     sendPaymentConfirmationNotification({
       mobile: booking.customerMobile,
@@ -321,7 +321,12 @@ router.get("/:id/invoice", requireAuth as any, async (req: AuthenticatedRequest,
   res.json(buildInvoiceResponse(b, pkg));
 });
 
-function buildInvoiceResponse(b: any, pkg: any) {
+function buildInvoiceResponse(b: typeof bookingsTable.$inferSelect, pkg: { gstPercent: string | number } | null) {
+  const paymentDate = b.updatedAt?.toISOString?.();
+  const dueDate = paymentDate
+    ? new Date(new Date(paymentDate).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString()
+    : null;
+
   return {
     invoiceNumber: b.invoiceNumber,
     bookingNumber: b.bookingNumber,
@@ -334,8 +339,11 @@ function buildInvoiceResponse(b: any, pkg: any) {
     totalAmount: b.totalAmount ? Number(b.totalAmount) : null,
     gstAmount: b.gstAmount ? Number(b.gstAmount) : null,
     finalAmount: b.finalAmount ? Number(b.finalAmount) : null,
-    paymentDate: b.updatedAt?.toISOString?.(),
+    paymentDate,
+    dueDate,
     departureDate: b.preferredDepartureDate,
+    roomType: b.roomType,
+    advanceAmount: b.advanceAmount ? Number(b.advanceAmount) : null,
     status: b.status,
     pilgrims: b.pilgrims ?? [],
     sacCode: "998555",

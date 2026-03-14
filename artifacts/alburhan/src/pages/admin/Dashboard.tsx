@@ -12,6 +12,7 @@ import {
   type BroadcastResponse,
   type BroadcastRequestAudience,
   type CreateOfflineBookingRequestPaymentStatus,
+  type CreateOfflineBookingRequestRoomType,
 } from "@workspace/api-client-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -131,6 +132,8 @@ interface OfflineFormState {
   packageId: string;
   numberOfPilgrims: number;
   preferredDepartureDate: string;
+  roomType: string;
+  advanceAmount: number;
   notes: string;
   paymentStatus: "pending" | "paid";
   paymentAmount: number;
@@ -139,8 +142,8 @@ interface OfflineFormState {
 
 const initialOfflineForm: OfflineFormState = {
   customerName: "", customerMobile: "", customerEmail: "", packageId: "",
-  numberOfPilgrims: 1, preferredDepartureDate: "", notes: "",
-  paymentStatus: "pending", paymentAmount: 0, paymentMethod: "",
+  numberOfPilgrims: 1, preferredDepartureDate: "", roomType: "", advanceAmount: 0,
+  notes: "", paymentStatus: "pending", paymentAmount: 0, paymentMethod: "",
 };
 
 function OfflineBookingModal({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -172,6 +175,8 @@ function OfflineBookingModal({ open, onClose }: { open: boolean; onClose: () => 
         packageId: form.packageId || undefined,
         numberOfPilgrims: form.numberOfPilgrims,
         preferredDepartureDate: form.preferredDepartureDate || undefined,
+        roomType: (form.roomType || undefined) as CreateOfflineBookingRequestRoomType | undefined,
+        advanceAmount: form.advanceAmount || undefined,
         notes: form.notes || undefined,
         paymentStatus: form.paymentStatus as CreateOfflineBookingRequestPaymentStatus,
         paymentAmount: form.paymentAmount || undefined,
@@ -216,6 +221,22 @@ function OfflineBookingModal({ open, onClose }: { open: boolean; onClose: () => 
             <div>
               <Label>Departure Date</Label>
               <Input type="date" value={form.preferredDepartureDate} onChange={e => setForm(f => ({ ...f, preferredDepartureDate: e.target.value }))} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Room Type</Label>
+              <select className="w-full border rounded-md px-3 py-2 text-sm bg-background" value={form.roomType} onChange={e => setForm(f => ({ ...f, roomType: e.target.value }))}>
+                <option value="">-- Select --</option>
+                <option value="sharing">Sharing</option>
+                <option value="double">Double</option>
+                <option value="triple">Triple</option>
+                <option value="quad">Quad</option>
+              </select>
+            </div>
+            <div>
+              <Label>Advance Amount (₹)</Label>
+              <Input type="number" min={0} value={form.advanceAmount} onChange={e => setForm(f => ({ ...f, advanceAmount: parseFloat(e.target.value) || 0 }))} placeholder="0" />
             </div>
           </div>
           <div>

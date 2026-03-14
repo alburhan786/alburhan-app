@@ -17,6 +17,7 @@ export * from "./broadcastResponse";
 export * from "./createBookingRequest";
 export * from "./createOfflineBookingRequest";
 export * from "./createOfflineBookingRequestPaymentStatus";
+export * from "./createOfflineBookingRequestRoomType";
 export * from "./createPackageRequest";
 export * from "./createPackageRequestDetails";
 export * from "./createPackageRequestType";

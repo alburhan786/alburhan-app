@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { CreateOfflineBookingRequestPaymentStatus } from "./createOfflineBookingRequestPaymentStatus";
+import type { CreateOfflineBookingRequestRoomType } from "./createOfflineBookingRequestRoomType";
 import type { Pilgrim } from "./pilgrim";
 
 export interface CreateOfflineBookingRequest {
@@ -16,6 +17,8 @@ export interface CreateOfflineBookingRequest {
   numberOfPilgrims: number;
   pilgrims?: Pilgrim[];
   preferredDepartureDate?: string;
+  roomType?: CreateOfflineBookingRequestRoomType;
+  advanceAmount?: number;
   notes?: string;
   paymentStatus?: CreateOfflineBookingRequestPaymentStatus;
   paymentAmount?: number;
