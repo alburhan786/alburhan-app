@@ -235,7 +235,7 @@ export default function PrintIdCards() {
 
                     <div style={{ background: DARK, color: "#fff", padding: "1.2mm 2mm", fontSize: "3.8pt", textAlign: "center", lineHeight: 1.5, borderRadius: "0 0 3px 3px", margin: "2mm -3mm 0" }}>
                       <div>Khanka Masjid, Sanwara Rd, Burhanpur 450331 M.P.</div>
-                      <div style={{ color: GOLD, fontWeight: 800, fontSize: "5pt", letterSpacing: "0.3px" }}>Tel: 9893225590 | EMERGENCY: 0547090786</div>
+                      <div style={{ color: GOLD, fontWeight: 800, fontSize: "6pt", letterSpacing: "0.3px", textTransform: "uppercase" }}>Tel: 9893225590 | EMERGENCY: 0547090786</div>
                     </div>
                   </div>
                 </div>
