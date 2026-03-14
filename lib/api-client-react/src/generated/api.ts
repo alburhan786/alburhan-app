@@ -32,6 +32,7 @@ import type {
   Document,
   ErrorResponse,
   GetBookingsReportParams,
+  GetCustomersReport200Item,
   GetPaymentsReport200Item,
   GroupPilgrim,
   GroupPilgrimInput,
@@ -2436,6 +2437,81 @@ export function useGetBookingsReport<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetBookingsReportQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get customers report (admin)
+ */
+export const getGetCustomersReportUrl = () => {
+  return `/api/admin/reports/customers`;
+};
+
+export const getCustomersReport = async (
+  options?: RequestInit,
+): Promise<GetCustomersReport200Item[]> => {
+  return customFetch<GetCustomersReport200Item[]>(getGetCustomersReportUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetCustomersReportQueryKey = () => {
+  return [`/api/admin/reports/customers`] as const;
+};
+
+export const getGetCustomersReportQueryOptions = <
+  TData = Awaited<ReturnType<typeof getCustomersReport>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getCustomersReport>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetCustomersReportQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getCustomersReport>>
+  > = ({ signal }) => getCustomersReport({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getCustomersReport>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetCustomersReportQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getCustomersReport>>
+>;
+export type GetCustomersReportQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get customers report (admin)
+ */
+
+export function useGetCustomersReport<
+  TData = Awaited<ReturnType<typeof getCustomersReport>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getCustomersReport>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetCustomersReportQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

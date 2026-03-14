@@ -90,7 +90,7 @@ router.post("/broadcast", requireAdmin as any, async (req: AuthenticatedRequest,
   const results = await Promise.allSettled(
     mobiles.flatMap(m => [sendWhatsApp(m, message), sendSMS(m, message)])
   );
-  const sent = results.filter(r => r.status === "fulfilled" && (r as any).value).length;
+  const sent = results.filter(r => r.status === "fulfilled" && (r as PromiseFulfilledResult<boolean>).value).length;
 
   res.json({ message: `Broadcast sent to ${mobiles.length} recipients (${sent} deliveries)`, recipientCount: mobiles.length });
 });
@@ -114,6 +114,22 @@ router.get("/reports/bookings", requireAdmin as any, async (req: AuthenticatedRe
     finalAmount: b.finalAmount ? Number(b.finalAmount) : null,
     createdAt: b.createdAt?.toISOString?.(),
     updatedAt: b.updatedAt?.toISOString?.(),
+  })));
+});
+
+router.get("/reports/customers", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
+  const customers = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.role, "customer"))
+    .orderBy(desc(usersTable.createdAt));
+
+  res.json(customers.map(c => ({
+    name: c.name,
+    mobile: c.mobile,
+    email: c.email,
+    role: c.role,
+    createdAt: c.createdAt?.toISOString?.(),
   })));
 });
 

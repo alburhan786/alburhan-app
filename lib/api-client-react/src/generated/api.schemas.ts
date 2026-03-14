@@ -555,6 +555,8 @@ export type GetBookingsReportParams = {
   to?: string;
 };
 
+export type GetCustomersReport200Item = { [key: string]: unknown };
+
 export type GetPaymentsReport200Item = { [key: string]: unknown };
 
 export type DeleteGroup200 = {

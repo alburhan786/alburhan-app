@@ -595,6 +595,21 @@ paths:
                 items:
                   $ref: "#/components/schemas/Booking"
 
+  /admin/reports/customers:
+    get:
+      operationId: getCustomersReport
+      tags: [admin]
+      summary: Get customers report (admin)
+      responses:
+        "200":
+          description: Customers report data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+
   /admin/reports/payments:
     get:
       operationId: getPaymentsReport

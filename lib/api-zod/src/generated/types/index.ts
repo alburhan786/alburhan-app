@@ -28,6 +28,7 @@ export * from "./documentDocumentType";
 export * from "./documentUploadedBy";
 export * from "./errorResponse";
 export * from "./getBookingsReportParams";
+export * from "./getCustomersReport200Item";
 export * from "./getPaymentsReport200Item";
 export * from "./groupPilgrim";
 export * from "./groupPilgrimInput";

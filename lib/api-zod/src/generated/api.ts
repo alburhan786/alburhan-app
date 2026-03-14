@@ -933,6 +933,14 @@ export const GetBookingsReportResponse = zod.array(
 );
 
 /**
+ * @summary Get customers report (admin)
+ */
+export const GetCustomersReportResponseItem = zod.object({}).passthrough();
+export const GetCustomersReportResponse = zod.array(
+  GetCustomersReportResponseItem,
+);
+
+/**
  * @summary Get payments report (admin)
  */
 export const GetPaymentsReportResponseItem = zod.object({}).passthrough();

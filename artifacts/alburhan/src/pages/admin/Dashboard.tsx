@@ -1,12 +1,24 @@
 import { useState } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
-import { useGetAdminStats, useListPackages, useCreateOfflineBooking, useSendBroadcast, getBookingsReport, getPaymentsReport } from "@workspace/api-client-react";
+import {
+  useGetAdminStats,
+  useListPackages,
+  useCreateOfflineBooking,
+  useSendBroadcast,
+  getBookingsReport,
+  getPaymentsReport,
+  getCustomersReport,
+  type Booking,
+  type BroadcastResponse,
+  type BroadcastRequestAudience,
+  type CreateOfflineBookingRequestPaymentStatus,
+} from "@workspace/api-client-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { IndianRupee, Users, Package as PackageIcon, Clock, Send, FileText, Plus } from "lucide-react";
+import { IndianRupee, Users, Package as PackageIcon, Clock, Send, FileText, Plus, Printer } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
@@ -112,27 +124,61 @@ export default function AdminDashboard() {
   );
 }
 
+interface OfflineFormState {
+  customerName: string;
+  customerMobile: string;
+  customerEmail: string;
+  packageId: string;
+  numberOfPilgrims: number;
+  preferredDepartureDate: string;
+  notes: string;
+  paymentStatus: "pending" | "paid";
+  paymentAmount: number;
+  paymentMethod: string;
+}
+
+const initialOfflineForm: OfflineFormState = {
+  customerName: "", customerMobile: "", customerEmail: "", packageId: "",
+  numberOfPilgrims: 1, preferredDepartureDate: "", notes: "",
+  paymentStatus: "pending", paymentAmount: 0, paymentMethod: "",
+};
+
 function OfflineBookingModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { data: packages } = useListPackages();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [form, setForm] = useState({
-    customerName: "", customerMobile: "", customerEmail: "", packageId: "",
-    numberOfPilgrims: 1, preferredDepartureDate: "", notes: "",
-    paymentStatus: "pending" as "pending" | "paid", paymentAmount: 0, paymentMethod: "",
-  });
+  const [form, setForm] = useState<OfflineFormState>(initialOfflineForm);
 
   const mutation = useCreateOfflineBooking({
     mutation: {
-      onSuccess: (data: any) => {
-        toast({ title: "Booking Created", description: `Booking #${data.bookingNumber} created successfully.` });
+      onSuccess: (data) => {
+        const booking = data as Booking;
+        toast({ title: "Booking Created", description: `Booking #${booking.bookingNumber} created successfully.` });
         queryClient.invalidateQueries({ queryKey: ["getAdminStats"] });
         onClose();
-        setForm({ customerName: "", customerMobile: "", customerEmail: "", packageId: "", numberOfPilgrims: 1, preferredDepartureDate: "", notes: "", paymentStatus: "pending", paymentAmount: 0, paymentMethod: "" });
+        setForm(initialOfflineForm);
       },
       onError: () => { toast({ title: "Error", description: "Failed to create booking.", variant: "destructive" }); },
     },
   });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    mutation.mutate({
+      data: {
+        customerName: form.customerName,
+        customerMobile: form.customerMobile,
+        customerEmail: form.customerEmail || undefined,
+        packageId: form.packageId || undefined,
+        numberOfPilgrims: form.numberOfPilgrims,
+        preferredDepartureDate: form.preferredDepartureDate || undefined,
+        notes: form.notes || undefined,
+        paymentStatus: form.paymentStatus as CreateOfflineBookingRequestPaymentStatus,
+        paymentAmount: form.paymentAmount || undefined,
+        paymentMethod: form.paymentMethod || undefined,
+      },
+    });
+  };
 
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
@@ -140,7 +186,7 @@ function OfflineBookingModal({ open, onClose }: { open: boolean; onClose: () => 
         <DialogHeader>
           <DialogTitle className="font-serif">Create Offline Booking</DialogTitle>
         </DialogHeader>
-        <form onSubmit={e => { e.preventDefault(); mutation.mutate({ data: form as any }); }} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Customer Name *</Label>
@@ -159,7 +205,7 @@ function OfflineBookingModal({ open, onClose }: { open: boolean; onClose: () => 
             <Label>Package</Label>
             <select className="w-full border rounded-md px-3 py-2 text-sm bg-background" value={form.packageId} onChange={e => setForm(f => ({ ...f, packageId: e.target.value }))}>
               <option value="">-- Select Package --</option>
-              {packages?.map((p: any) => <option key={p.id} value={p.id}>{p.name} (₹{Number(p.pricePerPerson).toLocaleString("en-IN")}/person)</option>)}
+              {packages?.map(p => <option key={p.id} value={p.id}>{p.name} (₹{Number(p.pricePerPerson).toLocaleString("en-IN")}/person)</option>)}
             </select>
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -208,12 +254,13 @@ function OfflineBookingModal({ open, onClose }: { open: boolean; onClose: () => 
 function BroadcastModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { toast } = useToast();
   const [message, setMessage] = useState("");
-  const [audience, setAudience] = useState<"all" | "pending_payment" | "confirmed">("all");
+  const [audience, setAudience] = useState<BroadcastRequestAudience>("all");
 
   const mutation = useSendBroadcast({
     mutation: {
-      onSuccess: (data: any) => {
-        toast({ title: "Broadcast Sent", description: data.message });
+      onSuccess: (data) => {
+        const result = data as BroadcastResponse;
+        toast({ title: "Broadcast Sent", description: result.message });
         setMessage("");
         onClose();
       },
@@ -230,7 +277,7 @@ function BroadcastModal({ open, onClose }: { open: boolean; onClose: () => void 
         <form onSubmit={e => { e.preventDefault(); mutation.mutate({ data: { message, audience } }); }} className="space-y-4">
           <div>
             <Label>Audience</Label>
-            <select className="w-full border rounded-md px-3 py-2 text-sm bg-background" value={audience} onChange={e => setAudience(e.target.value as any)}>
+            <select className="w-full border rounded-md px-3 py-2 text-sm bg-background" value={audience} onChange={e => setAudience(e.target.value as BroadcastRequestAudience)}>
               <option value="all">All Customers</option>
               <option value="pending_payment">Pending Payment (Approved Bookings)</option>
               <option value="confirmed">Confirmed Bookings Only</option>
@@ -260,22 +307,62 @@ function BroadcastModal({ open, onClose }: { open: boolean; onClose: () => void 
   );
 }
 
+type ReportType = "bookings" | "payments" | "customers";
+type OutputFormat = "csv" | "print";
+
+function downloadCSV(data: Record<string, unknown>[], filename: string) {
+  if (!data.length) return;
+  const headers = Object.keys(data[0]);
+  const csvContent = [
+    headers.join(","),
+    ...data.map(row => headers.map(h => `"${String(row[h] ?? "").replace(/"/g, '""')}"`).join(","))
+  ].join("\n");
+  const blob = new Blob([csvContent], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function escapeHtml(str: string): string {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+function openPrintableReport(data: Record<string, unknown>[], title: string) {
+  if (!data.length) return;
+  const headers = Object.keys(data[0]);
+  const safeTitle = escapeHtml(title);
+  const rows = data.map(row =>
+    `<tr>${headers.map(h => `<td style="border:1px solid #ddd;padding:6px 10px;font-size:12px">${escapeHtml(String(row[h] ?? ""))}</td>`).join("")}</tr>`
+  ).join("");
+  const html = `<!DOCTYPE html><html><head><title>${safeTitle}</title><style>body{font-family:Inter,sans-serif;margin:20px}h1{font-family:serif;color:#0A3D2A;font-size:20px}table{border-collapse:collapse;width:100%}th{background:#0A3D2A;color:#fff;padding:8px 10px;font-size:11px;text-transform:uppercase}td{border:1px solid #ddd;padding:6px 10px;font-size:12px}tr:nth-child(even){background:#f9f9f9}@media print{body{margin:0}}</style></head><body><h1>Al Burhan Tours &amp; Travels — ${safeTitle}</h1><p style="font-size:12px;color:#666">Generated: ${escapeHtml(new Date().toLocaleString("en-IN"))}</p><table><thead><tr>${headers.map(h => `<th>${escapeHtml(h)}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table><script>window.print()</script></body></html>`;
+  const w = window.open("", "_blank");
+  if (w) { w.document.write(html); w.document.close(); }
+}
+
 function ReportsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const [reportType, setReportType] = useState("bookings");
+  const [reportType, setReportType] = useState<ReportType>("bookings");
+  const [outputFormat, setOutputFormat] = useState<OutputFormat>("csv");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
   const handleGenerate = async () => {
+    setLoading(true);
     try {
-      let data: any[];
+      let data: Record<string, unknown>[];
       if (reportType === "payments") {
-        data = await getPaymentsReport() as any;
+        data = (await getPaymentsReport()) as Record<string, unknown>[];
+      } else if (reportType === "customers") {
+        data = (await getCustomersReport()) as Record<string, unknown>[];
       } else {
-        const params: any = {};
+        const params: { from?: string; to?: string } = {};
         if (dateFrom) params.from = dateFrom;
         if (dateTo) params.to = dateTo;
-        data = await getBookingsReport(params) as any;
+        data = (await getBookingsReport(params)) as Record<string, unknown>[];
       }
 
       if (!data.length) {
@@ -283,23 +370,20 @@ function ReportsModal({ open, onClose }: { open: boolean; onClose: () => void })
         return;
       }
 
-      const headers = Object.keys(data[0]);
-      const csvContent = [
-        headers.join(","),
-        ...data.map(row => headers.map(h => `"${String(row[h] ?? "").replace(/"/g, '""')}"`).join(","))
-      ].join("\n");
+      const reportLabel = reportType === "payments" ? "Payments Report" : reportType === "customers" ? "Customer List" : "Bookings Report";
 
-      const blob = new Blob([csvContent], { type: "text/csv" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${reportType}-report-${new Date().toISOString().split("T")[0]}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast({ title: "Report Downloaded", description: `${data.length} records exported.` });
+      if (outputFormat === "print") {
+        openPrintableReport(data, reportLabel);
+      } else {
+        downloadCSV(data, `${reportType}-report-${new Date().toISOString().split("T")[0]}.csv`);
+      }
+
+      toast({ title: "Report Generated", description: `${data.length} records exported.` });
       onClose();
     } catch {
       toast({ title: "Error", description: "Failed to generate report.", variant: "destructive" });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -312,27 +396,49 @@ function ReportsModal({ open, onClose }: { open: boolean; onClose: () => void })
         <div className="space-y-4">
           <div>
             <Label>Report Type</Label>
-            <select className="w-full border rounded-md px-3 py-2 text-sm bg-background" value={reportType} onChange={e => setReportType(e.target.value)}>
-              <option value="bookings">All Bookings Report</option>
+            <select className="w-full border rounded-md px-3 py-2 text-sm bg-background" value={reportType} onChange={e => setReportType(e.target.value as ReportType)}>
+              <option value="bookings">Bookings Summary</option>
               <option value="payments">Payment / Revenue Report</option>
+              <option value="customers">Customer List</option>
             </select>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>From Date</Label>
-              <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+          {reportType === "bookings" && (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>From Date</Label>
+                <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+              </div>
+              <div>
+                <Label>To Date</Label>
+                <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} />
+              </div>
             </div>
-            <div>
-              <Label>To Date</Label>
-              <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} />
+          )}
+          <div>
+            <Label>Output Format</Label>
+            <div className="flex gap-3 mt-1">
+              <button
+                type="button"
+                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md border text-sm transition-colors ${outputFormat === "csv" ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted"}`}
+                onClick={() => setOutputFormat("csv")}
+              >
+                <FileText className="w-4 h-4" /> Download CSV
+              </button>
+              <button
+                type="button"
+                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md border text-sm transition-colors ${outputFormat === "print" ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted"}`}
+                onClick={() => setOutputFormat("print")}
+              >
+                <Printer className="w-4 h-4" /> Print View
+              </button>
             </div>
           </div>
-          <p className="text-xs text-muted-foreground">Leave dates empty to export all records. Report will be downloaded as CSV.</p>
+          <p className="text-xs text-muted-foreground">Leave dates empty to export all records.</p>
           <div className="flex gap-3 justify-end pt-2">
             <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button onClick={handleGenerate}>
-              <FileText className="w-4 h-4 mr-2" />
-              Download Report
+            <Button onClick={handleGenerate} disabled={loading}>
+              {outputFormat === "print" ? <Printer className="w-4 h-4 mr-2" /> : <FileText className="w-4 h-4 mr-2" />}
+              {loading ? "Generating..." : outputFormat === "print" ? "Open Print View" : "Download Report"}
             </Button>
           </div>
         </div>

@@ -12,6 +12,7 @@ import {
   sendBookingApprovalNotification,
   sendBookingRejectionNotification,
   sendBookingSubmissionNotification,
+  sendPaymentConfirmationNotification,
 } from "../lib/notifications.js";
 
 const router = Router();
@@ -72,24 +73,46 @@ router.post("/offline", requireAdmin as any, async (req: AuthenticatedRequest, r
     }
   }
 
+  const bookingNumber = generateBookingNumber();
+  const isPaid = data.paymentStatus === "paid";
+
   const [booking] = await db.insert(bookingsTable).values({
-    bookingNumber: generateBookingNumber(),
+    bookingNumber,
     packageId: data.packageId ?? null,
     packageName: packageData?.name ?? null,
     customerName: data.customerName,
     customerMobile: data.customerMobile,
     customerEmail: data.customerEmail ?? null,
     numberOfPilgrims: data.numberOfPilgrims,
-    pilgrims: (data.pilgrims as any) ?? [],
+    pilgrims: (data.pilgrims ?? []) as Array<{ name: string; passportNumber?: string; passportExpiry?: string; dateOfBirth?: string }>,
     preferredDepartureDate: data.preferredDepartureDate ?? null,
-    status: data.paymentStatus === "paid" ? "confirmed" : "approved",
+    status: isPaid ? "confirmed" : "approved",
     totalAmount: totalAmount ? String(totalAmount) : null,
     gstAmount: gstAmount ? String(gstAmount) : null,
     finalAmount: finalAmount ? String(finalAmount) : null,
     notes: data.notes ?? null,
     isOffline: true,
-    invoiceNumber: data.paymentStatus === "paid" ? generateInvoiceNumber() : null,
+    invoiceNumber: isPaid ? generateInvoiceNumber() : null,
   }).returning();
+
+  const packageName = packageData?.name ?? "Travel Package";
+  if (isPaid) {
+    sendPaymentConfirmationNotification({
+      mobile: booking.customerMobile,
+      email: booking.customerEmail,
+      customerName: booking.customerName,
+      bookingNumber: booking.bookingNumber,
+      amount: booking.finalAmount ? String(Number(booking.finalAmount).toLocaleString("en-IN")) : "N/A",
+      invoiceNumber: booking.invoiceNumber ?? "",
+    }).catch(console.error);
+  } else {
+    sendBookingApprovalNotification({
+      mobile: booking.customerMobile,
+      email: booking.customerEmail,
+      customerName: booking.customerName,
+      bookingNumber: booking.bookingNumber,
+    }).catch(console.error);
+  }
 
   res.status(201).json(formatBooking(booking));
 });
@@ -101,8 +124,8 @@ router.get("/", requireAuth as any, async (req: AuthenticatedRequest, res) => {
   const limit = Number(query.limit ?? 20);
   const offset = (page - 1) * limit;
 
-  let conditions: any[] = [];
-  if (query.status) conditions.push(eq(bookingsTable.status, query.status as any));
+  const conditions: ReturnType<typeof eq>[] = [];
+  if (query.status) conditions.push(eq(bookingsTable.status, query.status));
   if (req.user?.role !== "admin") {
     conditions.push(eq(bookingsTable.customerMobile, req.user!.mobile));
   }
@@ -173,7 +196,7 @@ router.post("/", requireAuth as any, async (req: AuthenticatedRequest, res) => {
     customerMobile: data.customerMobile,
     customerEmail: data.customerEmail ?? null,
     numberOfPilgrims: data.numberOfPilgrims,
-    pilgrims: (data.pilgrims as any) ?? [],
+    pilgrims: (data.pilgrims ?? []) as Array<{ name: string; passportNumber?: string; passportExpiry?: string; dateOfBirth?: string }>,
     preferredDepartureDate: data.preferredDepartureDate,
     status: "pending",
     totalAmount: totalAmount ? String(totalAmount) : null,
