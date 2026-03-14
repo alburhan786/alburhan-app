@@ -6,7 +6,7 @@ const BASE = import.meta.env.BASE_URL || "/";
 
 interface Pilgrim {
   id: string; serialNumber: number; fullName: string; photoUrl?: string;
-  mobileIndia?: string; mobileSaudi?: string; city?: string; relation?: string;
+  mobileIndia?: string; mobileSaudi?: string; city?: string;
   passportNumber?: string;
 }
 interface Group { id: string; groupName: string; year: number; maktabNumber?: string; }
@@ -34,8 +34,6 @@ export default function PrintLuggage() {
   }, [pilgrims]);
 
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
-
-  const relations = ["Self", "Wife", "Husband", "Mother", "Father", "Son", "Daughter", "Brother", "Sister"];
 
   return (
     <>
@@ -132,17 +130,6 @@ export default function PrintLuggage() {
                 </div>
               </div>
 
-              <div style={{ display: "flex", gap: "2mm", flexWrap: "wrap", justifyContent: "center", marginBottom: "3mm" }}>
-                {relations.map(r => (
-                  <span key={r} style={{
-                    padding: "1.5mm 4mm", borderRadius: "3px", fontSize: "8pt",
-                    background: p.relation === r ? DARK : "#f5f5f5",
-                    color: p.relation === r ? GOLD : "#888",
-                    fontWeight: p.relation === r ? 700 : 400,
-                    border: p.relation === r ? "none" : "1px solid #ddd",
-                  }}>{r}</span>
-                ))}
-              </div>
             </div>
 
             <div style={{ position: "relative", zIndex: 2, background: DARK, color: GOLD, padding: "2.5mm 5mm", fontSize: "8pt", textAlign: "center", fontWeight: 600, letterSpacing: "0.3px" }}>
