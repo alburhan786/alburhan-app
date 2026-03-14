@@ -122,6 +122,7 @@ export default function PrintIdCards() {
                   <div style={{ marginBottom: "1mm" }}>
                     <div style={{ fontSize: "6pt", fontWeight: 800, color: DARK, letterSpacing: "0.5px" }}>AL BURHAN</div>
                     <div style={{ fontSize: "4pt", color: "#888", letterSpacing: "0.3px" }}>TOURS & TRAVELS</div>
+                    <div style={{ fontSize: "3.5pt", color: "#aaa" }}>Burhanpur, M.P.</div>
                   </div>
 
                   <div style={{ display: "flex", justifyContent: "center", marginBottom: "1.5mm" }}>
@@ -140,29 +141,30 @@ export default function PrintIdCards() {
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.8mm", fontSize: "5.5pt", flex: 1 }}>
                     <div style={{ display: "flex", alignItems: "flex-start", gap: "1.5mm" }}>
                       <div style={bulletDot} />
-                      <div><span style={{ color: "#888", fontSize: "4.5pt" }}>S.No: </span><span style={{ fontWeight: 700, color: DARK }}>#{String(p.serialNumber).padStart(3, "0")}</span></div>
+                      <div><span style={{ color: "#888", fontSize: "4.5pt" }}>Serial No. </span><span style={{ fontWeight: 700, color: DARK }}>#{String(p.serialNumber).padStart(3, "0")}</span></div>
                     </div>
                     <div style={{ display: "flex", alignItems: "flex-start", gap: "1.5mm" }}>
                       <div style={bulletDot} />
-                      <div><span style={{ color: "#888", fontSize: "4.5pt" }}>Passport: </span><span style={{ fontWeight: 600, fontFamily: "monospace", letterSpacing: "0.3px" }}>{p.passportNumber || "—"}</span></div>
+                      <div><span style={{ color: "#888", fontSize: "4.5pt" }}>Passport No. </span><span style={{ fontWeight: 600, fontFamily: "monospace", letterSpacing: "0.3px" }}>{p.passportNumber || "—"}</span></div>
                     </div>
                     <div style={{ display: "flex", alignItems: "flex-start", gap: "1.5mm" }}>
                       <div style={bulletDot} />
-                      <div><span style={{ color: "#888", fontSize: "4.5pt" }}>Mobile: </span><span style={{ fontWeight: 600 }}>{p.mobileIndia || "—"}</span></div>
+                      <div><span style={{ color: "#888", fontSize: "4.5pt" }}>Mobile (India) </span><span style={{ fontWeight: 600 }}>{p.mobileIndia || "—"}</span></div>
                     </div>
                   </div>
 
-                  <div style={{ display: "flex", justifyContent: "center", padding: "1mm 0 1.5mm", overflow: "hidden" }}>
-                    {p.passportNumber ? (
-                      <Barcode value={p.passportNumber} height={12} width={0.8} fontSize={0} />
-                    ) : (
-                      <div style={{ fontSize: "5pt", color: "#999" }}>{group.groupName}</div>
-                    )}
+                  <div style={{ marginTop: "auto" }}>
+                    <div style={{ display: "flex", justifyContent: "center", overflow: "hidden", marginBottom: "0.5mm" }}>
+                      {p.passportNumber ? (
+                        <Barcode value={p.passportNumber} height={12} width={0.8} fontSize={0} />
+                      ) : (
+                        <div style={{ fontSize: "5pt", color: "#999" }}>{group.groupName}</div>
+                      )}
+                    </div>
+                    <div style={{ background: DARK, color: GOLD, padding: "0.8mm 2mm", fontSize: "3.8pt", textAlign: "center", fontWeight: 600, borderRadius: "0 0 3px 3px", margin: "0 -3mm" }}>
+                      Emergency: 0547090786 / 0568780786
+                    </div>
                   </div>
-                </div>
-
-                <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: DARK, color: GOLD, padding: "0.8mm 2mm", fontSize: "4pt", textAlign: "center", fontWeight: 600, zIndex: 2 }}>
-                  Emergency: 0547090786 / 0568780786
                 </div>
               </div>
             ))}
@@ -180,37 +182,34 @@ export default function PrintIdCards() {
                   <div style={{ marginBottom: "2mm" }}>
                     <div style={{ fontSize: "6pt", fontWeight: 800, color: DARK, letterSpacing: "0.5px" }}>AL BURHAN</div>
                     <div style={{ fontSize: "4pt", color: "#888", letterSpacing: "0.3px" }}>TOURS & TRAVELS</div>
+                    <div style={{ fontSize: "3.5pt", color: "#aaa" }}>Burhanpur, M.P.</div>
                   </div>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: "1.2mm", fontSize: "5.5pt", lineHeight: 1.4 }}>
                     <div style={{ display: "flex", alignItems: "flex-start", gap: "1.5mm" }}>
                       <div style={bulletDot} />
-                      <div><span style={{ color: "#888", fontSize: "4.5pt" }}>Passport: </span><span style={{ fontFamily: "monospace", letterSpacing: "0.3px", fontWeight: 600 }}>{p.passportNumber || "—"}</span></div>
+                      <div><span style={{ color: "#888", fontSize: "4.5pt" }}>Passport No. </span><span style={{ fontFamily: "monospace", letterSpacing: "0.3px", fontWeight: 600 }}>{p.passportNumber || "—"}</span></div>
                     </div>
                     <div style={{ display: "flex", alignItems: "flex-start", gap: "1.5mm" }}>
                       <div style={bulletDot} />
                       <div><span style={{ color: "#888", fontSize: "4.5pt" }}>Maktab: </span><span style={{ fontWeight: 600 }}>{group.maktabNumber || "—"}</span></div>
                     </div>
-                    {group.hotels?.makkah && (
-                      <div style={{ display: "flex", alignItems: "flex-start", gap: "1.5mm" }}>
-                        <div style={bulletDot} />
-                        <div>
-                          <span style={{ color: "#888", fontSize: "4.5pt" }}>Makkah: </span>
-                          <span style={{ fontWeight: 600 }}>{group.hotels.makkah.name}</span>
-                          {group.hotels.makkah.address && <div style={{ fontSize: "4pt", color: "#888", marginTop: "0.3mm" }}>{group.hotels.makkah.address}</div>}
-                        </div>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: "1.5mm" }}>
+                      <div style={bulletDot} />
+                      <div>
+                        <span style={{ color: "#888", fontSize: "4.5pt" }}>Makkah Hotel: </span>
+                        <span style={{ fontWeight: 600 }}>{group.hotels?.makkah?.name || "—"}</span>
+                        {group.hotels?.makkah?.address && <div style={{ fontSize: "4pt", color: "#888", marginTop: "0.3mm" }}>{group.hotels.makkah.address}</div>}
                       </div>
-                    )}
-                    {group.hotels?.madinah && (
-                      <div style={{ display: "flex", alignItems: "flex-start", gap: "1.5mm" }}>
-                        <div style={bulletDot} />
-                        <div>
-                          <span style={{ color: "#888", fontSize: "4.5pt" }}>Madinah: </span>
-                          <span style={{ fontWeight: 600 }}>{group.hotels.madinah.name}</span>
-                          {group.hotels.madinah.address && <div style={{ fontSize: "4pt", color: "#888", marginTop: "0.3mm" }}>{group.hotels.madinah.address}</div>}
-                        </div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: "1.5mm" }}>
+                      <div style={bulletDot} />
+                      <div>
+                        <span style={{ color: "#888", fontSize: "4.5pt" }}>Madinah Hotel: </span>
+                        <span style={{ fontWeight: 600 }}>{group.hotels?.madinah?.name || "—"}</span>
+                        {group.hotels?.madinah?.address && <div style={{ fontSize: "4pt", color: "#888", marginTop: "0.3mm" }}>{group.hotels.madinah.address}</div>}
                       </div>
-                    )}
+                    </div>
                   </div>
 
                   <div style={{ marginTop: "auto", paddingBottom: "1mm" }}>
@@ -222,13 +221,13 @@ export default function PrintIdCards() {
                     <div style={{ fontSize: "6.5pt", fontWeight: 700, color: DARK, textAlign: "center", marginBottom: "1mm" }}>{p.fullName}</div>
                     <div style={{ textAlign: "center", fontSize: "4.5pt", color: "#999" }}>Your Sincerely</div>
 
-                    <div style={{ marginTop: "3mm", borderTop: `0.5px solid #ccc`, width: "60%", margin: "3mm auto 0" }} />
-                  </div>
-                </div>
+                    <div style={{ borderTop: `0.5px solid #ccc`, width: "60%", margin: "2mm auto 0" }} />
 
-                <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: DARK, color: "#fff", padding: "1.2mm 2mm", fontSize: "3.8pt", textAlign: "center", zIndex: 2, lineHeight: 1.5 }}>
-                  <div>Khanka Masjid, Sanwara Rd, Burhanpur 450331 M.P.</div>
-                  <div style={{ color: GOLD, fontWeight: 600 }}>Tel: 9893225590 | Emergency: 0547090786</div>
+                    <div style={{ background: DARK, color: "#fff", padding: "1.2mm 2mm", fontSize: "3.8pt", textAlign: "center", lineHeight: 1.5, borderRadius: "0 0 3px 3px", margin: "2mm -3mm 0" }}>
+                      <div>Khanka Masjid, Sanwara Rd, Burhanpur 450331 M.P.</div>
+                      <div style={{ color: GOLD, fontWeight: 600 }}>Tel: 9893225590 | Emergency: 0547090786</div>
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}
