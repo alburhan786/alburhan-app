@@ -33,6 +33,12 @@ router.post("/create-order", requireAuth as any, async (req: AuthenticatedReques
     res.status(404).json({ message: "Booking not found" });
     return;
   }
+
+  if (req.user?.role !== "admin" && booking.customerMobile !== req.user?.mobile) {
+    res.status(403).json({ message: "You can only pay for your own bookings" });
+    return;
+  }
+
   if (booking.status !== "approved") {
     res.status(400).json({ message: "Booking must be approved before payment" });
     return;
@@ -98,6 +104,29 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
     return;
   }
 
+  const existingBookings = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
+  const existingBooking = existingBookings[0];
+
+  if (!existingBooking) {
+    res.status(404).json({ message: "Booking not found" });
+    return;
+  }
+
+  if (req.user?.role !== "admin" && existingBooking.customerMobile !== req.user?.mobile) {
+    res.status(403).json({ message: "You can only pay for your own bookings" });
+    return;
+  }
+
+  if (existingBooking.status !== "approved") {
+    res.status(400).json({ message: "Booking must be approved before payment verification" });
+    return;
+  }
+
+  if (existingBooking.razorpayOrderId && existingBooking.razorpayOrderId !== razorpayOrderId) {
+    res.status(400).json({ message: "Order ID mismatch" });
+    return;
+  }
+
   const invoiceNumber = `INV${Date.now().toString().slice(-8)}`;
 
   const [booking] = await db
@@ -111,11 +140,6 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
     })
     .where(eq(bookingsTable.id, bookingId))
     .returning();
-
-  if (!booking) {
-    res.status(404).json({ message: "Booking not found" });
-    return;
-  }
 
   sendPaymentConfirmationNotification({
     mobile: booking.customerMobile,

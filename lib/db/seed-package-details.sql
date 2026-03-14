@@ -1,5 +1,5 @@
 UPDATE packages SET details = '{
-  "airline": "Saudi Airlines / Air India Express",
+  "airline": "Akasa Air / Air India Express",
   "departureCities": ["Mumbai", "Delhi", "Hyderabad", "Lucknow"],
   "hotelMakkah": "Jabal Omar Marriott",
   "hotelMadinah": "Shaza Al Madina",
@@ -15,7 +15,7 @@ UPDATE packages SET details = '{
 WHERE name = 'Ramadan Umrah Full Month Package' AND type = 'ramadan_umrah';
 
 UPDATE packages SET details = '{
-  "airline": "Saudi Airlines",
+  "airline": "Akasa Air",
   "departureCities": ["Mumbai", "Delhi"],
   "hotelMakkah": "Hilton Suites Makkah",
   "hotelMadinah": "Crowne Plaza Madinah",
