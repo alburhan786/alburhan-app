@@ -65,12 +65,15 @@ function LogoHeader({ size }: { size?: "small" }) {
   const nameSize = size === "small" ? "8pt" : "10pt";
   const tagSize = size === "small" ? "4pt" : "5pt";
   const gap = size === "small" ? "0.5mm" : "0.8mm";
+  const flagSize = size === "small" ? "8pt" : "10pt";
   return (
     <div style={{ textAlign: "center", marginBottom: size === "small" ? "1mm" : "1.5mm" }}>
-      <div style={{ display: "flex", justifyContent: "center" }}>
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "1.5mm" }}>
+        <span style={{ fontSize: flagSize, lineHeight: 1 }}>🇮🇳</span>
         <img src={BASE + "images/logo.png"} alt="" style={{ height: logoSize, objectFit: "contain" }} />
+        <span style={{ fontSize: flagSize, lineHeight: 1 }}>🇮🇳</span>
       </div>
-      <div style={{ fontSize: nameSize, fontWeight: 900, color: DARK, letterSpacing: "2px", lineHeight: 1.1, marginTop: gap }}>AL-BURHAN</div>
+      <div style={{ fontSize: nameSize, fontWeight: 900, color: DARK, letterSpacing: "1px", lineHeight: 1.1, marginTop: gap }}>AL-BURHAN</div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "1.5mm", marginTop: "0.3mm" }}>
         <div style={{ width: "4mm", height: "0.3mm", background: GOLD }} />
         <div style={{ fontSize: tagSize, fontWeight: 700, color: GOLD, letterSpacing: "1.5px", lineHeight: 1 }}>TOURS & TRAVELS</div>

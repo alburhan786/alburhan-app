@@ -76,6 +76,7 @@ export default function PrintLuggage() {
             }} />
 
             <div style={{ position: "relative", zIndex: 1, padding: "5mm 6mm 3mm", display: "flex", alignItems: "center", gap: "3mm" }}>
+              <span style={{ fontSize: "16pt", lineHeight: 1 }}>🇮🇳</span>
               <img src={`${BASE}images/logo.png`} alt="" style={{ height: "14mm", objectFit: "contain" }} />
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 700, fontSize: "13pt", color: DARK, letterSpacing: "0.5px" }}>Al Burhan Tours & Travels</div>

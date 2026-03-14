@@ -76,7 +76,11 @@ export default function PrintZamzam() {
               position: "relative", zIndex: 1,
               padding: "6mm 6mm 4mm", textAlign: "center",
             }}>
-              <img src={`${BASE}images/logo.png`} alt="" style={{ height: "14mm", objectFit: "contain", marginBottom: "2mm" }} />
+              <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "2mm", marginBottom: "2mm" }}>
+                <span style={{ fontSize: "14pt", lineHeight: 1 }}>🇮🇳</span>
+                <img src={`${BASE}images/logo.png`} alt="" style={{ height: "14mm", objectFit: "contain" }} />
+                <span style={{ fontSize: "14pt", lineHeight: 1 }}>🇮🇳</span>
+              </div>
               <div style={{ fontSize: "28pt", fontWeight: 900, letterSpacing: "5px", color: DARK, lineHeight: 1 }}>ZAMZAM</div>
               <div style={{ fontSize: "9pt", color: GOLD, fontWeight: 700, letterSpacing: "2px", marginTop: "2mm" }}>HOLY WATER</div>
             </div>
