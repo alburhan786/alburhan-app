@@ -73,7 +73,7 @@ function LogoHeader({ size }: { size?: "small" }) {
         <img src={BASE + "images/india_flag.jpg"} alt="" style={{ width: flagImgSize, height: flagImgSize, borderRadius: "50%", objectFit: "cover" }} />
         <div style={{ fontSize: indiaSize, fontWeight: 700, color: DARK, letterSpacing: "0.3px", marginTop: "0.3mm", lineHeight: 1 }}>INDIA</div>
       </div>
-      <div style={{ flex: 1, textAlign: "center", minWidth: 0 }}>
+      <div style={{ flex: 1, textAlign: "center", minWidth: 0, background: "rgba(255,255,255,0.92)", borderRadius: "2px", padding: "0.5mm 1mm" }}>
         <div style={{ fontSize: nameSize, fontWeight: 900, color: DARK, letterSpacing: "0.5px", lineHeight: 1.1 }}>AL-BURHAN</div>
         <div style={{ fontSize: tagSize, fontWeight: 700, color: GOLD, letterSpacing: "0.5px", lineHeight: 1.2 }}>TOURS & TRAVELS</div>
       </div>
