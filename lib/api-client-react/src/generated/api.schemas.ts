@@ -407,6 +407,90 @@ export interface Inquiry {
   createdAt: string;
 }
 
+export interface HotelInfo {
+  name?: string;
+  address?: string;
+  checkIn?: string;
+  checkOut?: string;
+}
+
+export interface HotelsData {
+  makkah?: HotelInfo;
+  madinah?: HotelInfo;
+}
+
+export interface HajjGroupInput {
+  groupName: string;
+  year: number;
+  departureDate?: string | null;
+  returnDate?: string | null;
+  flightNumber?: string | null;
+  maktabNumber?: string | null;
+  hotels?: HotelsData;
+  notes?: string | null;
+}
+
+export interface HajjGroup {
+  id: string;
+  groupName: string;
+  year: number;
+  departureDate?: string | null;
+  returnDate?: string | null;
+  flightNumber?: string | null;
+  maktabNumber?: string | null;
+  hotels?: HotelsData;
+  notes?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type HajjGroupWithCount = HajjGroup & {
+  pilgrimCount?: number;
+};
+
+export interface GroupPilgrimInput {
+  fullName: string;
+  passportNumber?: string;
+  visaNumber?: string;
+  dateOfBirth?: string;
+  gender?: string;
+  bloodGroup?: string;
+  mobileIndia?: string;
+  mobileSaudi?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  roomNumber?: string;
+  busNumber?: string;
+  relation?: string;
+  coverNumber?: string;
+  serialNumber?: number;
+}
+
+export interface GroupPilgrim {
+  id: string;
+  groupId: string;
+  serialNumber: number;
+  fullName: string;
+  passportNumber?: string | null;
+  visaNumber?: string | null;
+  dateOfBirth?: string | null;
+  gender?: string | null;
+  bloodGroup?: string | null;
+  photoUrl?: string | null;
+  mobileIndia?: string | null;
+  mobileSaudi?: string | null;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  roomNumber?: string | null;
+  busNumber?: string | null;
+  relation?: string | null;
+  coverNumber?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export type ListPackagesParams = {
   type?: ListPackagesType;
   active?: boolean;
@@ -445,4 +529,16 @@ export const ListBookingsStatus = {
 
 export type RejectBookingBody = {
   reason?: string;
+};
+
+export type DeleteGroup200 = {
+  message?: string;
+};
+
+export type DeletePilgrim200 = {
+  message?: string;
+};
+
+export type UploadPilgrimPhotoBody = {
+  photo?: Blob;
 };

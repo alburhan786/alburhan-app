@@ -711,7 +711,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Pilgrim"
+                  $ref: "#/components/schemas/GroupPilgrim"
     post:
       tags: [groups]
       operationId: createPilgrim
@@ -729,14 +729,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/PilgrimInput"
+              $ref: "#/components/schemas/GroupPilgrimInput"
       responses:
         "201":
           description: Pilgrim created
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Pilgrim"
+                $ref: "#/components/schemas/GroupPilgrim"
 
   /groups/{groupId}/pilgrims/{pilgrimId}:
     put:
@@ -761,14 +761,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/PilgrimInput"
+              $ref: "#/components/schemas/GroupPilgrimInput"
       responses:
         "200":
           description: Pilgrim updated
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Pilgrim"
+                $ref: "#/components/schemas/GroupPilgrim"
     delete:
       tags: [groups]
       operationId: deletePilgrim
@@ -831,7 +831,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Pilgrim"
+                $ref: "#/components/schemas/GroupPilgrim"
 
 components:
   schemas:
@@ -1599,7 +1599,7 @@ components:
             pilgrimCount:
               type: integer
 
-    PilgrimInput:
+    GroupPilgrimInput:
       type: object
       properties:
         fullName:
@@ -1637,7 +1637,7 @@ components:
       required:
         - fullName
 
-    Pilgrim:
+    GroupPilgrim:
       type: object
       properties:
         id:

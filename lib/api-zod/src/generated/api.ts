@@ -895,3 +895,357 @@ export const ListInquiriesResponseItem = zod.object({
   createdAt: zod.date(),
 });
 export const ListInquiriesResponse = zod.array(ListInquiriesResponseItem);
+
+/**
+ * @summary List all Hajj groups (admin only)
+ */
+export const ListGroupsResponseItem = zod
+  .object({
+    id: zod.string(),
+    groupName: zod.string(),
+    year: zod.number(),
+    departureDate: zod.string().nullish(),
+    returnDate: zod.string().nullish(),
+    flightNumber: zod.string().nullish(),
+    maktabNumber: zod.string().nullish(),
+    hotels: zod
+      .object({
+        makkah: zod
+          .object({
+            name: zod.string().optional(),
+            address: zod.string().optional(),
+            checkIn: zod.string().optional(),
+            checkOut: zod.string().optional(),
+          })
+          .optional(),
+        madinah: zod
+          .object({
+            name: zod.string().optional(),
+            address: zod.string().optional(),
+            checkIn: zod.string().optional(),
+            checkOut: zod.string().optional(),
+          })
+          .optional(),
+      })
+      .optional(),
+    notes: zod.string().nullish(),
+    createdAt: zod.date().optional(),
+    updatedAt: zod.date().optional(),
+  })
+  .and(
+    zod.object({
+      pilgrimCount: zod.number().optional(),
+    }),
+  );
+export const ListGroupsResponse = zod.array(ListGroupsResponseItem);
+
+/**
+ * @summary Create a new Hajj group (admin only)
+ */
+export const CreateGroupBody = zod.object({
+  groupName: zod.string(),
+  year: zod.number(),
+  departureDate: zod.string().nullish(),
+  returnDate: zod.string().nullish(),
+  flightNumber: zod.string().nullish(),
+  maktabNumber: zod.string().nullish(),
+  hotels: zod
+    .object({
+      makkah: zod
+        .object({
+          name: zod.string().optional(),
+          address: zod.string().optional(),
+          checkIn: zod.string().optional(),
+          checkOut: zod.string().optional(),
+        })
+        .optional(),
+      madinah: zod
+        .object({
+          name: zod.string().optional(),
+          address: zod.string().optional(),
+          checkIn: zod.string().optional(),
+          checkOut: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+  notes: zod.string().nullish(),
+});
+
+/**
+ * @summary Get a single group (admin only)
+ */
+export const GetGroupParams = zod.object({
+  id: zod.coerce.string(),
+});
+
+export const GetGroupResponse = zod.object({
+  id: zod.string(),
+  groupName: zod.string(),
+  year: zod.number(),
+  departureDate: zod.string().nullish(),
+  returnDate: zod.string().nullish(),
+  flightNumber: zod.string().nullish(),
+  maktabNumber: zod.string().nullish(),
+  hotels: zod
+    .object({
+      makkah: zod
+        .object({
+          name: zod.string().optional(),
+          address: zod.string().optional(),
+          checkIn: zod.string().optional(),
+          checkOut: zod.string().optional(),
+        })
+        .optional(),
+      madinah: zod
+        .object({
+          name: zod.string().optional(),
+          address: zod.string().optional(),
+          checkIn: zod.string().optional(),
+          checkOut: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+  notes: zod.string().nullish(),
+  createdAt: zod.date().optional(),
+  updatedAt: zod.date().optional(),
+});
+
+/**
+ * @summary Update a group (admin only)
+ */
+export const UpdateGroupParams = zod.object({
+  id: zod.coerce.string(),
+});
+
+export const UpdateGroupBody = zod.object({
+  groupName: zod.string(),
+  year: zod.number(),
+  departureDate: zod.string().nullish(),
+  returnDate: zod.string().nullish(),
+  flightNumber: zod.string().nullish(),
+  maktabNumber: zod.string().nullish(),
+  hotels: zod
+    .object({
+      makkah: zod
+        .object({
+          name: zod.string().optional(),
+          address: zod.string().optional(),
+          checkIn: zod.string().optional(),
+          checkOut: zod.string().optional(),
+        })
+        .optional(),
+      madinah: zod
+        .object({
+          name: zod.string().optional(),
+          address: zod.string().optional(),
+          checkIn: zod.string().optional(),
+          checkOut: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+  notes: zod.string().nullish(),
+});
+
+export const UpdateGroupResponse = zod.object({
+  id: zod.string(),
+  groupName: zod.string(),
+  year: zod.number(),
+  departureDate: zod.string().nullish(),
+  returnDate: zod.string().nullish(),
+  flightNumber: zod.string().nullish(),
+  maktabNumber: zod.string().nullish(),
+  hotels: zod
+    .object({
+      makkah: zod
+        .object({
+          name: zod.string().optional(),
+          address: zod.string().optional(),
+          checkIn: zod.string().optional(),
+          checkOut: zod.string().optional(),
+        })
+        .optional(),
+      madinah: zod
+        .object({
+          name: zod.string().optional(),
+          address: zod.string().optional(),
+          checkIn: zod.string().optional(),
+          checkOut: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+  notes: zod.string().nullish(),
+  createdAt: zod.date().optional(),
+  updatedAt: zod.date().optional(),
+});
+
+/**
+ * @summary Delete a group and its pilgrims (admin only)
+ */
+export const DeleteGroupParams = zod.object({
+  id: zod.coerce.string(),
+});
+
+export const DeleteGroupResponse = zod.object({
+  message: zod.string().optional(),
+});
+
+/**
+ * @summary List pilgrims in a group (admin only)
+ */
+export const ListPilgrimsParams = zod.object({
+  groupId: zod.coerce.string(),
+});
+
+export const ListPilgrimsResponseItem = zod.object({
+  id: zod.string(),
+  groupId: zod.string(),
+  serialNumber: zod.number(),
+  fullName: zod.string(),
+  passportNumber: zod.string().nullish(),
+  visaNumber: zod.string().nullish(),
+  dateOfBirth: zod.string().nullish(),
+  gender: zod.string().nullish(),
+  bloodGroup: zod.string().nullish(),
+  photoUrl: zod.string().nullish(),
+  mobileIndia: zod.string().nullish(),
+  mobileSaudi: zod.string().nullish(),
+  address: zod.string().nullish(),
+  city: zod.string().nullish(),
+  state: zod.string().nullish(),
+  roomNumber: zod.string().nullish(),
+  busNumber: zod.string().nullish(),
+  relation: zod.string().nullish(),
+  coverNumber: zod.string().nullish(),
+  createdAt: zod.date().optional(),
+  updatedAt: zod.date().optional(),
+});
+export const ListPilgrimsResponse = zod.array(ListPilgrimsResponseItem);
+
+/**
+ * @summary Add a pilgrim to a group (admin only)
+ */
+export const CreatePilgrimParams = zod.object({
+  groupId: zod.coerce.string(),
+});
+
+export const CreatePilgrimBody = zod.object({
+  fullName: zod.string(),
+  passportNumber: zod.string().optional(),
+  visaNumber: zod.string().optional(),
+  dateOfBirth: zod.string().optional(),
+  gender: zod.string().optional(),
+  bloodGroup: zod.string().optional(),
+  mobileIndia: zod.string().optional(),
+  mobileSaudi: zod.string().optional(),
+  address: zod.string().optional(),
+  city: zod.string().optional(),
+  state: zod.string().optional(),
+  roomNumber: zod.string().optional(),
+  busNumber: zod.string().optional(),
+  relation: zod.string().optional(),
+  coverNumber: zod.string().optional(),
+  serialNumber: zod.number().optional(),
+});
+
+/**
+ * @summary Update a pilgrim (admin only)
+ */
+export const UpdatePilgrimParams = zod.object({
+  groupId: zod.coerce.string(),
+  pilgrimId: zod.coerce.string(),
+});
+
+export const UpdatePilgrimBody = zod.object({
+  fullName: zod.string(),
+  passportNumber: zod.string().optional(),
+  visaNumber: zod.string().optional(),
+  dateOfBirth: zod.string().optional(),
+  gender: zod.string().optional(),
+  bloodGroup: zod.string().optional(),
+  mobileIndia: zod.string().optional(),
+  mobileSaudi: zod.string().optional(),
+  address: zod.string().optional(),
+  city: zod.string().optional(),
+  state: zod.string().optional(),
+  roomNumber: zod.string().optional(),
+  busNumber: zod.string().optional(),
+  relation: zod.string().optional(),
+  coverNumber: zod.string().optional(),
+  serialNumber: zod.number().optional(),
+});
+
+export const UpdatePilgrimResponse = zod.object({
+  id: zod.string(),
+  groupId: zod.string(),
+  serialNumber: zod.number(),
+  fullName: zod.string(),
+  passportNumber: zod.string().nullish(),
+  visaNumber: zod.string().nullish(),
+  dateOfBirth: zod.string().nullish(),
+  gender: zod.string().nullish(),
+  bloodGroup: zod.string().nullish(),
+  photoUrl: zod.string().nullish(),
+  mobileIndia: zod.string().nullish(),
+  mobileSaudi: zod.string().nullish(),
+  address: zod.string().nullish(),
+  city: zod.string().nullish(),
+  state: zod.string().nullish(),
+  roomNumber: zod.string().nullish(),
+  busNumber: zod.string().nullish(),
+  relation: zod.string().nullish(),
+  coverNumber: zod.string().nullish(),
+  createdAt: zod.date().optional(),
+  updatedAt: zod.date().optional(),
+});
+
+/**
+ * @summary Delete a pilgrim (admin only)
+ */
+export const DeletePilgrimParams = zod.object({
+  groupId: zod.coerce.string(),
+  pilgrimId: zod.coerce.string(),
+});
+
+export const DeletePilgrimResponse = zod.object({
+  message: zod.string().optional(),
+});
+
+/**
+ * @summary Upload pilgrim photo (admin only)
+ */
+export const UploadPilgrimPhotoParams = zod.object({
+  groupId: zod.coerce.string(),
+  pilgrimId: zod.coerce.string(),
+});
+
+export const UploadPilgrimPhotoBody = zod.object({
+  photo: zod.instanceof(File).optional(),
+});
+
+export const UploadPilgrimPhotoResponse = zod.object({
+  id: zod.string(),
+  groupId: zod.string(),
+  serialNumber: zod.number(),
+  fullName: zod.string(),
+  passportNumber: zod.string().nullish(),
+  visaNumber: zod.string().nullish(),
+  dateOfBirth: zod.string().nullish(),
+  gender: zod.string().nullish(),
+  bloodGroup: zod.string().nullish(),
+  photoUrl: zod.string().nullish(),
+  mobileIndia: zod.string().nullish(),
+  mobileSaudi: zod.string().nullish(),
+  address: zod.string().nullish(),
+  city: zod.string().nullish(),
+  state: zod.string().nullish(),
+  roomNumber: zod.string().nullish(),
+  busNumber: zod.string().nullish(),
+  relation: zod.string().nullish(),
+  coverNumber: zod.string().nullish(),
+  createdAt: zod.date().optional(),
+  updatedAt: zod.date().optional(),
+});

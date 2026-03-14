@@ -25,8 +25,15 @@ import type {
   CreateOfflineBookingRequest,
   CreatePackageRequest,
   CreatePaymentOrderRequest,
+  DeleteGroup200,
+  DeletePilgrim200,
   Document,
   ErrorResponse,
+  GroupPilgrim,
+  GroupPilgrimInput,
+  HajjGroup,
+  HajjGroupInput,
+  HajjGroupWithCount,
   HealthStatus,
   Inquiry,
   InquiryRequest,
@@ -41,6 +48,7 @@ import type {
   SendNotificationRequest,
   SendOtpRequest,
   SendOtpResponse,
+  UploadPilgrimPhotoBody,
   UploadUrlRequest,
   UploadUrlResponse,
   User,
@@ -2409,3 +2417,888 @@ export function useListInquiries<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary List all Hajj groups (admin only)
+ */
+export const getListGroupsUrl = () => {
+  return `/api/groups`;
+};
+
+export const listGroups = async (
+  options?: RequestInit,
+): Promise<HajjGroupWithCount[]> => {
+  return customFetch<HajjGroupWithCount[]>(getListGroupsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListGroupsQueryKey = () => {
+  return [`/api/groups`] as const;
+};
+
+export const getListGroupsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listGroups>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listGroups>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListGroupsQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listGroups>>> = ({
+    signal,
+  }) => listGroups({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listGroups>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListGroupsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listGroups>>
+>;
+export type ListGroupsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List all Hajj groups (admin only)
+ */
+
+export function useListGroups<
+  TData = Awaited<ReturnType<typeof listGroups>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listGroups>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListGroupsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create a new Hajj group (admin only)
+ */
+export const getCreateGroupUrl = () => {
+  return `/api/groups`;
+};
+
+export const createGroup = async (
+  hajjGroupInput: HajjGroupInput,
+  options?: RequestInit,
+): Promise<HajjGroup> => {
+  return customFetch<HajjGroup>(getCreateGroupUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(hajjGroupInput),
+  });
+};
+
+export const getCreateGroupMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createGroup>>,
+    TError,
+    { data: BodyType<HajjGroupInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createGroup>>,
+  TError,
+  { data: BodyType<HajjGroupInput> },
+  TContext
+> => {
+  const mutationKey = ["createGroup"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createGroup>>,
+    { data: BodyType<HajjGroupInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createGroup(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateGroupMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createGroup>>
+>;
+export type CreateGroupMutationBody = BodyType<HajjGroupInput>;
+export type CreateGroupMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create a new Hajj group (admin only)
+ */
+export const useCreateGroup = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createGroup>>,
+    TError,
+    { data: BodyType<HajjGroupInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createGroup>>,
+  TError,
+  { data: BodyType<HajjGroupInput> },
+  TContext
+> => {
+  return useMutation(getCreateGroupMutationOptions(options));
+};
+
+/**
+ * @summary Get a single group (admin only)
+ */
+export const getGetGroupUrl = (id: string) => {
+  return `/api/groups/${id}`;
+};
+
+export const getGroup = async (
+  id: string,
+  options?: RequestInit,
+): Promise<HajjGroup> => {
+  return customFetch<HajjGroup>(getGetGroupUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetGroupQueryKey = (id: string) => {
+  return [`/api/groups/${id}`] as const;
+};
+
+export const getGetGroupQueryOptions = <
+  TData = Awaited<ReturnType<typeof getGroup>>,
+  TError = ErrorType<unknown>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getGroup>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetGroupQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getGroup>>> = ({
+    signal,
+  }) => getGroup(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof getGroup>>, TError, TData> & {
+    queryKey: QueryKey;
+  };
+};
+
+export type GetGroupQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getGroup>>
+>;
+export type GetGroupQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get a single group (admin only)
+ */
+
+export function useGetGroup<
+  TData = Awaited<ReturnType<typeof getGroup>>,
+  TError = ErrorType<unknown>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getGroup>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetGroupQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Update a group (admin only)
+ */
+export const getUpdateGroupUrl = (id: string) => {
+  return `/api/groups/${id}`;
+};
+
+export const updateGroup = async (
+  id: string,
+  hajjGroupInput: HajjGroupInput,
+  options?: RequestInit,
+): Promise<HajjGroup> => {
+  return customFetch<HajjGroup>(getUpdateGroupUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(hajjGroupInput),
+  });
+};
+
+export const getUpdateGroupMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateGroup>>,
+    TError,
+    { id: string; data: BodyType<HajjGroupInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateGroup>>,
+  TError,
+  { id: string; data: BodyType<HajjGroupInput> },
+  TContext
+> => {
+  const mutationKey = ["updateGroup"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateGroup>>,
+    { id: string; data: BodyType<HajjGroupInput> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateGroup(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateGroupMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateGroup>>
+>;
+export type UpdateGroupMutationBody = BodyType<HajjGroupInput>;
+export type UpdateGroupMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update a group (admin only)
+ */
+export const useUpdateGroup = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateGroup>>,
+    TError,
+    { id: string; data: BodyType<HajjGroupInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateGroup>>,
+  TError,
+  { id: string; data: BodyType<HajjGroupInput> },
+  TContext
+> => {
+  return useMutation(getUpdateGroupMutationOptions(options));
+};
+
+/**
+ * @summary Delete a group and its pilgrims (admin only)
+ */
+export const getDeleteGroupUrl = (id: string) => {
+  return `/api/groups/${id}`;
+};
+
+export const deleteGroup = async (
+  id: string,
+  options?: RequestInit,
+): Promise<DeleteGroup200> => {
+  return customFetch<DeleteGroup200>(getDeleteGroupUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteGroupMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteGroup>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteGroup>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ["deleteGroup"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteGroup>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteGroup(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteGroupMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteGroup>>
+>;
+
+export type DeleteGroupMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Delete a group and its pilgrims (admin only)
+ */
+export const useDeleteGroup = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteGroup>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteGroup>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(getDeleteGroupMutationOptions(options));
+};
+
+/**
+ * @summary List pilgrims in a group (admin only)
+ */
+export const getListPilgrimsUrl = (groupId: string) => {
+  return `/api/groups/${groupId}/pilgrims`;
+};
+
+export const listPilgrims = async (
+  groupId: string,
+  options?: RequestInit,
+): Promise<GroupPilgrim[]> => {
+  return customFetch<GroupPilgrim[]>(getListPilgrimsUrl(groupId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListPilgrimsQueryKey = (groupId: string) => {
+  return [`/api/groups/${groupId}/pilgrims`] as const;
+};
+
+export const getListPilgrimsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listPilgrims>>,
+  TError = ErrorType<unknown>,
+>(
+  groupId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listPilgrims>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListPilgrimsQueryKey(groupId);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listPilgrims>>> = ({
+    signal,
+  }) => listPilgrims(groupId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!groupId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listPilgrims>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListPilgrimsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listPilgrims>>
+>;
+export type ListPilgrimsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List pilgrims in a group (admin only)
+ */
+
+export function useListPilgrims<
+  TData = Awaited<ReturnType<typeof listPilgrims>>,
+  TError = ErrorType<unknown>,
+>(
+  groupId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listPilgrims>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListPilgrimsQueryOptions(groupId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Add a pilgrim to a group (admin only)
+ */
+export const getCreatePilgrimUrl = (groupId: string) => {
+  return `/api/groups/${groupId}/pilgrims`;
+};
+
+export const createPilgrim = async (
+  groupId: string,
+  groupPilgrimInput: GroupPilgrimInput,
+  options?: RequestInit,
+): Promise<GroupPilgrim> => {
+  return customFetch<GroupPilgrim>(getCreatePilgrimUrl(groupId), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(groupPilgrimInput),
+  });
+};
+
+export const getCreatePilgrimMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createPilgrim>>,
+    TError,
+    { groupId: string; data: BodyType<GroupPilgrimInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createPilgrim>>,
+  TError,
+  { groupId: string; data: BodyType<GroupPilgrimInput> },
+  TContext
+> => {
+  const mutationKey = ["createPilgrim"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createPilgrim>>,
+    { groupId: string; data: BodyType<GroupPilgrimInput> }
+  > = (props) => {
+    const { groupId, data } = props ?? {};
+
+    return createPilgrim(groupId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreatePilgrimMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createPilgrim>>
+>;
+export type CreatePilgrimMutationBody = BodyType<GroupPilgrimInput>;
+export type CreatePilgrimMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Add a pilgrim to a group (admin only)
+ */
+export const useCreatePilgrim = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createPilgrim>>,
+    TError,
+    { groupId: string; data: BodyType<GroupPilgrimInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createPilgrim>>,
+  TError,
+  { groupId: string; data: BodyType<GroupPilgrimInput> },
+  TContext
+> => {
+  return useMutation(getCreatePilgrimMutationOptions(options));
+};
+
+/**
+ * @summary Update a pilgrim (admin only)
+ */
+export const getUpdatePilgrimUrl = (groupId: string, pilgrimId: string) => {
+  return `/api/groups/${groupId}/pilgrims/${pilgrimId}`;
+};
+
+export const updatePilgrim = async (
+  groupId: string,
+  pilgrimId: string,
+  groupPilgrimInput: GroupPilgrimInput,
+  options?: RequestInit,
+): Promise<GroupPilgrim> => {
+  return customFetch<GroupPilgrim>(getUpdatePilgrimUrl(groupId, pilgrimId), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(groupPilgrimInput),
+  });
+};
+
+export const getUpdatePilgrimMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updatePilgrim>>,
+    TError,
+    { groupId: string; pilgrimId: string; data: BodyType<GroupPilgrimInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updatePilgrim>>,
+  TError,
+  { groupId: string; pilgrimId: string; data: BodyType<GroupPilgrimInput> },
+  TContext
+> => {
+  const mutationKey = ["updatePilgrim"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updatePilgrim>>,
+    { groupId: string; pilgrimId: string; data: BodyType<GroupPilgrimInput> }
+  > = (props) => {
+    const { groupId, pilgrimId, data } = props ?? {};
+
+    return updatePilgrim(groupId, pilgrimId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdatePilgrimMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updatePilgrim>>
+>;
+export type UpdatePilgrimMutationBody = BodyType<GroupPilgrimInput>;
+export type UpdatePilgrimMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update a pilgrim (admin only)
+ */
+export const useUpdatePilgrim = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updatePilgrim>>,
+    TError,
+    { groupId: string; pilgrimId: string; data: BodyType<GroupPilgrimInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updatePilgrim>>,
+  TError,
+  { groupId: string; pilgrimId: string; data: BodyType<GroupPilgrimInput> },
+  TContext
+> => {
+  return useMutation(getUpdatePilgrimMutationOptions(options));
+};
+
+/**
+ * @summary Delete a pilgrim (admin only)
+ */
+export const getDeletePilgrimUrl = (groupId: string, pilgrimId: string) => {
+  return `/api/groups/${groupId}/pilgrims/${pilgrimId}`;
+};
+
+export const deletePilgrim = async (
+  groupId: string,
+  pilgrimId: string,
+  options?: RequestInit,
+): Promise<DeletePilgrim200> => {
+  return customFetch<DeletePilgrim200>(
+    getDeletePilgrimUrl(groupId, pilgrimId),
+    {
+      ...options,
+      method: "DELETE",
+    },
+  );
+};
+
+export const getDeletePilgrimMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deletePilgrim>>,
+    TError,
+    { groupId: string; pilgrimId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deletePilgrim>>,
+  TError,
+  { groupId: string; pilgrimId: string },
+  TContext
+> => {
+  const mutationKey = ["deletePilgrim"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deletePilgrim>>,
+    { groupId: string; pilgrimId: string }
+  > = (props) => {
+    const { groupId, pilgrimId } = props ?? {};
+
+    return deletePilgrim(groupId, pilgrimId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeletePilgrimMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deletePilgrim>>
+>;
+
+export type DeletePilgrimMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Delete a pilgrim (admin only)
+ */
+export const useDeletePilgrim = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deletePilgrim>>,
+    TError,
+    { groupId: string; pilgrimId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deletePilgrim>>,
+  TError,
+  { groupId: string; pilgrimId: string },
+  TContext
+> => {
+  return useMutation(getDeletePilgrimMutationOptions(options));
+};
+
+/**
+ * @summary Upload pilgrim photo (admin only)
+ */
+export const getUploadPilgrimPhotoUrl = (
+  groupId: string,
+  pilgrimId: string,
+) => {
+  return `/api/groups/${groupId}/pilgrims/${pilgrimId}/photo`;
+};
+
+export const uploadPilgrimPhoto = async (
+  groupId: string,
+  pilgrimId: string,
+  uploadPilgrimPhotoBody: UploadPilgrimPhotoBody,
+  options?: RequestInit,
+): Promise<GroupPilgrim> => {
+  const formData = new FormData();
+  if (uploadPilgrimPhotoBody.photo !== undefined) {
+    formData.append(`photo`, uploadPilgrimPhotoBody.photo);
+  }
+
+  return customFetch<GroupPilgrim>(
+    getUploadPilgrimPhotoUrl(groupId, pilgrimId),
+    {
+      ...options,
+      method: "POST",
+      body: formData,
+    },
+  );
+};
+
+export const getUploadPilgrimPhotoMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof uploadPilgrimPhoto>>,
+    TError,
+    {
+      groupId: string;
+      pilgrimId: string;
+      data: BodyType<UploadPilgrimPhotoBody>;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof uploadPilgrimPhoto>>,
+  TError,
+  {
+    groupId: string;
+    pilgrimId: string;
+    data: BodyType<UploadPilgrimPhotoBody>;
+  },
+  TContext
+> => {
+  const mutationKey = ["uploadPilgrimPhoto"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof uploadPilgrimPhoto>>,
+    {
+      groupId: string;
+      pilgrimId: string;
+      data: BodyType<UploadPilgrimPhotoBody>;
+    }
+  > = (props) => {
+    const { groupId, pilgrimId, data } = props ?? {};
+
+    return uploadPilgrimPhoto(groupId, pilgrimId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UploadPilgrimPhotoMutationResult = NonNullable<
+  Awaited<ReturnType<typeof uploadPilgrimPhoto>>
+>;
+export type UploadPilgrimPhotoMutationBody = BodyType<UploadPilgrimPhotoBody>;
+export type UploadPilgrimPhotoMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Upload pilgrim photo (admin only)
+ */
+export const useUploadPilgrimPhoto = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof uploadPilgrimPhoto>>,
+    TError,
+    {
+      groupId: string;
+      pilgrimId: string;
+      data: BodyType<UploadPilgrimPhotoBody>;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof uploadPilgrimPhoto>>,
+  TError,
+  {
+    groupId: string;
+    pilgrimId: string;
+    data: BodyType<UploadPilgrimPhotoBody>;
+  },
+  TContext
+> => {
+  return useMutation(getUploadPilgrimPhotoMutationOptions(options));
+};

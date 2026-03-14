@@ -76,15 +76,21 @@ export default function PrintIdCards() {
                     <div style={{ flex: 1, fontSize: "6pt", lineHeight: 1.3, overflow: "hidden" }}>
                       <div style={{ fontWeight: "bold", fontSize: "7.5pt", marginBottom: "0.5mm" }}>{p.fullName}</div>
                       {p.passportNumber && (
-                        <div style={{ marginBottom: "0.5mm" }}>
+                        <div style={{ marginBottom: "0.3mm" }}>
                           <div style={{ fontSize: "5pt", color: "#666" }}>PASSPORT</div>
-                          <div style={{ overflow: "hidden", maxHeight: "8mm" }}><Barcode value={p.passportNumber} height={14} width={0.8} fontSize={5} /></div>
+                          <div style={{ overflow: "hidden", maxHeight: "7mm" }}><Barcode value={p.passportNumber} height={12} width={0.7} fontSize={5} /></div>
                         </div>
                       )}
-                      {group.hotels?.makkah?.name && <div style={{ fontSize: "5.5pt" }}>Makkah: {group.hotels.makkah.name}</div>}
-                      {group.hotels?.makkah?.address && <div style={{ fontSize: "5pt", color: "#555" }}>{group.hotels.makkah.address}</div>}
-                      {group.hotels?.madinah?.name && <div style={{ fontSize: "5.5pt" }}>Madinah: {group.hotels.madinah.name}</div>}
-                      {group.hotels?.madinah?.address && <div style={{ fontSize: "5pt", color: "#555" }}>{group.hotels.madinah.address}</div>}
+                      {p.visaNumber && (
+                        <div style={{ marginBottom: "0.3mm" }}>
+                          <div style={{ fontSize: "5pt", color: "#666" }}>VISA</div>
+                          <div style={{ overflow: "hidden", maxHeight: "7mm" }}><Barcode value={p.visaNumber} height={12} width={0.7} fontSize={5} /></div>
+                        </div>
+                      )}
+                      {group.hotels?.makkah?.name && <div style={{ fontSize: "5pt" }}>Makkah: {group.hotels.makkah.name}</div>}
+                      {group.hotels?.makkah?.address && <div style={{ fontSize: "4.5pt", color: "#555" }}>{group.hotels.makkah.address}</div>}
+                      {group.hotels?.madinah?.name && <div style={{ fontSize: "5pt" }}>Madinah: {group.hotels.madinah.name}</div>}
+                      {group.hotels?.madinah?.address && <div style={{ fontSize: "4.5pt", color: "#555" }}>{group.hotels.madinah.address}</div>}
                     </div>
                   </div>
                   <div style={{ background: "#f8f8f8", padding: "1mm 3mm", borderTop: "1px solid #eee", fontSize: "5.5pt", display: "flex", justifyContent: "space-between" }}>
@@ -105,14 +111,14 @@ export default function PrintIdCards() {
                     <div style={{ fontWeight: "bold", marginBottom: "1mm" }}>{p.fullName} (#{p.serialNumber})</div>
                     {p.passportNumber && (
                       <div style={{ marginBottom: "1mm" }}>
-                        <span style={{ fontSize: "5.5pt", color: "#666" }}>PP: </span>
+                        <span style={{ fontSize: "5.5pt", color: "#666" }}>Passport: </span>
                         <span style={{ fontFamily: "monospace", letterSpacing: "1px" }}>{p.passportNumber}</span>
                       </div>
                     )}
                     {p.visaNumber && (
-                      <div style={{ marginBottom: "1.5mm" }}>
-                        <div style={{ fontSize: "5pt", color: "#666" }}>VISA</div>
-                        <div style={{ overflow: "hidden", maxHeight: "8mm" }}><Barcode value={p.visaNumber} height={14} width={0.8} fontSize={5} /></div>
+                      <div style={{ marginBottom: "1mm" }}>
+                        <span style={{ fontSize: "5.5pt", color: "#666" }}>Visa: </span>
+                        <span style={{ fontFamily: "monospace", letterSpacing: "1px" }}>{p.visaNumber}</span>
                       </div>
                     )}
                     {group.hotels?.makkah && (
