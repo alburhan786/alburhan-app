@@ -5,7 +5,7 @@ import { PrintHeader } from "./PrintHeader";
 const API = import.meta.env.VITE_API_URL || "";
 const BASE = import.meta.env.BASE_URL || "/";
 
-interface Pilgrim { id: string; serialNumber: number; fullName: string; }
+interface Pilgrim { id: string; serialNumber: number; fullName: string; photoUrl?: string; }
 interface Group { id: string; groupName: string; year: number; }
 
 export default function PrintZamzam() {
@@ -71,14 +71,24 @@ export default function PrintZamzam() {
                   <div style={{ fontSize: "6pt", opacity: 0.8, marginTop: "1.5mm", letterSpacing: "1px", position: "relative" }}>HOLY WATER</div>
                 </div>
 
-                <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", padding: "4mm 5mm", textAlign: "center" }}>
-                  <div style={{ fontSize: "6pt", color: "#888", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "1mm" }}>Serial No.</div>
-                  <div style={{ fontSize: "20pt", fontWeight: 800, color: "#0A3D2A", lineHeight: 1 }}>#{String(p.serialNumber).padStart(3, "0")}</div>
+                <div style={{ flex: 1, display: "flex", justifyContent: "center", alignItems: "center", padding: "4mm 5mm", gap: "4mm" }}>
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
+                    <div style={{ fontSize: "6pt", color: "#888", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "1mm" }}>Serial No.</div>
+                    <div style={{ fontSize: "20pt", fontWeight: 800, color: "#0A3D2A", lineHeight: 1 }}>#{String(p.serialNumber).padStart(3, "0")}</div>
 
-                  <div style={{ width: "80%", height: "1px", background: "#e0e0e0", margin: "4mm 0" }} />
+                    <div style={{ width: "80%", height: "1px", background: "#e0e0e0", margin: "3mm 0" }} />
 
-                  <div style={{ fontSize: "12pt", fontWeight: 700, color: "#333", lineHeight: 1.2, marginBottom: "2mm" }}>{p.fullName}</div>
-                  <div style={{ fontSize: "8pt", color: "#666" }}>{group.groupName} — {group.year}</div>
+                    <div style={{ fontSize: "11pt", fontWeight: 700, color: "#333", lineHeight: 1.2, marginBottom: "2mm" }}>{p.fullName}</div>
+                    <div style={{ fontSize: "8pt", color: "#666" }}>{group.groupName} — {group.year}</div>
+                  </div>
+
+                  <div style={{ flexShrink: 0 }}>
+                    {p.photoUrl ? (
+                      <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "18mm", height: "22mm", objectFit: "cover", borderRadius: "3px", border: "1.5px solid #0A3D2A" }} />
+                    ) : (
+                      <div style={{ width: "18mm", height: "22mm", background: "#f0f0f0", borderRadius: "3px", border: "1.5px solid #ccc", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "5pt", color: "#aaa" }}>PHOTO</div>
+                    )}
+                  </div>
                 </div>
 
                 <div style={{ background: "#0A3D2A", color: "#C9A84C", padding: "2mm", textAlign: "center", fontSize: "6pt", fontWeight: 600, letterSpacing: "0.5px" }}>

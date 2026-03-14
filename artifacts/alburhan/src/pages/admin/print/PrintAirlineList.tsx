@@ -6,7 +6,7 @@ const API = import.meta.env.VITE_API_URL || "";
 
 interface Pilgrim {
   id: string; serialNumber: number; fullName: string; passportNumber?: string;
-  dateOfBirth?: string; gender?: string; city?: string;
+  dateOfBirth?: string; gender?: string; city?: string; photoUrl?: string;
 }
 interface Group {
   id: string; groupName: string; year: number; departureDate?: string;
@@ -64,6 +64,7 @@ export default function PrintAirlineList() {
           <thead>
             <tr>
               <th style={{ ...thStyle, textAlign: "center" }}>S.No.</th>
+              <th style={thStyle}>Photo</th>
               <th style={thStyle}>Pilgrim Name</th>
               <th style={thStyle}>Passport No.</th>
               <th style={thStyle}>Date of Birth</th>
@@ -79,6 +80,13 @@ export default function PrintAirlineList() {
             {pilgrims.map((p, i) => (
               <tr key={p.id} style={{ background: i % 2 === 0 ? "#fff" : "#f0f4fa" }}>
                 <td style={{ ...tdStyle, textAlign: "center", fontWeight: 700 }}>{p.serialNumber}</td>
+                <td style={{ ...tdStyle, padding: "1mm 2mm" }}>
+                  {p.photoUrl ? (
+                    <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "8mm", height: "10mm", objectFit: "cover", borderRadius: "2px" }} />
+                  ) : (
+                    <div style={{ width: "8mm", height: "10mm", background: "#f0f0f0", borderRadius: "2px" }} />
+                  )}
+                </td>
                 <td style={{ ...tdStyle, fontWeight: 600 }}>{p.fullName}</td>
                 <td style={{ ...tdStyle, fontFamily: "monospace", fontSize: "8pt", letterSpacing: "0.5px" }}>{p.passportNumber || "—"}</td>
                 <td style={tdStyle}>{p.dateOfBirth || "—"}</td>

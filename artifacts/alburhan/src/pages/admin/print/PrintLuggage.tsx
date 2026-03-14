@@ -8,8 +8,9 @@ const BASE = import.meta.env.BASE_URL || "/";
 interface Pilgrim {
   id: string; serialNumber: number; fullName: string; photoUrl?: string;
   mobileIndia?: string; mobileSaudi?: string; city?: string; relation?: string;
+  passportNumber?: string;
 }
-interface Group { id: string; groupName: string; year: number; }
+interface Group { id: string; groupName: string; year: number; maktabNumber?: string; }
 
 export default function PrintLuggage() {
   const [, params] = useRoute("/admin/groups/:groupId/print/luggage");
@@ -90,6 +91,8 @@ export default function PrintLuggage() {
                     <div style={{ fontWeight: 800, fontSize: "13pt", color: "#0A3D2A", marginBottom: "2mm", lineHeight: 1.2 }}>{p.fullName}</div>
                     <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "0.5mm 3mm", fontSize: "8.5pt" }}>
                       <span style={{ color: "#666" }}>Group:</span><span style={{ fontWeight: 600 }}>{group.groupName}</span>
+                      <span style={{ color: "#666" }}>Passport:</span><span style={{ fontWeight: 600, fontFamily: "monospace", letterSpacing: "0.5px" }}>{p.passportNumber || "—"}</span>
+                      <span style={{ color: "#666" }}>Maktab:</span><span style={{ fontWeight: 600 }}>{group.maktabNumber || "—"}</span>
                       <span style={{ color: "#666" }}>City:</span><span style={{ fontWeight: 600 }}>{p.city || "—"}</span>
                       <span style={{ color: "#666" }}>India:</span><span style={{ fontWeight: 600 }}>{p.mobileIndia || "—"}</span>
                       <span style={{ color: "#666" }}>Saudi:</span><span style={{ fontWeight: 600 }}>{p.mobileSaudi || "—"}</span>
@@ -97,7 +100,7 @@ export default function PrintLuggage() {
                   </div>
                 </div>
 
-                <div style={{ padding: "0 4mm 3mm" }}>
+                <div style={{ padding: "0 4mm 2mm" }}>
                   <div style={{ display: "flex", gap: "2mm", flexWrap: "wrap" }}>
                     {relations.map(r => (
                       <span key={r} style={{
@@ -109,6 +112,10 @@ export default function PrintLuggage() {
                       }}>{r}</span>
                     ))}
                   </div>
+                </div>
+
+                <div style={{ background: "#0A3D2A", color: "#C9A84C", padding: "1.5mm 4mm", fontSize: "7pt", textAlign: "center", fontWeight: 600, letterSpacing: "0.3px" }}>
+                  Emergency: 0547090786 / 0568780786
                 </div>
               </div>
             ))}

@@ -6,7 +6,7 @@ const API = import.meta.env.VITE_API_URL || "";
 
 interface Pilgrim {
   id: string; serialNumber: number; fullName: string; passportNumber?: string;
-  mobileIndia?: string; address?: string; city?: string; state?: string;
+  mobileIndia?: string; address?: string; city?: string; state?: string; photoUrl?: string;
 }
 interface Group {
   id: string; groupName: string; year: number; departureDate?: string; returnDate?: string;
@@ -41,13 +41,22 @@ export default function PrintContract() {
     <div key={pilgrim.id} style={{ ...s, maxWidth: "210mm", margin: "0 auto", padding: "2mm", pageBreakAfter: idx < pilgrims.length - 1 ? "always" : "auto" }}>
       <PrintHeader title="BOOKING AGREEMENT / CONTRACT" />
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2mm 6mm", fontSize: "9pt", marginBottom: "5mm", padding: "3mm 4mm", background: "#f5faf7", borderRadius: "4px", border: "1px solid #e0e0e0" }}>
-        <div><span style={{ color: "#666" }}>Agreement Date:</span> <b>{new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })}</b></div>
-        <div><span style={{ color: "#666" }}>Group:</span> <b>{group!.groupName} ({group!.year})</b></div>
-        <div><span style={{ color: "#666" }}>Pilgrim Name:</span> <b>{pilgrim.fullName}</b></div>
-        <div><span style={{ color: "#666" }}>Passport No.:</span> <b>{pilgrim.passportNumber || "—"}</b></div>
-        <div><span style={{ color: "#666" }}>Mobile:</span> <b>{pilgrim.mobileIndia || "—"}</b></div>
-        <div><span style={{ color: "#666" }}>Address:</span> <b>{[pilgrim.address, pilgrim.city, pilgrim.state].filter(Boolean).join(", ") || "—"}</b></div>
+      <div style={{ display: "flex", gap: "4mm", fontSize: "9pt", marginBottom: "5mm", padding: "3mm 4mm", background: "#f5faf7", borderRadius: "4px", border: "1px solid #e0e0e0" }}>
+        <div style={{ flexShrink: 0 }}>
+          {pilgrim.photoUrl ? (
+            <img src={`${API}${pilgrim.photoUrl}`} alt="" style={{ width: "18mm", height: "22mm", objectFit: "cover", borderRadius: "3px", border: "1.5px solid #0A3D2A" }} />
+          ) : (
+            <div style={{ width: "18mm", height: "22mm", background: "#e8e8e8", borderRadius: "3px", border: "1.5px solid #ccc", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "6pt", color: "#aaa" }}>PHOTO</div>
+          )}
+        </div>
+        <div style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2mm 6mm" }}>
+          <div><span style={{ color: "#666" }}>Agreement Date:</span> <b>{new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })}</b></div>
+          <div><span style={{ color: "#666" }}>Group:</span> <b>{group!.groupName} ({group!.year})</b></div>
+          <div><span style={{ color: "#666" }}>Pilgrim Name:</span> <b>{pilgrim.fullName}</b></div>
+          <div><span style={{ color: "#666" }}>Passport No.:</span> <b>{pilgrim.passportNumber || "—"}</b></div>
+          <div><span style={{ color: "#666" }}>Mobile:</span> <b>{pilgrim.mobileIndia || "—"}</b></div>
+          <div><span style={{ color: "#666" }}>Address:</span> <b>{[pilgrim.address, pilgrim.city, pilgrim.state].filter(Boolean).join(", ") || "—"}</b></div>
+        </div>
       </div>
 
       <p>This Agreement is entered into between <b>Al Burhan Tours & Travels</b> (hereinafter referred to as "the Company") and <b>{pilgrim.fullName}</b> (hereinafter referred to as "the Pilgrim") for the services outlined below.</p>

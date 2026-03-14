@@ -6,7 +6,7 @@ const API = import.meta.env.VITE_API_URL || "";
 
 interface Pilgrim {
   id: string; serialNumber: number; fullName: string; passportNumber?: string;
-  roomNumber?: string;
+  roomNumber?: string; photoUrl?: string;
 }
 interface Group {
   id: string; groupName: string; year: number;
@@ -65,6 +65,7 @@ export default function PrintHotelList() {
           <thead>
             <tr>
               <th style={thStyle}>Sr.</th>
+              <th style={thStyle}>Photo</th>
               <th style={thStyle}>Name</th>
               <th style={thStyle}>Passport</th>
               <th style={{ ...thStyle, textAlign: "center" }}>Room No.</th>
@@ -80,6 +81,13 @@ export default function PrintHotelList() {
             {pilgrims.map((p, i) => (
               <tr key={p.id} style={{ background: i % 2 === 0 ? "#fff" : "#f5faf7" }}>
                 <td style={{ ...tdStyle, fontWeight: 700, textAlign: "center" }}>{p.serialNumber}</td>
+                <td style={{ ...tdStyle, padding: "1mm 2mm" }}>
+                  {p.photoUrl ? (
+                    <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "8mm", height: "10mm", objectFit: "cover", borderRadius: "2px" }} />
+                  ) : (
+                    <div style={{ width: "8mm", height: "10mm", background: "#f0f0f0", borderRadius: "2px" }} />
+                  )}
+                </td>
                 <td style={{ ...tdStyle, fontWeight: 600 }}>{p.fullName}</td>
                 <td style={{ ...tdStyle, fontFamily: "monospace", fontSize: "7.5pt" }}>{p.passportNumber || "—"}</td>
                 <td style={{ ...tdStyle, fontWeight: 700, textAlign: "center", color: "#0A3D2A", fontSize: "10pt" }}>{p.roomNumber || "—"}</td>
