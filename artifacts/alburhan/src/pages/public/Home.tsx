@@ -1,14 +1,44 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useListPackages } from "@workspace/api-client-react";
 import { formatCurrency } from "@/lib/utils";
-import { MapPin, Calendar, Clock, ArrowRight, Star, Quote, Plane, Building2, Bot, BookOpen, Globe, Phone } from "lucide-react";
+import { MapPin, Calendar, Clock, ArrowRight, Star, Quote, Plane, Building2, Bot, BookOpen, Globe, Phone, MessageCircle, User, ClipboardList, ShieldCheck } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+
+const API_BASE = import.meta.env.VITE_API_URL || "";
+
+interface BannerImage {
+  id: string;
+  title: string | null;
+  fileUrl: string;
+  sortOrder: number;
+}
+
+const DEFAULT_HERO_IMAGE = "https://pixabay.com/get/g6735cbfacbb796055e554554eb8a6eb0a048a412ecc8bc49bd05d9226610968952a486d73ddd936ab4fe10a34cb42f700722f3a2f29c2a147d8ebd03f45421d9_1280.jpg";
 
 export default function Home() {
   const { data: packages = [] } = useListPackages({ active: true });
   const featuredPackages = packages.slice(0, 3);
+
+  const [bannerImages, setBannerImages] = useState<BannerImage[]>([]);
+  const [currentBannerIdx, setCurrentBannerIdx] = useState(0);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/gallery/active`)
+      .then(res => res.ok ? res.json() : [])
+      .then(imgs => setBannerImages(imgs))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (bannerImages.length <= 1) return;
+    const timer = setInterval(() => {
+      setCurrentBannerIdx(prev => (prev + 1) % bannerImages.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [bannerImages.length]);
 
   const ziyaratTours = [
     { name: "Iraq Ziyarat", desc: "Najaf, Karbala, Kazmain, Samarra", icon: "🕌" },
@@ -21,13 +51,19 @@ export default function Home() {
     <MainLayout>
       {/* Hero Section */}
       <section className="relative min-h-[85vh] flex items-center justify-center overflow-hidden">
-        {/* landing page hero scenic mountain landscape */}
         <div className="absolute inset-0 bg-primary">
-          <img 
-            src="https://pixabay.com/get/g6735cbfacbb796055e554554eb8a6eb0a048a412ecc8bc49bd05d9226610968952a486d73ddd936ab4fe10a34cb42f700722f3a2f29c2a147d8ebd03f45421d9_1280.jpg" 
-            alt="Kaaba Mecca" 
-            className="w-full h-full object-cover opacity-40 mix-blend-overlay"
-          />
+          <AnimatePresence mode="wait">
+            <motion.img
+              key={bannerImages.length > 0 ? bannerImages[currentBannerIdx]?.id : "default"}
+              src={bannerImages.length > 0 ? `${API_BASE}${bannerImages[currentBannerIdx]?.fileUrl}` : DEFAULT_HERO_IMAGE}
+              alt={bannerImages.length > 0 ? (bannerImages[currentBannerIdx]?.title || "Banner") : "Kaaba Mecca"}
+              className="w-full h-full object-cover opacity-40 mix-blend-overlay"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 1 }}
+            />
+          </AnimatePresence>
           <div className="absolute inset-0 bg-gradient-to-t from-primary via-primary/50 to-transparent" />
         </div>
         
@@ -73,26 +109,30 @@ export default function Home() {
       <section className="py-12 bg-white relative -mt-16 z-20">
         <div className="container mx-auto px-4">
           <div className="bg-white rounded-2xl shadow-xl shadow-black/5 border border-border/30 p-6 md:p-8">
-            <div className="grid grid-cols-3 md:grid-cols-6 gap-4 md:gap-6">
+            <div className="grid grid-cols-5 md:grid-cols-10 gap-3 md:gap-4">
               {[
                 { icon: Plane, label: "Hajj", href: "/packages", color: "bg-emerald-100 text-emerald-700" },
                 { icon: Star, label: "Umrah", href: "/packages", color: "bg-amber-100 text-amber-700" },
                 { icon: Globe, label: "Ziyarat", href: "/ziyarat", color: "bg-blue-100 text-blue-700" },
                 { icon: Building2, label: "Hotels", href: "/hotels", color: "bg-purple-100 text-purple-700" },
                 { icon: Bot, label: "AI Assistant", href: "/ai-assistant", color: "bg-rose-100 text-rose-700" },
+                { icon: MessageCircle, label: "Live Chat", href: "/live-chat", color: "bg-green-100 text-green-700" },
+                { icon: ClipboardList, label: "Book Now", href: "/packages", color: "bg-orange-100 text-orange-700" },
+                { icon: BookOpen, label: "My Booking", href: "/customer/dashboard", color: "bg-sky-100 text-sky-700" },
+                { icon: User, label: "Account", href: "/login", color: "bg-indigo-100 text-indigo-700" },
                 { icon: Phone, label: "Contact Us", href: "/contact", color: "bg-teal-100 text-teal-700" },
               ].map((item, i) => (
                 <Link key={i} href={item.href}>
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.05 }}
-                    className="flex flex-col items-center gap-2 p-4 rounded-xl hover:bg-muted/50 transition-all duration-200 cursor-pointer group"
+                    transition={{ delay: i * 0.04 }}
+                    className="flex flex-col items-center gap-1.5 p-3 rounded-xl hover:bg-muted/50 transition-all duration-200 cursor-pointer group"
                   >
-                    <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${item.color} group-hover:scale-110 transition-transform`}>
-                      <item.icon className="w-7 h-7" />
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${item.color} group-hover:scale-110 transition-transform`}>
+                      <item.icon className="w-6 h-6" />
                     </div>
-                    <span className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">{item.label}</span>
+                    <span className="text-xs font-medium text-foreground group-hover:text-primary transition-colors text-center leading-tight">{item.label}</span>
                   </motion.div>
                 </Link>
               ))}

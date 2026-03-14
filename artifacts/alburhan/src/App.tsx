@@ -9,6 +9,7 @@ import PackageDetail from "@/pages/public/PackageDetail";
 import Ziyarat from "@/pages/public/Ziyarat";
 import Hotels from "@/pages/public/Hotels";
 import AIAssistant from "@/pages/public/AIAssistant";
+import LiveChat from "@/pages/public/LiveChat";
 import Blog from "@/pages/public/Blog";
 import About from "@/pages/public/About";
 import Contact from "@/pages/public/Contact";
@@ -53,6 +54,7 @@ function Router() {
       <Route path="/ziyarat" component={Ziyarat} />
       <Route path="/hotels" component={Hotels} />
       <Route path="/ai-assistant" component={AIAssistant} />
+      <Route path="/live-chat" component={LiveChat} />
       <Route path="/blog" component={Blog} />
       <Route path="/about" component={About} />
       <Route path="/contact" component={Contact} />
