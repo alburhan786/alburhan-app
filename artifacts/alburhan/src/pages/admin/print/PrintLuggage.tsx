@@ -75,10 +75,11 @@ export default function PrintLuggage() {
               borderRadius: "0 60% 0 0", zIndex: 0,
             }} />
 
-            <img src={`${BASE}images/india_flag.jpg`} alt="" style={{ position: "absolute", bottom: "12mm", right: "5mm", width: "14mm", height: "14mm", borderRadius: "50%", objectFit: "cover", zIndex: 2 }} />
-
-            <div style={{ position: "relative", zIndex: 1, padding: "5mm 6mm 3mm", display: "flex", alignItems: "center", gap: "3mm" }}>
-              <img src={`${BASE}images/logo.png`} alt="" style={{ height: "18mm", objectFit: "contain" }} />
+            <div style={{ position: "relative", zIndex: 1, padding: "5mm 6mm 3mm", display: "flex", alignItems: "center", gap: "4mm" }}>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2mm", flexShrink: 0 }}>
+                <img src={`${BASE}images/logo.png`} alt="" style={{ height: "24mm", objectFit: "contain" }} />
+                <img src={`${BASE}images/india_flag.jpg`} alt="" style={{ width: "18mm", height: "18mm", borderRadius: "50%", objectFit: "cover" }} />
+              </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 700, fontSize: "13pt", color: DARK, letterSpacing: "0.5px" }}>Al Burhan Tours & Travels</div>
               </div>
