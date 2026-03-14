@@ -75,12 +75,12 @@ export default function PrintLuggage() {
               borderRadius: "0 60% 0 0", zIndex: 0,
             }} />
 
+            <img src={`${BASE}images/india_flag.jpg`} alt="" style={{ position: "absolute", bottom: "12mm", right: "5mm", width: "14mm", height: "14mm", borderRadius: "50%", objectFit: "cover", zIndex: 2 }} />
+
             <div style={{ position: "relative", zIndex: 1, padding: "5mm 6mm 3mm", display: "flex", alignItems: "center", gap: "3mm" }}>
-              <span style={{ fontSize: "16pt", lineHeight: 1 }}>🇮🇳</span>
-              <img src={`${BASE}images/logo.png`} alt="" style={{ height: "14mm", objectFit: "contain" }} />
+              <img src={`${BASE}images/logo.png`} alt="" style={{ height: "18mm", objectFit: "contain" }} />
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 700, fontSize: "13pt", color: DARK, letterSpacing: "0.5px" }}>Al Burhan Tours & Travels</div>
-                <div style={{ fontSize: "8pt", color: "#666" }}>Burhanpur, M.P.</div>
               </div>
               <div style={{ textAlign: "right" }}>
                 <div style={{ fontSize: "22pt", fontWeight: 800, color: "#fff" }}>#{String(p.serialNumber).padStart(3, "0")}</div>
