@@ -63,7 +63,6 @@ function WaveShapesBack() {
 function LogoHeader({ size }: { size?: "small" }) {
   const isSmall = size === "small";
   const flagImgSize = isSmall ? "6mm" : "8mm";
-  const logoImgSize = isSmall ? "8mm" : "10mm";
   const nameSize = isSmall ? "7pt" : "8pt";
   const tagSize = isSmall ? "3.5pt" : "4.5pt";
   const indiaSize = isSmall ? "3.5pt" : "4.5pt";
@@ -78,7 +77,7 @@ function LogoHeader({ size }: { size?: "small" }) {
         <div style={{ fontSize: tagSize, fontWeight: 700, color: GOLD, letterSpacing: "0.5px", lineHeight: 1.2 }}>TOURS & TRAVELS</div>
       </div>
       <div style={{ flexShrink: 0 }}>
-        <img src={BASE + "images/logo.png"} alt="" style={{ width: logoImgSize, height: logoImgSize, objectFit: "contain" }} />
+        <img src={BASE + "images/logo.png"} alt="" style={{ width: flagImgSize, height: flagImgSize, borderRadius: "50%", objectFit: "cover" }} />
       </div>
     </div>
   );
