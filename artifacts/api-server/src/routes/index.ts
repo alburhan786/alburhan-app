@@ -9,6 +9,7 @@ import notificationsRouter from "./notifications.js";
 import adminRouter from "./admin.js";
 import inquiryRouter from "./inquiry.js";
 import galleryRouter from "./gallery.js";
+import groupsRouter from "./groups.js";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use("/notifications", notificationsRouter);
 router.use("/admin", adminRouter);
 router.use("/inquiry", inquiryRouter);
 router.use("/gallery", galleryRouter);
+router.use("/groups", groupsRouter);
 
 export default router;

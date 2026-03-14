@@ -1,7 +1,7 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { LayoutDashboard, PackageSearch, Users, BookOpen, MessageSquare, LogOut, ImageIcon } from "lucide-react";
+import { LayoutDashboard, PackageSearch, Users, BookOpen, MessageSquare, LogOut, ImageIcon, UsersRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function AdminLayout({ children }: { children: ReactNode }) {
@@ -13,6 +13,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
     { icon: PackageSearch, label: "Packages", href: "/admin/packages" },
     { icon: BookOpen, label: "Bookings", href: "/admin/bookings" },
     { icon: ImageIcon, label: "Gallery", href: "/admin/gallery" },
+    { icon: UsersRound, label: "Hajj Groups", href: "/admin/groups" },
     { icon: Users, label: "Customers", href: "/admin/customers" },
     { icon: MessageSquare, label: "Inquiries", href: "/admin/inquiries" },
   ];
@@ -31,7 +32,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
         <nav className="flex-1 px-4 py-6 space-y-2">
           {menu.map(item => (
             <Link key={item.href} href={item.href}>
-              <span className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 cursor-pointer ${location === item.href ? 'bg-accent text-accent-foreground font-medium shadow-lg' : 'hover:bg-primary-foreground/10 text-primary-foreground/80 hover:text-white'}`}>
+              <span className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 cursor-pointer ${location === item.href || location.startsWith(item.href + '/') ? 'bg-accent text-accent-foreground font-medium shadow-lg' : 'hover:bg-primary-foreground/10 text-primary-foreground/80 hover:text-white'}`}>
                 <item.icon size={20} />
                 {item.label}
               </span>

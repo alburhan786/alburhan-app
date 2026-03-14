@@ -20,6 +20,13 @@ import AdminDashboard from "@/pages/admin/Dashboard";
 import PackagesManager from "@/pages/admin/PackagesManager";
 import BookingsManager from "@/pages/admin/BookingsManager";
 import GalleryManager from "@/pages/admin/GalleryManager";
+import GroupsManager from "@/pages/admin/GroupsManager";
+import PilgrimManager from "@/pages/admin/PilgrimManager";
+import PrintIdCards from "@/pages/admin/print/PrintIdCards";
+import PrintLuggage from "@/pages/admin/print/PrintLuggage";
+import PrintMedical from "@/pages/admin/print/PrintMedical";
+import PrintHotelList from "@/pages/admin/print/PrintHotelList";
+import PrintBusList from "@/pages/admin/print/PrintBusList";
 import NotFound from "@/pages/not-found";
 import { useAuth } from "@/hooks/use-auth";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -72,6 +79,13 @@ function Router() {
       <Route path="/admin/packages" component={() => <AdminRoute component={PackagesManager} />} />
       <Route path="/admin/bookings" component={() => <AdminRoute component={BookingsManager} />} />
       <Route path="/admin/gallery" component={() => <AdminRoute component={GalleryManager} />} />
+      <Route path="/admin/groups" component={() => <AdminRoute component={GroupsManager} />} />
+      <Route path="/admin/groups/:groupId/pilgrims" component={() => <AdminRoute component={PilgrimManager} />} />
+      <Route path="/admin/groups/:groupId/print/id-cards" component={() => <AdminRoute component={PrintIdCards} />} />
+      <Route path="/admin/groups/:groupId/print/luggage" component={() => <AdminRoute component={PrintLuggage} />} />
+      <Route path="/admin/groups/:groupId/print/medical" component={() => <AdminRoute component={PrintMedical} />} />
+      <Route path="/admin/groups/:groupId/print/hotel-list" component={() => <AdminRoute component={PrintHotelList} />} />
+      <Route path="/admin/groups/:groupId/print/bus-list" component={() => <AdminRoute component={PrintBusList} />} />
       <Route path="/admin/customers" component={() => <AdminRoute component={() => <div className="p-8 text-2xl font-serif">Customers Manager (Coming Soon)</div>} />} />
       <Route path="/admin/inquiries" component={() => <AdminRoute component={() => <div className="p-8 text-2xl font-serif">Inquiries Manager (Coming Soon)</div>} />} />
 

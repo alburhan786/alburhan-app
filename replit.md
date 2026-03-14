@@ -56,6 +56,7 @@ artifacts/
         │   ├── payments.ts     # Razorpay order + verify
         │   ├── documents.ts    # File upload management
         │   ├── gallery.ts      # Image gallery CRUD (admin upload, public list)
+        │   ├── groups.ts       # Hajj groups + pilgrims CRUD + photo upload
         │   ├── notifications.ts# Send SMS/WhatsApp to customers
         │   ├── admin.ts        # Stats + customer list + inquiries
         │   └── inquiry.ts      # Public inquiry form
@@ -74,7 +75,8 @@ lib/
     ├── bookings.ts
     ├── documents.ts
     ├── gallery.ts
-    └── inquiries.ts
+    ├── inquiries.ts
+    └── groups.ts          # hajj_groups + pilgrims tables
 ```
 
 ## Environment Variables (Secrets)
@@ -121,6 +123,19 @@ Packages have a `details` JSONB column for structured fields:
 - **Booking Submitted**: Customer gets SMS + WhatsApp; Admin gets WhatsApp alerts (9893989786, 9893225590)
 - **Booking Approved/Rejected**: Customer gets SMS + WhatsApp + Email
 - **Payment Confirmed**: Customer gets SMS + WhatsApp + Email with invoice number
+
+## Hajj Groups & Pilgrim Management (Admin Only)
+
+- Groups: Create/edit/delete Hajj groups with hotel info (Makkah + Madinah), flight, maktab numbers
+- Pilgrims: Add/edit/delete pilgrims per group with passport, visa, blood group, photo, room/bus assignments
+- Photo upload: Pilgrim photos uploaded to /uploads/ dir, served via /api/documents/files/:filename
+- Print views (all at /admin/groups/:id/print/...):
+  - **ID Cards**: 4-up A4 portrait, front + back with photo, passport, hotel info, emergency contacts
+  - **Luggage Stickers**: 2-up A4, group/city/mobile info with relation badges
+  - **Medical Stickers**: 2-up A4, red theme with blood group, age, passport, emergency contacts
+  - **Hotel Room List**: A4 landscape table with room assignments and hotel check-in/out dates
+  - **Bus List**: A4 portrait table with bus assignments and contact info
+- Emergency contacts on printed docs: Saudi 0547090786, India 0568780786
 
 ## Database Commands
 
