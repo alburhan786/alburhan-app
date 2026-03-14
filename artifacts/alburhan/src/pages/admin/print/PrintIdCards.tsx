@@ -66,8 +66,8 @@ function LogoHeader({ size }: { size?: "small" }) {
   const tagSize = size === "small" ? "4.5pt" : "5pt";
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "1.5mm", marginBottom: "1.5mm" }}>
-      <div style={{ width: logoSize, height: logoSize, borderRadius: "50%", background: DARK, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden", border: `1px solid ${GOLD}` }}>
-        <img src={BASE + "images/logo.png"} alt="" style={{ width: "85%", height: "85%", objectFit: "contain", filter: "brightness(1.8) contrast(1.2)" }} />
+      <div style={{ width: logoSize, height: logoSize, flexShrink: 0, overflow: "hidden" }}>
+        <img src={BASE + "images/logo.png"} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
       </div>
       <div>
         <div style={{ fontSize: nameSize, fontWeight: 800, color: DARK, letterSpacing: "0.5px", lineHeight: 1.2 }}>AL BURHAN</div>
@@ -176,7 +176,7 @@ export default function PrintIdCards() {
                       )}
                     </div>
                     <div style={{ background: DARK, color: GOLD, padding: "1mm 2mm", fontSize: "6pt", textAlign: "center", fontWeight: 800, borderRadius: "0 0 3px 3px", margin: "0 -3mm", textTransform: "uppercase", letterSpacing: "0.3px" }}>
-                      EMERGENCY: 0547090786 / 0568780786
+                      M. Altaf: 0547090786 | M. Wasim: 0568780786
                     </div>
                   </div>
                 </div>
@@ -223,19 +223,25 @@ export default function PrintIdCards() {
                   </div>
 
                   <div style={{ marginTop: "auto", paddingBottom: "1mm" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "5pt", color: "#666", marginBottom: "2mm" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "5pt", color: "#666", marginBottom: "1.5mm" }}>
                       <div>Group: <b style={{ color: DARK }}>{group.groupName}</b></div>
                       <div>Year: <b style={{ color: DARK }}>{group.year}</b></div>
                     </div>
 
-                    <div style={{ fontSize: "6.5pt", fontWeight: 700, color: DARK, textAlign: "center", marginBottom: "1mm" }}>{p.fullName}</div>
+                    <div style={{ display: "flex", justifyContent: "center", overflow: "hidden", marginBottom: "1mm" }}>
+                      {p.passportNumber ? (
+                        <Barcode value={p.passportNumber} height={14} width={1.0} fontSize={0} />
+                      ) : (
+                        <div style={{ fontSize: "5pt", color: "#999" }}>{group.groupName}</div>
+                      )}
+                    </div>
+
+                    <div style={{ fontSize: "6.5pt", fontWeight: 700, color: DARK, textAlign: "center", marginBottom: "0.5mm" }}>{p.fullName}</div>
                     <div style={{ textAlign: "center", fontSize: "4.5pt", color: "#999" }}>Your Sincerely</div>
 
-                    <div style={{ borderTop: `0.5px solid #ccc`, width: "60%", margin: "2mm auto 0" }} />
-
-                    <div style={{ background: DARK, color: "#fff", padding: "1.2mm 2mm", fontSize: "3.8pt", textAlign: "center", lineHeight: 1.5, borderRadius: "0 0 3px 3px", margin: "2mm -3mm 0" }}>
+                    <div style={{ background: DARK, color: "#fff", padding: "1.2mm 2mm", fontSize: "3.8pt", textAlign: "center", lineHeight: 1.5, borderRadius: "0 0 3px 3px", margin: "1.5mm -3mm 0" }}>
                       <div>Khanka Masjid, Sanwara Rd, Burhanpur 450331 M.P.</div>
-                      <div style={{ color: GOLD, fontWeight: 800, fontSize: "6pt", letterSpacing: "0.3px", textTransform: "uppercase" }}>Tel: 9893225590 | EMERGENCY: 0547090786</div>
+                      <div style={{ color: GOLD, fontWeight: 800, fontSize: "5.5pt", letterSpacing: "0.3px", textTransform: "uppercase" }}>M. Altaf: 0547090786 | M. Wasim: 0568780786</div>
                     </div>
                   </div>
                 </div>

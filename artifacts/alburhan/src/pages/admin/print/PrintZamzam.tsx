@@ -104,7 +104,7 @@ export default function PrintZamzam() {
             </div>
 
             <div style={{ position: "relative", zIndex: 2, background: DARK, color: GOLD, padding: "2.5mm 5mm", fontSize: "8pt", textAlign: "center", fontWeight: 600, letterSpacing: "0.3px" }}>
-              AL BURHAN TOURS & TRAVELS — BURHANPUR &nbsp;|&nbsp; Emergency: 0547090786 / 0568780786
+              AL BURHAN TOURS & TRAVELS — BURHANPUR &nbsp;|&nbsp; M. Altaf: 0547090786 | M. Wasim: 0568780786
             </div>
           </div>
         </div>
