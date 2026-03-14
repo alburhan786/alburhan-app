@@ -5,8 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit, Trash2, Users, Eye, Printer } from "lucide-react";
-import { Link } from "wouter";
+import { Plus, Edit, Trash2, Users, Eye, Printer, ChevronDown } from "lucide-react";
+import { Link, useLocation } from "wouter";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -29,6 +30,44 @@ const emptyForm = {
   hotelMakkahName: "", hotelMakkahAddress: "", hotelMakkahCheckIn: "", hotelMakkahCheckOut: "",
   hotelMadinahName: "", hotelMadinahAddress: "", hotelMadinahCheckIn: "", hotelMadinahCheckOut: "",
 };
+
+function PrintDropdown({ groupId }: { groupId: string }) {
+  const [, navigate] = useLocation();
+  const items = [
+    { label: "Photo ID Cards", path: "id-cards" },
+    { label: "Luggage Stickers", path: "luggage" },
+    { label: "Medical Stickers", path: "medical" },
+    { label: "Zamzam Stickers", path: "zamzam" },
+    { sep: true },
+    { label: "Hotel Room List", path: "hotel-list" },
+    { label: "Bus Seating List", path: "bus-list" },
+    { label: "Airline Passenger List", path: "airline-list" },
+    { sep: true },
+    { label: "Feedback Form", path: "feedback" },
+    { label: "Booking Contract", path: "contract" },
+  ] as const;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button size="sm" variant="outline" className="rounded-lg gap-1">
+          <Printer size={14} /> Print <ChevronDown size={12} />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-52">
+        {items.map((item, i) =>
+          "sep" in item ? (
+            <DropdownMenuSeparator key={`sep-${i}`} />
+          ) : (
+            <DropdownMenuItem key={item.path} className="cursor-pointer" onSelect={() => navigate(`/admin/groups/${groupId}/print/${item.path}`)}>
+              {item.label}
+            </DropdownMenuItem>
+          )
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 export default function GroupsManager() {
   const [groups, setGroups] = useState<HajjGroup[]>([]);
@@ -144,11 +183,14 @@ export default function GroupsManager() {
                   <Users size={18} />
                   <span>{g.pilgrimCount} Pilgrims</span>
                 </div>
-                <Link href={`/admin/groups/${g.id}/pilgrims`}>
-                  <Button size="sm" variant="outline" className="rounded-lg gap-1">
-                    <Eye size={14} /> Manage
-                  </Button>
-                </Link>
+                <div className="flex gap-2">
+                  <PrintDropdown groupId={g.id} />
+                  <Link href={`/admin/groups/${g.id}/pilgrims`}>
+                    <Button size="sm" variant="outline" className="rounded-lg gap-1">
+                      <Eye size={14} /> Manage
+                    </Button>
+                  </Link>
+                </div>
               </div>
             </Card>
           ))}

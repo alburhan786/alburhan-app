@@ -3,11 +3,18 @@ import { useRoute } from "wouter";
 
 const API = import.meta.env.VITE_API_URL || "";
 
+interface Pilgrim {
+  id: string; serialNumber: number; fullName: string; passportNumber?: string;
+  photoUrl?: string; busNumber?: string; mobileIndia?: string; mobileSaudi?: string;
+  city?: string; relation?: string;
+}
+interface Group { id: string; groupName: string; year: number; flightNumber?: string; }
+
 export default function PrintBusList() {
   const [, params] = useRoute("/admin/groups/:groupId/print/bus-list");
   const groupId = params?.groupId || "";
-  const [group, setGroup] = useState<any>(null);
-  const [pilgrims, setPilgrims] = useState<any[]>([]);
+  const [group, setGroup] = useState<Group | null>(null);
+  const [pilgrims, setPilgrims] = useState<Pilgrim[]>([]);
 
   useEffect(() => {
     if (!groupId) return;
@@ -18,10 +25,10 @@ export default function PrintBusList() {
   }, [groupId]);
 
   useEffect(() => {
-    if (pilgrims.length > 0) setTimeout(() => window.print(), 500);
+    if (pilgrims.length > 0) setTimeout(() => window.print(), 800);
   }, [pilgrims]);
 
-  if (!group) return <div className="p-8 text-center">Loading...</div>;
+  if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
 
   return (
     <>
@@ -31,56 +38,57 @@ export default function PrintBusList() {
           body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
           .no-print { display: none !important; }
         }
-        .print-table { width: 100%; border-collapse: collapse; font-family: Arial, sans-serif; font-size: 9pt; }
-        .print-table th, .print-table td { border: 1px solid #333; padding: 2mm 3mm; text-align: left; }
-        .print-table th { background: #1a5632; color: #fff; font-size: 8pt; text-transform: uppercase; }
-        .print-table tr:nth-child(even) { background: #f8f8f8; }
+        * { box-sizing: border-box; }
       `}</style>
 
-      <div className="no-print p-4 bg-amber-50 text-center">
-        <button onClick={() => window.print()} className="px-6 py-2 bg-primary text-white rounded-lg font-medium mr-4">Print Bus List</button>
-        <button onClick={() => window.history.back()} className="px-6 py-2 border rounded-lg">Back</button>
+      <div className="no-print" style={{ padding: "16px", background: "#fef3c7", textAlign: "center" }}>
+        <button onClick={() => window.print()} style={{ padding: "10px 24px", background: "#0A3D2A", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", marginRight: "12px" }}>Print Bus List</button>
+        <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
       </div>
 
-      <div style={{ padding: "4mm", fontFamily: "Arial, sans-serif" }}>
-        <div style={{ textAlign: "center", marginBottom: "6mm" }}>
-          <div style={{ fontWeight: "bold", fontSize: "16pt", color: "#1a5632" }}>Al Burhan Tours & Travels</div>
-          <div style={{ fontSize: "12pt", fontWeight: "bold", marginTop: "2mm" }}>Bus List — {group.groupName} ({group.year})</div>
-          {group.flightNumber && <div style={{ fontSize: "9pt", marginTop: "1mm" }}>Flight: {group.flightNumber}</div>}
+      <div style={{ padding: "4mm", fontFamily: "'Inter', Arial, sans-serif" }}>
+        <div style={{ textAlign: "center", marginBottom: "6mm", borderBottom: "3px solid #0A3D2A", paddingBottom: "4mm" }}>
+          <div style={{ fontWeight: 800, fontSize: "18pt", color: "#0A3D2A", letterSpacing: "0.5px" }}>Al Burhan Tours & Travels</div>
+          <div style={{ fontSize: "13pt", fontWeight: 700, marginTop: "2mm", color: "#333" }}>Bus Seating List — {group.groupName} ({group.year})</div>
+          {group.flightNumber && <div style={{ fontSize: "9pt", marginTop: "1mm", color: "#666" }}>Flight: {group.flightNumber}</div>}
         </div>
 
-        <table className="print-table">
+        <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "'Inter', Arial, sans-serif", fontSize: "8.5pt" }}>
           <thead>
             <tr>
-              <th>Sr.</th>
-              <th>Name</th>
-              <th>Passport</th>
-              <th>Bus No.</th>
-              <th>Group</th>
-              <th>Mobile (India)</th>
-              <th>Mobile (Saudi)</th>
-              <th>City</th>
-              <th>Relation</th>
+              <th style={{ background: "#0A3D2A", color: "#fff", padding: "2.5mm 2mm", textAlign: "center", fontSize: "7.5pt", textTransform: "uppercase", letterSpacing: "0.5px", border: "1px solid #0A3D2A" }}>Sr.</th>
+              <th style={{ background: "#0A3D2A", color: "#fff", padding: "2.5mm 2mm", textAlign: "center", fontSize: "7.5pt", textTransform: "uppercase", letterSpacing: "0.5px", border: "1px solid #0A3D2A" }}>Photo</th>
+              <th style={{ background: "#0A3D2A", color: "#fff", padding: "2.5mm 3mm", textAlign: "left", fontSize: "7.5pt", textTransform: "uppercase", letterSpacing: "0.5px", border: "1px solid #0A3D2A" }}>Name</th>
+              <th style={{ background: "#0A3D2A", color: "#fff", padding: "2.5mm 3mm", textAlign: "left", fontSize: "7.5pt", textTransform: "uppercase", letterSpacing: "0.5px", border: "1px solid #0A3D2A" }}>Passport</th>
+              <th style={{ background: "#0A3D2A", color: "#fff", padding: "2.5mm 2mm", textAlign: "center", fontSize: "7.5pt", textTransform: "uppercase", letterSpacing: "0.5px", border: "1px solid #0A3D2A" }}>Bus</th>
+              <th style={{ background: "#0A3D2A", color: "#fff", padding: "2.5mm 3mm", textAlign: "left", fontSize: "7.5pt", textTransform: "uppercase", letterSpacing: "0.5px", border: "1px solid #0A3D2A" }}>Mobile (India)</th>
+              <th style={{ background: "#0A3D2A", color: "#fff", padding: "2.5mm 3mm", textAlign: "left", fontSize: "7.5pt", textTransform: "uppercase", letterSpacing: "0.5px", border: "1px solid #0A3D2A" }}>City</th>
+              <th style={{ background: "#0A3D2A", color: "#fff", padding: "2.5mm 3mm", textAlign: "left", fontSize: "7.5pt", textTransform: "uppercase", letterSpacing: "0.5px", border: "1px solid #0A3D2A" }}>Relation</th>
             </tr>
           </thead>
           <tbody>
-            {pilgrims.map(p => (
-              <tr key={p.id}>
-                <td style={{ fontWeight: "bold" }}>{p.serialNumber}</td>
-                <td>{p.fullName}</td>
-                <td style={{ fontFamily: "monospace", fontSize: "8pt" }}>{p.passportNumber || "—"}</td>
-                <td style={{ fontWeight: "bold" }}>{p.busNumber || "—"}</td>
-                <td>{group.groupName}</td>
-                <td>{p.mobileIndia || "—"}</td>
-                <td>{p.mobileSaudi || "—"}</td>
-                <td>{p.city || "—"}</td>
-                <td>{p.relation || "—"}</td>
+            {pilgrims.map((p, i) => (
+              <tr key={p.id} style={{ background: i % 2 === 0 ? "#fff" : "#f8faf8" }}>
+                <td style={{ border: "1px solid #ddd", padding: "1.5mm 2mm", textAlign: "center", fontWeight: 700 }}>{p.serialNumber}</td>
+                <td style={{ border: "1px solid #ddd", padding: "1mm", textAlign: "center" }}>
+                  {p.photoUrl ? (
+                    <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "8mm", height: "10mm", objectFit: "cover", borderRadius: "2px" }} />
+                  ) : (
+                    <div style={{ width: "8mm", height: "10mm", background: "#eee", borderRadius: "2px", margin: "0 auto" }} />
+                  )}
+                </td>
+                <td style={{ border: "1px solid #ddd", padding: "1.5mm 3mm", fontWeight: 600 }}>{p.fullName}</td>
+                <td style={{ border: "1px solid #ddd", padding: "1.5mm 3mm", fontFamily: "monospace", fontSize: "7.5pt" }}>{p.passportNumber || "—"}</td>
+                <td style={{ border: "1px solid #ddd", padding: "1.5mm 2mm", textAlign: "center", fontWeight: 700, color: "#0A3D2A" }}>{p.busNumber || "—"}</td>
+                <td style={{ border: "1px solid #ddd", padding: "1.5mm 3mm" }}>{p.mobileIndia || "—"}</td>
+                <td style={{ border: "1px solid #ddd", padding: "1.5mm 3mm" }}>{p.city || "—"}</td>
+                <td style={{ border: "1px solid #ddd", padding: "1.5mm 3mm" }}>{p.relation || "—"}</td>
               </tr>
             ))}
           </tbody>
         </table>
-        <div style={{ marginTop: "4mm", fontSize: "8pt", textAlign: "center", color: "#666" }}>
-          Total Pilgrims: {pilgrims.length} | Generated on {new Date().toLocaleDateString()}
+        <div style={{ marginTop: "4mm", fontSize: "8pt", textAlign: "center", color: "#888", borderTop: "1px solid #e0e0e0", paddingTop: "3mm" }}>
+          Total Pilgrims: <b>{pilgrims.length}</b> &nbsp;|&nbsp; Generated: {new Date().toLocaleDateString("en-IN")}
         </div>
       </div>
     </>

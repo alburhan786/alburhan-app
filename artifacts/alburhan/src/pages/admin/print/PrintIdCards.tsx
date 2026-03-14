@@ -6,7 +6,8 @@ const API = import.meta.env.VITE_API_URL || "";
 
 interface Pilgrim {
   id: string; serialNumber: number; fullName: string; passportNumber?: string;
-  visaNumber?: string; photoUrl?: string;
+  visaNumber?: string; photoUrl?: string; dateOfBirth?: string; mobileIndia?: string;
+  bloodGroup?: string; roomNumber?: string; gender?: string;
 }
 interface Group {
   id: string; groupName: string; year: number; maktabNumber?: string;
@@ -28,123 +29,147 @@ export default function PrintIdCards() {
   }, [groupId]);
 
   useEffect(() => {
-    if (pilgrims.length > 0) setTimeout(() => window.print(), 500);
+    if (pilgrims.length > 0) setTimeout(() => window.print(), 800);
   }, [pilgrims]);
 
-  if (!group) return <div className="p-8 text-center">Loading...</div>;
+  if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
+
+  const pages: Pilgrim[][] = [];
+  for (let i = 0; i < pilgrims.length; i += 4) pages.push(pilgrims.slice(i, i + 4));
 
   return (
     <>
       <style>{`
         @media print {
-          @page { size: A4 portrait; margin: 8mm; }
-          body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          @page { size: A4 portrait; margin: 6mm; }
+          body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; margin: 0; }
           .no-print { display: none !important; }
         }
-        .id-card { width: 85.6mm; height: 53.98mm; border: 1px solid #ccc; border-radius: 4px; overflow: hidden; page-break-inside: avoid; font-family: Arial, sans-serif; }
-        .cards-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; }
+        * { box-sizing: border-box; }
+        .id-card {
+          width: 85.6mm; height: 53.98mm;
+          border: 1.5px solid #0A3D2A; border-radius: 6px; overflow: hidden;
+          page-break-inside: avoid; font-family: 'Inter', Arial, sans-serif;
+          background: #fff; position: relative;
+        }
+        .cards-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; padding: 2mm; }
         .page-break { page-break-after: always; }
+        .card-header {
+          background: linear-gradient(135deg, #0A3D2A 0%, #145a3a 100%);
+          color: #fff; padding: 2mm 3mm; display: flex; justify-content: space-between; align-items: center;
+          position: relative; overflow: hidden;
+        }
+        .card-header::after {
+          content: ''; position: absolute; right: -8mm; top: -8mm;
+          width: 20mm; height: 20mm; background: rgba(201,168,76,0.15);
+          border-radius: 50%; pointer-events: none;
+        }
+        .card-header::before {
+          content: ''; position: absolute; right: 4mm; bottom: -6mm;
+          width: 14mm; height: 14mm; background: rgba(201,168,76,0.1);
+          border-radius: 50%; pointer-events: none;
+        }
+        .field-label { font-size: 4.5pt; color: #888; text-transform: uppercase; letter-spacing: 0.3px; line-height: 1; }
+        .field-value { font-size: 6pt; color: #222; font-weight: 600; line-height: 1.2; }
       `}</style>
 
-      <div className="no-print p-4 bg-amber-50 text-center">
-        <button onClick={() => window.print()} className="px-6 py-2 bg-primary text-white rounded-lg font-medium mr-4">Print ID Cards</button>
-        <button onClick={() => window.history.back()} className="px-6 py-2 border rounded-lg">Back</button>
+      <div className="no-print" style={{ padding: "16px", background: "#fef3c7", textAlign: "center" }}>
+        <button onClick={() => window.print()} style={{ padding: "10px 24px", background: "#0A3D2A", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", marginRight: "12px" }}>Print ID Cards</button>
+        <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
       </div>
 
-      {(() => {
-        const pages: Pilgrim[][] = [];
-        for (let i = 0; i < pilgrims.length; i += 4) {
-          pages.push(pilgrims.slice(i, i + 4));
-        }
-        return pages.map((page, pi) => (
-          <div key={pi} className={pi < pages.length - 1 ? "page-break" : ""}>
-            <div className="cards-grid" style={{ padding: "2mm" }}>
-              {page.map(p => (
-                <div key={`front-${p.id}`} className="id-card" style={{ display: "flex", flexDirection: "column", fontSize: "7pt", background: "#fff" }}>
-                  <div style={{ background: "#1a5632", color: "#fff", padding: "1.5mm 3mm", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div style={{ fontWeight: "bold", fontSize: "8pt" }}>Al Burhan Tours & Travels</div>
-                    <div style={{ fontSize: "6pt" }}>#{p.serialNumber}</div>
+      {pages.map((page, pi) => (
+        <div key={pi} className={pi < pages.length - 1 ? "page-break" : ""}>
+          <div className="cards-grid">
+            {page.map(p => (
+              <div key={`front-${p.id}`} className="id-card">
+                <div className="card-header">
+                  <div style={{ zIndex: 1 }}>
+                    <div style={{ fontSize: "8pt", fontWeight: 700, letterSpacing: "0.5px" }}>AL BURHAN</div>
+                    <div style={{ fontSize: "5pt", opacity: 0.85, letterSpacing: "0.8px" }}>TOURS & TRAVELS</div>
                   </div>
-                  <div style={{ display: "flex", flex: 1, padding: "1.5mm" }}>
-                    <div style={{ width: "20mm", marginRight: "2mm", flexShrink: 0 }}>
-                      {p.photoUrl ? (
-                        <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "20mm", height: "25mm", objectFit: "cover", border: "1px solid #ddd" }} />
-                      ) : (
-                        <div style={{ width: "20mm", height: "25mm", background: "#f0f0f0", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid #ddd", fontSize: "6pt", color: "#999" }}>Photo</div>
-                      )}
-                    </div>
-                    <div style={{ flex: 1, fontSize: "6pt", lineHeight: 1.3, overflow: "hidden" }}>
-                      <div style={{ fontWeight: "bold", fontSize: "7.5pt", marginBottom: "0.5mm" }}>{p.fullName}</div>
-                      {p.passportNumber && (
-                        <div style={{ marginBottom: "0.3mm" }}>
-                          <div style={{ fontSize: "5pt", color: "#666" }}>PASSPORT</div>
-                          <div style={{ overflow: "hidden", maxHeight: "7mm" }}><Barcode value={p.passportNumber} height={12} width={0.7} fontSize={5} /></div>
-                        </div>
-                      )}
-                      {p.visaNumber && (
-                        <div style={{ marginBottom: "0.3mm" }}>
-                          <div style={{ fontSize: "5pt", color: "#666" }}>VISA</div>
-                          <div style={{ overflow: "hidden", maxHeight: "7mm" }}><Barcode value={p.visaNumber} height={12} width={0.7} fontSize={5} /></div>
-                        </div>
-                      )}
-                      {group.hotels?.makkah?.name && <div style={{ fontSize: "5pt" }}>Makkah: {group.hotels.makkah.name}</div>}
-                      {group.hotels?.makkah?.address && <div style={{ fontSize: "4.5pt", color: "#555" }}>{group.hotels.makkah.address}</div>}
-                      {group.hotels?.madinah?.name && <div style={{ fontSize: "5pt" }}>Madinah: {group.hotels.madinah.name}</div>}
-                      {group.hotels?.madinah?.address && <div style={{ fontSize: "4.5pt", color: "#555" }}>{group.hotels.madinah.address}</div>}
-                    </div>
-                  </div>
-                  <div style={{ background: "#f8f8f8", padding: "1mm 3mm", borderTop: "1px solid #eee", fontSize: "5.5pt", display: "flex", justifyContent: "space-between" }}>
-                    <span>Emergency: 0547090786</span>
-                    <span>India: 0568780786</span>
+                  <div style={{ zIndex: 1, textAlign: "right" }}>
+                    <div style={{ fontSize: "7pt", color: "#C9A84C", fontWeight: 700 }}>HAJJ {group.year}</div>
+                    <div style={{ fontSize: "5.5pt", opacity: 0.8 }}>#{String(p.serialNumber).padStart(3, "0")}</div>
                   </div>
                 </div>
-              ))}
-            </div>
 
-            <div className="cards-grid" style={{ padding: "2mm", marginTop: "4mm" }}>
-              {page.map(p => (
-                <div key={`back-${p.id}`} className="id-card" style={{ display: "flex", flexDirection: "column", fontSize: "7pt", background: "#fff" }}>
-                  <div style={{ background: "#1a5632", color: "#fff", padding: "1.5mm 3mm", fontWeight: "bold", fontSize: "7.5pt" }}>
-                    Al Burhan Tours & Travels
-                  </div>
-                  <div style={{ flex: 1, padding: "2mm", fontSize: "6.5pt", lineHeight: 1.5 }}>
-                    <div style={{ fontWeight: "bold", marginBottom: "1mm" }}>{p.fullName} (#{p.serialNumber})</div>
-                    {p.passportNumber && (
-                      <div style={{ marginBottom: "1mm" }}>
-                        <span style={{ fontSize: "5.5pt", color: "#666" }}>Passport: </span>
-                        <span style={{ fontFamily: "monospace", letterSpacing: "1px" }}>{p.passportNumber}</span>
-                      </div>
-                    )}
-                    {p.visaNumber && (
-                      <div style={{ marginBottom: "1mm" }}>
-                        <span style={{ fontSize: "5.5pt", color: "#666" }}>Visa: </span>
-                        <span style={{ fontFamily: "monospace", letterSpacing: "1px" }}>{p.visaNumber}</span>
-                      </div>
-                    )}
-                    {group.hotels?.makkah && (
-                      <div style={{ marginBottom: "1.5mm" }}>
-                        <div style={{ fontWeight: "bold", color: "#1a5632", fontSize: "6pt" }}>Makkah Hotel:</div>
-                        <div>{group.hotels.makkah.name}</div>
-                        {group.hotels.makkah.address && <div style={{ fontSize: "6pt", color: "#555" }}>{group.hotels.makkah.address}</div>}
-                      </div>
-                    )}
-                    {group.hotels?.madinah && (
-                      <div>
-                        <div style={{ fontWeight: "bold", color: "#1a5632", fontSize: "6pt" }}>Madinah Hotel:</div>
-                        <div>{group.hotels.madinah.name}</div>
-                        {group.hotels.madinah.address && <div style={{ fontSize: "6pt", color: "#555" }}>{group.hotels.madinah.address}</div>}
-                      </div>
+                <div style={{ display: "flex", flex: 1, padding: "2mm 2.5mm 1.5mm", gap: "2mm" }}>
+                  <div style={{ width: "22mm", flexShrink: 0 }}>
+                    {p.photoUrl ? (
+                      <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "22mm", height: "26mm", objectFit: "cover", borderRadius: "3px", border: "2px solid #0A3D2A" }} />
+                    ) : (
+                      <div style={{ width: "22mm", height: "26mm", background: "linear-gradient(135deg, #e8e8e8, #f5f5f5)", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "3px", border: "2px solid #ccc", fontSize: "6pt", color: "#aaa" }}>PHOTO</div>
                     )}
                   </div>
-                  <div style={{ background: "#f8f8f8", padding: "1mm 3mm", borderTop: "1px solid #eee", fontSize: "5.5pt", textAlign: "center" }}>
-                    {group.groupName} — {group.year} | Maktab: {group.maktabNumber || "N/A"}
+
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "0.8mm", minWidth: 0 }}>
+                    <div style={{ fontSize: "8pt", fontWeight: 800, color: "#0A3D2A", lineHeight: 1.15, marginBottom: "0.5mm", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.fullName}</div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5mm 2mm" }}>
+                      <div><div className="field-label">Passport</div><div className="field-value" style={{ fontFamily: "monospace", letterSpacing: "0.5px" }}>{p.passportNumber || "—"}</div></div>
+                      <div><div className="field-label">DOB</div><div className="field-value">{p.dateOfBirth || "—"}</div></div>
+                      <div><div className="field-label">Mobile</div><div className="field-value">{p.mobileIndia || "—"}</div></div>
+                      <div><div className="field-label">Blood Group</div><div className="field-value" style={{ color: "#c0392b" }}>{p.bloodGroup || "—"}</div></div>
+                      <div><div className="field-label">Maktab</div><div className="field-value">{group.maktabNumber || "—"}</div></div>
+                      <div><div className="field-label">Room</div><div className="field-value">{p.roomNumber || "—"}</div></div>
+                    </div>
                   </div>
                 </div>
-              ))}
-            </div>
+
+                <div style={{ background: "#f5f5f5", borderTop: "1px solid #e0e0e0", padding: "1mm 3mm", display: "flex", justifyContent: "center", alignItems: "center" }}>
+                  {p.passportNumber ? (
+                    <div style={{ overflow: "hidden", maxHeight: "8mm" }}>
+                      <Barcode value={p.passportNumber} height={14} width={0.8} fontSize={0} />
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: "5pt", color: "#999" }}>{group.groupName} — {group.year}</div>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
-        ));
-      })()}
+
+          <div className="cards-grid" style={{ marginTop: "4mm" }}>
+            {page.map(p => (
+              <div key={`back-${p.id}`} className="id-card" style={{ display: "flex", flexDirection: "column" }}>
+                <div className="card-header">
+                  <div style={{ zIndex: 1 }}>
+                    <div style={{ fontSize: "7.5pt", fontWeight: 700 }}>AL BURHAN TOURS & TRAVELS</div>
+                    <div style={{ fontSize: "5pt", opacity: 0.8 }}>Mumbai, Maharashtra, India</div>
+                  </div>
+                </div>
+
+                <div style={{ flex: 1, padding: "2mm 3mm", fontSize: "6.5pt", lineHeight: 1.6 }}>
+                  <div style={{ fontWeight: 700, fontSize: "7.5pt", color: "#0A3D2A", marginBottom: "1.5mm", borderBottom: "1px solid #e0e0e0", paddingBottom: "1mm" }}>{p.fullName} <span style={{ color: "#888", fontWeight: 400 }}>#{p.serialNumber}</span></div>
+
+                  {p.passportNumber && <div><span style={{ color: "#666", fontSize: "5.5pt" }}>Passport: </span><span style={{ fontFamily: "monospace", letterSpacing: "1px", fontWeight: 600 }}>{p.passportNumber}</span></div>}
+                  {p.visaNumber && <div><span style={{ color: "#666", fontSize: "5.5pt" }}>Visa: </span><span style={{ fontFamily: "monospace", letterSpacing: "1px" }}>{p.visaNumber}</span></div>}
+
+                  {group.hotels?.makkah && (
+                    <div style={{ marginTop: "1.5mm", padding: "1mm 2mm", background: "#f0faf4", borderRadius: "2px", borderLeft: "2px solid #0A3D2A" }}>
+                      <div style={{ fontWeight: 700, color: "#0A3D2A", fontSize: "5.5pt" }}>MAKKAH HOTEL</div>
+                      <div style={{ fontSize: "6pt" }}>{group.hotels.makkah.name}</div>
+                      {group.hotels.makkah.address && <div style={{ fontSize: "5pt", color: "#666" }}>{group.hotels.makkah.address}</div>}
+                    </div>
+                  )}
+                  {group.hotels?.madinah && (
+                    <div style={{ marginTop: "1mm", padding: "1mm 2mm", background: "#f0faf4", borderRadius: "2px", borderLeft: "2px solid #0A3D2A" }}>
+                      <div style={{ fontWeight: 700, color: "#0A3D2A", fontSize: "5.5pt" }}>MADINAH HOTEL</div>
+                      <div style={{ fontSize: "6pt" }}>{group.hotels.madinah.name}</div>
+                      {group.hotels.madinah.address && <div style={{ fontSize: "5pt", color: "#666" }}>{group.hotels.madinah.address}</div>}
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ background: "#0A3D2A", color: "#C9A84C", padding: "1.5mm 3mm", fontSize: "5.5pt", textAlign: "center", fontWeight: 600 }}>
+                  Emergency Saudi: 0547090786 &nbsp;|&nbsp; India: 0568780786
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
     </>
   );
 }

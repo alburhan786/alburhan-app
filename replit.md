@@ -40,6 +40,7 @@ artifacts/
 │   │   │   ├── auth/          # Login (OTP flow)
 │   │   │   ├── customer/      # Customer dashboard
 │   │   │   └── admin/         # Admin dashboard (quick actions: offline booking, broadcast, reports), bookings, packages
+│   │   │       └── print/    # 9 print documents: PrintIdCards, PrintLuggage, PrintMedical, PrintBusList, PrintHotelList, PrintAirlineList, PrintZamzam, PrintFeedback, PrintContract
 │   │   ├── components/
 │   │   │   └── layout/        # MainLayout, AdminLayout
 │   │   └── hooks/

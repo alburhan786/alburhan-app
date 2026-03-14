@@ -28,6 +28,10 @@ import PrintLuggage from "@/pages/admin/print/PrintLuggage";
 import PrintMedical from "@/pages/admin/print/PrintMedical";
 import PrintHotelList from "@/pages/admin/print/PrintHotelList";
 import PrintBusList from "@/pages/admin/print/PrintBusList";
+import PrintAirlineList from "@/pages/admin/print/PrintAirlineList";
+import PrintZamzam from "@/pages/admin/print/PrintZamzam";
+import PrintFeedback from "@/pages/admin/print/PrintFeedback";
+import PrintContract from "@/pages/admin/print/PrintContract";
 import NotFound from "@/pages/not-found";
 import { useAuth } from "@/hooks/use-auth";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -88,6 +92,10 @@ function Router() {
       <Route path="/admin/groups/:groupId/print/medical" component={() => <AdminRoute component={PrintMedical} />} />
       <Route path="/admin/groups/:groupId/print/hotel-list" component={() => <AdminRoute component={PrintHotelList} />} />
       <Route path="/admin/groups/:groupId/print/bus-list" component={() => <AdminRoute component={PrintBusList} />} />
+      <Route path="/admin/groups/:groupId/print/airline-list" component={() => <AdminRoute component={PrintAirlineList} />} />
+      <Route path="/admin/groups/:groupId/print/zamzam" component={() => <AdminRoute component={PrintZamzam} />} />
+      <Route path="/admin/groups/:groupId/print/feedback" component={() => <AdminRoute component={PrintFeedback} />} />
+      <Route path="/admin/groups/:groupId/print/contract" component={() => <AdminRoute component={PrintContract} />} />
       <Route path="/admin/customers" component={() => <AdminRoute component={() => <div className="p-8 text-2xl font-serif">Customers Manager (Coming Soon)</div>} />} />
       <Route path="/admin/inquiries" component={() => <AdminRoute component={() => <div className="p-8 text-2xl font-serif">Inquiries Manager (Coming Soon)</div>} />} />
 
