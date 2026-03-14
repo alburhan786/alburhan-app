@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { useGetPackage, useCreateBooking, useListBookings, type Package, type PackageDetails, type Booking } from "@workspace/api-client-react";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -87,7 +87,7 @@ export default function PackageDetail() {
     (b: Booking) => b.packageId === id && b.status === "pending"
   );
 
-  const { register, control, handleSubmit, formState: { errors } } = useForm<BookingForm>({
+  const { register, control, handleSubmit, reset, formState: { errors } } = useForm<BookingForm>({
     resolver: zodResolver(bookingSchema),
     defaultValues: {
       numberOfPilgrims: 1,
@@ -97,6 +97,19 @@ export default function PackageDetail() {
       customerEmail: user?.email || '',
     }
   });
+
+  useEffect(() => {
+    if (user) {
+      reset({
+        numberOfPilgrims: 1,
+        pilgrims: [{ name: '', passportNumber: '' }],
+        customerName: user.name || '',
+        customerMobile: user.mobile || '',
+        customerEmail: user.email || '',
+      });
+    }
+  }, [user, reset]);
+
   const { fields, append, remove } = useFieldArray({ control, name: "pilgrims" });
 
   const handleBookNow = () => {
