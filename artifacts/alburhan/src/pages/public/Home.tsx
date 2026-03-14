@@ -111,16 +111,16 @@ export default function Home() {
           <div className="bg-white rounded-2xl shadow-xl shadow-black/5 border border-border/30 p-6 md:p-8">
             <div className="grid grid-cols-5 md:grid-cols-10 gap-3 md:gap-4">
               {[
-                { icon: Plane, label: "Hajj", href: "/packages", color: "bg-emerald-100 text-emerald-700" },
-                { icon: Star, label: "Umrah", href: "/packages", color: "bg-amber-100 text-amber-700" },
-                { icon: Globe, label: "Ziyarat", href: "/ziyarat", color: "bg-blue-100 text-blue-700" },
+                { icon: Plane, label: "Hajj Packages", href: "/packages", color: "bg-emerald-100 text-emerald-700" },
+                { icon: Star, label: "Umrah Packages", href: "/packages", color: "bg-amber-100 text-amber-700" },
                 { icon: Building2, label: "Hotels", href: "/hotels", color: "bg-purple-100 text-purple-700" },
                 { icon: Bot, label: "AI Assistant", href: "/ai-assistant", color: "bg-rose-100 text-rose-700" },
                 { icon: MessageCircle, label: "Live Chat", href: "/live-chat", color: "bg-green-100 text-green-700" },
-                { icon: ClipboardList, label: "Book Now", href: "/packages", color: "bg-orange-100 text-orange-700" },
-                { icon: BookOpen, label: "My Booking", href: "/customer/dashboard", color: "bg-sky-100 text-sky-700" },
                 { icon: User, label: "Account", href: "/login", color: "bg-indigo-100 text-indigo-700" },
-                { icon: Phone, label: "Contact Us", href: "/contact", color: "bg-teal-100 text-teal-700" },
+                { icon: ShieldCheck, label: "Admin Panel", href: "/admin/dashboard", color: "bg-slate-100 text-slate-700" },
+                { icon: ClipboardList, label: "Create Booking", href: "/packages", color: "bg-orange-100 text-orange-700" },
+                { icon: Globe, label: "Partner Login", href: "/login", color: "bg-cyan-100 text-cyan-700" },
+                { icon: BookOpen, label: "Manage Booking", href: "/customer/dashboard", color: "bg-sky-100 text-sky-700" },
               ].map((item, i) => (
                 <Link key={i} href={item.href}>
                   <motion.div
