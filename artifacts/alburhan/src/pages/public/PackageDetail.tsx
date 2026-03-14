@@ -1,15 +1,17 @@
 import { useState } from "react";
 import { useParams, Link, useLocation } from "wouter";
-import { useGetPackage, useCreateBooking } from "@workspace/api-client-react";
+import { useGetPackage, useCreateBooking, useListBookings, type Package, type PackageDetails, type Booking } from "@workspace/api-client-react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import { usePayment } from "@/hooks/use-payment";
 import { formatCurrency } from "@/lib/utils";
-import { ChevronLeft, Star, Check, X, Share2, Plane, Building2, MapPin, UtensilsCrossed, Bus, FileText, Users, Calendar, Clock } from "lucide-react";
+import { ChevronLeft, Star, Check, X, Share2, Plane, Building2, MapPin, UtensilsCrossed, Bus, FileText, Users, Calendar, Clock, CreditCard } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -50,7 +52,7 @@ const TYPE_KEY: Record<string, string> = {
   jordan_heritage: "JORDAN",
 };
 
-function DetailRow({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
+function DetailRow({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
   return (
     <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 last:border-b-0">
       <div className="flex items-center gap-2.5">
@@ -68,10 +70,24 @@ export default function PackageDetail() {
   const createBooking = useCreateBooking();
   const { toast } = useToast();
   const { user, isAuthenticated } = useAuth();
+  const { initiatePayment, isInitializing: isPaymentLoading } = usePayment();
   const [, setLocation] = useLocation();
   const [isOpen, setIsOpen] = useState(false);
 
-  const { register, control, handleSubmit, watch, formState: { errors } } = useForm<BookingForm>({
+  const { data: bookingsData } = useListBookings(
+    {},
+    { query: { enabled: isAuthenticated } }
+  );
+
+  const approvedBooking = bookingsData?.bookings?.find(
+    (b: Booking) => b.packageId === id && b.status === "approved"
+  );
+
+  const pendingBooking = bookingsData?.bookings?.find(
+    (b: Booking) => b.packageId === id && b.status === "pending"
+  );
+
+  const { register, control, handleSubmit, formState: { errors } } = useForm<BookingForm>({
     resolver: zodResolver(bookingSchema),
     defaultValues: {
       numberOfPilgrims: 1,
@@ -95,13 +111,24 @@ export default function PackageDetail() {
     setIsOpen(true);
   };
 
+  const handlePayNow = () => {
+    if (!approvedBooking) return;
+    initiatePayment(
+      approvedBooking.id,
+      approvedBooking.customerName,
+      approvedBooking.customerEmail || "",
+      approvedBooking.customerMobile
+    );
+  };
+
   const onSubmit = async (data: BookingForm) => {
     try {
       await createBooking.mutateAsync({ data: { packageId: id, ...data } });
       setIsOpen(false);
       toast({ title: "Booking Request Submitted!", description: "Our team will review and contact you shortly. Jazak Allah Khair!" });
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Failed to submit booking.", variant: "destructive" });
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : "Failed to submit booking.";
+      toast({ title: "Error", description: msg, variant: "destructive" });
     }
   };
 
@@ -136,8 +163,51 @@ export default function PackageDetail() {
     </MainLayout>
   );
 
-  const details = (pkg as any).details || {};
+  const details: PackageDetails = pkg.details || {};
   const exclusions = ["5% GST", "Personal expenses", "Travel insurance", "Qurbani"];
+
+  const renderBottomCTA = () => {
+    if (approvedBooking) {
+      return (
+        <button
+          onClick={handlePayNow}
+          disabled={isPaymentLoading}
+          className="px-8 py-3 bg-primary text-white font-bold rounded-2xl text-base shadow-lg hover:bg-primary/90 transition-colors flex items-center gap-2 disabled:opacity-60"
+        >
+          <CreditCard size={18} />
+          {isPaymentLoading ? "Processing..." : "Pay Now"}
+        </button>
+      );
+    }
+    if (pendingBooking) {
+      return (
+        <button
+          disabled
+          className="px-8 py-3 bg-amber-500 text-white font-bold rounded-2xl text-base shadow-lg opacity-80 cursor-not-allowed"
+        >
+          Booking Pending
+        </button>
+      );
+    }
+    if (!isAuthenticated) {
+      return (
+        <button
+          onClick={handleBookNow}
+          className="px-8 py-3 bg-primary text-white font-bold rounded-2xl text-base shadow-lg hover:bg-primary/90 transition-colors"
+        >
+          Login to Book
+        </button>
+      );
+    }
+    return (
+      <button
+        onClick={handleBookNow}
+        className="px-8 py-3 bg-primary text-white font-bold rounded-2xl text-base shadow-lg hover:bg-primary/90 transition-colors"
+      >
+        Book Now
+      </button>
+    );
+  };
 
   return (
     <MainLayout>
@@ -161,7 +231,7 @@ export default function PackageDetail() {
             <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold">
               {TYPE_DISPLAY[pkg.type] || pkg.type.replace('_', ' ')}
             </span>
-            {(pkg as any).featured && (
+            {pkg.featured && (
               <span className="px-3 py-1 rounded-full text-white text-xs font-bold flex items-center gap-1" style={{ backgroundColor: 'hsl(33, 90%, 48%)' }}>
                 <Star size={10} fill="white" /> FEATURED
               </span>
@@ -191,9 +261,6 @@ export default function PackageDetail() {
               {details.returnDate && (
                 <DetailRow icon={Calendar} label="Return Date" value={details.returnDate} />
               )}
-              {pkg.departureDates && pkg.departureDates.length > 1 && (
-                <DetailRow icon={Calendar} label="More Dates" value={pkg.departureDates.slice(1).join(', ')} />
-              )}
               {details.visa && (
                 <DetailRow icon={FileText} label="Visa" value={details.visa} />
               )}
@@ -206,62 +273,21 @@ export default function PackageDetail() {
               {details.roomType && (
                 <DetailRow icon={Users} label="Room Type" value={details.roomType} />
               )}
+              {details.hotelMakkah && (
+                <DetailRow icon={Building2} label="Hotel (Makkah)" value={`${details.hotelMakkah}${details.hotelCategoryMakkah ? ` – ${details.hotelCategoryMakkah}` : ''}`} />
+              )}
+              {details.distanceMakkah && (
+                <DetailRow icon={MapPin} label="Distance (Haram)" value={details.distanceMakkah} />
+              )}
+              {details.hotelMadinah && (
+                <DetailRow icon={Building2} label="Hotel (Madinah)" value={`${details.hotelMadinah}${details.hotelCategoryMadinah ? ` – ${details.hotelCategoryMadinah}` : ''}`} />
+              )}
+              {details.distanceMadinah && (
+                <DetailRow icon={MapPin} label="Distance (Masjid Nabawi)" value={details.distanceMadinah} />
+              )}
               <DetailRow icon={FileText} label="GST" value={`${pkg.gstPercent}% (excluded)`} />
             </div>
           </div>
-
-          {(details.hotelMakkah || details.hotelMadinah) && (
-            <div>
-              <h2 className="font-bold text-foreground text-base mb-3">Hotel Accommodations</h2>
-              <div className="space-y-3">
-                {details.hotelMakkah && (
-                  <div className="bg-white rounded-2xl border border-border/60 p-4 shadow-sm">
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <Building2 size={14} className="text-primary" />
-                      <p className="text-muted-foreground text-xs font-medium">Makkah</p>
-                    </div>
-                    <p className="font-bold text-foreground text-sm">{details.hotelMakkah}</p>
-                    {details.hotelCategoryMakkah && <p className="text-primary text-xs mt-1">{'★'.repeat(parseInt(details.hotelCategoryMakkah) || 0)} {details.hotelCategoryMakkah}</p>}
-                    {details.distanceMakkah && <p className="text-muted-foreground text-xs mt-0.5">{details.distanceMakkah} from Haram</p>}
-                  </div>
-                )}
-                {details.hotelMadinah && (
-                  <div className="bg-white rounded-2xl border border-border/60 p-4 shadow-sm">
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <Building2 size={14} className="text-primary" />
-                      <p className="text-muted-foreground text-xs font-medium">Madinah</p>
-                    </div>
-                    <p className="font-bold text-foreground text-sm">{details.hotelMadinah}</p>
-                    {details.hotelCategoryMadinah && <p className="text-primary text-xs mt-1">{'★'.repeat(parseInt(details.hotelCategoryMadinah) || 0)} {details.hotelCategoryMadinah}</p>}
-                    {details.distanceMadinah && <p className="text-muted-foreground text-xs mt-0.5">{details.distanceMadinah} from Masjid-e-Nabawi</p>}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Fallback hotel display from includes if no structured details */}
-          {!details.hotelMakkah && !details.hotelMadinah && pkg.includes && pkg.includes.some((i: string) => i.toLowerCase().includes('hotel') || i.toLowerCase().includes('makkah') || i.toLowerCase().includes('madinah')) && (
-            <div>
-              <h2 className="font-bold text-foreground text-base mb-3">Hotel Accommodations</h2>
-              <div className="space-y-3">
-                {pkg.includes.filter((i: string) => i.toLowerCase().includes('makkah') || i.toLowerCase().includes('makk')).slice(0, 1).map((hotel: string, i: number) => (
-                  <div key={i} className="bg-white rounded-2xl border border-border/60 p-4 shadow-sm">
-                    <p className="text-muted-foreground text-xs mb-1">Makkah</p>
-                    <p className="font-bold text-foreground text-sm">{hotel.split('(')[0].trim()}</p>
-                    {hotel.includes('(') && <p className="text-muted-foreground text-xs mt-1">{'★'} {hotel.match(/\(([^)]+)\)/)?.[1]}</p>}
-                  </div>
-                ))}
-                {pkg.includes.filter((i: string) => i.toLowerCase().includes('madinah') || i.toLowerCase().includes('medina') || i.toLowerCase().includes('nabawi')).slice(0, 1).map((hotel: string, i: number) => (
-                  <div key={i} className="bg-white rounded-2xl border border-border/60 p-4 shadow-sm">
-                    <p className="text-muted-foreground text-xs mb-1">Madinah</p>
-                    <p className="font-bold text-foreground text-sm">{hotel.split('(')[0].trim()}</p>
-                    {hotel.includes('(') && <p className="text-muted-foreground text-xs mt-1">{'★'} {hotel.match(/\(([^)]+)\)/)?.[1]}</p>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
           <div>
             <h2 className="font-bold text-foreground text-base mb-3">Room Pricing</h2>
@@ -285,7 +311,7 @@ export default function PackageDetail() {
             <div>
               <h2 className="font-bold text-foreground text-base mb-3">Inclusions</h2>
               <div className="bg-white rounded-2xl border border-border/60 p-4 shadow-sm space-y-3">
-                {pkg.includes.map((inc: string, i: number) => (
+                {pkg.includes.map((inc, i) => (
                   <div key={i} className="flex items-start gap-3">
                     <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
                       <Check size={12} className="text-primary" strokeWidth={3} />
@@ -301,7 +327,7 @@ export default function PackageDetail() {
             <div>
               <h2 className="font-bold text-foreground text-base mb-3">Highlights</h2>
               <div className="bg-white rounded-2xl border border-border/60 p-4 shadow-sm space-y-3">
-                {pkg.highlights.map((h: string, i: number) => (
+                {pkg.highlights.map((h, i) => (
                   <div key={i} className="flex items-start gap-3">
                     <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 text-primary font-bold text-xs bg-primary/10">
                       {i + 1}
@@ -352,15 +378,13 @@ export default function PackageDetail() {
         <div>
           <p className="text-muted-foreground text-xs">Starting from</p>
           <p className="text-xl font-bold text-foreground">{formatCurrency(pkg.pricePerPerson)}</p>
-          <p className="text-xs text-muted-foreground">+ {pkg.gstPercent}% GST</p>
+          <p className="text-xs text-muted-foreground">
+            + {pkg.gstPercent}% GST
+            {details.airline && <span className="ml-2 text-primary">| {details.airline}</span>}
+          </p>
         </div>
 
-        <button
-          onClick={handleBookNow}
-          className="px-8 py-3 bg-primary text-white font-bold rounded-2xl text-base shadow-lg hover:bg-primary/90 transition-colors"
-        >
-          Book Now
-        </button>
+        {renderBottomCTA()}
 
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
@@ -414,7 +438,7 @@ export default function PackageDetail() {
                   className="w-full h-10 px-3 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                 >
                   <option value="">Select date</option>
-                  {pkg.departureDates?.map((d: string) => <option key={d} value={d}>{d}</option>)}
+                  {pkg.departureDates?.map((d) => <option key={d} value={d}>{d}</option>)}
                   <option value="Flexible">Flexible / Other</option>
                 </select>
                 {errors.preferredDepartureDate && <p className="text-xs text-destructive">{errors.preferredDepartureDate.message}</p>}
