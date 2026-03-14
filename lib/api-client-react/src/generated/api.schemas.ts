@@ -67,6 +67,22 @@ export const PackageType = {
   jordan_heritage: "jordan_heritage",
 } as const;
 
+export type PackageDetails = {
+  airline?: string;
+  departureCities?: string[];
+  returnDate?: string;
+  hotelMakkah?: string;
+  hotelMadinah?: string;
+  hotelCategoryMakkah?: string;
+  hotelCategoryMadinah?: string;
+  distanceMakkah?: string;
+  distanceMadinah?: string;
+  roomType?: string;
+  mealPlan?: string;
+  transport?: string;
+  visa?: string;
+};
+
 export interface Package {
   id: string;
   name: string;
@@ -78,8 +94,10 @@ export interface Package {
   includes?: string[];
   highlights?: string[];
   departureDates?: string[];
+  details?: PackageDetails;
   maxPilgrims?: number;
   imageUrl?: string;
+  featured?: boolean;
   isActive: boolean;
   createdAt?: string;
 }
@@ -98,6 +116,22 @@ export const CreatePackageRequestType = {
   jordan_heritage: "jordan_heritage",
 } as const;
 
+export type CreatePackageRequestDetails = {
+  airline?: string;
+  departureCities?: string[];
+  returnDate?: string;
+  hotelMakkah?: string;
+  hotelMadinah?: string;
+  hotelCategoryMakkah?: string;
+  hotelCategoryMadinah?: string;
+  distanceMakkah?: string;
+  distanceMadinah?: string;
+  roomType?: string;
+  mealPlan?: string;
+  transport?: string;
+  visa?: string;
+};
+
 export interface CreatePackageRequest {
   name: string;
   type: CreatePackageRequestType;
@@ -108,8 +142,10 @@ export interface CreatePackageRequest {
   includes?: string[];
   highlights?: string[];
   departureDates?: string[];
+  details?: CreatePackageRequestDetails;
   maxPilgrims?: number;
   imageUrl?: string;
+  featured?: boolean;
   isActive?: boolean;
 }
 

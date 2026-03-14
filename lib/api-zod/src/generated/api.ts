@@ -105,8 +105,26 @@ export const ListPackagesResponseItem = zod.object({
   includes: zod.array(zod.string()).optional(),
   highlights: zod.array(zod.string()).optional(),
   departureDates: zod.array(zod.string()).optional(),
+  details: zod
+    .object({
+      airline: zod.string().optional(),
+      departureCities: zod.array(zod.string()).optional(),
+      returnDate: zod.string().optional(),
+      hotelMakkah: zod.string().optional(),
+      hotelMadinah: zod.string().optional(),
+      hotelCategoryMakkah: zod.string().optional(),
+      hotelCategoryMadinah: zod.string().optional(),
+      distanceMakkah: zod.string().optional(),
+      distanceMadinah: zod.string().optional(),
+      roomType: zod.string().optional(),
+      mealPlan: zod.string().optional(),
+      transport: zod.string().optional(),
+      visa: zod.string().optional(),
+    })
+    .optional(),
   maxPilgrims: zod.number().optional(),
   imageUrl: zod.string().optional(),
+  featured: zod.boolean().optional(),
   isActive: zod.boolean(),
   createdAt: zod.date().optional(),
 });
@@ -137,8 +155,26 @@ export const CreatePackageBody = zod.object({
   includes: zod.array(zod.string()).optional(),
   highlights: zod.array(zod.string()).optional(),
   departureDates: zod.array(zod.string()).optional(),
+  details: zod
+    .object({
+      airline: zod.string().optional(),
+      departureCities: zod.array(zod.string()).optional(),
+      returnDate: zod.string().optional(),
+      hotelMakkah: zod.string().optional(),
+      hotelMadinah: zod.string().optional(),
+      hotelCategoryMakkah: zod.string().optional(),
+      hotelCategoryMadinah: zod.string().optional(),
+      distanceMakkah: zod.string().optional(),
+      distanceMadinah: zod.string().optional(),
+      roomType: zod.string().optional(),
+      mealPlan: zod.string().optional(),
+      transport: zod.string().optional(),
+      visa: zod.string().optional(),
+    })
+    .optional(),
   maxPilgrims: zod.number().optional(),
   imageUrl: zod.string().optional(),
+  featured: zod.boolean().optional(),
   isActive: zod.boolean().default(createPackageBodyIsActiveDefault),
 });
 
@@ -169,8 +205,26 @@ export const GetPackageResponse = zod.object({
   includes: zod.array(zod.string()).optional(),
   highlights: zod.array(zod.string()).optional(),
   departureDates: zod.array(zod.string()).optional(),
+  details: zod
+    .object({
+      airline: zod.string().optional(),
+      departureCities: zod.array(zod.string()).optional(),
+      returnDate: zod.string().optional(),
+      hotelMakkah: zod.string().optional(),
+      hotelMadinah: zod.string().optional(),
+      hotelCategoryMakkah: zod.string().optional(),
+      hotelCategoryMadinah: zod.string().optional(),
+      distanceMakkah: zod.string().optional(),
+      distanceMadinah: zod.string().optional(),
+      roomType: zod.string().optional(),
+      mealPlan: zod.string().optional(),
+      transport: zod.string().optional(),
+      visa: zod.string().optional(),
+    })
+    .optional(),
   maxPilgrims: zod.number().optional(),
   imageUrl: zod.string().optional(),
+  featured: zod.boolean().optional(),
   isActive: zod.boolean(),
   createdAt: zod.date().optional(),
 });
@@ -204,8 +258,26 @@ export const UpdatePackageBody = zod.object({
   includes: zod.array(zod.string()).optional(),
   highlights: zod.array(zod.string()).optional(),
   departureDates: zod.array(zod.string()).optional(),
+  details: zod
+    .object({
+      airline: zod.string().optional(),
+      departureCities: zod.array(zod.string()).optional(),
+      returnDate: zod.string().optional(),
+      hotelMakkah: zod.string().optional(),
+      hotelMadinah: zod.string().optional(),
+      hotelCategoryMakkah: zod.string().optional(),
+      hotelCategoryMadinah: zod.string().optional(),
+      distanceMakkah: zod.string().optional(),
+      distanceMadinah: zod.string().optional(),
+      roomType: zod.string().optional(),
+      mealPlan: zod.string().optional(),
+      transport: zod.string().optional(),
+      visa: zod.string().optional(),
+    })
+    .optional(),
   maxPilgrims: zod.number().optional(),
   imageUrl: zod.string().optional(),
+  featured: zod.boolean().optional(),
   isActive: zod.boolean().default(updatePackageBodyIsActiveDefault),
 });
 
@@ -229,8 +301,26 @@ export const UpdatePackageResponse = zod.object({
   includes: zod.array(zod.string()).optional(),
   highlights: zod.array(zod.string()).optional(),
   departureDates: zod.array(zod.string()).optional(),
+  details: zod
+    .object({
+      airline: zod.string().optional(),
+      departureCities: zod.array(zod.string()).optional(),
+      returnDate: zod.string().optional(),
+      hotelMakkah: zod.string().optional(),
+      hotelMadinah: zod.string().optional(),
+      hotelCategoryMakkah: zod.string().optional(),
+      hotelCategoryMadinah: zod.string().optional(),
+      distanceMakkah: zod.string().optional(),
+      distanceMadinah: zod.string().optional(),
+      roomType: zod.string().optional(),
+      mealPlan: zod.string().optional(),
+      transport: zod.string().optional(),
+      visa: zod.string().optional(),
+    })
+    .optional(),
   maxPilgrims: zod.number().optional(),
   imageUrl: zod.string().optional(),
+  featured: zod.boolean().optional(),
   isActive: zod.boolean(),
   createdAt: zod.date().optional(),
 });

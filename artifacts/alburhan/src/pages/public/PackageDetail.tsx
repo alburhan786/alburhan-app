@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, Link } from "wouter";
+import { useParams, Link, useLocation } from "wouter";
 import { useGetPackage, useCreateBooking } from "@workspace/api-client-react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -7,8 +7,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { formatCurrency } from "@/lib/utils";
-import { ChevronLeft, Star, Check, X, Share2 } from "lucide-react";
+import { ChevronLeft, Star, Check, X, Share2, Plane, Building2, MapPin, UtensilsCrossed, Bus, FileText, Users, Calendar, Clock } from "lucide-react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -49,24 +50,56 @@ const TYPE_KEY: Record<string, string> = {
   jordan_heritage: "JORDAN",
 };
 
+function DetailRow({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 last:border-b-0">
+      <div className="flex items-center gap-2.5">
+        <Icon size={16} className="text-primary/70" />
+        <span className="text-muted-foreground text-sm">{label}</span>
+      </div>
+      <span className="font-semibold text-sm text-foreground text-right max-w-[55%]">{value}</span>
+    </div>
+  );
+}
+
 export default function PackageDetail() {
   const { id } = useParams<{ id: string }>();
   const { data: pkg, isLoading } = useGetPackage(id);
   const createBooking = useCreateBooking();
   const { toast } = useToast();
+  const { user, isAuthenticated } = useAuth();
+  const [, setLocation] = useLocation();
   const [isOpen, setIsOpen] = useState(false);
 
   const { register, control, handleSubmit, watch, formState: { errors } } = useForm<BookingForm>({
     resolver: zodResolver(bookingSchema),
-    defaultValues: { numberOfPilgrims: 1, pilgrims: [{ name: '', passportNumber: '' }] }
+    defaultValues: {
+      numberOfPilgrims: 1,
+      pilgrims: [{ name: '', passportNumber: '' }],
+      customerName: user?.name || '',
+      customerMobile: user?.mobile || '',
+      customerEmail: user?.email || '',
+    }
   });
   const { fields, append, remove } = useFieldArray({ control, name: "pilgrims" });
+
+  const handleBookNow = () => {
+    if (!isAuthenticated) {
+      toast({
+        title: "Login Required",
+        description: "Please login first to book this package.",
+      });
+      setLocation("/login");
+      return;
+    }
+    setIsOpen(true);
+  };
 
   const onSubmit = async (data: BookingForm) => {
     try {
       await createBooking.mutateAsync({ data: { packageId: id, ...data } });
       setIsOpen(false);
-      toast({ title: "Booking Request Submitted!", description: "Our team will contact you shortly. Jazak Allah Khair!" });
+      toast({ title: "Booking Request Submitted!", description: "Our team will review and contact you shortly. Jazak Allah Khair!" });
     } catch (error: any) {
       toast({ title: "Error", description: error.message || "Failed to submit booking.", variant: "destructive" });
     }
@@ -103,11 +136,11 @@ export default function PackageDetail() {
     </MainLayout>
   );
 
+  const details = (pkg as any).details || {};
   const exclusions = ["5% GST", "Personal expenses", "Travel insurance", "Qurbani"];
 
   return (
     <MainLayout>
-      {/* App-style back header */}
       <div className="bg-white border-b border-border sticky top-[96px] z-40 flex items-center justify-between px-4 py-3">
         <Link href="/packages">
           <button className="flex items-center gap-1 text-sm font-medium text-foreground hover:text-primary transition-colors">
@@ -121,7 +154,6 @@ export default function PackageDetail() {
       <div className="bg-background min-h-screen pb-32">
         <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
 
-          {/* Tags row — matches app */}
           <div className="flex flex-wrap gap-2">
             <span className="px-3 py-1 rounded-full bg-primary text-white text-xs font-bold">
               {TYPE_KEY[pkg.type] || pkg.type.toUpperCase()}
@@ -129,14 +161,13 @@ export default function PackageDetail() {
             <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold">
               {TYPE_DISPLAY[pkg.type] || pkg.type.replace('_', ' ')}
             </span>
-            {pkg.featured && (
+            {(pkg as any).featured && (
               <span className="px-3 py-1 rounded-full text-white text-xs font-bold flex items-center gap-1" style={{ backgroundColor: 'hsl(33, 90%, 48%)' }}>
                 <Star size={10} fill="white" /> FEATURED
               </span>
             )}
           </div>
 
-          {/* Title + Description */}
           <div>
             <h1 className="text-2xl font-bold text-foreground mb-3 font-sans">{pkg.name}</h1>
             {pkg.description && (
@@ -144,34 +175,94 @@ export default function PackageDetail() {
             )}
           </div>
 
-          {/* Package Details table */}
           <div>
             <h2 className="font-bold text-foreground text-base mb-3">Package Details</h2>
             <div className="bg-white rounded-2xl border border-border/60 overflow-hidden shadow-sm">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
-                <span className="text-muted-foreground text-sm">Duration</span>
-                <span className="font-semibold text-sm text-foreground">{pkg.duration || 'TBD'}</span>
-              </div>
+              <DetailRow icon={Clock} label="Duration" value={pkg.duration || 'TBD'} />
+              {details.airline && (
+                <DetailRow icon={Plane} label="Airline" value={details.airline} />
+              )}
+              {details.departureCities && details.departureCities.length > 0 && (
+                <DetailRow icon={MapPin} label="Departure Cities" value={details.departureCities.join(', ')} />
+              )}
               {pkg.departureDates && pkg.departureDates.length > 0 && (
-                <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
-                  <span className="text-muted-foreground text-sm">Departure</span>
-                  <span className="font-semibold text-sm text-foreground">{pkg.departureDates[0]}</span>
-                </div>
+                <DetailRow icon={Calendar} label="Departure Date" value={pkg.departureDates[0]} />
+              )}
+              {details.returnDate && (
+                <DetailRow icon={Calendar} label="Return Date" value={details.returnDate} />
               )}
               {pkg.departureDates && pkg.departureDates.length > 1 && (
-                <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
-                  <span className="text-muted-foreground text-sm">More Dates</span>
-                  <span className="font-semibold text-sm text-foreground">{pkg.departureDates.slice(1).join(', ')}</span>
-                </div>
+                <DetailRow icon={Calendar} label="More Dates" value={pkg.departureDates.slice(1).join(', ')} />
               )}
-              <div className="flex items-center justify-between px-4 py-3">
-                <span className="text-muted-foreground text-sm">GST</span>
-                <span className="font-semibold text-sm text-foreground">{pkg.gstPercent}% (excluded)</span>
-              </div>
+              {details.visa && (
+                <DetailRow icon={FileText} label="Visa" value={details.visa} />
+              )}
+              {details.transport && (
+                <DetailRow icon={Bus} label="Transport" value={details.transport} />
+              )}
+              {details.mealPlan && (
+                <DetailRow icon={UtensilsCrossed} label="Meals" value={details.mealPlan} />
+              )}
+              {details.roomType && (
+                <DetailRow icon={Users} label="Room Type" value={details.roomType} />
+              )}
+              <DetailRow icon={FileText} label="GST" value={`${pkg.gstPercent}% (excluded)`} />
             </div>
           </div>
 
-          {/* Room Pricing */}
+          {(details.hotelMakkah || details.hotelMadinah) && (
+            <div>
+              <h2 className="font-bold text-foreground text-base mb-3">Hotel Accommodations</h2>
+              <div className="space-y-3">
+                {details.hotelMakkah && (
+                  <div className="bg-white rounded-2xl border border-border/60 p-4 shadow-sm">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <Building2 size={14} className="text-primary" />
+                      <p className="text-muted-foreground text-xs font-medium">Makkah</p>
+                    </div>
+                    <p className="font-bold text-foreground text-sm">{details.hotelMakkah}</p>
+                    {details.hotelCategoryMakkah && <p className="text-primary text-xs mt-1">{'★'.repeat(parseInt(details.hotelCategoryMakkah) || 0)} {details.hotelCategoryMakkah}</p>}
+                    {details.distanceMakkah && <p className="text-muted-foreground text-xs mt-0.5">{details.distanceMakkah} from Haram</p>}
+                  </div>
+                )}
+                {details.hotelMadinah && (
+                  <div className="bg-white rounded-2xl border border-border/60 p-4 shadow-sm">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <Building2 size={14} className="text-primary" />
+                      <p className="text-muted-foreground text-xs font-medium">Madinah</p>
+                    </div>
+                    <p className="font-bold text-foreground text-sm">{details.hotelMadinah}</p>
+                    {details.hotelCategoryMadinah && <p className="text-primary text-xs mt-1">{'★'.repeat(parseInt(details.hotelCategoryMadinah) || 0)} {details.hotelCategoryMadinah}</p>}
+                    {details.distanceMadinah && <p className="text-muted-foreground text-xs mt-0.5">{details.distanceMadinah} from Masjid-e-Nabawi</p>}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Fallback hotel display from includes if no structured details */}
+          {!details.hotelMakkah && !details.hotelMadinah && pkg.includes && pkg.includes.some((i: string) => i.toLowerCase().includes('hotel') || i.toLowerCase().includes('makkah') || i.toLowerCase().includes('madinah')) && (
+            <div>
+              <h2 className="font-bold text-foreground text-base mb-3">Hotel Accommodations</h2>
+              <div className="space-y-3">
+                {pkg.includes.filter((i: string) => i.toLowerCase().includes('makkah') || i.toLowerCase().includes('makk')).slice(0, 1).map((hotel: string, i: number) => (
+                  <div key={i} className="bg-white rounded-2xl border border-border/60 p-4 shadow-sm">
+                    <p className="text-muted-foreground text-xs mb-1">Makkah</p>
+                    <p className="font-bold text-foreground text-sm">{hotel.split('(')[0].trim()}</p>
+                    {hotel.includes('(') && <p className="text-muted-foreground text-xs mt-1">{'★'} {hotel.match(/\(([^)]+)\)/)?.[1]}</p>}
+                  </div>
+                ))}
+                {pkg.includes.filter((i: string) => i.toLowerCase().includes('madinah') || i.toLowerCase().includes('medina') || i.toLowerCase().includes('nabawi')).slice(0, 1).map((hotel: string, i: number) => (
+                  <div key={i} className="bg-white rounded-2xl border border-border/60 p-4 shadow-sm">
+                    <p className="text-muted-foreground text-xs mb-1">Madinah</p>
+                    <p className="font-bold text-foreground text-sm">{hotel.split('(')[0].trim()}</p>
+                    {hotel.includes('(') && <p className="text-muted-foreground text-xs mt-1">{'★'} {hotel.match(/\(([^)]+)\)/)?.[1]}</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div>
             <h2 className="font-bold text-foreground text-base mb-3">Room Pricing</h2>
             <div className="bg-white rounded-2xl border border-border/60 overflow-hidden shadow-sm">
@@ -190,35 +281,11 @@ export default function PackageDetail() {
             </div>
           </div>
 
-          {/* Hotel Accommodations — extracted from includes */}
-          {pkg.includes && pkg.includes.some(i => i.toLowerCase().includes('hotel') || i.toLowerCase().includes('makkah') || i.toLowerCase().includes('madinah')) && (
-            <div>
-              <h2 className="font-bold text-foreground text-base mb-3">Hotel Accommodations</h2>
-              <div className="space-y-3">
-                {pkg.includes.filter(i => i.toLowerCase().includes('makkah') || i.toLowerCase().includes('makk')).slice(0, 1).map((hotel, i) => (
-                  <div key={i} className="bg-white rounded-2xl border border-border/60 p-4 shadow-sm">
-                    <p className="text-muted-foreground text-xs mb-1">Makkah</p>
-                    <p className="font-bold text-foreground text-sm">{hotel.split('(')[0].trim()}</p>
-                    {hotel.includes('(') && <p className="text-muted-foreground text-xs mt-1">⭐ {hotel.match(/\(([^)]+)\)/)?.[1]}</p>}
-                  </div>
-                ))}
-                {pkg.includes.filter(i => i.toLowerCase().includes('madinah') || i.toLowerCase().includes('medina') || i.toLowerCase().includes('nabawi')).slice(0, 1).map((hotel, i) => (
-                  <div key={i} className="bg-white rounded-2xl border border-border/60 p-4 shadow-sm">
-                    <p className="text-muted-foreground text-xs mb-1">Madinah</p>
-                    <p className="font-bold text-foreground text-sm">{hotel.split('(')[0].trim()}</p>
-                    {hotel.includes('(') && <p className="text-muted-foreground text-xs mt-1">⭐ {hotel.match(/\(([^)]+)\)/)?.[1]}</p>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Inclusions */}
           {pkg.includes && pkg.includes.length > 0 && (
             <div>
               <h2 className="font-bold text-foreground text-base mb-3">Inclusions</h2>
               <div className="bg-white rounded-2xl border border-border/60 p-4 shadow-sm space-y-3">
-                {pkg.includes.map((inc, i) => (
+                {pkg.includes.map((inc: string, i: number) => (
                   <div key={i} className="flex items-start gap-3">
                     <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
                       <Check size={12} className="text-primary" strokeWidth={3} />
@@ -230,12 +297,11 @@ export default function PackageDetail() {
             </div>
           )}
 
-          {/* Highlights / Itinerary */}
           {pkg.highlights && pkg.highlights.length > 0 && (
             <div>
               <h2 className="font-bold text-foreground text-base mb-3">Highlights</h2>
               <div className="bg-white rounded-2xl border border-border/60 p-4 shadow-sm space-y-3">
-                {pkg.highlights.map((h, i) => (
+                {pkg.highlights.map((h: string, i: number) => (
                   <div key={i} className="flex items-start gap-3">
                     <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 text-primary font-bold text-xs bg-primary/10">
                       {i + 1}
@@ -247,7 +313,6 @@ export default function PackageDetail() {
             </div>
           )}
 
-          {/* Exclusions */}
           <div>
             <h2 className="font-bold text-foreground text-base mb-3">Exclusions</h2>
             <div className="bg-white rounded-2xl border border-border/60 p-4 shadow-sm space-y-3">
@@ -262,7 +327,6 @@ export default function PackageDetail() {
             </div>
           </div>
 
-          {/* Share Package */}
           <div>
             <h2 className="font-bold text-foreground text-base mb-3">Share Package</h2>
             <div className="flex gap-3">
@@ -284,7 +348,6 @@ export default function PackageDetail() {
         </div>
       </div>
 
-      {/* Sticky bottom bar — exactly like app */}
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-border px-4 py-3 flex items-center justify-between shadow-2xl">
         <div>
           <p className="text-muted-foreground text-xs">Starting from</p>
@@ -292,12 +355,14 @@ export default function PackageDetail() {
           <p className="text-xs text-muted-foreground">+ {pkg.gstPercent}% GST</p>
         </div>
 
+        <button
+          onClick={handleBookNow}
+          className="px-8 py-3 bg-primary text-white font-bold rounded-2xl text-base shadow-lg hover:bg-primary/90 transition-colors"
+        >
+          Book Now
+        </button>
+
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
-          <DialogTrigger asChild>
-            <button className="px-8 py-3 bg-primary text-white font-bold rounded-2xl text-base shadow-lg hover:bg-primary/90 transition-colors">
-              Book Now
-            </button>
-          </DialogTrigger>
           <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="font-bold text-xl text-foreground">Complete Your Booking</DialogTitle>
@@ -334,11 +399,11 @@ export default function PackageDetail() {
               <div>
                 <Label className="font-semibold mb-2 block">Contact Details</Label>
                 <div className="space-y-3">
-                  <Input {...register("customerName")} placeholder="Full name" />
+                  <Input {...register("customerName")} placeholder="Full name" defaultValue={user?.name || ''} />
                   {errors.customerName && <p className="text-xs text-destructive">{errors.customerName.message}</p>}
-                  <Input {...register("customerMobile")} placeholder="Mobile number" type="tel" />
+                  <Input {...register("customerMobile")} placeholder="Mobile number" type="tel" defaultValue={user?.mobile || ''} />
                   {errors.customerMobile && <p className="text-xs text-destructive">{errors.customerMobile.message}</p>}
-                  <Input {...register("customerEmail")} placeholder="Email (optional)" type="email" />
+                  <Input {...register("customerEmail")} placeholder="Email (optional)" type="email" defaultValue={user?.email || ''} />
                 </div>
               </div>
 
@@ -349,7 +414,7 @@ export default function PackageDetail() {
                   className="w-full h-10 px-3 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                 >
                   <option value="">Select date</option>
-                  {pkg.departureDates?.map(d => <option key={d} value={d}>{d}</option>)}
+                  {pkg.departureDates?.map((d: string) => <option key={d} value={d}>{d}</option>)}
                   <option value="Flexible">Flexible / Other</option>
                 </select>
                 {errors.preferredDepartureDate && <p className="text-xs text-destructive">{errors.preferredDepartureDate.message}</p>}

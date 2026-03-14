@@ -4,6 +4,22 @@ import { z } from "zod/v4";
 
 export const packageTypeEnum = pgEnum("package_type", ["umrah", "ramadan_umrah", "hajj", "special_hajj", "iraq_ziyarat", "baitul_muqaddas", "syria_ziyarat", "jordan_heritage"]);
 
+export interface PackageDetails {
+  airline?: string;
+  departureCities?: string[];
+  returnDate?: string;
+  hotelMakkah?: string;
+  hotelMadinah?: string;
+  hotelCategoryMakkah?: string;
+  hotelCategoryMadinah?: string;
+  distanceMakkah?: string;
+  distanceMadinah?: string;
+  roomType?: string;
+  mealPlan?: string;
+  transport?: string;
+  visa?: string;
+}
+
 export const packagesTable = pgTable("packages", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
@@ -15,6 +31,7 @@ export const packagesTable = pgTable("packages", {
   includes: jsonb("includes").$type<string[]>().default([]),
   highlights: jsonb("highlights").$type<string[]>().default([]),
   departureDates: jsonb("departure_dates").$type<string[]>().default([]),
+  details: jsonb("details").$type<PackageDetails>().default({}),
   maxPilgrims: integer("max_pilgrims"),
   imageUrl: text("image_url"),
   featured: boolean("featured").notNull().default(false),

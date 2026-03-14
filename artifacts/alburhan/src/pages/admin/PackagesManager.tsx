@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit, Trash2 } from "lucide-react";
+import { Plus, Edit, Trash2, Star } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -29,6 +29,7 @@ export default function PackagesManager() {
 
   const handleEditClick = (pkg: any) => {
     setEditingPackageId(pkg.id);
+    const details = pkg.details || {};
     editForm.reset({
       name: pkg.name || "",
       type: pkg.type || "umrah",
@@ -40,23 +41,61 @@ export default function PackagesManager() {
       departureDates: Array.isArray(pkg.departureDates) ? pkg.departureDates.join(", ") : (pkg.departureDates || ""),
       imageUrl: pkg.imageUrl || "",
       isActive: pkg.isActive ? "true" : "false",
+      featured: pkg.featured ? "true" : "false",
       gstPercent: pkg.gstPercent || 5,
+      airline: details.airline || "",
+      departureCities: Array.isArray(details.departureCities) ? details.departureCities.join(", ") : "",
+      returnDate: details.returnDate || "",
+      hotelMakkah: details.hotelMakkah || "",
+      hotelMadinah: details.hotelMadinah || "",
+      hotelCategoryMakkah: details.hotelCategoryMakkah || "",
+      hotelCategoryMadinah: details.hotelCategoryMadinah || "",
+      distanceMakkah: details.distanceMakkah || "",
+      distanceMadinah: details.distanceMadinah || "",
+      roomType: details.roomType || "",
+      mealPlan: details.mealPlan || "",
+      transport: details.transport || "",
+      visa: details.visa || "",
     });
     setIsEditOpen(true);
   };
 
+  function buildPayload(data: any) {
+    const details: any = {};
+    if (data.airline) details.airline = data.airline;
+    if (data.departureCities) details.departureCities = data.departureCities.split(',').map((s: string) => s.trim()).filter(Boolean);
+    if (data.returnDate) details.returnDate = data.returnDate;
+    if (data.hotelMakkah) details.hotelMakkah = data.hotelMakkah;
+    if (data.hotelMadinah) details.hotelMadinah = data.hotelMadinah;
+    if (data.hotelCategoryMakkah) details.hotelCategoryMakkah = data.hotelCategoryMakkah;
+    if (data.hotelCategoryMadinah) details.hotelCategoryMadinah = data.hotelCategoryMadinah;
+    if (data.distanceMakkah) details.distanceMakkah = data.distanceMakkah;
+    if (data.distanceMadinah) details.distanceMadinah = data.distanceMadinah;
+    if (data.roomType) details.roomType = data.roomType;
+    if (data.mealPlan) details.mealPlan = data.mealPlan;
+    if (data.transport) details.transport = data.transport;
+    if (data.visa) details.visa = data.visa;
+
+    return {
+      name: data.name,
+      type: data.type,
+      description: data.description || undefined,
+      duration: data.duration || undefined,
+      pricePerPerson: Number(data.pricePerPerson),
+      gstPercent: Number(data.gstPercent) || 5,
+      includes: data.includes ? data.includes.split(',').map((s: string) => s.trim()).filter(Boolean) : [],
+      highlights: data.highlights ? data.highlights.split(',').map((s: string) => s.trim()).filter(Boolean) : [],
+      departureDates: data.departureDates ? data.departureDates.split(',').map((s: string) => s.trim()).filter(Boolean) : [],
+      details: Object.keys(details).length > 0 ? details : undefined,
+      imageUrl: data.imageUrl || undefined,
+      featured: data.featured === 'true',
+      isActive: data.isActive === 'true',
+    };
+  }
+
   const onSubmit = async (data: any) => {
     try {
-      const payload = {
-        ...data,
-        pricePerPerson: Number(data.pricePerPerson),
-        gstPercent: Number(data.gstPercent) || 5,
-        includes: data.includes ? data.includes.split(',').map((s:string) => s.trim()) : [],
-        highlights: data.highlights ? data.highlights.split(',').map((s:string) => s.trim()) : [],
-        departureDates: data.departureDates ? data.departureDates.split(',').map((s:string) => s.trim()) : [],
-        isActive: data.isActive === 'true'
-      };
-      await createMutation.mutateAsync({ data: payload });
+      await createMutation.mutateAsync({ data: buildPayload(data) });
       toast({ title: "Package created successfully" });
       setIsCreateOpen(false);
       reset();
@@ -69,16 +108,7 @@ export default function PackagesManager() {
   const onEditSubmit = async (data: any) => {
     if (!editingPackageId) return;
     try {
-      const payload = {
-        ...data,
-        pricePerPerson: Number(data.pricePerPerson),
-        gstPercent: Number(data.gstPercent) || 5,
-        includes: data.includes ? data.includes.split(',').map((s:string) => s.trim()) : [],
-        highlights: data.highlights ? data.highlights.split(',').map((s:string) => s.trim()) : [],
-        departureDates: data.departureDates ? data.departureDates.split(',').map((s:string) => s.trim()) : [],
-        isActive: data.isActive === 'true'
-      };
-      await updateMutation.mutateAsync({ id: editingPackageId, data: payload });
+      await updateMutation.mutateAsync({ id: editingPackageId, data: buildPayload(data) });
       toast({ title: "Package updated successfully" });
       setIsEditOpen(false);
       setEditingPackageId(null);
@@ -101,58 +131,144 @@ export default function PackagesManager() {
   };
 
   const PackageFormFields = ({ reg }: { reg: any }) => (
-    <div className="grid grid-cols-2 gap-4">
-      <div className="space-y-2">
-        <label className="text-sm font-medium">Name</label>
-        <Input {...reg("name", { required: true })} placeholder="e.g. Premium Umrah 14 Days" />
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-sm font-bold text-foreground uppercase tracking-wider mb-3">Basic Information</h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Name</label>
+            <Input {...reg("name", { required: true })} placeholder="e.g. Premium Umrah 14 Days" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Type</label>
+            <select {...reg("type")} className="w-full h-10 px-3 rounded-md border bg-background text-sm">
+              <option value="umrah">Umrah</option>
+              <option value="ramadan_umrah">Ramadan Umrah</option>
+              <option value="hajj">Hajj</option>
+              <option value="special_hajj">Special Hajj</option>
+              <option value="iraq_ziyarat">Iraq Ziyarat</option>
+              <option value="baitul_muqaddas">Baitul Muqaddas</option>
+              <option value="syria_ziyarat">Syria Ziyarat</option>
+              <option value="jordan_heritage">Jordan Heritage</option>
+            </select>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Price (per person)</label>
+            <Input type="number" {...reg("pricePerPerson", { required: true })} />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Duration</label>
+            <Input {...reg("duration")} placeholder="14 Days" />
+          </div>
+          <div className="col-span-2 space-y-2">
+            <label className="text-sm font-medium">Description</label>
+            <textarea {...reg("description")} className="w-full p-3 rounded-md border min-h-[80px] text-sm" />
+          </div>
+        </div>
       </div>
-      <div className="space-y-2">
-        <label className="text-sm font-medium">Type</label>
-        <select {...reg("type")} className="w-full h-10 px-3 rounded-md border bg-background text-sm">
-          <option value="umrah">Umrah</option>
-          <option value="ramadan_umrah">Ramadan Umrah</option>
-          <option value="hajj">Hajj</option>
-          <option value="special_hajj">Special Hajj</option>
-        </select>
+
+      <div>
+        <h3 className="text-sm font-bold text-foreground uppercase tracking-wider mb-3">Travel Details</h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Airline</label>
+            <Input {...reg("airline")} placeholder="e.g. Saudi Airlines" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Departure Cities (comma sep)</label>
+            <Input {...reg("departureCities")} placeholder="Mumbai, Delhi, Hyderabad" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Return Date</label>
+            <Input {...reg("returnDate")} placeholder="e.g. 15 April 2027" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Visa</label>
+            <Input {...reg("visa")} placeholder="e.g. Umrah Visa Included" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Transport</label>
+            <Input {...reg("transport")} placeholder="e.g. AC Bus, Private Car" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Meal Plan</label>
+            <Input {...reg("mealPlan")} placeholder="e.g. Breakfast + Dinner" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Room Type</label>
+            <Input {...reg("roomType")} placeholder="e.g. Quad Sharing" />
+          </div>
+        </div>
       </div>
-      <div className="space-y-2">
-        <label className="text-sm font-medium">Price (per person)</label>
-        <Input type="number" {...reg("pricePerPerson", { required: true })} />
+
+      <div>
+        <h3 className="text-sm font-bold text-foreground uppercase tracking-wider mb-3">Hotels</h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Hotel Makkah</label>
+            <Input {...reg("hotelMakkah")} placeholder="e.g. Pullman ZamZam" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Hotel Madinah</label>
+            <Input {...reg("hotelMadinah")} placeholder="e.g. Shaza Al Madina" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Category Makkah</label>
+            <Input {...reg("hotelCategoryMakkah")} placeholder="e.g. 5 Star" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Category Madinah</label>
+            <Input {...reg("hotelCategoryMadinah")} placeholder="e.g. 4 Star" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Distance from Haram (Makkah)</label>
+            <Input {...reg("distanceMakkah")} placeholder="e.g. 100 meters" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Distance from Masjid (Madinah)</label>
+            <Input {...reg("distanceMadinah")} placeholder="e.g. 200 meters" />
+          </div>
+        </div>
       </div>
-      <div className="space-y-2">
-        <label className="text-sm font-medium">Duration</label>
-        <Input {...reg("duration")} placeholder="14 Days" />
-      </div>
-      <div className="col-span-2 space-y-2">
-        <label className="text-sm font-medium">Description</label>
-        <textarea {...reg("description")} className="w-full p-3 rounded-md border min-h-[100px]" />
-      </div>
-      <div className="col-span-2 space-y-2">
-        <label className="text-sm font-medium">Includes (comma separated)</label>
-        <Input {...reg("includes")} placeholder="Visa, Flights, 5-Star Hotel" />
-      </div>
-      <div className="col-span-2 space-y-2">
-        <label className="text-sm font-medium">Departure Dates (comma separated)</label>
-        <Input {...reg("departureDates")} placeholder="15 Oct 2024, 28 Oct 2024" />
-      </div>
-      <div className="col-span-2 space-y-2">
-        <label className="text-sm font-medium">Highlights (comma separated)</label>
-        <Input {...reg("highlights")} placeholder="Ziyarat, VIP Transport, Guided Tours" />
-      </div>
-      <div className="col-span-2 space-y-2">
-        <label className="text-sm font-medium">Image URL</label>
-        <Input {...reg("imageUrl")} placeholder="https://..." />
-      </div>
-      <div className="space-y-2">
-        <label className="text-sm font-medium">GST %</label>
-        <Input type="number" {...reg("gstPercent")} placeholder="5" />
-      </div>
-      <div className="space-y-2">
-        <label className="text-sm font-medium">Active Status</label>
-        <select {...reg("isActive")} className="w-full h-10 px-3 rounded-md border bg-background text-sm">
-          <option value="true">Active</option>
-          <option value="false">Inactive</option>
-        </select>
+
+      <div>
+        <h3 className="text-sm font-bold text-foreground uppercase tracking-wider mb-3">Lists & Settings</h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="col-span-2 space-y-2">
+            <label className="text-sm font-medium">Includes (comma separated)</label>
+            <Input {...reg("includes")} placeholder="Visa, Flights, 5-Star Hotel" />
+          </div>
+          <div className="col-span-2 space-y-2">
+            <label className="text-sm font-medium">Departure Dates (comma separated)</label>
+            <Input {...reg("departureDates")} placeholder="15 Oct 2024, 28 Oct 2024" />
+          </div>
+          <div className="col-span-2 space-y-2">
+            <label className="text-sm font-medium">Highlights (comma separated)</label>
+            <Input {...reg("highlights")} placeholder="Ziyarat, VIP Transport, Guided Tours" />
+          </div>
+          <div className="col-span-2 space-y-2">
+            <label className="text-sm font-medium">Image URL</label>
+            <Input {...reg("imageUrl")} placeholder="https://..." />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">GST %</label>
+            <Input type="number" {...reg("gstPercent")} placeholder="5" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Featured</label>
+            <select {...reg("featured")} className="w-full h-10 px-3 rounded-md border bg-background text-sm">
+              <option value="false">No</option>
+              <option value="true">Yes</option>
+            </select>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Active Status</label>
+            <select {...reg("isActive")} className="w-full h-10 px-3 rounded-md border bg-background text-sm">
+              <option value="true">Active</option>
+              <option value="false">Inactive</option>
+            </select>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -220,10 +336,13 @@ export default function PackagesManager() {
             <tbody className="divide-y divide-border">
               {isLoading ? (
                 <tr><td colSpan={5} className="text-center py-8">Loading...</td></tr>
-              ) : packages.map(pkg => (
+              ) : packages.map((pkg: any) => (
                 <tr key={pkg.id} className="hover:bg-muted/30 transition-colors">
                   <td className="px-6 py-4">
-                    <div className="font-bold text-foreground">{pkg.name}</div>
+                    <div className="flex items-center gap-2">
+                      <div className="font-bold text-foreground">{pkg.name}</div>
+                      {pkg.featured && <Star size={14} className="text-amber-500" fill="currentColor" />}
+                    </div>
                     <div className="text-xs text-muted-foreground">{pkg.duration}</div>
                   </td>
                   <td className="px-6 py-4 uppercase text-xs font-bold tracking-wider text-primary">{pkg.type.replace('_', ' ')}</td>

@@ -706,10 +706,43 @@ components:
           type: array
           items:
             type: string
+        details:
+          type: object
+          properties:
+            airline:
+              type: string
+            departureCities:
+              type: array
+              items:
+                type: string
+            returnDate:
+              type: string
+            hotelMakkah:
+              type: string
+            hotelMadinah:
+              type: string
+            hotelCategoryMakkah:
+              type: string
+            hotelCategoryMadinah:
+              type: string
+            distanceMakkah:
+              type: string
+            distanceMadinah:
+              type: string
+            roomType:
+              type: string
+            mealPlan:
+              type: string
+            transport:
+              type: string
+            visa:
+              type: string
         maxPilgrims:
           type: number
         imageUrl:
           type: string
+        featured:
+          type: boolean
         isActive:
           type: boolean
         createdAt:
@@ -752,10 +785,43 @@ components:
           type: array
           items:
             type: string
+        details:
+          type: object
+          properties:
+            airline:
+              type: string
+            departureCities:
+              type: array
+              items:
+                type: string
+            returnDate:
+              type: string
+            hotelMakkah:
+              type: string
+            hotelMadinah:
+              type: string
+            hotelCategoryMakkah:
+              type: string
+            hotelCategoryMadinah:
+              type: string
+            distanceMakkah:
+              type: string
+            distanceMadinah:
+              type: string
+            roomType:
+              type: string
+            mealPlan:
+              type: string
+            transport:
+              type: string
+            visa:
+              type: string
         maxPilgrims:
           type: number
         imageUrl:
           type: string
+        featured:
+          type: boolean
         isActive:
           type: boolean
           default: true

@@ -49,8 +49,10 @@ router.post("/", requireAdmin as any, async (req, res) => {
     includes: (data.includes as string[]) ?? [],
     highlights: (data.highlights as string[]) ?? [],
     departureDates: (data.departureDates as string[]) ?? [],
+    details: (data as any).details ?? {},
     maxPilgrims: data.maxPilgrims ?? null,
     imageUrl: data.imageUrl ?? null,
+    featured: (data as any).featured ?? false,
     isActive: data.isActive ?? true,
   }).returning();
   res.status(201).json(formatPackage(pkg));
@@ -73,8 +75,10 @@ router.put("/:id", requireAdmin as any, async (req, res) => {
     includes: (data.includes as string[]) ?? [],
     highlights: (data.highlights as string[]) ?? [],
     departureDates: (data.departureDates as string[]) ?? [],
+    details: (data as any).details ?? {},
     maxPilgrims: data.maxPilgrims ?? null,
     imageUrl: data.imageUrl ?? null,
+    featured: (data as any).featured ?? false,
     isActive: data.isActive ?? true,
     updatedAt: new Date(),
   }).where(eq(packagesTable.id, req.params.id)).returning();

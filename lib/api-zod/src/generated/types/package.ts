@@ -5,6 +5,7 @@
  * Al Burhan Tours & Travels - Booking System API
  * OpenAPI spec version: 0.1.0
  */
+import type { PackageDetails } from "./packageDetails";
 import type { PackageType } from "./packageType";
 
 export interface Package {
@@ -18,8 +19,10 @@ export interface Package {
   includes?: string[];
   highlights?: string[];
   departureDates?: string[];
+  details?: PackageDetails;
   maxPilgrims?: number;
   imageUrl?: string;
+  featured?: boolean;
   isActive: boolean;
   createdAt?: Date;
 }

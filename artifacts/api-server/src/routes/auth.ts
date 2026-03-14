@@ -32,6 +32,11 @@ router.post("/send-otp", async (req, res) => {
 
   await sendOtpSMS(mobile, otp);
 
+  sendWhatsApp(
+    mobile,
+    `Your Al Burhan Tours & Travels OTP is: *${otp}*\n\nValid for 10 minutes. Do not share with anyone.\n\nAl Burhan Tours & Travels\n+91 9893225590`
+  ).catch(console.error);
+
   console.log(`[OTP] Mobile: ${mobile}, OTP: ${otp}, NewUser: ${isNewUser}`);
 
   res.json({

@@ -11,6 +11,7 @@ import { requireAuth, requireAdmin, type AuthenticatedRequest } from "../lib/aut
 import {
   sendBookingApprovalNotification,
   sendBookingRejectionNotification,
+  sendBookingSubmissionNotification,
 } from "../lib/notifications.js";
 
 const router = Router();
@@ -181,6 +182,15 @@ router.post("/", requireAuth as any, async (req: AuthenticatedRequest, res) => {
     notes: data.notes ?? null,
     isOffline: false,
   }).returning();
+
+  sendBookingSubmissionNotification({
+    mobile: booking.customerMobile,
+    email: booking.customerEmail,
+    customerName: booking.customerName,
+    bookingNumber: booking.bookingNumber,
+    packageName: booking.packageName ?? pkg?.name ?? "Travel Package",
+    numberOfPilgrims: booking.numberOfPilgrims,
+  }).catch(console.error);
 
   res.status(201).json(formatBooking(booking));
 });

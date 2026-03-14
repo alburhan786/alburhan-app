@@ -130,6 +130,27 @@ export async function sendBookingRejectionNotification(opts: {
   ]);
 }
 
+export async function sendBookingSubmissionNotification(opts: {
+  mobile: string;
+  email?: string | null;
+  customerName: string;
+  bookingNumber: string;
+  packageName: string;
+  numberOfPilgrims: number;
+}) {
+  const customerMsg = `Assalamu Alaikum ${opts.customerName},\n\nYour booking request #${opts.bookingNumber} for "${opts.packageName}" (${opts.numberOfPilgrims} pilgrim${opts.numberOfPilgrims > 1 ? "s" : ""}) has been submitted successfully.\n\nOur team will review and respond shortly. You will receive a notification once approved.\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 9893225590 | +91 9893989786`;
+
+  const adminMsg = `New Booking Alert!\n\nBooking #${opts.bookingNumber}\nCustomer: ${opts.customerName}\nMobile: ${opts.mobile}\nPackage: ${opts.packageName}\nPilgrims: ${opts.numberOfPilgrims}\n\nPlease review and approve/reject from the admin dashboard.`;
+
+  await Promise.allSettled([
+    sendSMS(opts.mobile, customerMsg),
+    sendWhatsApp(opts.mobile, customerMsg),
+    opts.email ? sendEmail(opts.email, "Booking Submitted – Al Burhan Tours & Travels", customerMsg) : Promise.resolve(),
+    sendWhatsApp("9893989786", adminMsg),
+    sendWhatsApp("9893225590", adminMsg),
+  ]);
+}
+
 export async function sendPaymentConfirmationNotification(opts: {
   mobile: string;
   email?: string | null;

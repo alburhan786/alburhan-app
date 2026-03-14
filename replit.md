@@ -98,8 +98,27 @@ To add more admins, update user role in DB: `UPDATE users SET role = 'admin' WHE
 - `ramadan_umrah` — Ramadan Umrah packages
 - `hajj` — Hajj 2027 packages
 - `special_hajj` — VIP Hajj packages
+- `iraq_ziyarat` — Iraq Ziyarat packages
+- `baitul_muqaddas` — Baitul Muqaddas packages
+- `syria_ziyarat` — Syria Ziyarat packages
+- `jordan_heritage` — Jordan Heritage packages
 
 All prices exclude 5% GST (added at checkout).
+
+## Package Details (JSONB)
+
+Packages have a `details` JSONB column for structured fields:
+- `airline`, `departureCities[]`, `returnDate`
+- `hotelMakkah`, `hotelMadinah`, `hotelCategoryMakkah`, `hotelCategoryMadinah`
+- `distanceMakkah`, `distanceMadinah`
+- `roomType`, `mealPlan`, `transport`, `visa`
+
+## Notifications
+
+- **OTP**: Sent via SMS (Fast2SMS DLT template) + WhatsApp (BotBee)
+- **Booking Submitted**: Customer gets SMS + WhatsApp; Admin gets WhatsApp alerts (9893989786, 9893225590)
+- **Booking Approved/Rejected**: Customer gets SMS + WhatsApp + Email
+- **Payment Confirmed**: Customer gets SMS + WhatsApp + Email with invoice number
 
 ## Database Commands
 
