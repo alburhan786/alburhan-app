@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, hajjGroupsTable, pilgrimsTable } from "@workspace/db";
-import { eq, desc, asc, count, max } from "drizzle-orm";
+import { eq, and, desc, asc, count, max } from "drizzle-orm";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import multer from "multer";
 import path from "path";
@@ -107,6 +107,9 @@ router.post("/:groupId/pilgrims", requireAdmin as any, async (req: Authenticated
 
   if (!fullName) { res.status(400).json({ message: "fullName is required" }); return; }
 
+  const groups = await db.select().from(hajjGroupsTable).where(eq(hajjGroupsTable.id, req.params.groupId)).limit(1);
+  if (!groups[0]) { res.status(404).json({ message: "Group not found" }); return; }
+
   const [{ maxSerial }] = await db.select({ maxSerial: max(pilgrimsTable.serialNumber) })
     .from(pilgrimsTable).where(eq(pilgrimsTable.groupId, req.params.groupId));
   const nextSerial = (maxSerial || 0) + 1;
@@ -126,26 +129,30 @@ router.put("/:groupId/pilgrims/:pilgrimId", requireAdmin as any, async (req: Aut
     photoUrl, mobileIndia, mobileSaudi, address, city, state, roomNumber,
     busNumber, relation, coverNumber, serialNumber } = req.body;
 
+  const scope = and(eq(pilgrimsTable.id, req.params.pilgrimId), eq(pilgrimsTable.groupId, req.params.groupId));
+
   const [updated] = await db.update(pilgrimsTable).set({
     fullName, passportNumber, visaNumber, dateOfBirth, gender, bloodGroup,
     photoUrl, mobileIndia, mobileSaudi, address, city, state,
     roomNumber, busNumber, relation, coverNumber,
     serialNumber: serialNumber ? Number(serialNumber) : undefined,
     updatedAt: new Date(),
-  }).where(eq(pilgrimsTable.id, req.params.pilgrimId)).returning();
+  }).where(scope).returning();
 
-  if (!updated) { res.status(404).json({ message: "Pilgrim not found" }); return; }
+  if (!updated) { res.status(404).json({ message: "Pilgrim not found in this group" }); return; }
   res.json(fmtPilgrim(updated));
 });
 
 router.delete("/:groupId/pilgrims/:pilgrimId", requireAdmin as any, async (req, res) => {
-  const pilgrims = await db.select().from(pilgrimsTable).where(eq(pilgrimsTable.id, req.params.pilgrimId));
-  if (pilgrims[0]?.photoUrl) {
+  const scope = and(eq(pilgrimsTable.id, req.params.pilgrimId), eq(pilgrimsTable.groupId, req.params.groupId));
+  const pilgrims = await db.select().from(pilgrimsTable).where(scope);
+  if (!pilgrims[0]) { res.status(404).json({ message: "Pilgrim not found in this group" }); return; }
+  if (pilgrims[0].photoUrl) {
     const filename = path.basename(pilgrims[0].photoUrl);
     const filePath = path.join(UPLOADS_DIR, filename);
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
   }
-  await db.delete(pilgrimsTable).where(eq(pilgrimsTable.id, req.params.pilgrimId));
+  await db.delete(pilgrimsTable).where(scope);
   res.json({ message: "Pilgrim deleted" });
 });
 
@@ -156,11 +163,12 @@ router.post(
   async (req: AuthenticatedRequest, res) => {
     if (!req.file) { res.status(400).json({ message: "No photo provided" }); return; }
     const photoUrl = `/api/documents/files/${req.file.filename}`;
+    const scope = and(eq(pilgrimsTable.id, req.params.pilgrimId), eq(pilgrimsTable.groupId, req.params.groupId));
     const [updated] = await db.update(pilgrimsTable)
       .set({ photoUrl, updatedAt: new Date() })
-      .where(eq(pilgrimsTable.id, req.params.pilgrimId))
+      .where(scope)
       .returning();
-    if (!updated) { res.status(404).json({ message: "Pilgrim not found" }); return; }
+    if (!updated) { res.status(404).json({ message: "Pilgrim not found in this group" }); return; }
     res.json(fmtPilgrim(updated));
   }
 );
