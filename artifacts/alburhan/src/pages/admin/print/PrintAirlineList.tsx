@@ -75,6 +75,7 @@ export default function PrintAirlineList() {
               <th style={{ ...thStyle, textAlign: "center" }}>Gender</th>
               <th style={thStyle}>Nationality</th>
               <th style={thStyle}>City</th>
+              <th style={thStyle}>Seat Pref.</th>
               <th style={thStyle}>Flight No.</th>
               <th style={thStyle}>Departure Date</th>
             </tr>
@@ -89,6 +90,7 @@ export default function PrintAirlineList() {
                 <td style={{ ...tdStyle, textAlign: "center" }}>{p.gender || "—"}</td>
                 <td style={tdStyle}>Indian</td>
                 <td style={tdStyle}>{p.city || "—"}</td>
+                <td style={{ ...tdStyle, textAlign: "center" }}>—</td>
                 <td style={{ ...tdStyle, fontWeight: 600 }}>{group.flightNumber || "—"}</td>
                 <td style={tdStyle}>{group.departureDate || "—"}</td>
               </tr>
