@@ -77,7 +77,7 @@ export default function PrintZamzam() {
                 <img src={`${BASE}images/logo.png`} alt="" style={{ height: "24mm", objectFit: "contain" }} />
                 <img src={`${BASE}images/india_flag.jpg`} alt="" style={{ width: "18mm", height: "18mm", borderRadius: "50%", objectFit: "cover" }} />
               </div>
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: 1, textAlign: "left" }}>
                 <div style={{ fontWeight: 900, fontSize: "15pt", color: "#1A7A4A", letterSpacing: "1px", textTransform: "uppercase", lineHeight: 1.1 }}>AL-BURHAN</div>
                 <div style={{ fontWeight: 700, fontSize: "9pt", color: GOLD, letterSpacing: "1.5px", textTransform: "uppercase" }}>TOURS & TRAVELS</div>
               </div>
