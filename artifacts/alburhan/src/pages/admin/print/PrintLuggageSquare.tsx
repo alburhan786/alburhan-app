@@ -100,24 +100,33 @@ export default function PrintLuggageSquare() {
               </div>
 
               <div style={{ position: "relative", zIndex: 1, padding: "2mm 4mm", flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "1.5mm 3mm", fontSize: "8pt", lineHeight: 1.4 }}>
-                  <div style={{ fontWeight: 700, color: DARK, textTransform: "uppercase", fontSize: "6.5pt" }}>Name</div>
-                  <div style={{ fontWeight: 800, fontSize: "10pt", color: "#222" }}>{p.fullName}</div>
+                <div style={{ display: "flex", gap: "3mm", alignItems: "flex-start" }}>
+                  <div style={{ flex: 1, display: "grid", gridTemplateColumns: "auto 1fr", gap: "1.5mm 3mm", fontSize: "8pt", lineHeight: 1.4 }}>
+                    <div style={{ fontWeight: 700, color: DARK, textTransform: "uppercase", fontSize: "6.5pt" }}>Name</div>
+                    <div style={{ fontWeight: 800, fontSize: "10pt", color: "#222" }}>{p.fullName}</div>
 
-                  <div style={{ fontWeight: 700, color: DARK, textTransform: "uppercase", fontSize: "6.5pt" }}>Passport</div>
-                  <div style={{ fontWeight: 700, fontFamily: "monospace", letterSpacing: "0.5px" }}>{p.passportNumber || "—"}</div>
+                    <div style={{ fontWeight: 700, color: DARK, textTransform: "uppercase", fontSize: "6.5pt" }}>Passport</div>
+                    <div style={{ fontWeight: 700, fontFamily: "monospace", letterSpacing: "0.5px" }}>{p.passportNumber || "—"}</div>
 
-                  <div style={{ fontWeight: 700, color: DARK, textTransform: "uppercase", fontSize: "6.5pt" }}>Group No.</div>
-                  <div style={{ fontWeight: 700 }}>{group.maktabNumber || "—"}</div>
+                    <div style={{ fontWeight: 700, color: DARK, textTransform: "uppercase", fontSize: "6.5pt" }}>Group No.</div>
+                    <div style={{ fontWeight: 700 }}>{group.maktabNumber || "—"}</div>
 
-                  <div style={{ fontWeight: 700, color: DARK, textTransform: "uppercase", fontSize: "6.5pt" }}>Bus No.</div>
-                  <div style={{ fontWeight: 700 }}>{p.busNumber || "—"}</div>
+                    <div style={{ fontWeight: 700, color: DARK, textTransform: "uppercase", fontSize: "6.5pt" }}>Bus No.</div>
+                    <div style={{ fontWeight: 700 }}>{p.busNumber || "—"}</div>
 
-                  <div style={{ fontWeight: 700, color: DARK, textTransform: "uppercase", fontSize: "6.5pt" }}>Hotel Makkah</div>
-                  <div style={{ fontWeight: 600, fontSize: "7.5pt" }}>{group.hotels?.makkah?.name || "—"}</div>
+                    <div style={{ fontWeight: 700, color: DARK, textTransform: "uppercase", fontSize: "6.5pt" }}>Hotel Makkah</div>
+                    <div style={{ fontWeight: 600, fontSize: "7.5pt" }}>{group.hotels?.makkah?.name || "—"}</div>
 
-                  <div style={{ fontWeight: 700, color: DARK, textTransform: "uppercase", fontSize: "6.5pt" }}>Hotel Madinah</div>
-                  <div style={{ fontWeight: 600, fontSize: "7.5pt" }}>{group.hotels?.madinah?.name || "—"}</div>
+                    <div style={{ fontWeight: 700, color: DARK, textTransform: "uppercase", fontSize: "6.5pt" }}>Hotel Madinah</div>
+                    <div style={{ fontWeight: 600, fontSize: "7.5pt" }}>{group.hotels?.madinah?.name || "—"}</div>
+                  </div>
+                  <div style={{ flexShrink: 0 }}>
+                    {p.photoUrl ? (
+                      <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "22mm", height: "22mm", objectFit: "cover", borderRadius: "50%", border: `2px solid ${GOLD}`, boxShadow: "0 1px 4px rgba(0,0,0,0.12)" }} />
+                    ) : (
+                      <div style={{ width: "22mm", height: "22mm", background: "#f0f0f0", borderRadius: "50%", border: `2px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "6pt", color: "#aaa" }}>PHOTO</div>
+                    )}
+                  </div>
                 </div>
 
                 <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "4mm", marginTop: "2mm" }}>
