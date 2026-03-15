@@ -146,6 +146,7 @@ function InvoiceContent({ invoice }: { invoice: InvoiceType }) {
                     <td className="px-2 py-2 text-center">{i + 1}</td>
                     <td className="px-2 py-2">
                       <div className="font-semibold">{invoice.packageName || "Travel Package"}</div>
+                      {p.name && <div className="text-[9px]">{p.name}</div>}
                     </td>
                     <td className="px-2 py-2 text-center">{invoice.sacCode || "998555"}</td>
                     <td className="px-2 py-2 text-center">{p.passportNumber || "—"}</td>
@@ -170,7 +171,7 @@ function InvoiceContent({ invoice }: { invoice: InvoiceType }) {
                   <td className="px-2 py-2 text-right">{formatINR(totalAmount)}</td>
                   <td className="px-2 py-2 text-right">
                     {formatINR(gstAmount)}
-                    <div className="text-[8px] text-gray-500">({gstPercent}%)</div>
+                    <div className="text-[8px]">({gstPercent}%)</div>
                   </td>
                   <td className="px-2 py-2 text-right">{formatINR(finalAmount)}</td>
                 </tr>
@@ -264,7 +265,7 @@ function InvoiceContent({ invoice }: { invoice: InvoiceType }) {
                 </tr>
                 <tr className="border-t border-black">
                   <td className="py-1">Previous Balance</td>
-                  <td className="py-1 text-right">{"\u20B9"} {previousBalance}</td>
+                  <td className="py-1 text-right">{"\u20B9"} {formatINR(previousBalance)}</td>
                 </tr>
                 <tr className="font-bold">
                   <td className="py-1">Current Balance</td>
