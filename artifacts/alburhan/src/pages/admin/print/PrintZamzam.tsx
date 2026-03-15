@@ -72,15 +72,17 @@ export default function PrintZamzam() {
               borderRadius: "0 60% 0 0", zIndex: 0,
             }} />
 
-            <div style={{
-              position: "relative", zIndex: 1,
-              padding: "6mm 6mm 4mm", textAlign: "center",
-            }}>
-              <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "2mm", marginBottom: "2mm" }}>
-                <span style={{ fontSize: "14pt", lineHeight: 1 }}>🇮🇳</span>
-                <img src={`${BASE}images/logo.png`} alt="" style={{ height: "14mm", objectFit: "contain" }} />
-                <span style={{ fontSize: "14pt", lineHeight: 1 }}>🇮🇳</span>
+            <div style={{ position: "relative", zIndex: 1, padding: "5mm 6mm 2mm", display: "flex", alignItems: "center", gap: "4mm" }}>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2mm", flexShrink: 0 }}>
+                <img src={`${BASE}images/logo.png`} alt="" style={{ height: "24mm", objectFit: "contain" }} />
+                <img src={`${BASE}images/india_flag.jpg`} alt="" style={{ width: "18mm", height: "18mm", borderRadius: "50%", objectFit: "cover" }} />
               </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 900, fontSize: "15pt", color: "#1A7A4A", letterSpacing: "1px", textTransform: "uppercase", lineHeight: 1.1 }}>AL-BURHAN</div>
+                <div style={{ fontWeight: 700, fontSize: "9pt", color: GOLD, letterSpacing: "1.5px", textTransform: "uppercase" }}>TOURS & TRAVELS</div>
+              </div>
+            </div>
+            <div style={{ position: "relative", zIndex: 1, textAlign: "center", padding: "0 6mm 2mm" }}>
               <div style={{ fontSize: "28pt", fontWeight: 900, letterSpacing: "5px", color: DARK, lineHeight: 1 }}>ZAMZAM</div>
               <div style={{ fontSize: "9pt", color: GOLD, fontWeight: 700, letterSpacing: "2px", marginTop: "2mm" }}>HOLY WATER</div>
             </div>
