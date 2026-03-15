@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, documentsTable, bookingsTable, pilgrimsTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { requireAuth, type AuthenticatedRequest } from "../lib/auth.js";
 import multer from "multer";
 import path from "path";
