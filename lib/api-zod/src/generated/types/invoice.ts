@@ -5,6 +5,7 @@
  * Al Burhan Tours & Travels - Booking System API
  * OpenAPI spec version: 0.1.0
  */
+import type { InvoicePaymentStatus } from "./invoicePaymentStatus";
 import type { Pilgrim } from "./pilgrim";
 
 export interface Invoice {
@@ -32,6 +33,9 @@ export interface Invoice {
   chequeInfo?: string;
   roomType?: string;
   status?: string;
+  travelDate?: string;
+  paymentMethod?: string;
+  paymentStatus?: InvoicePaymentStatus;
   pilgrims?: Pilgrim[];
   sacCode?: string;
   gstPercent?: number;

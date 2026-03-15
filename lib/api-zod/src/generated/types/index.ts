@@ -44,6 +44,7 @@ export * from "./hotelsData";
 export * from "./inquiry";
 export * from "./inquiryRequest";
 export * from "./invoice";
+export * from "./invoicePaymentStatus";
 export * from "./listBookingsParams";
 export * from "./listBookingsStatus";
 export * from "./listPackagesParams";

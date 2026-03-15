@@ -1424,6 +1424,13 @@ components:
           type: string
         status:
           type: string
+        travelDate:
+          type: string
+        paymentMethod:
+          type: string
+        paymentStatus:
+          type: string
+          enum: [Paid, Partial, Pending]
         pilgrims:
           type: array
           items:

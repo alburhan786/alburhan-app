@@ -370,6 +370,15 @@ function deriveHajYear(b: { preferredDepartureDate?: string | null; packageName?
   return String(new Date().getFullYear());
 }
 
+function derivePaymentStatus(b: typeof bookingsTable.$inferSelect): "Paid" | "Partial" | "Pending" {
+  const final = b.finalAmount ? Number(b.finalAmount) : 0;
+  const advance = b.advanceAmount ? Number(b.advanceAmount) : 0;
+  if (b.status === "confirmed" && b.razorpayPaymentId) return "Paid";
+  if (advance > 0 && advance >= final) return "Paid";
+  if (advance > 0) return "Partial";
+  return "Pending";
+}
+
 function buildInvoiceResponse(b: typeof bookingsTable.$inferSelect, pkg: { gstPercent: string | number } | null) {
   const paymentDate = b.updatedAt?.toISOString?.();
   const dueDate = paymentDate
@@ -403,6 +412,9 @@ function buildInvoiceResponse(b: typeof bookingsTable.$inferSelect, pkg: { gstPe
       : (b.advanceAmount && Number(b.advanceAmount) > 0 ? `Advance ${fmtDateShort(b.updatedAt)}` : ""),
     roomType: b.roomType,
     status: b.status,
+    travelDate: b.preferredDepartureDate || null,
+    paymentMethod: b.razorpayPaymentId ? "Razorpay" : (b.isOffline ? "Cash / Bank Transfer" : "Online"),
+    paymentStatus: derivePaymentStatus(b),
     pilgrims: b.pilgrims ?? [],
     sacCode: "998555",
     gstPercent: pkg ? Number(pkg.gstPercent) : 5,

@@ -266,6 +266,15 @@ export interface BookingListResponse {
   limit?: number;
 }
 
+export type InvoicePaymentStatus =
+  (typeof InvoicePaymentStatus)[keyof typeof InvoicePaymentStatus];
+
+export const InvoicePaymentStatus = {
+  Paid: "Paid",
+  Partial: "Partial",
+  Pending: "Pending",
+} as const;
+
 export interface Invoice {
   invoiceNumber: string;
   bookingNumber: string;
@@ -291,6 +300,9 @@ export interface Invoice {
   chequeInfo?: string;
   roomType?: string;
   status?: string;
+  travelDate?: string;
+  paymentMethod?: string;
+  paymentStatus?: InvoicePaymentStatus;
   pilgrims?: Pilgrim[];
   sacCode?: string;
   gstPercent?: number;
