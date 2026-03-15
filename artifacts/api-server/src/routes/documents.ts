@@ -83,10 +83,16 @@ router.post(
         if (booking && Array.isArray(booking.pilgrims) && booking.pilgrims.length > 0) {
           const passportNumber = (booking.pilgrims[0] as any).passportNumber;
           if (passportNumber) {
-            await db.update(pilgrimsTable)
-              .set({ photoUrl: fileUrl })
-              .where(eq(pilgrimsTable.passportNumber, passportNumber));
-            console.log(`[Documents] Synced passport photo to pilgrim with passport ${passportNumber}`);
+            const [pilgrim] = await db.select({ id: pilgrimsTable.id })
+              .from(pilgrimsTable)
+              .where(eq(pilgrimsTable.passportNumber, passportNumber))
+              .limit(1);
+            if (pilgrim) {
+              await db.update(pilgrimsTable)
+                .set({ photoUrl: fileUrl })
+                .where(eq(pilgrimsTable.id, pilgrim.id));
+              console.log(`[Documents] Synced passport photo to pilgrim ${pilgrim.id} (passport ${passportNumber})`);
+            }
           }
         }
       } catch (err) {

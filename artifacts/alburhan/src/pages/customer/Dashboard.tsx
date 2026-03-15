@@ -29,6 +29,18 @@ const MANDATORY_DOCS = [
 
 const BASE_API = (import.meta.env.BASE_URL || "/").replace(/\/$/, "");
 
+function DocWarningBadge({ bookingId }: { bookingId: string }) {
+  const { data: docs } = useListDocuments(bookingId);
+  const uploadedTypes = (docs || []).map((d: any) => d.documentType);
+  const uploadedCount = MANDATORY_DOCS.filter(d => uploadedTypes.includes(d.value)).length;
+  if (uploadedCount === MANDATORY_DOCS.length) return null;
+  return (
+    <Badge className="bg-amber-100 text-amber-800 border-amber-300 text-[10px] px-2 py-0.5 animate-pulse">
+      <AlertCircle size={12} className="mr-1" /> {MANDATORY_DOCS.length - uploadedCount} doc(s) missing
+    </Badge>
+  );
+}
+
 function MandatoryDocumentsCard({ bookingId, onOpenUpload }: { bookingId: string; onOpenUpload: () => void }) {
   const { data: docs } = useListDocuments(bookingId);
   const uploadedTypes = (docs || []).map((d: any) => d.documentType);
@@ -143,7 +155,7 @@ function UploadModal({ bookingId, bookingNumber, onClose }: { bookingId: string;
           {/* Required documents checklist */}
           <div className="bg-accent/10 rounded-xl p-4 space-y-2">
             <p className="text-sm font-semibold text-primary mb-3">Required Documents:</p>
-            {DOC_TYPES.slice(0, 4).map(dt => {
+            {MANDATORY_DOCS.map(dt => {
               const uploaded = existingDocs?.some((d: any) => d.documentType === dt.value);
               return (
                 <div key={dt.value} className="flex items-center gap-2 text-sm">
@@ -394,9 +406,12 @@ export default function CustomerDashboard() {
                         <div className="text-xs text-muted-foreground font-mono mb-1">#{booking.bookingNumber}</div>
                         <h3 className="text-lg font-serif font-bold text-primary">{booking.packageName || "Package Booking"}</h3>
                       </div>
-                      <Badge variant="outline" className={`px-3 py-1 uppercase tracking-wider text-xs font-bold ${getStatusColor(booking.status)}`}>
-                        {booking.status}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        {booking.status === 'confirmed' && <DocWarningBadge bookingId={booking.id} />}
+                        <Badge variant="outline" className={`px-3 py-1 uppercase tracking-wider text-xs font-bold ${getStatusColor(booking.status)}`}>
+                          {booking.status}
+                        </Badge>
+                      </div>
                     </div>
 
                     {/* Status message */}
