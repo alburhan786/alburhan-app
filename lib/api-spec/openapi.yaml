@@ -1386,6 +1386,14 @@ components:
           type: string
         customerEmail:
           type: string
+        customerAddress:
+          type: string
+        customerGstin:
+          type: string
+        customerPan:
+          type: string
+        customerState:
+          type: string
         packageName:
           type: string
         numberOfPilgrims:
@@ -1398,12 +1406,32 @@ components:
           type: number
         finalAmount:
           type: number
+        advanceAmount:
+          type: number
+        previousBalance:
+          type: number
         paymentDate:
+          type: string
+        dueDate:
           type: string
         departureDate:
           type: string
+        hajYear:
+          type: string
+        chequeInfo:
+          type: string
+        roomType:
+          type: string
         status:
           type: string
+        pilgrims:
+          type: array
+          items:
+            $ref: "#/components/schemas/Pilgrim"
+        sacCode:
+          type: string
+        gstPercent:
+          type: number
         companyName:
           type: string
         companyAddress:
@@ -1411,6 +1439,18 @@ components:
         companyPhone:
           type: string
         companyEmail:
+          type: string
+        gstin:
+          type: string
+        pan:
+          type: string
+        bankName:
+          type: string
+        bankBranch:
+          type: string
+        bankAccount:
+          type: string
+        bankIfsc:
           type: string
       required:
         - invoiceNumber

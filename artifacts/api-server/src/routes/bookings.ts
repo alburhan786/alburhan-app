@@ -350,10 +350,20 @@ router.get("/:id/invoice", requireAuth as any, async (req: AuthenticatedRequest,
   res.json(buildInvoiceResponse(b, pkg));
 });
 
+function deriveHajYear(b: { preferredDepartureDate?: string | null; packageName?: string | null }): string {
+  if (b.preferredDepartureDate) {
+    const yr = new Date(b.preferredDepartureDate).getFullYear();
+    if (!isNaN(yr)) return String(yr);
+  }
+  const match = b.packageName?.match(/\b(20\d{2})\b/);
+  if (match) return match[1];
+  return String(new Date().getFullYear());
+}
+
 function buildInvoiceResponse(b: typeof bookingsTable.$inferSelect, pkg: { gstPercent: string | number } | null) {
   const paymentDate = b.updatedAt?.toISOString?.();
   const dueDate = paymentDate
-    ? new Date(new Date(paymentDate).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString()
+    ? new Date(new Date(paymentDate).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()
     : null;
 
   return {
@@ -362,30 +372,37 @@ function buildInvoiceResponse(b: typeof bookingsTable.$inferSelect, pkg: { gstPe
     customerName: b.customerName,
     customerMobile: b.customerMobile,
     customerEmail: b.customerEmail,
+    customerAddress: "",
+    customerGstin: "",
+    customerPan: "",
+    customerState: "Madhya Pradesh",
     packageName: b.packageName,
     numberOfPilgrims: b.numberOfPilgrims,
     pricePerPerson: b.totalAmount && b.numberOfPilgrims ? Number(b.totalAmount) / b.numberOfPilgrims : null,
     totalAmount: b.totalAmount ? Number(b.totalAmount) : null,
     gstAmount: b.gstAmount ? Number(b.gstAmount) : null,
     finalAmount: b.finalAmount ? Number(b.finalAmount) : null,
+    advanceAmount: b.advanceAmount ? Number(b.advanceAmount) : null,
+    previousBalance: 0,
     paymentDate,
     dueDate,
     departureDate: b.preferredDepartureDate,
+    hajYear: deriveHajYear(b),
+    chequeInfo: b.razorpayPaymentId ? `Razorpay ${b.razorpayPaymentId}` : "",
     roomType: b.roomType,
-    advanceAmount: b.advanceAmount ? Number(b.advanceAmount) : null,
     status: b.status,
     pilgrims: b.pilgrims ?? [],
     sacCode: "998555",
     gstPercent: pkg ? Number(pkg.gstPercent) : 5,
-    companyName: "AL BURHAN TOURS & TRAVELS",
-    companyAddress: "Office No. 3, 1st Floor, Haj House, 7-A Maulana Azad Road, Near Crawford Market, Mumbai - 400001, Maharashtra, India",
-    companyPhone: "+91 9893225590 / +91 9893989786",
-    companyEmail: "info@alburhantravels.com",
-    gstin: "27AXXPXXXXXX1ZX",
-    pan: "AXXPXXXXXX",
+    companyName: "ALBURHAN TOURS & TRAVELS",
+    companyAddress: "5/8 KHANKA MASJID COMPLEX, SHANWARA ROAD BURHANPUR 450331 M.P., BURHANPUR, 450331",
+    companyPhone: "9893989786",
+    companyEmail: "alburhantravels@gmail.com",
+    gstin: "23AAVFA3223C1ZW",
+    pan: "AAVFA3223C",
     bankName: "HDFC BANK LTD",
-    bankBranch: "Mumbai Main Branch",
-    bankAccount: "50200113931336",
+    bankBranch: "BURHANPUR",
+    bankAccount: "50200011391336",
     bankIfsc: "HDFC0001769",
   };
 }

@@ -5,6 +5,7 @@
  * Al Burhan Tours & Travels - Booking System API
  * OpenAPI spec version: 0.1.0
  */
+import type { Pilgrim } from "./pilgrim";
 
 export interface Invoice {
   invoiceNumber: string;
@@ -12,17 +13,36 @@ export interface Invoice {
   customerName: string;
   customerMobile?: string;
   customerEmail?: string;
+  customerAddress?: string;
+  customerGstin?: string;
+  customerPan?: string;
+  customerState?: string;
   packageName: string;
   numberOfPilgrims?: number;
   pricePerPerson?: number;
   totalAmount?: number;
   gstAmount?: number;
   finalAmount: number;
+  advanceAmount?: number;
+  previousBalance?: number;
   paymentDate?: string;
+  dueDate?: string;
   departureDate?: string;
+  hajYear?: string;
+  chequeInfo?: string;
+  roomType?: string;
   status?: string;
+  pilgrims?: Pilgrim[];
+  sacCode?: string;
+  gstPercent?: number;
   companyName?: string;
   companyAddress?: string;
   companyPhone?: string;
   companyEmail?: string;
+  gstin?: string;
+  pan?: string;
+  bankName?: string;
+  bankBranch?: string;
+  bankAccount?: string;
+  bankIfsc?: string;
 }

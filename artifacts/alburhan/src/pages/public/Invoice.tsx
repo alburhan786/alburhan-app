@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import { useParams } from "wouter";
 import { useGetPublicInvoice } from "@workspace/api-client-react";
+import type { Invoice as InvoiceType, Pilgrim } from "@workspace/api-client-react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Printer, Share2, Download } from "lucide-react";
@@ -25,7 +26,7 @@ function numberToWords(n: number): string {
   if (thousand > 0) result += convert99(thousand, ones, tens) + " Thousand ";
   if (hundred > 0) result += ones[hundred] + " Hundred ";
   if (rem > 0) result += (result ? "and " : "") + convert99(rem, ones, tens);
-  return result.trim() + " Rupees Only";
+  return result.trim() + " Rupees";
 }
 
 function convert99(n: number, ones: string[], tens: string[]): string {
@@ -37,11 +38,286 @@ function formatINR(amount: number): string {
   return new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
 }
 
-function formatInvoiceDate(dateString: string | null | undefined): string {
-  if (!dateString) return "N/A";
+function formatINRWhole(amount: number): string {
+  return new Intl.NumberFormat("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
+}
+
+function fmtDate(dateString: string | null | undefined): string {
+  if (!dateString) return "";
   try {
-    return new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(dateString));
+    return new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(dateString));
   } catch { return dateString; }
+}
+
+function MetaRow({ label, value }: { label: string; value: string }) {
+  return (
+    <tr>
+      <td className="text-left py-[2px] pr-2 text-[11px] whitespace-nowrap">{label}</td>
+      <td className="py-[2px] px-1 text-[11px]">:</td>
+      <td className="text-right py-[2px] pl-2 text-[11px] font-semibold whitespace-nowrap">{value || ""}</td>
+    </tr>
+  );
+}
+
+function InvoiceContent({ invoice }: { invoice: InvoiceType }) {
+  const pilgrims: Pilgrim[] = Array.isArray(invoice.pilgrims) ? invoice.pilgrims : [];
+  const gstPercent = invoice.gstPercent ?? 5;
+  const cgstRate = gstPercent / 2;
+  const sgstRate = gstPercent / 2;
+  const totalAmount = invoice.totalAmount ?? 0;
+  const gstAmount = invoice.gstAmount ?? 0;
+  const cgstAmount = gstAmount / 2;
+  const sgstAmount = gstAmount / 2;
+  const finalAmount = invoice.finalAmount ?? 0;
+  const advanceAmount = invoice.advanceAmount ?? 0;
+  const balance = finalAmount - advanceAmount;
+  const previousBalance = invoice.previousBalance ?? 0;
+  const currentBalance = balance + previousBalance;
+  const pilgrimCount = pilgrims.length > 0 ? pilgrims.length : 1;
+  const pricePerPerson = invoice.pricePerPerson ?? totalAmount / pilgrimCount;
+  const taxPerPerson = gstAmount / pilgrimCount;
+  const amountPerPerson = finalAmount / pilgrimCount;
+
+  return (
+    <div className="bg-white text-black" style={{ fontFamily: "Arial, Helvetica, sans-serif", fontSize: "12px", lineHeight: 1.4 }}>
+      <div className="border border-black">
+        {/* HEADER */}
+        <div className="flex border-b border-black">
+          <div className="w-[40%] p-3 border-r border-black">
+            <div className="font-bold text-[15px] leading-tight mb-1">ALBURHAN TOURS &<br />TRAVELS</div>
+            <div className="text-[10px] leading-snug mt-1">
+              {invoice.companyAddress}
+            </div>
+            <div className="text-[10px] mt-1">GSTIN : {invoice.gstin}</div>
+            <div className="text-[10px]">Mobile : {invoice.companyPhone}</div>
+            <div className="text-[10px]">Email : {invoice.companyEmail}</div>
+            <div className="text-[10px]">PAN Number : {invoice.pan}</div>
+          </div>
+          <div className="w-[20%] flex flex-col items-center justify-start p-3 border-r border-black">
+            <div className="font-bold text-[14px] text-center">TAX INVOICE</div>
+            <div className="text-[9px] mt-1 text-center">ORIGINAL FOR RECIPIENT</div>
+          </div>
+          <div className="w-[40%] p-2">
+            <table className="w-full">
+              <tbody>
+                <MetaRow label="Invoice No." value={invoice.invoiceNumber || ""} />
+                <MetaRow label="Invoice Date" value={fmtDate(invoice.paymentDate)} />
+                <MetaRow label="Due Date" value={fmtDate(invoice.dueDate)} />
+                <MetaRow label="BANK NAME" value={invoice.bankName || ""} />
+                <MetaRow label="DATE AND CHEQUE" value={invoice.chequeInfo || ""} />
+                <MetaRow label="HAJ YEARS" value={invoice.hajYear || ""} />
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* BILL TO */}
+        <div className="border-b border-black p-3">
+          <div className="font-bold text-[11px] mb-1 bg-gray-100 px-2 py-1 inline-block">BILL TO</div>
+          <div className="mt-1">
+            <div className="font-bold text-[12px]">{invoice.customerName}</div>
+            {invoice.customerAddress && <div className="text-[10px]">{invoice.customerAddress}</div>}
+            <div className="text-[10px]">Mobile : {invoice.customerMobile}</div>
+            {invoice.customerGstin && <div className="text-[10px]">GSTIN : {invoice.customerGstin}</div>}
+            {invoice.customerPan && <div className="text-[10px]">PAN Number : {invoice.customerPan}</div>}
+            {invoice.customerState && <div className="text-[10px]">State : {invoice.customerState}</div>}
+          </div>
+        </div>
+
+        {/* SERVICES TABLE */}
+        <div>
+          <table className="w-full border-collapse text-[10px]">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="border-b border-black px-2 py-2 text-center w-[6%]">S.NO.</th>
+                <th className="border-b border-black px-2 py-2 text-left w-[20%]">SERVICES</th>
+                <th className="border-b border-black px-2 py-2 text-center w-[8%]">SAC</th>
+                <th className="border-b border-black px-2 py-2 text-center w-[14%]">PASSPORT NO</th>
+                <th className="border-b border-black px-2 py-2 text-center w-[12%]">DATE OF ISSUE</th>
+                <th className="border-b border-black px-2 py-2 text-right w-[14%]">RATE</th>
+                <th className="border-b border-black px-2 py-2 text-right w-[12%]">TAX</th>
+                <th className="border-b border-black px-2 py-2 text-right w-[14%]">AMOUNT</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pilgrims.length > 0 ? (
+                pilgrims.map((p, i) => (
+                  <tr key={i} className="border-b border-gray-200">
+                    <td className="px-2 py-2 text-center">{i + 1}</td>
+                    <td className="px-2 py-2">
+                      <div className="font-semibold">{invoice.packageName || "Travel Package"}</div>
+                    </td>
+                    <td className="px-2 py-2 text-center">{invoice.sacCode || "998555"}</td>
+                    <td className="px-2 py-2 text-center">{p.passportNumber || "—"}</td>
+                    <td className="px-2 py-2 text-center">{fmtDate(p.passportExpiry) || "—"}</td>
+                    <td className="px-2 py-2 text-right">{formatINR(pricePerPerson)}</td>
+                    <td className="px-2 py-2 text-right">
+                      {formatINR(taxPerPerson)}
+                      <div className="text-[8px] text-gray-500">({gstPercent}%)</div>
+                    </td>
+                    <td className="px-2 py-2 text-right">{formatINR(amountPerPerson)}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr className="border-b border-gray-200">
+                  <td className="px-2 py-2 text-center">1</td>
+                  <td className="px-2 py-2">
+                    <div className="font-semibold">{invoice.packageName || "Travel Package"}</div>
+                  </td>
+                  <td className="px-2 py-2 text-center">{invoice.sacCode || "998555"}</td>
+                  <td className="px-2 py-2 text-center">—</td>
+                  <td className="px-2 py-2 text-center">—</td>
+                  <td className="px-2 py-2 text-right">{formatINR(totalAmount)}</td>
+                  <td className="px-2 py-2 text-right">
+                    {formatINR(gstAmount)}
+                    <div className="text-[8px] text-gray-500">({gstPercent}%)</div>
+                  </td>
+                  <td className="px-2 py-2 text-right">{formatINR(finalAmount)}</td>
+                </tr>
+              )}
+              {/* SUBTOTAL row */}
+              <tr className="border-t border-black font-bold">
+                <td colSpan={5} className="px-2 py-2 text-right">SUBTOTAL</td>
+                <td className="px-2 py-2 text-right"></td>
+                <td className="px-2 py-2 text-right">{"\u20B9"} {formatINR(gstAmount)}</td>
+                <td className="px-2 py-2 text-right">{"\u20B9"} {formatINR(finalAmount)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* TERMS + TAX SUMMARY */}
+        <div className="flex border-t border-black">
+          {/* LEFT: Terms & Conditions */}
+          <div className="w-[55%] p-3 border-r border-black text-[8px] leading-snug">
+            <div className="font-bold text-[10px] mb-1">TERMS AND CONDITIONS</div>
+            <div className="text-[8px] leading-relaxed">
+              <p className="font-semibold mt-1">Terms and Conditions - Alburhan Tours and Travels</p>
+              <p className="font-semibold mt-2">Booking and Payment:</p>
+              <p>a. Customers are required to complete the booking form and provide accurate information.</p>
+              <p>b. A deposit is due upon booking, with the remaining balance payable as specified in the invoice.</p>
+              <p>c. Cancellations are subject to our cancellation policy, which will be provided upon booking.</p>
+              <p>d. GST 5% and TCS 5% are applicable.</p>
+
+              <p className="font-semibold mt-2">Itinerary and Services:</p>
+              <p>a. Alburhan Tours and Travels will provide a detailed itinerary for the Hajj or Umrah tour, including dates, destinations, and activities.</p>
+              <p>b. The package includes accommodation, transportation, meals, and guided tours, as specified in the itinerary.</p>
+              <p>c. Additional services or upgrades may be available upon request and are subject to availability and additional charges.</p>
+
+              <p className="font-semibold mt-2">Travel Documents and Insurance:</p>
+              <p>a. Customers are responsible for obtaining and maintaining valid travel documents, including passports, and health certificates, excluding visas which will be provided by the us as required.</p>
+              <p>b. We strongly recommend customers to obtain comprehensive travel insurance to cover any unforeseen circumstances or emergencies.</p>
+
+              <p className="font-semibold mt-2">Health and Safety:</p>
+              <p>a. Customers are advised to consult with their healthcare provider and follow any recommended vaccinations or health precautions before embarking on the tour.</p>
+              <p>b. Alburhan Tours and Travels prioritizes the safety and security of our customers and will take reasonable measures to ensure a safe and comfortable journey.</p>
+
+              <p className="font-semibold mt-2">Responsibilities of Alburhan Tours and Travels:</p>
+              <p>a. We will provide the services and accommodations as outlined in the agreed itinerary.</p>
+              <p>b. In the event of unforeseen circumstances or events beyond our control, we reserve the right to make necessary changes to the itinerary or services, providing suitable alternatives.</p>
+              <p>c. We shall not be liable for any loss, delay, injury, or damage caused by circumstances beyond our reasonable control.</p>
+
+              <p className="font-semibold mt-2">Customer Responsibilities:</p>
+              <p>a. Customers are expected to comply with local laws, regulations, and customs during the tour.</p>
+              <p>b. Promptness and adherence to the tour schedule are essential. Late arrivals may result in missed services without liability on our part.</p>
+              <p>c. Customers are responsible for their behavior towards other travelers, tour guides, and local communities.</p>
+
+              <p className="font-semibold mt-2">Dispute Resolution:</p>
+              <p>a. In the event of any disputes, both parties agree to resolve the matter amicably through negotiation or mediation.</p>
+              <p>b. If a resolution cannot be reached, any legal proceedings shall be subject to the jurisdiction of the courts in Burhanpur.</p>
+
+              <p className="font-semibold mt-2">Limitation of Liability:</p>
+              <p>a. Alburhan Tours and Travels shall not be liable for any loss, injury, damage, or delay caused by factors beyond our control, including but not limited to natural disasters, political unrest, or transportation delays.</p>
+              <p>b. Our liability for any claims arising from the tour shall be limited to the total amount paid by the customer for the specific tour package.</p>
+
+              <p className="mt-2 text-[7px] italic">By booking a tour with Alburhan Tours and Travels, customers agree to abide by these terms and conditions. It is recommended that customers carefully read and understand these terms and conditions before making a booking.</p>
+              <p className="mt-1 text-[7px] italic">Please note that these terms and conditions are provided as an example and should be reviewed by legal professionals to ensure compliance with applicable laws and regulations in your jurisdiction.</p>
+            </div>
+          </div>
+
+          {/* RIGHT: Tax summary */}
+          <div className="w-[45%] p-3">
+            <table className="w-full text-[11px]">
+              <tbody>
+                <tr>
+                  <td className="py-1 font-semibold">TAXABLE AMOUNT</td>
+                  <td className="py-1 text-right font-semibold">{"\u20B9"} {formatINR(totalAmount)}</td>
+                </tr>
+                <tr>
+                  <td className="py-1">CGST @{cgstRate}%</td>
+                  <td className="py-1 text-right">{"\u20B9"} {formatINR(cgstAmount)}</td>
+                </tr>
+                <tr>
+                  <td className="py-1">SGST @{sgstRate}%</td>
+                  <td className="py-1 text-right">{"\u20B9"} {formatINR(sgstAmount)}</td>
+                </tr>
+                <tr className="border-t border-black">
+                  <td className="py-1 font-bold">TOTAL AMOUNT</td>
+                  <td className="py-1 text-right font-bold">{"\u20B9"} {formatINR(finalAmount)}</td>
+                </tr>
+                <tr>
+                  <td className="py-1">Received Amount</td>
+                  <td className="py-1 text-right">{"\u20B9"} {formatINR(advanceAmount)}</td>
+                </tr>
+                <tr>
+                  <td className="py-1">Balance</td>
+                  <td className="py-1 text-right">{"\u20B9"} {formatINR(balance)}</td>
+                </tr>
+                <tr className="border-t border-gray-300">
+                  <td className="py-1">Previous Balance</td>
+                  <td className="py-1 text-right">{"\u20B9"} {previousBalance}</td>
+                </tr>
+                <tr className="font-bold">
+                  <td className="py-1">Current Balance</td>
+                  <td className="py-1 text-right">{"\u20B9"} {formatINR(currentBalance)}</td>
+                </tr>
+              </tbody>
+            </table>
+
+            {/* Amount in words */}
+            <div className="mt-3 border-t border-black pt-2 text-center">
+              <div className="text-[9px] text-gray-500">Total Amount (in words)</div>
+              <div className="text-[11px] font-semibold italic">{numberToWords(Math.round(finalAmount))}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* BANK DETAILS */}
+        <div className="border-t border-black p-3">
+          <div className="font-bold text-[10px] mb-1">BANK DETAILS</div>
+          <table className="text-[10px]">
+            <tbody>
+              <tr>
+                <td className="pr-3 py-[1px]">Name:</td>
+                <td className="font-semibold py-[1px]">{invoice.bankName}</td>
+              </tr>
+              <tr>
+                <td className="pr-3 py-[1px]">IFSC Code:</td>
+                <td className="font-semibold py-[1px]">{invoice.bankIfsc}</td>
+              </tr>
+              <tr>
+                <td className="pr-3 py-[1px]">Account No:</td>
+                <td className="font-semibold py-[1px]">{invoice.bankAccount}</td>
+              </tr>
+              <tr>
+                <td className="pr-3 py-[1px]">Bank:</td>
+                <td className="font-semibold py-[1px]">{invoice.bankName}, {invoice.bankBranch}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* SIGNATURE */}
+        <div className="border-t border-black p-3 flex justify-end">
+          <div className="text-right">
+            <div className="h-14"></div>
+            <div className="text-[10px]">Authorised Signature for</div>
+            <div className="text-[11px] font-bold">ALBURHAN TOURS & TRAVELS</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function Invoice() {
@@ -49,9 +325,8 @@ export default function Invoice() {
   const bookingNumber = params.bookingNumber;
   const invoiceRef = useRef<HTMLDivElement>(null);
 
-  const { data: invoice, isLoading, error } = useGetPublicInvoice(bookingNumber!, {
-    query: { enabled: !!bookingNumber },
-  });
+  const queryResult = useGetPublicInvoice(bookingNumber ?? "");
+  const { data: invoice, isLoading, error } = queryResult;
 
   if (isLoading) {
     return (
@@ -104,154 +379,8 @@ export default function Invoice() {
             <Button variant="outline" size="sm" onClick={handleShare}><Share2 className="w-4 h-4 mr-2" />Share</Button>
           </div>
 
-          <div ref={invoiceRef} className="bg-white border border-gray-200 shadow-sm rounded-lg overflow-hidden" id="invoice-content">
-            <div className="bg-[#0A3D2A] text-white px-8 py-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h1 className="text-2xl font-serif font-bold tracking-wide">{invoice.companyName}</h1>
-                  <p className="text-emerald-200 text-sm mt-1 max-w-md leading-relaxed">{invoice.companyAddress}</p>
-                  <p className="text-emerald-200 text-sm mt-1">Phone: {invoice.companyPhone}</p>
-                  <p className="text-emerald-200 text-sm">Email: {invoice.companyEmail}</p>
-                </div>
-                <div className="text-right">
-                  <div className="text-3xl font-serif font-bold text-[#C9A84C]">TAX INVOICE</div>
-                  <p className="text-emerald-200 text-sm mt-2">GSTIN: {invoice.gstin}</p>
-                  <p className="text-emerald-200 text-sm">PAN: {invoice.pan}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="px-8 py-6">
-              <div className="grid grid-cols-2 gap-8 mb-8">
-                <div>
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Invoice Details</h3>
-                  <div className="space-y-1 text-sm">
-                    <p><span className="text-gray-500">Invoice No:</span> <span className="font-semibold">{invoice.invoiceNumber}</span></p>
-                    <p><span className="text-gray-500">Invoice Date:</span> <span className="font-semibold">{formatInvoiceDate(invoice.paymentDate)}</span></p>
-                    <p><span className="text-gray-500">Booking No:</span> <span className="font-semibold">{invoice.bookingNumber}</span></p>
-                    {invoice.dueDate && (
-                      <p><span className="text-gray-500">Due Date:</span> <span className="font-semibold">{formatInvoiceDate(invoice.dueDate)}</span></p>
-                    )}
-                    {invoice.departureDate && (
-                      <p><span className="text-gray-500">Departure:</span> <span className="font-semibold">{formatInvoiceDate(invoice.departureDate)}</span></p>
-                    )}
-                  </div>
-                </div>
-                <div>
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Bill To</h3>
-                  <div className="space-y-1 text-sm">
-                    <p className="font-semibold text-base">{invoice.customerName}</p>
-                    <p><span className="text-gray-500">Mobile:</span> {invoice.customerMobile}</p>
-                    {invoice.customerEmail && (
-                      <p><span className="text-gray-500">Email:</span> {invoice.customerEmail}</p>
-                    )}
-                    <p><span className="text-gray-500">Pilgrims:</span> {invoice.numberOfPilgrims}</p>
-                    {invoice.roomType && (
-                      <p><span className="text-gray-500">Room Type:</span> <span className="capitalize">{invoice.roomType}</span></p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="mb-8">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-50 border-y border-gray-200">
-                      <th className="text-left px-4 py-3 font-semibold text-gray-600">S.No</th>
-                      <th className="text-left px-4 py-3 font-semibold text-gray-600">Description</th>
-                      <th className="text-center px-4 py-3 font-semibold text-gray-600">SAC Code</th>
-                      <th className="text-center px-4 py-3 font-semibold text-gray-600">Qty</th>
-                      <th className="text-right px-4 py-3 font-semibold text-gray-600">Rate (₹)</th>
-                      <th className="text-right px-4 py-3 font-semibold text-gray-600">Amount (₹)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr className="border-b border-gray-100">
-                      <td className="px-4 py-3">1</td>
-                      <td className="px-4 py-3 font-medium">{invoice.packageName || "Travel Package"}</td>
-                      <td className="px-4 py-3 text-center font-mono text-xs">{invoice.sacCode}</td>
-                      <td className="px-4 py-3 text-center">{invoice.numberOfPilgrims}</td>
-                      <td className="px-4 py-3 text-right font-mono">{invoice.pricePerPerson ? formatINR(invoice.pricePerPerson) : "—"}</td>
-                      <td className="px-4 py-3 text-right font-mono">{invoice.totalAmount ? formatINR(invoice.totalAmount) : "—"}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="flex justify-end mb-8">
-                <div className="w-72">
-                  <div className="flex justify-between py-2 text-sm">
-                    <span className="text-gray-500">Subtotal:</span>
-                    <span className="font-mono">₹ {invoice.totalAmount ? formatINR(invoice.totalAmount) : "—"}</span>
-                  </div>
-                  <div className="flex justify-between py-2 text-sm border-b border-gray-100">
-                    <span className="text-gray-500">GST ({invoice.gstPercent}%):</span>
-                    <span className="font-mono">₹ {invoice.gstAmount ? formatINR(invoice.gstAmount) : "—"}</span>
-                  </div>
-                  <div className="flex justify-between py-3 text-lg font-bold">
-                    <span>Total:</span>
-                    <span className="text-[#0A3D2A] font-mono">₹ {invoice.finalAmount ? formatINR(invoice.finalAmount) : "—"}</span>
-                  </div>
-                  {invoice.advanceAmount != null && invoice.advanceAmount > 0 && (
-                    <>
-                      <div className="flex justify-between py-2 text-sm border-t border-gray-100">
-                        <span className="text-gray-500">Advance Paid:</span>
-                        <span className="font-mono text-green-700">- ₹ {formatINR(invoice.advanceAmount)}</span>
-                      </div>
-                      <div className="flex justify-between py-2 text-sm font-semibold">
-                        <span>Balance Due:</span>
-                        <span className="font-mono text-red-700">₹ {invoice.finalAmount ? formatINR(invoice.finalAmount - invoice.advanceAmount) : "—"}</span>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {invoice.finalAmount && (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-8 text-sm">
-                  <span className="font-semibold text-amber-800">Amount in Words: </span>
-                  <span className="text-amber-900 italic">{numberToWords(Math.round(invoice.finalAmount))}</span>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-8 mb-8">
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Bank Details</h3>
-                  <div className="space-y-1 text-sm">
-                    <p><span className="text-gray-500">Bank:</span> <span className="font-semibold">{invoice.bankName}</span></p>
-                    <p><span className="text-gray-500">Branch:</span> {invoice.bankBranch}</p>
-                    <p><span className="text-gray-500">A/C No:</span> <span className="font-mono font-semibold">{invoice.bankAccount}</span></p>
-                    <p><span className="text-gray-500">IFSC:</span> <span className="font-mono font-semibold">{invoice.bankIfsc}</span></p>
-                  </div>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Terms & Conditions</h3>
-                  <ul className="text-xs text-gray-600 space-y-1 list-disc list-inside">
-                    <li>Payment is non-refundable once the visa process has begun.</li>
-                    <li>Cancellation charges as per company policy.</li>
-                    <li>All disputes subject to Mumbai jurisdiction.</li>
-                    <li>GST is charged as per government norms (SAC 998555).</li>
-                    <li>This is a computer generated invoice.</li>
-                  </ul>
-                </div>
-              </div>
-
-              <div className="border-t border-gray-200 pt-6 flex items-end justify-between">
-                <div className="text-xs text-gray-400">
-                  <p>This is a computer-generated invoice and does not require a physical signature.</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-semibold text-gray-700">For {invoice.companyName}</p>
-                  <div className="mt-8 border-t border-gray-300 pt-1">
-                    <p className="text-xs text-gray-500">Authorized Signatory</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-[#0A3D2A] text-center text-emerald-200 text-xs py-3">
-              Thank you for choosing Al Burhan Tours & Travels — Serving pilgrims for 35+ years
-            </div>
+          <div ref={invoiceRef} id="invoice-content">
+            <InvoiceContent invoice={invoice} />
           </div>
         </div>
       </MainLayout>
