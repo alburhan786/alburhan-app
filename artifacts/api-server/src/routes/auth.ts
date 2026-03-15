@@ -8,6 +8,8 @@ import {
 import { generateOtp, requireAuth, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendOtpSMS, sendWhatsApp } from "../lib/notifications.js";
 
+const ADMIN_MOBILES = ["9893989786", "9893225590", "9999999999"];
+
 const router = Router();
 
 router.post("/send-otp", async (req, res) => {
@@ -22,7 +24,7 @@ router.post("/send-otp", async (req, res) => {
   const isNewUser = !existing[0];
 
   if (isNewUser) {
-    await db.insert(usersTable).values({ mobile, role: "customer" });
+    await db.insert(usersTable).values({ mobile, role: ADMIN_MOBILES.includes(mobile) ? "admin" : "customer" });
   }
 
   const otp = generateOtp();
