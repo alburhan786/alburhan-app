@@ -1426,6 +1426,8 @@ components:
           type: string
         travelDate:
           type: string
+        maktabNumber:
+          type: string
         paymentMethod:
           type: string
         paymentStatus:

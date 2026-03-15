@@ -615,6 +615,7 @@ export const GetInvoiceResponse = zod.object({
   roomType: zod.string().optional(),
   status: zod.string().optional(),
   travelDate: zod.string().optional(),
+  maktabNumber: zod.string().optional(),
   paymentMethod: zod.string().optional(),
   paymentStatus: zod.enum(["Paid", "Partial", "Pending"]).optional(),
   pilgrims: zod
@@ -1048,6 +1049,7 @@ export const GetPublicInvoiceResponse = zod.object({
   roomType: zod.string().optional(),
   status: zod.string().optional(),
   travelDate: zod.string().optional(),
+  maktabNumber: zod.string().optional(),
   paymentMethod: zod.string().optional(),
   paymentStatus: zod.enum(["Paid", "Partial", "Pending"]).optional(),
   pilgrims: zod

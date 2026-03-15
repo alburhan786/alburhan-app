@@ -94,7 +94,7 @@ function InvoiceContent({ invoice }: { invoice: InvoiceType }) {
   const pricePerPerson = invoice.pricePerPerson ?? totalAmount / pilgrimCount;
   const taxPerPerson = gstAmount / pilgrimCount;
   const amountPerPerson = finalAmount / pilgrimCount;
-  const verificationUrl = `https://alburhantravels.com/invoice/${invoice.bookingNumber}`;
+  const verificationUrl = `https://alburhantravels.com/invoice/${invoice.invoiceNumber || invoice.bookingNumber}`;
 
   return (
     <div className="bg-white text-black" style={{ fontFamily: "Arial, Helvetica, sans-serif", fontSize: "12px", lineHeight: 1.4 }}>
@@ -178,6 +178,7 @@ function InvoiceContent({ invoice }: { invoice: InvoiceType }) {
                       <div className="font-semibold">{invoice.packageName || "Travel Package"}</div>
                       {p.name && <div className="text-[9px]">{p.name}</div>}
                       {invoice.roomType && <div className="text-[8px]" style={{ color: "#555" }}>Room: {invoice.roomType}</div>}
+                      {invoice.maktabNumber && <div className="text-[8px]" style={{ color: "#555" }}>Maktab: {invoice.maktabNumber}</div>}
                       {invoice.travelDate && <div className="text-[8px]" style={{ color: "#555" }}>Travel: {fmtDate(invoice.travelDate)}</div>}
                     </td>
                     <td className="px-2 py-2 text-center">{invoice.sacCode || "998555"}</td>
@@ -197,6 +198,7 @@ function InvoiceContent({ invoice }: { invoice: InvoiceType }) {
                   <td className="px-2 py-2">
                     <div className="font-semibold">{invoice.packageName || "Travel Package"}</div>
                     {invoice.roomType && <div className="text-[8px]" style={{ color: "#555" }}>Room: {invoice.roomType}</div>}
+                    {invoice.maktabNumber && <div className="text-[8px]" style={{ color: "#555" }}>Maktab: {invoice.maktabNumber}</div>}
                     {invoice.travelDate && <div className="text-[8px]" style={{ color: "#555" }}>Travel: {fmtDate(invoice.travelDate)}</div>}
                   </td>
                   <td className="px-2 py-2 text-center">{invoice.sacCode || "998555"}</td>
@@ -344,7 +346,7 @@ function InvoiceContent({ invoice }: { invoice: InvoiceType }) {
             {/* WhatsApp Contact */}
             <div className="mt-2 pt-2 text-[9px]" style={{ borderTop: `1px solid #ddd` }}>
               <span className="font-semibold" style={{ color: DARK_GREEN }}>Customer Support (WhatsApp):</span>{" "}
-              <span>+91 9893989786 | +91 9893225590</span>
+              <span>+91 9893989786</span>
             </div>
           </div>
 

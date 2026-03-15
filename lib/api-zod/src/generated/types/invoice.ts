@@ -34,6 +34,7 @@ export interface Invoice {
   roomType?: string;
   status?: string;
   travelDate?: string;
+  maktabNumber?: string;
   paymentMethod?: string;
   paymentStatus?: InvoicePaymentStatus;
   pilgrims?: Pilgrim[];

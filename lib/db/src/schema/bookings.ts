@@ -26,6 +26,7 @@ export const bookingsTable = pgTable("bookings", {
   invoiceNumber: text("invoice_number"),
   rejectionReason: text("rejection_reason"),
   roomType: text("room_type"),
+  groupId: text("group_id"),
   advanceAmount: numeric("advance_amount", { precision: 12, scale: 2 }),
   notes: text("notes"),
   isOffline: boolean("is_offline").notNull().default(false),

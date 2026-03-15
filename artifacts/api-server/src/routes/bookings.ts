@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, bookingsTable, packagesTable, usersTable } from "@workspace/db";
+import { db, bookingsTable, packagesTable, usersTable, hajjGroupsTable } from "@workspace/db";
 import { eq, and, desc, count, sql } from "drizzle-orm";
 import {
   CreateBookingBody,
@@ -308,6 +308,20 @@ router.post("/:id/send-invoice", requireAdmin as any, async (req: AuthenticatedR
   res.json({ message: "Invoice notification sent", whatsapp: whatsappOk, sms: smsOk });
 });
 
+async function resolveInvoiceData(b: typeof bookingsTable.$inferSelect) {
+  let pkg = null;
+  if (b.packageId) {
+    const pkgs = await db.select().from(packagesTable).where(eq(packagesTable.id, b.packageId)).limit(1);
+    pkg = pkgs[0] ?? null;
+  }
+  let maktabNumber: string | null = null;
+  if (b.groupId) {
+    const groups = await db.select({ maktabNumber: hajjGroupsTable.maktabNumber }).from(hajjGroupsTable).where(eq(hajjGroupsTable.id, b.groupId)).limit(1);
+    maktabNumber = groups[0]?.maktabNumber ?? null;
+  }
+  return { pkg, maktabNumber };
+}
+
 router.get("/by-number/:bookingNumber/invoice-public", async (req, res) => {
   const bookings = await db.select().from(bookingsTable).where(eq(bookingsTable.bookingNumber, req.params.bookingNumber)).limit(1);
   if (!bookings[0]) {
@@ -319,14 +333,8 @@ router.get("/by-number/:bookingNumber/invoice-public", async (req, res) => {
     res.status(400).json({ message: "Invoice only available for confirmed bookings" });
     return;
   }
-
-  let pkg = null;
-  if (b.packageId) {
-    const pkgs = await db.select().from(packagesTable).where(eq(packagesTable.id, b.packageId)).limit(1);
-    pkg = pkgs[0] ?? null;
-  }
-
-  res.json(buildInvoiceResponse(b, pkg));
+  const { pkg, maktabNumber } = await resolveInvoiceData(b);
+  res.json(buildInvoiceResponse(b, pkg, maktabNumber));
 });
 
 router.get("/:id/invoice", requireAuth as any, async (req: AuthenticatedRequest, res) => {
@@ -340,14 +348,8 @@ router.get("/:id/invoice", requireAuth as any, async (req: AuthenticatedRequest,
     res.status(400).json({ message: "Invoice only available for confirmed bookings" });
     return;
   }
-
-  let pkg = null;
-  if (b.packageId) {
-    const pkgs = await db.select().from(packagesTable).where(eq(packagesTable.id, b.packageId)).limit(1);
-    pkg = pkgs[0] ?? null;
-  }
-
-  res.json(buildInvoiceResponse(b, pkg));
+  const { pkg, maktabNumber } = await resolveInvoiceData(b);
+  res.json(buildInvoiceResponse(b, pkg, maktabNumber));
 });
 
 function fmtDateShort(d: Date | string | null | undefined): string {
@@ -379,7 +381,7 @@ function derivePaymentStatus(b: typeof bookingsTable.$inferSelect): "Paid" | "Pa
   return "Pending";
 }
 
-function buildInvoiceResponse(b: typeof bookingsTable.$inferSelect, pkg: { gstPercent: string | number } | null) {
+function buildInvoiceResponse(b: typeof bookingsTable.$inferSelect, pkg: { gstPercent: string | number } | null, maktabNumber: string | null = null) {
   const paymentDate = b.updatedAt?.toISOString?.();
   const dueDate = paymentDate
     ? new Date(new Date(paymentDate).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()
@@ -413,7 +415,8 @@ function buildInvoiceResponse(b: typeof bookingsTable.$inferSelect, pkg: { gstPe
     roomType: b.roomType,
     status: b.status,
     travelDate: b.preferredDepartureDate || null,
-    paymentMethod: b.razorpayPaymentId ? "Razorpay" : (b.isOffline ? "Cash / Bank Transfer" : "Online"),
+    maktabNumber: maktabNumber || null,
+    paymentMethod: b.razorpayPaymentId ? "Razorpay" : (b.isOffline ? "Cash" : "Online"),
     paymentStatus: derivePaymentStatus(b),
     pilgrims: b.pilgrims ?? [],
     sacCode: "998555",
