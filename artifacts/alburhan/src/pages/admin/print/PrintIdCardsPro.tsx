@@ -261,7 +261,7 @@ export default function PrintIdCardsPro() {
                     </div>
 
                     <div style={{ width: "20mm", flexShrink: 0, display: "flex", flexDirection: "column", gap: "1mm", alignItems: "center" }}>
-                      <div style={{ fontSize: "4.5pt", fontWeight: 800, color: DARK, textTransform: "uppercase", letterSpacing: "0.3px", textAlign: "center" }}>Emergency</div>
+                      <div style={{ fontSize: "5pt", fontWeight: 800, color: DARK, textTransform: "uppercase", letterSpacing: "0.3px", textAlign: "center" }}>Emergency</div>
                       <div style={{ fontSize: "5pt", lineHeight: 1.6, color: "#333", textAlign: "center" }}>
                         <div style={{ fontWeight: 700 }}>+91 9893225590</div>
                         <div style={{ fontWeight: 700 }}>+91 9893989786</div>
