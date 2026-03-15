@@ -155,7 +155,7 @@ export default function PrintLuggageSquare() {
               <div style={{ display: "flex", gap: "2mm", marginBottom: "1.5mm" }}>
                 <div style={{ flex: 1, background: "#f0fdf4", border: `1px solid ${DARK}`, borderRadius: "3px", padding: "1mm 2mm", textAlign: "center" }}>
                   <div style={{ fontSize: "5.5pt", color: "#666", textTransform: "uppercase", fontWeight: 600 }}>PASSPORT</div>
-                  <div style={{ fontSize: "11pt", fontWeight: 900, fontFamily: "monospace", letterSpacing: "0.8px", color: DARK }}>{p.passportNumber || "—"}</div>
+                  <div style={{ fontSize: "14pt", fontWeight: 900, fontFamily: "monospace", letterSpacing: "0.8px", color: DARK }}>{p.passportNumber || "—"}</div>
                 </div>
                 <div style={{ flex: 1, background: "#f0fdf4", border: `1px solid ${DARK}`, borderRadius: "3px", padding: "1mm 2mm", textAlign: "center" }}>
                   <div style={{ fontSize: "5.5pt", color: "#666", textTransform: "uppercase", fontWeight: 600 }}>MAKTAB</div>
