@@ -44,8 +44,9 @@ export default function PrintFeedback() {
       `}</style>
 
       <div className="no-print" style={{ padding: "16px", background: "#fef3c7", textAlign: "center" }}>
-        <button onClick={() => window.print()} style={{ padding: "10px 24px", background: "#0A3D2A", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", marginRight: "12px" }}>Print Feedback Form</button>
+        <button onClick={() => window.print()} style={{ padding: "10px 24px", background: "#0A3D2A", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", marginRight: "12px" }}>⬇ Download PDF / Print Feedback Form</button>
         <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
+        <span style={{ fontSize: "11px", color: "#666", marginRight: "12px" }}>(In print dialog, select "Save as PDF" to download)</span>
       </div>
 
       <div style={{ padding: "2mm", fontFamily: "'Inter', Arial, sans-serif", maxWidth: "210mm", margin: "0 auto" }}>
