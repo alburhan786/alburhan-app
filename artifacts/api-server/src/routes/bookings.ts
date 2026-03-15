@@ -416,7 +416,7 @@ function buildInvoiceResponse(b: typeof bookingsTable.$inferSelect, pkg: { gstPe
     status: b.status,
     travelDate: b.preferredDepartureDate || null,
     maktabNumber: maktabNumber || null,
-    paymentMethod: b.razorpayPaymentId ? "Razorpay" : (b.isOffline ? "Cash" : "Online"),
+    paymentMethod: b.razorpayPaymentId ? "Razorpay" : (b.isOffline ? "Cash" : "Bank Transfer"),
     paymentStatus: derivePaymentStatus(b),
     pilgrims: b.pilgrims ?? [],
     sacCode: "998555",

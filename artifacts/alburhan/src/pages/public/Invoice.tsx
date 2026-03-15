@@ -94,7 +94,7 @@ function InvoiceContent({ invoice }: { invoice: InvoiceType }) {
   const pricePerPerson = invoice.pricePerPerson ?? totalAmount / pilgrimCount;
   const taxPerPerson = gstAmount / pilgrimCount;
   const amountPerPerson = finalAmount / pilgrimCount;
-  const verificationUrl = `https://alburhantravels.com/invoice/${invoice.invoiceNumber || invoice.bookingNumber}`;
+  const verificationUrl = `https://alburhantravels.com/invoice/${invoice.bookingNumber}`;
 
   return (
     <div className="bg-white text-black" style={{ fontFamily: "Arial, Helvetica, sans-serif", fontSize: "12px", lineHeight: 1.4 }}>
