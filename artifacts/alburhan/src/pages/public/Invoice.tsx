@@ -113,14 +113,14 @@ function InvoiceContent({ invoice }: { invoice: InvoiceType }) {
 
         {/* BILL TO */}
         <div className="border-b border-black p-3">
-          <div className="font-bold text-[11px] mb-1 bg-gray-100 px-2 py-1 inline-block">BILL TO</div>
+          <div className="font-bold text-[11px] mb-1 px-2 py-1 inline-block border border-black">BILL TO</div>
           <div className="mt-1">
             <div className="font-bold text-[12px]">{invoice.customerName}</div>
-            {invoice.customerAddress && <div className="text-[10px]">{invoice.customerAddress}</div>}
+            <div className="text-[10px]">{invoice.customerAddress || ""}</div>
             <div className="text-[10px]">Mobile : {invoice.customerMobile}</div>
-            {invoice.customerGstin && <div className="text-[10px]">GSTIN : {invoice.customerGstin}</div>}
-            {invoice.customerPan && <div className="text-[10px]">PAN Number : {invoice.customerPan}</div>}
-            {invoice.customerState && <div className="text-[10px]">State : {invoice.customerState}</div>}
+            <div className="text-[10px]">GSTIN : {invoice.customerGstin || ""}</div>
+            <div className="text-[10px]">PAN Number : {invoice.customerPan || ""}</div>
+            <div className="text-[10px]">State : {invoice.customerState || ""}</div>
           </div>
         </div>
 
@@ -128,38 +128,38 @@ function InvoiceContent({ invoice }: { invoice: InvoiceType }) {
         <div>
           <table className="w-full border-collapse text-[10px]">
             <thead>
-              <tr className="bg-gray-100">
-                <th className="border-b border-black px-2 py-2 text-center w-[6%]">S.NO.</th>
-                <th className="border-b border-black px-2 py-2 text-left w-[20%]">SERVICES</th>
-                <th className="border-b border-black px-2 py-2 text-center w-[8%]">SAC</th>
-                <th className="border-b border-black px-2 py-2 text-center w-[14%]">PASSPORT NO</th>
-                <th className="border-b border-black px-2 py-2 text-center w-[12%]">DATE OF ISSUE</th>
-                <th className="border-b border-black px-2 py-2 text-right w-[14%]">RATE</th>
-                <th className="border-b border-black px-2 py-2 text-right w-[12%]">TAX</th>
-                <th className="border-b border-black px-2 py-2 text-right w-[14%]">AMOUNT</th>
+              <tr>
+                <th className="border-y border-black px-2 py-2 text-center w-[6%]">S.NO.</th>
+                <th className="border-y border-black px-2 py-2 text-left w-[20%]">SERVICES</th>
+                <th className="border-y border-black px-2 py-2 text-center w-[8%]">SAC</th>
+                <th className="border-y border-black px-2 py-2 text-center w-[14%]">PASSPORT NO</th>
+                <th className="border-y border-black px-2 py-2 text-center w-[12%]">DATE OF ISSUE</th>
+                <th className="border-y border-black px-2 py-2 text-right w-[14%]">RATE</th>
+                <th className="border-y border-black px-2 py-2 text-right w-[12%]">TAX</th>
+                <th className="border-y border-black px-2 py-2 text-right w-[14%]">AMOUNT</th>
               </tr>
             </thead>
             <tbody>
               {pilgrims.length > 0 ? (
                 pilgrims.map((p, i) => (
-                  <tr key={i} className="border-b border-gray-200">
+                  <tr key={i} className="border-b border-black">
                     <td className="px-2 py-2 text-center">{i + 1}</td>
                     <td className="px-2 py-2">
                       <div className="font-semibold">{invoice.packageName || "Travel Package"}</div>
                     </td>
                     <td className="px-2 py-2 text-center">{invoice.sacCode || "998555"}</td>
                     <td className="px-2 py-2 text-center">{p.passportNumber || "—"}</td>
-                    <td className="px-2 py-2 text-center">{fmtDate(p.passportExpiry) || "—"}</td>
+                    <td className="px-2 py-2 text-center">{p.dateOfBirth ? fmtDate(p.dateOfBirth) : "—"}</td>
                     <td className="px-2 py-2 text-right">{formatINR(pricePerPerson)}</td>
                     <td className="px-2 py-2 text-right">
                       {formatINR(taxPerPerson)}
-                      <div className="text-[8px] text-gray-500">({gstPercent}%)</div>
+                      <div className="text-[8px]">({gstPercent}%)</div>
                     </td>
                     <td className="px-2 py-2 text-right">{formatINR(amountPerPerson)}</td>
                   </tr>
                 ))
               ) : (
-                <tr className="border-b border-gray-200">
+                <tr className="border-b border-black">
                   <td className="px-2 py-2 text-center">1</td>
                   <td className="px-2 py-2">
                     <div className="font-semibold">{invoice.packageName || "Travel Package"}</div>
@@ -263,7 +263,7 @@ function InvoiceContent({ invoice }: { invoice: InvoiceType }) {
                   <td className="py-1">Balance</td>
                   <td className="py-1 text-right">{"\u20B9"} {formatINR(balance)}</td>
                 </tr>
-                <tr className="border-t border-gray-300">
+                <tr className="border-t border-black">
                   <td className="py-1">Previous Balance</td>
                   <td className="py-1 text-right">{"\u20B9"} {previousBalance}</td>
                 </tr>
@@ -276,7 +276,7 @@ function InvoiceContent({ invoice }: { invoice: InvoiceType }) {
 
             {/* Amount in words */}
             <div className="mt-3 border-t border-black pt-2 text-center">
-              <div className="text-[9px] text-gray-500">Total Amount (in words)</div>
+              <div className="text-[9px]">Total Amount (in words)</div>
               <div className="text-[11px] font-semibold italic">{numberToWords(Math.round(finalAmount))}</div>
             </div>
           </div>

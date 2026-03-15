@@ -350,6 +350,16 @@ router.get("/:id/invoice", requireAuth as any, async (req: AuthenticatedRequest,
   res.json(buildInvoiceResponse(b, pkg));
 });
 
+function fmtDateShort(d: Date | string | null | undefined): string {
+  if (!d) return "";
+  const date = d instanceof Date ? d : new Date(d);
+  if (isNaN(date.getTime())) return "";
+  const dd = String(date.getDate()).padStart(2, "0");
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const yyyy = date.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+}
+
 function deriveHajYear(b: { preferredDepartureDate?: string | null; packageName?: string | null }): string {
   if (b.preferredDepartureDate) {
     const yr = new Date(b.preferredDepartureDate).getFullYear();
@@ -388,14 +398,16 @@ function buildInvoiceResponse(b: typeof bookingsTable.$inferSelect, pkg: { gstPe
     dueDate,
     departureDate: b.preferredDepartureDate,
     hajYear: deriveHajYear(b),
-    chequeInfo: b.razorpayPaymentId ? `Razorpay ${b.razorpayPaymentId}` : "",
+    chequeInfo: b.razorpayPaymentId
+      ? `Razorpay ${b.razorpayPaymentId}`
+      : (b.advanceAmount && Number(b.advanceAmount) > 0 ? `Advance ${fmtDateShort(b.updatedAt)}` : ""),
     roomType: b.roomType,
     status: b.status,
     pilgrims: b.pilgrims ?? [],
     sacCode: "998555",
     gstPercent: pkg ? Number(pkg.gstPercent) : 5,
     companyName: "ALBURHAN TOURS & TRAVELS",
-    companyAddress: "5/8 KHANKA MASJID COMPLEX, SHANWARA ROAD BURHANPUR 450331 M.P., BURHANPUR, 450331",
+    companyAddress: "Shop No 8-5, Khanka Masjid Complex, Sanwara Road, Burhanpur 450331 M.P.",
     companyPhone: "9893989786",
     companyEmail: "alburhantravels@gmail.com",
     gstin: "23AAVFA3223C1ZW",
