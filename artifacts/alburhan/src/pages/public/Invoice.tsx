@@ -1,8 +1,10 @@
+import { useRef } from "react";
 import { useParams } from "wouter";
 import { useGetPublicInvoice } from "@workspace/api-client-react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
-import { Printer, Share2 } from "lucide-react";
+import { Printer, Share2, Download } from "lucide-react";
+import { downloadPdf } from "@/lib/pdf-download";
 
 function numberToWords(n: number): string {
   const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
@@ -45,6 +47,7 @@ function formatInvoiceDate(dateString: string | null | undefined): string {
 export default function Invoice() {
   const params = useParams<{ bookingNumber: string }>();
   const bookingNumber = params.bookingNumber;
+  const invoiceRef = useRef<HTMLDivElement>(null);
 
   const { data: invoice, isLoading, error } = useGetPublicInvoice(bookingNumber!, {
     query: { enabled: !!bookingNumber },
@@ -74,6 +77,13 @@ export default function Invoice() {
   }
 
   const handlePrint = () => window.print();
+  const handleDownloadPdf = () => {
+    downloadPdf(invoiceRef.current, {
+      filename: `Invoice-${invoice.invoiceNumber || bookingNumber}.pdf`,
+      orientation: "portrait",
+      margin: 5,
+    });
+  };
   const handleShare = async () => {
     if (navigator.share) {
       await navigator.share({ title: `Invoice ${invoice.invoiceNumber}`, url: window.location.href });
@@ -89,11 +99,12 @@ export default function Invoice() {
       <MainLayout>
         <div className="max-w-4xl mx-auto py-8 px-4 print-area">
           <div className="no-print flex gap-3 mb-6 justify-end">
+            <Button variant="outline" size="sm" onClick={handleDownloadPdf}><Download className="w-4 h-4 mr-2" />Download PDF</Button>
             <Button variant="outline" size="sm" onClick={handlePrint}><Printer className="w-4 h-4 mr-2" />Print</Button>
             <Button variant="outline" size="sm" onClick={handleShare}><Share2 className="w-4 h-4 mr-2" />Share</Button>
           </div>
 
-          <div className="bg-white border border-gray-200 shadow-sm rounded-lg overflow-hidden" id="invoice-content">
+          <div ref={invoiceRef} className="bg-white border border-gray-200 shadow-sm rounded-lg overflow-hidden" id="invoice-content">
             <div className="bg-[#0A3D2A] text-white px-8 py-6">
               <div className="flex items-start justify-between">
                 <div>

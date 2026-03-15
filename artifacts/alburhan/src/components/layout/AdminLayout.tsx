@@ -1,7 +1,7 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { LayoutDashboard, PackageSearch, Users, BookOpen, MessageSquare, LogOut, ImageIcon, UsersRound } from "lucide-react";
+import { LayoutDashboard, PackageSearch, Users, BookOpen, MessageSquare, LogOut, ImageIcon, UsersRound, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function AdminLayout({ children }: { children: ReactNode }) {
@@ -12,6 +12,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
     { icon: LayoutDashboard, label: "Dashboard", href: "/admin/dashboard" },
     { icon: PackageSearch, label: "Packages", href: "/admin/packages" },
     { icon: BookOpen, label: "Bookings", href: "/admin/bookings" },
+    { icon: Receipt, label: "Invoices", href: "/admin/invoices" },
     { icon: ImageIcon, label: "Gallery", href: "/admin/gallery" },
     { icon: UsersRound, label: "Hajj Groups", href: "/admin/groups" },
     { icon: Users, label: "Customers", href: "/admin/customers" },

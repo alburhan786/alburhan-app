@@ -55,6 +55,7 @@ export * from "./pilgrim";
 export * from "./rejectBookingBody";
 export * from "./saveDocumentRequest";
 export * from "./saveDocumentRequestDocumentType";
+export * from "./sendInvoiceNotification200";
 export * from "./sendNotificationRequest";
 export * from "./sendNotificationRequestChannelsItem";
 export * from "./sendOtpRequest";

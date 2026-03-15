@@ -1,12 +1,130 @@
+import { useState } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { useListBookings, useApproveBooking, useRejectBooking } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
-import { CheckCircle, XCircle, Eye } from "lucide-react";
+import { CheckCircle, XCircle, Eye, ExternalLink } from "lucide-react";
+
+function BookingDetailModal({ booking, open, onClose }: { booking: any; open: boolean; onClose: () => void }) {
+  if (!booking) return null;
+
+  const pilgrims = Array.isArray(booking.pilgrims) ? booking.pilgrims : [];
+
+  return (
+    <Dialog open={open} onOpenChange={v => !v && onClose()}>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-3">
+            <span>Booking Details</span>
+            <Badge variant="outline" className="uppercase text-[10px] font-bold">{booking.status}</Badge>
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 gap-6">
+            <div>
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">Booking Info</h4>
+              <div className="space-y-1.5 text-sm">
+                <p><span className="text-muted-foreground">Booking #:</span> <span className="font-mono font-bold">{booking.bookingNumber}</span></p>
+                <p><span className="text-muted-foreground">Date:</span> {formatDate(booking.createdAt)}</p>
+                {booking.invoiceNumber && <p><span className="text-muted-foreground">Invoice:</span> <span className="font-mono font-bold text-emerald-700">{booking.invoiceNumber}</span></p>}
+                {booking.isOffline && <p><Badge variant="outline" className="text-[9px]">Offline Booking</Badge></p>}
+              </div>
+            </div>
+            <div>
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">Customer</h4>
+              <div className="space-y-1.5 text-sm">
+                <p className="font-bold text-base">{booking.customerName}</p>
+                <p><span className="text-muted-foreground">Mobile:</span> {booking.customerMobile}</p>
+                {booking.customerEmail && <p><span className="text-muted-foreground">Email:</span> {booking.customerEmail}</p>}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-6">
+            <div>
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">Package</h4>
+              <div className="space-y-1.5 text-sm">
+                <p className="font-medium">{booking.packageName || "—"}</p>
+                <p><span className="text-muted-foreground">Pilgrims:</span> {booking.numberOfPilgrims}</p>
+                {booking.roomType && <p><span className="text-muted-foreground">Room:</span> <span className="capitalize">{booking.roomType}</span></p>}
+                {booking.preferredDepartureDate && <p><span className="text-muted-foreground">Departure:</span> {formatDate(booking.preferredDepartureDate)}</p>}
+              </div>
+            </div>
+            <div>
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">Payment</h4>
+              <div className="space-y-1.5 text-sm">
+                {booking.totalAmount && <p><span className="text-muted-foreground">Base Amount:</span> <span className="font-mono">{formatCurrency(booking.totalAmount)}</span></p>}
+                {booking.gstAmount && <p><span className="text-muted-foreground">GST:</span> <span className="font-mono">{formatCurrency(booking.gstAmount)}</span></p>}
+                {booking.finalAmount && <p><span className="text-muted-foreground">Total:</span> <span className="font-mono font-bold text-[#0B3D2E]">{formatCurrency(booking.finalAmount)}</span></p>}
+                {booking.razorpayPaymentId && <p><span className="text-muted-foreground">Razorpay:</span> <span className="font-mono text-xs">{booking.razorpayPaymentId}</span></p>}
+              </div>
+            </div>
+          </div>
+
+          {booking.rejectionReason && (
+            <div>
+              <h4 className="text-xs font-semibold text-red-600 uppercase mb-2">Rejection Reason</h4>
+              <p className="text-sm bg-red-50 rounded-lg p-3 text-red-800">{booking.rejectionReason}</p>
+            </div>
+          )}
+
+          {booking.notes && (
+            <div>
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">Notes</h4>
+              <p className="text-sm bg-muted rounded-lg p-3">{booking.notes}</p>
+            </div>
+          )}
+
+          {pilgrims.length > 0 && (
+            <div>
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">Pilgrims ({pilgrims.length})</h4>
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted text-xs">
+                    <tr>
+                      <th className="px-3 py-2 text-left">#</th>
+                      <th className="px-3 py-2 text-left">Name</th>
+                      <th className="px-3 py-2 text-left">Passport</th>
+                      <th className="px-3 py-2 text-left">DOB</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {pilgrims.map((p: any, i: number) => (
+                      <tr key={i}>
+                        <td className="px-3 py-2 text-muted-foreground">{i + 1}</td>
+                        <td className="px-3 py-2 font-medium">{p.name || "—"}</td>
+                        <td className="px-3 py-2 font-mono text-xs">{p.passportNumber || "—"}</td>
+                        <td className="px-3 py-2 text-xs">{p.dateOfBirth || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {booking.status === "confirmed" && booking.invoiceNumber && (
+            <div className="pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(`${import.meta.env.BASE_URL}invoice/${booking.bookingNumber}`, '_blank')}
+              >
+                <ExternalLink className="w-4 h-4 mr-2" />View Invoice
+              </Button>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export default function BookingsManager() {
   const { data, isLoading } = useListBookings();
@@ -15,6 +133,7 @@ export default function BookingsManager() {
   const rejectMutation = useRejectBooking();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [detailBooking, setDetailBooking] = useState<any>(null);
 
   const handleApprove = async (id: string) => {
     try {
@@ -91,7 +210,7 @@ export default function BookingsManager() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary">
+                      <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary" onClick={() => setDetailBooking(booking)} title="View Details">
                         <Eye size={18} />
                       </Button>
                       {booking.status === 'pending' && (
@@ -112,6 +231,8 @@ export default function BookingsManager() {
           </table>
         </div>
       </Card>
+
+      <BookingDetailModal booking={detailBooking} open={!!detailBooking} onClose={() => setDetailBooking(null)} />
     </AdminLayout>
   );
 }

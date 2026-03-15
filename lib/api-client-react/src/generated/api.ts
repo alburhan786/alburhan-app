@@ -50,6 +50,7 @@ import type {
   PaymentOrder,
   RejectBookingBody,
   SaveDocumentRequest,
+  SendInvoiceNotification200,
   SendNotificationRequest,
   SendOtpRequest,
   SendOtpResponse,
@@ -1423,6 +1424,93 @@ export function useGetInvoice<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Send invoice via WhatsApp and SMS to the customer
+ */
+export const getSendInvoiceNotificationUrl = (id: string) => {
+  return `/api/bookings/${id}/send-invoice`;
+};
+
+export const sendInvoiceNotification = async (
+  id: string,
+  options?: RequestInit,
+): Promise<SendInvoiceNotification200> => {
+  return customFetch<SendInvoiceNotification200>(
+    getSendInvoiceNotificationUrl(id),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getSendInvoiceNotificationMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof sendInvoiceNotification>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof sendInvoiceNotification>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ["sendInvoiceNotification"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof sendInvoiceNotification>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return sendInvoiceNotification(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SendInvoiceNotificationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof sendInvoiceNotification>>
+>;
+
+export type SendInvoiceNotificationMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Send invoice via WhatsApp and SMS to the customer
+ */
+export const useSendInvoiceNotification = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof sendInvoiceNotification>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof sendInvoiceNotification>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(getSendInvoiceNotificationMutationOptions(options));
+};
 
 /**
  * @summary Create an offline booking (admin)

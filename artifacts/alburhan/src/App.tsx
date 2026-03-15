@@ -34,6 +34,7 @@ import PrintFeedback from "@/pages/admin/print/PrintFeedback";
 import PrintContract from "@/pages/admin/print/PrintContract";
 import PrintLuggageSquare from "@/pages/admin/print/PrintLuggageSquare";
 import PrintIdCardsPro from "@/pages/admin/print/PrintIdCardsPro";
+import InvoiceManager from "@/pages/admin/InvoiceManager";
 import NotFound from "@/pages/not-found";
 import { useAuth } from "@/hooks/use-auth";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -86,6 +87,7 @@ function Router() {
       <Route path="/admin/dashboard" component={() => <AdminRoute component={AdminDashboard} />} />
       <Route path="/admin/packages" component={() => <AdminRoute component={PackagesManager} />} />
       <Route path="/admin/bookings" component={() => <AdminRoute component={BookingsManager} />} />
+      <Route path="/admin/invoices" component={() => <AdminRoute component={InvoiceManager} />} />
       <Route path="/admin/gallery" component={() => <AdminRoute component={GalleryManager} />} />
       <Route path="/admin/groups" component={() => <AdminRoute component={GroupsManager} />} />
       <Route path="/admin/groups/:groupId/pilgrims" component={() => <AdminRoute component={PilgrimManager} />} />

@@ -370,6 +370,32 @@ paths:
               schema:
                 $ref: "#/components/schemas/Invoice"
 
+  /bookings/{id}/send-invoice:
+    post:
+      operationId: sendInvoiceNotification
+      tags: [bookings]
+      summary: Send invoice via WhatsApp and SMS to the customer
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Invoice notification sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  whatsapp:
+                    type: boolean
+                  sms:
+                    type: boolean
+
   /bookings/offline:
     post:
       operationId: createOfflineBooking

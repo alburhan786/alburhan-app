@@ -13,6 +13,8 @@ import {
   sendBookingRejectionNotification,
   sendBookingSubmissionNotification,
   sendPaymentConfirmationNotification,
+  sendWhatsApp,
+  sendSMS,
 } from "../lib/notifications.js";
 
 const router = Router();
@@ -277,6 +279,33 @@ router.post("/:id/reject", requireAdmin as any, async (req: AuthenticatedRequest
   }).catch(console.error);
 
   res.json(formatBooking(updated));
+});
+
+router.post("/:id/send-invoice", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  const bookings = await db.select().from(bookingsTable).where(eq(bookingsTable.id, req.params.id)).limit(1);
+  if (!bookings[0]) {
+    res.status(404).json({ message: "Booking not found" });
+    return;
+  }
+  const b = bookings[0];
+  if (b.status !== "confirmed" || !b.invoiceNumber) {
+    res.status(400).json({ message: "Invoice only available for confirmed bookings with invoice number" });
+    return;
+  }
+
+  const baseUrl = `https://${req.get("host") || process.env.REPLIT_DEV_DOMAIN || "alburhantravels.com"}`;
+  const invoiceUrl = `${baseUrl}/invoice/${b.bookingNumber}`;
+  const message = `Assalamu Alaikum ${b.customerName},\n\nYour invoice #${b.invoiceNumber} for booking #${b.bookingNumber} is ready.\n\nView/Download Invoice:\n${invoiceUrl}\n\nTotal Amount: INR ${b.finalAmount ? Number(b.finalAmount).toLocaleString("en-IN") : "N/A"}\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 9893225590 | +91 9893989786`;
+
+  const results = await Promise.allSettled([
+    sendWhatsApp(b.customerMobile, message),
+    sendSMS(b.customerMobile, message),
+  ]);
+
+  const whatsappOk = results[0].status === "fulfilled" && (results[0] as PromiseFulfilledResult<boolean>).value;
+  const smsOk = results[1].status === "fulfilled" && (results[1] as PromiseFulfilledResult<boolean>).value;
+
+  res.json({ message: "Invoice notification sent", whatsapp: whatsappOk, sms: smsOk });
 });
 
 router.get("/by-number/:bookingNumber/invoice-public", async (req, res) => {

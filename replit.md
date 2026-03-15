@@ -39,8 +39,9 @@ artifacts/
 │   │   │   ├── public/        # Home, Packages, PackageDetail, Ziyarat, Blog, About, Contact, Legal, Invoice
 │   │   │   ├── auth/          # Login (OTP flow)
 │   │   │   ├── customer/      # Customer dashboard
-│   │   │   └── admin/         # Admin dashboard (quick actions: offline booking, broadcast, reports), bookings, packages
-│   │   │       └── print/    # 9 print documents: PrintIdCards, PrintLuggage, PrintMedical, PrintBusList, PrintHotelList, PrintAirlineList, PrintZamzam, PrintFeedback, PrintContract
+│   │   │   └── admin/         # Admin dashboard, bookings, invoices, packages, groups, gallery
+│   │   │       ├── InvoiceManager.tsx  # Invoice & Billing page (list, filter, offline booking, send invoice via WhatsApp/SMS)
+│   │   │       └── print/    # 11 print documents: PrintIdCards, PrintIdCardsPro, PrintLuggage, PrintLuggageSquare, PrintMedical, PrintBusList, PrintHotelList, PrintAirlineList, PrintZamzam, PrintFeedback, PrintContract
 │   │   ├── components/
 │   │   │   └── layout/        # MainLayout, AdminLayout
 │   │   └── hooks/
@@ -53,7 +54,7 @@ artifacts/
         ├── routes/
         │   ├── auth.ts         # OTP login/verify/logout
         │   ├── packages.ts     # Package CRUD
-        │   ├── bookings.ts     # Booking management + approve/reject
+        │   ├── bookings.ts     # Booking management + approve/reject + send-invoice notification
         │   ├── payments.ts     # Razorpay order + verify
         │   ├── documents.ts    # File upload management
         │   ├── gallery.ts      # Image gallery CRUD (admin upload, public list)

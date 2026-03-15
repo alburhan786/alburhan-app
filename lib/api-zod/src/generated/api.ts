@@ -599,6 +599,19 @@ export const GetInvoiceResponse = zod.object({
 });
 
 /**
+ * @summary Send invoice via WhatsApp and SMS to the customer
+ */
+export const SendInvoiceNotificationParams = zod.object({
+  id: zod.coerce.string(),
+});
+
+export const SendInvoiceNotificationResponse = zod.object({
+  message: zod.string().optional(),
+  whatsapp: zod.boolean().optional(),
+  sms: zod.boolean().optional(),
+});
+
+/**
  * @summary Create an offline booking (admin)
  */
 export const CreateOfflineBookingBody = zod.object({

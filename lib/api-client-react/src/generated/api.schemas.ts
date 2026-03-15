@@ -562,6 +562,12 @@ export type RejectBookingBody = {
   reason?: string;
 };
 
+export type SendInvoiceNotification200 = {
+  message?: string;
+  whatsapp?: boolean;
+  sms?: boolean;
+};
+
 export type GetBookingsReportParams = {
   from?: string;
   to?: string;
