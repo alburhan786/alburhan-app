@@ -160,13 +160,13 @@ export default function PrintIdCardsPro() {
                 <FrontWaves />
                 <div style={{ position: "relative", zIndex: 1, display: "flex", height: "100%", padding: "2.5mm 3mm 0" }}>
 
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "28mm", flexShrink: 0 }}>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "30mm", flexShrink: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "1.5mm", marginBottom: "1mm" }}>
-                      <img src={BASE + "images/logo.png"} alt="" style={{ width: "7mm", height: "7mm", objectFit: "contain" }} />
+                      <img src={BASE + "images/logo.png"} alt="" style={{ width: "10mm", height: "10mm", objectFit: "contain" }} />
                       <div>
-                        <div style={{ fontSize: "5.5pt", fontWeight: 900, color: DARK, letterSpacing: "0.3px", lineHeight: 1.1 }}>AL BURHAN</div>
-                        <div style={{ fontSize: "3.5pt", fontWeight: 700, color: GOLD, letterSpacing: "0.4px" }}>TOURS & TRAVELS</div>
-                        <div style={{ fontSize: "4pt", fontWeight: 800, color: DARK, marginTop: "0.3mm" }}>HAJJ {group.year}</div>
+                        <div style={{ fontSize: "7pt", fontWeight: 900, color: DARK, letterSpacing: "0.3px", lineHeight: 1.1 }}>AL BURHAN</div>
+                        <div style={{ fontSize: "4.5pt", fontWeight: 700, color: GOLD, letterSpacing: "0.4px" }}>TOURS & TRAVELS</div>
+                        <div style={{ fontSize: "5pt", fontWeight: 800, color: DARK, marginTop: "0.3mm" }}>HAJJ {group.year}</div>
                       </div>
                     </div>
 
@@ -209,7 +209,7 @@ export default function PrintIdCardsPro() {
                       </div>
                     </div>
 
-                    <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1mm" }}>
+                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "auto", marginBottom: "3mm" }}>
                       <QRCodeSVG value={buildQrData(p, group)} size={52} level="M" />
                     </div>
                   </div>
@@ -217,10 +217,10 @@ export default function PrintIdCardsPro() {
                 </div>
 
                 <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 2 }}>
-                  <div style={{ display: "flex", justifyContent: "center", overflow: "hidden", marginBottom: "0.5mm", padding: "0 3mm" }}>
+                  <div style={{ display: "flex", justifyContent: "center", overflow: "hidden", padding: "0 3mm" }}>
                     <Barcode value={`${p.passportNumber || "N/A"}-${String(p.serialNumber).padStart(3, "0")}`} height={12} width={1.0} fontSize={0} />
                   </div>
-                  <div style={{ background: DARK, color: GOLD, padding: "1mm 2mm", fontSize: "3.8pt", textAlign: "center", fontWeight: 700, letterSpacing: "0.2px" }}>
+                  <div style={{ background: DARK, color: GOLD, padding: "1mm 2mm", fontSize: "3.8pt", textAlign: "center", fontWeight: 700, letterSpacing: "0.2px", marginTop: "0.5mm" }}>
                     #{String(p.serialNumber).padStart(3, "0")} | Altaf: 0547090786 | Wasim: 0568780786
                   </div>
                 </div>
@@ -273,14 +273,17 @@ export default function PrintIdCardsPro() {
                         <div style={{ fontWeight: 700 }}>0568780786</div>
                       </div>
                       <div style={{ marginTop: "auto", display: "flex", justifyContent: "center" }}>
-                        <img src={BASE + "images/india_flag.jpg"} alt="" style={{ width: "8mm", height: "8mm", borderRadius: "50%", objectFit: "cover" }} />
+                        <img src={BASE + "images/india_flag.jpg"} alt="" style={{ width: "13mm", height: "13mm", borderRadius: "50%", objectFit: "cover", border: `2px solid ${GOLD}` }} />
                       </div>
                     </div>
                   </div>
 
                   <div style={{ marginTop: "auto" }}>
-                    <div style={{ fontSize: "6pt", fontWeight: 700, color: DARK, textAlign: "center", marginBottom: "0.5mm" }}>{p.fullName}</div>
-                    <div style={{ background: DARK, color: "#fff", padding: "1mm 2mm", fontSize: "3.5pt", textAlign: "center", lineHeight: 1.5, borderRadius: "0 0 3px 3px", margin: "0 -3mm" }}>
+                    <div style={{ background: DARK, padding: "1.2mm 3mm", margin: "0 -3mm", textAlign: "center" }}>
+                      <div style={{ fontSize: "3.5pt", color: "#fff", opacity: 0.7, textTransform: "uppercase", letterSpacing: "0.5px", lineHeight: 1 }}>PILGRIM</div>
+                      <div style={{ fontSize: "9pt", fontWeight: 900, color: GOLD, lineHeight: 1.3, textTransform: "uppercase" }}>{p.fullName}</div>
+                    </div>
+                    <div style={{ background: DARK, color: "#fff", padding: "1mm 2mm", fontSize: "3.5pt", textAlign: "center", lineHeight: 1.5, borderRadius: "0 0 3px 3px", margin: "0 -3mm", borderTop: `0.5px solid ${GOLD}` }}>
                       <div>Khanka Masjid Complex, Sanwara Rd, Burhanpur 450331 M.P.</div>
                       <div style={{ color: GOLD, fontWeight: 800, fontSize: "4pt", letterSpacing: "0.2px" }}>AL BURHAN TOURS & TRAVELS | +91 9893225590</div>
                     </div>
