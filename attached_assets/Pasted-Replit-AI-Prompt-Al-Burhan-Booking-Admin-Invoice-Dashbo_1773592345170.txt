@@ -1,0 +1,284 @@
+Replit AI Prompt — Al Burhan Booking + Admin Invoice Dashboard
+Create a full travel booking and invoice management system for a company called
+"ALBURHAN TOURS & TRAVELS".
+
+The system must include a public booking system and a secure admin dashboard
+to manage customers, bookings, payments, and invoice generation.
+
+Business Details:
+
+Company Name:
+ALBURHAN TOURS & TRAVELS
+
+Address:
+5/8 Khanka Masjid Complex
+Shanwara Road Burhanpur
+Madhya Pradesh 450331
+
+Mobile:
++91 9893989786
+
+Email:
+alburhantravels@gmail.com
+
+GSTIN:
+23AAVFA3223C1ZW
+
+PAN:
+AAVFA3223C
+
+Bank Details:
+HDFC BANK LTD
+Account Number: 50200011391336
+IFSC: HDFC0001769
+
+
+SYSTEM MODULES
+
+1. Customer Booking System
+
+Allow customers to book Hajj or Umrah packages online.
+
+Fields:
+
+Customer Name
+Mobile Number
+Email
+Address
+City
+Passport Number
+Travel Year
+Package Type (Hajj / Umrah / Ziyarat)
+Hotel Option
+Number of Travelers
+Notes
+
+After booking:
+Generate Booking ID.
+
+
+2. Payment Integration
+
+Add payment gateway support:
+
+Razorpay
+UPI
+Credit Card
+Debit Card
+Net Banking
+
+After successful payment:
+
+Generate invoice automatically.
+
+
+3. Invoice Generation
+
+Generate professional TAX INVOICE PDF.
+
+Fields:
+
+Invoice Number
+Invoice Date
+Customer Name
+Mobile
+Address
+Passport Number
+Service Name
+Travel Year
+Package Price
+
+Tax Calculation:
+
+CGST 2.5%
+SGST 2.5%
+
+Display:
+
+Subtotal
+Taxable Amount
+Total Amount
+Received Amount
+Balance Amount
+
+Add QR Code to invoice for verification.
+
+Include company logo and bank details.
+
+
+4. Admin Dashboard
+
+Create a secure admin panel login.
+
+Admin Features:
+
+Dashboard overview
+Total bookings
+Total invoices
+Payments received
+Pending balance
+
+Modules:
+
+Customers
+Bookings
+Invoices
+Payments
+Reports
+
+
+5. Offline Booking System
+
+Admin must be able to create bookings manually.
+
+Admin Form:
+
+Customer Name
+Mobile
+Passport Number
+City
+Package
+Travel Year
+Amount
+Received Payment
+Balance
+
+Admin clicks:
+
+"Generate Invoice"
+
+System creates invoice PDF.
+
+
+6. Manual Invoice Creation
+
+Admin can generate invoice without online payment.
+
+Invoice status:
+
+Paid
+Partial Payment
+Pending
+
+Admin can:
+
+Download invoice
+Send invoice to customer
+Edit invoice
+
+
+7. Send Invoice via WhatsApp and SMS
+
+After invoice creation:
+
+Send WhatsApp message:
+
+"Dear Customer,
+Your invoice from ALBURHAN TOURS & TRAVELS has been generated."
+
+Attach PDF invoice.
+
+Send SMS:
+
+"Your Hajj/Umrah invoice is ready. Check WhatsApp or email."
+
+
+8. Invoice Verification Page
+
+Create public URL:
+
+/verify-invoice/{invoice_number}
+
+Customer can check invoice authenticity.
+
+
+9. Reports Module
+
+Admin can download reports:
+
+Daily booking report
+Payment report
+Outstanding balance report
+Hajj group report
+
+
+10. Technology Stack
+
+Frontend:
+HTML
+TailwindCSS
+JavaScript
+
+Backend:
+Python Flask
+
+Database:
+SQLite or MySQL
+
+PDF Generation:
+ReportLab
+
+QR Code:
+qrcode library
+
+Barcode:
+python-barcode
+
+
+11. Output
+
+Admin dashboard
+Customer booking system
+Offline invoice generator
+Online payment invoice generator
+PDF invoices
+WhatsApp notification system
+Admin Dashboard Layout (Suggested)
+Main menu:
+Dashboard
+Bookings
+Customers
+Invoices
+Payments
+Reports
+Settings
+Logout
+Dashboard widgets:
+Total Bookings
+Total Revenue
+Pending Payments
+Invoices Generated
+Offline Invoice Example
+Admin creates booking:
+Customer: Mohammed Altaf Khan
+Passport: R9544391
+Package: Hajj 2026
+Amount: 550000
+Received: 200000
+Balance: 350000
+System generates invoice PDF.
+WhatsApp Invoice Message
+Assalamu Alaikum
+
+Dear Mohammed Altaf Khan,
+
+Your invoice from ALBURHAN TOURS & TRAVELS
+has been generated.
+
+Invoice No: 1213
+Package: Hajj 2026
+
+Please find the invoice attached.
+
+For support:
++91 9893989786
+Final System Workflow
+Customer Booking
+        ↓
+Payment Gateway
+        ↓
+Invoice Generated
+        ↓
+Send WhatsApp + SMS
+        ↓
+Admin Dashboard Records
