@@ -414,7 +414,7 @@ export default function Invoice() {
   const handlePrint = () => window.print();
   const handleDownloadPdf = () => {
     downloadPdf(invoiceRef.current, {
-      filename: `Invoice-${invoice.invoiceNumber || bookingNumber}.pdf`,
+      filename: `Invoice-${invoice.invoiceNumber || identifier}.pdf`,
       orientation: "portrait",
       margin: 5,
     });
