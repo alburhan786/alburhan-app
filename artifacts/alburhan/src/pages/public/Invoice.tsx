@@ -94,28 +94,21 @@ function InvoiceContent({ invoice }: { invoice: InvoiceType }) {
   const pricePerPerson = invoice.pricePerPerson ?? totalAmount / pilgrimCount;
   const taxPerPerson = gstAmount / pilgrimCount;
   const amountPerPerson = finalAmount / pilgrimCount;
-  const verificationUrl = `https://alburhantravels.com/invoice/${invoice.invoiceNumber || invoice.bookingNumber}`;
-  const qrData = JSON.stringify({
-    invoiceNumber: invoice.invoiceNumber,
-    customerName: invoice.customerName,
-    package: invoice.packageName,
-    amount: finalAmount,
-    url: verificationUrl,
-  });
+  const verificationUrl = `https://alburhantravels.com/invoice/${invoice.bookingNumber}`;
 
   return (
     <div className="bg-white text-black" style={{ fontFamily: "Arial, Helvetica, sans-serif", fontSize: "12px", lineHeight: 1.4 }}>
       <div style={{ border: `2px solid ${DARK_GREEN}` }}>
-        {/* GREEN HEADER BAR */}
-        <div style={{ backgroundColor: DARK_GREEN, color: "white", padding: "8px 16px" }} className="flex items-center justify-between">
+        {/* HEADER BAR */}
+        <div style={{ padding: "8px 16px", borderBottom: `3px solid ${GOLD}` }} className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img src={`${import.meta.env.BASE_URL}images/logo.png`} alt="Al Burhan Logo" style={{ height: "48px", width: "auto" }} />
             <div>
-              <div className="font-bold text-[16px] leading-tight" style={{ color: GOLD }}>ALBURHAN TOURS & TRAVELS</div>
-              <div className="text-[9px] tracking-wider" style={{ color: "#E8D48B" }}>Hajj &bull; Umrah &bull; Ziyarat Tours &bull; 35+ Years Experience</div>
+              <div className="font-bold text-[16px] leading-tight" style={{ color: DARK_GREEN }}>ALBURHAN TOURS & TRAVELS</div>
+              <div className="text-[9px] tracking-wider" style={{ color: GOLD }}>Hajj &bull; Umrah &bull; Ziyarat Tours &bull; 35+ Years Experience</div>
             </div>
           </div>
-          <div className="text-right text-[9px] leading-snug" style={{ color: "#E8D48B" }}>
+          <div className="text-right text-[9px] leading-snug" style={{ color: DARK_GREEN }}>
             <div>Tel: {invoice.companyPhone}</div>
             <div>{invoice.companyEmail}</div>
           </div>
@@ -165,15 +158,15 @@ function InvoiceContent({ invoice }: { invoice: InvoiceType }) {
         <div>
           <table className="w-full border-collapse text-[10px]">
             <thead>
-              <tr style={{ backgroundColor: DARK_GREEN, color: "white" }}>
-                <th className="px-2 py-2 text-center w-[5%]" style={{ border: `1px solid ${DARK_GREEN}` }}>S.NO.</th>
-                <th className="px-2 py-2 text-left w-[24%]" style={{ border: `1px solid ${DARK_GREEN}` }}>SERVICES</th>
-                <th className="px-2 py-2 text-center w-[8%]" style={{ border: `1px solid ${DARK_GREEN}` }}>SAC</th>
-                <th className="px-2 py-2 text-center w-[13%]" style={{ border: `1px solid ${DARK_GREEN}` }}>PASSPORT NO</th>
-                <th className="px-2 py-2 text-center w-[10%]" style={{ border: `1px solid ${DARK_GREEN}` }}>DATE OF ISSUE</th>
-                <th className="px-2 py-2 text-right w-[14%]" style={{ border: `1px solid ${DARK_GREEN}` }}>RATE</th>
-                <th className="px-2 py-2 text-right w-[12%]" style={{ border: `1px solid ${DARK_GREEN}` }}>TAX</th>
-                <th className="px-2 py-2 text-right w-[14%]" style={{ border: `1px solid ${DARK_GREEN}` }}>AMOUNT</th>
+              <tr style={{ color: DARK_GREEN, borderTop: `2px solid ${DARK_GREEN}`, borderBottom: `2px solid ${DARK_GREEN}` }}>
+                <th className="px-2 py-2 text-center w-[5%]">S.NO.</th>
+                <th className="px-2 py-2 text-left w-[24%]">SERVICES</th>
+                <th className="px-2 py-2 text-center w-[8%]">SAC</th>
+                <th className="px-2 py-2 text-center w-[13%]">PASSPORT NO</th>
+                <th className="px-2 py-2 text-center w-[10%]">DATE OF ISSUE</th>
+                <th className="px-2 py-2 text-right w-[14%]">RATE</th>
+                <th className="px-2 py-2 text-right w-[12%]">TAX</th>
+                <th className="px-2 py-2 text-right w-[14%]">AMOUNT</th>
               </tr>
             </thead>
             <tbody>
@@ -218,7 +211,7 @@ function InvoiceContent({ invoice }: { invoice: InvoiceType }) {
                 </tr>
               )}
               {/* SUBTOTAL row */}
-              <tr className="font-bold" style={{ borderTop: `2px solid ${DARK_GREEN}`, backgroundColor: "#f0f7f4" }}>
+              <tr className="font-bold" style={{ borderTop: `2px solid ${DARK_GREEN}` }}>
                 <td colSpan={5} className="px-2 py-2 text-right">SUBTOTAL</td>
                 <td className="px-2 py-2 text-right"></td>
                 <td className="px-2 py-2 text-right">{"\u20B9"} {formatINR(gstAmount)}</td>
@@ -357,7 +350,7 @@ function InvoiceContent({ invoice }: { invoice: InvoiceType }) {
 
           {/* QR Code */}
           <div className="p-3 flex flex-col items-center justify-center" style={{ borderLeft: `1px solid ${DARK_GREEN}` }}>
-            <QRCodeSVG value={qrData} size={80} level="M" fgColor={DARK_GREEN} />
+            <QRCodeSVG value={verificationUrl} size={80} level="M" fgColor={DARK_GREEN} />
             <div className="text-[7px] mt-1 text-center" style={{ color: DARK_GREEN }}>Scan to verify</div>
           </div>
         </div>
@@ -372,7 +365,7 @@ function InvoiceContent({ invoice }: { invoice: InvoiceType }) {
         </div>
 
         {/* FOOTER BAR */}
-        <div style={{ backgroundColor: DARK_GREEN, color: "#E8D48B", padding: "6px 16px" }} className="text-[8px] text-center">
+        <div style={{ borderTop: `2px solid ${GOLD}`, padding: "6px 16px", color: DARK_GREEN }} className="text-[8px] text-center">
           Shop No 8-5, Khanka Masjid Complex, Sanwara Road, Burhanpur 450331 M.P. | Tel: {invoice.companyPhone} | {invoice.companyEmail} | GSTIN: {invoice.gstin}
         </div>
       </div>
