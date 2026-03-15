@@ -10,6 +10,8 @@ export * from "./adminStats";
 export * from "./authResponse";
 export * from "./booking";
 export * from "./bookingListResponse";
+export * from "./bookingPaymentStatus";
+export * from "./bookingRoomType";
 export * from "./bookingStatus";
 export * from "./broadcastRequest";
 export * from "./broadcastRequestAudience";

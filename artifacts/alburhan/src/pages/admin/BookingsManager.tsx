@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { useListBookings, useApproveBooking, useRejectBooking } from "@workspace/api-client-react";
+import type { Booking, Pilgrim } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +11,7 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { CheckCircle, XCircle, Eye, ExternalLink } from "lucide-react";
 
-function BookingDetailModal({ booking, open, onClose }: { booking: any; open: boolean; onClose: () => void }) {
+function BookingDetailModal({ booking, open, onClose }: { booking: Booking | null; open: boolean; onClose: () => void }) {
   if (!booking) return null;
 
   const pilgrims = Array.isArray(booking.pilgrims) ? booking.pilgrims : [];
@@ -95,7 +96,7 @@ function BookingDetailModal({ booking, open, onClose }: { booking: any; open: bo
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {pilgrims.map((p: any, i: number) => (
+                    {pilgrims.map((p: Pilgrim, i: number) => (
                       <tr key={i}>
                         <td className="px-3 py-2 text-muted-foreground">{i + 1}</td>
                         <td className="px-3 py-2 font-medium">{p.name || "—"}</td>
@@ -133,15 +134,16 @@ export default function BookingsManager() {
   const rejectMutation = useRejectBooking();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [detailBooking, setDetailBooking] = useState<any>(null);
+  const [detailBooking, setDetailBooking] = useState<Booking | null>(null);
 
   const handleApprove = async (id: string) => {
     try {
       await approveMutation.mutateAsync({ id });
       toast({ title: "Booking Approved" });
       queryClient.invalidateQueries({ queryKey: ['/api/bookings'] });
-    } catch (err:any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to approve booking";
+      toast({ title: "Error", description: message, variant: "destructive" });
     }
   };
 
@@ -152,8 +154,9 @@ export default function BookingsManager() {
       await rejectMutation.mutateAsync({ id, data: { reason } });
       toast({ title: "Booking Rejected" });
       queryClient.invalidateQueries({ queryKey: ['/api/bookings'] });
-    } catch (err:any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to reject booking";
+      toast({ title: "Error", description: message, variant: "destructive" });
     }
   };
 

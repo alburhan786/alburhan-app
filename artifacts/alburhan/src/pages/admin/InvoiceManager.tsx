@@ -1,6 +1,17 @@
 import { useState, useRef } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
-import { useListBookings, useCreateOfflineBooking, useSendInvoiceNotification, useListPackages } from "@workspace/api-client-react";
+import {
+  useListBookings,
+  useCreateOfflineBooking,
+  useSendInvoiceNotification,
+  useListPackages,
+} from "@workspace/api-client-react";
+import type {
+  Booking,
+  Package,
+  CreateOfflineBookingRequestRoomType,
+  CreateOfflineBookingRequestPaymentStatus,
+} from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +25,24 @@ import { useQueryClient } from "@tanstack/react-query";
 import { FileText, Send, Eye, Plus, Search, Download } from "lucide-react";
 import { downloadPdf } from "@/lib/pdf-download";
 
-function InvoicePreview({ booking, onClose }: { booking: any; onClose: () => void }) {
+type PaymentFilter = "all" | "paid" | "partial" | "pending";
+
+function getPaymentStatus(booking: Booking): "paid" | "partial" | "pending" {
+  if (booking.paymentStatus === "paid" || booking.status === "confirmed") return "paid";
+  if (
+    (booking.status === "approved" || booking.status === "pending") &&
+    booking.advanceAmount &&
+    booking.advanceAmount > 0 &&
+    booking.finalAmount &&
+    booking.advanceAmount < booking.finalAmount
+  ) {
+    return "partial";
+  }
+  if (booking.status === "rejected" || booking.status === "cancelled") return "pending";
+  return "pending";
+}
+
+function InvoicePreview({ booking, onClose }: { booking: Booking; onClose: () => void }) {
   const invoiceRef = useRef<HTMLDivElement>(null);
 
   function formatINR(amount: number): string {
@@ -127,7 +155,7 @@ function InvoicePreview({ booking, onClose }: { booking: any; onClose: () => voi
 function OfflineBookingDialog({ onSuccess }: { onSuccess: () => void }) {
   const [open, setOpen] = useState(false);
   const { data: packagesData } = useListPackages();
-  const packages = packagesData || [];
+  const packages: Package[] = packagesData || [];
   const createMutation = useCreateOfflineBooking();
   const { toast } = useToast();
 
@@ -137,9 +165,9 @@ function OfflineBookingDialog({ onSuccess }: { onSuccess: () => void }) {
     customerEmail: "",
     packageId: "",
     numberOfPilgrims: 1,
-    roomType: "" as string,
+    roomType: "" as CreateOfflineBookingRequestRoomType | "",
     advanceAmount: 0,
-    paymentStatus: "pending" as string,
+    paymentStatus: "pending" as CreateOfflineBookingRequestPaymentStatus,
     notes: "",
   });
 
@@ -157,9 +185,9 @@ function OfflineBookingDialog({ onSuccess }: { onSuccess: () => void }) {
           customerEmail: form.customerEmail || undefined,
           packageId: form.packageId || undefined,
           numberOfPilgrims: form.numberOfPilgrims,
-          roomType: (form.roomType || undefined) as any,
+          roomType: form.roomType || undefined,
           advanceAmount: form.advanceAmount || undefined,
-          paymentStatus: (form.paymentStatus || undefined) as any,
+          paymentStatus: form.paymentStatus || undefined,
           notes: form.notes || undefined,
         },
       });
@@ -167,8 +195,9 @@ function OfflineBookingDialog({ onSuccess }: { onSuccess: () => void }) {
       setOpen(false);
       setForm({ customerName: "", customerMobile: "", customerEmail: "", packageId: "", numberOfPilgrims: 1, roomType: "", advanceAmount: 0, paymentStatus: "pending", notes: "" });
       onSuccess();
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to create booking";
+      toast({ title: "Error", description: message, variant: "destructive" });
     }
   };
 
@@ -203,7 +232,7 @@ function OfflineBookingDialog({ onSuccess }: { onSuccess: () => void }) {
             <Select value={form.packageId} onValueChange={v => setForm(f => ({ ...f, packageId: v }))}>
               <SelectTrigger><SelectValue placeholder="Select package" /></SelectTrigger>
               <SelectContent>
-                {packages.map((pkg: any) => (
+                {packages.map((pkg) => (
                   <SelectItem key={pkg.id} value={pkg.id}>{pkg.name} - ₹{Number(pkg.pricePerPerson).toLocaleString("en-IN")}/person</SelectItem>
                 ))}
               </SelectContent>
@@ -216,7 +245,7 @@ function OfflineBookingDialog({ onSuccess }: { onSuccess: () => void }) {
             </div>
             <div>
               <Label>Room Type</Label>
-              <Select value={form.roomType} onValueChange={v => setForm(f => ({ ...f, roomType: v }))}>
+              <Select value={form.roomType} onValueChange={v => setForm(f => ({ ...f, roomType: v as CreateOfflineBookingRequestRoomType }))}>
                 <SelectTrigger><SelectValue placeholder="Select room" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="sharing">Sharing</SelectItem>
@@ -234,11 +263,10 @@ function OfflineBookingDialog({ onSuccess }: { onSuccess: () => void }) {
             </div>
             <div>
               <Label>Payment Status</Label>
-              <Select value={form.paymentStatus} onValueChange={v => setForm(f => ({ ...f, paymentStatus: v }))}>
+              <Select value={form.paymentStatus} onValueChange={v => setForm(f => ({ ...f, paymentStatus: v as CreateOfflineBookingRequestPaymentStatus }))}>
                 <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="partial">Partial</SelectItem>
                   <SelectItem value="paid">Paid</SelectItem>
                 </SelectContent>
               </Select>
@@ -257,21 +285,114 @@ function OfflineBookingDialog({ onSuccess }: { onSuccess: () => void }) {
   );
 }
 
+function DownloadPdfButton({ booking }: { booking: Booking }) {
+  const hiddenRef = useRef<HTMLDivElement>(null);
+  const [rendering, setRendering] = useState(false);
+
+  function formatINR(amount: number): string {
+    return new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
+  }
+
+  const handleDownload = async () => {
+    setRendering(true);
+    await new Promise(r => setTimeout(r, 100));
+    await downloadPdf(hiddenRef.current, {
+      filename: `Invoice-${booking.invoiceNumber || booking.bookingNumber}.pdf`,
+      orientation: "portrait",
+      margin: 5,
+    });
+    setRendering(false);
+  };
+
+  return (
+    <>
+      <Button variant="ghost" size="icon" title="Download PDF" onClick={handleDownload}>
+        <Download size={16} className="text-purple-600" />
+      </Button>
+      {rendering && (
+        <div style={{ position: "fixed", left: "-9999px", top: 0 }}>
+          <div ref={hiddenRef} style={{ width: 794, background: "white", padding: 32 }}>
+            <div style={{ background: "#0A3D2A", color: "white", padding: "24px 32px", display: "flex", justifyContent: "space-between" }}>
+              <div>
+                <div style={{ fontSize: 18, fontWeight: "bold" }}>AL BURHAN TOURS & TRAVELS</div>
+                <div style={{ fontSize: 11, color: "#6ee7b7", marginTop: 4 }}>Shop No 8-5, Khanka Masjid Complex, Sanwara Road, Burhanpur 450331 M.P.</div>
+                <div style={{ fontSize: 11, color: "#6ee7b7" }}>Phone: +91 9893225590 | +91 9893989786</div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: 22, fontWeight: "bold", color: "#C9A84C" }}>TAX INVOICE</div>
+                <div style={{ fontSize: 11, color: "#6ee7b7", marginTop: 4 }}>Invoice: {booking.invoiceNumber || "N/A"}</div>
+              </div>
+            </div>
+            <div style={{ padding: "16px 32px" }}>
+              <div style={{ display: "flex", gap: 32, marginBottom: 16 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", marginBottom: 6 }}>Invoice Details</div>
+                  <div style={{ fontSize: 13 }}>Invoice No: <strong>{booking.invoiceNumber || "N/A"}</strong></div>
+                  <div style={{ fontSize: 13 }}>Booking: <strong>{booking.bookingNumber}</strong></div>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", marginBottom: 6 }}>Bill To</div>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>{booking.customerName}</div>
+                  <div style={{ fontSize: 13 }}>Mobile: {booking.customerMobile}</div>
+                  <div style={{ fontSize: 13 }}>Pilgrims: {booking.numberOfPilgrims}</div>
+                </div>
+              </div>
+              <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse", marginBottom: 16 }}>
+                <thead>
+                  <tr style={{ background: "#f9fafb", borderTop: "1px solid #e5e7eb", borderBottom: "1px solid #e5e7eb" }}>
+                    <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 600, color: "#4b5563" }}>Description</th>
+                    <th style={{ textAlign: "center", padding: "8px 12px", fontWeight: 600, color: "#4b5563" }}>Qty</th>
+                    <th style={{ textAlign: "right", padding: "8px 12px", fontWeight: 600, color: "#4b5563" }}>Rate</th>
+                    <th style={{ textAlign: "right", padding: "8px 12px", fontWeight: 600, color: "#4b5563" }}>Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr style={{ borderBottom: "1px solid #f3f4f6" }}>
+                    <td style={{ padding: "8px 12px", fontWeight: 500 }}>{booking.packageName || "Travel Package"}</td>
+                    <td style={{ padding: "8px 12px", textAlign: "center" }}>{booking.numberOfPilgrims}</td>
+                    <td style={{ padding: "8px 12px", textAlign: "right", fontFamily: "monospace" }}>{booking.totalAmount && booking.numberOfPilgrims ? `₹${formatINR(booking.totalAmount / booking.numberOfPilgrims)}` : "—"}</td>
+                    <td style={{ padding: "8px 12px", textAlign: "right", fontFamily: "monospace" }}>{booking.totalAmount ? `₹${formatINR(booking.totalAmount)}` : "—"}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                <div style={{ width: 240 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 13 }}>
+                    <span style={{ color: "#6b7280" }}>Subtotal:</span>
+                    <span style={{ fontFamily: "monospace" }}>₹{booking.totalAmount ? formatINR(booking.totalAmount) : "—"}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 13, borderBottom: "1px solid #f3f4f6" }}>
+                    <span style={{ color: "#6b7280" }}>GST (5%):</span>
+                    <span style={{ fontFamily: "monospace" }}>₹{booking.gstAmount ? formatINR(booking.gstAmount) : "—"}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", fontSize: 16, fontWeight: "bold" }}>
+                    <span>Total:</span>
+                    <span style={{ color: "#0A3D2A", fontFamily: "monospace" }}>₹{booking.finalAmount ? formatINR(booking.finalAmount) : "—"}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 export default function InvoiceManager() {
   const { data, isLoading } = useListBookings();
-  const allBookings = data?.bookings || [];
+  const allBookings: Booking[] = data?.bookings || [];
   const sendInvoiceMutation = useSendInvoiceNotification();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const [filter, setFilter] = useState<string>("all");
+  const [filter, setFilter] = useState<PaymentFilter>("all");
   const [search, setSearch] = useState("");
-  const [previewBooking, setPreviewBooking] = useState<any>(null);
+  const [previewBooking, setPreviewBooking] = useState<Booking | null>(null);
 
   const filteredBookings = allBookings.filter(b => {
-    if (filter === "confirmed" && b.status !== "confirmed") return false;
-    if (filter === "approved" && b.status !== "approved") return false;
-    if (filter === "pending" && b.status !== "pending") return false;
+    const payStatus = getPaymentStatus(b);
+    if (filter !== "all" && payStatus !== filter) return false;
     if (search) {
       const q = search.toLowerCase();
       return (
@@ -284,20 +405,19 @@ export default function InvoiceManager() {
     return true;
   });
 
-  const getPaymentBadge = (booking: any) => {
-    if (booking.status === "confirmed") {
-      return <Badge className="bg-emerald-100 text-emerald-800 border-0 text-[10px] font-bold uppercase">Paid</Badge>;
+  const getPaymentBadge = (booking: Booking) => {
+    const payStatus = getPaymentStatus(booking);
+    switch (payStatus) {
+      case "paid":
+        return <Badge className="bg-emerald-100 text-emerald-800 border-0 text-[10px] font-bold uppercase">Paid</Badge>;
+      case "partial":
+        return <Badge className="bg-amber-100 text-amber-800 border-0 text-[10px] font-bold uppercase">Partial</Badge>;
+      default:
+        return <Badge className="bg-red-100 text-red-800 border-0 text-[10px] font-bold uppercase">Pending</Badge>;
     }
-    if (booking.status === "approved" && booking.advanceAmount && Number(booking.advanceAmount) > 0) {
-      return <Badge className="bg-amber-100 text-amber-800 border-0 text-[10px] font-bold uppercase">Partial</Badge>;
-    }
-    if (booking.status === "approved") {
-      return <Badge className="bg-red-100 text-red-800 border-0 text-[10px] font-bold uppercase">Pending</Badge>;
-    }
-    return <Badge className="bg-gray-100 text-gray-600 border-0 text-[10px] font-bold uppercase">{booking.status}</Badge>;
   };
 
-  const handleSendInvoice = async (booking: any) => {
+  const handleSendInvoice = async (booking: Booking) => {
     if (booking.status !== "confirmed" || !booking.invoiceNumber) {
       toast({ title: "Cannot send invoice", description: "Invoice is only available for confirmed bookings", variant: "destructive" });
       return;
@@ -308,14 +428,15 @@ export default function InvoiceManager() {
         title: "Invoice Sent",
         description: `WhatsApp: ${result.whatsapp ? "✓" : "✗"} | SMS: ${result.sms ? "✓" : "✗"}`,
       });
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to send invoice";
+      toast({ title: "Error", description: message, variant: "destructive" });
     }
   };
 
-  const confirmedCount = allBookings.filter(b => b.status === "confirmed").length;
-  const approvedCount = allBookings.filter(b => b.status === "approved").length;
-  const pendingCount = allBookings.filter(b => b.status === "pending").length;
+  const paidCount = allBookings.filter(b => getPaymentStatus(b) === "paid").length;
+  const partialCount = allBookings.filter(b => getPaymentStatus(b) === "partial").length;
+  const pendingPayCount = allBookings.filter(b => getPaymentStatus(b) === "pending").length;
   const totalRevenue = allBookings.filter(b => b.status === "confirmed").reduce((sum, b) => sum + (b.finalAmount || 0), 0);
 
   return (
@@ -330,16 +451,16 @@ export default function InvoiceManager() {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <Card className="p-4 border-none shadow-sm rounded-xl">
-          <div className="text-xs text-muted-foreground uppercase font-semibold">Confirmed</div>
-          <div className="text-2xl font-bold text-emerald-700 mt-1">{confirmedCount}</div>
+          <div className="text-xs text-muted-foreground uppercase font-semibold">Paid</div>
+          <div className="text-2xl font-bold text-emerald-700 mt-1">{paidCount}</div>
         </Card>
         <Card className="p-4 border-none shadow-sm rounded-xl">
-          <div className="text-xs text-muted-foreground uppercase font-semibold">Awaiting Payment</div>
-          <div className="text-2xl font-bold text-amber-700 mt-1">{approvedCount}</div>
+          <div className="text-xs text-muted-foreground uppercase font-semibold">Partial Payment</div>
+          <div className="text-2xl font-bold text-amber-700 mt-1">{partialCount}</div>
         </Card>
         <Card className="p-4 border-none shadow-sm rounded-xl">
-          <div className="text-xs text-muted-foreground uppercase font-semibold">Pending Review</div>
-          <div className="text-2xl font-bold text-blue-700 mt-1">{pendingCount}</div>
+          <div className="text-xs text-muted-foreground uppercase font-semibold">Payment Pending</div>
+          <div className="text-2xl font-bold text-red-700 mt-1">{pendingPayCount}</div>
         </Card>
         <Card className="p-4 border-none shadow-sm rounded-xl">
           <div className="text-xs text-muted-foreground uppercase font-semibold">Total Revenue</div>
@@ -359,12 +480,12 @@ export default function InvoiceManager() {
             />
           </div>
           <div className="flex gap-2">
-            {[
-              { value: "all", label: "All" },
-              { value: "confirmed", label: "Paid" },
-              { value: "approved", label: "Awaiting" },
-              { value: "pending", label: "Pending" },
-            ].map(f => (
+            {([
+              { value: "all" as PaymentFilter, label: "All" },
+              { value: "paid" as PaymentFilter, label: "Paid" },
+              { value: "partial" as PaymentFilter, label: "Partial" },
+              { value: "pending" as PaymentFilter, label: "Pending" },
+            ]).map(f => (
               <Button
                 key={f.value}
                 variant={filter === f.value ? "default" : "outline"}
@@ -424,13 +545,6 @@ export default function InvoiceManager() {
                     <div className="flex items-center justify-end gap-1">
                       {booking.status === "confirmed" && booking.invoiceNumber && (
                         <>
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button variant="ghost" size="icon" title="Preview Invoice" onClick={() => setPreviewBooking(booking)}>
-                                <FileText size={16} className="text-[#0B3D2E]" />
-                              </Button>
-                            </DialogTrigger>
-                          </Dialog>
                           <Button
                             variant="ghost"
                             size="icon"
@@ -438,6 +552,15 @@ export default function InvoiceManager() {
                             onClick={() => window.open(`${import.meta.env.BASE_URL}invoice/${booking.bookingNumber}`, '_blank')}
                           >
                             <Eye size={16} className="text-blue-600" />
+                          </Button>
+                          <DownloadPdfButton booking={booking} />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Preview Invoice"
+                            onClick={() => setPreviewBooking(booking)}
+                          >
+                            <FileText size={16} className="text-[#0B3D2E]" />
                           </Button>
                           <Button
                             variant="ghost"
@@ -460,7 +583,7 @@ export default function InvoiceManager() {
       </Card>
 
       {previewBooking && (
-        <Dialog open={!!previewBooking} onOpenChange={v => !v && setPreviewBooking(null)}>
+        <Dialog open={!!previewBooking} onOpenChange={v => { if (!v) setPreviewBooking(null); }}>
           <InvoicePreview booking={previewBooking} onClose={() => setPreviewBooking(null)} />
         </Dialog>
       )}

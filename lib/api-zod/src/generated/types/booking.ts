@@ -5,6 +5,8 @@
  * Al Burhan Tours & Travels - Booking System API
  * OpenAPI spec version: 0.1.0
  */
+import type { BookingPaymentStatus } from "./bookingPaymentStatus";
+import type { BookingRoomType } from "./bookingRoomType";
 import type { BookingStatus } from "./bookingStatus";
 import type { Pilgrim } from "./pilgrim";
 
@@ -30,6 +32,9 @@ export interface Booking {
   invoiceNumber?: string;
   rejectionReason?: string;
   notes?: string;
+  roomType?: BookingRoomType;
+  advanceAmount?: number;
+  paymentStatus?: BookingPaymentStatus;
   isOffline?: boolean;
   createdAt: Date;
   updatedAt?: Date;

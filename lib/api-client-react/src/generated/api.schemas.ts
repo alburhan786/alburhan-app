@@ -211,6 +211,24 @@ export const BookingStatus = {
   cancelled: "cancelled",
 } as const;
 
+export type BookingRoomType =
+  (typeof BookingRoomType)[keyof typeof BookingRoomType];
+
+export const BookingRoomType = {
+  sharing: "sharing",
+  double: "double",
+  triple: "triple",
+  quad: "quad",
+} as const;
+
+export type BookingPaymentStatus =
+  (typeof BookingPaymentStatus)[keyof typeof BookingPaymentStatus];
+
+export const BookingPaymentStatus = {
+  pending: "pending",
+  paid: "paid",
+} as const;
+
 export interface Booking {
   id: string;
   bookingNumber: string;
@@ -233,6 +251,9 @@ export interface Booking {
   invoiceNumber?: string;
   rejectionReason?: string;
   notes?: string;
+  roomType?: BookingRoomType;
+  advanceAmount?: number;
+  paymentStatus?: BookingPaymentStatus;
   isOffline?: boolean;
   createdAt: string;
   updatedAt?: string;

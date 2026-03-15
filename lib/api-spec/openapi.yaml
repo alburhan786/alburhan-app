@@ -1331,6 +1331,14 @@ components:
           type: string
         notes:
           type: string
+        roomType:
+          type: string
+          enum: [sharing, double, triple, quad]
+        advanceAmount:
+          type: number
+        paymentStatus:
+          type: string
+          enum: [pending, paid]
         isOffline:
           type: boolean
         createdAt:
