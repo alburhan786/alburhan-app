@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, documentsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, documentsTable, bookingsTable, pilgrimsTable } from "@workspace/db";
+import { eq, and } from "drizzle-orm";
 import { requireAuth, type AuthenticatedRequest } from "../lib/auth.js";
 import multer from "multer";
 import path from "path";
@@ -76,6 +76,23 @@ router.post(
       fileUrl,
       uploadedBy: req.user?.role === "admin" ? "admin" : "customer",
     }).returning();
+
+    if (documentType === "passport_photo") {
+      try {
+        const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
+        if (booking && Array.isArray(booking.pilgrims) && booking.pilgrims.length > 0) {
+          const passportNumber = (booking.pilgrims[0] as any).passportNumber;
+          if (passportNumber) {
+            await db.update(pilgrimsTable)
+              .set({ photoUrl: fileUrl })
+              .where(eq(pilgrimsTable.passportNumber, passportNumber));
+            console.log(`[Documents] Synced passport photo to pilgrim with passport ${passportNumber}`);
+          }
+        }
+      } catch (err) {
+        console.error("[Documents] Failed to sync passport photo to pilgrim:", err);
+      }
+    }
 
     res.status(201).json({
       ...doc,

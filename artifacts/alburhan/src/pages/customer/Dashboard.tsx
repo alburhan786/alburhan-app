@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { CreditCard, FileText, Download, Clock, Upload, Trash2, CheckCircle, AlertCircle, X, Eye } from "lucide-react";
+import { CreditCard, FileText, Download, Clock, Upload, Trash2, CheckCircle, AlertCircle, X, Eye, ShieldAlert } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -20,7 +20,62 @@ const DOC_TYPES = [
   { value: "other", label: "Other Document" },
 ];
 
+const MANDATORY_DOCS = [
+  { value: "passport_photo", label: "Passport Size Photo" },
+  { value: "passport", label: "Passport Copy" },
+  { value: "pan_card", label: "PAN Card" },
+  { value: "aadhaar", label: "Aadhaar Card" },
+];
+
 const BASE_API = (import.meta.env.BASE_URL || "/").replace(/\/$/, "");
+
+function MandatoryDocumentsCard({ bookingId, onOpenUpload }: { bookingId: string; onOpenUpload: () => void }) {
+  const { data: docs } = useListDocuments(bookingId);
+  const uploadedTypes = (docs || []).map((d: any) => d.documentType);
+  const uploadedCount = MANDATORY_DOCS.filter(d => uploadedTypes.includes(d.value)).length;
+  const allDone = uploadedCount === MANDATORY_DOCS.length;
+  const pct = Math.round((uploadedCount / MANDATORY_DOCS.length) * 100);
+
+  return (
+    <Card className={`overflow-hidden rounded-2xl shadow-md border-2 ${allDone ? "border-emerald-300 bg-emerald-50/50" : "border-amber-300 bg-amber-50/50"}`}>
+      <div className={`px-5 py-4 flex items-center gap-3 ${allDone ? "bg-emerald-100" : "bg-amber-100"}`}>
+        {allDone
+          ? <CheckCircle className="w-6 h-6 text-emerald-600 shrink-0" />
+          : <ShieldAlert className="w-6 h-6 text-amber-600 shrink-0" />}
+        <div className="flex-1">
+          <h4 className="font-bold text-sm">{allDone ? "All Documents Submitted" : "Required Documents — Please Upload"}</h4>
+          <p className="text-xs text-muted-foreground mt-0.5">{uploadedCount} of {MANDATORY_DOCS.length} documents uploaded</p>
+        </div>
+      </div>
+      <div className="px-5 pt-3 pb-1">
+        <div className="w-full h-2 rounded-full bg-gray-200 overflow-hidden">
+          <div className={`h-full rounded-full transition-all ${allDone ? "bg-emerald-500" : "bg-amber-500"}`} style={{ width: `${pct}%` }} />
+        </div>
+      </div>
+      <div className="px-5 py-3 space-y-2">
+        {MANDATORY_DOCS.map(doc => {
+          const uploaded = uploadedTypes.includes(doc.value);
+          return (
+            <div key={doc.value} className="flex items-center gap-2 text-sm">
+              {uploaded
+                ? <CheckCircle size={16} className="text-emerald-500 shrink-0" />
+                : <X size={16} className="text-red-400 shrink-0" />}
+              <span className={uploaded ? "text-foreground/70 line-through" : "text-foreground font-medium"}>{doc.label}</span>
+              {uploaded && <Badge className="ml-auto bg-emerald-100 text-emerald-800 text-[10px] px-1.5">Done</Badge>}
+            </div>
+          );
+        })}
+      </div>
+      {!allDone && (
+        <div className="px-5 pb-4">
+          <Button onClick={onOpenUpload} className="w-full bg-amber-600 hover:bg-amber-700 text-white">
+            <Upload className="w-4 h-4 mr-2" /> Upload Missing Documents
+          </Button>
+        </div>
+      )}
+    </Card>
+  );
+}
 
 function UploadModal({ bookingId, bookingNumber, onClose }: { bookingId: string; bookingNumber: string; onClose: () => void }) {
   const { toast } = useToast();
@@ -407,6 +462,12 @@ export default function CustomerDashboard() {
                             )}
                           </div>
                         )}
+                      </div>
+                    )}
+
+                    {booking.status === 'confirmed' && (
+                      <div className="mx-5 mb-4">
+                        <MandatoryDocumentsCard bookingId={booking.id} onOpenUpload={() => setUploadBookingId(booking.id)} />
                       </div>
                     )}
 
