@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { downloadPdf } from "@/lib/pdf-download";
 import { useRoute } from "wouter";
 import { PrintHeader } from "./PrintHeader";
 
@@ -21,13 +22,24 @@ export default function PrintFeedback() {
   const groupId = params?.groupId || "";
   const [group, setGroup] = useState<Group | null>(null);
 
+    const contentRef = useRef<HTMLDivElement>(null);
+    const [pdfLoading, setPdfLoading] = useState(false);
+
+    const handleDownload = useCallback(async () => {
+      if (!contentRef.current || pdfLoading) return;
+      setPdfLoading(true);
+      try {
+        await downloadPdf(contentRef.current, { filename: `Feedback-Form-${group?.groupName || "group"}.pdf` });
+      } finally { setPdfLoading(false); }
+    }, [group, pdfLoading]);
   useEffect(() => {
     if (!groupId) return;
     fetch(`${API}/api/groups/${groupId}`, { credentials: "include" }).then(r => r.json()).then(setGroup);
   }, [groupId]);
 
   useEffect(() => {
-    if (group) setTimeout(() => window.print(), 800);
+    const t = setTimeout(() => handleDownload(), 1200);
+    return () => clearTimeout(t);
   }, [group]);
 
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
@@ -44,11 +56,11 @@ export default function PrintFeedback() {
       `}</style>
 
       <div className="no-print" style={{ padding: "16px", background: "#fef3c7", textAlign: "center" }}>
-        <button onClick={() => window.print()} style={{ padding: "10px 24px", background: "#0A3D2A", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", marginRight: "12px" }}>⬇ Download PDF / Print Feedback Form</button>
+        <button onClick={handleDownload} disabled={pdfLoading} style={{ padding: "10px 24px", background: "#0A3D2A", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", marginRight: "12px", opacity: pdfLoading ? 0.6 : 1 }}>{pdfLoading ? "Generating PDF..." : "⬇ Download PDF"}</button>
         <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
-        <span style={{ fontSize: "11px", color: "#666", marginRight: "12px" }}>(In print dialog, select "Save as PDF" to download)</span>
       </div>
 
+      <div ref={contentRef}>
       <div style={{ padding: "2mm", fontFamily: "'Inter', Arial, sans-serif", maxWidth: "210mm", margin: "0 auto" }}>
         <PrintHeader title="Customer Feedback Form" subtitle={`${group.groupName} — ${group.year}${group.departureDate ? ` | ${group.departureDate}` : ""}${group.returnDate ? ` to ${group.returnDate}` : ""}`} />
 
@@ -139,6 +151,7 @@ export default function PrintFeedback() {
         <div style={{ marginTop: "8mm", textAlign: "center", fontSize: "7pt", color: "#aaa", borderTop: "1px solid #e0e0e0", paddingTop: "3mm" }}>
           Thank you for your valuable feedback. It helps us serve you better. — Al Burhan Tours & Travels, Burhanpur
         </div>
+      </div>
       </div>
     </>
   );

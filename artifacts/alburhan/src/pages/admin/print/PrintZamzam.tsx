@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { downloadPdf } from "@/lib/pdf-download";
 import { useRoute } from "wouter";
 import { Barcode } from "@/components/print/Barcode";
 
@@ -18,6 +19,16 @@ export default function PrintZamzam() {
   const [group, setGroup] = useState<Group | null>(null);
   const [pilgrims, setPilgrims] = useState<Pilgrim[]>([]);
 
+    const contentRef = useRef<HTMLDivElement>(null);
+    const [pdfLoading, setPdfLoading] = useState(false);
+
+    const handleDownload = useCallback(async () => {
+      if (!contentRef.current || pdfLoading) return;
+      setPdfLoading(true);
+      try {
+        await downloadPdf(contentRef.current, { filename: `Zamzam-Stickers-${group?.groupName || "group"}.pdf` });
+      } finally { setPdfLoading(false); }
+    }, [group, pdfLoading]);
   useEffect(() => {
     if (!groupId) return;
     Promise.all([
@@ -27,7 +38,8 @@ export default function PrintZamzam() {
   }, [groupId]);
 
   useEffect(() => {
-    if (pilgrims.length > 0) setTimeout(() => window.print(), 800);
+    const t = setTimeout(() => handleDownload(), 1200);
+    return () => clearTimeout(t);
   }, [pilgrims]);
 
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
@@ -53,11 +65,11 @@ export default function PrintZamzam() {
       `}</style>
 
       <div className="no-print" style={{ padding: "16px", background: "#fef3c7", textAlign: "center" }}>
-        <button onClick={() => window.print()} style={{ padding: "10px 24px", background: DARK, color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", marginRight: "12px" }}>⬇ Download PDF / Print Zamzam Stickers</button>
+        <button onClick={handleDownload} disabled={pdfLoading} style={{ padding: "10px 24px", background: DARK, color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", marginRight: "12px", opacity: pdfLoading ? 0.6 : 1 }}>{pdfLoading ? "Generating PDF..." : "⬇ Download PDF"}</button>
         <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
-        <span style={{ fontSize: "11px", color: "#666", marginRight: "12px" }}>(In print dialog, select "Save as PDF" to download)</span>
       </div>
 
+      <div ref={contentRef}>
       {pilgrims.map(p => (
         <div key={p.id} className="zamzam-sticker">
           <div style={{ position: "relative", overflow: "hidden", height: "100%", display: "flex", flexDirection: "column" }}>
@@ -116,6 +128,7 @@ export default function PrintZamzam() {
           </div>
         </div>
       ))}
+      </div>
     </>
   );
 }

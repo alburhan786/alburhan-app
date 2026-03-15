@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { downloadPdf } from "@/lib/pdf-download";
 import { useRoute } from "wouter";
 import { PrintHeader } from "./PrintHeader";
 
@@ -19,6 +20,16 @@ export default function PrintHotelList() {
   const [group, setGroup] = useState<Group | null>(null);
   const [pilgrims, setPilgrims] = useState<Pilgrim[]>([]);
 
+    const contentRef = useRef<HTMLDivElement>(null);
+    const [pdfLoading, setPdfLoading] = useState(false);
+
+    const handleDownload = useCallback(async () => {
+      if (!contentRef.current || pdfLoading) return;
+      setPdfLoading(true);
+      try {
+        await downloadPdf(contentRef.current, { filename: `Hotel-Room-List-${group?.groupName || "group"}.pdf`, orientation: "landscape" });
+      } finally { setPdfLoading(false); }
+    }, [group, pdfLoading]);
   useEffect(() => {
     if (!groupId) return;
     Promise.all([
@@ -28,7 +39,8 @@ export default function PrintHotelList() {
   }, [groupId]);
 
   useEffect(() => {
-    if (pilgrims.length > 0) setTimeout(() => window.print(), 800);
+    const t = setTimeout(() => handleDownload(), 1200);
+    return () => clearTimeout(t);
   }, [pilgrims]);
 
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
@@ -48,11 +60,11 @@ export default function PrintHotelList() {
       `}</style>
 
       <div className="no-print" style={{ padding: "16px", background: "#fef3c7", textAlign: "center" }}>
-        <button onClick={() => window.print()} style={{ padding: "10px 24px", background: "#0A3D2A", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", marginRight: "12px" }}>⬇ Download PDF / Print Hotel Room List</button>
+        <button onClick={handleDownload} disabled={pdfLoading} style={{ padding: "10px 24px", background: "#0A3D2A", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", marginRight: "12px", opacity: pdfLoading ? 0.6 : 1 }}>{pdfLoading ? "Generating PDF..." : "⬇ Download PDF"}</button>
         <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
-        <span style={{ fontSize: "11px", color: "#666", marginRight: "12px" }}>(In print dialog, select "Save as PDF" to download)</span>
       </div>
 
+      <div ref={contentRef}>
       <div style={{ padding: "4mm", fontFamily: "'Inter', Arial, sans-serif" }}>
         <PrintHeader title="Hotel Room List" subtitle={`${group.groupName} (${group.year})`} />
         {(group.hotels?.makkah?.name || group.hotels?.madinah?.name) && (
@@ -105,6 +117,7 @@ export default function PrintHotelList() {
         <div style={{ marginTop: "4mm", fontSize: "8pt", textAlign: "center", color: "#888", borderTop: "1px solid #e0e0e0", paddingTop: "3mm" }}>
           Total Pilgrims: <b>{pilgrims.length}</b> &nbsp;|&nbsp; Generated: {new Date().toLocaleDateString("en-IN")}
         </div>
+      </div>
       </div>
     </>
   );
