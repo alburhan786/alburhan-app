@@ -65,6 +65,17 @@ router.post(
       return;
     }
 
+    const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
+    if (!booking) {
+      res.status(404).json({ message: "Booking not found" });
+      return;
+    }
+
+    if (req.user?.role !== "admin" && booking.customerId !== req.user?.id) {
+      res.status(403).json({ message: "Not authorized to upload documents for this booking" });
+      return;
+    }
+
     const fileKey = `uploads/${req.file.filename}`;
     const fileUrl = `/api/documents/files/${req.file.filename}`;
 
@@ -79,9 +90,9 @@ router.post(
 
     if (documentType === "passport_photo") {
       try {
-        const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId));
-        if (booking && Array.isArray(booking.pilgrims) && booking.pilgrims.length > 0) {
-          const passportNumber = (booking.pilgrims[0] as any).passportNumber;
+        const pilgrims = booking.pilgrims as Array<{ name: string; passportNumber?: string }> | null;
+        if (Array.isArray(pilgrims) && pilgrims.length > 0) {
+          const passportNumber = pilgrims[0].passportNumber;
           if (passportNumber) {
             const [pilgrim] = await db.select({ id: pilgrimsTable.id })
               .from(pilgrimsTable)
