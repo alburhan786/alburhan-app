@@ -160,14 +160,12 @@ export default function PrintIdCardsPro() {
                 <FrontWaves />
                 <div style={{ position: "relative", zIndex: 1, display: "flex", height: "100%", padding: "2.5mm 3mm 0" }}>
 
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "30mm", flexShrink: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "1.5mm", marginBottom: "1mm" }}>
-                      <img src={BASE + "images/logo.png"} alt="" style={{ width: "10mm", height: "10mm", objectFit: "contain" }} />
-                      <div>
-                        <div style={{ fontSize: "7pt", fontWeight: 900, color: DARK, letterSpacing: "0.3px", lineHeight: 1.1 }}>AL BURHAN</div>
-                        <div style={{ fontSize: "4.5pt", fontWeight: 700, color: GOLD, letterSpacing: "0.4px" }}>TOURS & TRAVELS</div>
-                        <div style={{ fontSize: "5pt", fontWeight: 800, color: DARK, marginTop: "0.3mm" }}>HAJJ {group.year}</div>
-                      </div>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "32mm", flexShrink: 0 }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: "1mm" }}>
+                      <img src={BASE + "images/logo.png"} alt="" style={{ width: "13mm", height: "13mm", objectFit: "contain", marginBottom: "0.5mm" }} />
+                      <div style={{ fontSize: "9pt", fontWeight: 900, color: DARK, letterSpacing: "0.5px", lineHeight: 1.1, textAlign: "center" }}>AL BURHAN</div>
+                      <div style={{ fontSize: "5pt", fontWeight: 700, color: GOLD, letterSpacing: "0.5px", textAlign: "center" }}>TOURS & TRAVELS</div>
+                      <div style={{ fontSize: "5pt", fontWeight: 800, color: DARK, marginTop: "0.3mm", textAlign: "center" }}>HAJJ {group.year}</div>
                     </div>
 
                     <div style={{ marginBottom: "1mm" }}>
@@ -242,38 +240,36 @@ export default function PrintIdCardsPro() {
                     Hajj Pilgrim Identification
                   </div>
 
-                  <div style={{ display: "flex", gap: "3mm", flex: 1 }}>
-                    <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "1.5mm" }}>
+                  <div style={{ display: "flex", gap: "2mm", flex: 1 }}>
+                    <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "1.5mm", minWidth: 0 }}>
                       <div>
-                        <div style={labelStyle}>Maktab No.</div>
-                        <div style={valueStyle}>{group.maktabNumber || "—"}</div>
+                        <div style={{ fontSize: "5pt", color: "#888", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Maktab No.</div>
+                        <div style={{ display: "inline-block", background: DARK, color: GOLD, fontSize: "8pt", fontWeight: 900, padding: "0.5mm 2mm", borderRadius: "2px", marginTop: "0.5mm" }}>{group.maktabNumber || "—"}</div>
                       </div>
                       <div>
-                        <div style={labelStyle}>Hotel Makkah</div>
-                        <div style={valueStyle}>{group.hotels?.makkah?.name || "—"}</div>
-                        {group.hotels?.makkah?.address && <div style={{ fontSize: "4pt", color: "#888", lineHeight: 1.3 }}>{group.hotels.makkah.address}</div>}
+                        <div style={{ fontSize: "5pt", color: "#888", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Hotel Makkah</div>
+                        <div style={{ fontSize: "7pt", fontWeight: 800, color: DARK, lineHeight: 1.3 }}>{group.hotels?.makkah?.name || "—"}</div>
                       </div>
                       <div>
-                        <div style={labelStyle}>Hotel Madinah</div>
-                        <div style={valueStyle}>{group.hotels?.madinah?.name || "—"}</div>
-                        {group.hotels?.madinah?.address && <div style={{ fontSize: "4pt", color: "#888", lineHeight: 1.3 }}>{group.hotels.madinah.address}</div>}
+                        <div style={{ fontSize: "5pt", color: "#888", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Hotel Madinah</div>
+                        <div style={{ fontSize: "7pt", fontWeight: 800, color: DARK, lineHeight: 1.3 }}>{group.hotels?.madinah?.name || "—"}</div>
                       </div>
                       <div>
-                        <div style={labelStyle}>Group Leader</div>
-                        <div style={valueStyle}>{group.hotels?.groupLeader || "—"}</div>
+                        <div style={{ fontSize: "5pt", color: "#888", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Group Leader</div>
+                        <div style={{ fontSize: "7pt", fontWeight: 800, color: DARK, lineHeight: 1.3 }}>{group.hotels?.groupLeader || "—"}</div>
                       </div>
                     </div>
 
-                    <div style={{ width: "30mm", flexShrink: 0, display: "flex", flexDirection: "column", gap: "1mm" }}>
-                      <div style={{ fontSize: "4.5pt", fontWeight: 800, color: DARK, textTransform: "uppercase", letterSpacing: "0.3px" }}>Emergency Contacts</div>
-                      <div style={{ fontSize: "5pt", lineHeight: 1.6, color: "#333" }}>
+                    <div style={{ width: "20mm", flexShrink: 0, display: "flex", flexDirection: "column", gap: "1mm", alignItems: "center" }}>
+                      <div style={{ fontSize: "4.5pt", fontWeight: 800, color: DARK, textTransform: "uppercase", letterSpacing: "0.3px", textAlign: "center" }}>Emergency</div>
+                      <div style={{ fontSize: "5pt", lineHeight: 1.6, color: "#333", textAlign: "center" }}>
                         <div style={{ fontWeight: 700 }}>+91 9893225590</div>
                         <div style={{ fontWeight: 700 }}>+91 9893989786</div>
                         <div style={{ fontWeight: 700 }}>0547090786</div>
                         <div style={{ fontWeight: 700 }}>0568780786</div>
                       </div>
                       <div style={{ marginTop: "auto", display: "flex", justifyContent: "center" }}>
-                        <img src={BASE + "images/india_flag.jpg"} alt="" style={{ width: "13mm", height: "13mm", borderRadius: "50%", objectFit: "cover", border: `2px solid ${GOLD}` }} />
+                        <img src={BASE + "images/india_flag.jpg"} alt="" style={{ width: "10mm", height: "10mm", borderRadius: "50%", objectFit: "cover", border: `2px solid ${GOLD}` }} />
                       </div>
                     </div>
                   </div>
