@@ -1,8 +1,7 @@
 import app from "./app";
 import { db, usersTable } from "@workspace/db";
-import { eq, inArray } from "drizzle-orm";
-
-const ADMIN_MOBILES = ["9893989786", "9893225590", "9999999999"];
+import { inArray } from "drizzle-orm";
+import { ADMIN_MOBILES } from "./routes/auth.js";
 
 const rawPort = process.env["PORT"];
 

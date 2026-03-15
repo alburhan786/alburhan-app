@@ -8,7 +8,7 @@ import {
 import { generateOtp, requireAuth, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendOtpSMS, sendWhatsApp } from "../lib/notifications.js";
 
-const ADMIN_MOBILES = ["9893989786", "9893225590", "9999999999"];
+export const ADMIN_MOBILES = ["9893989786", "9893225590", "9999999999"];
 
 const router = Router();
 
