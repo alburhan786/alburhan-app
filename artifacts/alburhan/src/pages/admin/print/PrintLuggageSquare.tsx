@@ -127,7 +127,7 @@ export default function PrintLuggageSquare() {
               </div>
 
               <div style={{ position: "relative", zIndex: 2, background: DARK, color: GOLD, padding: "1.5mm 3mm", fontSize: "6.5pt", textAlign: "center", fontWeight: 600, letterSpacing: "0.3px" }}>
-                +91 9893225590 &nbsp;|&nbsp; +91 9893989786
+                Emergency: +91 9893225590 &nbsp;|&nbsp; +91 9893989786
               </div>
             </div>
           </div>
