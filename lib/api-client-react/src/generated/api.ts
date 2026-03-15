@@ -2773,6 +2773,101 @@ export function useGetPublicInvoice<
 }
 
 /**
+ * @summary Get public invoice by invoice number (no auth)
+ */
+export const getGetPublicInvoiceByNumberUrl = (invoiceNumber: string) => {
+  return `/api/bookings/by-invoice-number/${invoiceNumber}/invoice-public`;
+};
+
+export const getPublicInvoiceByNumber = async (
+  invoiceNumber: string,
+  options?: RequestInit,
+): Promise<Invoice> => {
+  return customFetch<Invoice>(getGetPublicInvoiceByNumberUrl(invoiceNumber), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetPublicInvoiceByNumberQueryKey = (invoiceNumber: string) => {
+  return [
+    `/api/bookings/by-invoice-number/${invoiceNumber}/invoice-public`,
+  ] as const;
+};
+
+export const getGetPublicInvoiceByNumberQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPublicInvoiceByNumber>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  invoiceNumber: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPublicInvoiceByNumber>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetPublicInvoiceByNumberQueryKey(invoiceNumber);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getPublicInvoiceByNumber>>
+  > = ({ signal }) =>
+    getPublicInvoiceByNumber(invoiceNumber, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!invoiceNumber,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPublicInvoiceByNumber>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPublicInvoiceByNumberQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPublicInvoiceByNumber>>
+>;
+export type GetPublicInvoiceByNumberQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Get public invoice by invoice number (no auth)
+ */
+
+export function useGetPublicInvoiceByNumber<
+  TData = Awaited<ReturnType<typeof getPublicInvoiceByNumber>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  invoiceNumber: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPublicInvoiceByNumber>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPublicInvoiceByNumberQueryOptions(
+    invoiceNumber,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
  * @summary Submit a public inquiry
  */
 export const getSubmitInquiryUrl = () => {

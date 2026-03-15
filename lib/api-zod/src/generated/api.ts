@@ -1077,6 +1077,66 @@ export const GetPublicInvoiceResponse = zod.object({
 });
 
 /**
+ * @summary Get public invoice by invoice number (no auth)
+ */
+export const GetPublicInvoiceByNumberParams = zod.object({
+  invoiceNumber: zod.coerce.string(),
+});
+
+export const GetPublicInvoiceByNumberResponse = zod.object({
+  invoiceNumber: zod.string(),
+  bookingNumber: zod.string(),
+  customerName: zod.string(),
+  customerMobile: zod.string().optional(),
+  customerEmail: zod.string().optional(),
+  customerAddress: zod.string().optional(),
+  customerGstin: zod.string().optional(),
+  customerPan: zod.string().optional(),
+  customerState: zod.string().optional(),
+  packageName: zod.string(),
+  numberOfPilgrims: zod.number().optional(),
+  pricePerPerson: zod.number().optional(),
+  totalAmount: zod.number().optional(),
+  gstAmount: zod.number().optional(),
+  finalAmount: zod.number(),
+  advanceAmount: zod.number().optional(),
+  previousBalance: zod.number().optional(),
+  paymentDate: zod.string().optional(),
+  dueDate: zod.string().optional(),
+  departureDate: zod.string().optional(),
+  hajYear: zod.string().optional(),
+  chequeInfo: zod.string().optional(),
+  roomType: zod.string().optional(),
+  status: zod.string().optional(),
+  travelDate: zod.string().optional(),
+  maktabNumber: zod.string().optional(),
+  paymentMethod: zod.string().optional(),
+  paymentStatus: zod.enum(["Paid", "Partial", "Pending"]).optional(),
+  pilgrims: zod
+    .array(
+      zod.object({
+        name: zod.string(),
+        passportNumber: zod.string().optional(),
+        passportExpiry: zod.string().optional(),
+        dateOfBirth: zod.string().optional(),
+      }),
+    )
+    .optional(),
+  sacCode: zod.string().optional(),
+  gstPercent: zod.number().optional(),
+  companyName: zod.string().optional(),
+  companyAddress: zod.string().optional(),
+  companyPhone: zod.string().optional(),
+  companyEmail: zod.string().optional(),
+  gstin: zod.string().optional(),
+  pan: zod.string().optional(),
+  bankName: zod.string().optional(),
+  bankBranch: zod.string().optional(),
+  bankAccount: zod.string().optional(),
+  bankIfsc: zod.string().optional(),
+});
+
+/**
  * @summary Submit a public inquiry
  */
 export const SubmitInquiryBody = zod.object({

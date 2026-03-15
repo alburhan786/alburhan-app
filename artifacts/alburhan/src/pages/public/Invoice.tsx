@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import { useParams } from "wouter";
-import { useGetPublicInvoice } from "@workspace/api-client-react";
+import { useGetPublicInvoice, useGetPublicInvoiceByNumber } from "@workspace/api-client-react";
 import type { Invoice as InvoiceType, Pilgrim } from "@workspace/api-client-react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -94,7 +94,7 @@ function InvoiceContent({ invoice }: { invoice: InvoiceType }) {
   const pricePerPerson = invoice.pricePerPerson ?? totalAmount / pilgrimCount;
   const taxPerPerson = gstAmount / pilgrimCount;
   const amountPerPerson = finalAmount / pilgrimCount;
-  const verificationUrl = `https://alburhantravels.com/invoice/${invoice.bookingNumber}`;
+  const verificationUrl = `https://alburhantravels.com/invoice/${invoice.invoiceNumber || invoice.bookingNumber}`;
 
   return (
     <div className="bg-white text-black" style={{ fontFamily: "Arial, Helvetica, sans-serif", fontSize: "12px", lineHeight: 1.4 }}>
@@ -377,11 +377,16 @@ function InvoiceContent({ invoice }: { invoice: InvoiceType }) {
 
 export default function Invoice() {
   const params = useParams<{ bookingNumber: string }>();
-  const bookingNumber = params.bookingNumber;
+  const identifier = params.bookingNumber ?? "";
   const invoiceRef = useRef<HTMLDivElement>(null);
 
-  const queryResult = useGetPublicInvoice(bookingNumber ?? "");
-  const { data: invoice, isLoading, error } = queryResult;
+  const isInvoiceNumber = identifier.startsWith("INV");
+
+  const bookingQuery = useGetPublicInvoice(isInvoiceNumber ? "" : identifier, { query: { enabled: !isInvoiceNumber && !!identifier } });
+  const invoiceNumQuery = useGetPublicInvoiceByNumber(isInvoiceNumber ? identifier : "", { query: { enabled: isInvoiceNumber && !!identifier } });
+
+  const activeQuery = isInvoiceNumber ? invoiceNumQuery : bookingQuery;
+  const { data: invoice, isLoading, error } = activeQuery;
 
   if (isLoading) {
     return (

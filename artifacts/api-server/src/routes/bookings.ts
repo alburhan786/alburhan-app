@@ -337,6 +337,21 @@ router.get("/by-number/:bookingNumber/invoice-public", async (req, res) => {
   res.json(buildInvoiceResponse(b, pkg, maktabNumber));
 });
 
+router.get("/by-invoice-number/:invoiceNumber/invoice-public", async (req, res) => {
+  const bookings = await db.select().from(bookingsTable).where(eq(bookingsTable.invoiceNumber, req.params.invoiceNumber)).limit(1);
+  if (!bookings[0]) {
+    res.status(404).json({ message: "Invoice not found" });
+    return;
+  }
+  const b = bookings[0];
+  if (b.status !== "confirmed") {
+    res.status(400).json({ message: "Invoice only available for confirmed bookings" });
+    return;
+  }
+  const { pkg, maktabNumber } = await resolveInvoiceData(b);
+  res.json(buildInvoiceResponse(b, pkg, maktabNumber));
+});
+
 router.get("/:id/invoice", requireAuth as any, async (req: AuthenticatedRequest, res) => {
   const bookings = await db.select().from(bookingsTable).where(eq(bookingsTable.id, req.params.id)).limit(1);
   if (!bookings[0]) {

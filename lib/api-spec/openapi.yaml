@@ -676,6 +676,31 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /bookings/by-invoice-number/{invoiceNumber}/invoice-public:
+    get:
+      operationId: getPublicInvoiceByNumber
+      tags: [bookings]
+      summary: Get public invoice by invoice number (no auth)
+      parameters:
+        - name: invoiceNumber
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Invoice data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /inquiry:
     post:
       operationId: submitInquiry
