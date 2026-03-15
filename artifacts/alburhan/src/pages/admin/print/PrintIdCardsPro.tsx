@@ -160,25 +160,25 @@ export default function PrintIdCardsPro() {
                 <FrontWaves />
                 <div style={{ position: "relative", zIndex: 1, display: "flex", height: "100%", padding: "2.5mm 3mm 0" }}>
 
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "26mm", flexShrink: 0 }}>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "28mm", flexShrink: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "1.5mm", marginBottom: "1mm" }}>
                       <img src={BASE + "images/logo.png"} alt="" style={{ width: "7mm", height: "7mm", objectFit: "contain" }} />
                       <div>
-                        <div style={{ fontSize: "5.5pt", fontWeight: 900, color: DARK, letterSpacing: "0.3px", lineHeight: 1.1 }}>AL-BURHAN</div>
+                        <div style={{ fontSize: "5.5pt", fontWeight: 900, color: DARK, letterSpacing: "0.3px", lineHeight: 1.1 }}>AL BURHAN</div>
                         <div style={{ fontSize: "3.5pt", fontWeight: 700, color: GOLD, letterSpacing: "0.4px" }}>TOURS & TRAVELS</div>
+                        <div style={{ fontSize: "4pt", fontWeight: 800, color: DARK, marginTop: "0.3mm" }}>HAJJ {group.year}</div>
                       </div>
                     </div>
 
                     <div style={{ marginBottom: "1mm" }}>
                       {p.photoUrl ? (
-                        <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "20mm", height: "20mm", objectFit: "cover", borderRadius: "50%", border: `2px solid ${GOLD}` }} />
+                        <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "25mm", height: "25mm", objectFit: "cover", borderRadius: "50%", border: `2px solid ${GOLD}` }} />
                       ) : (
-                        <div style={{ width: "20mm", height: "20mm", background: "#f0f0f0", borderRadius: "50%", border: `2px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "5pt", color: "#aaa" }}>PHOTO</div>
+                        <div style={{ width: "25mm", height: "25mm", background: "#f0f0f0", borderRadius: "50%", border: `2px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "5pt", color: "#aaa" }}>PHOTO</div>
                       )}
                     </div>
 
-                    <div style={{ fontSize: "7pt", fontWeight: 900, color: DARK, textAlign: "center", lineHeight: 1.15, textTransform: "uppercase", wordBreak: "break-word", maxWidth: "24mm" }}>{p.fullName}</div>
-                    <div style={{ fontSize: "4pt", fontWeight: 700, color: GOLD, marginTop: "0.5mm" }}>HAJJ {group.year}</div>
+                    <div style={{ fontSize: "7pt", fontWeight: 900, color: DARK, textAlign: "center", lineHeight: 1.15, textTransform: "uppercase", wordBreak: "break-word", maxWidth: "26mm" }}>{p.fullName}</div>
                   </div>
 
                   <div style={{ flex: 1, display: "flex", flexDirection: "column", paddingLeft: "2mm", minWidth: 0 }}>
@@ -218,7 +218,7 @@ export default function PrintIdCardsPro() {
 
                 <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 2 }}>
                   <div style={{ display: "flex", justifyContent: "center", overflow: "hidden", marginBottom: "0.5mm", padding: "0 3mm" }}>
-                    <Barcode value={p.passportNumber || `H${String(p.serialNumber).padStart(3, "0")}`} height={12} width={1.0} fontSize={0} />
+                    <Barcode value={`${p.passportNumber || "N/A"}-${String(p.serialNumber).padStart(3, "0")}`} height={12} width={1.0} fontSize={0} />
                   </div>
                   <div style={{ background: DARK, color: GOLD, padding: "1mm 2mm", fontSize: "3.8pt", textAlign: "center", fontWeight: 700, letterSpacing: "0.2px" }}>
                     #{String(p.serialNumber).padStart(3, "0")} | Altaf: 0547090786 | Wasim: 0568780786
