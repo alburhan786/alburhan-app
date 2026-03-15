@@ -26,15 +26,16 @@ interface HajjGroup {
 
 const emptyForm = {
   groupName: "", year: new Date().getFullYear(), departureDate: "", returnDate: "",
-  flightNumber: "", maktabNumber: "", notes: "",
-  hotelMakkahName: "", hotelMakkahAddress: "", hotelMakkahCheckIn: "", hotelMakkahCheckOut: "",
-  hotelMadinahName: "", hotelMadinahAddress: "", hotelMadinahCheckIn: "", hotelMadinahCheckOut: "",
+  flightNumber: "", maktabNumber: "", notes: "", groupLeader: "",
+  hotelMakkahName: "", hotelMakkahAddress: "", hotelMakkahCheckIn: "", hotelMakkahCheckOut: "", hotelMakkahGoogleMaps: "",
+  hotelMadinahName: "", hotelMadinahAddress: "", hotelMadinahCheckIn: "", hotelMadinahCheckOut: "", hotelMadinahGoogleMaps: "",
 };
 
 function PrintDropdown({ groupId }: { groupId: string }) {
   const [, navigate] = useLocation();
   const items = [
     { label: "Photo ID Cards", path: "id-cards" },
+    { label: "Pro ID Cards (85×54)", path: "id-cards-pro" },
     { label: "Luggage Stickers", path: "luggage" },
     { label: "Square Luggage Sticker", path: "luggage-square" },
     { label: "Medical Stickers", path: "medical" },
@@ -95,14 +96,17 @@ export default function GroupsManager() {
       groupName: g.groupName, year: g.year, departureDate: g.departureDate || "",
       returnDate: g.returnDate || "", flightNumber: g.flightNumber || "",
       maktabNumber: g.maktabNumber || "", notes: g.notes || "",
+      groupLeader: g.hotels?.groupLeader || "",
       hotelMakkahName: g.hotels?.makkah?.name || "",
       hotelMakkahAddress: g.hotels?.makkah?.address || "",
       hotelMakkahCheckIn: g.hotels?.makkah?.checkIn || "",
       hotelMakkahCheckOut: g.hotels?.makkah?.checkOut || "",
+      hotelMakkahGoogleMaps: g.hotels?.makkah?.googleMapsLink || "",
       hotelMadinahName: g.hotels?.madinah?.name || "",
       hotelMadinahAddress: g.hotels?.madinah?.address || "",
       hotelMadinahCheckIn: g.hotels?.madinah?.checkIn || "",
       hotelMadinahCheckOut: g.hotels?.madinah?.checkOut || "",
+      hotelMadinahGoogleMaps: g.hotels?.madinah?.googleMapsLink || "",
     });
     setDialogOpen(true);
   };
@@ -114,8 +118,9 @@ export default function GroupsManager() {
       returnDate: form.returnDate || null, flightNumber: form.flightNumber || null,
       maktabNumber: form.maktabNumber || null, notes: form.notes || null,
       hotels: {
-        makkah: { name: form.hotelMakkahName, address: form.hotelMakkahAddress, checkIn: form.hotelMakkahCheckIn, checkOut: form.hotelMakkahCheckOut },
-        madinah: { name: form.hotelMadinahName, address: form.hotelMadinahAddress, checkIn: form.hotelMadinahCheckIn, checkOut: form.hotelMadinahCheckOut },
+        groupLeader: form.groupLeader || null,
+        makkah: { name: form.hotelMakkahName, address: form.hotelMakkahAddress, checkIn: form.hotelMakkahCheckIn, checkOut: form.hotelMakkahCheckOut, googleMapsLink: form.hotelMakkahGoogleMaps || null },
+        madinah: { name: form.hotelMadinahName, address: form.hotelMadinahAddress, checkIn: form.hotelMadinahCheckIn, checkOut: form.hotelMadinahCheckOut, googleMapsLink: form.hotelMadinahGoogleMaps || null },
       },
     };
     try {
@@ -213,6 +218,7 @@ export default function GroupsManager() {
                 <div className="space-y-1"><label className="text-sm font-medium">Return Date</label><Input value={form.returnDate} onChange={e => f("returnDate", e.target.value)} placeholder="e.g. 15 Jul 2027" /></div>
                 <div className="space-y-1"><label className="text-sm font-medium">Flight Number</label><Input value={form.flightNumber} onChange={e => f("flightNumber", e.target.value)} /></div>
                 <div className="space-y-1"><label className="text-sm font-medium">Maktab Number</label><Input value={form.maktabNumber} onChange={e => f("maktabNumber", e.target.value)} /></div>
+                <div className="space-y-1"><label className="text-sm font-medium">Group Leader</label><Input value={form.groupLeader} onChange={e => f("groupLeader", e.target.value)} placeholder="e.g. Mohammed Altaf" /></div>
               </div>
             </div>
             <div>
@@ -222,6 +228,7 @@ export default function GroupsManager() {
                 <div className="space-y-1"><label className="text-sm font-medium">Address</label><Input value={form.hotelMakkahAddress} onChange={e => f("hotelMakkahAddress", e.target.value)} /></div>
                 <div className="space-y-1"><label className="text-sm font-medium">Check-in</label><Input value={form.hotelMakkahCheckIn} onChange={e => f("hotelMakkahCheckIn", e.target.value)} /></div>
                 <div className="space-y-1"><label className="text-sm font-medium">Check-out</label><Input value={form.hotelMakkahCheckOut} onChange={e => f("hotelMakkahCheckOut", e.target.value)} /></div>
+                <div className="col-span-2 space-y-1"><label className="text-sm font-medium">Google Maps Link</label><Input value={form.hotelMakkahGoogleMaps} onChange={e => f("hotelMakkahGoogleMaps", e.target.value)} placeholder="https://maps.google.com/?q=..." /></div>
               </div>
             </div>
             <div>
@@ -231,6 +238,7 @@ export default function GroupsManager() {
                 <div className="space-y-1"><label className="text-sm font-medium">Address</label><Input value={form.hotelMadinahAddress} onChange={e => f("hotelMadinahAddress", e.target.value)} /></div>
                 <div className="space-y-1"><label className="text-sm font-medium">Check-in</label><Input value={form.hotelMadinahCheckIn} onChange={e => f("hotelMadinahCheckIn", e.target.value)} /></div>
                 <div className="space-y-1"><label className="text-sm font-medium">Check-out</label><Input value={form.hotelMadinahCheckOut} onChange={e => f("hotelMadinahCheckOut", e.target.value)} /></div>
+                <div className="col-span-2 space-y-1"><label className="text-sm font-medium">Google Maps Link</label><Input value={form.hotelMadinahGoogleMaps} onChange={e => f("hotelMadinahGoogleMaps", e.target.value)} placeholder="https://maps.google.com/?q=..." /></div>
               </div>
             </div>
             <div className="space-y-1">

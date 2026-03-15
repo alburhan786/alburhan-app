@@ -33,6 +33,7 @@ import PrintZamzam from "@/pages/admin/print/PrintZamzam";
 import PrintFeedback from "@/pages/admin/print/PrintFeedback";
 import PrintContract from "@/pages/admin/print/PrintContract";
 import PrintLuggageSquare from "@/pages/admin/print/PrintLuggageSquare";
+import PrintIdCardsPro from "@/pages/admin/print/PrintIdCardsPro";
 import NotFound from "@/pages/not-found";
 import { useAuth } from "@/hooks/use-auth";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -89,6 +90,7 @@ function Router() {
       <Route path="/admin/groups" component={() => <AdminRoute component={GroupsManager} />} />
       <Route path="/admin/groups/:groupId/pilgrims" component={() => <AdminRoute component={PilgrimManager} />} />
       <Route path="/admin/groups/:groupId/print/id-cards" component={() => <AdminRoute component={PrintIdCards} />} />
+      <Route path="/admin/groups/:groupId/print/id-cards-pro" component={() => <AdminRoute component={PrintIdCardsPro} />} />
       <Route path="/admin/groups/:groupId/print/luggage" component={() => <AdminRoute component={PrintLuggage} />} />
       <Route path="/admin/groups/:groupId/print/luggage-square" component={() => <AdminRoute component={PrintLuggageSquare} />} />
       <Route path="/admin/groups/:groupId/print/medical" component={() => <AdminRoute component={PrintMedical} />} />
