@@ -52,9 +52,9 @@ function fmtDate(dateString: string | null | undefined): string {
 function MetaRow({ label, value }: { label: string; value: string }) {
   return (
     <tr>
-      <td className="text-left py-[2px] pr-2 text-[11px] whitespace-nowrap">{label}</td>
-      <td className="py-[2px] px-1 text-[11px]">:</td>
-      <td className="text-right py-[2px] pl-2 text-[11px] font-semibold whitespace-nowrap">{value || ""}</td>
+      <td className="text-left py-1 px-2 text-[11px] whitespace-nowrap border border-black">{label}</td>
+      <td className="py-1 px-1 text-[11px] border border-black text-center">:</td>
+      <td className="text-right py-1 px-2 text-[11px] font-semibold whitespace-nowrap border border-black">{value || ""}</td>
     </tr>
   );
 }
@@ -97,8 +97,8 @@ function InvoiceContent({ invoice }: { invoice: InvoiceType }) {
             <div className="font-bold text-[14px] text-center">TAX INVOICE</div>
             <div className="text-[9px] mt-1 text-center">ORIGINAL FOR RECIPIENT</div>
           </div>
-          <div className="w-[40%] p-2">
-            <table className="w-full">
+          <div className="w-[40%] p-0">
+            <table className="w-full border-collapse">
               <tbody>
                 <MetaRow label="Invoice No." value={invoice.invoiceNumber || ""} />
                 <MetaRow label="Invoice Date" value={fmtDate(invoice.paymentDate)} />
@@ -149,7 +149,7 @@ function InvoiceContent({ invoice }: { invoice: InvoiceType }) {
                     </td>
                     <td className="px-2 py-2 text-center">{invoice.sacCode || "998555"}</td>
                     <td className="px-2 py-2 text-center">{p.passportNumber || "—"}</td>
-                    <td className="px-2 py-2 text-center">{p.dateOfBirth ? fmtDate(p.dateOfBirth) : "—"}</td>
+                    <td className="px-2 py-2 text-center">—</td>
                     <td className="px-2 py-2 text-right">{formatINR(pricePerPerson)}</td>
                     <td className="px-2 py-2 text-right">
                       {formatINR(taxPerPerson)}
@@ -230,8 +230,7 @@ function InvoiceContent({ invoice }: { invoice: InvoiceType }) {
               <p>a. Alburhan Tours and Travels shall not be liable for any loss, injury, damage, or delay caused by factors beyond our control, including but not limited to natural disasters, political unrest, or transportation delays.</p>
               <p>b. Our liability for any claims arising from the tour shall be limited to the total amount paid by the customer for the specific tour package.</p>
 
-              <p className="mt-2 text-[7px] italic">By booking a tour with Alburhan Tours and Travels, customers agree to abide by these terms and conditions. It is recommended that customers carefully read and understand these terms and conditions before making a booking.</p>
-              <p className="mt-1 text-[7px] italic">Please note that these terms and conditions are provided as an example and should be reviewed by legal professionals to ensure compliance with applicable laws and regulations in your jurisdiction.</p>
+              <p className="mt-2 text-[7px] italic">By booking a tour with Alburhan Tours and Travels, customers agree to abide by these terms and conditions.</p>
             </div>
           </div>
 
