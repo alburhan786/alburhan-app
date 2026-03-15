@@ -36,6 +36,7 @@ function PrintDropdown({ groupId }: { groupId: string }) {
   const items = [
     { label: "Photo ID Cards", path: "id-cards" },
     { label: "Luggage Stickers", path: "luggage" },
+    { label: "Square Luggage Sticker", path: "luggage-square" },
     { label: "Medical Stickers", path: "medical" },
     { label: "Zamzam Stickers", path: "zamzam" },
     { sep: true },
