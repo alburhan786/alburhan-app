@@ -4,8 +4,7 @@ import { useGetPublicInvoice, useGetPublicInvoiceByNumber } from "@workspace/api
 import type { Invoice as InvoiceType, Pilgrim } from "@workspace/api-client-react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
-import { Printer, Share2, Download } from "lucide-react";
-import { downloadPdf } from "@/lib/pdf-download";
+import { Share2 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
 const DARK_GREEN = "#0B3D2E";
@@ -411,14 +410,6 @@ export default function Invoice() {
     );
   }
 
-  const handlePrint = () => window.print();
-  const handleDownloadPdf = () => {
-    downloadPdf(invoiceRef.current, {
-      filename: `Invoice-${invoice.invoiceNumber || identifier}.pdf`,
-      orientation: "portrait",
-      margin: 5,
-    });
-  };
   const handleShare = async () => {
     if (navigator.share) {
       await navigator.share({ title: `Invoice ${invoice.invoiceNumber}`, url: window.location.href });
@@ -430,12 +421,9 @@ export default function Invoice() {
 
   return (
     <>
-      <style>{`@media print { .no-print { display: none !important; } .print-area { padding: 0 !important; margin: 0 !important; } }`}</style>
       <MainLayout>
-        <div className="max-w-4xl mx-auto py-8 px-4 print-area">
-          <div className="no-print flex gap-3 mb-6 justify-end">
-            <Button variant="outline" size="sm" onClick={handleDownloadPdf}><Download className="w-4 h-4 mr-2" />Download PDF</Button>
-            <Button variant="outline" size="sm" onClick={handlePrint}><Printer className="w-4 h-4 mr-2" />Print</Button>
+        <div className="max-w-4xl mx-auto py-8 px-4">
+          <div className="flex gap-3 mb-6 justify-end">
             <Button variant="outline" size="sm" onClick={handleShare}><Share2 className="w-4 h-4 mr-2" />Share</Button>
           </div>
 
