@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { downloadPdf } from "@/lib/pdf-download";
 import { useRoute } from "wouter";
 import { Barcode } from "@/components/print/Barcode";
+import { QRCodeSVG } from "qrcode.react";
 
 const API = import.meta.env.VITE_API_URL || "";
 const BASE = import.meta.env.BASE_URL || "/";
@@ -18,6 +19,22 @@ interface Group {
 const DARK = "#052316";
 const GOLD = "#C9A84C";
 const GOLD_LIGHT = "#E8D48B";
+
+function buildQrData(p: Pilgrim, group: Group): string {
+  const lines = [
+    `Name: ${p.fullName}`,
+    `Passport: ${p.passportNumber || "N/A"}`,
+    `Group: ${group.groupName} (${group.year})`,
+    `Gender: ${p.gender || "N/A"}`,
+  ];
+  if (p.mobileIndia) lines.push(`Mobile (India): ${p.mobileIndia}`);
+  if (group.hotels?.makkah?.name) lines.push(`Hotel Makkah: ${group.hotels.makkah.name}`);
+  if (group.hotels?.madinah?.name) lines.push(`Hotel Madinah: ${group.hotels.madinah.name}`);
+  if (group.maktabNumber) lines.push(`Maktab: ${group.maktabNumber}`);
+  lines.push(`Emergency (Saudi): 0547090786 | 0568780786`);
+  lines.push(`Emergency (India): +91 9893989786`);
+  return lines.join("\n");
+}
 
 function WaveShapes() {
   return (
@@ -181,17 +198,25 @@ export default function PrintIdCards() {
                     </div>
                   </div>
 
-                  <div style={{ marginTop: "auto" }}>
-                    <div style={{ display: "flex", justifyContent: "center", overflow: "hidden", marginBottom: "0.5mm" }}>
-                      {p.passportNumber ? (
-                        <Barcode value={p.passportNumber} height={18} width={1.2} fontSize={0} />
-                      ) : (
-                        <div style={{ fontSize: "5pt", color: "#999" }}>{group.groupName}</div>
-                      )}
-                    </div>
-                    <div style={{ background: DARK, color: GOLD, padding: "1mm 2mm", fontSize: "4.5pt", textAlign: "center", fontWeight: 800, borderRadius: "0 0 3px 3px", margin: "0 -3mm", textTransform: "uppercase", letterSpacing: "0.2px" }}>
-                      Mohammed Altaf: 0547090786 | Mohammed Wasim: 0568780786
-                    </div>
+                  <div style={{ marginTop: "auto", paddingBottom: "14mm" }} />
+                </div>
+
+                {/* QR code — above footer bar, right-aligned */}
+                <div style={{ position: "absolute", bottom: "14mm", right: "3mm", zIndex: 3, background: "#fff", padding: "1px", borderRadius: "2px" }}>
+                  <QRCodeSVG value={buildQrData(p, group)} size={34} level="M" />
+                </div>
+
+                {/* Barcode + footer — absolute at bottom */}
+                <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 2 }}>
+                  <div style={{ display: "flex", justifyContent: "flex-start", overflow: "hidden", paddingLeft: "2mm", marginBottom: "0.5mm" }}>
+                    {p.passportNumber ? (
+                      <Barcode value={p.passportNumber} height={14} width={1.0} fontSize={0} />
+                    ) : (
+                      <div style={{ fontSize: "5pt", color: "#999" }}>{group.groupName}</div>
+                    )}
+                  </div>
+                  <div style={{ background: DARK, color: GOLD, padding: "1mm 2mm", fontSize: "4pt", textAlign: "center", fontWeight: 800, letterSpacing: "0.2px" }}>
+                    Mohammed Altaf: 0547090786 | Mohammed Wasim: 0568780786
                   </div>
                 </div>
               </div>
@@ -236,27 +261,25 @@ export default function PrintIdCards() {
                     </div>
                   </div>
 
-                  <div style={{ marginTop: "auto", paddingBottom: "1mm" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "5pt", color: "#666", marginBottom: "1.5mm" }}>
-                      <div>Group: <b style={{ color: DARK }}>{group.groupName}</b></div>
-                      <div>Year: <b style={{ color: DARK }}>{group.year}</b></div>
+                  {/* QR code centered */}
+                  <div style={{ display: "flex", justifyContent: "center", marginTop: "2mm", marginBottom: "1.5mm" }}>
+                    <div style={{ background: "#fff", padding: "2px", borderRadius: "3px", border: `1px solid ${GOLD}` }}>
+                      <QRCodeSVG value={buildQrData(p, group)} size={50} level="M" />
                     </div>
+                  </div>
 
-                    <div style={{ display: "flex", justifyContent: "center", overflow: "hidden", marginBottom: "1mm" }}>
-                      {p.passportNumber ? (
-                        <Barcode value={p.passportNumber} height={14} width={1.0} fontSize={0} />
-                      ) : (
-                        <div style={{ fontSize: "5pt", color: "#999" }}>{group.groupName}</div>
-                      )}
-                    </div>
+                </div>
 
-                    <div style={{ fontSize: "6.5pt", fontWeight: 700, color: DARK, textAlign: "center", marginBottom: "0.5mm" }}>{p.fullName}</div>
-                    <div style={{ textAlign: "center", fontSize: "4.5pt", color: "#999" }}>Your Sincerely</div>
-
-                    <div style={{ background: DARK, color: "#fff", padding: "1.2mm 2mm", fontSize: "3.8pt", textAlign: "center", lineHeight: 1.5, borderRadius: "0 0 3px 3px", margin: "1.5mm -3mm 0" }}>
-                      <div>Khanka Masjid, Sanwara Rd, Burhanpur 450331 M.P.</div>
-                      <div style={{ color: GOLD, fontWeight: 800, fontSize: "5pt", letterSpacing: "0.2px", textTransform: "uppercase" }}>Mohammed Altaf: 0547090786 | Mohammed Wasim: 0568780786</div>
-                    </div>
+                {/* Back footer — absolute */}
+                <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 3 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "4.5pt", color: "#666", padding: "0 3mm", marginBottom: "1mm" }}>
+                    <div>Group: <b style={{ color: DARK }}>{group.groupName}</b></div>
+                    <div><b style={{ color: DARK }}>{p.fullName}</b></div>
+                    <div>Year: <b style={{ color: DARK }}>{group.year}</b></div>
+                  </div>
+                  <div style={{ background: DARK, color: "#fff", padding: "1.2mm 2mm", fontSize: "3.8pt", textAlign: "center", lineHeight: 1.5 }}>
+                    <div>Khanka Masjid, Sanwara Rd, Burhanpur 450331 M.P.</div>
+                    <div style={{ color: GOLD, fontWeight: 800, fontSize: "4pt", letterSpacing: "0.2px" }}>Mohammed Altaf: 0547090786 | Mohammed Wasim: 0568780786</div>
                   </div>
                 </div>
               </div>
