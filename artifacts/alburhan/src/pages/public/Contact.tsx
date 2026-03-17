@@ -191,7 +191,7 @@ export default function Contact() {
 
                 <div className="pt-4 border-t border-white/20">
                   <p className="text-sm text-white/70 mb-3">You can also contact us through WhatsApp for quick assistance.</p>
-                  <a href="https://wa.me/919893989786" target="_blank" rel="noreferrer" className="block w-full">
+                  <a href="https://wa.me/918989701701" target="_blank" rel="noreferrer" className="block w-full">
                     <Button className="w-full bg-[#25D366] hover:bg-[#25D366]/90 text-white font-bold py-6">
                       Chat on WhatsApp
                     </Button>

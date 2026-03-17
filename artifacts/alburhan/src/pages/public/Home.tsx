@@ -571,7 +571,7 @@ export default function Home() {
             <h2 className="text-3xl md:text-4xl font-serif font-bold mb-3">Have Questions About Your Journey?</h2>
             <p className="text-white/80 text-lg max-w-lg">Message us directly on WhatsApp for instant support and booking inquiries.</p>
           </div>
-          <a href="https://wa.me/919893989786" target="_blank" rel="noreferrer">
+          <a href="https://wa.me/918989701701" target="_blank" rel="noreferrer">
             <Button size="lg" className="bg-white text-[#25D366] hover:bg-white/95 rounded-xl px-10 py-7 text-lg font-bold shadow-2xl hover:scale-[1.03] transition-all">
               Chat on WhatsApp
             </Button>
