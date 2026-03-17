@@ -166,6 +166,7 @@ export default function Contact() {
                       <p className="text-sm text-white/70 mb-1">Phone / WhatsApp</p>
                       <p className="font-semibold">+91 9893989786</p>
                       <p className="font-semibold">+91 8989701701</p>
+                      <p className="font-semibold">+91 9893225590</p>
                     </div>
                   </div>
 

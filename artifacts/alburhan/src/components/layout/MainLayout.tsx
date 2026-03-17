@@ -167,7 +167,7 @@ export function MainLayout({ children }: { children: ReactNode }) {
                   <img src={`${import.meta.env.BASE_URL}images/logo.png`} alt="Al Burhan Tours & Travels" className="h-14 w-auto object-contain brightness-0 invert" />
                 </Link>
                 <p className="text-white/50 max-w-sm leading-relaxed text-sm mb-6">
-                  Guiding you on your sacred journey with 35+ years of trusted experience in providing premium Hajj, Umrah & Ziyarat services from Mumbai, India.
+                  Guiding you on your sacred journey with 35+ years of trusted experience in providing premium Hajj, Umrah & Ziyarat services from Burhanpur, M.P., India.
                 </p>
                 <div className="flex gap-3">
                   {[
@@ -225,11 +225,11 @@ export function MainLayout({ children }: { children: ReactNode }) {
                 <ul className="space-y-3 mb-6">
                   <li className="flex items-start gap-3 text-white/50 text-sm">
                     <MapPin size={16} className="text-gold shrink-0 mt-0.5" />
-                    <span>Mumbai, Maharashtra, India</span>
+                    <span>Burhanpur · Mumbai · Nanded · Parbhani · Jalgaon · Indore</span>
                   </li>
                   <li className="flex items-start gap-3 text-white/50 text-sm">
                     <Phone size={16} className="text-gold shrink-0 mt-0.5" />
-                    <span>+91 8989701701 / +91 9893989786</span>
+                    <span>+91 9893989786 / +91 8989701701 / +91 9893225590</span>
                   </li>
                   <li className="flex items-start gap-3 text-white/50 text-sm">
                     <Mail size={16} className="text-gold shrink-0 mt-0.5" />
