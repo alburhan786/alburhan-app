@@ -293,6 +293,7 @@ export default function CustomerDashboard() {
   const [payDialogBooking, setPayDialogBooking] = useState<any | null>(null);
   const [partialInput, setPartialInput] = useState<string>("");
   const [payMode, setPayMode] = useState<"full" | "partial">("full");
+  const [paymentSuccess, setPaymentSuccess] = useState<{ booking: any; isPartial: boolean; paidAmount: number } | null>(null);
 
   const uploadBooking = bookings.find((b: any) => b.id === uploadBookingId);
 
@@ -655,13 +656,23 @@ export default function CustomerDashboard() {
                     className="flex-1 bg-primary text-white hover:bg-primary/90 font-semibold"
                     disabled={isInitializing || (payMode === 'partial' && !partialValid)}
                     onClick={() => {
+                      const isPartial = payMode === 'partial';
+                      const charge = isPartial ? parsedPartial : chargeAmount;
+                      const bookingSnap = { ...payDialogBooking };
                       setPayDialogBooking(null);
                       initiatePayment(
-                        payDialogBooking.id,
-                        payDialogBooking.customerName,
-                        payDialogBooking.customerEmail || "",
-                        payDialogBooking.customerMobile,
-                        payMode === 'partial' ? parsedPartial : undefined
+                        bookingSnap.id,
+                        bookingSnap.customerName,
+                        bookingSnap.customerEmail || "",
+                        bookingSnap.customerMobile,
+                        isPartial ? parsedPartial : undefined,
+                        (updatedBooking) => {
+                          setPaymentSuccess({
+                            booking: updatedBooking,
+                            isPartial: updatedBooking.status === 'partially_paid',
+                            paidAmount: charge,
+                          });
+                        }
                       );
                     }}
                   >
@@ -674,6 +685,78 @@ export default function CustomerDashboard() {
           </Dialog>
         );
       })()}
+
+      {/* Payment Success Modal */}
+      <Dialog open={!!paymentSuccess} onOpenChange={(open) => { if (!open) setPaymentSuccess(null); }}>
+        <DialogContent className="max-w-md">
+          <div className="flex flex-col items-center text-center py-4 space-y-4">
+            <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center">
+              <CheckCircle className="w-10 h-10 text-emerald-600" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-emerald-700">
+                {paymentSuccess?.isPartial ? 'Partial Payment Received!' : 'Payment Successful!'}
+              </h2>
+              <p className="text-muted-foreground mt-1">
+                {paymentSuccess?.isPartial
+                  ? 'Your partial payment has been recorded. Please pay the remaining balance to confirm your booking.'
+                  : 'Your booking is now confirmed. Alhamdulillah!'}
+              </p>
+            </div>
+            <div className="w-full bg-muted/50 rounded-xl p-4 space-y-2 text-sm text-left">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Booking #</span>
+                <span className="font-semibold">{paymentSuccess?.booking?.bookingNumber}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Amount Paid</span>
+                <span className="font-semibold text-emerald-700">
+                  ₹{paymentSuccess?.paidAmount?.toLocaleString('en-IN')}
+                </span>
+              </div>
+              {!paymentSuccess?.isPartial && paymentSuccess?.booking?.invoiceNumber && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Invoice #</span>
+                  <span className="font-semibold">{paymentSuccess.booking.invoiceNumber}</span>
+                </div>
+              )}
+              {paymentSuccess?.isPartial && paymentSuccess?.booking?.finalAmount && (
+                <div className="flex justify-between text-orange-700">
+                  <span>Balance Remaining</span>
+                  <span className="font-semibold">
+                    ₹{(Number(paymentSuccess.booking.finalAmount) - Number(paymentSuccess.booking.paidAmount || 0)).toLocaleString('en-IN')}
+                  </span>
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {paymentSuccess?.isPartial
+                ? 'SMS and WhatsApp confirmation has been sent to your registered mobile number.'
+                : 'Invoice and confirmation has been sent to your registered mobile number and email.'}
+            </p>
+            <div className="flex gap-3 w-full">
+              {!paymentSuccess?.isPartial && paymentSuccess?.booking?.bookingNumber && (
+                <Button
+                  variant="outline"
+                  className="flex-1 text-primary border-primary"
+                  onClick={() => {
+                    window.open(`${BASE_API}/invoice/${paymentSuccess!.booking.bookingNumber}`, '_blank');
+                  }}
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  View Invoice
+                </Button>
+              )}
+              <Button
+                className="flex-1 bg-primary text-white"
+                onClick={() => setPaymentSuccess(null)}
+              >
+                Done
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }

@@ -229,4 +229,136 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
   });
 });
 
+router.post("/webhook", async (req: any, res) => {
+  const secret = process.env.RAZORPAY_SECRET;
+  if (!secret) {
+    console.error("[Webhook] RAZORPAY_SECRET not set");
+    res.status(500).json({ message: "Webhook not configured" });
+    return;
+  }
+
+  const signature = req.headers["x-razorpay-signature"] as string | undefined;
+  if (!signature) {
+    res.status(400).json({ message: "Missing signature" });
+    return;
+  }
+
+  const rawBody: Buffer | undefined = req.rawBody;
+  if (!rawBody) {
+    res.status(400).json({ message: "Raw body not available" });
+    return;
+  }
+
+  const expected = crypto
+    .createHmac("sha256", secret)
+    .update(rawBody)
+    .digest("hex");
+
+  if (expected !== signature) {
+    console.error("[Webhook] Invalid signature");
+    res.status(400).json({ message: "Invalid webhook signature" });
+    return;
+  }
+
+  const event = req.body;
+  const eventType: string = event?.event || "";
+  console.log("[Webhook] Received event:", eventType);
+
+  if (eventType !== "payment.captured" && eventType !== "order.paid") {
+    res.json({ message: "Event received, not processed" });
+    return;
+  }
+
+  try {
+    const orderId: string | undefined =
+      event?.payload?.payment?.entity?.order_id ||
+      event?.payload?.order?.entity?.id;
+    const paymentId: string | undefined =
+      event?.payload?.payment?.entity?.id;
+    const amountPaise: number | undefined =
+      event?.payload?.payment?.entity?.amount;
+
+    if (!orderId) {
+      console.error("[Webhook] No order_id in payload");
+      res.json({ message: "No order_id in payload" });
+      return;
+    }
+
+    const bookings = await db
+      .select()
+      .from(bookingsTable)
+      .where(eq(bookingsTable.razorpayOrderId, orderId))
+      .limit(1);
+    const booking = bookings[0];
+
+    if (!booking) {
+      console.warn("[Webhook] No booking found for orderId:", orderId);
+      res.json({ message: "Booking not found" });
+      return;
+    }
+
+    if (booking.status === "confirmed") {
+      console.log("[Webhook] Booking already confirmed:", booking.bookingNumber);
+      res.json({ message: "Already confirmed" });
+      return;
+    }
+
+    const finalAmount = Number(booking.finalAmount || 0);
+    const previouslyPaid = Number(booking.paidAmount || 0);
+    const thisPayment = amountPaise ? amountPaise / 100 : (finalAmount - previouslyPaid);
+    const newPaidAmount = previouslyPaid + thisPayment;
+    const isFullyPaid = newPaidAmount >= finalAmount;
+    const newStatus = isFullyPaid ? "confirmed" : "partially_paid";
+    const invoiceNumber = isFullyPaid
+      ? (booking.invoiceNumber || `INV${Date.now().toString().slice(-8)}`)
+      : booking.invoiceNumber;
+
+    const [updated] = await db
+      .update(bookingsTable)
+      .set({
+        status: newStatus as any,
+        razorpayPaymentId: paymentId || booking.razorpayPaymentId,
+        paidAmount: String(newPaidAmount),
+        invoiceNumber: invoiceNumber ?? undefined,
+        updatedAt: new Date(),
+      })
+      .where(eq(bookingsTable.id, booking.id))
+      .returning();
+
+    console.log("[Webhook] Booking updated:", updated.bookingNumber, "→", newStatus);
+
+    const baseUrl = process.env.REPLIT_DEV_DOMAIN
+      ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+      : "https://alburhantravels.com";
+
+    if (isFullyPaid) {
+      const invoiceUrl = `${baseUrl}/invoice/${updated.bookingNumber}`;
+      sendPaymentConfirmationNotification({
+        mobile: updated.customerMobile,
+        email: updated.customerEmail,
+        customerName: updated.customerName,
+        bookingNumber: updated.bookingNumber,
+        amount: Number(updated.finalAmount || 0).toLocaleString("en-IN"),
+        invoiceNumber: invoiceNumber!,
+        invoiceUrl,
+      }).catch(console.error);
+    } else {
+      const remainingBalance = Math.max(0, finalAmount - newPaidAmount);
+      sendPartialPaymentNotification({
+        mobile: updated.customerMobile,
+        email: updated.customerEmail,
+        customerName: updated.customerName,
+        bookingNumber: updated.bookingNumber,
+        paidAmount: thisPayment.toLocaleString("en-IN"),
+        remainingAmount: remainingBalance.toLocaleString("en-IN"),
+      }).catch(console.error);
+    }
+
+    res.json({ message: "Webhook processed", status: newStatus });
+  } catch (err: any) {
+    console.error("[Webhook] Processing error:", err?.message);
+    res.status(500).json({ message: "Webhook processing failed" });
+  }
+});
+
 export default router;

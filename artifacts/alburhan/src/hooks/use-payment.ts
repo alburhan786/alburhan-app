@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useCreatePaymentOrder, useVerifyPayment } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -9,10 +9,13 @@ declare global {
   }
 }
 
+const BASE_API = (import.meta.env.BASE_URL || "/").replace(/\/$/, "");
+
 export function usePayment() {
   const [isSdkLoaded, setIsSdkLoaded] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const createOrder = useCreatePaymentOrder();
   const verifyPayment = useVerifyPayment();
@@ -30,12 +33,40 @@ export function usePayment() {
     document.body.appendChild(script);
   }, [toast]);
 
+  function startPolling(bookingId: string, onSuccess: (booking: any) => void) {
+    if (pollRef.current) clearInterval(pollRef.current);
+    let attempts = 0;
+    const maxAttempts = 40;
+
+    pollRef.current = setInterval(async () => {
+      attempts++;
+      if (attempts > maxAttempts) {
+        clearInterval(pollRef.current!);
+        pollRef.current = null;
+        return;
+      }
+      try {
+        const res = await fetch(`${BASE_API}/api/bookings/${bookingId}`, { credentials: "include" });
+        if (!res.ok) return;
+        const booking = await res.json();
+        if (booking.status === "confirmed" || booking.status === "partially_paid") {
+          clearInterval(pollRef.current!);
+          pollRef.current = null;
+          queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+          queryClient.invalidateQueries({ queryKey: [`/api/bookings/${bookingId}`] });
+          onSuccess(booking);
+        }
+      } catch {}
+    }, 3000);
+  }
+
   const initiatePayment = async (
     bookingId: string,
     customerName: string,
     customerEmail: string,
     customerMobile: string,
-    payAmount?: number
+    payAmount?: number,
+    onSuccess?: (booking: any) => void
   ) => {
     if (!isSdkLoaded) {
       toast({ title: "Please wait", description: "Payment gateway is still loading..." });
@@ -45,6 +76,32 @@ export function usePayment() {
     try {
       const order = await createOrder.mutateAsync({ data: { bookingId, payAmount } });
 
+      const handlePaymentSuccess = async (response: any) => {
+        if (pollRef.current) {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+        }
+        try {
+          const result = await verifyPayment.mutateAsync({
+            data: {
+              bookingId,
+              razorpayOrderId: response.razorpay_order_id,
+              razorpayPaymentId: response.razorpay_payment_id,
+              razorpaySignature: response.razorpay_signature,
+              payAmount,
+            }
+          });
+          queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+          queryClient.invalidateQueries({ queryKey: [`/api/bookings/${bookingId}`] });
+          if (onSuccess) onSuccess(result);
+        } catch (err: any) {
+          console.error("[Payment] Verify failed, webhook will handle confirmation:", err?.message);
+          startPolling(bookingId, (booking) => {
+            if (onSuccess) onSuccess(booking);
+          });
+        }
+      };
+
       const options = {
         key: order.razorpayKeyId,
         amount: order.amount,
@@ -53,35 +110,7 @@ export function usePayment() {
         description: payAmount ? `Partial Payment — ₹${payAmount.toLocaleString("en-IN")}` : "Booking Payment",
         image: `${import.meta.env.BASE_URL}images/logo.png`,
         order_id: order.orderId,
-        handler: async function (response: any) {
-          try {
-            await verifyPayment.mutateAsync({
-              data: {
-                bookingId,
-                razorpayOrderId: response.razorpay_order_id,
-                razorpayPaymentId: response.razorpay_payment_id,
-                razorpaySignature: response.razorpay_signature,
-                payAmount,
-              }
-            });
-
-            const isFullPay = !payAmount;
-            toast({
-              title: isFullPay ? "Payment Successful" : "Partial Payment Recorded",
-              description: isFullPay
-                ? "Your booking is now confirmed. Alhamdulillah."
-                : `₹${payAmount!.toLocaleString("en-IN")} received. Please pay the remaining balance to confirm your booking.`,
-            });
-            queryClient.invalidateQueries({ queryKey: ['/api/bookings'] });
-            queryClient.invalidateQueries({ queryKey: [`/api/bookings/${bookingId}`] });
-          } catch (err: any) {
-            toast({
-              title: "Payment Verification Failed",
-              description: err.message || "Please contact support.",
-              variant: "destructive"
-            });
-          }
-        },
+        handler: handlePaymentSuccess,
         prefill: {
           name: customerName,
           email: customerEmail || "info@alburhan.com",
@@ -90,10 +119,21 @@ export function usePayment() {
         theme: {
           color: "#013220",
         },
+        modal: {
+          ondismiss: () => {
+            startPolling(bookingId, (booking) => {
+              if (onSuccess) onSuccess(booking);
+            });
+          },
+        },
       };
 
       const rzp = new window.Razorpay(options);
-      rzp.on('payment.failed', function (response: any) {
+      rzp.on("payment.failed", function (response: any) {
+        if (pollRef.current) {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+        }
         toast({
           title: "Payment Failed",
           description: response.error.description,

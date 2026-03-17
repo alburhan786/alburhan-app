@@ -1,4 +1,5 @@
 import axios from "axios";
+import nodemailer from "nodemailer";
 
 const FAST2SMS_API_KEY = process.env.FAST2SMS_API_KEY;
 const FAST2SMS_SENDER_ID = "ALBURH";
@@ -138,9 +139,42 @@ async function sendWhatsAppWithFallback(mobile: string, message: string): Promis
   }
 }
 
+function getEmailTransport() {
+  const host = process.env.SMTP_HOST || "smtp.gmail.com";
+  const port = Number(process.env.SMTP_PORT || 587);
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  if (!user || !pass) return null;
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: { user, pass },
+  });
+}
+
 export async function sendEmail(to: string, subject: string, body: string): Promise<boolean> {
-  console.log("[Email] Would send to:", to, "Subject:", subject, "Body:", body.slice(0, 100));
-  return true;
+  if (!to) return false;
+  const transport = getEmailTransport();
+  if (!transport) {
+    console.log("[Email] SMTP not configured (set SMTP_USER + SMTP_PASS). Skipping email to:", to);
+    return false;
+  }
+  try {
+    const from = process.env.SMTP_USER || "info@alburhantravels.com";
+    await transport.sendMail({
+      from: `Al Burhan Tours & Travels <${from}>`,
+      to,
+      subject,
+      text: body,
+      html: body.replace(/\n/g, "<br>"),
+    });
+    console.log("[Email] Sent to:", to, "Subject:", subject);
+    return true;
+  } catch (err: any) {
+    console.error("[Email] Error sending to", to, ":", err?.message);
+    return false;
+  }
 }
 
 export async function sendBookingSubmissionNotification(opts: {
