@@ -194,12 +194,12 @@ export default function PrintIdCardsPro() {
                       <div style={{ fontSize: "5pt", fontWeight: 800, color: DARK, marginTop: "0.3mm", textAlign: "center" }}>HAJJ {group.year}</div>
                     </div>
 
-                    {/* Passport-style photo: ~30mm × 38mm */}
+                    {/* Passport-style photo */}
                     <div style={{ marginBottom: "1mm" }}>
                       {p.photoUrl ? (
-                        <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "28mm", height: "35mm", objectFit: "cover", borderRadius: "2px", border: `2px solid ${GOLD}` }} />
+                        <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "22mm", height: "28mm", objectFit: "cover", borderRadius: "2px", border: `2px solid ${GOLD}` }} />
                       ) : (
-                        <div style={{ width: "28mm", height: "35mm", background: "#f0f0f0", borderRadius: "2px", border: `2px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "5pt", color: "#aaa" }}>PHOTO</div>
+                        <div style={{ width: "22mm", height: "28mm", background: "#f0f0f0", borderRadius: "2px", border: `2px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "5pt", color: "#aaa" }}>PHOTO</div>
                       )}
                     </div>
                   </div>
@@ -243,8 +243,8 @@ export default function PrintIdCardsPro() {
                       </div>
                     </div>
 
-                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "auto", marginBottom: "4mm" }}>
-                      <QRCodeSVG value={buildQrData(p, group)} size={48} level="M" />
+                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "auto", paddingBottom: "5mm" }}>
+                      <QRCodeSVG value={buildQrData(p, group)} size={36} level="M" />
                     </div>
                   </div>
 
@@ -255,7 +255,7 @@ export default function PrintIdCardsPro() {
                     <Barcode value={`${p.passportNumber || "N/A"}-${String(p.serialNumber).padStart(3, "0")}`} height={12} width={1.0} fontSize={0} />
                   </div>
                   <div style={{ background: DARK, color: GOLD, padding: "1mm 2mm", fontSize: "3.8pt", textAlign: "center", fontWeight: 700, letterSpacing: "0.2px", marginTop: "0.5mm" }}>
-                    #{String(p.serialNumber).padStart(3, "0")} | Emergency: +91 9893989786
+                    #{String(p.serialNumber).padStart(3, "0")} | Emergency: 0547090786 | 0568780786
                   </div>
                 </div>
 
@@ -304,10 +304,11 @@ export default function PrintIdCardsPro() {
                     <div style={{ width: "22mm", flexShrink: 0, display: "flex", flexDirection: "column", gap: "1mm", alignItems: "center" }}>
                       <div style={{ fontSize: "5pt", fontWeight: 800, color: DARK, textTransform: "uppercase", letterSpacing: "0.3px", textAlign: "center" }}>Emergency</div>
                       <div style={{ fontSize: "5pt", lineHeight: 1.6, color: "#333", textAlign: "center" }}>
-                        <div style={{ fontWeight: 700 }}>+91 9893989786</div>
-                        <div style={{ fontWeight: 700 }}>+91 9893225590</div>
+                        <div style={{ fontSize: "4pt", color: "#888" }}>SAUDI</div>
                         <div style={{ fontWeight: 700 }}>0547090786</div>
                         <div style={{ fontWeight: 700 }}>0568780786</div>
+                        <div style={{ fontSize: "4pt", color: "#888", marginTop: "0.5mm" }}>INDIA</div>
+                        <div style={{ fontWeight: 700 }}>+91 9893989786</div>
                       </div>
                       <div style={{ marginTop: "2mm", display: "flex", justifyContent: "center" }}>
                         <img src={BASE + "images/india_flag.jpg"} alt="" style={{ width: "10mm", height: "10mm", borderRadius: "50%", objectFit: "cover", border: `2px solid ${GOLD}` }} />

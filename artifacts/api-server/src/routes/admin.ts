@@ -64,6 +64,12 @@ router.get("/inquiries", requireAdmin as any, async (_req: AuthenticatedRequest,
   })));
 });
 
+router.patch("/inquiries/:id/read", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  const { id } = req.params;
+  await db.update(inquiriesTable).set({ isRead: true }).where(eq(inquiriesTable.id, id));
+  res.json({ success: true });
+});
+
 router.post("/broadcast", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   const { message, audience } = req.body;
   if (!message || !audience) {

@@ -35,6 +35,8 @@ import PrintContract from "@/pages/admin/print/PrintContract";
 import PrintLuggageSquare from "@/pages/admin/print/PrintLuggageSquare";
 import PrintIdCardsPro from "@/pages/admin/print/PrintIdCardsPro";
 import InvoiceManager from "@/pages/admin/InvoiceManager";
+import CustomerManager from "@/pages/admin/CustomerManager";
+import InquiryManager from "@/pages/admin/InquiryManager";
 import NotFound from "@/pages/not-found";
 import { useAuth } from "@/hooks/use-auth";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -102,8 +104,8 @@ function Router() {
       <Route path="/admin/groups/:groupId/print/zamzam" component={() => <AdminRoute component={PrintZamzam} />} />
       <Route path="/admin/groups/:groupId/print/feedback" component={() => <AdminRoute component={PrintFeedback} />} />
       <Route path="/admin/groups/:groupId/print/contract" component={() => <AdminRoute component={PrintContract} />} />
-      <Route path="/admin/customers" component={() => <AdminRoute component={() => <div className="p-8 text-2xl font-serif">Customers Manager (Coming Soon)</div>} />} />
-      <Route path="/admin/inquiries" component={() => <AdminRoute component={() => <div className="p-8 text-2xl font-serif">Inquiries Manager (Coming Soon)</div>} />} />
+      <Route path="/admin/customers" component={() => <AdminRoute component={CustomerManager} />} />
+      <Route path="/admin/inquiries" component={() => <AdminRoute component={InquiryManager} />} />
 
       <Route component={NotFound} />
     </Switch>

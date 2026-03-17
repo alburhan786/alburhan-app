@@ -2,11 +2,12 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { downloadPdf } from "@/lib/pdf-download";
 import { useRoute } from "wouter";
 import { Barcode } from "@/components/print/Barcode";
+import { QRCodeSVG } from "qrcode.react";
 
 const API = import.meta.env.VITE_API_URL || "";
 const BASE = import.meta.env.BASE_URL || "/";
 
-interface Pilgrim { id: string; serialNumber: number; fullName: string; photoUrl?: string; }
+interface Pilgrim { id: string; serialNumber: number; fullName: string; photoUrl?: string; mobileIndia?: string; }
 interface Group { id: string; groupName: string; year: number; }
 
 const DARK = "#0A3D2A";
@@ -121,13 +122,22 @@ export default function PrintZamzam() {
                 {group.groupName} — {group.year}
               </div>
 
-              <div style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
+              <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "6mm" }}>
                 <Barcode value={`ZAM${String(p.serialNumber).padStart(3, "0")}`} height={30} width={1.8} fontSize={0} />
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                  <QRCodeSVG
+                    value={`Name: ${p.fullName}\nSerial: ${String(p.serialNumber).padStart(3, "0")}\nGroup: ${group.groupName} ${group.year}\nMobile: ${p.mobileIndia || "N/A"}\nEmergency: 0547090786`}
+                    size={40}
+                    level="M"
+                    fgColor={DARK}
+                  />
+                  <div style={{ fontSize: "5pt", color: "#888", marginTop: "1mm" }}>0547090786</div>
+                </div>
               </div>
             </div>
 
             <div style={{ position: "relative", zIndex: 2, background: DARK, color: GOLD, padding: "2.5mm 5mm", fontSize: "8pt", textAlign: "center", fontWeight: 600, letterSpacing: "0.3px" }}>
-              AL BURHAN TOURS & TRAVELS — BURHANPUR &nbsp;|&nbsp; +91 9893989786
+              AL BURHAN TOURS & TRAVELS — BURHANPUR &nbsp;|&nbsp; +91 9893989786 &nbsp;|&nbsp; 0547090786
             </div>
           </div>
         </div>
