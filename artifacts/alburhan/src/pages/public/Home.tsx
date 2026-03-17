@@ -45,12 +45,41 @@ function AnimatedCounter({ target, suffix = "" }: { target: number; suffix?: str
 }
 
 const testimonials = [
-  { name: "Ahmed Khan", text: "Al Burhan made our Hajj journey incredibly smooth. The guides were extremely knowledgeable and supportive throughout the spiritual process.", rating: 5, initial: "AK" },
-  { name: "Fatima Shaikh", text: "The arrangements for our Umrah were flawless. Hotels were very close to the Haram, and the entire team was helpful 24/7.", rating: 5, initial: "FS" },
-  { name: "Mohammed Ali", text: "We recently went for Iraq Ziyarat. Everything from flights to local transport was well organized. Highly recommended!", rating: 5, initial: "MA" },
-  { name: "Ayesha Begum", text: "Best travel company for pilgrimage. Their 35 years of experience truly shows in their service quality and attention to detail.", rating: 5, initial: "AB" },
-  { name: "Hussain Mirza", text: "Excellent Umrah arrangements. From visa processing to hotel bookings, everything was taken care of perfectly.", rating: 5, initial: "HM" },
-  { name: "Zainab Khatoon", text: "We felt safe and well-guided throughout our journey. Al Burhan treats every pilgrim like family.", rating: 5, initial: "ZK" },
+  { name: "Mohammed Aslam", city: "Mumbai", text: "Al Burhan Tours & Travels provided excellent service during our Umrah trip. Everything from visa processing to hotel arrangements was handled professionally.", rating: 5, initial: "MA" },
+  { name: "Abdul Rahman", city: "Burhanpur", text: "Our Hajj journey was very well organized. The team supported us throughout the trip and made our pilgrimage comfortable.", rating: 5, initial: "AR" },
+  { name: "Sajida Begum", city: "Hyderabad", text: "I highly recommend Al Burhan Tours & Travels. Their staff was helpful, and the travel arrangements were smooth and well planned.", rating: 5, initial: "SB" },
+  { name: "Mohammed Imran", city: "Indore", text: "Very reliable travel agency for Umrah. The hotels and transportation were well arranged, and the guides were very supportive.", rating: 5, initial: "MI" },
+];
+
+const faqs = [
+  {
+    q: "What services does Al Burhan Tours & Travels provide?",
+    a: "We provide complete travel services including Hajj packages, Umrah packages, Ziyarat tours, visa processing, air ticket booking, hotel accommodation, and transportation services."
+  },
+  {
+    q: "How can I book a Hajj or Umrah package?",
+    a: "You can book your package by contacting our office directly, through WhatsApp, or by submitting a booking request on our website."
+  },
+  {
+    q: "What documents are required for Umrah or Hajj travel?",
+    a: "Generally required documents include a valid passport (minimum 6 months validity), passport size photographs, identity proof, vaccination certificate if required, and other documents depending on travel regulations. Our team will guide you through the full process."
+  },
+  {
+    q: "Do you provide visa services?",
+    a: "Yes, we assist customers with Umrah visa processing and travel documentation as part of our travel packages."
+  },
+  {
+    q: "Do you arrange group travel for Hajj and Umrah?",
+    a: "Yes, we organize group pilgrimages with experienced guides to ensure a comfortable and organized travel experience."
+  },
+  {
+    q: "Can I pay in installments?",
+    a: "In many cases, customers can pay in installments according to booking terms. Please contact our office for details."
+  },
+  {
+    q: "Do you organize Ziyarat tours?",
+    a: "Yes, we organize religious Ziyarat tours to historical Islamic sites including destinations in Saudi Arabia, Iraq, Jordan, and other locations depending on travel regulations."
+  },
 ];
 
 export default function Home() {
@@ -407,10 +436,45 @@ export default function Home() {
                   </div>
                   <div>
                     <div className="font-semibold text-foreground text-sm">{testimonial.name}</div>
-                    <div className="text-xs text-muted-foreground">Verified Pilgrim</div>
+                    <div className="text-xs text-muted-foreground">{testimonial.city} · Verified Pilgrim</div>
                   </div>
                 </div>
               </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="py-24 bg-white">
+        <div className="container mx-auto px-4 max-w-3xl">
+          <div className="text-center mb-16">
+            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
+              <span className="text-accent font-semibold text-sm uppercase tracking-widest">FAQs</span>
+              <h2 className="text-4xl md:text-5xl font-serif font-bold text-foreground mt-3 mb-4">Frequently Asked Questions</h2>
+              <p className="text-muted-foreground max-w-xl mx-auto">Everything you need to know before booking your sacred journey.</p>
+            </motion.div>
+          </div>
+
+          <div className="space-y-4">
+            {faqs.map((faq, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 15 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.07 }}
+                className="bg-muted/40 rounded-2xl border border-border/50 overflow-hidden"
+              >
+                <details className="group">
+                  <summary className="flex items-center justify-between gap-4 px-6 py-5 cursor-pointer list-none select-none">
+                    <span className="font-semibold text-foreground text-sm md:text-base">{faq.q}</span>
+                    <span className="shrink-0 w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary group-open:rotate-180 transition-transform duration-200 font-bold text-lg">+</span>
+                  </summary>
+                  <div className="px-6 pb-5 text-muted-foreground text-sm leading-relaxed border-t border-border/40 pt-4">
+                    {faq.a}
+                  </div>
+                </details>
+              </motion.div>
             ))}
           </div>
         </div>
@@ -424,7 +488,7 @@ export default function Home() {
             <h2 className="text-3xl md:text-4xl font-serif font-bold mb-3">Have Questions About Your Journey?</h2>
             <p className="text-white/80 text-lg max-w-lg">Message us directly on WhatsApp for instant support and booking inquiries.</p>
           </div>
-          <a href="https://wa.me/919893225590" target="_blank" rel="noreferrer">
+          <a href="https://wa.me/919893989786" target="_blank" rel="noreferrer">
             <Button size="lg" className="bg-white text-[#25D366] hover:bg-white/95 rounded-xl px-10 py-7 text-lg font-bold shadow-2xl hover:scale-[1.03] transition-all">
               Chat on WhatsApp
             </Button>
