@@ -476,22 +476,20 @@ export default function Invoice() {
     <>
       <MainLayout>
         <div className="max-w-4xl mx-auto py-8 px-4">
-          <div className="flex flex-wrap gap-3 mb-6 justify-end print:hidden">
+          <div className="flex flex-col sm:flex-row gap-3 mb-6 sm:justify-end print:hidden">
             <Button
-              variant="outline"
               size="sm"
               onClick={handleDownload}
               disabled={pdfLoading}
-              className="border-[#0B3D2E] text-[#0B3D2E] hover:bg-[#0B3D2E] hover:text-white"
+              className="bg-[#0B3D2E] text-white hover:bg-[#C9A23F] border-0"
             >
               <Download className="w-4 h-4 mr-2" />
               {pdfLoading ? "Generating..." : "Download PDF"}
             </Button>
             <Button
-              variant="outline"
               size="sm"
               onClick={() => window.print()}
-              className="border-[#0B3D2E] text-[#0B3D2E] hover:bg-[#0B3D2E] hover:text-white"
+              className="bg-[#0B3D2E] text-white hover:bg-[#C9A23F] border-0"
             >
               <Printer className="w-4 h-4 mr-2" />
               Print
@@ -499,9 +497,8 @@ export default function Invoice() {
             <Popover open={shareOpen} onOpenChange={setShareOpen}>
               <PopoverTrigger asChild>
                 <Button
-                  variant="outline"
                   size="sm"
-                  className="border-[#C9A23F] text-[#C9A23F] hover:bg-[#C9A23F] hover:text-white"
+                  className="bg-[#C9A23F] text-white hover:bg-[#0B3D2E] border-0"
                 >
                   <Share2 className="w-4 h-4 mr-2" />
                   Share
