@@ -45,10 +45,33 @@ function AnimatedCounter({ target, suffix = "" }: { target: number; suffix?: str
 }
 
 const testimonials = [
-  { name: "Mohammed Aslam", city: "Mumbai", text: "Al Burhan Tours & Travels provided excellent service during our Umrah trip. Everything from visa processing to hotel arrangements was handled professionally.", rating: 5, initial: "MA" },
-  { name: "Abdul Rahman", city: "Burhanpur", text: "Our Hajj journey was very well organized. The team supported us throughout the trip and made our pilgrimage comfortable.", rating: 5, initial: "AR" },
-  { name: "Sajida Begum", city: "Hyderabad", text: "I highly recommend Al Burhan Tours & Travels. Their staff was helpful, and the travel arrangements were smooth and well planned.", rating: 5, initial: "SB" },
-  { name: "Mohammed Imran", city: "Indore", text: "Very reliable travel agency for Umrah. The hotels and transportation were well arranged, and the guides were very supportive.", rating: 5, initial: "MI" },
+  { name: "Mohammed Aslam", city: "Mumbai", text: "Al Burhan Tours & Travels provided excellent service during our Umrah trip. Everything from visa processing to hotel arrangements was handled professionally.", rating: 5, initial: "MA", photo: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&h=80&fit=crop&q=80" },
+  { name: "Abdul Rahman", city: "Burhanpur", text: "Our Hajj journey was very well organized. The team supported us throughout the trip and made our pilgrimage comfortable.", rating: 5, initial: "AR", photo: "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=80&h=80&fit=crop&q=80" },
+  { name: "Sajida Begum", city: "Hyderabad", text: "I highly recommend Al Burhan Tours & Travels. Their staff was helpful, and the travel arrangements were smooth and well planned.", rating: 5, initial: "SB", photo: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=80&h=80&fit=crop&q=80" },
+  { name: "Mohammed Imran", city: "Indore", text: "Very reliable travel agency for Umrah. The hotels and transportation were well arranged, and the guides were very supportive.", rating: 5, initial: "MI", photo: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=80&h=80&fit=crop&q=80" },
+  { name: "Fatima Noor", city: "Nanded", text: "Alhamdulillah, the Umrah trip was wonderful. Al Burhan team took care of every detail and we felt safe and supported throughout.", rating: 5, initial: "FN", photo: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=80&h=80&fit=crop&q=80" },
+  { name: "Zakir Hussain", city: "Jalgaon", text: "The Ziyarat tour to Iraq was an unforgettable spiritual experience. Excellent arrangements and very caring guides.", rating: 5, initial: "ZH", photo: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=80&h=80&fit=crop&q=80" },
+];
+
+const pilgrimVideos = [
+  {
+    id: "KCrjGKEa5xk",
+    title: "Hajj – The Sacred Pilgrimage",
+    desc: "Witness the spiritual journey of millions at the holy city of Mecca.",
+    thumb: "https://images.unsplash.com/photo-1591604129939-f1efa4d9f7fa?w=640&h=360&fit=crop&q=80",
+  },
+  {
+    id: "gJFnWQUKVjo",
+    title: "Umrah – A Journey of the Heart",
+    desc: "Experience the serenity of performing Tawaf around the Kaaba.",
+    thumb: "https://images.unsplash.com/photo-1565552645632-d725f8bfc19a?w=640&h=360&fit=crop&q=80",
+  },
+  {
+    id: "3FbcgAVE72E",
+    title: "Madinah – City of the Prophet ﷺ",
+    desc: "A peaceful visit to Masjid al-Nabawi and the blessed city of Madinah.",
+    thumb: "https://images.unsplash.com/photo-1565552645632-d725f8bfc19a?w=640&h=360&fit=crop&q=80",
+  },
 ];
 
 const faqs = [
@@ -81,6 +104,49 @@ const faqs = [
     a: "Yes, we organize religious Ziyarat tours to historical Islamic sites including destinations in Saudi Arabia, Iraq, Jordan, and other locations depending on travel regulations."
   },
 ];
+
+function PilgrimVideoCard({ video, index }: { video: typeof pilgrimVideos[0]; index: number }) {
+  const [playing, setPlaying] = useState(false);
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+      transition={{ delay: index * 0.12 }}
+      className="rounded-2xl overflow-hidden shadow-xl border border-border/50 bg-white group"
+    >
+      <div className="relative aspect-video bg-black">
+        {playing ? (
+          <iframe
+            src={`https://www.youtube.com/embed/${video.id}?autoplay=1&rel=0`}
+            title={video.title}
+            allow="autoplay; encrypted-media; picture-in-picture"
+            allowFullScreen
+            className="w-full h-full"
+          />
+        ) : (
+          <>
+            <img src={video.thumb} alt={video.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+            <button
+              onClick={() => setPlaying(true)}
+              className="absolute inset-0 flex items-center justify-center"
+              aria-label={`Play ${video.title}`}
+            >
+              <div className="w-16 h-16 rounded-full bg-white/90 flex items-center justify-center shadow-2xl group-hover:scale-110 transition-transform duration-300">
+                <svg className="w-7 h-7 text-primary ml-1" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              </div>
+            </button>
+          </>
+        )}
+      </div>
+      <div className="p-5">
+        <h3 className="font-serif font-bold text-primary text-lg mb-1">{video.title}</h3>
+        <p className="text-muted-foreground text-sm leading-relaxed">{video.desc}</p>
+      </div>
+    </motion.div>
+  );
+}
 
 export default function Home() {
   const { data: packages = [] } = useListPackages({ active: true });
@@ -431,8 +497,12 @@ export default function Home() {
                 </div>
                 <p className="text-muted-foreground mb-5 italic leading-relaxed text-sm">"{testimonial.text}"</p>
                 <div className="flex items-center gap-3 border-t border-border/50 pt-4">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
-                    {testimonial.initial}
+                  <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-accent/30 shrink-0">
+                    {testimonial.photo ? (
+                      <img src={testimonial.photo} alt={testimonial.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">{testimonial.initial}</div>
+                    )}
                   </div>
                   <div>
                     <div className="font-semibold text-foreground text-sm">{testimonial.name}</div>
@@ -440,6 +510,25 @@ export default function Home() {
                   </div>
                 </div>
               </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Pilgrim Moments – Video Gallery */}
+      <section className="py-24 bg-primary/[0.03]">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-16">
+            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
+              <span className="text-accent font-semibold text-sm uppercase tracking-widest">Pilgrim Moments</span>
+              <h2 className="text-4xl md:text-5xl font-serif font-bold text-foreground mt-3 mb-4">Watch & Inspire</h2>
+              <p className="text-muted-foreground max-w-xl mx-auto">Sacred sights from Mecca, Madinah, and beyond — glimpses of the journey that awaits you.</p>
+            </motion.div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {pilgrimVideos.map((video, i) => (
+              <PilgrimVideoCard key={i} video={video} index={i} />
             ))}
           </div>
         </div>
