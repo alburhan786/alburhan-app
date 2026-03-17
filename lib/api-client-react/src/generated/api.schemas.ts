@@ -286,6 +286,7 @@ export interface Invoice {
   customerPan?: string;
   customerState?: string;
   packageName: string;
+  packageType?: string;
   numberOfPilgrims?: number;
   pricePerPerson?: number;
   totalAmount?: number;

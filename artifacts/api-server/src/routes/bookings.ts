@@ -396,7 +396,7 @@ function derivePaymentStatus(b: typeof bookingsTable.$inferSelect): "Paid" | "Pa
   return "Pending";
 }
 
-function buildInvoiceResponse(b: typeof bookingsTable.$inferSelect, pkg: { gstPercent: string | number } | null, maktabNumber: string | null = null) {
+function buildInvoiceResponse(b: typeof bookingsTable.$inferSelect, pkg: { gstPercent: string | number; type?: string | null } | null, maktabNumber: string | null = null) {
   const paymentDate = b.updatedAt?.toISOString?.();
   const dueDate = paymentDate
     ? new Date(new Date(paymentDate).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()
@@ -413,6 +413,7 @@ function buildInvoiceResponse(b: typeof bookingsTable.$inferSelect, pkg: { gstPe
     customerPan: "",
     customerState: "Madhya Pradesh",
     packageName: b.packageName,
+    packageType: pkg?.type ?? null,
     numberOfPilgrims: b.numberOfPilgrims,
     pricePerPerson: b.totalAmount && b.numberOfPilgrims ? Number(b.totalAmount) / b.numberOfPilgrims : null,
     totalAmount: b.totalAmount ? Number(b.totalAmount) : null,

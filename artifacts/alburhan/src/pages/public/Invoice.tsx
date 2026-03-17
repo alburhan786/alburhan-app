@@ -51,6 +51,22 @@ function fmtDate(dateString: string | null | undefined): string {
   } catch { return dateString; }
 }
 
+const PACKAGE_TYPE_LABELS: Record<string, string> = {
+  hajj: "Hajj",
+  special_hajj: "Special Hajj",
+  umrah: "Umrah",
+  ramadan_umrah: "Ramadan Umrah",
+  iraq_ziyarat: "Iraq Ziyarat",
+  baitul_muqaddas: "Baitul Muqaddas",
+  syria_ziyarat: "Syria Ziyarat",
+  jordan_heritage: "Jordan Heritage",
+};
+
+function formatPackageType(type: string | null | undefined): string {
+  if (!type) return "";
+  return PACKAGE_TYPE_LABELS[type] ?? type.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+}
+
 function StatusBadge({ status }: { status: string | undefined }) {
   const s = (status || "Pending").toLowerCase();
   let bg = "#FEF3CD";
@@ -178,6 +194,7 @@ function InvoiceContent({ invoice }: { invoice: InvoiceType }) {
                     <td className="px-2 py-2 text-center">{i + 1}</td>
                     <td className="px-2 py-2">
                       <div className="font-semibold">{invoice.packageName || "Travel Package"}</div>
+                      {invoice.packageType && <div className="text-[8px] font-semibold" style={{ color: GOLD }}>{formatPackageType(invoice.packageType)}</div>}
                       {p.name && <div className="text-[9px]">{p.name}</div>}
                       {invoice.roomType && <div className="text-[8px]" style={{ color: "#555" }}>Room: {invoice.roomType}</div>}
                       {invoice.maktabNumber && <div className="text-[8px]" style={{ color: "#555" }}>Maktab: {invoice.maktabNumber}</div>}
@@ -185,7 +202,7 @@ function InvoiceContent({ invoice }: { invoice: InvoiceType }) {
                     </td>
                     <td className="px-2 py-2 text-center">{invoice.sacCode || "998555"}</td>
                     <td className="px-2 py-2 text-center">{p.passportNumber || "—"}</td>
-                    <td className="px-2 py-2 text-center">—</td>
+                    <td className="px-2 py-2 text-center">{p.passportExpiry ? fmtDate(p.passportExpiry) : "—"}</td>
                     <td className="px-2 py-2 text-right">{formatINR(pricePerPerson)}</td>
                     <td className="px-2 py-2 text-right">
                       {formatINR(taxPerPerson)}
@@ -199,6 +216,7 @@ function InvoiceContent({ invoice }: { invoice: InvoiceType }) {
                   <td className="px-2 py-2 text-center">1</td>
                   <td className="px-2 py-2">
                     <div className="font-semibold">{invoice.packageName || "Travel Package"}</div>
+                    {invoice.packageType && <div className="text-[8px] font-semibold" style={{ color: GOLD }}>{formatPackageType(invoice.packageType)}</div>}
                     {invoice.roomType && <div className="text-[8px]" style={{ color: "#555" }}>Room: {invoice.roomType}</div>}
                     {invoice.maktabNumber && <div className="text-[8px]" style={{ color: "#555" }}>Maktab: {invoice.maktabNumber}</div>}
                     {invoice.travelDate && <div className="text-[8px]" style={{ color: "#555" }}>Travel: {fmtDate(invoice.travelDate)}</div>}

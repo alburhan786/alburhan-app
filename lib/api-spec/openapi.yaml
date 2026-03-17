@@ -1421,6 +1421,8 @@ components:
           type: string
         packageName:
           type: string
+        packageType:
+          type: string
         numberOfPilgrims:
           type: number
         pricePerPerson:
