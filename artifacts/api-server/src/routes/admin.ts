@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db, bookingsTable, usersTable, packagesTable, inquiriesTable } from "@workspace/db";
 import { eq, count, sum, desc, and, sql } from "drizzle-orm";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
-import { sendSMS, sendWhatsApp } from "../lib/notifications.js";
+import { sendWhatsApp } from "../lib/notifications.js";
 
 const router = Router();
 
@@ -94,7 +94,7 @@ router.post("/broadcast", requireAdmin as any, async (req: AuthenticatedRequest,
   }
 
   const results = await Promise.allSettled(
-    mobiles.flatMap(m => [sendWhatsApp(m, message), sendSMS(m, message)])
+    mobiles.map(m => sendWhatsApp(m, message))
   );
   const sent = results.filter(r => r.status === "fulfilled" && (r as PromiseFulfilledResult<boolean>).value).length;
 

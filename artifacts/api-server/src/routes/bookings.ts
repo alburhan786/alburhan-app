@@ -14,7 +14,7 @@ import {
   sendBookingSubmissionNotification,
   sendPaymentConfirmationNotification,
   sendWhatsApp,
-  sendSMS,
+  sendDLTSMS,
 } from "../lib/notifications.js";
 
 const router = Router();
@@ -299,7 +299,7 @@ router.post("/:id/send-invoice", requireAdmin as any, async (req: AuthenticatedR
 
   const results = await Promise.allSettled([
     sendWhatsApp(b.customerMobile, message),
-    sendSMS(b.customerMobile, message),
+    sendDLTSMS(b.customerMobile, b.customerName, b.bookingNumber, b.invoiceNumber || ""),
   ]);
 
   const whatsappOk = results[0].status === "fulfilled" && (results[0] as PromiseFulfilledResult<boolean>).value;

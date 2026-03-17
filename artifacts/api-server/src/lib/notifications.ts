@@ -3,6 +3,7 @@ import axios from "axios";
 const FAST2SMS_API_KEY = process.env.FAST2SMS_API_KEY;
 const FAST2SMS_SENDER_ID = "ALBURH";
 const FAST2SMS_OTP_DLT_TEMPLATE_ID = "164844";
+const FAST2SMS_NOTIFY_DLT_TEMPLATE_ID = "211277";
 
 const BOTBEE_API_KEY = process.env.BOTBEE_API_KEY;
 const BOTBEE_PHONE_NUMBER_ID = process.env.BOTBEE_PHONE_NUMBER_ID;
@@ -39,34 +40,26 @@ export async function sendOtpSMS(mobile: string, otp: string): Promise<boolean> 
   }
 }
 
-export async function sendSMS(mobile: string, message: string): Promise<boolean> {
+export async function sendDLTSMS(
+  mobile: string,
+  var1: string,
+  var2: string,
+  var3: string
+): Promise<boolean> {
   if (!FAST2SMS_API_KEY) {
-    console.log("[SMS] API key not set — message:", message.slice(0, 80), "for:", mobile);
+    console.log("[SMS-DLT] API key not set — vars:", var1, var2, var3, "for:", mobile);
     return false;
   }
   try {
     const phone = toFast2SMSPhone(mobile);
-    const response = await axios.post(
-      "https://www.fast2sms.com/dev/bulkV2",
-      {
-        route: "q",
-        message,
-        flash: 0,
-        numbers: phone,
-        sender_id: FAST2SMS_SENDER_ID,
-      },
-      {
-        headers: {
-          authorization: FAST2SMS_API_KEY,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-    console.log("[SMS] Sent to", mobile, response.data);
+    const variables = encodeURIComponent(`${var1}|${var2}|${var3}|`);
+    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${FAST2SMS_API_KEY}&route=dlt&sender_id=${FAST2SMS_SENDER_ID}&message=${FAST2SMS_NOTIFY_DLT_TEMPLATE_ID}&variables_values=${variables}&numbers=${phone}&flash=0`;
+    const response = await axios.get(url);
+    console.log("[SMS-DLT] Sent to", mobile, response.data);
     return true;
   } catch (err: any) {
     const errData = err?.response?.data || err.message;
-    console.error("[SMS] Error for", mobile, ":", JSON.stringify(errData));
+    console.error("[SMS-DLT] Error for", mobile, ":", JSON.stringify(errData));
     return false;
   }
 }
@@ -159,11 +152,10 @@ export async function sendBookingSubmissionNotification(opts: {
   numberOfPilgrims: number;
 }) {
   const customerMsg = `Assalamu Alaikum ${opts.customerName},\n\nYour booking #${opts.bookingNumber} for "${opts.packageName}" (${opts.numberOfPilgrims} pilgrim${opts.numberOfPilgrims > 1 ? "s" : ""}) has been submitted.\n\nOur team will review shortly and notify you once approved.\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 8989701701`;
-
   const adminMsg = `New Booking Alert!\n\nBooking #${opts.bookingNumber}\nCustomer: ${opts.customerName}\nMobile: ${opts.mobile}\nPackage: ${opts.packageName}\nPilgrims: ${opts.numberOfPilgrims}\n\nReview from admin dashboard.`;
 
   await Promise.allSettled([
-    sendSMS(opts.mobile, customerMsg),
+    sendDLTSMS(opts.mobile, opts.customerName, opts.bookingNumber, "SUBMITTED"),
     sendWhatsAppWithFallback(opts.mobile, customerMsg),
     opts.email ? sendEmail(opts.email, "Booking Submitted – Al Burhan Tours & Travels", customerMsg) : Promise.resolve(),
     sendWhatsApp("9893989786", adminMsg),
@@ -179,7 +171,7 @@ export async function sendBookingApprovalNotification(opts: {
 }) {
   const message = `Assalamu Alaikum ${opts.customerName},\n\nYour booking #${opts.bookingNumber} with Al Burhan Tours & Travels has been APPROVED.\n\nPlease login to complete payment.\n\nHelp: +91 8989701701 / +91 9893989786\n\nJazak Allah Khair!`;
   await Promise.allSettled([
-    sendSMS(opts.mobile, message),
+    sendDLTSMS(opts.mobile, opts.customerName, opts.bookingNumber, "APPROVED"),
     sendWhatsAppWithFallback(opts.mobile, message),
     opts.email ? sendEmail(opts.email, "Booking Approved – Al Burhan Tours & Travels", message) : Promise.resolve(),
   ]);
@@ -195,7 +187,7 @@ export async function sendBookingRejectionNotification(opts: {
   const reasonText = opts.reason ? `\n\nReason: ${opts.reason}` : "";
   const message = `Assalamu Alaikum ${opts.customerName},\n\nWe regret that your booking #${opts.bookingNumber} could not be processed.${reasonText}\n\nPlease contact us:\n+91 8989701701\n+91 9893989786`;
   await Promise.allSettled([
-    sendSMS(opts.mobile, message),
+    sendDLTSMS(opts.mobile, opts.customerName, opts.bookingNumber, "REJECTED"),
     sendWhatsAppWithFallback(opts.mobile, message),
     opts.email ? sendEmail(opts.email, "Booking Update – Al Burhan Tours & Travels", message) : Promise.resolve(),
   ]);
@@ -212,11 +204,10 @@ export async function sendPaymentConfirmationNotification(opts: {
 }) {
   const invoiceLine = opts.invoiceUrl ? `\n\nInvoice: ${opts.invoiceUrl}` : "";
   const message = `Assalamu Alaikum ${opts.customerName},\n\nPayment of Rs.${opts.amount} received for booking #${opts.bookingNumber}.\n\nYour booking is CONFIRMED!\nInvoice No: ${opts.invoiceNumber}${invoiceLine}\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 8989701701`;
-
   const adminMsg = `Payment Received!\n\nBooking: #${opts.bookingNumber}\nCustomer: ${opts.customerName}\nMobile: ${opts.mobile}\nAmount: Rs.${opts.amount}\nInvoice: ${opts.invoiceNumber}`;
 
   await Promise.allSettled([
-    sendSMS(opts.mobile, message),
+    sendDLTSMS(opts.mobile, opts.customerName, opts.bookingNumber, `Rs.${opts.amount}`),
     sendWhatsAppWithFallback(opts.mobile, message),
     opts.email ? sendEmail(opts.email, "Booking Confirmed – Al Burhan Tours & Travels", message) : Promise.resolve(),
     sendWhatsApp("9893989786", adminMsg),
@@ -234,7 +225,7 @@ export async function sendPartialPaymentNotification(opts: {
 }) {
   const message = `Assalamu Alaikum ${opts.customerName},\n\nPartial payment of Rs.${opts.paidAmount} received for booking #${opts.bookingNumber}.\n\nBalance remaining: Rs.${opts.remainingAmount}\n\nPlease login to pay the remaining amount.\n\nAl Burhan Tours & Travels\n+91 8989701701`;
   await Promise.allSettled([
-    sendSMS(opts.mobile, message),
+    sendDLTSMS(opts.mobile, opts.customerName, opts.bookingNumber, `Paid Rs.${opts.paidAmount} Balance Rs.${opts.remainingAmount}`),
     sendWhatsAppWithFallback(opts.mobile, message),
     opts.email ? sendEmail(opts.email, "Partial Payment Received – Al Burhan Tours & Travels", message) : Promise.resolve(),
   ]);

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, inquiriesTable } from "@workspace/db";
 import { SubmitInquiryBody } from "@workspace/api-zod";
-import { sendWhatsApp, sendSMS } from "../lib/notifications.js";
+import { sendWhatsApp } from "../lib/notifications.js";
 
 const router = Router();
 
@@ -24,7 +24,6 @@ router.post("/", async (req, res) => {
   const adminMsg = `New inquiry from ${data.name} (${data.mobile}): ${data.message}`;
   const adminMobile = process.env.ADMIN_MOBILE ?? "";
   if (adminMobile) {
-    sendSMS(adminMobile, adminMsg).catch(console.error);
     sendWhatsApp(adminMobile, adminMsg).catch(console.error);
   }
 
