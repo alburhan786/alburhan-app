@@ -58,7 +58,7 @@ export function PrivacyPolicy() {
       <p>If you have any questions about our privacy policy, you can contact us:</p>
       <ul>
         <li><strong>Email:</strong> info@alburhantravels.com</li>
-        <li><strong>Phone:</strong> +91 9893989786</li>
+        <li><strong>Phone:</strong> +91 9893989786 / +91 8989701701 / +91 9893225590</li>
       </ul>
     </LegalLayout>
   );
@@ -120,7 +120,7 @@ export function CancellationPolicy() {
       <p>To initiate a cancellation, please contact us in writing:</p>
       <ul>
         <li><strong>Email:</strong> info@alburhantravels.com</li>
-        <li><strong>Phone:</strong> +91 9893989786</li>
+        <li><strong>Phone:</strong> +91 9893989786 / +91 8989701701 / +91 9893225590</li>
         <li><strong>Office:</strong> 5/8 Khanka Masjid Complex, Shanwara Road, Burhanpur MP 450331</li>
       </ul>
     </LegalLayout>
@@ -152,7 +152,7 @@ export function RefundPolicy() {
       <h2>Contact for Refunds</h2>
       <ul>
         <li><strong>Email:</strong> info@alburhantravels.com</li>
-        <li><strong>Phone:</strong> +91 9893989786</li>
+        <li><strong>Phone:</strong> +91 9893989786 / +91 8989701701 / +91 9893225590</li>
       </ul>
     </LegalLayout>
   );
