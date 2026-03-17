@@ -242,21 +242,23 @@ export default function PrintIdCardsPro() {
                       </div>
                     </div>
 
-                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "auto", paddingBottom: "12mm", paddingRight: "1mm" }}>
-                      <QRCodeSVG
-                        value={buildQrData(p, group)}
-                        size={32}
-                        level="H"
-                        imageSettings={{
-                          src: `${BASE}images/logo.png`,
-                          height: 7,
-                          width: 7,
-                          excavate: true,
-                        }}
-                      />
-                    </div>
-                  </div>
+                  </div>{/* end right column */}
 
+                </div>{/* end content row */}
+
+                {/* QR code — absolutely placed above footer, z-index above footer bar */}
+                <div style={{ position: "absolute", bottom: "10mm", right: "3mm", zIndex: 3 }}>
+                  <QRCodeSVG
+                    value={buildQrData(p, group)}
+                    size={30}
+                    level="H"
+                    imageSettings={{
+                      src: `${BASE}images/logo.png`,
+                      height: 6,
+                      width: 6,
+                      excavate: true,
+                    }}
+                  />
                 </div>
 
                 <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 2 }}>
