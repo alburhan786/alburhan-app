@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { useListBookings, useApproveBooking, useRejectBooking, useListDocuments, useDeleteDocument } from "@workspace/api-client-react";
 import type { Booking, Pilgrim } from "@workspace/api-client-react";
@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
-import { CheckCircle, XCircle, Eye, ExternalLink, Plus, Trash2, FileText, Download, ImageIcon } from "lucide-react";
+import { CheckCircle, XCircle, Eye, ExternalLink, Plus, Trash2, FileText, Download, ImageIcon, RefreshCw, Upload } from "lucide-react";
 
 const DOC_TYPE_LABELS: Record<string, string> = {
   passport: "Passport",
@@ -37,17 +38,25 @@ const DOC_TYPE_COLOR: Record<string, string> = {
   other: "bg-gray-100 text-gray-800",
 };
 
-const API_BASE = import.meta.env.VITE_API_URL || "";
-
 function isImageFile(fileName: string) {
   return /\.(jpg|jpeg|png|webp|gif)$/i.test(fileName);
 }
 
+const DOC_TYPES = Object.entries(DOC_TYPE_LABELS).map(([value, label]) => ({ value, label }));
+const BASE_API = import.meta.env.VITE_API_URL || "";
+
 function AdminDocumentsSection({ bookingId }: { bookingId: string }) {
-  const { data: docs, isLoading } = useListDocuments(bookingId);
+  const { data: docs, isLoading, refetch } = useListDocuments(bookingId, {
+    query: { refetchOnMount: "always" },
+  });
   const deleteDoc = useDeleteDocument();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const [uploading, setUploading] = useState(false);
+  const [docType, setDocType] = useState("passport");
+  const [file, setFile] = useState<File | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const handleDelete = async (docId: string, fileName: string) => {
     if (!confirm(`Delete "${fileName}"? This cannot be undone.`)) return;
@@ -60,25 +69,74 @@ function AdminDocumentsSection({ bookingId }: { bookingId: string }) {
     }
   };
 
-  if (isLoading) return <p className="text-sm text-muted-foreground">Loading documents…</p>;
+  const handleUpload = async () => {
+    if (!file) { toast({ title: "Please select a file", variant: "destructive" }); return; }
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("bookingId", bookingId);
+      fd.append("documentType", docType);
+      const res = await fetch(`${BASE_API}/api/documents/upload`, { method: "POST", body: fd, credentials: "include" });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Upload failed");
+      }
+      toast({ title: "Document uploaded!" });
+      setFile(null);
+      if (fileRef.current) fileRef.current.value = "";
+      refetch();
+      queryClient.invalidateQueries({ queryKey: [`/api/documents/${bookingId}`] });
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const docList = (docs || []) as any[];
 
-  if (docList.length === 0) {
-    return (
-      <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/40 rounded-lg p-3">
-        <FileText size={16} />
-        <span>No documents uploaded yet by customer.</span>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
+      {/* Admin Upload Row */}
+      <div className="flex items-center gap-2 p-3 bg-muted/40 rounded-lg border border-dashed">
+        <Select value={docType} onValueChange={setDocType}>
+          <SelectTrigger className="h-8 w-40 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {DOC_TYPES.map(t => (
+              <SelectItem key={t.value} value={t.value} className="text-xs">{t.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".pdf,.jpg,.jpeg,.png,.webp"
+          className="text-xs flex-1 min-w-0"
+          onChange={e => setFile(e.target.files?.[0] || null)}
+        />
+        <Button size="sm" className="h-8 text-xs gap-1.5 bg-[#0B3D2E] hover:bg-[#0d5038] text-white shrink-0" onClick={handleUpload} disabled={uploading || !file}>
+          <Upload size={12} /> {uploading ? "Uploading…" : "Upload"}
+        </Button>
+        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-muted-foreground shrink-0" title="Refresh list" onClick={() => refetch()}>
+          <RefreshCw size={13} className={isLoading ? "animate-spin" : ""} />
+        </Button>
+      </div>
+
+      {/* Document List */}
+      {isLoading && <p className="text-sm text-muted-foreground">Loading documents…</p>}
+      {!isLoading && docList.length === 0 && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/40 rounded-lg p-3">
+          <FileText size={16} />
+          <span>No documents uploaded yet.</span>
+        </div>
+      )}
       {docList.map((doc: any) => {
         const label = DOC_TYPE_LABELS[doc.documentType] || doc.documentType;
         const color = DOC_TYPE_COLOR[doc.documentType] || "bg-gray-100 text-gray-800";
-        const fileUrl = `${API_BASE}${doc.fileUrl}`;
+        const fileUrl = `${BASE_API}${doc.fileUrl}`;
         const isImg = isImageFile(doc.fileName || "");
 
         return (
