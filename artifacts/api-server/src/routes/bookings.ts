@@ -53,70 +53,77 @@ router.get("/offline", requireAdmin as any, (_req, res) => {
 router.post("/offline", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   const parsed = CreateOfflineBookingBody.safeParse(req.body);
   if (!parsed.success) {
+    console.error("[bookings] POST /offline Zod error:", parsed.error.message);
     res.status(400).json({ message: "Invalid booking data", error: parsed.error.message });
     return;
   }
   const data = parsed.data;
 
-  let packageData = null;
-  let totalAmount = null;
-  let gstAmount = null;
-  let finalAmount = null;
+  try {
+    let packageData = null;
+    let totalAmount = null;
+    let gstAmount = null;
+    let finalAmount = null;
 
-  if (data.packageId) {
-    const pkgs = await db.select().from(packagesTable).where(eq(packagesTable.id, data.packageId)).limit(1);
-    if (pkgs[0]) {
-      packageData = pkgs[0];
-      const price = Number(packageData.pricePerPerson) * data.numberOfPilgrims;
-      const gst = price * (Number(packageData.gstPercent) / 100);
-      totalAmount = price;
-      gstAmount = gst;
-      finalAmount = price + gst;
+    if (data.packageId) {
+      const pkgs = await db.select().from(packagesTable).where(eq(packagesTable.id, data.packageId)).limit(1);
+      if (pkgs[0]) {
+        packageData = pkgs[0];
+        const price = Number(packageData.pricePerPerson) * data.numberOfPilgrims;
+        const gst = price * (Number(packageData.gstPercent) / 100);
+        totalAmount = price;
+        gstAmount = gst;
+        finalAmount = price + gst;
+      }
     }
+
+    const bookingNumber = generateBookingNumber();
+    const isPaid = data.paymentStatus === "paid";
+
+    const [booking] = await db.insert(bookingsTable).values({
+      bookingNumber,
+      packageId: data.packageId ?? null,
+      packageName: packageData?.name ?? null,
+      customerName: data.customerName,
+      customerMobile: data.customerMobile,
+      customerEmail: data.customerEmail ?? null,
+      numberOfPilgrims: data.numberOfPilgrims,
+      pilgrims: (data.pilgrims ?? []) as Array<{ name: string; passportNumber?: string; passportExpiry?: string; dateOfBirth?: string }>,
+      preferredDepartureDate: data.preferredDepartureDate ?? null,
+      roomType: data.roomType ?? null,
+      advanceAmount: data.advanceAmount ? String(data.advanceAmount) : null,
+      status: isPaid ? "confirmed" : "approved",
+      totalAmount: totalAmount ? String(totalAmount) : null,
+      gstAmount: gstAmount ? String(gstAmount) : null,
+      finalAmount: finalAmount ? String(finalAmount) : null,
+      notes: data.notes ?? null,
+      isOffline: true,
+      invoiceNumber: isPaid ? generateInvoiceNumber() : null,
+    }).returning();
+
+    if (isPaid) {
+      sendPaymentConfirmationNotification({
+        mobile: booking.customerMobile,
+        email: booking.customerEmail,
+        customerName: booking.customerName,
+        bookingNumber: booking.bookingNumber,
+        amount: booking.finalAmount ? String(Number(booking.finalAmount).toLocaleString("en-IN")) : "N/A",
+        invoiceNumber: booking.invoiceNumber ?? "",
+      }).catch(console.error);
+    } else {
+      sendBookingApprovalNotification({
+        mobile: booking.customerMobile,
+        email: booking.customerEmail,
+        customerName: booking.customerName,
+        bookingNumber: booking.bookingNumber,
+      }).catch(console.error);
+    }
+
+    res.status(201).json(formatBooking(booking));
+  } catch (err: any) {
+    console.error("[bookings] POST /offline DB error:", err);
+    res.status(500).json({ message: err?.message || "Failed to create offline booking" });
   }
-
-  const bookingNumber = generateBookingNumber();
-  const isPaid = data.paymentStatus === "paid";
-
-  const [booking] = await db.insert(bookingsTable).values({
-    bookingNumber,
-    packageId: data.packageId ?? null,
-    packageName: packageData?.name ?? null,
-    customerName: data.customerName,
-    customerMobile: data.customerMobile,
-    customerEmail: data.customerEmail ?? null,
-    numberOfPilgrims: data.numberOfPilgrims,
-    pilgrims: (data.pilgrims ?? []) as Array<{ name: string; passportNumber?: string; passportExpiry?: string; dateOfBirth?: string }>,
-    preferredDepartureDate: data.preferredDepartureDate ?? null,
-    roomType: data.roomType ?? null,
-    advanceAmount: data.advanceAmount ? String(data.advanceAmount) : null,
-    status: isPaid ? "confirmed" : "approved",
-    totalAmount: totalAmount ? String(totalAmount) : null,
-    gstAmount: gstAmount ? String(gstAmount) : null,
-    finalAmount: finalAmount ? String(finalAmount) : null,
-    notes: data.notes ?? null,
-    isOffline: true,
-    invoiceNumber: isPaid ? generateInvoiceNumber() : null,
-  }).returning();
-  if (isPaid) {
-    sendPaymentConfirmationNotification({
-      mobile: booking.customerMobile,
-      email: booking.customerEmail,
-      customerName: booking.customerName,
-      bookingNumber: booking.bookingNumber,
-      amount: booking.finalAmount ? String(Number(booking.finalAmount).toLocaleString("en-IN")) : "N/A",
-      invoiceNumber: booking.invoiceNumber ?? "",
-    }).catch(console.error);
-  } else {
-    sendBookingApprovalNotification({
-      mobile: booking.customerMobile,
-      email: booking.customerEmail,
-      customerName: booking.customerName,
-      bookingNumber: booking.bookingNumber,
-    }).catch(console.error);
-  }
-
-  res.status(201).json(formatBooking(booking));
 });
 
 router.get("/", requireAuth as any, async (req: AuthenticatedRequest, res) => {

@@ -58,17 +58,22 @@ router.post("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => 
     res.status(400).json({ message: "groupName and year are required" });
     return;
   }
-  const [group] = await db.insert(hajjGroupsTable).values({
-    groupName,
-    year: Number(year),
-    departureDate: departureDate || null,
-    returnDate: returnDate || null,
-    flightNumber: flightNumber || null,
-    maktabNumber: maktabNumber || null,
-    hotels: hotels || {},
-    notes: notes || null,
-  }).returning();
-  res.status(201).json(fmtGroup(group));
+  try {
+    const [group] = await db.insert(hajjGroupsTable).values({
+      groupName,
+      year: Number(year),
+      departureDate: departureDate || null,
+      returnDate: returnDate || null,
+      flightNumber: flightNumber || null,
+      maktabNumber: maktabNumber || null,
+      hotels: hotels || {},
+      notes: notes || null,
+    }).returning();
+    res.status(201).json(fmtGroup(group));
+  } catch (err: any) {
+    console.error("[groups] POST / DB error:", err);
+    res.status(500).json({ message: err?.message || "Failed to create group" });
+  }
 });
 
 router.get("/:id", requireAdmin as any, async (req, res) => {
@@ -79,12 +84,17 @@ router.get("/:id", requireAdmin as any, async (req, res) => {
 
 router.put("/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   const { groupName, year, departureDate, returnDate, flightNumber, maktabNumber, hotels, notes } = req.body;
-  const [updated] = await db.update(hajjGroupsTable).set({
-    groupName, year: Number(year), departureDate, returnDate, flightNumber, maktabNumber,
-    hotels: hotels || {}, notes, updatedAt: new Date(),
-  }).where(eq(hajjGroupsTable.id, req.params.id)).returning();
-  if (!updated) { res.status(404).json({ message: "Group not found" }); return; }
-  res.json(fmtGroup(updated));
+  try {
+    const [updated] = await db.update(hajjGroupsTable).set({
+      groupName, year: Number(year), departureDate, returnDate, flightNumber, maktabNumber,
+      hotels: hotels || {}, notes, updatedAt: new Date(),
+    }).where(eq(hajjGroupsTable.id, req.params.id)).returning();
+    if (!updated) { res.status(404).json({ message: "Group not found" }); return; }
+    res.json(fmtGroup(updated));
+  } catch (err: any) {
+    console.error("[groups] PUT /:id DB error:", err);
+    res.status(500).json({ message: err?.message || "Failed to update group" });
+  }
 });
 
 router.delete("/:id", requireAdmin as any, async (req, res) => {

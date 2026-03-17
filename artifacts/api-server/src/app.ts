@@ -12,6 +12,20 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on("finish", () => {
+    const ms = Date.now() - start;
+    const ts = new Date().toISOString();
+    if (res.statusCode >= 400) {
+      console.error(`[${ts}] ${req.method} ${req.path} ${res.statusCode} (${ms}ms)`);
+    } else {
+      console.log(`[${ts}] ${req.method} ${req.path} ${res.statusCode} (${ms}ms)`);
+    }
+  });
+  next();
+});
+
 app.use(session({
   secret: process.env.SESSION_SECRET || "alburhan-tours-secret-key-2024",
   resave: false,

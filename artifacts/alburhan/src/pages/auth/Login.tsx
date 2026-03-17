@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,8 +17,13 @@ export default function Login() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [, setLocation] = useLocation();
 
+  useEffect(() => {
+    if (isAuthenticated) {
+      setLocation(isAdmin ? "/admin/dashboard" : "/customer/dashboard");
+    }
+  }, [isAuthenticated, isAdmin, setLocation]);
+
   if (isAuthenticated) {
-    setLocation(isAdmin ? "/admin/dashboard" : "/customer/dashboard");
     return null;
   }
 

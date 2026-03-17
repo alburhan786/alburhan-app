@@ -127,11 +127,18 @@ export default function GroupsManager() {
       const url = editingId ? `${API}/api/groups/${editingId}` : `${API}/api/groups`;
       const res = await fetch(url, { method: editingId ? "PUT" : "POST", credentials: "include",
         headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) {
+        let errMsg = "Failed to save group";
+        try { const body = await res.json(); errMsg = body.message || body.error || errMsg; } catch {}
+        throw new Error(errMsg);
+      }
       toast({ title: editingId ? "Group updated" : "Group created" });
       setDialogOpen(false);
       fetchGroups();
-    } catch { toast({ title: "Error saving group", variant: "destructive" }); }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Error saving group";
+      toast({ title: "Error saving group", description: msg, variant: "destructive" });
+    }
   };
 
   const handleDelete = async (id: string) => {

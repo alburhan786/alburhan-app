@@ -82,17 +82,25 @@ router.post("/create-order", requireAuth as any, async (req: AuthenticatedReques
 
   const amountPaise = Math.round(chargeAmount * 100);
 
-  const order = await razorpay.orders.create({
-    amount: amountPaise,
-    currency: "INR",
-    receipt: booking.bookingNumber,
-    notes: {
-      bookingId: booking.id,
-      bookingNumber: booking.bookingNumber,
-      customerName: booking.customerName,
-      isPartial: chargeAmount < remainingBalance ? "true" : "false",
-    },
-  });
+  let order: Awaited<ReturnType<typeof razorpay.orders.create>>;
+  try {
+    order = await razorpay.orders.create({
+      amount: amountPaise,
+      currency: "INR",
+      receipt: booking.bookingNumber,
+      notes: {
+        bookingId: booking.id,
+        bookingNumber: booking.bookingNumber,
+        customerName: booking.customerName,
+        isPartial: chargeAmount < remainingBalance ? "true" : "false",
+      },
+    });
+  } catch (err: any) {
+    console.error("[payments] Razorpay orders.create error:", err?.error || err);
+    const msg = err?.error?.description || err?.message || "Failed to create payment order";
+    res.status(502).json({ message: msg });
+    return;
+  }
 
   await db.update(bookingsTable).set({ razorpayOrderId: order.id }).where(eq(bookingsTable.id, bookingId));
 
