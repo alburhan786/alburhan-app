@@ -185,20 +185,20 @@ export default function PrintIdCardsPro() {
                 <div style={{ position: "relative", zIndex: 1, display: "flex", height: "100%", padding: "2.5mm 3mm 0" }}>
 
                   {/* Left column: logo + photo + name */}
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "34mm", flexShrink: 0 }}>
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: "1.5mm", marginTop: "3mm" }}>
-                      <img src={BASE + "images/logo.png"} alt="" style={{ width: "12mm", height: "12mm", objectFit: "contain", marginBottom: "0.5mm" }} />
-                      <div style={{ fontSize: "8pt", fontWeight: 900, color: DARK, letterSpacing: "0.5px", lineHeight: 1.1, textAlign: "center" }}>AL BURHAN</div>
-                      <div style={{ fontSize: "4.5pt", fontWeight: 700, color: GOLD, letterSpacing: "0.5px", textAlign: "center" }}>TOURS & TRAVELS</div>
-                      <div style={{ fontSize: "5pt", fontWeight: 800, color: DARK, marginTop: "0.3mm", textAlign: "center" }}>HAJJ {group.year}</div>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "26mm", flexShrink: 0 }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: "1mm", marginTop: "3mm" }}>
+                      <img src={BASE + "images/logo.png"} alt="" style={{ width: "8mm", height: "8mm", objectFit: "contain", marginBottom: "0.5mm" }} />
+                      <div style={{ fontSize: "6pt", fontWeight: 900, color: DARK, letterSpacing: "0.5px", lineHeight: 1.1, textAlign: "center" }}>AL BURHAN</div>
+                      <div style={{ fontSize: "3.5pt", fontWeight: 700, color: GOLD, letterSpacing: "0.5px", textAlign: "center" }}>TOURS & TRAVELS</div>
+                      <div style={{ fontSize: "4pt", fontWeight: 800, color: DARK, marginTop: "0.3mm", textAlign: "center" }}>HAJJ {group.year}</div>
                     </div>
 
                     {/* Passport-style photo */}
                     <div style={{ marginBottom: "1mm" }}>
                       {p.photoUrl ? (
-                        <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "22mm", height: "28mm", objectFit: "cover", borderRadius: "2px", border: `2px solid ${GOLD}` }} />
+                        <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "18mm", height: "23mm", objectFit: "cover", borderRadius: "2px", border: `2px solid ${GOLD}` }} />
                       ) : (
-                        <div style={{ width: "22mm", height: "28mm", background: "#f0f0f0", borderRadius: "2px", border: `2px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "5pt", color: "#aaa" }}>PHOTO</div>
+                        <div style={{ width: "18mm", height: "23mm", background: "#f0f0f0", borderRadius: "2px", border: `2px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "5pt", color: "#aaa" }}>PHOTO</div>
                       )}
                     </div>
                   </div>
@@ -242,16 +242,26 @@ export default function PrintIdCardsPro() {
                       </div>
                     </div>
 
-                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "auto", paddingBottom: "5mm" }}>
-                      <QRCodeSVG value={buildQrData(p, group)} size={36} level="M" />
+                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "auto", paddingBottom: "12mm", paddingRight: "1mm" }}>
+                      <QRCodeSVG
+                        value={buildQrData(p, group)}
+                        size={32}
+                        level="H"
+                        imageSettings={{
+                          src: `${BASE}images/logo.png`,
+                          height: 7,
+                          width: 7,
+                          excavate: true,
+                        }}
+                      />
                     </div>
                   </div>
 
                 </div>
 
                 <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 2 }}>
-                  <div style={{ display: "flex", justifyContent: "center", overflow: "hidden", padding: "0 3mm" }}>
-                    <Barcode value={`${p.passportNumber || "N/A"}-${String(p.serialNumber).padStart(3, "0")}`} height={12} width={1.0} fontSize={0} />
+                  <div style={{ display: "flex", justifyContent: "center", overflow: "hidden", padding: "0 4mm" }}>
+                    <Barcode value={`${p.passportNumber || "N/A"}-${String(p.serialNumber).padStart(3, "0")}`} height={10} width={0.9} fontSize={0} />
                   </div>
                   <div style={{ background: DARK, color: GOLD, padding: "1mm 2mm", fontSize: "3.8pt", textAlign: "center", fontWeight: 700, letterSpacing: "0.2px", marginTop: "0.5mm" }}>
                     #{String(p.serialNumber).padStart(3, "0")} | Emergency: 0547090786 | 0568780786
