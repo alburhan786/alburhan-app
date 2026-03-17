@@ -8,7 +8,7 @@ import {
 import { generateOtp, requireAuth, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendOtpSMS, sendWhatsApp } from "../lib/notifications.js";
 
-export const ADMIN_MOBILES = ["9893989786", "9893225590", "9999999999"];
+export const ADMIN_MOBILES = ["9893989786", "9893225590", "8989701701", "9999999999"];
 
 const router = Router();
 
@@ -36,7 +36,7 @@ router.post("/send-otp", async (req, res) => {
 
   sendWhatsApp(
     mobile,
-    `Your Al Burhan Tours & Travels OTP is: *${otp}*\n\nValid for 10 minutes. Do not share with anyone.\n\nAl Burhan Tours & Travels\n+91 9893225590`
+    `Your Al Burhan Tours & Travels OTP is: *${otp}*\n\nValid for 10 minutes. Do not share with anyone.\n\nAl Burhan Tours & Travels\n+91 8989701701`
   ).catch(console.error);
 
   console.log(`[OTP] Mobile: ${mobile}, OTP: ${otp}, NewUser: ${isNewUser}`);
@@ -92,12 +92,12 @@ router.post("/verify-otp", async (req, res) => {
   if (isNewUser) {
     sendWhatsApp(
       mobile,
-      `Assalamu Alaikum! Welcome to Al Burhan Tours & Travels.\n\nWe are delighted to have you with us. With 35+ years of experience, we are here to guide you on your sacred journey.\n\nFor assistance, call us:\n+91 9893225590\n+91 9893989786\n\nJazak Allah Khair!`
+      `Assalamu Alaikum! Welcome to Al Burhan Tours & Travels.\n\nWe are delighted to have you with us. With 35+ years of experience, we are here to guide you on your sacred journey.\n\nFor assistance, call us:\n+91 8989701701\n+91 9893989786\n\nJazak Allah Khair!`
     ).catch(console.error);
   } else {
     sendWhatsApp(
       mobile,
-      `Assalamu Alaikum ${user.name || ""},\n\nWelcome back to Al Burhan Tours & Travels! You have logged in successfully.\n\nFor assistance: +91 9893225590\n\nJazak Allah Khair!`
+      `Assalamu Alaikum ${user.name || ""},\n\nWelcome back to Al Burhan Tours & Travels! You have logged in successfully.\n\nFor assistance: +91 8989701701\n\nJazak Allah Khair!`
     ).catch(console.error);
   }
 

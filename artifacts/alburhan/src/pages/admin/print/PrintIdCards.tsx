@@ -162,7 +162,7 @@ export default function PrintIdCards() {
                   </div>
 
                   <div style={{ textAlign: "center", marginBottom: "1mm" }}>
-                    <div style={{ fontSize: "8pt", fontWeight: 800, color: DARK, lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.fullName}</div>
+                    <div style={{ fontSize: "7.5pt", fontWeight: 900, color: DARK, lineHeight: 1.25, wordBreak: "break-word", textTransform: "uppercase" }}>{p.fullName || "—"}</div>
                     <div style={{ fontSize: "5.5pt", color: GOLD, fontWeight: 700, marginTop: "0.5mm" }}>HAJJ 2027</div>
                   </div>
 

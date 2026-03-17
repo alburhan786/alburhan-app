@@ -10,7 +10,7 @@ const BASE = import.meta.env.BASE_URL || "/";
 interface Pilgrim {
   id: string; serialNumber: number; fullName: string; passportNumber?: string;
   photoUrl?: string; mobileIndia?: string; mobileSaudi?: string;
-  city?: string; busNumber?: string;
+  city?: string; busNumber?: string; roomNumber?: string; seatNumber?: string;
 }
 interface Group {
   id: string; groupName: string; year: number; maktabNumber?: string;
@@ -46,19 +46,18 @@ function buildQrData(p: Pilgrim, group: Group): string {
   const lines = [
     `Name: ${p.fullName}`,
     `Passport: ${p.passportNumber || "N/A"}`,
-    `Group: ${group.groupName}`,
+    `Group: ${group.groupName} (${group.year})`,
   ];
-  if (group.hotels?.makkah?.name)
-    lines.push(`Hotel Makkah: ${group.hotels.makkah.name}`);
-  if (group.hotels?.madinah?.name)
-    lines.push(`Hotel Madinah: ${group.hotels.madinah.name}`);
-  if (group.hotels?.groupLeader)
-    lines.push(`Group Leader: ${group.hotels.groupLeader}`);
-  if (p.busNumber)
-    lines.push(`Bus: ${p.busNumber}`);
-  if (p.mobileIndia)
-    lines.push(`Mobile: ${p.mobileIndia}`);
-  lines.push(`Emergency: +91 9893989786`);
+  if (p.mobileIndia) lines.push(`Mobile (India): ${p.mobileIndia}`);
+  if (p.mobileSaudi) lines.push(`Mobile (Saudi): ${p.mobileSaudi}`);
+  if (group.hotels?.makkah?.name) lines.push(`Hotel Makkah: ${group.hotels.makkah.name}`);
+  if (group.hotels?.madinah?.name) lines.push(`Hotel Madinah: ${group.hotels.madinah.name}`);
+  if (p.roomNumber) lines.push(`Room: ${p.roomNumber}`);
+  if (p.busNumber) lines.push(`Bus: ${p.busNumber}`);
+  if (p.seatNumber) lines.push(`Seat: ${p.seatNumber}`);
+  if (group.hotels?.groupLeader) lines.push(`Group Leader: ${group.hotels.groupLeader}`);
+  lines.push(`Emergency (Saudi): 0547090786 | 0568780786`);
+  lines.push(`Emergency (India): +91 9893989786`);
   return lines.join("\n");
 }
 

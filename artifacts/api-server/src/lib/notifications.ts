@@ -106,7 +106,7 @@ export async function sendBookingApprovalNotification(opts: {
   customerName: string;
   bookingNumber: string;
 }) {
-  const message = `Assalamu Alaikum ${opts.customerName},\n\nYour booking request #${opts.bookingNumber} with Al Burhan Tours & Travels has been APPROVED.\n\nPlease login to your dashboard and complete payment to confirm your booking.\n\nFor help call us:\n+91 9893225590\n+91 9893989786\n\nJazak Allah Khair!`;
+  const message = `Assalamu Alaikum ${opts.customerName},\n\nYour booking request #${opts.bookingNumber} with Al Burhan Tours & Travels has been APPROVED.\n\nPlease login to your dashboard and complete payment to confirm your booking.\n\nFor help call us:\n+91 8989701701\n+91 9893989786\n\nJazak Allah Khair!`;
   await Promise.allSettled([
     sendSMS(opts.mobile, message),
     sendWhatsApp(opts.mobile, message),
@@ -122,7 +122,7 @@ export async function sendBookingRejectionNotification(opts: {
   reason?: string | null;
 }) {
   const reasonText = opts.reason ? `\n\nReason: ${opts.reason}` : "";
-  const message = `Assalamu Alaikum ${opts.customerName},\n\nWe regret to inform you that your booking request #${opts.bookingNumber} with Al Burhan Tours & Travels could not be processed at this time.${reasonText}\n\nPlease contact us for more information:\n+91 9893225590\n+91 9893989786`;
+  const message = `Assalamu Alaikum ${opts.customerName},\n\nWe regret to inform you that your booking request #${opts.bookingNumber} with Al Burhan Tours & Travels could not be processed at this time.${reasonText}\n\nPlease contact us for more information:\n+91 8989701701\n+91 9893989786`;
   await Promise.allSettled([
     sendSMS(opts.mobile, message),
     sendWhatsApp(opts.mobile, message),
@@ -138,7 +138,7 @@ export async function sendBookingSubmissionNotification(opts: {
   packageName: string;
   numberOfPilgrims: number;
 }) {
-  const customerMsg = `Assalamu Alaikum ${opts.customerName},\n\nYour booking request #${opts.bookingNumber} for "${opts.packageName}" (${opts.numberOfPilgrims} pilgrim${opts.numberOfPilgrims > 1 ? "s" : ""}) has been submitted successfully.\n\nOur team will review and respond shortly. You will receive a notification once approved.\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 9893225590 | +91 9893989786`;
+  const customerMsg = `Assalamu Alaikum ${opts.customerName},\n\nYour booking request #${opts.bookingNumber} for "${opts.packageName}" (${opts.numberOfPilgrims} pilgrim${opts.numberOfPilgrims > 1 ? "s" : ""}) has been submitted successfully.\n\nOur team will review and respond shortly. You will receive a notification once approved.\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 8989701701 | +91 9893989786`;
 
   const adminMsg = `New Booking Alert!\n\nBooking #${opts.bookingNumber}\nCustomer: ${opts.customerName}\nMobile: ${opts.mobile}\nPackage: ${opts.packageName}\nPilgrims: ${opts.numberOfPilgrims}\n\nPlease review and approve/reject from the admin dashboard.`;
 
@@ -147,7 +147,7 @@ export async function sendBookingSubmissionNotification(opts: {
     sendWhatsApp(opts.mobile, customerMsg),
     opts.email ? sendEmail(opts.email, "Booking Submitted – Al Burhan Tours & Travels", customerMsg) : Promise.resolve(),
     sendWhatsApp("9893989786", adminMsg),
-    sendWhatsApp("9893225590", adminMsg),
+    sendWhatsApp("8989701701", adminMsg),
   ]);
 }
 
@@ -161,7 +161,7 @@ export async function sendPaymentConfirmationNotification(opts: {
   invoiceUrl?: string;
 }) {
   const invoiceLine = opts.invoiceUrl ? `\n\nView/Download Invoice:\n${opts.invoiceUrl}` : "";
-  const message = `Assalamu Alaikum ${opts.customerName},\n\nYour payment of INR ${opts.amount} for booking #${opts.bookingNumber} has been received.\n\nYour booking is now CONFIRMED!\nInvoice: #${opts.invoiceNumber}${invoiceLine}\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 9893225590 | +91 9893989786`;
+  const message = `Assalamu Alaikum ${opts.customerName},\n\nYour payment of INR ${opts.amount} for booking #${opts.bookingNumber} has been received.\n\nYour booking is now CONFIRMED!\nInvoice: #${opts.invoiceNumber}${invoiceLine}\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 8989701701 | +91 9893989786`;
   await Promise.allSettled([
     sendSMS(opts.mobile, message),
     sendWhatsApp(opts.mobile, message),

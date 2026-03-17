@@ -295,7 +295,7 @@ router.post("/:id/send-invoice", requireAdmin as any, async (req: AuthenticatedR
 
   const baseUrl = `https://${req.get("host") || process.env.REPLIT_DEV_DOMAIN || "alburhantravels.com"}`;
   const invoiceUrl = `${baseUrl}/invoice/${b.bookingNumber}`;
-  const message = `Assalamu Alaikum ${b.customerName},\n\nYour invoice #${b.invoiceNumber} for booking #${b.bookingNumber} is ready.\n\nView/Download Invoice:\n${invoiceUrl}\n\nTotal Amount: INR ${b.finalAmount ? Number(b.finalAmount).toLocaleString("en-IN") : "N/A"}\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 9893225590 | +91 9893989786`;
+  const message = `Assalamu Alaikum ${b.customerName},\n\nYour invoice #${b.invoiceNumber} for booking #${b.bookingNumber} is ready.\n\nView/Download Invoice:\n${invoiceUrl}\n\nTotal Amount: INR ${b.finalAmount ? Number(b.finalAmount).toLocaleString("en-IN") : "N/A"}\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 8989701701 | +91 9893989786`;
 
   const results = await Promise.allSettled([
     sendWhatsApp(b.customerMobile, message),

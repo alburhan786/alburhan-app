@@ -47,7 +47,7 @@ function buildQrData(p: Pilgrim, group: Group): string {
     `Hotel Madinah: ${group.hotels?.madinah?.name || "N/A"}`,
     `India: ${p.mobileIndia || "N/A"}`,
     `Saudi: ${p.mobileSaudi || "N/A"}`,
-    `Emergency: +91 9893225590`,
+    `Emergency: +91 8989701701`,
   ].join("\n");
 }
 
@@ -175,7 +175,7 @@ export default function PrintLuggageSquare() {
             </div>
 
             <div style={{ position: "relative", zIndex: 2, background: DARK, color: GOLD, padding: "1.5mm 3mm", fontSize: "6pt", textAlign: "center", fontWeight: 600, letterSpacing: "0.3px" }}>
-              Emergency: +91 9893225590 | +91 9893989786
+              Emergency: +91 8989701701 | +91 9893989786
             </div>
           </div>
         </div>
