@@ -4,7 +4,7 @@ import { useGetPublicInvoice, useGetPublicInvoiceByNumber } from "@workspace/api
 import type { Invoice as InvoiceType, Pilgrim } from "@workspace/api-client-react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
-import { Share2, Copy, Mail, Download } from "lucide-react";
+import { Share2, Copy, Mail, Download, Printer } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { downloadPdf } from "@/lib/pdf-download";
 import { useToast } from "@/hooks/use-toast";
@@ -476,7 +476,7 @@ export default function Invoice() {
     <>
       <MainLayout>
         <div className="max-w-4xl mx-auto py-8 px-4">
-          <div className="flex flex-wrap gap-3 mb-6 justify-end">
+          <div className="flex flex-wrap gap-3 mb-6 justify-end print:hidden">
             <Button
               variant="outline"
               size="sm"
@@ -486,6 +486,15 @@ export default function Invoice() {
             >
               <Download className="w-4 h-4 mr-2" />
               {pdfLoading ? "Generating..." : "Download PDF"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.print()}
+              className="border-[#0B3D2E] text-[#0B3D2E] hover:bg-[#0B3D2E] hover:text-white"
+            >
+              <Printer className="w-4 h-4 mr-2" />
+              Print
             </Button>
             <Popover open={shareOpen} onOpenChange={setShareOpen}>
               <PopoverTrigger asChild>
