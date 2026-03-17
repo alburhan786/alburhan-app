@@ -45,12 +45,10 @@ function AnimatedCounter({ target, suffix = "" }: { target: number; suffix?: str
 }
 
 const testimonials = [
-  { name: "Mohammed Aslam", city: "Mumbai", text: "Al Burhan Tours & Travels provided excellent service during our Umrah trip. Everything from visa processing to hotel arrangements was handled professionally.", rating: 5, initial: "MA", photo: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&h=80&fit=crop&q=80" },
-  { name: "Abdul Rahman", city: "Burhanpur", text: "Our Hajj journey was very well organized. The team supported us throughout the trip and made our pilgrimage comfortable.", rating: 5, initial: "AR", photo: "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=80&h=80&fit=crop&q=80" },
-  { name: "Sajida Begum", city: "Hyderabad", text: "I highly recommend Al Burhan Tours & Travels. Their staff was helpful, and the travel arrangements were smooth and well planned.", rating: 5, initial: "SB", photo: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=80&h=80&fit=crop&q=80" },
-  { name: "Mohammed Imran", city: "Indore", text: "Very reliable travel agency for Umrah. The hotels and transportation were well arranged, and the guides were very supportive.", rating: 5, initial: "MI", photo: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=80&h=80&fit=crop&q=80" },
-  { name: "Fatima Noor", city: "Nanded", text: "Alhamdulillah, the Umrah trip was wonderful. Al Burhan team took care of every detail and we felt safe and supported throughout.", rating: 5, initial: "FN", photo: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=80&h=80&fit=crop&q=80" },
-  { name: "Zakir Hussain", city: "Jalgaon", text: "The Ziyarat tour to Iraq was an unforgettable spiritual experience. Excellent arrangements and very caring guides.", rating: 5, initial: "ZH", photo: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=80&h=80&fit=crop&q=80" },
+  { name: "Mohammed Aslam", city: "Mumbai", text: "Al Burhan Tours & Travels provided excellent service during our Umrah trip. Everything from visa processing to hotel arrangements was handled professionally.", rating: 5, initial: "MA" },
+  { name: "Abdul Rahman", city: "Burhanpur", text: "Our Hajj journey was very well organized. The team supported us throughout the trip and made our pilgrimage comfortable.", rating: 5, initial: "AR" },
+  { name: "Sajida Begum", city: "Hyderabad", text: "I highly recommend Al Burhan Tours & Travels. Their staff was helpful, and the travel arrangements were smooth and well planned.", rating: 5, initial: "SB" },
+  { name: "Mohammed Imran", city: "Indore", text: "Very reliable travel agency for Umrah. The hotels and transportation were well arranged, and the guides were very supportive.", rating: 5, initial: "MI" },
 ];
 
 const pilgrimVideos = [
@@ -497,12 +495,8 @@ export default function Home() {
                 </div>
                 <p className="text-muted-foreground mb-5 italic leading-relaxed text-sm">"{testimonial.text}"</p>
                 <div className="flex items-center gap-3 border-t border-border/50 pt-4">
-                  <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-accent/30 shrink-0">
-                    {testimonial.photo ? (
-                      <img src={testimonial.photo} alt={testimonial.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">{testimonial.initial}</div>
-                    )}
+                  <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-accent/30 shrink-0 bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
+                    {testimonial.initial}
                   </div>
                   <div>
                     <div className="font-semibold text-foreground text-sm">{testimonial.name}</div>
