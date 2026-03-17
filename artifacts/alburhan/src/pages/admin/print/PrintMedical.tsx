@@ -23,8 +23,8 @@ function calcAge(dob?: string): string {
   return "—";
 }
 
-const CARD_W = "89mm";
-const CARD_H = "76mm";
+const CARD_W = "88.9mm";
+const CARD_H = "76.2mm";
 
 function MedCard({ p, group }: { p: Pilgrim; group: Group }) {
   const qrData = [
@@ -79,7 +79,7 @@ function MedCard({ p, group }: { p: Pilgrim; group: Group }) {
       </div>
 
       {/* RIGHT: Photo + Barcode */}
-      <div style={{ width: "26mm", flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "space-between", padding: "3mm 2mm", borderLeft: "1px solid #ccc" }}>
+      <div style={{ width: "28mm", flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "space-between", padding: "3mm 2mm 3mm 2mm", borderLeft: "1px solid #ccc" }}>
         {/* Photo */}
         <div>
           {p.photoUrl ? (
@@ -89,9 +89,9 @@ function MedCard({ p, group }: { p: Pilgrim; group: Group }) {
           )}
         </div>
 
-        {/* Vertical Barcode */}
-        <div style={{ transform: "rotate(90deg)", transformOrigin: "center center", marginTop: "4mm" }}>
-          <Barcode value={p.passportNumber || String(p.serialNumber).padStart(6, "0")} height={18} width={0.8} fontSize={5} displayValue />
+        {/* Barcode — centered horizontally */}
+        <div style={{ display: "flex", justifyContent: "center", width: "100%", marginTop: "2mm" }}>
+          <Barcode value={p.passportNumber || String(p.serialNumber).padStart(6, "0")} height={14} width={0.75} fontSize={5} displayValue />
         </div>
       </div>
     </div>
