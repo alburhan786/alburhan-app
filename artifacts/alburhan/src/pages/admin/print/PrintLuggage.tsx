@@ -15,6 +15,7 @@ interface Pilgrim {
 interface Group {
   id: string; groupName: string; year: number; maktabNumber?: string;
   hotels?: {
+    groupLeader?: string;
     makkah?: { name?: string };
     madinah?: { name?: string };
   };
@@ -45,9 +46,10 @@ function buildQrData(p: Pilgrim, group: Group): string {
     `Bus: ${p.busNumber || "N/A"}`,
     `Hotel Makkah: ${group.hotels?.makkah?.name || "N/A"}`,
     `Hotel Madinah: ${group.hotels?.madinah?.name || "N/A"}`,
+    `Group Leader: ${group.hotels?.groupLeader || "N/A"}`,
     `India: ${p.mobileIndia || "N/A"}`,
     `Saudi: ${p.mobileSaudi || "N/A"}`,
-    `Emergency: +91 9893225590`,
+    `Emergency: +91 9893989786`,
   ].join("\n");
 }
 
@@ -74,12 +76,6 @@ export default function PrintLuggage() {
       fetch(`${API}/api/groups/${groupId}/pilgrims`, { credentials: "include" }).then(r => r.json()),
     ]).then(([g, p]) => { setGroup(g); setPilgrims(p); });
   }, [groupId]);
-
-  useEffect(() => {
-    if (pilgrims.length === 0) return;
-    const t = setTimeout(() => handleDownload(), 1200);
-    return () => clearTimeout(t);
-  }, [pilgrims]);
 
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
 
@@ -108,6 +104,7 @@ export default function PrintLuggage() {
 
       <div className="no-print" style={{ padding: "16px", background: "#fef3c7", textAlign: "center" }}>
         <button onClick={handleDownload} disabled={pdfLoading} style={{ padding: "10px 24px", background: DARK, color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", marginRight: "12px", opacity: pdfLoading ? 0.6 : 1 }}>{pdfLoading ? "Generating PDF..." : "⬇ Download PDF"}</button>
+        <button onClick={() => window.print()} style={{ padding: "10px 24px", background: "#fff", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", marginRight: "12px" }}>🖨 Print</button>
         <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
       </div>
 

@@ -38,11 +38,6 @@ export default function PrintHotelList() {
     ]).then(([g, p]) => { setGroup(g); setPilgrims(p); });
   }, [groupId]);
 
-  useEffect(() => {
-    const t = setTimeout(() => handleDownload(), 1200);
-    return () => clearTimeout(t);
-  }, [pilgrims]);
-
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
 
   const thStyle: React.CSSProperties = { background: "#0A3D2A", color: "#fff", padding: "3mm 3mm", textAlign: "left", fontSize: "7.5pt", textTransform: "uppercase", letterSpacing: "0.5px", border: "1px solid #0A3D2A" };

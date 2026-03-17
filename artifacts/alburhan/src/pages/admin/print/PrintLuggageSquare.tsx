@@ -75,12 +75,6 @@ export default function PrintLuggageSquare() {
     ]).then(([g, p]) => { setGroup(g); setPilgrims(p); });
   }, [groupId]);
 
-  useEffect(() => {
-    if (pilgrims.length === 0) return;
-    const t = setTimeout(() => handleDownload(), 1200);
-    return () => clearTimeout(t);
-  }, [pilgrims]);
-
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
 
   const groupColor = getGroupColor(group.groupName);

@@ -37,11 +37,6 @@ export default function PrintFeedback() {
     fetch(`${API}/api/groups/${groupId}`, { credentials: "include" }).then(r => r.json()).then(setGroup);
   }, [groupId]);
 
-  useEffect(() => {
-    const t = setTimeout(() => handleDownload(), 1200);
-    return () => clearTimeout(t);
-  }, [group]);
-
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
 
   return (

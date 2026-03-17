@@ -29,6 +29,7 @@ interface Pilgrim {
   busNumber?: string;
   relation?: string;
   coverNumber?: string;
+  medicalCondition?: string;
 }
 
 interface Group {
@@ -45,7 +46,7 @@ interface Group {
 const emptyPilgrim = {
   fullName: "", passportNumber: "", visaNumber: "", dateOfBirth: "", gender: "",
   bloodGroup: "", mobileIndia: "", mobileSaudi: "", address: "", city: "",
-  state: "", roomNumber: "", busNumber: "", relation: "", coverNumber: "",
+  state: "", roomNumber: "", busNumber: "", relation: "", coverNumber: "", medicalCondition: "",
 };
 
 export default function PilgrimManager() {
@@ -84,6 +85,7 @@ export default function PilgrimManager() {
       mobileIndia: p.mobileIndia || "", mobileSaudi: p.mobileSaudi || "", address: p.address || "",
       city: p.city || "", state: p.state || "", roomNumber: p.roomNumber || "",
       busNumber: p.busNumber || "", relation: p.relation || "", coverNumber: p.coverNumber || "",
+      medicalCondition: p.medicalCondition || "",
     });
     setDialogOpen(true);
   };
@@ -264,6 +266,24 @@ export default function PilgrimManager() {
                 </select>
               </div>
               <div className="space-y-1"><label className="text-sm font-medium">Cover Number (HGO ID)</label><Input value={form.coverNumber} onChange={e => f("coverNumber", e.target.value)} /></div>
+              <div className="col-span-2 space-y-1">
+                <label className="text-sm font-medium">Medical Condition</label>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {["Diabetic","BP Patient","Heart Patient","Allergy"].map(cond => (
+                    <button key={cond} type="button" onClick={() => {
+                      const existing = form.medicalCondition ? form.medicalCondition.split(", ").filter(Boolean) : [];
+                      if (existing.includes(cond)) {
+                        f("medicalCondition", existing.filter(c => c !== cond).join(", "));
+                      } else {
+                        f("medicalCondition", [...existing, cond].join(", "));
+                      }
+                    }} className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all ${form.medicalCondition?.includes(cond) ? "bg-red-600 text-white border-red-600" : "bg-white text-red-600 border-red-300 hover:bg-red-50"}`}>
+                      {cond}
+                    </button>
+                  ))}
+                </div>
+                <Input value={form.medicalCondition} onChange={e => f("medicalCondition", e.target.value)} placeholder="e.g. Diabetic, BP Patient (or type custom condition)" />
+              </div>
             </div>
             <Button onClick={handleSave} className="w-full">{editingId ? "Save Changes" : "Add Pilgrim"}</Button>
           </div>

@@ -108,11 +108,6 @@ export default function PrintIdCards() {
     ]).then(([g, p]) => { setGroup(g); setPilgrims(p); });
   }, [groupId]);
 
-  useEffect(() => {
-    const t = setTimeout(() => handleDownload(), 1200);
-    return () => clearTimeout(t);
-  }, [pilgrims]);
-
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
 
   const pages: Pilgrim[][] = [];

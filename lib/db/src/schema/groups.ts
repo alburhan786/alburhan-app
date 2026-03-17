@@ -9,6 +9,7 @@ export const hajjGroupsTable = pgTable("hajj_groups", {
   flightNumber: text("flight_number"),
   maktabNumber: text("maktab_number"),
   hotels: jsonb("hotels").$type<{
+    groupLeader?: string;
     makkah?: { name?: string; address?: string; checkIn?: string; checkOut?: string };
     madinah?: { name?: string; address?: string; checkIn?: string; checkOut?: string };
   }>().default({}),
@@ -39,6 +40,7 @@ export const pilgrimsTable = pgTable("pilgrims", {
   busNumber: text("bus_number"),
   relation: text("relation"),
   coverNumber: text("cover_number"),
+  medicalCondition: text("medical_condition"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

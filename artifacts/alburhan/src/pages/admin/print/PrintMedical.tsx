@@ -10,9 +10,24 @@ const BASE = import.meta.env.BASE_URL || "/";
 interface Pilgrim {
   id: string; serialNumber: number; fullName: string; passportNumber?: string;
   dateOfBirth?: string; gender?: string; bloodGroup?: string; photoUrl?: string;
-  mobileIndia?: string; address?: string; city?: string; state?: string; coverNumber?: string;
+  mobileIndia?: string; address?: string; city?: string; state?: string;
+  coverNumber?: string; medicalCondition?: string;
 }
 interface Group { id: string; groupName: string; year: number; }
+
+const CONDITION_COLORS: Record<string, string> = {
+  "Diabetic": "#F59E0B",
+  "BP Patient": "#3B82F6",
+  "Heart Patient": "#EF4444",
+  "Allergy": "#8B5CF6",
+};
+
+function getConditionColor(cond: string): string {
+  for (const [key, color] of Object.entries(CONDITION_COLORS)) {
+    if (cond.toLowerCase().includes(key.toLowerCase())) return color;
+  }
+  return "#6B7280";
+}
 
 export default function PrintMedical() {
   const [, params] = useRoute("/admin/groups/:groupId/print/medical");
@@ -20,16 +35,17 @@ export default function PrintMedical() {
   const [group, setGroup] = useState<Group | null>(null);
   const [pilgrims, setPilgrims] = useState<Pilgrim[]>([]);
 
-    const contentRef = useRef<HTMLDivElement>(null);
-    const [pdfLoading, setPdfLoading] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
 
-    const handleDownload = useCallback(async () => {
-      if (!contentRef.current || pdfLoading) return;
-      setPdfLoading(true);
-      try {
-        await downloadPdf(contentRef.current, { filename: `Medical-Stickers-${group?.groupName || "group"}.pdf` });
-      } finally { setPdfLoading(false); }
-    }, [group, pdfLoading]);
+  const handleDownload = useCallback(async () => {
+    if (!contentRef.current || pdfLoading) return;
+    setPdfLoading(true);
+    try {
+      await downloadPdf(contentRef.current, { filename: `Medical-Stickers-${group?.groupName || "group"}.pdf` });
+    } finally { setPdfLoading(false); }
+  }, [group, pdfLoading]);
+
   useEffect(() => {
     if (!groupId) return;
     Promise.all([
@@ -37,11 +53,6 @@ export default function PrintMedical() {
       fetch(`${API}/api/groups/${groupId}/pilgrims`, { credentials: "include" }).then(r => r.json()),
     ]).then(([g, p]) => { setGroup(g); setPilgrims(p); });
   }, [groupId]);
-
-  useEffect(() => {
-    const t = setTimeout(() => handleDownload(), 1200);
-    return () => clearTimeout(t);
-  }, [pilgrims]);
 
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
 
@@ -74,6 +85,7 @@ export default function PrintMedical() {
 
       <div className="no-print" style={{ padding: "16px", background: "#fef3c7", textAlign: "center" }}>
         <button onClick={handleDownload} disabled={pdfLoading} style={{ padding: "10px 24px", background: "#c0392b", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", marginRight: "12px", opacity: pdfLoading ? 0.6 : 1 }}>{pdfLoading ? "Generating PDF..." : "⬇ Download PDF"}</button>
+        <button onClick={() => window.print()} style={{ padding: "10px 24px", background: "#fff", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", marginRight: "12px" }}>🖨 Print</button>
         <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
       </div>
 
@@ -82,58 +94,88 @@ export default function PrintMedical() {
         <div key={pi} className={pi < pages.length - 1 ? "page-break" : ""}>
           <PrintHeader title="Medical Information" subtitle={`${group.groupName} — ${group.year}`} />
           <div className="med-grid">
-            {page.map(p => (
-              <div key={p.id} className="med-sticker">
-                <div style={{ background: "linear-gradient(135deg, #c0392b, #e74c3c)", color: "#fff", padding: "3mm 4mm", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "2mm" }}>
-                    <img src={`${BASE}images/logo.png`} alt="" style={{ height: "10mm", objectFit: "contain" }} />
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: "10pt", letterSpacing: "0.5px" }}>Al Burhan Tours & Travels</div>
-                      <div style={{ fontSize: "7pt", opacity: 0.85, fontWeight: 600, letterSpacing: "1px" }}>MEDICAL INFORMATION</div>
-                    </div>
-                  </div>
-                  <div style={{ fontSize: "8pt", fontWeight: 700 }}>{p.coverNumber || `#${p.serialNumber}`}</div>
-                </div>
-
-                <div style={{ display: "flex", padding: "3mm 4mm", gap: "4mm" }}>
-                  <div style={{ width: "24mm", flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: "2mm" }}>
-                    {p.photoUrl ? (
-                      <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "24mm", height: "28mm", objectFit: "cover", borderRadius: "4px", border: "2px solid #c0392b" }} />
-                    ) : (
-                      <div style={{ width: "24mm", height: "28mm", background: "#fdf2f2", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "4px", border: "2px solid #e0b4b4", fontSize: "6pt", color: "#c0392b" }}>PHOTO</div>
-                    )}
-                    <div style={{
-                      width: "24mm", height: "12mm", background: "#c0392b", color: "#fff",
-                      borderRadius: "4px", display: "flex", flexDirection: "column",
-                      alignItems: "center", justifyContent: "center",
-                    }}>
-                      <div style={{ fontSize: "5pt", opacity: 0.85, letterSpacing: "0.5px" }}>BLOOD GROUP</div>
-                      <div style={{ fontSize: "14pt", fontWeight: 800, lineHeight: 1 }}>{p.bloodGroup || "—"}</div>
-                    </div>
-                  </div>
-
-                  <div style={{ flex: 1 }}>
-                    {p.passportNumber && (
-                      <div style={{ marginBottom: "2mm", padding: "1.5mm", background: "#fafafa", borderRadius: "3px", textAlign: "center", overflow: "hidden" }}>
-                        <Barcode value={p.passportNumber} height={18} width={1} fontSize={6} displayValue />
+            {page.map(p => {
+              const conditions = p.medicalCondition
+                ? p.medicalCondition.split(",").map(c => c.trim()).filter(Boolean)
+                : [];
+              return (
+                <div key={p.id} className="med-sticker">
+                  <div style={{ background: "linear-gradient(135deg, #c0392b, #e74c3c)", color: "#fff", padding: "3mm 4mm", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "2mm" }}>
+                      <img src={`${BASE}images/logo.png`} alt="" style={{ height: "10mm", objectFit: "contain" }} />
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: "10pt", letterSpacing: "0.5px" }}>Al Burhan Tours & Travels</div>
+                        <div style={{ fontSize: "7pt", opacity: 0.85, fontWeight: 600, letterSpacing: "1px" }}>MEDICAL INFORMATION</div>
                       </div>
-                    )}
-                    <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "1mm 3mm", fontSize: "8pt" }}>
-                      <span style={{ fontWeight: 700 }}>Name:</span><span>{p.fullName}</span>
-                      <span style={{ fontWeight: 700 }}>Age:</span><span>{calcAge(p.dateOfBirth)}</span>
-                      <span style={{ fontWeight: 700 }}>Gender:</span><span>{p.gender || "—"}</span>
-                      <span style={{ fontWeight: 700 }}>Contact:</span><span>{p.mobileIndia || "—"}</span>
-                      <span style={{ fontWeight: 700 }}>Address:</span><span style={{ fontSize: "7pt" }}>{[p.address, p.city, p.state].filter(Boolean).join(", ") || "—"}</span>
+                    </div>
+                    <div style={{ fontSize: "8pt", fontWeight: 700 }}>{p.coverNumber || `#${String(p.serialNumber).padStart(3, "0")}`}</div>
+                  </div>
+
+                  <div style={{ display: "flex", padding: "3mm 4mm", gap: "4mm" }}>
+                    <div style={{ width: "24mm", flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: "2mm" }}>
+                      {p.photoUrl ? (
+                        <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "24mm", height: "28mm", objectFit: "cover", borderRadius: "4px", border: "2px solid #c0392b" }} />
+                      ) : (
+                        <div style={{ width: "24mm", height: "28mm", background: "#fdf2f2", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "4px", border: "2px solid #e0b4b4", fontSize: "6pt", color: "#c0392b" }}>PHOTO</div>
+                      )}
+                      <div style={{
+                        width: "24mm", height: "12mm", background: "#c0392b", color: "#fff",
+                        borderRadius: "4px", display: "flex", flexDirection: "column",
+                        alignItems: "center", justifyContent: "center",
+                      }}>
+                        <div style={{ fontSize: "5pt", opacity: 0.85, letterSpacing: "0.5px" }}>BLOOD GROUP</div>
+                        <div style={{ fontSize: "14pt", fontWeight: 800, lineHeight: 1 }}>{p.bloodGroup || "—"}</div>
+                      </div>
+                    </div>
+
+                    <div style={{ flex: 1 }}>
+                      {p.passportNumber && (
+                        <div style={{ marginBottom: "2mm", padding: "1.5mm", background: "#fafafa", borderRadius: "3px", textAlign: "center", overflow: "hidden" }}>
+                          <Barcode value={p.passportNumber} height={18} width={1} fontSize={6} displayValue />
+                        </div>
+                      )}
+                      <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "1mm 3mm", fontSize: "8pt" }}>
+                        <span style={{ fontWeight: 700 }}>Name:</span><span>{p.fullName}</span>
+                        <span style={{ fontWeight: 700 }}>Age:</span><span>{calcAge(p.dateOfBirth)}</span>
+                        <span style={{ fontWeight: 700 }}>Gender:</span><span>{p.gender || "—"}</span>
+                        <span style={{ fontWeight: 700 }}>Contact:</span><span>{p.mobileIndia || "—"}</span>
+                        <span style={{ fontWeight: 700 }}>Address:</span><span style={{ fontSize: "7pt" }}>{[p.address, p.city, p.state].filter(Boolean).join(", ") || "—"}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div style={{ margin: "0 4mm 3mm", padding: "2mm 3mm", background: "#fdf2f2", borderRadius: "4px", border: "1px solid #f5c6cb", fontSize: "7.5pt" }}>
-                  <div style={{ fontWeight: 700, color: "#c0392b", marginBottom: "1mm", fontSize: "6.5pt", letterSpacing: "0.5px" }}>EMERGENCY CONTACTS</div>
-                  <div>Saudi: <b>0547090786</b> &nbsp;|&nbsp; India: <b>0568780786</b></div>
+                  {/* Medical Conditions */}
+                  <div style={{ margin: "0 4mm 2mm", padding: "2mm 3mm", background: "#fff5f5", borderRadius: "4px", border: "1.5px solid #f5c6cb" }}>
+                    <div style={{ fontWeight: 700, color: "#c0392b", marginBottom: "1.5mm", fontSize: "6.5pt", letterSpacing: "0.5px", textTransform: "uppercase" }}>
+                      ⚕ Medical Condition
+                    </div>
+                    {conditions.length > 0 ? (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "1.5mm" }}>
+                        {conditions.map((cond, i) => (
+                          <span key={i} style={{
+                            background: getConditionColor(cond),
+                            color: "#fff",
+                            padding: "0.5mm 2mm",
+                            borderRadius: "2px",
+                            fontSize: "7pt",
+                            fontWeight: 700,
+                          }}>
+                            {cond}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span style={{ fontSize: "7.5pt", color: "#888", fontStyle: "italic" }}>No known medical conditions</span>
+                    )}
+                  </div>
+
+                  <div style={{ margin: "0 4mm 3mm", padding: "2mm 3mm", background: "#fdf2f2", borderRadius: "4px", border: "1px solid #f5c6cb", fontSize: "7.5pt" }}>
+                    <div style={{ fontWeight: 700, color: "#c0392b", marginBottom: "1mm", fontSize: "6.5pt", letterSpacing: "0.5px" }}>EMERGENCY CONTACTS</div>
+                    <div>+91 9893989786 &nbsp;|&nbsp; +91 9893225590</div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       ))}

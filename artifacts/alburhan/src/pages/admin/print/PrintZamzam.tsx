@@ -19,16 +19,17 @@ export default function PrintZamzam() {
   const [group, setGroup] = useState<Group | null>(null);
   const [pilgrims, setPilgrims] = useState<Pilgrim[]>([]);
 
-    const contentRef = useRef<HTMLDivElement>(null);
-    const [pdfLoading, setPdfLoading] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
 
-    const handleDownload = useCallback(async () => {
-      if (!contentRef.current || pdfLoading) return;
-      setPdfLoading(true);
-      try {
-        await downloadPdf(contentRef.current, { filename: `Zamzam-Stickers-${group?.groupName || "group"}.pdf` });
-      } finally { setPdfLoading(false); }
-    }, [group, pdfLoading]);
+  const handleDownload = useCallback(async () => {
+    if (!contentRef.current || pdfLoading) return;
+    setPdfLoading(true);
+    try {
+      await downloadPdf(contentRef.current, { filename: `Zamzam-Stickers-${group?.groupName || "group"}.pdf` });
+    } finally { setPdfLoading(false); }
+  }, [group, pdfLoading]);
+
   useEffect(() => {
     if (!groupId) return;
     Promise.all([
@@ -36,11 +37,6 @@ export default function PrintZamzam() {
       fetch(`${API}/api/groups/${groupId}/pilgrims`, { credentials: "include" }).then(r => r.json()),
     ]).then(([g, p]) => { setGroup(g); setPilgrims(p); });
   }, [groupId]);
-
-  useEffect(() => {
-    const t = setTimeout(() => handleDownload(), 1200);
-    return () => clearTimeout(t);
-  }, [pilgrims]);
 
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
 
@@ -66,6 +62,7 @@ export default function PrintZamzam() {
 
       <div className="no-print" style={{ padding: "16px", background: "#fef3c7", textAlign: "center" }}>
         <button onClick={handleDownload} disabled={pdfLoading} style={{ padding: "10px 24px", background: DARK, color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", marginRight: "12px", opacity: pdfLoading ? 0.6 : 1 }}>{pdfLoading ? "Generating PDF..." : "⬇ Download PDF"}</button>
+        <button onClick={() => window.print()} style={{ padding: "10px 24px", background: "#fff", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", marginRight: "12px" }}>🖨 Print</button>
         <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
       </div>
 
@@ -95,6 +92,7 @@ export default function PrintZamzam() {
                 <div style={{ fontWeight: 700, fontSize: "9pt", color: GOLD, letterSpacing: "1.5px", textTransform: "uppercase" }}>TOURS & TRAVELS</div>
               </div>
             </div>
+
             <div style={{ position: "relative", zIndex: 1, textAlign: "center", padding: "0 6mm 2mm" }}>
               <div style={{ fontSize: "28pt", fontWeight: 900, letterSpacing: "5px", color: DARK, lineHeight: 1 }}>ZAMZAM</div>
               <div style={{ fontSize: "9pt", color: GOLD, fontWeight: 700, letterSpacing: "2px", marginTop: "2mm" }}>HOLY WATER</div>
@@ -109,13 +107,19 @@ export default function PrintZamzam() {
                 )}
               </div>
 
+              {/* Serial Number — BIG */}
               <div style={{ fontSize: "7pt", color: "#888", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "1mm" }}>Serial No.</div>
-              <div style={{ fontSize: "26pt", fontWeight: 800, color: DARK, lineHeight: 1, marginBottom: "4mm" }}>#{String(p.serialNumber).padStart(3, "0")}</div>
+              <div style={{ fontSize: "28pt", fontWeight: 900, color: DARK, lineHeight: 1, marginBottom: "3mm" }}>#{String(p.serialNumber).padStart(3, "0")}</div>
 
-              <div style={{ width: "60%", height: "1px", background: "#e0e0e0", marginBottom: "4mm" }} />
+              <div style={{ width: "60%", height: "1px", background: "#e0e0e0", marginBottom: "3mm" }} />
 
-              <div style={{ fontSize: "16pt", fontWeight: 700, color: "#333", lineHeight: 1.2, textAlign: "center", marginBottom: "3mm", maxWidth: "130mm", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.fullName}</div>
-              <div style={{ fontSize: "10pt", color: "#666", marginBottom: "4mm" }}>{group.groupName} — {group.year}</div>
+              {/* Pilgrim Name — big and bold */}
+              <div style={{ fontSize: "18pt", fontWeight: 900, color: "#222", lineHeight: 1.2, textAlign: "center", marginBottom: "2mm", maxWidth: "130mm", textTransform: "uppercase" }}>{p.fullName}</div>
+
+              {/* Group Name */}
+              <div style={{ background: DARK, color: GOLD, padding: "1mm 4mm", borderRadius: "3px", fontSize: "9pt", fontWeight: 800, letterSpacing: "1px", marginBottom: "4mm" }}>
+                {group.groupName} — {group.year}
+              </div>
 
               <div style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
                 <Barcode value={`ZAM${String(p.serialNumber).padStart(3, "0")}`} height={30} width={1.8} fontSize={0} />
@@ -123,7 +127,7 @@ export default function PrintZamzam() {
             </div>
 
             <div style={{ position: "relative", zIndex: 2, background: DARK, color: GOLD, padding: "2.5mm 5mm", fontSize: "8pt", textAlign: "center", fontWeight: 600, letterSpacing: "0.3px" }}>
-              AL BURHAN TOURS & TRAVELS — BURHANPUR &nbsp;|&nbsp; Mohammed Altaf: 0547090786 | Mohammed Wasim: 0568780786
+              AL BURHAN TOURS & TRAVELS — BURHANPUR &nbsp;|&nbsp; +91 9893989786
             </div>
           </div>
         </div>

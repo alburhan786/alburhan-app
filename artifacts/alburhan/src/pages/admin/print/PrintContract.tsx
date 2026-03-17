@@ -38,11 +38,6 @@ export default function PrintContract() {
     ]).then(([g, p]) => { setGroup(g); setPilgrims(p); });
   }, [groupId]);
 
-  useEffect(() => {
-    const t = setTimeout(() => handleDownload(), 1200);
-    return () => clearTimeout(t);
-  }, [pilgrims]);
-
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
   if (pilgrims.length === 0) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>No pilgrims in this group.</div>;
 

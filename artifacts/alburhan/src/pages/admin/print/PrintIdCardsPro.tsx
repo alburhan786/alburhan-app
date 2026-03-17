@@ -27,6 +27,21 @@ const GOLD_LIGHT = "#E8D48B";
 const W = "85mm";
 const H = "54mm";
 
+const GROUP_COLOR_MAP: Record<string, { bg: string; label: string }> = {
+  VIP: { bg: "#c0392b", label: "VIP" },
+  A: { bg: "#1A7A4A", label: "GROUP A" },
+  B: { bg: "#2563EB", label: "GROUP B" },
+  C: { bg: "#D97706", label: "GROUP C" },
+  D: { bg: "#DC2626", label: "GROUP D" },
+};
+
+function getGroupColor(groupName: string): { bg: string; label: string } {
+  const upper = groupName.trim().toUpperCase();
+  if (upper.includes("VIP")) return GROUP_COLOR_MAP.VIP;
+  const last = upper.slice(-1);
+  return GROUP_COLOR_MAP[last] || { bg: "#6B7280", label: upper };
+}
+
 function buildQrData(p: Pilgrim, group: Group): string {
   const lines = [
     `Name: ${p.fullName}`,
@@ -34,18 +49,20 @@ function buildQrData(p: Pilgrim, group: Group): string {
     `Group: ${group.groupName}`,
   ];
   if (group.hotels?.makkah?.name)
-    lines.push(`Hotel: ${group.hotels.makkah.name}`);
-  if (group.hotels?.makkah?.address)
-    lines.push(`Address: ${group.hotels.makkah.address}`);
-  if (group.hotels?.makkah?.googleMapsLink)
-    lines.push(`Location: ${group.hotels.makkah.googleMapsLink}`);
+    lines.push(`Hotel Makkah: ${group.hotels.makkah.name}`);
+  if (group.hotels?.madinah?.name)
+    lines.push(`Hotel Madinah: ${group.hotels.madinah.name}`);
+  if (group.hotels?.groupLeader)
+    lines.push(`Group Leader: ${group.hotels.groupLeader}`);
   if (p.busNumber)
     lines.push(`Bus: ${p.busNumber}`);
-  lines.push(`Emergency: +91 9893225590`);
+  if (p.mobileIndia)
+    lines.push(`Mobile: ${p.mobileIndia}`);
+  lines.push(`Emergency: +91 9893989786`);
   return lines.join("\n");
 }
 
-function FrontWaves() {
+function FrontWaves({ groupColor }: { groupColor: string }) {
   return (
     <>
       <div style={{
@@ -57,12 +74,12 @@ function FrontWaves() {
         background: "rgba(255,255,255,0.07)", borderRadius: "0 0 0 100%", zIndex: 0,
       }} />
       <div style={{
-        position: "absolute", bottom: 0, left: 0, width: "22mm", height: "22mm",
-        background: `linear-gradient(135deg, ${GOLD}, ${GOLD_LIGHT})`, borderRadius: "0 100% 0 0", zIndex: 0,
+        position: "absolute", bottom: 0, left: 0, right: 0, height: "3mm",
+        background: groupColor, zIndex: 2,
       }} />
       <div style={{
-        position: "absolute", bottom: "5mm", left: 0, width: "12mm", height: "12mm",
-        background: "rgba(255,255,255,0.12)", borderRadius: "0 100% 0 0", zIndex: 0,
+        position: "absolute", bottom: "3mm", left: 0, width: "22mm", height: "22mm",
+        background: `linear-gradient(135deg, ${GOLD}, ${GOLD_LIGHT})`, borderRadius: "0 100% 0 0", zIndex: 0,
       }} />
     </>
   );
@@ -111,14 +128,9 @@ export default function PrintIdCardsPro() {
     ]).then(([g, p]) => { setGroup(g); setPilgrims(p); });
   }, [groupId]);
 
-  useEffect(() => {
-    if (pilgrims.length === 0) return;
-    const t = setTimeout(() => handleDownload(), 1200);
-    return () => clearTimeout(t);
-  }, [pilgrims]);
-
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
 
+  const { bg: groupColor, label: groupLabel } = getGroupColor(group.groupName);
   const pages: Pilgrim[][] = [];
   for (let i = 0; i < pilgrims.length; i += 2) pages.push(pilgrims.slice(i, i + 2));
 
@@ -147,6 +159,7 @@ export default function PrintIdCardsPro() {
 
       <div className="no-print" style={{ padding: "16px", background: "#fef3c7", textAlign: "center" }}>
         <button onClick={handleDownload} disabled={pdfLoading} style={{ padding: "10px 24px", background: DARK, color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", marginRight: "12px", opacity: pdfLoading ? 0.6 : 1 }}>{pdfLoading ? "Generating PDF..." : "⬇ Download PDF"}</button>
+        <button onClick={() => window.print()} style={{ padding: "10px 24px", background: "#fff", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", marginRight: "12px" }}>🖨 Print</button>
         <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
       </div>
 
@@ -154,48 +167,71 @@ export default function PrintIdCardsPro() {
       {pages.map((page, pi) => (
         <div key={pi} className={pi < pages.length - 1 ? "pro-page-break" : ""} style={{ padding: "4mm 0" }}>
 
+          {/* FRONT FACES */}
           <div className="pro-cards-row">
             {page.map(p => (
               <div key={`f-${p.id}`} className="pro-card">
-                <FrontWaves />
+                <FrontWaves groupColor={groupColor} />
+
+                {/* Group color badge top-left */}
+                <div style={{
+                  position: "absolute", top: "2mm", left: "2mm", zIndex: 3,
+                  background: groupColor, color: "#fff",
+                  padding: "0.8mm 2mm", borderRadius: "2px",
+                  fontSize: "4.5pt", fontWeight: 800, letterSpacing: "0.5px",
+                }}>
+                  {groupLabel}
+                </div>
+
                 <div style={{ position: "relative", zIndex: 1, display: "flex", height: "100%", padding: "2.5mm 3mm 0" }}>
 
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "32mm", flexShrink: 0 }}>
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: "1mm" }}>
-                      <img src={BASE + "images/logo.png"} alt="" style={{ width: "13mm", height: "13mm", objectFit: "contain", marginBottom: "0.5mm" }} />
-                      <div style={{ fontSize: "9pt", fontWeight: 900, color: DARK, letterSpacing: "0.5px", lineHeight: 1.1, textAlign: "center" }}>AL BURHAN</div>
-                      <div style={{ fontSize: "5pt", fontWeight: 700, color: GOLD, letterSpacing: "0.5px", textAlign: "center" }}>TOURS & TRAVELS</div>
+                  {/* Left column: logo + photo + name */}
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "34mm", flexShrink: 0 }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: "1.5mm", marginTop: "3mm" }}>
+                      <img src={BASE + "images/logo.png"} alt="" style={{ width: "12mm", height: "12mm", objectFit: "contain", marginBottom: "0.5mm" }} />
+                      <div style={{ fontSize: "8pt", fontWeight: 900, color: DARK, letterSpacing: "0.5px", lineHeight: 1.1, textAlign: "center" }}>AL BURHAN</div>
+                      <div style={{ fontSize: "4.5pt", fontWeight: 700, color: GOLD, letterSpacing: "0.5px", textAlign: "center" }}>TOURS & TRAVELS</div>
                       <div style={{ fontSize: "5pt", fontWeight: 800, color: DARK, marginTop: "0.3mm", textAlign: "center" }}>HAJJ {group.year}</div>
                     </div>
 
+                    {/* Passport-style photo: ~30mm × 38mm */}
                     <div style={{ marginBottom: "1mm" }}>
                       {p.photoUrl ? (
-                        <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "25mm", height: "25mm", objectFit: "cover", borderRadius: "50%", border: `2px solid ${GOLD}` }} />
+                        <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "28mm", height: "35mm", objectFit: "cover", borderRadius: "2px", border: `2px solid ${GOLD}` }} />
                       ) : (
-                        <div style={{ width: "25mm", height: "25mm", background: "#f0f0f0", borderRadius: "50%", border: `2px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "5pt", color: "#aaa" }}>PHOTO</div>
+                        <div style={{ width: "28mm", height: "35mm", background: "#f0f0f0", borderRadius: "2px", border: `2px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "5pt", color: "#aaa" }}>PHOTO</div>
                       )}
                     </div>
-
-                    <div style={{ fontSize: "7pt", fontWeight: 900, color: DARK, textAlign: "center", lineHeight: 1.15, textTransform: "uppercase", wordBreak: "break-word", maxWidth: "26mm" }}>{p.fullName}</div>
                   </div>
 
+                  {/* Right column: fields + pilgrim number + QR */}
                   <div style={{ flex: 1, display: "flex", flexDirection: "column", paddingLeft: "2mm", minWidth: 0 }}>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "1.2mm", flex: 1 }}>
+
+                    {/* Big Pilgrim Number */}
+                    <div style={{
+                      background: DARK, color: GOLD, borderRadius: "3px",
+                      padding: "1mm 2mm", marginBottom: "1.5mm", textAlign: "center",
+                    }}>
+                      <div style={{ fontSize: "3.5pt", fontWeight: 700, letterSpacing: "1px", opacity: 0.8, textTransform: "uppercase" }}>HAJJ PILGRIM</div>
+                      <div style={{ fontSize: "13pt", fontWeight: 900, lineHeight: 1, letterSpacing: "1px" }}>
+                        NO: {String(p.serialNumber).padStart(3, "0")}
+                      </div>
+                    </div>
+
+                    <div style={{ fontSize: "8pt", fontWeight: 900, color: DARK, lineHeight: 1.15, textTransform: "uppercase", wordBreak: "break-word", marginBottom: "1mm" }}>{p.fullName}</div>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: "1mm", flex: 1 }}>
                       <div style={{ display: "flex", alignItems: "flex-start", gap: "1mm" }}>
                         <div style={bulletDot} />
                         <div><div style={labelStyle}>Passport No.</div><div style={{ ...valueStyle, fontFamily: "monospace", letterSpacing: "0.5px" }}>{p.passportNumber || "—"}</div></div>
                       </div>
                       <div style={{ display: "flex", alignItems: "flex-start", gap: "1mm" }}>
                         <div style={bulletDot} />
-                        <div><div style={labelStyle}>City</div><div style={valueStyle}>{p.city || "—"}</div></div>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "flex-start", gap: "1mm" }}>
-                        <div style={bulletDot} />
-                        <div><div style={labelStyle}>Group</div><div style={valueStyle}>{group.groupName}</div></div>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "flex-start", gap: "1mm" }}>
-                        <div style={bulletDot} />
                         <div><div style={labelStyle}>Bus No.</div><div style={valueStyle}>{p.busNumber || "—"}</div></div>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: "1mm" }}>
+                        <div style={bulletDot} />
+                        <div><div style={labelStyle}>Maktab</div><div style={{ ...valueStyle, background: DARK, color: GOLD, padding: "0 1.5mm", borderRadius: "2px", display: "inline-block" }}>{group.maktabNumber || "—"}</div></div>
                       </div>
                       <div style={{ display: "flex", alignItems: "flex-start", gap: "1mm" }}>
                         <div style={bulletDot} />
@@ -207,8 +243,8 @@ export default function PrintIdCardsPro() {
                       </div>
                     </div>
 
-                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "auto", marginBottom: "3mm" }}>
-                      <QRCodeSVG value={buildQrData(p, group)} size={52} level="M" />
+                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "auto", marginBottom: "4mm" }}>
+                      <QRCodeSVG value={buildQrData(p, group)} size={48} level="M" />
                     </div>
                   </div>
 
@@ -219,7 +255,7 @@ export default function PrintIdCardsPro() {
                     <Barcode value={`${p.passportNumber || "N/A"}-${String(p.serialNumber).padStart(3, "0")}`} height={12} width={1.0} fontSize={0} />
                   </div>
                   <div style={{ background: DARK, color: GOLD, padding: "1mm 2mm", fontSize: "3.8pt", textAlign: "center", fontWeight: 700, letterSpacing: "0.2px", marginTop: "0.5mm" }}>
-                    #{String(p.serialNumber).padStart(3, "0")} | Altaf: 0547090786 | Wasim: 0568780786
+                    #{String(p.serialNumber).padStart(3, "0")} | Emergency: +91 9893989786
                   </div>
                 </div>
 
@@ -230,14 +266,15 @@ export default function PrintIdCardsPro() {
             ))}
           </div>
 
+          {/* BACK FACES */}
           <div className="pro-cards-row">
             {page.map(p => (
               <div key={`b-${p.id}`} className="pro-card">
                 <BackWaves />
                 <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", height: "100%", padding: "2.5mm 3mm 0" }}>
 
-                  <div style={{ background: DARK, color: GOLD, padding: "1.5mm 3mm", borderRadius: "3px", textAlign: "center", marginBottom: "2mm", fontSize: "6pt", fontWeight: 800, letterSpacing: "1px", textTransform: "uppercase" }}>
-                    Hajj Pilgrim Identification
+                  <div style={{ background: groupColor, color: "#fff", padding: "1.5mm 3mm", borderRadius: "3px", textAlign: "center", marginBottom: "2mm", fontSize: "6pt", fontWeight: 800, letterSpacing: "1px", textTransform: "uppercase" }}>
+                    Hajj Pilgrim Identification — {groupLabel}
                   </div>
 
                   <div style={{ display: "flex", gap: "2mm", flex: 1 }}>
@@ -245,6 +282,10 @@ export default function PrintIdCardsPro() {
                       <div>
                         <div style={{ fontSize: "5pt", color: "#888", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Maktab No.</div>
                         <div style={{ display: "inline-block", background: DARK, color: GOLD, fontSize: "8pt", fontWeight: 900, padding: "0.5mm 2mm", borderRadius: "2px", marginTop: "0.5mm" }}>{group.maktabNumber || "—"}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: "5pt", color: "#888", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Bus No.</div>
+                        <div style={{ fontSize: "8pt", fontWeight: 900, color: DARK }}>{p.busNumber || "—"}</div>
                       </div>
                       <div>
                         <div style={{ fontSize: "5pt", color: "#888", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Hotel Makkah</div>
@@ -260,17 +301,18 @@ export default function PrintIdCardsPro() {
                       </div>
                     </div>
 
-                    <div style={{ width: "20mm", flexShrink: 0, display: "flex", flexDirection: "column", gap: "1mm", alignItems: "center" }}>
+                    <div style={{ width: "22mm", flexShrink: 0, display: "flex", flexDirection: "column", gap: "1mm", alignItems: "center" }}>
                       <div style={{ fontSize: "5pt", fontWeight: 800, color: DARK, textTransform: "uppercase", letterSpacing: "0.3px", textAlign: "center" }}>Emergency</div>
                       <div style={{ fontSize: "5pt", lineHeight: 1.6, color: "#333", textAlign: "center" }}>
-                        <div style={{ fontWeight: 700 }}>+91 9893225590</div>
                         <div style={{ fontWeight: 700 }}>+91 9893989786</div>
+                        <div style={{ fontWeight: 700 }}>+91 9893225590</div>
                         <div style={{ fontWeight: 700 }}>0547090786</div>
                         <div style={{ fontWeight: 700 }}>0568780786</div>
                       </div>
-                      <div style={{ marginTop: "auto", display: "flex", justifyContent: "center" }}>
+                      <div style={{ marginTop: "2mm", display: "flex", justifyContent: "center" }}>
                         <img src={BASE + "images/india_flag.jpg"} alt="" style={{ width: "10mm", height: "10mm", borderRadius: "50%", objectFit: "cover", border: `2px solid ${GOLD}` }} />
                       </div>
+                      <div style={{ fontSize: "4pt", fontWeight: 700, color: "#666", textAlign: "center", marginTop: "1mm" }}>🇮🇳 INDIA GROUP</div>
                     </div>
                   </div>
 
@@ -281,7 +323,7 @@ export default function PrintIdCardsPro() {
                     </div>
                     <div style={{ background: DARK, color: "#fff", padding: "1mm 2mm", fontSize: "3.5pt", textAlign: "center", lineHeight: 1.5, borderRadius: "0 0 3px 3px", margin: "0 -3mm", borderTop: `0.5px solid ${GOLD}` }}>
                       <div>Khanka Masjid Complex, Sanwara Rd, Burhanpur 450331 M.P.</div>
-                      <div style={{ color: GOLD, fontWeight: 800, fontSize: "4pt", letterSpacing: "0.2px" }}>AL BURHAN TOURS & TRAVELS | +91 9893225590</div>
+                      <div style={{ color: GOLD, fontWeight: 800, fontSize: "4pt", letterSpacing: "0.2px" }}>AL BURHAN TOURS & TRAVELS | +91 9893989786</div>
                     </div>
                   </div>
                 </div>
