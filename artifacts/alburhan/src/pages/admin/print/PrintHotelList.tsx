@@ -7,7 +7,7 @@ const API = import.meta.env.VITE_API_URL || "";
 
 interface Pilgrim {
   id: string; serialNumber: number; fullName: string; passportNumber?: string;
-  roomNumber?: string; roomType?: string; photoUrl?: string;
+  roomNumber?: string; roomType?: string; busNumber?: string; photoUrl?: string;
 }
 interface Group {
   id: string; groupName: string; year: number;
@@ -17,13 +17,6 @@ interface Group {
   };
 }
 
-function getFloor(roomNumber?: string): string {
-  if (!roomNumber) return "—";
-  const digits = roomNumber.replace(/\D/g, "");
-  if (digits.length >= 3) return `Floor ${digits[0]}`;
-  if (digits.length === 2) return `Floor ${digits[0]}`;
-  return "—";
-}
 
 export default function PrintHotelList() {
   const [, params] = useRoute("/admin/groups/:groupId/print/hotel-list");
@@ -100,14 +93,13 @@ export default function PrintHotelList() {
                 <th style={thStyle}>Name</th>
                 <th style={thStyle}>Passport</th>
                 <th style={{ ...thStyle, textAlign: "center" }}>Room No.</th>
-                <th style={{ ...thStyle, textAlign: "center" }}>Floor</th>
-                <th style={{ ...thStyle, textAlign: "center" }}>Room Type</th>
+                <th style={{ ...thStyle, textAlign: "center" }}>Bus No.</th>
                 <th style={thStyle}>Makkah Hotel</th>
-                <th style={thStyle}>Check-in Time</th>
-                <th style={thStyle}>Check-out</th>
+                <th style={thStyle}>Makkah Check-in</th>
+                <th style={thStyle}>Makkah Check-out</th>
                 <th style={thStyle}>Madinah Hotel</th>
-                <th style={thStyle}>Check-in Time</th>
-                <th style={thStyle}>Check-out</th>
+                <th style={thStyle}>Madinah Check-in</th>
+                <th style={thStyle}>Madinah Check-out</th>
               </tr>
             </thead>
             <tbody>
@@ -124,12 +116,7 @@ export default function PrintHotelList() {
                   <td style={{ ...tdStyle, fontWeight: 600 }}>{p.fullName}</td>
                   <td style={{ ...tdStyle, fontFamily: "monospace", fontSize: "7.5pt" }}>{p.passportNumber || "—"}</td>
                   <td style={{ ...tdStyle, fontWeight: 700, textAlign: "center", color: "#0A3D2A", fontSize: "10pt" }}>{p.roomNumber || "—"}</td>
-                  <td style={{ ...tdStyle, textAlign: "center", color: "#555" }}>{getFloor(p.roomNumber)}</td>
-                  <td style={{ ...tdStyle, textAlign: "center" }}>
-                    {p.roomType ? (
-                      <span style={{ background: "#e6f4ea", color: "#0A3D2A", padding: "1px 6px", borderRadius: "4px", fontWeight: 600, fontSize: "7.5pt" }}>{p.roomType}</span>
-                    ) : "—"}
-                  </td>
+                  <td style={{ ...tdStyle, textAlign: "center", fontWeight: 700, color: "#1a2744" }}>{p.busNumber || "—"}</td>
                   <td style={tdStyle}>{group.hotels?.makkah?.name || "—"}</td>
                   <td style={{ ...tdStyle, color: "#C9A23F", fontWeight: 600 }}>{group.hotels?.makkah?.checkIn || "—"}</td>
                   <td style={tdStyle}>{group.hotels?.makkah?.checkOut || "—"}</td>
