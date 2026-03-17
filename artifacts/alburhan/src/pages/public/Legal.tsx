@@ -64,7 +64,7 @@ export function PrivacyPolicy() {
   );
 }
 
-export function TermsConditions() {
+export function TermsAndConditions() {
   return (
     <LegalLayout title="Terms & Conditions" lastUpdated="January 1, 2025">
       <p>By using our website and booking our services, you agree to the following terms and conditions.</p>

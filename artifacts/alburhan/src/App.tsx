@@ -13,7 +13,7 @@ import LiveChat from "@/pages/public/LiveChat";
 import Blog from "@/pages/public/Blog";
 import About from "@/pages/public/About";
 import Contact from "@/pages/public/Contact";
-import { PrivacyPolicy, TermsConditions, CancellationPolicy, RefundPolicy } from "@/pages/public/Legal";
+import { PrivacyPolicy, TermsAndConditions, CancellationPolicy, RefundPolicy } from "@/pages/public/Legal";
 import Invoice from "@/pages/public/Invoice";
 import Login from "@/pages/auth/Login";
 import CustomerDashboard from "@/pages/customer/Dashboard";
@@ -80,7 +80,7 @@ function Router() {
       <Route path="/about" component={About} />
       <Route path="/contact" component={Contact} />
       <Route path="/privacy" component={PrivacyPolicy} />
-      <Route path="/terms" component={TermsConditions} />
+      <Route path="/terms" component={TermsAndConditions} />
       <Route path="/cancellation" component={CancellationPolicy} />
       <Route path="/refund" component={RefundPolicy} />
       <Route path="/login" component={Login} />

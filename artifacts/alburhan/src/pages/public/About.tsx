@@ -61,7 +61,7 @@ export default function About() {
                   </li>
                   <li className="flex items-center gap-3">
                     <span className="text-accent">📞</span>
-                    <span><strong>Phone:</strong> +91 9893989786 / +91 8989701701 / +91 9893225590</span>
+                    <span><strong>Phone:</strong> +91 9893989786</span>
                   </li>
                   <li className="flex items-center gap-3">
                     <span className="text-accent">✉️</span>
