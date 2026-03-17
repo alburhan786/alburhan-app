@@ -5,7 +5,7 @@ import { db, bookingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { CreatePaymentOrderBody, VerifyPaymentBody } from "@workspace/api-zod";
 import { requireAuth, type AuthenticatedRequest } from "../lib/auth.js";
-import { sendPaymentConfirmationNotification } from "../lib/notifications.js";
+import { sendPaymentConfirmationNotification, sendPartialPaymentNotification } from "../lib/notifications.js";
 
 const router = Router();
 
@@ -181,20 +181,30 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
     .where(eq(bookingsTable.id, bookingId))
     .returning();
 
-  if (isFullyPaid) {
-    const baseUrl = process.env.REPLIT_DEV_DOMAIN
-      ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-      : `${req.protocol}://${req.get("host")?.replace(/\/api$/, "")}`;
-    const invoiceUrl = `${baseUrl}/invoice/${booking.bookingNumber}`;
+  const baseUrl = process.env.REPLIT_DEV_DOMAIN
+    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+    : `${req.protocol}://${req.get("host")?.replace(/\/api$/, "")}`;
 
+  if (isFullyPaid) {
+    const invoiceUrl = `${baseUrl}/invoice/${booking.bookingNumber}`;
     sendPaymentConfirmationNotification({
       mobile: booking.customerMobile,
       email: booking.customerEmail,
       customerName: booking.customerName,
       bookingNumber: booking.bookingNumber,
-      amount: booking.finalAmount ? String(Number(booking.finalAmount).toLocaleString("en-IN")) : "N/A",
+      amount: Number(booking.finalAmount || 0).toLocaleString("en-IN"),
       invoiceNumber: invoiceNumber!,
       invoiceUrl,
+    }).catch(console.error);
+  } else {
+    const remainingBalance = Math.max(0, finalAmount - newPaidAmount);
+    sendPartialPaymentNotification({
+      mobile: booking.customerMobile,
+      email: booking.customerEmail,
+      customerName: booking.customerName,
+      bookingNumber: booking.bookingNumber,
+      paidAmount: thisPayment.toLocaleString("en-IN"),
+      remainingAmount: remainingBalance.toLocaleString("en-IN"),
     }).catch(console.error);
   }
 
