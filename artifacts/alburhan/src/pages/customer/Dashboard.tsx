@@ -125,7 +125,7 @@ function UploadModal({ bookingId, bookingNumber, onClose }: { bookingId: string;
       toast({ title: "Document uploaded successfully!" });
       setFile(null);
       refetch();
-      queryClient.invalidateQueries({ queryKey: ['/api/documents', bookingId] });
+      queryClient.invalidateQueries({ queryKey: [`/api/documents/${bookingId}`] });
     } catch (err: any) {
       toast({ title: "Upload failed", description: err.message, variant: "destructive" });
     } finally {
@@ -138,6 +138,7 @@ function UploadModal({ bookingId, bookingNumber, onClose }: { bookingId: string;
   const handleDelete = async (docId: string) => {
     await deleteDoc.mutateAsync({ id: docId });
     refetch();
+    queryClient.invalidateQueries({ queryKey: [`/api/documents/${bookingId}`] });
     toast({ title: "Document removed" });
   };
 
