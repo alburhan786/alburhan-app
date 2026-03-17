@@ -4,9 +4,8 @@ import { useGetPublicInvoice, useGetPublicInvoiceByNumber } from "@workspace/api
 import type { Invoice as InvoiceType, Pilgrim } from "@workspace/api-client-react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
-import { Download, Printer, Share2, Copy, Mail } from "lucide-react";
+import { Share2, Copy, Mail } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-import { downloadPdf } from "@/lib/pdf-download";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
@@ -392,7 +391,6 @@ export default function Invoice() {
   const params = useParams<{ bookingNumber: string }>();
   const identifier = params.bookingNumber ?? "";
   const invoiceRef = useRef<HTMLDivElement>(null);
-  const [pdfLoading, setPdfLoading] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const { toast } = useToast();
 
@@ -403,20 +401,6 @@ export default function Invoice() {
 
   const activeQuery = isInvoiceNumber ? invoiceNumQuery : bookingQuery;
   const { data: invoice, isLoading, error } = activeQuery;
-
-  const handleDownload = async () => {
-    if (!invoiceRef.current || pdfLoading) return;
-    setPdfLoading(true);
-    try {
-      await downloadPdf(invoiceRef.current, { filename: `Invoice-${identifier}.pdf`, orientation: "portrait" });
-    } finally {
-      setPdfLoading(false);
-    }
-  };
-
-  const handlePrint = () => {
-    window.print();
-  };
 
   const handleCopyLink = async () => {
     await navigator.clipboard.writeText(window.location.href);
@@ -462,31 +446,9 @@ export default function Invoice() {
 
   return (
     <>
-      <style>{`@media print { .invoice-actions { display: none !important; } }`}</style>
       <MainLayout>
         <div className="max-w-4xl mx-auto py-8 px-4">
-          <div className="invoice-actions flex flex-wrap gap-3 mb-6 justify-end">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleDownload}
-              disabled={pdfLoading}
-              className="border-[#0B3D2E] text-[#0B3D2E] hover:bg-[#0B3D2E] hover:text-white"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              {pdfLoading ? "Generating..." : "Download PDF"}
-            </Button>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handlePrint}
-              className="border-[#0B3D2E] text-[#0B3D2E] hover:bg-[#0B3D2E] hover:text-white"
-            >
-              <Printer className="w-4 h-4 mr-2" />
-              Print
-            </Button>
-
+          <div className="flex flex-wrap gap-3 mb-6 justify-end">
             <Popover open={shareOpen} onOpenChange={setShareOpen}>
               <PopoverTrigger asChild>
                 <Button
