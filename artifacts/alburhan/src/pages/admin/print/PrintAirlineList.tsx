@@ -8,7 +8,7 @@ const API = import.meta.env.VITE_API_URL || "";
 interface Pilgrim {
   id: string; serialNumber: number; fullName: string; passportNumber?: string;
   visaNumber?: string; dateOfBirth?: string; gender?: string; city?: string;
-  photoUrl?: string; busNumber?: string; seatNumber?: string; roomNumber?: string;
+  photoUrl?: string; busNumber?: string; roomNumber?: string;
 }
 interface Group {
   id: string; groupName: string; year: number; departureDate?: string;
@@ -82,7 +82,6 @@ export default function PrintAirlineList() {
                 <th style={thStyle}>Date of Birth</th>
                 <th style={{ ...thStyle, textAlign: "center" }}>Gender</th>
                 <th style={thStyle}>City</th>
-                <th style={{ ...thStyle, textAlign: "center" }}>Seat No.</th>
                 <th style={{ ...thStyle, textAlign: "center" }}>Bus No.</th>
                 <th style={{ ...thStyle, textAlign: "center" }}>Room No.</th>
                 <th style={thStyle}>Flight No.</th>
@@ -106,7 +105,6 @@ export default function PrintAirlineList() {
                   <td style={tdStyle}>{p.dateOfBirth || "—"}</td>
                   <td style={{ ...tdStyle, textAlign: "center" }}>{p.gender || "—"}</td>
                   <td style={tdStyle}>{p.city || "—"}</td>
-                  <td style={{ ...tdStyle, textAlign: "center", fontWeight: 700, color: "#1a2744" }}>{p.seatNumber || "—"}</td>
                   <td style={{ ...tdStyle, textAlign: "center", fontWeight: 700, color: "#0A3D2A" }}>{p.busNumber || "—"}</td>
                   <td style={{ ...tdStyle, textAlign: "center", fontWeight: 700, color: "#C9A23F" }}>{p.roomNumber || "—"}</td>
                   <td style={{ ...tdStyle, fontWeight: 600 }}>{group.flightNumber || "—"}</td>
