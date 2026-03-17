@@ -37,6 +37,7 @@ import PrintIdCardsPro from "@/pages/admin/print/PrintIdCardsPro";
 import InvoiceManager from "@/pages/admin/InvoiceManager";
 import CustomerManager from "@/pages/admin/CustomerManager";
 import InquiryManager from "@/pages/admin/InquiryManager";
+import OfflineBookingManager from "@/pages/admin/OfflineBookingManager";
 import NotFound from "@/pages/not-found";
 import { useAuth } from "@/hooks/use-auth";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -104,6 +105,7 @@ function Router() {
       <Route path="/admin/groups/:groupId/print/zamzam" component={() => <AdminRoute component={PrintZamzam} />} />
       <Route path="/admin/groups/:groupId/print/feedback" component={() => <AdminRoute component={PrintFeedback} />} />
       <Route path="/admin/groups/:groupId/print/contract" component={() => <AdminRoute component={PrintContract} />} />
+      <Route path="/admin/offline-bookings" component={() => <AdminRoute component={OfflineBookingManager} />} />
       <Route path="/admin/customers" component={() => <AdminRoute component={CustomerManager} />} />
       <Route path="/admin/inquiries" component={() => <AdminRoute component={InquiryManager} />} />
 
