@@ -6,7 +6,10 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { CreditCard, FileText, Download, Clock, Upload, Trash2, CheckCircle, AlertCircle, X, Eye, ShieldAlert } from "lucide-react";
+import { CreditCard, FileText, Download, Clock, Upload, Trash2, CheckCircle, AlertCircle, X, Eye, ShieldAlert, IndianRupee } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -258,8 +261,14 @@ function getStatusColor(status: string) {
     case 'confirmed': return 'bg-emerald-100 text-emerald-800 border-emerald-200';
     case 'rejected': return 'bg-red-100 text-red-800 border-red-200';
     case 'cancelled': return 'bg-gray-100 text-gray-800 border-gray-200';
+    case 'partially_paid': return 'bg-orange-100 text-orange-800 border-orange-200';
     default: return 'bg-amber-100 text-amber-800 border-amber-200';
   }
+}
+
+function getStatusLabel(status: string) {
+  if (status === 'partially_paid') return 'Partially Paid';
+  return status;
 }
 
 function getStatusMessage(status: string) {
@@ -268,6 +277,7 @@ function getStatusMessage(status: string) {
     case 'approved': return 'Booking approved! Please complete your payment to confirm.';
     case 'confirmed': return 'Booking confirmed! Jazak Allah Khair for choosing Al Burhan Tours.';
     case 'rejected': return 'Booking could not be processed. Please contact us for alternatives.';
+    case 'partially_paid': return 'Partial payment received. Please pay the remaining balance to confirm your booking.';
     default: return '';
   }
 }
@@ -280,6 +290,9 @@ export default function CustomerDashboard() {
   const { toast } = useToast();
   const [uploadBookingId, setUploadBookingId] = useState<string | null>(null);
   const [expandedBooking, setExpandedBooking] = useState<string | null>(null);
+  const [payDialogBooking, setPayDialogBooking] = useState<any | null>(null);
+  const [partialInput, setPartialInput] = useState<string>("");
+  const [payMode, setPayMode] = useState<"full" | "partial">("full");
 
   const uploadBooking = bookings.find((b: any) => b.id === uploadBookingId);
 
@@ -409,7 +422,7 @@ export default function CustomerDashboard() {
                       <div className="flex items-center gap-2">
                         {booking.status === 'confirmed' && <DocWarningBadge bookingId={booking.id} />}
                         <Badge variant="outline" className={`px-3 py-1 uppercase tracking-wider text-xs font-bold ${getStatusColor(booking.status)}`}>
-                          {booking.status}
+                          {getStatusLabel(booking.status)}
                         </Badge>
                       </div>
                     </div>
@@ -435,6 +448,18 @@ export default function CustomerDashboard() {
                         <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Total Amount</p>
                         <p className="font-semibold text-primary text-lg">{booking.finalAmount ? formatCurrency(booking.finalAmount) : 'Pending'}</p>
                         {booking.gstAmount && <p className="text-xs text-muted-foreground">incl. GST ₹{Number(booking.gstAmount).toLocaleString('en-IN')}</p>}
+                        {booking.status === 'partially_paid' && booking.paidAmount && (
+                          <div className="mt-2 space-y-1">
+                            <div className="w-full bg-orange-100 rounded-full h-2">
+                              <div
+                                className="bg-orange-500 h-2 rounded-full"
+                                style={{ width: `${Math.min(100, (Number(booking.paidAmount) / Number(booking.finalAmount)) * 100)}%` }}
+                              />
+                            </div>
+                            <p className="text-xs text-orange-700 font-medium">Paid: ₹{Number(booking.paidAmount).toLocaleString('en-IN')}</p>
+                            <p className="text-xs text-muted-foreground">Balance: ₹{(Number(booking.finalAmount) - Number(booking.paidAmount)).toLocaleString('en-IN')}</p>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -488,13 +513,18 @@ export default function CustomerDashboard() {
 
                     {/* Actions */}
                     <div className="p-4 bg-muted/20 border-t border-border flex flex-wrap justify-end gap-3">
-                      {booking.status === 'approved' && (
+                      {(booking.status === 'approved' || booking.status === 'partially_paid') && (
                         <Button
-                          onClick={() => initiatePayment(booking.id, booking.customerName, booking.customerEmail || "", booking.customerMobile)}
+                          onClick={() => {
+                            setPayDialogBooking(booking);
+                            setPartialInput("");
+                            setPayMode("full");
+                          }}
                           disabled={isInitializing}
                           className="bg-accent text-accent-foreground hover:bg-accent/90 font-semibold"
                         >
-                          <CreditCard className="w-4 h-4 mr-2" /> Pay Now
+                          <CreditCard className="w-4 h-4 mr-2" />
+                          {booking.status === 'partially_paid' ? 'Pay Balance' : 'Pay Now'}
                         </Button>
                       )}
 
@@ -525,6 +555,125 @@ export default function CustomerDashboard() {
           </div>
         </div>
       </div>
+      {/* Payment Dialog */}
+      {payDialogBooking && (() => {
+        const finalAmt = Number(payDialogBooking.finalAmount || 0);
+        const paidAmt = Number(payDialogBooking.paidAmount || 0);
+        const balanceDue = finalAmt - paidAmt;
+        const isPartiallyPaid = payDialogBooking.status === 'partially_paid';
+        const parsedPartial = parseFloat(partialInput);
+        const partialValid = !isNaN(parsedPartial) && parsedPartial >= 1 && parsedPartial <= balanceDue;
+        const chargeAmount = payMode === 'full' ? balanceDue : (partialValid ? parsedPartial : 0);
+
+        return (
+          <Dialog open={true} onOpenChange={(open) => { if (!open) setPayDialogBooking(null); }}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-primary">
+                  <IndianRupee className="w-5 h-5 text-accent" />
+                  {isPartiallyPaid ? 'Pay Remaining Balance' : 'Choose Payment Amount'}
+                </DialogTitle>
+                <DialogDescription>
+                  {payDialogBooking.packageName || 'Booking'} — #{payDialogBooking.bookingNumber}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 pt-1">
+                {/* Amount summary */}
+                <div className="bg-muted/50 rounded-xl p-4 space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Total Amount</span>
+                    <span className="font-semibold">₹{finalAmt.toLocaleString('en-IN')}</span>
+                  </div>
+                  {paidAmt > 0 && (
+                    <div className="flex justify-between text-orange-700">
+                      <span>Already Paid</span>
+                      <span className="font-semibold">₹{paidAmt.toLocaleString('en-IN')}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between border-t border-border pt-2 font-bold text-primary">
+                    <span>Balance Due</span>
+                    <span>₹{balanceDue.toLocaleString('en-IN')}</span>
+                  </div>
+                </div>
+
+                {/* Pay full amount option */}
+                <button
+                  onClick={() => setPayMode("full")}
+                  className={`w-full flex items-center justify-between p-4 rounded-xl border-2 transition-all text-left ${payMode === 'full' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
+                >
+                  <div>
+                    <p className="font-semibold text-sm">{isPartiallyPaid ? 'Pay Full Remaining Balance' : 'Pay Full Amount'}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {isPartiallyPaid ? 'Clear your balance & confirm booking' : 'Complete payment to confirm booking'}
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0 ml-4">
+                    <p className="font-bold text-primary">₹{balanceDue.toLocaleString('en-IN')}</p>
+                    {payMode === 'full' && <div className="w-4 h-4 rounded-full bg-primary ml-auto mt-1 flex items-center justify-center"><div className="w-2 h-2 rounded-full bg-white" /></div>}
+                  </div>
+                </button>
+
+                {/* Pay partial amount option */}
+                <button
+                  onClick={() => setPayMode("partial")}
+                  className={`w-full flex items-start justify-between p-4 rounded-xl border-2 transition-all text-left ${payMode === 'partial' ? 'border-orange-400 bg-orange-50' : 'border-border hover:border-orange-300'}`}
+                >
+                  <div className="flex-1">
+                    <p className="font-semibold text-sm">Pay Custom Amount</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Pay a partial amount now, rest later</p>
+                  </div>
+                  {payMode === 'partial' && <div className="w-4 h-4 rounded-full bg-orange-500 ml-4 mt-0.5 flex items-center justify-center shrink-0"><div className="w-2 h-2 rounded-full bg-white" /></div>}
+                </button>
+
+                {payMode === 'partial' && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="partialAmt" className="text-sm">Enter amount to pay (₹)</Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">₹</span>
+                      <Input
+                        id="partialAmt"
+                        type="number"
+                        min={1}
+                        max={balanceDue}
+                        value={partialInput}
+                        onChange={(e) => setPartialInput(e.target.value)}
+                        placeholder={`1 – ${balanceDue.toLocaleString('en-IN')}`}
+                        className="pl-7"
+                        autoFocus
+                      />
+                    </div>
+                    {partialInput && !partialValid && (
+                      <p className="text-xs text-destructive">Enter an amount between ₹1 and ₹{balanceDue.toLocaleString('en-IN')}</p>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex gap-3 pt-1">
+                  <Button variant="outline" className="flex-1" onClick={() => setPayDialogBooking(null)}>Cancel</Button>
+                  <Button
+                    className="flex-1 bg-primary text-white hover:bg-primary/90 font-semibold"
+                    disabled={isInitializing || (payMode === 'partial' && !partialValid)}
+                    onClick={() => {
+                      setPayDialogBooking(null);
+                      initiatePayment(
+                        payDialogBooking.id,
+                        payDialogBooking.customerName,
+                        payDialogBooking.customerEmail || "",
+                        payDialogBooking.customerMobile,
+                        payMode === 'partial' ? parsedPartial : undefined
+                      );
+                    }}
+                  >
+                    <CreditCard className="w-4 h-4 mr-2" />
+                    {isInitializing ? 'Loading…' : `Pay ₹${chargeAmount > 0 ? chargeAmount.toLocaleString('en-IN') : '—'}`}
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
     </MainLayout>
   );
 }

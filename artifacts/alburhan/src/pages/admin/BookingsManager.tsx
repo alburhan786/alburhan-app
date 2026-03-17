@@ -66,6 +66,8 @@ function BookingDetailModal({ booking, open, onClose }: { booking: Booking | nul
                 {booking.gstAmount && <p><span className="text-muted-foreground">GST:</span> <span className="font-mono">{formatCurrency(booking.gstAmount)}</span></p>}
                 {booking.finalAmount && <p><span className="text-muted-foreground">Final:</span> <span className="font-mono font-bold text-[#0B3D2E]">{formatCurrency(booking.finalAmount)}</span></p>}
                 {(booking as any).advanceAmount && <p><span className="text-muted-foreground">Advance:</span> <span className="font-mono text-emerald-700">₹{Number((booking as any).advanceAmount).toLocaleString("en-IN")}</span></p>}
+                {(booking as any).paidAmount && <p><span className="text-muted-foreground">Paid Online:</span> <span className="font-mono font-bold text-orange-700">₹{Number((booking as any).paidAmount).toLocaleString("en-IN")}</span></p>}
+                {(booking as any).paidAmount && booking.finalAmount && Number((booking as any).paidAmount) < Number(booking.finalAmount) && <p><span className="text-muted-foreground">Balance Due:</span> <span className="font-mono font-bold text-red-600">₹{(Number(booking.finalAmount) - Number((booking as any).paidAmount)).toLocaleString("en-IN")}</span></p>}
                 {booking.razorpayPaymentId && <p><span className="text-muted-foreground">Razorpay:</span> <span className="font-mono text-xs">{booking.razorpayPaymentId}</span></p>}
               </div>
             </div>
@@ -434,8 +436,14 @@ export default function BookingsManager() {
       case 'confirmed': return 'bg-emerald-100 text-emerald-800';
       case 'rejected': return 'bg-red-100 text-red-800';
       case 'cancelled': return 'bg-gray-100 text-gray-800';
+      case 'partially_paid': return 'bg-orange-100 text-orange-800';
       default: return 'bg-amber-100 text-amber-800';
     }
+  };
+
+  const getStatusLabel = (status: string) => {
+    if (status === 'partially_paid') return 'Partially Paid';
+    return status;
   };
 
   const filtered = statusFilter === "all" ? bookings : bookings.filter(b => b.status === statusFilter);
@@ -458,11 +466,12 @@ export default function BookingsManager() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-6 gap-4 mb-6">
         {[
           { label: "All", value: bookings.length, key: "all", color: "bg-gray-50 border-gray-200" },
           { label: "Pending", value: counts.pending || 0, key: "pending", color: "bg-amber-50 border-amber-200" },
           { label: "Approved", value: counts.approved || 0, key: "approved", color: "bg-blue-50 border-blue-200" },
+          { label: "Part. Paid", value: counts.partially_paid || 0, key: "partially_paid", color: "bg-orange-50 border-orange-200" },
           { label: "Confirmed", value: counts.confirmed || 0, key: "confirmed", color: "bg-emerald-50 border-emerald-200" },
           { label: "Rejected", value: counts.rejected || 0, key: "rejected", color: "bg-red-50 border-red-200" },
         ].map(s => (
@@ -514,7 +523,7 @@ export default function BookingsManager() {
                   </td>
                   <td className="px-6 py-4">
                     <Badge variant="outline" className={`px-2.5 py-1 uppercase tracking-wider text-[10px] font-bold border-0 ${getStatusColor(booking.status)}`}>
-                      {booking.status}
+                      {getStatusLabel(booking.status)}
                     </Badge>
                   </td>
                   <td className="px-6 py-4 text-right">

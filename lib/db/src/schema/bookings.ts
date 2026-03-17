@@ -2,7 +2,7 @@ import { pgTable, text, timestamp, numeric, integer, boolean, pgEnum, jsonb } fr
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
-export const bookingStatusEnum = pgEnum("booking_status", ["pending", "approved", "rejected", "confirmed", "cancelled"]);
+export const bookingStatusEnum = pgEnum("booking_status", ["pending", "approved", "rejected", "confirmed", "cancelled", "partially_paid"]);
 
 export const bookingsTable = pgTable("bookings", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -28,6 +28,7 @@ export const bookingsTable = pgTable("bookings", {
   roomType: text("room_type"),
   groupId: text("group_id"),
   advanceAmount: numeric("advance_amount", { precision: 12, scale: 2 }),
+  paidAmount: numeric("paid_amount", { precision: 12, scale: 2 }),
   notes: text("notes"),
   isOffline: boolean("is_offline").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),

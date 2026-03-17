@@ -8,4 +8,5 @@
 
 export interface CreatePaymentOrderRequest {
   bookingId: string;
+  payAmount?: number;
 }

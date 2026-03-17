@@ -30,40 +30,47 @@ export function usePayment() {
     document.body.appendChild(script);
   }, [toast]);
 
-  const initiatePayment = async (bookingId: string, customerName: string, customerEmail: string, customerMobile: string) => {
+  const initiatePayment = async (
+    bookingId: string,
+    customerName: string,
+    customerEmail: string,
+    customerMobile: string,
+    payAmount?: number
+  ) => {
     if (!isSdkLoaded) {
       toast({ title: "Please wait", description: "Payment gateway is still loading..." });
       return;
     }
 
     try {
-      // 1. Create order on backend
-      const order = await createOrder.mutateAsync({ data: { bookingId } });
+      const order = await createOrder.mutateAsync({ data: { bookingId, payAmount } });
 
-      // 2. Open Razorpay Checkout
       const options = {
         key: order.razorpayKeyId,
         amount: order.amount,
         currency: order.currency,
         name: "Al Burhan Tours & Travels",
-        description: "Booking Payment",
+        description: payAmount ? `Partial Payment — ₹${payAmount.toLocaleString("en-IN")}` : "Booking Payment",
         image: `${import.meta.env.BASE_URL}images/logo.png`,
         order_id: order.orderId,
         handler: async function (response: any) {
           try {
-            // 3. Verify payment on backend
             await verifyPayment.mutateAsync({
               data: {
                 bookingId,
                 razorpayOrderId: response.razorpay_order_id,
                 razorpayPaymentId: response.razorpay_payment_id,
                 razorpaySignature: response.razorpay_signature,
+                payAmount,
               }
             });
-            
+
+            const isFullPay = !payAmount;
             toast({
-              title: "Payment Successful",
-              description: "Your booking is now confirmed. Alhamdulillah.",
+              title: isFullPay ? "Payment Successful" : "Partial Payment Recorded",
+              description: isFullPay
+                ? "Your booking is now confirmed. Alhamdulillah."
+                : `₹${payAmount!.toLocaleString("en-IN")} received. Please pay the remaining balance to confirm your booking.`,
             });
             queryClient.invalidateQueries({ queryKey: ['/api/bookings'] });
             queryClient.invalidateQueries({ queryKey: [`/api/bookings/${bookingId}`] });
@@ -81,7 +88,7 @@ export function usePayment() {
           contact: customerMobile,
         },
         theme: {
-          color: "#013220", // Deep emerald primary
+          color: "#013220",
         },
       };
 

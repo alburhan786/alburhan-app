@@ -11,4 +11,5 @@ export interface VerifyPaymentRequest {
   razorpayOrderId: string;
   razorpayPaymentId: string;
   razorpaySignature: string;
+  payAmount?: number;
 }

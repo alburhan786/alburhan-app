@@ -24,7 +24,7 @@ router.post("/create-order", requireAuth as any, async (req: AuthenticatedReques
     res.status(400).json({ message: "Invalid request" });
     return;
   }
-  const { bookingId } = parsed.data;
+  const { bookingId, payAmount } = parsed.data;
 
   const bookings = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
   const booking = bookings[0];
@@ -39,13 +39,37 @@ router.post("/create-order", requireAuth as any, async (req: AuthenticatedReques
     return;
   }
 
-  if (booking.status !== "approved") {
+  if (booking.status !== "approved" && booking.status !== "partially_paid") {
     res.status(400).json({ message: "Booking must be approved before payment" });
     return;
   }
   if (!booking.finalAmount) {
     res.status(400).json({ message: "Booking amount not set" });
     return;
+  }
+
+  const finalAmount = Number(booking.finalAmount);
+  const alreadyPaid = Number(booking.paidAmount || 0);
+  const remainingBalance = finalAmount - alreadyPaid;
+
+  if (remainingBalance <= 0) {
+    res.status(400).json({ message: "This booking is already fully paid" });
+    return;
+  }
+
+  let chargeAmount: number;
+  if (payAmount) {
+    if (payAmount <= 0) {
+      res.status(400).json({ message: "Payment amount must be greater than zero" });
+      return;
+    }
+    if (payAmount > remainingBalance) {
+      res.status(400).json({ message: `Payment amount cannot exceed remaining balance of ₹${remainingBalance.toLocaleString("en-IN")}` });
+      return;
+    }
+    chargeAmount = payAmount;
+  } else {
+    chargeAmount = remainingBalance;
   }
 
   let razorpay;
@@ -56,7 +80,7 @@ router.post("/create-order", requireAuth as any, async (req: AuthenticatedReques
     return;
   }
 
-  const amountPaise = Math.round(Number(booking.finalAmount) * 100);
+  const amountPaise = Math.round(chargeAmount * 100);
 
   const order = await razorpay.orders.create({
     amount: amountPaise,
@@ -66,6 +90,7 @@ router.post("/create-order", requireAuth as any, async (req: AuthenticatedReques
       bookingId: booking.id,
       bookingNumber: booking.bookingNumber,
       customerName: booking.customerName,
+      isPartial: chargeAmount < remainingBalance ? "true" : "false",
     },
   });
 
@@ -77,6 +102,11 @@ router.post("/create-order", requireAuth as any, async (req: AuthenticatedReques
     currency: "INR",
     bookingId: booking.id,
     razorpayKeyId: process.env.RAZORPAY_KEY_ID!,
+    chargeAmount,
+    finalAmount,
+    alreadyPaid,
+    remainingBalance,
+    isPartial: chargeAmount < finalAmount,
   });
 });
 
@@ -86,7 +116,7 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
     res.status(400).json({ message: "Invalid request" });
     return;
   }
-  const { bookingId, razorpayOrderId, razorpayPaymentId, razorpaySignature } = parsed.data;
+  const { bookingId, razorpayOrderId, razorpayPaymentId, razorpaySignature, payAmount } = parsed.data;
 
   const secret = process.env.RAZORPAY_SECRET;
   if (!secret) {
@@ -117,8 +147,8 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
     return;
   }
 
-  if (existingBooking.status !== "approved") {
-    res.status(400).json({ message: "Booking must be approved before payment verification" });
+  if (existingBooking.status !== "approved" && existingBooking.status !== "partially_paid") {
+    res.status(400).json({ message: "Booking is not in a payable state" });
     return;
   }
 
@@ -127,40 +157,55 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
     return;
   }
 
-  const invoiceNumber = `INV${Date.now().toString().slice(-8)}`;
+  const finalAmount = Number(existingBooking.finalAmount || 0);
+  const previouslyPaid = Number(existingBooking.paidAmount || 0);
+  const thisPayment = payAmount ?? (finalAmount - previouslyPaid);
+  const newPaidAmount = previouslyPaid + thisPayment;
+  const isFullyPaid = newPaidAmount >= finalAmount;
+
+  const newStatus = isFullyPaid ? "confirmed" : "partially_paid";
+  const invoiceNumber = isFullyPaid
+    ? (existingBooking.invoiceNumber || `INV${Date.now().toString().slice(-8)}`)
+    : existingBooking.invoiceNumber;
 
   const [booking] = await db
     .update(bookingsTable)
     .set({
-      status: "confirmed",
+      status: newStatus as any,
       razorpayOrderId,
-      razorpayPaymentId,
-      invoiceNumber,
+      razorpayPaymentId: isFullyPaid ? razorpayPaymentId : existingBooking.razorpayPaymentId,
+      paidAmount: String(newPaidAmount),
+      invoiceNumber: invoiceNumber ?? undefined,
       updatedAt: new Date(),
     })
     .where(eq(bookingsTable.id, bookingId))
     .returning();
 
-  const baseUrl = process.env.REPLIT_DEV_DOMAIN
-    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-    : `${req.protocol}://${req.get("host")?.replace(/\/api$/, "")}`;
-  const invoiceUrl = `${baseUrl}/invoice/${booking.bookingNumber}`;
+  if (isFullyPaid) {
+    const baseUrl = process.env.REPLIT_DEV_DOMAIN
+      ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+      : `${req.protocol}://${req.get("host")?.replace(/\/api$/, "")}`;
+    const invoiceUrl = `${baseUrl}/invoice/${booking.bookingNumber}`;
 
-  sendPaymentConfirmationNotification({
-    mobile: booking.customerMobile,
-    email: booking.customerEmail,
-    customerName: booking.customerName,
-    bookingNumber: booking.bookingNumber,
-    amount: booking.finalAmount ? String(Number(booking.finalAmount).toLocaleString("en-IN")) : "N/A",
-    invoiceNumber,
-    invoiceUrl,
-  }).catch(console.error);
+    sendPaymentConfirmationNotification({
+      mobile: booking.customerMobile,
+      email: booking.customerEmail,
+      customerName: booking.customerName,
+      bookingNumber: booking.bookingNumber,
+      amount: booking.finalAmount ? String(Number(booking.finalAmount).toLocaleString("en-IN")) : "N/A",
+      invoiceNumber: invoiceNumber!,
+      invoiceUrl,
+    }).catch(console.error);
+  }
 
   res.json({
     ...booking,
     totalAmount: booking.totalAmount ? Number(booking.totalAmount) : null,
     gstAmount: booking.gstAmount ? Number(booking.gstAmount) : null,
     finalAmount: booking.finalAmount ? Number(booking.finalAmount) : null,
+    paidAmount: newPaidAmount,
+    remainingBalance: Math.max(0, finalAmount - newPaidAmount),
+    isFullyPaid,
     createdAt: booking.createdAt?.toISOString?.(),
     updatedAt: booking.updatedAt?.toISOString?.(),
   });

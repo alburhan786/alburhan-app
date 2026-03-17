@@ -322,6 +322,7 @@ export interface Invoice {
 
 export interface CreatePaymentOrderRequest {
   bookingId: string;
+  payAmount?: number;
 }
 
 export interface PaymentOrder {
@@ -337,6 +338,7 @@ export interface VerifyPaymentRequest {
   razorpayOrderId: string;
   razorpayPaymentId: string;
   razorpaySignature: string;
+  payAmount?: number;
 }
 
 export type UploadUrlRequestDocumentType =

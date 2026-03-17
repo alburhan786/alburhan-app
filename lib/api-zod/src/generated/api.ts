@@ -688,6 +688,7 @@ export const CreateOfflineBookingBody = zod.object({
  */
 export const CreatePaymentOrderBody = zod.object({
   bookingId: zod.string(),
+  payAmount: zod.number().positive().optional(),
 });
 
 export const CreatePaymentOrderResponse = zod.object({
@@ -706,6 +707,7 @@ export const VerifyPaymentBody = zod.object({
   razorpayOrderId: zod.string(),
   razorpayPaymentId: zod.string(),
   razorpaySignature: zod.string(),
+  payAmount: zod.number().positive().optional(),
 });
 
 export const VerifyPaymentResponse = zod.object({
