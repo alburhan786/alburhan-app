@@ -247,17 +247,11 @@ export default function PrintIdCardsPro() {
                 </div>{/* end content row */}
 
                 {/* QR code — absolutely placed above footer, z-index above footer bar */}
-                <div style={{ position: "absolute", bottom: "10mm", right: "3mm", zIndex: 3 }}>
+                <div style={{ position: "absolute", bottom: "10mm", right: "3mm", zIndex: 3, background: "#fff", padding: "1px", borderRadius: "2px" }}>
                   <QRCodeSVG
                     value={buildQrData(p, group)}
-                    size={30}
-                    level="H"
-                    imageSettings={{
-                      src: `${BASE}images/logo.png`,
-                      height: 6,
-                      width: 6,
-                      excavate: true,
-                    }}
+                    size={38}
+                    level="M"
                   />
                 </div>
 
@@ -288,7 +282,7 @@ export default function PrintIdCardsPro() {
                     Hajj Pilgrim Identification — {groupLabel}
                   </div>
 
-                  <div style={{ display: "flex", gap: "2mm", flex: 1 }}>
+                  <div style={{ display: "flex", gap: "2mm", paddingBottom: "14mm" }}>
                     <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "1.5mm", minWidth: 0 }}>
                       <div>
                         <div style={{ fontSize: "5pt", color: "#888", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Maktab No.</div>
@@ -328,15 +322,17 @@ export default function PrintIdCardsPro() {
                     </div>
                   </div>
 
-                  <div style={{ marginTop: "auto" }}>
-                    <div style={{ background: DARK, padding: "1.2mm 3mm", margin: "0 -3mm", textAlign: "center" }}>
-                      <div style={{ fontSize: "3.5pt", color: "#fff", opacity: 0.7, textTransform: "uppercase", letterSpacing: "0.5px", lineHeight: 1 }}>PILGRIM</div>
-                      <div style={{ fontSize: "9pt", fontWeight: 900, color: GOLD, lineHeight: 1.3, textTransform: "uppercase" }}>{p.fullName}</div>
-                    </div>
-                    <div style={{ background: DARK, color: "#fff", padding: "1mm 2mm", fontSize: "3.5pt", textAlign: "center", lineHeight: 1.5, borderRadius: "0 0 3px 3px", margin: "0 -3mm", borderTop: `0.5px solid ${GOLD}` }}>
-                      <div>Khanka Masjid Complex, Sanwara Rd, Burhanpur 450331 M.P.</div>
-                      <div style={{ color: GOLD, fontWeight: 800, fontSize: "4pt", letterSpacing: "0.2px" }}>AL BURHAN TOURS & TRAVELS | +91 9893989786</div>
-                    </div>
+                </div>
+
+                {/* Back footer: pilgrim name + address — absolute so it always shows */}
+                <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 3 }}>
+                  <div style={{ background: DARK, padding: "1.2mm 3mm", textAlign: "center" }}>
+                    <div style={{ fontSize: "3.5pt", color: "#fff", opacity: 0.7, textTransform: "uppercase", letterSpacing: "0.5px", lineHeight: 1 }}>PILGRIM</div>
+                    <div style={{ fontSize: "9pt", fontWeight: 900, color: GOLD, lineHeight: 1.2, textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.fullName}</div>
+                  </div>
+                  <div style={{ background: DARK, color: "#fff", padding: "1mm 2mm", fontSize: "3.5pt", textAlign: "center", lineHeight: 1.5, borderTop: `0.5px solid ${GOLD}` }}>
+                    <div>Khanka Masjid Complex, Sanwara Rd, Burhanpur 450331 M.P.</div>
+                    <div style={{ color: GOLD, fontWeight: 800, fontSize: "4pt", letterSpacing: "0.2px" }}>AL BURHAN TOURS & TRAVELS | +91 9893989786</div>
                   </div>
                 </div>
               </div>
