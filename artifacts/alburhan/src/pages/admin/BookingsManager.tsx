@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
-import { useListBookings, useApproveBooking, useRejectBooking } from "@workspace/api-client-react";
+import { useListBookings, useApproveBooking, useRejectBooking, useListDocuments, useDeleteDocument } from "@workspace/api-client-react";
 import type { Booking, Pilgrim } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -9,7 +9,123 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
-import { CheckCircle, XCircle, Eye, ExternalLink, Plus, Trash2 } from "lucide-react";
+import { CheckCircle, XCircle, Eye, ExternalLink, Plus, Trash2, FileText, Download, ImageIcon } from "lucide-react";
+
+const DOC_TYPE_LABELS: Record<string, string> = {
+  passport: "Passport",
+  pan_card: "PAN Card",
+  aadhaar: "Aadhaar Card",
+  passport_photo: "Passport Photo",
+  flight_ticket: "Flight Ticket",
+  visa: "Visa",
+  room_allotment: "Room Allotment",
+  bus_allotment: "Bus Allotment",
+  medical_certificate: "Medical Certificate",
+  other: "Other Document",
+};
+
+const DOC_TYPE_COLOR: Record<string, string> = {
+  passport: "bg-blue-100 text-blue-800",
+  pan_card: "bg-purple-100 text-purple-800",
+  aadhaar: "bg-orange-100 text-orange-800",
+  passport_photo: "bg-pink-100 text-pink-800",
+  flight_ticket: "bg-sky-100 text-sky-800",
+  visa: "bg-green-100 text-green-800",
+  room_allotment: "bg-teal-100 text-teal-800",
+  bus_allotment: "bg-indigo-100 text-indigo-800",
+  medical_certificate: "bg-red-100 text-red-800",
+  other: "bg-gray-100 text-gray-800",
+};
+
+const API_BASE = import.meta.env.VITE_API_URL || "";
+
+function isImageFile(fileName: string) {
+  return /\.(jpg|jpeg|png|webp|gif)$/i.test(fileName);
+}
+
+function AdminDocumentsSection({ bookingId }: { bookingId: string }) {
+  const { data: docs, isLoading } = useListDocuments(bookingId);
+  const deleteDoc = useDeleteDocument();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const handleDelete = async (docId: string, fileName: string) => {
+    if (!confirm(`Delete "${fileName}"? This cannot be undone.`)) return;
+    try {
+      await deleteDoc.mutateAsync({ id: docId });
+      queryClient.invalidateQueries({ queryKey: [`/api/documents/${bookingId}`] });
+      toast({ title: "Document deleted" });
+    } catch {
+      toast({ title: "Error", description: "Could not delete document", variant: "destructive" });
+    }
+  };
+
+  if (isLoading) return <p className="text-sm text-muted-foreground">Loading documents…</p>;
+
+  const docList = (docs || []) as any[];
+
+  if (docList.length === 0) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/40 rounded-lg p-3">
+        <FileText size={16} />
+        <span>No documents uploaded yet by customer.</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {docList.map((doc: any) => {
+        const label = DOC_TYPE_LABELS[doc.documentType] || doc.documentType;
+        const color = DOC_TYPE_COLOR[doc.documentType] || "bg-gray-100 text-gray-800";
+        const fileUrl = `${API_BASE}${doc.fileUrl}`;
+        const isImg = isImageFile(doc.fileName || "");
+
+        return (
+          <div key={doc.id} className="flex items-center gap-3 border rounded-lg p-3 bg-white">
+            <div className="flex-shrink-0">
+              {isImg
+                ? <ImageIcon size={20} className="text-blue-500" />
+                : <FileText size={20} className="text-gray-500" />
+              }
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge className={`text-[10px] px-2 py-0.5 font-semibold border-0 ${color}`}>{label}</Badge>
+                <span className="text-xs text-muted-foreground truncate">{doc.fileName}</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                Uploaded by {doc.uploadedBy === "admin" ? "Admin" : "Customer"}
+                {doc.createdAt ? ` · ${new Date(doc.createdAt).toLocaleDateString("en-IN")}` : ""}
+              </p>
+            </div>
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <a href={fileUrl} target="_blank" rel="noreferrer" title="View">
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-blue-600 hover:bg-blue-50">
+                  <Eye size={14} />
+                </Button>
+              </a>
+              <a href={fileUrl} download={doc.fileName} title="Download">
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-emerald-600 hover:bg-emerald-50">
+                  <Download size={14} />
+                </Button>
+              </a>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-red-500 hover:bg-red-50"
+                title="Delete"
+                onClick={() => handleDelete(doc.id, doc.fileName)}
+              >
+                <Trash2 size={14} />
+              </Button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -114,6 +230,13 @@ function BookingDetailModal({ booking, open, onClose }: { booking: Booking | nul
               </div>
             </div>
           )}
+
+          <div>
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2 flex items-center gap-1.5">
+              <FileText size={12} /> Customer Documents
+            </h4>
+            <AdminDocumentsSection bookingId={booking.id} />
+          </div>
 
           {booking.status === "confirmed" && booking.invoiceNumber && (
             <div className="pt-2">
