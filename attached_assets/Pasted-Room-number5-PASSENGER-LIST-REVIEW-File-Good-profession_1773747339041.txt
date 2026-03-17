@@ -1,0 +1,646 @@
+Room number5️⃣ PASSENGER LIST REVIEW
+(File: )
+Good professional manifest.
+Improve:
+Add columns
+
+Visa Number
+Seat Number
+Bus Number
+Room Number
+
+Helps airport operations.
+
+6️⃣ HOTEL ROOM LIST REVIEW
+(File: )
+Very good.
+Add
+
+Floor
+Room Type
+Check-in Time
+
+Example
+
+Room 405
+Floor 4
+Quad Room
+
+
+7️⃣ INVOICE REVIEW
+(File: )
+Your invoice is very professional already.
+But improve these:
+Add
+1. Customer Passport
+
+Passport No
+
+
+2. Package Name
+Example
+
+Ramadan Umrah Package
+
+
+3. Payment Mode
+
+UPI / Bank / Cash
+
+
+4. QR PAYMENT CODE
+Add QR for payment.
+
+8️⃣ BEST SYSTEM IMPROVEMENT FOR ADMIN PANEL
+Your Replit system should generate automatically:
+
+Pilgrim ID card
+Luggage sticker
+Medical card
+Zamzam sticker
+Passenger list
+Hotel room list
+Invoice
+
+All from one booking form.
+
+9️⃣ BEST PROMPT FOR REPLIT AI
+Use this prompt.
+
+Build a professional Hajj & Umrah Management System for a travel company called:
+
+AL BURHAN TOURS & TRAVELS
+
+The system must include an admin dashboard with the following modules:
+
+1. Pilgrim Management
+Admin can add pilgrims with:
+Name
+Passport Number
+Date of Birth
+Gender
+Nationality
+City
+Mobile Number
+Saudi Mobile
+Photo Upload
+Blood Group
+Medical Conditions
+Group Name
+Bus Number
+Maktab Number
+Hotel Makkah
+Hotel Madinah
+Room Number
+
+
+• Pilgrim Smart ID Card
+(front and back)
+• Luggage Stickers
+• Zamzam Bottle Stickers
+• Medical Emergency Card
+• Passenger Airline Manifest
+• Hotel Room List
+• Booking Invoice
+
+3. QR Code System
+Each pilgrim must have a QR code containing:
+Name
+Passport
+Mobile
+Hotel
+Group
+Emergency contact
+
+4. Barcode Tracking
+Each pilgrim must have a barcode and serial number.
+
+5. Invoice System
+Generate professional tax invoice with:
+Package name
+Amount
+GST
+TCS (2%, 5%, 20% optional)
+Payment received
+Balance amount
+
+6. WhatsApp Integration
+Automatically send to customer:
+Invoice
+ID card
+Booking confirmation
+Payment receipt
+
+7. Export System
+Export all documents in PDF:
+A4 print ready
+Sticker print ready
+ID card size
+
+8. Clean professional UI
+Islamic green and gold theme matching
+Al Burhan Tours & Travels branding.
+
+9. Bulk Upload
+Admin can upload pilgrim data via Excel.
+
+10. Security
+Admin login
+Role based access
+
+
+⭐ Final Opinion
+Your system is already 85% perfect.
+Only need:
+✔ bigger fonts ✔ more QR information ✔ group color coding ✔ better luggage visibility
+Then it becomes professional Hajj management software.
+
+
+What You Should ADD (Very Important)
+1️⃣ WhatsApp Automation
+Automatically send documents to pilgrims.
+Add button:
+
+Send via WhatsApp
+
+Send:
+* ID Card
+* Invoice
+* Booking confirmation
+* Flight details
+* Hotel details
+* Luggage sticker
+Example message:
+
+Assalamualaikum
+
+Dear {Pilgrim Name}
+
+Your Hajj 2027 booking is confirmed with
+Al Burhan Tours & Travels.
+
+Attached documents:
+• ID Card
+• Luggage Sticker
+• Flight Details
+• Hotel Information
+
+Emergency Contact:
++91 9893989786
+
+
+2️⃣ GROUP MANAGEMENT SYSTEM
+Add these fields in group setup:
+
+Group Leader
+Group Color
+Bus Number
+Maktab Number
+Tent Number (Mina)
+Guide Name
+
+Example:
+
+Group: Hajj Group A
+Leader: Mohammed Altaf
+Bus: 1
+Maktab: 45
+Tent: Mina Sector A
+
+
+3️⃣ PILGRIM TRACKING QR SYSTEM
+Each pilgrim QR should contain:
+
+Name
+Passport
+Hotel
+Room Number
+Group
+Emergency Contact
+
+If pilgrim gets lost → scan QR → details appear.
+
+4️⃣ BAG TRACKING SYSTEM
+Add luggage tracking:
+
+Bag Number
+Pilgrim Name
+Group
+Bus
+Hotel
+
+Example sticker:
+
+AL BURHAN TOURS & TRAVELS
+HAJJ 2027
+
+BAG NO: 001
+PILGRIM: AHMED KHAN
+GROUP: A
+BUS: 1
+
+
+5️⃣ PAYMENT MANAGEMENT
+Add:
+
+Total Package Price
+Advance Received
+Balance
+Due Date
+Payment History
+
+Example:
+
+Package Price: ₹1,40,000
+Advance: ₹50,000
+Balance: ₹90,000
+
+
+6️⃣ VISA TRACKING SYSTEM
+Add status:
+
+Passport Submitted
+Visa Processing
+Visa Approved
+Visa Received
+
+Very useful for travel agents.
+
+7️⃣ DOCUMENT CENTER
+Admin can upload:
+
+Passport copy
+Visa copy
+Vaccination certificate
+Ticket copy
+Hotel voucher
+
+All stored in pilgrim profile.
+
+8️⃣ REPORTS PANEL
+Add reports:
+
+Total Pilgrims
+Visa Pending
+Payment Pending
+Room Allocation
+Bus Allocation
+
+Example dashboard:
+
+Total Pilgrims: 120
+Visa Approved: 90
+Payment Pending: 15
+
+
+⭐ BEST PROMPT TO GIVE REPLIT AI
+Use this improved prompt.
+
+Upgrade my Hajj Management System for a travel company called
+AL BURHAN TOURS & TRAVELS.
+
+The system already generates:
+ID Cards
+Luggage Stickers
+Medical Stickers
+Zamzam Stickers
+Passenger List
+Hotel Room List
+Bus Seating List
+Feedback Form
+Booking Contract.
+
+Now improve the system with these new features:
+
+1. WhatsApp Automation
+Automatically send PDF documents to pilgrims:
+ID Card
+Invoice
+Booking confirmation
+Flight details
+Hotel details.
+
+2. Pilgrim Profile Page
+Each pilgrim should have a profile with:
+Photo
+Passport number
+Mobile number
+Saudi mobile
+Hotel Makkah
+Hotel Madinah
+Room number
+Bus number
+Maktab number
+Medical info.
+
+3. QR Code Tracking
+Each pilgrim QR code should contain:
+Name
+Passport
+Hotel
+Group
+Emergency contact.
+
+4. Payment Management
+Track:
+Package price
+Advance payment
+Balance
+Payment history.
+
+5. Visa Tracking
+Statuses:
+Passport submitted
+Visa processing
+Visa approved
+Visa delivered.
+
+6. Bag Tracking
+Generate luggage stickers with:
+Bag number
+Pilgrim name
+Group
+Bus.
+
+7. Reports Dashboard
+Show:
+Total pilgrims
+Visa pending
+Payment pending
+Room allocation
+Bus allocation.
+
+8. Professional UI
+Use green and gold Islamic design theme matching
+Al Burhan Tours & Travels branding.
+
+9. Bulk Excel Upload
+Allow admin to upload pilgrims from Excel.
+
+10. Export
+Allow printing PDF for:
+ID cards
+Luggage stickers
+Passenger lists
+Room lists
+Invoices.
+
+
+⭐ Final Advice
+Your system is already very close to professional Hajj software used by big agencies.
+If you add:
+✔ WhatsApp automation ✔ visa tracking ✔ payment tracking ✔ bag tracking ✔ pilgrim profile
+Then your system will become one of the best Hajj agency systems.
+
+
+
+Upgrade my existing Hajj & Umrah Management Dashboard for the travel company:
+
+AL BURHAN TOURS & TRAVELS
+
+The system already includes:
+ID Cards
+Pro ID Cards
+Luggage Stickers
+Square Luggage Stickers
+Medical Stickers
+Zamzam Stickers
+Hotel Room List
+Bus Seating List
+Airline Passenger List
+Feedback Form
+Booking Contract
+
+Now implement the following improvements.
+
+-----------------------------------------------------
+
+1️⃣ WEBSITE LOGO IMPROVEMENT
+Increase the company logo size in the website header and dashboard.
+
+Requirements:
+• Logo should be larger and clearer
+• Place logo on top-left header
+• Maintain responsive design for mobile and desktop
+• Use transparent PNG logo
+
+-----------------------------------------------------
+
+2️⃣ SOCIAL MEDIA LINKS
+
+Add social media icons in header and footer:
+
+Facebook
+Instagram
+YouTube
+
+Example links:
+
+Facebook:
+https://facebook.com/alburhantravels
+
+Instagram:
+https://instagram.com/alburhantravels
+
+YouTube:
+https://youtube.com/@alburhantravels
+
+Icons should open links in a new tab.
+
+-----------------------------------------------------
+
+3️⃣ WHATSAPP NUMBER UPDATE
+
+Replace old WhatsApp numbers everywhere in the system.
+
+REMOVE:
++91 9893225590
+
+ADD NEW NUMBER:
++91 8989701701
+
+Use this number in:
+
+Invoices
+ID cards
+Stickers
+Website contact section
+WhatsApp buttons
+
+-----------------------------------------------------
+
+4️⃣ AI TRAVEL ASSISTANT (ACTIVATE)
+
+Enable AI Travel Assistant feature.
+
+Functions:
+• Answer pilgrim questions
+• Provide package information
+• Provide Hajj / Umrah guidance
+• Support FAQ
+
+Example questions:
+
+"What documents required for Umrah?"
+"What is the Hajj package price?"
+"Hotel details in Makkah?"
+
+The assistant should appear as a chat widget on the dashboard or website.
+
+-----------------------------------------------------
+
+5️⃣ INVOICE DASHBOARD IMPROVEMENT
+
+Add buttons on invoice page:
+
+• Download PDF
+• Print Invoice
+• Share Invoice
+
+Share options:
+
+WhatsApp
+Email
+Copy Link
+
+Example buttons:
+
+[Download PDF]
+[Print]
+[Share]
+
+Share example:
+
+Send invoice to customer via WhatsApp automatically.
+
+-----------------------------------------------------
+
+6️⃣ HOTEL ROOM LIST LAYOUT
+
+Improve hotel room list layout.
+
+Current layout: vertical
+
+Change to: horizontal table layout
+
+Columns:
+
+SR
+Pilgrim Photo
+Name
+Passport
+Room Number
+Makkah Hotel
+Check-in
+Check-out
+Madinah Hotel
+Check-in
+Check-out
+
+Table should be clean and printable on A4.
+
+-----------------------------------------------------
+
+7️⃣ AIRLINE PASSENGER LIST LAYOUT
+
+Make airline passenger list horizontal table.
+
+Columns:
+
+SR
+Photo
+Pilgrim Name
+Passport
+Date of Birth
+Gender
+Nationality
+City
+Seat Preference
+Flight Number
+Departure Date
+
+Add print button for airline manifest.
+
+-----------------------------------------------------
+
+8️⃣ ZAMZAM STICKER PRINT IMPROVEMENT
+
+Set Zamzam sticker layout for A4 printing.
+
+Requirements:
+
+• A4 page
+• 2 stickers per page
+• Equal spacing
+• Professional design
+
+Sticker includes:
+
+AL BURHAN TOURS & TRAVELS logo
+Pilgrim Name
+Serial Number
+Group Name
+Barcode
+
+Example:
+
+----------------------------------
+ZAMZAM HOLY WATER
+Serial: #001
+Pilgrim: Ahmed Khan
+Group: Hajj 2027
+----------------------------------
+
+-----------------------------------------------------
+
+9️⃣ PRINT SYSTEM IMPROVEMENT
+
+Add unified print system.
+
+Admin should be able to print:
+
+ID Cards
+Luggage Stickers
+Medical Stickers
+Zamzam Stickers
+Passenger List
+Room List
+Invoices
+
+Each print layout must be:
+
+A4 optimized
+High resolution
+Professional margins
+
+-----------------------------------------------------
+
+10️⃣ UI DESIGN IMPROVEMENT
+
+Maintain Islamic travel theme:
+
+Primary Color:
+Dark Green
+
+Secondary Color:
+Gold
+
+Style:
+
+Clean
+Modern
+Professional
+Suitable for Hajj & Umrah travel company.
+
+-----------------------------------------------------
+
+11️⃣ FINAL RESULT
+
+The system should become a complete Hajj travel management platform for:
+
+Al Burhan Tours & Travels
+
+with professional printing,
+document generation,
+and customer communication features.
+

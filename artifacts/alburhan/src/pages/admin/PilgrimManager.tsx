@@ -26,7 +26,9 @@ interface Pilgrim {
   city?: string;
   state?: string;
   roomNumber?: string;
+  roomType?: string;
   busNumber?: string;
+  seatNumber?: string;
   relation?: string;
   coverNumber?: string;
   medicalCondition?: string;
@@ -46,7 +48,7 @@ interface Group {
 const emptyPilgrim = {
   fullName: "", passportNumber: "", visaNumber: "", dateOfBirth: "", gender: "",
   bloodGroup: "", mobileIndia: "", mobileSaudi: "", address: "", city: "",
-  state: "", roomNumber: "", busNumber: "", relation: "", coverNumber: "", medicalCondition: "",
+  state: "", roomNumber: "", roomType: "", busNumber: "", seatNumber: "", relation: "", coverNumber: "", medicalCondition: "",
 };
 
 export default function PilgrimManager() {
@@ -84,7 +86,8 @@ export default function PilgrimManager() {
       dateOfBirth: p.dateOfBirth || "", gender: p.gender || "", bloodGroup: p.bloodGroup || "",
       mobileIndia: p.mobileIndia || "", mobileSaudi: p.mobileSaudi || "", address: p.address || "",
       city: p.city || "", state: p.state || "", roomNumber: p.roomNumber || "",
-      busNumber: p.busNumber || "", relation: p.relation || "", coverNumber: p.coverNumber || "",
+      roomType: p.roomType || "", busNumber: p.busNumber || "", seatNumber: p.seatNumber || "",
+      relation: p.relation || "", coverNumber: p.coverNumber || "",
       medicalCondition: p.medicalCondition || "",
     });
     setDialogOpen(true);
@@ -258,7 +261,14 @@ export default function PilgrimManager() {
               <div className="space-y-1"><label className="text-sm font-medium">City</label><Input value={form.city} onChange={e => f("city", e.target.value)} /></div>
               <div className="space-y-1"><label className="text-sm font-medium">State</label><Input value={form.state} onChange={e => f("state", e.target.value)} /></div>
               <div className="space-y-1"><label className="text-sm font-medium">Room Number</label><Input value={form.roomNumber} onChange={e => f("roomNumber", e.target.value)} /></div>
+              <div className="space-y-1"><label className="text-sm font-medium">Room Type</label>
+                <select value={form.roomType} onChange={e => f("roomType", e.target.value)} className="w-full h-10 px-3 rounded-md border bg-background text-sm">
+                  <option value="">Select</option>
+                  {["Single","Double","Triple","Quad","Quint"].map(rt => <option key={rt} value={rt}>{rt}</option>)}
+                </select>
+              </div>
               <div className="space-y-1"><label className="text-sm font-medium">Bus Number</label><Input value={form.busNumber} onChange={e => f("busNumber", e.target.value)} /></div>
+              <div className="space-y-1"><label className="text-sm font-medium">Seat Number</label><Input value={form.seatNumber} onChange={e => f("seatNumber", e.target.value)} placeholder="e.g. 14A" /></div>
               <div className="space-y-1"><label className="text-sm font-medium">Relation</label>
                 <select value={form.relation} onChange={e => f("relation", e.target.value)} className="w-full h-10 px-3 rounded-md border bg-background text-sm">
                   <option value="">Select</option>

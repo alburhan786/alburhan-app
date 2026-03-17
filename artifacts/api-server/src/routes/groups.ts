@@ -102,8 +102,8 @@ router.get("/:groupId/pilgrims", requireAdmin as any, async (req, res) => {
 
 router.post("/:groupId/pilgrims", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   const { fullName, passportNumber, visaNumber, dateOfBirth, gender, bloodGroup,
-    photoUrl, mobileIndia, mobileSaudi, address, city, state, roomNumber,
-    busNumber, relation, coverNumber, medicalCondition } = req.body;
+    photoUrl, mobileIndia, mobileSaudi, address, city, state, roomNumber, roomType,
+    busNumber, seatNumber, relation, coverNumber, medicalCondition } = req.body;
 
   if (!fullName) { res.status(400).json({ message: "fullName is required" }); return; }
 
@@ -119,22 +119,22 @@ router.post("/:groupId/pilgrims", requireAdmin as any, async (req: Authenticated
     serialNumber: nextSerial,
     fullName, passportNumber, visaNumber, dateOfBirth, gender, bloodGroup,
     photoUrl, mobileIndia, mobileSaudi, address, city, state,
-    roomNumber, busNumber, relation, coverNumber, medicalCondition,
+    roomNumber, roomType, busNumber, seatNumber, relation, coverNumber, medicalCondition,
   }).returning();
   res.status(201).json(fmtPilgrim(pilgrim));
 });
 
 router.put("/:groupId/pilgrims/:pilgrimId", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   const { fullName, passportNumber, visaNumber, dateOfBirth, gender, bloodGroup,
-    photoUrl, mobileIndia, mobileSaudi, address, city, state, roomNumber,
-    busNumber, relation, coverNumber, medicalCondition, serialNumber } = req.body;
+    photoUrl, mobileIndia, mobileSaudi, address, city, state, roomNumber, roomType,
+    busNumber, seatNumber, relation, coverNumber, medicalCondition, serialNumber } = req.body;
 
   const scope = and(eq(pilgrimsTable.id, req.params.pilgrimId), eq(pilgrimsTable.groupId, req.params.groupId));
 
   const [updated] = await db.update(pilgrimsTable).set({
     fullName, passportNumber, visaNumber, dateOfBirth, gender, bloodGroup,
     photoUrl, mobileIndia, mobileSaudi, address, city, state,
-    roomNumber, busNumber, relation, coverNumber, medicalCondition,
+    roomNumber, roomType, busNumber, seatNumber, relation, coverNumber, medicalCondition,
     serialNumber: serialNumber ? Number(serialNumber) : undefined,
     updatedAt: new Date(),
   }).where(scope).returning();

@@ -320,15 +320,15 @@ function InvoiceContent({ invoice }: { invoice: InvoiceType }) {
           </div>
         </div>
 
-        {/* BANK DETAILS + QR CODE */}
+        {/* BANK DETAILS + QR CODES */}
         <div className="flex" style={{ borderTop: `1px solid ${DARK_GREEN}` }}>
           <div className="flex-1 p-3">
             <div className="font-bold text-[10px] mb-1" style={{ color: DARK_GREEN }}>BANK DETAILS</div>
             <table className="text-[10px]">
               <tbody>
                 <tr>
-                  <td className="pr-3 py-[1px]">Name:</td>
-                  <td className="font-semibold py-[1px]">{invoice.bankName}</td>
+                  <td className="pr-3 py-[1px]">Bank:</td>
+                  <td className="font-semibold py-[1px]">{invoice.bankName}, {invoice.bankBranch}</td>
                 </tr>
                 <tr>
                   <td className="pr-3 py-[1px]">IFSC Code:</td>
@@ -337,10 +337,6 @@ function InvoiceContent({ invoice }: { invoice: InvoiceType }) {
                 <tr>
                   <td className="pr-3 py-[1px]">Account No:</td>
                   <td className="font-semibold py-[1px]">{invoice.bankAccount}</td>
-                </tr>
-                <tr>
-                  <td className="pr-3 py-[1px]">Bank:</td>
-                  <td className="font-semibold py-[1px]">{invoice.bankName}, {invoice.bankBranch}</td>
                 </tr>
               </tbody>
             </table>
@@ -352,9 +348,24 @@ function InvoiceContent({ invoice }: { invoice: InvoiceType }) {
             </div>
           </div>
 
-          {/* QR Code */}
-          <div className="p-3 flex flex-col items-center justify-center" style={{ borderLeft: `1px solid ${DARK_GREEN}` }}>
-            <QRCodeSVG value={verificationUrl} size={80} level="M" fgColor={DARK_GREEN} />
+          {/* UPI Payment QR */}
+          <div className="p-3 flex flex-col items-center justify-center" style={{ borderLeft: `1px solid ${DARK_GREEN}`, minWidth: "110px" }}>
+            <div className="text-[8px] font-bold mb-1 text-center" style={{ color: DARK_GREEN }}>PAY VIA UPI</div>
+            <QRCodeSVG
+              value={`upi://pay?pa=${invoice.bankAccount || "50200011391336"}@hdfcbank&pn=ALBURHAN+TOURS+%26+TRAVELS&am=${currentBalance > 0 ? currentBalance.toFixed(2) : ""}&cu=INR&tn=Invoice+${invoice.invoiceNumber || invoice.bookingNumber || ""}`}
+              size={72}
+              level="M"
+              fgColor={DARK_GREEN}
+            />
+            <div className="text-[7px] mt-1 text-center" style={{ color: "#555" }}>
+              Balance: ₹{formatINR(currentBalance)}
+            </div>
+          </div>
+
+          {/* Invoice Verification QR */}
+          <div className="p-3 flex flex-col items-center justify-center" style={{ borderLeft: `1px solid ${DARK_GREEN}`, minWidth: "100px" }}>
+            <div className="text-[8px] font-bold mb-1 text-center" style={{ color: DARK_GREEN }}>VERIFY INVOICE</div>
+            <QRCodeSVG value={verificationUrl} size={72} level="M" fgColor={DARK_GREEN} />
             <div className="text-[7px] mt-1 text-center" style={{ color: DARK_GREEN }}>Scan to verify</div>
           </div>
         </div>
