@@ -19,19 +19,47 @@ function LegalLayout({ title, lastUpdated, children }: { title: string, lastUpda
 export function PrivacyPolicy() {
   return (
     <LegalLayout title="Privacy Policy" lastUpdated="January 1, 2025">
-      <h2>Introduction</h2>
-      <p>At Al Burhan Tours & Travels, we respect your privacy and are committed to protecting your personal data. This privacy policy will inform you as to how we look after your personal data when you visit our website or book our services.</p>
-      
-      <h2>Data We Collect</h2>
-      <p>We may collect, use, store and transfer different kinds of personal data about you including:</p>
+      <p>Al Burhan Tours & Travels respects your privacy and is committed to protecting your personal information.</p>
+
+      <h2>Information We Collect</h2>
+      <p>We may collect the following information when you use our website or services:</p>
       <ul>
-        <li><strong>Identity Data:</strong> First name, last name, username, passport details, date of birth.</li>
-        <li><strong>Contact Data:</strong> Billing address, email address and telephone numbers.</li>
-        <li><strong>Financial Data:</strong> Bank account and payment card details (processed securely via our payment gateways).</li>
+        <li>Name</li>
+        <li>Contact details (phone number, email)</li>
+        <li>Passport details for travel processing</li>
+        <li>Address information</li>
+        <li>Payment information</li>
+        <li>Travel preferences and booking details</li>
       </ul>
 
-      <h2>How We Use Your Data</h2>
-      <p>We will only use your personal data when the law allows us to. Most commonly, we will use your personal data to process your booking, manage your travel arrangements, visa processing, and communicate with you regarding your journey.</p>
+      <h2>How We Use Your Information</h2>
+      <p>Your information may be used for:</p>
+      <ul>
+        <li>Processing travel bookings</li>
+        <li>Visa and travel documentation</li>
+        <li>Customer support</li>
+        <li>Sending booking confirmations and invoices</li>
+        <li>Travel updates and notifications</li>
+      </ul>
+
+      <h2>Data Protection</h2>
+      <p>We take appropriate security measures to protect your personal information from unauthorized access or misuse.</p>
+
+      <h2>Third Party Services</h2>
+      <p>Your information may be shared with:</p>
+      <ul>
+        <li>Airlines</li>
+        <li>Hotels</li>
+        <li>Visa authorities</li>
+        <li>Government authorities where required for travel processing</li>
+      </ul>
+
+      <h2>Contact</h2>
+      <p>If you have any questions about our privacy policy, you can contact us:</p>
+      <ul>
+        <li><strong>Email:</strong> info@alburhantravels.com</li>
+        <li><strong>Phone:</strong> +91 9893989786</li>
+      </ul>
     </LegalLayout>
   );
 }
@@ -39,17 +67,34 @@ export function PrivacyPolicy() {
 export function TermsConditions() {
   return (
     <LegalLayout title="Terms & Conditions" lastUpdated="January 1, 2025">
-      <h2>Agreement to Terms</h2>
-      <p>By booking a package with Al Burhan Tours & Travels, you agree to be bound by these Terms and Conditions. Please read them carefully.</p>
+      <p>By using our website and booking our services, you agree to the following terms and conditions.</p>
 
-      <h2>Booking and Payment</h2>
-      <p>A booking is confirmed only when the initial deposit is received. The full payment must be cleared prior to the departure date as specified in your booking confirmation.</p>
+      <h2>Booking Policy</h2>
+      <ul>
+        <li>All bookings must be confirmed with a deposit payment.</li>
+        <li>Customers must provide accurate personal and travel details.</li>
+        <li>Remaining balance must be paid before travel departure.</li>
+      </ul>
 
-      <h2>Visa Processing</h2>
-      <p>While we assist in processing visas for Hajj, Umrah, and Ziyarat, the final approval rests solely with the respective embassies and ministries. Al Burhan is not liable for visa rejections.</p>
-      
       <h2>Travel Documents</h2>
-      <p>Pilgrims are responsible for ensuring their passports are valid for at least 6 months from the date of travel and contain sufficient blank pages.</p>
+      <p>Customers are responsible for:</p>
+      <ul>
+        <li>Valid passport</li>
+        <li>Required travel documents</li>
+        <li>Compliance with immigration regulations</li>
+      </ul>
+
+      <h2>Service Changes</h2>
+      <p>Al Burhan Tours & Travels reserves the right to make necessary changes to itineraries, hotels, or transportation arrangements due to operational requirements or circumstances beyond our control.</p>
+
+      <h2>Liability</h2>
+      <p>We act as an intermediary between customers and travel service providers such as airlines, hotels, and transportation companies. We are not responsible for delays, cancellations, or changes caused by third-party providers.</p>
+
+      <h2>Force Majeure</h2>
+      <p>We are not liable for circumstances beyond our control including natural disasters, government restrictions, political unrest, or travel bans.</p>
+
+      <h2>Dispute Resolution</h2>
+      <p>In the event of any disputes, both parties agree to resolve the matter amicably. Any legal proceedings shall be subject to the jurisdiction of the courts in Burhanpur, Madhya Pradesh.</p>
     </LegalLayout>
   );
 }
@@ -57,17 +102,27 @@ export function TermsConditions() {
 export function CancellationPolicy() {
   return (
     <LegalLayout title="Cancellation Policy" lastUpdated="January 1, 2025">
-      <h2>Cancellation by Pilgrim</h2>
-      <p>If you need to cancel your booking, you must notify us in writing. The following cancellation charges typically apply:</p>
+      <p>All cancellations must be made in writing via email or through our office.</p>
+      <p>Cancellation charges may apply depending on the time of cancellation before the travel date.</p>
+
+      <h2>General Cancellation Guidelines</h2>
       <ul>
-        <li>45+ days before departure: Loss of initial deposit</li>
-        <li>30-44 days before departure: 50% of total package cost</li>
-        <li>15-29 days before departure: 75% of total package cost</li>
-        <li>Less than 15 days before departure: 100% of total package cost</li>
+        <li><strong>More than 60 days before departure</strong> – Minimal administrative charges may apply.</li>
+        <li><strong>30 to 60 days before departure</strong> – Partial cancellation fee may apply.</li>
+        <li><strong>Less than 30 days before departure</strong> – Higher cancellation charges may apply.</li>
+        <li><strong>No-show or last-minute cancellation</strong> – Full package amount may be non-refundable.</li>
       </ul>
 
-      <h2>Cancellation by Al Burhan</h2>
-      <p>In rare circumstances, we may need to cancel a tour. If we do, you will receive a full refund or the option to transfer to an alternative date/package.</p>
+      <h2>Non-Refundable Charges</h2>
+      <p>Visa processing fees, airline charges, and hotel booking fees may be non-refundable depending on service provider policies.</p>
+
+      <h2>How to Cancel</h2>
+      <p>To initiate a cancellation, please contact us in writing:</p>
+      <ul>
+        <li><strong>Email:</strong> info@alburhantravels.com</li>
+        <li><strong>Phone:</strong> +91 9893989786</li>
+        <li><strong>Office:</strong> 5/8 Khanka Masjid Complex, Shanwara Road, Burhanpur MP 450331</li>
+      </ul>
     </LegalLayout>
   );
 }
@@ -75,17 +130,30 @@ export function CancellationPolicy() {
 export function RefundPolicy() {
   return (
     <LegalLayout title="Refund Policy" lastUpdated="January 1, 2025">
-      <h2>Processing Refunds</h2>
-      <p>Approved refunds will be processed within 14-21 business days. Refunds are strictly processed to the original method of payment or a designated bank account in the pilgrim's name.</p>
-      
-      <h2>Non-refundable Items</h2>
-      <p>Certain items are strictly non-refundable once processed:</p>
+      <p>Refunds will be processed according to the cancellation policy and service provider conditions.</p>
+
+      <h2>When Refunds Are Issued</h2>
+      <p>Refunds may be issued in the following cases:</p>
       <ul>
-        <li>Visa processing fees</li>
-        <li>Issued flight tickets (subject to airline policy)</li>
-        <li>Specific hotel reservations during peak seasons (e.g., last 10 days of Ramadan, Hajj days)</li>
+        <li>Approved cancellation requests</li>
+        <li>Travel service unavailability</li>
+        <li>Duplicate payments or billing errors</li>
       </ul>
-      <p>We advise all pilgrims to obtain comprehensive travel insurance to cover unforeseen cancellations.</p>
+
+      <h2>Refund Processing Time</h2>
+      <p>Refund processing may take <strong>7 to 21 business days</strong> depending on banking and payment gateway processing.</p>
+
+      <h2>Deductions</h2>
+      <p>Certain charges such as visa fees, airline cancellation penalties, and administrative costs may be deducted before issuing refunds.</p>
+
+      <h2>Payment Method</h2>
+      <p>Refunds will be issued using the original payment method where possible.</p>
+
+      <h2>Contact for Refunds</h2>
+      <ul>
+        <li><strong>Email:</strong> info@alburhantravels.com</li>
+        <li><strong>Phone:</strong> +91 9893989786</li>
+      </ul>
     </LegalLayout>
   );
 }
