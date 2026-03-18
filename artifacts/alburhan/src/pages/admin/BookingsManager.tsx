@@ -188,9 +188,38 @@ function AdminDocumentsSection({ bookingId }: { bookingId: string }) {
 const API = import.meta.env.VITE_API_URL || "";
 
 function BookingDetailModal({ booking, open, onClose }: { booking: Booking | null; open: boolean; onClose: () => void }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [syncing, setSyncing] = useState(false);
+
   if (!booking) return null;
 
   const pilgrims = Array.isArray(booking.pilgrims) ? booking.pilgrims : [];
+
+  const handleSyncPayment = async () => {
+    setSyncing(true);
+    try {
+      const res = await fetch(`${API}/api/payments/sync-payment`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingId: booking.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Sync failed");
+      if (data.status === "confirmed" || data.status === "partially_paid") {
+        toast({ title: "Payment Synced!", description: `Booking updated to ${data.status}. Notifications sent.` });
+        queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+        onClose();
+      } else {
+        toast({ title: "No payment captured", description: data.message || "Razorpay has no captured payment for this order yet." });
+      }
+    } catch (err: any) {
+      toast({ title: "Sync failed", description: err.message, variant: "destructive" });
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
@@ -296,8 +325,8 @@ function BookingDetailModal({ booking, open, onClose }: { booking: Booking | nul
             <AdminDocumentsSection bookingId={booking.id} />
           </div>
 
-          {booking.status === "confirmed" && booking.invoiceNumber && (
-            <div className="pt-2">
+          <div className="flex flex-wrap items-center gap-2 pt-2">
+            {booking.status === "confirmed" && booking.invoiceNumber && (
               <Button
                 variant="outline"
                 size="sm"
@@ -305,8 +334,20 @@ function BookingDetailModal({ booking, open, onClose }: { booking: Booking | nul
               >
                 <ExternalLink className="w-4 h-4 mr-2" />View Invoice
               </Button>
-            </div>
-          )}
+            )}
+            {(booking.status === "approved" || booking.status === "partially_paid") && (booking as any).razorpayOrderId && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-orange-300 text-orange-700 hover:bg-orange-50"
+                onClick={handleSyncPayment}
+                disabled={syncing}
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
+                {syncing ? "Syncing…" : "Sync Payment from Razorpay"}
+              </Button>
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>

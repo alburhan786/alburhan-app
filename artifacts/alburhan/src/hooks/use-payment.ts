@@ -46,6 +46,28 @@ export function usePayment() {
         return;
       }
       try {
+        // Every 5th poll (~15s) call sync-payment to check Razorpay directly
+        if (attempts % 5 === 0) {
+          const syncRes = await fetch(`${BASE_API}/api/payments/sync-payment`, {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ bookingId }),
+          });
+          if (syncRes.ok) {
+            const syncData = await syncRes.json();
+            if (syncData.status === "confirmed" || syncData.status === "partially_paid") {
+              clearInterval(pollRef.current!);
+              pollRef.current = null;
+              queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+              queryClient.invalidateQueries({ queryKey: [`/api/bookings/${bookingId}`] });
+              onSuccess(syncData.booking);
+              return;
+            }
+          }
+        }
+
+        // Regular booking status check
         const res = await fetch(`${BASE_API}/api/bookings/${bookingId}`, { credentials: "include" });
         if (!res.ok) return;
         const booking = await res.json();

@@ -229,6 +229,115 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
   });
 });
 
+router.post("/sync-payment", requireAuth as any, async (req: AuthenticatedRequest, res) => {
+  const { bookingId } = req.body;
+  if (!bookingId) { res.status(400).json({ message: "bookingId required" }); return; }
+
+  const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
+  if (!booking) { res.status(404).json({ message: "Booking not found" }); return; }
+
+  if (req.user?.role !== "admin" && booking.customerMobile !== req.user?.mobile) {
+    res.status(403).json({ message: "Not authorized" }); return;
+  }
+
+  if (booking.status === "confirmed") {
+    res.json({ status: "confirmed", message: "Already confirmed", booking });
+    return;
+  }
+
+  if (!booking.razorpayOrderId) {
+    res.json({ status: booking.status, message: "No payment order yet" }); return;
+  }
+
+  let razorpay;
+  try { razorpay = getRazorpay(); }
+  catch { res.status(500).json({ message: "Payment gateway not configured" }); return; }
+
+  let order: any;
+  try {
+    order = await razorpay.orders.fetch(booking.razorpayOrderId);
+  } catch (err: any) {
+    console.error("[sync-payment] orders.fetch error:", err?.error || err?.message);
+    res.status(502).json({ message: "Could not reach Razorpay" }); return;
+  }
+
+  if (order.status !== "paid") {
+    res.json({ status: order.status, message: "Payment not yet captured" }); return;
+  }
+
+  let payments: any;
+  try {
+    payments = await razorpay.orders.fetchPayments(booking.razorpayOrderId);
+  } catch (err: any) {
+    console.error("[sync-payment] fetchPayments error:", err?.error || err?.message);
+    res.status(502).json({ message: "Could not fetch payments from Razorpay" }); return;
+  }
+
+  const capturedPayment = (payments?.items || []).find((p: any) => p.status === "captured");
+
+  const finalAmount = Number(booking.finalAmount || 0);
+  const previouslyPaid = Number(booking.paidAmount || 0);
+  const thisPayment = capturedPayment ? capturedPayment.amount / 100 : (finalAmount - previouslyPaid);
+  const newPaidAmount = previouslyPaid + thisPayment;
+  const isFullyPaid = newPaidAmount >= finalAmount;
+  const newStatus = isFullyPaid ? "confirmed" : "partially_paid";
+  const invoiceNumber = isFullyPaid
+    ? (booking.invoiceNumber || `INV${Date.now().toString().slice(-8)}`)
+    : booking.invoiceNumber;
+
+  const [updated] = await db
+    .update(bookingsTable)
+    .set({
+      status: newStatus as any,
+      razorpayPaymentId: capturedPayment?.id || booking.razorpayPaymentId,
+      paidAmount: String(newPaidAmount),
+      invoiceNumber: invoiceNumber ?? undefined,
+      updatedAt: new Date(),
+    })
+    .where(eq(bookingsTable.id, booking.id))
+    .returning();
+
+  console.log("[sync-payment] Synced booking:", updated.bookingNumber, "→", newStatus);
+
+  const baseUrl = process.env.REPLIT_DEV_DOMAIN
+    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+    : `${req.protocol}://${req.get("host")}`;
+
+  if (isFullyPaid) {
+    const invoiceUrl = `${baseUrl}/invoice/${updated.bookingNumber}`;
+    sendPaymentConfirmationNotification({
+      mobile: updated.customerMobile,
+      email: updated.customerEmail,
+      customerName: updated.customerName,
+      bookingNumber: updated.bookingNumber,
+      amount: Number(updated.finalAmount || 0).toLocaleString("en-IN"),
+      invoiceNumber: invoiceNumber!,
+      invoiceUrl,
+    }).catch(console.error);
+  } else {
+    const remainingBalance = Math.max(0, finalAmount - newPaidAmount);
+    sendPartialPaymentNotification({
+      mobile: updated.customerMobile,
+      email: updated.customerEmail,
+      customerName: updated.customerName,
+      bookingNumber: updated.bookingNumber,
+      paidAmount: thisPayment.toLocaleString("en-IN"),
+      remainingAmount: remainingBalance.toLocaleString("en-IN"),
+    }).catch(console.error);
+  }
+
+  res.json({
+    status: newStatus,
+    message: "Payment synced successfully",
+    booking: {
+      ...updated,
+      isFullyPaid,
+      paidAmount: newPaidAmount,
+      remainingBalance: Math.max(0, finalAmount - newPaidAmount),
+    },
+  });
+});
+
 router.post("/webhook", async (req: any, res) => {
   const secret = process.env.RAZORPAY_SECRET;
   if (!secret) {

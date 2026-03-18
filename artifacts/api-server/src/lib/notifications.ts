@@ -241,7 +241,7 @@ export async function sendPaymentConfirmationNotification(opts: {
   const adminMsg = `Payment Received!\n\nBooking: #${opts.bookingNumber}\nCustomer: ${opts.customerName}\nMobile: ${opts.mobile}\nAmount: Rs.${opts.amount}\nInvoice: ${opts.invoiceNumber}`;
 
   await Promise.allSettled([
-    sendDLTSMS(opts.mobile, opts.customerName, opts.bookingNumber, `Rs.${opts.amount}`),
+    sendDLTSMS(opts.mobile, opts.customerName, opts.bookingNumber, "CONFIRMED"),
     sendWhatsAppWithFallback(opts.mobile, message),
     opts.email ? sendEmail(opts.email, "Booking Confirmed – Al Burhan Tours & Travels", message) : Promise.resolve(),
     sendWhatsApp("9893989786", adminMsg),
@@ -259,7 +259,7 @@ export async function sendPartialPaymentNotification(opts: {
 }) {
   const message = `Assalamu Alaikum ${opts.customerName},\n\nPartial payment of Rs.${opts.paidAmount} received for booking #${opts.bookingNumber}.\n\nBalance remaining: Rs.${opts.remainingAmount}\n\nPlease login to pay the remaining amount.\n\nAl Burhan Tours & Travels\n+91 8989701701`;
   await Promise.allSettled([
-    sendDLTSMS(opts.mobile, opts.customerName, opts.bookingNumber, `Paid Rs.${opts.paidAmount} Balance Rs.${opts.remainingAmount}`),
+    sendDLTSMS(opts.mobile, opts.customerName, opts.bookingNumber, "PARTIAL PAYMENT"),
     sendWhatsAppWithFallback(opts.mobile, message),
     opts.email ? sendEmail(opts.email, "Partial Payment Received – Al Burhan Tours & Travels", message) : Promise.resolve(),
   ]);
