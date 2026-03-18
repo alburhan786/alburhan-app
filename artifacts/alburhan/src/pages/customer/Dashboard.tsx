@@ -30,7 +30,7 @@ const MANDATORY_DOCS = [
   { value: "aadhaar", label: "Aadhaar Card" },
 ];
 
-const BASE_API = (import.meta.env.BASE_URL || "/").replace(/\/$/, "");
+const BASE_API = import.meta.env.VITE_API_URL || "";
 
 function DocWarningBadge({ bookingId }: { bookingId: string }) {
   const { data: docs } = useListDocuments(bookingId);

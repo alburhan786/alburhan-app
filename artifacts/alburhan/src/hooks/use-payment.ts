@@ -9,7 +9,7 @@ declare global {
   }
 }
 
-const BASE_API = (import.meta.env.BASE_URL || "/").replace(/\/$/, "");
+const BASE_API = import.meta.env.VITE_API_URL || "";
 
 export function usePayment() {
   const [isSdkLoaded, setIsSdkLoaded] = useState(false);
