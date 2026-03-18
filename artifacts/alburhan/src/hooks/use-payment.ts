@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useCreatePaymentOrder, useVerifyPayment } from "@workspace/api-client-react";
+import { useCreatePaymentOrder } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 
@@ -18,7 +18,6 @@ export function usePayment() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const createOrder = useCreatePaymentOrder();
-  const verifyPayment = useVerifyPayment();
 
   useEffect(() => {
     if (window.Razorpay) {
@@ -99,25 +98,40 @@ export function usePayment() {
       const order = await createOrder.mutateAsync({ data: { bookingId, payAmount } });
 
       const handlePaymentSuccess = async (response: any) => {
+        console.log("Payment Success:", response);
         if (pollRef.current) {
           clearInterval(pollRef.current);
           pollRef.current = null;
         }
         try {
-          const result = await verifyPayment.mutateAsync({
-            data: {
+          const res = await fetch(`${BASE_API}/api/payments/verify`, {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_signature: response.razorpay_signature,
               bookingId,
-              razorpayOrderId: response.razorpay_order_id,
-              razorpayPaymentId: response.razorpay_payment_id,
-              razorpaySignature: response.razorpay_signature,
               payAmount,
-            }
+            }),
           });
-          queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
-          queryClient.invalidateQueries({ queryKey: [`/api/bookings/${bookingId}`] });
-          if (onSuccess) onSuccess(result);
+
+          const data = await res.json();
+
+          if (data.success) {
+            queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+            queryClient.invalidateQueries({ queryKey: [`/api/bookings/${bookingId}`] });
+            if (onSuccess) onSuccess(data.booking);
+          } else {
+            console.error("[Payment] Verify returned failure:", data.message);
+            toast({ title: "Verification issue", description: data.message || "Payment received but verification failed. Our team will confirm shortly.", variant: "destructive" });
+            startPolling(bookingId, (booking) => {
+              if (onSuccess) onSuccess(booking);
+            });
+          }
         } catch (err: any) {
-          console.error("[Payment] Verify failed, webhook will handle confirmation:", err?.message);
+          console.error("[Payment] Verify failed:", err?.message);
           startPolling(bookingId, (booking) => {
             if (onSuccess) onSuccess(booking);
           });
@@ -173,5 +187,5 @@ export function usePayment() {
     }
   };
 
-  return { initiatePayment, isInitializing: createOrder.isPending || verifyPayment.isPending };
+  return { initiatePayment, isInitializing: createOrder.isPending };
 }

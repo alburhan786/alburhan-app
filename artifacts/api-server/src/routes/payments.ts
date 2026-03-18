@@ -119,26 +119,35 @@ router.post("/create-order", requireAuth as any, async (req: AuthenticatedReques
 });
 
 router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res) => {
-  const parsed = VerifyPaymentBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ message: "Invalid request" });
+  const body = req.body || {};
+
+  // Accept both snake_case (Razorpay standard) and camelCase
+  const razorpayOrderId: string = body.razorpay_order_id || body.razorpayOrderId;
+  const razorpayPaymentId: string = body.razorpay_payment_id || body.razorpayPaymentId;
+  const razorpaySignature: string = body.razorpay_signature || body.razorpaySignature;
+  const bookingId: string = body.bookingId;
+  const payAmount: number | undefined = body.payAmount;
+
+  if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature || !bookingId) {
+    res.status(400).json({ success: false, message: "Missing required fields: bookingId, razorpay_order_id, razorpay_payment_id, razorpay_signature" });
     return;
   }
-  const { bookingId, razorpayOrderId, razorpayPaymentId, razorpaySignature, payAmount } = parsed.data;
 
   const secret = process.env.RAZORPAY_SECRET;
   if (!secret) {
-    res.status(500).json({ message: "Payment gateway not configured" });
+    res.status(500).json({ success: false, message: "Payment gateway not configured" });
     return;
   }
 
+  // Verify HMAC signature (critical security check)
   const generated = crypto
     .createHmac("sha256", secret)
     .update(`${razorpayOrderId}|${razorpayPaymentId}`)
     .digest("hex");
 
   if (generated !== razorpaySignature) {
-    res.status(400).json({ message: "Invalid payment signature" });
+    console.error("[verify] Signature mismatch for payment:", razorpayPaymentId);
+    res.status(400).json({ success: false, message: "Invalid payment signature" });
     return;
   }
 
@@ -146,22 +155,22 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
   const existingBooking = existingBookings[0];
 
   if (!existingBooking) {
-    res.status(404).json({ message: "Booking not found" });
+    res.status(404).json({ success: false, message: "Booking not found" });
     return;
   }
 
   if (req.user?.role !== "admin" && existingBooking.customerMobile !== req.user?.mobile) {
-    res.status(403).json({ message: "You can only pay for your own bookings" });
+    res.status(403).json({ success: false, message: "You can only pay for your own bookings" });
     return;
   }
 
   if (existingBooking.status !== "approved" && existingBooking.status !== "partially_paid") {
-    res.status(400).json({ message: "Booking is not in a payable state" });
+    res.status(400).json({ success: false, message: "Booking is not in a payable state" });
     return;
   }
 
   if (existingBooking.razorpayOrderId && existingBooking.razorpayOrderId !== razorpayOrderId) {
-    res.status(400).json({ message: "Order ID mismatch" });
+    res.status(400).json({ success: false, message: "Order ID mismatch" });
     return;
   }
 
@@ -189,12 +198,15 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
     .where(eq(bookingsTable.id, bookingId))
     .returning();
 
+  console.log("[verify] Payment verified:", razorpayPaymentId, "→ Booking", booking.bookingNumber, newStatus);
+
   const baseUrl = process.env.REPLIT_DEV_DOMAIN
     ? `https://${process.env.REPLIT_DEV_DOMAIN}`
     : `${req.protocol}://${req.get("host")?.replace(/\/api$/, "")}`;
 
+  const invoiceUrl = isFullyPaid ? `${baseUrl}/invoice/${booking.bookingNumber}` : undefined;
+
   if (isFullyPaid) {
-    const invoiceUrl = `${baseUrl}/invoice/${booking.bookingNumber}`;
     sendPaymentConfirmationNotification({
       mobile: booking.customerMobile,
       email: booking.customerEmail,
@@ -217,15 +229,20 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
   }
 
   res.json({
-    ...booking,
-    totalAmount: booking.totalAmount ? Number(booking.totalAmount) : null,
-    gstAmount: booking.gstAmount ? Number(booking.gstAmount) : null,
-    finalAmount: booking.finalAmount ? Number(booking.finalAmount) : null,
-    paidAmount: newPaidAmount,
-    remainingBalance: Math.max(0, finalAmount - newPaidAmount),
+    success: true,
+    invoice: invoiceUrl || null,
+    status: newStatus,
     isFullyPaid,
-    createdAt: booking.createdAt?.toISOString?.(),
-    updatedAt: booking.updatedAt?.toISOString?.(),
+    booking: {
+      ...booking,
+      totalAmount: booking.totalAmount ? Number(booking.totalAmount) : null,
+      gstAmount: booking.gstAmount ? Number(booking.gstAmount) : null,
+      finalAmount: booking.finalAmount ? Number(booking.finalAmount) : null,
+      paidAmount: newPaidAmount,
+      remainingBalance: Math.max(0, finalAmount - newPaidAmount),
+      createdAt: booking.createdAt?.toISOString?.(),
+      updatedAt: booking.updatedAt?.toISOString?.(),
+    },
   });
 });
 
