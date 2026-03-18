@@ -741,7 +741,7 @@ export default function CustomerDashboard() {
                   variant="outline"
                   className="flex-1 text-primary border-primary"
                   onClick={() => {
-                    window.open(`${BASE_API}/invoice/${paymentSuccess!.booking.bookingNumber}`, '_blank');
+                    window.open(`${import.meta.env.BASE_URL}invoice/${paymentSuccess!.booking.bookingNumber}`, '_blank');
                   }}
                 >
                   <FileText className="w-4 h-4 mr-2" />

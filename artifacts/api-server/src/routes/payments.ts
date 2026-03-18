@@ -121,6 +121,8 @@ router.post("/create-order", requireAuth as any, async (req: AuthenticatedReques
 router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res) => {
   const body = req.body || {};
 
+  console.log("[verify] Called by user:", req.user?.mobile, "| body keys:", Object.keys(body));
+
   // Accept both snake_case (Razorpay standard) and camelCase
   const razorpayOrderId: string = body.razorpay_order_id || body.razorpayOrderId;
   const razorpayPaymentId: string = body.razorpay_payment_id || body.razorpayPaymentId;
@@ -129,6 +131,7 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
   const payAmount: number | undefined = body.payAmount;
 
   if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature || !bookingId) {
+    console.error("[verify] Missing fields — orderId:", !!razorpayOrderId, "paymentId:", !!razorpayPaymentId, "sig:", !!razorpaySignature, "bookingId:", !!bookingId);
     res.status(400).json({ success: false, message: "Missing required fields: bookingId, razorpay_order_id, razorpay_payment_id, razorpay_signature" });
     return;
   }
