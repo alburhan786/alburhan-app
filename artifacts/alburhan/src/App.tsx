@@ -41,6 +41,7 @@ import OfflineBookingManager from "@/pages/admin/OfflineBookingManager";
 import QRTracker from "@/pages/admin/QRTracker";
 import ReportsManager from "@/pages/admin/ReportsManager";
 import PrintCenter from "@/pages/admin/PrintCenter";
+import BroadcastManager from "@/pages/admin/BroadcastManager";
 import NotFound from "@/pages/not-found";
 import { useAuth } from "@/hooks/use-auth";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -114,6 +115,7 @@ function Router() {
       <Route path="/admin/print-center" component={() => <AdminRoute component={PrintCenter} />} />
       <Route path="/admin/customers" component={() => <AdminRoute component={CustomerManager} />} />
       <Route path="/admin/inquiries" component={() => <AdminRoute component={InquiryManager} />} />
+      <Route path="/admin/broadcast" component={() => <AdminRoute component={BroadcastManager} />} />
 
       <Route component={NotFound} />
     </Switch>

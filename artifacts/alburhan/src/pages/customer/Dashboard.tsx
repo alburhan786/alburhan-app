@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useCallback } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useAuth } from "@/hooks/use-auth";
 import { useListBookings, useListDocuments, useDeleteDocument } from "@workspace/api-client-react";
@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { CreditCard, FileText, Download, Clock, Upload, Trash2, CheckCircle, AlertCircle, X, Eye, ShieldAlert, IndianRupee, Plane, Stamp, Hotel, Bus, Printer, Share2, Copy } from "lucide-react";
+import { CreditCard, FileText, Download, Clock, Upload, Trash2, CheckCircle, AlertCircle, X, Eye, ShieldAlert, IndianRupee, Plane, Stamp, Hotel, Bus, Printer, Share2, Copy, Bell, BellRing, CheckCheck, Megaphone } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -415,6 +415,84 @@ function getStatusMessage(status: string) {
   }
 }
 
+const NOTIF_TYPE_EMOJI: Record<string, string> = {
+  mina_update: "🕌", tawaf_update: "🕋", madinah_update: "🟢",
+  flight_update: "✈️", bus_update: "🚌", food_update: "🍽️",
+  ziyarat_update: "🗺️", general: "📢",
+};
+
+interface CustomerNotification {
+  id: string; title: string; message: string; type: string; isRead: boolean; createdAt: string;
+}
+
+function NotificationsPanel({
+  notifications, onClose, onMarkRead, onMarkAllRead,
+}: {
+  notifications: CustomerNotification[];
+  onClose: () => void;
+  onMarkRead: (id: string) => void;
+  onMarkAllRead: () => void;
+}) {
+  const unread = notifications.filter(n => !n.isRead).length;
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative w-full max-w-sm h-full bg-white shadow-2xl flex flex-col">
+        <div className="flex items-center justify-between px-4 py-4 border-b border-border bg-primary text-white">
+          <div className="flex items-center gap-2">
+            <BellRing className="w-5 h-5" />
+            <span className="font-bold text-base">Notifications</span>
+            {unread > 0 && <span className="bg-accent text-accent-foreground text-xs font-bold px-2 py-0.5 rounded-full">{unread}</span>}
+          </div>
+          <div className="flex items-center gap-2">
+            {unread > 0 && (
+              <button onClick={onMarkAllRead} className="text-xs text-white/70 hover:text-white flex items-center gap-1">
+                <CheckCheck size={13} /> Mark all read
+              </button>
+            )}
+            <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-lg transition-colors">
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {notifications.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
+              <Bell className="w-10 h-10 opacity-20" />
+              <p className="text-sm">No notifications yet</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-border">
+              {notifications.map(n => (
+                <div
+                  key={n.id}
+                  className={`p-4 cursor-pointer transition-colors hover:bg-muted/30 ${!n.isRead ? "bg-primary/5 border-l-4 border-l-primary" : ""}`}
+                  onClick={() => !n.isRead && onMarkRead(n.id)}
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="text-xl shrink-0 mt-0.5">{NOTIF_TYPE_EMOJI[n.type] || "📢"}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className={`text-sm font-semibold ${!n.isRead ? "text-primary" : "text-foreground"}`}>{n.title}</p>
+                        {!n.isRead && <span className="w-2 h-2 rounded-full bg-primary shrink-0 mt-1.5" />}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{n.message}</p>
+                      <p className="text-[10px] text-muted-foreground/60 mt-2">{formatDate(n.createdAt)}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="border-t border-border p-3 bg-muted/30">
+          <p className="text-[11px] text-center text-muted-foreground">Messages from Al Burhan Tours & Travels</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function CustomerDashboard() {
   const { user } = useAuth();
   const { data } = useListBookings();
@@ -427,6 +505,60 @@ export default function CustomerDashboard() {
   const [partialInput, setPartialInput] = useState<string>("");
   const [payMode, setPayMode] = useState<"full" | "partial">("full");
   const [paymentSuccess, setPaymentSuccess] = useState<{ booking: any; isPartial: boolean; paidAmount: number } | null>(null);
+
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<CustomerNotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const prevUnreadRef = React.useRef(0);
+
+  const fetchUnreadCount = useCallback(async () => {
+    try {
+      const res = await fetch(`${BASE_API}/api/notifications/my/unread-count`, { credentials: "include" });
+      if (!res.ok) return;
+      const data = await res.json();
+      const newCount = data.count || 0;
+      if (newCount > prevUnreadRef.current && prevUnreadRef.current >= 0) {
+        if (newCount > prevUnreadRef.current) {
+          toast({ title: "New Message!", description: "You have a new notification from Al Burhan Tours.", duration: 5000 });
+        }
+      }
+      prevUnreadRef.current = newCount;
+      setUnreadCount(newCount);
+    } catch {}
+  }, [toast]);
+
+  useEffect(() => {
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, [fetchUnreadCount]);
+
+  const loadNotifications = useCallback(async () => {
+    try {
+      const res = await fetch(`${BASE_API}/api/notifications/my`, { credentials: "include" });
+      if (!res.ok) return;
+      setNotifications(await res.json());
+    } catch {}
+  }, []);
+
+  const handleOpenNotifications = () => {
+    setShowNotifications(true);
+    loadNotifications();
+  };
+
+  const handleMarkRead = async (id: string) => {
+    await fetch(`${BASE_API}/api/notifications/my/${id}/read`, { method: "PATCH", credentials: "include" });
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+    setUnreadCount(c => Math.max(0, c - 1));
+    prevUnreadRef.current = Math.max(0, prevUnreadRef.current - 1);
+  };
+
+  const handleMarkAllRead = async () => {
+    await fetch(`${BASE_API}/api/notifications/my/read-all`, { method: "PATCH", credentials: "include" });
+    setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+    setUnreadCount(0);
+    prevUnreadRef.current = 0;
+  };
 
   const uploadBooking = bookings.find((b: any) => b.id === uploadBookingId);
 
@@ -499,13 +631,36 @@ export default function CustomerDashboard() {
         </div>
       )}
 
+      {showNotifications && (
+        <NotificationsPanel
+          notifications={notifications}
+          onClose={() => setShowNotifications(false)}
+          onMarkRead={handleMarkRead}
+          onMarkAllRead={handleMarkAllRead}
+        />
+      )}
+
       <div className="bg-primary pt-12 pb-24 relative overflow-hidden">
         <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: `url(${import.meta.env.BASE_URL}images/islamic-pattern-bg.png)` }} />
-        <div className="container mx-auto px-4 relative z-10">
-          <h1 className="text-3xl md:text-4xl font-serif font-bold text-white mb-2">
-            Assalamu Alaikum, {user?.name || 'Pilgrim'}
-          </h1>
-          <p className="text-primary-foreground/80">Manage your bookings and track your sacred journey.</p>
+        <div className="container mx-auto px-4 relative z-10 flex items-start justify-between">
+          <div>
+            <h1 className="text-3xl md:text-4xl font-serif font-bold text-white mb-2">
+              Assalamu Alaikum, {user?.name || 'Pilgrim'}
+            </h1>
+            <p className="text-primary-foreground/80">Manage your bookings and track your sacred journey.</p>
+          </div>
+          <button
+            onClick={handleOpenNotifications}
+            className="relative mt-1 p-2.5 rounded-xl bg-white/10 hover:bg-white/20 transition-colors text-white"
+            title="Notifications"
+          >
+            {unreadCount > 0 ? <BellRing className="w-6 h-6" /> : <Bell className="w-6 h-6" />}
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-accent text-accent-foreground text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </button>
         </div>
       </div>
 
