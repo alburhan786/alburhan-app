@@ -10,6 +10,8 @@ import {
   TextInput,
   Modal,
   Platform,
+  Linking,
+  Share,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -229,14 +231,49 @@ export default function BookingDetailsScreen() {
 
   const remainingAmount = parseFloat(booking.totalAmount) - parseFloat(booking.paidAmount);
 
+  const apiBase = getApiUrl().replace('/api', '');
+  const invoiceUrl = `${apiBase}/invoice/${booking.id}`;
+
+  const handleViewInvoice = () => {
+    Linking.openURL(invoiceUrl).catch(() =>
+      Alert.alert('Error', 'Could not open invoice')
+    );
+  };
+
+  const handleShareInvoice = async () => {
+    try {
+      await Share.share({
+        message: `Al Burhan Tours & Travels\nBooking #${booking.id}\nInvoice: ${invoiceUrl}`,
+        url: invoiceUrl,
+        title: `Invoice - Booking #${booking.id}`,
+      });
+    } catch {}
+  };
+
   return (
     <View style={{ flex: 1 }}>
       <ScrollView style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.bookingId}>Booking #{booking.id}</Text>
+          <View>
+            <Text style={styles.bookingId}>Booking #{booking.id}</Text>
+            {booking.invoiceNumber && (
+              <Text style={styles.invoiceNum}>Invoice: {booking.invoiceNumber}</Text>
+            )}
+          </View>
           <View style={styles.statusBadge}>
             <Text style={styles.statusText}>{booking.status.toUpperCase()}</Text>
           </View>
+        </View>
+
+        <View style={styles.invoiceActions}>
+          <TouchableOpacity style={styles.invoiceBtn} onPress={handleViewInvoice}>
+            <Ionicons name="document-text-outline" size={18} color="#047857" />
+            <Text style={styles.invoiceBtnText}>View Invoice</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.invoiceBtn, styles.invoiceBtnShare]} onPress={handleShareInvoice}>
+            <Ionicons name="share-outline" size={18} color="#fff" />
+            <Text style={[styles.invoiceBtnText, { color: '#fff' }]}>Share Invoice</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
@@ -440,8 +477,13 @@ const styles = StyleSheet.create({
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: { backgroundColor: Colors.card, padding: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.border },
   bookingId: { fontSize: 20, fontWeight: 'bold' as const, color: Colors.text },
+  invoiceNum: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
   statusBadge: { backgroundColor: Colors.primary, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
   statusText: { color: '#FFFFFF', fontSize: 12, fontWeight: 'bold' as const },
+  invoiceActions: { flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 12, gap: 10, backgroundColor: '#f0fdf4', borderBottomWidth: 1, borderBottomColor: '#d1fae5' },
+  invoiceBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 10, borderWidth: 1.5, borderColor: '#047857', backgroundColor: '#fff' },
+  invoiceBtnShare: { backgroundColor: '#047857' },
+  invoiceBtnText: { fontSize: 14, fontWeight: '700' as const, color: '#047857' },
   section: { padding: 16 },
   sectionTitle: { fontSize: 18, fontWeight: 'bold' as const, color: Colors.text, marginBottom: 12 },
   card: { backgroundColor: Colors.card, borderRadius: 12, padding: 16, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },

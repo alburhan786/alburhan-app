@@ -75,31 +75,20 @@ async function sendOtpSmsFast2SMS(phone: string, otpCode: string): Promise<boole
   }
 }
 
-async function sendBookingDltSms(phone: string, invoiceNum: string, invoiceUrl?: string): Promise<boolean> {
+async function sendBookingDltSms(phone: string, invoiceNum: string, _invoiceUrl?: string): Promise<boolean> {
   const apiKey = process.env.FAST2SMS_API_KEY;
   if (!apiKey) {
     console.log("[Fast2SMS DLT] API key not configured, skipping booking SMS");
     return false;
   }
   try {
-    const variables = invoiceUrl
-      ? `${invoiceNum}|${invoiceUrl}|`
-      : `${invoiceNum}||`;
+    const variables = `${invoiceNum}||`;
     const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=dlt&sender_id=ALBURH&message=211052&variables_values=${encodeURIComponent(variables)}&flash=0&numbers=${phone}`;
     console.log(`[Fast2SMS DLT Booking] Sending to ${phone} | variables_values="${variables}"`);
     const response = await fetch(url, { method: "GET" });
     const data = await response.json();
     console.log("[Fast2SMS DLT Booking] Response:", JSON.stringify(data));
     if (data.return === true) return true;
-    if (invoiceUrl) {
-      console.log("[Fast2SMS DLT Booking] URL attempt failed, retrying without URL...");
-      const fallbackVars = `${invoiceNum}||`;
-      const fallbackUrl = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=dlt&sender_id=ALBURH&message=211052&variables_values=${encodeURIComponent(fallbackVars)}&flash=0&numbers=${phone}`;
-      const r2 = await fetch(fallbackUrl, { method: "GET" });
-      const d2 = await r2.json();
-      console.log("[Fast2SMS DLT Booking] Fallback Response:", JSON.stringify(d2));
-      return d2.return === true;
-    }
     console.log("[Fast2SMS DLT Booking] Failed:", data.message);
     return false;
   } catch (error) {
