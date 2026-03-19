@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { CreditCard, FileText, Download, Clock, Upload, Trash2, CheckCircle, AlertCircle, X, Eye, ShieldAlert, IndianRupee, Plane, Stamp, Hotel, Bus } from "lucide-react";
+import { CreditCard, FileText, Download, Clock, Upload, Trash2, CheckCircle, AlertCircle, X, Eye, ShieldAlert, IndianRupee, Plane, Stamp, Hotel, Bus, Printer, Share2, Copy } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -281,11 +281,38 @@ const TRAVEL_DOC_TYPES: Record<string, { label: string; icon: React.ElementType;
 
 function TravelDocumentsCard({ bookingId }: { bookingId: string }) {
   const BASE_API = import.meta.env.VITE_API_URL || "";
+  const { toast } = useToast();
   const { data: docs } = useListDocuments(bookingId, { query: { refetchOnMount: "always" } });
   const allDocs = (docs || []) as any[];
   const travelDocs = allDocs.filter((d: any) => d.uploadedBy === "admin" && TRAVEL_DOC_TYPES[d.documentType]);
 
   const slots = Object.keys(TRAVEL_DOC_TYPES);
+
+  function handlePrint(url: string) {
+    const win = window.open(url, "_blank");
+    if (win) {
+      win.addEventListener("load", () => {
+        win.focus();
+        win.print();
+      });
+    }
+  }
+
+  async function handleShare(url: string, fileName: string) {
+    const fullUrl = `${window.location.origin}${url.startsWith("/") ? url : `/${url}`}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: fileName, url: fullUrl });
+      } catch (_) {}
+    } else {
+      try {
+        await navigator.clipboard.writeText(fullUrl);
+        toast({ title: "Link copied!", description: "Document link copied to clipboard." });
+      } catch (_) {
+        toast({ title: "Share", description: fullUrl, variant: "destructive" });
+      }
+    }
+  }
 
   return (
     <Card className="overflow-hidden rounded-2xl shadow-md border-2 border-primary/20">
@@ -314,25 +341,46 @@ function TravelDocumentsCard({ bookingId }: { bookingId: string }) {
               </div>
             );
           }
-          return uploaded.map((doc: any) => (
-            <div key={doc.id} className={`flex items-center gap-3 p-3 rounded-xl border ${meta.bg}`}>
-              <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${meta.bg}`}>
-                <Icon className={`w-4 h-4 ${meta.color}`} />
+          return uploaded.map((doc: any) => {
+            const fileUrl = `${BASE_API}${doc.fileUrl}`;
+            const isPdf = doc.fileName?.toLowerCase().endsWith(".pdf");
+            return (
+              <div key={doc.id} className={`rounded-xl border ${meta.bg} overflow-hidden`}>
+                <div className={`flex items-center gap-3 p-3`}>
+                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-white/50`}>
+                    <Icon className={`w-4 h-4 ${meta.color}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-xs font-bold ${meta.color}`}>{meta.label}</p>
+                    <p className="text-[11px] text-muted-foreground truncate">{doc.fileName}</p>
+                  </div>
+                </div>
+                <div className={`grid grid-cols-4 border-t border-black/5 divide-x divide-black/5`}>
+                  <a href={fileUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1 py-2 hover:bg-black/5 transition-colors">
+                    <Eye size={15} className={meta.color} />
+                    <span className="text-[10px] font-medium text-muted-foreground">View</span>
+                  </a>
+                  <a href={fileUrl} download={doc.fileName} className="flex flex-col items-center gap-1 py-2 hover:bg-black/5 transition-colors">
+                    <Download size={15} className={meta.color} />
+                    <span className="text-[10px] font-medium text-muted-foreground">Download</span>
+                  </a>
+                  {isPdf && (
+                    <button onClick={() => handlePrint(fileUrl)} className="flex flex-col items-center gap-1 py-2 hover:bg-black/5 transition-colors w-full">
+                      <Printer size={15} className={meta.color} />
+                      <span className="text-[10px] font-medium text-muted-foreground">Print</span>
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleShare(doc.fileUrl, doc.fileName)}
+                    className={`flex flex-col items-center gap-1 py-2 hover:bg-black/5 transition-colors w-full ${!isPdf ? "col-span-2" : ""}`}
+                  >
+                    <Share2 size={15} className={meta.color} />
+                    <span className="text-[10px] font-medium text-muted-foreground">Share</span>
+                  </button>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className={`text-xs font-bold ${meta.color}`}>{meta.label}</p>
-                <p className="text-[11px] text-muted-foreground truncate">{doc.fileName}</p>
-              </div>
-              <div className="flex gap-1 shrink-0">
-                <a href={`${BASE_API}${doc.fileUrl}`} target="_blank" rel="noreferrer">
-                  <Button size="sm" variant="ghost" className={`h-8 w-8 p-0 ${meta.color}`}><Eye size={14} /></Button>
-                </a>
-                <a href={`${BASE_API}${doc.fileUrl}`} download={doc.fileName}>
-                  <Button size="sm" variant="ghost" className={`h-8 w-8 p-0 ${meta.color}`}><Download size={14} /></Button>
-                </a>
-              </div>
-            </div>
-          ));
+            );
+          });
         })}
       </div>
     </Card>
