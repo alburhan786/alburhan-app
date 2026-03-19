@@ -289,3 +289,33 @@ export async function sendPartialPaymentNotification(opts: {
     opts.email ? sendEmail(opts.email, "Partial Payment Received – Al Burhan Tours & Travels", message) : Promise.resolve(),
   ]);
 }
+
+export async function sendCustomerDocumentUploadNotification(opts: {
+  customerName: string;
+  customerMobile: string;
+  bookingNumber: string;
+  documentType: string;
+}) {
+  const docLabel = opts.documentType.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+  const adminMsg = `📄 Document Uploaded!\n\nBooking: #${opts.bookingNumber}\nCustomer: ${opts.customerName} (${opts.customerMobile})\nDocument: ${docLabel}\n\nReview in admin dashboard.`;
+  await Promise.allSettled([
+    sendWhatsApp("9893989786", adminMsg),
+    sendWhatsApp("8989701701", adminMsg),
+  ]);
+}
+
+export async function sendAdminDocumentReadyNotification(opts: {
+  mobile: string;
+  email?: string | null;
+  customerName: string;
+  bookingNumber: string;
+  documentType: string;
+}) {
+  const docLabel = opts.documentType.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+  const message = `Assalamu Alaikum ${opts.customerName},\n\nYour ${docLabel} for booking #${opts.bookingNumber} is ready.\n\nPlease login to your dashboard to view and download it.\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 8989701701`;
+  await Promise.allSettled([
+    sendDLTSMS(opts.mobile, opts.customerName, opts.bookingNumber, docLabel.toUpperCase().slice(0, 30)),
+    sendWhatsAppWithFallback(opts.mobile, message),
+    opts.email ? sendEmail(opts.email, `Your ${docLabel} is Ready – Al Burhan Tours & Travels`, message) : Promise.resolve(),
+  ]);
+}

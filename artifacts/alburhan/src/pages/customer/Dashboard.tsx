@@ -1,3 +1,4 @@
+import React from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useAuth } from "@/hooks/use-auth";
 import { useListBookings, useListDocuments, useDeleteDocument } from "@workspace/api-client-react";
@@ -6,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { CreditCard, FileText, Download, Clock, Upload, Trash2, CheckCircle, AlertCircle, X, Eye, ShieldAlert, IndianRupee } from "lucide-react";
+import { CreditCard, FileText, Download, Clock, Upload, Trash2, CheckCircle, AlertCircle, X, Eye, ShieldAlert, IndianRupee, Plane, Stamp, Hotel, Bus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -268,6 +269,73 @@ function UploadModal({ bookingId, bookingNumber, onClose }: { bookingId: string;
         </div>
       </Card>
     </div>
+  );
+}
+
+const TRAVEL_DOC_TYPES: Record<string, { label: string; icon: React.ElementType; color: string; bg: string }> = {
+  flight_ticket: { label: "Flight Ticket", icon: Plane,  color: "text-sky-700",     bg: "bg-sky-50 border-sky-200" },
+  visa:          { label: "Visa",          icon: Stamp,  color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200" },
+  room_allotment:{ label: "Hotel / Room Allotment", icon: Hotel, color: "text-violet-700", bg: "bg-violet-50 border-violet-200" },
+  bus_allotment: { label: "Bus Allotment", icon: Bus,   color: "text-orange-700",  bg: "bg-orange-50 border-orange-200" },
+};
+
+function TravelDocumentsCard({ bookingId }: { bookingId: string }) {
+  const BASE_API = import.meta.env.VITE_API_URL || "";
+  const { data: docs } = useListDocuments(bookingId, { query: { refetchOnMount: "always" } });
+  const allDocs = (docs || []) as any[];
+  const travelDocs = allDocs.filter((d: any) => d.uploadedBy === "admin" && TRAVEL_DOC_TYPES[d.documentType]);
+
+  const slots = Object.keys(TRAVEL_DOC_TYPES);
+
+  return (
+    <Card className="overflow-hidden rounded-2xl shadow-md border-2 border-primary/20">
+      <div className="px-5 py-4 flex items-center gap-3 bg-primary/5 border-b border-primary/15">
+        <Plane className="w-5 h-5 text-primary shrink-0" />
+        <div>
+          <h4 className="font-bold text-sm text-primary">Your Travel Documents</h4>
+          <p className="text-xs text-muted-foreground mt-0.5">Uploaded by Al Burhan Tours — visible once ready</p>
+        </div>
+      </div>
+      <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {slots.map(type => {
+          const meta = TRAVEL_DOC_TYPES[type];
+          const Icon = meta.icon;
+          const uploaded = travelDocs.filter((d: any) => d.documentType === type);
+          if (uploaded.length === 0) {
+            return (
+              <div key={type} className="flex items-center gap-3 p-3 rounded-xl border border-dashed border-border bg-muted/20">
+                <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                  <Icon className="w-4 h-4 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground">{meta.label}</p>
+                  <p className="text-[11px] text-muted-foreground/70 mt-0.5">Will appear once ready</p>
+                </div>
+              </div>
+            );
+          }
+          return uploaded.map((doc: any) => (
+            <div key={doc.id} className={`flex items-center gap-3 p-3 rounded-xl border ${meta.bg}`}>
+              <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${meta.bg}`}>
+                <Icon className={`w-4 h-4 ${meta.color}`} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className={`text-xs font-bold ${meta.color}`}>{meta.label}</p>
+                <p className="text-[11px] text-muted-foreground truncate">{doc.fileName}</p>
+              </div>
+              <div className="flex gap-1 shrink-0">
+                <a href={`${BASE_API}${doc.fileUrl}`} target="_blank" rel="noreferrer">
+                  <Button size="sm" variant="ghost" className={`h-8 w-8 p-0 ${meta.color}`}><Eye size={14} /></Button>
+                </a>
+                <a href={`${BASE_API}${doc.fileUrl}`} download={doc.fileName}>
+                  <Button size="sm" variant="ghost" className={`h-8 w-8 p-0 ${meta.color}`}><Download size={14} /></Button>
+                </a>
+              </div>
+            </div>
+          ));
+        })}
+      </div>
+    </Card>
   );
 }
 
@@ -534,9 +602,12 @@ export default function CustomerDashboard() {
                       </div>
                     )}
 
-                    {booking.status === 'confirmed' && (
-                      <div className="mx-5 mb-4">
+                    {(booking.status === 'approved' || booking.status === 'confirmed' || booking.status === 'partially_paid') && (
+                      <div className="mx-5 mb-4 space-y-4">
                         <MandatoryDocumentsCard bookingId={booking.id} onOpenUpload={() => setUploadBookingId(booking.id)} />
+                        {booking.status === 'confirmed' && (
+                          <TravelDocumentsCard bookingId={booking.id} />
+                        )}
                       </div>
                     )}
 

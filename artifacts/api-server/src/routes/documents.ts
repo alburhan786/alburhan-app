@@ -2,9 +2,12 @@ import { Router } from "express";
 import { db, documentsTable, bookingsTable, pilgrimsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth, type AuthenticatedRequest } from "../lib/auth.js";
+import { sendCustomerDocumentUploadNotification, sendAdminDocumentReadyNotification } from "../lib/notifications.js";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+
+const ADMIN_NOTIFIED_DOC_TYPES = ["flight_ticket", "visa", "room_allotment", "bus_allotment"];
 
 const UPLOADS_DIR = process.env.UPLOADS_DIR ||
   path.resolve(process.cwd(), process.env.NODE_ENV === "production" ? "uploads" : "../../uploads");
@@ -114,6 +117,29 @@ router.post(
       ...doc,
       createdAt: doc.createdAt?.toISOString?.(),
     });
+
+    const isAdmin = req.user?.role === "admin";
+    const bkNum = booking.bookingNumber;
+    const custName = booking.customerName;
+    const custMobile = booking.customerMobile;
+    const custEmail = booking.customerEmail;
+
+    if (isAdmin && ADMIN_NOTIFIED_DOC_TYPES.includes(documentType)) {
+      sendAdminDocumentReadyNotification({
+        mobile: custMobile,
+        email: custEmail,
+        customerName: custName,
+        bookingNumber: bkNum,
+        documentType,
+      }).catch(err => console.error("[Documents] Admin doc notification error:", err));
+    } else if (!isAdmin) {
+      sendCustomerDocumentUploadNotification({
+        customerName: custName,
+        customerMobile: custMobile,
+        bookingNumber: bkNum,
+        documentType,
+      }).catch(err => console.error("[Documents] Customer doc notification error:", err));
+    }
   }
 );
 
