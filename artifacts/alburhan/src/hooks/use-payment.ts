@@ -149,6 +149,7 @@ export function usePayment() {
     }
 
     paymentHandledRef.current = false;
+    stopPolling();
 
     try {
       const order = await createOrder.mutateAsync({
