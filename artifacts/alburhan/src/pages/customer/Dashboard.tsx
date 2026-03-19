@@ -605,9 +605,7 @@ export default function CustomerDashboard() {
                     {(booking.status === 'approved' || booking.status === 'confirmed' || booking.status === 'partially_paid') && (
                       <div className="mx-5 mb-4 space-y-4">
                         <MandatoryDocumentsCard bookingId={booking.id} onOpenUpload={() => setUploadBookingId(booking.id)} />
-                        {booking.status === 'confirmed' && (
-                          <TravelDocumentsCard bookingId={booking.id} />
-                        )}
+                        <TravelDocumentsCard bookingId={booking.id} />
                       </div>
                     )}
 
