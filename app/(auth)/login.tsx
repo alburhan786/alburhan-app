@@ -160,7 +160,13 @@ export default function LoginScreen() {
 
     return (
       <>
-        <Text style={styles.otpLabel}>Enter the 6-digit OTP sent to {phone}</Text>
+        <View style={styles.otpInfoBox}>
+          <Ionicons name="information-circle-outline" size={18} color="#047857" />
+          <Text style={styles.otpInfoText}>
+            OTP sent to <Text style={styles.otpPhone}>+91 {phone}</Text>{'\n'}
+            Check your <Text style={styles.otpBold}>SMS</Text> and <Text style={styles.otpBold}>WhatsApp</Text>
+          </Text>
+        </View>
 
         <TextInput
           style={[styles.input, styles.otpInput]}
@@ -349,6 +355,31 @@ const styles = StyleSheet.create({
     fontSize: 24,
     letterSpacing: 8,
     textAlign: 'center' as const,
+  },
+  otpInfoBox: {
+    flexDirection: 'row' as const,
+    alignItems: 'flex-start' as const,
+    backgroundColor: '#f0fdf4',
+    borderWidth: 1,
+    borderColor: '#d1fae5',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 16,
+    gap: 8,
+  },
+  otpInfoText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#374151',
+    lineHeight: 20,
+  },
+  otpPhone: {
+    fontWeight: '700' as const,
+    color: '#047857',
+  },
+  otpBold: {
+    fontWeight: '700' as const,
+    color: '#047857',
   },
   otpLabel: {
     fontSize: 14,
