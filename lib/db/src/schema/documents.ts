@@ -4,7 +4,7 @@ import { z } from "zod/v4";
 
 export const documentTypeEnum = pgEnum("document_type", [
   "passport", "pan_card", "aadhaar", "passport_photo",
-  "flight_ticket", "visa", "room_allotment", "bus_allotment", "other"
+  "flight_ticket", "visa", "room_allotment", "bus_allotment", "model_contract", "other"
 ]);
 
 export const documentUploadedByEnum = pgEnum("document_uploaded_by", ["customer", "admin"]);

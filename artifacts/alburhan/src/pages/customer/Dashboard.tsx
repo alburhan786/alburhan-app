@@ -273,10 +273,11 @@ function UploadModal({ bookingId, bookingNumber, onClose }: { bookingId: string;
 }
 
 const TRAVEL_DOC_TYPES: Record<string, { label: string; icon: React.ElementType; color: string; bg: string }> = {
-  flight_ticket: { label: "Flight Ticket", icon: Plane,  color: "text-sky-700",     bg: "bg-sky-50 border-sky-200" },
-  visa:          { label: "Visa",          icon: Stamp,  color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200" },
-  room_allotment:{ label: "Hotel / Room Allotment", icon: Hotel, color: "text-violet-700", bg: "bg-violet-50 border-violet-200" },
-  bus_allotment: { label: "Bus Allotment", icon: Bus,   color: "text-orange-700",  bg: "bg-orange-50 border-orange-200" },
+  flight_ticket:  { label: "Flight Ticket",          icon: Plane,     color: "text-sky-700",     bg: "bg-sky-50 border-sky-200" },
+  visa:           { label: "Visa",                   icon: Stamp,     color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200" },
+  room_allotment: { label: "Hotel / Room Allotment", icon: Hotel,     color: "text-violet-700",  bg: "bg-violet-50 border-violet-200" },
+  bus_allotment:  { label: "Bus Allotment",          icon: Bus,       color: "text-orange-700",  bg: "bg-orange-50 border-orange-200" },
+  model_contract: { label: "Model Contract",         icon: FileText,  color: "text-rose-700",    bg: "bg-rose-50 border-rose-200" },
 };
 
 function TravelDocumentsCard({ bookingId }: { bookingId: string }) {
