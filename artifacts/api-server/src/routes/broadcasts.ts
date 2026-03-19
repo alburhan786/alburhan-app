@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db, broadcastsTable, customerNotificationsTable, bookingsTable, usersTable } from "@workspace/db";
 import { eq, desc, ilike, or } from "drizzle-orm";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
-import { sendWhatsApp, sendRCS } from "../lib/notifications.js";
+import { sendWhatsApp, sendRCS, type RcsRichData } from "../lib/notifications.js";
 import axios from "axios";
 
 const router = Router();
@@ -84,7 +84,8 @@ async function dispatchToRecipient(
   r: Recipient,
   broadcast: { id: string; title: string; type: string },
   rawMessage: string,
-  channels: string[]
+  channels: string[],
+  rcsOptions?: { url?: string; agent?: string; richMode?: boolean }
 ): Promise<void> {
   const personalized = applyVariables(rawMessage, r);
   const stdMessage = `🕋 ${broadcast.title}\n${personalized}\n\n- Al Burhan Tours & Travels`;
@@ -101,15 +102,26 @@ async function dispatchToRecipient(
   }
 
   if (channels.includes("rcs")) {
+    const richData: RcsRichData | undefined = rcsOptions?.richMode && rcsOptions?.url
+      ? { url: rcsOptions.url, agent: rcsOptions.agent || "jio", active: true }
+      : undefined;
+
     tasks.push(
-      sendRCS(r.mobile, r.name, personalized).then(async (ok) => {
+      sendRCS(r.mobile, r.name, personalized, richData).then(async (ok) => {
         if (!ok) {
-          console.warn("[RCS] Falling back to SMS for", r.mobile);
-          await sendBroadcastSMS(r.mobile, stdMessage).catch(() => {});
+          console.warn("[RCS→WA] Falling back to WhatsApp for", r.mobile);
+          const waOk = await sendWhatsApp(r.mobile, waMessage).catch(() => false);
+          if (!waOk) {
+            console.warn("[RCS→WA→SMS] Falling back to SMS for", r.mobile);
+            await sendBroadcastSMS(r.mobile, stdMessage).catch(() => {});
+          }
         }
       }).catch(async () => {
-        console.warn("[RCS] Exception — falling back to SMS for", r.mobile);
-        await sendBroadcastSMS(r.mobile, stdMessage).catch(() => {});
+        console.warn("[RCS] Exception — falling back to WhatsApp for", r.mobile);
+        const waOk = await sendWhatsApp(r.mobile, waMessage).catch(() => false);
+        if (!waOk) {
+          await sendBroadcastSMS(r.mobile, stdMessage).catch(() => {});
+        }
       })
     );
   }
@@ -131,7 +143,7 @@ async function dispatchToRecipient(
 }
 
 router.post("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
-  const { title, message, type, audience, channels } = req.body;
+  const { title, message, type, audience, channels, rcsUrl, rcsAgent, rcsRichMode } = req.body;
   if (!title || !message || !audience || !Array.isArray(channels)) {
     res.status(400).json({ message: "title, message, audience, and channels are required" });
     return;
@@ -159,8 +171,9 @@ router.post("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => 
     recipientCount: recipients.length,
   });
 
+  const rcsOptions = { url: rcsUrl, agent: rcsAgent, richMode: !!rcsRichMode };
   for (const r of recipients) {
-    await dispatchToRecipient(r, { id: broadcast.id, title, type: type || "general" }, message, channels);
+    await dispatchToRecipient(r, { id: broadcast.id, title, type: type || "general" }, message, channels, rcsOptions);
   }
 });
 
@@ -203,7 +216,8 @@ router.post("/:id/resend", requireAdmin as any, async (req: AuthenticatedRequest
       r,
       { id: newBroadcast.id, title: original.title, type: original.type },
       original.message,
-      original.channels
+      original.channels,
+      {}
     );
   }
 });

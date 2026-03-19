@@ -122,10 +122,17 @@ export async function sendWhatsApp(mobile: string, message: string): Promise<boo
   }
 }
 
+export interface RcsRichData {
+  url?: string;
+  agent?: "jio" | "vi" | string;
+  active?: boolean;
+}
+
 export async function sendRCS(
   mobile: string,
   customerName: string,
-  messageText: string
+  messageText: string,
+  richData?: RcsRichData
 ): Promise<boolean> {
   if (!LEMIN_API_KEY) {
     console.log("[RCS] LEMIN_API_KEY not set — skipping RCS for:", mobile);
@@ -134,7 +141,8 @@ export async function sendRCS(
   try {
     const clean = mobile.replace(/\D/g, "");
     const phone = clean.startsWith("91") ? clean.slice(2) : clean;
-    const payload = {
+
+    const payload: Record<string, unknown> = {
       type: "single",
       dial_code: "+91",
       template: LEMIN_TEMPLATE_ID,
@@ -145,6 +153,18 @@ export async function sendRCS(
         message: messageText,
       },
     };
+
+    if (richData?.active && richData?.url) {
+      payload.rich_data = {
+        url: richData.url,
+        agent: richData.agent || "jio",
+        active: "true",
+      };
+      console.log("[RCS] Sending rich RCS to", mobile, "url:", richData.url, "agent:", richData.agent);
+    } else {
+      console.log("[RCS] Sending plain text RCS to", mobile);
+    }
+
     const response = await withRetry(() =>
       axios.post(LEMIN_API_URL, payload, {
         headers: {

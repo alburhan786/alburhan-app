@@ -62,6 +62,9 @@ export default function BroadcastManager() {
   const [type, setType] = useState("general");
   const [audience, setAudience] = useState("all");
   const [channels, setChannels] = useState<string[]>(["whatsapp", "dashboard"]);
+  const [rcsRichMode, setRcsRichMode] = useState(false);
+  const [rcsUrl, setRcsUrl] = useState("");
+  const [rcsAgent, setRcsAgent] = useState<"jio" | "vi">("jio");
   const [sending, setSending] = useState(false);
 
   const [history, setHistory] = useState<BroadcastRecord[]>([]);
@@ -103,7 +106,7 @@ export default function BroadcastManager() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ title, message, type, audience, channels }),
+        body: JSON.stringify({ title, message, type, audience, channels, rcsUrl: rcsUrl.trim() || undefined, rcsAgent, rcsRichMode }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to send");
@@ -260,9 +263,74 @@ export default function BroadcastManager() {
                   ))}
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-1.5">
-                  RCS falls back to SMS automatically if delivery fails.
+                  RCS fails → WhatsApp fallback → SMS fallback (automatic cascade).
                 </p>
               </div>
+
+              {/* RCS Rich Options — shown only when RCS is selected */}
+              {channels.includes("rcs") && (
+                <div className="rounded-xl border-2 border-violet-200 bg-violet-50 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-bold text-violet-800 flex items-center gap-1.5">
+                      <Radio size={13} /> RCS Options
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-violet-600">Rich Mode</span>
+                      <button
+                        type="button"
+                        onClick={() => setRcsRichMode(v => !v)}
+                        className={`relative w-9 h-5 rounded-full transition-colors ${rcsRichMode ? "bg-violet-600" : "bg-gray-300"}`}
+                      >
+                        <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${rcsRichMode ? "translate-x-4" : "translate-x-0"}`} />
+                      </button>
+                      <span className={`text-[11px] font-semibold ${rcsRichMode ? "text-violet-700" : "text-muted-foreground"}`}>
+                        {rcsRichMode ? "ON" : "OFF"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {rcsRichMode ? (
+                    <>
+                      <div>
+                        <Label className="text-xs font-semibold text-violet-800 mb-1">Button URL</Label>
+                        <Input
+                          value={rcsUrl}
+                          onChange={e => setRcsUrl(e.target.value)}
+                          placeholder="https://alburhantravels.com/invoice/INV123"
+                          className="text-sm border-violet-200 focus:ring-violet-400"
+                        />
+                        <p className="text-[10px] text-violet-600 mt-1">Invoice, hotel map, ticket download link, etc.</p>
+                      </div>
+                      <div>
+                        <Label className="text-xs font-semibold text-violet-800 mb-1">Network Agent</Label>
+                        <div className="flex gap-2">
+                          {(["jio", "vi"] as const).map(ag => (
+                            <button
+                              key={ag}
+                              type="button"
+                              onClick={() => setRcsAgent(ag)}
+                              className={`px-4 py-1.5 rounded-lg text-sm font-semibold border-2 transition-all capitalize ${
+                                rcsAgent === ag
+                                  ? "bg-violet-600 border-violet-600 text-white"
+                                  : "border-violet-200 text-violet-700 bg-white"
+                              }`}
+                            >
+                              {ag === "jio" ? "Jio" : "VI"}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="rounded-lg bg-white border border-violet-200 p-2.5">
+                        <p className="text-[10px] font-semibold text-violet-700 mb-1">Rich RCS Preview</p>
+                        <p className="text-xs text-gray-700 whitespace-pre-wrap">{title || "Title"}{"\n"}{message || "Your message..."}</p>
+                        {rcsUrl && <div className="mt-2 bg-violet-100 text-violet-800 text-[11px] font-semibold rounded px-2 py-1 text-center">🔗 View Details →</div>}
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-[11px] text-violet-600">Plain text RCS — no button link. Toggle Rich Mode ON to add a URL button.</p>
+                  )}
+                </div>
+              )}
 
               <Button
                 type="submit"
