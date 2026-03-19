@@ -91,21 +91,22 @@ export async function sendWhatsApp(mobile: string, message: string): Promise<boo
   }
   try {
     const phone = toBotBeePhone(mobile);
+    const params = new URLSearchParams({
+      apiToken: BOTBEE_API_KEY,
+      phone_number_id: BOTBEE_PHONE_NUMBER_ID,
+      phone_number: phone,
+      message,
+    });
     const response = await withRetry(() =>
       axios.post(
         `${BOTBEE_BASE_URL}/send`,
-        {
-          apiToken: BOTBEE_API_KEY,
-          phone_number_id: BOTBEE_PHONE_NUMBER_ID,
-          message,
-          phone_number: phone,
-        },
-        { headers: { "Content-Type": "application/json" } }
+        params.toString(),
+        { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
       )
     );
     const result = response.data;
     if (result?.status === "0" || result?.status === 0) {
-      console.warn("[WhatsApp] Session msg failed for", mobile, ":", result.message, "— trying template fallback");
+      console.warn("[WhatsApp] Session msg failed for", mobile, ":", result.message);
       return false;
     }
     console.log("[WhatsApp] Session msg sent to", mobile, result);
