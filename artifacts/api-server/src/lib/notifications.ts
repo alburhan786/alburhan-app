@@ -30,6 +30,11 @@ const BOTBEE_PHONE_NUMBER_ID = process.env.BOTBEE_PHONE_NUMBER_ID;
 const BOTBEE_BUSINESS_ID = process.env.BOTBEE_BUSINESS_ID;
 const BOTBEE_BASE_URL = "https://app.botbee.io/api/v1/whatsapp";
 
+const LEMIN_API_URL = process.env.LEMIN_API_URL || "https://rcs.leminai.com/api/send";
+const LEMIN_API_KEY = process.env.LEMIN_API_KEY;
+const LEMIN_USER_ID = process.env.LEMIN_USER_ID || "0x89mqd53ph";
+const LEMIN_TEMPLATE_ID = process.env.LEMIN_TEMPLATE_ID || "1473";
+
 function toFast2SMSPhone(mobile: string): string {
   const clean = mobile.replace(/\D/g, "");
   if (clean.startsWith("91") && clean.length === 12) return clean.slice(2);
@@ -113,6 +118,51 @@ export async function sendWhatsApp(mobile: string, message: string): Promise<boo
     return true;
   } catch (err: any) {
     console.error("[WhatsApp] Error after retries for", mobile, ":", err?.response?.data || err.message);
+    return false;
+  }
+}
+
+export async function sendRCS(
+  mobile: string,
+  customerName: string,
+  messageText: string
+): Promise<boolean> {
+  if (!LEMIN_API_KEY) {
+    console.log("[RCS] LEMIN_API_KEY not set — skipping RCS for:", mobile);
+    return false;
+  }
+  try {
+    const clean = mobile.replace(/\D/g, "");
+    const phone = clean.startsWith("91") ? clean.slice(2) : clean;
+    const payload = {
+      type: "single",
+      dial_code: "+91",
+      template: LEMIN_TEMPLATE_ID,
+      phone,
+      user_id: LEMIN_USER_ID,
+      variables: {
+        name: customerName || "Pilgrim",
+        message: messageText,
+      },
+    };
+    const response = await withRetry(() =>
+      axios.post(LEMIN_API_URL, payload, {
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${LEMIN_API_KEY}`,
+        },
+        timeout: 10000,
+      })
+    );
+    const result = response.data;
+    if (result?.status === false || result?.success === false) {
+      console.warn("[RCS] Send failed for", mobile, ":", result?.message || result?.error);
+      return false;
+    }
+    console.log("[RCS] Sent to", mobile, result);
+    return true;
+  } catch (err: any) {
+    console.error("[RCS] Error after retries for", mobile, ":", err?.response?.data || err.message);
     return false;
   }
 }

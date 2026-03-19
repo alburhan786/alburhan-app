@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { formatDate } from "@/lib/utils";
-import { Send, RefreshCw, Megaphone, Users, Clock, RotateCcw, CheckCircle2, MessageSquare, Smartphone, Bell } from "lucide-react";
+import { Send, RefreshCw, Megaphone, Users, Clock, RotateCcw, CheckCircle2, MessageSquare, Smartphone, Bell, Radio } from "lucide-react";
 
 const BASE_API = import.meta.env.VITE_API_URL || "";
 
@@ -148,7 +148,7 @@ export default function BroadcastManager() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground">Broadcast Messages</h1>
-            <p className="text-sm text-muted-foreground">Send updates to customers via WhatsApp, SMS, and Dashboard</p>
+            <p className="text-sm text-muted-foreground">Send updates via WhatsApp, SMS, RCS, and Dashboard</p>
           </div>
         </div>
 
@@ -208,6 +208,19 @@ export default function BroadcastManager() {
                   required
                 />
                 <p className="text-[11px] text-muted-foreground mt-1">{message.length} characters</p>
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  {["{name}", "{phone}", "{group}", "{bus}", "{hotel}"].map(v => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setMessage(prev => prev + v)}
+                      className="text-[10px] font-mono bg-muted border border-border text-muted-foreground px-1.5 py-0.5 rounded hover:bg-primary/10 hover:border-primary/40 hover:text-primary transition-colors"
+                    >
+                      {v}
+                    </button>
+                  ))}
+                  <span className="text-[10px] text-muted-foreground/60 self-center ml-0.5">— click to insert variable</span>
+                </div>
               </div>
 
               {/* WhatsApp Preview */}
@@ -223,11 +236,12 @@ export default function BroadcastManager() {
               {/* Channel Selection */}
               <div>
                 <Label className="text-xs font-semibold mb-2">Send via</Label>
-                <div className="flex gap-3 flex-wrap">
+                <div className="flex gap-2 flex-wrap">
                   {[
-                    { id: "whatsapp", label: "WhatsApp", icon: MessageSquare, color: "border-green-300 bg-green-50 text-green-700" },
-                    { id: "sms",      label: "SMS",       icon: Smartphone,   color: "border-blue-300 bg-blue-50 text-blue-700" },
-                    { id: "dashboard",label: "Dashboard", icon: Bell,         color: "border-purple-300 bg-purple-50 text-purple-700" },
+                    { id: "whatsapp",  label: "WhatsApp", icon: MessageSquare, color: "border-green-300 bg-green-50 text-green-700" },
+                    { id: "sms",       label: "SMS",      icon: Smartphone,    color: "border-blue-300 bg-blue-50 text-blue-700" },
+                    { id: "rcs",       label: "RCS",      icon: Radio,         color: "border-violet-300 bg-violet-50 text-violet-700" },
+                    { id: "dashboard", label: "Dashboard",icon: Bell,          color: "border-purple-300 bg-purple-50 text-purple-700" },
                   ].map(ch => (
                     <button
                       key={ch.id}
@@ -245,6 +259,9 @@ export default function BroadcastManager() {
                     </button>
                   ))}
                 </div>
+                <p className="text-[11px] text-muted-foreground mt-1.5">
+                  RCS falls back to SMS automatically if delivery fails.
+                </p>
               </div>
 
               <Button
@@ -264,13 +281,13 @@ export default function BroadcastManager() {
           {/* Stats panel */}
           <div className="lg:col-span-2 space-y-4">
             <Card className="p-4 bg-primary text-white">
-              <p className="text-xs font-bold uppercase tracking-widest text-white/60 mb-3">Quick Info</p>
+              <p className="text-xs font-bold uppercase tracking-widest text-white/60 mb-3">Delivery Channels</p>
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
                   <MessageSquare className="w-5 h-5 text-accent shrink-0" />
                   <div>
                     <p className="text-xs font-semibold">WhatsApp</p>
-                    <p className="text-[11px] text-white/60">Via BotBee API — session/template</p>
+                    <p className="text-[11px] text-white/60">Via BotBee API</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -281,10 +298,17 @@ export default function BroadcastManager() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
+                  <Radio className="w-5 h-5 text-accent shrink-0" />
+                  <div>
+                    <p className="text-xs font-semibold">RCS</p>
+                    <p className="text-[11px] text-white/60">Via Lemin AI — falls back to SMS</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
                   <Bell className="w-5 h-5 text-accent shrink-0" />
                   <div>
                     <p className="text-xs font-semibold">Dashboard</p>
-                    <p className="text-[11px] text-white/60">Shows in customer notification panel</p>
+                    <p className="text-[11px] text-white/60">Customer notification panel</p>
                   </div>
                 </div>
               </div>
