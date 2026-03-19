@@ -2036,7 +2036,7 @@ export const useSaveDocument = <
  * @summary Delete a document
  */
 export const getDeleteDocumentUrl = (id: string) => {
-  return `/api/documents/${id}/delete`;
+  return `/api/documents/${id}`;
 };
 
 export const deleteDocument = async (

@@ -1,6 +1,25 @@
 import axios from "axios";
 import nodemailer from "nodemailer";
 
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  attempts = 3,
+  delayMs = 1500
+): Promise<T> {
+  let lastErr: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (i < attempts - 1) {
+        await new Promise((r) => setTimeout(r, delayMs * (i + 1)));
+      }
+    }
+  }
+  throw lastErr;
+}
+
 const FAST2SMS_API_KEY = process.env.FAST2SMS_API_KEY;
 const FAST2SMS_SENDER_ID = "ALBURH";
 const FAST2SMS_OTP_DLT_TEMPLATE_ID = "164844";
@@ -32,11 +51,11 @@ export async function sendOtpSMS(mobile: string, otp: string): Promise<boolean> 
   try {
     const phone = toFast2SMSPhone(mobile);
     const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${FAST2SMS_API_KEY}&route=dlt&sender_id=${FAST2SMS_SENDER_ID}&message=${FAST2SMS_OTP_DLT_TEMPLATE_ID}&variables_values=${otp}|&numbers=${phone}&flash=0`;
-    const response = await axios.get(url);
+    const response = await withRetry(() => axios.get(url), 3, 1000);
     console.log("[OTP-SMS] Sent to", mobile, response.data);
     return true;
   } catch (err: any) {
-    console.error("[OTP-SMS] Error:", err?.response?.data || err.message);
+    console.error("[OTP-SMS] Error after retries:", err?.response?.data || err.message);
     return false;
   }
 }
@@ -55,12 +74,12 @@ export async function sendDLTSMS(
     const phone = toFast2SMSPhone(mobile);
     const variables = encodeURIComponent(`${var1}|${var2}|${var3}|`);
     const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${FAST2SMS_API_KEY}&route=dlt&sender_id=${FAST2SMS_SENDER_ID}&message=${FAST2SMS_NOTIFY_DLT_TEMPLATE_ID}&variables_values=${variables}&numbers=${phone}&flash=0`;
-    const response = await axios.get(url);
+    const response = await withRetry(() => axios.get(url));
     console.log("[SMS-DLT] Sent to", mobile, response.data);
     return true;
   } catch (err: any) {
     const errData = err?.response?.data || err.message;
-    console.error("[SMS-DLT] Error for", mobile, ":", JSON.stringify(errData));
+    console.error("[SMS-DLT] Error after retries for", mobile, ":", JSON.stringify(errData));
     return false;
   }
 }
@@ -72,15 +91,17 @@ export async function sendWhatsApp(mobile: string, message: string): Promise<boo
   }
   try {
     const phone = toBotBeePhone(mobile);
-    const response = await axios.post(
-      `${BOTBEE_BASE_URL}/send`,
-      {
-        apiToken: BOTBEE_API_KEY,
-        phone_number_id: BOTBEE_PHONE_NUMBER_ID,
-        message,
-        phone_number: phone,
-      },
-      { headers: { "Content-Type": "application/json" } }
+    const response = await withRetry(() =>
+      axios.post(
+        `${BOTBEE_BASE_URL}/send`,
+        {
+          apiToken: BOTBEE_API_KEY,
+          phone_number_id: BOTBEE_PHONE_NUMBER_ID,
+          message,
+          phone_number: phone,
+        },
+        { headers: { "Content-Type": "application/json" } }
+      )
     );
     const result = response.data;
     if (result?.status === "0" || result?.status === 0) {
@@ -90,7 +111,7 @@ export async function sendWhatsApp(mobile: string, message: string): Promise<boo
     console.log("[WhatsApp] Session msg sent to", mobile, result);
     return true;
   } catch (err: any) {
-    console.error("[WhatsApp] Error for", mobile, ":", err?.response?.data || err.message);
+    console.error("[WhatsApp] Error after retries for", mobile, ":", err?.response?.data || err.message);
     return false;
   }
 }
@@ -119,15 +140,17 @@ export async function sendWhatsAppTemplate(
     if (BOTBEE_BUSINESS_ID) {
       payload.business_account_id = BOTBEE_BUSINESS_ID;
     }
-    const response = await axios.post(
-      `${BOTBEE_BASE_URL}/send-template`,
-      payload,
-      { headers: { "Content-Type": "application/json" } }
+    const response = await withRetry(() =>
+      axios.post(
+        `${BOTBEE_BASE_URL}/send-template`,
+        payload,
+        { headers: { "Content-Type": "application/json" } }
+      )
     );
     console.log("[WhatsApp-Template] Sent", templateName, "to", mobile, response.data);
     return true;
   } catch (err: any) {
-    console.error("[WhatsApp-Template] Error for", mobile, ":", err?.response?.data || err.message);
+    console.error("[WhatsApp-Template] Error after retries for", mobile, ":", err?.response?.data || err.message);
     return false;
   }
 }
@@ -162,17 +185,19 @@ export async function sendEmail(to: string, subject: string, body: string): Prom
   }
   try {
     const from = process.env.SMTP_USER || "info@alburhantravels.com";
-    await transport.sendMail({
-      from: `Al Burhan Tours & Travels <${from}>`,
-      to,
-      subject,
-      text: body,
-      html: body.replace(/\n/g, "<br>"),
-    });
+    await withRetry(() =>
+      transport!.sendMail({
+        from: `Al Burhan Tours & Travels <${from}>`,
+        to,
+        subject,
+        text: body,
+        html: body.replace(/\n/g, "<br>"),
+      })
+    );
     console.log("[Email] Sent to:", to, "Subject:", subject);
     return true;
   } catch (err: any) {
-    console.error("[Email] Error sending to", to, ":", err?.message);
+    console.error("[Email] Error after retries to", to, ":", err?.message);
     return false;
   }
 }

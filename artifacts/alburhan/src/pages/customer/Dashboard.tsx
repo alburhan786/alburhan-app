@@ -214,13 +214,28 @@ function UploadModal({ bookingId, bookingNumber, onClose }: { bookingId: string;
               )}
             </div>
 
-            <Button
-              className="w-full bg-primary text-white"
-              disabled={!file || uploading}
-              onClick={handleUpload}
-            >
-              {uploading ? "Uploading..." : "Upload Document"}
-            </Button>
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={onClose}
+                disabled={uploading}
+              >
+                ← Back
+              </Button>
+              <Button
+                className="flex-1 bg-primary text-white"
+                disabled={!file || uploading}
+                onClick={handleUpload}
+              >
+                {uploading ? (
+                  <span className="flex items-center gap-2">
+                    <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                    Uploading…
+                  </span>
+                ) : "Upload Document"}
+              </Button>
+            </div>
           </div>
 
           {/* Existing documents */}
@@ -353,6 +368,18 @@ export default function CustomerDashboard() {
           bookingNumber={(uploadBooking as any).bookingNumber}
           onClose={() => setUploadBookingId(null)}
         />
+      )}
+
+      {isInitializing && (
+        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center gap-5 max-w-xs w-full mx-4">
+            <div className="w-16 h-16 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+            <div className="text-center">
+              <p className="font-bold text-lg text-primary">Preparing Payment</p>
+              <p className="text-sm text-muted-foreground mt-1">Please wait while we connect to the payment gateway…</p>
+            </div>
+          </div>
+        </div>
       )}
 
       <div className="bg-primary pt-12 pb-24 relative overflow-hidden">

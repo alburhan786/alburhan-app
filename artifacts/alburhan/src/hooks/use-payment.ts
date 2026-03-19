@@ -259,9 +259,17 @@ export function usePayment() {
         console.error("[Payment] payment.failed:", response.error);
         stopPolling();
         paymentHandledRef.current = true;
+        const errDesc = response?.error?.description;
+        const errReason = response?.error?.reason;
+        const description =
+          typeof errDesc === "string" && errDesc
+            ? errDesc
+            : typeof errReason === "string" && errReason
+            ? errReason
+            : "Payment could not be processed. Please try again or use a different payment method.";
         toast({
           title: "Payment Failed",
-          description: response.error.description,
+          description,
           variant: "destructive",
         });
       });

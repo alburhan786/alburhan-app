@@ -1,0 +1,223 @@
+Build a complete end-to-end Hajj & Umrah booking system for:
+
+AL BURHAN TOURS & TRAVELS
+
+-----------------------------------------------------
+
+1️⃣ CUSTOMER LOGIN SYSTEM
+
+• Login via OTP (SMS + WhatsApp)
+• Fields:
+  - Name
+  - Mobile
+  - Email
+
+• After login → redirect to dashboard
+
+-----------------------------------------------------
+
+2️⃣ PACKAGE SELECTION
+
+Customer can:
+
+• View Packages:
+  - Hajj
+  - Umrah
+  - Ziyarat (Iraq, Baitul Muqaddas, Syria, Jordan)
+
+• Click "Book Now"
+
+-----------------------------------------------------
+
+3️⃣ BOOKING REQUEST SYSTEM
+
+Customer submits request:
+
+Required fields:
+
+• Name
+• Mobile
+• Passport Number
+• Date of Birth
+• Passport Issue Date
+• Passport Expiry Date
+• Place of Issue
+
+👉 Save as: PENDING
+
+-----------------------------------------------------
+
+4️⃣ ADMIN DASHBOARD
+
+Admin can:
+
+• View booking requests
+• Approve / Reject
+
+When approved:
+
+• Status = APPROVED
+• Enable payment for customer
+
+-----------------------------------------------------
+
+5️⃣ PAYMENT SYSTEM (RAZORPAY)
+
+Customer clicks PAY NOW
+
+After payment success:
+
+• Verify payment
+• Update status = PAID
+
+-----------------------------------------------------
+
+6️⃣ AUTO CONFIRMATION SYSTEM
+
+After payment:
+
+Automatically send:
+
+A) WhatsApp (BotBee API)
+B) SMS (Fast2SMS)
+C) Email
+
+Message:
+
+"Dear {Name},
+Your booking is confirmed.
+
+Invoice: {link}
+
+Thanks - Al Burhan Tours & Travels"
+
+-----------------------------------------------------
+
+7️⃣ INVOICE SYSTEM
+
+• Generate PDF invoice
+• Store in server
+• Create public link
+
+Example:
+https://alburhantravels.com/invoice/INV123
+
+-----------------------------------------------------
+
+8️⃣ DOCUMENT UPLOAD SYSTEM
+
+Customer uploads:
+
+• Passport
+• Photo
+• Visa
+• Other Documents
+
+After upload:
+
+• Save in database
+• Show in admin dashboard
+• Send confirmation message
+
+-----------------------------------------------------
+
+9️⃣ CUSTOMER DASHBOARD
+
+Show:
+
+✔ Booking Status
+✔ Payment Status
+✔ Invoice Download
+✔ Uploaded Documents
+✔ Ticket Details
+✔ Visa Copy
+✔ Hotel Details
+✔ Bus Details
+
+-----------------------------------------------------
+
+🔟 TOUR DOCUMENT MANAGEMENT
+
+Admin uploads:
+
+• Flight Ticket
+• Visa
+• Hotel Details
+• Travel Itinerary
+
+Auto show in customer dashboard
+
+-----------------------------------------------------
+
+1️⃣1️⃣ NOTIFICATION SYSTEM
+
+Trigger notifications for:
+
+• Booking request
+• Approval
+• Payment success
+• Document upload
+• Ticket ready
+
+Send via:
+
+• WhatsApp
+• SMS
+• Email
+
+-----------------------------------------------------
+
+1️⃣2️⃣ WHATSAPP INTEGRATION (BOTBEE)
+
+Use API:
+
+https://app.botbee.io/api/v1/whatsapp/send
+
+Send:
+
+• Booking confirmation
+• Invoice link
+• Payment reminder
+• Document confirmation
+
+-----------------------------------------------------
+
+1️⃣3️⃣ SMS INTEGRATION (FAST2SMS)
+
+Send:
+
+• OTP
+• Booking confirmation
+• Payment success
+
+-----------------------------------------------------
+
+1️⃣4️⃣ ADMIN FEATURES
+
+• Manage bookings
+• Manage customers
+• Upload documents
+• Generate invoices
+• View payments
+• Send notifications
+
+-----------------------------------------------------
+
+1️⃣5️⃣ STATUS FLOW
+
+PENDING → APPROVED → PAID → DOCUMENT SUBMITTED → COMPLETED
+
+-----------------------------------------------------
+
+1️⃣6️⃣ FINAL RESULT
+
+System must:
+
+✔ Handle full booking lifecycle
+✔ Auto send invoice
+✔ Auto send WhatsApp + SMS
+✔ Show all documents in dashboard
+✔ Work smoothly without errors
+✔ Be mobile-friendly and fast
+
+for AL BURHAN TOURS & TRAVELS
