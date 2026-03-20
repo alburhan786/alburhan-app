@@ -75,15 +75,16 @@ async function sendOtpSmsFast2SMS(phone: string, otpCode: string): Promise<boole
   }
 }
 
-async function sendBookingDltSms(phone: string, _invoiceNum?: string, _invoiceUrl?: string): Promise<boolean> {
+async function sendBookingDltSms(phone: string, name: string, packageName: string, amount: string, invoiceUrl: string): Promise<boolean> {
   const apiKey = process.env.FAST2SMS_API_KEY;
   if (!apiKey) {
     console.log("[Fast2SMS DLT] API key not configured, skipping booking SMS");
     return false;
   }
   try {
-    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=dlt&sender_id=ALBUR&message=211277&variables_values=&flash=0&numbers=${phone}`;
-    console.log(`[Fast2SMS DLT Booking] Sending to ${phone} | template=211277 sender=ALBUR no-variables`);
+    const variables = `${name}|${packageName}|${amount}|${invoiceUrl}|`;
+    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=dlt&sender_id=ALBURH&message=211763&variables_values=${encodeURIComponent(variables)}&flash=0&numbers=${phone}`;
+    console.log(`[Fast2SMS DLT Booking] Sending to ${phone} | variables="${variables}"`);
     const response = await fetch(url, { method: "GET" });
     const data = await response.json();
     console.log("[Fast2SMS DLT Booking] Response:", JSON.stringify(data));
@@ -979,7 +980,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         break;
     }
 
-    const smsResult = await sendBookingDltSms(user.phone, invoiceNum, invoiceUrl);
+    const smsResult = await sendBookingDltSms(user.phone, customerName, packageName, amountPaid, invoiceUrl);
     console.log(`[SMS DLT] To ${user.phone}: ${smsResult ? "sent" : "failed"}`);
 
     const whatsappResult = await sendWhatsAppConfirmationTemplate(
@@ -1255,7 +1256,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const message = `Assalamu Alaikum\n\nDear *${contactName}*\n\nYour booking with *Al Burhan Tours & Travels* has been confirmed.\n\nPackage: ${offlinePackageName}\nAmount Paid: ₹${formatINR(parseFloat(paidAmount || "0"))}\n\nYour invoice is attached below.\n${invoiceUrl}\n\nFor assistance please contact:\n9893225590\n9893989786\n\n*Al Burhan Tours & Travels*`;
 
       if (sendSms) {
-        const smsOk = await sendBookingDltSms(contactPhone, actualInvoiceNum, invoiceUrl);
+        const smsOk = await sendBookingDltSms(contactPhone, contactName, offlinePackageName, formatINR(parseFloat(paidAmount || "0")), invoiceUrl);
         console.log(`[SMS DLT Offline] To ${contactPhone}: ${smsOk ? "sent" : "failed"}`);
         notificationStatus += smsOk ? "SMS sent. " : "SMS failed. ";
       }
