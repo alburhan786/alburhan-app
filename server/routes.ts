@@ -944,16 +944,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  function getInvoiceBaseUrl(): string {
+    // Custom override — set INVOICE_BASE_URL env var to a short domain
+    if (process.env.INVOICE_BASE_URL) {
+      return process.env.INVOICE_BASE_URL.replace(/\/$/, "");
+    }
+    // Production deployed domain (short — e.g. myapp.replit.app)
+    if (process.env.REPLIT_DOMAINS) {
+      const first = process.env.REPLIT_DOMAINS.split(",")[0].trim();
+      return `https://${first}`;
+    }
+    // Dev domain fallback
+    if (process.env.REPLIT_DEV_DOMAIN) {
+      return `https://${process.env.REPLIT_DEV_DOMAIN}`;
+    }
+    return "http://localhost:5000";
+  }
+
   async function sendNotifications(userId: number, bookingId: number, type: string) {
     const [user] = await db.select().from(users).where(eq(users.id, userId));
     if (!user) return;
 
-    const domain = process.env.REPLIT_DEV_DOMAIN || process.env.REPL_SLUG + "." + process.env.REPL_OWNER + ".repl.co";
-    const invoiceUrl = `https://${domain}/invoice/${bookingId}`;
+    const invoiceUrl = `${getInvoiceBaseUrl()}/invoice/${bookingId}`;
 
     let invoiceNum = "";
     let packageName = "Hajj/Umrah Package";
     let amountPaid = "0";
+    let totalAmount = "0";
     let customerName = user.name;
 
     try {
@@ -964,11 +981,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await db.update(bookings).set({ invoiceNumber: invoiceNum }).where(eq(bookings.id, bookingId));
         }
         amountPaid = formatINR(parseFloat(bk.paidAmount || "0"));
+        totalAmount = formatINR(parseFloat(bk.totalAmount || "0"));
         customerName = bk.contactName || user.name;
         const [pkg] = await db.select().from(packages).where(eq(packages.id, bk.packageId));
         if (pkg) packageName = pkg.name;
       }
     } catch (e) {}
+
+    // For booking_created the paidAmount is 0; show totalAmount instead
+    const smsAmount = type === "booking_created" ? totalAmount : amountPaid;
 
     let message = "";
     switch (type) {
@@ -980,11 +1001,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         break;
     }
 
-    const smsResult = await sendBookingDltSms(user.phone, customerName, packageName, amountPaid, invoiceUrl);
-    console.log(`[SMS DLT] To ${user.phone}: ${smsResult ? "sent" : "failed"}`);
+    const smsResult = await sendBookingDltSms(user.phone, customerName, packageName, smsAmount, invoiceUrl);
+    console.log(`[SMS DLT] To ${user.phone}: ${smsResult ? "sent" : "failed"} | amount=${smsAmount} | url=${invoiceUrl}`);
 
     const whatsappResult = await sendWhatsAppConfirmationTemplate(
-      user.phone, customerName, packageName, `INR ${amountPaid}`, invoiceUrl
+      user.phone, customerName, packageName, `INR ${smsAmount}`, invoiceUrl
     );
     console.log(`[WhatsApp Confirmation Template] To ${user.phone}: ${whatsappResult ? "sent" : "failed"}`);
 
@@ -1240,8 +1261,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const domain = process.env.REPLIT_DEV_DOMAIN || "localhost:5000";
-      const invoiceUrl = `https://${domain}/invoice/${booking.id}`;
+      const invoiceUrl = `${getInvoiceBaseUrl()}/invoice/${booking.id}`;
       const totalAmt = parseFloat(totalAmount);
       const tcsAmount = totalAmt * 0.05;
       const grandTotal = totalAmt + tcsAmount;
