@@ -511,6 +511,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Short redirect for SMS — /i/33 → /invoice/33 (saves chars in DLT variable)
+  app.get("/i/:bookingId", (req, res) => {
+    res.redirect(301, `/invoice/${req.params.bookingId}`);
+  });
+
   app.get("/invoice/:bookingId", async (req, res) => {
     try {
       const bookingId = parseInt(req.params.bookingId);
