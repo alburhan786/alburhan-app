@@ -956,8 +956,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     // Production deployed domain (short — e.g. myapp.replit.app)
     if (process.env.REPLIT_DOMAINS) {
-      const first = process.env.REPLIT_DOMAINS.split(",")[0].trim();
-      return `https://${first}`;
+      const domains = process.env.REPLIT_DOMAINS.split(",").map(d => d.trim());
+      // Prefer shortest domain
+      const shortest = domains.sort((a, b) => a.length - b.length)[0];
+      return `https://${shortest}`;
     }
     // Dev domain fallback
     if (process.env.REPLIT_DEV_DOMAIN) {
@@ -966,11 +968,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return "http://localhost:5000";
   }
 
+  // Log the invoice base URL on startup so we can confirm what's being used
+  const _invoiceBase = getInvoiceBaseUrl();
+  console.log(`[Invoice URL] Base: ${_invoiceBase} | SMS will use: ${_invoiceBase}/i/{id}`);
+
   async function sendNotifications(userId: number, bookingId: number, type: string) {
     const [user] = await db.select().from(users).where(eq(users.id, userId));
     if (!user) return;
 
     const invoiceUrl = `${getInvoiceBaseUrl()}/invoice/${bookingId}`;
+    const smsInvoiceUrl = `${getInvoiceBaseUrl()}/i/${bookingId}`;
 
     let invoiceNum = "";
     let packageName = "Hajj/Umrah Package";
@@ -1006,8 +1013,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         break;
     }
 
-    const smsResult = await sendBookingDltSms(user.phone, customerName, packageName, smsAmount, invoiceUrl);
-    console.log(`[SMS DLT] To ${user.phone}: ${smsResult ? "sent" : "failed"} | amount=${smsAmount} | url=${invoiceUrl}`);
+    const smsResult = await sendBookingDltSms(user.phone, customerName, packageName, smsAmount, smsInvoiceUrl);
+    console.log(`[SMS DLT] To ${user.phone}: ${smsResult ? "sent" : "failed"} | amount=${smsAmount} | url=${smsInvoiceUrl} (${smsInvoiceUrl.length} chars)`);
 
     const whatsappResult = await sendWhatsAppConfirmationTemplate(
       user.phone, customerName, packageName, `INR ${smsAmount}`, invoiceUrl
@@ -1267,6 +1274,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const invoiceUrl = `${getInvoiceBaseUrl()}/invoice/${booking.id}`;
+      const smsInvoiceUrl = `${getInvoiceBaseUrl()}/i/${booking.id}`;
       const totalAmt = parseFloat(totalAmount);
       const tcsAmount = totalAmt * 0.05;
       const grandTotal = totalAmt + tcsAmount;
@@ -1281,7 +1289,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const message = `Assalamu Alaikum\n\nDear *${contactName}*\n\nYour booking with *Al Burhan Tours & Travels* has been confirmed.\n\nPackage: ${offlinePackageName}\nAmount Paid: ₹${formatINR(parseFloat(paidAmount || "0"))}\n\nYour invoice is attached below.\n${invoiceUrl}\n\nFor assistance please contact:\n9893225590\n9893989786\n\n*Al Burhan Tours & Travels*`;
 
       if (sendSms) {
-        const smsOk = await sendBookingDltSms(contactPhone, contactName, offlinePackageName, formatINR(parseFloat(paidAmount || "0")), invoiceUrl);
+        const smsOk = await sendBookingDltSms(contactPhone, contactName, offlinePackageName, formatINR(parseFloat(paidAmount || "0")), smsInvoiceUrl);
         console.log(`[SMS DLT Offline] To ${contactPhone}: ${smsOk ? "sent" : "failed"}`);
         notificationStatus += smsOk ? "SMS sent. " : "SMS failed. ";
       }
