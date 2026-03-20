@@ -3,8 +3,8 @@ run = "npm start"
 modules = ["nodejs-20", "postgresql-16"]
 
   [deployment]
-  run = ["npm", "start"]
-  deploymentTarget = "cloudrun"
+run = ["npm", "start"]
+deploymentTarget = "autoscale"
 
 [[ports]]
 localPort = 5000
