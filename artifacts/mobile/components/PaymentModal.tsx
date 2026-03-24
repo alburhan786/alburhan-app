@@ -49,7 +49,13 @@ if (Platform.OS !== "web") {
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const mod = require("react-native-razorpay") as { default: { open: (opts: RazorpayOptions) => Promise<RazorpaySuccess> } };
-    RazorpayCheckout = mod.default ?? (mod as unknown as { open: (opts: RazorpayOptions) => Promise<RazorpaySuccess> });
+    const candidate = mod.default ?? (mod as unknown as { open: (opts: RazorpayOptions) => Promise<RazorpaySuccess> });
+    if (candidate && typeof candidate.open === "function") {
+      const { NativeModules } = require("react-native") as { NativeModules: Record<string, unknown> };
+      if (NativeModules.RNRazorpayCheckout) {
+        RazorpayCheckout = candidate;
+      }
+    }
   } catch {
     RazorpayCheckout = null;
   }

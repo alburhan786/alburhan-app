@@ -1,8 +1,9 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  AppState,
   Platform,
   Pressable,
   RefreshControl,
@@ -99,10 +100,27 @@ export default function NotificationsScreen() {
     } catch {}
   }, [baseUrl]);
 
+  const appState = useRef(AppState.currentState);
   useEffect(() => {
     fetchNotifications().finally(() => setLoading(false));
-    const interval = setInterval(fetchNotifications, 30_000);
-    return () => clearInterval(interval);
+
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (appState.current.match(/inactive|background/) && nextState === "active") {
+        fetchNotifications().catch(() => {});
+      }
+      appState.current = nextState;
+    });
+
+    const interval = setInterval(() => {
+      if (appState.current === "active") {
+        fetchNotifications().catch(() => {});
+      }
+    }, 30_000);
+
+    return () => {
+      subscription.remove();
+      clearInterval(interval);
+    };
   }, [fetchNotifications]);
 
   const handleMarkRead = useCallback(async (id: string) => {
