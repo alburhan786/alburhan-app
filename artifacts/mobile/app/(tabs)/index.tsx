@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { COLORS } from "@/constants/colors";
 import { useAuth } from "@/contexts/auth";
-import { PaymentModal, PaymentResult } from "@/components/PaymentModal";
+import { PaymentModal, PaymentResult, RazorpayOptions } from "@/components/PaymentModal";
 import { useListBookings } from "@workspace/api-client-react";
 
 interface Booking {
@@ -136,7 +136,11 @@ export default function HomeScreen() {
   const { data, isLoading, refetch } = useListBookings();
   const [refreshing, setRefreshing] = useState(false);
   const [payingId, setPayingId] = useState<string | null>(null);
-  const [paymentModal, setPaymentModal] = useState<{ url: string; bookingNumber: string } | null>(null);
+  const [paymentModal, setPaymentModal] = useState<{
+    url: string;
+    bookingNumber: string;
+    razorpayOptions: RazorpayOptions;
+  } | null>(null);
 
   type BookingListData = { bookings: Booking[] };
   const bookings: Booking[] = (data as BookingListData | undefined)?.bookings ?? [];
@@ -161,17 +165,34 @@ export default function HomeScreen() {
       const order: OrderResponse = await res.json();
       if (!res.ok) throw new Error(order.message || "Failed to create order");
 
+      const mobile = user?.mobile ?? "";
       const params = new URLSearchParams({
         orderId: order.orderId,
         bookingId: booking.id,
         amount: String(order.amount),
         name: booking.customerName,
-        mobile: user?.mobile ?? "",
+        mobile,
         bookingNumber: booking.bookingNumber,
       });
 
       const checkoutUrl = `${baseUrl}/api/payments/checkout-page?${params.toString()}`;
-      setPaymentModal({ url: checkoutUrl, bookingNumber: booking.bookingNumber });
+
+      const rzpKeyRes = await fetch(`${baseUrl}/api/payments/razorpay-key`, { credentials: "include" });
+      type KeyResp = { keyId: string };
+      const rzpKeyData: KeyResp = rzpKeyRes.ok ? await rzpKeyRes.json() : { keyId: "" };
+
+      const razorpayOptions: RazorpayOptions = {
+        key: rzpKeyData.keyId,
+        amount: order.amount,
+        currency: "INR",
+        name: "Al Burhan Tours & Travels",
+        description: `Booking #${booking.bookingNumber}`,
+        order_id: order.orderId,
+        prefill: { name: booking.customerName, contact: `+91${mobile}` },
+        theme: { color: "#0B3D2E" },
+      };
+
+      setPaymentModal({ url: checkoutUrl, bookingNumber: booking.bookingNumber, razorpayOptions });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Could not initiate payment. Please try again.";
       Alert.alert("Payment Error", msg);
@@ -314,6 +335,7 @@ export default function HomeScreen() {
       <PaymentModal
         visible={!!paymentModal}
         checkoutUrl={paymentModal.url}
+        razorpayOptions={paymentModal.razorpayOptions}
         bookingNumber={paymentModal.bookingNumber}
         onResult={(result: PaymentResult) => {
           setPaymentModal(null);

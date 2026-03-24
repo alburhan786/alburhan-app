@@ -490,6 +490,11 @@ router.post("/webhook", async (req: any, res) => {
   }
 });
 
+router.get("/razorpay-key", (req, res) => {
+  const keyId = process.env.RAZORPAY_KEY_ID ?? "";
+  res.json({ keyId });
+});
+
 function escHtml(str: string): string {
   return String(str)
     .replace(/&/g, "&amp;")

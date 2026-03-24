@@ -57,6 +57,7 @@
   },
   "dependencies": {
     "expo-document-picker": "^55.0.9",
+    "react-native-razorpay": "^2.3.1",
     "react-native-webview": "^13.16.1"
   }
 }

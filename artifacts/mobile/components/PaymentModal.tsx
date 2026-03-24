@@ -1,7 +1,8 @@
 import { Feather } from "@expo/vector-icons";
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Modal,
   Platform,
   Pressable,
@@ -9,43 +10,80 @@ import {
   Text,
   View,
 } from "react-native";
-import { WebView } from "react-native-webview";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { COLORS } from "@/constants/colors";
 
 export type PaymentResult = "success" | "failure" | "dismissed";
 
+export interface RazorpayOptions {
+  key: string;
+  amount: number;
+  currency: string;
+  name: string;
+  description: string;
+  order_id: string;
+  prefill: {
+    name: string;
+    contact: string;
+  };
+  theme: { color: string };
+}
+
 interface PaymentModalProps {
   visible: boolean;
   checkoutUrl: string;
-  onResult: (result: PaymentResult) => void;
+  razorpayOptions: RazorpayOptions;
+  onResult: (result: PaymentResult, paymentId?: string) => void;
   bookingNumber: string;
 }
 
-export function PaymentModal({ visible, checkoutUrl, onResult, bookingNumber }: PaymentModalProps) {
+type RazorpaySuccess = { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string };
+type RazorpayError = { code: number; description: string };
+
+let RazorpayCheckout: { open: (opts: RazorpayOptions) => Promise<RazorpaySuccess> } | null = null;
+
+if (Platform.OS !== "web") {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const mod = require("react-native-razorpay") as { default: { open: (opts: RazorpayOptions) => Promise<RazorpaySuccess> } };
+    RazorpayCheckout = mod.default ?? (mod as unknown as { open: (opts: RazorpayOptions) => Promise<RazorpaySuccess> });
+  } catch {
+    RazorpayCheckout = null;
+  }
+}
+
+function WebFallbackModal({
+  visible,
+  checkoutUrl,
+  bookingNumber,
+  onResult,
+}: {
+  visible: boolean;
+  checkoutUrl: string;
+  bookingNumber: string;
+  onResult: (result: PaymentResult) => void;
+}) {
   const insets = useSafeAreaInsets();
-  const webViewRef = useRef<WebView>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const webViewRef = useRef<import("react-native-webview").WebView>(null);
+
+  const [WebView, setWebView] = useState<typeof import("react-native-webview").WebView | null>(null);
+
+  useEffect(() => {
+    import("react-native-webview").then((mod) => {
+      setWebView(() => mod.WebView as typeof import("react-native-webview").WebView);
+    }).catch(() => {});
+  }, []);
 
   const handleMessage = useCallback((event: { nativeEvent: { data: string } }) => {
     try {
-      const data = JSON.parse(event.nativeEvent.data) as { type: string; status?: string };
-      if (data.type === "payment_success") {
-        onResult("success");
-      } else if (data.type === "payment_failure") {
-        onResult("failure");
-      } else if (data.type === "payment_dismissed") {
-        onResult("dismissed");
-      }
+      const data = JSON.parse(event.nativeEvent.data) as { type: string };
+      if (data.type === "payment_success") onResult("success");
+      else if (data.type === "payment_failure") onResult("failure");
+      else if (data.type === "payment_dismissed") onResult("dismissed");
     } catch {
-    }
-  }, [onResult]);
-
-  const handleNavigationStateChange = useCallback((state: { url: string }) => {
-    if (state.url.startsWith("alburhan://")) {
-      onResult("success");
     }
   }, [onResult]);
 
@@ -61,19 +99,16 @@ export function PaymentModal({ visible, checkoutUrl, onResult, bookingNumber }: 
             <Feather name="x" size={22} color={COLORS.text} />
           </Pressable>
         </View>
-
         <View style={styles.secureBar}>
           <Feather name="lock" size={12} color={COLORS.success} />
           <Text style={styles.secureText}>256-bit SSL • Powered by Razorpay</Text>
         </View>
-
         {loading && !loadError && (
           <View style={styles.loadingOverlay}>
             <ActivityIndicator size="large" color={COLORS.darkGreen} />
             <Text style={styles.loadingText}>Loading payment gateway…</Text>
           </View>
         )}
-
         {loadError ? (
           <View style={styles.errorBox}>
             <Feather name="wifi-off" size={40} color={COLORS.border} />
@@ -86,7 +121,7 @@ export function PaymentModal({ visible, checkoutUrl, onResult, bookingNumber }: 
               <Text style={styles.retryBtnText}>Retry</Text>
             </Pressable>
           </View>
-        ) : (
+        ) : WebView ? (
           <WebView
             ref={webViewRef}
             source={{ uri: checkoutUrl }}
@@ -95,17 +130,69 @@ export function PaymentModal({ visible, checkoutUrl, onResult, bookingNumber }: 
             onLoadEnd={() => setLoading(false)}
             onError={() => { setLoading(false); setLoadError(true); }}
             onMessage={handleMessage}
-            onNavigationStateChange={handleNavigationStateChange}
             javaScriptEnabled
             domStorageEnabled
-            thirdPartyCookiesEnabled
             originWhitelist={["https://*", "alburhan://*"]}
             userAgent="AlBurhanApp/1.0 Mobile RazorpayCheckout"
           />
+        ) : (
+          <View style={styles.loadingOverlay}>
+            <ActivityIndicator size="large" color={COLORS.darkGreen} />
+          </View>
         )}
       </View>
     </Modal>
   );
+}
+
+export function PaymentModal({
+  visible,
+  checkoutUrl,
+  razorpayOptions,
+  onResult,
+  bookingNumber,
+}: PaymentModalProps) {
+  const [launched, setLaunched] = useState(false);
+
+  useEffect(() => {
+    if (!visible || launched) return;
+    if (Platform.OS === "web" || !RazorpayCheckout) return;
+
+    setLaunched(true);
+
+    RazorpayCheckout.open(razorpayOptions)
+      .then((data: RazorpaySuccess) => {
+        onResult("success", data.razorpay_payment_id);
+      })
+      .catch((error: RazorpayError) => {
+        if (error.code === 0) {
+          onResult("dismissed");
+        } else {
+          Alert.alert(
+            "Payment Failed",
+            error.description || "The payment could not be processed. Please try again.",
+            [{ text: "OK", onPress: () => onResult("failure") }],
+          );
+        }
+      });
+  }, [visible, launched, razorpayOptions, onResult]);
+
+  useEffect(() => {
+    if (!visible) setLaunched(false);
+  }, [visible]);
+
+  if (Platform.OS === "web" || !RazorpayCheckout) {
+    return (
+      <WebFallbackModal
+        visible={visible}
+        checkoutUrl={checkoutUrl}
+        bookingNumber={bookingNumber}
+        onResult={onResult}
+      />
+    );
+  }
+
+  return null;
 }
 
 const styles = StyleSheet.create({
@@ -134,9 +221,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     color: COLORS.textMuted,
   },
-  closeBtn: {
-    padding: 4,
-  },
+  closeBtn: { padding: 4 },
   secureBar: {
     flexDirection: "row",
     alignItems: "center",
@@ -199,4 +284,5 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     color: "#fff",
   },
+  border: { borderColor: COLORS.border },
 });
