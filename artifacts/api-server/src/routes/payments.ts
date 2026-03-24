@@ -490,4 +490,208 @@ router.post("/webhook", async (req: any, res) => {
   }
 });
 
+router.get("/checkout-page", async (req, res) => {
+  const { orderId, bookingId, amount, name, mobile, bookingNumber } = req.query as Record<string, string>;
+  const keyId = process.env.RAZORPAY_KEY_ID ?? "";
+  const amountNum = Number(amount ?? 0);
+  const amountInRupees = (amountNum / 100).toLocaleString("en-IN");
+
+  res.setHeader("Content-Type", "text/html");
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>Payment — Al Burhan Tours</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #F7F5F0; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+  .card { background: #fff; border-radius: 20px; padding: 28px 24px; max-width: 420px; width: 100%; box-shadow: 0 8px 32px rgba(0,0,0,0.12); }
+  .logo { text-align: center; margin-bottom: 20px; }
+  .logo-main { font-size: 22px; font-weight: 800; color: #0B3D2E; letter-spacing: 2px; }
+  .logo-sub { font-size: 11px; color: #C9A23F; letter-spacing: 3px; font-weight: 600; margin-top: 2px; }
+  .booking-info { background: #F0EDE6; border-radius: 12px; padding: 14px 16px; margin-bottom: 20px; }
+  .booking-label { font-size: 11px; color: #9A9A9A; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
+  .booking-num { font-size: 14px; font-weight: 700; color: #0B3D2E; }
+  .amount-box { text-align: center; margin-bottom: 24px; }
+  .amount-label { font-size: 13px; color: #5A5A5A; margin-bottom: 6px; }
+  .amount { font-size: 36px; font-weight: 800; color: #0B3D2E; }
+  .amount-note { font-size: 11px; color: #9A9A9A; margin-top: 4px; }
+  .pay-btn { background: #0B3D2E; color: #fff; border: none; border-radius: 14px; width: 100%; padding: 17px; font-size: 17px; font-weight: 700; cursor: pointer; letter-spacing: 0.3px; transition: opacity 0.2s; }
+  .pay-btn:hover { opacity: 0.9; }
+  .pay-btn:disabled { background: #B0C8C0; cursor: not-allowed; }
+  .status { display: none; text-align: center; padding: 20px; }
+  .status.success { display: block; }
+  .status.failure { display: block; }
+  .status-icon { font-size: 48px; margin-bottom: 12px; }
+  .status-title { font-size: 20px; font-weight: 700; color: #0B3D2E; margin-bottom: 8px; }
+  .status-msg { font-size: 14px; color: #5A5A5A; line-height: 1.5; }
+  .close-btn { background: #0B3D2E; color: #fff; border: none; border-radius: 12px; padding: 14px 32px; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 20px; }
+  .secure-note { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 14px; font-size: 11px; color: #9A9A9A; }
+  .loading { display: none; text-align: center; padding: 12px; color: #5A5A5A; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <div style="font-size:24px;color:#C9A23F;font-weight:800;">البرہان</div>
+    <div class="logo-main">AL BURHAN</div>
+    <div class="logo-sub">TOURS & TRAVELS</div>
+  </div>
+
+  <div id="payment-form">
+    <div class="booking-info">
+      <div class="booking-label">Booking Reference</div>
+      <div class="booking-num">#${bookingNumber || "—"}</div>
+      <div style="font-size:12px;color:#5A5A5A;margin-top:4px;">${name || ""}</div>
+    </div>
+    <div class="amount-box">
+      <div class="amount-label">Amount to Pay</div>
+      <div class="amount">₹${amountInRupees}</div>
+      <div class="amount-note">Including all taxes and fees</div>
+    </div>
+    <button class="pay-btn" id="payBtn" onclick="openRazorpay()">Pay ₹${amountInRupees} Securely</button>
+    <div class="loading" id="loading">Processing payment…</div>
+    <div class="secure-note">
+      <svg width="12" height="14" viewBox="0 0 12 14" fill="none"><path d="M6 1L1 3v4c0 2.76 2.24 5 5 5s5-2.24 5-5V3L6 1z" fill="#9A9A9A"/></svg>
+      Secured by Razorpay • 256-bit SSL
+    </div>
+  </div>
+
+  <div class="status success" id="success">
+    <div class="status-icon">✅</div>
+    <div class="status-title">Payment Successful!</div>
+    <div class="status-msg">Your payment has been received.<br/>Your booking is being confirmed.<br/><br/>Jazak Allah Khair!</div>
+    <button class="close-btn" onclick="window.close()">Return to App</button>
+  </div>
+
+  <div class="status failure" id="failure">
+    <div class="status-icon">❌</div>
+    <div class="status-title">Payment Failed</div>
+    <div class="status-msg" id="failureMsg">The payment could not be processed. Please try again.</div>
+    <button class="close-btn" onclick="window.close()">Go Back</button>
+  </div>
+</div>
+
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script>
+function openRazorpay() {
+  document.getElementById('payBtn').disabled = true;
+  document.getElementById('loading').style.display = 'block';
+
+  var options = {
+    key: '${keyId}',
+    amount: '${amountNum}',
+    currency: 'INR',
+    name: 'Al Burhan Tours & Travels',
+    description: 'Booking #${bookingNumber}',
+    order_id: '${orderId}',
+    prefill: { name: '${name}', contact: '+91${mobile}' },
+    theme: { color: '#0B3D2E' },
+    modal: {
+      ondismiss: function() {
+        document.getElementById('payBtn').disabled = false;
+        document.getElementById('loading').style.display = 'none';
+      }
+    },
+    handler: function(response) {
+      document.getElementById('payment-form').style.display = 'none';
+      document.getElementById('loading').style.display = 'none';
+
+      fetch('/api/payments/verify-public', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          razorpay_order_id: response.razorpay_order_id,
+          razorpay_payment_id: response.razorpay_payment_id,
+          razorpay_signature: response.razorpay_signature,
+          bookingId: '${bookingId}'
+        })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        document.getElementById('success').style.display = 'block';
+        setTimeout(function() { window.close(); }, 4000);
+      })
+      .catch(function() {
+        document.getElementById('success').style.display = 'block';
+        setTimeout(function() { window.close(); }, 4000);
+      });
+    }
+  };
+
+  var rzp = new Razorpay(options);
+  rzp.on('payment.failed', function(response) {
+    document.getElementById('payment-form').style.display = 'none';
+    document.getElementById('failure').style.display = 'block';
+    document.getElementById('failureMsg').textContent = response.error.description || 'Payment failed. Please try again.';
+  });
+  rzp.open();
+}
+
+window.onload = function() {
+  setTimeout(openRazorpay, 300);
+};
+</script>
+</body>
+</html>`);
+});
+
+router.post("/verify-public", async (req, res) => {
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature, bookingId } = req.body;
+
+  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !bookingId) {
+    res.status(400).json({ success: false, message: "Missing required fields" });
+    return;
+  }
+
+  const secret = process.env.RAZORPAY_SECRET;
+  if (!secret) {
+    res.status(500).json({ success: false, message: "Payment gateway not configured" });
+    return;
+  }
+
+  const generated = crypto
+    .createHmac("sha256", secret)
+    .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+    .digest("hex");
+
+  if (generated !== razorpay_signature) {
+    res.status(400).json({ success: false, message: "Invalid payment signature" });
+    return;
+  }
+
+  const existingBookings = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
+  const booking = existingBookings[0];
+
+  if (!booking) {
+    res.status(404).json({ success: false, message: "Booking not found" });
+    return;
+  }
+
+  const finalAmount = Number(booking.finalAmount ?? 0);
+  const existingPaid = Number(booking.paidAmount ?? 0);
+  let chargeAmount = finalAmount - existingPaid;
+
+  try {
+    const rzp = getRazorpay();
+    const payment = await rzp.payments.fetch(razorpay_payment_id) as any;
+    chargeAmount = payment.amount ? Number(payment.amount) / 100 : chargeAmount;
+  } catch {}
+
+  const newPaidAmount = existingPaid + chargeAmount;
+  const remainingBalance = finalAmount - newPaidAmount;
+  const newStatus = remainingBalance <= 0 ? "confirmed" : "partially_paid";
+
+  await db.update(bookingsTable).set({
+    status: newStatus,
+    razorpayPaymentId: razorpay_payment_id,
+    paidAmount: String(newPaidAmount),
+    updatedAt: new Date(),
+  }).where(eq(bookingsTable.id, bookingId));
+
+  res.json({ success: true, status: newStatus });
+});
+
 export default router;
+

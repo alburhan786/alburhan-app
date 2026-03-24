@@ -49,13 +49,27 @@ artifacts/
 │   │       └── use-payment.ts # Razorpay payment flow
 │   └── public/images/         # AI-generated brand images
 │
+├── mobile/             # Expo React Native app (iOS & Android)
+│   └── app/
+│       ├── _layout.tsx         # Root layout: setBaseUrl, AuthProvider, AuthGate, QueryClient
+│       ├── login.tsx           # OTP login screen (dark green + gold branding)
+│       ├── verify.tsx          # OTP verification (6 digit boxes)
+│       ├── setup.tsx           # New user profile setup
+│       └── (tabs)/
+│           ├── _layout.tsx     # NativeTabs with unread badge polling
+│           ├── index.tsx       # Bookings dashboard + Pay Now (WebBrowser)
+│           ├── documents.tsx   # Document upload (ImagePicker + travel docs)
+│           ├── notifications.tsx # Notification center with mark-read
+│           └── profile.tsx     # Profile edit + logout
+│   Bundle ID: com.alburhan.travels | Scheme: alburhan | Port: 18115
+│
 └── api-server/         # Express 5 backend (serves at /api)
     └── src/
         ├── routes/
         │   ├── auth.ts         # OTP login/verify/logout
         │   ├── packages.ts     # Package CRUD
         │   ├── bookings.ts     # Booking management + approve/reject + send-invoice notification
-        │   ├── payments.ts     # Razorpay order + verify
+        │   ├── payments.ts     # Razorpay order + verify + checkout-page HTML + verify-public
         │   ├── documents.ts    # File upload management
         │   ├── gallery.ts      # Image gallery CRUD (admin upload, public list)
         │   ├── groups.ts       # Hajj groups + pilgrims CRUD + photo upload
@@ -68,7 +82,7 @@ artifacts/
 
 lib/
 ├── api-spec/openapi.yaml  # OpenAPI 3.1 spec (source of truth)
-├── api-client-react/      # Generated React Query hooks
+├── api-client-react/      # Generated React Query hooks (exports setBaseUrl/getBaseUrl for mobile)
 ├── api-zod/               # Generated Zod validation schemas
 └── db/src/schema/
     ├── users.ts

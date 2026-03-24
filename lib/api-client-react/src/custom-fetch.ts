@@ -2,6 +2,25 @@ export type CustomFetchOptions = RequestInit & {
   responseType?: "json" | "text" | "blob" | "auto";
 };
 
+let _baseUrl = "";
+
+export function setBaseUrl(url: string): void {
+  _baseUrl = url.endsWith("/") ? url.slice(0, -1) : url;
+}
+
+export function getBaseUrl(): string {
+  return _baseUrl;
+}
+
+function resolveFullUrl(input: RequestInfo | URL): RequestInfo | URL {
+  if (!_baseUrl) return input;
+  const urlStr = typeof input === "string" ? input : isUrl(input) ? input.toString() : (input as Request).url;
+  if (/^https?:\/\//i.test(urlStr)) return input;
+  const normalized = urlStr.startsWith("/") ? urlStr : `/${urlStr}`;
+  if (typeof input === "string") return `${_baseUrl}${normalized}`;
+  return new URL(`${_baseUrl}${normalized}`);
+}
+
 export type ErrorType<T = unknown> = ApiError<T>;
 
 export type BodyType<T> = T;
@@ -297,9 +316,10 @@ export async function customFetch<T = unknown>(
     headers.set("accept", DEFAULT_JSON_ACCEPT);
   }
 
-  const requestInfo = { method, url: resolveUrl(input) };
+  const resolvedInput = resolveFullUrl(input);
+  const requestInfo = { method, url: resolveUrl(resolvedInput) };
 
-  const response = await fetch(input, { ...init, method, headers, credentials: "include" });
+  const response = await fetch(resolvedInput, { ...init, method, headers, credentials: "include" });
 
   if (!response.ok) {
     const errorData = await parseErrorBody(response, method);
