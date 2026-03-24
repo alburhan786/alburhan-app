@@ -674,14 +674,19 @@ function openRazorpay() {
           bookingId: RZP_DATA.bookingId
         })
       })
-      .then(function(r) { return r.json(); })
+      .then(function(r) {
+        if (!r.ok) { return r.json().then(function(e) { throw new Error(e.message || 'Verification failed'); }); }
+        return r.json();
+      })
       .then(function() {
         document.getElementById('success').style.display = 'block';
         setTimeout(function() { notifyApp('success'); }, 3000);
       })
-      .catch(function() {
-        document.getElementById('success').style.display = 'block';
-        setTimeout(function() { notifyApp('success'); }, 3000);
+      .catch(function(err) {
+        var msg = err && err.message ? err.message : 'Payment could not be verified. Please contact support.';
+        document.getElementById('failure').style.display = 'block';
+        document.getElementById('failureMsg').textContent = msg;
+        setTimeout(function() { notifyApp('failure'); }, 5000);
       });
     }
   };

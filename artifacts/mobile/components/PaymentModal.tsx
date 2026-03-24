@@ -34,8 +34,10 @@ interface PaymentModalProps {
   visible: boolean;
   checkoutUrl: string;
   razorpayOptions: RazorpayOptions;
-  onResult: (result: PaymentResult, paymentId?: string) => void;
+  bookingId: string;
   bookingNumber: string;
+  baseUrl: string;
+  onResult: (result: PaymentResult, paymentId?: string) => void;
 }
 
 type RazorpaySuccess = { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string };
@@ -149,8 +151,10 @@ export function PaymentModal({
   visible,
   checkoutUrl,
   razorpayOptions,
-  onResult,
+  bookingId,
   bookingNumber,
+  baseUrl,
+  onResult,
 }: PaymentModalProps) {
   const [launched, setLaunched] = useState(false);
 
@@ -161,8 +165,32 @@ export function PaymentModal({
     setLaunched(true);
 
     RazorpayCheckout.open(razorpayOptions)
-      .then((data: RazorpaySuccess) => {
-        onResult("success", data.razorpay_payment_id);
+      .then(async (data: RazorpaySuccess) => {
+        try {
+          const verifyRes = await fetch(`${baseUrl}/api/payments/verify-public`, {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              razorpay_order_id: data.razorpay_order_id,
+              razorpay_payment_id: data.razorpay_payment_id,
+              razorpay_signature: data.razorpay_signature,
+              bookingId,
+            }),
+          });
+          if (!verifyRes.ok) {
+            const err = await verifyRes.json().catch(() => ({})) as { message?: string };
+            throw new Error(err.message || "Payment verification failed");
+          }
+          onResult("success", data.razorpay_payment_id);
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : "Could not verify payment";
+          Alert.alert(
+            "Verification Failed",
+            `${msg}. Please contact support with your payment ID: ${data.razorpay_payment_id}`,
+            [{ text: "OK", onPress: () => onResult("failure") }],
+          );
+        }
       })
       .catch((error: RazorpayError) => {
         if (error.code === 0) {
@@ -175,7 +203,7 @@ export function PaymentModal({
           );
         }
       });
-  }, [visible, launched, razorpayOptions, onResult]);
+  }, [visible, launched, razorpayOptions, bookingId, baseUrl, onResult]);
 
   useEffect(() => {
     if (!visible) setLaunched(false);

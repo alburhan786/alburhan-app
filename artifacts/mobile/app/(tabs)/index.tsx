@@ -139,6 +139,7 @@ export default function HomeScreen() {
   const [paymentModal, setPaymentModal] = useState<{
     url: string;
     bookingNumber: string;
+    bookingId: string;
     razorpayOptions: RazorpayOptions;
   } | null>(null);
 
@@ -192,7 +193,7 @@ export default function HomeScreen() {
         theme: { color: "#0B3D2E" },
       };
 
-      setPaymentModal({ url: checkoutUrl, bookingNumber: booking.bookingNumber, razorpayOptions });
+      setPaymentModal({ url: checkoutUrl, bookingNumber: booking.bookingNumber, bookingId: booking.id, razorpayOptions });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Could not initiate payment. Please try again.";
       Alert.alert("Payment Error", msg);
@@ -336,7 +337,9 @@ export default function HomeScreen() {
         visible={!!paymentModal}
         checkoutUrl={paymentModal.url}
         razorpayOptions={paymentModal.razorpayOptions}
+        bookingId={paymentModal.bookingId}
         bookingNumber={paymentModal.bookingNumber}
+        baseUrl={baseUrl}
         onResult={(result: PaymentResult) => {
           setPaymentModal(null);
           if (result === "success") {
