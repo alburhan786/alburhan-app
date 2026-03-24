@@ -20,7 +20,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { COLORS } from "@/constants/colors";
 import { useAuth } from "@/contexts/auth";
-import { useListBookings, useListDocuments, useDeleteDocument } from "@workspace/api-client-react";
+import { useListBookings, useListDocuments, useDeleteDocument, BookingListResponse } from "@workspace/api-client-react";
 
 const MANDATORY_DOCS = [
   { value: "passport_photo", label: "Passport Size Photo", icon: "image" as const, imageOnly: true },
@@ -74,7 +74,7 @@ function BookingDocSection({ booking, baseUrl }: { booking: any; baseUrl: string
   const [uploading, setUploading] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const allDocs: DocItem[] = (docs as any) ?? [];
+  const allDocs: DocItem[] = (docs ?? []) as DocItem[];
   const myDocs = allDocs.filter(d => d.uploadedBy !== "admin");
   const travelDocs = allDocs.filter(d => d.uploadedBy === "admin" && TRAVEL_DOC_TYPES[d.documentType]);
   const uploadedTypes = myDocs.map(d => d.documentType);
@@ -180,7 +180,7 @@ function BookingDocSection({ booking, baseUrl }: { booking: any; baseUrl: string
         text: "Remove", style: "destructive",
         onPress: async () => {
           try {
-            await deleteDoc.mutateAsync({ id: docId } as any);
+            await deleteDoc.mutateAsync({ id: docId });
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
             await refetch();
           } catch {}
@@ -317,7 +317,7 @@ export default function DocumentsScreen() {
   const { data, isLoading, refetch } = useListBookings();
   const [refreshing, setRefreshing] = useState(false);
 
-  const bookings: any[] = (data as any)?.bookings ?? [];
+  const bookings = (data as BookingListResponse | undefined)?.bookings ?? [];
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

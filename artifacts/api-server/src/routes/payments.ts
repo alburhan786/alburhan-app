@@ -490,19 +490,63 @@ router.post("/webhook", async (req: any, res) => {
   }
 });
 
+function escHtml(str: string): string {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;");
+}
+
+function escJs(str: string): string {
+  return String(str)
+    .replace(/\\/g, "\\\\")
+    .replace(/'/g, "\\'")
+    .replace(/"/g, '\\"')
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/&/g, "\\u0026")
+    .replace(/\n/g, "\\n")
+    .replace(/\r/g, "\\r");
+}
+
 router.get("/checkout-page", async (req, res) => {
-  const { orderId, bookingId, amount, name, mobile, bookingNumber } = req.query as Record<string, string>;
+  const raw = req.query as Record<string, string | undefined>;
+  const orderId = String(raw.orderId ?? "");
+  const bookingId = String(raw.bookingId ?? "");
+  const amount = String(raw.amount ?? "0");
+  const name = String(raw.name ?? "");
+  const mobile = String(raw.mobile ?? "");
+  const bookingNumber = String(raw.bookingNumber ?? "");
+
+  if (!orderId || !bookingId) {
+    res.status(400).send("Missing required parameters");
+    return;
+  }
+
   const keyId = process.env.RAZORPAY_KEY_ID ?? "";
-  const amountNum = Number(amount ?? 0);
+  const amountNum = Number(amount);
   const amountInRupees = (amountNum / 100).toLocaleString("en-IN");
 
-  res.setHeader("Content-Type", "text/html");
+  const safeOrderId = escJs(orderId);
+  const safeBookingId = escJs(bookingId);
+  const safeName = escJs(name);
+  const safeMobile = escJs(mobile);
+  const safeKeyId = escJs(keyId);
+  const safeBookingNum = escJs(bookingNumber);
+
+  const displayBookingNum = escHtml(bookingNumber || "—");
+  const displayName = escHtml(name);
+  const displayAmount = escHtml(amountInRupees);
+
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.send(`<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
-<title>Payment — Al Burhan Tours</title>
+<title>Payment &mdash; Al Burhan Tours</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #F7F5F0; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
@@ -521,8 +565,6 @@ router.get("/checkout-page", async (req, res) => {
   .pay-btn:hover { opacity: 0.9; }
   .pay-btn:disabled { background: #B0C8C0; cursor: not-allowed; }
   .status { display: none; text-align: center; padding: 20px; }
-  .status.success { display: block; }
-  .status.failure { display: block; }
   .status-icon { font-size: 48px; margin-bottom: 12px; }
   .status-title { font-size: 20px; font-weight: 700; color: #0B3D2E; margin-bottom: 8px; }
   .status-msg { font-size: 14px; color: #5A5A5A; line-height: 1.5; }
@@ -534,64 +576,83 @@ router.get("/checkout-page", async (req, res) => {
 <body>
 <div class="card">
   <div class="logo">
-    <div style="font-size:24px;color:#C9A23F;font-weight:800;">البرہان</div>
+    <div style="font-size:24px;color:#C9A23F;font-weight:800;">&#x627;&#x644;&#x628;&#x631;&#x6C1;&#x627;&#x646;</div>
     <div class="logo-main">AL BURHAN</div>
-    <div class="logo-sub">TOURS & TRAVELS</div>
+    <div class="logo-sub">TOURS &amp; TRAVELS</div>
   </div>
 
   <div id="payment-form">
     <div class="booking-info">
       <div class="booking-label">Booking Reference</div>
-      <div class="booking-num">#${bookingNumber || "—"}</div>
-      <div style="font-size:12px;color:#5A5A5A;margin-top:4px;">${name || ""}</div>
+      <div class="booking-num">#${displayBookingNum}</div>
+      <div style="font-size:12px;color:#5A5A5A;margin-top:4px;">${displayName}</div>
     </div>
     <div class="amount-box">
       <div class="amount-label">Amount to Pay</div>
-      <div class="amount">₹${amountInRupees}</div>
+      <div class="amount">&#x20B9;${displayAmount}</div>
       <div class="amount-note">Including all taxes and fees</div>
     </div>
-    <button class="pay-btn" id="payBtn" onclick="openRazorpay()">Pay ₹${amountInRupees} Securely</button>
-    <div class="loading" id="loading">Processing payment…</div>
+    <button class="pay-btn" id="payBtn" onclick="openRazorpay()">Pay &#x20B9;${displayAmount} Securely</button>
+    <div class="loading" id="loading">Processing payment&hellip;</div>
     <div class="secure-note">
       <svg width="12" height="14" viewBox="0 0 12 14" fill="none"><path d="M6 1L1 3v4c0 2.76 2.24 5 5 5s5-2.24 5-5V3L6 1z" fill="#9A9A9A"/></svg>
-      Secured by Razorpay • 256-bit SSL
+      Secured by Razorpay &bull; 256-bit SSL
     </div>
   </div>
 
-  <div class="status success" id="success">
-    <div class="status-icon">✅</div>
+  <div class="status" id="success">
+    <div class="status-icon">&#x2705;</div>
     <div class="status-title">Payment Successful!</div>
     <div class="status-msg">Your payment has been received.<br/>Your booking is being confirmed.<br/><br/>Jazak Allah Khair!</div>
-    <button class="close-btn" onclick="window.close()">Return to App</button>
+    <button class="close-btn" onclick="notifyApp('success')">Return to App</button>
   </div>
 
-  <div class="status failure" id="failure">
-    <div class="status-icon">❌</div>
+  <div class="status" id="failure">
+    <div class="status-icon">&#x274C;</div>
     <div class="status-title">Payment Failed</div>
     <div class="status-msg" id="failureMsg">The payment could not be processed. Please try again.</div>
-    <button class="close-btn" onclick="window.close()">Go Back</button>
+    <button class="close-btn" onclick="notifyApp('failure')">Go Back</button>
   </div>
 </div>
 
 <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 <script>
+var RZP_DATA = {
+  key: '${safeKeyId}',
+  amount: ${amountNum},
+  orderId: '${safeOrderId}',
+  bookingId: '${safeBookingId}',
+  name: '${safeName}',
+  mobile: '${safeMobile}',
+  bookingNum: '${safeBookingNum}'
+};
+
+function notifyApp(type) {
+  if (window.ReactNativeWebView) {
+    window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'payment_' + type }));
+  } else {
+    window.close();
+  }
+}
+
 function openRazorpay() {
   document.getElementById('payBtn').disabled = true;
   document.getElementById('loading').style.display = 'block';
 
   var options = {
-    key: '${keyId}',
-    amount: '${amountNum}',
+    key: RZP_DATA.key,
+    amount: RZP_DATA.amount,
     currency: 'INR',
     name: 'Al Burhan Tours & Travels',
-    description: 'Booking #${bookingNumber}',
-    order_id: '${orderId}',
-    prefill: { name: '${name}', contact: '+91${mobile}' },
+    description: 'Booking #' + RZP_DATA.bookingNum,
+    order_id: RZP_DATA.orderId,
+    prefill: { name: RZP_DATA.name, contact: '+91' + RZP_DATA.mobile },
     theme: { color: '#0B3D2E' },
     modal: {
       ondismiss: function() {
         document.getElementById('payBtn').disabled = false;
         document.getElementById('loading').style.display = 'none';
+        notifyApp('dismissed');
       }
     },
     handler: function(response) {
@@ -605,17 +666,17 @@ function openRazorpay() {
           razorpay_order_id: response.razorpay_order_id,
           razorpay_payment_id: response.razorpay_payment_id,
           razorpay_signature: response.razorpay_signature,
-          bookingId: '${bookingId}'
+          bookingId: RZP_DATA.bookingId
         })
       })
       .then(function(r) { return r.json(); })
-      .then(function(data) {
+      .then(function() {
         document.getElementById('success').style.display = 'block';
-        setTimeout(function() { window.close(); }, 4000);
+        setTimeout(function() { notifyApp('success'); }, 3000);
       })
       .catch(function() {
         document.getElementById('success').style.display = 'block';
-        setTimeout(function() { window.close(); }, 4000);
+        setTimeout(function() { notifyApp('success'); }, 3000);
       });
     }
   };
@@ -624,7 +685,8 @@ function openRazorpay() {
   rzp.on('payment.failed', function(response) {
     document.getElementById('payment-form').style.display = 'none';
     document.getElementById('failure').style.display = 'block';
-    document.getElementById('failureMsg').textContent = response.error.description || 'Payment failed. Please try again.';
+    var msg = response && response.error && response.error.description;
+    document.getElementById('failureMsg').textContent = msg || 'Payment failed. Please try again.';
   });
   rzp.open();
 }

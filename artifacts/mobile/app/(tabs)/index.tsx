@@ -1,9 +1,9 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import * as WebBrowser from "expo-web-browser";
 import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Linking,
   Platform,
   Pressable,
@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { COLORS } from "@/constants/colors";
 import { useAuth } from "@/contexts/auth";
+import { PaymentModal, PaymentResult } from "@/components/PaymentModal";
 import { useListBookings } from "@workspace/api-client-react";
 
 interface Booking {
@@ -135,8 +136,10 @@ export default function HomeScreen() {
   const { data, isLoading, refetch } = useListBookings();
   const [refreshing, setRefreshing] = useState(false);
   const [payingId, setPayingId] = useState<string | null>(null);
+  const [paymentModal, setPaymentModal] = useState<{ url: string; bookingNumber: string } | null>(null);
 
-  const bookings: Booking[] = (data as any)?.bookings ?? [];
+  type BookingListData = { bookings: Booking[] };
+  const bookings: Booking[] = (data as BookingListData | undefined)?.bookings ?? [];
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -153,7 +156,9 @@ export default function HomeScreen() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bookingId: booking.id, payAmount }),
       });
-      const order = await res.json();
+
+      type OrderResponse = { orderId: string; amount: number; message?: string };
+      const order: OrderResponse = await res.json();
       if (!res.ok) throw new Error(order.message || "Failed to create order");
 
       const params = new URLSearchParams({
@@ -166,16 +171,15 @@ export default function HomeScreen() {
       });
 
       const checkoutUrl = `${baseUrl}/api/payments/checkout-page?${params.toString()}`;
-      await WebBrowser.openAuthSessionAsync(checkoutUrl, "alburhan://");
-      await refetch();
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (e: any) {
-      Alert.alert("Payment Error", e.message || "Could not initiate payment. Please try again.");
+      setPaymentModal({ url: checkoutUrl, bookingNumber: booking.bookingNumber });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Could not initiate payment. Please try again.";
+      Alert.alert("Payment Error", msg);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setPayingId(null);
     }
-  }, [baseUrl, refetch, user]);
+  }, [baseUrl, user]);
 
   const handlePay = useCallback(async (booking: Booking) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -208,6 +212,7 @@ export default function HomeScreen() {
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
   return (
+    <>
     <ScrollView
       style={[styles.container, { backgroundColor: COLORS.background }]}
       contentInsetAdjustmentBehavior="automatic"
@@ -304,6 +309,22 @@ export default function HomeScreen() {
 
       <View style={{ height: Platform.OS === "web" ? 34 : insets.bottom + 100 }} />
     </ScrollView>
+
+    {paymentModal && (
+      <PaymentModal
+        visible={!!paymentModal}
+        checkoutUrl={paymentModal.url}
+        bookingNumber={paymentModal.bookingNumber}
+        onResult={(result: PaymentResult) => {
+          setPaymentModal(null);
+          if (result === "success") {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          }
+          refetch();
+        }}
+      />
+    )}
+    </>
   );
 }
 
