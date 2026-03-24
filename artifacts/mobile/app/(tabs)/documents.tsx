@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import * as DocumentPicker from "expo-document-picker";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import React, { useCallback, useState } from "react";
@@ -22,10 +23,11 @@ import { useAuth } from "@/contexts/auth";
 import { useListBookings, useListDocuments, useDeleteDocument } from "@workspace/api-client-react";
 
 const MANDATORY_DOCS = [
-  { value: "passport_photo", label: "Passport Size Photo", icon: "image" as const },
-  { value: "passport", label: "Passport Copy", icon: "book-open" as const },
-  { value: "pan_card", label: "PAN Card", icon: "credit-card" as const },
-  { value: "aadhaar", label: "Aadhaar Card", icon: "user" as const },
+  { value: "passport_photo", label: "Passport Size Photo", icon: "image" as const, imageOnly: true },
+  { value: "passport", label: "Passport Copy", icon: "book-open" as const, imageOnly: false },
+  { value: "pan_card", label: "PAN Card", icon: "credit-card" as const, imageOnly: false },
+  { value: "aadhaar", label: "Aadhaar Card", icon: "user" as const, imageOnly: false },
+  { value: "medical_certificate", label: "Medical Certificate", icon: "activity" as const, imageOnly: false },
 ];
 
 const TRAVEL_DOC_TYPES: Record<string, { label: string; icon: string; color: string; bg: string }> = {
@@ -71,7 +73,6 @@ function BookingDocSection({ booking, baseUrl }: { booking: any; baseUrl: string
   const deleteDoc = useDeleteDocument();
   const [uploading, setUploading] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedDocType, setSelectedDocType] = useState("passport");
 
   const allDocs: DocItem[] = (docs as any) ?? [];
   const myDocs = allDocs.filter(d => d.uploadedBy !== "admin");
@@ -79,20 +80,34 @@ function BookingDocSection({ booking, baseUrl }: { booking: any; baseUrl: string
   const uploadedTypes = myDocs.map(d => d.documentType);
   const uploadedMandatory = MANDATORY_DOCS.filter(m => uploadedTypes.includes(m.value)).length;
 
-  const handleUpload = async (docType: string) => {
+  const showUploadOptions = (docType: string, imageOnly: boolean) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     if (Platform.OS === "ios") {
+      const options = imageOnly
+        ? ["Cancel", "Take Photo", "Choose from Library"]
+        : ["Cancel", "Take Photo", "Choose from Library", "Choose File (PDF)"];
+
       ActionSheetIOS.showActionSheetWithOptions(
-        { options: ["Cancel", "Take Photo", "Choose from Library", "Choose File"], cancelButtonIndex: 0 },
+        { options, cancelButtonIndex: 0 },
         async (idx) => {
           if (idx === 0) return;
           if (idx === 1) await pickWithCamera(docType);
-          else await pickFromLibrary(docType);
+          else if (idx === 2) await pickFromLibrary(docType);
+          else if (idx === 3 && !imageOnly) await pickDocument(docType);
         }
       );
     } else {
-      await pickFromLibrary(docType);
+      Alert.alert(
+        "Upload Document",
+        "Choose how to add your document",
+        [
+          { text: "Take Photo", onPress: () => pickWithCamera(docType) },
+          { text: "Photo Library", onPress: () => pickFromLibrary(docType) },
+          ...(!imageOnly ? [{ text: "Choose File (PDF)", onPress: () => pickDocument(docType) }] : []),
+          { text: "Cancel", style: "cancel" as const },
+        ]
+      );
     }
   };
 
@@ -102,25 +117,40 @@ function BookingDocSection({ booking, baseUrl }: { booking: any; baseUrl: string
       Alert.alert("Permission Required", "Camera access is needed to take photos.");
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], quality: 0.8 });
+    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], quality: 0.85 });
     if (!result.canceled && result.assets[0]) {
-      await uploadFile(result.assets[0], docType);
+      await uploadImageAsset(result.assets[0], docType);
     }
   };
 
   const pickFromLibrary = async (docType: string) => {
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.8 });
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.85 });
     if (!result.canceled && result.assets[0]) {
-      await uploadFile(result.assets[0], docType);
+      await uploadImageAsset(result.assets[0], docType);
     }
   };
 
-  const uploadFile = async (asset: ImagePicker.ImagePickerAsset, docType: string) => {
+  const pickDocument = async (docType: string) => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: ["application/pdf", "image/*"],
+      copyToCacheDirectory: true,
+    });
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      await uploadRawFile({ uri: asset.uri, name: asset.name, mimeType: asset.mimeType ?? "application/pdf" }, docType);
+    }
+  };
+
+  const uploadImageAsset = async (asset: ImagePicker.ImagePickerAsset, docType: string) => {
+    const fileName = asset.uri.split("/").pop() ?? "document.jpg";
+    await uploadRawFile({ uri: asset.uri, name: fileName, mimeType: asset.mimeType ?? "image/jpeg" }, docType);
+  };
+
+  const uploadRawFile = async (file: { uri: string; name: string; mimeType: string }, docType: string) => {
     setUploading(docType);
     try {
       const formData = new FormData();
-      const fileName = asset.uri.split("/").pop() ?? "document.jpg";
-      formData.append("file", { uri: asset.uri, name: fileName, type: asset.mimeType ?? "image/jpeg" } as any);
+      formData.append("file", { uri: file.uri, name: file.name, type: file.mimeType } as any);
       formData.append("bookingId", booking.id);
       formData.append("documentType", docType);
 
@@ -193,6 +223,7 @@ function BookingDocSection({ booking, baseUrl }: { booking: any; baseUrl: string
             <View style={styles.docInfo}>
               <Text style={styles.docLabel}>{doc.label}</Text>
               {isUploaded && <Text style={styles.docFileName} numberOfLines={1}>{uploaded[0].fileName}</Text>}
+              {!doc.imageOnly && <Text style={styles.docHint}>Image or PDF accepted</Text>}
             </View>
             <View style={styles.docActions}>
               {isUploaded ? (
@@ -207,7 +238,7 @@ function BookingDocSection({ booking, baseUrl }: { booking: any; baseUrl: string
                 </>
               ) : (
                 <Pressable
-                  onPress={() => handleUpload(doc.value)}
+                  onPress={() => showUploadOptions(doc.value, doc.imageOnly)}
                   disabled={isUploadingThis}
                   style={styles.uploadBtn}
                 >
@@ -473,6 +504,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: "Inter_400Regular",
     color: COLORS.textMuted,
+  },
+  docHint: {
+    fontSize: 10,
+    fontFamily: "Inter_400Regular",
+    color: COLORS.border,
   },
   docActions: {
     flexDirection: "row",

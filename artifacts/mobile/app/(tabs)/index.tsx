@@ -144,31 +144,66 @@ export default function HomeScreen() {
     setRefreshing(false);
   }, [refetch]);
 
-  const handlePay = useCallback(async (booking: Booking) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  const initiatePayment = useCallback(async (booking: Booking, payAmount?: number) => {
     setPayingId(booking.id);
     try {
       const res = await fetch(`${baseUrl}/api/payments/create-order`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookingId: booking.id }),
+        body: JSON.stringify({ bookingId: booking.id, payAmount }),
       });
       const order = await res.json();
       if (!res.ok) throw new Error(order.message || "Failed to create order");
 
-      const checkoutUrl = `${baseUrl}/api/payments/checkout-page?orderId=${order.orderId}&bookingId=${booking.id}&amount=${order.amount}&name=${encodeURIComponent(booking.customerName)}&mobile=${encodeURIComponent(user?.mobile ?? "")}&bookingNumber=${encodeURIComponent(booking.bookingNumber)}`;
+      const params = new URLSearchParams({
+        orderId: order.orderId,
+        bookingId: booking.id,
+        amount: String(order.amount),
+        name: booking.customerName,
+        mobile: user?.mobile ?? "",
+        bookingNumber: booking.bookingNumber,
+      });
 
-      const result = await WebBrowser.openAuthSessionAsync(checkoutUrl, "alburhan://");
-
+      const checkoutUrl = `${baseUrl}/api/payments/checkout-page?${params.toString()}`;
+      await WebBrowser.openAuthSessionAsync(checkoutUrl, "alburhan://");
       await refetch();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e: any) {
+      Alert.alert("Payment Error", e.message || "Could not initiate payment. Please try again.");
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setPayingId(null);
     }
   }, [baseUrl, refetch, user]);
+
+  const handlePay = useCallback(async (booking: Booking) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    const finalAmount = Number(booking.finalAmount ?? 0);
+    const paidAmount = Number(booking.paidAmount ?? 0);
+    const remaining = finalAmount - paidAmount;
+
+    if (booking.status === "partially_paid" && remaining > 0) {
+      Alert.alert(
+        "Choose Payment Amount",
+        `Remaining balance: ₹${remaining.toLocaleString("en-IN")}\nTotal amount: ₹${finalAmount.toLocaleString("en-IN")}`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: `Pay Remaining ₹${remaining.toLocaleString("en-IN")}`,
+            onPress: () => initiatePayment(booking, remaining),
+          },
+          {
+            text: `Pay Full ₹${finalAmount.toLocaleString("en-IN")}`,
+            onPress: () => initiatePayment(booking, finalAmount),
+          },
+        ]
+      );
+    } else {
+      await initiatePayment(booking);
+    }
+  }, [initiatePayment]);
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 

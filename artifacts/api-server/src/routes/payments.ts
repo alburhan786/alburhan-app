@@ -651,6 +651,20 @@ router.post("/verify-public", async (req, res) => {
     return;
   }
 
+  const existingBookings = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
+  const booking = existingBookings[0];
+
+  if (!booking) {
+    res.status(404).json({ success: false, message: "Booking not found" });
+    return;
+  }
+
+  if (booking.razorpayOrderId !== razorpay_order_id) {
+    console.error("[verify-public] Order ID mismatch — booking:", booking.razorpayOrderId, "request:", razorpay_order_id);
+    res.status(400).json({ success: false, message: "Order ID does not match this booking" });
+    return;
+  }
+
   const generated = crypto
     .createHmac("sha256", secret)
     .update(`${razorpay_order_id}|${razorpay_payment_id}`)
@@ -661,14 +675,6 @@ router.post("/verify-public", async (req, res) => {
     return;
   }
 
-  const existingBookings = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
-  const booking = existingBookings[0];
-
-  if (!booking) {
-    res.status(404).json({ success: false, message: "Booking not found" });
-    return;
-  }
-
   const finalAmount = Number(booking.finalAmount ?? 0);
   const existingPaid = Number(booking.paidAmount ?? 0);
   let chargeAmount = finalAmount - existingPaid;
@@ -676,7 +682,9 @@ router.post("/verify-public", async (req, res) => {
   try {
     const rzp = getRazorpay();
     const payment = await rzp.payments.fetch(razorpay_payment_id) as any;
-    chargeAmount = payment.amount ? Number(payment.amount) / 100 : chargeAmount;
+    if (payment.amount && payment.order_id === razorpay_order_id) {
+      chargeAmount = Number(payment.amount) / 100;
+    }
   } catch {}
 
   const newPaidAmount = existingPaid + chargeAmount;
