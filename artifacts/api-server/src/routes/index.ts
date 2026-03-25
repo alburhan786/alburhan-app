@@ -11,7 +11,6 @@ import adminRouter from "./admin.js";
 import inquiryRouter from "./inquiry.js";
 import galleryRouter from "./gallery.js";
 import groupsRouter from "./groups.js";
-import migrateRouter from "./migrate.js";
 
 const router: IRouter = Router();
 
@@ -27,6 +26,5 @@ router.use("/admin", adminRouter);
 router.use("/inquiry", inquiryRouter);
 router.use("/gallery", galleryRouter);
 router.use("/groups", groupsRouter);
-router.use("/migrate", migrateRouter);
 
 export default router;
