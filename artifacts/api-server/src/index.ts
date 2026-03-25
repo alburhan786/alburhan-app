@@ -2,7 +2,6 @@ import app from "./app";
 import { db, usersTable } from "@workspace/db";
 import { inArray } from "drizzle-orm";
 import { ADMIN_MOBILES } from "./routes/auth.js";
-import { seedProductionData } from "./seed.js";
 
 const rawPort = process.env["PORT"];
 
@@ -20,12 +19,6 @@ if (Number.isNaN(port) || port <= 0) {
 
 app.listen(port, async () => {
   console.log(`Server listening on port ${port}`);
-
-  try {
-    await seedProductionData();
-  } catch (err) {
-    console.error("[Startup] Seed failed:", err);
-  }
 
   try {
     await db.update(usersTable)

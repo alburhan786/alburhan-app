@@ -1,16 +1,23 @@
+import { Router } from "express";
 import { db, packagesTable, usersTable, bookingsTable } from "@workspace/db";
 import { sql, count } from "drizzle-orm";
 
-export async function seedProductionData() {
-  try {
-    const [{ total: pkgCount }] = await db.select({ total: count() }).from(packagesTable);
-    if (Number(pkgCount) > 0) {
-      console.log(`[Seed] Skipped — ${pkgCount} packages already exist`);
-      return;
-    }
+const router = Router();
 
-    console.log("[Seed] Production DB is empty — seeding packages, users, bookings...");
+router.post("/run", async (req, res) => {
+  const migrationKey = process.env["MIGRATION_KEY"];
+  if (!migrationKey) {
+    return res.status(503).json({ error: "Migration not configured" });
+  }
+  const provided = req.headers["x-migration-key"] as string | undefined;
+  if (!provided || provided !== migrationKey) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
 
+  const results: Record<string, string> = {};
+
+  const [{ total: pkgCount }] = await db.select({ total: count() }).from(packagesTable);
+  if (Number(pkgCount) === 0) {
     await db.execute(sql`
       INSERT INTO packages (id, name, type, description, duration, price_per_person, gst_percent, includes, highlights, departure_dates, max_pilgrims, image_url, is_active, created_at, updated_at, featured, details) VALUES
       ('0381e073-49af-4eba-8c2e-825b03da88bf','Iraq Ziyarat Tour – 10 Days','iraq_ziyarat','A deeply spiritual journey to the sacred shrines of Iraq. Visit Imam Ali shrine in Najaf, Imam Hussain shrine in Karbala, Kazmain shrine in Baghdad, and the golden-domed shrines of Samarra. Our experienced guides ensure a safe and spiritually enriching pilgrimage.','10 Days / 9 Nights',55000,5,'["Return airfare from Mumbai/Delhi","Iraq visa processing","4-star hotel accommodation","Transportation between all shrines","Guided Ziyarat with scholar","All meals included","Baghdad-Najaf-Karbala-Baghdad circuit","Samarra day trip"]'::jsonb,'["Sacred Shia shrines","Expert religious guide","Najaf, Karbala, Kazmain, Samarra","All meals included","Flight + Visa included"]'::jsonb,'["2025-04-01","2025-06-01","2025-08-01","2025-10-01","2025-12-01"]'::jsonb,35,NULL,true,'2026-03-11 23:10:34.346539','2026-03-11 23:10:34.346539',false,'{}'::jsonb),
@@ -30,20 +37,25 @@ export async function seedProductionData() {
       ('fb7fb3dc-2910-4d99-bb92-80f4cf671508','Economy Umrah Package','umrah','Budget-friendly Umrah package with comfortable accommodation close to Haram. Ideal for groups and families seeking an affordable pilgrimage experience.','14 Nights / 15 Days',90000,5,'["Return Airfare","Visa Processing","14 Nights Accommodation","Makkah: Durrat O Sallah Hotel (1★) – 600m from Haram (12 min walk)","Madinah: Guest Time Hotel (2★) – 200m from Masjid Nabawi","5 Person Room Sharing","Airport Transfers"]'::jsonb,'["Departures Every 15 Days","5 Person Sharing Rooms","Close to Haram & Masjid Nabawi","Budget-Friendly Price","GST Extra @ 5%"]'::jsonb,'["Every 15 Days"]'::jsonb,40,NULL,true,'2026-03-11 22:51:13.413705','2026-03-11 23:19:49.459069',false,'{}'::jsonb)
       ON CONFLICT (id) DO NOTHING
     `);
-    console.log("[Seed] ✓ 15 packages inserted");
+    results["packages"] = "inserted 15 packages";
+  } else {
+    results["packages"] = `skipped — ${pkgCount} packages already exist`;
+  }
 
-    await db.execute(sql`
-      INSERT INTO users (id, name, mobile, email, role, created_at, updated_at) VALUES
-      ('0ea671c1-8b2a-483e-82b0-0b8bdeb7f625',NULL,'9893225590',NULL,'admin','2026-03-15 09:49:36.944729','2026-03-15 09:49:36.944729'),
-      ('2c7885ad-c6e3-4ca3-91c7-b36d71da90c8',NULL,'7987488550',NULL,'customer','2026-03-15 20:58:20.628621','2026-03-15 20:58:20.628621'),
-      ('4d5cf829-11bc-49ea-9a97-3db28a087bdb',NULL,'9867114562',NULL,'customer','2026-03-14 11:27:24.667064','2026-03-14 11:27:24.667064'),
-      ('7570e9bd-5671-4ef8-961f-95db5499c74a',NULL,'9930161806',NULL,'customer','2026-03-15 23:46:21.9638','2026-03-15 23:46:21.9638'),
-      ('9d5a12e3-44a3-4917-b58a-8f635a08040c','Admin','9999999999','admin@alburhantours.com','admin','2026-03-11 22:51:22.731147','2026-03-11 22:51:22.731147'),
-      ('f008a06a-b1ba-452c-857e-aeacaecf6a73',NULL,'8828861122',NULL,'customer','2026-03-20 15:21:14.295934','2026-03-20 15:21:14.295934')
-      ON CONFLICT (mobile) DO NOTHING
-    `);
-    console.log("[Seed] ✓ Users inserted (skipped duplicates)");
+  await db.execute(sql`
+    INSERT INTO users (id, name, mobile, email, role, created_at, updated_at) VALUES
+    ('0ea671c1-8b2a-483e-82b0-0b8bdeb7f625',NULL,'9893225590',NULL,'admin','2026-03-15 09:49:36.944729','2026-03-15 09:49:36.944729'),
+    ('2c7885ad-c6e3-4ca3-91c7-b36d71da90c8',NULL,'7987488550',NULL,'customer','2026-03-15 20:58:20.628621','2026-03-15 20:58:20.628621'),
+    ('4d5cf829-11bc-49ea-9a97-3db28a087bdb',NULL,'9867114562',NULL,'customer','2026-03-14 11:27:24.667064','2026-03-14 11:27:24.667064'),
+    ('7570e9bd-5671-4ef8-961f-95db5499c74a',NULL,'9930161806',NULL,'customer','2026-03-15 23:46:21.9638','2026-03-15 23:46:21.9638'),
+    ('9d5a12e3-44a3-4917-b58a-8f635a08040c','Admin','9999999999','admin@alburhantours.com','admin','2026-03-11 22:51:22.731147','2026-03-11 22:51:22.731147'),
+    ('f008a06a-b1ba-452c-857e-aeacaecf6a73',NULL,'8828861122',NULL,'customer','2026-03-20 15:21:14.295934','2026-03-20 15:21:14.295934')
+    ON CONFLICT (mobile) DO NOTHING
+  `);
+  results["users"] = "upserted 6 users (ON CONFLICT mobile DO NOTHING)";
 
+  const [{ total: bkgCount }] = await db.select({ total: count() }).from(bookingsTable);
+  if (Number(bkgCount) === 0) {
     await db.execute(sql`
       INSERT INTO bookings (id, booking_number, package_id, package_name, customer_id, customer_name, customer_mobile, customer_email, number_of_pilgrims, pilgrims, preferred_departure_date, status, total_amount, gst_amount, final_amount, razorpay_order_id, invoice_number, notes, is_offline, room_type, advance_amount, created_at, updated_at) VALUES
       ('510b7dee-619a-4b69-9e1c-1bd70058f771','ABT26033710','a22dbeb8-51b8-4e93-9a22-e562225cc2c5','Ramadan Umrah Special – Last 20 Days','4d5cf829-11bc-49ea-9a97-3db28a087bdb','mohammed','9867114562',NULL,1,'[{"name":"mohammed altaf","passportNumber":"R9544291"}]'::jsonb,'28 January 2027','approved',140000,7000,147000,'order_SSt3NbaGaE0IZ0',NULL,NULL,false,NULL,NULL,'2026-03-14 11:29:04.430674','2026-03-14 12:08:02.513'),
@@ -55,9 +67,13 @@ export async function seedProductionData() {
       ('fcb968ef-5e83-432b-8aa3-a96d70131aea','ABT26035537','9aac5fc5-c2e7-439a-9115-8f166e993ea6','Syria Ziyarat Tour','4d5cf829-11bc-49ea-9a97-3db28a087bdb','akila bano','7987488550',NULL,1,'[{"name":"akila bano","passportNumber":"w3678934"}]'::jsonb,'2025-08-15','approved',48000,2400,50400,'order_ST3CclKloGWTeU',NULL,NULL,false,NULL,NULL,'2026-03-19 10:15:05.129462','2026-03-19 10:16:13.453')
       ON CONFLICT (id) DO NOTHING
     `);
-    console.log("[Seed] ✓ 7 bookings inserted");
-    console.log("[Seed] Migration complete — production database seeded successfully");
-  } catch (err) {
-    console.error("[Seed] Migration failed:", err);
+    results["bookings"] = "inserted 7 bookings";
+  } else {
+    results["bookings"] = `skipped — ${bkgCount} bookings already exist`;
   }
-}
+
+  console.log("[Migration] Completed:", results);
+  return res.json({ success: true, results });
+});
+
+export default router;
