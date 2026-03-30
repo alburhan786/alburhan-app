@@ -1,4 +1,7 @@
 import { useState, useEffect } from "react";
+import { AdminLayout } from "@/components/layout/AdminLayout";
+import { Link } from "wouter";
+import { ArrowLeft, Search, Users } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -32,61 +35,72 @@ export default function CustomerManager() {
   );
 
   return (
-    <div style={{ padding: "24px", fontFamily: "Inter, sans-serif" }}>
-      <div style={{ marginBottom: "24px" }}>
-        <h1 style={{ fontSize: "24px", fontWeight: 700, color: "#0A3D2A", margin: 0 }}>Customer Manager</h1>
-        <p style={{ color: "#666", marginTop: "4px", fontSize: "14px" }}>All registered customers who have made bookings</p>
+    <AdminLayout>
+      <div className="mb-6">
+        <Link href="/admin">
+          <button className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-3 transition-colors">
+            <ArrowLeft size={15} /> Back to Dashboard
+          </button>
+        </Link>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-serif font-bold">Customer Manager</h1>
+            <p className="text-muted-foreground mt-1 text-sm">All registered customers who have made bookings</p>
+          </div>
+          <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-4 py-2 text-green-800 font-semibold text-sm">
+            <Users size={16} /> {customers.length} Customers
+          </div>
+        </div>
       </div>
 
-      <div style={{ display: "flex", gap: "12px", marginBottom: "20px" }}>
+      {/* Search */}
+      <div className="relative mb-5">
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
         <input
           type="text"
           placeholder="Search by name, email, or phone..."
           value={search}
           onChange={e => setSearch(e.target.value)}
-          style={{ flex: 1, padding: "10px 14px", borderRadius: "8px", border: "1.5px solid #ddd", fontSize: "14px", outline: "none" }}
+          className="w-full pl-9 pr-4 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
         />
-        <div style={{ padding: "10px 16px", background: "#f0f9f4", borderRadius: "8px", border: "1.5px solid #c3e6cb", color: "#0A3D2A", fontWeight: 600, fontSize: "14px", display: "flex", alignItems: "center" }}>
-          Total: {customers.length}
-        </div>
       </div>
 
       {loading ? (
-        <div style={{ textAlign: "center", padding: "60px", color: "#999" }}>Loading customers...</div>
+        <div className="text-center py-16 text-muted-foreground animate-pulse">Loading customers...</div>
       ) : filtered.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px", color: "#999" }}>
-          {search ? "No customers found matching your search." : "No customers found."}
+        <div className="text-center py-16 text-muted-foreground">
+          {search ? "No customers match your search." : "No customers found."}
         </div>
       ) : (
-        <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #eee", overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px" }}>
+        <div className="rounded-2xl border overflow-hidden shadow-sm bg-white">
+          <table className="w-full text-sm text-left">
             <thead>
-              <tr style={{ background: "#0A3D2A", color: "#fff" }}>
-                <th style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600 }}>#</th>
-                <th style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600 }}>Name</th>
-                <th style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600 }}>Email</th>
-                <th style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600 }}>Phone</th>
-                <th style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600 }}>Bookings</th>
-                <th style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600 }}>Total Paid</th>
-                <th style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600 }}>Joined</th>
+              <tr className="bg-[#0A3D2A] text-white">
+                <th className="px-5 py-3 font-semibold">#</th>
+                <th className="px-5 py-3 font-semibold">Name</th>
+                <th className="px-5 py-3 font-semibold">Email</th>
+                <th className="px-5 py-3 font-semibold">Phone</th>
+                <th className="px-5 py-3 font-semibold">Bookings</th>
+                <th className="px-5 py-3 font-semibold">Total Paid</th>
+                <th className="px-5 py-3 font-semibold">Joined</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-border">
               {filtered.map((c, i) => (
-                <tr key={c.id} style={{ borderBottom: "1px solid #f0f0f0", background: i % 2 === 0 ? "#fff" : "#fafafa" }}>
-                  <td style={{ padding: "12px 16px", color: "#888" }}>{i + 1}</td>
-                  <td style={{ padding: "12px 16px", fontWeight: 600, color: "#222" }}>{c.name}</td>
-                  <td style={{ padding: "12px 16px", color: "#555" }}>{c.email || "—"}</td>
-                  <td style={{ padding: "12px 16px", color: "#555" }}>{c.phone || "—"}</td>
-                  <td style={{ padding: "12px 16px" }}>
-                    <span style={{ background: "#e8f5e9", color: "#2e7d32", padding: "2px 10px", borderRadius: "20px", fontWeight: 600, fontSize: "12px" }}>
+                <tr key={c.id} className="hover:bg-muted/30 transition-colors">
+                  <td className="px-5 py-3 text-muted-foreground">{i + 1}</td>
+                  <td className="px-5 py-3 font-semibold text-foreground">{c.name}</td>
+                  <td className="px-5 py-3 text-muted-foreground">{c.email || "—"}</td>
+                  <td className="px-5 py-3 text-muted-foreground">{c.phone || "—"}</td>
+                  <td className="px-5 py-3">
+                    <span className="bg-green-100 text-green-800 px-2.5 py-0.5 rounded-full font-semibold text-xs">
                       {c.totalBookings ?? 0}
                     </span>
                   </td>
-                  <td style={{ padding: "12px 16px", color: "#0A3D2A", fontWeight: 600 }}>
+                  <td className="px-5 py-3 text-[#0A3D2A] font-semibold">
                     {c.totalPaid ? `₹${Number(c.totalPaid).toLocaleString("en-IN")}` : "—"}
                   </td>
-                  <td style={{ padding: "12px 16px", color: "#888", fontSize: "12px" }}>
+                  <td className="px-5 py-3 text-muted-foreground text-xs">
                     {c.createdAt ? new Date(c.createdAt).toLocaleDateString("en-IN") : "—"}
                   </td>
                 </tr>
@@ -95,6 +109,6 @@ export default function CustomerManager() {
           </table>
         </div>
       )}
-    </div>
+    </AdminLayout>
   );
 }

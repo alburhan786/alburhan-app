@@ -52,6 +52,28 @@ const uploadVideo = multer({
 const router = Router();
 
 router.post(
+  "/:id/upload-cover",
+  requireAdmin as any,
+  uploadImage.single("file"),
+  async (req, res) => {
+    if (!req.file) {
+      res.status(400).json({ message: "No image file provided" });
+      return;
+    }
+    const pkgs = await db.select().from(packagesTable).where(eq(packagesTable.id, req.params.id)).limit(1);
+    if (!pkgs[0]) {
+      res.status(404).json({ message: "Package not found" });
+      return;
+    }
+    const fileUrl = `/api/documents/files/${req.file.filename}`;
+    await db.update(packagesTable)
+      .set({ imageUrl: fileUrl, updatedAt: new Date() })
+      .where(eq(packagesTable.id, req.params.id));
+    res.json({ imageUrl: fileUrl });
+  }
+);
+
+router.post(
   "/:id/upload-image",
   requireAdmin as any,
   uploadImage.single("file"),
