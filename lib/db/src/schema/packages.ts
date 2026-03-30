@@ -21,8 +21,13 @@ export interface PackageDetails {
   transport?: string;
   visa?: string;
   meenaTentLocation?: string;
+  meenaTentCategory?: string;
+  meenaTentZone?: string;
   meenaTentImageUrls?: string[];
   meenaTentVideoUrls?: string[];
+  googleMapsMakkah?: string;
+  googleMapsMapMadinah?: string;
+  googleMapsMeena?: string;
 }
 
 export const packagesTable = pgTable("packages", {

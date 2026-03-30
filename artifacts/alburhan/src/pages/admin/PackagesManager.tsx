@@ -7,19 +7,20 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit, Trash2, Star, Images, Upload, Video, X, MapPin, Tent, Hotel, Settings, Info, Plane } from "lucide-react";
+import { Plus, Edit, Trash2, Star, Images, Upload, Video, X, MapPin, Tent, Hotel, Settings, Info, Plane, Navigation } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
 
 const BASE_API = import.meta.env.VITE_API_URL || "";
 
-type FormTab = "basic" | "travel" | "hotels" | "meena" | "settings";
+type FormTab = "basic" | "travel" | "hotels" | "meena" | "location" | "settings";
 
 const TABS: { id: FormTab; label: string; icon: React.ReactNode }[] = [
   { id: "basic",    label: "Basic Info",   icon: <Info size={13} /> },
   { id: "travel",   label: "Travel",       icon: <Plane size={13} /> },
   { id: "hotels",   label: "Hotels",       icon: <Hotel size={13} /> },
   { id: "meena",    label: "Meena Tent",   icon: <Tent size={13} /> },
+  { id: "location", label: "Location",     icon: <Navigation size={13} /> },
   { id: "settings", label: "Settings",     icon: <Settings size={13} /> },
 ];
 
@@ -84,6 +85,11 @@ export default function PackagesManager() {
       transport: details.transport || "",
       visa: details.visa || "",
       meenaTentLocation: details.meenaTentLocation || "",
+      meenaTentCategory: details.meenaTentCategory || "",
+      meenaTentZone: details.meenaTentZone || "",
+      googleMapsMakkah: details.googleMapsMakkah || "",
+      googleMapsMapMadinah: details.googleMapsMapMadinah || "",
+      googleMapsMeena: details.googleMapsMeena || "",
     });
     setFormTab("basic");
     setIsEditOpen(true);
@@ -107,6 +113,11 @@ export default function PackagesManager() {
     if (data.transport) details.transport = data.transport;
     if (data.visa) details.visa = data.visa;
     if (data.meenaTentLocation) details.meenaTentLocation = data.meenaTentLocation;
+    if (data.meenaTentCategory) details.meenaTentCategory = data.meenaTentCategory;
+    if (data.meenaTentZone) details.meenaTentZone = data.meenaTentZone;
+    if (data.googleMapsMakkah) details.googleMapsMakkah = data.googleMapsMakkah;
+    if (data.googleMapsMapMadinah) details.googleMapsMapMadinah = data.googleMapsMapMadinah;
+    if (data.googleMapsMeena) details.googleMapsMeena = data.googleMapsMeena;
     return {
       name: data.name,
       type: data.type,
@@ -408,6 +419,29 @@ export default function PackagesManager() {
       {/* Meena Tent */}
       {formTab === "meena" && (
         <div className="space-y-5">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Category</label>
+              <select {...reg("meenaTentCategory")} className="w-full h-10 px-3 rounded-md border bg-background text-sm">
+                <option value="">Select Category</option>
+                <option value="A">A (Premium)</option>
+                <option value="B">B (Standard)</option>
+                <option value="C">C (Economy)</option>
+                <option value="D">D (Basic)</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Zone</label>
+              <select {...reg("meenaTentZone")} className="w-full h-10 px-3 rounded-md border bg-background text-sm">
+                <option value="">Select Zone</option>
+                <option value="1">Zone 1</option>
+                <option value="2">Zone 2</option>
+                <option value="3">Zone 3</option>
+                <option value="4">Zone 4</option>
+                <option value="5">Zone 5</option>
+              </select>
+            </div>
+          </div>
           <div className="space-y-2">
             <label className="text-sm font-medium flex items-center gap-1.5"><MapPin size={13} /> Meena Tent Location / Address</label>
             <Input {...reg("meenaTentLocation")} placeholder="e.g. Mina Tent Block 10, Makkah" />
@@ -496,6 +530,40 @@ export default function PackagesManager() {
               <p className="text-sm text-muted-foreground">Save the package first, then come back to upload Meena Tent photos & videos.</p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Location */}
+      {formTab === "location" && (
+        <div className="space-y-5">
+          <p className="text-xs text-muted-foreground">Paste Google Maps share links for each location so customers can navigate directly.</p>
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+              <Hotel size={12} /> Makkah Hotel — Google Maps
+            </h4>
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-1"><Navigation size={12} /> Google Maps Link</label>
+              <Input {...reg("googleMapsMakkah")} placeholder="https://maps.google.com/?q=..." />
+            </div>
+          </div>
+          <div className="border-t pt-4">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+              <Hotel size={12} /> Madinah Hotel — Google Maps
+            </h4>
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-1"><Navigation size={12} /> Google Maps Link</label>
+              <Input {...reg("googleMapsMapMadinah")} placeholder="https://maps.google.com/?q=..." />
+            </div>
+          </div>
+          <div className="border-t pt-4">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+              <Tent size={12} /> Meena Tent — Google Maps
+            </h4>
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-1"><Navigation size={12} /> Google Maps Link</label>
+              <Input {...reg("googleMapsMeena")} placeholder="https://maps.google.com/?q=..." />
+            </div>
+          </div>
         </div>
       )}
 
