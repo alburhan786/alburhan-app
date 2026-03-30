@@ -353,6 +353,9 @@ export const UploadUrlRequestDocumentType = {
   visa: "visa",
   room_allotment: "room_allotment",
   bus_allotment: "bus_allotment",
+  model_contract: "model_contract",
+  tour_itinerary: "tour_itinerary",
+  medical_certificate: "medical_certificate",
   other: "other",
 } as const;
 
@@ -381,6 +384,9 @@ export const DocumentDocumentType = {
   visa: "visa",
   room_allotment: "room_allotment",
   bus_allotment: "bus_allotment",
+  model_contract: "model_contract",
+  tour_itinerary: "tour_itinerary",
+  medical_certificate: "medical_certificate",
   other: "other",
 } as const;
 
@@ -415,6 +421,9 @@ export const SaveDocumentRequestDocumentType = {
   visa: "visa",
   room_allotment: "room_allotment",
   bus_allotment: "bus_allotment",
+  model_contract: "model_contract",
+  tour_itinerary: "tour_itinerary",
+  medical_certificate: "medical_certificate",
   other: "other",
 } as const;
 
