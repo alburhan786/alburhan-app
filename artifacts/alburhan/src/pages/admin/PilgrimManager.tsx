@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit, Trash2, ArrowLeft, Upload, Printer, CreditCard, Luggage, Heart, Building2, Bus } from "lucide-react";
+import { Plus, Edit, Trash2, ArrowLeft, Upload, Printer, CreditCard, Luggage, Heart, Building2, Bus, DoorOpen } from "lucide-react";
 import { Link, useRoute } from "wouter";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -169,6 +169,9 @@ export default function PilgrimManager() {
                 </Link>
                 <Link href={`/admin/groups/${groupId}/print/bus-list`}>
                   <span className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-muted cursor-pointer"><Bus size={14} /> Bus List</span>
+                </Link>
+                <Link href={`/admin/groups/${groupId}/print/room-stickers`}>
+                  <span className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-muted cursor-pointer"><DoorOpen size={14} /> Room Stickers</span>
                 </Link>
               </div>
             </div>
