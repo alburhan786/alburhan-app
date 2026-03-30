@@ -1,0 +1,155 @@
+Create a complete CUSTOMER KYC SYSTEM for the website: alburhantravels.com (WEB ONLY – no mobile app).
+
+==============================
+1. DATABASE UPDATE (MANDATORY)
+==============================
+
+Table: customer_profiles
+
+Add fields:
+
+Basic Info:
+- id
+- userId
+- name
+- phone
+- whatsappNumber
+- dateOfBirth
+- gender
+- address
+
+Passport Details:
+- passportNumber
+- passportIssueDate
+- passportExpiryDate
+- passportPlaceOfIssue
+- passportImage (file)
+
+Personal:
+- photo (profile image)
+- bloodGroup
+
+Documents:
+- aadharNumber
+- aadharImage (file)
+- panNumber
+- panImage (file)
+- healthCertificate (file)
+
+System:
+- kycStatus (pending / approved / rejected)
+- createdAt
+- updatedAt
+
+==============================
+2. WEBSITE CUSTOMER FORM (KYC PAGE)
+==============================
+
+Create a page:
+👉 /kyc or "Complete Your KYC"
+
+Form sections:
+
+1. Personal Details
+- Full Name
+- Phone
+- WhatsApp Number
+- Date of Birth
+- Gender
+- Address
+
+2. Passport Details
+- Passport Number
+- Issue Date
+- Expiry Date
+- Place of Issue
+- Upload Passport Image
+
+3. Upload Documents
+- Upload Profile Photo
+- Upload Aadhar Card
+- Upload PAN Card
+- Upload Health Certificate
+
+4. Medical Info
+- Blood Group
+
+Button:
+👉 Submit KYC
+
+==============================
+3. VALIDATION (IMPORTANT)
+==============================
+
+- All required fields mandatory
+- Passport expiry must be future date
+- Passport + photo upload compulsory
+- Show proper error messages
+
+==============================
+4. BACKEND API
+==============================
+
+POST /api/kyc/submit
+- Save or update KYC data
+- Handle file uploads (multipart)
+
+GET /api/kyc/profile
+- Fetch logged-in user KYC
+
+PUT /api/kyc/update
+- Update existing KYC
+
+Ensure:
+- Auth required
+- Data linked with userId
+
+==============================
+5. ADMIN PANEL (VERY IMPORTANT)
+==============================
+
+In admin dashboard:
+
+Add "KYC Management" section:
+
+Show:
+- Customer Name
+- Photo
+- Phone
+- KYC Status (Pending / Approved / Rejected)
+
+Actions:
+- View full KYC details
+- View uploaded documents
+- Approve KYC
+- Reject KYC
+- Edit KYC
+
+==============================
+6. OFFLINE SUPPORT (ADMIN ENTRY)
+==============================
+
+Admin can:
+- Add KYC manually for customer
+- Upload documents from admin panel
+- Update any field
+
+==============================
+7. FINAL RESULT
+==============================
+
+Customer:
+✔ Fill KYC form on website  
+✔ Upload documents  
+✔ Submit easily  
+
+Admin:
+✔ View all customer KYC  
+✔ Approve / reject  
+✔ Edit / upload data  
+
+All data stored securely in database.
+
+==============================
+
+Make UI clean, simple, and mobile responsive.

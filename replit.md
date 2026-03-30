@@ -38,9 +38,10 @@ artifacts/
 │   │   ├── pages/
 │   │   │   ├── public/        # Home, Packages, PackageDetail, Ziyarat, Blog, About, Contact, Legal, Invoice (with QR code, green/gold branding, status badge)
 │   │   │   ├── auth/          # Login (OTP flow)
-│   │   │   ├── customer/      # Customer dashboard
-│   │   │   └── admin/         # Admin dashboard, bookings, invoices, packages, groups, gallery
+│   │   │   ├── customer/      # Customer dashboard, KYC.tsx (customer KYC form)
+│   │   │   └── admin/         # Admin dashboard, bookings, invoices, packages, groups, gallery, KYCManager.tsx
 │   │   │       ├── InvoiceManager.tsx  # Invoice & Billing page (list, filter, offline booking, send invoice via WhatsApp/SMS)
+│   │   │       ├── KYCManager.tsx  # KYC Management (view, approve, reject, admin add)
 │   │   │       └── print/    # 11 print documents: PrintIdCards, PrintIdCardsPro, PrintLuggage, PrintLuggageSquare, PrintMedical, PrintBusList, PrintHotelList, PrintAirlineList, PrintZamzam, PrintFeedback, PrintContract
 │   │   ├── components/
 │   │   │   └── layout/        # MainLayout, AdminLayout

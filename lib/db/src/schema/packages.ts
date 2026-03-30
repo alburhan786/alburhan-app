@@ -34,6 +34,8 @@ export const packagesTable = pgTable("packages", {
   details: jsonb("details").$type<PackageDetails>().default({}),
   maxPilgrims: integer("max_pilgrims"),
   imageUrl: text("image_url"),
+  imageUrls: jsonb("image_urls").$type<string[]>().default([]),
+  videoUrls: jsonb("video_urls").$type<string[]>().default([]),
   featured: boolean("featured").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),

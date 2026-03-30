@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/use-auth";
 import {
   LayoutDashboard, PackageSearch, Users, BookOpen, MessageSquare, LogOut,
   ImageIcon, UsersRound, Receipt, ClipboardPlus, ScanLine, BarChart2,
-  Printer, Menu, Megaphone
+  Printer, Menu, Megaphone, ShieldCheck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -54,6 +54,7 @@ const MENU: MenuSection[] = [
     section: "Customers & Reports",
     items: [
       { icon: Users, label: "Customers", href: "/admin/customers" },
+      { icon: ShieldCheck, label: "KYC Management", href: "/admin/kyc" },
       { icon: MessageSquare, label: "Inquiries", href: "/admin/inquiries" },
       { icon: Megaphone, label: "Broadcast Messages", href: "/admin/broadcast" },
       { icon: BarChart2, label: "Reports", href: "/admin/reports" },

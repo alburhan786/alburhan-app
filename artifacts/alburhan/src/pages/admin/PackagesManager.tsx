@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { useListPackages, useCreatePackage, useUpdatePackage, useDeletePackage } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -7,9 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit, Trash2, Star } from "lucide-react";
+import { Plus, Edit, Trash2, Star, Images, Upload, Video, X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
+
+const BASE_API = import.meta.env.VITE_API_URL || "";
 
 export default function PackagesManager() {
   const { data: packages = [], isLoading } = useListPackages();
@@ -22,6 +24,11 @@ export default function PackagesManager() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingPackageId, setEditingPackageId] = useState<string | null>(null);
+  const [mediaOpen, setMediaOpen] = useState(false);
+  const [mediaPkg, setMediaPkg] = useState<any>(null);
+  const [mediaUploading, setMediaUploading] = useState(false);
+  const imgInputRef = useRef<HTMLInputElement>(null);
+  const vidInputRef = useRef<HTMLInputElement>(null);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm();
 
@@ -126,6 +133,60 @@ export default function PackagesManager() {
       toast({ title: "Package deleted" });
       queryClient.invalidateQueries({ queryKey: ['/api/packages'] });
     } catch (err:any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const openMedia = (pkg: any) => {
+    setMediaPkg({ ...pkg, imageUrls: pkg.imageUrls || [], videoUrls: pkg.videoUrls || [] });
+    setMediaOpen(true);
+  };
+
+  const uploadMedia = async (file: File, type: "image" | "video") => {
+    if (!mediaPkg) return;
+    setMediaUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(`${BASE_API}/api/packages/${mediaPkg.id}/upload-${type}`, {
+        method: "POST", body: fd, credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      setMediaPkg((prev: any) => ({
+        ...prev,
+        imageUrls: type === "image" ? data.imageUrls : prev.imageUrls,
+        videoUrls: type === "video" ? data.videoUrls : prev.videoUrls,
+      }));
+      queryClient.invalidateQueries({ queryKey: ['/api/packages'] });
+      toast({ title: `${type === "image" ? "Photo" : "Video"} uploaded successfully` });
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } finally {
+      setMediaUploading(false);
+    }
+  };
+
+  const removeMedia = async (url: string, type: "image" | "video") => {
+    if (!mediaPkg) return;
+    if (!confirm(`Remove this ${type}?`)) return;
+    try {
+      const res = await fetch(`${BASE_API}/api/packages/${mediaPkg.id}/remove-${type}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ url }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      setMediaPkg((prev: any) => ({
+        ...prev,
+        imageUrls: type === "image" ? data.imageUrls : prev.imageUrls,
+        videoUrls: type === "video" ? data.videoUrls : prev.videoUrls,
+      }));
+      queryClient.invalidateQueries({ queryKey: ['/api/packages'] });
+      toast({ title: `${type === "image" ? "Photo" : "Video"} removed` });
+    } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     }
   };
@@ -321,6 +382,94 @@ export default function PackagesManager() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={mediaOpen} onOpenChange={(open) => { setMediaOpen(open); if (!open) setMediaPkg(null); }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-xl flex items-center gap-2">
+              <Images size={18} /> Package Media — {mediaPkg?.name}
+            </DialogTitle>
+          </DialogHeader>
+          {mediaPkg && (
+            <div className="space-y-6 mt-2">
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <Images size={14} /> Photos ({mediaPkg.imageUrls.length})
+                  </h3>
+                  <Button size="sm" variant="outline" className="gap-1.5" disabled={mediaUploading}
+                    onClick={() => imgInputRef.current?.click()}>
+                    <Upload size={14} /> Add Photo
+                  </Button>
+                  <input ref={imgInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) { uploadMedia(f, "image"); e.target.value = ""; } }} />
+                </div>
+                {mediaPkg.imageUrls.length === 0 ? (
+                  <div className="border-2 border-dashed border-border rounded-xl py-8 text-center cursor-pointer hover:border-primary transition-colors"
+                    onClick={() => imgInputRef.current?.click()}>
+                    <Images size={24} className="mx-auto text-muted-foreground mb-2" />
+                    <p className="text-sm text-muted-foreground">No photos yet. Click to upload hotel and package photos.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-2">
+                    {mediaPkg.imageUrls.map((url: string, i: number) => (
+                      <div key={i} className="relative group rounded-lg overflow-hidden border">
+                        <img src={`${BASE_API}${url}`} alt={`Package photo ${i + 1}`}
+                          className="w-full h-24 object-cover" />
+                        <button
+                          className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => removeMedia(url, "image")}>
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ))}
+                    <div className="border-2 border-dashed border-border rounded-lg h-24 flex items-center justify-center cursor-pointer hover:border-primary transition-colors"
+                      onClick={() => imgInputRef.current?.click()}>
+                      <Plus size={20} className="text-muted-foreground" />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <Video size={14} /> Videos ({mediaPkg.videoUrls.length})
+                  </h3>
+                  <Button size="sm" variant="outline" className="gap-1.5" disabled={mediaUploading}
+                    onClick={() => vidInputRef.current?.click()}>
+                    <Upload size={14} /> Add Video
+                  </Button>
+                  <input ref={vidInputRef} type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) { uploadMedia(f, "video"); e.target.value = ""; } }} />
+                </div>
+                {mediaPkg.videoUrls.length === 0 ? (
+                  <div className="border-2 border-dashed border-border rounded-xl py-8 text-center cursor-pointer hover:border-primary transition-colors"
+                    onClick={() => vidInputRef.current?.click()}>
+                    <Video size={24} className="mx-auto text-muted-foreground mb-2" />
+                    <p className="text-sm text-muted-foreground">No videos yet. Upload tour and hotel videos (MP4, WebM, MOV, up to 100MB).</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {mediaPkg.videoUrls.map((url: string, i: number) => (
+                      <div key={i} className="flex items-center gap-2 border rounded-lg p-2 bg-muted/30">
+                        <Video size={16} className="text-primary shrink-0" />
+                        <video src={`${BASE_API}${url}`} className="h-16 rounded" controls />
+                        <span className="text-xs text-muted-foreground flex-1 truncate">Video {i + 1}</span>
+                        <button onClick={() => removeMedia(url, "video")}
+                          className="text-red-500 hover:text-red-700 p-1">
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {mediaUploading && <p className="text-sm text-muted-foreground text-center">Uploading...</p>}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <Card className="border-none shadow-sm rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
@@ -353,11 +502,14 @@ export default function PackagesManager() {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary" onClick={() => handleEditClick(pkg)}>
+                    <div className="flex items-center justify-end gap-1">
+                      <Button variant="ghost" size="icon" title="Manage Photos & Videos" className="text-muted-foreground hover:text-primary" onClick={() => openMedia(pkg)}>
+                        <Images size={16} />
+                      </Button>
+                      <Button variant="ghost" size="icon" title="Edit Package" className="text-muted-foreground hover:text-primary" onClick={() => handleEditClick(pkg)}>
                         <Edit size={16} />
                       </Button>
-                      <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive" onClick={() => handleDelete(pkg.id)}>
+                      <Button variant="ghost" size="icon" title="Delete Package" className="text-muted-foreground hover:text-destructive" onClick={() => handleDelete(pkg.id)}>
                         <Trash2 size={16} />
                       </Button>
                     </div>

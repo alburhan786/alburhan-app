@@ -11,12 +11,15 @@ import adminRouter from "./admin.js";
 import inquiryRouter from "./inquiry.js";
 import galleryRouter from "./gallery.js";
 import groupsRouter from "./groups.js";
+import packageMediaRouter from "./package-media.js";
+import kycRouter from "./kyc.js";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use("/auth", authRouter);
 router.use("/packages", packagesRouter);
+router.use("/packages", packageMediaRouter);
 router.use("/bookings", bookingsRouter);
 router.use("/payments", paymentsRouter);
 router.use("/documents", documentsRouter);
@@ -26,5 +29,6 @@ router.use("/admin", adminRouter);
 router.use("/inquiry", inquiryRouter);
 router.use("/gallery", galleryRouter);
 router.use("/groups", groupsRouter);
+router.use("/kyc", kycRouter);
 
 export default router;

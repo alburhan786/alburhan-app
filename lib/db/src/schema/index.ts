@@ -7,3 +7,4 @@ export * from "./inquiries";
 export * from "./gallery";
 export * from "./groups";
 export * from "./broadcasts";
+export * from "./kyc";

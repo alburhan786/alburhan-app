@@ -42,6 +42,8 @@ import QRTracker from "@/pages/admin/QRTracker";
 import ReportsManager from "@/pages/admin/ReportsManager";
 import PrintCenter from "@/pages/admin/PrintCenter";
 import BroadcastManager from "@/pages/admin/BroadcastManager";
+import KYCManager from "@/pages/admin/KYCManager";
+import KYCPage from "@/pages/customer/KYC";
 import NotFound from "@/pages/not-found";
 import { useAuth } from "@/hooks/use-auth";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -89,6 +91,7 @@ function Router() {
 
       {/* Customer Routes */}
       <Route path="/customer/dashboard" component={() => <CustomerRoute component={CustomerDashboard} />} />
+      <Route path="/kyc" component={() => <CustomerRoute component={KYCPage} />} />
 
       {/* Admin Routes */}
       <Route path="/admin/dashboard" component={() => <AdminRoute component={AdminDashboard} />} />
@@ -116,6 +119,7 @@ function Router() {
       <Route path="/admin/customers" component={() => <AdminRoute component={CustomerManager} />} />
       <Route path="/admin/inquiries" component={() => <AdminRoute component={InquiryManager} />} />
       <Route path="/admin/broadcast" component={() => <AdminRoute component={BroadcastManager} />} />
+      <Route path="/admin/kyc" component={() => <AdminRoute component={KYCManager} />} />
 
       <Route component={NotFound} />
     </Switch>
