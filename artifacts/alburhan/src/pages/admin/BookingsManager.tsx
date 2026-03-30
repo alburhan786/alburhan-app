@@ -22,6 +22,7 @@ const DOC_TYPE_LABELS: Record<string, string> = {
   room_allotment: "Room Allotment",
   bus_allotment: "Bus Allotment",
   model_contract: "Model Contract",
+  tour_itinerary: "Tour Itinerary",
   medical_certificate: "Medical Certificate",
   other: "Other Document",
 };
@@ -36,6 +37,7 @@ const DOC_TYPE_COLOR: Record<string, string> = {
   room_allotment: "bg-teal-100 text-teal-800",
   bus_allotment: "bg-indigo-100 text-indigo-800",
   model_contract: "bg-rose-100 text-rose-800",
+  tour_itinerary: "bg-amber-100 text-amber-800",
   medical_certificate: "bg-red-100 text-red-800",
   other: "bg-gray-100 text-gray-800",
 };

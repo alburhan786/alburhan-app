@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { CreditCard, FileText, Download, Clock, Upload, Trash2, CheckCircle, AlertCircle, X, Eye, ShieldAlert, IndianRupee, Plane, Stamp, Hotel, Bus, Printer, Share2, Copy, Bell, BellRing, CheckCheck, Megaphone } from "lucide-react";
+import { CreditCard, FileText, Download, Clock, Upload, Trash2, CheckCircle, AlertCircle, X, Eye, ShieldAlert, IndianRupee, Plane, Stamp, Hotel, Bus, Printer, Share2, Copy, Bell, BellRing, CheckCheck, Megaphone, ClipboardList } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -273,11 +273,12 @@ function UploadModal({ bookingId, bookingNumber, onClose }: { bookingId: string;
 }
 
 const TRAVEL_DOC_TYPES: Record<string, { label: string; icon: React.ElementType; color: string; bg: string }> = {
-  flight_ticket:  { label: "Flight Ticket",          icon: Plane,     color: "text-sky-700",     bg: "bg-sky-50 border-sky-200" },
-  visa:           { label: "Visa",                   icon: Stamp,     color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200" },
-  room_allotment: { label: "Hotel / Room Allotment", icon: Hotel,     color: "text-violet-700",  bg: "bg-violet-50 border-violet-200" },
-  bus_allotment:  { label: "Bus Allotment",          icon: Bus,       color: "text-orange-700",  bg: "bg-orange-50 border-orange-200" },
-  model_contract: { label: "Model Contract",         icon: FileText,  color: "text-rose-700",    bg: "bg-rose-50 border-rose-200" },
+  flight_ticket:  { label: "Flight Ticket",          icon: Plane,          color: "text-sky-700",     bg: "bg-sky-50 border-sky-200" },
+  visa:           { label: "Visa",                   icon: Stamp,          color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200" },
+  room_allotment: { label: "Hotel / Room Allotment", icon: Hotel,          color: "text-violet-700",  bg: "bg-violet-50 border-violet-200" },
+  bus_allotment:  { label: "Bus Allotment",          icon: Bus,            color: "text-orange-700",  bg: "bg-orange-50 border-orange-200" },
+  model_contract: { label: "Model Contract",         icon: FileText,       color: "text-rose-700",    bg: "bg-rose-50 border-rose-200" },
+  tour_itinerary: { label: "Tour Itinerary",         icon: ClipboardList,  color: "text-amber-700",   bg: "bg-amber-50 border-amber-200" },
 };
 
 function TravelDocumentsCard({ bookingId }: { bookingId: string }) {
