@@ -22,14 +22,23 @@ interface Pilgrim {
   bloodGroup?: string;
 }
 
+interface HotelInfo {
+  name?: string;
+  address?: string;
+  checkIn?: string;
+  checkOut?: string;
+  googleMapsLink?: string;
+}
+
 interface Group {
   id: string;
   groupName: string;
   year: number;
   hotels?: {
     groupLeader?: string;
-    makkah?: { name?: string; address?: string; checkIn?: string; checkOut?: string };
-    madinah?: { name?: string; address?: string; checkIn?: string; checkOut?: string };
+    makkah?: HotelInfo;
+    madinah?: HotelInfo;
+    aziziah?: HotelInfo;
   };
 }
 
@@ -51,100 +60,97 @@ function groupPilgrimsByRoom(pilgrims: Pilgrim[]): Map<string, Pilgrim[]> {
     if (!map.has(room)) map.set(room, []);
     map.get(room)!.push(p);
   }
-  const sorted = new Map([...map.entries()].sort((a, b) => {
+  return new Map([...map.entries()].sort((a, b) => {
     if (a[0] === "Unassigned") return 1;
     if (b[0] === "Unassigned") return -1;
     return a[0].localeCompare(b[0], undefined, { numeric: true });
   }));
-  return sorted;
 }
 
 interface RoomStickerProps {
   roomNumber: string;
   pilgrims: Pilgrim[];
-  hotelName: string;
-  hotelCity: string;
   group: Group;
 }
 
-function RoomSticker({ roomNumber, pilgrims, hotelName, hotelCity }: RoomStickerProps) {
-  const roomType = pilgrims[0]?.roomType || `${pilgrims.length} Bed`;
+function HotelRow({ label, info }: { label: string; info?: HotelInfo }) {
+  if (!info?.name) return null;
+  return (
+    <div style={{ display: "flex", alignItems: "baseline", gap: "3mm", fontSize: "7pt", borderBottom: "0.5px solid rgba(255,255,255,0.15)", paddingBottom: "1mm", marginBottom: "1mm" }}>
+      <span style={{ color: "#a8d5c2", minWidth: "14mm", fontWeight: 700, textTransform: "uppercase", fontSize: "5.5pt", letterSpacing: "0.3px" }}>{label}</span>
+      <span style={{ color: "#fff", fontWeight: 700 }}>{info.name}</span>
+      {(info.checkIn || info.checkOut) && (
+        <span style={{ color: "#c9e0d4", fontSize: "6pt", marginLeft: "auto" }}>
+          {info.checkIn && `In: ${info.checkIn}`}
+          {info.checkIn && info.checkOut && " · "}
+          {info.checkOut && `Out: ${info.checkOut}`}
+        </span>
+      )}
+    </div>
+  );
+}
 
-  const stickerStyle: React.CSSProperties = {
-    width: "148mm",
-    minHeight: "105mm",
-    border: `2.5px solid ${DARK_GREEN}`,
-    borderRadius: "4mm",
-    fontFamily: "'Arial', sans-serif",
-    overflow: "hidden",
-    background: "#fff",
-    pageBreakInside: "avoid",
-    display: "inline-block",
-    verticalAlign: "top",
-  };
+function RoomSticker({ roomNumber, pilgrims, group }: RoomStickerProps) {
+  const roomType = pilgrims[0]?.roomType || `${pilgrims.length} Bed`;
+  const { makkah, madinah, aziziah } = group.hotels || {};
+  const hasHotels = makkah?.name || madinah?.name || aziziah?.name;
 
   return (
-    <div style={stickerStyle} className="no-break">
+    <div className="no-break" style={{
+      width: "148mm",
+      border: `2.5px solid ${DARK_GREEN}`,
+      borderRadius: "4mm",
+      fontFamily: "'Arial', sans-serif",
+      overflow: "hidden",
+      background: "#fff",
+      pageBreakInside: "avoid",
+      display: "inline-block",
+      verticalAlign: "top",
+    }}>
       {/* Header */}
       <div style={{ background: DARK_GREEN, color: "#fff", padding: "3mm 4mm 2.5mm" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "2.5mm", marginBottom: "1mm" }}>
-          <span style={{ fontSize: "13pt" }}>🕋</span>
-          <div>
-            <div style={{ fontSize: "10pt", fontWeight: 900, letterSpacing: "0.3px", lineHeight: 1.1 }}>
-              AL BURHAN TOURS &amp; TRAVELS
-            </div>
-            <div style={{ fontSize: "6.5pt", color: "#c9e0d4", marginTop: "0.5mm" }}>
-              Burhanpur M.P. | +91 9893989786
-            </div>
-          </div>
-        </div>
-
-        {/* Hotel + Room row */}
-        <div style={{
-          display: "flex", justifyContent: "space-between", alignItems: "flex-end",
-          borderTop: "0.5px solid rgba(255,255,255,0.25)", paddingTop: "2mm", marginTop: "2mm"
-        }}>
-          <div>
-            <div style={{ fontSize: "6pt", color: "#c9e0d4", textTransform: "uppercase", letterSpacing: "0.4px" }}>
-              {hotelCity} Hotel
-            </div>
-            <div style={{ fontSize: "9pt", fontWeight: 700, color: GOLD, marginTop: "0.3mm" }}>
-              {hotelName || "—"}
+        {/* Company + Room number row */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "2.5mm" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "2mm" }}>
+            <span style={{ fontSize: "14pt" }}>🕋</span>
+            <div>
+              <div style={{ fontSize: "9.5pt", fontWeight: 900, letterSpacing: "0.2px", lineHeight: 1.1 }}>
+                AL BURHAN TOURS &amp; TRAVELS
+              </div>
+              <div style={{ fontSize: "6pt", color: "#a8d5c2", marginTop: "0.3mm" }}>
+                Burhanpur M.P. · Tel: {SUPPORT_PHONE}
+              </div>
             </div>
           </div>
           <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: "6pt", color: "#c9e0d4", textTransform: "uppercase", letterSpacing: "0.4px" }}>
-              Room No.
-            </div>
-            <div style={{
-              fontSize: "22pt", fontWeight: 900, color: GOLD, lineHeight: 1,
-              letterSpacing: "-0.5px"
-            }}>
+            <div style={{ fontSize: "5.5pt", color: "#a8d5c2", textTransform: "uppercase", letterSpacing: "0.4px" }}>Room No.</div>
+            <div style={{ fontSize: "24pt", fontWeight: 900, color: GOLD, lineHeight: 0.9, letterSpacing: "-0.5px" }}>
               {roomNumber}
             </div>
-            <div style={{ fontSize: "6pt", color: "#c9e0d4" }}>
-              {roomType} &nbsp;|&nbsp; {pilgrims.length} person{pilgrims.length !== 1 ? "s" : ""}
+            <div style={{ fontSize: "6pt", color: "#a8d5c2" }}>
+              {roomType} · {pilgrims.length} person{pilgrims.length !== 1 ? "s" : ""}
             </div>
           </div>
         </div>
+
+        {/* Hotel rows */}
+        {hasHotels && (
+          <div style={{ borderTop: "0.5px solid rgba(255,255,255,0.2)", paddingTop: "2mm", marginTop: "1mm" }}>
+            <HotelRow label="Makkah" info={makkah} />
+            <HotelRow label="Madinah" info={madinah} />
+            <HotelRow label="Aziziah" info={aziziah} />
+          </div>
+        )}
       </div>
 
       {/* Pilgrim Table */}
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "8pt" }}>
         <thead>
           <tr style={{ background: "#f0f7f4" }}>
-            <th style={{ padding: "1.5mm 2.5mm", textAlign: "left", color: DARK_GREEN, fontWeight: 800, borderBottom: `1.5px solid ${DARK_GREEN}`, fontSize: "6.5pt", textTransform: "uppercase", letterSpacing: "0.3px", width: "38%" }}>
-              Name
-            </th>
-            <th style={{ padding: "1.5mm 2mm", textAlign: "left", color: DARK_GREEN, fontWeight: 800, borderBottom: `1.5px solid ${DARK_GREEN}`, fontSize: "6.5pt", textTransform: "uppercase", letterSpacing: "0.3px", width: "27%" }}>
-              Passport No.
-            </th>
-            <th style={{ padding: "1.5mm 2mm", textAlign: "center", color: DARK_GREEN, fontWeight: 800, borderBottom: `1.5px solid ${DARK_GREEN}`, fontSize: "6.5pt", textTransform: "uppercase", letterSpacing: "0.3px", width: "13%" }}>
-              Age/Sex
-            </th>
-            <th style={{ padding: "1.5mm 2mm", textAlign: "left", color: DARK_GREEN, fontWeight: 800, borderBottom: `1.5px solid ${DARK_GREEN}`, fontSize: "6.5pt", textTransform: "uppercase", letterSpacing: "0.3px", width: "22%" }}>
-              Relation
-            </th>
+            <th style={{ padding: "1.5mm 2.5mm", textAlign: "left", color: DARK_GREEN, fontWeight: 800, borderBottom: `1.5px solid ${DARK_GREEN}`, fontSize: "6pt", textTransform: "uppercase", letterSpacing: "0.3px", width: "40%" }}>Name</th>
+            <th style={{ padding: "1.5mm 2mm", textAlign: "left", color: DARK_GREEN, fontWeight: 800, borderBottom: `1.5px solid ${DARK_GREEN}`, fontSize: "6pt", textTransform: "uppercase", letterSpacing: "0.3px", width: "28%" }}>Passport No.</th>
+            <th style={{ padding: "1.5mm 2mm", textAlign: "center", color: DARK_GREEN, fontWeight: 800, borderBottom: `1.5px solid ${DARK_GREEN}`, fontSize: "6pt", textTransform: "uppercase", letterSpacing: "0.3px", width: "12%" }}>Age/Sex</th>
+            <th style={{ padding: "1.5mm 2mm", textAlign: "left", color: DARK_GREEN, fontWeight: 800, borderBottom: `1.5px solid ${DARK_GREEN}`, fontSize: "6pt", textTransform: "uppercase", letterSpacing: "0.3px", width: "20%" }}>Relation</th>
           </tr>
         </thead>
         <tbody>
@@ -161,9 +167,9 @@ function RoomSticker({ roomNumber, pilgrims, hotelName, hotelCity }: RoomSticker
               <td style={{ padding: "2mm 2mm", fontFamily: "monospace", fontSize: "7pt", color: "#333", letterSpacing: "0.3px" }}>
                 {p.passportNumber || "—"}
               </td>
-              <td style={{ padding: "2mm 2mm", textAlign: "center", color: "#444", fontSize: "7.5pt" }}>
-                {calcAge(p.dateOfBirth)}
-                {p.gender && <span style={{ color: "#888", fontSize: "6pt", display: "block" }}>{p.gender.charAt(0).toUpperCase()}</span>}
+              <td style={{ padding: "2mm 2mm", textAlign: "center", color: "#444" }}>
+                <div style={{ fontSize: "8pt", fontWeight: 700 }}>{calcAge(p.dateOfBirth)}</div>
+                {p.gender && <div style={{ color: "#888", fontSize: "6pt" }}>{p.gender.charAt(0).toUpperCase()}</div>}
               </td>
               <td style={{ padding: "2mm 2mm", fontWeight: 600, color: DARK_GREEN, fontSize: "7.5pt" }}>
                 {p.relation || "—"}
@@ -180,7 +186,7 @@ function RoomSticker({ roomNumber, pilgrims, hotelName, hotelCity }: RoomSticker
         alignItems: "center", fontSize: "6pt", color: "#555"
       }}>
         <span>📞 Support: <strong>{SUPPORT_PHONE}</strong></span>
-        <span style={{ color: GOLD, fontWeight: 700 }}>Al Burhan Tours &amp; Travels</span>
+        <span style={{ color: GOLD, fontWeight: 700 }}>Al Burhan Tours &amp; Travels · {group.groupName}</span>
       </div>
     </div>
   );
@@ -195,7 +201,6 @@ export default function PrintRoomStickers() {
   const [loading, setLoading] = useState(true);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState<string>("ALL");
-  const [selectedHotel, setSelectedHotel] = useState<"makkah" | "madinah">("makkah");
 
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -217,11 +222,6 @@ export default function PrintRoomStickers() {
     ? [...roomMap.entries()]
     : roomMap.has(selectedRoom) ? [[selectedRoom, roomMap.get(selectedRoom)!]] : [];
 
-  const hotelName = selectedHotel === "makkah"
-    ? (group?.hotels?.makkah?.name || "")
-    : (group?.hotels?.madinah?.name || "");
-  const hotelCity = selectedHotel === "makkah" ? "Makkah" : "Madinah";
-
   const handleDownload = useCallback(async () => {
     if (!contentRef.current || pdfLoading) return;
     setPdfLoading(true);
@@ -237,24 +237,10 @@ export default function PrintRoomStickers() {
     } finally { setPdfLoading(false); }
   }, [group, selectedRoom, pdfLoading]);
 
-  if (loading) {
-    return (
-      <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial", color: "#666" }}>
-        Loading room data...
-      </div>
-    );
-  }
+  if (loading) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial", color: "#666" }}>Loading room data...</div>;
+  if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial", color: "#c00" }}>Group not found.</div>;
 
-  if (!group) {
-    return (
-      <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial", color: "#c00" }}>
-        Group not found.
-      </div>
-    );
-  }
-
-  const withRoomCount = pilgrims.filter(p => p.roomNumber?.trim()).length;
-  const withoutRoom = pilgrims.length - withRoomCount;
+  const withoutRoom = pilgrims.filter(p => !p.roomNumber?.trim()).length;
 
   return (
     <>
@@ -263,16 +249,15 @@ export default function PrintRoomStickers() {
           @page { size: A4 portrait; margin: 8mm; }
           body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
           .no-print { display: none !important; }
-          .sticker-grid { display: flex; flex-wrap: wrap; gap: 6mm; }
         }
         * { box-sizing: border-box; }
         .sticker-grid { display: flex; flex-wrap: wrap; gap: 6mm; padding: 4mm; }
-        .no-break { page-break-inside: avoid; }
+        .no-break { page-break-inside: avoid; break-inside: avoid; }
       `}</style>
 
       {/* Controls — hidden on print */}
       <div className="no-print" style={{
-        padding: "14px 20px", background: "#fef3c7", borderBottom: "1px solid #f59e0b",
+        padding: "12px 20px", background: "#fef3c7", borderBottom: "1px solid #f59e0b",
         display: "flex", flexWrap: "wrap", gap: "10px", alignItems: "center"
       }}>
         <div style={{ flex: 1, minWidth: "200px" }}>
@@ -281,25 +266,21 @@ export default function PrintRoomStickers() {
             {group.groupName} ({group.year}) &nbsp;|&nbsp;
             <span style={{ color: "#c00" }}>{roomMap.size} rooms</span> &nbsp;|&nbsp;
             {pilgrims.length} pilgrims
-            {withoutRoom > 0 && <span style={{ color: "#f59e0b" }}> ({withoutRoom} without room)</span>}
+            {withoutRoom > 0 && <span style={{ color: "#f59e0b" }}> · {withoutRoom} without room</span>}
           </div>
-        </div>
-
-        {/* Hotel selector */}
-        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-          <label style={{ fontSize: "12px", fontWeight: 600, color: "#555" }}>Hotel:</label>
-          <select value={selectedHotel} onChange={e => setSelectedHotel(e.target.value as any)}
-            style={{ padding: "6px 10px", borderRadius: "6px", border: "1px solid #ccc", fontSize: "13px" }}>
-            <option value="makkah">Makkah — {group.hotels?.makkah?.name || "Not set"}</option>
-            <option value="madinah">Madinah — {group.hotels?.madinah?.name || "Not set"}</option>
-          </select>
+          {/* Hotel names preview */}
+          <div style={{ fontSize: "11px", color: "#0B3D2E", marginTop: "3px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
+            {group.hotels?.makkah?.name && <span>🕌 Makkah: <strong>{group.hotels.makkah.name}</strong></span>}
+            {group.hotels?.madinah?.name && <span>🕌 Madinah: <strong>{group.hotels.madinah.name}</strong></span>}
+            {group.hotels?.aziziah?.name && <span>🏨 Aziziah: <strong>{group.hotels.aziziah.name}</strong></span>}
+          </div>
         </div>
 
         {/* Room selector */}
         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
           <label style={{ fontSize: "12px", fontWeight: 600, color: "#555" }}>Room:</label>
           <select value={selectedRoom} onChange={e => setSelectedRoom(e.target.value)}
-            style={{ padding: "6px 10px", borderRadius: "6px", border: "1px solid #ccc", fontSize: "13px", minWidth: "120px" }}>
+            style={{ padding: "6px 10px", borderRadius: "6px", border: "1px solid #ccc", fontSize: "13px", minWidth: "130px" }}>
             <option value="ALL">All Rooms ({roomMap.size})</option>
             {allRoomKeys.map(r => (
               <option key={r} value={r}>Room {r} ({roomMap.get(r)?.length} persons)</option>
@@ -307,7 +288,6 @@ export default function PrintRoomStickers() {
           </select>
         </div>
 
-        {/* Action buttons */}
         <button onClick={handleDownload} disabled={pdfLoading || roomsToShow.length === 0}
           style={{ padding: "8px 18px", background: "#0B3D2E", color: "#fff", border: "none", borderRadius: "7px", fontWeight: 700, cursor: "pointer", fontSize: "13px", opacity: (pdfLoading || roomsToShow.length === 0) ? 0.6 : 1 }}>
           {pdfLoading ? "Generating..." : "⬇ Download PDF"}
@@ -322,26 +302,18 @@ export default function PrintRoomStickers() {
         </button>
       </div>
 
-      {/* Stats bar */}
-      <div className="no-print" style={{ padding: "8px 20px", background: "#fff", borderBottom: "1px solid #e5e7eb", display: "flex", gap: "20px", flexWrap: "wrap" }}>
-        {[...roomMap.entries()].map(([room, ps]) => (
-          <button key={room} onClick={() => setSelectedRoom(room === selectedRoom ? "ALL" : room)}
-            style={{
-              padding: "3px 10px", borderRadius: "99px", fontSize: "11px", fontWeight: 700,
-              cursor: "pointer", border: "1.5px solid",
-              background: selectedRoom === room ? DARK_GREEN : "#f0f7f4",
-              color: selectedRoom === room ? "#fff" : DARK_GREEN,
-              borderColor: selectedRoom === room ? DARK_GREEN : "#c9e0d4",
-            }}>
-            Room {room} &bull; {ps.length}p
+      {/* Room pill quick-filter */}
+      <div className="no-print" style={{ padding: "8px 20px", background: "#fff", borderBottom: "1px solid #e5e7eb", display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
+        <button onClick={() => setSelectedRoom("ALL")}
+          style={{ padding: "3px 10px", borderRadius: "99px", fontSize: "11px", fontWeight: 700, cursor: "pointer", border: "1.5px solid", background: selectedRoom === "ALL" ? DARK_GREEN : "#f0f7f4", color: selectedRoom === "ALL" ? "#fff" : DARK_GREEN, borderColor: selectedRoom === "ALL" ? DARK_GREEN : "#c9e0d4" }}>
+          All ({roomMap.size})
+        </button>
+        {allRoomKeys.map(r => (
+          <button key={r} onClick={() => setSelectedRoom(r === selectedRoom ? "ALL" : r)}
+            style={{ padding: "3px 10px", borderRadius: "99px", fontSize: "11px", fontWeight: 700, cursor: "pointer", border: "1.5px solid", background: selectedRoom === r ? DARK_GREEN : "#f0f7f4", color: selectedRoom === r ? "#fff" : DARK_GREEN, borderColor: selectedRoom === r ? DARK_GREEN : "#c9e0d4" }}>
+            {r} &bull; {roomMap.get(r)?.length}p
           </button>
         ))}
-        {selectedRoom !== "ALL" && (
-          <button onClick={() => setSelectedRoom("ALL")}
-            style={{ padding: "3px 10px", borderRadius: "99px", fontSize: "11px", cursor: "pointer", border: "1px dashed #ccc", background: "#fff", color: "#666" }}>
-            Show All
-          </button>
-        )}
       </div>
 
       {/* Print content */}
@@ -353,21 +325,12 @@ export default function PrintRoomStickers() {
         ) : (
           <div className="sticker-grid">
             {roomsToShow.map(([room, ps]) => (
-              <RoomSticker
-                key={room}
-                roomNumber={room}
-                pilgrims={ps}
-                hotelName={hotelName}
-                hotelCity={hotelCity}
-                group={group!}
-              />
+              <RoomSticker key={room} roomNumber={room} pilgrims={ps} group={group!} />
             ))}
           </div>
         )}
-
-        {/* Print footer */}
-        <div style={{ padding: "4mm 4mm 2mm", fontSize: "7pt", color: "#999", textAlign: "center", marginTop: "3mm" }}>
-          Generated by Al Burhan Tours &amp; Travels Admin &nbsp;|&nbsp; {new Date().toLocaleDateString("en-IN")} &nbsp;|&nbsp; {group.groupName} {group.year}
+        <div style={{ padding: "2mm 4mm", fontSize: "7pt", color: "#bbb", textAlign: "center" }}>
+          Al Burhan Tours &amp; Travels · {group.groupName} {group.year} · Generated {new Date().toLocaleDateString("en-IN")}
         </div>
       </div>
     </>

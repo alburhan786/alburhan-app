@@ -10,8 +10,9 @@ export const hajjGroupsTable = pgTable("hajj_groups", {
   maktabNumber: text("maktab_number"),
   hotels: jsonb("hotels").$type<{
     groupLeader?: string;
-    makkah?: { name?: string; address?: string; checkIn?: string; checkOut?: string };
-    madinah?: { name?: string; address?: string; checkIn?: string; checkOut?: string };
+    makkah?: { name?: string; address?: string; checkIn?: string; checkOut?: string; googleMapsLink?: string };
+    madinah?: { name?: string; address?: string; checkIn?: string; checkOut?: string; googleMapsLink?: string };
+    aziziah?: { name?: string; address?: string; checkIn?: string; checkOut?: string; googleMapsLink?: string };
   }>().default({}),
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),

@@ -29,6 +29,7 @@ const emptyForm = {
   flightNumber: "", maktabNumber: "", notes: "", groupLeader: "",
   hotelMakkahName: "", hotelMakkahAddress: "", hotelMakkahCheckIn: "", hotelMakkahCheckOut: "", hotelMakkahGoogleMaps: "",
   hotelMadinahName: "", hotelMadinahAddress: "", hotelMadinahCheckIn: "", hotelMadinahCheckOut: "", hotelMadinahGoogleMaps: "",
+  hotelAziziahName: "", hotelAziziahAddress: "", hotelAziziahCheckIn: "", hotelAziziahCheckOut: "", hotelAziziahGoogleMaps: "",
 };
 
 function PrintDropdown({ groupId }: { groupId: string }) {
@@ -47,6 +48,8 @@ function PrintDropdown({ groupId }: { groupId: string }) {
     { sep: true },
     { label: "Feedback Form", path: "feedback" },
     { label: "Booking Contract", path: "contract" },
+    { sep: true },
+    { label: "Room Stickers", path: "room-stickers" },
   ] as const;
 
   return (
@@ -107,6 +110,11 @@ export default function GroupsManager() {
       hotelMadinahCheckIn: g.hotels?.madinah?.checkIn || "",
       hotelMadinahCheckOut: g.hotels?.madinah?.checkOut || "",
       hotelMadinahGoogleMaps: g.hotels?.madinah?.googleMapsLink || "",
+      hotelAziziahName: g.hotels?.aziziah?.name || "",
+      hotelAziziahAddress: g.hotels?.aziziah?.address || "",
+      hotelAziziahCheckIn: g.hotels?.aziziah?.checkIn || "",
+      hotelAziziahCheckOut: g.hotels?.aziziah?.checkOut || "",
+      hotelAziziahGoogleMaps: g.hotels?.aziziah?.googleMapsLink || "",
     });
     setDialogOpen(true);
   };
@@ -121,6 +129,7 @@ export default function GroupsManager() {
         groupLeader: form.groupLeader || null,
         makkah: { name: form.hotelMakkahName, address: form.hotelMakkahAddress, checkIn: form.hotelMakkahCheckIn, checkOut: form.hotelMakkahCheckOut, googleMapsLink: form.hotelMakkahGoogleMaps || null },
         madinah: { name: form.hotelMadinahName, address: form.hotelMadinahAddress, checkIn: form.hotelMadinahCheckIn, checkOut: form.hotelMadinahCheckOut, googleMapsLink: form.hotelMadinahGoogleMaps || null },
+        aziziah: { name: form.hotelAziziahName, address: form.hotelAziziahAddress, checkIn: form.hotelAziziahCheckIn, checkOut: form.hotelAziziahCheckOut, googleMapsLink: form.hotelAziziahGoogleMaps || null },
       },
     };
     try {
@@ -190,6 +199,7 @@ export default function GroupsManager() {
                 {g.departureDate && <p>Departure: {g.departureDate}</p>}
                 {g.hotels?.makkah?.name && <p>Makkah: {g.hotels.makkah.name}</p>}
                 {g.hotels?.madinah?.name && <p>Madinah: {g.hotels.madinah.name}</p>}
+                {g.hotels?.aziziah?.name && <p>Aziziah: {g.hotels.aziziah.name}</p>}
               </div>
               <div className="flex items-center justify-between border-t pt-4">
                 <div className="flex items-center gap-2 text-primary font-bold">
@@ -246,6 +256,16 @@ export default function GroupsManager() {
                 <div className="space-y-1"><label className="text-sm font-medium">Check-in</label><Input value={form.hotelMadinahCheckIn} onChange={e => f("hotelMadinahCheckIn", e.target.value)} /></div>
                 <div className="space-y-1"><label className="text-sm font-medium">Check-out</label><Input value={form.hotelMadinahCheckOut} onChange={e => f("hotelMadinahCheckOut", e.target.value)} /></div>
                 <div className="col-span-2 space-y-1"><label className="text-sm font-medium">Google Maps Link</label><Input value={form.hotelMadinahGoogleMaps} onChange={e => f("hotelMadinahGoogleMaps", e.target.value)} placeholder="https://maps.google.com/?q=..." /></div>
+              </div>
+            </div>
+            <div>
+              <h3 className="text-sm font-bold uppercase tracking-wider mb-3">Hotel Aziziah</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1"><label className="text-sm font-medium">Name</label><Input value={form.hotelAziziahName} onChange={e => f("hotelAziziahName", e.target.value)} /></div>
+                <div className="space-y-1"><label className="text-sm font-medium">Address</label><Input value={form.hotelAziziahAddress} onChange={e => f("hotelAziziahAddress", e.target.value)} /></div>
+                <div className="space-y-1"><label className="text-sm font-medium">Check-in</label><Input value={form.hotelAziziahCheckIn} onChange={e => f("hotelAziziahCheckIn", e.target.value)} /></div>
+                <div className="space-y-1"><label className="text-sm font-medium">Check-out</label><Input value={form.hotelAziziahCheckOut} onChange={e => f("hotelAziziahCheckOut", e.target.value)} /></div>
+                <div className="col-span-2 space-y-1"><label className="text-sm font-medium">Google Maps Link</label><Input value={form.hotelAziziahGoogleMaps} onChange={e => f("hotelAziziahGoogleMaps", e.target.value)} placeholder="https://maps.google.com/?q=..." /></div>
               </div>
             </div>
             <div className="space-y-1">
