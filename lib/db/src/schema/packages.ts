@@ -14,10 +14,15 @@ export interface PackageDetails {
   hotelCategoryMadinah?: string;
   distanceMakkah?: string;
   distanceMadinah?: string;
+  locationMakkah?: string;
+  locationMadinah?: string;
   roomType?: string;
   mealPlan?: string;
   transport?: string;
   visa?: string;
+  meenaTentLocation?: string;
+  meenaTentImageUrls?: string[];
+  meenaTentVideoUrls?: string[];
 }
 
 export const packagesTable = pgTable("packages", {

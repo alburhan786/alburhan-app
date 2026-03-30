@@ -173,4 +173,84 @@ router.delete(
   }
 );
 
+router.post(
+  "/:id/upload-meena-image",
+  requireAdmin as any,
+  uploadImage.single("file"),
+  async (req, res) => {
+    if (!req.file) { res.status(400).json({ message: "No image file provided" }); return; }
+    const pkgs = await db.select().from(packagesTable).where(eq(packagesTable.id, req.params.id)).limit(1);
+    if (!pkgs[0]) { res.status(404).json({ message: "Package not found" }); return; }
+    const fileUrl = `/api/documents/files/${req.file.filename}`;
+    const details: any = pkgs[0].details || {};
+    const current: string[] = details.meenaTentImageUrls || [];
+    const updated = [...current, fileUrl];
+    await db.update(packagesTable)
+      .set({ details: { ...details, meenaTentImageUrls: updated }, updatedAt: new Date() })
+      .where(eq(packagesTable.id, req.params.id));
+    res.json({ url: fileUrl, meenaTentImageUrls: updated });
+  }
+);
+
+router.delete(
+  "/:id/remove-meena-image",
+  requireAdmin as any,
+  async (req, res) => {
+    const { url } = req.body;
+    if (!url) { res.status(400).json({ message: "url is required" }); return; }
+    const pkgs = await db.select().from(packagesTable).where(eq(packagesTable.id, req.params.id)).limit(1);
+    if (!pkgs[0]) { res.status(404).json({ message: "Package not found" }); return; }
+    const details: any = pkgs[0].details || {};
+    const current: string[] = details.meenaTentImageUrls || [];
+    const updated = current.filter((u) => u !== url);
+    const filename = path.basename(url);
+    const filePath = path.join(UPLOADS_DIR, filename);
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    await db.update(packagesTable)
+      .set({ details: { ...details, meenaTentImageUrls: updated }, updatedAt: new Date() })
+      .where(eq(packagesTable.id, req.params.id));
+    res.json({ meenaTentImageUrls: updated });
+  }
+);
+
+router.post(
+  "/:id/upload-meena-video",
+  requireAdmin as any,
+  uploadVideo.single("file"),
+  async (req, res) => {
+    if (!req.file) { res.status(400).json({ message: "No video file provided" }); return; }
+    const pkgs = await db.select().from(packagesTable).where(eq(packagesTable.id, req.params.id)).limit(1);
+    if (!pkgs[0]) { res.status(404).json({ message: "Package not found" }); return; }
+    const fileUrl = `/api/documents/files/${req.file.filename}`;
+    const details: any = pkgs[0].details || {};
+    const current: string[] = details.meenaTentVideoUrls || [];
+    const updated = [...current, fileUrl];
+    await db.update(packagesTable)
+      .set({ details: { ...details, meenaTentVideoUrls: updated }, updatedAt: new Date() })
+      .where(eq(packagesTable.id, req.params.id));
+    res.json({ url: fileUrl, meenaTentVideoUrls: updated });
+  }
+);
+
+router.delete(
+  "/:id/remove-meena-video",
+  requireAdmin as any,
+  async (req, res) => {
+    const { url } = req.body;
+    if (!url) { res.status(400).json({ message: "url is required" }); return; }
+    const pkgs = await db.select().from(packagesTable).where(eq(packagesTable.id, req.params.id)).limit(1);
+    if (!pkgs[0]) { res.status(404).json({ message: "Package not found" }); return; }
+    const details: any = pkgs[0].details || {};
+    const current: string[] = details.meenaTentVideoUrls || [];
+    const updated = current.filter((u) => u !== url);
+    const filename = path.basename(url);
+    const filePath = path.join(UPLOADS_DIR, filename);
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    await db.update(packagesTable)
+      .set({ details: { ...details, meenaTentVideoUrls: updated }, updatedAt: new Date() })
+      .where(eq(packagesTable.id, req.params.id));
+    res.json({ meenaTentVideoUrls: updated });
+  }
+);
+
 export default router;

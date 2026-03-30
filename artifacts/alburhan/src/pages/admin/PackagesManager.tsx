@@ -7,11 +7,21 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit, Trash2, Star, Images, Upload, Video, X } from "lucide-react";
+import { Plus, Edit, Trash2, Star, Images, Upload, Video, X, MapPin, Tent, Hotel, Settings, Info, Plane } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
 
 const BASE_API = import.meta.env.VITE_API_URL || "";
+
+type FormTab = "basic" | "travel" | "hotels" | "meena" | "settings";
+
+const TABS: { id: FormTab; label: string; icon: React.ReactNode }[] = [
+  { id: "basic",    label: "Basic Info",   icon: <Info size={13} /> },
+  { id: "travel",   label: "Travel",       icon: <Plane size={13} /> },
+  { id: "hotels",   label: "Hotels",       icon: <Hotel size={13} /> },
+  { id: "meena",    label: "Meena Tent",   icon: <Tent size={13} /> },
+  { id: "settings", label: "Settings",     icon: <Settings size={13} /> },
+];
 
 export default function PackagesManager() {
   const { data: packages = [], isLoading } = useListPackages();
@@ -20,22 +30,30 @@ export default function PackagesManager() {
   const deleteMutation = useDeletePackage();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  
+
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingPackageId, setEditingPackageId] = useState<string | null>(null);
+  const [editingPkgData, setEditingPkgData] = useState<any>(null);
+  const [formTab, setFormTab] = useState<FormTab>("basic");
+
   const [mediaOpen, setMediaOpen] = useState(false);
   const [mediaPkg, setMediaPkg] = useState<any>(null);
   const [mediaUploading, setMediaUploading] = useState(false);
+  const [meenaUploading, setMeenaUploading] = useState(false);
+
   const imgInputRef = useRef<HTMLInputElement>(null);
   const vidInputRef = useRef<HTMLInputElement>(null);
+  const meenaImgRef = useRef<HTMLInputElement>(null);
+  const meenaVidRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm();
-
+  const { register, handleSubmit, reset } = useForm();
   const editForm = useForm();
 
   const handleEditClick = (pkg: any) => {
     setEditingPackageId(pkg.id);
+    setEditingPkgData(pkg);
     const details = pkg.details || {};
     editForm.reset({
       name: pkg.name || "",
@@ -59,11 +77,15 @@ export default function PackagesManager() {
       hotelCategoryMadinah: details.hotelCategoryMadinah || "",
       distanceMakkah: details.distanceMakkah || "",
       distanceMadinah: details.distanceMadinah || "",
+      locationMakkah: details.locationMakkah || "",
+      locationMadinah: details.locationMadinah || "",
       roomType: details.roomType || "",
       mealPlan: details.mealPlan || "",
       transport: details.transport || "",
       visa: details.visa || "",
+      meenaTentLocation: details.meenaTentLocation || "",
     });
+    setFormTab("basic");
     setIsEditOpen(true);
   };
 
@@ -78,11 +100,13 @@ export default function PackagesManager() {
     if (data.hotelCategoryMadinah) details.hotelCategoryMadinah = data.hotelCategoryMadinah;
     if (data.distanceMakkah) details.distanceMakkah = data.distanceMakkah;
     if (data.distanceMadinah) details.distanceMadinah = data.distanceMadinah;
+    if (data.locationMakkah) details.locationMakkah = data.locationMakkah;
+    if (data.locationMadinah) details.locationMadinah = data.locationMadinah;
     if (data.roomType) details.roomType = data.roomType;
     if (data.mealPlan) details.mealPlan = data.mealPlan;
     if (data.transport) details.transport = data.transport;
     if (data.visa) details.visa = data.visa;
-
+    if (data.meenaTentLocation) details.meenaTentLocation = data.meenaTentLocation;
     return {
       name: data.name,
       type: data.type,
@@ -107,7 +131,7 @@ export default function PackagesManager() {
       setIsCreateOpen(false);
       reset();
       queryClient.invalidateQueries({ queryKey: ['/api/packages'] });
-    } catch (err:any) {
+    } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     }
   };
@@ -119,9 +143,10 @@ export default function PackagesManager() {
       toast({ title: "Package updated successfully" });
       setIsEditOpen(false);
       setEditingPackageId(null);
+      setEditingPkgData(null);
       editForm.reset();
       queryClient.invalidateQueries({ queryKey: ['/api/packages'] });
-    } catch (err:any) {
+    } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     }
   };
@@ -132,7 +157,7 @@ export default function PackagesManager() {
       await deleteMutation.mutateAsync({ id });
       toast({ title: "Package deleted" });
       queryClient.invalidateQueries({ queryKey: ['/api/packages'] });
-    } catch (err:any) {
+    } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     }
   };
@@ -148,9 +173,7 @@ export default function PackagesManager() {
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const res = await fetch(`${BASE_API}/api/packages/${mediaPkg.id}/upload-${type}`, {
-        method: "POST", body: fd, credentials: "include",
-      });
+      const res = await fetch(`${BASE_API}/api/packages/${mediaPkg.id}/upload-${type}`, { method: "POST", body: fd, credentials: "include" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
       setMediaPkg((prev: any) => ({
@@ -159,23 +182,17 @@ export default function PackagesManager() {
         videoUrls: type === "video" ? data.videoUrls : prev.videoUrls,
       }));
       queryClient.invalidateQueries({ queryKey: ['/api/packages'] });
-      toast({ title: `${type === "image" ? "Photo" : "Video"} uploaded successfully` });
+      toast({ title: `${type === "image" ? "Photo" : "Video"} uploaded` });
     } catch (err: any) {
       toast({ title: "Upload failed", description: err.message, variant: "destructive" });
-    } finally {
-      setMediaUploading(false);
-    }
+    } finally { setMediaUploading(false); }
   };
 
   const removeMedia = async (url: string, type: "image" | "video") => {
-    if (!mediaPkg) return;
-    if (!confirm(`Remove this ${type}?`)) return;
+    if (!mediaPkg || !confirm(`Remove this ${type}?`)) return;
     try {
       const res = await fetch(`${BASE_API}/api/packages/${mediaPkg.id}/remove-${type}`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ url }),
+        method: "DELETE", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ url }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
@@ -191,13 +208,87 @@ export default function PackagesManager() {
     }
   };
 
-  const PackageFormFields = ({ reg }: { reg: any }) => (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-sm font-bold text-foreground uppercase tracking-wider mb-3">Basic Information</h3>
+  const uploadCover = async (file: File) => {
+    if (!mediaPkg) return;
+    setMediaUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(`${BASE_API}/api/packages/${mediaPkg.id}/upload-cover`, { method: "POST", body: fd, credentials: "include" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      setMediaPkg((prev: any) => ({ ...prev, imageUrl: data.imageUrl }));
+      queryClient.invalidateQueries({ queryKey: ['/api/packages'] });
+      toast({ title: "Cover photo updated" });
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } finally { setMediaUploading(false); }
+  };
+
+  const uploadMeena = async (file: File, type: "image" | "video") => {
+    if (!editingPackageId) return;
+    setMeenaUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(`${BASE_API}/api/packages/${editingPackageId}/upload-meena-${type}`, { method: "POST", body: fd, credentials: "include" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      setEditingPkgData((prev: any) => ({
+        ...prev,
+        details: {
+          ...(prev?.details || {}),
+          meenaTentImageUrls: type === "image" ? data.meenaTentImageUrls : prev?.details?.meenaTentImageUrls,
+          meenaTentVideoUrls: type === "video" ? data.meenaTentVideoUrls : prev?.details?.meenaTentVideoUrls,
+        },
+      }));
+      queryClient.invalidateQueries({ queryKey: ['/api/packages'] });
+      toast({ title: `Meena Tent ${type === "image" ? "photo" : "video"} uploaded` });
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } finally { setMeenaUploading(false); }
+  };
+
+  const removeMeena = async (url: string, type: "image" | "video") => {
+    if (!editingPackageId || !confirm(`Remove this ${type}?`)) return;
+    try {
+      const res = await fetch(`${BASE_API}/api/packages/${editingPackageId}/remove-meena-${type}`, {
+        method: "DELETE", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ url }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      setEditingPkgData((prev: any) => ({
+        ...prev,
+        details: {
+          ...(prev?.details || {}),
+          meenaTentImageUrls: type === "image" ? data.meenaTentImageUrls : prev?.details?.meenaTentImageUrls,
+          meenaTentVideoUrls: type === "video" ? data.meenaTentVideoUrls : prev?.details?.meenaTentVideoUrls,
+        },
+      }));
+      queryClient.invalidateQueries({ queryKey: ['/api/packages'] });
+      toast({ title: `Meena Tent ${type === "image" ? "photo" : "video"} removed` });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const FormTabs = ({ reg, isEdit }: { reg: any; isEdit: boolean }) => (
+    <div className="space-y-0">
+      {/* Tab bar */}
+      <div className="flex gap-0.5 border-b mb-5 overflow-x-auto">
+        {TABS.map(t => (
+          <button key={t.id} type="button" onClick={() => setFormTab(t.id)}
+            className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-t-lg border-b-2 transition-colors whitespace-nowrap ${formTab === t.id ? "border-primary text-primary bg-primary/5" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
+            {t.icon} {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Basic Info */}
+      {formTab === "basic" && (
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium">Name</label>
+            <label className="text-sm font-medium">Package Name *</label>
             <Input {...reg("name", { required: true })} placeholder="e.g. Premium Umrah 14 Days" />
           </div>
           <div className="space-y-2">
@@ -214,22 +305,22 @@ export default function PackagesManager() {
             </select>
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium">Price (per person)</label>
-            <Input type="number" {...reg("pricePerPerson", { required: true })} />
+            <label className="text-sm font-medium">Price per Person (₹) *</label>
+            <Input type="number" {...reg("pricePerPerson", { required: true })} placeholder="e.g. 85000" />
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Duration</label>
-            <Input {...reg("duration")} placeholder="14 Days" />
+            <Input {...reg("duration")} placeholder="e.g. 14 Days" />
           </div>
           <div className="col-span-2 space-y-2">
             <label className="text-sm font-medium">Description</label>
-            <textarea {...reg("description")} className="w-full p-3 rounded-md border min-h-[80px] text-sm" />
+            <textarea {...reg("description")} className="w-full p-3 rounded-md border min-h-[90px] text-sm resize-none" placeholder="Brief description of the package..." />
           </div>
         </div>
-      </div>
+      )}
 
-      <div>
-        <h3 className="text-sm font-bold text-foreground uppercase tracking-wider mb-3">Travel Details</h3>
+      {/* Travel */}
+      {formTab === "travel" && (
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <label className="text-sm font-medium">Airline</label>
@@ -260,77 +351,195 @@ export default function PackagesManager() {
             <Input {...reg("roomType")} placeholder="e.g. Quad Sharing" />
           </div>
         </div>
-      </div>
+      )}
 
-      <div>
-        <h3 className="text-sm font-bold text-foreground uppercase tracking-wider mb-3">Hotels</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Hotel Makkah</label>
-            <Input {...reg("hotelMakkah")} placeholder="e.g. Pullman ZamZam" />
+      {/* Hotels */}
+      {formTab === "hotels" && (
+        <div className="space-y-5">
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+              <Hotel size={12} /> Makkah Hotel
+            </h4>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Hotel Name</label>
+                <Input {...reg("hotelMakkah")} placeholder="e.g. Pullman ZamZam" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Category</label>
+                <Input {...reg("hotelCategoryMakkah")} placeholder="e.g. 5 Star" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Distance from Haram</label>
+                <Input {...reg("distanceMakkah")} placeholder="e.g. 100 meters" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-1"><MapPin size={12} /> Location / Address</label>
+                <Input {...reg("locationMakkah")} placeholder="e.g. Ajyad St, Makkah" />
+              </div>
+            </div>
           </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Hotel Madinah</label>
-            <Input {...reg("hotelMadinah")} placeholder="e.g. Shaza Al Madina" />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Category Makkah</label>
-            <Input {...reg("hotelCategoryMakkah")} placeholder="e.g. 5 Star" />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Category Madinah</label>
-            <Input {...reg("hotelCategoryMadinah")} placeholder="e.g. 4 Star" />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Distance from Haram (Makkah)</label>
-            <Input {...reg("distanceMakkah")} placeholder="e.g. 100 meters" />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Distance from Masjid (Madinah)</label>
-            <Input {...reg("distanceMadinah")} placeholder="e.g. 200 meters" />
+          <div className="border-t pt-4">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+              <Hotel size={12} /> Madinah Hotel
+            </h4>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Hotel Name</label>
+                <Input {...reg("hotelMadinah")} placeholder="e.g. Shaza Al Madina" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Category</label>
+                <Input {...reg("hotelCategoryMadinah")} placeholder="e.g. 4 Star" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Distance from Masjid</label>
+                <Input {...reg("distanceMadinah")} placeholder="e.g. 200 meters" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-1"><MapPin size={12} /> Location / Address</label>
+                <Input {...reg("locationMadinah")} placeholder="e.g. King Fahd Rd, Madinah" />
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      <div>
-        <h3 className="text-sm font-bold text-foreground uppercase tracking-wider mb-3">Lists & Settings</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="col-span-2 space-y-2">
+      {/* Meena Tent */}
+      {formTab === "meena" && (
+        <div className="space-y-5">
+          <div className="space-y-2">
+            <label className="text-sm font-medium flex items-center gap-1.5"><MapPin size={13} /> Meena Tent Location / Address</label>
+            <Input {...reg("meenaTentLocation")} placeholder="e.g. Mina Tent Block 10, Makkah" />
+          </div>
+
+          {isEdit && editingPackageId ? (
+            <>
+              {/* Meena Photos */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <Images size={13} /> Meena Tent Photos ({(editingPkgData?.details?.meenaTentImageUrls || []).length})
+                  </h4>
+                  <Button size="sm" variant="outline" className="gap-1.5" disabled={meenaUploading} type="button"
+                    onClick={() => meenaImgRef.current?.click()}>
+                    <Upload size={13} /> Add Photo
+                  </Button>
+                  <input ref={meenaImgRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) { uploadMeena(f, "image"); e.target.value = ""; } }} />
+                </div>
+                {(editingPkgData?.details?.meenaTentImageUrls || []).length === 0 ? (
+                  <div className="border-2 border-dashed rounded-xl py-8 text-center cursor-pointer hover:border-primary transition-colors"
+                    onClick={() => meenaImgRef.current?.click()}>
+                    <Images size={22} className="mx-auto text-muted-foreground mb-2" />
+                    <p className="text-sm text-muted-foreground">Click to upload Meena tent photos</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-2">
+                    {(editingPkgData?.details?.meenaTentImageUrls || []).map((url: string, i: number) => (
+                      <div key={i} className="relative group rounded-lg overflow-hidden border">
+                        <img src={`${BASE_API}${url}`} alt={`Meena photo ${i + 1}`} className="w-full h-24 object-cover" />
+                        <button type="button"
+                          className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => removeMeena(url, "image")}>
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ))}
+                    <div className="border-2 border-dashed rounded-lg h-24 flex items-center justify-center cursor-pointer hover:border-primary transition-colors"
+                      onClick={() => meenaImgRef.current?.click()}>
+                      <Plus size={20} className="text-muted-foreground" />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Meena Videos */}
+              <div className="border-t pt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <Video size={13} /> Meena Tent Videos ({(editingPkgData?.details?.meenaTentVideoUrls || []).length})
+                  </h4>
+                  <Button size="sm" variant="outline" className="gap-1.5" disabled={meenaUploading} type="button"
+                    onClick={() => meenaVidRef.current?.click()}>
+                    <Upload size={13} /> Add Video
+                  </Button>
+                  <input ref={meenaVidRef} type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) { uploadMeena(f, "video"); e.target.value = ""; } }} />
+                </div>
+                {(editingPkgData?.details?.meenaTentVideoUrls || []).length === 0 ? (
+                  <div className="border-2 border-dashed rounded-xl py-8 text-center cursor-pointer hover:border-primary transition-colors"
+                    onClick={() => meenaVidRef.current?.click()}>
+                    <Video size={22} className="mx-auto text-muted-foreground mb-2" />
+                    <p className="text-sm text-muted-foreground">Click to upload Meena tent videos (MP4, MOV)</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {(editingPkgData?.details?.meenaTentVideoUrls || []).map((url: string, i: number) => (
+                      <div key={i} className="flex items-center gap-2 border rounded-lg p-2 bg-muted/30">
+                        <Video size={16} className="text-primary shrink-0" />
+                        <video src={`${BASE_API}${url}`} className="h-16 rounded" controls />
+                        <span className="text-xs text-muted-foreground flex-1 truncate">Video {i + 1}</span>
+                        <button type="button" onClick={() => removeMeena(url, "video")} className="text-red-500 hover:text-red-700 p-1">
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {meenaUploading && <p className="text-xs text-muted-foreground text-center animate-pulse">Uploading...</p>}
+            </>
+          ) : (
+            <div className="rounded-xl border-2 border-dashed border-border p-6 text-center">
+              <Tent size={28} className="mx-auto text-muted-foreground mb-2" />
+              <p className="text-sm text-muted-foreground">Save the package first, then come back to upload Meena Tent photos & videos.</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Settings */}
+      {formTab === "settings" && (
+        <div className="space-y-4">
+          <div className="space-y-2">
             <label className="text-sm font-medium">Includes (comma separated)</label>
-            <Input {...reg("includes")} placeholder="Visa, Flights, 5-Star Hotel" />
+            <Input {...reg("includes")} placeholder="Visa, Flights, 5-Star Hotel, Ziyarat" />
           </div>
-          <div className="col-span-2 space-y-2">
+          <div className="space-y-2">
             <label className="text-sm font-medium">Departure Dates (comma separated)</label>
-            <Input {...reg("departureDates")} placeholder="15 Oct 2024, 28 Oct 2024" />
+            <Input {...reg("departureDates")} placeholder="15 Oct 2025, 28 Oct 2025" />
           </div>
-          <div className="col-span-2 space-y-2">
+          <div className="space-y-2">
             <label className="text-sm font-medium">Highlights (comma separated)</label>
             <Input {...reg("highlights")} placeholder="Ziyarat, VIP Transport, Guided Tours" />
           </div>
-          <div className="col-span-2 space-y-2">
-            <label className="text-sm font-medium">Image URL</label>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Cover Image URL</label>
             <Input {...reg("imageUrl")} placeholder="https://..." />
           </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">GST %</label>
-            <Input type="number" {...reg("gstPercent")} placeholder="5" />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Featured</label>
-            <select {...reg("featured")} className="w-full h-10 px-3 rounded-md border bg-background text-sm">
-              <option value="false">No</option>
-              <option value="true">Yes</option>
-            </select>
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Active Status</label>
-            <select {...reg("isActive")} className="w-full h-10 px-3 rounded-md border bg-background text-sm">
-              <option value="true">Active</option>
-              <option value="false">Inactive</option>
-            </select>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">GST %</label>
+              <Input type="number" {...reg("gstPercent")} placeholder="5" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Featured</label>
+              <select {...reg("featured")} className="w-full h-10 px-3 rounded-md border bg-background text-sm">
+                <option value="false">No</option>
+                <option value="true">Yes</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Status</label>
+              <select {...reg("isActive")} className="w-full h-10 px-3 rounded-md border bg-background text-sm">
+                <option value="true">Active</option>
+                <option value="false">Inactive</option>
+              </select>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 
@@ -338,11 +547,10 @@ export default function PackagesManager() {
     <AdminLayout>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
         <div>
-          <h1 className="text-3xl font-serif font-bold text-foreground">Package Management</h1>
+          <h1 className="text-3xl font-serif font-bold">Package Management</h1>
           <p className="text-muted-foreground mt-1">Create, edit and manage travel packages.</p>
         </div>
-        
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <Dialog open={isCreateOpen} onOpenChange={open => { setIsCreateOpen(open); if (!open) { reset(); setFormTab("basic"); } }}>
           <DialogTrigger asChild>
             <Button className="bg-primary text-white gap-2 rounded-xl">
               <Plus size={18} /> Add New Package
@@ -352,8 +560,8 @@ export default function PackagesManager() {
             <DialogHeader>
               <DialogTitle className="font-serif text-2xl">Create New Package</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-4">
-              <PackageFormFields reg={register} />
+            <form onSubmit={handleSubmit(onSubmit)} className="mt-4">
+              <FormTabs reg={register} isEdit={false} />
               <Button type="submit" className="w-full mt-6" disabled={createMutation.isPending}>
                 {createMutation.isPending ? "Creating..." : "Create Package"}
               </Button>
@@ -362,19 +570,17 @@ export default function PackagesManager() {
         </Dialog>
       </div>
 
-      <Dialog open={isEditOpen} onOpenChange={(open) => {
+      {/* Edit Dialog */}
+      <Dialog open={isEditOpen} onOpenChange={open => {
         setIsEditOpen(open);
-        if (!open) {
-          setEditingPackageId(null);
-          editForm.reset();
-        }
+        if (!open) { setEditingPackageId(null); setEditingPkgData(null); editForm.reset(); setFormTab("basic"); }
       }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-serif text-2xl">Edit Package</DialogTitle>
           </DialogHeader>
-          <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4 mt-4">
-            <PackageFormFields reg={editForm.register} />
+          <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="mt-4">
+            <FormTabs reg={editForm.register} isEdit={true} />
             <Button type="submit" className="w-full mt-6" disabled={updateMutation.isPending}>
               {updateMutation.isPending ? "Saving..." : "Save Changes"}
             </Button>
@@ -382,29 +588,57 @@ export default function PackagesManager() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={mediaOpen} onOpenChange={(open) => { setMediaOpen(open); if (!open) setMediaPkg(null); }}>
+      {/* Media Gallery Dialog */}
+      <Dialog open={mediaOpen} onOpenChange={open => { setMediaOpen(open); if (!open) setMediaPkg(null); }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-serif text-xl flex items-center gap-2">
-              <Images size={18} /> Package Media — {mediaPkg?.name}
+              <Images size={18} /> Media Gallery — {mediaPkg?.name}
             </DialogTitle>
           </DialogHeader>
           {mediaPkg && (
             <div className="space-y-6 mt-2">
+              {/* Cover Photo */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Cover Photo</h3>
+                  <Button size="sm" variant="outline" className="gap-1.5" disabled={mediaUploading}
+                    onClick={() => coverInputRef.current?.click()}>
+                    <Upload size={13} /> {mediaPkg.imageUrl ? "Change Cover" : "Upload Cover"}
+                  </Button>
+                  <input ref={coverInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) { uploadCover(f); e.target.value = ""; } }} />
+                </div>
+                {mediaPkg.imageUrl ? (
+                  <div className="relative rounded-xl overflow-hidden border h-36">
+                    <img src={mediaPkg.imageUrl.startsWith("http") ? mediaPkg.imageUrl : `${BASE_API}${mediaPkg.imageUrl}`}
+                      alt="Cover" className="w-full h-full object-cover" />
+                    <div className="absolute bottom-0 left-0 right-0 bg-black/40 text-white text-xs px-3 py-1">Cover Photo</div>
+                  </div>
+                ) : (
+                  <div className="border-2 border-dashed rounded-xl py-6 text-center cursor-pointer hover:border-primary transition-colors"
+                    onClick={() => coverInputRef.current?.click()}>
+                    <Upload size={22} className="mx-auto text-muted-foreground mb-1" />
+                    <p className="text-sm text-muted-foreground">Upload cover photo</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Gallery Photos */}
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                    <Images size={14} /> Photos ({mediaPkg.imageUrls.length})
+                    <Images size={13} /> Gallery Photos ({mediaPkg.imageUrls.length})
                   </h3>
                   <Button size="sm" variant="outline" className="gap-1.5" disabled={mediaUploading}
                     onClick={() => imgInputRef.current?.click()}>
-                    <Upload size={14} /> Add Photo
+                    <Upload size={13} /> Add Photo
                   </Button>
                   <input ref={imgInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
                     onChange={e => { const f = e.target.files?.[0]; if (f) { uploadMedia(f, "image"); e.target.value = ""; } }} />
                 </div>
                 {mediaPkg.imageUrls.length === 0 ? (
-                  <div className="border-2 border-dashed border-border rounded-xl py-8 text-center cursor-pointer hover:border-primary transition-colors"
+                  <div className="border-2 border-dashed rounded-xl py-8 text-center cursor-pointer hover:border-primary transition-colors"
                     onClick={() => imgInputRef.current?.click()}>
                     <Images size={24} className="mx-auto text-muted-foreground mb-2" />
                     <p className="text-sm text-muted-foreground">No photos yet. Click to upload hotel and package photos.</p>
@@ -413,16 +647,14 @@ export default function PackagesManager() {
                   <div className="grid grid-cols-3 gap-2">
                     {mediaPkg.imageUrls.map((url: string, i: number) => (
                       <div key={i} className="relative group rounded-lg overflow-hidden border">
-                        <img src={`${BASE_API}${url}`} alt={`Package photo ${i + 1}`}
-                          className="w-full h-24 object-cover" />
-                        <button
-                          className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                        <img src={`${BASE_API}${url}`} alt={`Photo ${i + 1}`} className="w-full h-24 object-cover" />
+                        <button className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
                           onClick={() => removeMedia(url, "image")}>
                           <X size={12} />
                         </button>
                       </div>
                     ))}
-                    <div className="border-2 border-dashed border-border rounded-lg h-24 flex items-center justify-center cursor-pointer hover:border-primary transition-colors"
+                    <div className="border-2 border-dashed rounded-lg h-24 flex items-center justify-center cursor-pointer hover:border-primary transition-colors"
                       onClick={() => imgInputRef.current?.click()}>
                       <Plus size={20} className="text-muted-foreground" />
                     </div>
@@ -430,23 +662,24 @@ export default function PackagesManager() {
                 )}
               </div>
 
+              {/* Videos */}
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                    <Video size={14} /> Videos ({mediaPkg.videoUrls.length})
+                    <Video size={13} /> Videos ({mediaPkg.videoUrls.length})
                   </h3>
                   <Button size="sm" variant="outline" className="gap-1.5" disabled={mediaUploading}
                     onClick={() => vidInputRef.current?.click()}>
-                    <Upload size={14} /> Add Video
+                    <Upload size={13} /> Add Video
                   </Button>
                   <input ref={vidInputRef} type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden"
                     onChange={e => { const f = e.target.files?.[0]; if (f) { uploadMedia(f, "video"); e.target.value = ""; } }} />
                 </div>
                 {mediaPkg.videoUrls.length === 0 ? (
-                  <div className="border-2 border-dashed border-border rounded-xl py-8 text-center cursor-pointer hover:border-primary transition-colors"
+                  <div className="border-2 border-dashed rounded-xl py-8 text-center cursor-pointer hover:border-primary transition-colors"
                     onClick={() => vidInputRef.current?.click()}>
                     <Video size={24} className="mx-auto text-muted-foreground mb-2" />
-                    <p className="text-sm text-muted-foreground">No videos yet. Upload tour and hotel videos (MP4, WebM, MOV, up to 100MB).</p>
+                    <p className="text-sm text-muted-foreground">Upload tour and hotel videos (MP4, WebM, MOV).</p>
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -455,8 +688,7 @@ export default function PackagesManager() {
                         <Video size={16} className="text-primary shrink-0" />
                         <video src={`${BASE_API}${url}`} className="h-16 rounded" controls />
                         <span className="text-xs text-muted-foreground flex-1 truncate">Video {i + 1}</span>
-                        <button onClick={() => removeMedia(url, "video")}
-                          className="text-red-500 hover:text-red-700 p-1">
+                        <button onClick={() => removeMedia(url, "video")} className="text-red-500 hover:text-red-700 p-1">
                           <X size={14} />
                         </button>
                       </div>
@@ -464,62 +696,103 @@ export default function PackagesManager() {
                   </div>
                 )}
               </div>
-              {mediaUploading && <p className="text-sm text-muted-foreground text-center">Uploading...</p>}
+
+              {mediaUploading && <p className="text-sm text-muted-foreground text-center animate-pulse">Uploading...</p>}
             </div>
           )}
         </DialogContent>
       </Dialog>
 
-      <Card className="border-none shadow-sm rounded-2xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-muted text-muted-foreground uppercase text-xs font-semibold">
-              <tr>
-                <th className="px-6 py-4">Package Name</th>
-                <th className="px-6 py-4">Type</th>
-                <th className="px-6 py-4">Price</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {isLoading ? (
-                <tr><td colSpan={5} className="text-center py-8">Loading...</td></tr>
-              ) : packages.map((pkg: any) => (
-                <tr key={pkg.id} className="hover:bg-muted/30 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <div className="font-bold text-foreground">{pkg.name}</div>
-                      {pkg.featured && <Star size={14} className="text-amber-500" fill="currentColor" />}
+      {/* Package Cards Grid */}
+      {isLoading ? (
+        <div className="text-center py-16 text-muted-foreground animate-pulse">Loading packages...</div>
+      ) : packages.length === 0 ? (
+        <Card className="p-12 text-center border-dashed border-2">
+          <p className="text-muted-foreground">No packages yet. Click "Add New Package" to create one.</p>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {(packages as any[]).map((pkg: any) => {
+            const details = pkg.details || {};
+            const coverUrl = pkg.imageUrl
+              ? (pkg.imageUrl.startsWith("http") ? pkg.imageUrl : `${BASE_API}${pkg.imageUrl}`)
+              : null;
+            const photoCount = (pkg.imageUrls || []).length;
+            const videoCount = (pkg.videoUrls || []).length;
+            const meenaPhotos = (details.meenaTentImageUrls || []).length;
+            const meenaVideos = (details.meenaTentVideoUrls || []).length;
+            return (
+              <Card key={pkg.id} className="rounded-2xl border-none shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+                {/* Cover image */}
+                <div className="relative h-36 bg-muted">
+                  {coverUrl ? (
+                    <img src={coverUrl} alt={pkg.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-100">
+                      <Hotel size={32} className="text-muted-foreground/40" />
                     </div>
-                    <div className="text-xs text-muted-foreground">{pkg.duration}</div>
-                  </td>
-                  <td className="px-6 py-4 uppercase text-xs font-bold tracking-wider text-primary">{pkg.type.replace('_', ' ')}</td>
-                  <td className="px-6 py-4 font-medium">{formatCurrency(pkg.pricePerPerson)}</td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${pkg.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
-                      {pkg.isActive ? 'Active' : 'Inactive'}
+                  )}
+                  {pkg.featured && (
+                    <span className="absolute top-2 left-2 bg-amber-400 text-amber-900 text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <Star size={10} /> Featured
                     </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button variant="ghost" size="icon" title="Manage Photos & Videos" className="text-muted-foreground hover:text-primary" onClick={() => openMedia(pkg)}>
-                        <Images size={16} />
-                      </Button>
-                      <Button variant="ghost" size="icon" title="Edit Package" className="text-muted-foreground hover:text-primary" onClick={() => handleEditClick(pkg)}>
-                        <Edit size={16} />
-                      </Button>
-                      <Button variant="ghost" size="icon" title="Delete Package" className="text-muted-foreground hover:text-destructive" onClick={() => handleDelete(pkg.id)}>
-                        <Trash2 size={16} />
-                      </Button>
+                  )}
+                  <span className={`absolute top-2 right-2 text-xs font-semibold px-2 py-0.5 rounded-full ${pkg.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                    {pkg.isActive ? "Active" : "Inactive"}
+                  </span>
+                  {/* Media badges */}
+                  {(photoCount > 0 || videoCount > 0) && (
+                    <div className="absolute bottom-2 left-2 flex gap-1">
+                      {photoCount > 0 && <span className="bg-black/60 text-white text-xs px-1.5 py-0.5 rounded flex items-center gap-1"><Images size={10} /> {photoCount}</span>}
+                      {videoCount > 0 && <span className="bg-black/60 text-white text-xs px-1.5 py-0.5 rounded flex items-center gap-1"><Video size={10} /> {videoCount}</span>}
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  )}
+                </div>
+
+                <div className="p-4 space-y-3">
+                  <div>
+                    <h3 className="font-bold text-base leading-tight">{pkg.name}</h3>
+                    <p className="text-xs text-muted-foreground mt-0.5 capitalize">{pkg.type?.replace(/_/g, " ")}</p>
+                  </div>
+
+                  <div className="text-xl font-bold text-primary">{formatCurrency(pkg.pricePerPerson)}<span className="text-xs font-normal text-muted-foreground"> /person</span></div>
+
+                  {/* Hotel info */}
+                  {(details.hotelMakkah || details.hotelMadinah) && (
+                    <div className="text-xs text-muted-foreground space-y-0.5">
+                      {details.hotelMakkah && <div className="flex items-center gap-1"><Hotel size={10} /> Makkah: <span className="font-medium text-foreground">{details.hotelMakkah}{details.hotelCategoryMakkah ? ` · ${details.hotelCategoryMakkah}` : ""}</span></div>}
+                      {details.hotelMadinah && <div className="flex items-center gap-1"><Hotel size={10} /> Madinah: <span className="font-medium text-foreground">{details.hotelMadinah}{details.hotelCategoryMadinah ? ` · ${details.hotelCategoryMadinah}` : ""}</span></div>}
+                      {details.meenaTentLocation && <div className="flex items-center gap-1"><Tent size={10} /> Meena: <span className="font-medium text-foreground">{details.meenaTentLocation}</span></div>}
+                    </div>
+                  )}
+
+                  {/* Meena media badge */}
+                  {(meenaPhotos > 0 || meenaVideos > 0) && (
+                    <div className="flex gap-1">
+                      {meenaPhotos > 0 && <span className="bg-orange-50 text-orange-700 border border-orange-200 text-xs px-1.5 py-0.5 rounded flex items-center gap-1"><Tent size={9} /> {meenaPhotos} photos</span>}
+                      {meenaVideos > 0 && <span className="bg-orange-50 text-orange-700 border border-orange-200 text-xs px-1.5 py-0.5 rounded flex items-center gap-1"><Video size={9} /> {meenaVideos} videos</span>}
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <div className="flex gap-2 pt-1 border-t">
+                    <Button size="sm" variant="outline" className="flex-1 gap-1 text-xs" onClick={() => handleEditClick(pkg)}>
+                      <Edit size={12} /> Edit
+                    </Button>
+                    <Button size="sm" variant="outline" className="flex-1 gap-1 text-xs" onClick={() => openMedia(pkg)}>
+                      <Images size={12} /> Media
+                    </Button>
+                    <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-700 hover:bg-red-50 px-2"
+                      onClick={() => handleDelete(pkg.id)}>
+                      <Trash2 size={14} />
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
         </div>
-      </Card>
+      )}
     </AdminLayout>
   );
 }
