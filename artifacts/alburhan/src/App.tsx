@@ -34,6 +34,7 @@ import PrintFeedback from "@/pages/admin/print/PrintFeedback";
 import PrintContract from "@/pages/admin/print/PrintContract";
 import PrintLuggageSquare from "@/pages/admin/print/PrintLuggageSquare";
 import PrintIdCardsPro from "@/pages/admin/print/PrintIdCardsPro";
+import PrintRoomStickers from "@/pages/admin/print/PrintRoomStickers";
 import InvoiceManager from "@/pages/admin/InvoiceManager";
 import CustomerManager from "@/pages/admin/CustomerManager";
 import InquiryManager from "@/pages/admin/InquiryManager";
@@ -112,6 +113,7 @@ function Router() {
       <Route path="/admin/groups/:groupId/print/zamzam" component={() => <AdminRoute component={PrintZamzam} />} />
       <Route path="/admin/groups/:groupId/print/feedback" component={() => <AdminRoute component={PrintFeedback} />} />
       <Route path="/admin/groups/:groupId/print/contract" component={() => <AdminRoute component={PrintContract} />} />
+      <Route path="/admin/groups/:groupId/print/room-stickers" component={() => <AdminRoute component={PrintRoomStickers} />} />
       <Route path="/admin/offline-bookings" component={() => <AdminRoute component={OfflineBookingManager} />} />
       <Route path="/admin/qr-tracker" component={() => <AdminRoute component={QRTracker} />} />
       <Route path="/admin/reports" component={() => <AdminRoute component={ReportsManager} />} />

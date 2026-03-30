@@ -3,7 +3,7 @@ import { AdminLayout } from "@/components/layout/AdminLayout";
 import { Link } from "wouter";
 import {
   Printer, CreditCard, Luggage, Stethoscope, Plane, Hotel, Bus,
-  FileText, Star, Users, Hash, AlertCircle
+  FileText, Star, Users, Hash, AlertCircle, DoorOpen
 } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -32,6 +32,7 @@ const PRINT_OPTIONS = [
   { label: "Zamzam Labels", icon: <Hash size={14} />, path: "zamzam", color: "bg-cyan-50 text-cyan-700 border-cyan-200 hover:bg-cyan-100" },
   { label: "Feedback Forms", icon: <FileText size={14} />, path: "feedback", color: "bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100" },
   { label: "Contract", icon: <FileText size={14} />, path: "contract", color: "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100" },
+  { label: "Room Stickers", icon: <DoorOpen size={14} />, path: "room-stickers", color: "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100" },
 ];
 
 function statusColor(status?: string) {
