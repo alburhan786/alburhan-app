@@ -74,6 +74,11 @@ if (process.env.NODE_ENV === 'production') {
 
   if (fs.existsSync(staticDir)) {
     app.use(express.static(staticDir));
+
+    app.use('/api', (_req, res) => {
+      res.status(404).json({ error: 'API route not found' });
+    });
+
     app.get('*', (_req, res) => {
       res.sendFile(path.join(staticDir, 'index.html'));
     });
