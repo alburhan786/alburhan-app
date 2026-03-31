@@ -46,9 +46,9 @@ export function MainLayout({ children }: { children: ReactNode }) {
       </div>
 
       <header className={`sticky top-0 z-50 transition-all duration-500 print:hidden ${isScrolled ? 'glass shadow-lg shadow-black/5 border-b border-white/20' : 'bg-white/95 backdrop-blur-sm'}`}>
-        <div className="container mx-auto px-4 h-20 flex items-center justify-between">
+        <div className="container mx-auto px-4 h-24 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3 group">
-            <img src={`${import.meta.env.BASE_URL}images/logo.png`} alt="Al Burhan Tours & Travels" className="h-14 w-auto object-contain group-hover:scale-105 transition-transform" />
+            <img src={`${import.meta.env.BASE_URL}images/logo.png`} alt="Al Burhan Tours & Travels" className="h-16 w-auto object-contain group-hover:scale-105 transition-transform" />
           </Link>
 
           <nav className="hidden lg:flex items-center gap-1">

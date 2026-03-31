@@ -228,6 +228,15 @@ export default function Home() {
             transition={{ duration: 1, ease: "easeOut" }}
             className="max-w-4xl mx-auto"
           >
+            <motion.img
+              src={`${import.meta.env.BASE_URL}images/logo.png`}
+              alt="Al Burhan Tours & Travels"
+              className="h-28 md:h-36 w-auto mx-auto mb-6 drop-shadow-2xl"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.8 }}
+            />
+
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
