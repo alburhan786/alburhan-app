@@ -71,7 +71,8 @@ export default function Ziyarat() {
               p.name.toLowerCase().includes(category.title.split(' ')[0].toLowerCase())
             );
 
-            const firstPkg = categoryPackages[0];
+            const primaryType = category.filterMatch[0];
+            const firstPkg = categoryPackages.find(p => p.type.toLowerCase() === primaryType) ?? categoryPackages[0];
             const displayImage = getPkgSrc(firstPkg?.imageUrl, category.image);
             const displayDesc = firstPkg?.description || category.desc;
 
