@@ -1,11 +1,22 @@
 import express, { type Express } from "express";
 import cors from "cors";
+import compression from "compression";
+import helmet from "helmet";
 import session from "express-session";
+import path from "path";
+import fs from "fs";
 import router from "./routes/index.js";
 
 const app: Express = express();
 
 app.set('trust proxy', 1);
+
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
+}));
+
+app.use(compression());
 
 app.use((req, res, next) => {
   const host = req.headers.host || '';
@@ -17,7 +28,9 @@ app.use((req, res, next) => {
 });
 
 app.use(cors({
-  origin: true,
+  origin: process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
+    : true,
   credentials: true,
 }));
 app.use(express.json({
@@ -46,13 +59,25 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: false,
+    secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
     maxAge: 7 * 24 * 60 * 60 * 1000,
-    sameSite: "lax",
+    sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
   },
 }));
 
 app.use("/api", router);
+
+if (process.env.NODE_ENV === 'production') {
+  const staticDir = process.env.STATIC_FILES_DIR ||
+    path.resolve(process.cwd(), 'artifacts/alburhan/dist/public');
+
+  if (fs.existsSync(staticDir)) {
+    app.use(express.static(staticDir));
+    app.get('*', (_req, res) => {
+      res.sendFile(path.join(staticDir, 'index.html'));
+    });
+  }
+}
 
 export default app;
