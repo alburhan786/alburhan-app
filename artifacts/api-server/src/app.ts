@@ -69,8 +69,13 @@ app.use(session({
 app.use("/api", router);
 
 if (process.env.NODE_ENV === 'production') {
-  const staticDir = process.env.STATIC_FILES_DIR ||
-    path.resolve(process.cwd(), 'artifacts/alburhan/dist/public');
+  const staticDir = process.env.STATIC_FILES_DIR || (() => {
+    const candidates = [
+      path.resolve(process.cwd(), 'artifacts/alburhan/dist/public'),
+      path.resolve(process.cwd(), '../alburhan/dist/public'),
+    ];
+    return candidates.find(d => fs.existsSync(d)) ?? candidates[0];
+  })();
 
   if (fs.existsSync(staticDir)) {
     app.use(express.static(staticDir));
