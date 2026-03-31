@@ -28,5 +28,4 @@ app.listen(port, async () => {
   } catch (err) {
     console.error("[Startup] Failed to sync admin roles:", err);
   }
-
 });
