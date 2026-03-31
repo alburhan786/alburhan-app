@@ -5,6 +5,13 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
 
+const API_BASE = import.meta.env.VITE_API_URL || "";
+
+function getPkgSrc(imageUrl: string | null | undefined, fallback: string): string {
+  if (imageUrl) return imageUrl.startsWith('/') ? `${API_BASE}${imageUrl}` : imageUrl;
+  return fallback;
+}
+
 export default function Ziyarat() {
   const { data: packages = [] } = useListPackages({ active: true });
 
@@ -64,6 +71,10 @@ export default function Ziyarat() {
               p.name.toLowerCase().includes(category.title.split(' ')[0].toLowerCase())
             );
 
+            const firstPkg = categoryPackages[0];
+            const displayImage = getPkgSrc(firstPkg?.imageUrl, category.image);
+            const displayDesc = firstPkg?.description || category.desc;
+
             const isEven = index % 2 === 0;
 
             return (
@@ -72,13 +83,13 @@ export default function Ziyarat() {
                   <div className="lg:w-1/2">
                     <div className="relative rounded-2xl overflow-hidden shadow-2xl">
                       <div className="absolute inset-0 bg-primary/20 mix-blend-multiply z-10" />
-                      <img src={category.image} alt={category.title} className="w-full aspect-[4/3] object-cover" />
+                      <img src={displayImage} alt={category.title} className="w-full aspect-[4/3] object-cover" />
                     </div>
                   </div>
                   <div className="lg:w-1/2">
                     <h2 className="text-4xl font-serif font-bold text-primary mb-2">{category.title}</h2>
                     <h3 className="text-xl text-accent font-semibold mb-6">{category.subtitle}</h3>
-                    <p className="text-muted-foreground text-lg leading-relaxed mb-8">{category.desc}</p>
+                    <p className="text-muted-foreground text-lg leading-relaxed mb-8">{displayDesc}</p>
                     <div className="flex gap-4">
                       <Button className="bg-primary hover:bg-primary/90 text-white rounded-full px-8">Inquire Now</Button>
                     </div>
