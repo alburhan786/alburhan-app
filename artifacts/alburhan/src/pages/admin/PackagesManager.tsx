@@ -48,9 +48,12 @@ export default function PackagesManager() {
   const meenaImgRef = useRef<HTMLInputElement>(null);
   const meenaVidRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const editCoverRef = useRef<HTMLInputElement>(null);
 
-  const { register, handleSubmit, reset } = useForm();
+  const { register, handleSubmit, reset, watch } = useForm();
+  const createImageUrl = watch("imageUrl") as string | undefined;
   const editForm = useForm();
+  const editImageUrl = editForm.watch("imageUrl") as string | undefined;
 
   const handleEditClick = (pkg: any) => {
     setEditingPackageId(pkg.id);
@@ -236,6 +239,23 @@ export default function PackagesManager() {
     } finally { setMediaUploading(false); }
   };
 
+  const uploadEditCover = async (file: File) => {
+    if (!editingPackageId) return;
+    setMediaUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(`${BASE_API}/api/packages/${editingPackageId}/upload-cover`, { method: "POST", body: fd, credentials: "include" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      editForm.setValue("imageUrl", data.imageUrl);
+      queryClient.invalidateQueries({ queryKey: ['/api/packages'] });
+      toast({ title: "Cover photo uploaded" });
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } finally { setMediaUploading(false); }
+  };
+
   const uploadMeena = async (file: File, type: "image" | "video") => {
     if (!editingPackageId) return;
     setMeenaUploading(true);
@@ -283,7 +303,13 @@ export default function PackagesManager() {
     }
   };
 
-  const FormTabs = ({ reg, isEdit }: { reg: any; isEdit: boolean }) => (
+  const FormTabs = ({ reg, isEdit, watchedImageUrl, onUpload, uploadRef }: {
+    reg: any; isEdit: boolean; watchedImageUrl?: string; onUpload?: (f: File) => void; uploadRef?: { current: HTMLInputElement | null };
+  }) => {
+    const imgSrc = watchedImageUrl
+      ? (watchedImageUrl.startsWith("/") ? `${BASE_API}${watchedImageUrl}` : watchedImageUrl)
+      : null;
+    return (
     <div className="space-y-0">
       {/* Tab bar */}
       <div className="flex gap-0.5 border-b mb-5 overflow-x-auto">
@@ -326,6 +352,34 @@ export default function PackagesManager() {
           <div className="col-span-2 space-y-2">
             <label className="text-sm font-medium">Description</label>
             <textarea {...reg("description")} className="w-full p-3 rounded-md border min-h-[90px] text-sm resize-none" placeholder="Brief description of the package..." />
+          </div>
+
+          {/* Cover Image — prominent, with live preview */}
+          <div className="col-span-2 space-y-2">
+            <label className="text-sm font-medium flex items-center gap-1.5"><Images size={13} /> Cover Image</label>
+            <div className="flex gap-2 items-center">
+              <Input {...reg("imageUrl")} placeholder="Paste image URL or upload →" className="flex-1" />
+              {isEdit && onUpload && uploadRef && (
+                <>
+                  <Button type="button" size="sm" variant="outline" className="shrink-0 gap-1.5" disabled={mediaUploading}
+                    onClick={() => uploadRef.current?.click()}>
+                    <Upload size={13} /> Upload
+                  </Button>
+                  <input ref={uploadRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) { onUpload(f); e.target.value = ""; } }} />
+                </>
+              )}
+            </div>
+            {imgSrc ? (
+              <div className="relative rounded-xl overflow-hidden border h-32 mt-1">
+                <img src={imgSrc} alt="Cover preview" className="w-full h-full object-cover" />
+                <span className="absolute bottom-1 left-2 text-xs text-white bg-black/50 rounded px-1.5 py-0.5">Preview</span>
+              </div>
+            ) : (
+              !isEdit && (
+                <p className="text-xs text-muted-foreground">Paste a URL above. After creating, use the "Media" button on the card to upload a photo.</p>
+              )
+            )}
           </div>
         </div>
       )}
@@ -582,10 +636,6 @@ export default function PackagesManager() {
             <label className="text-sm font-medium">Highlights (comma separated)</label>
             <Input {...reg("highlights")} placeholder="Ziyarat, VIP Transport, Guided Tours" />
           </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Cover Image URL</label>
-            <Input {...reg("imageUrl")} placeholder="https://..." />
-          </div>
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-2">
               <label className="text-sm font-medium">GST %</label>
@@ -610,6 +660,7 @@ export default function PackagesManager() {
       )}
     </div>
   );
+  };
 
   return (
     <AdminLayout>
@@ -629,7 +680,7 @@ export default function PackagesManager() {
               <DialogTitle className="font-serif text-2xl">Create New Package</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit(onSubmit)} className="mt-4">
-              <FormTabs reg={register} isEdit={false} />
+              <FormTabs reg={register} isEdit={false} watchedImageUrl={createImageUrl} />
               <Button type="submit" className="w-full mt-6" disabled={createMutation.isPending}>
                 {createMutation.isPending ? "Creating..." : "Create Package"}
               </Button>
@@ -648,7 +699,8 @@ export default function PackagesManager() {
             <DialogTitle className="font-serif text-2xl">Edit Package</DialogTitle>
           </DialogHeader>
           <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="mt-4">
-            <FormTabs reg={editForm.register} isEdit={true} />
+            <FormTabs reg={editForm.register} isEdit={true} watchedImageUrl={editImageUrl}
+              onUpload={uploadEditCover} uploadRef={editCoverRef} />
             <Button type="submit" className="w-full mt-6" disabled={updateMutation.isPending}>
               {updateMutation.isPending ? "Saving..." : "Save Changes"}
             </Button>
