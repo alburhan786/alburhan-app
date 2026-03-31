@@ -148,7 +148,10 @@ function PilgrimVideoCard({ video, index }: { video: typeof pilgrimVideos[0]; in
 
 export default function Home() {
   const { data: packages = [] } = useListPackages({ active: true });
-  const featuredPackages = packages.slice(0, 3);
+  const featuredPackages = (() => {
+    const f = packages.filter(p => p.featured);
+    return (f.length > 0 ? f : packages).slice(0, 3);
+  })();
 
   const [bannerImages, setBannerImages] = useState<BannerImage[]>([]);
   const [currentBannerIdx, setCurrentBannerIdx] = useState(0);
@@ -169,10 +172,10 @@ export default function Home() {
   }, [bannerImages.length]);
 
   const ziyaratTours = [
-    { name: "Iraq Ziyarat", desc: "Najaf, Karbala, Kazmain, Samarra", icon: "🕌", color: "from-amber-600 to-amber-800" },
-    { name: "Baitul Muqaddas", desc: "Spiritual journey to Jerusalem", icon: "✨", color: "from-cyan-600 to-cyan-800" },
-    { name: "Syria Ziyarat", desc: "Sacred shrines in Damascus", icon: "🕋", color: "from-rose-600 to-rose-800" },
-    { name: "Jordan Heritage", desc: "Islamic historical sites", icon: "🏛️", color: "from-emerald-600 to-emerald-800" }
+    { name: "Iraq Ziyarat", desc: "Najaf, Karbala, Kazmain, Samarra", icon: "🕌", color: "from-amber-700/85 to-amber-950/95", image: "https://images.unsplash.com/photo-1586348943529-beaae6c28db9?w=600&q=75" },
+    { name: "Baitul Muqaddas", desc: "Spiritual journey to Jerusalem", icon: "✨", color: "from-cyan-700/85 to-cyan-950/95", image: "https://images.unsplash.com/photo-1564507592333-c60657eea523?w=600&q=75" },
+    { name: "Syria Ziyarat", desc: "Sacred shrines in Damascus", icon: "🕋", color: "from-rose-700/85 to-rose-950/95", image: "https://images.unsplash.com/photo-1591604129939-f1efa4d9f7fa?w=600&q=75" },
+    { name: "Jordan Heritage", desc: "Islamic historical sites", icon: "🏛️", color: "from-emerald-700/85 to-emerald-950/95", image: "https://images.unsplash.com/photo-1553783742-79c41b53f2ea?w=600&q=75" }
   ];
 
   const quickNav = [
@@ -345,7 +348,7 @@ export default function Home() {
               >
                 <div className="relative h-60 overflow-hidden">
                   <img
-                    src={pkg.imageUrl || "https://images.unsplash.com/photo-1584551246679-0daf3d275d0f?w=800&q=80"}
+                    src={pkg.imageUrl ? (pkg.imageUrl.startsWith('http') ? pkg.imageUrl : `${API_BASE}${pkg.imageUrl}`) : "https://images.unsplash.com/photo-1584551246679-0daf3d275d0f?w=800&q=80"}
                     alt={pkg.name}
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                   />
@@ -411,9 +414,14 @@ export default function Home() {
                 key={tour.name}
               >
                 <Link href="/ziyarat">
-                  <div className={`group relative rounded-2xl p-8 bg-gradient-to-br ${tour.color} text-white overflow-hidden cursor-pointer hover:-translate-y-1 hover:shadow-2xl transition-all duration-300`}>
-                    <div className="absolute inset-0 opacity-10 shimmer" />
-                    <div className="relative z-10">
+                  <div className="group relative rounded-2xl overflow-hidden cursor-pointer hover:-translate-y-1 hover:shadow-2xl transition-all duration-300">
+                    <img
+                      src={tour.image}
+                      alt={tour.name}
+                      className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <div className={`absolute inset-0 bg-gradient-to-br ${tour.color}`} />
+                    <div className="relative z-10 p-8 text-white">
                       <div className="text-5xl mb-5 group-hover:scale-110 transition-transform duration-300">{tour.icon}</div>
                       <h3 className="text-xl font-serif font-bold mb-2">{tour.name}</h3>
                       <p className="text-white/70 text-sm mb-4">{tour.desc}</p>

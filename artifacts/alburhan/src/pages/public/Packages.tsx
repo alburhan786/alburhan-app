@@ -7,6 +7,24 @@ import { Star, Search, Clock, MapPin, ArrowRight, Sparkles } from "lucide-react"
 import { useState } from "react";
 import { motion } from "framer-motion";
 
+const API_BASE = import.meta.env.VITE_API_URL || "";
+
+const CATEGORY_FALLBACK_IMAGES: Record<string, string> = {
+  umrah: "https://images.unsplash.com/photo-1591604129939-f1efa4d9f7fa?w=800&q=80",
+  ramadan_umrah: "https://images.unsplash.com/photo-1591604129939-f1efa4d9f7fa?w=800&q=80",
+  hajj: "https://images.unsplash.com/photo-1584551246679-0daf3d275d0f?w=800&q=80",
+  special_hajj: "https://images.unsplash.com/photo-1584551246679-0daf3d275d0f?w=800&q=80",
+  iraq_ziyarat: "https://images.unsplash.com/photo-1565552645632-d725f8bfc19a?w=800&q=80",
+  baitul_muqaddas: "https://images.unsplash.com/photo-1547826039-bfc35e0f1ea8?w=800&q=80",
+  syria_ziyarat: "https://images.unsplash.com/photo-1573608248547-9b94aa0d9fe1?w=800&q=80",
+  jordan_heritage: "https://images.unsplash.com/photo-1579033461380-adb5e6e32b78?w=800&q=80",
+};
+
+function getPkgImgSrc(imageUrl: string | null | undefined, type: string): string {
+  if (imageUrl) return imageUrl.startsWith('http') ? imageUrl : `${API_BASE}${imageUrl}`;
+  return CATEGORY_FALLBACK_IMAGES[type] || "https://images.unsplash.com/photo-1591604129939-f1efa4d9f7fa?w=800&q=80";
+}
+
 const CATEGORY_LABELS: Record<string, string> = {
   umrah: "UMRAH 2026",
   ramadan_umrah: "RAMADAN UMRAH 2027",
@@ -182,14 +200,28 @@ export default function Packages() {
                         transition={{ delay: idx * 0.05 }}
                       >
                         <Link href={`/packages/${pkg.id}`}>
-                          <div className="bg-white rounded-2xl border border-border/60 overflow-hidden hover:shadow-xl hover:shadow-black/[0.06] hover:-translate-y-1 transition-all duration-300 group cursor-pointer h-full flex flex-col" style={{ borderLeftWidth: 3, borderLeftColor: color }}>
-                            <div className="p-5 flex-1 flex flex-col">
+                          <div className="bg-white rounded-2xl border border-border/60 overflow-hidden hover:shadow-xl hover:shadow-black/[0.06] hover:-translate-y-1 transition-all duration-300 group cursor-pointer h-full flex flex-col">
+                            <div className="relative h-44 overflow-hidden">
+                              <img
+                                src={getPkgImgSrc(pkg.imageUrl, pkg.type)}
+                                alt={pkg.name}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
                               {pkg.featured && (
-                                <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-white text-xs font-semibold mb-3 w-fit" style={{ backgroundColor: 'hsl(40, 76%, 54%)' }}>
-                                  <Star size={10} fill="white" /> Featured
+                                <div className="absolute top-3 left-3">
+                                  <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-white text-xs font-semibold backdrop-blur-sm bg-amber-500/90 shadow">
+                                    <Star size={9} fill="white" /> Featured
+                                  </div>
                                 </div>
                               )}
-
+                              <div className="absolute bottom-0 left-0 right-0 px-3 pb-2.5">
+                                <span className="inline-block px-2.5 py-0.5 rounded text-white text-[10px] font-bold tracking-wide backdrop-blur-sm" style={{ backgroundColor: `${color}cc` }}>
+                                  {TYPE_DISPLAY[pkg.type] || pkg.type.replace('_', ' ')}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="p-5 flex-1 flex flex-col">
                               <h3 className="font-bold text-foreground text-base leading-snug mb-1 group-hover:text-primary transition-colors">{pkg.name}</h3>
 
                               <p className="text-xs font-semibold mb-3" style={{ color }}>
