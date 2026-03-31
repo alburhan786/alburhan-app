@@ -5,6 +5,8 @@ import router from "./routes/index.js";
 
 const app: Express = express();
 
+app.set('trust proxy', 1);
+
 app.use((req, res, next) => {
   const host = req.headers.host || '';
   if (host.startsWith('www.')) {
