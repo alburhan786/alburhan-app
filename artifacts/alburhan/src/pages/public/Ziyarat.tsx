@@ -21,7 +21,7 @@ export default function Ziyarat() {
       title: "Iraq Ziyarat",
       subtitle: "Najaf, Karbala, Kazmain, Samarra",
       desc: "Embark on a soul-stirring journey to the holy shrines of Iraq. Our meticulously planned tours offer profound spiritual experiences at the resting places of the revered Imams.",
-      image: "https://images.unsplash.com/photo-1542042161784-26ab9e041e89?w=800&q=80",
+      image: "https://images.unsplash.com/photo-1609139003551-9a6d4ee1e8bf?w=800&q=80",
       filterMatch: ['iraq_ziyarat', 'iraq ziyarat']
     },
     {
@@ -29,7 +29,7 @@ export default function Ziyarat() {
       title: "Baitul Muqaddas",
       subtitle: "Spiritual Journey to Jerusalem",
       desc: "Visit the third holiest site in Islam. Pray at Al-Aqsa Mosque and explore the rich history of the prophets in the blessed lands of Jerusalem.",
-      image: "https://images.unsplash.com/photo-1549479361-b44cda0b10de?w=800&q=80",
+      image: "https://images.unsplash.com/photo-1564507592333-c60657eea523?w=800&q=80",
       filterMatch: ['baitul_muqaddas', 'baitul muqaddas']
     },
     {
@@ -37,7 +37,7 @@ export default function Ziyarat() {
       title: "Syria Ziyarat",
       subtitle: "Sacred Shrines in Damascus",
       desc: "Pay your respects at the blessed shrines of Sayyida Zainab (SA) and Sayyida Ruqayya (SA) in the historic and spiritual city of Damascus.",
-      image: "https://images.unsplash.com/photo-1588665487467-36e761dfcc41?w=800&q=80",
+      image: "https://images.unsplash.com/photo-1548778052-311f4bc2b502?w=800&q=80",
       filterMatch: ['syria_ziyarat', 'syria ziyarat']
     },
     {
@@ -45,7 +45,7 @@ export default function Ziyarat() {
       title: "Jordan Islamic Heritage",
       subtitle: "Historical Sites of the Prophets",
       desc: "Trace the footsteps of the companions and prophets. Visit the Cave of the Seven Sleepers (Ashab al-Kahf) and the battlefields of Mutah.",
-      image: "https://images.unsplash.com/photo-1541410965313-d53b3c16ef17?w=800&q=80",
+      image: "https://images.unsplash.com/photo-1548705434-f53f6d55b012?w=800&q=80",
       filterMatch: ['jordan_heritage', 'jordan heritage']
     }
   ];

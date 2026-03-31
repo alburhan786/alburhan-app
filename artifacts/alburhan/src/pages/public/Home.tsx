@@ -172,10 +172,10 @@ export default function Home() {
   }, [bannerImages.length]);
 
   const ZIYARAT_DEFAULTS = [
-    { type: "iraq_ziyarat",    name: "Iraq Ziyarat",    desc: "Najaf, Karbala, Kazmain, Samarra",  icon: "🕌", color: "from-amber-700/85 to-amber-950/95",   fallbackImg: "https://images.unsplash.com/photo-1586348943529-beaae6c28db9?w=600&q=75" },
+    { type: "iraq_ziyarat",    name: "Iraq Ziyarat",    desc: "Najaf, Karbala, Kazmain, Samarra",  icon: "🕌", color: "from-amber-700/85 to-amber-950/95",   fallbackImg: "https://images.unsplash.com/photo-1609139003551-9a6d4ee1e8bf?w=600&q=75" },
     { type: "baitul_muqaddas", name: "Baitul Muqaddas", desc: "Spiritual journey to Jerusalem",    icon: "✨", color: "from-cyan-700/85 to-cyan-950/95",     fallbackImg: "https://images.unsplash.com/photo-1564507592333-c60657eea523?w=600&q=75" },
-    { type: "syria_ziyarat",   name: "Syria Ziyarat",   desc: "Sacred shrines in Damascus",        icon: "🕋", color: "from-rose-700/85 to-rose-950/95",     fallbackImg: "https://images.unsplash.com/photo-1591604129939-f1efa4d9f7fa?w=600&q=75" },
-    { type: "jordan_heritage", name: "Jordan Heritage", desc: "Islamic historical sites",          icon: "🏛️", color: "from-emerald-700/85 to-emerald-950/95", fallbackImg: "https://images.unsplash.com/photo-1553783742-79c41b53f2ea?w=600&q=75" },
+    { type: "syria_ziyarat",   name: "Syria Ziyarat",   desc: "Sacred shrines in Damascus",        icon: "🕋", color: "from-rose-700/85 to-rose-950/95",     fallbackImg: "https://images.unsplash.com/photo-1548778052-311f4bc2b502?w=600&q=75" },
+    { type: "jordan_heritage", name: "Jordan Heritage", desc: "Islamic historical sites",          icon: "🏛️", color: "from-emerald-700/85 to-emerald-950/95", fallbackImg: "https://images.unsplash.com/photo-1548705434-f53f6d55b012?w=600&q=75" },
   ];
 
   const ziyaratTours = ZIYARAT_DEFAULTS.map(z => {
