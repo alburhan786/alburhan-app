@@ -348,7 +348,7 @@ export default function Home() {
               >
                 <div className="relative h-60 overflow-hidden">
                   <img
-                    src={pkg.imageUrl ? (pkg.imageUrl.startsWith('http') ? pkg.imageUrl : `${API_BASE}${pkg.imageUrl}`) : "https://images.unsplash.com/photo-1584551246679-0daf3d275d0f?w=800&q=80"}
+                    src={pkg.imageUrl ? (pkg.imageUrl.startsWith('/') ? `${API_BASE}${pkg.imageUrl}` : pkg.imageUrl) : "https://images.unsplash.com/photo-1584551246679-0daf3d275d0f?w=800&q=80"}
                     alt={pkg.name}
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                   />

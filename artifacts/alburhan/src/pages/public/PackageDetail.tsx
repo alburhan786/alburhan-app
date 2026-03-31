@@ -312,7 +312,7 @@ export default function PackageDetail() {
       <section className="relative bg-dark-green overflow-hidden">
         <div className="absolute inset-0">
           <img
-            src={pkg.imageUrl ? (pkg.imageUrl.startsWith('http') ? pkg.imageUrl : `${API_BASE}${pkg.imageUrl}`) : "https://images.unsplash.com/photo-1584551246679-0daf3d275d0f?w=1200&q=80"}
+            src={pkg.imageUrl ? (pkg.imageUrl.startsWith('/') ? `${API_BASE}${pkg.imageUrl}` : pkg.imageUrl) : "https://images.unsplash.com/photo-1584551246679-0daf3d275d0f?w=1200&q=80"}
             alt={pkg.name}
             className="w-full h-full object-cover opacity-30"
           />

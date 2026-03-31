@@ -21,7 +21,7 @@ const CATEGORY_FALLBACK_IMAGES: Record<string, string> = {
 };
 
 function getPkgImgSrc(imageUrl: string | null | undefined, type: string): string {
-  if (imageUrl) return imageUrl.startsWith('http') ? imageUrl : `${API_BASE}${imageUrl}`;
+  if (imageUrl) return imageUrl.startsWith('/') ? `${API_BASE}${imageUrl}` : imageUrl;
   return CATEGORY_FALLBACK_IMAGES[type] || "https://images.unsplash.com/photo-1591604129939-f1efa4d9f7fa?w=800&q=80";
 }
 
