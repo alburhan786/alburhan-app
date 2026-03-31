@@ -1,6 +1,6 @@
 import app from "./app";
-import { db, usersTable, packagesTable } from "@workspace/db";
-import { inArray, eq, and, like } from "drizzle-orm";
+import { db, usersTable } from "@workspace/db";
+import { inArray } from "drizzle-orm";
 import { ADMIN_MOBILES } from "./routes/auth.js";
 
 const rawPort = process.env["PORT"];
@@ -29,12 +29,4 @@ app.listen(port, async () => {
     console.error("[Startup] Failed to sync admin roles:", err);
   }
 
-  try {
-    await db.update(packagesTable)
-      .set({ imageUrl: null })
-      .where(and(eq(packagesTable.type, 'iraq_ziyarat'), like(packagesTable.imageUrl, '/uploads/%')));
-    console.log("[Startup] Cleared wrong uploaded images from iraq_ziyarat packages");
-  } catch (err) {
-    console.error("[Startup] Failed to clear iraq_ziyarat wrong images:", err);
-  }
 });
