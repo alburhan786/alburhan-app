@@ -153,7 +153,7 @@ router.post(
   upload.single("photo"),
   async (req: AuthenticatedRequest, res) => {
     if (!req.file) { res.status(400).json({ message: "No photo provided" }); return; }
-    const photoUrl = await uploadToGCS(req.file.buffer, req.file.originalname, req.file.mimetype, "uploads");
+    const photoUrl = await uploadToGCS(req.file.buffer, req.file.originalname, req.file.mimetype, "private_uploads");
     const scope = and(eq(pilgrimsTable.id, req.params.pilgrimId), eq(pilgrimsTable.groupId, req.params.groupId));
     const [updated] = await db.update(pilgrimsTable)
       .set({ photoUrl, updatedAt: new Date() })

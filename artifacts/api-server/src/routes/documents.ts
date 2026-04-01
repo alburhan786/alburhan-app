@@ -67,7 +67,7 @@ router.post(
       return;
     }
 
-    const fileUrl = await uploadToGCS(req.file.buffer, req.file.originalname, req.file.mimetype, "uploads");
+    const fileUrl = await uploadToGCS(req.file.buffer, req.file.originalname, req.file.mimetype, "private_uploads");
     const fileKey = fileUrl;
 
     const [doc] = await db.insert(documentsTable).values({

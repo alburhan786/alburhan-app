@@ -74,11 +74,11 @@ router.post(
       updatedAt: new Date(),
     };
 
-    if (files?.photo?.[0]) profileData.photoUrl = await uploadToGCS(files.photo[0].buffer, files.photo[0].originalname, files.photo[0].mimetype, "uploads");
-    if (files?.passportImage?.[0]) profileData.passportImageUrl = await uploadToGCS(files.passportImage[0].buffer, files.passportImage[0].originalname, files.passportImage[0].mimetype, "uploads");
-    if (files?.aadharImage?.[0]) profileData.aadharImageUrl = await uploadToGCS(files.aadharImage[0].buffer, files.aadharImage[0].originalname, files.aadharImage[0].mimetype, "uploads");
-    if (files?.panImage?.[0]) profileData.panImageUrl = await uploadToGCS(files.panImage[0].buffer, files.panImage[0].originalname, files.panImage[0].mimetype, "uploads");
-    if (files?.healthCertificate?.[0]) profileData.healthCertificateUrl = await uploadToGCS(files.healthCertificate[0].buffer, files.healthCertificate[0].originalname, files.healthCertificate[0].mimetype, "uploads");
+    if (files?.photo?.[0]) profileData.photoUrl = await uploadToGCS(files.photo[0].buffer, files.photo[0].originalname, files.photo[0].mimetype, "private_uploads");
+    if (files?.passportImage?.[0]) profileData.passportImageUrl = await uploadToGCS(files.passportImage[0].buffer, files.passportImage[0].originalname, files.passportImage[0].mimetype, "private_uploads");
+    if (files?.aadharImage?.[0]) profileData.aadharImageUrl = await uploadToGCS(files.aadharImage[0].buffer, files.aadharImage[0].originalname, files.aadharImage[0].mimetype, "private_uploads");
+    if (files?.panImage?.[0]) profileData.panImageUrl = await uploadToGCS(files.panImage[0].buffer, files.panImage[0].originalname, files.panImage[0].mimetype, "private_uploads");
+    if (files?.healthCertificate?.[0]) profileData.healthCertificateUrl = await uploadToGCS(files.healthCertificate[0].buffer, files.healthCertificate[0].originalname, files.healthCertificate[0].mimetype, "private_uploads");
 
     if (existing[0]) {
       const [updated] = await db
@@ -128,11 +128,11 @@ router.put(
       if (body[f] !== undefined) (profileData as any)[f] = body[f] || null;
     }
 
-    if (files?.photo?.[0]) profileData.photoUrl = await uploadToGCS(files.photo[0].buffer, files.photo[0].originalname, files.photo[0].mimetype, "uploads");
-    if (files?.passportImage?.[0]) profileData.passportImageUrl = await uploadToGCS(files.passportImage[0].buffer, files.passportImage[0].originalname, files.passportImage[0].mimetype, "uploads");
-    if (files?.aadharImage?.[0]) profileData.aadharImageUrl = await uploadToGCS(files.aadharImage[0].buffer, files.aadharImage[0].originalname, files.aadharImage[0].mimetype, "uploads");
-    if (files?.panImage?.[0]) profileData.panImageUrl = await uploadToGCS(files.panImage[0].buffer, files.panImage[0].originalname, files.panImage[0].mimetype, "uploads");
-    if (files?.healthCertificate?.[0]) profileData.healthCertificateUrl = await uploadToGCS(files.healthCertificate[0].buffer, files.healthCertificate[0].originalname, files.healthCertificate[0].mimetype, "uploads");
+    if (files?.photo?.[0]) profileData.photoUrl = await uploadToGCS(files.photo[0].buffer, files.photo[0].originalname, files.photo[0].mimetype, "private_uploads");
+    if (files?.passportImage?.[0]) profileData.passportImageUrl = await uploadToGCS(files.passportImage[0].buffer, files.passportImage[0].originalname, files.passportImage[0].mimetype, "private_uploads");
+    if (files?.aadharImage?.[0]) profileData.aadharImageUrl = await uploadToGCS(files.aadharImage[0].buffer, files.aadharImage[0].originalname, files.aadharImage[0].mimetype, "private_uploads");
+    if (files?.panImage?.[0]) profileData.panImageUrl = await uploadToGCS(files.panImage[0].buffer, files.panImage[0].originalname, files.panImage[0].mimetype, "private_uploads");
+    if (files?.healthCertificate?.[0]) profileData.healthCertificateUrl = await uploadToGCS(files.healthCertificate[0].buffer, files.healthCertificate[0].originalname, files.healthCertificate[0].mimetype, "private_uploads");
 
     const [updated] = await db
       .update(customerProfilesTable)
@@ -251,11 +251,11 @@ router.post(
       updatedAt: new Date(),
     };
 
-    if (files?.photo?.[0]) profileData.photoUrl = await uploadToGCS(files.photo[0].buffer, files.photo[0].originalname, files.photo[0].mimetype, "uploads");
-    if (files?.passportImage?.[0]) profileData.passportImageUrl = await uploadToGCS(files.passportImage[0].buffer, files.passportImage[0].originalname, files.passportImage[0].mimetype, "uploads");
-    if (files?.aadharImage?.[0]) profileData.aadharImageUrl = await uploadToGCS(files.aadharImage[0].buffer, files.aadharImage[0].originalname, files.aadharImage[0].mimetype, "uploads");
-    if (files?.panImage?.[0]) profileData.panImageUrl = await uploadToGCS(files.panImage[0].buffer, files.panImage[0].originalname, files.panImage[0].mimetype, "uploads");
-    if (files?.healthCertificate?.[0]) profileData.healthCertificateUrl = await uploadToGCS(files.healthCertificate[0].buffer, files.healthCertificate[0].originalname, files.healthCertificate[0].mimetype, "uploads");
+    if (files?.photo?.[0]) profileData.photoUrl = await uploadToGCS(files.photo[0].buffer, files.photo[0].originalname, files.photo[0].mimetype, "private_uploads");
+    if (files?.passportImage?.[0]) profileData.passportImageUrl = await uploadToGCS(files.passportImage[0].buffer, files.passportImage[0].originalname, files.passportImage[0].mimetype, "private_uploads");
+    if (files?.aadharImage?.[0]) profileData.aadharImageUrl = await uploadToGCS(files.aadharImage[0].buffer, files.aadharImage[0].originalname, files.aadharImage[0].mimetype, "private_uploads");
+    if (files?.panImage?.[0]) profileData.panImageUrl = await uploadToGCS(files.panImage[0].buffer, files.panImage[0].originalname, files.panImage[0].mimetype, "private_uploads");
+    if (files?.healthCertificate?.[0]) profileData.healthCertificateUrl = await uploadToGCS(files.healthCertificate[0].buffer, files.healthCertificate[0].originalname, files.healthCertificate[0].mimetype, "private_uploads");
 
     if (existing[0]) {
       const [updated] = await db

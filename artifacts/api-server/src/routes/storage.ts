@@ -9,6 +9,7 @@ const objectStorageService = new ObjectStorageService();
  * GET /storage/public-objects/*filePath
  *
  * Serve public assets from PUBLIC_OBJECT_SEARCH_PATHS.
+ * No authentication required.
  */
 router.get("/storage/public-objects/*filePath", async (req: Request, res: Response) => {
   try {
@@ -39,12 +40,23 @@ router.get("/storage/public-objects/*filePath", async (req: Request, res: Respon
 /**
  * GET /storage/objects/*path
  *
- * Serve private object entities (uploaded files).
+ * Serve uploaded files from Object Storage.
+ * Files under "private_uploads/" require an authenticated session.
+ * Files under "uploads/" (gallery, package images) are publicly accessible.
  */
 router.get("/storage/objects/*path", async (req: Request, res: Response) => {
   try {
     const raw = req.params.path;
     const wildcardPath = Array.isArray(raw) ? raw.join("/") : raw;
+
+    if (wildcardPath.startsWith("private_uploads/")) {
+      const userId = (req.session as any)?.userId;
+      if (!userId) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+    }
+
     const objectPath = `/objects/${wildcardPath}`;
     const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
 
