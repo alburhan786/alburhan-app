@@ -3,26 +3,10 @@ import { db, galleryImagesTable } from "@workspace/db";
 import { eq, desc, asc } from "drizzle-orm";
 import { requireAuth, requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import multer from "multer";
-import path from "path";
-import fs from "fs";
-
-const UPLOADS_DIR = process.env.UPLOADS_DIR ||
-  path.resolve(process.cwd(), process.env.NODE_ENV === "production" ? "uploads" : "../../uploads");
-
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
-  filename: (_req, file, cb) => {
-    const unique = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    cb(null, `gallery_${unique}_${file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, "_")}`);
-  },
-});
+import { uploadToGCS, deleteFromGCS } from "../lib/gcsUpload.js";
 
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const allowed = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
@@ -80,7 +64,7 @@ router.post(
     }
 
     const title = req.body.title || req.file.originalname;
-    const fileUrl = `/api/documents/files/${req.file.filename}`;
+    const fileUrl = await uploadToGCS(req.file.buffer, req.file.originalname, req.file.mimetype, "uploads");
 
     const [image] = await db.insert(galleryImagesTable).values({
       title,
@@ -129,9 +113,7 @@ router.delete(
   async (req: AuthenticatedRequest, res) => {
     const images = await db.select().from(galleryImagesTable).where(eq(galleryImagesTable.id, req.params.id));
     if (images[0]?.fileUrl) {
-      const filename = path.basename(images[0].fileUrl);
-      const filePath = path.join(UPLOADS_DIR, filename);
-      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      await deleteFromGCS(images[0].fileUrl);
     }
     await db.delete(galleryImagesTable).where(eq(galleryImagesTable.id, req.params.id));
     res.json({ message: "Image deleted" });

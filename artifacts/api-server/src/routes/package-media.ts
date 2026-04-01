@@ -3,34 +3,10 @@ import { db, packagesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAdmin } from "../lib/auth.js";
 import multer from "multer";
-import path from "path";
-import fs from "fs";
-
-const UPLOADS_DIR = process.env.UPLOADS_DIR ||
-  path.resolve(process.cwd(), process.env.NODE_ENV === "production" ? "uploads" : "../../uploads");
-
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-}
-
-const imageStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
-  filename: (_req, file, cb) => {
-    const unique = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    cb(null, `pkg_img_${unique}_${file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, "_")}`);
-  },
-});
-
-const videoStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
-  filename: (_req, file, cb) => {
-    const unique = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    cb(null, `pkg_vid_${unique}_${file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, "_")}`);
-  },
-});
+import { uploadToGCS, deleteFromGCS } from "../lib/gcsUpload.js";
 
 const uploadImage = multer({
-  storage: imageStorage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const allowed = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
@@ -40,7 +16,7 @@ const uploadImage = multer({
 });
 
 const uploadVideo = multer({
-  storage: videoStorage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 100 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const allowed = ["video/mp4", "video/webm", "video/ogg", "video/quicktime", "video/x-msvideo"];
@@ -65,7 +41,7 @@ router.post(
       res.status(404).json({ message: "Package not found" });
       return;
     }
-    const fileUrl = `/api/documents/files/${req.file.filename}`;
+    const fileUrl = await uploadToGCS(req.file.buffer, req.file.originalname, req.file.mimetype, "uploads");
     await db.update(packagesTable)
       .set({ imageUrl: fileUrl, updatedAt: new Date() })
       .where(eq(packagesTable.id, req.params.id));
@@ -87,7 +63,7 @@ router.post(
       res.status(404).json({ message: "Package not found" });
       return;
     }
-    const fileUrl = `/api/documents/files/${req.file.filename}`;
+    const fileUrl = await uploadToGCS(req.file.buffer, req.file.originalname, req.file.mimetype, "uploads");
     const currentUrls: string[] = (pkgs[0].imageUrls as string[]) || [];
     const updated = [...currentUrls, fileUrl];
     await db.update(packagesTable)
@@ -113,9 +89,7 @@ router.delete(
     }
     const currentUrls: string[] = (pkgs[0].imageUrls as string[]) || [];
     const updated = currentUrls.filter((u) => u !== url);
-    const filename = path.basename(url);
-    const filePath = path.join(UPLOADS_DIR, filename);
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    await deleteFromGCS(url);
     await db.update(packagesTable)
       .set({ imageUrls: updated, updatedAt: new Date() })
       .where(eq(packagesTable.id, req.params.id));
@@ -137,7 +111,7 @@ router.post(
       res.status(404).json({ message: "Package not found" });
       return;
     }
-    const fileUrl = `/api/documents/files/${req.file.filename}`;
+    const fileUrl = await uploadToGCS(req.file.buffer, req.file.originalname, req.file.mimetype, "uploads");
     const currentUrls: string[] = (pkgs[0].videoUrls as string[]) || [];
     const updated = [...currentUrls, fileUrl];
     await db.update(packagesTable)
@@ -163,9 +137,7 @@ router.delete(
     }
     const currentUrls: string[] = (pkgs[0].videoUrls as string[]) || [];
     const updated = currentUrls.filter((u) => u !== url);
-    const filename = path.basename(url);
-    const filePath = path.join(UPLOADS_DIR, filename);
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    await deleteFromGCS(url);
     await db.update(packagesTable)
       .set({ videoUrls: updated, updatedAt: new Date() })
       .where(eq(packagesTable.id, req.params.id));
@@ -181,7 +153,7 @@ router.post(
     if (!req.file) { res.status(400).json({ message: "No image file provided" }); return; }
     const pkgs = await db.select().from(packagesTable).where(eq(packagesTable.id, req.params.id)).limit(1);
     if (!pkgs[0]) { res.status(404).json({ message: "Package not found" }); return; }
-    const fileUrl = `/api/documents/files/${req.file.filename}`;
+    const fileUrl = await uploadToGCS(req.file.buffer, req.file.originalname, req.file.mimetype, "uploads");
     const details: any = pkgs[0].details || {};
     const current: string[] = details.meenaTentImageUrls || [];
     const updated = [...current, fileUrl];
@@ -203,9 +175,7 @@ router.delete(
     const details: any = pkgs[0].details || {};
     const current: string[] = details.meenaTentImageUrls || [];
     const updated = current.filter((u) => u !== url);
-    const filename = path.basename(url);
-    const filePath = path.join(UPLOADS_DIR, filename);
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    await deleteFromGCS(url);
     await db.update(packagesTable)
       .set({ details: { ...details, meenaTentImageUrls: updated }, updatedAt: new Date() })
       .where(eq(packagesTable.id, req.params.id));
@@ -221,7 +191,7 @@ router.post(
     if (!req.file) { res.status(400).json({ message: "No video file provided" }); return; }
     const pkgs = await db.select().from(packagesTable).where(eq(packagesTable.id, req.params.id)).limit(1);
     if (!pkgs[0]) { res.status(404).json({ message: "Package not found" }); return; }
-    const fileUrl = `/api/documents/files/${req.file.filename}`;
+    const fileUrl = await uploadToGCS(req.file.buffer, req.file.originalname, req.file.mimetype, "uploads");
     const details: any = pkgs[0].details || {};
     const current: string[] = details.meenaTentVideoUrls || [];
     const updated = [...current, fileUrl];
@@ -243,9 +213,7 @@ router.delete(
     const details: any = pkgs[0].details || {};
     const current: string[] = details.meenaTentVideoUrls || [];
     const updated = current.filter((u) => u !== url);
-    const filename = path.basename(url);
-    const filePath = path.join(UPLOADS_DIR, filename);
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    await deleteFromGCS(url);
     await db.update(packagesTable)
       .set({ details: { ...details, meenaTentVideoUrls: updated }, updatedAt: new Date() })
       .where(eq(packagesTable.id, req.params.id));

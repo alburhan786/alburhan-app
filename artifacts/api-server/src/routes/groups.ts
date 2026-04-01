@@ -3,26 +3,10 @@ import { db, hajjGroupsTable, pilgrimsTable } from "@workspace/db";
 import { eq, and, desc, asc, count, max } from "drizzle-orm";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import multer from "multer";
-import path from "path";
-import fs from "fs";
-
-const UPLOADS_DIR = process.env.UPLOADS_DIR ||
-  path.resolve(process.cwd(), process.env.NODE_ENV === "production" ? "uploads" : "../../uploads");
-
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
-  filename: (_req, file, cb) => {
-    const unique = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    cb(null, `pilgrim_${unique}_${file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, "_")}`);
-  },
-});
+import { uploadToGCS, deleteFromGCS } from "../lib/gcsUpload.js";
 
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const allowed = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
@@ -157,9 +141,7 @@ router.delete("/:groupId/pilgrims/:pilgrimId", requireAdmin as any, async (req, 
   const pilgrims = await db.select().from(pilgrimsTable).where(scope);
   if (!pilgrims[0]) { res.status(404).json({ message: "Pilgrim not found in this group" }); return; }
   if (pilgrims[0].photoUrl) {
-    const filename = path.basename(pilgrims[0].photoUrl);
-    const filePath = path.join(UPLOADS_DIR, filename);
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    await deleteFromGCS(pilgrims[0].photoUrl);
   }
   await db.delete(pilgrimsTable).where(scope);
   res.json({ message: "Pilgrim deleted" });
@@ -171,7 +153,7 @@ router.post(
   upload.single("photo"),
   async (req: AuthenticatedRequest, res) => {
     if (!req.file) { res.status(400).json({ message: "No photo provided" }); return; }
-    const photoUrl = `/api/documents/files/${req.file.filename}`;
+    const photoUrl = await uploadToGCS(req.file.buffer, req.file.originalname, req.file.mimetype, "uploads");
     const scope = and(eq(pilgrimsTable.id, req.params.pilgrimId), eq(pilgrimsTable.groupId, req.params.groupId));
     const [updated] = await db.update(pilgrimsTable)
       .set({ photoUrl, updatedAt: new Date() })

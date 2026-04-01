@@ -6,26 +6,15 @@ import { sendCustomerDocumentUploadNotification, sendAdminDocumentReadyNotificat
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { uploadToGCS, deleteFromGCS } from "../lib/gcsUpload.js";
 
 const ADMIN_NOTIFIED_DOC_TYPES = ["flight_ticket", "visa", "room_allotment", "bus_allotment", "model_contract", "tour_itinerary"];
 
 const UPLOADS_DIR = process.env.UPLOADS_DIR ||
   path.resolve(process.cwd(), process.env.NODE_ENV === "production" ? "uploads" : "../../uploads");
 
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
-  filename: (_req, file, cb) => {
-    const unique = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    cb(null, `${unique}_${file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, "_")}`);
-  },
-});
-
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const allowed = ["image/jpeg", "image/jpg", "image/png", "image/webp", "application/pdf"];
@@ -78,8 +67,8 @@ router.post(
       return;
     }
 
-    const fileKey = `uploads/${req.file.filename}`;
-    const fileUrl = `/api/documents/files/${req.file.filename}`;
+    const fileUrl = await uploadToGCS(req.file.buffer, req.file.originalname, req.file.mimetype, "uploads");
+    const fileKey = fileUrl;
 
     const [doc] = await db.insert(documentsTable).values({
       bookingId,
@@ -168,9 +157,8 @@ router.get("/:bookingId", requireAuth as any, async (req: AuthenticatedRequest, 
 
 router.delete("/:id", requireAuth as any, async (req: AuthenticatedRequest, res) => {
   const docs = await db.select().from(documentsTable).where(eq(documentsTable.id, req.params.id));
-  if (docs[0]?.fileKey) {
-    const filePath = path.join(UPLOADS_DIR, path.basename(docs[0].fileKey));
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  if (docs[0]?.fileUrl) {
+    await deleteFromGCS(docs[0].fileUrl);
   }
   await db.delete(documentsTable).where(eq(documentsTable.id, req.params.id));
   res.json({ message: "Document deleted" });

@@ -13,6 +13,7 @@ import galleryRouter from "./gallery.js";
 import groupsRouter from "./groups.js";
 import packageMediaRouter from "./package-media.js";
 import kycRouter from "./kyc.js";
+import storageRouter from "./storage.js";
 
 const router: IRouter = Router();
 
@@ -30,5 +31,6 @@ router.use("/inquiry", inquiryRouter);
 router.use("/gallery", galleryRouter);
 router.use("/groups", groupsRouter);
 router.use("/kyc", kycRouter);
+router.use(storageRouter);
 
 export default router;
