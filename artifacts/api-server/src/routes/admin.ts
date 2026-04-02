@@ -314,27 +314,31 @@ router.patch("/requests/:id/assign-group", requireAdmin as any, async (req: Auth
     if (gender === "male") salutation = "Mr.";
     else if (gender === "female") salutation = "Mrs.";
 
-    const [pilgrim] = await db.insert(pilgrimsTable).values({
-      groupId,
-      serialNumber: nextSerial,
-      fullName: profile?.name || request.customerName,
-      passportNumber: profile?.passportNumber ?? null,
-      dateOfBirth: profile?.dateOfBirth ?? null,
-      gender,
-      address: profile?.address ?? null,
-      photoUrl: profile?.photoUrl ?? null,
-      mobileIndia: request.customerMobile,
-      passportIssueDate: profile?.passportIssueDate ?? null,
-      passportExpiryDate: profile?.passportExpiryDate ?? null,
-      passportPlaceOfIssue: profile?.passportPlaceOfIssue ?? null,
-      salutation,
-    }).returning();
+    const { pilgrim, updated } = await db.transaction(async (tx) => {
+      const [newPilgrim] = await tx.insert(pilgrimsTable).values({
+        groupId,
+        serialNumber: nextSerial,
+        fullName: profile?.name || request.customerName,
+        passportNumber: profile?.passportNumber ?? null,
+        dateOfBirth: profile?.dateOfBirth ?? null,
+        gender,
+        address: profile?.address ?? null,
+        photoUrl: profile?.photoUrl ?? null,
+        mobileIndia: request.customerMobile,
+        passportIssueDate: profile?.passportIssueDate ?? null,
+        passportExpiryDate: profile?.passportExpiryDate ?? null,
+        passportPlaceOfIssue: profile?.passportPlaceOfIssue ?? null,
+        salutation,
+      }).returning();
 
-    const [updated] = await db
-      .update(packageRequestsTable)
-      .set({ groupId, pilgrimId: pilgrim.id, updatedAt: new Date() })
-      .where(eq(packageRequestsTable.id, id))
-      .returning();
+      const [updatedReq] = await tx
+        .update(packageRequestsTable)
+        .set({ groupId, pilgrimId: newPilgrim.id, updatedAt: new Date() })
+        .where(eq(packageRequestsTable.id, id))
+        .returning();
+
+      return { pilgrim: newPilgrim, updated: updatedReq };
+    });
 
     res.json({ request: updated, pilgrim, group: groups[0] });
   } catch (err: any) {

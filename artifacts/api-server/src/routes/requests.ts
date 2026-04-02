@@ -192,7 +192,7 @@ router.post("/:id/submit-details", requireAuth as any, detailsUpload as any, asy
     }
 
     if (request.groupId && request.pilgrimId) {
-      await db
+      const updatedPilgrims = await db
         .update(pilgrimsTable)
         .set({
           fullName: body.name || request.customerName,
@@ -211,7 +211,11 @@ router.post("/:id/submit-details", requireAuth as any, detailsUpload as any, asy
             eq(pilgrimsTable.id, request.pilgrimId),
             eq(pilgrimsTable.groupId, request.groupId)
           )
-        );
+        )
+        .returning();
+      if (!updatedPilgrims[0]) {
+        console.warn(`[requests] submit-details: assigned pilgrim ${request.pilgrimId} not found in group ${request.groupId} for request ${request.id} — pilgrim may have been deleted`);
+      }
     }
 
     if (request.bookingId) {
