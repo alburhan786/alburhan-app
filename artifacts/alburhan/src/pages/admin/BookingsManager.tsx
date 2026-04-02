@@ -690,9 +690,9 @@ function BookingDetailModal({ booking, open, onClose }: { booking: Booking | nul
             <AdminPaymentLedger booking={booking} />
           </div>
 
-          {(booking as any).travellerDetailsStatus && (
-            <div className={`rounded-lg px-3 py-2 flex items-center gap-2 text-sm ${(booking as any).travellerDetailsStatus === "submitted" ? "bg-indigo-50 border border-indigo-200 text-indigo-800" : "bg-amber-50 border border-amber-200 text-amber-800"}`}>
-              {(booking as any).travellerDetailsStatus === "submitted"
+          {booking.travellerDetailsStatus && (
+            <div className={`rounded-lg px-3 py-2 flex items-center gap-2 text-sm ${booking.travellerDetailsStatus === "submitted" ? "bg-indigo-50 border border-indigo-200 text-indigo-800" : "bg-amber-50 border border-amber-200 text-amber-800"}`}>
+              {booking.travellerDetailsStatus === "submitted"
                 ? <><User size={14} /> Customer has submitted travel details</>
                 : <><ClipboardList size={14} /> Customer has not submitted travel details yet</>}
             </div>
@@ -731,7 +731,7 @@ function BookingDetailModal({ booking, open, onClose }: { booking: Booking | nul
                 Currently assigned to group ID: <span className="font-mono">{booking.groupId}</span>
               </p>
             )}
-            {(booking as any).travellerDetailsStatus === "submitted" ? (
+            {booking.travellerDetailsStatus === "submitted" ? (
               <div className="flex items-center gap-2">
                 <Button
                   size="sm"
@@ -749,7 +749,7 @@ function BookingDetailModal({ booking, open, onClose }: { booking: Booking | nul
               </div>
             ) : (
               <p className="text-xs text-muted-foreground">
-                Customer travel details: <span className="font-semibold capitalize">{(booking as any).travellerDetailsStatus || "not submitted"}</span>.
+                Customer travel details: <span className="font-semibold capitalize">{booking.travellerDetailsStatus || "not submitted"}</span>.
                 Auto-fill will be available once customer submits their travel details.
               </p>
             )}
@@ -765,7 +765,7 @@ function BookingDetailModal({ booking, open, onClose }: { booking: Booking | nul
                 <ExternalLink className="w-4 h-4 mr-2" />View Invoice
               </Button>
             )}
-            {(booking.status === "approved" || booking.status === "partially_paid") && (booking as any).razorpayOrderId && (
+            {(booking.status === "approved" || booking.status === "partially_paid") && booking.razorpayOrderId && (
               <Button
                 variant="outline"
                 size="sm"
@@ -1178,7 +1178,7 @@ export default function BookingsManager() {
                       <Badge variant="outline" className={`px-2.5 py-1 uppercase tracking-wider text-[10px] font-bold border-0 ${getStatusColor(booking.status)}`}>
                         {getStatusLabel(booking.status)}
                       </Badge>
-                      {(booking as any).travellerDetailsStatus === "submitted" ? (
+                      {booking.travellerDetailsStatus === "submitted" ? (
                         <Badge className="bg-indigo-100 text-indigo-800 border-0 text-[9px] px-1.5 py-0.5 font-semibold w-fit">
                           <User size={9} className="mr-0.5" /> Details Submitted
                         </Badge>

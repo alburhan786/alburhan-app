@@ -255,6 +255,8 @@ export interface Booking {
   advanceAmount?: number;
   paymentStatus?: BookingPaymentStatus;
   isOffline?: boolean;
+  groupId?: string;
+  travellerDetailsStatus?: string;
   createdAt: string;
   updatedAt?: string;
 }

@@ -292,7 +292,7 @@ function TravelDetailsCard({ bookingId, initialStatus }: { bookingId: string; in
                 ) : (
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-indigo-700">{existingPhotoUrl ? "Replace photo" : "Click to upload photo"}</p>
-                    <p className="text-xs text-muted-foreground">JPG, PNG or WebP — max 5 MB</p>
+                    <p className="text-xs text-muted-foreground">JPG or PNG — max 5 MB</p>
                   </div>
                 )}
               </div>
@@ -300,7 +300,7 @@ function TravelDetailsCard({ bookingId, initialStatus }: { bookingId: string; in
                 ref={photoInputRef}
                 type="file"
                 className="hidden"
-                accept="image/jpeg,image/jpg,image/png,image/webp"
+                accept="image/jpeg,image/jpg,image/png"
                 onChange={e => setPhotoFile(e.target.files?.[0] ?? null)}
               />
             </div>

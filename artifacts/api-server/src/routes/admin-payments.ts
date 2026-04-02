@@ -261,17 +261,21 @@ router.post(
       : [];
 
     let pilgrim;
+    let upserted: "updated" | "created";
     if (existingByPassport[0]) {
       const [updated] = await db.update(pilgrimsTable).set(pilgrimData).where(eq(pilgrimsTable.id, existingByPassport[0].id)).returning();
       pilgrim = updated;
-      return res.json({ message: "Pilgrim updated from customer profile", pilgrim, upserted: "updated" });
+      upserted = "updated";
+    } else {
+      const [{ maxSerial }] = await db.select({ maxSerial: max(pilgrimsTable.serialNumber) }).from(pilgrimsTable).where(eq(pilgrimsTable.groupId, booking.groupId));
+      const [created] = await db.insert(pilgrimsTable).values({ ...pilgrimData, groupId: booking.groupId, serialNumber: (maxSerial || 0) + 1 }).returning();
+      pilgrim = created;
+      upserted = "created";
     }
 
-    const [{ maxSerial }] = await db.select({ maxSerial: max(pilgrimsTable.serialNumber) }).from(pilgrimsTable).where(eq(pilgrimsTable.groupId, booking.groupId));
-    const [created] = await db.insert(pilgrimsTable).values({ ...pilgrimData, groupId: booking.groupId, serialNumber: (maxSerial || 0) + 1 }).returning();
-    pilgrim = created;
-
-    res.status(201).json({ message: "Pilgrim auto-filled from customer profile", pilgrim, upserted: "created" });
+    const statusCode = upserted === "created" ? 201 : 200;
+    const message = upserted === "created" ? "Pilgrim auto-filled from customer profile" : "Pilgrim updated from customer profile";
+    res.status(statusCode).json({ message, pilgrim, upserted });
   }
 );
 
