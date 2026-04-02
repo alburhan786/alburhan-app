@@ -5,9 +5,11 @@ import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 
 type BookingStatus = "pending" | "approved" | "rejected" | "confirmed" | "cancelled" | "partially_paid";
 type PaymentMode = "cash" | "neft" | "upi" | "cheque" | "online";
+type DbOrTx = typeof db;
 
 const PAYABLE_STATUSES: BookingStatus[] = ["approved", "partially_paid", "confirmed"];
 const VALID_MODES: PaymentMode[] = ["cash", "neft", "upi", "cheque", "online"];
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 const router = Router();
 
@@ -16,30 +18,24 @@ function generateInvoiceNumber(): string {
 }
 
 /**
- * Recalculates paidAmount and booking status from the ledger.
- * Assumes onlinePaidAmount is already correctly set before calling this.
- * Only transitions status for payable states (approved / partially_paid / confirmed).
+ * Recalculates paidAmount and booking status within an existing transaction.
+ * Assumes onlinePaidAmount is correctly seeded before calling.
+ * Only transitions status from payable states (approved/partially_paid/confirmed).
  */
-async function recalculateBookingPayment(bookingId: string) {
-  const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
+async function recalculateBookingPayment(tx: DbOrTx, bookingId: string) {
+  const [booking] = await tx.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
   if (!booking) return;
 
-  const [result] = await db
+  const [result] = await tx
     .select({ total: sum(paymentTransactionsTable.amount) })
     .from(paymentTransactionsTable)
     .where(eq(paymentTransactionsTable.bookingId, bookingId));
 
   const ledgerSum = Number(result?.total ?? 0);
-
-  // onlinePaidAmount is always correct by the time we reach here:
-  // - For new bookings: "0" (default), which is correct (no Razorpay payments)
-  // - For first-time ledger entry on a Razorpay-paid booking: pre-seeded in POST handler
-  // - For subsequent ledger entries: already persisted from the first recalculation
   const onlinePaidAmount = Number(booking.onlinePaidAmount ?? 0);
   const totalPaid = onlinePaidAmount + ledgerSum;
   const finalAmount = Number(booking.finalAmount ?? 0);
 
-  // Only transition status for payable states; do not touch rejected/cancelled/pending.
   let newStatus: BookingStatus = booking.status as BookingStatus;
   let invoiceNumber = booking.invoiceNumber;
 
@@ -56,7 +52,7 @@ async function recalculateBookingPayment(bookingId: string) {
     }
   }
 
-  await db
+  await tx
     .update(bookingsTable)
     .set({
       paidAmount: String(totalPaid),
@@ -71,23 +67,20 @@ async function recalculateBookingPayment(bookingId: string) {
 }
 
 /**
- * Before inserting the very first ledger entry for a booking that already had
- * Razorpay-sourced payments (paidAmount > 0, onlinePaidAmount still at the schema
- * default of "0"), we persist paidAmount → onlinePaidAmount so that subsequent
- * recalculations use the correct online baseline and do not lose it.
+ * If this is the first manual ledger entry for a booking that already had Razorpay
+ * payments (paidAmount > 0, onlinePaidAmount still at schema default "0"), seeds
+ * onlinePaidAmount = paidAmount so recalculation retains the Razorpay baseline.
  */
-async function ensureOnlineBaselineSeeded(bookingId: string, booking: { paidAmount: string | null; onlinePaidAmount: string | null }) {
+async function ensureOnlineBaselineSeeded(tx: DbOrTx, bookingId: string, booking: { paidAmount: string | null; onlinePaidAmount: string | null }) {
   const priorPaid = Number(booking.paidAmount ?? 0);
   const currentOnline = Number(booking.onlinePaidAmount ?? 0);
   if (currentOnline === 0 && priorPaid > 0) {
-    const [row] = await db
+    const [row] = await tx
       .select({ n: count() })
       .from(paymentTransactionsTable)
       .where(eq(paymentTransactionsTable.bookingId, bookingId));
-    const existingCount = Number(row?.n ?? 0);
-    if (existingCount === 0) {
-      // First-ever ledger entry for this booking — seed the online baseline.
-      await db
+    if (Number(row?.n ?? 0) === 0) {
+      await tx
         .update(bookingsTable)
         .set({ onlinePaidAmount: String(priorPaid) })
         .where(eq(bookingsTable.id, bookingId));
@@ -135,42 +128,53 @@ router.post("/:id/payments", requireAdmin as RequestHandler, async (req: Authent
     if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
       return res.status(400).json({ message: "Valid amount is required" });
     }
-    if (!paymentDate || typeof paymentDate !== "string") {
-      return res.status(400).json({ message: "Payment date is required" });
+    if (!paymentDate || typeof paymentDate !== "string" || !ISO_DATE_RE.test(paymentDate)) {
+      return res.status(400).json({ message: "Payment date must be in YYYY-MM-DD format" });
     }
     if (!paymentMode || !VALID_MODES.includes(paymentMode as PaymentMode)) {
       return res.status(400).json({ message: "Valid payment mode is required" });
     }
 
-    const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
-    if (!booking) {
-      return res.status(404).json({ message: "Booking not found" });
-    }
+    const result = await db.transaction(async (tx) => {
+      const [booking] = await tx.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
+      if (!booking) {
+        throw Object.assign(new Error("Booking not found"), { statusCode: 404 });
+      }
+      if (!PAYABLE_STATUSES.includes(booking.status as BookingStatus)) {
+        throw Object.assign(
+          new Error(`Cannot record payment for a ${booking.status} booking`),
+          { statusCode: 422 }
+        );
+      }
 
-    // Seed onlinePaidAmount from paidAmount before the first ledger entry so that
-    // recalculation never overwrites Razorpay-sourced amounts with 0.
-    await ensureOnlineBaselineSeeded(bookingId, booking);
+      await ensureOnlineBaselineSeeded(tx, bookingId, booking);
 
-    const [entry] = await db
-      .insert(paymentTransactionsTable)
-      .values({
-        bookingId,
-        amount: String(Number(amount)),
-        paymentDate,
-        paymentMode: paymentMode as PaymentMode,
-        referenceNumber: referenceNumber ?? null,
-        notes: notes ?? null,
-        recordedBy: req.user?.id ?? null,
-      })
-      .returning();
+      const [entry] = await tx
+        .insert(paymentTransactionsTable)
+        .values({
+          bookingId,
+          amount: String(Number(amount)),
+          paymentDate,
+          paymentMode: paymentMode as PaymentMode,
+          referenceNumber: referenceNumber ?? null,
+          notes: notes ?? null,
+          recordedBy: req.user?.id ?? null,
+        })
+        .returning();
 
-    const updated = await recalculateBookingPayment(bookingId);
+      const updated = await recalculateBookingPayment(tx, bookingId);
+      return { entry, updated };
+    });
 
     return res.status(201).json({
-      entry: { ...entry, amount: Number(entry.amount), createdAt: entry.createdAt?.toISOString() },
-      booking: { paidAmount: updated?.totalPaid, status: updated?.newStatus, invoiceNumber: updated?.invoiceNumber },
+      entry: { ...result.entry, amount: Number(result.entry.amount), createdAt: result.entry.createdAt?.toISOString() },
+      booking: { paidAmount: result.updated?.totalPaid, status: result.updated?.newStatus, invoiceNumber: result.updated?.invoiceNumber },
     });
   } catch (err) {
+    const statusCode = (err as { statusCode?: number }).statusCode;
+    if (statusCode === 404 || statusCode === 422) {
+      return res.status(statusCode).json({ message: (err as Error).message });
+    }
     console.error("[admin-payments] POST error:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
@@ -181,25 +185,31 @@ router.delete("/:id/payments/:txnId", requireAdmin as RequestHandler, async (req
     const bookingId = req.params["id"];
     const txnId = req.params["txnId"];
 
-    const [entry] = await db
-      .select()
-      .from(paymentTransactionsTable)
-      .where(eq(paymentTransactionsTable.id, txnId))
-      .limit(1);
+    const result = await db.transaction(async (tx) => {
+      const [entry] = await tx
+        .select()
+        .from(paymentTransactionsTable)
+        .where(eq(paymentTransactionsTable.id, txnId))
+        .limit(1);
 
-    if (!entry || entry.bookingId !== bookingId) {
-      return res.status(404).json({ message: "Payment entry not found" });
-    }
+      if (!entry || entry.bookingId !== bookingId) {
+        throw Object.assign(new Error("Payment entry not found"), { statusCode: 404 });
+      }
 
-    await db.delete(paymentTransactionsTable).where(eq(paymentTransactionsTable.id, txnId));
-
-    const updated = await recalculateBookingPayment(bookingId);
+      await tx.delete(paymentTransactionsTable).where(eq(paymentTransactionsTable.id, txnId));
+      const updated = await recalculateBookingPayment(tx, bookingId);
+      return { updated };
+    });
 
     return res.json({
       message: "Payment entry deleted",
-      booking: { paidAmount: updated?.totalPaid, status: updated?.newStatus },
+      booking: { paidAmount: result.updated?.totalPaid, status: result.updated?.newStatus },
     });
   } catch (err) {
+    const statusCode = (err as { statusCode?: number }).statusCode;
+    if (statusCode === 404) {
+      return res.status(404).json({ message: (err as Error).message });
+    }
     console.error("[admin-payments] DELETE error:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
