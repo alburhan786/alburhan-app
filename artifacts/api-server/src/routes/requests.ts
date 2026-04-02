@@ -38,6 +38,14 @@ async function notifyAdminNewRequest(opts: { customerName: string; customerMobil
   ]);
 }
 
+async function notifyCustomerRequestReceived(opts: { mobile: string; customerName: string; packageName: string }) {
+  const msg = `Assalamu Alaikum ${opts.customerName},\n\nYour request for "${opts.packageName}" has been received! Our team will review it and get back to you shortly.\n\nFor queries: +91 8989701701\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
+  await Promise.allSettled([
+    sendWhatsApp(opts.mobile, msg),
+    sendDLTSMS(opts.mobile, opts.customerName, opts.packageName, "REQUESTED"),
+  ]);
+}
+
 async function notifyCustomerRequestApproved(opts: { mobile: string; customerName: string; packageName: string }) {
   const msg = `Assalamu Alaikum ${opts.customerName},\n\nYour request for "${opts.packageName}" has been APPROVED!\n\nPlease login to your dashboard and fill in your travel details to proceed.\n\nHelp: +91 8989701701 / +91 9893989786\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
   await Promise.allSettled([
@@ -91,6 +99,12 @@ router.post("/", requireAuth as any, async (req: AuthenticatedRequest, res) => {
     notifyAdminNewRequest({
       customerName: request.customerName,
       customerMobile: request.customerMobile,
+      packageName: pkg.name,
+    }).catch(console.error);
+
+    notifyCustomerRequestReceived({
+      mobile: request.customerMobile,
+      customerName: request.customerName,
       packageName: pkg.name,
     }).catch(console.error);
 
@@ -160,7 +174,7 @@ router.patch("/admin/:id/approve", requireAdmin as any, async (_req: Authenticat
       customerName: request.customerName,
       customerMobile: request.customerMobile,
       numberOfPilgrims: 1,
-      status: "approved",
+      status: "pending",
       totalAmount: price ? String(price) : null,
       gstAmount: gst ? String(gst) : null,
       finalAmount: finalAmount ? String(finalAmount) : null,
@@ -305,6 +319,7 @@ router.post("/:id/submit-details", requireAuth as any, detailsUpload as any, asy
         .update(bookingsTable)
         .set({
           customerName: body.name || request.customerName,
+          status: "approved",
           updatedAt: new Date(),
         })
         .where(eq(bookingsTable.id, request.bookingId));

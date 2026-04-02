@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -60,7 +60,7 @@ export default function RequestsManager() {
     }
   };
 
-  useState(() => { loadRequests(); });
+  useEffect(() => { loadRequests(); }, []);
 
   const handleApprove = async (id: string) => {
     setProcessing(id);
