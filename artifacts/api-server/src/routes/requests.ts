@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, packageRequestsTable, packagesTable, bookingsTable, customerProfilesTable, pilgrimsTable } from "@workspace/db";
 import { eq, desc, and } from "drizzle-orm";
-import { requireAuth, requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
+import { requireAuth, type AuthenticatedRequest } from "../lib/auth.js";
 import multer from "multer";
 import { uploadToGCS } from "../lib/gcsUpload.js";
 import { sendWhatsApp, sendDLTSMS } from "../lib/notifications.js";
@@ -126,109 +126,6 @@ router.get("/", requireAuth as any, async (req: AuthenticatedRequest, res) => {
   } catch (err: any) {
     console.error("[requests] GET / error:", err);
     res.status(500).json({ message: err?.message || "Failed to fetch requests" });
-  }
-});
-
-router.get("/admin/all", requireAdmin as any, async (_req, res) => {
-  try {
-    const requests = await db
-      .select()
-      .from(packageRequestsTable)
-      .orderBy(desc(packageRequestsTable.createdAt));
-    res.json(requests);
-  } catch (err: any) {
-    console.error("[requests] GET /admin/all error:", err);
-    res.status(500).json({ message: err?.message || "Failed to fetch requests" });
-  }
-});
-
-router.patch("/admin/:id/approve", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
-  try {
-    const req = _req;
-    const requests = await db.select().from(packageRequestsTable).where(eq(packageRequestsTable.id, req.params.id)).limit(1);
-    const request = requests[0];
-    if (!request) {
-      res.status(404).json({ message: "Request not found" });
-      return;
-    }
-    if (request.status !== "pending") {
-      res.status(400).json({ message: "Request is not pending" });
-      return;
-    }
-
-    let pkg = null;
-    if (request.packageId) {
-      const pkgs = await db.select().from(packagesTable).where(eq(packagesTable.id, request.packageId)).limit(1);
-      pkg = pkgs[0] ?? null;
-    }
-
-    const price = pkg ? Number(pkg.pricePerPerson) : null;
-    const gst = price && pkg ? price * (Number(pkg.gstPercent) / 100) : null;
-    const finalAmount = price && gst ? price + gst : null;
-
-    const [booking] = await db.insert(bookingsTable).values({
-      bookingNumber: generateBookingNumber(),
-      packageId: request.packageId ?? null,
-      packageName: request.packageName ?? null,
-      customerId: request.customerId ?? null,
-      customerName: request.customerName,
-      customerMobile: request.customerMobile,
-      numberOfPilgrims: 1,
-      status: "approved",
-      totalAmount: price ? String(price) : null,
-      gstAmount: gst ? String(gst) : null,
-      finalAmount: finalAmount ? String(finalAmount) : null,
-      notes: request.message ?? null,
-      isOffline: false,
-    }).returning();
-
-    const [updated] = await db
-      .update(packageRequestsTable)
-      .set({ status: "approved", bookingId: booking.id, updatedAt: new Date() })
-      .where(eq(packageRequestsTable.id, req.params.id))
-      .returning();
-
-    notifyCustomerRequestApproved({
-      mobile: request.customerMobile,
-      customerName: request.customerName,
-      packageName: request.packageName ?? "Package",
-    }).catch(console.error);
-
-    res.json({ request: updated, booking });
-  } catch (err: any) {
-    console.error("[requests] PATCH /admin/:id/approve error:", err);
-    res.status(500).json({ message: err?.message || "Failed to approve request" });
-  }
-});
-
-router.patch("/admin/:id/reject", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
-  try {
-    const req = _req;
-    const { reason } = req.body;
-    const requests = await db.select().from(packageRequestsTable).where(eq(packageRequestsTable.id, req.params.id)).limit(1);
-    const request = requests[0];
-    if (!request) {
-      res.status(404).json({ message: "Request not found" });
-      return;
-    }
-
-    const [updated] = await db
-      .update(packageRequestsTable)
-      .set({ status: "rejected", rejectionReason: reason ?? null, updatedAt: new Date() })
-      .where(eq(packageRequestsTable.id, req.params.id))
-      .returning();
-
-    notifyCustomerRequestRejected({
-      mobile: request.customerMobile,
-      customerName: request.customerName,
-      packageName: request.packageName ?? "Package",
-      reason,
-    }).catch(console.error);
-
-    res.json(updated);
-  } catch (err: any) {
-    console.error("[requests] PATCH /admin/:id/reject error:", err);
-    res.status(500).json({ message: err?.message || "Failed to reject request" });
   }
 });
 
