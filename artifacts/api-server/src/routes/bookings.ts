@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, bookingsTable, packagesTable, usersTable, hajjGroupsTable } from "@workspace/db";
+import { db, bookingsTable, packagesTable, usersTable, hajjGroupsTable, customerProfilesTable } from "@workspace/db";
 import { eq, and, desc, count, sql } from "drizzle-orm";
 import {
   CreateBookingBody,
@@ -456,5 +456,75 @@ function buildInvoiceResponse(b: typeof bookingsTable.$inferSelect, pkg: { gstPe
     bankIfsc: "HDFC0001769",
   };
 }
+
+router.get(
+  "/:id/traveller-details",
+  requireAuth as any,
+  async (req: AuthenticatedRequest, res) => {
+    const bookingId = req.params.id as string;
+    const userId = req.user!.id;
+    const isAdmin = req.user!.role === "admin";
+
+    const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
+    if (!booking) { res.status(404).json({ message: "Booking not found" }); return; }
+    if (!isAdmin && booking.customerId !== userId) { res.status(403).json({ message: "Forbidden" }); return; }
+
+    const profileUserId = isAdmin ? booking.customerId : userId;
+    let profile = null;
+    if (profileUserId) {
+      const profiles = await db.select().from(customerProfilesTable).where(eq(customerProfilesTable.userId, profileUserId)).limit(1);
+      profile = profiles[0] || null;
+    }
+
+    res.json({ travellerDetailsStatus: booking.travellerDetailsStatus, profile });
+  }
+);
+
+router.post(
+  "/:id/traveller-details",
+  requireAuth as any,
+  async (req: AuthenticatedRequest, res) => {
+    const bookingId = req.params.id as string;
+    const userId = req.user!.id;
+
+    const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
+    if (!booking) { res.status(404).json({ message: "Booking not found" }); return; }
+    if (booking.customerId !== userId) { res.status(403).json({ message: "Forbidden" }); return; }
+    if (!["approved", "confirmed", "partially_paid"].includes(booking.status)) {
+      res.status(400).json({ message: "Booking is not in an editable state" }); return;
+    }
+
+    const { name, dateOfBirth, gender, address, passportNumber, passportIssueDate, passportExpiryDate, passportPlaceOfIssue, bloodGroup, mobileIndia } = req.body;
+
+    const profileData: any = {
+      name: name || null,
+      dateOfBirth: dateOfBirth || null,
+      gender: gender || null,
+      address: address || null,
+      passportNumber: passportNumber || null,
+      passportIssueDate: passportIssueDate || null,
+      passportExpiryDate: passportExpiryDate || null,
+      passportPlaceOfIssue: passportPlaceOfIssue || null,
+      bloodGroup: bloodGroup || null,
+      phone: mobileIndia || null,
+      updatedAt: new Date(),
+    };
+
+    const existing = await db.select().from(customerProfilesTable).where(eq(customerProfilesTable.userId, userId)).limit(1);
+    if (existing[0]) {
+      await db.update(customerProfilesTable).set(profileData).where(eq(customerProfilesTable.userId, userId));
+    } else {
+      await db.insert(customerProfilesTable).values({ ...profileData, userId, kycStatus: "pending" });
+    }
+
+    const [updated] = await db
+      .update(bookingsTable)
+      .set({ travellerDetailsStatus: "submitted", updatedAt: new Date() })
+      .where(eq(bookingsTable.id, bookingId))
+      .returning();
+
+    res.json({ message: "Travel details saved", travellerDetailsStatus: updated.travellerDetailsStatus });
+  }
+);
 
 export default router;

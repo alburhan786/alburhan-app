@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
-import { CheckCircle, XCircle, Eye, ExternalLink, Plus, Trash2, FileText, Download, ImageIcon, RefreshCw, Upload, Wallet } from "lucide-react";
+import { CheckCircle, XCircle, Eye, ExternalLink, Plus, Trash2, FileText, Download, ImageIcon, RefreshCw, Upload, Wallet, ClipboardList, User } from "lucide-react";
 
 const DOC_TYPE_LABELS: Record<string, string> = {
   passport: "Passport",
@@ -481,6 +481,30 @@ function BookingDetailModal({ booking, open, onClose }: { booking: Booking | nul
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [syncing, setSyncing] = useState(false);
+  const [autoFilling, setAutoFilling] = useState(false);
+
+  const handleAutoFillPilgrim = async () => {
+    if (!booking) return;
+    if (!booking.groupId) {
+      toast({ title: "No group assigned", description: "Please assign this booking to a Hajj group first.", variant: "destructive" }); return;
+    }
+    setAutoFilling(true);
+    try {
+      const res = await fetch(`${API}/api/admin/bookings/${booking.id}/auto-fill-pilgrim`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Auto-fill failed");
+      toast({ title: "Pilgrim added to group!", description: `${data.pilgrim?.fullName} has been added to the Hajj group.` });
+      queryClient.invalidateQueries({ queryKey: ["/api/groups"] });
+    } catch (err: any) {
+      toast({ title: "Auto-fill failed", description: err.message, variant: "destructive" });
+    } finally {
+      setAutoFilling(false);
+    }
+  };
 
   if (!booking) return null;
 
@@ -622,6 +646,14 @@ function BookingDetailModal({ booking, open, onClose }: { booking: Booking | nul
             <AdminPaymentLedger booking={booking} />
           </div>
 
+          {(booking as any).travellerDetailsStatus && (
+            <div className={`rounded-lg px-3 py-2 flex items-center gap-2 text-sm ${(booking as any).travellerDetailsStatus === "submitted" ? "bg-indigo-50 border border-indigo-200 text-indigo-800" : "bg-amber-50 border border-amber-200 text-amber-800"}`}>
+              {(booking as any).travellerDetailsStatus === "submitted"
+                ? <><User size={14} /> Customer has submitted travel details</>
+                : <><ClipboardList size={14} /> Customer has not submitted travel details yet</>}
+            </div>
+          )}
+
           <div className="flex flex-wrap items-center gap-2 pt-2">
             {booking.status === "confirmed" && booking.invoiceNumber && (
               <Button
@@ -630,6 +662,17 @@ function BookingDetailModal({ booking, open, onClose }: { booking: Booking | nul
                 onClick={() => window.open(`${import.meta.env.BASE_URL}invoice/${booking.bookingNumber}`, '_blank')}
               >
                 <ExternalLink className="w-4 h-4 mr-2" />View Invoice
+              </Button>
+            )}
+            {(booking as any).travellerDetailsStatus === "submitted" && booking.groupId && (
+              <Button
+                size="sm"
+                className="bg-indigo-700 hover:bg-indigo-800 text-white"
+                onClick={handleAutoFillPilgrim}
+                disabled={autoFilling}
+              >
+                <User className={`w-4 h-4 mr-2 ${autoFilling ? "animate-pulse" : ""}`} />
+                {autoFilling ? "Adding Pilgrim…" : "Auto-fill Pilgrim in Group"}
               </Button>
             )}
             {(booking.status === "approved" || booking.status === "partially_paid") && (booking as any).razorpayOrderId && (
@@ -1041,9 +1084,20 @@ export default function BookingsManager() {
                     )}
                   </td>
                   <td className="px-6 py-4">
-                    <Badge variant="outline" className={`px-2.5 py-1 uppercase tracking-wider text-[10px] font-bold border-0 ${getStatusColor(booking.status)}`}>
-                      {getStatusLabel(booking.status)}
-                    </Badge>
+                    <div className="flex flex-col gap-1.5">
+                      <Badge variant="outline" className={`px-2.5 py-1 uppercase tracking-wider text-[10px] font-bold border-0 ${getStatusColor(booking.status)}`}>
+                        {getStatusLabel(booking.status)}
+                      </Badge>
+                      {(booking as any).travellerDetailsStatus === "submitted" ? (
+                        <Badge className="bg-indigo-100 text-indigo-800 border-0 text-[9px] px-1.5 py-0.5 font-semibold w-fit">
+                          <User size={9} className="mr-0.5" /> Details Submitted
+                        </Badge>
+                      ) : (["approved", "confirmed", "partially_paid"].includes(booking.status)) ? (
+                        <Badge className="bg-amber-100 text-amber-700 border-0 text-[9px] px-1.5 py-0.5 font-semibold w-fit animate-pulse">
+                          <ClipboardList size={9} className="mr-0.5" /> Details Pending
+                        </Badge>
+                      ) : null}
+                    </div>
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">

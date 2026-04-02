@@ -93,6 +93,182 @@ function MandatoryDocumentsCard({ bookingId, onOpenUpload }: { bookingId: string
   );
 }
 
+const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+
+function TravelDetailsCard({ bookingId, initialStatus }: { bookingId: string; initialStatus: string }) {
+  const [status, setStatus] = useState(initialStatus);
+  const [showForm, setShowForm] = useState(false);
+  const [loadingProfile, setLoadingProfile] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [form, setForm] = useState({
+    name: "", dateOfBirth: "", gender: "", mobileIndia: "", bloodGroup: "",
+    address: "", passportNumber: "", passportIssueDate: "", passportExpiryDate: "", passportPlaceOfIssue: "",
+  });
+  const { toast } = useToast();
+
+  const loadProfile = async () => {
+    setLoadingProfile(true);
+    try {
+      const res = await fetch(`${BASE_API}/api/bookings/${bookingId}/traveller-details`, { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        setStatus(data.travellerDetailsStatus ?? status);
+        if (data.profile) {
+          setForm({
+            name: data.profile.name || "",
+            dateOfBirth: data.profile.dateOfBirth || "",
+            gender: data.profile.gender || "",
+            mobileIndia: data.profile.phone || "",
+            bloodGroup: data.profile.bloodGroup || "",
+            address: data.profile.address || "",
+            passportNumber: data.profile.passportNumber || "",
+            passportIssueDate: data.profile.passportIssueDate || "",
+            passportExpiryDate: data.profile.passportExpiryDate || "",
+            passportPlaceOfIssue: data.profile.passportPlaceOfIssue || "",
+          });
+        }
+      }
+    } catch {}
+    setLoadingProfile(false);
+  };
+
+  const handleOpenForm = () => {
+    setShowForm(true);
+    loadProfile();
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.name.trim()) {
+      toast({ title: "Full name is required", variant: "destructive" }); return;
+    }
+    if (!form.passportNumber.trim()) {
+      toast({ title: "Passport number is required", variant: "destructive" }); return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await fetch(`${BASE_API}/api/bookings/${bookingId}/traveller-details`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Submission failed");
+      }
+      setStatus("submitted");
+      setShowForm(false);
+      toast({ title: "Travel details saved!", description: "Jazak Allah Khair — our team will review your information." });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const isSubmitted = status === "submitted";
+  const inputCls = "w-full h-9 rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary";
+
+  return (
+    <Card className={`overflow-hidden rounded-2xl shadow-md border-2 ${isSubmitted ? "border-emerald-300 bg-emerald-50/50" : "border-indigo-300 bg-indigo-50/50"}`}>
+      <div className={`px-5 py-4 flex items-center justify-between gap-3 ${isSubmitted ? "bg-emerald-100" : "bg-indigo-100"}`}>
+        <div className="flex items-center gap-3">
+          {isSubmitted
+            ? <CheckCircle className="w-6 h-6 text-emerald-600 shrink-0" />
+            : <User className="w-6 h-6 text-indigo-600 shrink-0" />}
+          <div>
+            <h4 className="font-bold text-sm">{isSubmitted ? "Travel Details Submitted" : "Travel Details Required"}</h4>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {isSubmitted ? "Your passport & contact info has been saved." : "Please fill in your passport and contact information to proceed."}
+            </p>
+          </div>
+        </div>
+        <Button
+          size="sm" variant="outline"
+          className={`text-xs shrink-0 font-semibold ${isSubmitted ? "border-emerald-400 text-emerald-700 hover:bg-emerald-50" : "border-indigo-500 text-indigo-700 hover:bg-indigo-50"}`}
+          onClick={handleOpenForm}
+        >
+          {isSubmitted ? "Edit Details" : "Fill Now"}
+        </Button>
+      </div>
+
+      {showForm && (
+        <form onSubmit={handleSubmit} className="px-5 pb-5 pt-4 space-y-4">
+          {loadingProfile && <p className="text-sm text-muted-foreground animate-pulse text-center py-2">Loading your saved details…</p>}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="sm:col-span-2 space-y-1">
+              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Full Name (as on Passport) <span className="text-red-500">*</span></label>
+              <input className={inputCls} placeholder="As printed on your passport" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Date of Birth</label>
+              <input className={inputCls} type="date" value={form.dateOfBirth} onChange={e => setForm(f => ({ ...f, dateOfBirth: e.target.value }))} />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Gender</label>
+              <select className={inputCls} value={form.gender} onChange={e => setForm(f => ({ ...f, gender: e.target.value }))}>
+                <option value="">Select</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mobile (India)</label>
+              <input className={inputCls} type="tel" placeholder="10-digit number" value={form.mobileIndia} onChange={e => setForm(f => ({ ...f, mobileIndia: e.target.value }))} />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Blood Group</label>
+              <select className={inputCls} value={form.bloodGroup} onChange={e => setForm(f => ({ ...f, bloodGroup: e.target.value }))}>
+                <option value="">Select</option>
+                {BLOOD_GROUPS.map(bg => <option key={bg} value={bg}>{bg}</option>)}
+              </select>
+            </div>
+
+            <div className="sm:col-span-2 space-y-1">
+              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Address</label>
+              <input className={inputCls} placeholder="Full residential address" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} />
+            </div>
+
+            <div className="sm:col-span-2 space-y-1">
+              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Passport Number <span className="text-red-500">*</span></label>
+              <input className={`${inputCls} font-mono uppercase`} placeholder="e.g. P1234567" value={form.passportNumber} onChange={e => setForm(f => ({ ...f, passportNumber: e.target.value.toUpperCase() }))} required />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Passport Issue Date</label>
+              <input className={inputCls} type="date" value={form.passportIssueDate} onChange={e => setForm(f => ({ ...f, passportIssueDate: e.target.value }))} />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Passport Expiry Date</label>
+              <input className={inputCls} type="date" value={form.passportExpiryDate} onChange={e => setForm(f => ({ ...f, passportExpiryDate: e.target.value }))} />
+            </div>
+
+            <div className="sm:col-span-2 space-y-1">
+              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Place of Issue</label>
+              <input className={inputCls} placeholder="City where passport was issued" value={form.passportPlaceOfIssue} onChange={e => setForm(f => ({ ...f, passportPlaceOfIssue: e.target.value }))} />
+            </div>
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            <Button type="submit" disabled={submitting} className="bg-indigo-700 hover:bg-indigo-800 text-white text-sm">
+              {submitting ? <span className="flex items-center gap-2"><span className="w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />Saving…</span> : "Save Details"}
+            </Button>
+            <Button type="button" variant="outline" className="text-sm" onClick={() => setShowForm(false)}>Cancel</Button>
+          </div>
+        </form>
+      )}
+    </Card>
+  );
+}
+
 function UploadModal({ bookingId, bookingNumber, onClose }: { bookingId: string; bookingNumber: string; onClose: () => void }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -1067,6 +1243,7 @@ export default function CustomerDashboard() {
 
                     {(booking.status === 'approved' || booking.status === 'confirmed' || booking.status === 'partially_paid') && (
                       <div className="mx-5 mb-4 space-y-4">
+                        <TravelDetailsCard bookingId={booking.id} initialStatus={(booking as any).travellerDetailsStatus || "not_submitted"} />
                         <MandatoryDocumentsCard bookingId={booking.id} onOpenUpload={() => setUploadBookingId(booking.id)} />
                         <TravelDocumentsCard bookingId={booking.id} />
                       </div>

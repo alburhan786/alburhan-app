@@ -1,6 +1,6 @@
 import { Router, type RequestHandler } from "express";
-import { db, bookingsTable, paymentTransactionsTable } from "@workspace/db";
-import { eq, sum, count, asc } from "drizzle-orm";
+import { db, bookingsTable, paymentTransactionsTable, customerProfilesTable, pilgrimsTable } from "@workspace/db";
+import { eq, sum, count, asc, max } from "drizzle-orm";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 
 type BookingStatus = "pending" | "approved" | "rejected" | "confirmed" | "cancelled" | "partially_paid";
@@ -214,5 +214,56 @@ router.delete("/:id/payments/:txnId", requireAdmin as RequestHandler, async (req
     return res.status(500).json({ message: "Internal server error" });
   }
 });
+
+router.post(
+  "/:id/auto-fill-pilgrim",
+  requireAdmin as any,
+  async (req: AuthenticatedRequest, res) => {
+    const bookingId = req.params.id as string;
+
+    const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
+    if (!booking) { res.status(404).json({ message: "Booking not found" }); return; }
+    if (!booking.customerId) { res.status(400).json({ message: "Booking has no linked customer" }); return; }
+    if (!booking.groupId) { res.status(400).json({ message: "Booking has no linked group — assign a group first" }); return; }
+
+    const [profile] = await db
+      .select()
+      .from(customerProfilesTable)
+      .where(eq(customerProfilesTable.userId, booking.customerId))
+      .limit(1);
+
+    if (!profile) { res.status(404).json({ message: "Customer has not submitted their travel details yet" }); return; }
+
+    const existingPilgrims = await db
+      .select({ serialNumber: pilgrimsTable.serialNumber })
+      .from(pilgrimsTable)
+      .where(eq(pilgrimsTable.groupId, booking.groupId));
+
+    const maxSerial = existingPilgrims.reduce((m, p) => Math.max(m, p.serialNumber), 0);
+
+    const salutation = profile.gender === "male" ? "Haji" : profile.gender === "female" ? "Hajjah" : "";
+    const pilgrimData = {
+      groupId: booking.groupId,
+      serialNumber: maxSerial + 1,
+      fullName: profile.name || booking.customerName,
+      salutation,
+      passportNumber: profile.passportNumber || null,
+      passportIssueDate: profile.passportIssueDate || null,
+      passportExpiryDate: profile.passportExpiryDate || null,
+      passportPlaceOfIssue: profile.passportPlaceOfIssue || null,
+      dateOfBirth: profile.dateOfBirth || null,
+      gender: profile.gender || null,
+      bloodGroup: profile.bloodGroup || null,
+      address: profile.address || null,
+      mobileIndia: profile.phone || booking.customerMobile,
+      photoUrl: profile.photoUrl || null,
+      updatedAt: new Date(),
+    };
+
+    const [pilgrim] = await db.insert(pilgrimsTable).values(pilgrimData).returning();
+
+    res.status(201).json({ message: "Pilgrim auto-filled from customer profile", pilgrim });
+  }
+);
 
 export default router;
