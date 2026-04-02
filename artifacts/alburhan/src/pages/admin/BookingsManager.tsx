@@ -499,6 +499,7 @@ function BookingDetailModal({ booking, open, onClose }: { booking: Booking | nul
         .catch(() => {})
         .finally(() => setLoadingGroups(false));
       if (booking?.groupId) setSelectedGroupId(booking.groupId);
+      else setSelectedGroupId("");
     }
   }, [open, booking?.id]);
 

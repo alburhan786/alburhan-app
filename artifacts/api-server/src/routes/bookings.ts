@@ -546,7 +546,7 @@ router.post(
       .where(eq(bookingsTable.id, bookingId))
       .returning();
 
-    res.json({ message: "Travel details saved", travellerDetailsStatus: updated.travellerDetailsStatus, profile: savedProfile });
+    res.json({ message: "Travel details saved", booking: formatBooking(updated), travellerDetailsStatus: updated.travellerDetailsStatus, profile: savedProfile });
   }
 );
 

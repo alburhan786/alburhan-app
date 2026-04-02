@@ -93,7 +93,6 @@ function MandatoryDocumentsCard({ bookingId, onOpenUpload }: { bookingId: string
   );
 }
 
-const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
 function TravelDetailsCard({ bookingId, initialStatus }: { bookingId: string; initialStatus: string }) {
   const [status, setStatus] = useState(initialStatus);
