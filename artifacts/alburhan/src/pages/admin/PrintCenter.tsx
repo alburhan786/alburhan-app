@@ -3,7 +3,7 @@ import { AdminLayout } from "@/components/layout/AdminLayout";
 import { Link } from "wouter";
 import {
   Printer, CreditCard, Luggage, Stethoscope, Plane, Hotel, Bus,
-  FileText, Star, Users, Hash, AlertCircle, DoorOpen
+  FileText, Star, Users, Hash, AlertCircle, DoorOpen, ScrollText
 } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -29,6 +29,7 @@ const PRINT_OPTIONS = [
   { label: "Hotel List", icon: <Hotel size={14} />, path: "hotel-list", color: "bg-teal-50 text-teal-700 border-teal-200 hover:bg-teal-100" },
   { label: "Bus List", icon: <Bus size={14} />, path: "bus-list", color: "bg-green-50 text-green-700 border-green-200 hover:bg-green-100" },
   { label: "Airline List", icon: <Plane size={14} />, path: "airline-list", color: "bg-sky-50 text-sky-700 border-sky-200 hover:bg-sky-100" },
+  { label: "Haji List", icon: <ScrollText size={14} />, path: "haji-list", color: "bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100" },
   { label: "Zamzam Labels", icon: <Hash size={14} />, path: "zamzam", color: "bg-cyan-50 text-cyan-700 border-cyan-200 hover:bg-cyan-100" },
   { label: "Feedback Forms", icon: <FileText size={14} />, path: "feedback", color: "bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100" },
   { label: "Contract", icon: <FileText size={14} />, path: "contract", color: "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100" },

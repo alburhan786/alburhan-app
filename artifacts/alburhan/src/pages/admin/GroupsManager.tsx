@@ -45,6 +45,7 @@ function PrintDropdown({ groupId }: { groupId: string }) {
     { label: "Hotel Room List", path: "hotel-list" },
     { label: "Bus Seating List", path: "bus-list" },
     { label: "Airline Passenger List", path: "airline-list" },
+    { label: "Haji List", path: "haji-list" },
     { sep: true },
     { label: "Feedback Form", path: "feedback" },
     { label: "Booking Contract", path: "contract" },
