@@ -183,7 +183,7 @@ export default function PackageDetail() {
   );
 
   const approvedBooking = bookingsData?.bookings?.find(
-    (b: Booking) => b.packageId === id && b.status === "approved"
+    (b: Booking) => b.packageId === id && (b.status === "approved" || b.status === "confirmed")
   );
 
   const pendingBooking = bookingsData?.bookings?.find(

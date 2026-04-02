@@ -39,7 +39,7 @@ router.post("/create-order", requireAuth as any, async (req: AuthenticatedReques
     return;
   }
 
-  if (booking.status !== "approved" && booking.status !== "partially_paid") {
+  if (booking.status !== "approved" && booking.status !== "partially_paid" && booking.status !== "confirmed") {
     res.status(400).json({ message: "Booking must be approved before payment" });
     return;
   }
@@ -167,7 +167,7 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
     return;
   }
 
-  if (existingBooking.status !== "approved" && existingBooking.status !== "partially_paid") {
+  if (existingBooking.status !== "approved" && existingBooking.status !== "partially_paid" && existingBooking.status !== "confirmed") {
     res.status(400).json({ success: false, message: "Booking is not in a payable state" });
     return;
   }

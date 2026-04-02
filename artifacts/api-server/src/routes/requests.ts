@@ -174,7 +174,7 @@ router.patch("/admin/:id/approve", requireAdmin as any, async (_req: Authenticat
       customerName: request.customerName,
       customerMobile: request.customerMobile,
       numberOfPilgrims: 1,
-      status: "pending",
+      status: "approved",
       totalAmount: price ? String(price) : null,
       gstAmount: gst ? String(gst) : null,
       finalAmount: finalAmount ? String(finalAmount) : null,
@@ -319,7 +319,7 @@ router.post("/:id/submit-details", requireAuth as any, detailsUpload as any, asy
         .update(bookingsTable)
         .set({
           customerName: body.name || request.customerName,
-          status: "approved",
+          status: "confirmed",
           updatedAt: new Date(),
         })
         .where(eq(bookingsTable.id, request.bookingId));

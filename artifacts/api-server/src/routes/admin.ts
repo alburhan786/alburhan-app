@@ -1,8 +1,8 @@
 import { Router } from "express";
-import { db, bookingsTable, usersTable, packagesTable, inquiriesTable } from "@workspace/db";
+import { db, bookingsTable, usersTable, packagesTable, inquiriesTable, packageRequestsTable } from "@workspace/db";
 import { eq, count, sum, desc, and, sql } from "drizzle-orm";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
-import { sendWhatsApp } from "../lib/notifications.js";
+import { sendWhatsApp, sendDLTSMS } from "../lib/notifications.js";
 
 const router = Router();
 
@@ -158,6 +158,106 @@ router.get("/reports/payments", requireAdmin as any, async (_req: AuthenticatedR
     paymentDate: b.updatedAt?.toISOString?.(),
     razorpayPaymentId: b.razorpayPaymentId,
   })));
+});
+
+function generateBookingNumber(): string {
+  const now = new Date();
+  const yy = now.getFullYear().toString().slice(-2);
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const rand = Math.floor(1000 + Math.random() * 9000);
+  return `ABT${yy}${mm}${rand}`;
+}
+
+router.get("/requests", requireAdmin as any, async (_req, res) => {
+  try {
+    const requests = await db
+      .select()
+      .from(packageRequestsTable)
+      .orderBy(desc(packageRequestsTable.createdAt));
+    res.json(requests);
+  } catch (err: any) {
+    console.error("[admin] GET /requests error:", err);
+    res.status(500).json({ message: err?.message || "Failed to fetch requests" });
+  }
+});
+
+router.patch("/requests/:id/approve", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const requests = await db.select().from(packageRequestsTable).where(eq(packageRequestsTable.id, req.params.id)).limit(1);
+    const request = requests[0];
+    if (!request) { res.status(404).json({ message: "Request not found" }); return; }
+    if (request.status !== "pending") { res.status(400).json({ message: "Request is not pending" }); return; }
+
+    let pkg = null;
+    if (request.packageId) {
+      const pkgs = await db.select().from(packagesTable).where(eq(packagesTable.id, request.packageId)).limit(1);
+      pkg = pkgs[0] ?? null;
+    }
+
+    const price = pkg ? Number(pkg.pricePerPerson) : null;
+    const gst = price && pkg ? price * (Number(pkg.gstPercent) / 100) : null;
+    const finalAmount = price && gst ? price + gst : null;
+
+    const [booking] = await db.insert(bookingsTable).values({
+      bookingNumber: generateBookingNumber(),
+      packageId: request.packageId ?? null,
+      packageName: request.packageName ?? null,
+      customerId: request.customerId ?? null,
+      customerName: request.customerName,
+      customerMobile: request.customerMobile,
+      numberOfPilgrims: 1,
+      status: "approved",
+      totalAmount: price ? String(price) : null,
+      gstAmount: gst ? String(gst) : null,
+      finalAmount: finalAmount ? String(finalAmount) : null,
+      notes: request.message ?? null,
+      isOffline: false,
+    }).returning();
+
+    const [updated] = await db
+      .update(packageRequestsTable)
+      .set({ status: "approved", bookingId: booking.id, updatedAt: new Date() })
+      .where(eq(packageRequestsTable.id, req.params.id))
+      .returning();
+
+    const approvedMsg = `Assalamu Alaikum ${request.customerName},\n\nYour request for "${request.packageName}" has been APPROVED!\n\nPlease login to your dashboard and fill in your travel details to proceed.\n\nHelp: +91 8989701701 / +91 9893989786\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
+    Promise.allSettled([
+      sendWhatsApp(request.customerMobile, approvedMsg),
+      sendDLTSMS(request.customerMobile, request.customerName, request.packageName ?? "Package", "APPROVED"),
+    ]).catch(console.error);
+
+    res.json({ request: updated, booking });
+  } catch (err: any) {
+    console.error("[admin] PATCH /requests/:id/approve error:", err);
+    res.status(500).json({ message: err?.message || "Failed to approve request" });
+  }
+});
+
+router.patch("/requests/:id/reject", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { reason } = req.body;
+    const requests = await db.select().from(packageRequestsTable).where(eq(packageRequestsTable.id, req.params.id)).limit(1);
+    const request = requests[0];
+    if (!request) { res.status(404).json({ message: "Request not found" }); return; }
+
+    const [updated] = await db
+      .update(packageRequestsTable)
+      .set({ status: "rejected", rejectionReason: reason ?? null, updatedAt: new Date() })
+      .where(eq(packageRequestsTable.id, req.params.id))
+      .returning();
+
+    const reasonText = reason ? `\n\nReason: ${reason}` : "";
+    const rejectedMsg = `Assalamu Alaikum ${request.customerName},\n\nWe regret that your request for "${request.packageName}" could not be accommodated at this time.${reasonText}\n\nPlease contact us for alternatives:\n+91 8989701701 / +91 9893989786\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
+    Promise.allSettled([
+      sendWhatsApp(request.customerMobile, rejectedMsg),
+      sendDLTSMS(request.customerMobile, request.customerName, request.packageName ?? "Package", "REJECTED"),
+    ]).catch(console.error);
+
+    res.json(updated);
+  } catch (err: any) {
+    console.error("[admin] PATCH /requests/:id/reject error:", err);
+    res.status(500).json({ message: err?.message || "Failed to reject request" });
+  }
 });
 
 export default router;

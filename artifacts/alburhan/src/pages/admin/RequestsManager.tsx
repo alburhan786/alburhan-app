@@ -50,7 +50,7 @@ export default function RequestsManager() {
   const loadRequests = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch(`${BASE_API}/api/requests/admin/all`, { credentials: "include" });
+      const res = await fetch(`${BASE_API}/api/admin/requests`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch");
       setRequests(await res.json());
     } catch {
@@ -65,7 +65,7 @@ export default function RequestsManager() {
   const handleApprove = async (id: string) => {
     setProcessing(id);
     try {
-      const res = await fetch(`${BASE_API}/api/requests/admin/${id}/approve`, {
+      const res = await fetch(`${BASE_API}/api/admin/requests/${id}/approve`, {
         method: "PATCH",
         credentials: "include",
       });
@@ -87,7 +87,7 @@ export default function RequestsManager() {
     if (!rejectDialogId) return;
     setProcessing(rejectDialogId);
     try {
-      const res = await fetch(`${BASE_API}/api/requests/admin/${rejectDialogId}/reject`, {
+      const res = await fetch(`${BASE_API}/api/admin/requests/${rejectDialogId}/reject`, {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
