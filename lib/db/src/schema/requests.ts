@@ -16,6 +16,8 @@ export const packageRequestsTable = pgTable("package_requests", {
   message: text("message"),
   status: requestStatusEnum("status").notNull().default("pending"),
   rejectionReason: text("rejection_reason"),
+  groupId: text("group_id"),
+  pilgrimId: text("pilgrim_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

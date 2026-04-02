@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { CheckCircle, XCircle, Clock, MessageSquare, Package, Phone, User, RefreshCw } from "lucide-react";
+import { CheckCircle, XCircle, Clock, MessageSquare, Package, Phone, User, RefreshCw, Users, ExternalLink } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { Link } from "wouter";
 
@@ -34,18 +34,31 @@ interface PackageRequest {
   message: string | null;
   status: string;
   rejectionReason: string | null;
+  groupId: string | null;
+  pilgrimId: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+interface HajjGroup {
+  id: string;
+  groupName: string;
+  year: number;
 }
 
 export default function RequestsManager() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [requests, setRequests] = useState<PackageRequest[]>([]);
+  const [groups, setGroups] = useState<HajjGroup[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [rejectDialogId, setRejectDialogId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [processing, setProcessing] = useState<string | null>(null);
+
+  const [assignDialogId, setAssignDialogId] = useState<string | null>(null);
+  const [assignGroupId, setAssignGroupId] = useState("");
+  const [assigning, setAssigning] = useState(false);
 
   const loadRequests = async () => {
     setIsLoading(true);
@@ -60,7 +73,17 @@ export default function RequestsManager() {
     }
   };
 
-  useEffect(() => { loadRequests(); }, []);
+  const loadGroups = async () => {
+    try {
+      const res = await fetch(`${BASE_API}/api/groups`, { credentials: "include" });
+      if (res.ok) setGroups(await res.json());
+    } catch {}
+  };
+
+  useEffect(() => {
+    loadRequests();
+    loadGroups();
+  }, []);
 
   const handleApprove = async (id: string) => {
     setProcessing(id);
@@ -108,8 +131,42 @@ export default function RequestsManager() {
     }
   };
 
+  const openAssignDialog = (id: string) => {
+    setAssignDialogId(id);
+    setAssignGroupId(groups[0]?.id ?? "");
+  };
+
+  const handleAssignGroup = async () => {
+    if (!assignDialogId || !assignGroupId) return;
+    setAssigning(true);
+    try {
+      const res = await fetch(`${BASE_API}/api/admin/requests/${assignDialogId}/assign-group`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ groupId: assignGroupId }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message);
+      }
+      const data = await res.json();
+      const grpName = data.group?.groupName ?? "group";
+      toast({ title: "Group assigned", description: `Pilgrim placeholder created in "${grpName}". Travel details from customer will auto-populate it.` });
+      setAssignDialogId(null);
+      setAssignGroupId("");
+      await loadRequests();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setAssigning(false);
+    }
+  };
+
   const pending = requests.filter(r => r.status === "pending");
   const handled = requests.filter(r => r.status !== "pending");
+
+  const groupMap = Object.fromEntries(groups.map(g => [g.id, g]));
 
   return (
     <AdminLayout>
@@ -157,9 +214,12 @@ export default function RequestsManager() {
                     <RequestCard
                       key={r.id}
                       request={r}
+                      groups={groups}
+                      groupMap={groupMap}
                       processing={processing}
                       onApprove={handleApprove}
                       onReject={(id) => { setRejectDialogId(id); setRejectReason(""); }}
+                      onAssign={openAssignDialog}
                     />
                   ))}
                 </div>
@@ -176,9 +236,12 @@ export default function RequestsManager() {
                     <RequestCard
                       key={r.id}
                       request={r}
+                      groups={groups}
+                      groupMap={groupMap}
                       processing={processing}
                       onApprove={handleApprove}
                       onReject={(id) => { setRejectDialogId(id); setRejectReason(""); }}
+                      onAssign={openAssignDialog}
                     />
                   ))}
                 </div>
@@ -221,23 +284,81 @@ export default function RequestsManager() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!assignDialogId} onOpenChange={(o) => { if (!o) { setAssignDialogId(null); setAssignGroupId(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="w-5 h-5 text-primary" /> Assign to Hajj Group
+            </DialogTitle>
+            <DialogDescription>
+              A pilgrim placeholder will be created in the selected group. The customer's travel details will automatically fill in when they submit their passport information.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            {groups.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No Hajj groups available. Create a group first in the Pilgrim Manager.</p>
+            ) : (
+              <select
+                className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                value={assignGroupId}
+                onChange={e => setAssignGroupId(e.target.value)}
+              >
+                {groups.map(g => (
+                  <option key={g.id} value={g.id}>
+                    {g.groupName} ({g.year})
+                  </option>
+                ))}
+              </select>
+            )}
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={() => { setAssignDialogId(null); setAssignGroupId(""); }}>
+                Cancel
+              </Button>
+              <Button
+                className="flex-1 bg-primary text-white hover:bg-primary/90"
+                onClick={handleAssignGroup}
+                disabled={assigning || !assignGroupId || groups.length === 0}
+              >
+                {assigning ? (
+                  <span className="flex items-center gap-2">
+                    <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                    Assigning...
+                  </span>
+                ) : (
+                  <><Users className="w-4 h-4 mr-2" /> Assign Group</>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 }
 
 function RequestCard({
   request,
+  groups,
+  groupMap,
   processing,
   onApprove,
   onReject,
+  onAssign,
 }: {
   request: PackageRequest;
+  groups: HajjGroup[];
+  groupMap: Record<string, HajjGroup>;
   processing: string | null;
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
+  onAssign: (id: string) => void;
 }) {
   const isPending = request.status === "pending";
+  const isApproved = request.status === "approved";
   const isProcessing = processing === request.id;
+  const assignedGroup = request.groupId ? groupMap[request.groupId] : null;
+  const canAssign = !isPending && isApproved && !request.pilgrimId && groups.length > 0;
 
   return (
     <Card className="rounded-2xl overflow-hidden shadow-sm border-border/60 hover:shadow-md transition-all">
@@ -257,13 +378,15 @@ function RequestCard({
               </a>
             </div>
           </div>
-          {request.bookingId && (
-            <Link href={`/admin/bookings`}>
-              <Button variant="outline" size="sm" className="text-xs">
-                View Booking
-              </Button>
-            </Link>
-          )}
+          <div className="flex gap-2 flex-wrap">
+            {request.bookingId && (
+              <Link href={`/admin/bookings`}>
+                <Button variant="outline" size="sm" className="text-xs">
+                  View Booking
+                </Button>
+              </Link>
+            )}
+          </div>
         </div>
 
         <div className="bg-muted/30 rounded-xl px-4 py-3 mb-4">
@@ -285,29 +408,59 @@ function RequestCard({
           </div>
         )}
 
-        {isPending && (
-          <div className="flex gap-3">
-            <Button
-              className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
-              disabled={!!processing}
-              onClick={() => onApprove(request.id)}
-            >
-              {isProcessing ? (
-                <span className="flex items-center gap-2"><span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" /> Processing...</span>
-              ) : (
-                <><CheckCircle className="w-4 h-4 mr-2" /> Approve</>
-              )}
-            </Button>
-            <Button
-              variant="destructive"
-              className="flex-1"
-              disabled={!!processing}
-              onClick={() => onReject(request.id)}
-            >
-              <XCircle className="w-4 h-4 mr-2" /> Reject
-            </Button>
+        {request.pilgrimId && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 mb-4 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm text-emerald-800">
+              <Users className="w-4 h-4 shrink-0" />
+              <span>
+                <span className="font-semibold">Assigned to group:</span>{" "}
+                {assignedGroup ? `${assignedGroup.groupName} (${assignedGroup.year})` : "Unknown Group"}
+              </span>
+            </div>
+            <Link href="/admin/pilgrims">
+              <Button variant="outline" size="sm" className="text-xs text-emerald-700 border-emerald-300 hover:bg-emerald-50 shrink-0">
+                View Pilgrims <ExternalLink className="w-3 h-3 ml-1" />
+              </Button>
+            </Link>
           </div>
         )}
+
+        <div className="flex gap-3 flex-wrap">
+          {isPending && (
+            <>
+              <Button
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+                disabled={!!processing}
+                onClick={() => onApprove(request.id)}
+              >
+                {isProcessing ? (
+                  <span className="flex items-center gap-2"><span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" /> Processing...</span>
+                ) : (
+                  <><CheckCircle className="w-4 h-4 mr-2" /> Approve</>
+                )}
+              </Button>
+              <Button
+                variant="destructive"
+                className="flex-1"
+                disabled={!!processing}
+                onClick={() => onReject(request.id)}
+              >
+                <XCircle className="w-4 h-4 mr-2" /> Reject
+              </Button>
+            </>
+          )}
+
+          {canAssign && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-primary text-primary hover:bg-primary/5"
+              onClick={() => onAssign(request.id)}
+            >
+              <Users className="w-4 h-4 mr-2" /> Assign to Group
+            </Button>
+          )}
+        </div>
       </div>
     </Card>
   );

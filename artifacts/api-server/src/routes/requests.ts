@@ -191,25 +191,50 @@ router.post("/:id/submit-details", requireAuth as any, detailsUpload as any, asy
       });
     }
 
-    if (request.bookingId) {
-      const existingPilgrims = await db
-        .select()
-        .from(pilgrimsTable)
-        .where(eq(pilgrimsTable.groupId, `booking:${request.bookingId}`))
-        .limit(1);
-
-      if (!existingPilgrims[0]) {
-        await db.insert(pilgrimsTable).values({
-          groupId: `booking:${request.bookingId}`,
-          serialNumber: 1,
+    if (request.groupId && request.pilgrimId) {
+      await db
+        .update(pilgrimsTable)
+        .set({
           fullName: body.name || request.customerName,
           passportNumber: body.passportNumber || null,
           dateOfBirth: body.dateOfBirth || null,
           gender: body.gender || null,
           address: body.address || null,
-          photoUrl: photoUrl || null,
-          mobileIndia: request.customerMobile,
-        });
+          ...(photoUrl ? { photoUrl } : {}),
+          passportIssueDate: body.passportIssueDate || null,
+          passportExpiryDate: body.passportExpiryDate || null,
+          passportPlaceOfIssue: body.passportPlaceOfIssue || null,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(pilgrimsTable.id, request.pilgrimId),
+            eq(pilgrimsTable.groupId, request.groupId)
+          )
+        );
+    }
+
+    if (request.bookingId) {
+      if (!request.pilgrimId) {
+        const existingPilgrims = await db
+          .select()
+          .from(pilgrimsTable)
+          .where(eq(pilgrimsTable.groupId, `booking:${request.bookingId}`))
+          .limit(1);
+
+        if (!existingPilgrims[0]) {
+          await db.insert(pilgrimsTable).values({
+            groupId: `booking:${request.bookingId}`,
+            serialNumber: 1,
+            fullName: body.name || request.customerName,
+            passportNumber: body.passportNumber || null,
+            dateOfBirth: body.dateOfBirth || null,
+            gender: body.gender || null,
+            address: body.address || null,
+            photoUrl: photoUrl || null,
+            mobileIndia: request.customerMobile,
+          });
+        }
       }
 
       await db

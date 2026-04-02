@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, bookingsTable, usersTable, packagesTable, inquiriesTable, packageRequestsTable } from "@workspace/db";
-import { eq, count, sum, desc, and, sql } from "drizzle-orm";
+import { db, bookingsTable, usersTable, packagesTable, inquiriesTable, packageRequestsTable, hajjGroupsTable, customerProfilesTable, pilgrimsTable } from "@workspace/db";
+import { eq, count, sum, desc, and, sql, max } from "drizzle-orm";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendWhatsApp, sendDLTSMS } from "../lib/notifications.js";
 
@@ -257,6 +257,89 @@ router.patch("/requests/:id/reject", requireAdmin as any, async (req: Authentica
   } catch (err: any) {
     console.error("[admin] PATCH /requests/:id/reject error:", err);
     res.status(500).json({ message: err?.message || "Failed to reject request" });
+  }
+});
+
+router.patch("/requests/:id/assign-group", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const id = String(req.params.id);
+    const { groupId } = req.body;
+
+    if (!groupId) {
+      res.status(400).json({ message: "groupId is required" });
+      return;
+    }
+
+    const requests = await db
+      .select()
+      .from(packageRequestsTable)
+      .where(eq(packageRequestsTable.id, id))
+      .limit(1);
+    const request = requests[0];
+    if (!request) { res.status(404).json({ message: "Request not found" }); return; }
+    if (request.status === "pending") {
+      res.status(400).json({ message: "Approve the request before assigning to a group" });
+      return;
+    }
+    if (request.pilgrimId) {
+      res.status(400).json({ message: "This request is already assigned to a group" });
+      return;
+    }
+
+    const groups = await db
+      .select()
+      .from(hajjGroupsTable)
+      .where(eq(hajjGroupsTable.id, groupId))
+      .limit(1);
+    if (!groups[0]) { res.status(404).json({ message: "Group not found" }); return; }
+
+    let profile = null;
+    if (request.customerId) {
+      const profiles = await db
+        .select()
+        .from(customerProfilesTable)
+        .where(eq(customerProfilesTable.userId, request.customerId))
+        .limit(1);
+      profile = profiles[0] ?? null;
+    }
+
+    const [{ maxSerial }] = await db
+      .select({ maxSerial: max(pilgrimsTable.serialNumber) })
+      .from(pilgrimsTable)
+      .where(eq(pilgrimsTable.groupId, groupId));
+    const nextSerial = (maxSerial || 0) + 1;
+
+    const gender = profile?.gender ?? null;
+    let salutation: string | null = null;
+    if (gender === "male") salutation = "Mr.";
+    else if (gender === "female") salutation = "Mrs.";
+
+    const [pilgrim] = await db.insert(pilgrimsTable).values({
+      groupId,
+      serialNumber: nextSerial,
+      fullName: profile?.name || request.customerName,
+      passportNumber: profile?.passportNumber ?? null,
+      dateOfBirth: profile?.dateOfBirth ?? null,
+      gender,
+      address: profile?.address ?? null,
+      photoUrl: profile?.photoUrl ?? null,
+      mobileIndia: request.customerMobile,
+      passportIssueDate: profile?.passportIssueDate ?? null,
+      passportExpiryDate: profile?.passportExpiryDate ?? null,
+      passportPlaceOfIssue: profile?.passportPlaceOfIssue ?? null,
+      salutation,
+    }).returning();
+
+    const [updated] = await db
+      .update(packageRequestsTable)
+      .set({ groupId, pilgrimId: pilgrim.id, updatedAt: new Date() })
+      .where(eq(packageRequestsTable.id, id))
+      .returning();
+
+    res.json({ request: updated, pilgrim, group: groups[0] });
+  } catch (err: any) {
+    console.error("[admin] PATCH /requests/:id/assign-group error:", err);
+    res.status(500).json({ message: err?.message || "Failed to assign group" });
   }
 });
 
