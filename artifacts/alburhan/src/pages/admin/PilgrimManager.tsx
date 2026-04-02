@@ -310,7 +310,14 @@ export default function PilgrimManager() {
 
               <div className="space-y-1"><label className="text-sm font-medium">Date of Birth</label><Input value={form.dateOfBirth} onChange={e => f("dateOfBirth", e.target.value)} placeholder="DD/MM/YYYY" /></div>
               <div className="space-y-1"><label className="text-sm font-medium">Gender</label>
-                <select value={form.gender} onChange={e => f("gender", e.target.value)} className="w-full h-10 px-3 rounded-md border bg-background text-sm">
+                <select value={form.gender} onChange={e => {
+                  const g = e.target.value;
+                  setForm(prev => ({
+                    ...prev,
+                    gender: g,
+                    salutation: prev.salutation ? prev.salutation : g === "Male" ? "Mr." : g === "Female" ? "Mrs." : prev.salutation,
+                  }));
+                }} className="w-full h-10 px-3 rounded-md border bg-background text-sm">
                   <option value="">Select</option><option value="Male">Male</option><option value="Female">Female</option>
                 </select>
               </div>

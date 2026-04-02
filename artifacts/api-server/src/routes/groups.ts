@@ -40,11 +40,6 @@ async function getImageBuffer(photoUrl: string): Promise<Buffer | null> {
       if (fs.existsSync(filePath)) return fs.readFileSync(filePath);
       return null;
     }
-    if (photoUrl.startsWith("http://") || photoUrl.startsWith("https://")) {
-      const { default: axios } = await import("axios");
-      const resp = await axios.get(photoUrl, { responseType: "arraybuffer", timeout: 5000 });
-      return Buffer.from(resp.data);
-    }
   } catch {}
   return null;
 }
