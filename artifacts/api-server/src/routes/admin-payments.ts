@@ -1,6 +1,6 @@
 import { Router, type RequestHandler } from "express";
 import { db, bookingsTable, paymentTransactionsTable, customerProfilesTable, pilgrimsTable } from "@workspace/db";
-import { eq, sum, count, asc, max } from "drizzle-orm";
+import { eq, sum, count, asc, max, and } from "drizzle-orm";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 
 type BookingStatus = "pending" | "approved" | "rejected" | "confirmed" | "cancelled" | "partially_paid";
@@ -223,6 +223,9 @@ router.post(
 
     const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
     if (!booking) { res.status(404).json({ message: "Booking not found" }); return; }
+    if (booking.travellerDetailsStatus !== "submitted") {
+      res.status(400).json({ message: "Customer has not submitted their travel details yet" }); return;
+    }
     if (!booking.customerId) { res.status(400).json({ message: "Booking has no linked customer" }); return; }
     if (!booking.groupId) { res.status(400).json({ message: "Booking has no linked group — assign a group first" }); return; }
 
@@ -232,19 +235,10 @@ router.post(
       .where(eq(customerProfilesTable.userId, booking.customerId))
       .limit(1);
 
-    if (!profile) { res.status(404).json({ message: "Customer has not submitted their travel details yet" }); return; }
-
-    const existingPilgrims = await db
-      .select({ serialNumber: pilgrimsTable.serialNumber })
-      .from(pilgrimsTable)
-      .where(eq(pilgrimsTable.groupId, booking.groupId));
-
-    const maxSerial = existingPilgrims.reduce((m, p) => Math.max(m, p.serialNumber), 0);
+    if (!profile) { res.status(404).json({ message: "Customer profile not found — ask customer to re-submit their details" }); return; }
 
     const salutation = profile.gender === "male" ? "Haji" : profile.gender === "female" ? "Hajjah" : "";
     const pilgrimData = {
-      groupId: booking.groupId,
-      serialNumber: maxSerial + 1,
       fullName: profile.name || booking.customerName,
       salutation,
       passportNumber: profile.passportNumber || null,
@@ -260,9 +254,24 @@ router.post(
       updatedAt: new Date(),
     };
 
-    const [pilgrim] = await db.insert(pilgrimsTable).values(pilgrimData).returning();
+    const existingByPassport = profile.passportNumber
+      ? await db.select().from(pilgrimsTable)
+          .where(and(eq(pilgrimsTable.groupId, booking.groupId), eq(pilgrimsTable.passportNumber, profile.passportNumber)))
+          .limit(1)
+      : [];
 
-    res.status(201).json({ message: "Pilgrim auto-filled from customer profile", pilgrim });
+    let pilgrim;
+    if (existingByPassport[0]) {
+      const [updated] = await db.update(pilgrimsTable).set(pilgrimData).where(eq(pilgrimsTable.id, existingByPassport[0].id)).returning();
+      pilgrim = updated;
+      return res.json({ message: "Pilgrim updated from customer profile", pilgrim, upserted: "updated" });
+    }
+
+    const [{ maxSerial }] = await db.select({ maxSerial: max(pilgrimsTable.serialNumber) }).from(pilgrimsTable).where(eq(pilgrimsTable.groupId, booking.groupId));
+    const [created] = await db.insert(pilgrimsTable).values({ ...pilgrimData, groupId: booking.groupId, serialNumber: (maxSerial || 0) + 1 }).returning();
+    pilgrim = created;
+
+    res.status(201).json({ message: "Pilgrim auto-filled from customer profile", pilgrim, upserted: "created" });
   }
 );
 

@@ -97,9 +97,12 @@ const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
 function TravelDetailsCard({ bookingId, initialStatus }: { bookingId: string; initialStatus: string }) {
   const [status, setStatus] = useState(initialStatus);
-  const [showForm, setShowForm] = useState(false);
-  const [loadingProfile, setLoadingProfile] = useState(false);
+  const [showForm, setShowForm] = useState(initialStatus === "not_submitted");
+  const [loadingProfile, setLoadingProfile] = useState(initialStatus === "not_submitted");
   const [submitting, setSubmitting] = useState(false);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [existingPhotoUrl, setExistingPhotoUrl] = useState<string | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
     name: "", dateOfBirth: "", gender: "", mobileIndia: "", bloodGroup: "",
     address: "", passportNumber: "", passportIssueDate: "", passportExpiryDate: "", passportPlaceOfIssue: "",
@@ -126,11 +129,18 @@ function TravelDetailsCard({ bookingId, initialStatus }: { bookingId: string; in
             passportExpiryDate: data.profile.passportExpiryDate || "",
             passportPlaceOfIssue: data.profile.passportPlaceOfIssue || "",
           });
+          setExistingPhotoUrl(data.profile.photoUrl || null);
         }
       }
     } catch {}
     setLoadingProfile(false);
   };
+
+  useEffect(() => {
+    if (initialStatus === "not_submitted") {
+      loadProfile();
+    }
+  }, []);
 
   const handleOpenForm = () => {
     setShowForm(true);
@@ -147,18 +157,24 @@ function TravelDetailsCard({ bookingId, initialStatus }: { bookingId: string; in
     }
     setSubmitting(true);
     try {
+      const fd = new FormData();
+      Object.entries(form).forEach(([k, v]) => fd.append(k, v));
+      if (photoFile) fd.append("photo", photoFile);
+
       const res = await fetch(`${BASE_API}/api/bookings/${bookingId}/traveller-details`, {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: fd,
       });
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.message || "Submission failed");
       }
+      const data = await res.json();
+      if (data.profile?.photoUrl) setExistingPhotoUrl(data.profile.photoUrl);
       setStatus("submitted");
       setShowForm(false);
+      setPhotoFile(null);
       toast({ title: "Travel details saved!", description: "Jazak Allah Khair — our team will review your information." });
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -187,9 +203,9 @@ function TravelDetailsCard({ bookingId, initialStatus }: { bookingId: string; in
         <Button
           size="sm" variant="outline"
           className={`text-xs shrink-0 font-semibold ${isSubmitted ? "border-emerald-400 text-emerald-700 hover:bg-emerald-50" : "border-indigo-500 text-indigo-700 hover:bg-indigo-50"}`}
-          onClick={handleOpenForm}
+          onClick={showForm ? () => setShowForm(false) : handleOpenForm}
         >
-          {isSubmitted ? "Edit Details" : "Fill Now"}
+          {showForm ? "Hide Form" : isSubmitted ? "Edit Details" : "Fill Now"}
         </Button>
       </div>
 
@@ -254,6 +270,39 @@ function TravelDetailsCard({ bookingId, initialStatus }: { bookingId: string; in
             <div className="sm:col-span-2 space-y-1">
               <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Place of Issue</label>
               <input className={inputCls} placeholder="City where passport was issued" value={form.passportPlaceOfIssue} onChange={e => setForm(f => ({ ...f, passportPlaceOfIssue: e.target.value }))} />
+            </div>
+
+            <div className="sm:col-span-2 space-y-1">
+              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Passport Size Photo</label>
+              <div
+                className="flex items-center gap-3 rounded-lg border-2 border-dashed border-indigo-200 bg-indigo-50/50 px-4 py-3 cursor-pointer hover:border-indigo-400 transition-colors"
+                onClick={() => photoInputRef.current?.click()}
+              >
+                {existingPhotoUrl && !photoFile && (
+                  <img src={existingPhotoUrl} alt="Current photo" className="w-10 h-10 rounded object-cover border border-indigo-200 shrink-0" />
+                )}
+                {photoFile ? (
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <CheckCircle className="w-4 h-4 text-indigo-600 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-indigo-700 truncate">{photoFile.name}</p>
+                      <p className="text-xs text-muted-foreground">{(photoFile.size / 1024).toFixed(1)} KB</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-indigo-700">{existingPhotoUrl ? "Replace photo" : "Click to upload photo"}</p>
+                    <p className="text-xs text-muted-foreground">JPG, PNG or WebP — max 5 MB</p>
+                  </div>
+                )}
+              </div>
+              <input
+                ref={photoInputRef}
+                type="file"
+                className="hidden"
+                accept="image/jpeg,image/jpg,image/png,image/webp"
+                onChange={e => setPhotoFile(e.target.files?.[0] ?? null)}
+              />
             </div>
           </div>
 

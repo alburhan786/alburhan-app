@@ -1,6 +1,18 @@
 import { Router } from "express";
-import { db, bookingsTable, packagesTable, usersTable, hajjGroupsTable, customerProfilesTable } from "@workspace/db";
-import { eq, and, desc, count, sql } from "drizzle-orm";
+import { db, bookingsTable, packagesTable, usersTable, hajjGroupsTable, customerProfilesTable, pilgrimsTable } from "@workspace/db";
+import { eq, and, desc, count, sql, max } from "drizzle-orm";
+import multer from "multer";
+import { uploadToGCS } from "../lib/gcsUpload.js";
+
+const photoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    if (allowed.includes(file.mimetype)) cb(null, true);
+    else cb(new Error("Only JPG, PNG, and WebP files are allowed"));
+  },
+}).single("photo");
 import {
   CreateBookingBody,
   ListBookingsQueryParams,
@@ -457,6 +469,46 @@ function buildInvoiceResponse(b: typeof bookingsTable.$inferSelect, pkg: { gstPe
   };
 }
 
+async function upsertPilgrimFromProfile(
+  groupId: string,
+  profile: { name?: string | null; passportNumber?: string | null; passportIssueDate?: string | null; passportExpiryDate?: string | null; passportPlaceOfIssue?: string | null; dateOfBirth?: string | null; gender?: string | null; bloodGroup?: string | null; address?: string | null; phone?: string | null; photoUrl?: string | null },
+  fallbackName: string,
+  fallbackMobile: string,
+): Promise<typeof pilgrimsTable.$inferSelect> {
+  const salutation = profile.gender === "male" ? "Haji" : profile.gender === "female" ? "Hajjah" : "";
+
+  const existingByPassport = profile.passportNumber
+    ? await db.select().from(pilgrimsTable)
+        .where(and(eq(pilgrimsTable.groupId, groupId), eq(pilgrimsTable.passportNumber, profile.passportNumber)))
+        .limit(1)
+    : [];
+
+  const pilgrimData = {
+    fullName: profile.name || fallbackName,
+    salutation,
+    passportNumber: profile.passportNumber || null,
+    passportIssueDate: profile.passportIssueDate || null,
+    passportExpiryDate: profile.passportExpiryDate || null,
+    passportPlaceOfIssue: profile.passportPlaceOfIssue || null,
+    dateOfBirth: profile.dateOfBirth || null,
+    gender: profile.gender || null,
+    bloodGroup: profile.bloodGroup || null,
+    address: profile.address || null,
+    mobileIndia: profile.phone || fallbackMobile,
+    photoUrl: profile.photoUrl || null,
+    updatedAt: new Date(),
+  };
+
+  if (existingByPassport[0]) {
+    const [updated] = await db.update(pilgrimsTable).set(pilgrimData).where(eq(pilgrimsTable.id, existingByPassport[0].id)).returning();
+    return updated;
+  }
+
+  const [{ maxSerial }] = await db.select({ maxSerial: max(pilgrimsTable.serialNumber) }).from(pilgrimsTable).where(eq(pilgrimsTable.groupId, groupId));
+  const [created] = await db.insert(pilgrimsTable).values({ ...pilgrimData, groupId, serialNumber: (maxSerial || 0) + 1 }).returning();
+  return created;
+}
+
 router.get(
   "/:id/traveller-details",
   requireAuth as any,
@@ -483,6 +535,7 @@ router.get(
 router.post(
   "/:id/traveller-details",
   requireAuth as any,
+  (req, res, next) => photoUpload(req, res, next),
   async (req: AuthenticatedRequest, res) => {
     const bookingId = req.params.id as string;
     const userId = req.user!.id;
@@ -494,27 +547,34 @@ router.post(
       res.status(400).json({ message: "Booking is not in an editable state" }); return;
     }
 
-    const { name, dateOfBirth, gender, address, passportNumber, passportIssueDate, passportExpiryDate, passportPlaceOfIssue, bloodGroup, mobileIndia } = req.body;
-
-    const profileData: any = {
-      name: name || null,
-      dateOfBirth: dateOfBirth || null,
-      gender: gender || null,
-      address: address || null,
-      passportNumber: passportNumber || null,
-      passportIssueDate: passportIssueDate || null,
-      passportExpiryDate: passportExpiryDate || null,
-      passportPlaceOfIssue: passportPlaceOfIssue || null,
-      bloodGroup: bloodGroup || null,
-      phone: mobileIndia || null,
+    const body = req.body as Record<string, string>;
+    const profileData: Record<string, string | null | Date> = {
+      name: body.name || null,
+      dateOfBirth: body.dateOfBirth || null,
+      gender: body.gender || null,
+      address: body.address || null,
+      passportNumber: body.passportNumber || null,
+      passportIssueDate: body.passportIssueDate || null,
+      passportExpiryDate: body.passportExpiryDate || null,
+      passportPlaceOfIssue: body.passportPlaceOfIssue || null,
+      bloodGroup: body.bloodGroup || null,
+      phone: body.mobileIndia || null,
       updatedAt: new Date(),
     };
 
+    const photoFile = (req as any).file as Express.Multer.File | undefined;
+    if (photoFile) {
+      profileData.photoUrl = await uploadToGCS(photoFile.buffer, photoFile.originalname, photoFile.mimetype, "private_uploads");
+    }
+
     const existing = await db.select().from(customerProfilesTable).where(eq(customerProfilesTable.userId, userId)).limit(1);
+    let savedProfile;
     if (existing[0]) {
-      await db.update(customerProfilesTable).set(profileData).where(eq(customerProfilesTable.userId, userId));
+      const [updated] = await db.update(customerProfilesTable).set(profileData).where(eq(customerProfilesTable.userId, userId)).returning();
+      savedProfile = updated;
     } else {
-      await db.insert(customerProfilesTable).values({ ...profileData, userId, kycStatus: "pending" });
+      const [created] = await db.insert(customerProfilesTable).values({ ...profileData, userId, kycStatus: "pending" }).returning();
+      savedProfile = created;
     }
 
     const [updated] = await db
@@ -523,7 +583,39 @@ router.post(
       .where(eq(bookingsTable.id, bookingId))
       .returning();
 
-    res.json({ message: "Travel details saved", travellerDetailsStatus: updated.travellerDetailsStatus });
+    res.json({ message: "Travel details saved", travellerDetailsStatus: updated.travellerDetailsStatus, profile: savedProfile });
+  }
+);
+
+router.patch(
+  "/:id/assign-group",
+  requireAdmin as any,
+  async (req: AuthenticatedRequest, res) => {
+    const bookingId = req.params.id as string;
+    const { groupId } = req.body as { groupId: string };
+    if (!groupId) { res.status(400).json({ message: "groupId is required" }); return; }
+
+    const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
+    if (!booking) { res.status(404).json({ message: "Booking not found" }); return; }
+
+    const [group] = await db.select().from(hajjGroupsTable).where(eq(hajjGroupsTable.id, groupId)).limit(1);
+    if (!group) { res.status(404).json({ message: "Group not found" }); return; }
+
+    const [updatedBooking] = await db
+      .update(bookingsTable)
+      .set({ groupId, updatedAt: new Date() })
+      .where(eq(bookingsTable.id, bookingId))
+      .returning();
+
+    let pilgrim: typeof pilgrimsTable.$inferSelect | null = null;
+    if (booking.travellerDetailsStatus === "submitted" && booking.customerId) {
+      const [profile] = await db.select().from(customerProfilesTable).where(eq(customerProfilesTable.userId, booking.customerId)).limit(1);
+      if (profile) {
+        pilgrim = await upsertPilgrimFromProfile(groupId, profile, booking.customerName, booking.customerMobile);
+      }
+    }
+
+    res.json({ booking: formatBooking(updatedBooking), group, pilgrim, autoFilled: !!pilgrim });
   }
 );
 

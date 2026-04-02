@@ -482,6 +482,25 @@ function BookingDetailModal({ booking, open, onClose }: { booking: Booking | nul
   const queryClient = useQueryClient();
   const [syncing, setSyncing] = useState(false);
   const [autoFilling, setAutoFilling] = useState(false);
+  const [assigningGroup, setAssigningGroup] = useState(false);
+  const [selectedGroupId, setSelectedGroupId] = useState("");
+  const [availableGroups, setAvailableGroups] = useState<{ id: string; name: string; year: number; maktabNumber?: string }[]>([]);
+  const [loadingGroups, setLoadingGroups] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setLoadingGroups(true);
+      fetch(`${API}/api/groups`, { credentials: "include" })
+        .then(r => r.json())
+        .then(data => {
+          const groups = Array.isArray(data) ? data : (data.groups ?? []);
+          setAvailableGroups(groups.map((g: any) => ({ id: g.id, name: g.name, year: g.year, maktabNumber: g.maktabNumber })));
+        })
+        .catch(() => {})
+        .finally(() => setLoadingGroups(false));
+      if (booking?.groupId) setSelectedGroupId(booking.groupId);
+    }
+  }, [open, booking?.id]);
 
   const handleAutoFillPilgrim = async () => {
     if (!booking) return;
@@ -497,12 +516,37 @@ function BookingDetailModal({ booking, open, onClose }: { booking: Booking | nul
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Auto-fill failed");
-      toast({ title: "Pilgrim added to group!", description: `${data.pilgrim?.fullName} has been added to the Hajj group.` });
+      toast({ title: "Pilgrim added to group!", description: `${data.pilgrim?.fullName} has been added/updated in the Hajj group.` });
       queryClient.invalidateQueries({ queryKey: ["/api/groups"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
     } catch (err: any) {
       toast({ title: "Auto-fill failed", description: err.message, variant: "destructive" });
     } finally {
       setAutoFilling(false);
+    }
+  };
+
+  const handleAssignGroup = async () => {
+    if (!booking || !selectedGroupId) return;
+    setAssigningGroup(true);
+    try {
+      const res = await fetch(`${API}/api/bookings/${booking.id}/assign-group`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ groupId: selectedGroupId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Group assignment failed");
+      const autoFillMsg = data.autoFilled ? " Pilgrim auto-populated from submitted travel details." : "";
+      toast({ title: "Group assigned!", description: `Booking assigned to group.${autoFillMsg}` });
+      queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/groups"] });
+      onClose();
+    } catch (err: any) {
+      toast({ title: "Assignment failed", description: err.message, variant: "destructive" });
+    } finally {
+      setAssigningGroup(false);
     }
   };
 
@@ -654,6 +698,63 @@ function BookingDetailModal({ booking, open, onClose }: { booking: Booking | nul
             </div>
           )}
 
+          <div className="rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 space-y-3">
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-indigo-700 flex items-center gap-2">
+              <ClipboardList className="w-4 h-4" />
+              Hajj Group Assignment
+            </h4>
+            <div className="flex items-center gap-2 flex-wrap">
+              <select
+                className="h-9 flex-1 min-w-[180px] rounded-lg border border-indigo-200 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                value={selectedGroupId}
+                onChange={e => setSelectedGroupId(e.target.value)}
+                disabled={loadingGroups}
+              >
+                <option value="">{loadingGroups ? "Loading groups…" : "Select a Hajj group…"}</option>
+                {availableGroups.map(g => (
+                  <option key={g.id} value={g.id}>
+                    {g.name} ({g.year}){g.maktabNumber ? ` — Maktab ${g.maktabNumber}` : ""}
+                  </option>
+                ))}
+              </select>
+              <Button
+                size="sm"
+                className="bg-indigo-700 hover:bg-indigo-800 text-white shrink-0"
+                onClick={handleAssignGroup}
+                disabled={!selectedGroupId || assigningGroup}
+              >
+                {assigningGroup ? <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin" />Assigning…</span> : "Assign to Group"}
+              </Button>
+            </div>
+            {booking.groupId && (
+              <p className="text-xs text-indigo-600">
+                Currently assigned to group ID: <span className="font-mono">{booking.groupId}</span>
+              </p>
+            )}
+            {(booking as any).travellerDetailsStatus === "submitted" ? (
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-indigo-400 text-indigo-700 hover:bg-indigo-50"
+                  onClick={handleAutoFillPilgrim}
+                  disabled={autoFilling || !booking.groupId}
+                >
+                  <User className={`w-4 h-4 mr-2 ${autoFilling ? "animate-pulse" : ""}`} />
+                  {autoFilling ? "Filling…" : "Auto-fill Pilgrim"}
+                </Button>
+                {!booking.groupId && (
+                  <p className="text-xs text-amber-600">Assign a group above to enable auto-fill.</p>
+                )}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Customer travel details: <span className="font-semibold capitalize">{(booking as any).travellerDetailsStatus || "not submitted"}</span>.
+                Auto-fill will be available once customer submits their travel details.
+              </p>
+            )}
+          </div>
+
           <div className="flex flex-wrap items-center gap-2 pt-2">
             {booking.status === "confirmed" && booking.invoiceNumber && (
               <Button
@@ -662,17 +763,6 @@ function BookingDetailModal({ booking, open, onClose }: { booking: Booking | nul
                 onClick={() => window.open(`${import.meta.env.BASE_URL}invoice/${booking.bookingNumber}`, '_blank')}
               >
                 <ExternalLink className="w-4 h-4 mr-2" />View Invoice
-              </Button>
-            )}
-            {(booking as any).travellerDetailsStatus === "submitted" && booking.groupId && (
-              <Button
-                size="sm"
-                className="bg-indigo-700 hover:bg-indigo-800 text-white"
-                onClick={handleAutoFillPilgrim}
-                disabled={autoFilling}
-              >
-                <User className={`w-4 h-4 mr-2 ${autoFilling ? "animate-pulse" : ""}`} />
-                {autoFilling ? "Adding Pilgrim…" : "Auto-fill Pilgrim in Group"}
               </Button>
             )}
             {(booking.status === "approved" || booking.status === "partially_paid") && (booking as any).razorpayOrderId && (
