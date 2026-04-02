@@ -100,18 +100,20 @@ router.post("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => 
 });
 
 router.get("/:id", requireAdmin as any, async (req, res) => {
-  const groups = await db.select().from(hajjGroupsTable).where(eq(hajjGroupsTable.id, req.params.id)).limit(1);
+  const id = String(req.params.id);
+  const groups = await db.select().from(hajjGroupsTable).where(eq(hajjGroupsTable.id, id)).limit(1);
   if (!groups[0]) { res.status(404).json({ message: "Group not found" }); return; }
   res.json(fmtGroup(groups[0]));
 });
 
 router.put("/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  const id = String(req.params.id);
   const { groupName, year, departureDate, returnDate, flightNumber, maktabNumber, hotels, notes } = req.body;
   try {
     const [updated] = await db.update(hajjGroupsTable).set({
       groupName, year: Number(year), departureDate, returnDate, flightNumber, maktabNumber,
       hotels: hotels || {}, notes, updatedAt: new Date(),
-    }).where(eq(hajjGroupsTable.id, req.params.id)).returning();
+    }).where(eq(hajjGroupsTable.id, id)).returning();
     if (!updated) { res.status(404).json({ message: "Group not found" }); return; }
     res.json(fmtGroup(updated));
   } catch (err: any) {
@@ -121,19 +123,22 @@ router.put("/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) =
 });
 
 router.delete("/:id", requireAdmin as any, async (req, res) => {
-  await db.delete(pilgrimsTable).where(eq(pilgrimsTable.groupId, req.params.id));
-  await db.delete(hajjGroupsTable).where(eq(hajjGroupsTable.id, req.params.id));
+  const id = String(req.params.id);
+  await db.delete(pilgrimsTable).where(eq(pilgrimsTable.groupId, id));
+  await db.delete(hajjGroupsTable).where(eq(hajjGroupsTable.id, id));
   res.json({ message: "Group and all pilgrims deleted" });
 });
 
 router.get("/:groupId/pilgrims", requireAdmin as any, async (req, res) => {
+  const groupId = String(req.params.groupId);
   const pilgrims = await db.select().from(pilgrimsTable)
-    .where(eq(pilgrimsTable.groupId, req.params.groupId))
+    .where(eq(pilgrimsTable.groupId, groupId))
     .orderBy(asc(pilgrimsTable.serialNumber));
   res.json(pilgrims.map(fmtPilgrim));
 });
 
 router.post("/:groupId/pilgrims", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  const groupId = String(req.params.groupId);
   const { fullName, passportNumber, visaNumber, dateOfBirth, gender, bloodGroup,
     photoUrl, mobileIndia, mobileSaudi, address, city, state, roomNumber, roomType,
     busNumber, seatNumber, relation, coverNumber, medicalCondition,
@@ -141,15 +146,15 @@ router.post("/:groupId/pilgrims", requireAdmin as any, async (req: Authenticated
 
   if (!fullName) { res.status(400).json({ message: "fullName is required" }); return; }
 
-  const groups = await db.select().from(hajjGroupsTable).where(eq(hajjGroupsTable.id, req.params.groupId)).limit(1);
+  const groups = await db.select().from(hajjGroupsTable).where(eq(hajjGroupsTable.id, groupId)).limit(1);
   if (!groups[0]) { res.status(404).json({ message: "Group not found" }); return; }
 
   const [{ maxSerial }] = await db.select({ maxSerial: max(pilgrimsTable.serialNumber) })
-    .from(pilgrimsTable).where(eq(pilgrimsTable.groupId, req.params.groupId));
+    .from(pilgrimsTable).where(eq(pilgrimsTable.groupId, groupId));
   const nextSerial = (maxSerial || 0) + 1;
 
   const [pilgrim] = await db.insert(pilgrimsTable).values({
-    groupId: req.params.groupId,
+    groupId,
     serialNumber: nextSerial,
     fullName, passportNumber, visaNumber, dateOfBirth, gender, bloodGroup,
     photoUrl, mobileIndia, mobileSaudi, address, city, state,
@@ -163,12 +168,14 @@ router.post("/:groupId/pilgrims", requireAdmin as any, async (req: Authenticated
 });
 
 router.put("/:groupId/pilgrims/:pilgrimId", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  const groupId = String(req.params.groupId);
+  const pilgrimId = String(req.params.pilgrimId);
   const { fullName, passportNumber, visaNumber, dateOfBirth, gender, bloodGroup,
     photoUrl, mobileIndia, mobileSaudi, address, city, state, roomNumber, roomType,
     busNumber, seatNumber, relation, coverNumber, medicalCondition, serialNumber,
     salutation, passportIssueDate, passportExpiryDate, passportPlaceOfIssue } = req.body;
 
-  const scope = and(eq(pilgrimsTable.id, req.params.pilgrimId), eq(pilgrimsTable.groupId, req.params.groupId));
+  const scope = and(eq(pilgrimsTable.id, pilgrimId), eq(pilgrimsTable.groupId, groupId));
 
   const [updated] = await db.update(pilgrimsTable).set({
     fullName, passportNumber, visaNumber, dateOfBirth, gender, bloodGroup,
@@ -187,7 +194,9 @@ router.put("/:groupId/pilgrims/:pilgrimId", requireAdmin as any, async (req: Aut
 });
 
 router.delete("/:groupId/pilgrims/:pilgrimId", requireAdmin as any, async (req, res) => {
-  const scope = and(eq(pilgrimsTable.id, req.params.pilgrimId), eq(pilgrimsTable.groupId, req.params.groupId));
+  const groupId = String(req.params.groupId);
+  const pilgrimId = String(req.params.pilgrimId);
+  const scope = and(eq(pilgrimsTable.id, pilgrimId), eq(pilgrimsTable.groupId, groupId));
   const pilgrims = await db.select().from(pilgrimsTable).where(scope);
   if (!pilgrims[0]) { res.status(404).json({ message: "Pilgrim not found in this group" }); return; }
   if (pilgrims[0].photoUrl) {
@@ -202,9 +211,11 @@ router.post(
   requireAdmin as any,
   upload.single("photo"),
   async (req: AuthenticatedRequest, res) => {
+    const groupId = String(req.params.groupId);
+    const pilgrimId = String(req.params.pilgrimId);
     if (!req.file) { res.status(400).json({ message: "No photo provided" }); return; }
     const photoUrl = await uploadToGCS(req.file.buffer, req.file.originalname, req.file.mimetype, "private_uploads");
-    const scope = and(eq(pilgrimsTable.id, req.params.pilgrimId), eq(pilgrimsTable.groupId, req.params.groupId));
+    const scope = and(eq(pilgrimsTable.id, pilgrimId), eq(pilgrimsTable.groupId, groupId));
     const [updated] = await db.update(pilgrimsTable)
       .set({ photoUrl, updatedAt: new Date() })
       .where(scope)
@@ -216,12 +227,13 @@ router.post(
 
 router.get("/:groupId/haji-list/pdf", requireAdmin as any, async (req, res) => {
   try {
-    const groups = await db.select().from(hajjGroupsTable).where(eq(hajjGroupsTable.id, req.params.groupId)).limit(1);
+    const groupId = String(req.params.groupId);
+    const groups = await db.select().from(hajjGroupsTable).where(eq(hajjGroupsTable.id, groupId)).limit(1);
     if (!groups[0]) { res.status(404).json({ message: "Group not found" }); return; }
     const group = groups[0];
 
     const pilgrims = await db.select().from(pilgrimsTable)
-      .where(eq(pilgrimsTable.groupId, req.params.groupId))
+      .where(eq(pilgrimsTable.groupId, groupId))
       .orderBy(asc(pilgrimsTable.serialNumber));
 
     const doc = new PDFDocument({ size: "A4", layout: "landscape", margin: 0 });
@@ -354,15 +366,15 @@ router.get("/:groupId/haji-list/pdf", requireAdmin as any, async (req, res) => {
       cx += colWidths[5];
 
       doc.font("Helvetica").fontSize(7.5)
-        .text((p as any).passportIssueDate || "—", cx + 2, y + ROW_H / 2 - 6, { width: colWidths[6] - 4, align: "center", lineBreak: false });
+        .text(p.passportIssueDate || "—", cx + 2, y + ROW_H / 2 - 6, { width: colWidths[6] - 4, align: "center", lineBreak: false });
       cx += colWidths[6];
 
       doc.font("Helvetica").fontSize(7.5)
-        .text((p as any).passportPlaceOfIssue || "—", cx + 2, y + ROW_H / 2 - 6, { width: colWidths[7] - 4, align: "center", lineBreak: false });
+        .text(p.passportPlaceOfIssue || "—", cx + 2, y + ROW_H / 2 - 6, { width: colWidths[7] - 4, align: "center", lineBreak: false });
       cx += colWidths[7];
 
       doc.font("Helvetica").fontSize(7.5)
-        .text((p as any).passportExpiryDate || "—", cx + 2, y + ROW_H / 2 - 6, { width: colWidths[8] - 4, align: "center", lineBreak: false });
+        .text(p.passportExpiryDate || "—", cx + 2, y + ROW_H / 2 - 6, { width: colWidths[8] - 4, align: "center", lineBreak: false });
 
       drawRowBorders(y);
       y += ROW_H;
