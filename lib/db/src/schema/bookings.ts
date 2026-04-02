@@ -29,6 +29,7 @@ export const bookingsTable = pgTable("bookings", {
   groupId: text("group_id"),
   advanceAmount: numeric("advance_amount", { precision: 12, scale: 2 }),
   paidAmount: numeric("paid_amount", { precision: 12, scale: 2 }),
+  onlinePaidAmount: numeric("online_paid_amount", { precision: 12, scale: 2 }).default("0"),
   notes: text("notes"),
   isOffline: boolean("is_offline").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),

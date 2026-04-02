@@ -3,6 +3,7 @@ import Razorpay from "razorpay";
 import crypto from "crypto";
 import { db, bookingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+// Note: onlinePaidAmount tracks Razorpay-only payments; manual ledger entries are in payment_transactions
 import { CreatePaymentOrderBody, VerifyPaymentBody } from "@workspace/api-zod";
 import { requireAuth, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendPaymentConfirmationNotification, sendPartialPaymentNotification } from "../lib/notifications.js";
@@ -181,6 +182,7 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
   const previouslyPaid = Number(existingBooking.paidAmount || 0);
   const thisPayment = payAmount ?? (finalAmount - previouslyPaid);
   const newPaidAmount = previouslyPaid + thisPayment;
+  const newOnlinePaidAmount = Number(existingBooking.onlinePaidAmount || 0) + thisPayment;
   const isFullyPaid = newPaidAmount >= finalAmount;
 
   const newStatus = isFullyPaid ? "confirmed" : "partially_paid";
@@ -195,6 +197,7 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
       razorpayOrderId,
       razorpayPaymentId: isFullyPaid ? razorpayPaymentId : existingBooking.razorpayPaymentId,
       paidAmount: String(newPaidAmount),
+      onlinePaidAmount: String(newOnlinePaidAmount),
       invoiceNumber: invoiceNumber ?? undefined,
       updatedAt: new Date(),
     })
@@ -299,6 +302,7 @@ router.post("/sync-payment", requireAuth as any, async (req: AuthenticatedReques
   const previouslyPaid = Number(booking.paidAmount || 0);
   const thisPayment = capturedPayment ? capturedPayment.amount / 100 : (finalAmount - previouslyPaid);
   const newPaidAmount = previouslyPaid + thisPayment;
+  const newOnlinePaidAmount = Number(booking.onlinePaidAmount || 0) + thisPayment;
   const isFullyPaid = newPaidAmount >= finalAmount;
   const newStatus = isFullyPaid ? "confirmed" : "partially_paid";
   const invoiceNumber = isFullyPaid
@@ -311,6 +315,7 @@ router.post("/sync-payment", requireAuth as any, async (req: AuthenticatedReques
       status: newStatus as any,
       razorpayPaymentId: capturedPayment?.id || booking.razorpayPaymentId,
       paidAmount: String(newPaidAmount),
+      onlinePaidAmount: String(newOnlinePaidAmount),
       invoiceNumber: invoiceNumber ?? undefined,
       updatedAt: new Date(),
     })
@@ -436,6 +441,7 @@ router.post("/webhook", async (req: any, res) => {
     const previouslyPaid = Number(booking.paidAmount || 0);
     const thisPayment = amountPaise ? amountPaise / 100 : (finalAmount - previouslyPaid);
     const newPaidAmount = previouslyPaid + thisPayment;
+    const newOnlinePaidAmount = Number(booking.onlinePaidAmount || 0) + thisPayment;
     const isFullyPaid = newPaidAmount >= finalAmount;
     const newStatus = isFullyPaid ? "confirmed" : "partially_paid";
     const invoiceNumber = isFullyPaid
@@ -448,6 +454,7 @@ router.post("/webhook", async (req: any, res) => {
         status: newStatus as any,
         razorpayPaymentId: paymentId || booking.razorpayPaymentId,
         paidAmount: String(newPaidAmount),
+        onlinePaidAmount: String(newOnlinePaidAmount),
         invoiceNumber: invoiceNumber ?? undefined,
         updatedAt: new Date(),
       })
@@ -760,6 +767,7 @@ router.post("/verify-public", async (req, res) => {
   } catch {}
 
   const newPaidAmount = existingPaid + chargeAmount;
+  const newOnlinePaidAmount = Number(booking.onlinePaidAmount ?? 0) + chargeAmount;
   const remainingBalance = finalAmount - newPaidAmount;
   const newStatus = remainingBalance <= 0 ? "confirmed" : "partially_paid";
 
@@ -767,6 +775,7 @@ router.post("/verify-public", async (req, res) => {
     status: newStatus,
     razorpayPaymentId: razorpay_payment_id,
     paidAmount: String(newPaidAmount),
+    onlinePaidAmount: String(newOnlinePaidAmount),
     updatedAt: new Date(),
   }).where(eq(bookingsTable.id, bookingId));
 

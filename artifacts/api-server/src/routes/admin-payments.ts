@@ -18,7 +18,17 @@ async function recalculateBookingPayment(bookingId: string) {
     .from(paymentTransactionsTable)
     .where(eq(paymentTransactionsTable.bookingId, bookingId));
 
-  const totalPaid = Number(result?.total ?? 0);
+  const ledgerSum = Number(result?.total ?? 0);
+
+  // onlinePaidAmount tracks Razorpay-sourced payments only.
+  // If not yet set (e.g. first time a manual entry is recorded for an existing booking
+  // that already had a Razorpay payment), capture the current paidAmount as the baseline.
+  let onlinePaidAmount = Number(booking.onlinePaidAmount ?? 0);
+  if (booking.onlinePaidAmount === null && booking.paidAmount) {
+    onlinePaidAmount = Number(booking.paidAmount);
+  }
+
+  const totalPaid = onlinePaidAmount + ledgerSum;
   const finalAmount = Number(booking.finalAmount ?? 0);
 
   let newStatus = booking.status;
@@ -41,13 +51,14 @@ async function recalculateBookingPayment(bookingId: string) {
     .update(bookingsTable)
     .set({
       paidAmount: String(totalPaid),
+      onlinePaidAmount: String(onlinePaidAmount),
       status: newStatus as any,
       invoiceNumber: invoiceNumber ?? undefined,
       updatedAt: new Date(),
     })
     .where(eq(bookingsTable.id, bookingId));
 
-  return { totalPaid, newStatus, invoiceNumber };
+  return { totalPaid, ledgerSum, onlinePaidAmount, newStatus, invoiceNumber };
 }
 
 router.get("/:id/payments", requireAdmin as any, async (req: AuthenticatedRequest, res) => {

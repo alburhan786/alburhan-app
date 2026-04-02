@@ -276,9 +276,13 @@ function AdminPaymentLedger({ booking }: { booking: Booking }) {
     }
   };
 
-  const totalPaid = entries.reduce((s, e) => s + Number(e.amount), 0);
+  const ledgerTotal = entries.reduce((s, e) => s + Number(e.amount), 0);
   const finalAmount = Number((booking as any).finalAmount ?? 0);
+  // Use booking.paidAmount as the authoritative total (includes both Razorpay and manual payments).
+  // Fall back to ledgerTotal if paidAmount is not yet set.
+  const totalPaid = Number((booking as any).paidAmount ?? ledgerTotal);
   const remaining = finalAmount > 0 ? finalAmount - totalPaid : 0;
+  const onlinePortion = Number((booking as any).onlinePaidAmount ?? 0);
 
   return (
     <div className="space-y-3">
@@ -291,6 +295,9 @@ function AdminPaymentLedger({ booking }: { booking: Booking }) {
           <div className="text-center border-x">
             <div className="text-[10px] text-muted-foreground font-semibold uppercase">Paid</div>
             <div className="font-mono font-bold text-sm text-emerald-700">₹{totalPaid.toLocaleString("en-IN")}</div>
+            {onlinePortion > 0 && ledgerTotal > 0 && (
+              <div className="text-[10px] text-muted-foreground">({formatCurrency(String(onlinePortion))} online + ₹{ledgerTotal.toLocaleString("en-IN")} manual)</div>
+            )}
           </div>
           <div className="text-center">
             <div className="text-[10px] text-muted-foreground font-semibold uppercase">Balance</div>
