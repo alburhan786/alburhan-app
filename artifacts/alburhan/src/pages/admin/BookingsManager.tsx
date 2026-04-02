@@ -202,17 +202,50 @@ const MODE_COLORS: Record<string, string> = {
   online: "bg-orange-100 text-orange-800",
 };
 
-function AdminPaymentLedger({ booking }: { booking: Booking }) {
+interface PaymentEntry {
+  id: string;
+  bookingId: string;
+  amount: number;
+  paymentDate: string;
+  paymentMode: "cash" | "neft" | "upi" | "cheque" | "online";
+  referenceNumber?: string | null;
+  notes?: string | null;
+  recordedBy?: string | null;
+  createdAt: string;
+}
+
+interface BookingWithAmounts extends Booking {
+  finalAmount?: string | null;
+  paidAmount?: string | null;
+  onlinePaidAmount?: string | null;
+}
+
+interface LedgerForm {
+  amount: string;
+  paymentDate: string;
+  paymentMode: string;
+  referenceNumber: string;
+  notes: string;
+}
+
+function getBalanceColor(remaining: number, finalAmount: number): string {
+  if (remaining < 0) return "text-red-600";
+  if (remaining === 0) return "text-emerald-600";
+  if (remaining < finalAmount * 0.5) return "text-amber-600";
+  return "text-red-600";
+}
+
+function AdminPaymentLedger({ booking }: { booking: BookingWithAmounts }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const [entries, setEntries] = useState<any[]>([]);
+  const [entries, setEntries] = useState<PaymentEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<LedgerForm>({
     amount: "",
-    paymentDate: new Date().toISOString().split("T")[0],
+    paymentDate: new Date().toISOString().split("T")[0] ?? "",
     paymentMode: "cash",
     referenceNumber: "",
     notes: "",
@@ -222,10 +255,12 @@ function AdminPaymentLedger({ booking }: { booking: Booking }) {
     setLoading(true);
     try {
       const res = await fetch(`${API}/api/admin/bookings/${booking.id}/payments`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch");
-      setEntries(await res.json());
-    } catch {
-      toast({ title: "Error", description: "Could not load payment ledger", variant: "destructive" });
+      if (!res.ok) throw new Error("Failed to fetch ledger entries");
+      const data = (await res.json()) as PaymentEntry[];
+      setEntries(data);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Could not load payment ledger";
+      toast({ title: "Error", description: msg, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -246,15 +281,16 @@ function AdminPaymentLedger({ booking }: { booking: Booking }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...form, amount: Number(form.amount) }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Failed to record payment");
+      const data = (await res.json()) as { message?: string };
+      if (!res.ok) throw new Error(data.message ?? "Failed to record payment");
       toast({ title: "Payment recorded!" });
       setShowForm(false);
-      setForm({ amount: "", paymentDate: new Date().toISOString().split("T")[0], paymentMode: "cash", referenceNumber: "", notes: "" });
+      setForm({ amount: "", paymentDate: new Date().toISOString().split("T")[0] ?? "", paymentMode: "cash", referenceNumber: "", notes: "" });
       fetchEntries();
       queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to record payment";
+      toast({ title: "Error", description: msg, variant: "destructive" });
     } finally {
       setSubmitting(false);
     }
@@ -267,22 +303,22 @@ function AdminPaymentLedger({ booking }: { booking: Booking }) {
         method: "DELETE",
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Failed to delete");
+      if (!res.ok) throw new Error("Failed to delete payment entry");
       toast({ title: "Payment entry deleted" });
       fetchEntries();
       queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to delete";
+      toast({ title: "Error", description: msg, variant: "destructive" });
     }
   };
 
   const ledgerTotal = entries.reduce((s, e) => s + Number(e.amount), 0);
-  const finalAmount = Number((booking as any).finalAmount ?? 0);
+  const finalAmount = Number(booking.finalAmount ?? 0);
   // Use booking.paidAmount as the authoritative total (includes both Razorpay and manual payments).
-  // Fall back to ledgerTotal if paidAmount is not yet set.
-  const totalPaid = Number((booking as any).paidAmount ?? ledgerTotal);
+  const totalPaid = Number(booking.paidAmount ?? ledgerTotal);
   const remaining = finalAmount > 0 ? finalAmount - totalPaid : 0;
-  const onlinePortion = Number((booking as any).onlinePaidAmount ?? 0);
+  const onlinePortion = Number(booking.onlinePaidAmount ?? 0);
 
   return (
     <div className="space-y-3">
@@ -296,13 +332,17 @@ function AdminPaymentLedger({ booking }: { booking: Booking }) {
             <div className="text-[10px] text-muted-foreground font-semibold uppercase">Paid</div>
             <div className="font-mono font-bold text-sm text-emerald-700">₹{totalPaid.toLocaleString("en-IN")}</div>
             {onlinePortion > 0 && ledgerTotal > 0 && (
-              <div className="text-[10px] text-muted-foreground">({formatCurrency(String(onlinePortion))} online + ₹{ledgerTotal.toLocaleString("en-IN")} manual)</div>
+              <div className="text-[10px] text-muted-foreground">
+                ₹{onlinePortion.toLocaleString("en-IN")} online + ₹{ledgerTotal.toLocaleString("en-IN")} manual
+              </div>
             )}
           </div>
           <div className="text-center">
-            <div className="text-[10px] text-muted-foreground font-semibold uppercase">Balance</div>
-            <div className={`font-mono font-bold text-sm ${remaining <= 0 ? "text-emerald-600" : remaining < finalAmount * 0.5 ? "text-amber-600" : "text-red-600"}`}>
-              ₹{Math.max(remaining, 0).toLocaleString("en-IN")}
+            <div className="text-[10px] text-muted-foreground font-semibold uppercase">
+              {remaining < 0 ? "Overpaid" : "Balance"}
+            </div>
+            <div className={`font-mono font-bold text-sm ${getBalanceColor(remaining, finalAmount)}`}>
+              {remaining < 0 ? `+₹${Math.abs(remaining).toLocaleString("en-IN")}` : `₹${remaining.toLocaleString("en-IN")}`}
             </div>
           </div>
         </div>
@@ -325,21 +365,21 @@ function AdminPaymentLedger({ booking }: { booking: Booking }) {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {entries.map((e: any) => (
-                <tr key={e.id} className="hover:bg-muted/20">
-                  <td className="px-3 py-2 text-xs">{e.paymentDate}</td>
+              {entries.map(entry => (
+                <tr key={entry.id} className="hover:bg-muted/20">
+                  <td className="px-3 py-2 text-xs">{entry.paymentDate}</td>
                   <td className="px-3 py-2">
-                    <Badge className={`text-[10px] px-2 py-0.5 border-0 font-semibold ${MODE_COLORS[e.paymentMode] || "bg-gray-100 text-gray-800"}`}>
-                      {MODE_LABELS[e.paymentMode] || e.paymentMode}
+                    <Badge className={`text-[10px] px-2 py-0.5 border-0 font-semibold ${MODE_COLORS[entry.paymentMode] ?? "bg-gray-100 text-gray-800"}`}>
+                      {MODE_LABELS[entry.paymentMode] ?? entry.paymentMode}
                     </Badge>
                   </td>
-                  <td className="px-3 py-2 text-right font-mono font-bold text-emerald-700">₹{Number(e.amount).toLocaleString("en-IN")}</td>
+                  <td className="px-3 py-2 text-right font-mono font-bold text-emerald-700">₹{Number(entry.amount).toLocaleString("en-IN")}</td>
                   <td className="px-3 py-2 text-xs text-muted-foreground max-w-[120px] truncate">
-                    {e.referenceNumber && <span className="font-mono mr-1">{e.referenceNumber}</span>}
-                    {e.notes && <span className="italic">{e.notes}</span>}
+                    {entry.referenceNumber && <span className="font-mono mr-1">{entry.referenceNumber}</span>}
+                    {entry.notes && <span className="italic">{entry.notes}</span>}
                   </td>
                   <td className="px-3 py-2 text-right">
-                    <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:bg-red-50" onClick={() => handleDelete(e.id)}>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:bg-red-50" onClick={() => handleDelete(entry.id)}>
                       <Trash2 size={12} />
                     </Button>
                   </td>
