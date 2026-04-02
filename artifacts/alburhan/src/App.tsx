@@ -37,6 +37,7 @@ import PrintIdCardsPro from "@/pages/admin/print/PrintIdCardsPro";
 import PrintRoomStickers from "@/pages/admin/print/PrintRoomStickers";
 import InvoiceManager from "@/pages/admin/InvoiceManager";
 import CustomerManager from "@/pages/admin/CustomerManager";
+import RequestsManager from "@/pages/admin/RequestsManager";
 import InquiryManager from "@/pages/admin/InquiryManager";
 import OfflineBookingManager from "@/pages/admin/OfflineBookingManager";
 import QRTracker from "@/pages/admin/QRTracker";
@@ -119,6 +120,7 @@ function Router() {
       <Route path="/admin/reports" component={() => <AdminRoute component={ReportsManager} />} />
       <Route path="/admin/print-center" component={() => <AdminRoute component={PrintCenter} />} />
       <Route path="/admin/customers" component={() => <AdminRoute component={CustomerManager} />} />
+      <Route path="/admin/requests" component={() => <AdminRoute component={RequestsManager} />} />
       <Route path="/admin/inquiries" component={() => <AdminRoute component={InquiryManager} />} />
       <Route path="/admin/broadcast" component={() => <AdminRoute component={BroadcastManager} />} />
       <Route path="/admin/kyc" component={() => <AdminRoute component={KYCManager} />} />

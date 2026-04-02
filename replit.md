@@ -39,7 +39,7 @@ artifacts/
 │   │   │   ├── public/        # Home, Packages, PackageDetail, Ziyarat, Blog, About, Contact, Legal, Invoice (with QR code, green/gold branding, status badge)
 │   │   │   ├── auth/          # Login (OTP flow)
 │   │   │   ├── customer/      # Customer dashboard, KYC.tsx (customer KYC form)
-│   │   │   └── admin/         # Admin dashboard, bookings, invoices, packages, groups, gallery, KYCManager.tsx
+│   │   │   └── admin/         # Admin dashboard, bookings, invoices, packages, groups, gallery, KYCManager.tsx, RequestsManager.tsx
 │   │   │       ├── InvoiceManager.tsx  # Invoice & Billing page (list, filter, offline booking, send invoice via WhatsApp/SMS)
 │   │   │       ├── KYCManager.tsx  # KYC Management (view, approve, reject, admin add)
 │   │   │       └── print/    # 11 print documents: PrintIdCards, PrintIdCardsPro, PrintLuggage, PrintLuggageSquare, PrintMedical, PrintBusList, PrintHotelList, PrintAirlineList, PrintZamzam, PrintFeedback, PrintContract
@@ -76,7 +76,9 @@ artifacts/
         │   ├── groups.ts       # Hajj groups + pilgrims CRUD + photo upload
         │   ├── notifications.ts# Send SMS/WhatsApp to customers
         │   ├── admin.ts        # Stats + customer list + inquiries + broadcast + reports
-        │   └── inquiry.ts      # Public inquiry form
+        │   ├── inquiry.ts      # Public inquiry form
+        │   ├── requests.ts     # Package request system (customer request → admin approve/reject → customer fills details → pilgrim auto-created)
+        │   └── package-media.ts # Package media: cover photo, imageUrls, videoUrls, gallery (package_media table)
         └── lib/
             ├── auth.ts         # Session middleware, requireAuth/requireAdmin
             └── notifications.ts # Fast2SMS + BotBee WhatsApp API
@@ -93,7 +95,9 @@ lib/
     ├── documents.ts
     ├── gallery.ts
     ├── inquiries.ts
-    └── groups.ts          # hajj_groups + pilgrims tables
+    ├── groups.ts          # hajj_groups + pilgrims tables
+    ├── requests.ts        # package_requests table
+    └── package_media.ts   # package_media table (dedicated gallery per package)
 ```
 
 ## Environment Variables (Secrets)

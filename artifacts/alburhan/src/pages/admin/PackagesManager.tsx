@@ -42,6 +42,10 @@ export default function PackagesManager() {
   const [mediaPkg, setMediaPkg] = useState<any>(null);
   const [mediaUploading, setMediaUploading] = useState(false);
   const [meenaUploading, setMeenaUploading] = useState(false);
+  const [gallery, setGallery] = useState<any[]>([]);
+  const [galleryUploading, setGalleryUploading] = useState(false);
+  const galleryImgRef = useRef<HTMLInputElement>(null);
+  const galleryVidRef = useRef<HTMLInputElement>(null);
 
   const imgInputRef = useRef<HTMLInputElement>(null);
   const vidInputRef = useRef<HTMLInputElement>(null);
@@ -176,9 +180,50 @@ export default function PackagesManager() {
     }
   };
 
+  const loadGallery = async (pkgId: string) => {
+    try {
+      const res = await fetch(`${BASE_API}/api/packages/${pkgId}/gallery`, { credentials: "include" });
+      if (res.ok) setGallery(await res.json());
+    } catch {}
+  };
+
   const openMedia = (pkg: any) => {
     setMediaPkg({ ...pkg, imageUrls: pkg.imageUrls || [], videoUrls: pkg.videoUrls || [] });
+    setGallery([]);
+    loadGallery(pkg.id);
     setMediaOpen(true);
+  };
+
+  const uploadGalleryMedia = async (file: File, type: "image" | "video") => {
+    if (!mediaPkg) return;
+    setGalleryUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(`${BASE_API}/api/packages/${mediaPkg.id}/gallery/upload-${type}`, {
+        method: "POST", body: fd, credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      setGallery(prev => [...prev, data]);
+      toast({ title: `${type === "image" ? "Photo" : "Video"} added to gallery` });
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } finally { setGalleryUploading(false); }
+  };
+
+  const deleteGalleryItem = async (mediaId: string) => {
+    if (!mediaPkg) return;
+    try {
+      const res = await fetch(`${BASE_API}/api/packages/${mediaPkg.id}/gallery/${mediaId}`, {
+        method: "DELETE", credentials: "include",
+      });
+      if (!res.ok) throw new Error("Delete failed");
+      setGallery(prev => prev.filter(m => m.id !== mediaId));
+      toast({ title: "Removed from gallery" });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
   };
 
   const uploadMedia = async (file: File, type: "image" | "video") => {
@@ -813,6 +858,71 @@ export default function PackagesManager() {
                         </button>
                       </div>
                     ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Dedicated Gallery (new package_media table) */}
+              <div className="border-t pt-5">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <Images size={13} /> Photo & Video Gallery ({gallery.length})
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" variant="outline" className="gap-1.5 text-xs" disabled={galleryUploading}
+                      onClick={() => galleryImgRef.current?.click()}>
+                      <Upload size={12} /> Photo
+                    </Button>
+                    <Button size="sm" variant="outline" className="gap-1.5 text-xs" disabled={galleryUploading}
+                      onClick={() => galleryVidRef.current?.click()}>
+                      <Video size={12} /> Video
+                    </Button>
+                  </div>
+                  <input ref={galleryImgRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) { uploadGalleryMedia(f, "image"); e.target.value = ""; } }} />
+                  <input ref={galleryVidRef} type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) { uploadGalleryMedia(f, "video"); e.target.value = ""; } }} />
+                </div>
+                {galleryUploading && <p className="text-xs text-muted-foreground animate-pulse mb-2">Uploading...</p>}
+                {gallery.length === 0 ? (
+                  <div className="border-2 border-dashed rounded-xl py-6 text-center text-sm text-muted-foreground">
+                    No gallery media yet. Upload photos and videos to show in the package gallery.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-2">
+                    {gallery.map((item: any) => (
+                      <div key={item.id} className="relative group rounded-lg overflow-hidden border bg-muted/20">
+                        {item.type === "image" ? (
+                          <img
+                            src={item.url.startsWith("http") ? item.url : `${BASE_API}${item.url}`}
+                            alt={item.caption || "Gallery photo"}
+                            className="w-full h-24 object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-24 flex items-center justify-center bg-black">
+                            <Video size={24} className="text-white/80" />
+                          </div>
+                        )}
+                        <button
+                          className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => deleteGalleryItem(item.id)}
+                        >
+                          <X size={12} />
+                        </button>
+                        {item.caption && (
+                          <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] px-1.5 py-0.5 truncate">
+                            {item.caption}
+                          </div>
+                        )}
+                        <div className="absolute top-1 left-1">
+                          {item.type === "video" && <span className="bg-black/70 text-white text-[10px] px-1 rounded">VID</span>}
+                        </div>
+                      </div>
+                    ))}
+                    <div className="border-2 border-dashed rounded-lg h-24 flex items-center justify-center cursor-pointer hover:border-primary transition-colors"
+                      onClick={() => galleryImgRef.current?.click()}>
+                      <Plus size={20} className="text-muted-foreground" />
+                    </div>
                   </div>
                 )}
               </div>

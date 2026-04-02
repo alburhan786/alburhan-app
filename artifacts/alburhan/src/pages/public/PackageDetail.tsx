@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { usePayment } from "@/hooks/use-payment";
 import { formatCurrency } from "@/lib/utils";
-import { ChevronLeft, ChevronDown, Star, Check, X, Share2, Plane, Building2, MapPin, UtensilsCrossed, Bus, FileText, Users, Calendar, Clock, CreditCard, ArrowRight, Shield, Phone } from "lucide-react";
+import { ChevronLeft, ChevronDown, Star, Check, X, Share2, Plane, Building2, MapPin, UtensilsCrossed, Bus, FileText, Users, Calendar, Clock, CreditCard, ArrowRight, Shield, Phone, MessageSquare, Send } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -171,6 +171,11 @@ export default function PackageDetail() {
   const { initiatePayment, isInitializing: isPaymentLoading } = usePayment();
   const [, setLocation] = useLocation();
   const [isOpen, setIsOpen] = useState(false);
+  const [isRequestOpen, setIsRequestOpen] = useState(false);
+  const [requestMessage, setRequestMessage] = useState("");
+  const [requestSubmitting, setRequestSubmitting] = useState(false);
+  const [galleryItems, setGalleryItems] = useState<any[]>([]);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   const { data: bookingsData } = useListBookings(
     {},
@@ -240,6 +245,47 @@ export default function PackageDetail() {
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : "Failed to submit booking.";
       toast({ title: "Error", description: msg, variant: "destructive" });
+    }
+  };
+
+  useEffect(() => {
+    if (id) {
+      fetch(`${API_BASE}/api/packages/${id}/gallery`)
+        .then(r => r.ok ? r.json() : [])
+        .then(setGalleryItems)
+        .catch(() => setGalleryItems([]));
+    }
+  }, [id]);
+
+  const handleRequestPackage = () => {
+    if (!isAuthenticated) {
+      toast({ title: "Login Required", description: "Please login first to request this package." });
+      setLocation("/login");
+      return;
+    }
+    setIsRequestOpen(true);
+  };
+
+  const handleSubmitRequest = async () => {
+    setRequestSubmitting(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/requests`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ packageId: id, message: requestMessage }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to submit request");
+      }
+      setIsRequestOpen(false);
+      setRequestMessage("");
+      toast({ title: "Request Sent!", description: "Our team will review your request and get back to you. Jazak Allah Khair!" });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setRequestSubmitting(false);
     }
   };
 
@@ -461,6 +507,50 @@ export default function PackageDetail() {
                   </div>
                 </div>
               </motion.div>
+
+              {galleryItems.length > 0 && (
+                <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
+                  <h2 className="font-bold text-foreground text-lg mb-4 flex items-center gap-2">
+                    <div className="w-1 h-6 rounded-full bg-primary" />
+                    Photo & Video Gallery
+                  </h2>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {galleryItems.map((item: any) => (
+                      item.type === "image" ? (
+                        <div
+                          key={item.id}
+                          className="relative rounded-xl overflow-hidden border border-border/60 cursor-pointer group shadow-sm aspect-square"
+                          onClick={() => setLightboxUrl(item.url.startsWith("http") ? item.url : `${API_BASE}${item.url}`)}
+                        >
+                          <img
+                            src={item.url.startsWith("http") ? item.url : `${API_BASE}${item.url}`}
+                            alt={item.caption || "Gallery photo"}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                          {item.caption && (
+                            <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-xs px-2 py-1 translate-y-full group-hover:translate-y-0 transition-transform">
+                              {item.caption}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div key={item.id} className="relative rounded-xl overflow-hidden border border-border/60 shadow-sm aspect-square bg-black">
+                          <video
+                            src={item.url.startsWith("http") ? item.url : `${API_BASE}${item.url}`}
+                            className="w-full h-full object-cover"
+                            controls
+                          />
+                          {item.caption && (
+                            <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-xs px-2 py-1">
+                              {item.caption}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    ))}
+                  </div>
+                </motion.div>
+              )}
             </div>
 
             <div className="lg:col-span-1">
@@ -508,6 +598,16 @@ export default function PackageDetail() {
                     </div>
 
                     {renderCTAButton()}
+
+                    {!approvedBooking && !pendingBooking && (
+                      <button
+                        onClick={handleRequestPackage}
+                        className="w-full mt-3 py-3 border-2 border-primary/30 text-primary font-semibold rounded-xl text-sm hover:bg-primary/5 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <MessageSquare size={16} />
+                        {!isAuthenticated ? "Login to Request" : "Request This Package"}
+                      </button>
+                    )}
 
                     <div className="mt-4 flex gap-2">
                       <button
@@ -574,6 +674,67 @@ export default function PackageDetail() {
           </button>
         )}
       </div>
+
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
+          onClick={() => setLightboxUrl(null)}
+        >
+          <img src={lightboxUrl} alt="Gallery" className="max-w-full max-h-full rounded-xl shadow-2xl" onClick={e => e.stopPropagation()} />
+          <button
+            className="absolute top-4 right-4 text-white bg-black/50 rounded-full p-2 hover:bg-black/70 transition-colors"
+            onClick={() => setLightboxUrl(null)}
+          >
+            <X size={20} />
+          </button>
+        </div>
+      )}
+
+      <Dialog open={isRequestOpen} onOpenChange={setIsRequestOpen}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle className="font-bold text-xl text-foreground flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-primary" />
+              Request This Package
+            </DialogTitle>
+            <p className="text-muted-foreground text-sm">{pkg.name}</p>
+          </DialogHeader>
+          <div className="space-y-5 mt-2">
+            <div className="bg-primary/5 rounded-xl p-4 text-sm text-primary/80">
+              Send us your interest and custom requirements. Our team will review and get back to you — no payment needed at this stage.
+            </div>
+            <div>
+              <label className="text-sm font-semibold block mb-2">Your Message / Custom Requirement</label>
+              <textarea
+                className="w-full min-h-[120px] rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
+                placeholder="E.g. I am looking for a Umrah package for 2 people in January, preferably with 5-star hotel near Haram..."
+                value={requestMessage}
+                onChange={e => setRequestMessage(e.target.value)}
+              />
+            </div>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setIsRequestOpen(false)}
+                className="flex-1 py-3 rounded-xl border border-border text-muted-foreground font-medium text-sm hover:bg-muted/30 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmitRequest}
+                disabled={requestSubmitting}
+                className="flex-1 py-3 rounded-xl bg-primary text-white font-bold text-sm hover:bg-primary/90 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {requestSubmitting ? (
+                  <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                ) : <Send size={15} />}
+                {requestSubmitting ? "Sending..." : "Send Request"}
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">

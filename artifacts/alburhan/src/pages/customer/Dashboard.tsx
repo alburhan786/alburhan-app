@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { CreditCard, FileText, Download, Clock, Upload, Trash2, CheckCircle, AlertCircle, X, Eye, ShieldAlert, IndianRupee, Plane, Stamp, Hotel, Bus, Printer, Share2, Copy, Bell, BellRing, CheckCheck, Megaphone, ClipboardList } from "lucide-react";
+import { CreditCard, FileText, Download, Clock, Upload, Trash2, CheckCircle, AlertCircle, X, Eye, ShieldAlert, IndianRupee, Plane, Stamp, Hotel, Bus, Printer, Share2, Copy, Bell, BellRing, CheckCheck, Megaphone, ClipboardList, MessageSquare, Send, User, XCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -494,6 +494,262 @@ function NotificationsPanel({
   );
 }
 
+interface PackageRequest {
+  id: string;
+  packageId: string | null;
+  bookingId: string | null;
+  customerName: string;
+  customerMobile: string;
+  packageName: string | null;
+  message: string | null;
+  status: string;
+  rejectionReason: string | null;
+  createdAt: string;
+}
+
+function getRequestStatusBadge(status: string) {
+  switch (status) {
+    case "approved": return <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300">Approved</Badge>;
+    case "rejected": return <Badge className="bg-red-100 text-red-800 border-red-300">Rejected</Badge>;
+    default: return <Badge className="bg-amber-100 text-amber-800 border-amber-300 animate-pulse">Pending</Badge>;
+  }
+}
+
+function DetailsFormModal({ request, onClose, onSuccess }: { request: PackageRequest; onClose: () => void; onSuccess: () => void }) {
+  const { toast } = useToast();
+  const photoRef = useRef<HTMLInputElement>(null);
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [form, setForm] = useState({
+    name: "",
+    gender: "",
+    dateOfBirth: "",
+    passportNumber: "",
+    passportIssueDate: "",
+    passportExpiryDate: "",
+    passportPlaceOfIssue: "",
+    address: "",
+  });
+
+  const handleChange = (field: string, value: string) => setForm(f => ({ ...f, [field]: value }));
+
+  const handleSubmit = async () => {
+    if (!form.name || !form.passportNumber) {
+      toast({ title: "Required fields missing", description: "Please fill in your Full Name and Passport Number.", variant: "destructive" });
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const formData = new FormData();
+      Object.entries(form).forEach(([k, v]) => { if (v) formData.append(k, v); });
+      if (photo) formData.append("photo", photo);
+
+      const res = await fetch(`${BASE_API}/api/requests/${request.id}/submit-details`, {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Submission failed");
+      }
+      toast({ title: "Details submitted!", description: "Your travel details have been received. Jazak Allah Khair!" });
+      onSuccess();
+      onClose();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 overflow-auto">
+      <Card className="w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden">
+        <div className="bg-primary p-5 text-white flex items-center justify-between">
+          <div>
+            <h3 className="text-xl font-serif font-bold">Fill Your Travel Details</h3>
+            <p className="text-white/70 text-sm mt-0.5">{request.packageName}</p>
+          </div>
+          <button onClick={onClose} className="text-white/80 hover:text-white transition-colors">
+            <X size={22} />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-sm text-emerald-700 flex items-start gap-2">
+            <CheckCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            Your request has been approved! Please fill in your passport details to proceed.
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Full Name <span className="text-red-500">*</span></Label>
+            <Input placeholder="Full name as per passport" value={form.name} onChange={e => handleChange("name", e.target.value)} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Gender</Label>
+              <select
+                className="w-full h-10 rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                value={form.gender}
+                onChange={e => handleChange("gender", e.target.value)}
+              >
+                <option value="">Select</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Date of Birth</Label>
+              <Input type="date" value={form.dateOfBirth} onChange={e => handleChange("dateOfBirth", e.target.value)} />
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Passport Number <span className="text-red-500">*</span></Label>
+            <Input placeholder="e.g. A1234567" value={form.passportNumber} onChange={e => handleChange("passportNumber", e.target.value)} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Issue Date</Label>
+              <Input type="date" value={form.passportIssueDate} onChange={e => handleChange("passportIssueDate", e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Expiry Date</Label>
+              <Input type="date" value={form.passportExpiryDate} onChange={e => handleChange("passportExpiryDate", e.target.value)} />
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Place of Issue</Label>
+            <Input placeholder="City where passport was issued" value={form.passportPlaceOfIssue} onChange={e => handleChange("passportPlaceOfIssue", e.target.value)} />
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Full Address</Label>
+            <textarea
+              className="w-full min-h-[70px] rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+              placeholder="Complete home address"
+              value={form.address}
+              onChange={e => handleChange("address", e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Passport Size Photo</Label>
+            <div
+              className="border-2 border-dashed border-border rounded-xl p-4 text-center cursor-pointer hover:border-primary hover:bg-primary/5 transition-all"
+              onClick={() => photoRef.current?.click()}
+            >
+              <input ref={photoRef} type="file" className="hidden" accept="image/jpeg,image/jpg,image/png,image/webp" onChange={e => setPhoto(e.target.files?.[0] ?? null)} />
+              {photo ? (
+                <div className="space-y-1">
+                  <User size={28} className="mx-auto text-primary" />
+                  <p className="text-sm font-medium text-primary">{photo.name}</p>
+                  <p className="text-xs text-muted-foreground">{(photo.size / 1024).toFixed(1)} KB</p>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <Upload size={28} className="mx-auto text-muted-foreground" />
+                  <p className="text-sm font-medium">Click to select photo</p>
+                  <p className="text-xs text-muted-foreground">JPG, PNG — Passport size</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <Button variant="outline" className="flex-1" onClick={onClose} disabled={submitting}>Cancel</Button>
+            <Button className="flex-1 bg-primary text-white" onClick={handleSubmit} disabled={submitting}>
+              {submitting ? (
+                <span className="flex items-center gap-2"><span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" /> Submitting...</span>
+              ) : (
+                <><Send className="w-4 h-4 mr-1" /> Submit Details</>
+              )}
+            </Button>
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function MyRequestsSection() {
+  const { toast } = useToast();
+  const [requests, setRequests] = useState<PackageRequest[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [detailsRequest, setDetailsRequest] = useState<PackageRequest | null>(null);
+
+  const loadRequests = async () => {
+    try {
+      const res = await fetch(`${BASE_API}/api/requests`, { credentials: "include" });
+      if (!res.ok) return;
+      setRequests(await res.json());
+    } catch {
+      toast({ title: "Could not load requests", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => { loadRequests(); }, []);
+
+  if (isLoading) return null;
+  if (requests.length === 0) return null;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-serif font-bold text-foreground flex items-center gap-2">
+          <MessageSquare className="w-6 h-6 text-primary" /> My Requests
+        </h2>
+        <Badge variant="outline" className="text-muted-foreground">{requests.length} request{requests.length !== 1 ? "s" : ""}</Badge>
+      </div>
+
+      {detailsRequest && (
+        <DetailsFormModal
+          request={detailsRequest}
+          onClose={() => setDetailsRequest(null)}
+          onSuccess={loadRequests}
+        />
+      )}
+
+      <div className="space-y-3">
+        {requests.map(r => (
+          <Card key={r.id} className="rounded-2xl overflow-hidden shadow-sm border-border/60">
+            <div className="p-4">
+              <div className="flex flex-wrap justify-between items-start gap-3">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">{formatDate(r.createdAt)}</p>
+                  <p className="font-bold text-foreground">{r.packageName || "Package Request"}</p>
+                  {r.message && <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{r.message}</p>}
+                  {r.rejectionReason && (
+                    <div className="mt-2 flex items-start gap-2 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
+                      <XCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                      <span>{r.rejectionReason}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-col items-end gap-2">
+                  {getRequestStatusBadge(r.status)}
+                  {r.status === "approved" && (
+                    <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs" onClick={() => setDetailsRequest(r)}>
+                      Fill Your Details
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function CustomerDashboard() {
   const { user } = useAuth();
   const { data } = useListBookings();
@@ -695,7 +951,9 @@ export default function CustomerDashboard() {
           </div>
 
           {/* Main content */}
-          <div className="lg:col-span-3 space-y-6">
+          <div className="lg:col-span-3 space-y-8">
+            <MyRequestsSection />
+
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-serif font-bold text-foreground">My Bookings</h2>
               <Badge variant="outline" className="text-muted-foreground">{bookings.length} booking{bookings.length !== 1 ? 's' : ''}</Badge>
