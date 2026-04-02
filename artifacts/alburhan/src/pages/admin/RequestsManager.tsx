@@ -417,7 +417,7 @@ function RequestCard({
                 {assignedGroup ? `${assignedGroup.groupName} (${assignedGroup.year})` : "Unknown Group"}
               </span>
             </div>
-            <Link href="/admin/pilgrims">
+            <Link href={`/admin/groups/${request.groupId}/pilgrims`}>
               <Button variant="outline" size="sm" className="text-xs text-emerald-700 border-emerald-300 hover:bg-emerald-50 shrink-0">
                 View Pilgrims <ExternalLink className="w-3 h-3 ml-1" />
               </Button>

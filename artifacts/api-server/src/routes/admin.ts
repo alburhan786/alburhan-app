@@ -277,8 +277,8 @@ router.patch("/requests/:id/assign-group", requireAdmin as any, async (req: Auth
       .limit(1);
     const request = requests[0];
     if (!request) { res.status(404).json({ message: "Request not found" }); return; }
-    if (request.status === "pending") {
-      res.status(400).json({ message: "Approve the request before assigning to a group" });
+    if (request.status !== "approved") {
+      res.status(400).json({ message: "Only approved requests can be assigned to a group" });
       return;
     }
     if (request.pilgrimId) {
