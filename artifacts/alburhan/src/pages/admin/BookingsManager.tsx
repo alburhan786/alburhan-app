@@ -215,7 +215,6 @@ interface PaymentEntry {
 }
 
 interface BookingWithAmounts extends Booking {
-  finalAmount?: string | null;
   paidAmount?: string | null;
   onlinePaidAmount?: string | null;
 }
@@ -327,7 +326,8 @@ function AdminPaymentLedger({ booking }: { booking: BookingWithAmounts }) {
   };
 
   const ledgerTotal = entries.reduce((s, e) => s + Number(e.amount), 0);
-  const finalAmount = Number(booking.finalAmount ?? 0);
+  // finalAmount is already a number from the generated Booking type
+  const finalAmount = booking.finalAmount ?? 0;
   // livePaidAmount is authoritative — updated from server responses after each mutation.
   const totalPaid = livePaidAmount;
   const remaining = finalAmount > 0 ? finalAmount - totalPaid : 0;
