@@ -33,10 +33,11 @@ interface Group {
 }
 
 function deriveTitle(gender?: string): string {
-  if (!gender) return "Mr.";
+  if (!gender) return "";
   const g = gender.toLowerCase();
   if (g === "female") return "Mrs.";
-  return "Mr.";
+  if (g === "male") return "Mr.";
+  return "";
 }
 
 export default function PrintHajiList() {
