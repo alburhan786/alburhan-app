@@ -153,12 +153,17 @@ export default function PrintHajiList() {
               borderRadius: "2mm",
               border: "1px solid #d4ddd4",
             }}>
-              {groupMeta.split("   |   ").map((item, i) => (
-                <span key={i}>
-                  {i > 0 && <span style={{ color: "#C9A23F", margin: "0 2mm" }}>|</span>}
-                  <span dangerouslySetInnerHTML={{ __html: item.replace(/^([^:]+):/, '<b style="color:#0A3D2A">$1</b>:') }} />
-                </span>
-              ))}
+              {groupMeta.split("   |   ").map((item, i) => {
+                const colonIdx = item.indexOf(":");
+                const label = colonIdx >= 0 ? item.slice(0, colonIdx) : item;
+                const value = colonIdx >= 0 ? item.slice(colonIdx) : "";
+                return (
+                  <span key={i}>
+                    {i > 0 && <span style={{ color: "#C9A23F", margin: "0 2mm" }}>|</span>}
+                    <b style={{ color: "#0A3D2A" }}>{label}</b>{value}
+                  </span>
+                );
+              })}
             </div>
           )}
 
