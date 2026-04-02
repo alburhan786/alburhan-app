@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit, Trash2, ArrowLeft, Upload, Printer, CreditCard, Luggage, Heart, Building2, Bus, DoorOpen } from "lucide-react";
+import { Plus, Edit, Trash2, ArrowLeft, Upload, Printer, CreditCard, Luggage, Heart, Building2, Bus, DoorOpen, FileDown } from "lucide-react";
 import { Link, useRoute } from "wouter";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -32,6 +32,10 @@ interface Pilgrim {
   relation?: string;
   coverNumber?: string;
   medicalCondition?: string;
+  salutation?: string;
+  passportIssueDate?: string;
+  passportExpiryDate?: string;
+  passportPlaceOfIssue?: string;
 }
 
 interface Group {
@@ -49,6 +53,7 @@ const emptyPilgrim = {
   fullName: "", passportNumber: "", visaNumber: "", dateOfBirth: "", gender: "",
   bloodGroup: "", mobileIndia: "", mobileSaudi: "", address: "", city: "",
   state: "", roomNumber: "", roomType: "", busNumber: "", seatNumber: "", relation: "", coverNumber: "", medicalCondition: "",
+  salutation: "", passportIssueDate: "", passportExpiryDate: "", passportPlaceOfIssue: "",
 };
 
 export default function PilgrimManager() {
@@ -63,6 +68,7 @@ export default function PilgrimManager() {
   const [form, setForm] = useState(emptyPilgrim);
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const { toast } = useToast();
 
   const fetchData = useCallback(async () => {
@@ -89,6 +95,10 @@ export default function PilgrimManager() {
       roomType: p.roomType || "", busNumber: p.busNumber || "", seatNumber: p.seatNumber || "",
       relation: p.relation || "", coverNumber: p.coverNumber || "",
       medicalCondition: p.medicalCondition || "",
+      salutation: p.salutation || "",
+      passportIssueDate: p.passportIssueDate || "",
+      passportExpiryDate: p.passportExpiryDate || "",
+      passportPlaceOfIssue: p.passportPlaceOfIssue || "",
     });
     setDialogOpen(true);
   };
@@ -136,6 +146,26 @@ export default function PilgrimManager() {
     finally { setUploadingId(null); }
   };
 
+  const handleDownloadPdf = async () => {
+    setDownloadingPdf(true);
+    try {
+      const res = await fetch(`${API}/api/groups/${groupId}/haji-list/pdf`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to generate PDF");
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `haji-list-${group?.groupName || groupId}-${group?.year || ""}.pdf`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      toast({ title: "Haji List PDF downloaded!" });
+    } catch {
+      toast({ title: "Failed to download PDF", variant: "destructive" });
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
   const f = (key: string, val: string) => setForm(prev => ({ ...prev, [key]: val }));
 
   if (loading) return <AdminLayout><div className="py-12 text-center text-muted-foreground animate-pulse">Loading...</div></AdminLayout>;
@@ -151,7 +181,17 @@ export default function PilgrimManager() {
             <h1 className="text-3xl font-serif font-bold">{group?.groupName || "Group"} — Pilgrims</h1>
             <p className="text-muted-foreground mt-1">{pilgrims.length} pilgrims registered</p>
           </div>
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap items-center">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 rounded-lg border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+              onClick={handleDownloadPdf}
+              disabled={downloadingPdf}
+            >
+              <FileDown size={14} />
+              {downloadingPdf ? "Generating..." : "Haji List PDF"}
+            </Button>
             <div className="relative group">
               <Button variant="outline" size="sm" className="gap-1 rounded-lg"><Printer size={14} /> Print</Button>
               <div className="absolute right-0 top-full mt-1 bg-white border rounded-xl shadow-lg py-2 w-48 hidden group-hover:block z-50">
@@ -190,6 +230,7 @@ export default function PilgrimManager() {
               <tr>
                 <th className="px-4 py-3">#</th>
                 <th className="px-4 py-3">Photo</th>
+                <th className="px-4 py-3">Title</th>
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Passport</th>
                 <th className="px-4 py-3">Mobile</th>
@@ -201,7 +242,7 @@ export default function PilgrimManager() {
             </thead>
             <tbody className="divide-y divide-border">
               {pilgrims.length === 0 ? (
-                <tr><td colSpan={9} className="text-center py-8 text-muted-foreground">No pilgrims yet. Click "Add Pilgrim" to start.</td></tr>
+                <tr><td colSpan={10} className="text-center py-8 text-muted-foreground">No pilgrims yet. Click "Add Pilgrim" to start.</td></tr>
               ) : pilgrims.map(p => (
                 <tr key={p.id} className="hover:bg-muted/30">
                   <td className="px-4 py-3 font-mono font-bold text-primary">{p.serialNumber}</td>
@@ -217,6 +258,7 @@ export default function PilgrimManager() {
                       )}
                     </div>
                   </td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground">{p.salutation || "—"}</td>
                   <td className="px-4 py-3 font-medium">{p.fullName}</td>
                   <td className="px-4 py-3 font-mono text-xs">{p.passportNumber || "—"}</td>
                   <td className="px-4 py-3 text-xs">{p.mobileIndia || "—"}</td>
@@ -243,9 +285,29 @@ export default function PilgrimManager() {
           </DialogHeader>
           <div className="space-y-4 mt-4">
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1"><label className="text-sm font-medium">Full Name *</label><Input value={form.fullName} onChange={e => f("fullName", e.target.value)} /></div>
+
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Title / Salutation</label>
+                <select value={form.salutation} onChange={e => f("salutation", e.target.value)} className="w-full h-10 px-3 rounded-md border bg-background text-sm">
+                  <option value="">Select</option>
+                  <option value="Mr.">Mr. (Male Adult)</option>
+                  <option value="Mrs.">Mrs. (Female Married)</option>
+                  <option value="Miss">Miss (Female Unmarried)</option>
+                  <option value="Master">Master (Male Child)</option>
+                  <option value="Infant">Infant</option>
+                </select>
+              </div>
+
+              <div className="space-y-1"><label className="text-sm font-medium">Full Name *</label><Input value={form.fullName} onChange={e => f("fullName", e.target.value)} placeholder="As per passport" /></div>
+
               <div className="space-y-1"><label className="text-sm font-medium">Passport Number</label><Input value={form.passportNumber} onChange={e => f("passportNumber", e.target.value)} /></div>
               <div className="space-y-1"><label className="text-sm font-medium">Visa Number</label><Input value={form.visaNumber} onChange={e => f("visaNumber", e.target.value)} /></div>
+
+              <div className="space-y-1"><label className="text-sm font-medium">Passport Issue Date</label><Input value={form.passportIssueDate} onChange={e => f("passportIssueDate", e.target.value)} placeholder="DD/MM/YYYY" /></div>
+              <div className="space-y-1"><label className="text-sm font-medium">Passport Expiry Date</label><Input value={form.passportExpiryDate} onChange={e => f("passportExpiryDate", e.target.value)} placeholder="DD/MM/YYYY" /></div>
+
+              <div className="col-span-2 space-y-1"><label className="text-sm font-medium">Place of Issue</label><Input value={form.passportPlaceOfIssue} onChange={e => f("passportPlaceOfIssue", e.target.value)} placeholder="City where passport was issued" /></div>
+
               <div className="space-y-1"><label className="text-sm font-medium">Date of Birth</label><Input value={form.dateOfBirth} onChange={e => f("dateOfBirth", e.target.value)} placeholder="DD/MM/YYYY" /></div>
               <div className="space-y-1"><label className="text-sm font-medium">Gender</label>
                 <select value={form.gender} onChange={e => f("gender", e.target.value)} className="w-full h-10 px-3 rounded-md border bg-background text-sm">
