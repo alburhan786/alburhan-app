@@ -10,3 +10,4 @@ export * from "./broadcasts";
 export * from "./kyc";
 export * from "./requests";
 export * from "./package_media";
+export * from "./payment_transactions";

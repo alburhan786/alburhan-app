@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { useListBookings, useApproveBooking, useRejectBooking, useListDocuments, useDeleteDocument } from "@workspace/api-client-react";
 import type { Booking, Pilgrim } from "@workspace/api-client-react";
@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
-import { CheckCircle, XCircle, Eye, ExternalLink, Plus, Trash2, FileText, Download, ImageIcon, RefreshCw, Upload } from "lucide-react";
+import { CheckCircle, XCircle, Eye, ExternalLink, Plus, Trash2, FileText, Download, ImageIcon, RefreshCw, Upload, Wallet } from "lucide-react";
 
 const DOC_TYPE_LABELS: Record<string, string> = {
   passport: "Passport",
@@ -191,6 +191,232 @@ function AdminDocumentsSection({ bookingId }: { bookingId: string }) {
 
 const API = import.meta.env.VITE_API_URL || "";
 
+const MODE_LABELS: Record<string, string> = {
+  cash: "Cash", neft: "NEFT", upi: "UPI", cheque: "Cheque", online: "Online",
+};
+const MODE_COLORS: Record<string, string> = {
+  cash: "bg-green-100 text-green-800",
+  neft: "bg-blue-100 text-blue-800",
+  upi: "bg-purple-100 text-purple-800",
+  cheque: "bg-amber-100 text-amber-800",
+  online: "bg-orange-100 text-orange-800",
+};
+
+function AdminPaymentLedger({ booking }: { booking: Booking }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const [entries, setEntries] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [form, setForm] = useState({
+    amount: "",
+    paymentDate: new Date().toISOString().split("T")[0],
+    paymentMode: "cash",
+    referenceNumber: "",
+    notes: "",
+  });
+
+  const fetchEntries = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API}/api/admin/bookings/${booking.id}/payments`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch");
+      setEntries(await res.json());
+    } catch {
+      toast({ title: "Error", description: "Could not load payment ledger", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchEntries(); }, [booking.id]);
+
+  const handleRecord = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.amount || isNaN(Number(form.amount)) || Number(form.amount) <= 0) {
+      toast({ title: "Enter a valid amount", variant: "destructive" }); return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await fetch(`${API}/api/admin/bookings/${booking.id}/payments`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...form, amount: Number(form.amount) }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to record payment");
+      toast({ title: "Payment recorded!" });
+      setShowForm(false);
+      setForm({ amount: "", paymentDate: new Date().toISOString().split("T")[0], paymentMode: "cash", referenceNumber: "", notes: "" });
+      fetchEntries();
+      queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (txnId: string) => {
+    if (!confirm("Delete this payment entry? The booking balance will be recalculated.")) return;
+    try {
+      const res = await fetch(`${API}/api/admin/bookings/${booking.id}/payments/${txnId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to delete");
+      toast({ title: "Payment entry deleted" });
+      fetchEntries();
+      queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const totalPaid = entries.reduce((s, e) => s + Number(e.amount), 0);
+  const finalAmount = Number((booking as any).finalAmount ?? 0);
+  const remaining = finalAmount > 0 ? finalAmount - totalPaid : 0;
+
+  return (
+    <div className="space-y-3">
+      {finalAmount > 0 && (
+        <div className="grid grid-cols-3 gap-2 bg-muted/40 rounded-xl p-3 border">
+          <div className="text-center">
+            <div className="text-[10px] text-muted-foreground font-semibold uppercase">Total</div>
+            <div className="font-mono font-bold text-sm text-foreground">₹{finalAmount.toLocaleString("en-IN")}</div>
+          </div>
+          <div className="text-center border-x">
+            <div className="text-[10px] text-muted-foreground font-semibold uppercase">Paid</div>
+            <div className="font-mono font-bold text-sm text-emerald-700">₹{totalPaid.toLocaleString("en-IN")}</div>
+          </div>
+          <div className="text-center">
+            <div className="text-[10px] text-muted-foreground font-semibold uppercase">Balance</div>
+            <div className={`font-mono font-bold text-sm ${remaining <= 0 ? "text-emerald-600" : remaining < finalAmount * 0.5 ? "text-amber-600" : "text-red-600"}`}>
+              ₹{Math.max(remaining, 0).toLocaleString("en-IN")}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {loading && <p className="text-sm text-muted-foreground">Loading ledger…</p>}
+      {!loading && entries.length === 0 && (
+        <p className="text-sm text-muted-foreground bg-muted/40 rounded-lg p-3">No payment entries recorded yet.</p>
+      )}
+      {entries.length > 0 && (
+        <div className="border rounded-lg overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-muted text-[10px] text-muted-foreground uppercase">
+              <tr>
+                <th className="px-3 py-2 text-left">Date</th>
+                <th className="px-3 py-2 text-left">Mode</th>
+                <th className="px-3 py-2 text-right">Amount</th>
+                <th className="px-3 py-2 text-left">Ref / Notes</th>
+                <th className="px-3 py-2"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {entries.map((e: any) => (
+                <tr key={e.id} className="hover:bg-muted/20">
+                  <td className="px-3 py-2 text-xs">{e.paymentDate}</td>
+                  <td className="px-3 py-2">
+                    <Badge className={`text-[10px] px-2 py-0.5 border-0 font-semibold ${MODE_COLORS[e.paymentMode] || "bg-gray-100 text-gray-800"}`}>
+                      {MODE_LABELS[e.paymentMode] || e.paymentMode}
+                    </Badge>
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono font-bold text-emerald-700">₹{Number(e.amount).toLocaleString("en-IN")}</td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground max-w-[120px] truncate">
+                    {e.referenceNumber && <span className="font-mono mr-1">{e.referenceNumber}</span>}
+                    {e.notes && <span className="italic">{e.notes}</span>}
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:bg-red-50" onClick={() => handleDelete(e.id)}>
+                      <Trash2 size={12} />
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {!showForm && (
+        <Button size="sm" className="bg-[#0B3D2E] hover:bg-[#0d5038] text-white h-8 text-xs gap-1.5" onClick={() => setShowForm(true)}>
+          <Plus size={12} /> Record Payment
+        </Button>
+      )}
+
+      {showForm && (
+        <form onSubmit={handleRecord} className="border rounded-xl p-4 bg-muted/30 space-y-3">
+          <div className="text-xs font-bold text-[#0B3D2E] uppercase tracking-wide mb-1">Record New Payment</div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Amount (₹) *</label>
+              <input
+                type="number" min="1" step="0.01" required placeholder="0.00"
+                value={form.amount}
+                onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
+                className="w-full px-3 py-1.5 text-sm rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#0B3D2E]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Payment Date *</label>
+              <input
+                type="date" required
+                value={form.paymentDate}
+                onChange={e => setForm(f => ({ ...f, paymentDate: e.target.value }))}
+                className="w-full px-3 py-1.5 text-sm rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#0B3D2E]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Mode *</label>
+              <select
+                required
+                value={form.paymentMode}
+                onChange={e => setForm(f => ({ ...f, paymentMode: e.target.value }))}
+                className="w-full px-3 py-1.5 text-sm rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#0B3D2E]"
+              >
+                <option value="cash">Cash</option>
+                <option value="neft">NEFT</option>
+                <option value="upi">UPI</option>
+                <option value="cheque">Cheque</option>
+                <option value="online">Online (Razorpay)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Reference # (optional)</label>
+              <input
+                type="text" placeholder="UTR / Cheque no. / Txn ID"
+                value={form.referenceNumber}
+                onChange={e => setForm(f => ({ ...f, referenceNumber: e.target.value }))}
+                className="w-full px-3 py-1.5 text-sm rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#0B3D2E]"
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Notes (optional)</label>
+              <input
+                type="text" placeholder="Any notes about this payment"
+                value={form.notes}
+                onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+                className="w-full px-3 py-1.5 text-sm rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#0B3D2E]"
+              />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button type="submit" size="sm" className="bg-[#0B3D2E] hover:bg-[#0d5038] text-white h-8 text-xs" disabled={submitting}>
+              {submitting ? "Saving…" : "Save Payment"}
+            </Button>
+            <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={() => setShowForm(false)}>Cancel</Button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
+
 function BookingDetailModal({ booking, open, onClose }: { booking: Booking | null; open: boolean; onClose: () => void }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -327,6 +553,13 @@ function BookingDetailModal({ booking, open, onClose }: { booking: Booking | nul
               <FileText size={12} /> Customer Documents
             </h4>
             <AdminDocumentsSection bookingId={booking.id} />
+          </div>
+
+          <div>
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2 flex items-center gap-1.5">
+              <Wallet size={12} /> Payment Ledger
+            </h4>
+            <AdminPaymentLedger booking={booking} />
           </div>
 
           <div className="flex flex-wrap items-center gap-2 pt-2">

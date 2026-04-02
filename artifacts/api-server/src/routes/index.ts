@@ -15,6 +15,7 @@ import packageMediaRouter from "./package-media.js";
 import kycRouter from "./kyc.js";
 import storageRouter from "./storage.js";
 import requestsRouter from "./requests.js";
+import adminPaymentsRouter from "./admin-payments.js";
 
 const router: IRouter = Router();
 
@@ -33,6 +34,7 @@ router.use("/gallery", galleryRouter);
 router.use("/groups", groupsRouter);
 router.use("/kyc", kycRouter);
 router.use("/requests", requestsRouter);
+router.use("/admin/bookings", adminPaymentsRouter);
 router.use(storageRouter);
 
 export default router;
