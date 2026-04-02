@@ -243,6 +243,9 @@ function AdminPaymentLedger({ booking }: { booking: BookingWithAmounts }) {
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  // livePaidAmount is kept in sync from server responses so the balance bar
+  // reflects the latest state even while the modal is open (the booking prop is stale).
+  const [livePaidAmount, setLivePaidAmount] = useState<number>(Number(booking.paidAmount ?? 0));
   const [form, setForm] = useState<LedgerForm>({
     amount: "",
     paymentDate: new Date().toISOString().split("T")[0] ?? "",
@@ -266,7 +269,10 @@ function AdminPaymentLedger({ booking }: { booking: BookingWithAmounts }) {
     }
   };
 
-  useEffect(() => { fetchEntries(); }, [booking.id]);
+  useEffect(() => {
+    fetchEntries();
+    setLivePaidAmount(Number(booking.paidAmount ?? 0));
+  }, [booking.id]);
 
   const handleRecord = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -281,8 +287,11 @@ function AdminPaymentLedger({ booking }: { booking: BookingWithAmounts }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...form, amount: Number(form.amount) }),
       });
-      const data = (await res.json()) as { message?: string };
+      const data = (await res.json()) as { message?: string; booking?: { paidAmount?: number } };
       if (!res.ok) throw new Error(data.message ?? "Failed to record payment");
+      if (data.booking?.paidAmount !== undefined) {
+        setLivePaidAmount(data.booking.paidAmount);
+      }
       toast({ title: "Payment recorded!" });
       setShowForm(false);
       setForm({ amount: "", paymentDate: new Date().toISOString().split("T")[0] ?? "", paymentMode: "cash", referenceNumber: "", notes: "" });
@@ -303,7 +312,11 @@ function AdminPaymentLedger({ booking }: { booking: BookingWithAmounts }) {
         method: "DELETE",
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Failed to delete payment entry");
+      const data = (await res.json()) as { message?: string; booking?: { paidAmount?: number } };
+      if (!res.ok) throw new Error(data.message ?? "Failed to delete payment entry");
+      if (data.booking?.paidAmount !== undefined) {
+        setLivePaidAmount(data.booking.paidAmount);
+      }
       toast({ title: "Payment entry deleted" });
       fetchEntries();
       queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
@@ -315,10 +328,10 @@ function AdminPaymentLedger({ booking }: { booking: BookingWithAmounts }) {
 
   const ledgerTotal = entries.reduce((s, e) => s + Number(e.amount), 0);
   const finalAmount = Number(booking.finalAmount ?? 0);
-  // Use booking.paidAmount as the authoritative total (includes both Razorpay and manual payments).
-  const totalPaid = Number(booking.paidAmount ?? ledgerTotal);
+  // livePaidAmount is authoritative — updated from server responses after each mutation.
+  const totalPaid = livePaidAmount;
   const remaining = finalAmount > 0 ? finalAmount - totalPaid : 0;
-  const onlinePortion = Number(booking.onlinePaidAmount ?? 0);
+  const onlinePortion = totalPaid - ledgerTotal;
 
   return (
     <div className="space-y-3">
