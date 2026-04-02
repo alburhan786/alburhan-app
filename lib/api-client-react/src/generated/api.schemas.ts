@@ -209,6 +209,7 @@ export const BookingStatus = {
   rejected: "rejected",
   confirmed: "confirmed",
   cancelled: "cancelled",
+  partially_paid: "partially_paid",
 } as const;
 
 export type BookingRoomType =

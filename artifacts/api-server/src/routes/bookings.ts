@@ -522,8 +522,6 @@ router.post(
       passportIssueDate: body.passportIssueDate || null,
       passportExpiryDate: body.passportExpiryDate || null,
       passportPlaceOfIssue: body.passportPlaceOfIssue || null,
-      bloodGroup: body.bloodGroup || null,
-      phone: body.mobileIndia || null,
       updatedAt: new Date(),
     };
 
@@ -572,7 +570,7 @@ router.patch(
       .where(eq(bookingsTable.id, bookingId))
       .returning();
 
-    let pilgrim: typeof pilgrimsTable.$inferSelect | null = null;
+    let pilgrim: Awaited<ReturnType<typeof upsertPilgrimFromProfile>> | null = null;
     if (booking.travellerDetailsStatus === "submitted" && booking.customerId) {
       const [profile] = await db.select().from(customerProfilesTable).where(eq(customerProfilesTable.userId, booking.customerId)).limit(1);
       if (profile) {

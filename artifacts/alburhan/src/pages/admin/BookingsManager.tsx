@@ -1057,6 +1057,7 @@ export default function BookingsManager() {
   const [detailBooking, setDetailBooking] = useState<Booking | null>(null);
   const [showOfflineForm, setShowOfflineForm] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [autoFillingCardId, setAutoFillingCardId] = useState<string | null>(null);
 
   const handleApprove = async (id: string) => {
     try {
@@ -1079,6 +1080,25 @@ export default function BookingsManager() {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to reject booking";
       toast({ title: "Error", description: message, variant: "destructive" });
+    }
+  };
+
+  const handleAutoFillFromCard = async (bookingId: string) => {
+    setAutoFillingCardId(bookingId);
+    try {
+      const res = await fetch(`${API}/api/admin/bookings/${bookingId}/auto-fill-pilgrim`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Auto-fill failed");
+      toast({ title: "Pilgrim auto-filled!", description: data.message || "Pilgrim record populated from customer's travel details." });
+      queryClient.invalidateQueries({ queryKey: ['/api/bookings'] });
+    } catch (err: unknown) {
+      toast({ title: "Error", description: err instanceof Error ? err.message : "Auto-fill failed", variant: "destructive" });
+    } finally {
+      setAutoFillingCardId(null);
     }
   };
 
@@ -1194,6 +1214,18 @@ export default function BookingsManager() {
                       <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary" onClick={() => setDetailBooking(booking)} title="View Details">
                         <Eye size={18} />
                       </Button>
+                      {booking.travellerDetailsStatus === "submitted" && booking.groupId && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-indigo-600 hover:bg-indigo-50"
+                          title="Auto-fill Pilgrim from submitted details"
+                          disabled={autoFillingCardId === booking.id}
+                          onClick={() => handleAutoFillFromCard(booking.id)}
+                        >
+                          <User size={18} className={autoFillingCardId === booking.id ? "animate-pulse" : ""} />
+                        </Button>
+                      )}
                       {booking.status === 'pending' && (
                         <>
                           <Button variant="ghost" size="icon" className="text-emerald-600 hover:bg-emerald-50" onClick={() => handleApprove(booking.id)} title="Approve">

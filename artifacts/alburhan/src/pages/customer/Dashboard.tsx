@@ -104,7 +104,7 @@ function TravelDetailsCard({ bookingId, initialStatus }: { bookingId: string; in
   const [existingPhotoUrl, setExistingPhotoUrl] = useState<string | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
-    name: "", dateOfBirth: "", gender: "", mobileIndia: "", bloodGroup: "",
+    name: "", dateOfBirth: "", gender: "",
     address: "", passportNumber: "", passportIssueDate: "", passportExpiryDate: "", passportPlaceOfIssue: "",
   });
   const { toast } = useToast();
@@ -121,8 +121,6 @@ function TravelDetailsCard({ bookingId, initialStatus }: { bookingId: string; in
             name: data.profile.name || "",
             dateOfBirth: data.profile.dateOfBirth || "",
             gender: data.profile.gender || "",
-            mobileIndia: data.profile.phone || "",
-            bloodGroup: data.profile.bloodGroup || "",
             address: data.profile.address || "",
             passportNumber: data.profile.passportNumber || "",
             passportIssueDate: data.profile.passportIssueDate || "",
@@ -263,19 +261,6 @@ function TravelDetailsCard({ bookingId, initialStatus }: { bookingId: string; in
                 <option value="male">Male</option>
                 <option value="female">Female</option>
                 <option value="other">Other</option>
-              </select>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mobile (India)</label>
-              <input className={inputCls} type="tel" placeholder="10-digit number" value={form.mobileIndia} onChange={e => setForm(f => ({ ...f, mobileIndia: e.target.value }))} />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Blood Group</label>
-              <select className={inputCls} value={form.bloodGroup} onChange={e => setForm(f => ({ ...f, bloodGroup: e.target.value }))}>
-                <option value="">Select</option>
-                {BLOOD_GROUPS.map(bg => <option key={bg} value={bg}>{bg}</option>)}
               </select>
             </div>
 
@@ -1324,7 +1309,7 @@ export default function CustomerDashboard() {
 
                     {(booking.status === 'approved' || booking.status === 'confirmed' || booking.status === 'partially_paid') && (
                       <div className="mx-5 mb-4 space-y-4">
-                        <TravelDetailsCard bookingId={booking.id} initialStatus={(booking as any).travellerDetailsStatus || "not_submitted"} />
+                        <TravelDetailsCard bookingId={booking.id} initialStatus={booking.travellerDetailsStatus || "not_submitted"} />
                         <MandatoryDocumentsCard bookingId={booking.id} onOpenUpload={() => setUploadBookingId(booking.id)} />
                         <TravelDocumentsCard bookingId={booking.id} />
                       </div>
