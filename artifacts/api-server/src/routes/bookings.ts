@@ -1,8 +1,13 @@
-import { Router } from "express";
-import { db, bookingsTable, packagesTable, usersTable, hajjGroupsTable, customerProfilesTable, pilgrimsTable } from "@workspace/db";
-import { eq, and, desc, count, sql, max } from "drizzle-orm";
+import { Router, type Request } from "express";
+import { db, bookingsTable, packagesTable, usersTable, hajjGroupsTable, customerProfilesTable } from "@workspace/db";
+import { eq, and, desc, count, sql } from "drizzle-orm";
 import multer from "multer";
 import { uploadToGCS } from "../lib/gcsUpload.js";
+import { upsertPilgrimFromProfile } from "../lib/pilgrimUtils.js";
+
+interface MulterRequest extends Request {
+  file?: Express.Multer.File;
+}
 
 const photoUpload = multer({
   storage: multer.memoryStorage(),
@@ -469,46 +474,6 @@ function buildInvoiceResponse(b: typeof bookingsTable.$inferSelect, pkg: { gstPe
   };
 }
 
-async function upsertPilgrimFromProfile(
-  groupId: string,
-  profile: { name?: string | null; passportNumber?: string | null; passportIssueDate?: string | null; passportExpiryDate?: string | null; passportPlaceOfIssue?: string | null; dateOfBirth?: string | null; gender?: string | null; bloodGroup?: string | null; address?: string | null; phone?: string | null; photoUrl?: string | null },
-  fallbackName: string,
-  fallbackMobile: string,
-): Promise<typeof pilgrimsTable.$inferSelect> {
-  const salutation = profile.gender === "male" ? "Haji" : profile.gender === "female" ? "Hajjah" : "";
-
-  const existingByPassport = profile.passportNumber
-    ? await db.select().from(pilgrimsTable)
-        .where(and(eq(pilgrimsTable.groupId, groupId), eq(pilgrimsTable.passportNumber, profile.passportNumber)))
-        .limit(1)
-    : [];
-
-  const pilgrimData = {
-    fullName: profile.name || fallbackName,
-    salutation,
-    passportNumber: profile.passportNumber || null,
-    passportIssueDate: profile.passportIssueDate || null,
-    passportExpiryDate: profile.passportExpiryDate || null,
-    passportPlaceOfIssue: profile.passportPlaceOfIssue || null,
-    dateOfBirth: profile.dateOfBirth || null,
-    gender: profile.gender || null,
-    bloodGroup: profile.bloodGroup || null,
-    address: profile.address || null,
-    mobileIndia: profile.phone || fallbackMobile,
-    photoUrl: profile.photoUrl || null,
-    updatedAt: new Date(),
-  };
-
-  if (existingByPassport[0]) {
-    const [updated] = await db.update(pilgrimsTable).set(pilgrimData).where(eq(pilgrimsTable.id, existingByPassport[0].id)).returning();
-    return updated;
-  }
-
-  const [{ maxSerial }] = await db.select({ maxSerial: max(pilgrimsTable.serialNumber) }).from(pilgrimsTable).where(eq(pilgrimsTable.groupId, groupId));
-  const [created] = await db.insert(pilgrimsTable).values({ ...pilgrimData, groupId, serialNumber: (maxSerial || 0) + 1 }).returning();
-  return created;
-}
-
 router.get(
   "/:id/traveller-details",
   requireAuth as any,
@@ -562,7 +527,7 @@ router.post(
       updatedAt: new Date(),
     };
 
-    const photoFile = (req as any).file as Express.Multer.File | undefined;
+    const photoFile = (req as MulterRequest).file;
     if (photoFile) {
       profileData.photoUrl = await uploadToGCS(photoFile.buffer, photoFile.originalname, photoFile.mimetype, "private_uploads");
     }

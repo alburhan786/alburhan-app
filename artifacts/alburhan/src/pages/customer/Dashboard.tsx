@@ -137,9 +137,7 @@ function TravelDetailsCard({ bookingId, initialStatus }: { bookingId: string; in
   };
 
   useEffect(() => {
-    if (initialStatus === "not_submitted") {
-      loadProfile();
-    }
+    loadProfile();
   }, []);
 
   const handleOpenForm = () => {
@@ -208,6 +206,40 @@ function TravelDetailsCard({ bookingId, initialStatus }: { bookingId: string; in
           {showForm ? "Hide Form" : isSubmitted ? "Edit Details" : "Fill Now"}
         </Button>
       </div>
+
+      {isSubmitted && !showForm && (
+        <div className="px-5 pb-4 pt-3 space-y-3">
+          {loadingProfile ? (
+            <p className="text-sm text-muted-foreground animate-pulse py-1">Loading your details…</p>
+          ) : (
+            <div className="flex gap-4 items-start">
+              {existingPhotoUrl && (
+                <img src={existingPhotoUrl} alt="Passport photo" className="w-14 h-14 rounded-lg object-cover border-2 border-emerald-200 shrink-0" />
+              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 flex-1 text-sm">
+                {form.name && (
+                  <div><span className="text-xs text-muted-foreground">Name: </span><span className="font-semibold">{form.name}</span></div>
+                )}
+                {form.passportNumber && (
+                  <div><span className="text-xs text-muted-foreground">Passport: </span><span className="font-mono font-semibold">{form.passportNumber}</span></div>
+                )}
+                {form.dateOfBirth && (
+                  <div><span className="text-xs text-muted-foreground">DOB: </span><span>{form.dateOfBirth}</span></div>
+                )}
+                {form.gender && (
+                  <div><span className="text-xs text-muted-foreground">Gender: </span><span className="capitalize">{form.gender}</span></div>
+                )}
+                {form.passportExpiryDate && (
+                  <div><span className="text-xs text-muted-foreground">Passport Expires: </span><span>{form.passportExpiryDate}</span></div>
+                )}
+                {form.passportPlaceOfIssue && (
+                  <div><span className="text-xs text-muted-foreground">Issued at: </span><span>{form.passportPlaceOfIssue}</span></div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {showForm && (
         <form onSubmit={handleSubmit} className="px-5 pb-5 pt-4 space-y-4">

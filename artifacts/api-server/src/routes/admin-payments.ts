@@ -1,7 +1,8 @@
 import { Router, type RequestHandler } from "express";
-import { db, bookingsTable, paymentTransactionsTable, customerProfilesTable, pilgrimsTable } from "@workspace/db";
-import { eq, sum, count, asc, max, and } from "drizzle-orm";
+import { db, bookingsTable, paymentTransactionsTable, customerProfilesTable } from "@workspace/db";
+import { eq, sum, count, asc } from "drizzle-orm";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
+import { upsertPilgrimFromProfile } from "../lib/pilgrimUtils.js";
 
 type BookingStatus = "pending" | "approved" | "rejected" | "confirmed" | "cancelled" | "partially_paid";
 type PaymentMode = "cash" | "neft" | "upi" | "cheque" | "online";
@@ -237,45 +238,8 @@ router.post(
 
     if (!profile) { res.status(404).json({ message: "Customer profile not found — ask customer to re-submit their details" }); return; }
 
-    const salutation = profile.gender === "male" ? "Haji" : profile.gender === "female" ? "Hajjah" : "";
-    const pilgrimData = {
-      fullName: profile.name || booking.customerName,
-      salutation,
-      passportNumber: profile.passportNumber || null,
-      passportIssueDate: profile.passportIssueDate || null,
-      passportExpiryDate: profile.passportExpiryDate || null,
-      passportPlaceOfIssue: profile.passportPlaceOfIssue || null,
-      dateOfBirth: profile.dateOfBirth || null,
-      gender: profile.gender || null,
-      bloodGroup: profile.bloodGroup || null,
-      address: profile.address || null,
-      mobileIndia: profile.phone || booking.customerMobile,
-      photoUrl: profile.photoUrl || null,
-      updatedAt: new Date(),
-    };
-
-    const existingByPassport = profile.passportNumber
-      ? await db.select().from(pilgrimsTable)
-          .where(and(eq(pilgrimsTable.groupId, booking.groupId), eq(pilgrimsTable.passportNumber, profile.passportNumber)))
-          .limit(1)
-      : [];
-
-    let pilgrim;
-    let upserted: "updated" | "created";
-    if (existingByPassport[0]) {
-      const [updated] = await db.update(pilgrimsTable).set(pilgrimData).where(eq(pilgrimsTable.id, existingByPassport[0].id)).returning();
-      pilgrim = updated;
-      upserted = "updated";
-    } else {
-      const [{ maxSerial }] = await db.select({ maxSerial: max(pilgrimsTable.serialNumber) }).from(pilgrimsTable).where(eq(pilgrimsTable.groupId, booking.groupId));
-      const [created] = await db.insert(pilgrimsTable).values({ ...pilgrimData, groupId: booking.groupId, serialNumber: (maxSerial || 0) + 1 }).returning();
-      pilgrim = created;
-      upserted = "created";
-    }
-
-    const statusCode = upserted === "created" ? 201 : 200;
-    const message = upserted === "created" ? "Pilgrim auto-filled from customer profile" : "Pilgrim updated from customer profile";
-    res.status(statusCode).json({ message, pilgrim, upserted });
+    const pilgrim = await upsertPilgrimFromProfile(booking.groupId, profile, booking.customerName, booking.customerMobile);
+    res.json({ message: "Pilgrim upserted from customer profile", pilgrim });
   }
 );
 
