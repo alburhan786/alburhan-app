@@ -8,8 +8,6 @@ import { objectStorageClient } from "../lib/objectStorage.js";
 import PDFDocument from "pdfkit";
 import fs from "fs";
 import path from "path";
-let QRCode: typeof import("qrcode") | null = null;
-try { QRCode = (await import("qrcode")).default as any; } catch {}
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -911,16 +909,15 @@ async function generateRoomStickerPage(
   }
 
   y += 8;
-  if (QRCode) {
-    try {
-      const qrData = JSON.stringify({ room: room.roomNumber, hotel: hotelLabel, floor: room.floor || "", group: groupName });
-      const qrBuf = await (QRCode as any).toBuffer(qrData, { type: "png", width: 80, margin: 1 });
-      const qrSize = 52;
-      doc.image(qrBuf, W - M - qrSize, y, { width: qrSize, height: qrSize });
-      doc.fill("#aaa").font("Helvetica").fontSize(5.5)
-        .text("Scan for room info", W - M - qrSize, y + qrSize + 1, { width: qrSize, align: "center", lineBreak: false });
-    } catch {}
-  }
+  try {
+    const { default: QRCode } = await import("qrcode");
+    const qrData = JSON.stringify({ room: room.roomNumber, hotel: hotelLabel, floor: room.floor || "", group: groupName });
+    const qrBuf = await (QRCode as any).toBuffer(qrData, { type: "png", width: 80, margin: 1 });
+    const qrSize = 52;
+    doc.image(qrBuf, W - M - qrSize, y, { width: qrSize, height: qrSize });
+    doc.fill("#aaa").font("Helvetica").fontSize(5.5)
+      .text("Scan for room info", W - M - qrSize, y + qrSize + 1, { width: qrSize, align: "center", lineBreak: false });
+  } catch {}
 
   const footerY = H - 14;
   doc.rect(M, footerY - 3, W - M * 2, 13).fill("#f0f7f4");
