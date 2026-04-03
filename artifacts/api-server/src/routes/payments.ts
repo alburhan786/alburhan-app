@@ -208,7 +208,7 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
 
   const baseUrl = process.env.REPLIT_DEV_DOMAIN
     ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-    : `${req.protocol}://${req.get("host")?.replace(/\/api$/, "")}`;
+    : (process.env.SITE_URL || "https://alburhantravels.com");
 
   const invoiceUrl = isFullyPaid ? `${baseUrl}/invoice/${booking.bookingNumber}` : undefined;
 
@@ -326,7 +326,7 @@ router.post("/sync-payment", requireAuth as any, async (req: AuthenticatedReques
 
   const baseUrl = process.env.REPLIT_DEV_DOMAIN
     ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-    : `${req.protocol}://${req.get("host")}`;
+    : (process.env.SITE_URL || "https://alburhantravels.com");
 
   if (isFullyPaid) {
     const invoiceUrl = `${baseUrl}/invoice/${updated.bookingNumber}`;
