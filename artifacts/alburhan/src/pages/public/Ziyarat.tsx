@@ -21,7 +21,7 @@ export default function Ziyarat() {
       title: "Iraq Ziyarat",
       subtitle: "Najaf, Karbala, Kazmain, Samarra",
       desc: "Embark on a soul-stirring journey to the holy shrines of Iraq. Our meticulously planned tours offer profound spiritual experiences at the resting places of the revered Imams.",
-      image: `${import.meta.env.BASE_URL}images/ziyarat/iraq.jpg`,
+      image: `${import.meta.env.BASE_URL}images/ziyarat/iraq.png`,
       filterMatch: ['iraq_ziyarat', 'iraq ziyarat']
     },
     {

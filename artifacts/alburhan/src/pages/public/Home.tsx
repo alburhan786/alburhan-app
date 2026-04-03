@@ -172,7 +172,7 @@ export default function Home() {
   }, [bannerImages.length]);
 
   const ZIYARAT_DEFAULTS = [
-    { type: "iraq_ziyarat",    name: "Iraq Ziyarat",    desc: "Najaf, Karbala, Kazmain, Samarra",  icon: "🕌", color: "from-amber-700/85 to-amber-950/95",   fallbackImg: `${import.meta.env.BASE_URL}images/ziyarat/iraq.jpg` },
+    { type: "iraq_ziyarat",    name: "Iraq Ziyarat",    desc: "Najaf, Karbala, Kazmain, Samarra",  icon: "🕌", color: "from-amber-700/85 to-amber-950/95",   fallbackImg: `${import.meta.env.BASE_URL}images/ziyarat/iraq.png` },
     { type: "baitul_muqaddas", name: "Baitul Muqaddas", desc: "Spiritual journey to Jerusalem",    icon: "✨", color: "from-cyan-700/85 to-cyan-950/95",     fallbackImg: `${import.meta.env.BASE_URL}images/ziyarat/jerusalem.jpg` },
     { type: "syria_ziyarat",   name: "Syria Ziyarat",   desc: "Sacred shrines in Damascus",        icon: "🕋", color: "from-rose-700/85 to-rose-950/95",     fallbackImg: `${import.meta.env.BASE_URL}images/ziyarat/syria.jpg` },
     { type: "jordan_heritage", name: "Jordan Heritage", desc: "Islamic historical sites",          icon: "🏛️", color: "from-emerald-700/85 to-emerald-950/95", fallbackImg: `${import.meta.env.BASE_URL}images/ziyarat/jordan.jpg` },

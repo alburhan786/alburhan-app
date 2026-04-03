@@ -1,5 +1,10 @@
 uploads = []
-generated = []
+
+[[generated]]
+id = "fZ7NzGkKOATmqeW2Ixzz9"
+uri = "file://artifacts/alburhan/public/images/ziyarat/iraq.png"
+type = "image"
+title = "iraq-karbala-shrine"
 
 [[outputs]]
 id = "c6bBzA_qw1JrunIOEAfRV"
