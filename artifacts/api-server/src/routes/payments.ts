@@ -465,7 +465,7 @@ router.post("/webhook", async (req: any, res) => {
 
     const baseUrl = process.env.REPLIT_DEV_DOMAIN
       ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-      : "https://alburhantravels.com";
+      : (process.env.SITE_URL || "https://alburhantravels.com");
 
     if (isFullyPaid) {
       const invoiceUrl = `${baseUrl}/invoice/${updated.bookingNumber}`;
