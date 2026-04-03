@@ -494,14 +494,6 @@ router.post("/:groupId/rooms/auto-allocate", requireAdmin as any, async (req, re
         }
       }
 
-      if (!bestRoom) {
-        for (const room of rooms) {
-          const occupied = roomBeds.get(room.id) || 0;
-          const avail = room.totalBeds - occupied;
-          if (avail >= neededBeds && avail < bestAvail) { bestAvail = avail; bestRoom = room; }
-        }
-      }
-
       if (bestRoom) {
         roomBeds.set(bestRoom.id, (roomBeds.get(bestRoom.id) || 0) + neededBeds);
         for (const p of family) {
