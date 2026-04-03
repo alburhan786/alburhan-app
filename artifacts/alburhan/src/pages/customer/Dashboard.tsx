@@ -524,9 +524,9 @@ const TRAVEL_DOC_TYPES: Record<string, { label: string; icon: React.ElementType;
 
 function TravelDocumentsCard({ bookingId, bookingNumber, invoiceNumber, bookingStatus }: {
   bookingId: string;
-  bookingNumber?: string;
-  invoiceNumber?: string | null;
-  bookingStatus?: string;
+  bookingNumber: string;
+  invoiceNumber: string | null;
+  bookingStatus: string;
 }) {
   const BASE_API = import.meta.env.VITE_API_URL || "";
   const { toast } = useToast();
@@ -604,7 +604,7 @@ function TravelDocumentsCard({ bookingId, bookingNumber, invoiceNumber, bookingS
                 <span className="text-[10px] font-medium text-muted-foreground">Print</span>
               </button>
               <button
-                onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(`My Tax Invoice from Al Burhan Tours & Travels\nInvoice No: ${invoiceNumber}\nView here: https://alburhantravels.com/invoice/${bookingNumber}`)}`, "_blank")}
+                onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(`My Tax Invoice from Al Burhan Tours & Travels\nInvoice No: ${invoiceNumber}\nView here: ${window.location.origin}${import.meta.env.BASE_URL || "/"}invoice/${bookingNumber}`)}`, "_blank")}
                 className="flex flex-col items-center gap-1 py-2 hover:bg-black/5 transition-colors w-full"
               >
                 <Share2 size={15} className="text-emerald-700" />
