@@ -40,6 +40,7 @@ export const pilgrimsTable = pgTable("pilgrims", {
   roomNumber: text("room_number"),
   roomType: text("room_type"),
   roomHotel: text("room_hotel"),
+  roomId: text("room_id"),
   busNumber: text("bus_number"),
   seatNumber: text("seat_number"),
   salutation: text("salutation"),

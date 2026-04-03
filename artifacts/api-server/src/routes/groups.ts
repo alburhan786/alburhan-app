@@ -8,6 +8,7 @@ import { objectStorageClient } from "../lib/objectStorage.js";
 import PDFDocument from "pdfkit";
 import fs from "fs";
 import path from "path";
+import QRCode from "qrcode";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -135,7 +136,7 @@ router.get("/:groupId/pilgrims", requireAdmin as any, async (req, res) => {
 router.post("/:groupId/pilgrims", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   const groupId = String(req.params.groupId);
   const { fullName, passportNumber, visaNumber, dateOfBirth, gender, bloodGroup,
-    photoUrl, mobileIndia, mobileSaudi, address, city, state, roomNumber, roomType, roomHotel,
+    photoUrl, mobileIndia, mobileSaudi, address, city, state, roomNumber, roomType, roomHotel, roomId,
     busNumber, seatNumber, relation, coverNumber, medicalCondition,
     salutation, passportIssueDate, passportExpiryDate, passportPlaceOfIssue } = req.body;
 
@@ -153,7 +154,7 @@ router.post("/:groupId/pilgrims", requireAdmin as any, async (req: Authenticated
     serialNumber: nextSerial,
     fullName, passportNumber, visaNumber, dateOfBirth, gender, bloodGroup,
     photoUrl, mobileIndia, mobileSaudi, address, city, state,
-    roomNumber, roomType, roomHotel: roomHotel || null,
+    roomNumber, roomType, roomHotel: roomHotel || null, roomId: roomId || null,
     busNumber, seatNumber, relation, coverNumber, medicalCondition,
     salutation: salutation || null,
     passportIssueDate: passportIssueDate || null,
@@ -167,7 +168,7 @@ router.put("/:groupId/pilgrims/:pilgrimId", requireAdmin as any, async (req: Aut
   const groupId = String(req.params.groupId);
   const pilgrimId = String(req.params.pilgrimId);
   const { fullName, passportNumber, visaNumber, dateOfBirth, gender, bloodGroup,
-    photoUrl, mobileIndia, mobileSaudi, address, city, state, roomNumber, roomType, roomHotel,
+    photoUrl, mobileIndia, mobileSaudi, address, city, state, roomNumber, roomType, roomHotel, roomId,
     busNumber, seatNumber, relation, coverNumber, medicalCondition, serialNumber,
     salutation, passportIssueDate, passportExpiryDate, passportPlaceOfIssue } = req.body;
 
@@ -176,7 +177,7 @@ router.put("/:groupId/pilgrims/:pilgrimId", requireAdmin as any, async (req: Aut
   const [updated] = await db.update(pilgrimsTable).set({
     fullName, passportNumber, visaNumber, dateOfBirth, gender, bloodGroup,
     photoUrl, mobileIndia, mobileSaudi, address, city, state,
-    roomNumber, roomType, roomHotel: roomHotel ?? null,
+    roomNumber, roomType, roomHotel: roomHotel ?? null, roomId: roomId ?? null,
     busNumber, seatNumber, relation, coverNumber, medicalCondition,
     serialNumber: serialNumber ? Number(serialNumber) : undefined,
     salutation: salutation || null,
@@ -481,7 +482,7 @@ router.post("/:groupId/rooms/auto-allocate", requireAdmin as any, async (req, re
     const roomBeds = new Map<string, number>();
     for (const room of rooms) roomBeds.set(room.id, 0);
 
-    type Assignment = { pilgrimId: string; roomNumber: string; roomHotel: string };
+    type Assignment = { pilgrimId: string; roomNumber: string; roomHotel: string; roomId: string };
     const assignments: Assignment[] = [];
     let assignedCount = 0;
     let unassignedCount = 0;
@@ -512,7 +513,7 @@ router.post("/:groupId/rooms/auto-allocate", requireAdmin as any, async (req, re
       if (bestRoom) {
         roomBeds.set(bestRoom.id, (roomBeds.get(bestRoom.id) || 0) + neededBeds);
         for (const p of family) {
-          assignments.push({ pilgrimId: p.id, roomNumber: bestRoom!.roomNumber, roomHotel: bestRoom!.hotel });
+          assignments.push({ pilgrimId: p.id, roomNumber: bestRoom!.roomNumber, roomHotel: bestRoom!.hotel, roomId: bestRoom!.id });
         }
         assignedCount += neededBeds;
       } else {
@@ -522,11 +523,11 @@ router.post("/:groupId/rooms/auto-allocate", requireAdmin as any, async (req, re
 
     await db.transaction(async (tx) => {
       await tx.update(pilgrimsTable)
-        .set({ roomNumber: null, roomHotel: null, updatedAt: new Date() })
+        .set({ roomNumber: null, roomHotel: null, roomId: null, updatedAt: new Date() })
         .where(eq(pilgrimsTable.groupId, groupId));
       for (const a of assignments) {
         await tx.update(pilgrimsTable)
-          .set({ roomNumber: a.roomNumber, roomHotel: a.roomHotel, updatedAt: new Date() })
+          .set({ roomNumber: a.roomNumber, roomHotel: a.roomHotel, roomId: a.roomId, updatedAt: new Date() })
           .where(eq(pilgrimsTable.id, a.pilgrimId));
       }
     });
@@ -813,6 +814,203 @@ router.get("/:groupId/rooms/list/pdf", requireAdmin as any, async (req, res) => 
   } catch (err: any) {
     console.error("[groups] rooms/list/pdf error:", err);
     if (!res.headersSent) res.status(500).json({ message: err?.message || "Failed to generate PDF" });
+  }
+});
+
+async function generateRoomStickerPage(
+  doc: InstanceType<typeof PDFDocument>,
+  room: { id: string; roomNumber: string; hotel: string; floor?: string | null; roomType: string; notes?: string | null },
+  roomPilgrims: { fullName: string; relation?: string | null; gender?: string | null; passportNumber?: string | null; salutation?: string | null }[],
+  groupName: string,
+  isFirstPage: boolean
+) {
+  const DARK_GREEN = "#0B3D2E";
+  const GOLD = "#C9A23F";
+  const HOTEL_LABELS: Record<string, string> = { makkah: "Makkah", madinah: "Madinah", aziziah: "Aziziah" };
+  const ROOM_TYPE_LABELS: Record<string, string> = { family: "Family Room", ladies: "Ladies Room", gents: "Gents Room" };
+
+  if (!isFirstPage) doc.addPage({ size: "A5", layout: "portrait", margin: 0 });
+
+  const W = doc.page.width;
+  const H = doc.page.height;
+  const M = 20;
+  let y = M;
+
+  const hotelLabel = HOTEL_LABELS[room.hotel] || room.hotel;
+  const roomTypeLabel = ROOM_TYPE_LABELS[room.roomType] || room.roomType;
+  const floorLabel = room.floor ? ` · Floor ${room.floor}` : "";
+
+  const HDR_H = 60;
+  doc.rect(M, y, W - M * 2, HDR_H).fill(DARK_GREEN);
+
+  const LEFT_W = W - M * 2 - 85;
+  doc.fill(GOLD).font("Helvetica-Bold").fontSize(12)
+    .text("AL BURHAN TOURS & TRAVELS", M + 6, y + 7, { width: LEFT_W, lineBreak: false });
+  doc.fill("white").font("Helvetica").fontSize(6.5)
+    .text("5/8 Khanka Masjid Complex, Shanwara Road", M + 6, y + 21, { width: LEFT_W, lineBreak: false });
+  doc.fill("white").font("Helvetica").fontSize(6.5)
+    .text("Burhanpur 450331 M.P. | Tel: +91 9893989786", M + 6, y + 31, { width: LEFT_W, lineBreak: false });
+  doc.fill("#a8d5c2").font("Helvetica").fontSize(6.5)
+    .text(`${hotelLabel}${floorLabel} · ${roomTypeLabel}`, M + 6, y + 44, { width: LEFT_W, lineBreak: false });
+
+  const RN_X = W - M - 82;
+  doc.fill("#ffffff").font("Helvetica").fontSize(7)
+    .text("ROOM NO.", RN_X, y + 8, { width: 78, align: "center", lineBreak: false });
+  doc.fill(GOLD).font("Helvetica-Bold").fontSize(32)
+    .text(room.roomNumber, RN_X, y + 17, { width: 78, align: "center", lineBreak: false });
+  doc.fill("white").font("Helvetica").fontSize(6.5)
+    .text(`${roomPilgrims.length} Person${roomPilgrims.length !== 1 ? "s" : ""}`, RN_X, y + 47, { width: 78, align: "center", lineBreak: false });
+
+  y += HDR_H + 6;
+
+  const TABLE_X = M;
+  const TABLE_W = W - M * 2;
+  const COL_W = [TABLE_W * 0.38, TABLE_W * 0.26, TABLE_W * 0.14, TABLE_W * 0.22];
+  const COL_LABELS = ["Name", "Passport No.", "Gender", "Relation"];
+  const ROW_H = 18;
+  const TBL_HDR_H = 14;
+
+  doc.rect(TABLE_X, y, TABLE_W, TBL_HDR_H).fill("#1a5c44");
+  let cx = TABLE_X;
+  COL_LABELS.forEach((lbl, i) => {
+    doc.fill("white").font("Helvetica-Bold").fontSize(6.5)
+      .text(lbl, cx + 2, y + 4, { width: COL_W[i] - 4, align: "center", lineBreak: false });
+    cx += COL_W[i];
+  });
+  y += TBL_HDR_H;
+
+  for (let i = 0; i < roomPilgrims.length; i++) {
+    const p = roomPilgrims[i];
+    doc.rect(TABLE_X, y, TABLE_W, ROW_H).fill(i % 2 === 0 ? "#f5faf7" : "white");
+    cx = TABLE_X;
+    const displayName = [p.salutation, p.fullName].filter(Boolean).join(" ");
+    doc.fill("#111").font("Helvetica-Bold").fontSize(7.5)
+      .text(displayName, cx + 3, y + 5, { width: COL_W[0] - 6, lineBreak: false });
+    cx += COL_W[0];
+    doc.fill("#333").font("Helvetica").fontSize(7)
+      .text(p.passportNumber || "—", cx + 2, y + 5, { width: COL_W[1] - 4, align: "center", lineBreak: false });
+    cx += COL_W[1];
+    const genderShort = p.gender ? p.gender.charAt(0).toUpperCase() : "—";
+    doc.fill("#444").font("Helvetica").fontSize(7.5)
+      .text(genderShort, cx + 2, y + 5, { width: COL_W[2] - 4, align: "center", lineBreak: false });
+    cx += COL_W[2];
+    doc.fill(DARK_GREEN).font("Helvetica").fontSize(7)
+      .text(p.relation || "—", cx + 2, y + 5, { width: COL_W[3] - 4, align: "center", lineBreak: false });
+    doc.save();
+    doc.rect(TABLE_X, y, TABLE_W, ROW_H).stroke("#c8d8c8");
+    doc.restore();
+    y += ROW_H;
+  }
+
+  if (roomPilgrims.length === 0) {
+    doc.rect(TABLE_X, y, TABLE_W, ROW_H).fill("#fafafa");
+    doc.fill("#bbb").font("Helvetica").fontSize(8)
+      .text("No pilgrims assigned", TABLE_X, y + 5, { width: TABLE_W, align: "center", lineBreak: false });
+    y += ROW_H;
+  }
+
+  y += 8;
+  try {
+    const qrData = JSON.stringify({ room: room.roomNumber, hotel: hotelLabel, floor: room.floor || "", group: groupName });
+    const qrBuf = await QRCode.toBuffer(qrData, { type: "png", width: 80, margin: 1 });
+    const qrSize = 52;
+    doc.image(qrBuf, W - M - qrSize, y, { width: qrSize, height: qrSize });
+    doc.fill("#aaa").font("Helvetica").fontSize(5.5)
+      .text("Scan for room info", W - M - qrSize, y + qrSize + 1, { width: qrSize, align: "center", lineBreak: false });
+  } catch {}
+
+  const footerY = H - 14;
+  doc.rect(M, footerY - 3, W - M * 2, 13).fill("#f0f7f4");
+  const genDate = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  doc.fill("#555").font("Helvetica").fontSize(6)
+    .text(`Al Burhan Tours & Travels · ${groupName} · ${genDate}`, M, footerY, { width: W - M * 2, align: "center", lineBreak: false });
+}
+
+router.get("/:groupId/rooms/stickers/bulk-pdf", requireAdmin as any, async (req, res) => {
+  try {
+    const groupId = String(req.params.groupId);
+    const groups = await db.select().from(hajjGroupsTable).where(eq(hajjGroupsTable.id, groupId)).limit(1);
+    if (!groups[0]) { res.status(404).json({ message: "Group not found" }); return; }
+    const group = groups[0];
+
+    const rooms = await db.select().from(hajjRoomsTable)
+      .where(eq(hajjRoomsTable.groupId, groupId))
+      .orderBy(asc(hajjRoomsTable.hotel), asc(hajjRoomsTable.roomNumber));
+
+    const allPilgrims = await db.select().from(pilgrimsTable)
+      .where(eq(pilgrimsTable.groupId, groupId))
+      .orderBy(asc(pilgrimsTable.serialNumber));
+
+    const pilgrimsByRoomId = new Map<string, typeof allPilgrims>();
+    for (const p of allPilgrims) {
+      if (p.roomId) {
+        if (!pilgrimsByRoomId.has(p.roomId)) pilgrimsByRoomId.set(p.roomId, []);
+        pilgrimsByRoomId.get(p.roomId)!.push(p);
+      }
+    }
+
+    const doc = new PDFDocument({ size: "A5", layout: "portrait", margin: 0, autoFirstPage: true });
+    const safeName = group.groupName.replace(/[^a-zA-Z0-9]/g, "-");
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="room-stickers-${safeName}-${group.year}.pdf"`);
+    doc.pipe(res);
+
+    const hotelOrder = ["makkah", "madinah", "aziziah"];
+    const sortedRooms = [...rooms].sort((a, b) => {
+      const hi = hotelOrder.indexOf(a.hotel) - hotelOrder.indexOf(b.hotel);
+      if (hi !== 0) return hi;
+      const na = parseInt(a.roomNumber, 10), nb = parseInt(b.roomNumber, 10);
+      if (!isNaN(na) && !isNaN(nb)) return na - nb;
+      return a.roomNumber.localeCompare(b.roomNumber);
+    });
+
+    let isFirst = true;
+    for (const room of sortedRooms) {
+      const roomPilgrims = pilgrimsByRoomId.get(room.id) || [];
+      await generateRoomStickerPage(doc, room, roomPilgrims, group.groupName, isFirst);
+      isFirst = false;
+    }
+
+    if (sortedRooms.length === 0) {
+      doc.fill("#888").font("Helvetica").fontSize(12)
+        .text("No rooms found for this group.", 40, 40);
+    }
+
+    doc.end();
+  } catch (err: any) {
+    console.error("[groups] bulk stickers PDF error:", err);
+    if (!res.headersSent) res.status(500).json({ message: err?.message || "Failed to generate bulk stickers PDF" });
+  }
+});
+
+router.get("/:groupId/rooms/:roomId/sticker", requireAdmin as any, async (req, res) => {
+  try {
+    const groupId = String(req.params.groupId);
+    const roomId = String(req.params.roomId);
+
+    const groups = await db.select().from(hajjGroupsTable).where(eq(hajjGroupsTable.id, groupId)).limit(1);
+    if (!groups[0]) { res.status(404).json({ message: "Group not found" }); return; }
+    const group = groups[0];
+
+    const roomScope = and(eq(hajjRoomsTable.id, roomId), eq(hajjRoomsTable.groupId, groupId));
+    const roomRows = await db.select().from(hajjRoomsTable).where(roomScope).limit(1);
+    if (!roomRows[0]) { res.status(404).json({ message: "Room not found" }); return; }
+    const room = roomRows[0];
+
+    const roomPilgrims = await db.select().from(pilgrimsTable)
+      .where(and(eq(pilgrimsTable.groupId, groupId), eq(pilgrimsTable.roomId, roomId)))
+      .orderBy(asc(pilgrimsTable.serialNumber));
+
+    const doc = new PDFDocument({ size: "A5", layout: "portrait", margin: 0, autoFirstPage: true });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="room-sticker-${room.roomNumber}-${room.hotel}.pdf"`);
+    doc.pipe(res);
+
+    await generateRoomStickerPage(doc, room, roomPilgrims, group.groupName, true);
+    doc.end();
+  } catch (err: any) {
+    console.error("[groups] room sticker PDF error:", err);
+    if (!res.headersSent) res.status(500).json({ message: err?.message || "Failed to generate sticker PDF" });
   }
 });
 

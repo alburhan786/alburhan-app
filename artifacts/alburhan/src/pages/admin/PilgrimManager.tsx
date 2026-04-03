@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Edit, Trash2, ArrowLeft, Upload, Printer, CreditCard, Luggage, Heart,
-  Building2, Bus, DoorOpen, FileDown, Hotel, BedDouble, Users, Wand2, X, AlertTriangle } from "lucide-react";
+  Building2, Bus, DoorOpen, FileDown, Hotel, BedDouble, Users, Wand2, X, AlertTriangle, Sticker } from "lucide-react";
 import { Link, useRoute } from "wouter";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -29,6 +29,7 @@ interface Pilgrim {
   roomNumber?: string;
   roomType?: string;
   roomHotel?: string;
+  roomId?: string;
   busNumber?: string;
   seatNumber?: string;
   relation?: string;
@@ -111,6 +112,7 @@ export default function PilgrimManager() {
   const [roomForm, setRoomForm] = useState(emptyRoomForm);
   const [autoAllocating, setAutoAllocating] = useState(false);
   const [downloadingRoomPdf, setDownloadingRoomPdf] = useState(false);
+  const [downloadingBulkStickers, setDownloadingBulkStickers] = useState(false);
   const [deleteConfirmRoomId, setDeleteConfirmRoomId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
@@ -290,7 +292,7 @@ export default function PilgrimManager() {
       const res = await fetch(`${API}/api/groups/${groupId}/pilgrims/${pilgrimId}`, {
         method: "PUT", credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...pilgrim, roomNumber: null, roomHotel: null }),
+        body: JSON.stringify({ ...pilgrim, roomNumber: null, roomHotel: null, roomId: null }),
       });
       if (!res.ok) throw new Error("Failed");
       toast({ title: "Pilgrim removed from room" });
@@ -301,16 +303,33 @@ export default function PilgrimManager() {
   const handleAssignPilgrimToRoom = async (pilgrimId: string, roomNumber: string, hotel: string) => {
     const pilgrim = pilgrims.find(p => p.id === pilgrimId);
     if (!pilgrim) return;
+    const matchingRoom = rooms.find(r => r.roomNumber === roomNumber && r.hotel === hotel);
+    const newRoomId = matchingRoom?.id || null;
     try {
       const res = await fetch(`${API}/api/groups/${groupId}/pilgrims/${pilgrimId}`, {
         method: "PUT", credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...pilgrim, roomNumber: roomNumber || null, roomHotel: hotel || null }),
+        body: JSON.stringify({ ...pilgrim, roomNumber: roomNumber || null, roomHotel: hotel || null, roomId: newRoomId }),
       });
       if (!res.ok) throw new Error("Failed");
       toast({ title: roomNumber ? `Assigned to Room ${roomNumber} (${HOTEL_LABELS[hotel] || hotel})` : "Room assignment cleared" });
       fetchData();
     } catch { toast({ title: "Error assigning pilgrim to room", variant: "destructive" }); }
+  };
+
+  const handleDownloadBulkStickers = async () => {
+    setDownloadingBulkStickers(true);
+    try {
+      const res = await fetch(`${API}/api/groups/${groupId}/rooms/stickers/bulk-pdf`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = `room-stickers-${group?.groupName || groupId}-${group?.year || ""}.pdf`;
+      a.click(); window.URL.revokeObjectURL(url);
+      toast({ title: "Bulk Stickers PDF downloaded!" });
+    } catch { toast({ title: "Failed to download stickers PDF", variant: "destructive" }); }
+    finally { setDownloadingBulkStickers(false); }
   };
 
   const f = (key: string, val: string) => setForm(prev => ({ ...prev, [key]: val }));
@@ -504,6 +523,14 @@ export default function PilgrimManager() {
             >
               <FileDown size={16} /> {downloadingRoomPdf ? "Generating..." : "Room List PDF"}
             </Button>
+            <Button
+              onClick={handleDownloadBulkStickers}
+              disabled={downloadingBulkStickers || rooms.length === 0}
+              variant="outline"
+              className="gap-1.5 rounded-xl border-amber-300 text-amber-700 hover:bg-amber-50 disabled:opacity-60"
+            >
+              <Sticker size={16} /> {downloadingBulkStickers ? "Generating..." : "Bulk Stickers PDF"}
+            </Button>
           </div>
 
           {/* Unassigned pilgrims banner */}
@@ -560,6 +587,13 @@ export default function PilgrimManager() {
                             </div>
                           </div>
                           <div className="flex items-center gap-0.5 shrink-0">
+                            <Button
+                              variant="ghost" size="icon" className="h-8 w-8 text-amber-600 hover:text-amber-800 hover:bg-amber-50"
+                              title="Download Room Sticker PDF"
+                              onClick={() => window.open(`${API}/api/groups/${groupId}/rooms/${room.id}/sticker`, "_blank")}
+                            >
+                              <Sticker size={14} />
+                            </Button>
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditRoom(room)}>
                               <Edit size={14} />
                             </Button>
