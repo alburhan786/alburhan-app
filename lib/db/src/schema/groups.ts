@@ -39,6 +39,7 @@ export const pilgrimsTable = pgTable("pilgrims", {
   state: text("state"),
   roomNumber: text("room_number"),
   roomType: text("room_type"),
+  roomHotel: text("room_hotel"),
   busNumber: text("bus_number"),
   seatNumber: text("seat_number"),
   salutation: text("salutation"),
@@ -53,3 +54,18 @@ export const pilgrimsTable = pgTable("pilgrims", {
 });
 
 export type Pilgrim = typeof pilgrimsTable.$inferSelect;
+
+export const hajjRoomsTable = pgTable("hajj_rooms", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  groupId: text("group_id").notNull(),
+  roomNumber: text("room_number").notNull(),
+  hotel: text("hotel").notNull().default("makkah"),
+  totalBeds: integer("total_beds").notNull().default(4),
+  roomType: text("room_type").notNull().default("gents"),
+  floor: text("floor"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export type HajjRoom = typeof hajjRoomsTable.$inferSelect;
