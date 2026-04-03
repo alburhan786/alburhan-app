@@ -845,11 +845,11 @@ async function generateRoomStickerPage(
   const LEFT_W = W - M * 2 - 82;
   doc.fill(GOLD).font("Helvetica-Bold").fontSize(10)
     .text("AL BURHAN TOURS & TRAVELS", M + 6, y + 6, { width: LEFT_W, lineBreak: false });
-  doc.fill("white").font("Helvetica").fontSize(6)
+  doc.fill("white").font("Helvetica").fontSize(5.5)
     .text("5/8 Khanka Masjid Complex, Shanwara Road", M + 6, y + 18, { width: LEFT_W, lineBreak: false });
-  doc.fill("white").font("Helvetica").fontSize(6)
+  doc.fill("white").font("Helvetica").fontSize(5.5)
     .text("Burhanpur 450331 M.P. | Tel: +91 9893989786", M + 6, y + 27, { width: LEFT_W, lineBreak: false });
-  doc.fill("#a8d5c2").font("Helvetica").fontSize(6)
+  doc.fill("#a8d5c2").font("Helvetica").fontSize(5.5)
     .text(`${hotelLabel}${floorLabel} · ${roomTypeLabel}`, M + 6, y + 37, { width: LEFT_W, lineBreak: false });
 
   const RN_X = W - M - 80;
