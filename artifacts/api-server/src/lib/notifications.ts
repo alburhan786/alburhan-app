@@ -286,7 +286,7 @@ export async function sendBookingSubmissionNotification(opts: {
 
   await Promise.allSettled([
     sendDLTSMS(opts.mobile, opts.customerName, opts.bookingNumber, "SUBMITTED"),
-    sendWhatsAppWithFallback(opts.mobile, customerMsg),
+    sendWhatsApp(opts.mobile, customerMsg),
     opts.email ? sendEmail(opts.email, "Booking Submitted – Al Burhan Tours & Travels", customerMsg) : Promise.resolve(),
     sendWhatsApp("9893989786", adminMsg),
     sendWhatsApp("8989701701", adminMsg),
@@ -302,7 +302,7 @@ export async function sendBookingApprovalNotification(opts: {
   const message = `Assalamu Alaikum ${opts.customerName},\n\nYour booking #${opts.bookingNumber} with Al Burhan Tours & Travels has been APPROVED.\n\nPlease login to complete payment.\n\nHelp: +91 8989701701 / +91 9893989786\n\nJazak Allah Khair!`;
   await Promise.allSettled([
     sendDLTSMS(opts.mobile, opts.customerName, opts.bookingNumber, "APPROVED"),
-    sendWhatsAppWithFallback(opts.mobile, message),
+    sendWhatsApp(opts.mobile, message),
     opts.email ? sendEmail(opts.email, "Booking Approved – Al Burhan Tours & Travels", message) : Promise.resolve(),
   ]);
 }
@@ -318,7 +318,7 @@ export async function sendBookingRejectionNotification(opts: {
   const message = `Assalamu Alaikum ${opts.customerName},\n\nWe regret that your booking #${opts.bookingNumber} could not be processed.${reasonText}\n\nPlease contact us:\n+91 8989701701\n+91 9893989786`;
   await Promise.allSettled([
     sendDLTSMS(opts.mobile, opts.customerName, opts.bookingNumber, "REJECTED"),
-    sendWhatsAppWithFallback(opts.mobile, message),
+    sendWhatsApp(opts.mobile, message),
     opts.email ? sendEmail(opts.email, "Booking Update – Al Burhan Tours & Travels", message) : Promise.resolve(),
   ]);
 }
@@ -338,7 +338,7 @@ export async function sendPaymentConfirmationNotification(opts: {
 
   await Promise.allSettled([
     sendDLTSMS(opts.mobile, opts.customerName, opts.bookingNumber, "CONFIRMED"),
-    sendWhatsAppWithFallback(opts.mobile, message),
+    sendWhatsApp(opts.mobile, message),
     opts.email ? sendEmail(opts.email, "Booking Confirmed – Al Burhan Tours & Travels", message) : Promise.resolve(),
     sendWhatsApp("9893989786", adminMsg),
     sendWhatsApp("8989701701", adminMsg),
@@ -356,7 +356,7 @@ export async function sendPartialPaymentNotification(opts: {
   const message = `Assalamu Alaikum ${opts.customerName},\n\nPartial payment of Rs.${opts.paidAmount} received for booking #${opts.bookingNumber}.\n\nBalance remaining: Rs.${opts.remainingAmount}\n\nPlease login to pay the remaining amount.\n\nAl Burhan Tours & Travels\n+91 8989701701`;
   await Promise.allSettled([
     sendDLTSMS(opts.mobile, opts.customerName, opts.bookingNumber, "PARTIAL PAYMENT"),
-    sendWhatsAppWithFallback(opts.mobile, message),
+    sendWhatsApp(opts.mobile, message),
     opts.email ? sendEmail(opts.email, "Partial Payment Received – Al Burhan Tours & Travels", message) : Promise.resolve(),
   ]);
 }
@@ -386,7 +386,7 @@ export async function sendAdminDocumentReadyNotification(opts: {
   const message = `Assalamu Alaikum ${opts.customerName},\n\nYour ${docLabel} for booking #${opts.bookingNumber} is ready.\n\nPlease login to your dashboard to view and download it.\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 8989701701`;
   await Promise.allSettled([
     sendDLTSMS(opts.mobile, opts.customerName, opts.bookingNumber, docLabel.toUpperCase().slice(0, 30)),
-    sendWhatsAppWithFallback(opts.mobile, message),
+    sendWhatsApp(opts.mobile, message),
     opts.email ? sendEmail(opts.email, `Your ${docLabel} is Ready – Al Burhan Tours & Travels`, message) : Promise.resolve(),
   ]);
 }
