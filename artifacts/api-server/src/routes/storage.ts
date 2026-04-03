@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { Readable } from "stream";
-import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage.js";
+import { ObjectStorageService, ObjectNotFoundError, objectStorageClient } from "../lib/objectStorage.js";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
@@ -43,6 +43,9 @@ router.get("/storage/public-objects/*filePath", async (req: Request, res: Respon
  * Serve uploaded files from Object Storage.
  * Files under "private_uploads/" require an authenticated session.
  * Files under "uploads/" (gallery, package images) are publicly accessible.
+ *
+ * Files are stored by gcsUpload.ts at GCS key: objects/{wildcardPath}
+ * in the DEFAULT_OBJECT_STORAGE_BUCKET_ID bucket.
  */
 router.get("/storage/objects/*path", async (req: Request, res: Response) => {
   try {
@@ -57,8 +60,19 @@ router.get("/storage/objects/*path", async (req: Request, res: Response) => {
       }
     }
 
-    const objectPath = `/objects/${wildcardPath}`;
-    const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
+    const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
+    if (!bucketId) {
+      res.status(500).json({ error: "Object storage not configured" });
+      return;
+    }
+
+    const gcsKey = `objects/${wildcardPath}`;
+    const objectFile = objectStorageClient.bucket(bucketId).file(gcsKey);
+    const [exists] = await objectFile.exists();
+    if (!exists) {
+      res.status(404).json({ error: "Object not found" });
+      return;
+    }
 
     const response = await objectStorageService.downloadObject(objectFile);
     res.status(response.status);
@@ -71,10 +85,6 @@ router.get("/storage/objects/*path", async (req: Request, res: Response) => {
       res.end();
     }
   } catch (error) {
-    if (error instanceof ObjectNotFoundError) {
-      res.status(404).json({ error: "Object not found" });
-      return;
-    }
     console.error("[storage] Error serving object:", error);
     res.status(500).json({ error: "Failed to serve object" });
   }
