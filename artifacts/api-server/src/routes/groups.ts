@@ -828,52 +828,52 @@ async function generateRoomStickerPage(
   const HOTEL_LABELS: Record<string, string> = { makkah: "Makkah", madinah: "Madinah", aziziah: "Aziziah" };
   const ROOM_TYPE_LABELS: Record<string, string> = { family: "Family Room", ladies: "Ladies Room", gents: "Gents Room" };
 
-  if (!isFirstPage) doc.addPage({ size: "A5", layout: "portrait", margin: 0 });
+  if (!isFirstPage) doc.addPage({ size: [288, 432], margin: 0 });
 
   const W = doc.page.width;
   const H = doc.page.height;
-  const M = 20;
+  const M = 16;
   let y = M;
 
   const hotelLabel = HOTEL_LABELS[room.hotel] || room.hotel;
   const roomTypeLabel = ROOM_TYPE_LABELS[room.roomType] || room.roomType;
   const floorLabel = room.floor ? ` · Floor ${room.floor}` : "";
 
-  const HDR_H = 60;
+  const HDR_H = 48;
   doc.rect(M, y, W - M * 2, HDR_H).fill(DARK_GREEN);
 
-  const LEFT_W = W - M * 2 - 85;
-  doc.fill(GOLD).font("Helvetica-Bold").fontSize(12)
-    .text("AL BURHAN TOURS & TRAVELS", M + 6, y + 7, { width: LEFT_W, lineBreak: false });
-  doc.fill("white").font("Helvetica").fontSize(6.5)
-    .text("5/8 Khanka Masjid Complex, Shanwara Road", M + 6, y + 21, { width: LEFT_W, lineBreak: false });
-  doc.fill("white").font("Helvetica").fontSize(6.5)
-    .text("Burhanpur 450331 M.P. | Tel: +91 9893989786", M + 6, y + 31, { width: LEFT_W, lineBreak: false });
-  doc.fill("#a8d5c2").font("Helvetica").fontSize(6.5)
-    .text(`${hotelLabel}${floorLabel} · ${roomTypeLabel}`, M + 6, y + 44, { width: LEFT_W, lineBreak: false });
+  const LEFT_W = W - M * 2 - 82;
+  doc.fill(GOLD).font("Helvetica-Bold").fontSize(10)
+    .text("AL BURHAN TOURS & TRAVELS", M + 6, y + 6, { width: LEFT_W, lineBreak: false });
+  doc.fill("white").font("Helvetica").fontSize(6)
+    .text("5/8 Khanka Masjid Complex, Shanwara Road", M + 6, y + 18, { width: LEFT_W, lineBreak: false });
+  doc.fill("white").font("Helvetica").fontSize(6)
+    .text("Burhanpur 450331 M.P. | Tel: +91 9893989786", M + 6, y + 27, { width: LEFT_W, lineBreak: false });
+  doc.fill("#a8d5c2").font("Helvetica").fontSize(6)
+    .text(`${hotelLabel}${floorLabel} · ${roomTypeLabel}`, M + 6, y + 37, { width: LEFT_W, lineBreak: false });
 
-  const RN_X = W - M - 82;
-  doc.fill("#ffffff").font("Helvetica").fontSize(7)
-    .text("ROOM NO.", RN_X, y + 8, { width: 78, align: "center", lineBreak: false });
-  doc.fill(GOLD).font("Helvetica-Bold").fontSize(32)
-    .text(room.roomNumber, RN_X, y + 17, { width: 78, align: "center", lineBreak: false });
-  doc.fill("white").font("Helvetica").fontSize(6.5)
-    .text(`${roomPilgrims.length} Person${roomPilgrims.length !== 1 ? "s" : ""}`, RN_X, y + 47, { width: 78, align: "center", lineBreak: false });
+  const RN_X = W - M - 80;
+  doc.fill("#ffffff").font("Helvetica").fontSize(6)
+    .text("ROOM NO.", RN_X, y + 7, { width: 76, align: "center", lineBreak: false });
+  doc.fill(GOLD).font("Helvetica-Bold").fontSize(26)
+    .text(room.roomNumber, RN_X, y + 15, { width: 76, align: "center", lineBreak: false });
+  doc.fill("white").font("Helvetica").fontSize(6)
+    .text(`${roomPilgrims.length} Person${roomPilgrims.length !== 1 ? "s" : ""}`, RN_X, y + 39, { width: 76, align: "center", lineBreak: false });
 
-  y += HDR_H + 6;
+  y += HDR_H + 5;
 
   const TABLE_X = M;
   const TABLE_W = W - M * 2;
   const COL_W = [TABLE_W * 0.38, TABLE_W * 0.26, TABLE_W * 0.14, TABLE_W * 0.22];
   const COL_LABELS = ["Name", "Passport No.", "Gender", "Relation"];
-  const ROW_H = 18;
-  const TBL_HDR_H = 14;
+  const ROW_H = 16;
+  const TBL_HDR_H = 12;
 
   doc.rect(TABLE_X, y, TABLE_W, TBL_HDR_H).fill("#1a5c44");
   let cx = TABLE_X;
   COL_LABELS.forEach((lbl, i) => {
-    doc.fill("white").font("Helvetica-Bold").fontSize(6.5)
-      .text(lbl, cx + 2, y + 4, { width: COL_W[i] - 4, align: "center", lineBreak: false });
+    doc.fill("white").font("Helvetica-Bold").fontSize(6)
+      .text(lbl, cx + 2, y + 3, { width: COL_W[i] - 4, align: "center", lineBreak: false });
     cx += COL_W[i];
   });
   y += TBL_HDR_H;
@@ -912,8 +912,8 @@ async function generateRoomStickerPage(
   try {
     const { default: QRCode } = await import("qrcode");
     const qrData = JSON.stringify({ room: room.roomNumber, hotel: hotelLabel, floor: room.floor || "", group: groupName });
-    const qrBuf = await QRCode.toBuffer(qrData, { type: "png", width: 80, margin: 1 });
-    const qrSize = 52;
+    const qrBuf = await QRCode.toBuffer(qrData, { type: "png", width: 64, margin: 1 });
+    const qrSize = 44;
     doc.image(qrBuf, W - M - qrSize, y, { width: qrSize, height: qrSize });
     doc.fill("#aaa").font("Helvetica").fontSize(5.5)
       .text("Scan for room info", W - M - qrSize, y + qrSize + 1, { width: qrSize, align: "center", lineBreak: false });
@@ -949,7 +949,7 @@ router.get("/:groupId/rooms/stickers/bulk-pdf", requireAdmin as any, async (req,
       }
     }
 
-    const doc = new PDFDocument({ size: "A5", layout: "portrait", margin: 0, autoFirstPage: true });
+    const doc = new PDFDocument({ size: [288, 432], margin: 0, autoFirstPage: true });
     const safeName = group.groupName.replace(/[^a-zA-Z0-9]/g, "-");
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="room-stickers-${safeName}-${group.year}.pdf"`);
@@ -1001,7 +1001,7 @@ router.get("/:groupId/rooms/:roomId/sticker", requireAdmin as any, async (req, r
       .where(and(eq(pilgrimsTable.groupId, groupId), eq(pilgrimsTable.roomId, roomId)))
       .orderBy(asc(pilgrimsTable.serialNumber));
 
-    const doc = new PDFDocument({ size: "A5", layout: "portrait", margin: 0, autoFirstPage: true });
+    const doc = new PDFDocument({ size: [288, 432], margin: 0, autoFirstPage: true });
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="room-sticker-${room.roomNumber}-${room.hotel}.pdf"`);
     doc.pipe(res);
