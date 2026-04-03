@@ -459,6 +459,44 @@ router.post("/:groupId/rooms", requireAdmin as any, async (req: AuthenticatedReq
   }
 });
 
+router.post("/:groupId/rooms/bulk", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  const groupId = String(req.params.groupId);
+  const { rooms } = req.body;
+  if (!Array.isArray(rooms) || rooms.length === 0 || rooms.length > 200) {
+    res.status(400).json({ message: "rooms must be a non-empty array (max 200 items)" });
+    return;
+  }
+  for (const r of rooms) {
+    if (!r.roomNumber || !r.hotel || !r.totalBeds || !r.roomType) {
+      res.status(400).json({ message: "Each room requires roomNumber, hotel, totalBeds, roomType" });
+      return;
+    }
+    if (!VALID_HOTELS.includes(r.hotel)) {
+      res.status(400).json({ message: `hotel must be one of: ${VALID_HOTELS.join(", ")}` });
+      return;
+    }
+    if (!VALID_ROOM_TYPES.includes(r.roomType)) {
+      res.status(400).json({ message: `roomType must be one of: ${VALID_ROOM_TYPES.join(", ")}` });
+      return;
+    }
+  }
+  try {
+    const rows = rooms.map((r: { roomNumber: string; hotel: string; totalBeds: number; roomType: string; floor?: string; notes?: string }) => ({
+      groupId,
+      roomNumber: String(r.roomNumber),
+      hotel: r.hotel,
+      totalBeds: Number(r.totalBeds),
+      roomType: r.roomType,
+      floor: r.floor || null,
+      notes: r.notes || null,
+    }));
+    const created = await db.insert(hajjRoomsTable).values(rows).returning();
+    res.status(201).json({ created: created.length, rooms: created });
+  } catch (err: any) {
+    res.status(500).json({ message: err?.message || "Failed to create rooms" });
+  }
+});
+
 router.post("/:groupId/rooms/auto-allocate", requireAdmin as any, async (req, res) => {
   const groupId = String(req.params.groupId);
   try {
