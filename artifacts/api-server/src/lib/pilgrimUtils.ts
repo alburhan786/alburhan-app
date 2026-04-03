@@ -24,13 +24,20 @@ export async function syncPilgrimsForUser(
       );
 
     const withGroup = bookings.filter((b) => b.groupId);
-    await Promise.all(
-      withGroup.map((b) =>
-        upsertPilgrimFromProfile(b.groupId!, profile, b.customerName, b.customerMobile).catch(
-          (err) => console.error(`[pilgrimSync] Failed for booking ${b.id}:`, err),
-        )
-      )
-    );
+    const seenGroupIds = new Set<string>();
+    const uniqueByGroup = withGroup.filter((b) => {
+      if (seenGroupIds.has(b.groupId!)) return false;
+      seenGroupIds.add(b.groupId!);
+      return true;
+    });
+
+    for (const b of uniqueByGroup) {
+      try {
+        await upsertPilgrimFromProfile(b.groupId!, profile, b.customerName, b.customerMobile);
+      } catch (err) {
+        console.error(`[pilgrimSync] Failed for booking ${b.id}:`, err);
+      }
+    }
   } catch (err) {
     console.error("[pilgrimSync] Failed to sync pilgrims for user", userId, err);
   }
