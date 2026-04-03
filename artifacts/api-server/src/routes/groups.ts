@@ -6,6 +6,7 @@ import multer from "multer";
 import { uploadToGCS, deleteFromGCS } from "../lib/gcsUpload.js";
 import { objectStorageClient } from "../lib/objectStorage.js";
 import PDFDocument from "pdfkit";
+import QRCode from "qrcode";
 import fs from "fs";
 import path from "path";
 import { LOGO_BASE64 } from "../lib/logoData.js";
@@ -958,15 +959,12 @@ async function generateRoomStickerPage(
   }
 
   y += 8;
-  try {
-    const { default: QRCode } = await import("qrcode");
-    const qrData = JSON.stringify({ room: room.roomNumber, hotel: hotelLabel, floor: room.floor || "", group: groupName });
-    const qrBuf = await QRCode.toBuffer(qrData, { type: "png", width: 64, margin: 1 });
-    const qrSize = 44;
-    doc.image(qrBuf, W - M - qrSize, y, { width: qrSize, height: qrSize });
-    doc.fill("#aaa").font("Helvetica").fontSize(5.5)
-      .text("Scan for room info", W - M - qrSize, y + qrSize + 1, { width: qrSize, align: "center", lineBreak: false });
-  } catch {}
+  const qrData = JSON.stringify({ room: room.roomNumber, hotel: hotelLabel, floor: room.floor || "", group: groupName });
+  const qrBuf = await QRCode.toBuffer(qrData, { type: "png", width: 64, margin: 1 });
+  const qrSize = 44;
+  doc.image(qrBuf, W - M - qrSize, y, { width: qrSize, height: qrSize });
+  doc.fill("#aaa").font("Helvetica").fontSize(5.5)
+    .text("Scan for room info", W - M - qrSize, y + qrSize + 1, { width: qrSize, align: "center", lineBreak: false });
 
   const footerY = H - 14;
   doc.rect(M, footerY - 3, W - M * 2, 13).fill("#f0f7f4");
