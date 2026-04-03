@@ -1320,6 +1320,46 @@ export default function CustomerDashboard() {
                       </div>
                     )}
 
+                    {/* Invoice Card — shown prominently for confirmed bookings */}
+                    {booking.status === 'confirmed' && booking.invoiceNumber && (
+                      <div className="mx-5 mb-4 rounded-xl border border-emerald-200 overflow-hidden" style={{ background: "linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%)" }}>
+                        <div className="px-4 py-3 border-b border-emerald-200 flex items-center gap-2 bg-emerald-700/10">
+                          <FileText className="w-4 h-4 text-emerald-700" />
+                          <span className="font-semibold text-emerald-800 text-sm">Your Invoice — Booking Confirmed</span>
+                          <CheckCircle className="w-4 h-4 text-emerald-600 ml-auto" />
+                        </div>
+                        <div className="p-4">
+                          <div className="flex justify-between items-center mb-4">
+                            <div>
+                              <p className="text-xs text-emerald-600 uppercase tracking-wide mb-0.5">Invoice No.</p>
+                              <p className="font-mono font-bold text-emerald-900 text-base">{booking.invoiceNumber}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-xs text-emerald-600 uppercase tracking-wide mb-0.5">Amount Paid</p>
+                              <p className="font-bold text-emerald-900 text-base">{booking.finalAmount ? formatCurrency(booking.finalAmount) : '—'}</p>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              className="flex-1 bg-emerald-700 hover:bg-emerald-800 text-white font-semibold"
+                              onClick={() => window.open((import.meta.env.BASE_URL || "/") + "invoice/" + booking.bookingNumber, "_blank")}
+                            >
+                              <Eye className="w-3.5 h-3.5 mr-1.5" /> View Invoice
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex-1 border-emerald-500 text-emerald-700 hover:bg-emerald-50 font-semibold"
+                              onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(`Assalamu Alaikum! My Hajj/Umrah booking with Al Burhan Tours & Travels is confirmed.\n\nInvoice No: ${booking.invoiceNumber}\nBooking: #${booking.bookingNumber}\n\nView Invoice: https://alburhantravels.com/invoice/${booking.bookingNumber}`)}`, "_blank")}
+                            >
+                              <Share2 className="w-3.5 h-3.5 mr-1.5" /> Share on WhatsApp
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Actions */}
                     <div className="p-4 bg-muted/20 border-t border-border flex flex-wrap justify-end gap-3">
                       {(booking.status === 'approved' || booking.status === 'partially_paid') && (
@@ -1338,22 +1378,13 @@ export default function CustomerDashboard() {
                       )}
 
                       {booking.status === 'confirmed' && (
-                        <>
-                          <Button
-                            variant="outline"
-                            onClick={() => window.open((import.meta.env.BASE_URL || "/") + "invoice/" + booking.bookingNumber, "_blank")}
-                            className="border-emerald-600 text-emerald-700 hover:bg-emerald-50"
-                          >
-                            <Eye className="w-4 h-4 mr-2" /> View Invoice
-                          </Button>
-                          <Button
-                            variant="outline"
-                            onClick={() => handleDownloadInvoice(booking.id)}
-                            className="border-primary text-primary hover:bg-primary/5"
-                          >
-                            <Download className="w-4 h-4 mr-2" /> Download Invoice
-                          </Button>
-                        </>
+                        <Button
+                          variant="outline"
+                          onClick={() => handleDownloadInvoice(booking.id)}
+                          className="border-primary text-primary hover:bg-primary/5"
+                        >
+                          <Download className="w-4 h-4 mr-2" /> Download Invoice PDF
+                        </Button>
                       )}
 
                       {(booking.status === 'approved' || booking.status === 'confirmed' || booking.status === 'pending') && (
