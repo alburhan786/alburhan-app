@@ -481,6 +481,11 @@ router.post("/:groupId/rooms/bulk", requireAdmin as any, async (req: Authenticat
       res.status(400).json({ message: `roomType must be one of: ${VALID_ROOM_TYPES.join(", ")}` });
       return;
     }
+    const beds = Number(r.totalBeds);
+    if (!Number.isInteger(beds) || beds < 1 || beds > 20) {
+      res.status(400).json({ message: "totalBeds must be a positive integer (max 20)" });
+      return;
+    }
   }
   try {
     const rows = rooms.map((r: { roomNumber: string; hotel: string; totalBeds: number; roomType: string; floor?: string; notes?: string }) => ({
