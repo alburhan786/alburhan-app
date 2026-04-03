@@ -522,7 +522,12 @@ const TRAVEL_DOC_TYPES: Record<string, { label: string; icon: React.ElementType;
   tour_itinerary: { label: "Tour Itinerary",         icon: ClipboardList,  color: "text-amber-700",   bg: "bg-amber-50 border-amber-200" },
 };
 
-function TravelDocumentsCard({ bookingId }: { bookingId: string }) {
+function TravelDocumentsCard({ bookingId, bookingNumber, invoiceNumber, bookingStatus }: {
+  bookingId: string;
+  bookingNumber?: string;
+  invoiceNumber?: string | null;
+  bookingStatus?: string;
+}) {
   const BASE_API = import.meta.env.VITE_API_URL || "";
   const { toast } = useToast();
   const { data: docs } = useListDocuments(bookingId, { query: { refetchOnMount: "always" } });
@@ -567,6 +572,58 @@ function TravelDocumentsCard({ bookingId }: { bookingId: string }) {
         </div>
       </div>
       <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+        {/* Invoice slot — always shown; active only when confirmed with invoice number */}
+        {bookingNumber && bookingStatus === 'confirmed' && invoiceNumber ? (
+          <div className="rounded-xl border bg-emerald-50 border-emerald-200 overflow-hidden">
+            <div className="flex items-center gap-3 p-3">
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-white/50">
+                <FileText className="w-4 h-4 text-emerald-700" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-emerald-700">TAX INVOICE</p>
+                <p className="text-[11px] text-emerald-600 font-mono mt-0.5">#{invoiceNumber}</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 border-t border-black/5 divide-x divide-black/5">
+              <button
+                onClick={() => window.open((import.meta.env.BASE_URL || "/") + "invoice/" + bookingNumber, "_blank")}
+                className="flex flex-col items-center gap-1 py-2 hover:bg-black/5 transition-colors w-full"
+              >
+                <Eye size={15} className="text-emerald-700" />
+                <span className="text-[10px] font-medium text-muted-foreground">View</span>
+              </button>
+              <button
+                onClick={() => {
+                  const win = window.open((import.meta.env.BASE_URL || "/") + "invoice/" + bookingNumber, "_blank");
+                  if (win) win.addEventListener("load", () => { win.focus(); win.print(); });
+                }}
+                className="flex flex-col items-center gap-1 py-2 hover:bg-black/5 transition-colors w-full"
+              >
+                <Printer size={15} className="text-emerald-700" />
+                <span className="text-[10px] font-medium text-muted-foreground">Print</span>
+              </button>
+              <button
+                onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(`My Tax Invoice from Al Burhan Tours & Travels\nInvoice No: ${invoiceNumber}\nView here: https://alburhantravels.com/invoice/${bookingNumber}`)}`, "_blank")}
+                className="flex flex-col items-center gap-1 py-2 hover:bg-black/5 transition-colors w-full"
+              >
+                <Share2 size={15} className="text-emerald-700" />
+                <span className="text-[10px] font-medium text-muted-foreground">WhatsApp</span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3 p-3 rounded-xl border border-dashed border-border bg-muted/20">
+            <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
+              <FileText className="w-4 h-4 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground">TAX INVOICE</p>
+              <p className="text-[11px] text-muted-foreground/70 mt-0.5">Will appear once payment is confirmed</p>
+            </div>
+          </div>
+        )}
+
         {slots.map(type => {
           const meta = TRAVEL_DOC_TYPES[type];
           const Icon = meta.icon;
@@ -1316,7 +1373,12 @@ export default function CustomerDashboard() {
                       <div className="mx-5 mb-4 space-y-4">
                         <TravelDetailsCard bookingId={booking.id} initialStatus={booking.travellerDetailsStatus || "not_submitted"} />
                         <MandatoryDocumentsCard bookingId={booking.id} onOpenUpload={() => setUploadBookingId(booking.id)} />
-                        <TravelDocumentsCard bookingId={booking.id} />
+                        <TravelDocumentsCard
+                          bookingId={booking.id}
+                          bookingNumber={booking.bookingNumber}
+                          invoiceNumber={booking.invoiceNumber}
+                          bookingStatus={booking.status}
+                        />
                       </div>
                     )}
 
