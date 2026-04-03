@@ -291,7 +291,7 @@ export default function PackageDetail() {
 
   const handleWhatsAppShare = () => {
     const msg = `Assalamu Alaikum! I'm interested in the *${pkg?.name}* package.\n\nDuration: ${pkg?.duration}\nPrice: Starting from ${formatCurrency(pkg?.pricePerPerson || 0)} + 5% GST\n\nPlease share more details. JazakAllah Khair!`;
-    window.open(`https://wa.me/918989701701?text=${encodeURIComponent(msg)}`, '_blank');
+    window.open(`https://wa.me/919893225590?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
   const handleShare = async () => {

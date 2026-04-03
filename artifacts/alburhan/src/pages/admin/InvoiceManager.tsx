@@ -85,7 +85,7 @@ function InvoicePreview({ booking, onClose }: { booking: Booking; onClose: () =>
             <div>
               <h2 className="text-lg font-serif font-bold">AL BURHAN TOURS & TRAVELS</h2>
               <p className="text-emerald-200 text-xs mt-1">Shop No 8-5, Khanka Masjid Complex, Sanwara Road, Burhanpur 450331 M.P.</p>
-              <p className="text-emerald-200 text-xs">Phone: +91 8989701701 | +91 9893989786</p>
+              <p className="text-emerald-200 text-xs">Phone: +91 9893225590 | +91 9893989786</p>
             </div>
             <div className="text-right">
               <div className="text-xl font-serif font-bold text-[#C9A84C]">TAX INVOICE</div>
@@ -316,7 +316,7 @@ function DownloadPdfButton({ booking }: { booking: Booking }) {
               <div>
                 <div style={{ fontSize: 18, fontWeight: "bold" }}>AL BURHAN TOURS & TRAVELS</div>
                 <div style={{ fontSize: 11, color: "#6ee7b7", marginTop: 4 }}>Shop No 8-5, Khanka Masjid Complex, Sanwara Road, Burhanpur 450331 M.P.</div>
-                <div style={{ fontSize: 11, color: "#6ee7b7" }}>Phone: +91 8989701701 | +91 9893989786</div>
+                <div style={{ fontSize: 11, color: "#6ee7b7" }}>Phone: +91 9893225590 | +91 9893989786</div>
               </div>
               <div style={{ textAlign: "right" }}>
                 <div style={{ fontSize: 22, fontWeight: "bold", color: "#C9A84C" }}>TAX INVOICE</div>

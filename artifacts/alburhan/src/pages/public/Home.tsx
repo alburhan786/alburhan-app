@@ -172,10 +172,10 @@ export default function Home() {
   }, [bannerImages.length]);
 
   const ZIYARAT_DEFAULTS = [
-    { type: "iraq_ziyarat",    name: "Iraq Ziyarat",    desc: "Najaf, Karbala, Kazmain, Samarra",  icon: "🕌", color: "from-amber-700/85 to-amber-950/95",   fallbackImg: "https://images.unsplash.com/photo-1609139003551-9a6d4ee1e8bf?w=600&q=75" },
-    { type: "baitul_muqaddas", name: "Baitul Muqaddas", desc: "Spiritual journey to Jerusalem",    icon: "✨", color: "from-cyan-700/85 to-cyan-950/95",     fallbackImg: "https://images.unsplash.com/photo-1564507592333-c60657eea523?w=600&q=75" },
-    { type: "syria_ziyarat",   name: "Syria Ziyarat",   desc: "Sacred shrines in Damascus",        icon: "🕋", color: "from-rose-700/85 to-rose-950/95",     fallbackImg: "https://images.unsplash.com/photo-1548778052-311f4bc2b502?w=600&q=75" },
-    { type: "jordan_heritage", name: "Jordan Heritage", desc: "Islamic historical sites",          icon: "🏛️", color: "from-emerald-700/85 to-emerald-950/95", fallbackImg: "https://images.unsplash.com/photo-1548705434-f53f6d55b012?w=600&q=75" },
+    { type: "iraq_ziyarat",    name: "Iraq Ziyarat",    desc: "Najaf, Karbala, Kazmain, Samarra",  icon: "🕌", color: "from-amber-700/85 to-amber-950/95",   fallbackImg: `${import.meta.env.BASE_URL}images/ziyarat/iraq.jpg` },
+    { type: "baitul_muqaddas", name: "Baitul Muqaddas", desc: "Spiritual journey to Jerusalem",    icon: "✨", color: "from-cyan-700/85 to-cyan-950/95",     fallbackImg: `${import.meta.env.BASE_URL}images/ziyarat/jerusalem.jpg` },
+    { type: "syria_ziyarat",   name: "Syria Ziyarat",   desc: "Sacred shrines in Damascus",        icon: "🕋", color: "from-rose-700/85 to-rose-950/95",     fallbackImg: `${import.meta.env.BASE_URL}images/ziyarat/syria.jpg` },
+    { type: "jordan_heritage", name: "Jordan Heritage", desc: "Islamic historical sites",          icon: "🏛️", color: "from-emerald-700/85 to-emerald-950/95", fallbackImg: `${import.meta.env.BASE_URL}images/ziyarat/jordan.jpg` },
   ];
 
   const ziyaratTours = ZIYARAT_DEFAULTS.map(z => {
@@ -598,7 +598,7 @@ export default function Home() {
             <h2 className="text-3xl md:text-4xl font-serif font-bold mb-3">Have Questions About Your Journey?</h2>
             <p className="text-white/80 text-lg max-w-lg">Message us directly on WhatsApp for instant support and booking inquiries.</p>
           </div>
-          <a href="https://wa.me/918989701701" target="_blank" rel="noreferrer">
+          <a href="https://wa.me/919893225590" target="_blank" rel="noreferrer">
             <Button size="lg" className="bg-white text-[#25D366] hover:bg-white/95 rounded-xl px-10 py-7 text-lg font-bold shadow-2xl hover:scale-[1.03] transition-all">
               Chat on WhatsApp
             </Button>

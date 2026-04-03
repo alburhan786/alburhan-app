@@ -22,7 +22,7 @@ export default function LiveChat() {
 
           <div className="max-w-lg mx-auto">
             <p className="text-muted-foreground mb-6">In the meantime, reach us directly on WhatsApp for instant support:</p>
-            <a href="https://wa.me/918989701701" target="_blank" rel="noreferrer">
+            <a href="https://wa.me/919893225590" target="_blank" rel="noreferrer">
               <Button size="lg" className="bg-[#25D366] hover:bg-[#25D366]/90 text-white rounded-full px-8 py-6 text-lg font-bold shadow-xl hover:scale-105 transition-transform">
                 <MessageCircle className="w-5 h-5 mr-2" />
                 Chat on WhatsApp

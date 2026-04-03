@@ -29,7 +29,7 @@ export function PrintHeader({ title, subtitle }: PrintHeaderProps) {
           Shop No 8-5, Khanka Masjid Complex, Sanwara Road, Burhanpur 450331 M.P.
         </div>
         <div style={{ fontSize: "8pt", color: "#666" }}>
-          Phone: +91 8989701701 / +91 9893989786
+          Phone: +91 9893225590 / +91 9893989786
         </div>
       </div>
       {(title || subtitle) && (

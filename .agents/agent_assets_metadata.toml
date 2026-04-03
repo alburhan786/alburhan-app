@@ -1,0 +1,26 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "c6bBzA_qw1JrunIOEAfRV"
+uri = "file://attached_assets/stock_images/karbala-iraq-shrine.jpg"
+type = "image"
+title = "Imam Hussain shrine golden dome Karbala Iraq Islamic pilgrimage holy site"
+
+[[outputs]]
+id = "laSrjiwZnoGaxU-CLO4gx"
+uri = "file://attached_assets/stock_images/jerusalem-dome-of-rock.jpg"
+type = "image"
+title = "Dome of the Rock Al-Aqsa Mosque Jerusalem Islamic holy site golden dome"
+
+[[outputs]]
+id = "kLG_xdL8Ud-yw1qgV8kQS"
+uri = "file://attached_assets/stock_images/syria-damascus-shrine.jpg"
+type = "image"
+title = "Damascus Syria ancient Islamic architecture mosque Umayyad historic shrine"
+
+[[outputs]]
+id = "Itvyxl4MVdBBCOvWH07o3"
+uri = "file://attached_assets/stock_images/petra-jordan-heritage.jpg"
+type = "image"
+title = "Petra Jordan ancient treasury rose-red rock monument heritage"
