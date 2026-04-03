@@ -1219,6 +1219,12 @@ export default function CustomerDashboard() {
                       <div>
                         <div className="text-xs text-muted-foreground font-mono mb-1">#{booking.bookingNumber}</div>
                         <h3 className="text-lg font-serif font-bold text-primary">{booking.packageName || "Package Booking"}</h3>
+                        {booking.status === 'confirmed' && booking.invoiceNumber && (
+                          <div className="mt-1 flex items-center gap-1.5">
+                            <FileText className="w-3 h-3 text-emerald-600" />
+                            <span className="text-xs font-mono text-emerald-700 font-semibold">Invoice #{booking.invoiceNumber}</span>
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         {booking.status === 'confirmed' && <DocWarningBadge bookingId={booking.id} />}
@@ -1332,13 +1338,22 @@ export default function CustomerDashboard() {
                       )}
 
                       {booking.status === 'confirmed' && (
-                        <Button
-                          variant="outline"
-                          onClick={() => handleDownloadInvoice(booking.id)}
-                          className="border-primary text-primary hover:bg-primary/5"
-                        >
-                          <Download className="w-4 h-4 mr-2" /> Download Invoice
-                        </Button>
+                        <>
+                          <Button
+                            variant="outline"
+                            onClick={() => window.open((import.meta.env.BASE_URL || "/") + "invoice/" + booking.bookingNumber, "_blank")}
+                            className="border-emerald-600 text-emerald-700 hover:bg-emerald-50"
+                          >
+                            <Eye className="w-4 h-4 mr-2" /> View Invoice
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={() => handleDownloadInvoice(booking.id)}
+                            className="border-primary text-primary hover:bg-primary/5"
+                          >
+                            <Download className="w-4 h-4 mr-2" /> Download Invoice
+                          </Button>
+                        </>
                       )}
 
                       {(booking.status === 'approved' || booking.status === 'confirmed' || booking.status === 'pending') && (
