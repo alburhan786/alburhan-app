@@ -135,7 +135,7 @@ router.get("/:groupId/pilgrims", requireAdmin as any, async (req, res) => {
 router.post("/:groupId/pilgrims", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   const groupId = String(req.params.groupId);
   const { fullName, passportNumber, visaNumber, dateOfBirth, gender, bloodGroup,
-    photoUrl, mobileIndia, mobileSaudi, address, city, state, roomNumber, roomType,
+    photoUrl, mobileIndia, mobileSaudi, address, city, state, roomNumber, roomType, roomHotel,
     busNumber, seatNumber, relation, coverNumber, medicalCondition,
     salutation, passportIssueDate, passportExpiryDate, passportPlaceOfIssue } = req.body;
 
@@ -153,7 +153,8 @@ router.post("/:groupId/pilgrims", requireAdmin as any, async (req: Authenticated
     serialNumber: nextSerial,
     fullName, passportNumber, visaNumber, dateOfBirth, gender, bloodGroup,
     photoUrl, mobileIndia, mobileSaudi, address, city, state,
-    roomNumber, roomType, busNumber, seatNumber, relation, coverNumber, medicalCondition,
+    roomNumber, roomType, roomHotel: roomHotel || null,
+    busNumber, seatNumber, relation, coverNumber, medicalCondition,
     salutation: salutation || null,
     passportIssueDate: passportIssueDate || null,
     passportExpiryDate: passportExpiryDate || null,
@@ -166,7 +167,7 @@ router.put("/:groupId/pilgrims/:pilgrimId", requireAdmin as any, async (req: Aut
   const groupId = String(req.params.groupId);
   const pilgrimId = String(req.params.pilgrimId);
   const { fullName, passportNumber, visaNumber, dateOfBirth, gender, bloodGroup,
-    photoUrl, mobileIndia, mobileSaudi, address, city, state, roomNumber, roomType,
+    photoUrl, mobileIndia, mobileSaudi, address, city, state, roomNumber, roomType, roomHotel,
     busNumber, seatNumber, relation, coverNumber, medicalCondition, serialNumber,
     salutation, passportIssueDate, passportExpiryDate, passportPlaceOfIssue } = req.body;
 
@@ -175,7 +176,8 @@ router.put("/:groupId/pilgrims/:pilgrimId", requireAdmin as any, async (req: Aut
   const [updated] = await db.update(pilgrimsTable).set({
     fullName, passportNumber, visaNumber, dateOfBirth, gender, bloodGroup,
     photoUrl, mobileIndia, mobileSaudi, address, city, state,
-    roomNumber, roomType, busNumber, seatNumber, relation, coverNumber, medicalCondition,
+    roomNumber, roomType, roomHotel: roomHotel ?? null,
+    busNumber, seatNumber, relation, coverNumber, medicalCondition,
     serialNumber: serialNumber ? Number(serialNumber) : undefined,
     salutation: salutation || null,
     passportIssueDate: passportIssueDate || null,
@@ -423,6 +425,9 @@ router.get("/:groupId/rooms", requireAdmin as any, async (req, res) => {
   res.json(result);
 });
 
+const VALID_HOTELS = ["makkah", "madinah", "aziziah"] as const;
+const VALID_ROOM_TYPES = ["family", "ladies", "gents"] as const;
+
 router.post("/:groupId/rooms", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   const groupId = String(req.params.groupId);
   const { roomNumber, hotel, totalBeds, roomType, floor, notes } = req.body;
@@ -430,10 +435,22 @@ router.post("/:groupId/rooms", requireAdmin as any, async (req: AuthenticatedReq
     res.status(400).json({ message: "roomNumber, hotel, totalBeds, roomType are required" });
     return;
   }
+  if (!VALID_HOTELS.includes(hotel)) {
+    res.status(400).json({ message: `hotel must be one of: ${VALID_HOTELS.join(", ")}` });
+    return;
+  }
+  if (!VALID_ROOM_TYPES.includes(roomType)) {
+    res.status(400).json({ message: `roomType must be one of: ${VALID_ROOM_TYPES.join(", ")}` });
+    return;
+  }
+  const beds = Number(totalBeds);
+  if (!Number.isInteger(beds) || beds < 1 || beds > 20) {
+    res.status(400).json({ message: "totalBeds must be a positive integer (max 20)" });
+    return;
+  }
   try {
     const [room] = await db.insert(hajjRoomsTable).values({
-      groupId, roomNumber, hotel,
-      totalBeds: Number(totalBeds), roomType,
+      groupId, roomNumber, hotel, totalBeds: beds, roomType,
       floor: floor || null, notes: notes || null,
     }).returning();
     res.status(201).json({ ...fmtRoom(room), occupiedBeds: 0 });
@@ -453,10 +470,6 @@ router.post("/:groupId/rooms/auto-allocate", requireAdmin as any, async (req, re
       .where(eq(pilgrimsTable.groupId, groupId))
       .orderBy(asc(pilgrimsTable.serialNumber));
 
-    await db.update(pilgrimsTable)
-      .set({ roomNumber: null, roomHotel: null, updatedAt: new Date() })
-      .where(eq(pilgrimsTable.groupId, groupId));
-
     const families = new Map<string, typeof pilgrims>();
     for (const p of pilgrims) {
       const key = p.coverNumber ? `cover_${p.coverNumber}` : `solo_${p.id}`;
@@ -468,6 +481,8 @@ router.post("/:groupId/rooms/auto-allocate", requireAdmin as any, async (req, re
     const roomBeds = new Map<string, number>();
     for (const room of rooms) roomBeds.set(room.id, 0);
 
+    type Assignment = { pilgrimId: string; roomNumber: string; roomHotel: string };
+    const assignments: Assignment[] = [];
     let assignedCount = 0;
     let unassignedCount = 0;
 
@@ -497,15 +512,24 @@ router.post("/:groupId/rooms/auto-allocate", requireAdmin as any, async (req, re
       if (bestRoom) {
         roomBeds.set(bestRoom.id, (roomBeds.get(bestRoom.id) || 0) + neededBeds);
         for (const p of family) {
-          await db.update(pilgrimsTable)
-            .set({ roomNumber: bestRoom!.roomNumber, roomHotel: bestRoom!.hotel, updatedAt: new Date() })
-            .where(eq(pilgrimsTable.id, p.id));
+          assignments.push({ pilgrimId: p.id, roomNumber: bestRoom!.roomNumber, roomHotel: bestRoom!.hotel });
         }
         assignedCount += neededBeds;
       } else {
         unassignedCount += neededBeds;
       }
     }
+
+    await db.transaction(async (tx) => {
+      await tx.update(pilgrimsTable)
+        .set({ roomNumber: null, roomHotel: null, updatedAt: new Date() })
+        .where(eq(pilgrimsTable.groupId, groupId));
+      for (const a of assignments) {
+        await tx.update(pilgrimsTable)
+          .set({ roomNumber: a.roomNumber, roomHotel: a.roomHotel, updatedAt: new Date() })
+          .where(eq(pilgrimsTable.id, a.pilgrimId));
+      }
+    });
 
     const updatedRooms = await db.select().from(hajjRoomsTable)
       .where(eq(hajjRoomsTable.groupId, groupId))
@@ -796,10 +820,23 @@ router.put("/:groupId/rooms/:roomId", requireAdmin as any, async (req: Authentic
   const groupId = String(req.params.groupId);
   const roomId = String(req.params.roomId);
   const { roomNumber, hotel, totalBeds, roomType, floor, notes } = req.body;
+  if (hotel && !VALID_HOTELS.includes(hotel)) {
+    res.status(400).json({ message: `hotel must be one of: ${VALID_HOTELS.join(", ")}` });
+    return;
+  }
+  if (roomType && !VALID_ROOM_TYPES.includes(roomType)) {
+    res.status(400).json({ message: `roomType must be one of: ${VALID_ROOM_TYPES.join(", ")}` });
+    return;
+  }
+  const beds = totalBeds !== undefined ? Number(totalBeds) : undefined;
+  if (beds !== undefined && (!Number.isInteger(beds) || beds < 1 || beds > 20)) {
+    res.status(400).json({ message: "totalBeds must be a positive integer (max 20)" });
+    return;
+  }
   try {
     const scope = and(eq(hajjRoomsTable.id, roomId), eq(hajjRoomsTable.groupId, groupId));
     const [updated] = await db.update(hajjRoomsTable).set({
-      roomNumber, hotel, totalBeds: Number(totalBeds), roomType,
+      roomNumber, hotel, totalBeds: beds, roomType,
       floor: floor || null, notes: notes || null, updatedAt: new Date(),
     }).where(scope).returning();
     if (!updated) { res.status(404).json({ message: "Room not found" }); return; }
