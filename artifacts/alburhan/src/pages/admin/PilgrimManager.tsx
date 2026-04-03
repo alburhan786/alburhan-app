@@ -300,19 +300,23 @@ export default function PilgrimManager() {
     } catch { toast({ title: "Error removing pilgrim from room", variant: "destructive" }); }
   };
 
-  const handleAssignPilgrimToRoom = async (pilgrimId: string, roomNumber: string, hotel: string) => {
+  const handleAssignPilgrimToRoom = async (pilgrimId: string, selectedRoomId: string | null) => {
     const pilgrim = pilgrims.find(p => p.id === pilgrimId);
     if (!pilgrim) return;
-    const matchingRoom = rooms.find(r => r.roomNumber === roomNumber && r.hotel === hotel);
-    const newRoomId = matchingRoom?.id || null;
+    const targetRoom = selectedRoomId ? rooms.find(r => r.id === selectedRoomId) : null;
     try {
       const res = await fetch(`${API}/api/groups/${groupId}/pilgrims/${pilgrimId}`, {
         method: "PUT", credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...pilgrim, roomNumber: roomNumber || null, roomHotel: hotel || null, roomId: newRoomId }),
+        body: JSON.stringify({
+          ...pilgrim,
+          roomNumber: targetRoom?.roomNumber || null,
+          roomHotel: targetRoom?.hotel || null,
+          roomId: selectedRoomId || null,
+        }),
       });
       if (!res.ok) throw new Error("Failed");
-      toast({ title: roomNumber ? `Assigned to Room ${roomNumber} (${HOTEL_LABELS[hotel] || hotel})` : "Room assignment cleared" });
+      toast({ title: targetRoom ? `Assigned to Room ${targetRoom.roomNumber} (${HOTEL_LABELS[targetRoom.hotel] || targetRoom.hotel})` : "Room assignment cleared" });
       fetchData();
     } catch { toast({ title: "Error assigning pilgrim to room", variant: "destructive" }); }
   };
@@ -703,16 +707,13 @@ export default function PilgrimManager() {
                           <td className="px-4 py-2.5 text-xs">{p.gender || "—"}</td>
                           <td className="px-4 py-2.5">
                             <select
-                              value={p.roomNumber && p.roomHotel ? `${p.roomNumber}::${p.roomHotel}` : ""}
-                              onChange={e => {
-                                const [rn, rh] = e.target.value.split("::");
-                                handleAssignPilgrimToRoom(p.id, rn || "", rh || "");
-                              }}
+                              value={p.roomId || ""}
+                              onChange={e => handleAssignPilgrimToRoom(p.id, e.target.value || null)}
                               className="h-8 px-2 rounded border bg-background text-xs min-w-[160px]"
                             >
                               <option value="">— Unassigned —</option>
                               {sortedRooms.map(r => (
-                                <option key={r.id} value={`${r.roomNumber}::${r.hotel}`}>
+                                <option key={r.id} value={r.id}>
                                   Rm {r.roomNumber} · {HOTEL_LABELS[r.hotel] || r.hotel} ({ROOM_TYPE_LABELS[r.roomType] || r.roomType})
                                 </option>
                               ))}
