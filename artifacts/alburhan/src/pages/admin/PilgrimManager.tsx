@@ -625,13 +625,15 @@ export default function PilgrimManager() {
                         <th className="px-4 py-3">Name</th>
                         <th className="px-4 py-3">Passport No.</th>
                         <th className="px-4 py-3">Relation</th>
+                        <th className="px-4 py-3">Room No.</th>
+                        <th className="px-4 py-3">Hotel</th>
                         <th className="px-4 py-3">Gender</th>
                         <th className="px-4 py-3">Assign Room</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
                       {pilgrimsForTable.length === 0 ? (
-                        <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">No pilgrims yet.</td></tr>
+                        <tr><td colSpan={9} className="text-center py-8 text-muted-foreground">No pilgrims yet.</td></tr>
                       ) : pilgrimsForTable.map(p => (
                         <tr key={p.id} className="hover:bg-muted/30">
                           <td className="px-4 py-2.5 font-mono font-bold text-primary text-xs">{p.serialNumber}</td>
@@ -645,6 +647,16 @@ export default function PilgrimManager() {
                           <td className="px-4 py-2.5 font-medium">{[p.salutation, p.fullName].filter(Boolean).join(" ")}</td>
                           <td className="px-4 py-2.5 font-mono text-xs">{p.passportNumber || "—"}</td>
                           <td className="px-4 py-2.5 text-xs">{p.relation || "—"}</td>
+                          <td className="px-4 py-2.5">
+                            {p.roomNumber
+                              ? <span className="font-semibold text-primary">{p.roomNumber}</span>
+                              : <span className="text-amber-600 text-xs font-medium">Unassigned</span>}
+                          </td>
+                          <td className="px-4 py-2.5">
+                            {p.roomHotel
+                              ? <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${HOTEL_COLORS[p.roomHotel] || "bg-gray-100"}`}>{HOTEL_LABELS[p.roomHotel] || p.roomHotel}</span>
+                              : <span className="text-muted-foreground text-xs">—</span>}
+                          </td>
                           <td className="px-4 py-2.5 text-xs">{p.gender || "—"}</td>
                           <td className="px-4 py-2.5">
                             <select
