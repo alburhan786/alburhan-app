@@ -8,6 +8,8 @@ import { objectStorageClient } from "../lib/objectStorage.js";
 import PDFDocument from "pdfkit";
 import fs from "fs";
 import path from "path";
+import { LOGO_BASE64 } from "../lib/logoData.js";
+const LOGO_BUFFER = Buffer.from(LOGO_BASE64, "base64");
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -651,11 +653,12 @@ router.get("/:groupId/rooms/list/pdf", requireAdmin as any, async (req, res) => 
 
     function drawPageHeader(yStart: number) {
       doc.rect(MARGIN, yStart, PAGE_W - MARGIN * 2, 44).fill(DARK_GREEN);
+      doc.image(LOGO_BUFFER, MARGIN + 4, yStart + 2, { width: 40, height: 40 });
       doc.fill(GOLD).font("Helvetica-Bold").fontSize(14)
-        .text("AL BURHAN TOURS & TRAVELS", MARGIN, yStart + 5, { width: PAGE_W - MARGIN * 2, align: "center", lineBreak: false });
+        .text("AL BURHAN TOURS & TRAVELS", MARGIN + 46, yStart + 5, { width: PAGE_W - MARGIN * 2 - 46, align: "center", lineBreak: false });
       doc.fill("white").font("Helvetica").fontSize(7.5)
         .text("5/8 Khanka Masjid Complex, Shanwara Road, Burhanpur 450331 M.P. | Tel: +91 9893989786 | WhatsApp: +91 8989701701",
-          MARGIN, yStart + 22, { width: PAGE_W - MARGIN * 2, align: "center", lineBreak: false });
+          MARGIN + 46, yStart + 22, { width: PAGE_W - MARGIN * 2 - 46, align: "center", lineBreak: false });
       return yStart + 46;
     }
 
@@ -880,15 +883,18 @@ async function generateRoomStickerPage(
   const HDR_H = 48;
   doc.rect(M, y, W - M * 2, HDR_H).fill(DARK_GREEN);
 
-  const LEFT_W = W - M * 2 - 82;
+  doc.image(LOGO_BUFFER, M + 2, y + 4, { width: 40, height: 40 });
+
+  const LOGO_OFF = 44;
+  const LEFT_W = W - M * 2 - 82 - LOGO_OFF;
   doc.fill(GOLD).font("Helvetica-Bold").fontSize(10)
-    .text("AL BURHAN TOURS & TRAVELS", M + 6, y + 6, { width: LEFT_W, lineBreak: false });
+    .text("AL BURHAN TOURS & TRAVELS", M + 6 + LOGO_OFF, y + 6, { width: LEFT_W, lineBreak: false });
   doc.fill("white").font("Helvetica").fontSize(5.5)
-    .text("5/8 Khanka Masjid Complex, Shanwara Road", M + 6, y + 18, { width: LEFT_W, lineBreak: false });
+    .text("5/8 Khanka Masjid Complex, Shanwara Road", M + 6 + LOGO_OFF, y + 18, { width: LEFT_W, lineBreak: false });
   doc.fill("white").font("Helvetica").fontSize(5.5)
-    .text("Burhanpur 450331 M.P. | Tel: +91 9893989786", M + 6, y + 27, { width: LEFT_W, lineBreak: false });
+    .text("Burhanpur 450331 M.P. | Tel: +91 9893989786", M + 6 + LOGO_OFF, y + 27, { width: LEFT_W, lineBreak: false });
   doc.fill("#a8d5c2").font("Helvetica").fontSize(5.5)
-    .text(`${hotelLabel}${floorLabel} · ${roomTypeLabel}`, M + 6, y + 37, { width: LEFT_W, lineBreak: false });
+    .text(`${hotelLabel}${floorLabel} · ${roomTypeLabel}`, M + 6 + LOGO_OFF, y + 37, { width: LEFT_W, lineBreak: false });
 
   const RN_X = W - M - 80;
   doc.fill("#ffffff").font("Helvetica").fontSize(6)

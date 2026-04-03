@@ -114,6 +114,9 @@ export default function PilgrimManager() {
   const [downloadingRoomPdf, setDownloadingRoomPdf] = useState(false);
   const [downloadingBulkStickers, setDownloadingBulkStickers] = useState(false);
   const [deleteConfirmRoomId, setDeleteConfirmRoomId] = useState<string | null>(null);
+  const [bulkRoomDialogOpen, setBulkRoomDialogOpen] = useState(false);
+  const [bulkRoomForm, setBulkRoomForm] = useState({ hotel: "makkah", roomType: "gents", totalBeds: "4", floor: "", fromRoom: "", toRoom: "" });
+  const [bulkAdding, setBulkAdding] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -338,6 +341,33 @@ export default function PilgrimManager() {
 
   const f = (key: string, val: string) => setForm(prev => ({ ...prev, [key]: val }));
   const rf = (key: string, val: string) => setRoomForm(prev => ({ ...prev, [key]: val }));
+  const brf = (key: string, val: string) => setBulkRoomForm(prev => ({ ...prev, [key]: val }));
+
+  const handleBulkRoomAdd = async () => {
+    const from = parseInt(bulkRoomForm.fromRoom, 10);
+    const to = parseInt(bulkRoomForm.toRoom, 10);
+    if (isNaN(from) || isNaN(to)) { toast({ title: "Enter valid room numbers", variant: "destructive" }); return; }
+    if (from > to) { toast({ title: '"From" must be ≤ "To"', variant: "destructive" }); return; }
+    if (to - from + 1 > 200) { toast({ title: "Range cannot exceed 200 rooms", variant: "destructive" }); return; }
+    setBulkAdding(true);
+    try {
+      const rooms = [];
+      for (let n = from; n <= to; n++) {
+        rooms.push({ roomNumber: String(n), hotel: bulkRoomForm.hotel, totalBeds: Number(bulkRoomForm.totalBeds), roomType: bulkRoomForm.roomType, floor: bulkRoomForm.floor || undefined });
+      }
+      const res = await fetch(`${API}/api/groups/${groupId}/rooms/bulk`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rooms }),
+      });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.message || "Failed"); }
+      const data = await res.json();
+      toast({ title: `${data.created} rooms added successfully!` });
+      setBulkRoomDialogOpen(false);
+      setBulkRoomForm({ hotel: "makkah", roomType: "gents", totalBeds: "4", floor: "", fromRoom: "", toRoom: "" });
+      fetchData();
+    } catch (err: any) { toast({ title: err.message || "Failed to add rooms", variant: "destructive" }); }
+    finally { setBulkAdding(false); }
+  };
 
   const unassignedPilgrims = pilgrims.filter(p => !p.roomNumber);
   const pilgrimsInRoom = (room: HajjRoom) =>
@@ -511,6 +541,9 @@ export default function PilgrimManager() {
           <div className="flex flex-wrap gap-2">
             <Button onClick={openCreateRoom} className="gap-1.5 rounded-xl bg-primary text-white">
               <Plus size={16} /> Add Room
+            </Button>
+            <Button onClick={() => setBulkRoomDialogOpen(true)} variant="outline" className="gap-1.5 rounded-xl border-primary text-primary hover:bg-primary/10">
+              <Layers size={16} /> Bulk Add Rooms
             </Button>
             <Button
               onClick={handleAutoAllocate}
@@ -877,6 +910,65 @@ export default function PilgrimManager() {
           <div className="flex gap-2 mt-4">
             <Button variant="outline" onClick={() => setDeleteConfirmRoomId(null)} className="flex-1">Cancel</Button>
             <Button variant="destructive" onClick={() => deleteConfirmRoomId && handleRoomDelete(deleteConfirmRoomId)} className="flex-1">Delete Room</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ===== Bulk Add Rooms Dialog ===== */}
+      <Dialog open={bulkRoomDialogOpen} onOpenChange={setBulkRoomDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-xl flex items-center gap-2"><Layers size={18} /> Bulk Add Rooms</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground -mt-1">Enter a range of room numbers to create multiple rooms at once.</p>
+          <div className="space-y-4 mt-2">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Hotel *</label>
+                <select value={bulkRoomForm.hotel} onChange={e => brf("hotel", e.target.value)} className="w-full h-10 px-3 rounded-md border bg-background text-sm">
+                  <option value="makkah">Makkah</option>
+                  <option value="madinah">Madinah</option>
+                  <option value="aziziah">Aziziah</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Room Type *</label>
+                <select value={bulkRoomForm.roomType} onChange={e => brf("roomType", e.target.value)} className="w-full h-10 px-3 rounded-md border bg-background text-sm">
+                  <option value="gents">Gents</option>
+                  <option value="ladies">Ladies</option>
+                  <option value="family">Family</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Total Beds *</label>
+                <select value={bulkRoomForm.totalBeds} onChange={e => brf("totalBeds", e.target.value)} className="w-full h-10 px-3 rounded-md border bg-background text-sm">
+                  {[2,3,4,5,6].map(n => <option key={n} value={n}>{n} Beds</option>)}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Floor (optional)</label>
+                <Input value={bulkRoomForm.floor} onChange={e => brf("floor", e.target.value)} placeholder="e.g. 3" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">From Room # *</label>
+                <Input value={bulkRoomForm.fromRoom} onChange={e => brf("fromRoom", e.target.value)} placeholder="e.g. 501" type="number" min="1" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">To Room # *</label>
+                <Input value={bulkRoomForm.toRoom} onChange={e => brf("toRoom", e.target.value)} placeholder="e.g. 520" type="number" min="1" />
+              </div>
+            </div>
+            {bulkRoomForm.fromRoom && bulkRoomForm.toRoom && !isNaN(parseInt(bulkRoomForm.fromRoom)) && !isNaN(parseInt(bulkRoomForm.toRoom)) && parseInt(bulkRoomForm.fromRoom) <= parseInt(bulkRoomForm.toRoom) && (
+              <p className="text-sm text-emerald-700 font-medium bg-emerald-50 rounded-lg px-3 py-2">
+                Will create {parseInt(bulkRoomForm.toRoom) - parseInt(bulkRoomForm.fromRoom) + 1} rooms (#{bulkRoomForm.fromRoom} to #{bulkRoomForm.toRoom})
+              </p>
+            )}
+            <div className="flex gap-2 pt-1">
+              <Button variant="outline" onClick={() => setBulkRoomDialogOpen(false)} className="flex-1">Cancel</Button>
+              <Button onClick={handleBulkRoomAdd} disabled={bulkAdding} className="flex-1">
+                {bulkAdding ? "Adding..." : "Create Rooms"}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
