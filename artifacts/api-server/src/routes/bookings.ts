@@ -546,6 +546,12 @@ router.post(
       .where(eq(bookingsTable.id, bookingId))
       .returning();
 
+    if (booking.groupId) {
+      upsertPilgrimFromProfile(booking.groupId, savedProfile, booking.customerName, booking.customerMobile).catch(
+        (err) => console.error(`[pilgrimSync] Failed for booking ${bookingId}:`, err)
+      );
+    }
+
     res.json({ message: "Travel details saved", booking: formatBooking(updated), travellerDetailsStatus: updated.travellerDetailsStatus, profile: savedProfile });
   }
 );

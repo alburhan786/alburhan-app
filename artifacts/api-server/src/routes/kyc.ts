@@ -4,6 +4,7 @@ import { eq, desc } from "drizzle-orm";
 import { requireAuth, requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import multer from "multer";
 import { uploadToGCS } from "../lib/gcsUpload.js";
+import { syncPilgrimsForUser } from "../lib/pilgrimUtils.js";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -86,12 +87,14 @@ router.post(
         .set(profileData)
         .where(eq(customerProfilesTable.userId, req.user!.id))
         .returning();
+      syncPilgrimsForUser(req.user!.id, updated);
       res.json(updated);
     } else {
       const [created] = await db
         .insert(customerProfilesTable)
         .values({ ...profileData, userId: req.user!.id })
         .returning();
+      syncPilgrimsForUser(req.user!.id, created);
       res.status(201).json(created);
     }
   }
@@ -139,6 +142,7 @@ router.put(
       .set(profileData)
       .where(eq(customerProfilesTable.userId, req.user!.id))
       .returning();
+    syncPilgrimsForUser(req.user!.id, updated);
     res.json(updated);
   }
 );

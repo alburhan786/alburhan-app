@@ -1,5 +1,40 @@
-import { db, pilgrimsTable } from "@workspace/db";
-import { eq, and, max } from "drizzle-orm";
+import { db, pilgrimsTable, bookingsTable } from "@workspace/db";
+import { eq, and, max, inArray } from "drizzle-orm";
+
+const ACTIVE_STATUSES = ["approved", "confirmed", "partially_paid"] as const;
+
+/**
+ * Find all active bookings for a user that are assigned to a Hajj group,
+ * and sync each corresponding pilgrim record from the given profile.
+ * Errors are swallowed so they never block the KYC save response.
+ */
+export async function syncPilgrimsForUser(
+  userId: string,
+  profile: ProfileForPilgrim,
+): Promise<void> {
+  try {
+    const bookings = await db
+      .select()
+      .from(bookingsTable)
+      .where(
+        and(
+          eq(bookingsTable.customerId, userId),
+          inArray(bookingsTable.status, [...ACTIVE_STATUSES]),
+        )
+      );
+
+    const withGroup = bookings.filter((b) => b.groupId);
+    await Promise.all(
+      withGroup.map((b) =>
+        upsertPilgrimFromProfile(b.groupId!, profile, b.customerName, b.customerMobile).catch(
+          (err) => console.error(`[pilgrimSync] Failed for booking ${b.id}:`, err),
+        )
+      )
+    );
+  } catch (err) {
+    console.error("[pilgrimSync] Failed to sync pilgrims for user", userId, err);
+  }
+}
 
 type ProfileForPilgrim = {
   name?: string | null;
