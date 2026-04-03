@@ -912,7 +912,7 @@ async function generateRoomStickerPage(
   try {
     const { default: QRCode } = await import("qrcode");
     const qrData = JSON.stringify({ room: room.roomNumber, hotel: hotelLabel, floor: room.floor || "", group: groupName });
-    const qrBuf = await (QRCode as any).toBuffer(qrData, { type: "png", width: 80, margin: 1 });
+    const qrBuf = await QRCode.toBuffer(qrData, { type: "png", width: 80, margin: 1 });
     const qrSize = 52;
     doc.image(qrBuf, W - M - qrSize, y, { width: qrSize, height: qrSize });
     doc.fill("#aaa").font("Helvetica").fontSize(5.5)
