@@ -319,14 +319,23 @@ export default function PilgrimManager() {
   const unassignedPilgrims = pilgrims.filter(p => !p.roomNumber);
   const pilgrimsInRoom = (room: HajjRoom) =>
     pilgrims.filter(p => p.roomNumber === room.roomNumber && p.roomHotel === room.hotel);
+  const numericRoom = (rn: string) => { const n = parseInt(rn, 10); return isNaN(n) ? Infinity : n; };
+  const compareRoomNumbers = (a: string, b: string) => {
+    const na = numericRoom(a), nb = numericRoom(b);
+    if (na !== Infinity || nb !== Infinity) return na - nb;
+    return a.localeCompare(b);
+  };
   const sortedRooms = [...rooms].sort((a, b) => {
     const hi = HOTEL_ORDER.indexOf(a.hotel) - HOTEL_ORDER.indexOf(b.hotel);
-    return hi !== 0 ? hi : a.roomNumber.localeCompare(b.roomNumber);
+    return hi !== 0 ? hi : compareRoomNumbers(a.roomNumber, b.roomNumber);
   });
   const pilgrimsForTable = [...pilgrims].sort((a, b) => {
-    const ra = a.roomNumber || "\uFFFF";
-    const rb = b.roomNumber || "\uFFFF";
-    if (ra !== rb) return ra.localeCompare(rb);
+    const ra = a.roomNumber, rb = b.roomNumber;
+    if (ra !== rb) {
+      if (!ra) return 1;
+      if (!rb) return -1;
+      return compareRoomNumbers(ra, rb);
+    }
     return (a.serialNumber || 0) - (b.serialNumber || 0);
   });
   const roomCardClass = (r: HajjRoom) => {
