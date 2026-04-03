@@ -1182,7 +1182,7 @@ export default function CustomerDashboard() {
             <Card className="p-5 shadow-sm border-border/50 rounded-2xl bg-accent/10">
               <h4 className="font-semibold text-sm text-primary mb-3">Need Help?</h4>
               <p className="text-xs text-muted-foreground mb-3">Our team is here to assist you with your booking.</p>
-              <a href="https://wa.me/919893225590" target="_blank" rel="noreferrer">
+              <a href="https://wa.me/918989701701" target="_blank" rel="noreferrer">
                 <Button size="sm" className="w-full bg-[#25D366] hover:bg-[#25D366]/90 text-white text-xs">
                   WhatsApp Us
                 </Button>
