@@ -233,8 +233,9 @@ export default function PilgrimManager() {
       toast({ title: editingRoomId ? "Room updated" : "Room created" });
       setRoomDialogOpen(false);
       fetchData();
-    } catch (err: any) {
-      toast({ title: err.message || "Error saving room", variant: "destructive" });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Error saving room";
+      toast({ title: msg, variant: "destructive" });
     }
   };
 
@@ -295,6 +296,21 @@ export default function PilgrimManager() {
       toast({ title: "Pilgrim removed from room" });
       fetchData();
     } catch { toast({ title: "Error removing pilgrim from room", variant: "destructive" }); }
+  };
+
+  const handleAssignPilgrimToRoom = async (pilgrimId: string, roomNumber: string, hotel: string) => {
+    const pilgrim = pilgrims.find(p => p.id === pilgrimId);
+    if (!pilgrim) return;
+    try {
+      const res = await fetch(`${API}/api/groups/${groupId}/pilgrims/${pilgrimId}`, {
+        method: "PUT", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...pilgrim, roomNumber: roomNumber || null, roomHotel: hotel || null }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      toast({ title: roomNumber ? `Assigned to Room ${roomNumber} (${HOTEL_LABELS[hotel] || hotel})` : "Room assignment cleared" });
+      fetchData();
+    } catch { toast({ title: "Error assigning pilgrim to room", variant: "destructive" }); }
   };
 
   const f = (key: string, val: string) => setForm(prev => ({ ...prev, [key]: val }));
@@ -609,14 +625,13 @@ export default function PilgrimManager() {
                         <th className="px-4 py-3">Name</th>
                         <th className="px-4 py-3">Passport No.</th>
                         <th className="px-4 py-3">Relation</th>
-                        <th className="px-4 py-3">Room No.</th>
-                        <th className="px-4 py-3">Hotel</th>
                         <th className="px-4 py-3">Gender</th>
+                        <th className="px-4 py-3">Assign Room</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
                       {pilgrimsForTable.length === 0 ? (
-                        <tr><td colSpan={8} className="text-center py-8 text-muted-foreground">No pilgrims yet.</td></tr>
+                        <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">No pilgrims yet.</td></tr>
                       ) : pilgrimsForTable.map(p => (
                         <tr key={p.id} className="hover:bg-muted/30">
                           <td className="px-4 py-2.5 font-mono font-bold text-primary text-xs">{p.serialNumber}</td>
@@ -630,17 +645,24 @@ export default function PilgrimManager() {
                           <td className="px-4 py-2.5 font-medium">{[p.salutation, p.fullName].filter(Boolean).join(" ")}</td>
                           <td className="px-4 py-2.5 font-mono text-xs">{p.passportNumber || "—"}</td>
                           <td className="px-4 py-2.5 text-xs">{p.relation || "—"}</td>
-                          <td className="px-4 py-2.5">
-                            {p.roomNumber
-                              ? <span className="font-semibold text-primary">{p.roomNumber}</span>
-                              : <span className="text-amber-600 text-xs font-medium">Unassigned</span>}
-                          </td>
-                          <td className="px-4 py-2.5">
-                            {p.roomHotel
-                              ? <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${HOTEL_COLORS[p.roomHotel] || "bg-gray-100"}`}>{HOTEL_LABELS[p.roomHotel] || p.roomHotel}</span>
-                              : <span className="text-muted-foreground text-xs">—</span>}
-                          </td>
                           <td className="px-4 py-2.5 text-xs">{p.gender || "—"}</td>
+                          <td className="px-4 py-2.5">
+                            <select
+                              value={p.roomNumber && p.roomHotel ? `${p.roomNumber}::${p.roomHotel}` : ""}
+                              onChange={e => {
+                                const [rn, rh] = e.target.value.split("::");
+                                handleAssignPilgrimToRoom(p.id, rn || "", rh || "");
+                              }}
+                              className="h-8 px-2 rounded border bg-background text-xs min-w-[160px]"
+                            >
+                              <option value="">— Unassigned —</option>
+                              {sortedRooms.map(r => (
+                                <option key={r.id} value={`${r.roomNumber}::${r.hotel}`}>
+                                  Rm {r.roomNumber} · {HOTEL_LABELS[r.hotel] || r.hotel} ({ROOM_TYPE_LABELS[r.roomType] || r.roomType})
+                                </option>
+                              ))}
+                            </select>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
