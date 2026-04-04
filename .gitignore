@@ -42,6 +42,12 @@ yarn-error.*
 
 # Firebase service account credentials (never commit)
 firebase_servvice_account
-firebase_servvice_account 
-*service_account*
+firebase-credentials.json
+*-service-account.json
+*service_account*.json
+*adminsdk*.json
 al-burhan-tours-*.json
+
+# Admin credentials (never commit)
+admin\ password
+"admin password"
