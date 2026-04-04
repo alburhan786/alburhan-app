@@ -1,14 +1,34 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getApiUrl } from "@/lib/query-client";
+import { fetch } from "expo/fetch";
+
+async function getUserCredentialHeaders(): Promise<Record<string, string>> {
+  try {
+    const userStr = await AsyncStorage.getItem("user");
+    if (!userStr) return {};
+    const user = JSON.parse(userStr);
+    if (user?.id && user?.userToken) {
+      return {
+        "X-User-Id": String(user.id),
+        "X-User-Token": user.userToken,
+      };
+    }
+  } catch (_) {}
+  return {};
+}
 
 async function request(method: string, path: string, data?: any) {
   try {
     const baseUrl = getApiUrl();
     const url = new URL(path, baseUrl);
+    const credHeaders = await getUserCredentialHeaders();
+    const headers: Record<string, string> = { ...credHeaders };
+    if (data) headers["Content-Type"] = "application/json";
     const res = await fetch(url.toString(), {
       method,
-      headers: data ? { "Content-Type": "application/json" } : {},
+      headers,
       body: data ? JSON.stringify(data) : undefined,
+      credentials: "include",
     });
     const json = await res.json();
     return json;
@@ -55,7 +75,7 @@ export const authService = {
     return response;
   },
 
-  async loginWithOtp(phone: string) {
+  async loginWithOtp(phone: string): Promise<{ success: boolean; message?: string; error?: string; errorCode?: string; fallbackOtp?: string; deliveryFailed?: boolean }> {
     return request("POST", "/api/auth/login-with-otp", { phone });
   },
 
@@ -68,10 +88,21 @@ export const authService = {
   },
 
   async logout() {
+    await request("POST", "/api/auth/logout");
     await AsyncStorage.removeItem("user");
   },
 
   async getCurrentUser() {
+    try {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/auth/me", baseUrl);
+      const res = await fetch(url.toString(), { method: "GET", credentials: "include" });
+      const json = await res.json();
+      if (json.success && json.user) {
+        await AsyncStorage.setItem("user", JSON.stringify(json.user));
+        return json.user;
+      }
+    } catch (_) {}
     const userStr = await AsyncStorage.getItem("user");
     return userStr ? JSON.parse(userStr) : null;
   },
@@ -103,6 +134,11 @@ export const bookingService = {
 
   async getBookingById(id: number) {
     return request("GET", `/api/bookings/${id}`);
+  },
+
+  getInvoicePdfUrl(bookingId: number): string {
+    const baseUrl = getApiUrl();
+    return new URL(`/api/bookings/${bookingId}/invoice`, baseUrl).toString();
   },
 };
 
@@ -153,9 +189,12 @@ export const documentService = {
         type: mimeType,
       } as any);
 
+      const credHeaders = await getUserCredentialHeaders();
       const res = await fetch(url.toString(), {
         method: "POST",
+        headers: credHeaders,
         body: formData,
+        credentials: "include",
       });
       const json = await res.json();
       return json;
@@ -167,6 +206,39 @@ export const documentService = {
 
   async getUserDocuments(userId: number) {
     return request("GET", `/api/documents/user/${userId}`);
+  },
+};
+
+export const deviceTokenService = {
+  async register(token: string, platform: string, expoPushToken?: string) {
+    return request("POST", "/api/user/device-token", { token, platform, expoPushToken });
+  },
+  async unregister(token: string) {
+    return request("DELETE", "/api/user/device-token", { token });
+  },
+};
+
+export const notificationService = {
+  async getUserNotifications() {
+    return request("GET", "/api/notifications");
+  },
+};
+
+export const kycService = {
+  async getProfile() {
+    return request("GET", "/api/profile/kyc");
+  },
+  async saveProfile(data: { aadharNumber?: string; panNumber?: string; bloodGroup?: string; whatsappNumber?: string }) {
+    return request("POST", "/api/profile/kyc", data);
+  },
+  async uploadPhoto(photoUri: string, fileName: string): Promise<{ success: boolean; photoUrl?: string; error?: string }> {
+    const { getApiUrl } = await import("../lib/query-client");
+    const credHeaders = await getUserCredentialHeaders();
+    const formData = new FormData();
+    formData.append("photo", { uri: photoUri, name: fileName, type: "image/jpeg" } as any);
+    const url = new URL("/api/profile/kyc/photo", getApiUrl()).toString();
+    const response = await fetch(url, { method: "POST", headers: { ...credHeaders }, body: formData });
+    return response.json();
   },
 };
 

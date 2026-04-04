@@ -1,8 +1,8 @@
 {
   "expo": {
     "name": "AL BURHAN TOURS",
-    "slug": "alburhantours",
-    "version": "1.0.0",
+    "slug": "alburhan-travels-",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "alburhantours",
@@ -11,20 +11,26 @@
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#047857"
+      "backgroundColor": "#1a00cc"
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.alburhantours.app"
+      "bundleIdentifier": "com.alburhantours.app",
+      "deploymentTarget": "15.1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "buildNumber": "18"
     },
     "android": {
       "package": "com.alburhantours.app",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
-        "backgroundColor": "#047857",
+        "backgroundColor": "#1a00cc",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
-      }
+      },
+      "versionCode": 7
     },
     "web": {
       "favicon": "./assets/images/favicon.png"
@@ -33,23 +39,37 @@
       [
         "expo-router",
         {
-          "origin": "https://khanaltaf1975-workspace.replit.app/"
+          "origin": "https://al-burhan-tours-and-travels.replit.app/"
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#1a00cc",
+          "androidMode": "default",
+          "androidCollapsedTitle": "Al Burhan Tours",
+          "iosDisplayInForeground": true,
+          "defaultChannel": "alburhan-push"
+        }
+      ]
     ],
-    "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
-    },
-    "extra": {
-      "eas": {
-        "projectId": "alburhantours"
-      }
+    "updates": {
+      "url": "https://u.expo.dev/31cc1af8-5403-4f51-82a3-8730763a7dbc",
+      "enabled": true,
+      "fallbackToCacheTimeout": 0
     },
     "runtimeVersion": {
       "policy": "appVersion"
+    },
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "31cc1af8-5403-4f51-82a3-8730763a7dbc"
+      }
     }
   }
 }

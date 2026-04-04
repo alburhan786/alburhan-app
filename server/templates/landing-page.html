@@ -326,6 +326,65 @@
           background: #e0e0e0;
         }
       }
+    .pkg-section {
+      margin-top: 48px;
+    }
+    .pkg-section h2 {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: #111;
+    }
+    .pkg-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 16px;
+    }
+    .pkg-card {
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #fff;
+      text-align: left;
+    }
+    .pkg-img-wrap {
+      width: 100%;
+      height: 140px;
+      overflow: hidden;
+      background: #f0fdf4;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .pkg-img-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .pkg-info {
+      padding: 12px;
+    }
+    .pkg-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: #111;
+      margin: 0 0 4px;
+    }
+    .pkg-price {
+      font-size: 13px;
+      color: #047857;
+      font-weight: 500;
+    }
+    .pkg-placeholder {
+      font-size: 12px;
+      color: #9ca3af;
+    }
+    @media (prefers-color-scheme: dark) {
+      .pkg-section h2 { color: #f0f0f0; }
+      .pkg-card { border-color: #333; background: #1a1a1a; }
+      .pkg-img-wrap { background: #1f2d1f; }
+      .pkg-name { color: #f0f0f0; }
+    }
     </style>
   </head>
   <body>
@@ -390,6 +449,11 @@
             >
           </div>
         </div>
+
+        <div class="pkg-section" id="pkg-section" style="display:none">
+          <h2>Our Packages</h2>
+          <div class="pkg-grid" id="pkg-grid"></div>
+        </div>
       </div>
     </div>
 
@@ -453,6 +517,38 @@
             contentEl.style.display = "block";
           }, 500);
         }
+      })();
+    </script>
+    <script>
+      (function () {
+        fetch('/api/packages?limit=6')
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            var pkgs = (data && data.packages) ? data.packages : [];
+            if (!pkgs.length) return;
+            var grid = document.getElementById('pkg-grid');
+            var section = document.getElementById('pkg-section');
+            pkgs.forEach(function (pkg) {
+              var imgObjs = Array.isArray(pkg.imageUrls) ? pkg.imageUrls : [];
+              if (!imgObjs.length && pkg.imageUrl) {
+                imgObjs = [{ url: pkg.imageUrl, isMain: true, position: 'center' }];
+              }
+              var mainImg = imgObjs.find(function (o) { return o.isMain; }) || imgObjs[0];
+              var imgHtml = mainImg
+                ? '<img src="' + mainImg.url + '" alt="' + (pkg.name || '') + '" style="object-position:' + (mainImg.position || 'center') + '" onerror="this.parentNode.innerHTML=\'<span class=&quot;pkg-placeholder&quot;>No image</span>\'" />'
+                : '<span class="pkg-placeholder">No image</span>';
+              var price = pkg.price ? '\u20B9' + Number(pkg.price).toLocaleString('en-IN') : '';
+              var card = document.createElement('div');
+              card.className = 'pkg-card';
+              card.innerHTML =
+                '<div class="pkg-img-wrap">' + imgHtml + '</div>' +
+                '<div class="pkg-info"><p class="pkg-name">' + (pkg.name || '') + '</p>' +
+                (price ? '<p class="pkg-price">' + price + '</p>' : '') + '</div>';
+              grid.appendChild(card);
+            });
+            section.style.display = 'block';
+          })
+          .catch(function () {});
       })();
     </script>
   </body>

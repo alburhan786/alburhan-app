@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "864342455343",
+    "project_id": "al-burhan-tours",
+    "storage_bucket": "al-burhan-tours.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:864342455343:android:e9de06b125e903f05882da",
+        "android_client_info": {
+          "package_name": "com.alburhantours.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDEMs5wPWAXiMMoqt4hYZRenipxV-m7RWE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

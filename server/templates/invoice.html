@@ -7,19 +7,20 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Segoe UI', Arial, sans-serif; background: #f5f5f5; color: #333; }
-    .invoice-container { max-width: 800px; margin: 20px auto; background: #fff; border: 1px solid #ddd; }
-    .invoice-header { padding: 20px 24px; border-bottom: 2px solid #047857; display: flex; justify-content: space-between; align-items: flex-start; }
-    .company-info h1 { font-size: 20px; color: #047857; font-weight: 700; }
+    .invoice-container { max-width: 800px; width: 100%; margin: 16px auto; background: #fff; border: 1px solid #ddd; }
+    .invoice-header { padding: 20px 24px; border-bottom: 2px solid #047857; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+    .company-info h1 { font-size: 18px; color: #047857; font-weight: 700; }
     .company-info p { font-size: 11px; color: #555; line-height: 1.5; }
     .invoice-badge { background: #047857; color: #fff; padding: 4px 14px; border-radius: 4px; font-size: 12px; font-weight: 600; display: inline-block; margin-bottom: 8px; }
-    .invoice-meta { text-align: right; }
+    .invoice-meta { text-align: right; flex-shrink: 0; }
     .invoice-meta table { font-size: 12px; border-collapse: collapse; }
-    .invoice-meta td { padding: 3px 8px; }
+    .invoice-meta td { padding: 3px 8px; white-space: nowrap; }
     .invoice-meta td:first-child { font-weight: 600; color: #555; text-align: right; }
-    .bill-to { padding: 16px 24px; background: #f0fdf4; border-bottom: 1px solid #ddd; }
+    .bill-to { padding: 14px 24px; background: #f0fdf4; border-bottom: 1px solid #ddd; }
     .bill-to h3 { font-size: 12px; color: #047857; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px; }
     .bill-to p { font-size: 12px; line-height: 1.6; }
-    .items-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .items-table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 480px; }
     .items-table th { background: #047857; color: #fff; padding: 10px 12px; text-align: left; font-weight: 600; }
     .items-table th:last-child, .items-table td:last-child { text-align: right; }
     .items-table th:nth-child(4), .items-table td:nth-child(4),
@@ -30,16 +31,16 @@
     .totals-section { padding: 0 24px 16px; }
     .totals-table { width: 100%; border-collapse: collapse; font-size: 12px; }
     .totals-table td { padding: 8px 12px; border-bottom: 1px solid #eee; }
-    .totals-table .label { text-align: right; width: 70%; font-weight: 500; color: #555; }
-    .totals-table .value { text-align: right; width: 30%; font-weight: 600; }
+    .totals-table .label { text-align: right; width: 60%; font-weight: 500; color: #555; }
+    .totals-table .value { text-align: right; font-weight: 600; }
     .totals-table .total-row td { background: #f0fdf4; font-size: 14px; font-weight: 700; color: #047857; border-top: 2px solid #047857; }
     .totals-table .balance-row td { background: #fef3c7; font-weight: 700; color: #92400e; }
     .gst-breakdown { padding: 16px 24px; border-top: 1px solid #ddd; }
     .gst-breakdown h4 { font-size: 12px; color: #047857; margin-bottom: 8px; }
-    .gst-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    .gst-table { width: 100%; border-collapse: collapse; font-size: 11px; min-width: 420px; }
     .gst-table th { background: #e6f7ef; padding: 6px 10px; text-align: center; font-weight: 600; border: 1px solid #ccc; }
     .gst-table td { padding: 6px 10px; text-align: center; border: 1px solid #ccc; }
-    .amount-words { padding: 12px 24px; background: #f9fafb; border-top: 1px solid #ddd; font-size: 12px; }
+    .amount-words { padding: 12px 24px; background: #f9fafb; border-top: 1px solid #ddd; font-size: 12px; line-height: 1.6; }
     .amount-words strong { color: #047857; }
     .bottom-section { display: flex; padding: 16px 24px; border-top: 1px solid #ddd; gap: 20px; }
     .bank-details { flex: 1; }
@@ -53,18 +54,39 @@
     .signatory { text-align: right; padding: 16px 24px; border-top: 1px solid #ddd; }
     .signatory p { font-size: 11px; color: #555; }
     .signatory .company { font-weight: 700; color: #047857; font-size: 12px; }
-    .footer { padding: 12px 24px; background: #047857; color: #fff; text-align: center; font-size: 11px; }
-    .print-btn { display: block; margin: 16px auto; padding: 12px 40px; background: #047857; color: #fff; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; font-weight: 600; }
+    .footer { padding: 12px 24px; background: #047857; color: #fff; text-align: center; font-size: 11px; line-height: 1.6; }
+    .action-buttons { text-align: center; padding: 16px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .print-btn { display: inline-block; padding: 12px 32px; background: #047857; color: #fff; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; font-weight: 600; text-decoration: none; }
     .print-btn:hover { background: #065f46; }
+    .whatsapp-btn { display: inline-block; padding: 12px 32px; background: #25D366; color: #fff; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; font-weight: 600; text-decoration: none; }
     @media print {
       body { background: #fff; }
       .invoice-container { margin: 0; border: none; box-shadow: none; }
-      .print-btn, .no-print { display: none !important; }
+      .action-buttons { display: none !important; }
     }
     @media (max-width: 600px) {
-      .invoice-header { flex-direction: column; gap: 12px; }
+      body { background: #fff; }
+      .invoice-container { margin: 0; border: none; border-radius: 0; }
+      .invoice-header { flex-direction: column; gap: 14px; padding: 16px; }
       .invoice-meta { text-align: left; }
-      .bottom-section { flex-direction: column; }
+      .invoice-meta td { padding: 3px 10px 3px 0; }
+      .company-info h1 { font-size: 16px; }
+      .bill-to { padding: 12px 16px; }
+      .bill-to p { font-size: 13px; }
+      .totals-section { padding: 0 16px 16px; }
+      .totals-table td { padding: 8px 8px; font-size: 13px; }
+      .totals-table .total-row td { font-size: 15px; }
+      .totals-table .balance-row td { font-size: 14px; }
+      .gst-breakdown { padding: 12px 16px; }
+      .amount-words { padding: 12px 16px; font-size: 13px; }
+      .bottom-section { flex-direction: column; padding: 12px 16px; gap: 16px; }
+      .bank-details table { font-size: 13px; }
+      .bank-details td { padding: 4px 10px 4px 0; }
+      .terms-section p { font-size: 11px; }
+      .signatory { padding: 12px 16px; }
+      .footer { font-size: 12px; padding: 12px 16px; }
+      .action-buttons { padding: 16px; gap: 10px; }
+      .print-btn, .whatsapp-btn { padding: 14px 24px; font-size: 15px; width: 100%; text-align: center; }
     }
   </style>
 </head>
@@ -96,30 +118,32 @@
       <p>Mobile: {{CUSTOMER_PHONE}} &nbsp; | &nbsp; Email: {{CUSTOMER_EMAIL}}</p>
     </div>
 
-    <table class="items-table">
-      <thead>
-        <tr>
-          <th style="width:40px">S.NO</th>
-          <th>SERVICES</th>
-          <th style="width:80px">SAC</th>
-          <th style="width:100px">RATE</th>
-          <th style="width:80px">TAX</th>
-          <th style="width:100px">AMOUNT</th>
-        </tr>
-      </thead>
-      <tbody>
-        {{SERVICE_ROWS}}
-        <tr>
-          <td colspan="4"></td>
-          <td style="text-align:right; font-size:11px; color:#555;">TCS @5.0%</td>
-          <td style="text-align:right;">{{TCS_AMOUNT}}</td>
-        </tr>
-      </tbody>
-    </table>
+    <div class="table-scroll">
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th style="width:40px">S.NO</th>
+            <th>SERVICES</th>
+            <th style="width:80px">SAC</th>
+            <th style="width:100px">RATE</th>
+            <th style="width:80px">TAX</th>
+            <th style="width:100px">AMOUNT</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{SERVICE_ROWS}}
+          <tr>
+            <td colspan="4"></td>
+            <td style="text-align:right; font-size:11px; color:#555;">TCS @5.0%</td>
+            <td style="text-align:right;">{{TCS_AMOUNT}}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
 
     <div class="totals-section">
       <table class="totals-table">
-        <tr><td class="label">TOTAL</td><td class="value">₹ {{TAX_TOTAL}}</td><td class="value" style="width:120px;">₹ {{GRAND_TOTAL}}</td></tr>
+        <tr><td class="label">TOTAL</td><td class="value" style="width:120px;">₹ {{TAX_TOTAL}}</td><td class="value" style="width:120px;">₹ {{GRAND_TOTAL}}</td></tr>
         <tr><td class="label">RECEIVED AMOUNT</td><td class="value"></td><td class="value">₹ {{RECEIVED_AMOUNT}}</td></tr>
         <tr><td class="label">PREVIOUS BALANCE</td><td class="value"></td><td class="value">₹ {{PREVIOUS_BALANCE}}</td></tr>
         <tr class="balance-row"><td class="label">CURRENT BALANCE</td><td class="value"></td><td class="value">₹ {{CURRENT_BALANCE}}</td></tr>
@@ -128,30 +152,32 @@
 
     <div class="gst-breakdown">
       <h4>GST Breakdown</h4>
-      <table class="gst-table">
-        <thead>
-          <tr>
-            <th>HSN/SAC</th>
-            <th>Taxable Value</th>
-            <th>CGST Rate</th>
-            <th>CGST Amount</th>
-            <th>SGST Rate</th>
-            <th>SGST Amount</th>
-            <th>Total Tax</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>998555</td>
-            <td>₹ {{TAXABLE_VALUE}}</td>
-            <td>2.5%</td>
-            <td>₹ {{CGST_AMOUNT}}</td>
-            <td>2.5%</td>
-            <td>₹ {{SGST_AMOUNT}}</td>
-            <td>₹ {{GST_TOTAL}}</td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="table-scroll">
+        <table class="gst-table">
+          <thead>
+            <tr>
+              <th>HSN/SAC</th>
+              <th>Taxable Value</th>
+              <th>CGST Rate</th>
+              <th>CGST Amount</th>
+              <th>SGST Rate</th>
+              <th>SGST Amount</th>
+              <th>Total Tax</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>998555</td>
+              <td>₹ {{TAXABLE_VALUE}}</td>
+              <td>2.5%</td>
+              <td>₹ {{CGST_AMOUNT}}</td>
+              <td>2.5%</td>
+              <td>₹ {{SGST_AMOUNT}}</td>
+              <td>₹ {{GST_TOTAL}}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <div class="amount-words">
@@ -194,9 +220,10 @@
     </div>
   </div>
 
-  <div class="no-print" style="text-align:center; padding: 16px; display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
-    <button class="print-btn" onclick="window.print()" style="margin:0;">Print / Save as PDF</button>
-    <a href="https://wa.me/?text=Invoice%20{{INVOICE_NUMBER}}%20-%20View%20here%3A%20{{SHARE_URL}}" target="_blank" class="print-btn" style="margin:0;background:#25D366;text-decoration:none;display:inline-block;">Share on WhatsApp</a>
+  <div class="action-buttons no-print">
+    <a href="/invoice/{{BOOKING_ID}}/pdf" class="print-btn" download>Download PDF</a>
+    <button class="print-btn" onclick="window.print()" style="background:#065f46;">Print / Save as PDF</button>
+    <a href="https://wa.me/?text=Invoice%20{{INVOICE_NUMBER}}%20-%20View%20here%3A%20{{SHARE_URL}}" target="_blank" class="whatsapp-btn">Share on WhatsApp</a>
   </div>
 </body>
 </html>

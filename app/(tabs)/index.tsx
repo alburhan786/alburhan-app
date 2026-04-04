@@ -10,7 +10,10 @@ import {
   Alert,
   Platform,
   Linking,
+  Image,
+  RefreshControl,
 } from "react-native";
+
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
@@ -20,10 +23,82 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const WHATSAPP_BUSINESS_LINK = 'https://wa.me/918989701701?text=Assalamu%20Alaikum%20I%20want%20to%20register%20for%20Hajj%202027%20package%20with%20Al%20Burhan%20Tours%20and%20Travels';
 
+interface PkgImg { url: string; isMain?: boolean; position?: 'left' | 'center' | 'right' }
+type PkgImgRaw = PkgImg | string;
+
+// Extend React Native's style types to include web-only CSS properties
+declare module 'react-native' {
+  interface ImageStyle {
+    objectPosition?: string;
+  }
+  interface ViewStyle {
+    boxShadow?: string;
+  }
+}
+
+function normalizePkgImgs(rawUrls?: PkgImgRaw[], fallbackUrl?: string): PkgImg[] {
+  const arr: PkgImgRaw[] = Array.isArray(rawUrls) && rawUrls.length > 0
+    ? rawUrls
+    : (fallbackUrl ? [fallbackUrl] : []);
+  return arr.map((item: PkgImgRaw) =>
+    typeof item === 'string' ? { url: item, isMain: false, position: 'center' as const } : item
+  );
+}
+
+function PackageImageWithFallback({ imageUrls, imageUrl, label, featured }: { imageUrls?: PkgImgRaw[]; imageUrl?: string; label: string; featured?: boolean; pkgId?: number }) {
+  const imgs = normalizePkgImgs(imageUrls, imageUrl);
+  const mainImg = imgs.find(i => i.isMain) || imgs[0];
+  const primaryUrl = mainImg?.url || '';
+  const position = (mainImg?.position || 'center') as 'left' | 'center' | 'right';
+  const [failed, setFailed] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  if (!primaryUrl || failed) {
+    return (
+      <View style={{ width: '100%', height: 180, backgroundColor: '#047857', alignItems: 'center', justifyContent: 'center' }}>
+        <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16, textTransform: 'uppercase', letterSpacing: 1 }}>{label}</Text>
+        {featured && (
+          <View style={{ position: 'absolute', top: 10, left: 10, backgroundColor: '#d97706', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}>
+            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>★ Featured</Text>
+          </View>
+        )}
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ width: '100%', height: 180, borderTopLeftRadius: 12, borderTopRightRadius: 12, overflow: 'hidden' }}>
+      <Image
+        source={{ uri: primaryUrl }}
+        style={[{ width: '100%', height: 180 }, Platform.OS === 'web' ? { objectFit: 'cover', objectPosition: position } : {}]}
+        resizeMode="cover"
+        onLoad={() => setLoaded(true)}
+        onError={() => setFailed(true)}
+      />
+      {!loaded && (
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#ecfdf5', alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator size="small" color="#047857" />
+        </View>
+      )}
+      {featured && (
+        <View style={{ position: 'absolute', top: 10, left: 10, backgroundColor: '#d97706', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}>
+          <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>★ Featured</Text>
+        </View>
+      )}
+      {imgs.length > 1 && (
+        <View style={{ position: 'absolute', bottom: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.45)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 }}>
+          <Text style={{ color: '#fff', fontSize: 11, fontWeight: '600' }}>📷 {imgs.length}</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
 export default function HomeScreen() {
     const [packages, setPackages] = useState<any[]>([]);
     const [filteredPackages, setFilteredPackages] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [filterType, setFilterType] = useState("all");
     const [minPrice, setMinPrice] = useState("");
     const [maxPrice, setMaxPrice] = useState("");
@@ -39,12 +114,12 @@ export default function HomeScreen() {
       applyFilters();
     }, [packages, filterType, minPrice, maxPrice, searchQuery]);
 
-    const loadPackages = async () => {
+    const loadPackages = async (isRefresh = false) => {
       try {
         const response = await packageService.getPackages();
         if (response.success && response.packages.length > 0) {
           setPackages(response.packages);
-        } else {
+        } else if (!isRefresh) {
           await seedDatabase();
           const retryResponse = await packageService.getPackages();
           if (retryResponse.success) {
@@ -53,10 +128,16 @@ export default function HomeScreen() {
         }
       } catch (error) {
         console.error('Error loading packages:', error);
-        Alert.alert('Error', 'Could not load packages');
+        if (!isRefresh) Alert.alert('Error', 'Could not load packages');
       } finally {
         setLoading(false);
+        setRefreshing(false);
       }
+    };
+
+    const onRefresh = () => {
+      setRefreshing(true);
+      loadPackages(true);
     };
 
     const applyFilters = () => {
@@ -106,8 +187,11 @@ export default function HomeScreen() {
           <View style={styles.headerTop}>
             <View style={{ flex: 1 }} />
             <View style={styles.headerCenter}>
-              <Text style={styles.headerTitle}>AL BURHAN</Text>
-              <Text style={styles.headerSubtitle}>Tours & Travels</Text>
+              <Image
+                source={require('@/assets/images/alburhan_logo.png')}
+                style={styles.headerLogo}
+                resizeMode="contain"
+              />
             </View>
             <View style={styles.headerActions}>
               <TouchableOpacity onPress={() => router.push('/(tabs)/bookings')} style={styles.headerBtn}>
@@ -120,7 +204,17 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        <ScrollView style={styles.content}>
+        <ScrollView
+          style={styles.content}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={['#047857']}
+              tintColor="#047857"
+            />
+          }
+        >
           <View style={styles.searchSection}>
             <TextInput
               style={styles.searchInput}
@@ -186,14 +280,26 @@ export default function HomeScreen() {
                 style={styles.packageCard}
                 onPress={() => router.push(`/package/${pkg.id}`)}
               >
-                <View style={styles.packageHeader}>
-                  {pkg.featured && (
-                    <View style={styles.featuredBadge}>
-                      <Text style={styles.featuredText}>★ Featured</Text>
+                <View style={styles.packageCardInner}>
+                {(pkg.imageUrls?.length > 0 || pkg.imageUrl) ? (
+                  <PackageImageWithFallback
+                    imageUrls={pkg.imageUrls}
+                    imageUrl={pkg.imageUrl}
+                    label={pkg.type}
+                    featured={pkg.featured}
+                    pkgId={pkg.id}
+                  />
+                ) : (
+                  pkg.featured && (
+                    <View style={styles.packageHeader}>
+                      <View style={styles.featuredBadge}>
+                        <Text style={styles.featuredText}>★ Featured</Text>
+                      </View>
                     </View>
-                  )}
-                </View>
+                  )
+                )}
 
+                <View style={styles.packageTextContent}>
                 <Text style={styles.packageName}>{pkg.name}</Text>
                 {pkg.category && (
                   <Text style={styles.categoryText}>{pkg.category}</Text>
@@ -221,6 +327,8 @@ export default function HomeScreen() {
                   <View style={styles.viewButton}>
                     <Text style={styles.viewButtonText}>View Details →</Text>
                   </View>
+                </View>
+                </View>
                 </View>
               </TouchableOpacity>
             );
@@ -313,16 +421,9 @@ export default function HomeScreen() {
       justifyContent: 'center' as const,
       alignItems: 'center' as const,
     },
-    headerTitle: {
-      fontSize: 28,
-      fontWeight: 'bold',
-      color: '#FFFFFF',
-      letterSpacing: 1,
-    },
-    headerSubtitle: {
-      fontSize: 14,
-      color: Colors.secondary,
-      marginTop: 4,
+    headerLogo: {
+      width: 120,
+      height: 48,
     },
     content: {
       flex: 1,
@@ -421,13 +522,38 @@ export default function HomeScreen() {
     packageCard: {
       backgroundColor: Colors.card,
       borderRadius: 16,
-      padding: 16,
       marginBottom: 16,
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 8,
-      elevation: 3,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 10,
+      elevation: 6,
+      ...(Platform.OS === 'web' ? { boxShadow: '0 4px 16px rgba(0,0,0,0.15)' } : {}),
+    },
+    packageCardInner: {
+      borderRadius: 16,
+      overflow: 'hidden',
+    },
+    packageImageContainer: {
+      position: 'relative',
+      width: '100%',
+      height: 180,
+    },
+    packageImage: {
+      width: '100%',
+      height: 180,
+    },
+    featuredBadgeOverlay: {
+      position: 'absolute',
+      top: 10,
+      left: 10,
+      backgroundColor: Colors.secondary,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 8,
+    },
+    packageTextContent: {
+      padding: 16,
     },
     packageHeader: {
       flexDirection: 'row',

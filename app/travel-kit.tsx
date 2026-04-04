@@ -5,10 +5,12 @@ import {
   ScrollView,
   StyleSheet,
   Platform,
+  TouchableOpacity,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/Colors';
 
 const kitItems = [
@@ -146,6 +148,7 @@ function KitIcon({ item, size }: { item: typeof kitItems[0]; size: number }) {
 
 export default function TravelKitScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const webTop = Platform.OS === 'web' ? 67 : 0;
 
   return (
@@ -159,8 +162,11 @@ export default function TravelKitScreen() {
           colors={['#047857', '#059669', '#10B981']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={[styles.heroSection, { paddingTop: insets.top + webTop + 20 }]}
+          style={[styles.heroSection, { paddingTop: insets.top + webTop + 12 }]}
         >
+          <TouchableOpacity onPress={() => router.back()} style={styles.heroBackBtn}>
+            <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
+          </TouchableOpacity>
           <View style={styles.heroIconContainer}>
             <View style={styles.heroIconCircle}>
               <MaterialCommunityIcons name="gift-outline" size={40} color="#047857" />
@@ -253,6 +259,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingBottom: 32,
     alignItems: 'center',
+  },
+  heroBackBtn: {
+    alignSelf: 'flex-start',
+    marginBottom: 16,
+    padding: 4,
   },
   heroIconContainer: {
     marginBottom: 16,

@@ -1,13 +1,52 @@
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
+import session from "express-session";
 import { registerRoutes } from "./routes";
 import { registerChatRoutes } from "./replit_integrations/chat";
+import { warmupDb, db } from "./db";
 import * as fs from "fs";
 import * as path from "path";
 import { createProxyMiddleware } from "http-proxy-middleware";
+import { users } from "@shared/schema";
+import { eq } from "drizzle-orm";
+import bcrypt from "bcryptjs";
+
+declare module "express-session" {
+  interface SessionData {
+    adminLoggedIn?: boolean;
+    userId?: number;
+  }
+}
 
 const app = express();
 const log = console.log;
+
+async function ensureDemoUser(): Promise<void> {
+  const DEMO_EMAIL = "test@alburhantravels.com";
+  const DEMO_PHONE = "9000000000";
+  const DEMO_NAME = "Test User";
+  const DEMO_PASSWORD = "123456";
+
+  const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, DEMO_EMAIL));
+  if (existing) {
+    console.log(`[Demo] Demo user ready: id=${existing.id} email=${DEMO_EMAIL}`);
+    return;
+  }
+  const hashedPassword = await bcrypt.hash(DEMO_PASSWORD, 10);
+  const [created] = await db.insert(users).values({
+    name: DEMO_NAME,
+    email: DEMO_EMAIL,
+    phone: DEMO_PHONE,
+    password: hashedPassword,
+  }).onConflictDoNothing().returning({ id: users.id });
+  if (created) {
+    console.log(`[Demo] Demo user created: id=${created.id} email=${DEMO_EMAIL} phone=${DEMO_PHONE}`);
+    console.log(`[Demo] Demo user ready: id=${created.id} email=${DEMO_EMAIL}`);
+  } else {
+    const [found] = await db.select({ id: users.id }).from(users).where(eq(users.email, DEMO_EMAIL));
+    console.log(`[Demo] Demo user ready: id=${found?.id ?? "?"} email=${DEMO_EMAIL}`);
+  }
+}
 
 declare module "http" {
   interface IncomingMessage {
@@ -182,26 +221,6 @@ function configureExpoAndLanding(app: express.Application) {
       changeOrigin: true,
       ws: true,
       logger: undefined,
-      on: {
-        proxyRes: (proxyRes, req) => {
-          const isManifest = (req.url === "/" || req.url === "/manifest") &&
-            req.headers["expo-platform"];
-
-          if (isManifest && devDomain) {
-            const originalWrite = proxyRes.pipe;
-            let body = "";
-
-            proxyRes.headers["transfer-encoding"] = "";
-
-            const originalPipe = proxyRes.pipe;
-            const chunks: Buffer[] = [];
-
-            proxyRes.on("data", (chunk: Buffer) => {
-              chunks.push(chunk);
-            });
-          }
-        },
-      },
     });
 
     app.use((req: Request, res: Response, next: NextFunction) => {
@@ -209,7 +228,16 @@ function configureExpoAndLanding(app: express.Application) {
         return next();
       }
 
-      if (req.path === "/admin" || req.path.startsWith("/invoice/")) {
+      if (
+        req.path === "/admin" ||
+        req.path.startsWith("/admin/") ||
+        req.path.startsWith("/invoice/") ||
+        req.path.startsWith("/i/") ||
+        req.path === "/privacy-policy" ||
+        req.path === "/terms-and-conditions" ||
+        req.path === "/refund-policy" ||
+        req.path === "/delete-account"
+      ) {
         return next();
       }
 
@@ -225,55 +253,7 @@ function configureExpoAndLanding(app: express.Application) {
       }
 
       if ((req.path === "/" || req.path === "/manifest") && platform) {
-        const metroUrl = `http://localhost:8081${req.path}`;
-        const headers: Record<string, string> = {};
-        const headersToForward = [
-          "expo-platform", "expo-dev-client-id", "expo-runtime-version",
-          "expo-expect-signature", "expo-protocol-version", "expo-sfv-version",
-          "accept", "user-agent",
-        ];
-        for (const h of headersToForward) {
-          const val = req.header(h);
-          if (val) headers[h] = val;
-        }
-
-        fetch(metroUrl, { headers })
-          .then(async (metroRes) => {
-            metroRes.headers.forEach((value, key) => {
-              if (key.toLowerCase() !== "transfer-encoding" && key.toLowerCase() !== "content-length") {
-                res.setHeader(key, value);
-              }
-            });
-
-            let body = await metroRes.text();
-
-            if (devDomain) {
-              try {
-                const manifest = JSON.parse(body);
-
-                const hostWithPort = `${devDomain}:443`;
-
-                if (manifest.extra?.expoClient) {
-                  manifest.extra.expoClient.hostUri = hostWithPort;
-                }
-                if (manifest.extra?.expoGo) {
-                  manifest.extra.expoGo.debuggerHost = hostWithPort;
-                }
-
-                body = JSON.stringify(manifest);
-                log(`Manifest rewritten: hostUri=${hostWithPort}`);
-              } catch {
-                log("Could not parse manifest for URL rewriting");
-              }
-            }
-
-            res.status(metroRes.status).send(body);
-          })
-          .catch((err) => {
-            log(`Metro manifest proxy error: ${err}`);
-            res.status(502).json({ error: "Could not connect to Metro bundler" });
-          });
-        return;
+        return metroProxy(req, res, next);
       }
 
       const shouldProxy =
@@ -361,10 +341,33 @@ function setupErrorHandler(app: express.Application) {
   setupBodyParsing(app);
   setupRequestLogging(app);
 
+  app.set("trust proxy", 1);
+
+  const sessionSecret = process.env.SESSION_SECRET;
+  if (!sessionSecret) {
+    throw new Error("SESSION_SECRET environment variable is not set. Please add it to your secrets.");
+  }
+  app.use(session({
+    secret: sessionSecret,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === "production",
+      httpOnly: true,
+      sameSite: "lax",
+      maxAge: 24 * 60 * 60 * 1000,
+    },
+  }));
+
+  app.use("/admin", express.urlencoded({ extended: false }));
+
   const metroProxy = configureExpoAndLanding(app);
 
   registerChatRoutes(app);
   const server = await registerRoutes(app);
+
+  const { initFirebaseEager } = await import("./services/firebase");
+  initFirebaseEager();
 
   setupErrorHandler(app);
 
@@ -379,6 +382,14 @@ function setupErrorHandler(app: express.Application) {
       log(`express server serving on port ${port}`);
     },
   );
+
+  warmupDb().catch((err) => {
+    console.warn("[DB] Warmup failed:", err?.message);
+  });
+
+  ensureDemoUser().catch((err) => {
+    console.warn("[Demo] ensureDemoUser failed:", err?.message);
+  });
 
   if (metroProxy) {
     server.on("upgrade", (req, socket, head) => {

@@ -106,7 +106,7 @@ export default function CreateBookingScreen() {
   const [pkg, setPkg] = useState<any>(null);
   const [numberOfPeople, setNumberOfPeople] = useState('1');
   const [travelers, setTravelers] = useState<any[]>([
-    { name: '', dateOfBirth: '', passportNumber: '', passportExpiry: '', age: '', gender: 'M' },
+    { name: '', dateOfBirth: '', passportNumber: '', passportIssue: '', passportExpiry: '', age: '', gender: 'M' },
   ]);
 
   const [contactName, setContactName] = useState('');
@@ -140,7 +140,7 @@ export default function CreateBookingScreen() {
     const count = parseInt(numberOfPeople) || 1;
     setTravelers(prev =>
       Array(count).fill(null).map((_, i) =>
-        prev[i] || { name: '', dateOfBirth: '', passportNumber: '', passportExpiry: '', age: '', gender: 'M' }
+        prev[i] || { name: '', dateOfBirth: '', passportNumber: '', passportIssue: '', passportExpiry: '', age: '', gender: 'M' }
       )
     );
   }, [numberOfPeople]);
@@ -168,9 +168,14 @@ export default function CreateBookingScreen() {
       Alert.alert('Missing Info', 'Please fill in all required contact and address details');
       return;
     }
-    const incomplete = travelers.some(t => !t.name.trim() || !t.dateOfBirth.trim() || !t.passportNumber.trim());
+    const incomplete = travelers.some(t => !t.name.trim() || !t.dateOfBirth.trim() || !t.passportNumber.trim() || !t.passportIssue.trim() || !t.passportExpiry.trim());
     if (incomplete) {
-      Alert.alert('Missing Info', 'Please complete traveler details (Name, Date of Birth, Passport Number)');
+      Alert.alert('Missing Info', 'Please complete all traveler passport details (Name, Date of Birth, Passport Number, Issue Date, Expiry Date)');
+      return;
+    }
+    const passportFormatInvalid = travelers.some(t => !/^[A-Z][0-9]{7}$/.test(t.passportNumber.trim()));
+    if (passportFormatInvalid) {
+      Alert.alert('Invalid Passport', 'Indian passport number must be 1 letter followed by 7 digits (e.g. A1234567)');
       return;
     }
 
@@ -186,7 +191,9 @@ export default function CreateBookingScreen() {
         totalAmount: totalAmount.toString(),
         travelers: travelers.map(t => ({
           name: t.name, dateOfBirth: t.dateOfBirth,
-          passportNumber: t.passportNumber, passportExpiry: t.passportExpiry,
+          passportNumber: t.passportNumber.trim().toUpperCase(),
+          passportIssue: t.passportIssue,
+          passportExpiry: t.passportExpiry,
           age: parseInt(t.age) || 0, gender: t.gender,
         })),
         contactName, contactPhone, contactEmail,
@@ -225,7 +232,10 @@ export default function CreateBookingScreen() {
         contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={[styles.header, Platform.OS === 'web' && { paddingTop: 87 }]}>
+        <View style={[styles.header, { paddingTop: Platform.OS === 'web' ? 87 : insets.top + 12 }]}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backRow}>
+            <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
+          </TouchableOpacity>
           <Text style={styles.title}>Complete Booking</Text>
           <Text style={styles.subtitle}>{pkg.name}</Text>
         </View>
@@ -250,14 +260,19 @@ export default function CreateBookingScreen() {
                 keyboardType="number-pad" required
               />
               <InputField
-                label="Passport Number" value={traveler.passportNumber} placeholder="e.g. A1234567"
+                label="Passport Number" value={traveler.passportNumber} placeholder="e.g. A1234567 (1 letter + 7 digits)"
                 onChangeText={(v: string) => updateTraveler(index, 'passportNumber', v.toUpperCase())}
                 required
               />
               <InputField
-                label="Passport Expiry" value={traveler.passportExpiry} placeholder="DD/MM/YYYY"
+                label="Date of Issue" value={traveler.passportIssue} placeholder="DD/MM/YYYY"
+                onChangeText={(v: string) => updateTraveler(index, 'passportIssue', autoFormatDate(v))}
+                keyboardType="number-pad" required
+              />
+              <InputField
+                label="Date of Expiry" value={traveler.passportExpiry} placeholder="DD/MM/YYYY"
                 onChangeText={(v: string) => updateTraveler(index, 'passportExpiry', autoFormatDate(v))}
-                keyboardType="number-pad"
+                keyboardType="number-pad" required
               />
             </View>
           ))}
@@ -354,6 +369,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f0fdf4' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: { backgroundColor: '#047857', padding: 20 },
+  backRow: { marginBottom: 12, alignSelf: 'flex-start', padding: 2 },
   title: { fontSize: 22, fontWeight: '700', color: '#fff', marginBottom: 2 },
   subtitle: { fontSize: 14, color: '#a7f3d0' },
   section: { paddingHorizontal: 16, paddingTop: 20 },

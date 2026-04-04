@@ -10,7 +10,8 @@
       "android": {
         "buildType": "apk",
         "gradleCommand": ":app:assembleDebug"
-      }
+      },
+      "channel": "development"
     },
     "preview": {
       "distribution": "internal",
@@ -18,16 +19,20 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_DOMAIN": "khanaltaf1975-workspace.replit.app:443"
-      }
+        "EXPO_PUBLIC_DOMAIN": "al-burhan-tours-and-travels.replit.app"
+      },
+      "channel": "preview"
     },
     "production": {
-      "autoIncrement": true,
+      "channel": "production",
       "android": {
         "buildType": "app-bundle"
       },
+      "ios": {
+        "buildConfiguration": "Release"
+      },
       "env": {
-        "EXPO_PUBLIC_DOMAIN": "khanaltaf1975-workspace.replit.app:443"
+        "EXPO_PUBLIC_DOMAIN": "al-burhan-tours-and-travels.replit.app"
       }
     }
   },
@@ -36,6 +41,13 @@
       "android": {
         "serviceAccountKeyPath": "./google-play-key.json",
         "track": "internal"
+      },
+      "ios": {
+        "ascAppId": "6760983020",
+        "appleTeamId": "Y8QGXX9VL6",
+        "ascApiKeyPath": "./AuthKey_GSYQUDY2AA.p8",
+        "ascApiKeyIssuerId": "74a76fb9-74cc-4c25-8c4c-708edb26e961",
+        "ascApiKeyId": "GSYQUDY2AA"
       }
     }
   }

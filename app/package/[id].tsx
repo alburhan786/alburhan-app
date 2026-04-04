@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
   import {
     View,
     Text,
@@ -9,13 +9,158 @@ import React, { useState, useEffect } from 'react';
     Alert,
     Linking,
     Share,
+    Image,
+    FlatList,
+    Dimensions,
+    Platform,
+    Animated,
   } from 'react-native';
   import { useLocalSearchParams, useRouter } from 'expo-router';
   import { LinearGradient } from 'expo-linear-gradient';
   import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+  import { useSafeAreaInsets } from 'react-native-safe-area-context';
   import { packageService } from '../../services/api';
   import { useAuth } from '../../contexts/AuthContext';
   import { Colors } from '../../constants/Colors';
+
+  const SCREEN_W = Dimensions.get('window').width;
+
+  interface PkgImgItem { url: string; isMain?: boolean; position?: 'left' | 'center' | 'right' }
+  type PkgImgRaw = PkgImgItem | string;
+
+  // Extend React Native's style types to include web-only CSS properties
+  declare module 'react-native' {
+    interface ImageStyle {
+      objectPosition?: string;
+    }
+    interface ViewStyle {
+      boxShadow?: string;
+    }
+  }
+
+  function normPkgImgs(rawUrls?: PkgImgRaw[], fallbackUrl?: string): PkgImgItem[] {
+    const arr: PkgImgRaw[] = Array.isArray(rawUrls) && rawUrls.length > 0
+      ? rawUrls
+      : (fallbackUrl ? [fallbackUrl] : []);
+    return arr.map((item: PkgImgRaw) =>
+      typeof item === 'string' ? { url: item, isMain: false, position: 'center' as const } : item
+    );
+  }
+
+  function BannerCarousel({ imageUrls, imageUrl, label }: { imageUrls?: PkgImgRaw[]; imageUrl?: string; label: string }) {
+    const imgs = normPkgImgs(imageUrls, imageUrl);
+    const mainFirst = [...imgs].sort((a, b) => (b.isMain ? 1 : 0) - (a.isMain ? 1 : 0));
+    const [activeIdx, setActiveIdx] = useState(0);
+    const [failedSet, setFailedSet] = useState<Set<number>>(new Set());
+    const [loadedSet, setLoadedSet] = useState<Set<number>>(new Set());
+    const markFailed = (i: number) => setFailedSet(prev => new Set([...prev, i]));
+    const markLoaded = (i: number) => setLoadedSet(prev => new Set([...prev, i]));
+
+    const dotAnims = useRef<Animated.Value[]>(
+      mainFirst.map((_, i) => new Animated.Value(i === 0 ? 1 : 0))
+    ).current;
+
+    useEffect(() => {
+      dotAnims.forEach((anim, i) => {
+        Animated.timing(anim, {
+          toValue: i === activeIdx ? 1 : 0,
+          duration: 200,
+          useNativeDriver: false,
+        }).start();
+      });
+    }, [activeIdx]);
+
+    if (mainFirst.length === 0 || (mainFirst.length === 1 && failedSet.has(0))) {
+      return (
+        <View style={{ width: '100%', height: 260, backgroundColor: '#047857', alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ color: '#fff', fontWeight: '700', fontSize: 20, textTransform: 'uppercase', letterSpacing: 2 }}>{label}</Text>
+        </View>
+      );
+    }
+
+    const shadowStyle = Platform.OS === 'web'
+      ? {
+          boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
+          borderRadius: 16,
+        }
+      : {
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.18,
+          shadowRadius: 10,
+          elevation: 8,
+          borderRadius: 16,
+        };
+
+    return (
+      <View style={[{ width: '100%' }, shadowStyle]}>
+        <View style={{ width: '100%', height: 260, borderRadius: 16, overflow: 'hidden' }}>
+          <FlatList
+            data={mainFirst}
+            horizontal
+            pagingEnabled
+            scrollEnabled={!!mainFirst.length && mainFirst.length > 1}
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={(_, i) => String(i)}
+            onMomentumScrollEnd={e => {
+              const idx = Math.round(e.nativeEvent.contentOffset.x / (SCREEN_W || 1));
+              setActiveIdx(idx);
+            }}
+            renderItem={({ item, index }) => {
+              const pos = item.position || 'center';
+              if (failedSet.has(index)) {
+                return (
+                  <View style={{ width: SCREEN_W, height: 260, backgroundColor: '#047857', alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ color: '#fff', fontWeight: '700', fontSize: 18 }}>{label}</Text>
+                  </View>
+                );
+              }
+              return (
+                <View style={{ width: SCREEN_W, height: 260 }}>
+                  <Image
+                    source={{ uri: item.url }}
+                    style={[
+                      { width: SCREEN_W, height: 260 },
+                      Platform.OS === 'web' ? { objectFit: 'cover', objectPosition: pos } : {}
+                    ]}
+                    resizeMode="cover"
+                    onLoad={() => markLoaded(index)}
+                    onError={() => markFailed(index)}
+                  />
+                  {!loadedSet.has(index) && (
+                    <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#ecfdf5', alignItems: 'center', justifyContent: 'center' }}>
+                      <ActivityIndicator size="large" color="#047857" />
+                    </View>
+                  )}
+                </View>
+              );
+            }}
+          />
+          {mainFirst.length > 1 && (
+            <View style={{ position: 'absolute', bottom: 14, alignSelf: 'center', flexDirection: 'row', gap: 6, backgroundColor: 'rgba(0,0,0,0.28)', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 }}>
+              {mainFirst.map((_, i) => (
+                <Animated.View
+                  key={i}
+                  style={{
+                    width: dotAnims[i] ? dotAnims[i].interpolate({ inputRange: [0, 1], outputRange: [7, 20] }) : 7,
+                    height: 7,
+                    borderRadius: 4,
+                    opacity: dotAnims[i] ? dotAnims[i].interpolate({ inputRange: [0, 1], outputRange: [0.5, 1.0] }) : 0.5,
+                    backgroundColor: '#fff',
+                  }}
+                />
+              ))}
+            </View>
+          )}
+          {mainFirst.length > 1 && (
+            <View style={{ position: 'absolute', top: 10, right: 10, backgroundColor: 'rgba(0,0,0,0.45)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
+              <Text style={{ color: '#fff', fontSize: 11, fontWeight: '600' }}>{activeIdx + 1}/{mainFirst.length}</Text>
+            </View>
+          )}
+        </View>
+      </View>
+    );
+  }
 
   export default function PackageDetailsScreen() {
     const { id } = useLocalSearchParams();
@@ -23,6 +168,7 @@ import React, { useState, useEffect } from 'react';
     const [loading, setLoading] = useState(true);
     const { user } = useAuth();
     const router = useRouter();
+    const insets = useSafeAreaInsets();
 
     useEffect(() => {
       loadPackage();
@@ -158,7 +304,16 @@ import React, { useState, useEffect } from 'react';
 
     return (
       <View style={styles.container}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={[styles.floatingBackBtn, { top: Platform.OS === 'web' ? 80 : insets.top + 10 }]}
+        >
+          <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
+        </TouchableOpacity>
         <ScrollView style={styles.content}>
+          {(pkg.imageUrl || (pkg.imageUrls && pkg.imageUrls.length > 0)) ? (
+            <BannerCarousel imageUrls={pkg.imageUrls} imageUrl={pkg.imageUrl} label={pkg.type} />
+          ) : null}
           <View style={styles.header}>
             <View style={styles.badges}>
               <View style={styles.typeBadge}>
@@ -245,20 +400,48 @@ import React, { useState, useEffect } from 'react';
           {pkg.hotelDetails && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Hotel Accommodations</Text>
-              <View style={styles.hotelCard}>
-                <Text style={styles.hotelCity}>Makkah</Text>
-                <Text style={styles.hotelName}>{pkg.hotelDetails.makkah.name}</Text>
-                <Text style={styles.hotelInfo}>
-                  {'★'.repeat(pkg.hotelDetails.makkah.rating)} • {pkg.hotelDetails.makkah.distance}
-                </Text>
-              </View>
-              <View style={styles.hotelCard}>
-                <Text style={styles.hotelCity}>Madinah</Text>
-                <Text style={styles.hotelName}>{pkg.hotelDetails.madinah.name}</Text>
-                <Text style={styles.hotelInfo}>
-                  {'★'.repeat(pkg.hotelDetails.madinah.rating)} • {pkg.hotelDetails.madinah.distance}
-                </Text>
-              </View>
+              {(['makkah', 'madinah'] as const).map((city) => {
+                const hotel = pkg.hotelDetails![city];
+                if (!hotel) return null;
+                const hotelImgs: string[] = Array.isArray(hotel.imageUrls) ? hotel.imageUrls : [];
+                const videoUrl: string | undefined = hotel.videoUrl || undefined;
+                return (
+                  <View key={city} style={styles.hotelCard}>
+                    <Text style={styles.hotelCity}>{city === 'makkah' ? 'Makkah' : 'Madinah'}</Text>
+                    <Text style={styles.hotelName}>{hotel.name}</Text>
+                    <Text style={styles.hotelInfo}>
+                      {'★'.repeat(hotel.rating)} • {hotel.distance}
+                    </Text>
+                    {hotelImgs.length > 0 && (
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        style={{ marginTop: 10 }}
+                        contentContainerStyle={{ gap: 8 }}
+                      >
+                        {hotelImgs.map((imgUrl, idx) => (
+                          <Image
+                            key={idx}
+                            source={{ uri: imgUrl }}
+                            style={{ width: 110, height: 75, borderRadius: 8, backgroundColor: '#f0fdf4' }}
+                            resizeMode="cover"
+                          />
+                        ))}
+                      </ScrollView>
+                    )}
+                    {videoUrl && (
+                      <TouchableOpacity
+                        onPress={() => Linking.openURL(videoUrl)}
+                        style={styles.hotelVideoBtn}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons name="play-circle-outline" size={18} color={Colors.primary} />
+                        <Text style={styles.hotelVideoText}>Watch Hotel Video</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                );
+              })}
             </View>
           )}
 
@@ -347,6 +530,17 @@ import React, { useState, useEffect } from 'react';
       flex: 1,
       backgroundColor: Colors.background,
     },
+    floatingBackBtn: {
+      position: 'absolute',
+      left: 16,
+      zIndex: 10,
+      backgroundColor: 'rgba(0,0,0,0.45)',
+      borderRadius: 20,
+      width: 38,
+      height: 38,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
     loadingContainer: {
       flex: 1,
       justifyContent: 'center',
@@ -363,6 +557,10 @@ import React, { useState, useEffect } from 'react';
     },
     content: {
       flex: 1,
+    },
+    bannerImage: {
+      width: '100%',
+      height: 220,
     },
     header: {
       backgroundColor: Colors.card,
@@ -466,6 +664,24 @@ import React, { useState, useEffect } from 'react';
     hotelInfo: {
       fontSize: 14,
       color: Colors.textSecondary,
+    },
+    hotelVideoBtn: {
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
+      gap: 6,
+      marginTop: 10,
+      alignSelf: 'flex-start' as const,
+      backgroundColor: '#f0fdf4',
+      paddingVertical: 6,
+      paddingHorizontal: 12,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: '#d1fae5',
+    },
+    hotelVideoText: {
+      color: Colors.primary,
+      fontSize: 13,
+      fontWeight: '600' as const,
     },
     listCard: {
       backgroundColor: Colors.card,

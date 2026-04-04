@@ -11,6 +11,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Linking,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -30,7 +31,9 @@ export default function LoginScreen() {
   const [otp, setOtp] = useState('');
   const [otpStep, setOtpStep] = useState<OtpStep>('phone');
   const [loading, setLoading] = useState(false);
-  const { login, loginWithOtp, verifyLoginOtp } = useAuth();
+  const [fallbackOtp, setFallbackOtp] = useState<string | null>(null);
+  const [phoneNotFound, setPhoneNotFound] = useState(false);
+  const { login, loginWithOtp, verifyLoginOtp, continueAsGuest } = useAuth();
   const router = useRouter();
 
   const handleEmailLogin = async () => {
@@ -56,12 +59,18 @@ export default function LoginScreen() {
       return;
     }
 
+    setPhoneNotFound(false);
     setLoading(true);
     try {
-      await loginWithOtp(phone);
+      const result = await loginWithOtp(phone);
+      setFallbackOtp(result.fallbackOtp || null);
       setOtpStep('verify');
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to send OTP');
+      if (error.errorCode === 'PHONE_NOT_REGISTERED') {
+        setPhoneNotFound(true);
+      } else {
+        Alert.alert('Error', error.message || 'Failed to send OTP');
+      }
     } finally {
       setLoading(false);
     }
@@ -79,6 +88,23 @@ export default function LoginScreen() {
       router.replace('/(tabs)');
     } catch (error: any) {
       Alert.alert('Verification Failed', error.message || 'Invalid OTP');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleContinueAsGuest = async () => {
+    await continueAsGuest();
+    router.replace('/(tabs)');
+  };
+
+  const handleDemoLogin = async () => {
+    setLoading(true);
+    try {
+      await login('test@alburhantravels.com', '123456');
+      router.replace('/(tabs)');
+    } catch (error: any) {
+      Alert.alert('Demo Login Failed', error.message || 'Please try again');
     } finally {
       setLoading(false);
     }
@@ -127,10 +153,22 @@ export default function LoginScreen() {
             style={styles.input}
             placeholder="Phone Number"
             value={phone}
-            onChangeText={setPhone}
+            onChangeText={(t) => { setPhone(t); setPhoneNotFound(false); }}
             keyboardType="phone-pad"
             placeholderTextColor={Colors.textSecondary}
           />
+
+          {phoneNotFound && (
+            <View style={styles.notFoundBanner}>
+              <Ionicons name="information-circle-outline" size={18} color="#b45309" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.notFoundText}>Phone number not registered yet.</Text>
+                <TouchableOpacity onPress={() => router.push('/(auth)/register')} style={styles.notFoundRegisterBtn}>
+                  <Text style={styles.notFoundRegisterText}>Create an account →</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
 
           <TouchableOpacity
             style={[styles.button, loading && styles.buttonDisabled]}
@@ -160,13 +198,25 @@ export default function LoginScreen() {
 
     return (
       <>
-        <View style={styles.otpInfoBox}>
-          <Ionicons name="information-circle-outline" size={18} color="#047857" />
-          <Text style={styles.otpInfoText}>
-            OTP sent to <Text style={styles.otpPhone}>+91 {phone}</Text>{'\n'}
-            Check your <Text style={styles.otpBold}>SMS</Text> and <Text style={styles.otpBold}>WhatsApp</Text>
-          </Text>
-        </View>
+        {fallbackOtp ? (
+          <View style={styles.fallbackOtpBox}>
+            <Ionicons name="warning-outline" size={18} color="#92400e" />
+            <View style={styles.fallbackOtpContent}>
+              <Text style={styles.fallbackOtpTitle}>SMS/WhatsApp delivery failed</Text>
+              <Text style={styles.fallbackOtpText}>Your OTP is shown below. Please use it to sign in.</Text>
+              <Text style={styles.fallbackOtpCode}>{fallbackOtp}</Text>
+              <Text style={styles.fallbackOtpNote}>Contact us if you need help: 9893225590</Text>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.otpInfoBox}>
+            <Ionicons name="information-circle-outline" size={18} color="#047857" />
+            <Text style={styles.otpInfoText}>
+              OTP sent to <Text style={styles.otpPhone}>+91 {phone}</Text>{'\n'}
+              Check your <Text style={styles.otpBold}>SMS</Text> and <Text style={styles.otpBold}>WhatsApp</Text>
+            </Text>
+          </View>
+        )}
 
         <TextInput
           style={[styles.input, styles.otpInput]}
@@ -195,7 +245,7 @@ export default function LoginScreen() {
 
         <TouchableOpacity
           style={styles.resendButton}
-          onPress={handleSendLoginOtp}
+          onPress={() => { setFallbackOtp(null); handleSendLoginOtp(); }}
           disabled={loading}
         >
           <Text style={styles.resendText}>Resend OTP</Text>
@@ -203,7 +253,7 @@ export default function LoginScreen() {
 
         <TouchableOpacity
           style={styles.changeButton}
-          onPress={() => { setOtpStep('phone'); setOtp(''); }}
+          onPress={() => { setOtpStep('phone'); setOtp(''); setFallbackOtp(null); }}
         >
           <Ionicons name="arrow-back" size={16} color={Colors.primary} />
           <Text style={styles.changeButtonText}>Change Number</Text>
@@ -219,8 +269,11 @@ export default function LoginScreen() {
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
-          <Text style={styles.logo}>AL BURHAN</Text>
-          <Text style={styles.subtitle}>Tours & Travels</Text>
+          <Image
+            source={require('../../assets/images/alburhan_logo.png')}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
           <Text style={styles.tagline}>Your Journey to the Holy Lands</Text>
         </View>
 
@@ -260,6 +313,31 @@ export default function LoginScreen() {
             </Text>
           </TouchableOpacity>
         </View>
+
+        <View style={styles.guestSection}>
+          <View style={styles.guestDividerRow}>
+            <View style={styles.guestDivider} />
+            <Text style={styles.guestDividerText}>or</Text>
+            <View style={styles.guestDivider} />
+          </View>
+          <TouchableOpacity
+            style={styles.guestButton}
+            onPress={handleContinueAsGuest}
+          >
+            <Ionicons name="eye-outline" size={18} color={Colors.primary} />
+            <Text style={styles.guestButtonText}>Continue as Guest</Text>
+          </TouchableOpacity>
+          <Text style={styles.guestNote}>Browse packages without signing in</Text>
+
+          <TouchableOpacity
+            style={styles.demoButton}
+            onPress={handleDemoLogin}
+            disabled={loading}
+          >
+            <Ionicons name="flask-outline" size={14} color={Colors.textSecondary} />
+            <Text style={styles.demoButtonText}>Demo Login (App Review)</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -279,17 +357,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 40,
   },
-  logo: {
-    fontSize: 36,
-    fontWeight: 'bold' as const,
-    color: Colors.primary,
-    letterSpacing: 2,
-  },
-  subtitle: {
-    fontSize: 18,
-    color: Colors.secondary,
-    fontWeight: '600' as const,
-    marginTop: 4,
+  logoImage: {
+    width: 180,
+    height: 120,
+    marginBottom: 8,
   },
   tagline: {
     fontSize: 14,
@@ -430,6 +501,49 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500' as const,
   },
+  fallbackOtpBox: {
+    flexDirection: 'row' as const,
+    alignItems: 'flex-start' as const,
+    backgroundColor: '#fffbeb',
+    borderWidth: 1,
+    borderColor: '#fcd34d',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 16,
+    gap: 8,
+  },
+  fallbackOtpContent: {
+    flex: 1,
+  },
+  fallbackOtpTitle: {
+    fontSize: 13,
+    fontWeight: '700' as const,
+    color: '#92400e',
+    marginBottom: 2,
+  },
+  fallbackOtpText: {
+    fontSize: 12,
+    color: '#78350f',
+    marginBottom: 6,
+  },
+  fallbackOtpCode: {
+    fontSize: 28,
+    fontWeight: 'bold' as const,
+    color: '#047857',
+    letterSpacing: 8,
+    textAlign: 'center' as const,
+    marginVertical: 4,
+    backgroundColor: '#f0fdf4',
+    borderRadius: 8,
+    paddingVertical: 6,
+    overflow: 'hidden' as const,
+  },
+  fallbackOtpNote: {
+    fontSize: 11,
+    color: '#92400e',
+    marginTop: 4,
+    textAlign: 'center' as const,
+  },
   changeButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -453,5 +567,88 @@ const styles = StyleSheet.create({
   linkTextBold: {
     color: Colors.primary,
     fontWeight: 'bold' as const,
+  },
+  notFoundBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#fffbeb',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+    gap: 8,
+  },
+  notFoundText: {
+    fontSize: 13,
+    color: '#92400e',
+    fontWeight: '600' as const,
+    marginBottom: 4,
+  },
+  notFoundRegisterBtn: {
+    alignSelf: 'flex-start',
+  },
+  notFoundRegisterText: {
+    fontSize: 13,
+    color: Colors.primary,
+    fontWeight: '700' as const,
+  },
+  guestSection: {
+    marginTop: 24,
+    alignItems: 'center',
+  },
+  guestDividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 16,
+    gap: 12,
+  },
+  guestDivider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: Colors.border,
+  },
+  guestDividerText: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+  },
+  guestButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: Colors.primary,
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    gap: 8,
+    backgroundColor: Colors.card,
+    width: '100%',
+  },
+  guestButtonText: {
+    color: Colors.primary,
+    fontSize: 16,
+    fontWeight: '600' as const,
+  },
+  guestNote: {
+    marginTop: 8,
+    fontSize: 12,
+    color: Colors.textSecondary,
+    textAlign: 'center' as const,
+  },
+  demoButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
+    paddingVertical: 8,
+    gap: 6,
+    opacity: 0.6,
+  },
+  demoButtonText: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontWeight: '500' as const,
   },
 });

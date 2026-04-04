@@ -39,3 +39,9 @@ yarn-error.*
 .vercel
 
 .env
+
+# Firebase service account credentials (never commit)
+firebase_servvice_account
+firebase_servvice_account 
+*service_account*
+al-burhan-tours-*.json

@@ -16,10 +16,58 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import { fetch as expoFetch } from 'expo/fetch';
+import { Buffer } from 'buffer';
 import { bookingService, paymentService } from '../../services/api';
 import { Colors } from '../../constants/Colors';
 import { getApiUrl } from '../../lib/query-client';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const getStatusColor = (status: string): string => {
+  switch (status) {
+    case 'pending': return '#9ca3af';
+    case 'confirmed': return '#16a34a';
+    case 'visa_approved': return '#2563eb';
+    case 'ticket_issued': return '#4f46e5';
+    case 'travel_ready': return '#d97706';
+    case 'cancelled': return '#dc2626';
+    case 'completed': return '#059669';
+    default: return '#6b7280';
+  }
+};
+
+const getStatusLabel = (status: string): string => {
+  switch (status) {
+    case 'pending': return '⏳ Pending';
+    case 'confirmed': return '✅ Confirmed';
+    case 'visa_approved': return '📄 Visa Approved';
+    case 'ticket_issued': return '🎫 Ticket Issued';
+    case 'travel_ready': return '🧳 Travel Ready';
+    case 'cancelled': return '❌ Cancelled';
+    case 'completed': return '✅ Completed';
+    default: return status;
+  }
+};
+
+const getPaymentStatusColor = (status: string): string => {
+  switch (status) {
+    case 'completed': return '#16a34a';
+    case 'partial': return '#d97706';
+    case 'pending': return '#dc2626';
+    default: return '#6b7280';
+  }
+};
+
+const getPaymentStatusLabel = (status: string): string => {
+  switch (status) {
+    case 'pending': return '💳 Payment Pending';
+    case 'partial': return '💰 Partial Payment';
+    case 'completed': return '✅ Payment Done';
+    default: return status;
+  }
+};
 
 export default function BookingDetailsScreen() {
   const { id } = useLocalSearchParams();
@@ -30,6 +78,7 @@ export default function BookingDetailsScreen() {
   const [showPaymentWebView, setShowPaymentWebView] = useState(false);
   const [razorpayHtml, setRazorpayHtml] = useState('');
   const [currentOrderId, setCurrentOrderId] = useState('');
+  const [pdfDownloading, setPdfDownloading] = useState(false);
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -250,18 +299,60 @@ export default function BookingDetailsScreen() {
     } catch {}
   };
 
+  const handleDownloadPdf = async () => {
+    const pdfUrl = bookingService.getInvoicePdfUrl(booking.id);
+    if (Platform.OS === 'web') {
+      const opened = await Linking.openURL(pdfUrl).then(() => true).catch(() => false);
+      if (!opened) Alert.alert('Error', 'Could not open invoice PDF');
+      return;
+    }
+    setPdfDownloading(true);
+    try {
+      const response = await expoFetch(pdfUrl, { credentials: 'include' });
+      if (!response.ok) {
+        Alert.alert('Error', 'Could not download invoice PDF');
+        return;
+      }
+      const buffer = await response.arrayBuffer();
+      const base64 = Buffer.from(new Uint8Array(buffer)).toString('base64');
+      const localUri = `${FileSystem.cacheDirectory}invoice-${booking.id}.pdf`;
+      await FileSystem.writeAsStringAsync(localUri, base64, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (isAvailable) {
+        await Sharing.shareAsync(localUri, {
+          mimeType: 'application/pdf',
+          dialogTitle: `Invoice - Booking #${booking.id}`,
+          UTI: 'com.adobe.pdf',
+        });
+      } else {
+        Linking.openURL(pdfUrl);
+      }
+    } catch {
+      Alert.alert('Error', 'Could not open invoice PDF');
+    } finally {
+      setPdfDownloading(false);
+    }
+  };
+
   return (
     <View style={{ flex: 1 }}>
       <ScrollView style={styles.container}>
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.bookingId}>Booking #{booking.id}</Text>
-            {booking.invoiceNumber && (
-              <Text style={styles.invoiceNum}>Invoice: {booking.invoiceNumber}</Text>
-            )}
-          </View>
-          <View style={styles.statusBadge}>
-            <Text style={styles.statusText}>{booking.status.toUpperCase()}</Text>
+        <View style={[styles.header, { flexDirection: 'column', paddingTop: Platform.OS === 'web' ? 67 : insets.top + 8 }]}>
+          <TouchableOpacity onPress={() => router.back()} style={{ marginBottom: 10 }}>
+            <Ionicons name="arrow-back" size={22} color={Colors.text} />
+          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <View>
+              <Text style={styles.bookingId}>Booking #{booking.id}</Text>
+              {booking.invoiceNumber && (
+                <Text style={styles.invoiceNum}>Invoice: {booking.invoiceNumber}</Text>
+              )}
+            </View>
+            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(booking.status) }]}>
+              <Text style={styles.statusText}>{getStatusLabel(booking.status)}</Text>
+            </View>
           </View>
         </View>
 
@@ -273,6 +364,22 @@ export default function BookingDetailsScreen() {
           <TouchableOpacity style={[styles.invoiceBtn, styles.invoiceBtnShare]} onPress={handleShareInvoice}>
             <Ionicons name="share-outline" size={18} color="#fff" />
             <Text style={[styles.invoiceBtnText, { color: '#fff' }]}>Share Invoice</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.invoiceActions}>
+          <TouchableOpacity
+            style={[styles.invoiceBtn, styles.invoiceBtnPdf, pdfDownloading && styles.invoiceBtnDisabled]}
+            onPress={handleDownloadPdf}
+            disabled={pdfDownloading}
+          >
+            {pdfDownloading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Ionicons name="download-outline" size={18} color="#fff" />
+            )}
+            <Text style={[styles.invoiceBtnText, { color: '#fff' }]}>
+              {pdfDownloading ? 'Downloading...' : 'Download PDF'}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -349,9 +456,9 @@ export default function BookingDetailsScreen() {
             </View>
             <View style={styles.row}>
               <Text style={styles.label}>Payment Status:</Text>
-              <View style={styles.paymentBadge}>
-                <Text style={styles.paymentText}>{booking.paymentStatus.toUpperCase()}</Text>
-              </View>
+              <Text style={[styles.paymentStatusText, { color: getPaymentStatusColor(booking.paymentStatus) }]}>
+                {getPaymentStatusLabel(booking.paymentStatus)}
+              </Text>
             </View>
           </View>
         </View>
@@ -483,6 +590,8 @@ const styles = StyleSheet.create({
   invoiceActions: { flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 12, gap: 10, backgroundColor: '#f0fdf4', borderBottomWidth: 1, borderBottomColor: '#d1fae5' },
   invoiceBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 10, borderWidth: 1.5, borderColor: '#047857', backgroundColor: '#fff' },
   invoiceBtnShare: { backgroundColor: '#047857' },
+  invoiceBtnPdf: { backgroundColor: '#1d4ed8', borderColor: '#1d4ed8' },
+  invoiceBtnDisabled: { opacity: 0.6 },
   invoiceBtnText: { fontSize: 14, fontWeight: '700' as const, color: '#047857' },
   section: { padding: 16 },
   sectionTitle: { fontSize: 18, fontWeight: 'bold' as const, color: Colors.text, marginBottom: 12 },
@@ -494,8 +603,7 @@ const styles = StyleSheet.create({
   boldValue: { fontWeight: 'bold' as const, fontSize: 16 },
   travelerTitle: { fontSize: 16, fontWeight: 'bold' as const, color: Colors.text, marginBottom: 8 },
   divider: { height: 1, backgroundColor: Colors.border, marginVertical: 8 },
-  paymentBadge: { backgroundColor: Colors.warning, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 6 },
-  paymentText: { color: '#FFFFFF', fontSize: 12, fontWeight: 'bold' as const },
+  paymentStatusText: { fontSize: 14, fontWeight: '700' as const, textAlign: 'right' as const },
   installmentNote: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#EFF6FF', borderRadius: 8, padding: 10, marginBottom: 14 },
   installmentNoteText: { fontSize: 12, color: Colors.primary, flex: 1, lineHeight: 16 },
   presetRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },

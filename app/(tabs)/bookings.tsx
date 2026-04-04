@@ -51,16 +51,25 @@ import React, { useState, useEffect } from 'react';
 
     const getStatusColor = (status: string) => {
       switch (status) {
-        case 'confirmed':
-          return Colors.success;
-        case 'pending':
-          return Colors.warning;
-        case 'cancelled':
-          return Colors.error;
-        case 'completed':
-          return Colors.primary;
-        default:
-          return Colors.textSecondary;
+        case 'confirmed': return '#16a34a';
+        case 'visa_approved': return '#2563eb';
+        case 'travel_ready': return '#059669';
+        case 'cancelled': return Colors.error;
+        case 'pending': return '#d97706';
+        case 'completed': return Colors.primary;
+        default: return Colors.textSecondary;
+      }
+    };
+
+    const getStatusLabel = (status: string) => {
+      switch (status) {
+        case 'confirmed': return 'Confirmed';
+        case 'visa_approved': return 'Visa Approved';
+        case 'travel_ready': return 'Travel Ready';
+        case 'cancelled': return 'Cancelled';
+        case 'pending': return 'Pending';
+        case 'completed': return 'Completed';
+        default: return status;
       }
     };
 
@@ -159,7 +168,7 @@ import React, { useState, useEffect } from 'react';
                     ]}
                   >
                     <Text style={styles.statusText}>
-                      {booking.status.toUpperCase()}
+                      {getStatusLabel(booking.status)}
                     </Text>
                   </View>
                 </View>

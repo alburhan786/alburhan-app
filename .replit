@@ -3,7 +3,7 @@ run = "npm start"
 modules = ["nodejs-20", "postgresql-16"]
 
   [deployment]
-run = ["npm", "start"]
+run = ["node", "server-runner.js"]
 deploymentTarget = "autoscale"
 
 [[ports]]
@@ -20,6 +20,7 @@ externalPort = 3001
 
 [nix]
 channel = "stable-25_05"
+packages = ["psmisc"]
 
 [workflows]
 runButton = "Project"
@@ -53,13 +54,13 @@ outputType = "webview"
 name = "Start Frontend"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npm run expo:dev"
-waitForPort = 8081
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "EXPO_NO_REDIRECT_PROMPT=true EXPO_PACKAGER_PROXY_URL=https://$REPLIT_DEV_DOMAIN REACT_NATIVE_PACKAGER_HOSTNAME=$REPLIT_DEV_DOMAIN EXPO_PUBLIC_DOMAIN=$REPLIT_DEV_DOMAIN npx expo start --localhost"
+waitForPort = 8081
 
 [userenv]
 
@@ -71,8 +72,17 @@ BOTBEE_API_KEY = "18586|wNNF04uDdR6fFHZwBPpcPQcMDQJ1yqauLNaxWkHP6eaed2ba"
 BOTBEE_BUSINESS_ID = "2322353164933958"
 BOTBEE_API_URL = "https://app.botbee.io/api/v1"
 META_WHATSAPP_TOKEN = "EAALZCchXOSMsBQrZCDxA6Kei5C7Q7Q91lckxYFZC80l2kWsAJMfqKFDG0sqMDwgiStnqn0IoV3Yov2kjU4I8aLkv9QfbreRZCitd7ztGL1RbmwAiBcfldo4KAcAgXLiapwrTTPpDWjkFpIQMoxQj3CZA8os4aNRqcKH3OTjbYlF57dOsrRH7S2VRS0git2uWJBuu2xiP7mJxteBIrBs0HnwXyYpmFoy20gVUOGYO7FiRlZBH43XbKZCxQFukWFdJ3BYQlxOJoPZBPZBKaij4HZCgLsYnfddhJSKnnY"
-INVOICE_BASE_URL = "https://khanaltaf1975-workspace.replit.app"
+INVOICE_BASE_URL = "https://al-burhan-tours-and-travels.replit.app"
+EXPO_PUBLIC_DOMAIN = "al-burhan-tours-and-travels.replit.app"
+EXPO_PUBLIC_FIREBASE_PROJECT_ID = "al-burhan-tours"
+
+[userenv.development]
+APP_DB_URL = "postgresql://postgres:password@helium/heliumdb?sslmode=disable"
 
 [agent]
-integrations = ["javascript_openai_ai_integrations:2.0.0"]
+integrations = ["javascript_openai_ai_integrations:2.0.0", "javascript_database:1.0.0", "expo_object_storage:1.0.0"]
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 120000
   

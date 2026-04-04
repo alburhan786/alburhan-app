@@ -47,13 +47,20 @@
     .badge-pending { background: linear-gradient(135deg, #fef3c7, #fde68a); color: #92400e; border: 1px solid #fcd34d; }
     .badge-confirmed { background: linear-gradient(135deg, #d1fae5, #a7f3d0); color: #065f46; border: 1px solid #6ee7b7; }
     .badge-cancelled { background: linear-gradient(135deg, #fee2e2, #fecaca); color: #991b1b; border: 1px solid #fca5a5; }
+    .badge-visa-approved { background: linear-gradient(135deg, #dbeafe, #bfdbfe); color: #1e40af; border: 1px solid #93c5fd; }
+    .badge-ticket-issued { background: linear-gradient(135deg, #ede9fe, #ddd6fe); color: #4f46e5; border: 1px solid #a5b4fc; }
+    .badge-travel-ready { background: linear-gradient(135deg, #ffedd5, #fed7aa); color: #9a3412; border: 1px solid #fdba74; }
     .badge-completed { background: linear-gradient(135deg, #dbeafe, #bfdbfe); color: #1e40af; border: 1px solid #93c5fd; }
+    .status-select { padding: 6px 10px; border-radius: 8px; border: 1px solid #d1d5db; font-size: 13px; background: #fff; color: #111827; cursor: pointer; }
     .badge-partial { background: linear-gradient(135deg, #ffedd5, #fed7aa); color: #9a3412; border: 1px solid #fdba74; }
     .badge-success { background: linear-gradient(135deg, #d1fae5, #a7f3d0); color: #065f46; border: 1px solid #6ee7b7; }
     .badge-failed { background: linear-gradient(135deg, #fee2e2, #fecaca); color: #991b1b; border: 1px solid #fca5a5; }
     .btn { padding: 7px 16px; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 4px; }
     .btn-confirm { background: linear-gradient(135deg, #047857, #059669); color: white; box-shadow: 0 1px 3px rgba(4,120,87,0.3); }
     .btn-confirm:hover { background: linear-gradient(135deg, #065f46, #047857); transform: translateY(-1px); box-shadow: 0 2px 6px rgba(4,120,87,0.4); }
+    .btn-action { background: linear-gradient(135deg, #1d4ed8, #2563eb); color: white; box-shadow: 0 1px 3px rgba(29,78,216,0.3); }
+    .btn-action:hover { background: linear-gradient(135deg, #1e40af, #1d4ed8); transform: translateY(-1px); box-shadow: 0 2px 6px rgba(29,78,216,0.4); }
+    .btn-action:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
     .btn-cancel { background: linear-gradient(135deg, #dc2626, #ef4444); color: white; box-shadow: 0 1px 3px rgba(220,38,38,0.3); }
     .btn-cancel:hover { background: linear-gradient(135deg, #b91c1c, #dc2626); }
     .btn-view { background: linear-gradient(135deg, #2563eb, #3b82f6); color: white; box-shadow: 0 1px 3px rgba(37,99,235,0.3); }
@@ -102,6 +109,15 @@
     .doc-info { display: flex; flex-direction: column; gap: 4px; }
     .doc-name { font-weight: 600; font-size: 13px; color: #1f2937; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .doc-actions { display: flex; gap: 6px; margin-top: 2px; }
+    .doc-status-pending { display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;background:linear-gradient(135deg,#fef3c7,#fde68a);color:#92400e;border:1px solid #fcd34d; }
+    .doc-status-approved { display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;background:linear-gradient(135deg,#d1fae5,#a7f3d0);color:#065f46;border:1px solid #6ee7b7; }
+    .doc-status-rejected { display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;background:linear-gradient(135deg,#fee2e2,#fecaca);color:#991b1b;border:1px solid #fca5a5; }
+    .btn-approve { background:linear-gradient(135deg,#047857,#059669);color:white;box-shadow:0 1px 3px rgba(4,120,87,0.3); }
+    .btn-approve:hover { background:linear-gradient(135deg,#065f46,#047857); }
+    .btn-reject { background:linear-gradient(135deg,#dc2626,#ef4444);color:white;box-shadow:0 1px 3px rgba(220,38,38,0.3); }
+    .btn-reject:hover { background:linear-gradient(135deg,#b91c1c,#dc2626); }
+    .customer-photo { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid #e5e7eb; background: #f3f4f6; display: block; flex-shrink: 0; }
+    .customer-photo-default { width: 40px; height: 40px; border-radius: 50%; background: #e5e7eb; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
     @media (max-width: 768px) {
       .content { padding: 16px; }
       .stats-grid { grid-template-columns: repeat(2, 1fr); }
@@ -121,7 +137,11 @@
       <h1>AL BURHAN TOURS & TRAVELS</h1>
       <span>Admin Dashboard</span>
     </div>
-    <button class="refresh-btn" onclick="loadAll()">Refresh</button>
+    <div style="display:flex;gap:10px;align-items:center">
+      <button class="refresh-btn" onclick="loadAll()">Refresh</button>
+      <button class="refresh-btn" onclick="fixImageUrls()" style="background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;border:none" title="Fix image URLs that were saved with wrong domain">Fix Img URLs</button>
+      <a href="/admin/logout" style="background:rgba(255,255,255,0.15);color:white;border:1.5px solid rgba(255,255,255,0.4);padding:8px 18px;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;cursor:pointer;transition:background 0.2s" onmouseover="this.style.background='rgba(255,255,255,0.25)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'">Logout</a>
+    </div>
   </div>
 
   <div class="nav">
@@ -133,6 +153,8 @@
     <button onclick="showSection('notifications', this)">Notifications</button>
     <button onclick="showSection('packages', this)">Packages</button>
     <button onclick="showSection('create-invoice', this)">Create Invoice</button>
+    <button onclick="showSection('whatsapp-test', this)">WhatsApp Test</button>
+    <button onclick="showSection('groups', this)">Groups</button>
   </div>
 
   <div class="content">
@@ -211,30 +233,180 @@
 
     <div id="section-notifications" class="section">
       <div class="card">
-        <h2>Send Notification to All Customers</h2>
-        <p style="color:#6b7280;font-size:14px;margin-bottom:16px">Send a message to all registered customers via SMS, WhatsApp, and Email simultaneously.</p>
+        <h2>Send Notification</h2>
+        <p style="color:#6b7280;font-size:14px;margin-bottom:20px">Choose a notification type, select a customer or broadcast to all, then send.</p>
+
         <div style="margin-bottom:16px">
-          <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Subject (for Email)</label>
-          <input type="text" id="notif-subject" placeholder="e.g. Important Update - Hajj 2027" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px" />
+          <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Notification Type *</label>
+          <select id="unified-notif-type" onchange="onUnifiedTypeChange()" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;background:#fff">
+            <option value="">-- Select notification type --</option>
+            <option value="booking">🎉 Booking Confirmed</option>
+            <option value="payment">💳 Payment Pending</option>
+            <option value="visa">📄 Visa Ready</option>
+            <option value="ticket">🎫 Ticket Issued</option>
+            <option value="flight">✈️ Flight Update</option>
+            <option value="travel_reminder">🧳 Travel Reminder</option>
+            <option value="meena">🕋 Meena Update</option>
+            <option value="madinah">🕌 Welcome to Madinah</option>
+            <option value="ziyarat">🚌 Ziyarat Schedule</option>
+            <option value="laundry">🧺 Laundry Ready</option>
+            <option value="food">🍽️ Food Ready</option>
+            <option value="broadcast">📢 Broadcast to All</option>
+          </select>
         </div>
+
+        <div style="margin-bottom:16px">
+          <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:8px">Target</label>
+          <div style="display:flex;gap:24px;flex-wrap:wrap">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:14px">
+              <input type="radio" name="unified-target" value="all" checked onchange="onUnifiedTargetChange()" /> Broadcast to All
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:14px">
+              <input type="radio" name="unified-target" value="user" onchange="onUnifiedTargetChange()" /> Specific Customer
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:14px">
+              <input type="radio" name="unified-target" value="group" onchange="onUnifiedTargetChange()" /> Group
+            </label>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+          <div id="unified-user-wrap" style="display:none">
+            <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Customer</label>
+            <select id="unified-notif-customer" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;background:#fff">
+              <option value="">-- Select customer --</option>
+            </select>
+          </div>
+          <div id="unified-group-wrap" style="display:none">
+            <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Group</label>
+            <select id="unified-notif-group" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;background:#fff">
+              <option value="">-- Select group --</option>
+            </select>
+          </div>
+          <div id="unified-bookingid-wrap">
+            <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">
+              Booking ID <span style="font-weight:400;color:#9ca3af">(optional — overrides target with booking's user)</span>
+            </label>
+            <input type="number" id="unified-notif-bookingid" placeholder="e.g. 42" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px" />
+          </div>
+        </div>
+
+        <div id="unified-status-filter-wrap" style="margin-bottom:16px">
+          <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">
+            Filter by Booking Status <span style="font-weight:400;color:#9ca3af">(optional — only send to users with this status)</span>
+          </label>
+          <select id="unified-notif-status" style="width:100%;max-width:320px;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;background:#fff">
+            <option value="">-- Any status (no filter) --</option>
+            <option value="pending">⏳ Pending</option>
+            <option value="confirmed">✅ Confirmed</option>
+            <option value="visa_approved">📄 Visa Approved</option>
+            <option value="ticket_issued">🎫 Ticket Issued</option>
+            <option value="travel_ready">🧳 Travel Ready</option>
+            <option value="cancelled">❌ Cancelled</option>
+          </select>
+        </div>
+
+        <div style="margin-bottom:12px">
+          <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Title</label>
+          <input type="text" id="unified-notif-title" placeholder="Notification title (auto-filled on type select)" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px" />
+        </div>
+
         <div style="margin-bottom:16px">
           <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Message</label>
-          <textarea id="notif-message" rows="5" placeholder="Assalamu Alaikum, ..." style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;resize:vertical"></textarea>
+          <textarea id="unified-notif-message" rows="3" placeholder="Message body (auto-filled on type select)" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;resize:vertical"></textarea>
         </div>
-        <button class="btn btn-confirm" onclick="sendBroadcastNotification()" id="broadcast-btn" style="padding:12px 32px;font-size:15px">
-          Send to All Customers (SMS + WhatsApp + Email)
+
+        <div style="margin-bottom:20px">
+          <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">
+            Image URL <span style="font-weight:400;color:#9ca3af">(optional — shown as a banner in the notification)</span>
+          </label>
+          <input type="url" id="unified-notif-image" placeholder="https://example.com/image.jpg" oninput="onUnifiedImageInput(this.value)" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px" />
+          <div id="unified-notif-image-preview" style="margin-top:8px;display:none">
+            <img id="unified-notif-image-thumb" src="" alt="Preview" style="max-height:80px;max-width:200px;border-radius:6px;border:1px solid #e5e7eb;object-fit:cover" onerror="document.getElementById('unified-notif-image-preview').style.display='none'" />
+          </div>
+        </div>
+
+        <button class="btn btn-confirm" onclick="sendUnifiedNotification()" id="unified-notif-btn" style="padding:12px 36px;font-size:15px">
+          Send Notification
         </button>
-        <div id="broadcast-status" style="margin-top:16px"></div>
+        <div id="unified-notif-result" style="margin-top:16px"></div>
       </div>
       <div class="card">
-        <h2>Notification History</h2>
-        <div id="notif-results" style="color:#6b7280;font-size:14px">Send a notification above to see results here.</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+          <h2 style="margin:0">Notification History</h2>
+          <div style="display:flex;gap:8px">
+            <button class="btn" onclick="retryFailedNotifications()" id="notif-retry-btn" style="padding:8px 16px;font-size:13px;background:#dc2626;color:#fff;border:none;cursor:pointer;border-radius:6px">↺ Retry Failed</button>
+            <button class="btn" onclick="loadNotificationHistory()" id="notif-history-btn" style="padding:8px 20px;font-size:13px">Refresh</button>
+          </div>
+        </div>
+        <div id="notif-retry-result" style="margin-bottom:8px"></div>
+        <div id="notif-history-stats" style="margin-bottom:12px"></div>
+        <div id="notif-results" style="color:#6b7280;font-size:14px">Loading history...</div>
       </div>
     </div>
 
     <div id="section-packages" class="section">
       <div class="card">
-        <h2>Packages</h2>
+        <h2>Add New Package</h2>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+          <div>
+            <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Type *</label>
+            <select id="pkg-type" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;background:white">
+              <option value="umrah">Umrah</option>
+              <option value="hajj">Hajj</option>
+            </select>
+          </div>
+          <div>
+            <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Package Name *</label>
+            <input type="text" id="pkg-name" placeholder="e.g. Premium Umrah Package" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px" />
+          </div>
+          <div>
+            <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Category</label>
+            <input type="text" id="pkg-category" placeholder="e.g. Premium Umrah" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px" />
+          </div>
+          <div>
+            <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Duration *</label>
+            <input type="text" id="pkg-duration" placeholder="e.g. 14 Nights / 15 Days" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px" />
+          </div>
+          <div>
+            <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Starting Price (₹) *</label>
+            <input type="number" id="pkg-price" placeholder="150000" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px" />
+          </div>
+          <div>
+            <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Available Seats *</label>
+            <input type="number" id="pkg-seats" placeholder="50" value="50" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px" />
+          </div>
+          <div>
+            <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Departure Date *</label>
+            <input type="date" id="pkg-departure" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px" />
+          </div>
+          <div>
+            <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Return Date *</label>
+            <input type="date" id="pkg-return" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px" />
+          </div>
+          <div style="grid-column:1/-1">
+            <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Image URL</label>
+            <input type="text" id="pkg-imageUrl" name="imageUrl" placeholder="https://example.com/package-image.jpg" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px" />
+            <p style="font-size:11px;color:#9ca3af;margin-top:4px">Paste a direct link to an image for this package card (optional)</p>
+          </div>
+          <div style="grid-column:1/-1">
+            <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Description *</label>
+            <textarea id="pkg-description" rows="3" placeholder="Describe the package..." style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;resize:vertical"></textarea>
+          </div>
+          <div style="grid-column:1/-1">
+            <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Inclusions (one per line)</label>
+            <textarea id="pkg-inclusions" rows="4" placeholder="Hotel Makkah&#10;Hotel Madinah&#10;Visa Processing&#10;Airport Transfers" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;resize:vertical"></textarea>
+          </div>
+          <div style="grid-column:1/-1;display:flex;align-items:center;gap:8px">
+            <input type="checkbox" id="pkg-featured" />
+            <label for="pkg-featured" style="font-size:13px;font-weight:600;color:#374151;cursor:pointer">Mark as Featured</label>
+          </div>
+        </div>
+        <button class="btn btn-confirm" onclick="createPackage()" id="create-pkg-btn" style="padding:12px 32px;font-size:15px">Create Package</button>
+        <div id="pkg-create-result" style="margin-top:16px"></div>
+      </div>
+      <div class="card">
+        <h2>All Packages</h2>
         <div class="table-wrap" id="all-packages"></div>
       </div>
     </div>
@@ -308,9 +480,6 @@
             Create Invoice & Booking
           </button>
           <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#374151;cursor:pointer">
-            <input type="checkbox" id="inv-send-sms" checked /> Send Invoice Link via SMS
-          </label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#374151;cursor:pointer">
             <input type="checkbox" id="inv-send-whatsapp" checked /> Send via WhatsApp
           </label>
         </div>
@@ -319,6 +488,113 @@
       <div class="card">
         <h2>Generated Invoices</h2>
         <div class="table-wrap" id="all-invoices"></div>
+      </div>
+    </div>
+
+    <div id="section-whatsapp-test" class="section">
+      <div class="card">
+        <h2>WhatsApp Diagnostic Tool</h2>
+        <p style="color:#6b7280;font-size:14px;margin-bottom:20px">Send a test WhatsApp message and see the exact response from Meta's API to diagnose delivery issues.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+          <div>
+            <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Phone Number *</label>
+            <input type="text" id="wa-test-phone" placeholder="e.g. 9893989786" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px" />
+            <p style="color:#9ca3af;font-size:12px;margin-top:4px">Enter without +91 prefix</p>
+          </div>
+          <div>
+            <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Template *</label>
+            <select id="wa-test-template" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px">
+              <option value="otp">OTP Login (alburhan_login_otp, en_US)</option>
+              <option value="booking">Booking Received (booking, en_GB)</option>
+              <option value="conformation">Payment Confirmation (conformation, en_GB)</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-confirm" onclick="testWhatsApp()" id="wa-test-btn" style="padding:12px 32px;font-size:15px;background:#047857">
+          Send Test Message
+        </button>
+        <div id="wa-test-result" style="margin-top:20px"></div>
+      </div>
+      <div class="card">
+        <h2>Test Push Notification</h2>
+        <p style="color:#6b7280;font-size:14px;margin-bottom:20px">Send a test push notification to verify real device delivery. Enter a User ID to use their registered token, or paste a token directly.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+          <div>
+            <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">User ID</label>
+            <input type="number" id="push-test-userid" placeholder="e.g. 2" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px" />
+            <p style="color:#9ca3af;font-size:12px;margin-top:4px">Sends to user's stored device token</p>
+          </div>
+          <div>
+            <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Or paste token directly</label>
+            <input type="text" id="push-test-token" placeholder="ExponentPushToken[...]" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;font-family:monospace" />
+            <p style="color:#9ca3af;font-size:12px;margin-top:4px">If both set, User ID takes priority</p>
+          </div>
+        </div>
+        <button class="btn btn-confirm" onclick="testPushNotification()" id="push-test-btn" style="padding:12px 32px;font-size:15px;background:#1d4ed8">
+          Send Test Push
+        </button>
+        <div id="push-test-result" style="margin-top:20px"></div>
+      </div>
+      <div class="card">
+        <h2>Template Reference</h2>
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead><tr style="background:#f9fafb"><th style="padding:8px 12px;text-align:left;border-bottom:1px solid #e5e7eb">Template</th><th style="padding:8px 12px;text-align:left;border-bottom:1px solid #e5e7eb">Language</th><th style="padding:8px 12px;text-align:left;border-bottom:1px solid #e5e7eb">Variables</th><th style="padding:8px 12px;text-align:left;border-bottom:1px solid #e5e7eb">When Used</th></tr></thead>
+          <tbody>
+            <tr><td style="padding:8px 12px;border-bottom:1px solid #f3f4f6"><code>alburhan_login_otp</code></td><td style="padding:8px 12px;border-bottom:1px solid #f3f4f6">en_US</td><td style="padding:8px 12px;border-bottom:1px solid #f3f4f6">{{1}} = OTP code (body + button)</td><td style="padding:8px 12px;border-bottom:1px solid #f3f4f6">User login / OTP request</td></tr>
+            <tr><td style="padding:8px 12px;border-bottom:1px solid #f3f4f6"><code>booking</code></td><td style="padding:8px 12px;border-bottom:1px solid #f3f4f6">en_GB</td><td style="padding:8px 12px;border-bottom:1px solid #f3f4f6">Header image + {{1}} = customer name</td><td style="padding:8px 12px;border-bottom:1px solid #f3f4f6">Booking created / admin creates offline booking</td></tr>
+            <tr><td style="padding:8px 12px"><code>conformation</code></td><td style="padding:8px 12px">en_GB</td><td style="padding:8px 12px">{{1}} name, {{2}} package, {{3}} amount, {{4}} invoice URL</td><td style="padding:8px 12px">Payment confirmed</td></tr>
+          </tbody>
+        </table>
+        <div style="margin-top:16px;padding:12px;background:#fef3c7;border-radius:8px;font-size:13px;color:#92400e">
+          <strong>Common Meta Error Codes:</strong><br>
+          132000 — Template not found (wrong name or language code)<br>
+          132001 — Template paused (low quality score — check Meta Business Manager)<br>
+          131047 — Message failed to send (recipient not on WhatsApp or invalid number)<br>
+          100 — Invalid parameter (wrong component structure)
+        </div>
+      </div>
+    </div>
+
+    <div id="section-groups" class="section">
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+          <div>
+            <h2 style="margin:0">Groups</h2>
+            <p style="color:#6b7280;font-size:14px;margin:4px 0 0">Organise customers into groups for targeted notifications.</p>
+          </div>
+          <button class="btn btn-confirm" onclick="document.getElementById('create-group-form').style.display = document.getElementById('create-group-form').style.display==='none'?'block':'none'" style="padding:8px 20px">+ New Group</button>
+        </div>
+        <div id="create-group-form" style="display:none;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:20px">
+          <h3 style="margin:0 0 12px;font-size:15px;color:#111827">Create New Group</h3>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+            <div>
+              <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Group Name *</label>
+              <input type="text" id="new-group-name" placeholder="e.g. Batch Jan 2026" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px" />
+            </div>
+            <div>
+              <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Description</label>
+              <input type="text" id="new-group-desc" placeholder="Optional description" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px" />
+            </div>
+          </div>
+          <button class="btn btn-confirm" onclick="createGroup()" style="padding:8px 20px">Create Group</button>
+          <span id="create-group-result" style="margin-left:12px;font-size:13px"></span>
+        </div>
+        <div id="groups-list">Loading groups...</div>
+      </div>
+
+      <div id="group-members-card" style="display:none" class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <h2 style="margin:0" id="group-members-title">Members</h2>
+          <button class="btn" onclick="document.getElementById('group-members-card').style.display='none'" style="padding:6px 16px;font-size:13px">Close</button>
+        </div>
+        <div style="display:flex;gap:10px;margin-bottom:16px">
+          <select id="add-member-user" style="flex:1;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;background:#fff">
+            <option value="">-- Select customer to add --</option>
+          </select>
+          <button class="btn btn-confirm" onclick="addGroupMember()" style="padding:10px 20px;font-size:14px;white-space:nowrap">Add Member</button>
+        </div>
+        <span id="add-member-result" style="font-size:13px;display:block;margin-bottom:12px"></span>
+        <div id="group-members-list">Loading members...</div>
       </div>
     </div>
   </div>
@@ -352,8 +628,13 @@
     }
 
     function getBadgeClass(status) {
-      var map = { pending: 'badge-pending', confirmed: 'badge-confirmed', cancelled: 'badge-cancelled', completed: 'badge-completed', partial: 'badge-partial', success: 'badge-success', failed: 'badge-failed' };
+      var map = { pending: 'badge-pending', confirmed: 'badge-confirmed', cancelled: 'badge-cancelled', visa_approved: 'badge-visa-approved', ticket_issued: 'badge-ticket-issued', travel_ready: 'badge-travel-ready', completed: 'badge-completed', partial: 'badge-partial', success: 'badge-success', failed: 'badge-failed' };
       return map[status] || 'badge-pending';
+    }
+
+    function getStatusLabel(status) {
+      var map = { pending: 'Pending', confirmed: 'Confirmed', cancelled: 'Cancelled', visa_approved: 'Visa Approved', ticket_issued: 'Ticket Issued', travel_ready: 'Travel Ready', completed: 'Completed', partial: 'Partial', success: 'Success', failed: 'Failed' };
+      return map[status] || status;
     }
 
     function showSection(name, btn) {
@@ -361,10 +642,14 @@
       document.querySelectorAll('.nav button').forEach(function(b) { b.classList.remove('active'); });
       document.getElementById('section-' + name).classList.add('active');
       if (btn) btn.classList.add('active');
+      if (name === 'notifications') { loadNotificationHistory(); }
+      if (name === 'groups') { loadGroups(); }
+      if (name === 'packages') { loadPackages(); }
     }
 
-    async function fetchJSON(url) {
-      var res = await fetch(API + url);
+    async function fetchJSON(url, options) {
+      var opts = Object.assign({ headers: { 'Content-Type': 'application/json' } }, options || {});
+      var res = await fetch(API + url, opts);
       return res.json();
     }
 
@@ -399,24 +684,35 @@
           var b = list[i];
           var actions = '<button class="btn btn-confirm" onclick="viewBooking(' + b.id + ')">View</button>';
           actions += '<a href="/invoice/' + b.id + '" target="_blank" class="btn btn-invoice" style="text-decoration:none">Invoice</a>';
-          if (b.status === 'pending') {
-            actions += '<button class="btn btn-confirm" onclick="updateStatus(' + b.id + ', \'confirmed\')">Confirm</button>';
-            actions += '<button class="btn btn-cancel" onclick="updateStatus(' + b.id + ', \'cancelled\')">Cancel</button>';
-          }
+          var legacyOpt = (['pending','confirmed','visa_approved','ticket_issued','travel_ready','cancelled'].indexOf(b.status) === -1)
+            ? '<option value="" selected disabled>' + getStatusLabel(b.status) + ' (current)</option>' : '';
+          actions += '<select class="status-select" onchange="if(this.value)updateStatus(' + b.id + ', this.value)" style="margin-left:4px">' +
+            legacyOpt +
+            '<option value="pending"' + (b.status==='pending'?' selected':'') + '>Pending</option>' +
+            '<option value="confirmed"' + (b.status==='confirmed'?' selected':'') + '>Confirmed</option>' +
+            '<option value="visa_approved"' + (b.status==='visa_approved'?' selected':'') + '>Visa Approved</option>' +
+            '<option value="ticket_issued"' + (b.status==='ticket_issued'?' selected':'') + '>Ticket Issued</option>' +
+            '<option value="travel_ready"' + (b.status==='travel_ready'?' selected':'') + '>Travel Ready</option>' +
+            '<option value="cancelled"' + (b.status==='cancelled'?' selected':'') + '>Cancelled</option>' +
+            '</select>';
+          var photoCell = b.photo
+            ? '<img class="customer-photo" src="' + esc(b.photo) + '" loading="lazy" alt="Photo" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'" /><div class="customer-photo-default" style="display:none"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="8" r="4" fill="#9ca3af"/><path d="M4 20c0-4 3.582-7 8-7s8 3 8 7" fill="#9ca3af"/></svg></div>'
+            : '<div class="customer-photo-default"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="8" r="4" fill="#9ca3af"/><path d="M4 20c0-4 3.582-7 8-7s8 3 8 7" fill="#9ca3af"/></svg></div>';
           rows += '<tr>' +
             '<td><strong>#' + b.id + '</strong></td>' +
+            '<td>' + photoCell + '</td>' +
             '<td>' + esc(b.contactName || '-') + '</td>' +
             '<td>' + esc(b.contactPhone || '-') + '</td>' +
             '<td>' + b.numberOfPeople + '</td>' +
             '<td>' + formatPrice(b.totalAmount) + '</td>' +
             '<td>' + formatPrice(b.paidAmount) + '</td>' +
-            '<td><span class="badge ' + getBadgeClass(b.status) + '">' + b.status + '</span></td>' +
+            '<td><span class="badge ' + getBadgeClass(b.status) + '">' + getStatusLabel(b.status) + '</span></td>' +
             '<td><span class="badge ' + getBadgeClass(b.paymentStatus) + '">' + b.paymentStatus + '</span></td>' +
             '<td>' + formatDate(b.bookingDate) + '</td>' +
             '<td><div class="btn-group">' + actions + '</div></td>' +
             '</tr>';
         }
-        return '<table><thead><tr><th>ID</th><th>Contact</th><th>Phone</th><th>Travelers</th><th>Total</th><th>Paid</th><th>Status</th><th>Payment</th><th>Date</th><th>Actions</th></tr></thead><tbody>' + rows + '</tbody></table>';
+        return '<table><thead><tr><th>ID</th><th>Photo</th><th>Contact</th><th>Phone</th><th>Travelers</th><th>Total</th><th>Paid</th><th>Status</th><th>Payment</th><th>Date</th><th>Actions</th></tr></thead><tbody>' + rows + '</tbody></table>';
       }
 
       document.getElementById('recent-bookings').innerHTML = renderTable(bookings.slice(0, 5));
@@ -436,9 +732,15 @@
       var rows = '';
       for (var i = 0; i < customers.length; i++) {
         var c = customers[i];
-        rows += '<tr><td>#' + c.id + '</td><td><strong>' + esc(c.name) + '</strong></td><td>' + esc(c.email) + '</td><td>' + esc(c.phone) + '</td><td>' + formatDate(c.createdAt) + '</td></tr>';
+        var photoHtml = c.photo
+          ? '<img src="' + esc(c.photo) + '" class="customer-photo" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'" /><div class="customer-photo-fallback" style="display:none"><svg viewBox="0 0 40 40" width="40" height="40"><circle cx="20" cy="20" r="20" fill="#e5e7eb"/><circle cx="20" cy="16" r="7" fill="#9ca3af"/><ellipse cx="20" cy="34" rx="12" ry="8" fill="#9ca3af"/></svg></div>'
+          : '<div class="customer-photo-fallback"><svg viewBox="0 0 40 40" width="40" height="40"><circle cx="20" cy="20" r="20" fill="#e5e7eb"/><circle cx="20" cy="16" r="7" fill="#9ca3af"/><ellipse cx="20" cy="34" rx="12" ry="8" fill="#9ca3af"/></svg></div>';
+        var waHtml = c.whatsappNumber
+          ? '<a href="https://wa.me/91' + esc(c.whatsappNumber) + '" target="_blank" style="color:#25D366;text-decoration:none;font-weight:600;">&#9830; ' + esc(c.whatsappNumber) + '</a>'
+          : '<span style="color:#9ca3af">—</span>';
+        rows += '<tr><td>#' + c.id + '</td><td>' + photoHtml + '</td><td><strong>' + esc(c.name) + '</strong></td><td>' + esc(c.email) + '</td><td>' + esc(c.phone) + '</td><td>' + waHtml + '</td><td>' + formatDate(c.createdAt) + '</td></tr>';
       }
-      document.getElementById('all-customers').innerHTML = '<table><thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Joined</th></tr></thead><tbody>' + rows + '</tbody></table>';
+      document.getElementById('all-customers').innerHTML = '<table><thead><tr><th>ID</th><th>Photo</th><th>Name</th><th>Email</th><th>Phone</th><th>WhatsApp</th><th>Joined</th></tr></thead><tbody>' + rows + '</tbody></table>';
     }
 
     async function loadPayments() {
@@ -561,16 +863,36 @@
           fileCell = '<span style="color:#9ca3af;font-size:12px">' + safeName + ' <em>(re-upload needed)</em></span>';
         }
 
-        rows += '<tr>' +
+        var docStatus = d.status || 'pending';
+        var statusBadge = docStatus === 'approved'
+          ? '<span class="doc-status-approved">✅ Approved</span>'
+          : docStatus === 'rejected'
+            ? '<span class="doc-status-rejected">❌ Rejected</span>' + (d.adminComment ? '<div style="font-size:11px;color:#991b1b;margin-top:3px;max-width:160px">' + esc(d.adminComment) + '</div>' : '')
+            : '<span class="doc-status-pending">🟡 Pending</span>';
+
+        var actionCell = '';
+        if (docStatus !== 'approved') {
+          actionCell += '<button class="btn btn-approve" style="padding:4px 10px;font-size:11px" onclick="approveDoc(' + d.id + ')">✅ Approve</button> ';
+        }
+        if (docStatus !== 'rejected') {
+          actionCell += '<button class="btn btn-reject" style="padding:4px 10px;font-size:11px" onclick="rejectDoc(' + d.id + ')">❌ Reject</button>';
+        }
+        if (docStatus !== 'pending') {
+          actionCell += ' <button class="btn" style="padding:4px 10px;font-size:11px;background:#6b7280;color:#fff" onclick="resetDocStatus(' + d.id + ')">↩ Reset</button>';
+        }
+
+        rows += '<tr id="doc-row-' + d.id + '">' +
           '<td><strong>#' + d.id + '</strong></td>' +
           '<td><strong>' + customerName + '</strong></td>' +
           '<td>' + bookingRef + '</td>' +
           '<td><span class="doc-type ' + getDocTypeClass(d.type) + '">' + (d.type || '-') + '</span></td>' +
           '<td>' + fileCell + '</td>' +
           '<td>' + formatDateTime(d.uploadedAt) + '</td>' +
+          '<td>' + statusBadge + '</td>' +
+          '<td><div style="display:flex;flex-direction:column;gap:4px" id="doc-actions-' + d.id + '">' + actionCell + '</div></td>' +
           '</tr>';
       }
-      document.getElementById('all-documents').innerHTML = '<table><thead><tr><th>ID</th><th>Customer</th><th>Booking</th><th>Type</th><th>File / Preview</th><th>Uploaded</th></tr></thead><tbody>' + rows + '</tbody></table>';
+      document.getElementById('all-documents').innerHTML = '<table><thead><tr><th>ID</th><th>Customer</th><th>Booking</th><th>Type</th><th>File / Preview</th><th>Uploaded</th><th>Status</th><th>Actions</th></tr></thead><tbody>' + rows + '</tbody></table>';
     }
 
     function viewDocImage(url, name) {
@@ -584,26 +906,726 @@
         '</div></div>';
     }
 
+    async function updateDocumentStatus(docId, status, adminComment) {
+      var payload = { documentId: docId, status: status };
+      if (adminComment) payload.adminComment = adminComment;
+      var resp = await fetch(API + '/api/admin/documents/update-status', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+      });
+      var data = await resp.json();
+      if (!data.success) {
+        alert('Error: ' + (data.error || 'Failed to update status'));
+        return false;
+      }
+      return true;
+    }
+
+    async function approveDoc(docId) {
+      if (!confirm('Approve document #' + docId + '? A push notification will be sent to the customer.')) return;
+      var ok = await updateDocumentStatus(docId, 'approved');
+      if (ok) loadDocuments();
+    }
+
+    function rejectDoc(docId) {
+      var actionsEl = document.getElementById('doc-actions-' + docId);
+      if (!actionsEl) return;
+      actionsEl.innerHTML =
+        '<div style="display:flex;flex-direction:column;gap:6px;min-width:200px">' +
+          '<input id="reject-reason-' + docId + '" type="text" placeholder="Rejection reason (required)" ' +
+            'style="padding:6px 10px;border:1px solid #fca5a5;border-radius:6px;font-size:12px;width:100%;box-sizing:border-box" />' +
+          '<div style="display:flex;gap:6px">' +
+            '<button class="btn btn-reject" style="padding:4px 10px;font-size:11px" ' +
+              'onclick="confirmRejectDoc(' + docId + ')">Confirm ❌</button>' +
+            '<button class="btn" style="padding:4px 10px;font-size:11px;background:#6b7280;color:#fff" ' +
+              'onclick="loadDocuments()">Cancel</button>' +
+          '</div>' +
+        '</div>';
+      var input = document.getElementById('reject-reason-' + docId);
+      if (input) input.focus();
+    }
+
+    async function confirmRejectDoc(docId) {
+      var input = document.getElementById('reject-reason-' + docId);
+      var reason = input ? input.value.trim() : '';
+      if (!reason) { input.style.borderColor = '#dc2626'; input.placeholder = 'Reason is required!'; input.focus(); return; }
+      var ok = await updateDocumentStatus(docId, 'rejected', reason);
+      if (ok) loadDocuments();
+    }
+
+    async function resetDocStatus(docId) {
+      if (!confirm('Reset document #' + docId + ' status to Pending?')) return;
+      var ok = await updateDocumentStatus(docId, 'pending');
+      if (ok) loadDocuments();
+    }
+
     async function loadPackages() {
       var data = await fetchJSON('/api/packages');
       if (!data.success) return;
       var pkgs = data.packages;
 
       var rows = '';
+      _pkgImageMap = {};
+      _pkgHotelMap = {};
+      if (pkgs.length === 0) {
+        document.getElementById('all-packages').innerHTML = '<div class="empty-state"><p>No packages found. Add one above.</p></div>';
+        return;
+      }
       for (var i = 0; i < pkgs.length; i++) {
         var p = pkgs[i];
+        _pkgHotelMap[p.id] = p.hotelDetails || null;
+        var imgObjs = Array.isArray(p.imageUrls) && p.imageUrls.length > 0 ? p.imageUrls : (p.imageUrl ? [{url: p.imageUrl, isMain: true, position: 'center'}] : []);
+        _pkgImageMap[p.id] = imgObjs;
+        var mainImgObj = imgObjs.find(function(o) { return o.isMain; }) || imgObjs[0];
+        var firstUrl = mainImgObj ? (typeof mainImgObj === 'string' ? mainImgObj : mainImgObj.url) : '';
+        var imgPos = (mainImgObj && mainImgObj.position) ? mainImgObj.position : 'center';
+        var imgCount = imgObjs.length;
+        var countLabel = imgCount === 0 ? '<span style="font-size:11px;color:#9ca3af">No images</span>'
+          : '<span style="font-size:11px;color:#047857;font-weight:600">' + imgCount + ' img' + (imgCount > 1 ? 's' : '') + '</span>';
+        var imgCell = firstUrl
+          ? '<div style="display:flex;flex-direction:column;gap:2px;align-items:center">' +
+            '<img src="' + esc(firstUrl) + '" style="width:56px;height:40px;object-fit:cover;object-position:' + imgPos + ';border-radius:5px;border:1px solid #e5e7eb" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'block\'" />' +
+            '<span style="display:none;font-size:10px;color:#047857;background:#f0fdf4;padding:1px 4px;border-radius:3px">&#9654; ' + imgCount + '</span>' +
+            countLabel +
+            '</div>'
+          : '<div style="display:flex;flex-direction:column;gap:2px;align-items:center">' + countLabel + '</div>';
+        var pkgType = (p.type || 'umrah');
+        var typeBadgeClass = pkgType === 'hajj' ? 'badge-pending' : 'badge-confirmed';
+        var nameCell = '<div><strong title="' + esc(p.description || '') + '">' + esc(p.name) + '</strong>' +
+          (p.category ? '<div style="font-size:11px;color:#6b7280;margin-top:2px">' + esc(p.category) + '</div>' : '') + '</div>';
+        var featuredCell = p.featured
+          ? '<span style="font-size:11px;font-weight:700;color:#047857;background:#d1fae5;padding:3px 8px;border-radius:10px;border:1px solid #6ee7b7">⭐ Yes</span>'
+          : '<span style="font-size:11px;color:#9ca3af">No</span>';
         rows += '<tr>' +
-          '<td>#' + p.id + '</td>' +
-          '<td><strong>' + p.name + '</strong></td>' +
-          '<td><span class="badge ' + (p.type === 'hajj' ? 'badge-confirmed' : 'badge-completed') + '">' + p.type.toUpperCase() + '</span></td>' +
-          '<td>' + formatPrice(p.price) + '</td>' +
-          '<td>' + p.duration + '</td>' +
-          '<td>' + p.availableSeats + '</td>' +
-          '<td>' + formatDate(p.departureDate) + '</td>' +
-          '<td>' + (p.featured ? 'Yes' : 'No') + '</td>' +
+          '<td style="font-size:13px;color:#6b7280">#' + p.id + '</td>' +
+          '<td>' + nameCell + '</td>' +
+          '<td><span class="badge ' + typeBadgeClass + '">' + pkgType.toUpperCase() + '</span></td>' +
+          '<td style="font-weight:700;color:#047857">' + formatPrice(p.price) + '</td>' +
+          '<td style="font-size:13px">' + esc(p.duration || '-') + '</td>' +
+          '<td style="text-align:center;font-weight:600">' + (p.availableSeats || 0) + '</td>' +
+          '<td style="font-size:13px">' + formatDate(p.departureDate) + '</td>' +
+          '<td style="text-align:center">' + featuredCell + '</td>' +
+          '<td>' + imgCell + '</td>' +
+          '<td><div style="display:flex;flex-direction:column;gap:5px">' +
+          '<button class="btn" style="font-size:12px;padding:5px 12px;background:linear-gradient(135deg,#1d4ed8,#1e40af);color:#fff;white-space:nowrap" onclick="openEditPackage(' + p.id + ')">✏️ Edit</button>' +
+          '<button class="btn btn-view" style="font-size:12px;padding:5px 12px;white-space:nowrap" onclick="editPackageImages(' + p.id + ', \'' + esc(p.name) + '\')">📷 Images</button>' +
+          '<button class="btn" style="font-size:12px;padding:5px 12px;background:linear-gradient(135deg,#d97706,#b45309);color:#fff;white-space:nowrap" onclick="editHotelMedia(' + p.id + ', \'' + esc(p.name) + '\')">🏨 Hotels</button>' +
+          '</div></td>' +
           '</tr>';
       }
-      document.getElementById('all-packages').innerHTML = '<table><thead><tr><th>ID</th><th>Name</th><th>Type</th><th>Price</th><th>Duration</th><th>Seats</th><th>Departure</th><th>Featured</th></tr></thead><tbody>' + rows + '</tbody></table>';
+      document.getElementById('all-packages').innerHTML = '<table><thead><tr><th>ID</th><th>Name</th><th>Type</th><th>Price</th><th>Duration</th><th>Seats</th><th>Departure</th><th>Featured</th><th>Images</th><th>Actions</th></tr></thead><tbody>' + rows + '</tbody></table>';
+    }
+
+    async function createPackage() {
+      var type = document.getElementById('pkg-type').value;
+      var name = document.getElementById('pkg-name').value.trim();
+      var category = document.getElementById('pkg-category').value.trim();
+      var duration = document.getElementById('pkg-duration').value.trim();
+      var price = document.getElementById('pkg-price').value;
+      var seats = document.getElementById('pkg-seats').value;
+      var departure = document.getElementById('pkg-departure').value;
+      var ret = document.getElementById('pkg-return').value;
+      var imageUrl = document.getElementById('pkg-imageUrl').value.trim();
+      var description = document.getElementById('pkg-description').value.trim();
+      var inclusionsRaw = document.getElementById('pkg-inclusions').value.trim();
+      var featured = document.getElementById('pkg-featured').checked;
+      var resultDiv = document.getElementById('pkg-create-result');
+
+      if (!name || !description || !duration || !price || !seats || !departure || !ret) {
+        alert('Please fill in all required fields (marked with *)');
+        return;
+      }
+
+      var inclusions = inclusionsRaw ? inclusionsRaw.split('\n').map(function(s) { return s.trim(); }).filter(Boolean) : [];
+
+      var btn = document.getElementById('create-pkg-btn');
+      btn.disabled = true;
+      btn.textContent = 'Creating...';
+
+      try {
+        var resp = await fetch(API + '/api/admin/packages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: type, name: name, category: category, description: description, duration: duration, price: parseFloat(price), imageUrl: imageUrl, availableSeats: parseInt(seats), departureDate: departure, returnDate: ret, featured: featured, inclusions: inclusions })
+        });
+        var data = await resp.json();
+        if (data.success) {
+          resultDiv.innerHTML = '<div style="padding:12px;background:#d1fae5;border-radius:8px;color:#065f46"><strong>Package created!</strong> ID #' + data.package.id + ' — ' + esc(data.package.name) + '</div>';
+          document.getElementById('pkg-name').value = '';
+          document.getElementById('pkg-category').value = '';
+          document.getElementById('pkg-duration').value = '';
+          document.getElementById('pkg-price').value = '';
+          document.getElementById('pkg-departure').value = '';
+          document.getElementById('pkg-return').value = '';
+          document.getElementById('pkg-imageUrl').value = '';
+          document.getElementById('pkg-description').value = '';
+          document.getElementById('pkg-inclusions').value = '';
+          document.getElementById('pkg-featured').checked = false;
+          loadPackages();
+        } else {
+          resultDiv.innerHTML = '<div style="padding:12px;background:#fee2e2;border-radius:8px;color:#991b1b">Error: ' + esc(data.error || 'Could not create') + '</div>';
+        }
+      } catch (e) {
+        resultDiv.innerHTML = '<div style="padding:12px;background:#fee2e2;border-radius:8px;color:#991b1b">Error: ' + e.message + '</div>';
+      }
+      btn.disabled = false;
+      btn.textContent = 'Create Package';
+    }
+
+    var _editPkgId = null;
+    var _editPkgImages = [];
+    var _pkgImageMap = {};
+    var _pkgHotelMap = {};
+    var _hotelEditCity = 'makkah';
+
+    function getImgObj(item) {
+      if (typeof item === 'string') return { url: item, isMain: false, position: 'center' };
+      return item;
+    }
+
+    function renderImageGallery() {
+      var container = document.getElementById('pkg-gallery');
+      if (!container) return;
+      if (_editPkgImages.length === 0) {
+        container.innerHTML = '<p style="color:#9ca3af;font-size:13px;text-align:center;padding:16px 0">No images yet. Upload one below.</p>';
+        return;
+      }
+      container.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:12px;padding:4px 0">' +
+        _editPkgImages.map(function(item) {
+          var img = getImgObj(item);
+          var pos = img.position || 'center';
+          var urlEncoded = encodeURIComponent(img.url);
+          return '<div style="flex:0 0 auto;width:160px">' +
+            '<div style="position:relative;width:160px;height:110px;background:#f3f4f6;border-radius:10px;border:3px solid ' + (img.isMain ? '#047857' : '#e5e7eb') + ';overflow:hidden;box-shadow:' + (img.isMain ? '0 0 0 1px #047857' : 'none') + '">' +
+              '<img src="' + esc(img.url) + '" style="width:100%;height:100%;object-fit:cover;object-position:' + pos + '" onerror="this.style.display=\'none\';this.parentNode.style.background=\'#f0fdf4\'" />' +
+              (img.isMain ? '<div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(4,120,87,0.85));padding:5px 6px 4px"><span style="color:#fff;font-size:10px;font-weight:700">★ Shows in App</span></div>' : '') +
+              '<button onclick="removePkgImage(\'' + urlEncoded + '\')" title="Remove image" style="position:absolute;top:4px;right:4px;background:rgba(220,38,38,0.85);color:#fff;border:none;border-radius:50%;width:22px;height:22px;font-size:14px;cursor:pointer;line-height:20px;text-align:center;padding:0">&times;</button>' +
+            '</div>' +
+            '<div style="margin-top:5px;display:flex;gap:3px;justify-content:center">' +
+              '<button onclick="setPkgImagePos(\'' + urlEncoded + '\',\'left\')" title="Crop Left" style="flex:1;padding:3px 0;font-size:11px;border:1px solid ' + (pos==='left'?'#047857':'#d1d5db') + ';background:' + (pos==='left'?'#ecfdf5':'#fff') + ';color:' + (pos==='left'?'#047857':'#374151') + ';border-radius:4px;cursor:pointer">◀ L</button>' +
+              '<button onclick="setPkgImagePos(\'' + urlEncoded + '\',\'center\')" title="Crop Center" style="flex:1;padding:3px 0;font-size:11px;border:1px solid ' + (pos==='center'?'#047857':'#d1d5db') + ';background:' + (pos==='center'?'#ecfdf5':'#fff') + ';color:' + (pos==='center'?'#047857':'#374151') + ';border-radius:4px;cursor:pointer">C</button>' +
+              '<button onclick="setPkgImagePos(\'' + urlEncoded + '\',\'right\')" title="Crop Right" style="flex:1;padding:3px 0;font-size:11px;border:1px solid ' + (pos==='right'?'#047857':'#d1d5db') + ';background:' + (pos==='right'?'#ecfdf5':'#fff') + ';color:' + (pos==='right'?'#047857':'#374151') + ';border-radius:4px;cursor:pointer">R ▶</button>' +
+            '</div>' +
+            (!img.isMain ? '<button onclick="setPkgMainImage(\'' + urlEncoded + '\')" style="width:100%;margin-top:4px;padding:6px 0;font-size:12px;font-weight:700;border:none;background:linear-gradient(135deg,#047857,#059669);color:#fff;border-radius:6px;cursor:pointer">★ Set as App Image</button>' : '<div style="width:100%;margin-top:4px;padding:6px 0;font-size:12px;text-align:center;color:#047857;font-weight:600">✓ Current app image</div>') +
+          '</div>';
+        }).join('') + '</div>';
+    }
+
+    var _allPkgsList = [];
+
+    async function openEditPackage(pkgId) {
+      var data = await fetchJSON('/api/packages/' + pkgId);
+      if (!data.success && !data.package) { alert('Could not load package'); return; }
+      var p = data.package || data;
+      var pkg = Array.isArray(data.packages) ? null : p;
+      // fetchJSON('/api/packages') returns array, but /api/packages/:id may return single
+      if (!pkg) { alert('Could not load package'); return; }
+
+      var typeOptions = ['hajj','umrah','ramadan_umrah','special_hajj','iraq_ziyarat','syria_ziyarat','baitul_muqaddas','jordan_heritage','other'].map(function(t) {
+        return '<option value="' + t + '"' + (pkg.type===t?' selected':'') + '>' + t.split('_').map(function(w){return w[0].toUpperCase()+w.slice(1);}).join(' ') + '</option>';
+      }).join('');
+
+      var inclText = Array.isArray(pkg.inclusions) ? pkg.inclusions.join('\n') : (pkg.inclusions || '');
+      var exclText = Array.isArray(pkg.exclusions) ? pkg.exclusions.join('\n') : (pkg.exclusions || '');
+
+      var depDate = '';
+      if (pkg.departureDate) { try { depDate = new Date(pkg.departureDate).toISOString().split('T')[0]; } catch(e){} }
+      var retDate = '';
+      if (pkg.returnDate) { try { retDate = new Date(pkg.returnDate).toISOString().split('T')[0]; } catch(e){} }
+
+      var mainImgUrl = '';
+      if (Array.isArray(pkg.imageUrls) && pkg.imageUrls.length > 0) {
+        var mainObj = pkg.imageUrls.find(function(o){ return typeof o === 'object' && o.isMain; }) || pkg.imageUrls[0];
+        mainImgUrl = typeof mainObj === 'string' ? mainObj : (mainObj ? mainObj.url : '');
+      } else if (pkg.imageUrl) { mainImgUrl = pkg.imageUrl; }
+
+      var inp = function(label, id, val, type, placeholder) {
+        type = type || 'text'; placeholder = placeholder || '';
+        return '<div><label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:4px">' + label + '</label>' +
+          '<input type="' + type + '" id="epkg-' + id + '" value="' + esc(val || '') + '" placeholder="' + esc(placeholder) + '" style="width:100%;padding:9px 11px;border:1px solid #d1d5db;border-radius:7px;font-size:13px;box-sizing:border-box" /></div>';
+      };
+      var ta = function(label, id, val, rows, placeholder) {
+        rows = rows || 3; placeholder = placeholder || '';
+        return '<div style="grid-column:1/-1"><label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:4px">' + label + '</label>' +
+          '<textarea id="epkg-' + id + '" rows="' + rows + '" placeholder="' + esc(placeholder) + '" style="width:100%;padding:9px 11px;border:1px solid #d1d5db;border-radius:7px;font-size:13px;resize:vertical;box-sizing:border-box">' + esc(val || '') + '</textarea></div>';
+      };
+
+      document.getElementById('modal-container').innerHTML =
+        '<div class="modal-overlay" onclick="if(event.target===this){loadPackages();closeModal()}">' +
+        '<div class="modal" style="max-width:720px">' +
+        '<button class="close-btn" onclick="loadPackages();closeModal()">&times;</button>' +
+        '<h2>Edit Package</h2>' +
+        '<input type="hidden" id="epkg-id" value="' + pkg.id + '" />' +
+
+        '<p style="font-size:12px;font-weight:700;color:#047857;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Basic Information</p>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">' +
+        '<div style="grid-column:1/-1"><label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:4px">Package Name *</label><input type="text" id="epkg-name" value="' + esc(pkg.name||'') + '" placeholder="e.g. Premium Umrah Package" style="width:100%;padding:9px 11px;border:1px solid #d1d5db;border-radius:7px;font-size:13px;box-sizing:border-box" /></div>' +
+        '<div><label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:4px">Type</label><select id="epkg-type" style="width:100%;padding:9px 11px;border:1px solid #d1d5db;border-radius:7px;font-size:13px;background:#fff">' + typeOptions + '</select></div>' +
+        inp('Price (₹ per person) *', 'price', pkg.price, 'number', '150000') +
+        inp('Duration *', 'duration', pkg.duration, 'text', '14 Nights / 15 Days') +
+        inp('Available Seats *', 'seats', pkg.availableSeats, 'number', '50') +
+        inp('Category / Sub-type', 'category', pkg.category, 'text', 'e.g. Economy, Premium') +
+        inp('Departure Date', 'departureDate', depDate, 'date', '') +
+        inp('Return Date', 'returnDate', retDate, 'date', '') +
+        ta('Description *', 'description', pkg.description, 3, 'Describe the package...') +
+        '</div>' +
+
+        '<p style="font-size:12px;font-weight:700;color:#047857;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Travel Details</p>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">' +
+        inp('Airline / Flight', 'flight', pkg.flight, 'text', 'e.g. Saudi Airlines, IndiGo') +
+        inp('Transport', 'transport', pkg.transport, 'text', 'e.g. AC Bus, Private Car') +
+        inp('Meal Plan', 'food', pkg.food, 'text', 'e.g. Breakfast + Dinner') +
+        inp('Room Type / Sharing', 'roomSharing', pkg.roomSharing, 'text', 'e.g. Quad Sharing') +
+        inp('Muallim Service', 'muallim', pkg.muallim, 'text', 'e.g. Category D - New Mina') +
+        inp('Tent / Camp Type', 'tent', pkg.tent, 'text', 'e.g. Air-Conditioned') +
+        '</div>' +
+
+        '<p style="font-size:12px;font-weight:700;color:#047857;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Lists &amp; Settings</p>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">' +
+        ta('Inclusions (one per line)', 'inclusions', inclText, 4, 'Hotel Makkah\nHotel Madinah\nVisa Processing\nAirport Transfers') +
+        ta('Exclusions (one per line)', 'exclusions', exclText, 4, '5% GST\nPersonal expenses') +
+        '<div style="grid-column:1/-1"><label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:4px">Main Image URL</label>' +
+        '<input type="url" id="epkg-imageUrl" value="' + esc(mainImgUrl) + '" placeholder="https://example.com/image.jpg" style="width:100%;padding:9px 11px;border:1px solid #d1d5db;border-radius:7px;font-size:13px;box-sizing:border-box" />' +
+        '<p style="font-size:11px;color:#9ca3af;margin-top:3px">Paste a direct image URL. You can also upload images via the Images button.</p></div>' +
+        '<div style="display:flex;align-items:center;gap:8px">' +
+        '<input type="checkbox" id="epkg-featured"' + (pkg.featured?' checked':'') + ' style="width:16px;height:16px;cursor:pointer" />' +
+        '<label for="epkg-featured" style="font-size:13px;font-weight:600;color:#374151;cursor:pointer">Mark as Featured (★)</label>' +
+        '</div>' +
+        '</div>' +
+
+        '<div id="epkg-status" style="margin-bottom:12px;font-size:13px"></div>' +
+        '<div style="display:flex;gap:10px">' +
+        '<button class="btn btn-confirm" onclick="saveEditPackage()" id="epkg-save-btn" style="flex:1;padding:12px;font-size:15px">Save Changes</button>' +
+        '<button class="btn" onclick="loadPackages();closeModal()" style="background:#f3f4f6;color:#374151;padding:12px 24px;font-size:14px">Cancel</button>' +
+        '</div>' +
+        '</div></div>';
+    }
+
+    async function saveEditPackage() {
+      var pkgId = document.getElementById('epkg-id').value;
+      var btn = document.getElementById('epkg-save-btn');
+      var statusDiv = document.getElementById('epkg-status');
+      if (!pkgId) return;
+
+      var name = document.getElementById('epkg-name').value.trim();
+      if (!name) { alert('Package name is required'); return; }
+
+      var incRaw = document.getElementById('epkg-inclusions').value.trim();
+      var excRaw = document.getElementById('epkg-exclusions').value.trim();
+      var inclusions = incRaw ? incRaw.split('\n').map(function(s){ return s.trim(); }).filter(Boolean) : [];
+      var exclusions = excRaw ? excRaw.split('\n').map(function(s){ return s.trim(); }).filter(Boolean) : [];
+
+      var payload = {
+        name: name,
+        type: document.getElementById('epkg-type').value,
+        price: parseFloat(document.getElementById('epkg-price').value) || 0,
+        duration: document.getElementById('epkg-duration').value.trim(),
+        availableSeats: parseInt(document.getElementById('epkg-seats').value) || 0,
+        category: document.getElementById('epkg-category').value.trim() || null,
+        description: document.getElementById('epkg-description').value.trim(),
+        departureDate: document.getElementById('epkg-departureDate').value || null,
+        returnDate: document.getElementById('epkg-returnDate').value || null,
+        flight: document.getElementById('epkg-flight').value.trim() || null,
+        transport: document.getElementById('epkg-transport').value.trim() || null,
+        food: document.getElementById('epkg-food').value.trim() || null,
+        roomSharing: document.getElementById('epkg-roomSharing').value.trim() || null,
+        muallim: document.getElementById('epkg-muallim').value.trim() || null,
+        tent: document.getElementById('epkg-tent').value.trim() || null,
+        imageUrl: document.getElementById('epkg-imageUrl').value.trim() || null,
+        inclusions: inclusions,
+        exclusions: exclusions,
+        featured: document.getElementById('epkg-featured').checked
+      };
+
+      btn.disabled = true; btn.textContent = 'Saving...';
+      statusDiv.innerHTML = '';
+      try {
+        var resp = await fetch(API + '/api/admin/packages/' + pkgId, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        var data = await resp.json();
+        if (data.success) {
+          statusDiv.innerHTML = '<div style="padding:10px;background:#d1fae5;border-radius:7px;color:#065f46">&#10003; Package updated successfully!</div>';
+          loadPackages();
+          setTimeout(function() { if (statusDiv) statusDiv.innerHTML = ''; }, 3000);
+        } else {
+          statusDiv.innerHTML = '<div style="padding:10px;background:#fee2e2;border-radius:7px;color:#991b1b">Error: ' + esc(data.error || 'Could not save') + '</div>';
+        }
+      } catch (e) {
+        statusDiv.innerHTML = '<div style="padding:10px;background:#fee2e2;border-radius:7px;color:#991b1b">Error: ' + esc(e.message) + '</div>';
+      }
+      btn.disabled = false; btn.textContent = 'Save Changes';
+    }
+
+    function editPackageImages(id, pkgName) {
+      _editPkgId = id;
+      _editPkgImages = (_pkgImageMap[id] || []).slice();
+      document.getElementById('modal-container').innerHTML =
+        '<div class="modal-overlay" onclick="if(event.target===this){loadPackages();closeModal()}">' +
+        '<div class="modal" style="max-width:620px">' +
+        '<button class="close-btn" onclick="loadPackages();closeModal()">&times;</button>' +
+        '<h2>Manage Package Images</h2>' +
+        '<p style="color:#6b7280;font-size:14px;margin-bottom:10px"><strong>' + esc(pkgName) + '</strong></p>' +
+        '<div style="background:#ecfdf5;border:1px solid #6ee7b7;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:#065f46">📱 The image marked <strong>★ Shows in App</strong> is what users see on the package card. Tap <strong>★ Set as App Image</strong> to change it.</div>' +
+        '<div id="pkg-gallery" style="margin-bottom:16px"></div>' +
+        '<div style="background:#f8fafc;border:2px dashed #d1d5db;border-radius:10px;padding:16px;margin-bottom:14px">' +
+        '<p style="font-size:13px;font-weight:600;color:#374151;margin:0 0 10px;text-align:center">Upload a new image</p>' +
+        '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center">' +
+        '<input type="file" id="pkg-image-file" accept="image/*" style="display:none" />' +
+        '<button class="btn" onclick="document.getElementById(\'pkg-image-file\').click()" style="background:#047857;color:#fff;padding:9px 20px;font-size:13px">Choose Image</button>' +
+        '<span id="pkg-file-name" style="font-size:12px;color:#6b7280">No file chosen</span>' +
+        '</div>' +
+        '<div id="pkg-preview-wrap" style="margin-top:10px;text-align:center;display:none"><img id="pkg-preview-img" src="" style="max-width:200px;max-height:120px;border-radius:8px;border:2px solid #d1d5db;object-fit:cover" /></div>' +
+        '<div style="text-align:center;margin-top:10px"><button id="pkg-upload-btn" class="btn btn-confirm" onclick="uploadPackageImage()" style="display:none;padding:9px 20px;font-size:13px">Upload &amp; Add</button></div>' +
+        '<div id="pkg-upload-status" style="margin-top:8px;font-size:12px;text-align:center"></div>' +
+        '</div>' +
+        '<button class="btn" onclick="loadPackages();closeModal()" style="background:#f3f4f6;color:#374151;width:100%;padding:12px">Done</button>' +
+        '</div></div>';
+
+      renderImageGallery();
+
+      document.getElementById('pkg-image-file').addEventListener('change', function() {
+        var file = this.files[0];
+        document.getElementById('pkg-file-name').textContent = file ? file.name : 'No file chosen';
+        document.getElementById('pkg-upload-btn').style.display = file ? 'inline-block' : 'none';
+        if (file) {
+          var reader = new FileReader();
+          reader.onload = function(e) {
+            document.getElementById('pkg-preview-img').src = e.target.result;
+            document.getElementById('pkg-preview-wrap').style.display = 'block';
+          };
+          reader.readAsDataURL(file);
+        } else {
+          document.getElementById('pkg-preview-wrap').style.display = 'none';
+        }
+      });
+    }
+
+    async function uploadPackageImage() {
+      var fileInput = document.getElementById('pkg-image-file');
+      var file = fileInput.files[0];
+      if (!file || !_editPkgId) return;
+      var statusDiv = document.getElementById('pkg-upload-status');
+      var btn = document.getElementById('pkg-upload-btn');
+      btn.disabled = true;
+      btn.textContent = 'Uploading...';
+      statusDiv.innerHTML = '<span style="color:#047857">Uploading, please wait...</span>';
+      try {
+        var formData = new FormData();
+        formData.append('image', file);
+        var resp = await fetch(API + '/api/admin/packages/' + _editPkgId + '/upload-image', { method: 'POST', body: formData });
+        var data = await resp.json();
+        if (data.success) {
+          _editPkgImages = Array.isArray(data.imageUrls) ? data.imageUrls : _editPkgImages;
+          _pkgImageMap[_editPkgId] = _editPkgImages;
+          renderImageGallery();
+          statusDiv.innerHTML = '<span style="color:#047857">&#10003; Image added! URL: ' + esc(data.imageUrl) + '</span>';
+          fileInput.value = '';
+          document.getElementById('pkg-file-name').textContent = 'No file chosen';
+          document.getElementById('pkg-preview-wrap').style.display = 'none';
+          btn.style.display = 'none';
+          loadPackages();
+        } else {
+          statusDiv.innerHTML = '<span style="color:#dc2626">Error: ' + esc(data.error || 'Upload failed') + '</span>';
+        }
+      } catch (e) {
+        statusDiv.innerHTML = '<span style="color:#dc2626">Error: ' + esc(e.message) + '</span>';
+      }
+      btn.disabled = false;
+      btn.textContent = 'Upload & Add';
+    }
+
+    async function removePkgImage(urlEncoded) {
+      var url = decodeURIComponent(urlEncoded);
+      if (!_editPkgId || !url) return;
+      if (!confirm('Remove this image?')) return;
+      try {
+        var resp = await fetch(API + '/api/admin/packages/' + _editPkgId + '/remove-image', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageUrl: url })
+        });
+        var data = await resp.json();
+        if (data.success) {
+          _editPkgImages = Array.isArray(data.imageUrls) ? data.imageUrls : _editPkgImages.filter(function(item) { return getImgObj(item).url !== url; });
+          _pkgImageMap[_editPkgId] = _editPkgImages;
+          renderImageGallery();
+          loadPackages();
+        } else {
+          alert('Error: ' + (data.error || 'Could not remove'));
+        }
+      } catch (e) {
+        alert('Error: ' + e.message);
+      }
+    }
+
+    async function setPkgMainImage(urlEncoded) {
+      var url = decodeURIComponent(urlEncoded);
+      if (!_editPkgId || !url) return;
+      try {
+        var resp = await fetch(API + '/api/admin/packages/' + _editPkgId + '/set-main-image', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageUrl: url })
+        });
+        var data = await resp.json();
+        if (data.success) {
+          _editPkgImages = Array.isArray(data.imageUrls) ? data.imageUrls : _editPkgImages;
+          _pkgImageMap[_editPkgId] = _editPkgImages;
+          renderImageGallery();
+          loadPackages();
+        } else {
+          alert('Error: ' + (data.error || 'Could not set main'));
+        }
+      } catch (e) {
+        alert('Error: ' + e.message);
+      }
+    }
+
+    async function setPkgImagePos(urlEncoded, position) {
+      var url = decodeURIComponent(urlEncoded);
+      if (!_editPkgId || !url) return;
+      try {
+        var resp = await fetch(API + '/api/admin/packages/' + _editPkgId + '/update-image-position', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageUrl: url, position: position })
+        });
+        var data = await resp.json();
+        if (data.success) {
+          _editPkgImages = Array.isArray(data.imageUrls) ? data.imageUrls : _editPkgImages;
+          _pkgImageMap[_editPkgId] = _editPkgImages;
+          renderImageGallery();
+          loadPackages();
+        } else {
+          alert('Error: ' + (data.error || 'Could not update position'));
+        }
+      } catch (e) {
+        alert('Error: ' + e.message);
+      }
+    }
+
+    function editHotelMedia(pkgId, pkgName) {
+      _editPkgId = pkgId;
+      _hotelEditCity = 'makkah';
+      var hotelDetails = _pkgHotelMap[pkgId] || {};
+      document.getElementById('modal-container').innerHTML =
+        '<div class="modal-overlay" onclick="if(event.target===this){loadPackages();closeModal()}">' +
+        '<div class="modal" style="max-width:660px">' +
+        '<button class="close-btn" onclick="loadPackages();closeModal()">&times;</button>' +
+        '<h2>Hotel Photos &amp; Videos</h2>' +
+        '<p style="color:#6b7280;font-size:14px;margin-bottom:16px"><strong>' + esc(pkgName) + '</strong> — Manage hotel photos and video links for each city</p>' +
+        '<div style="display:flex;gap:8px;margin-bottom:20px">' +
+        '<button id="hotel-tab-makkah" onclick="switchHotelTab(\'makkah\')" style="flex:1;padding:10px;border:2px solid #047857;background:#047857;color:#fff;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">🕋 Makkah Hotel</button>' +
+        '<button id="hotel-tab-madinah" onclick="switchHotelTab(\'madinah\')" style="flex:1;padding:10px;border:2px solid #d1d5db;background:#fff;color:#374151;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">🕌 Madinah Hotel</button>' +
+        '</div>' +
+        '<div id="hotel-city-panel"></div>' +
+        '<button class="btn" onclick="loadPackages();closeModal()" style="background:#f3f4f6;color:#374151;width:100%;padding:12px;margin-top:12px">Done</button>' +
+        '</div></div>';
+      renderHotelCityPanel('makkah', hotelDetails);
+    }
+
+    function switchHotelTab(city) {
+      _hotelEditCity = city;
+      var other = city === 'makkah' ? 'madinah' : 'makkah';
+      var active = document.getElementById('hotel-tab-' + city);
+      var inactive = document.getElementById('hotel-tab-' + other);
+      if (active) { active.style.background = '#047857'; active.style.color = '#fff'; active.style.borderColor = '#047857'; }
+      if (inactive) { inactive.style.background = '#fff'; inactive.style.color = '#374151'; inactive.style.borderColor = '#d1d5db'; }
+      var hotelDetails = _pkgHotelMap[_editPkgId] || {};
+      renderHotelCityPanel(city, hotelDetails);
+    }
+
+    function renderHotelCityPanel(city, hotelDetails) {
+      var hotel = (hotelDetails && hotelDetails[city]) ? hotelDetails[city] : {};
+      var imgs = Array.isArray(hotel.imageUrls) ? hotel.imageUrls : [];
+      var videoUrl = hotel.videoUrl || '';
+      var cityLabel = city === 'makkah' ? '🕋 Makkah' : '🕌 Madinah';
+
+      var photosHtml = '';
+      if (imgs.length === 0) {
+        photosHtml = '<p style="color:#9ca3af;font-size:13px;text-align:center;padding:12px 0">No photos yet. Upload one below.</p>';
+      } else {
+        photosHtml = '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:4px">';
+        for (var i = 0; i < imgs.length; i++) {
+          var imgUrl = imgs[i];
+          var encoded = encodeURIComponent(imgUrl);
+          photosHtml += '<div style="position:relative;width:120px;height:85px;border-radius:8px;overflow:hidden;border:2px solid #e5e7eb">' +
+            '<img src="' + esc(imgUrl) + '" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display=\'none\'" />' +
+            '<button onclick="removeHotelPhoto(\'' + city + '\',\'' + encoded + '\')" style="position:absolute;top:2px;right:2px;background:#dc2626;color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:13px;cursor:pointer;line-height:18px;text-align:center;padding:0">&times;</button>' +
+            '</div>';
+        }
+        photosHtml += '</div>';
+      }
+
+      var videoHtml = '';
+      if (videoUrl) {
+        videoHtml =
+          '<div style="margin-bottom:10px">' +
+          '<video src="' + esc(videoUrl) + '" controls muted playsinline style="width:100%;max-height:180px;border-radius:8px;background:#000;display:block"></video>' +
+          '<button onclick="removeHotelVideo(\'' + city + '\')" style="margin-top:6px;background:#dc2626;color:#fff;border:none;padding:6px 14px;border-radius:5px;font-size:12px;cursor:pointer">🗑 Remove Video</button>' +
+          '</div>';
+      } else {
+        videoHtml = '<p style="color:#9ca3af;font-size:12px;margin-bottom:8px">No video uploaded yet.</p>';
+      }
+
+      var panel = document.getElementById('hotel-city-panel');
+      if (!panel) return;
+      panel.innerHTML =
+        '<div style="background:#f8fafc;border-radius:10px;padding:16px;margin-bottom:12px">' +
+        '<p style="font-size:14px;font-weight:700;color:#047857;margin-bottom:12px">' + cityLabel + ' — ' + esc(hotel.name || 'Hotel') + ' (' + (hotel.rating ? '★'.repeat(hotel.rating) : '-') + ')</p>' +
+        '<p style="font-size:13px;font-weight:600;color:#374151;margin-bottom:8px">Photos (' + imgs.length + ')</p>' +
+        photosHtml +
+        '<div style="background:#fff;border:2px dashed #d1d5db;border-radius:8px;padding:14px;margin-top:10px">' +
+        '<p style="font-size:13px;font-weight:600;color:#374151;margin:0 0 8px;text-align:center">Upload Photos — select multiple at once</p>' +
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center">' +
+        '<input type="file" id="hotel-img-file-' + city + '" accept="image/*" multiple style="display:none" onchange="autoUploadHotelPhotos(\'' + city + '\')" />' +
+        '<button onclick="document.getElementById(\'hotel-img-file-' + city + '\').click()" style="background:#047857;color:#fff;border:none;padding:10px 24px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer">📷 Choose Photos</button>' +
+        '<span style="font-size:12px;color:#6b7280">You can select 10+ images at once</span>' +
+        '</div>' +
+        '<div id="hotel-upload-status-' + city + '" style="font-size:12px;margin-top:8px"></div>' +
+        '</div>' +
+        '</div>' +
+        '<div style="background:#f8fafc;border-radius:10px;padding:16px">' +
+        '<p style="font-size:13px;font-weight:700;color:#374151;margin-bottom:10px">🎬 Hotel Video</p>' +
+        videoHtml +
+        '<div style="background:#fff;border:2px dashed #d1d5db;border-radius:8px;padding:14px;margin-top:4px">' +
+        '<p style="font-size:13px;font-weight:600;color:#374151;margin:0 0 8px;text-align:center">Upload Video (mp4 / mov / webm, max 100MB)</p>' +
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center">' +
+        '<input type="file" id="hotel-video-file-' + city + '" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm" style="display:none" onchange="autoUploadHotelVideo(\'' + city + '\')" />' +
+        '<button onclick="document.getElementById(\'hotel-video-file-' + city + '\').click()" style="background:#1d4ed8;color:#fff;border:none;padding:10px 24px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer">🎬 Choose Video</button>' +
+        '</div>' +
+        '<div id="hotel-video-upload-status-' + city + '" style="font-size:12px;margin-top:8px;text-align:center"></div>' +
+        '</div>' +
+        '</div>';
+    }
+
+    async function autoUploadHotelPhotos(city) {
+      var fileInput = document.getElementById('hotel-img-file-' + city);
+      var files = fileInput ? Array.from(fileInput.files) : [];
+      if (!files.length || !_editPkgId) return;
+      var statusDiv = document.getElementById('hotel-upload-status-' + city);
+      var total = files.length;
+      var done = 0;
+      var failed = 0;
+      if (statusDiv) statusDiv.innerHTML = '<span style="color:#047857">Uploading 0/' + total + '...</span>';
+      for (var i = 0; i < files.length; i++) {
+        var file = files[i];
+        try {
+          var formData = new FormData();
+          formData.append('image', file);
+          var resp = await fetch(API + '/api/admin/packages/' + _editPkgId + '/hotel/' + city + '/upload-image', { method: 'POST', body: formData });
+          var data = await resp.json();
+          if (data.success) {
+            done++;
+            _pkgHotelMap[_editPkgId] = data.hotelDetails;
+            if (statusDiv) statusDiv.innerHTML = '<span style="color:#047857">Uploading ' + done + '/' + total + '...</span>';
+            renderHotelCityPanel(city, data.hotelDetails);
+          } else {
+            failed++;
+            console.warn('Hotel photo upload failed:', data.error);
+          }
+        } catch (e) {
+          failed++;
+          console.warn('Hotel photo upload error:', e.message);
+        }
+      }
+      if (fileInput) fileInput.value = '';
+      var msg = '&#10003; ' + done + ' photo' + (done !== 1 ? 's' : '') + ' uploaded';
+      if (failed > 0) msg += ' (' + failed + ' failed)';
+      if (statusDiv) statusDiv.innerHTML = '<span style="color:' + (failed > 0 ? '#d97706' : '#047857') + '">' + msg + '</span>';
+      setTimeout(function() { if (statusDiv) statusDiv.innerHTML = ''; }, 4000);
+    }
+
+    async function autoUploadHotelVideo(city) {
+      var fileInput = document.getElementById('hotel-video-file-' + city);
+      var file = fileInput ? fileInput.files[0] : null;
+      if (!file || !_editPkgId) return;
+      var statusDiv = document.getElementById('hotel-video-upload-status-' + city);
+      if (statusDiv) statusDiv.innerHTML = '<span style="color:#1d4ed8">Uploading video, please wait... (large files may take a minute)</span>';
+      try {
+        var formData = new FormData();
+        formData.append('video', file);
+        var resp = await fetch(API + '/api/admin/packages/' + _editPkgId + '/hotel/' + city + '/upload-video', { method: 'POST', body: formData });
+        var data = await resp.json();
+        if (data.success) {
+          _pkgHotelMap[_editPkgId] = data.hotelDetails;
+          if (fileInput) fileInput.value = '';
+          renderHotelCityPanel(city, data.hotelDetails);
+        } else {
+          if (statusDiv) statusDiv.innerHTML = '<span style="color:#dc2626">Error: ' + esc(data.error || 'Upload failed') + '</span>';
+        }
+      } catch (e) {
+        if (statusDiv) statusDiv.innerHTML = '<span style="color:#dc2626">Error: ' + esc(e.message) + '</span>';
+      }
+    }
+
+    async function removeHotelVideo(city) {
+      if (!_editPkgId) return;
+      if (!confirm('Remove the hotel video for ' + (city === 'makkah' ? 'Makkah' : 'Madinah') + '?')) return;
+      try {
+        var resp = await fetch(API + '/api/admin/packages/' + _editPkgId + '/hotel/' + city + '/remove-video', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        var data = await resp.json();
+        if (data.success) {
+          _pkgHotelMap[_editPkgId] = data.hotelDetails;
+          renderHotelCityPanel(city, data.hotelDetails);
+        } else {
+          alert('Error: ' + (data.error || 'Could not remove video'));
+        }
+      } catch (e) {
+        alert('Error: ' + e.message);
+      }
+    }
+
+    async function removeHotelPhoto(city, urlEncoded) {
+      var url = decodeURIComponent(urlEncoded);
+      if (!_editPkgId || !url) return;
+      if (!confirm('Remove this hotel photo?')) return;
+      try {
+        var resp = await fetch(API + '/api/admin/packages/' + _editPkgId + '/hotel/' + city + '/remove-image', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageUrl: url })
+        });
+        var data = await resp.json();
+        if (data.success) {
+          _pkgHotelMap[_editPkgId] = data.hotelDetails;
+          renderHotelCityPanel(city, data.hotelDetails);
+        } else {
+          alert('Error: ' + (data.error || 'Could not remove'));
+        }
+      } catch (e) {
+        alert('Error: ' + e.message);
+      }
+    }
+
+    async function saveHotelVideoUrl(city) {
+      if (!_editPkgId) return;
+      var input = document.getElementById('hotel-video-url-' + city);
+      var videoUrl = input ? input.value.trim() : '';
+      var statusDiv = document.getElementById('hotel-video-status-' + city);
+      if (statusDiv) statusDiv.innerHTML = '<span style="color:#047857">Saving...</span>';
+      try {
+        var resp = await fetch(API + '/api/admin/packages/' + _editPkgId + '/hotel/' + city + '/video', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ videoUrl: videoUrl || null })
+        });
+        var data = await resp.json();
+        if (data.success) {
+          _pkgHotelMap[_editPkgId] = data.hotelDetails;
+          if (statusDiv) statusDiv.innerHTML = '<span style="color:#047857">&#10003; Video URL saved!</span>';
+          setTimeout(function() { if (statusDiv) statusDiv.innerHTML = ''; }, 3000);
+        } else {
+          if (statusDiv) statusDiv.innerHTML = '<span style="color:#dc2626">Error: ' + esc(data.error || 'Could not save') + '</span>';
+        }
+      } catch (e) {
+        if (statusDiv) statusDiv.innerHTML = '<span style="color:#dc2626">Error: ' + esc(e.message) + '</span>';
+      }
     }
 
     async function viewBooking(id) {
@@ -612,34 +1634,59 @@
       var b = data.booking;
       var travelers = b.travelers || [];
 
+      var userProfile = null;
+      if (b.userId) {
+        try {
+          var uData = await fetchJSON('/api/admin/users/' + b.userId + '/profile');
+          if (uData.success) userProfile = uData.user;
+        } catch (e) {}
+      }
+
+      var initials = (b.contactName || '?').trim().split(' ').map(function(w){ return w[0]; }).join('').toUpperCase().slice(0, 2);
+      var avatarHtml = userProfile && userProfile.profileImage
+        ? '<img src="' + esc(userProfile.profileImage) + '" style="width:40px;height:40px;border-radius:50%;object-fit:cover;border:2px solid #d1fae5;flex-shrink:0" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'flex\'" />' +
+          '<div style="display:none;width:40px;height:40px;border-radius:50%;background:#047857;color:#fff;font-size:16px;font-weight:700;align-items:center;justify-content:center;flex-shrink:0">' + esc(initials) + '</div>'
+        : '<div style="display:flex;width:40px;height:40px;border-radius:50%;background:#047857;color:#fff;font-size:16px;font-weight:700;align-items:center;justify-content:center;flex-shrink:0">' + esc(initials) + '</div>';
+
       var travelersHtml = '';
       if (travelers.length > 0) {
         travelersHtml = '<div class="travelers-list"><h3 style="margin-bottom:12px;color:#047857">Travelers</h3>';
         for (var i = 0; i < travelers.length; i++) {
           var t = travelers[i];
           travelersHtml += '<div class="traveler-card"><div class="tname">Traveler ' + (i + 1) + ': ' + t.name + '</div>' +
-            '<div class="tinfo">Age: ' + t.age + ' | Gender: ' + (t.gender || '-') + ' | Passport: ' + (t.passportNumber || '-') + ' | Expiry: ' + (t.passportExpiry || '-') + '</div></div>';
+            '<div class="tinfo">Age: ' + t.age + ' | Gender: ' + (t.gender || '-') + ' | DOB: ' + (t.dateOfBirth || '-') + '</div>' +
+            '<div class="tinfo">Passport: ' + (t.passportNumber || '-') + ' | Issue: ' + (t.passportIssue || '-') + ' | Expiry: ' + (t.passportExpiry || '-') + '</div></div>';
         }
         travelersHtml += '</div>';
       }
 
-      var actionsHtml = '';
-      if (b.status === 'pending') {
-        actionsHtml = '<button class="btn btn-confirm" onclick="updateStatus(' + b.id + ', \'confirmed\');closeModal()">Confirm Booking</button>' +
-          '<button class="btn btn-cancel" onclick="updateStatus(' + b.id + ', \'cancelled\');closeModal()">Cancel Booking</button>';
-      }
+      var modalLegacyOpt = (['pending','confirmed','visa_approved','ticket_issued','travel_ready','cancelled'].indexOf(b.status) === -1)
+        ? '<option value="" selected disabled>' + getStatusLabel(b.status) + ' (current)</option>' : '';
+      var actionsHtml = '<label style="font-size:13px;font-weight:600;color:#374151">Change Status:</label>' +
+        '<select class="status-select" onchange="if(this.value && this.value!==\'' + b.status + '\'){updateStatus(' + b.id + ', this.value);closeModal();}" style="font-size:14px;padding:8px 14px">' +
+        modalLegacyOpt +
+        '<option value="pending"' + (b.status==='pending'?' selected':'') + '>Pending</option>' +
+        '<option value="confirmed"' + (b.status==='confirmed'?' selected':'') + '>Confirmed</option>' +
+        '<option value="visa_approved"' + (b.status==='visa_approved'?' selected':'') + '>Visa Approved</option>' +
+        '<option value="ticket_issued"' + (b.status==='ticket_issued'?' selected':'') + '>Ticket Issued</option>' +
+        '<option value="travel_ready"' + (b.status==='travel_ready'?' selected':'') + '>Travel Ready</option>' +
+        '<option value="cancelled"' + (b.status==='cancelled'?' selected':'') + '>Cancelled</option>' +
+        '</select>';
 
       document.getElementById('modal-container').innerHTML =
         '<div class="modal-overlay" onclick="if(event.target===this)closeModal()">' +
         '<div class="modal">' +
         '<button class="close-btn" onclick="closeModal()">&times;</button>' +
-        '<h2>Booking #' + b.id + ' Details</h2>' +
+        '<div style="display:flex;align-items:center;gap:14px;margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid #e5e7eb">' +
+        avatarHtml +
+        '<div>' +
+        '<h2 style="margin:0;font-size:20px;color:#111827">Booking #' + b.id + '</h2>' +
+        '<p style="margin:4px 0 0;font-size:15px;font-weight:600;color:#047857">' + esc(b.contactName || '-') + '</p>' +
+        '<p style="margin:2px 0 0;font-size:13px;color:#6b7280">' + esc(b.contactPhone || '') + (b.contactEmail ? ' · ' + esc(b.contactEmail) : '') + '</p>' +
+        '</div></div>' +
         '<div class="detail-grid">' +
-        '<div class="detail-item"><div class="dlabel">Status</div><div class="dvalue"><span class="badge ' + getBadgeClass(b.status) + '">' + b.status.toUpperCase() + '</span></div></div>' +
+        '<div class="detail-item"><div class="dlabel">Status</div><div class="dvalue"><span class="badge ' + getBadgeClass(b.status) + '">' + getStatusLabel(b.status) + '</span></div></div>' +
         '<div class="detail-item"><div class="dlabel">Payment Status</div><div class="dvalue"><span class="badge ' + getBadgeClass(b.paymentStatus) + '">' + b.paymentStatus.toUpperCase() + '</span></div></div>' +
-        '<div class="detail-item"><div class="dlabel">Contact Name</div><div class="dvalue">' + (b.contactName || '-') + '</div></div>' +
-        '<div class="detail-item"><div class="dlabel">Phone</div><div class="dvalue">' + (b.contactPhone || '-') + '</div></div>' +
-        '<div class="detail-item"><div class="dlabel">Email</div><div class="dvalue">' + (b.contactEmail || '-') + '</div></div>' +
         '<div class="detail-item"><div class="dlabel">Address</div><div class="dvalue">' + (b.address || '-') + '</div></div>' +
         '<div class="detail-item"><div class="dlabel">Number of Travelers</div><div class="dvalue">' + b.numberOfPeople + '</div></div>' +
         '<div class="detail-item"><div class="dlabel">Booking Date</div><div class="dvalue">' + formatDate(b.bookingDate) + '</div></div>' +
@@ -665,7 +1712,7 @@
       });
       var data = await res.json();
       if (data.success) {
-        alert('Booking #' + id + ' updated to ' + status.toUpperCase());
+        alert('Booking #' + id + ' updated to ' + getStatusLabel(status));
         loadAll();
       } else {
         alert('Error: ' + (data.error || 'Could not update'));
@@ -680,9 +1727,314 @@
       cachedCustomers = data.customers;
       var sel = document.getElementById('upload-customer');
       sel.innerHTML = '<option value="">-- Select Customer --</option>';
+      var expoPushSel = document.getElementById('expo-push-customer-select');
+      if (expoPushSel) expoPushSel.innerHTML = '<option value="">-- Pick from list --</option>';
+      var unifiedSel = document.getElementById('unified-notif-customer');
+      unifiedSel.innerHTML = '<option value="">-- Select customer --</option>';
+      var addMemberSel = document.getElementById('add-member-user');
+      if (addMemberSel) addMemberSel.innerHTML = '<option value="">-- Select customer to add --</option>';
       for (var i = 0; i < cachedCustomers.length; i++) {
         var c = cachedCustomers[i];
         sel.innerHTML += '<option value="' + c.id + '">' + c.name + ' (' + c.phone + ')</option>';
+        if (expoPushSel) expoPushSel.innerHTML += '<option value="' + c.id + '">' + esc(c.name) + ' (ID: ' + c.id + ')</option>';
+        unifiedSel.innerHTML += '<option value="' + c.id + '">' + esc(c.name) + ' (' + esc(c.phone) + ')</option>';
+        if (addMemberSel) addMemberSel.innerHTML += '<option value="' + c.id + '">' + esc(c.name) + ' (' + esc(c.phone) + ')</option>';
+      }
+    }
+
+    function previewImg(previewId, url) {
+      var img = document.getElementById(previewId);
+      if (img) {
+        if (url && url.startsWith('http')) {
+          img.src = url;
+          img.style.display = 'block';
+          img.onerror = function() { img.style.display = 'none'; };
+        } else {
+          img.src = '';
+          img.style.display = 'none';
+        }
+      }
+    }
+
+    var UNIFIED_NOTIF_PRESETS = {
+      booking:         { title: '🎉 Booking Confirmed!',    body: 'Assalamu Alaikum! Your booking is confirmed. Tap to view details.' },
+      payment:         { title: '💳 Payment Pending',       body: 'Complete your payment to confirm your booking.' },
+      visa:            { title: '📄 Visa Ready',            body: 'Your visa is ready. Download now from your dashboard.' },
+      ticket:          { title: '🎫 Ticket Issued',         body: 'Your flight ticket is ready. Tap to download.' },
+      flight:          { title: '✈️ Flight Update',         body: 'Your flight schedule has been updated. Check details now.' },
+      travel_reminder: { title: '🧳 Travel Reminder',       body: 'Your journey is coming soon. Please be ready with documents.' },
+      meena:           { title: '🕋 Meena Update',          body: 'You have reached Meena. Follow group instructions.' },
+      madinah:         { title: '🕌 Welcome to Madinah',    body: 'You have arrived in Madinah. Stay blessed.' },
+      ziyarat:         { title: '🚌 Ziyarat Schedule',      body: 'Your Ziyarat trip is scheduled. Be ready on time.' },
+      laundry:         { title: '🧺 Laundry Ready',         body: 'Your laundry is ready for pickup.' },
+      food:            { title: '🍽️ Food Ready',            body: 'Your meal is ready. Please collect now.' },
+      broadcast:       { title: '📢 Al Burhan Update',      body: 'New update available from Al Burhan Tours & Travels. Tap to check.' }
+    };
+
+    var BOOKING_ID_TYPES = ['booking', 'payment', 'visa', 'ticket', 'flight', 'travel_reminder'];
+    var OPERATIONAL_TYPES = ['flight', 'travel_reminder', 'meena', 'madinah', 'ziyarat', 'laundry', 'food'];
+
+    function onUnifiedTargetChange() {
+      var targetType = document.querySelector('input[name="unified-target"]:checked').value;
+      document.getElementById('unified-user-wrap').style.display = targetType === 'user' ? 'block' : 'none';
+      document.getElementById('unified-group-wrap').style.display = targetType === 'group' ? 'block' : 'none';
+    }
+
+    function onUnifiedTypeChange() {
+      var type = document.getElementById('unified-notif-type').value;
+      var preset = UNIFIED_NOTIF_PRESETS[type];
+      if (preset) {
+        document.getElementById('unified-notif-title').value = preset.title;
+        document.getElementById('unified-notif-message').value = preset.body;
+      } else {
+        document.getElementById('unified-notif-title').value = '';
+        document.getElementById('unified-notif-message').value = '';
+      }
+      if (type === 'broadcast') {
+        document.querySelectorAll('input[name="unified-target"]').forEach(function(r) {
+          if (r.value === 'all') { r.checked = true; }
+        });
+        onUnifiedTargetChange();
+      }
+    }
+
+    function onUnifiedImageInput(val) {
+      var previewDiv = document.getElementById('unified-notif-image-preview');
+      var thumb = document.getElementById('unified-notif-image-thumb');
+      var url = val.trim();
+      if (url && /^https?:\/\/.+/.test(url)) {
+        thumb.src = url;
+        previewDiv.style.display = 'block';
+      } else {
+        previewDiv.style.display = 'none';
+        thumb.src = '';
+      }
+    }
+
+    async function sendUnifiedNotification() {
+      var type = document.getElementById('unified-notif-type').value;
+      var targetType = document.querySelector('input[name="unified-target"]:checked').value;
+      var userId = document.getElementById('unified-notif-customer').value;
+      var groupId = document.getElementById('unified-notif-group').value;
+      var bookingId = document.getElementById('unified-notif-bookingid').value.trim();
+      var bookingStatus = document.getElementById('unified-notif-status').value;
+      var title = document.getElementById('unified-notif-title').value.trim();
+      var message = document.getElementById('unified-notif-message').value.trim();
+      var imageUrl = (document.getElementById('unified-notif-image').value || '').trim();
+      var resultEl = document.getElementById('unified-notif-result');
+      var btn = document.getElementById('unified-notif-btn');
+
+      if (!type) {
+        resultEl.innerHTML = '<div style="color:#dc2626;padding:10px;background:#fef2f2;border-radius:8px">Please select a notification type.</div>';
+        return;
+      }
+      if (targetType === 'user' && !userId) {
+        resultEl.innerHTML = '<div style="color:#dc2626;padding:10px;background:#fef2f2;border-radius:8px">Please select a customer.</div>';
+        return;
+      }
+      if (targetType === 'group' && !groupId) {
+        resultEl.innerHTML = '<div style="color:#dc2626;padding:10px;background:#fef2f2;border-radius:8px">Please select a group.</div>';
+        return;
+      }
+      if (!title) {
+        resultEl.innerHTML = '<div style="color:#dc2626;padding:10px;background:#fef2f2;border-radius:8px">Please enter a title.</div>';
+        return;
+      }
+      if (!message) {
+        resultEl.innerHTML = '<div style="color:#dc2626;padding:10px;background:#fef2f2;border-radius:8px">Please enter a message.</div>';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Sending...';
+      resultEl.innerHTML = '<div style="color:#6b7280;padding:10px">Sending notification...</div>';
+
+      try {
+        var payload = { type: type, title: title, message: message, targetType: targetType };
+        if (targetType === 'user') payload.userId = Number(userId);
+        if (targetType === 'group') payload.groupId = Number(groupId);
+        if (bookingId) payload.bookingId = Number(bookingId);
+        if (bookingStatus) payload.bookingStatus = bookingStatus;
+        if (imageUrl) payload.imageUrl = imageUrl;
+
+        var resp = await fetch(API + '/api/admin/send-notification', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+        });
+        var data = await resp.json();
+
+        if (data.success) {
+          var preset = UNIFIED_NOTIF_PRESETS[type] || {};
+          var typeLabel = preset.title || type;
+          var targetLabel;
+          if (data.targeted === 'booking') {
+            targetLabel = 'sent to user of booking <strong>#' + bookingId + '</strong>';
+          } else if (targetType === 'user') {
+            var cust = (cachedCustomers || []).find(function(c) { return c.id == userId; });
+            targetLabel = 'sent to <strong>' + esc(cust ? cust.name : 'customer #' + userId) + '</strong>';
+          } else if (targetType === 'group') {
+            targetLabel = 'sent to group, <strong>' + (data.sent || 0) + '</strong> member(s) reached';
+          } else {
+            targetLabel = 'broadcast to <strong>' + (data.sent || data.fcmSent || 0) + '</strong> customer(s)';
+          }
+          if (bookingStatus) targetLabel += ' (filter: ' + bookingStatus + ')';
+          resultEl.innerHTML = '<div style="padding:12px;background:#d1fae5;border-radius:8px;color:#065f46">' +
+            '<strong>' + esc(typeLabel) + '</strong> ' + targetLabel + ' ✅</div>';
+          loadNotificationHistory();
+        } else {
+          resultEl.innerHTML = '<div style="color:#dc2626;padding:12px;background:#fef2f2;border-radius:8px">Error: ' + esc(data.error || 'Failed to send') + '</div>';
+        }
+      } catch (err) {
+        resultEl.innerHTML = '<div style="color:#dc2626;padding:12px;background:#fef2f2;border-radius:8px">Error: ' + esc(err.message) + '</div>';
+      }
+      btn.disabled = false;
+      btn.textContent = 'Send Notification';
+    }
+
+    // ── Groups Management ────────────────────────────────────────────────
+    var activeGroupId = null;
+    var groupsCache = [];
+
+    async function loadGroups() {
+      var listEl = document.getElementById('groups-list');
+      if (!listEl) return;
+      var data = await fetchJSON('/api/admin/groups');
+      if (!data.success) {
+        listEl.innerHTML = '<p style="color:#dc2626">Failed to load groups.</p>';
+        return;
+      }
+      if (data.groups.length === 0) {
+        listEl.innerHTML = '<p style="color:#6b7280;padding:12px">No groups yet. Click "+ New Group" to create one.</p>';
+        return;
+      }
+      var html = '<table style="width:100%;border-collapse:collapse;font-size:14px">' +
+        '<thead><tr style="background:#f9fafb">' +
+        '<th style="padding:10px 12px;text-align:left;border-bottom:1px solid #e5e7eb">Name</th>' +
+        '<th style="padding:10px 12px;text-align:left;border-bottom:1px solid #e5e7eb">Description</th>' +
+        '<th style="padding:10px 12px;text-align:center;border-bottom:1px solid #e5e7eb">Members</th>' +
+        '<th style="padding:10px 12px;text-align:right;border-bottom:1px solid #e5e7eb">Actions</th>' +
+        '</tr></thead><tbody>';
+      groupsCache = data.groups;
+      for (var i = 0; i < data.groups.length; i++) {
+        var g = data.groups[i];
+        html += '<tr>' +
+          '<td style="padding:10px 12px;border-bottom:1px solid #f3f4f6;font-weight:600">' + esc(g.name) + '</td>' +
+          '<td style="padding:10px 12px;border-bottom:1px solid #f3f4f6;color:#6b7280">' + esc(g.description || '—') + '</td>' +
+          '<td style="padding:10px 12px;border-bottom:1px solid #f3f4f6;text-align:center">' +
+            '<span style="background:#dbeafe;color:#1e40af;padding:2px 10px;border-radius:12px;font-size:13px">' + g.memberCount + '</span>' +
+          '</td>' +
+          '<td style="padding:10px 12px;border-bottom:1px solid #f3f4f6;text-align:right">' +
+            '<button class="btn" data-gid="' + g.id + '" onclick="viewGroupMembers(+this.dataset.gid)" style="padding:5px 12px;font-size:12px;margin-right:6px">Members</button>' +
+            '<button class="btn" data-gid="' + g.id + '" onclick="deleteGroup(+this.dataset.gid)" style="padding:5px 12px;font-size:12px;background:#fef2f2;color:#dc2626;border-color:#fecaca">Delete</button>' +
+          '</td></tr>';
+      }
+      html += '</tbody></table>';
+      listEl.innerHTML = html;
+      populateGroupsDropdown(data.groups);
+    }
+
+    function populateGroupsDropdown(groupsList) {
+      var sel = document.getElementById('unified-notif-group');
+      if (!sel) return;
+      sel.innerHTML = '<option value="">-- Select group --</option>';
+      for (var i = 0; i < groupsList.length; i++) {
+        var g = groupsList[i];
+        sel.innerHTML += '<option value="' + g.id + '">' + esc(g.name) + ' (' + g.memberCount + ' members)</option>';
+      }
+    }
+
+    async function createGroup() {
+      var name = document.getElementById('new-group-name').value.trim();
+      var desc = document.getElementById('new-group-desc').value.trim();
+      var result = document.getElementById('create-group-result');
+      if (!name) { result.innerHTML = '<span style="color:#dc2626">Name is required.</span>'; return; }
+      result.innerHTML = '<span style="color:#6b7280">Creating...</span>';
+      var data = await fetchJSON('/api/admin/groups', { method: 'POST', body: JSON.stringify({ name: name, description: desc }) });
+      if (data.success) {
+        result.innerHTML = '<span style="color:#065f46">Group "' + esc(name) + '" created ✅</span>';
+        document.getElementById('new-group-name').value = '';
+        document.getElementById('new-group-desc').value = '';
+        loadGroups();
+      } else {
+        result.innerHTML = '<span style="color:#dc2626">Error: ' + esc(data.error) + '</span>';
+      }
+    }
+
+    async function deleteGroup(id) {
+      var g = groupsCache.find(function(x) { return x.id === id; });
+      var name = g ? g.name : 'Group #' + id;
+      if (!confirm('Delete group "' + name + '" and remove all its members?')) return;
+      var data = await fetchJSON('/api/admin/groups/' + id, { method: 'DELETE' });
+      if (data.success) {
+        if (activeGroupId === id) document.getElementById('group-members-card').style.display = 'none';
+        loadGroups();
+      } else {
+        alert('Error: ' + data.error);
+      }
+    }
+
+    async function viewGroupMembers(id) {
+      activeGroupId = id;
+      var g = groupsCache.find(function(x) { return x.id === id; });
+      document.getElementById('group-members-title').textContent = 'Members: ' + (g ? g.name : 'Group #' + id);
+      document.getElementById('group-members-card').style.display = 'block';
+      document.getElementById('add-member-result').textContent = '';
+      await refreshGroupMembers();
+      document.getElementById('group-members-card').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    async function refreshGroupMembers() {
+      if (!activeGroupId) return;
+      var listEl = document.getElementById('group-members-list');
+      listEl.innerHTML = 'Loading...';
+      var data = await fetchJSON('/api/admin/groups/' + activeGroupId + '/members');
+      if (!data.success) { listEl.innerHTML = '<p style="color:#dc2626">Failed to load members.</p>'; return; }
+      if (data.members.length === 0) {
+        listEl.innerHTML = '<p style="color:#6b7280;padding:8px">No members yet. Add customers above.</p>';
+        return;
+      }
+      var html = '<table style="width:100%;border-collapse:collapse;font-size:14px">' +
+        '<thead><tr style="background:#f9fafb">' +
+        '<th style="padding:8px 12px;text-align:left;border-bottom:1px solid #e5e7eb">Name</th>' +
+        '<th style="padding:8px 12px;text-align:left;border-bottom:1px solid #e5e7eb">Phone</th>' +
+        '<th style="padding:8px 12px;text-align:right;border-bottom:1px solid #e5e7eb">Action</th>' +
+        '</tr></thead><tbody>';
+      for (var i = 0; i < data.members.length; i++) {
+        var m = data.members[i];
+        html += '<tr>' +
+          '<td style="padding:8px 12px;border-bottom:1px solid #f3f4f6">' + esc(m.name) + '</td>' +
+          '<td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;color:#6b7280">' + esc(m.phone) + '</td>' +
+          '<td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;text-align:right">' +
+            '<button class="btn" onclick="removeGroupMember(' + m.userId + ')" style="padding:4px 10px;font-size:12px;background:#fef2f2;color:#dc2626;border-color:#fecaca">Remove</button>' +
+          '</td></tr>';
+      }
+      html += '</tbody></table>';
+      listEl.innerHTML = html;
+    }
+
+    async function addGroupMember() {
+      var userId = document.getElementById('add-member-user').value;
+      var result = document.getElementById('add-member-result');
+      if (!userId) { result.innerHTML = '<span style="color:#dc2626">Please select a customer.</span>'; return; }
+      result.innerHTML = '<span style="color:#6b7280">Adding...</span>';
+      var data = await fetchJSON('/api/admin/groups/' + activeGroupId + '/members', { method: 'POST', body: JSON.stringify({ userId: Number(userId) }) });
+      if (data.success) {
+        result.innerHTML = '<span style="color:#065f46">Member added ✅</span>';
+        document.getElementById('add-member-user').value = '';
+        refreshGroupMembers();
+        loadGroups();
+      } else {
+        result.innerHTML = '<span style="color:#dc2626">Error: ' + esc(data.error) + '</span>';
+      }
+    }
+
+    async function removeGroupMember(userId) {
+      if (!confirm('Remove this member from the group?')) return;
+      var data = await fetchJSON('/api/admin/groups/' + activeGroupId + '/members/' + userId, { method: 'DELETE' });
+      if (data.success) {
+        refreshGroupMembers();
+        loadGroups();
+      } else {
+        alert('Error: ' + data.error);
       }
     }
 
@@ -725,50 +2077,101 @@
       btn.textContent = 'Upload & Notify Customer';
     }
 
-    async function sendBroadcastNotification() {
-      var subject = document.getElementById('notif-subject').value;
-      var message = document.getElementById('notif-message').value;
-      var statusDiv = document.getElementById('broadcast-status');
-      var resultsDiv = document.getElementById('notif-results');
-
-      if (!message.trim()) { alert('Please enter a message'); return; }
-
-      var btn = document.getElementById('broadcast-btn');
-      btn.disabled = true;
-      btn.textContent = 'Sending to all customers...';
-      statusDiv.innerHTML = '<div style="padding:12px;background:#fef3c7;border-radius:8px;color:#92400e">Sending notifications to all customers via SMS, WhatsApp & Email. This may take a moment...</div>';
-
+    async function retryFailedNotifications() {
+      var btn = document.getElementById('notif-retry-btn');
+      var resultDiv = document.getElementById('notif-retry-result');
+      if (btn) { btn.disabled = true; btn.textContent = 'Retrying...'; }
+      resultDiv.innerHTML = '<div style="padding:10px;background:#fef3c7;border-radius:8px;color:#92400e;font-size:13px">Retrying failed notifications…</div>';
       try {
-        var resp = await fetch(API + '/api/admin/broadcast-notification', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ subject: subject, message: message })
-        });
-        var result = await resp.json();
-        if (result.success) {
-          statusDiv.innerHTML = '<div style="padding:12px;background:#d1fae5;border-radius:8px;color:#065f46">' +
-            '<strong>Done!</strong> Sent to ' + result.sent + ' of ' + result.total + ' customers.</div>';
-
-          if (result.results && result.results.length > 0) {
-            var tbl = '<table><thead><tr><th>Customer</th><th>SMS</th><th>WhatsApp</th><th>Email</th></tr></thead><tbody>';
-            for (var i = 0; i < result.results.length; i++) {
-              var r = result.results[i];
-              tbl += '<tr><td>' + r.name + '</td>' +
-                '<td>' + (r.sms ? '<span style="color:#059669">Sent</span>' : '<span style="color:#dc2626">Failed</span>') + '</td>' +
-                '<td>' + (r.whatsapp ? '<span style="color:#059669">Sent</span>' : '<span style="color:#dc2626">Failed</span>') + '</td>' +
-                '<td>' + (r.email ? '<span style="color:#059669">Sent</span>' : '<span style="color:#dc2626">Failed</span>') + '</td></tr>';
-            }
-            tbl += '</tbody></table>';
-            resultsDiv.innerHTML = tbl;
-          }
-        } else {
-          statusDiv.innerHTML = '<div style="padding:12px;background:#fee2e2;border-radius:8px;color:#991b1b">Error: ' + (result.error || 'Send failed') + '</div>';
+        var data = await fetchJSON('/api/admin/notifications/retry-failed', { method: 'POST' });
+        if (!data.success) {
+          resultDiv.innerHTML = '<div style="padding:10px;background:#fee2e2;border-radius:8px;color:#991b1b;font-size:13px">Error: ' + esc(data.error || 'Retry failed') + '</div>';
+          return;
         }
+        var r = data;
+        var successColor = r.succeeded > 0 ? '#065f46' : '#6b7280';
+        resultDiv.innerHTML = '<div style="padding:10px;background:#f0fdf4;border-radius:8px;color:#065f46;font-size:13px">' +
+          '↺ Retry complete — ' +
+          '<strong>' + r.retried + '</strong> attempted, ' +
+          '<strong style="color:' + successColor + '">' + r.succeeded + '</strong> recovered, ' +
+          '<strong style="color:' + (r.stillFailed > 0 ? '#dc2626' : '#6b7280') + '">' + r.stillFailed + '</strong> still failed' +
+          (r.tokensCleaned > 0 ? ', <strong style="color:#c2410c">' + r.tokensCleaned + '</strong> invalid token(s) removed' : '') +
+          '</div>';
+        // Refresh history to show updated statuses
+        loadNotificationHistory();
       } catch (e) {
-        statusDiv.innerHTML = '<div style="padding:12px;background:#fee2e2;border-radius:8px;color:#991b1b">Error: ' + e.message + '</div>';
+        resultDiv.innerHTML = '<div style="padding:10px;background:#fee2e2;border-radius:8px;color:#991b1b;font-size:13px">Error: ' + esc(e.message) + '</div>';
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '↺ Retry Failed'; }
       }
-      btn.disabled = false;
-      btn.textContent = 'Send to All Customers (SMS + WhatsApp + Email)';
+    }
+
+    async function loadNotificationHistory() {
+      var historyDiv = document.getElementById('notif-results');
+      var statsDiv = document.getElementById('notif-history-stats');
+      var btn = document.getElementById('notif-history-btn');
+      if (btn) { btn.disabled = true; btn.textContent = 'Loading...'; }
+      try {
+        var data = await fetchJSON('/api/admin/notification-history?limit=100');
+        if (!data.success) {
+          historyDiv.innerHTML = '<div style="color:#dc2626;padding:10px">Failed to load history.</div>';
+          return;
+        }
+        var rows = data.history || [];
+        var totalCount = rows.length;
+        var sentCount = rows.filter(function(r) { return r.status === 'sent'; }).length;
+        var failedCount = rows.filter(function(r) { return r.status === 'failed'; }).length;
+        var retriedCount = rows.filter(function(r) { return r.retryCount && r.retryCount > 0; }).length;
+
+        var successRate = totalCount > 0 ? Math.round((sentCount / totalCount) * 100) : 0;
+        var rateColor = successRate >= 90 ? '#065f46' : successRate >= 70 ? '#c2410c' : '#dc2626';
+        var rateBg = successRate >= 90 ? '#f0fdf4' : successRate >= 70 ? '#fff7ed' : '#fef2f2';
+        statsDiv.innerHTML = '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px">' +
+          '<span style="background:#f0fdf4;color:#065f46;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:600">Total: ' + totalCount + '</span>' +
+          '<span style="background:#ecfdf5;color:#047857;padding:6px 14px;border-radius:20px;font-size:13px">✓ Sent: ' + sentCount + '</span>' +
+          (failedCount > 0 ? '<span style="background:#fef2f2;color:#dc2626;padding:6px 14px;border-radius:20px;font-size:13px">✗ Failed: ' + failedCount + '</span>' : '') +
+          (retriedCount > 0 ? '<span style="background:#fff7ed;color:#c2410c;padding:6px 14px;border-radius:20px;font-size:13px">↺ Retried: ' + retriedCount + '</span>' : '') +
+          '<span style="background:' + rateBg + ';color:' + rateColor + ';padding:6px 14px;border-radius:20px;font-size:13px;font-weight:600">Success rate: ' + successRate + '%</span>' +
+          '<span style="background:#f9fafb;color:#374151;padding:6px 14px;border-radius:20px;font-size:13px">Last 100 records</span>' +
+          '</div>';
+
+        if (rows.length === 0) {
+          historyDiv.innerHTML = '<div style="color:#6b7280;padding:16px;text-align:center">No notifications sent yet.</div>';
+          return;
+        }
+
+        var tbl = '<div style="overflow-x:auto"><table><thead><tr><th>Date</th><th>Customer</th><th>Type</th><th>Message</th><th>Push</th><th>Status</th></tr></thead><tbody>';
+        for (var i = 0; i < rows.length; i++) {
+          var r = rows[i];
+          var meta = r.metadata || {};
+          var dt = r.sentAt ? new Date(r.sentAt).toLocaleDateString('en-IN', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }) : '—';
+          var msgPreview = (r.message || '').substring(0, 60) + ((r.message || '').length > 60 ? '…' : '');
+          var pushIcon = meta.push ? '<span style="color:#059669">✓</span>' : '<span style="color:#6b7280">—</span>';
+          var isFailed = r.status === 'failed';
+          var statusColor = isFailed ? '#dc2626' : '#059669';
+          var rowStyle = isFailed ? ' style="background:#fff5f5"' : '';
+          var statusCell = '<span style="color:' + statusColor + ';font-weight:600;font-size:12px">' + esc(r.status || '—') + '</span>';
+          if (r.retryCount && r.retryCount > 0) {
+            statusCell += ' <span style="background:#fff7ed;color:#c2410c;border-radius:10px;font-size:11px;padding:1px 6px" title="Retried ' + r.retryCount + ' time(s)">' + r.retryCount + '↺</span>';
+          }
+          if (isFailed && r.errorMessage) {
+            statusCell += '<br><span style="color:#dc2626;font-size:11px;word-break:break-all" title="' + esc(r.errorMessage) + '">' + esc(r.errorMessage.substring(0, 40)) + (r.errorMessage.length > 40 ? '…' : '') + '</span>';
+          }
+          tbl += '<tr' + rowStyle + '>' +
+            '<td style="white-space:nowrap;font-size:12px">' + esc(dt) + '</td>' +
+            '<td>' + esc(r.userName || '—') + (r.userPhone ? '<br><span style="color:#9ca3af;font-size:12px">' + esc(r.userPhone) + '</span>' : '') + '</td>' +
+            '<td><span style="background:#f3f4f6;padding:2px 8px;border-radius:10px;font-size:12px">' + esc(r.type || '—') + '</span></td>' +
+            '<td style="max-width:200px;font-size:13px">' + esc(msgPreview) + '</td>' +
+            '<td style="text-align:center">' + pushIcon + '</td>' +
+            '<td>' + statusCell + '</td>' +
+            '</tr>';
+        }
+        tbl += '</tbody></table></div>';
+        historyDiv.innerHTML = tbl;
+      } catch (e) {
+        historyDiv.innerHTML = '<div style="color:#dc2626;padding:10px">Error loading history: ' + esc(e.message) + '</div>';
+      }
+      if (btn) { btn.disabled = false; btn.textContent = 'Refresh'; }
     }
 
     var cachedPackages = [];
@@ -838,7 +2241,6 @@
       var paidAmount = parseFloat(document.getElementById('inv-paid').value) || 0;
       var travelersStr = document.getElementById('inv-travelers').value.trim();
       var specialRequests = document.getElementById('inv-requests').value.trim();
-      var sendSms = document.getElementById('inv-send-sms').checked;
       var sendWhatsapp = document.getElementById('inv-send-whatsapp').checked;
 
       if (!name || !phone || !packageId || rate <= 0) {
@@ -880,7 +2282,6 @@
             travelers: travelers,
             roomType: roomLabel,
             specialRequests: specialRequests,
-            sendSms: sendSms,
             sendWhatsapp: sendWhatsapp
           })
         });
@@ -953,6 +2354,68 @@
       }
     }
 
+    async function testWhatsApp() {
+      var phone = document.getElementById('wa-test-phone').value.trim();
+      var template = document.getElementById('wa-test-template').value;
+      var resultEl = document.getElementById('wa-test-result');
+      var btn = document.getElementById('wa-test-btn');
+      if (!phone) { resultEl.innerHTML = '<div style="color:#dc2626;padding:10px;background:#fef2f2;border-radius:8px">Please enter a phone number.</div>'; return; }
+      btn.disabled = true;
+      btn.textContent = 'Sending...';
+      resultEl.innerHTML = '<div style="color:#6b7280;padding:10px">Sending test message...</div>';
+      try {
+        var res = await fetch(API + '/api/admin/test-whatsapp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: phone, template: template })
+        });
+        var data = await res.json();
+        var statusColor = data.success ? '#065f46' : '#991b1b';
+        var statusBg = data.success ? '#d1fae5' : '#fee2e2';
+        var statusText = data.success ? '✅ Sent successfully (status=accepted)' : '❌ Failed to send';
+        resultEl.innerHTML = '<div style="padding:12px;background:' + statusBg + ';border-radius:8px;margin-bottom:12px"><strong style="color:' + statusColor + '">' + statusText + '</strong></div>' +
+          '<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Full Meta API Response:</div>' +
+          '<pre style="background:#1f2937;color:#f9fafb;padding:16px;border-radius:8px;overflow-x:auto;font-size:12px;white-space:pre-wrap;word-break:break-word">' + esc(JSON.stringify(data.raw, null, 2)) + '</pre>';
+      } catch (err) {
+        resultEl.innerHTML = '<div style="color:#dc2626;padding:10px;background:#fef2f2;border-radius:8px">Error: ' + esc(err.message) + '</div>';
+      }
+      btn.disabled = false;
+      btn.textContent = 'Send Test Message';
+    }
+
+    async function testPushNotification() {
+      var userId = document.getElementById('push-test-userid').value.trim();
+      var token = document.getElementById('push-test-token').value.trim();
+      var resultEl = document.getElementById('push-test-result');
+      var btn = document.getElementById('push-test-btn');
+      if (!userId && !token) {
+        resultEl.innerHTML = '<div style="color:#dc2626;padding:10px;background:#fef2f2;border-radius:8px">Enter a User ID or paste an Expo push token.</div>';
+        return;
+      }
+      btn.disabled = true;
+      btn.textContent = 'Sending...';
+      resultEl.innerHTML = '<div style="color:#6b7280;padding:10px">Sending test push...</div>';
+      var payload = userId ? { userId: parseInt(userId) } : { expoPushToken: token };
+      try {
+        var res = await fetch(API + '/api/admin/test-push', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        var data = await res.json();
+        var statusColor = data.success ? '#065f46' : '#991b1b';
+        var statusBg = data.success ? '#d1fae5' : '#fee2e2';
+        var statusText = data.success ? '✅ Push sent successfully — check your device!' : '❌ Push delivery failed';
+        resultEl.innerHTML = '<div style="padding:12px;background:' + statusBg + ';border-radius:8px;margin-bottom:12px"><strong style="color:' + statusColor + '">' + statusText + '</strong></div>' +
+          '<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Expo API Response:</div>' +
+          '<pre style="background:#1f2937;color:#f9fafb;padding:16px;border-radius:8px;overflow-x:auto;font-size:12px;white-space:pre-wrap;word-break:break-word">' + esc(JSON.stringify(data.raw, null, 2)) + '</pre>';
+      } catch (err) {
+        resultEl.innerHTML = '<div style="color:#dc2626;padding:10px;background:#fef2f2;border-radius:8px">Error: ' + esc(err.message) + '</div>';
+      }
+      btn.disabled = false;
+      btn.textContent = 'Send Test Push';
+    }
+
     function loadAll() {
       loadStats();
       loadBookings();
@@ -963,6 +2426,94 @@
       populateCustomerDropdown();
       populatePackageDropdown();
       loadInvoices();
+      loadGroups();
+    }
+
+    async function fixImageUrls() {
+      if (!confirm('This will scan all packages and fix any image URLs that point to the wrong domain (e.g. temporary workspace URLs). Continue?')) return;
+      try {
+        var resp = await fetch(API + '/api/admin/fix-image-urls', { method: 'POST' });
+        const data = await resp.json();
+        if (data.success) {
+          alert('Done! ' + data.message + '\nCorrect domain: ' + data.correctBase);
+          loadPackages();
+        } else {
+          alert('Error: ' + (data.error || 'Fix failed'));
+        }
+      } catch (e) {
+        alert('Error: ' + e.message);
+      }
+    }
+
+    var FIRESTORE_BASE = 'https://firestore.googleapis.com/v1/projects/{{FIREBASE_PROJECT_ID}}/databases/(default)/documents';
+
+    async function sendNotification(token, title, message, image, userId) {
+      var payload = { to: token, title: title, body: message, sound: 'default', data: {} };
+      if (image) payload.data.image = image;
+      var expoResp = await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!expoResp.ok) {
+        var expoBody = '';
+        try { expoBody = await expoResp.text(); } catch (_) {}
+        throw new Error('Expo push API error (' + expoResp.status + '): ' + (expoBody || 'no details'));
+      }
+      var expoData = await expoResp.json().catch(function() { return null; });
+      if (expoData && expoData.data && expoData.data.status === 'error') {
+        throw new Error('Expo push rejected: ' + (expoData.data.message || 'unknown error'));
+      }
+      var now = new Date().toISOString();
+      var notifDoc = {
+        fields: {
+          userId: { integerValue: String(userId) },
+          title: { stringValue: title },
+          message: { stringValue: message },
+          image: { stringValue: image || '' },
+          read: { booleanValue: false },
+          createdAt: { timestampValue: now }
+        }
+      };
+      var fsResp = await fetch(FIRESTORE_BASE + '/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(notifDoc)
+      });
+      if (!fsResp.ok) {
+        var fsBody = '';
+        try { fsBody = await fsResp.text(); } catch (_) {}
+        throw new Error('Firestore write error (' + fsResp.status + '): ' + (fsBody || 'check Firestore security rules'));
+      }
+    }
+
+    async function sendExpoPushNotification() {
+      var userId = document.getElementById('expo-push-userid').value.trim();
+      var title = document.getElementById('expo-push-title').value.trim();
+      var message = document.getElementById('expo-push-message').value.trim();
+      var image = document.getElementById('expo-push-image').value.trim();
+      var resultEl = document.getElementById('expo-push-result');
+      var btn = document.getElementById('expo-push-btn');
+      if (!userId) { resultEl.innerHTML = '<div style="color:#dc2626;padding:10px;background:#fef2f2;border-radius:8px">Please enter a Customer ID.</div>'; return; }
+      if (!title) { resultEl.innerHTML = '<div style="color:#dc2626;padding:10px;background:#fef2f2;border-radius:8px">Please enter a push title.</div>'; return; }
+      if (!message) { resultEl.innerHTML = '<div style="color:#dc2626;padding:10px;background:#fef2f2;border-radius:8px">Please enter a message.</div>'; return; }
+      btn.disabled = true;
+      btn.textContent = 'Sending...';
+      resultEl.innerHTML = '<div style="color:#6b7280;padding:10px">Sending push notification...</div>';
+      try {
+        var resp = await fetch('/api/admin/send-push-to-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: parseInt(userId), title: title, message: message, image: image || undefined })
+        });
+        var data = await resp.json();
+        if (!data.success) throw new Error(data.error || 'Failed to send push notification');
+        resultEl.innerHTML = '<div style="padding:12px;background:#d1fae5;border-radius:8px;color:#065f46"><strong>✅ Push notification sent!</strong><br><span style="font-size:12px;color:#047857">Delivered to ' + (data.tokenCount || 1) + ' device(s)</span></div>';
+      } catch (err) {
+        resultEl.innerHTML = '<div style="color:#dc2626;padding:12px;background:#fef2f2;border-radius:8px">❌ ' + esc(err.message) + '</div>';
+      }
+      btn.disabled = false;
+      btn.textContent = 'Send Expo Push';
     }
 
     loadAll();

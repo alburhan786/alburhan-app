@@ -2,8 +2,39 @@ import { Tabs } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Colors } from "@/constants/Colors";
 import { Platform } from "react-native";
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/AuthContext";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { NOTIFS_VIEWED_AT_KEY, NOTIFS_VIEWED_QUERY_KEY } from "@/constants/notificationBadge";
 
 export default function TabLayout() {
+  const { user } = useAuth();
+
+  const { data: notifData } = useQuery<{ success: boolean; notifications: { sentAt: string }[] }>({
+    queryKey: ["/api/notifications"],
+    enabled: !!user,
+    refetchInterval: 60000,
+  });
+
+  const viewedQueryKey = user ? NOTIFS_VIEWED_QUERY_KEY(user.id) : null;
+  const viewedAtStorageKey = user ? NOTIFS_VIEWED_AT_KEY(user.id) : null;
+
+  const { data: viewedAtStr } = useQuery<string | null>({
+    queryKey: viewedQueryKey ?? ["notificationsViewedAt", null],
+    queryFn: () => (viewedAtStorageKey ? AsyncStorage.getItem(viewedAtStorageKey) : null),
+    enabled: !!user,
+    staleTime: Infinity,
+  });
+
+  const lastViewedAt = viewedAtStr ? new Date(viewedAtStr) : null;
+  const notifications = notifData?.notifications ?? [];
+  const unreadCount = lastViewedAt
+    ? notifications.filter((n) => new Date(n.sentAt) > lastViewedAt).length
+    : notifications.length;
+  const badgeValue = user && unreadCount > 0
+    ? (unreadCount > 99 ? "99+" : unreadCount)
+    : undefined;
+
   return (
     <Tabs
       screenOptions={{
@@ -60,6 +91,30 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="notifications"
+        options={{
+          title: "Alerts",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons
+              name={badgeValue ? "notifications" : "notifications-outline"}
+              size={size}
+              color={color}
+            />
+          ),
+          tabBarBadge: badgeValue,
+          tabBarBadgeStyle: {
+            backgroundColor: "#ef4444",
+            color: "#ffffff",
+            fontSize: 10,
+            fontWeight: "700" as const,
+            minWidth: 16,
+            height: 16,
+            borderRadius: 8,
+            lineHeight: 16,
+          },
+        }}
+      />
+      <Tabs.Screen
         name="contact"
         options={{
           title: "Contact",
@@ -83,7 +138,10 @@ export default function TabLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          href: null,
+          title: "Profile",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="person" size={size} color={color} />
+          ),
         }}
       />
     </Tabs>

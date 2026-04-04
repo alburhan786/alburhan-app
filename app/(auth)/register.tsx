@@ -11,6 +11,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Linking,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -298,8 +299,11 @@ export default function RegisterScreen() {
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
-          <Text style={styles.logo}>AL BURHAN</Text>
-          <Text style={styles.subtitle}>Tours & Travels</Text>
+          <Image
+            source={require('../../assets/images/alburhan_logo.png')}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
         </View>
 
         <View style={styles.form}>
@@ -337,17 +341,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 32,
   },
-  logo: {
-    fontSize: 36,
-    fontWeight: 'bold' as const,
-    color: Colors.primary,
-    letterSpacing: 2,
-  },
-  subtitle: {
-    fontSize: 18,
-    color: Colors.secondary,
-    fontWeight: '600' as const,
-    marginTop: 4,
+  logoImage: {
+    width: 180,
+    height: 120,
+    marginBottom: 8,
   },
   form: {
     backgroundColor: Colors.card,
