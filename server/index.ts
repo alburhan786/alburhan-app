@@ -1,6 +1,8 @@
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
+import { Pool } from "pg";
 import { registerRoutes } from "./routes";
 import { registerChatRoutes } from "./replit_integrations/chat";
 import { warmupDb, db } from "./db";
@@ -347,7 +349,16 @@ function setupErrorHandler(app: express.Application) {
   if (!sessionSecret) {
     throw new Error("SESSION_SECRET environment variable is not set. Please add it to your secrets.");
   }
+
+  const PgSession = connectPgSimple(session);
+  const sessionPool = new Pool({ connectionString: process.env.DATABASE_URL });
+
   app.use(session({
+    store: new PgSession({
+      pool: sessionPool,
+      tableName: "session",
+      createTableIfMissing: true,
+    }),
     secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
@@ -355,7 +366,7 @@ function setupErrorHandler(app: express.Application) {
       secure: process.env.NODE_ENV === "production",
       httpOnly: true,
       sameSite: "lax",
-      maxAge: 24 * 60 * 60 * 1000,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     },
   }));
 
