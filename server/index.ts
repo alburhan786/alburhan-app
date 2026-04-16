@@ -2,10 +2,9 @@ import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
-import { Pool } from "pg";
 import { registerRoutes } from "./routes";
 import { registerChatRoutes } from "./replit_integrations/chat";
-import { warmupDb, db } from "./db";
+import { warmupDb, db, pool } from "./db";
 import * as fs from "fs";
 import * as path from "path";
 import { createProxyMiddleware } from "http-proxy-middleware";
@@ -351,11 +350,10 @@ function setupErrorHandler(app: express.Application) {
   }
 
   const PgSession = connectPgSimple(session);
-  const sessionPool = new Pool({ connectionString: process.env.DATABASE_URL });
 
   app.use(session({
     store: new PgSession({
-      pool: sessionPool,
+      pool,
       tableName: "session",
       createTableIfMissing: true,
     }),
@@ -366,7 +364,7 @@ function setupErrorHandler(app: express.Application) {
       secure: process.env.NODE_ENV === "production",
       httpOnly: true,
       sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      maxAge: 24 * 60 * 60 * 1000,
     },
   }));
 
