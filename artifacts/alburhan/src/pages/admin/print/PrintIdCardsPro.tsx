@@ -259,8 +259,20 @@ export default function PrintIdCardsPro() {
                   <div style={{ display: "flex", justifyContent: "center", overflow: "hidden", padding: "0 4mm" }}>
                     <Barcode value={`${p.passportNumber || "N/A"}-${String(p.serialNumber).padStart(3, "0")}`} height={10} width={0.9} fontSize={0} />
                   </div>
-                  <div style={{ background: DARK, color: GOLD, padding: "1mm 2mm", fontSize: "3.8pt", textAlign: "center", fontWeight: 700, letterSpacing: "0.2px", marginTop: "0.5mm" }}>
-                    #{String(p.serialNumber).padStart(3, "0")} | Mohammed Altaf: 0547090786 | Mohammed Wasim: 0568780786
+                  <div style={{ background: DARK, padding: "1.5mm 2mm", marginTop: "0.5mm" }}>
+                    <div style={{ color: "#aaa", fontSize: "3.8pt", textAlign: "center", letterSpacing: "0.5px", marginBottom: "0.8mm" }}>
+                      #{String(p.serialNumber).padStart(3, "0")} · EMERGENCY CONTACT (SAUDI)
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "center", gap: "6mm" }}>
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ color: GOLD, fontSize: "6pt", fontWeight: 900, lineHeight: 1.2 }}>Mohammed Altaf</div>
+                        <div style={{ color: "#fff", fontSize: "6pt", fontWeight: 900, lineHeight: 1.2 }}>0547090786</div>
+                      </div>
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ color: GOLD, fontSize: "6pt", fontWeight: 900, lineHeight: 1.2 }}>Mohammed Wasim</div>
+                        <div style={{ color: "#fff", fontSize: "6pt", fontWeight: 900, lineHeight: 1.2 }}>0568780786</div>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
