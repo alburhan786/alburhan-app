@@ -64,12 +64,19 @@ export default function PrintZamzam() {
   for (let i = 0; i < pilgrims.length; i += 2) pages.push(pilgrims.slice(i, i + 2));
 
   function flightLine(): string {
-    const parts: string[] = [];
-    if (group!.returnDate) parts.push(group!.returnDate);
-    if (group!.flightNumber) parts.push(group!.flightNumber);
-    parts.push("Jeddah Mumbai");
-    return parts.join(" ");
+    const { returnDate, flightNumber } = group!;
+    if (!returnDate || !flightNumber) return "";
+    const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const MON_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                       "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const d = new Date(returnDate);
+    const dayOfWeek = isNaN(d.getTime()) ? "" : DAY_NAMES[d.getDay()] + " ";
+    const dayMonth = isNaN(d.getTime())
+      ? returnDate
+      : `${d.getDate()} ${MON_NAMES[d.getMonth()]}`;
+    return `${dayOfWeek}${dayMonth} ${flightNumber} Jeddah Mumbai`;
   }
+  const hasFlightLine = !!(group.returnDate && group.flightNumber);
 
   const hYear = hijriYear(group.year);
 
@@ -213,7 +220,7 @@ export default function PrintZamzam() {
                         }}>
                           {displayName}
                         </div>
-                        {(group.returnDate || group.flightNumber) && (
+                        {hasFlightLine && (
                           <div style={{ fontSize: "7pt", color: "#222", marginTop: "1.5mm", lineHeight: 1.4 }}>
                             {flightLine()}
                           </div>
