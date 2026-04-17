@@ -169,13 +169,13 @@ export default function PrintZamzam() {
                     <div style={{ flex: 1 }}>
                       <div style={{
                         fontWeight: 900, fontSize: "9pt", color: GOLD,
-                        letterSpacing: "0.5px", lineHeight: 1.1
+                        letterSpacing: "0.5px", lineHeight: 1.15
                       }}>
                         AL-BURHAN
                       </div>
                       <div style={{
-                        fontWeight: 900, fontSize: "7.5pt", color: DARK_GREEN,
-                        letterSpacing: "1px", textTransform: "uppercase", lineHeight: 1.2
+                        fontWeight: 900, fontSize: "7pt", color: DARK_GREEN,
+                        letterSpacing: "0.5px", textTransform: "uppercase", lineHeight: 1.2
                       }}>
                         TOURS &amp; TRAVELS
                       </div>
@@ -247,7 +247,7 @@ export default function PrintZamzam() {
                   {/* ── Pilgrim Name ── */}
                   <div style={{ textAlign: "center", padding: "1mm 5mm 2.5mm" }}>
                     <div style={{
-                      fontSize: "13pt", fontWeight: 900, color: "#111",
+                      fontSize: "15pt", fontWeight: 900, color: "#111",
                       lineHeight: 1.2, wordBreak: "break-word", textTransform: "uppercase",
                       fontFamily: "'Arial Black', Arial, sans-serif"
                     }}>
