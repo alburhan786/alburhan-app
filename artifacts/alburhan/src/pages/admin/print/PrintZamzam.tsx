@@ -228,7 +228,7 @@ export default function PrintZamzam() {
                   </div>
 
                   {/* ── Serial Number ── */}
-                  <div style={{ textAlign: "center", padding: "3mm 4mm 0" }}>
+                  <div style={{ textAlign: "center", padding: "1mm 4mm 0" }}>
                     <div style={{
                       fontSize: "5.5pt", color: "#999", textTransform: "uppercase",
                       letterSpacing: "2px", fontWeight: 700
@@ -236,8 +236,8 @@ export default function PrintZamzam() {
                       SERIAL NO.
                     </div>
                     <div style={{
-                      fontSize: "46pt", fontWeight: 900, color: DARK_GREEN,
-                      lineHeight: 1.05, letterSpacing: "-1px",
+                      fontSize: "72pt", fontWeight: 900, color: DARK_GREEN,
+                      lineHeight: 1, letterSpacing: "-2px",
                       fontFamily: "'Arial Black', Arial, sans-serif"
                     }}>
                       #{serial}
@@ -286,7 +286,7 @@ export default function PrintZamzam() {
                     </div>
                     <QRCodeSVG
                       value={buildQr(p, group)}
-                      size={90}
+                      size={140}
                       level="M"
                       fgColor={DARK_GREEN}
                     />
