@@ -93,7 +93,7 @@ export default function PrintZamzam() {
           display: flex;
           gap: 5mm;
           width: 285mm;
-          height: 195mm;
+          height: 196mm;
           page-break-after: always;
         }
         .zz-page:last-child { page-break-after: auto; }
@@ -134,7 +134,7 @@ export default function PrintZamzam() {
         </button>
       </div>
 
-      <div ref={contentRef} style={{ padding: "6mm", background: "#fff" }}>
+      <div ref={contentRef} style={{ background: "#fff" }}>
         {pages.map((page, pageIdx) => (
           <div key={pageIdx} className="zz-page">
             {page.map(p => {
@@ -190,7 +190,7 @@ export default function PrintZamzam() {
                     <div style={{ display: "flex", gap: "3mm", padding: "2.5mm 3mm 1.5mm" }}>
                       {/* Passport photo */}
                       <div style={{
-                        flexShrink: 0, width: "22mm", height: "28mm",
+                        flexShrink: 0, width: "22mm", height: "22mm",
                         background: "#e0e0e0", overflow: "hidden",
                         border: "0.5px solid #bbb", display: "flex",
                         alignItems: "center", justifyContent: "center"
