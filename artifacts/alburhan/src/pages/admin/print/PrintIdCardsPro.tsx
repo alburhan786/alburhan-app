@@ -189,14 +189,28 @@ export default function PrintIdCardsPro() {
                   }}>
 
                     {/* Logo + company */}
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: "4mm", marginBottom: "1mm" }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: "4mm", marginBottom: "1.5mm" }}>
                       <img src={BASE + "images/logo.png"} alt="" style={{ width: "22mm", height: "22mm", objectFit: "contain" }} />
                       <div style={{ fontSize: "8pt", fontWeight: 900, color: GOLD, letterSpacing: "0.5px", lineHeight: 1.1, textAlign: "center", marginTop: "0.5mm" }}>AL BURHAN</div>
                       <div style={{ fontSize: "4pt", fontWeight: 700, color: GOLD, letterSpacing: "0.8px", textAlign: "center" }}>TOURS &amp; TRAVELS</div>
                       <div style={{ fontSize: "4pt", fontWeight: 800, color: DARK, marginTop: "0.3mm", textAlign: "center" }}>HAJJ {group.year}</div>
                     </div>
 
-                    {/* Serial number badge */}
+                    {/* Passport photo (before serial badge) */}
+                    <div style={{ marginBottom: "1mm" }}>
+                      {p.photoUrl ? (
+                        <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "22mm", height: "28mm", objectFit: "cover", borderRadius: "2px", border: `2px solid ${GOLD}` }} />
+                      ) : (
+                        <div style={{ width: "22mm", height: "28mm", background: "#f0f0f0", borderRadius: "2px", border: `2px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "5pt", color: "#aaa" }}>PHOTO</div>
+                      )}
+                    </div>
+
+                    {/* Pilgrim name */}
+                    <div style={{ fontSize: "7pt", fontWeight: 900, color: DARK, lineHeight: 1.15, textTransform: "uppercase", wordBreak: "break-word", textAlign: "center", marginBottom: "1mm" }}>
+                      {p.fullName}
+                    </div>
+
+                    {/* Serial number badge (after name) */}
                     <div style={{
                       background: DARK, color: GOLD, borderRadius: "3px",
                       padding: "1mm 3mm", marginBottom: "1.5mm", textAlign: "center", width: "100%",
@@ -207,21 +221,7 @@ export default function PrintIdCardsPro() {
                       </div>
                     </div>
 
-                    {/* Passport photo */}
-                    <div style={{ marginBottom: "1.5mm" }}>
-                      {p.photoUrl ? (
-                        <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "22mm", height: "28mm", objectFit: "cover", borderRadius: "2px", border: `2px solid ${GOLD}` }} />
-                      ) : (
-                        <div style={{ width: "22mm", height: "28mm", background: "#f0f0f0", borderRadius: "2px", border: `2px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "5pt", color: "#aaa" }}>PHOTO</div>
-                      )}
-                    </div>
-
-                    {/* Pilgrim name */}
-                    <div style={{ fontSize: "7pt", fontWeight: 900, color: DARK, lineHeight: 1.15, textTransform: "uppercase", wordBreak: "break-word", textAlign: "center", marginBottom: "1.5mm" }}>
-                      {p.fullName}
-                    </div>
-
-                    {/* Fields: Bus + Maktab (no passport, no mobile) */}
+                    {/* Fields: Bus, Maktab, Room (no passport, no mobile) */}
                     <div style={{ width: "100%", display: "flex", gap: "2mm", justifyContent: "center" }}>
                       <div style={{ textAlign: "center" }}>
                         <div style={{ fontSize: "4pt", color: "#888", textTransform: "uppercase", letterSpacing: "0.3px" }}>Bus No.</div>
@@ -231,6 +231,11 @@ export default function PrintIdCardsPro() {
                       <div style={{ textAlign: "center" }}>
                         <div style={{ fontSize: "4pt", color: "#888", textTransform: "uppercase", letterSpacing: "0.3px" }}>Maktab</div>
                         <div style={{ fontSize: "6pt", fontWeight: 900, color: GOLD, background: DARK, padding: "0 1.5mm", borderRadius: "2px", display: "inline-block" }}>{group.maktabNumber || "—"}</div>
+                      </div>
+                      <div style={{ width: "0.5px", background: "#ddd" }} />
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: "4pt", color: "#888", textTransform: "uppercase", letterSpacing: "0.3px" }}>Room</div>
+                        <div style={{ fontSize: "6pt", fontWeight: 900, color: DARK }}>{p.roomNumber || "—"}</div>
                       </div>
                     </div>
 
@@ -281,17 +286,15 @@ export default function PrintIdCardsPro() {
                       Hajj {group.year} · {groupLabel}
                     </div>
 
-                    {/* Hotel + trip info (single column) */}
+                    {/* Hotel + trip info (single column, fully stacked) */}
                     <div style={{ display: "flex", flexDirection: "column", gap: "1.5mm", flex: 1 }}>
-                      <div style={{ display: "flex", gap: "3mm" }}>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: "4.5pt", color: "#888", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Maktab No.</div>
-                          <div style={{ display: "inline-block", background: DARK, color: GOLD, fontSize: "8pt", fontWeight: 900, padding: "0.5mm 2mm", borderRadius: "2px", marginTop: "0.5mm" }}>{group.maktabNumber || "—"}</div>
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: "4.5pt", color: "#888", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Bus No.</div>
-                          <div style={{ fontSize: "8pt", fontWeight: 900, color: DARK }}>{p.busNumber || "—"}</div>
-                        </div>
+                      <div>
+                        <div style={{ fontSize: "4.5pt", color: "#888", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Maktab No.</div>
+                        <div style={{ display: "inline-block", background: DARK, color: GOLD, fontSize: "8pt", fontWeight: 900, padding: "0.5mm 2mm", borderRadius: "2px", marginTop: "0.5mm" }}>{group.maktabNumber || "—"}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: "4.5pt", color: "#888", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Bus No.</div>
+                        <div style={{ fontSize: "8pt", fontWeight: 900, color: DARK }}>{p.busNumber || "—"}</div>
                       </div>
                       <div>
                         <div style={{ fontSize: "4.5pt", color: "#888", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Hotel Makkah</div>
