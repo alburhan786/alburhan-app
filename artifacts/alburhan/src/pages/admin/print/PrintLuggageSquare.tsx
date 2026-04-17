@@ -17,12 +17,12 @@ interface Group {
   hotels?: {
     makkah?: { name?: string };
     madinah?: { name?: string };
+    aziziah?: { name?: string };
   };
 }
 
 const DARK = "#0A3D2A";
 const GOLD = "#C9A84C";
-const GOLD_LIGHT = "#E8D48B";
 
 const GROUP_COLORS: Record<string, string> = {
   A: "#1A7A4A",
@@ -45,9 +45,10 @@ function buildQrData(p: Pilgrim, group: Group): string {
     `Bus: ${p.busNumber || "N/A"}`,
     `Hotel Makkah: ${group.hotels?.makkah?.name || "N/A"}`,
     `Hotel Madinah: ${group.hotels?.madinah?.name || "N/A"}`,
+    `Hotel Aziziah: ${group.hotels?.aziziah?.name || "N/A"}`,
     `India: ${p.mobileIndia || "N/A"}`,
     `Saudi: ${p.mobileSaudi || "N/A"}`,
-    `Emergency: +91 9893225590`,
+    `Emergency: 0547090786`,
   ].join("\n");
 }
 
@@ -80,6 +81,9 @@ export default function PrintLuggageSquare() {
   const groupColor = getGroupColor(group.groupName);
   const groupLabel = group.groupName.toUpperCase();
 
+  const pages: Pilgrim[][] = [];
+  for (let i = 0; i < pilgrims.length; i += 2) pages.push(pilgrims.slice(i, i + 2));
+
   return (
     <>
       <style>{`
@@ -90,14 +94,17 @@ export default function PrintLuggageSquare() {
         }
         * { box-sizing: border-box; }
         .sq-sticker {
-          width: 100mm; height: 110mm;
+          width: 92mm; height: 92mm;
           border: 1.5px solid ${DARK}; border-radius: 5px; overflow: hidden;
-          page-break-inside: avoid; page-break-after: always;
+          page-break-inside: avoid;
           font-family: 'Inter', Arial, sans-serif;
           background: #fff; position: relative;
-          margin: 0 auto 5mm;
         }
-        .sq-sticker:last-child { page-break-after: auto; }
+        .sq-row {
+          display: flex; gap: 6mm; align-items: flex-start;
+          page-break-after: always;
+        }
+        .sq-row:last-child { page-break-after: auto; }
       `}</style>
 
       <div className="no-print" style={{ padding: "16px", background: "#fef3c7", textAlign: "center" }}>
@@ -106,80 +113,88 @@ export default function PrintLuggageSquare() {
       </div>
 
       <div ref={contentRef}>
-      {pilgrims.map(p => (
-        <div key={p.id} className="sq-sticker">
-          <div style={{ position: "relative", overflow: "hidden", height: "100%", display: "flex", flexDirection: "column" }}>
-            <div style={{
-              position: "absolute", top: "-8mm", right: "-6mm",
-              width: "40mm", height: "40mm",
-              background: DARK, borderRadius: "0 0 0 60%", zIndex: 0,
-            }} />
+        {pages.map((page, pageIdx) => (
+          <div key={pageIdx} className="sq-row">
+            {page.map(p => (
+              <div key={p.id} className="sq-sticker">
+                <div style={{ position: "relative", overflow: "hidden", height: "100%", display: "flex", flexDirection: "column" }}>
+                  <div style={{
+                    position: "absolute", top: "-8mm", right: "-6mm",
+                    width: "38mm", height: "38mm",
+                    background: DARK, borderRadius: "0 0 0 60%", zIndex: 0,
+                  }} />
 
-            <div style={{ position: "relative", zIndex: 1, padding: "2.5mm 4mm 1.5mm", display: "flex", alignItems: "center", gap: "2mm" }}>
-              <img src={`${BASE}images/logo.png`} alt="" style={{ height: "11mm", objectFit: "contain", flexShrink: 0 }} />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 900, fontSize: "9pt", color: "#1A7A4A", letterSpacing: "0.8px", textTransform: "uppercase", lineHeight: 1.1 }}>AL-BURHAN</div>
-                <div style={{ fontWeight: 700, fontSize: "6pt", color: GOLD, letterSpacing: "1px", textTransform: "uppercase" }}>TOURS & TRAVELS</div>
-              </div>
-              <div style={{ textAlign: "right", flexShrink: 0 }}>
-                <div style={{ fontSize: "13pt", fontWeight: 800, color: "#fff" }}>#{String(p.serialNumber).padStart(3, "0")}</div>
-                <div style={{ fontSize: "5.5pt", color: "#fff", opacity: 0.9 }}>HAJJ {group.year}</div>
-              </div>
-            </div>
+                  <div style={{ position: "relative", zIndex: 1, padding: "2mm 3.5mm 1mm", display: "flex", alignItems: "center", gap: "2mm" }}>
+                    <img src={`${BASE}images/logo.png`} alt="" style={{ height: "10mm", objectFit: "contain", flexShrink: 0 }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 900, fontSize: "8pt", color: "#1A7A4A", letterSpacing: "0.8px", textTransform: "uppercase", lineHeight: 1.1 }}>AL-BURHAN</div>
+                      <div style={{ fontWeight: 700, fontSize: "5.5pt", color: GOLD, letterSpacing: "1px", textTransform: "uppercase" }}>TOURS & TRAVELS</div>
+                    </div>
+                    <div style={{ textAlign: "right", flexShrink: 0 }}>
+                      <div style={{ fontSize: "20pt", fontWeight: 900, color: "#fff", lineHeight: 1 }}>#{String(p.serialNumber).padStart(3, "0")}</div>
+                      <div style={{ fontSize: "5pt", color: "#fff", opacity: 0.9 }}>HAJJ {group.year}</div>
+                    </div>
+                  </div>
 
-            <div style={{ background: groupColor, padding: "1.5mm 4mm", display: "flex", justifyContent: "space-between", alignItems: "center", position: "relative", zIndex: 1 }}>
-              <span style={{ color: "#fff", fontWeight: 800, fontSize: "8pt", letterSpacing: "0.8px" }}>GROUP: {groupLabel}</span>
-              <span style={{ color: "#fff", fontWeight: 700, fontSize: "7.5pt" }}>BUS: {p.busNumber || "—"}</span>
-            </div>
+                  <div style={{ background: groupColor, padding: "1mm 3.5mm", display: "flex", justifyContent: "space-between", alignItems: "center", position: "relative", zIndex: 1 }}>
+                    <span style={{ color: "#fff", fontWeight: 800, fontSize: "7.5pt", letterSpacing: "0.8px" }}>GROUP: {groupLabel}</span>
+                    <span style={{ color: "#fff", fontWeight: 700, fontSize: "7pt" }}>BUS: {p.busNumber || "—"}</span>
+                  </div>
 
-            <div style={{ position: "relative", zIndex: 1, padding: "2mm 4mm 1mm", flex: 1, display: "flex", flexDirection: "column" }}>
-              <div style={{ display: "flex", gap: "3mm", alignItems: "flex-start", marginBottom: "1.5mm" }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: "14pt", fontWeight: 900, color: DARK, lineHeight: 1.15, textTransform: "uppercase", wordBreak: "break-word" }}>{p.fullName}</div>
+                  <div style={{ position: "relative", zIndex: 1, padding: "1.5mm 3.5mm 1mm", flex: 1, display: "flex", flexDirection: "column" }}>
+                    <div style={{ display: "flex", gap: "2.5mm", alignItems: "flex-start", marginBottom: "1mm" }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: "12pt", fontWeight: 900, color: DARK, lineHeight: 1.15, textTransform: "uppercase", wordBreak: "break-word" }}>{p.fullName}</div>
+                      </div>
+                      <div style={{ flexShrink: 0 }}>
+                        {p.photoUrl ? (
+                          <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "15mm", height: "15mm", objectFit: "cover", borderRadius: "50%", border: `2px solid ${GOLD}` }} />
+                        ) : (
+                          <div style={{ width: "15mm", height: "15mm", background: "#f0f0f0", borderRadius: "50%", border: `2px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "5pt", color: "#aaa" }}>PHOTO</div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", gap: "2mm", marginBottom: "1mm" }}>
+                      <div style={{ flex: 1, background: "#f0fdf4", border: `1px solid ${DARK}`, borderRadius: "3px", padding: "0.8mm 2mm", textAlign: "center" }}>
+                        <div style={{ fontSize: "5pt", color: "#666", textTransform: "uppercase", fontWeight: 600 }}>PASSPORT</div>
+                        <div style={{ fontSize: "12pt", fontWeight: 900, fontFamily: "monospace", letterSpacing: "0.5px", color: DARK }}>{p.passportNumber || "—"}</div>
+                      </div>
+                      <div style={{ flex: 1, background: "#f0fdf4", border: `1px solid ${DARK}`, borderRadius: "3px", padding: "0.8mm 2mm", textAlign: "center" }}>
+                        <div style={{ fontSize: "5pt", color: "#666", textTransform: "uppercase", fontWeight: 600 }}>MAKTAB</div>
+                        <div style={{ fontSize: "10pt", fontWeight: 900, color: DARK }}>{group.maktabNumber || "—"}</div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.8mm 2mm", marginBottom: "1mm", fontSize: "6.5pt" }}>
+                      <div>
+                        <div style={{ fontSize: "4.5pt", color: "#999", textTransform: "uppercase", fontWeight: 600 }}>HOTEL MAKKAH</div>
+                        <div style={{ fontWeight: 700, color: "#222", fontSize: "6pt" }}>{group.hotels?.makkah?.name || "—"}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: "4.5pt", color: "#999", textTransform: "uppercase", fontWeight: 600 }}>HOTEL MADINAH</div>
+                        <div style={{ fontWeight: 700, color: "#222", fontSize: "6pt" }}>{group.hotels?.madinah?.name || "—"}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: "4.5pt", color: "#999", textTransform: "uppercase", fontWeight: 600 }}>HOTEL AZIZIAH</div>
+                        <div style={{ fontWeight: 700, color: "#222", fontSize: "6pt" }}>{group.hotels?.aziziah?.name || "—"}</div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "2.5mm", marginTop: "auto" }}>
+                      <QRCodeSVG value={buildQrData(p, group)} size={48} level="M" />
+                      <Barcode value={p.passportNumber || `H${String(p.serialNumber).padStart(3, "0")}`} height={20} width={1.3} fontSize={0} />
+                    </div>
+                  </div>
+
+                  <div style={{ position: "relative", zIndex: 2, background: DARK, color: GOLD, padding: "1.2mm 3mm", fontSize: "6pt", textAlign: "center", fontWeight: 600, letterSpacing: "0.3px" }}>
+                    Emergency: 0547090786 | +91 9893989786
+                  </div>
                 </div>
-                <div style={{ flexShrink: 0 }}>
-                  {p.photoUrl ? (
-                    <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "18mm", height: "18mm", objectFit: "cover", borderRadius: "50%", border: `2px solid ${GOLD}` }} />
-                  ) : (
-                    <div style={{ width: "18mm", height: "18mm", background: "#f0f0f0", borderRadius: "50%", border: `2px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "5pt", color: "#aaa" }}>PHOTO</div>
-                  )}
-                </div>
               </div>
-
-              <div style={{ display: "flex", gap: "2mm", marginBottom: "1.5mm" }}>
-                <div style={{ flex: 1, background: "#f0fdf4", border: `1px solid ${DARK}`, borderRadius: "3px", padding: "1mm 2mm", textAlign: "center" }}>
-                  <div style={{ fontSize: "5.5pt", color: "#666", textTransform: "uppercase", fontWeight: 600 }}>PASSPORT</div>
-                  <div style={{ fontSize: "14pt", fontWeight: 900, fontFamily: "monospace", letterSpacing: "0.8px", color: DARK }}>{p.passportNumber || "—"}</div>
-                </div>
-                <div style={{ flex: 1, background: "#f0fdf4", border: `1px solid ${DARK}`, borderRadius: "3px", padding: "1mm 2mm", textAlign: "center" }}>
-                  <div style={{ fontSize: "5.5pt", color: "#666", textTransform: "uppercase", fontWeight: 600 }}>MAKTAB</div>
-                  <div style={{ fontSize: "11pt", fontWeight: 900, color: DARK }}>{group.maktabNumber || "—"}</div>
-                </div>
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1mm 3mm", marginBottom: "1.5mm", fontSize: "7pt" }}>
-                <div>
-                  <div style={{ fontSize: "5pt", color: "#999", textTransform: "uppercase", fontWeight: 600 }}>HOTEL MAKKAH</div>
-                  <div style={{ fontWeight: 700, color: "#222" }}>{group.hotels?.makkah?.name || "—"}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: "5pt", color: "#999", textTransform: "uppercase", fontWeight: 600 }}>HOTEL MADINAH</div>
-                  <div style={{ fontWeight: 700, color: "#222" }}>{group.hotels?.madinah?.name || "—"}</div>
-                </div>
-              </div>
-
-              <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "3mm", marginTop: "auto" }}>
-                <QRCodeSVG value={buildQrData(p, group)} size={55} level="M" />
-                <Barcode value={p.passportNumber || `H${String(p.serialNumber).padStart(3, "0")}`} height={22} width={1.5} fontSize={0} />
-              </div>
-            </div>
-
-            <div style={{ position: "relative", zIndex: 2, background: DARK, color: GOLD, padding: "1.5mm 3mm", fontSize: "6pt", textAlign: "center", fontWeight: 600, letterSpacing: "0.3px" }}>
-              Emergency: +91 9893225590 | +91 9893989786
-            </div>
+            ))}
           </div>
-        </div>
-      ))}
+        ))}
       </div>
     </>
   );
