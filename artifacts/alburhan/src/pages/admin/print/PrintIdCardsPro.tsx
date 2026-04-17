@@ -56,7 +56,7 @@ function buildQrData(p: Pilgrim, group: Group): string {
   if (p.busNumber) lines.push(`Bus: ${p.busNumber}`);
   if (p.seatNumber) lines.push(`Seat: ${p.seatNumber}`);
   if (group.hotels?.groupLeader) lines.push(`Group Leader: ${group.hotels.groupLeader}`);
-  lines.push(`Emergency (Saudi): 0547090786 | 0568780786`);
+  lines.push(`Emergency (Saudi): Mohammed Altaf 0547090786 | Mohammed Wasim 0568780786`);
   lines.push(`Emergency (India): +91 9893989786`);
   return lines.join("\n");
 }
