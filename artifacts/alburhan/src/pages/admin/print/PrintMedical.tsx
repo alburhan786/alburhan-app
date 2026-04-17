@@ -27,16 +27,6 @@ const CARD_W = "88.9mm";
 const CARD_H = "76.2mm";
 
 function MedCard({ p, group }: { p: Pilgrim; group: Group }) {
-  const qrData = [
-    `Name: ${p.fullName}`,
-    `Passport: ${p.passportNumber || "N/A"}`,
-    `Blood: ${p.bloodGroup || "N/A"}`,
-    `Mobile (India): ${p.mobileIndia || "N/A"}`,
-    `Mobile (Saudi): ${p.mobileSaudi || "N/A"}`,
-    `Emergency India: +91 9893989786`,
-    `Emergency Saudi: 0547090786`,
-  ].join("\n");
-
   return (
     <div style={{
       width: CARD_W, height: CARD_H,
@@ -78,10 +68,10 @@ function MedCard({ p, group }: { p: Pilgrim; group: Group }) {
         </div>
       </div>
 
-      {/* RIGHT: Photo + Barcode */}
-      <div style={{ width: "28mm", flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "space-between", padding: "3mm 2mm 3mm 2mm", borderLeft: "1px solid #ccc" }}>
+      {/* RIGHT: Photo + Vertical Barcode */}
+      <div style={{ width: "28mm", flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", padding: "3mm 2mm 3mm 2mm", borderLeft: "1px solid #ccc", overflow: "hidden" }}>
         {/* Photo */}
-        <div>
+        <div style={{ flexShrink: 0 }}>
           {p.photoUrl ? (
             <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "22mm", height: "28mm", objectFit: "cover", border: "1px solid #999" }} />
           ) : (
@@ -89,9 +79,25 @@ function MedCard({ p, group }: { p: Pilgrim; group: Group }) {
           )}
         </div>
 
-        {/* Barcode — centered horizontally */}
-        <div style={{ display: "flex", justifyContent: "center", width: "100%", marginTop: "2mm" }}>
-          <Barcode value={p.passportNumber || String(p.serialNumber).padStart(6, "0")} height={14} width={0.75} fontSize={5} displayValue />
+        {/* Barcode — rotated 90° to run vertically, fills remaining height */}
+        <div style={{ flex: 1, width: "100%", position: "relative", marginTop: "2mm", overflow: "hidden" }}>
+          <div style={{
+            position: "absolute",
+            top: "50%", left: "50%",
+            transformOrigin: "center center",
+            transform: "translate(-50%, -50%) rotate(90deg)",
+            width: "36mm",
+            display: "flex",
+            justifyContent: "center",
+          }}>
+            <Barcode
+              value={p.passportNumber || String(p.serialNumber).padStart(6, "0")}
+              height={16}
+              width={1}
+              fontSize={6}
+              displayValue
+            />
+          </div>
         </div>
       </div>
     </div>
