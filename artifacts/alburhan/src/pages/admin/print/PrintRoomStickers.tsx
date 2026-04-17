@@ -5,7 +5,7 @@ import { useRoute } from "wouter";
 const API = import.meta.env.VITE_API_URL || "";
 const DARK_GREEN = "#0B3D2E";
 const GOLD = "#C9A23F";
-const SUPPORT_PHONE = "+91 9893989786";
+const SUPPORT_PHONE = "0547090786";
 
 interface Pilgrim {
   id: string;
@@ -97,7 +97,7 @@ function RoomSticker({ roomNumber, pilgrims, group }: RoomStickerProps) {
 
   return (
     <div className="no-break" style={{
-      width: "148mm",
+      width: "120mm",
       border: `2.5px solid ${DARK_GREEN}`,
       borderRadius: "4mm",
       fontFamily: "'Arial', sans-serif",
@@ -118,7 +118,7 @@ function RoomSticker({ roomNumber, pilgrims, group }: RoomStickerProps) {
                 AL BURHAN TOURS &amp; TRAVELS
               </div>
               <div style={{ fontSize: "6pt", color: "#a8d5c2", marginTop: "0.3mm" }}>
-                Burhanpur M.P. · Tel: {SUPPORT_PHONE}
+                Tel: {SUPPORT_PHONE}
               </div>
             </div>
           </div>
@@ -127,7 +127,7 @@ function RoomSticker({ roomNumber, pilgrims, group }: RoomStickerProps) {
             <div style={{ fontSize: "24pt", fontWeight: 900, color: GOLD, lineHeight: 0.9, letterSpacing: "-0.5px" }}>
               {roomNumber}
             </div>
-            <div style={{ fontSize: "6pt", color: "#a8d5c2" }}>
+            <div style={{ fontSize: "6pt", color: "#a8d5c2", marginTop: "2mm" }}>
               {roomType} · {pilgrims.length} person{pilgrims.length !== 1 ? "s" : ""}
             </div>
           </div>
@@ -158,11 +158,6 @@ function RoomSticker({ roomNumber, pilgrims, group }: RoomStickerProps) {
             <tr key={p.id} style={{ background: i % 2 === 0 ? "#fff" : "#f9fcfb", borderBottom: "0.5px solid #e0ece7" }}>
               <td style={{ padding: "2mm 2.5mm", fontWeight: 700, color: "#111", lineHeight: 1.2 }}>
                 {p.fullName}
-                {p.mobileIndia && (
-                  <div style={{ fontWeight: 400, fontSize: "6.5pt", color: "#555", marginTop: "0.3mm" }}>
-                    📞 {p.mobileIndia}
-                  </div>
-                )}
               </td>
               <td style={{ padding: "2mm 2mm", fontFamily: "monospace", fontSize: "7pt", color: "#333", letterSpacing: "0.3px" }}>
                 {p.passportNumber || "—"}

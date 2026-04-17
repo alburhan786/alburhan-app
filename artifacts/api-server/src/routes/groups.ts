@@ -875,7 +875,7 @@ async function generateRoomStickerPage(
   const HOTEL_LABELS: Record<string, string> = { makkah: "Makkah", madinah: "Madinah", aziziah: "Aziziah" };
   const ROOM_TYPE_LABELS: Record<string, string> = { family: "Family Room", ladies: "Ladies Room", gents: "Gents Room" };
 
-  if (!isFirstPage) doc.addPage({ size: [288, 432], margin: 0 });
+  if (!isFirstPage) doc.addPage({ size: [340, 432], margin: 0 });
 
   const W = doc.page.width;
   const H = doc.page.height;
@@ -886,7 +886,7 @@ async function generateRoomStickerPage(
   const roomTypeLabel = ROOM_TYPE_LABELS[room.roomType] || room.roomType;
   const floorLabel = room.floor ? ` · Floor ${room.floor}` : "";
 
-  const HDR_H = 48;
+  const HDR_H = 54;
   doc.rect(M, y, W - M * 2, HDR_H).fill(DARK_GREEN);
 
   doc.image(LOGO_BUFFER, M + 2, y + 4, { width: 40, height: 40 });
@@ -898,9 +898,9 @@ async function generateRoomStickerPage(
   doc.fill("white").font("Helvetica").fontSize(5)
     .text("5/8 Khanka Masjid Complex, Shanwara Road", M + 6 + LOGO_OFF, y + 17, { width: LEFT_W, lineBreak: false });
   doc.fill("white").font("Helvetica").fontSize(5)
-    .text("Burhanpur 450331 M.P. | Tel: +91 9893989786", M + 6 + LOGO_OFF, y + 24, { width: LEFT_W, lineBreak: false });
+    .text("Tel: 0547090786 | +91 9893989786", M + 6 + LOGO_OFF, y + 24, { width: LEFT_W, lineBreak: false });
   doc.fill("#a8d5c2").font("Helvetica").fontSize(5)
-    .text(`${hotelLabel}${floorLabel} · ${roomTypeLabel}`, M + 6 + LOGO_OFF, y + 38, { width: LEFT_W, lineBreak: false });
+    .text(`${hotelLabel}${floorLabel} · ${roomTypeLabel}`, M + 6 + LOGO_OFF, y + 44, { width: LEFT_W, lineBreak: false });
 
   const RN_X = W - M - 80;
   doc.fill("#ffffff").font("Helvetica").fontSize(6)
@@ -908,7 +908,7 @@ async function generateRoomStickerPage(
   doc.fill(GOLD).font("Helvetica-Bold").fontSize(26)
     .text(room.roomNumber, RN_X, y + 15, { width: 76, align: "center", lineBreak: false });
   doc.fill("white").font("Helvetica").fontSize(6)
-    .text(`${roomPilgrims.length} Person${roomPilgrims.length !== 1 ? "s" : ""}`, RN_X, y + 39, { width: 76, align: "center", lineBreak: false });
+    .text(`${roomPilgrims.length} Person${roomPilgrims.length !== 1 ? "s" : ""}`, RN_X, y + 46, { width: 76, align: "center", lineBreak: false });
 
   y += HDR_H + 5;
 
@@ -970,7 +970,7 @@ async function generateRoomStickerPage(
   doc.rect(M, footerY - 3, W - M * 2, 13).fill("#f0f7f4");
   const genDate = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
   doc.fill("#555").font("Helvetica").fontSize(6)
-    .text(`Al Burhan Tours & Travels · ${groupName} · ${genDate}`, M, footerY, { width: W - M * 2, align: "center", lineBreak: false });
+    .text(`Al Burhan Tours & Travels · ${groupName} · Support: 0547090786 · ${genDate}`, M, footerY, { width: W - M * 2, align: "center", lineBreak: false });
 }
 
 router.get("/:groupId/rooms/stickers/bulk-pdf", requireAdmin as any, async (req, res) => {
@@ -996,7 +996,7 @@ router.get("/:groupId/rooms/stickers/bulk-pdf", requireAdmin as any, async (req,
       }
     }
 
-    const doc = new PDFDocument({ size: [288, 432], margin: 0, autoFirstPage: true });
+    const doc = new PDFDocument({ size: [340, 432], margin: 0, autoFirstPage: true });
     const safeName = group.groupName.replace(/[^a-zA-Z0-9]/g, "-");
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="room-stickers-${safeName}-${group.year}.pdf"`);
@@ -1048,7 +1048,7 @@ router.get("/:groupId/rooms/:roomId/sticker", requireAdmin as any, async (req, r
       .where(and(eq(pilgrimsTable.groupId, groupId), eq(pilgrimsTable.roomId, roomId)))
       .orderBy(asc(pilgrimsTable.serialNumber));
 
-    const doc = new PDFDocument({ size: [288, 432], margin: 0, autoFirstPage: true });
+    const doc = new PDFDocument({ size: [340, 432], margin: 0, autoFirstPage: true });
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="room-sticker-${room.roomNumber}-${room.hotel}.pdf"`);
     doc.pipe(res);
