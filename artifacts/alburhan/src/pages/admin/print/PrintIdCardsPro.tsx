@@ -182,13 +182,13 @@ export default function PrintIdCardsPro() {
                   {groupLabel}
                 </div>
 
-                <div style={{ position: "relative", zIndex: 1, display: "flex", height: "100%", padding: "2.5mm 3mm 0" }}>
+                <div style={{ position: "relative", zIndex: 1, display: "flex", height: "100%", padding: "2.5mm 3mm 24mm" }}>
 
                   {/* Left column: logo + photo + name */}
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "26mm", flexShrink: 0 }}>
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: "1mm", marginTop: "3mm" }}>
-                      <img src={BASE + "images/logo.png"} alt="" style={{ width: "14mm", height: "14mm", objectFit: "contain", marginBottom: "0.5mm" }} />
-                      <div style={{ fontSize: "6pt", fontWeight: 900, color: DARK, letterSpacing: "0.5px", lineHeight: 1.1, textAlign: "center" }}>AL BURHAN</div>
+                      <img src={BASE + "images/logo.png"} alt="" style={{ width: "16mm", height: "16mm", objectFit: "contain", marginBottom: "0.5mm" }} />
+                      <div style={{ fontSize: "7pt", fontWeight: 900, color: DARK, letterSpacing: "0.5px", lineHeight: 1.1, textAlign: "center" }}>AL BURHAN</div>
                       <div style={{ fontSize: "3.5pt", fontWeight: 700, color: GOLD, letterSpacing: "0.5px", textAlign: "center" }}>TOURS & TRAVELS</div>
                       <div style={{ fontSize: "4pt", fontWeight: 800, color: DARK, marginTop: "0.3mm", textAlign: "center" }}>HAJJ {group.year}</div>
                     </div>
@@ -247,10 +247,10 @@ export default function PrintIdCardsPro() {
                 </div>{/* end content row */}
 
                 {/* QR code — absolutely placed above footer, z-index above footer bar */}
-                <div style={{ position: "absolute", bottom: "10mm", right: "3mm", zIndex: 3, background: "#fff", padding: "1px", borderRadius: "2px" }}>
+                <div style={{ position: "absolute", bottom: "25mm", right: "3mm", zIndex: 3, background: "#fff", padding: "1.5px", borderRadius: "2px", boxShadow: "0 0 0 1px #ddd" }}>
                   <QRCodeSVG
                     value={buildQrData(p, group)}
-                    size={38}
+                    size={55}
                     level="M"
                   />
                 </div>
@@ -294,7 +294,7 @@ export default function PrintIdCardsPro() {
                     Hajj Pilgrim Identification — {groupLabel}
                   </div>
 
-                  <div style={{ display: "flex", gap: "2mm", paddingBottom: "14mm" }}>
+                  <div style={{ display: "flex", gap: "2mm", paddingBottom: "16mm" }}>
                     <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "1.5mm", minWidth: 0 }}>
                       <div>
                         <div style={{ fontSize: "5pt", color: "#888", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Maktab No.</div>
