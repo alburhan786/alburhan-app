@@ -88,20 +88,20 @@ export default function PrintLuggageSquare() {
     <>
       <style>{`
         @media print {
-          @page { size: A4 portrait; margin: 10mm; }
+          @page { size: A4 portrait; margin: 5mm; }
           body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
           .no-print { display: none !important; }
         }
         * { box-sizing: border-box; }
         .sq-sticker {
-          width: 92mm; height: 92mm;
+          width: 100mm; height: 100mm;
           border: 1.5px solid ${DARK}; border-radius: 5px; overflow: hidden;
           page-break-inside: avoid;
           font-family: 'Inter', Arial, sans-serif;
           background: #fff; position: relative;
         }
         .sq-row {
-          display: flex; gap: 6mm; align-items: flex-start;
+          display: flex; gap: 0; align-items: flex-start;
           page-break-after: always;
         }
         .sq-row:last-child { page-break-after: auto; }
