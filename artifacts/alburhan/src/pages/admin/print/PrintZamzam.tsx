@@ -16,6 +16,9 @@ interface Pilgrim {
   salutation?: string;
   photoUrl?: string;
   passportNumber?: string;
+  mobileIndia?: string;
+  address?: string;
+  city?: string;
 }
 
 interface Group {
@@ -27,13 +30,17 @@ interface Group {
 }
 
 function buildQr(p: Pilgrim, group: Group): string {
-  return [
+  const lines = [
     `Name: ${p.fullName}`,
     `Serial: ${String(p.serialNumber).padStart(3, "0")}`,
     `Group: ${group.groupName} ${group.year}`,
     ...(group.flightNumber ? [`Flight: ${group.flightNumber}`] : []),
+    ...(p.passportNumber ? [`Passport: ${p.passportNumber}`] : []),
+    ...(p.mobileIndia ? [`Mobile: ${p.mobileIndia}`] : []),
     `Emergency: 0547090786`,
-  ].join("\n");
+    ...([p.address, p.city].filter(Boolean).length ? [`Address: ${[p.address, p.city].filter(Boolean).join(", ")}`] : []),
+  ];
+  return lines.join("\n");
 }
 
 export default function PrintZamzam() {
@@ -268,6 +275,20 @@ export default function PrintZamzam() {
                     </div>
                   </div>
 
+                  {/* ── Contact Info Block ── */}
+                  <div style={{ padding: "2mm 4mm 0", fontSize: "6pt", lineHeight: 1.6, color: "#333" }}>
+                    {p.passportNumber && (
+                      <div><span style={{ fontWeight: 700, color: DARK_GREEN }}>Passport: </span>{p.passportNumber}</div>
+                    )}
+                    {p.mobileIndia && (
+                      <div><span style={{ fontWeight: 700, color: DARK_GREEN }}>Mobile: </span>{p.mobileIndia}</div>
+                    )}
+                    <div><span style={{ fontWeight: 700, color: "#b91c1c" }}>Emergency: </span>0547090786</div>
+                    {(p.address || p.city) && (
+                      <div><span style={{ fontWeight: 700, color: DARK_GREEN }}>Address: </span>{[p.address, p.city].filter(Boolean).join(", ")}</div>
+                    )}
+                  </div>
+
                   {/* White flex spacer */}
                   <div style={{ flex: 1 }} />
 
@@ -288,7 +309,7 @@ export default function PrintZamzam() {
                     </div>
                     <QRCodeSVG
                       value={buildQr(p, group)}
-                      size={140}
+                      size={160}
                       level="M"
                       fgColor={DARK_GREEN}
                     />
