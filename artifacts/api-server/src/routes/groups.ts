@@ -908,7 +908,7 @@ async function generateRoomStickerPage(
   doc.fill(GOLD).font("Helvetica-Bold").fontSize(26)
     .text(room.roomNumber, RN_X, y + 15, { width: 76, align: "center", lineBreak: false });
   doc.fill("white").font("Helvetica").fontSize(6)
-    .text(`${roomPilgrims.length} Person${roomPilgrims.length !== 1 ? "s" : ""}`, RN_X, y + 46, { width: 76, align: "center", lineBreak: false });
+    .text(`${roomPilgrims.length} Person${roomPilgrims.length !== 1 ? "s" : ""}`, RN_X, y + 52, { width: 76, align: "center", lineBreak: false });
 
   y += HDR_H + 5;
 

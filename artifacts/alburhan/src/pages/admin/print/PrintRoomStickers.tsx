@@ -127,7 +127,7 @@ function RoomSticker({ roomNumber, pilgrims, group }: RoomStickerProps) {
             <div style={{ fontSize: "24pt", fontWeight: 900, color: GOLD, lineHeight: 0.9, letterSpacing: "-0.5px" }}>
               {roomNumber}
             </div>
-            <div style={{ fontSize: "6pt", color: "#a8d5c2", marginTop: "2mm" }}>
+            <div style={{ fontSize: "6pt", color: "#a8d5c2", marginTop: "5mm" }}>
               {roomType} · {pilgrims.length} person{pilgrims.length !== 1 ? "s" : ""}
             </div>
           </div>
