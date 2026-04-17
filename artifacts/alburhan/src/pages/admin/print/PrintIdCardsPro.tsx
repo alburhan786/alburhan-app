@@ -25,7 +25,7 @@ const DARK = "#0B3D2E";
 const GOLD = "#C9A23F";
 const GOLD_LIGHT = "#E8D48B";
 const W = "85mm";
-const H = "54mm";
+const H = "85mm";
 
 const GROUP_COLOR_MAP: Record<string, { bg: string; label: string }> = {
   VIP: { bg: "#c0392b", label: "VIP" },
@@ -187,7 +187,7 @@ export default function PrintIdCardsPro() {
                   {/* Left column: logo + photo + name */}
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "26mm", flexShrink: 0 }}>
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: "1mm", marginTop: "3mm" }}>
-                      <img src={BASE + "images/logo.png"} alt="" style={{ width: "8mm", height: "8mm", objectFit: "contain", marginBottom: "0.5mm" }} />
+                      <img src={BASE + "images/logo.png"} alt="" style={{ width: "14mm", height: "14mm", objectFit: "contain", marginBottom: "0.5mm" }} />
                       <div style={{ fontSize: "6pt", fontWeight: 900, color: DARK, letterSpacing: "0.5px", lineHeight: 1.1, textAlign: "center" }}>AL BURHAN</div>
                       <div style={{ fontSize: "3.5pt", fontWeight: 700, color: GOLD, letterSpacing: "0.5px", textAlign: "center" }}>TOURS & TRAVELS</div>
                       <div style={{ fontSize: "4pt", fontWeight: 800, color: DARK, marginTop: "0.3mm", textAlign: "center" }}>HAJJ {group.year}</div>
@@ -196,9 +196,9 @@ export default function PrintIdCardsPro() {
                     {/* Passport-style photo */}
                     <div style={{ marginBottom: "1mm" }}>
                       {p.photoUrl ? (
-                        <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "18mm", height: "23mm", objectFit: "cover", borderRadius: "2px", border: `2px solid ${GOLD}` }} />
+                        <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "22mm", height: "30mm", objectFit: "cover", borderRadius: "2px", border: `2px solid ${GOLD}` }} />
                       ) : (
-                        <div style={{ width: "18mm", height: "23mm", background: "#f0f0f0", borderRadius: "2px", border: `2px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "5pt", color: "#aaa" }}>PHOTO</div>
+                        <div style={{ width: "22mm", height: "30mm", background: "#f0f0f0", borderRadius: "2px", border: `2px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "5pt", color: "#aaa" }}>PHOTO</div>
                       )}
                     </div>
                   </div>
@@ -222,7 +222,7 @@ export default function PrintIdCardsPro() {
                     <div style={{ display: "flex", flexDirection: "column", gap: "1mm", flex: 1 }}>
                       <div style={{ display: "flex", alignItems: "flex-start", gap: "1mm" }}>
                         <div style={bulletDot} />
-                        <div><div style={labelStyle}>Passport No.</div><div style={{ ...valueStyle, fontFamily: "monospace", letterSpacing: "0.5px" }}>{p.passportNumber || "—"}</div></div>
+                        <div><div style={labelStyle}>Passport No.</div><div style={{ ...valueStyle, fontFamily: "monospace", letterSpacing: "0.5px", fontSize: "7pt", fontWeight: 900 }}>{p.passportNumber || "—"}</div></div>
                       </div>
                       <div style={{ display: "flex", alignItems: "flex-start", gap: "1mm" }}>
                         <div style={bulletDot} />
@@ -230,7 +230,7 @@ export default function PrintIdCardsPro() {
                       </div>
                       <div style={{ display: "flex", alignItems: "flex-start", gap: "1mm" }}>
                         <div style={bulletDot} />
-                        <div><div style={labelStyle}>Maktab</div><div style={{ ...valueStyle, background: DARK, color: GOLD, padding: "0 1.5mm", borderRadius: "2px", display: "inline-block" }}>{group.maktabNumber || "—"}</div></div>
+                        <div><div style={labelStyle}>Maktab</div><div style={{ ...valueStyle, background: DARK, color: GOLD, padding: "0 1.5mm", borderRadius: "2px", display: "inline-block", fontSize: "7pt", fontWeight: 900 }}>{group.maktabNumber || "—"}</div></div>
                       </div>
                       <div style={{ display: "flex", alignItems: "flex-start", gap: "1mm" }}>
                         <div style={bulletDot} />
@@ -260,7 +260,7 @@ export default function PrintIdCardsPro() {
                     <Barcode value={`${p.passportNumber || "N/A"}-${String(p.serialNumber).padStart(3, "0")}`} height={10} width={0.9} fontSize={0} />
                   </div>
                   <div style={{ background: DARK, color: GOLD, padding: "1mm 2mm", fontSize: "3.8pt", textAlign: "center", fontWeight: 700, letterSpacing: "0.2px", marginTop: "0.5mm" }}>
-                    #{String(p.serialNumber).padStart(3, "0")} | Emergency: 0547090786 | 0568780786
+                    #{String(p.serialNumber).padStart(3, "0")} | Mohammed Altaf: 0547090786 | Mohammed Wasim: 0568780786
                   </div>
                 </div>
 
@@ -294,11 +294,11 @@ export default function PrintIdCardsPro() {
                       </div>
                       <div>
                         <div style={{ fontSize: "5pt", color: "#888", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Hotel Makkah</div>
-                        <div style={{ fontSize: "7pt", fontWeight: 800, color: DARK, lineHeight: 1.3 }}>{group.hotels?.makkah?.name || "—"}</div>
+                        <div style={{ fontSize: "9pt", fontWeight: 900, color: DARK, lineHeight: 1.3 }}>{group.hotels?.makkah?.name || "—"}</div>
                       </div>
                       <div>
                         <div style={{ fontSize: "5pt", color: "#888", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Hotel Madinah</div>
-                        <div style={{ fontSize: "7pt", fontWeight: 800, color: DARK, lineHeight: 1.3 }}>{group.hotels?.madinah?.name || "—"}</div>
+                        <div style={{ fontSize: "9pt", fontWeight: 900, color: DARK, lineHeight: 1.3 }}>{group.hotels?.madinah?.name || "—"}</div>
                       </div>
                       <div>
                         <div style={{ fontSize: "5pt", color: "#888", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Group Leader</div>
@@ -308,12 +308,14 @@ export default function PrintIdCardsPro() {
 
                     <div style={{ width: "22mm", flexShrink: 0, display: "flex", flexDirection: "column", gap: "1mm", alignItems: "center" }}>
                       <div style={{ fontSize: "5pt", fontWeight: 800, color: DARK, textTransform: "uppercase", letterSpacing: "0.3px", textAlign: "center" }}>Emergency</div>
-                      <div style={{ fontSize: "5pt", lineHeight: 1.6, color: "#333", textAlign: "center" }}>
+                      <div style={{ lineHeight: 1.5, color: "#333", textAlign: "center" }}>
                         <div style={{ fontSize: "4pt", color: "#888" }}>SAUDI</div>
-                        <div style={{ fontWeight: 700 }}>0547090786</div>
-                        <div style={{ fontWeight: 700 }}>0568780786</div>
+                        <div style={{ fontWeight: 900, fontSize: "5.5pt" }}>Mohammed Altaf</div>
+                        <div style={{ fontWeight: 900, fontSize: "5.5pt" }}>0547090786</div>
+                        <div style={{ fontWeight: 900, fontSize: "5.5pt", marginTop: "0.5mm" }}>Mohammed Wasim</div>
+                        <div style={{ fontWeight: 900, fontSize: "5.5pt" }}>0568780786</div>
                         <div style={{ fontSize: "4pt", color: "#888", marginTop: "0.5mm" }}>INDIA</div>
-                        <div style={{ fontWeight: 700 }}>+91 9893989786</div>
+                        <div style={{ fontWeight: 900, fontSize: "5.5pt" }}>+91 9893989786</div>
                       </div>
                       <div style={{ marginTop: "2mm", display: "flex", justifyContent: "center" }}>
                         <img src={BASE + "images/india_flag.jpg"} alt="" style={{ width: "10mm", height: "10mm", borderRadius: "50%", objectFit: "cover", border: `2px solid ${GOLD}` }} />
