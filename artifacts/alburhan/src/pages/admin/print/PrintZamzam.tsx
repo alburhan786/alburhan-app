@@ -35,7 +35,7 @@ function buildQr(p: Pilgrim, group: Group): string {
     `Serial: ${String(p.serialNumber).padStart(3, "0")}`,
     `Group: ${group.groupName} ${group.year}`,
     ...(group.flightNumber ? [`Flight: ${group.flightNumber}`] : []),
-    ...(p.passportNumber ? [`Passport: ${p.passportNumber}`] : []),
+    ...(p.passportNumber ? [`Passport No: ${p.passportNumber}`] : []),
     ...(p.mobileIndia ? [`Mobile: ${p.mobileIndia}`] : []),
     `Emergency: 0547090786`,
     ...([p.address, p.city].filter(Boolean).length ? [`Address: ${[p.address, p.city].filter(Boolean).join(", ")}`] : []),
@@ -278,7 +278,7 @@ export default function PrintZamzam() {
                   {/* ── Contact Info Block ── */}
                   <div style={{ padding: "2mm 4mm 0", fontSize: "6pt", lineHeight: 1.6, color: "#333" }}>
                     {p.passportNumber && (
-                      <div><span style={{ fontWeight: 700, color: DARK_GREEN }}>Passport: </span>{p.passportNumber}</div>
+                      <div><span style={{ fontWeight: 700, color: DARK_GREEN }}>Passport No: </span>{p.passportNumber}</div>
                     )}
                     {p.mobileIndia && (
                       <div><span style={{ fontWeight: 700, color: DARK_GREEN }}>Mobile: </span>{p.mobileIndia}</div>
