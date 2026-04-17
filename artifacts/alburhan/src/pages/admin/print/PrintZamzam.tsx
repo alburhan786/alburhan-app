@@ -164,17 +164,17 @@ export default function PrintZamzam() {
                     <img
                       src={`${BASE}images/logo.png`}
                       alt=""
-                      style={{ height: "16mm", width: "16mm", objectFit: "contain", flexShrink: 0 }}
+                      style={{ height: "20mm", width: "20mm", objectFit: "contain", flexShrink: 0 }}
                     />
                     <div style={{ flex: 1 }}>
                       <div style={{
-                        fontWeight: 900, fontSize: "9pt", color: GOLD,
+                        fontWeight: 900, fontSize: "12pt", color: GOLD,
                         letterSpacing: "0.5px", lineHeight: 1.15
                       }}>
                         AL-BURHAN
                       </div>
                       <div style={{
-                        fontWeight: 900, fontSize: "7pt", color: DARK_GREEN,
+                        fontWeight: 900, fontSize: "9pt", color: DARK_GREEN,
                         letterSpacing: "0.5px", textTransform: "uppercase", lineHeight: 1.2
                       }}>
                         TOURS &amp; TRAVELS
@@ -238,7 +238,9 @@ export default function PrintZamzam() {
                     <div style={{
                       fontSize: "72pt", fontWeight: 900, color: DARK_GREEN,
                       lineHeight: 1, letterSpacing: "-2px",
-                      fontFamily: "'Arial Black', Arial, sans-serif"
+                      fontFamily: "'Arial Black', Arial, sans-serif",
+                      WebkitTextStroke: "4px white",
+                      paintOrder: "stroke fill",
                     }}>
                       #{serial}
                     </div>
