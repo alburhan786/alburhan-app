@@ -168,12 +168,12 @@ export default function PrintZamzam() {
                     position: "relative", zIndex: 1,
                   }}>
                     {/* Flag + Logo + Company */}
-                    <div style={{ display: "flex", alignItems: "center", gap: "1.5mm", marginBottom: "2mm", width: "100%" }}>
-                      <img src={`${BASE}images/india_flag.jpg`} alt="" style={{ width: "8mm", height: "8mm", borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
-                      <img src={`${BASE}images/logo.png`} alt="" style={{ height: "16mm", width: "16mm", objectFit: "contain", flexShrink: 0 }} />
+                    <div style={{ display: "flex", alignItems: "center", gap: "2mm", marginBottom: "2mm", width: "100%" }}>
+                      <img src={`${BASE}images/india_flag.jpg`} alt="" style={{ width: "13mm", height: "13mm", borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                      <img src={`${BASE}images/logo.png`} alt="" style={{ height: "22mm", width: "22mm", objectFit: "contain", flexShrink: 0 }} />
                       <div>
-                        <div style={{ fontWeight: 900, fontSize: "9pt", color: GOLD, letterSpacing: "0.3px", lineHeight: 1.1 }}>AL-BURHAN</div>
-                        <div style={{ fontWeight: 700, fontSize: "6pt", color: DARK_GREEN, letterSpacing: "0.3px", lineHeight: 1.2 }}>TOURS &amp; TRAVELS</div>
+                        <div style={{ fontWeight: 900, fontSize: "13pt", color: GOLD, letterSpacing: "0.3px", lineHeight: 1.1 }}>AL-BURHAN</div>
+                        <div style={{ fontWeight: 700, fontSize: "9pt", color: DARK_GREEN, letterSpacing: "0.3px", lineHeight: 1.2 }}>TOURS &amp; TRAVELS</div>
                       </div>
                     </div>
 
