@@ -167,14 +167,10 @@ export default function PrintZamzam() {
                     background: "#fafff8",
                     position: "relative", zIndex: 1,
                   }}>
-                    {/* Flag + Logo + Company */}
-                    <div style={{ display: "flex", alignItems: "center", gap: "2mm", marginBottom: "2mm", width: "100%" }}>
-                      <img src={`${BASE}images/india_flag.jpg`} alt="" style={{ width: "13mm", height: "13mm", borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
-                      <img src={`${BASE}images/logo.png`} alt="" style={{ height: "22mm", width: "22mm", objectFit: "contain", flexShrink: 0 }} />
-                      <div>
-                        <div style={{ fontWeight: 900, fontSize: "13pt", color: GOLD, letterSpacing: "0.3px", lineHeight: 1.1 }}>AL-BURHAN</div>
-                        <div style={{ fontWeight: 700, fontSize: "9pt", color: DARK_GREEN, letterSpacing: "0.3px", lineHeight: 1.2 }}>TOURS &amp; TRAVELS</div>
-                      </div>
+                    {/* Top: Big flag + Big logo only (no text) */}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "3mm", marginBottom: "2mm" }}>
+                      <img src={`${BASE}images/india_flag.jpg`} alt="" style={{ width: "16mm", height: "16mm", borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                      <img src={`${BASE}images/logo.png`} alt="" style={{ width: "28mm", height: "28mm", objectFit: "contain", flexShrink: 0 }} />
                     </div>
 
                     {/* Circular Photo */}
@@ -208,18 +204,13 @@ export default function PrintZamzam() {
                       </div>
                     </div>
 
-                    {/* Bottom Branding: flag + logo + company name */}
+                    {/* Bottom Branding: text only (no logo, no flag) */}
                     <div style={{
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      gap: "2mm", marginTop: "2mm",
-                      borderTop: `1px solid ${GOLD}`, paddingTop: "2mm", width: "100%",
+                      marginTop: "2mm", borderTop: `1px solid ${GOLD}`,
+                      paddingTop: "2mm", width: "100%", textAlign: "center",
                     }}>
-                      <img src={`${BASE}images/india_flag.jpg`} alt="" style={{ width: "10mm", height: "10mm", borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
-                      <img src={`${BASE}images/logo.png`} alt="" style={{ width: "14mm", height: "14mm", objectFit: "contain", flexShrink: 0 }} />
-                      <div style={{ textAlign: "left" }}>
-                        <div style={{ fontWeight: 900, fontSize: "9pt", color: GOLD, letterSpacing: "0.3px", lineHeight: 1.1 }}>AL-BURHAN</div>
-                        <div style={{ fontWeight: 700, fontSize: "7pt", color: DARK_GREEN, letterSpacing: "0.3px", lineHeight: 1.2 }}>TOURS &amp; TRAVELS</div>
-                      </div>
+                      <div style={{ fontWeight: 900, fontSize: "11pt", color: GOLD, letterSpacing: "0.5px", lineHeight: 1.1 }}>AL-BURHAN</div>
+                      <div style={{ fontWeight: 700, fontSize: "8pt", color: DARK_GREEN, letterSpacing: "0.5px", lineHeight: 1.2 }}>TOURS &amp; TRAVELS</div>
                     </div>
                   </div>
 
