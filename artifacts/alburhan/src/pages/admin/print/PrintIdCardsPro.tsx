@@ -159,7 +159,6 @@ export default function PrintIdCardsPro() {
                         width: "28mm", flexShrink: 0, background: "#f0f7f2",
                         display: "flex", flexDirection: "column", alignItems: "center",
                         padding: "2mm 1.5mm", gap: "1mm",
-                        borderRight: `1.5px solid ${GOLD}`,
                       }}>
                         <img
                           src={`${BASE}images/logo.png`}
@@ -221,7 +220,7 @@ export default function PrintIdCardsPro() {
 
                         {/* QR code — absolute bottom-right */}
                         <div style={{ position: "absolute", bottom: "1mm", right: "1.5mm" }}>
-                          <QRCodeSVG value={buildQrData(p, group)} size={44} level="M" fgColor={DARK} />
+                          <QRCodeSVG value={buildQrData(p, group)} size={50} level="M" fgColor={DARK} />
                         </div>
                       </div>
                     </div>
