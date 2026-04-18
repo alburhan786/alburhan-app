@@ -259,7 +259,7 @@ export default function PrintZamzam() {
 
                     {/* Flight Info */}
                     {(group.flightNumber || group.returnDate) && (
-                      <div style={{ marginBottom: "1.5mm", fontSize: "10pt", fontWeight: 800, color: DARK_GREEN, lineHeight: 1.5 }}>
+                      <div style={{ marginBottom: "1.5mm", fontSize: "13pt", fontWeight: 900, color: DARK_GREEN, lineHeight: 1.5 }}>
                         {group.flightNumber && (
                           <span>✈ <b>Flight:</b> {group.flightNumber}</span>
                         )}
@@ -271,14 +271,14 @@ export default function PrintZamzam() {
                     )}
 
                     {/* Contact Info */}
-                    <div style={{ fontSize: "9.5pt", lineHeight: 1.6, color: "#333", flex: 1 }}>
+                    <div style={{ fontSize: "12pt", lineHeight: 1.7, color: "#333", flex: 1 }}>
                       {p.passportNumber && (
-                        <div><span style={{ fontWeight: 800, color: DARK_GREEN }}>Passport No: </span><span style={{ fontWeight: 700 }}>{p.passportNumber}</span></div>
+                        <div><span style={{ fontWeight: 900, color: DARK_GREEN }}>Passport No: </span><span style={{ fontWeight: 900 }}>{p.passportNumber}</span></div>
                       )}
                       {p.mobileIndia && (
-                        <div><span style={{ fontWeight: 800, color: DARK_GREEN }}>Mobile: </span><span style={{ fontWeight: 700 }}>{p.mobileIndia}</span></div>
+                        <div><span style={{ fontWeight: 900, color: DARK_GREEN }}>Mobile: </span><span style={{ fontWeight: 900 }}>{p.mobileIndia}</span></div>
                       )}
-                      <div><span style={{ fontWeight: 800, color: "#b91c1c" }}>Emergency: </span><span style={{ fontWeight: 900, color: "#b91c1c" }}>0547090786</span></div>
+                      <div><span style={{ fontWeight: 900, color: "#b91c1c" }}>Emergency: </span><span style={{ fontWeight: 900, color: "#b91c1c" }}>0547090786</span></div>
                       {(p.address || p.city) && (
                         <div style={{ fontSize: "11pt", fontWeight: 900, color: DARK_GREEN, marginTop: "1mm" }}>
                           <span>Address: </span>{[p.address, p.city].filter(Boolean).join(", ")}
@@ -292,7 +292,7 @@ export default function PrintZamzam() {
                       justifyContent: "space-between", gap: "2mm", marginTop: "1mm"
                     }}>
                       <div>
-                        <Barcode value={barcodeVal} height={28} width={1.2} fontSize={0} />
+                        <Barcode value={barcodeVal} height={42} width={1.6} fontSize={0} />
                         <div style={{ fontSize: "5pt", color: "#555", fontFamily: "monospace", marginTop: "0.5mm", letterSpacing: "0.5px" }}>
                           {barcodeVal}
                         </div>
