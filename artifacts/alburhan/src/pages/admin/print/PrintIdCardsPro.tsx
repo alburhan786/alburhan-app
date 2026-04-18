@@ -83,13 +83,7 @@ export default function PrintIdCardsPro() {
     if (!contentRef.current || pdfLoading) return;
     setPdfLoading(true);
     try {
-      await downloadPdf(contentRef.current, {
-        filename: `Pro-ID-Cards-${group?.groupName || "group"}.pdf`,
-        orientation: "portrait",
-        format: "a4",
-        margin: [8, 8],
-        scale: 2,
-      });
+      await downloadPdf(contentRef.current, { filename: `Pro-ID-Cards-${group?.groupName || "group"}.pdf` });
     } finally { setPdfLoading(false); }
   }, [group, pdfLoading]);
 
@@ -125,28 +119,10 @@ export default function PrintIdCardsPro() {
         .pro-page-break { page-break-after: always; }
       `}</style>
 
-      <div className="no-print" style={{
-        padding: "12px 20px", background: "#fef3c7", borderBottom: "1px solid #f59e0b",
-        display: "flex", gap: "10px", alignItems: "center", justifyContent: "center", flexWrap: "wrap"
-      }}>
-        <strong style={{ fontSize: "15px", color: DARK, marginRight: "8px" }}>
-          🪪 ID Cards — {group.groupName} ({group.year}) — {pilgrims.length} pilgrims
-        </strong>
-        <button onClick={handleDownload} disabled={pdfLoading} style={{
-          padding: "8px 20px", background: DARK, color: "#fff", border: "none",
-          borderRadius: "7px", fontWeight: 700, cursor: "pointer", fontSize: "13px",
-          opacity: pdfLoading ? 0.6 : 1
-        }}>
-          {pdfLoading ? "Generating..." : "⬇ Download PDF"}
-        </button>
-        <button onClick={() => window.print()} style={{
-          padding: "8px 18px", background: "#1a2744", color: "#fff", border: "none",
-          borderRadius: "7px", fontWeight: 700, cursor: "pointer", fontSize: "13px"
-        }}>🖨 Print</button>
-        <button onClick={() => window.history.back()} style={{
-          padding: "8px 14px", border: "1px solid #ccc", borderRadius: "7px",
-          cursor: "pointer", background: "#fff", fontSize: "13px"
-        }}>← Back</button>
+      <div className="no-print" style={{ padding: "16px", background: "#fef3c7", textAlign: "center" }}>
+        <button onClick={handleDownload} disabled={pdfLoading} style={{ padding: "10px 24px", background: DARK, color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", marginRight: "12px", opacity: pdfLoading ? 0.6 : 1 }}>{pdfLoading ? "Generating PDF..." : "⬇ Download PDF"}</button>
+        <button onClick={() => window.print()} style={{ padding: "10px 24px", background: "#fff", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", marginRight: "12px" }}>🖨 Print</button>
+        <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
       </div>
 
       <div ref={contentRef} style={{ background: "#fff", padding: "4mm" }}>
