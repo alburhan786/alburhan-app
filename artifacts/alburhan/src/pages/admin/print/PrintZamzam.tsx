@@ -276,7 +276,7 @@ export default function PrintZamzam() {
                       <div><span style={{ fontWeight: 800, color: "#b91c1c" }}>Emergency: </span><span style={{ fontWeight: 900, color: "#b91c1c" }}>0547090786</span></div>
                       {(p.address || p.city) && (
                         <div style={{ fontSize: "8.5pt", fontWeight: 900, color: DARK_GREEN, marginTop: "1mm" }}>
-                          📍 {[p.address, p.city].filter(Boolean).join(", ")}
+                          <span>Address: </span>{[p.address, p.city].filter(Boolean).join(", ")}
                         </div>
                       )}
                     </div>
