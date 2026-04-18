@@ -160,7 +160,7 @@ export default function PrintZamzam() {
 
                   {/* ══ LEFT COLUMN: branding + photo + serial ══ */}
                   <div style={{
-                    width: "52mm", flexShrink: 0,
+                    width: "62mm", flexShrink: 0,
                     display: "flex", flexDirection: "column", alignItems: "center",
                     padding: "3mm 2mm 3mm 3mm",
                     borderRight: `1.5px solid ${GOLD}`,
@@ -169,17 +169,17 @@ export default function PrintZamzam() {
                   }}>
                     {/* Flag + Logo + Company */}
                     <div style={{ display: "flex", alignItems: "center", gap: "1.5mm", marginBottom: "2mm", width: "100%" }}>
-                      <img src={`${BASE}images/india_flag.jpg`} alt="" style={{ width: "7mm", height: "7mm", borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
-                      <img src={`${BASE}images/logo.png`} alt="" style={{ height: "14mm", width: "14mm", objectFit: "contain", flexShrink: 0 }} />
+                      <img src={`${BASE}images/india_flag.jpg`} alt="" style={{ width: "8mm", height: "8mm", borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                      <img src={`${BASE}images/logo.png`} alt="" style={{ height: "16mm", width: "16mm", objectFit: "contain", flexShrink: 0 }} />
                       <div>
-                        <div style={{ fontWeight: 900, fontSize: "8pt", color: GOLD, letterSpacing: "0.3px", lineHeight: 1.1 }}>AL-BURHAN</div>
-                        <div style={{ fontWeight: 700, fontSize: "5pt", color: DARK_GREEN, letterSpacing: "0.3px", lineHeight: 1.2 }}>TOURS &amp; TRAVELS</div>
+                        <div style={{ fontWeight: 900, fontSize: "9pt", color: GOLD, letterSpacing: "0.3px", lineHeight: 1.1 }}>AL-BURHAN</div>
+                        <div style={{ fontWeight: 700, fontSize: "6pt", color: DARK_GREEN, letterSpacing: "0.3px", lineHeight: 1.2 }}>TOURS &amp; TRAVELS</div>
                       </div>
                     </div>
 
                     {/* Circular Photo */}
                     <div style={{
-                      width: "32mm", height: "32mm", borderRadius: "50%",
+                      width: "44mm", height: "44mm", borderRadius: "50%",
                       border: `3px solid ${GOLD}`,
                       overflow: "hidden", background: "#dce3dc",
                       display: "flex", alignItems: "center", justifyContent: "center",
@@ -197,9 +197,9 @@ export default function PrintZamzam() {
 
                     {/* Serial Number */}
                     <div style={{ textAlign: "center" }}>
-                      <div style={{ fontSize: "4.5pt", color: "#999", textTransform: "uppercase", letterSpacing: "1.5px", fontWeight: 700 }}>SERIAL NO.</div>
+                      <div style={{ fontSize: "6pt", color: "#999", textTransform: "uppercase", letterSpacing: "1.5px", fontWeight: 700 }}>SERIAL NO.</div>
                       <div style={{
-                        fontSize: "40pt", fontWeight: 900, color: DARK_GREEN,
+                        fontSize: "52pt", fontWeight: 900, color: DARK_GREEN,
                         lineHeight: 1, letterSpacing: "-1px",
                         fontFamily: "'Arial Black', Arial, sans-serif",
                         WebkitTextStroke: "3px white", paintOrder: "stroke fill",
@@ -217,13 +217,13 @@ export default function PrintZamzam() {
                     {/* ZAMZAM Title */}
                     <div style={{ marginBottom: "1mm" }}>
                       <div style={{
-                        fontSize: "22pt", fontWeight: 900, color: DARK_GREEN,
+                        fontSize: "26pt", fontWeight: 900, color: DARK_GREEN,
                         letterSpacing: "6px", lineHeight: 1, textTransform: "uppercase",
                         fontFamily: "'Arial Black', Arial, sans-serif"
                       }}>
                         ZAMZAM
                       </div>
-                      <div style={{ fontSize: "5.5pt", color: "#999", letterSpacing: "3px", textTransform: "uppercase", fontStyle: "italic", fontWeight: 600 }}>
+                      <div style={{ fontSize: "7pt", color: "#999", letterSpacing: "3px", textTransform: "uppercase", fontStyle: "italic", fontWeight: 600 }}>
                         HOLY WATER
                       </div>
                     </div>
@@ -233,7 +233,7 @@ export default function PrintZamzam() {
 
                     {/* Pilgrim Name */}
                     <div style={{
-                      fontSize: "13pt", fontWeight: 900, color: "#111",
+                      fontSize: "17pt", fontWeight: 900, color: "#111",
                       lineHeight: 1.2, wordBreak: "break-word", textTransform: "uppercase",
                       fontFamily: "'Arial Black', Arial, sans-serif", marginBottom: "1.5mm"
                     }}>
@@ -245,7 +245,7 @@ export default function PrintZamzam() {
                       <div style={{
                         display: "inline-block",
                         background: DARK_GREEN, color: "#fff", borderRadius: "99px",
-                        padding: "1mm 4mm", fontSize: "6.5pt", fontWeight: 800,
+                        padding: "1.5mm 5mm", fontSize: "9pt", fontWeight: 800,
                         letterSpacing: "0.3px", lineHeight: 1.4
                       }}>
                         Al Burhan Tours And Travels — {group.year}
@@ -254,7 +254,7 @@ export default function PrintZamzam() {
 
                     {/* Flight Info */}
                     {(group.flightNumber || group.returnDate) && (
-                      <div style={{ marginBottom: "1.5mm", fontSize: "7.5pt", fontWeight: 800, color: DARK_GREEN, lineHeight: 1.5 }}>
+                      <div style={{ marginBottom: "1.5mm", fontSize: "10pt", fontWeight: 800, color: DARK_GREEN, lineHeight: 1.5 }}>
                         {group.flightNumber && (
                           <span>✈ <b>Flight:</b> {group.flightNumber}</span>
                         )}
@@ -265,8 +265,8 @@ export default function PrintZamzam() {
                       </div>
                     )}
 
-                    {/* Contact Info — address bold & bigger */}
-                    <div style={{ fontSize: "7pt", lineHeight: 1.55, color: "#333", flex: 1 }}>
+                    {/* Contact Info */}
+                    <div style={{ fontSize: "9.5pt", lineHeight: 1.6, color: "#333", flex: 1 }}>
                       {p.passportNumber && (
                         <div><span style={{ fontWeight: 800, color: DARK_GREEN }}>Passport No: </span><span style={{ fontWeight: 700 }}>{p.passportNumber}</span></div>
                       )}
@@ -275,7 +275,7 @@ export default function PrintZamzam() {
                       )}
                       <div><span style={{ fontWeight: 800, color: "#b91c1c" }}>Emergency: </span><span style={{ fontWeight: 900, color: "#b91c1c" }}>0547090786</span></div>
                       {(p.address || p.city) && (
-                        <div style={{ fontSize: "8.5pt", fontWeight: 900, color: DARK_GREEN, marginTop: "1mm" }}>
+                        <div style={{ fontSize: "11pt", fontWeight: 900, color: DARK_GREEN, marginTop: "1mm" }}>
                           <span>Address: </span>{[p.address, p.city].filter(Boolean).join(", ")}
                         </div>
                       )}
@@ -287,12 +287,12 @@ export default function PrintZamzam() {
                       justifyContent: "space-between", gap: "2mm", marginTop: "1mm"
                     }}>
                       <div>
-                        <Barcode value={barcodeVal} height={22} width={1} fontSize={0} />
-                        <div style={{ fontSize: "4.5pt", color: "#555", fontFamily: "monospace", marginTop: "0.5mm", letterSpacing: "0.5px" }}>
+                        <Barcode value={barcodeVal} height={28} width={1.2} fontSize={0} />
+                        <div style={{ fontSize: "5pt", color: "#555", fontFamily: "monospace", marginTop: "0.5mm", letterSpacing: "0.5px" }}>
                           {barcodeVal}
                         </div>
                       </div>
-                      <QRCodeSVG value={buildQr(p, group)} size={100} level="M" fgColor={DARK_GREEN} />
+                      <QRCodeSVG value={buildQr(p, group)} size={130} level="M" fgColor={DARK_GREEN} />
                     </div>
                   </div>
 
