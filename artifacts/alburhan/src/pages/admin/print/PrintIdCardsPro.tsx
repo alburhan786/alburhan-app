@@ -163,7 +163,7 @@ export default function PrintIdCardsPro() {
                         <img
                           src={`${BASE}images/logo.png`}
                           alt=""
-                          style={{ width: "13mm", height: "13mm", objectFit: "contain" }}
+                          style={{ width: "11mm", height: "11mm", objectFit: "contain" }}
                         />
                         <div style={{ textAlign: "center", lineHeight: 1.15 }}>
                           <div style={{ fontSize: "6.5pt", fontWeight: 900, color: GOLD, letterSpacing: "0.3px" }}>AL BURHAN</div>
@@ -176,11 +176,11 @@ export default function PrintIdCardsPro() {
                             <img
                               src={`${API}${p.photoUrl}`}
                               alt=""
-                              style={{ width: "21mm", height: "26mm", objectFit: "cover", border: `2px solid ${GOLD}`, borderRadius: "2px" }}
+                              style={{ width: "20mm", height: "20mm", objectFit: "cover", border: `2px solid ${GOLD}`, borderRadius: "2px" }}
                             />
                           ) : (
                             <div style={{
-                              width: "21mm", height: "26mm", background: "#e8ede8",
+                              width: "20mm", height: "20mm", background: "#e8ede8",
                               border: `2px solid ${GOLD}`, borderRadius: "2px",
                               display: "flex", alignItems: "center", justifyContent: "center",
                               fontSize: "4.5pt", color: "#aaa", fontWeight: 700, letterSpacing: "0.5px",
