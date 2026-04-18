@@ -35,6 +35,7 @@ function buildQr(p: Pilgrim, group: Group): string {
     `Serial: ${String(p.serialNumber).padStart(3, "0")}`,
     `Group: ${group.groupName} ${group.year}`,
     ...(group.flightNumber ? [`Flight: ${group.flightNumber}`] : []),
+    ...(group.returnDate ? [`Return: ${group.returnDate}`] : []),
     ...(p.passportNumber ? [`Passport No: ${p.passportNumber}`] : []),
     ...(p.mobileIndia ? [`Mobile: ${p.mobileIndia}`] : []),
     `Emergency: 0547090786`,
@@ -89,17 +90,17 @@ export default function PrintZamzam() {
         * { box-sizing: border-box; }
         .zz-page {
           display: flex;
+          flex-direction: column;
           gap: 4mm;
           width: 200mm;
           height: 284mm;
           page-break-after: always;
-          align-items: stretch;
         }
         .zz-page:last-child { page-break-after: auto; }
         .zz-sticker {
           flex: 1;
           display: flex;
-          flex-direction: column;
+          flex-direction: row;
           font-family: Arial, sans-serif;
           background: #fff;
           border: 1.5px solid #ccc;
@@ -150,81 +151,42 @@ export default function PrintZamzam() {
               return (
                 <div key={p.id} className="zz-sticker">
 
-                  {/* ── Decorative corner circle ── */}
+                  {/* ── Decorative corner circle top-right ── */}
                   <div style={{
-                    position: "absolute", top: "-14mm", right: "-14mm",
-                    width: "32mm", height: "32mm",
-                    background: DARK_GREEN, borderRadius: "50%",
-                    zIndex: 0,
+                    position: "absolute", top: "-10mm", right: "-10mm",
+                    width: "28mm", height: "28mm",
+                    background: DARK_GREEN, borderRadius: "50%", zIndex: 0,
                   }} />
 
-                  {/* ── Header ── */}
+                  {/* ══ LEFT COLUMN: branding + photo + serial ══ */}
                   <div style={{
-                    display: "flex", alignItems: "center", gap: "2mm",
-                    padding: "3.5mm 4mm 3mm", position: "relative", zIndex: 1
+                    width: "52mm", flexShrink: 0,
+                    display: "flex", flexDirection: "column", alignItems: "center",
+                    padding: "3mm 2mm 3mm 3mm",
+                    borderRight: `1.5px solid ${GOLD}`,
+                    background: "#fafff8",
+                    position: "relative", zIndex: 1,
                   }}>
-                    <img
-                      src={`${BASE}images/india_flag.jpg`}
-                      alt=""
-                      style={{ width: "9mm", height: "9mm", borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
-                    />
-                    <img
-                      src={`${BASE}images/logo.png`}
-                      alt=""
-                      style={{ height: "20mm", width: "20mm", objectFit: "contain", flexShrink: 0 }}
-                    />
-                    <div style={{ flex: 1 }}>
-                      <div style={{
-                        fontWeight: 900, fontSize: "12pt", color: GOLD,
-                        letterSpacing: "0.5px", lineHeight: 1.15
-                      }}>
-                        AL-BURHAN
-                      </div>
-                      <div style={{
-                        fontWeight: 900, fontSize: "9pt", color: DARK_GREEN,
-                        letterSpacing: "0.5px", textTransform: "uppercase", lineHeight: 1.2
-                      }}>
-                        TOURS &amp; TRAVELS
+                    {/* Flag + Logo + Company */}
+                    <div style={{ display: "flex", alignItems: "center", gap: "1.5mm", marginBottom: "2mm", width: "100%" }}>
+                      <img src={`${BASE}images/india_flag.jpg`} alt="" style={{ width: "7mm", height: "7mm", borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                      <img src={`${BASE}images/logo.png`} alt="" style={{ height: "14mm", width: "14mm", objectFit: "contain", flexShrink: 0 }} />
+                      <div>
+                        <div style={{ fontWeight: 900, fontSize: "8pt", color: GOLD, letterSpacing: "0.3px", lineHeight: 1.1 }}>AL-BURHAN</div>
+                        <div style={{ fontWeight: 700, fontSize: "5pt", color: DARK_GREEN, letterSpacing: "0.3px", lineHeight: 1.2 }}>TOURS &amp; TRAVELS</div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* ── ZAMZAM Title ── */}
-                  <div style={{ textAlign: "center", padding: "1mm 4mm 0" }}>
+                    {/* Circular Photo */}
                     <div style={{
-                      fontSize: "28pt", fontWeight: 900, color: DARK_GREEN,
-                      letterSpacing: "7px", lineHeight: 1, textTransform: "uppercase",
-                      fontFamily: "'Arial Black', Arial, sans-serif"
-                    }}>
-                      ZAMZAM
-                    </div>
-                    <div style={{
-                      fontSize: "6.5pt", color: "#999", letterSpacing: "3px",
-                      textTransform: "uppercase", marginTop: "1mm", fontStyle: "italic",
-                      fontWeight: 600
-                    }}>
-                      HOLY WATER
-                    </div>
-                  </div>
-
-                  {/* ── Gold Divider ── */}
-                  <div style={{ height: "0.7mm", background: GOLD, margin: "3mm 4mm" }} />
-
-                  {/* ── Circular Photo ── */}
-                  <div style={{ display: "flex", justifyContent: "center", padding: "0 4mm" }}>
-                    <div style={{
-                      width: "38mm", height: "38mm", borderRadius: "50%",
-                      border: `3.5px solid ${GOLD}`,
+                      width: "32mm", height: "32mm", borderRadius: "50%",
+                      border: `3px solid ${GOLD}`,
                       overflow: "hidden", background: "#dce3dc",
                       display: "flex", alignItems: "center", justifyContent: "center",
-                      flexShrink: 0,
+                      marginBottom: "1.5mm",
                     }}>
                       {p.photoUrl ? (
-                        <img
-                          src={p.photoUrl}
-                          alt=""
-                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                        />
+                        <img src={p.photoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                       ) : (
                         <svg width="100%" height="100%" viewBox="0 0 76 76">
                           <circle cx="38" cy="30" r="16" fill="#b0b8b0" />
@@ -232,87 +194,106 @@ export default function PrintZamzam() {
                         </svg>
                       )}
                     </div>
-                  </div>
 
-                  {/* ── Serial Number ── */}
-                  <div style={{ textAlign: "center", padding: "1mm 4mm 0" }}>
-                    <div style={{
-                      fontSize: "5.5pt", color: "#999", textTransform: "uppercase",
-                      letterSpacing: "2px", fontWeight: 700
-                    }}>
-                      SERIAL NO.
-                    </div>
-                    <div style={{
-                      fontSize: "72pt", fontWeight: 900, color: DARK_GREEN,
-                      lineHeight: 1, letterSpacing: "-2px",
-                      fontFamily: "'Arial Black', Arial, sans-serif",
-                      WebkitTextStroke: "4px white",
-                      paintOrder: "stroke fill",
-                    }}>
-                      #{serial}
+                    {/* Serial Number */}
+                    <div style={{ textAlign: "center" }}>
+                      <div style={{ fontSize: "4.5pt", color: "#999", textTransform: "uppercase", letterSpacing: "1.5px", fontWeight: 700 }}>SERIAL NO.</div>
+                      <div style={{
+                        fontSize: "40pt", fontWeight: 900, color: DARK_GREEN,
+                        lineHeight: 1, letterSpacing: "-1px",
+                        fontFamily: "'Arial Black', Arial, sans-serif",
+                        WebkitTextStroke: "3px white", paintOrder: "stroke fill",
+                      }}>
+                        #{serial}
+                      </div>
                     </div>
                   </div>
 
-                  {/* ── Pilgrim Name ── */}
-                  <div style={{ textAlign: "center", padding: "1mm 5mm 2.5mm" }}>
+                  {/* ══ RIGHT COLUMN: content ══ */}
+                  <div style={{
+                    flex: 1, display: "flex", flexDirection: "column",
+                    padding: "3mm 3mm 3mm 4mm", position: "relative", zIndex: 1, minWidth: 0,
+                  }}>
+                    {/* ZAMZAM Title */}
+                    <div style={{ marginBottom: "1mm" }}>
+                      <div style={{
+                        fontSize: "22pt", fontWeight: 900, color: DARK_GREEN,
+                        letterSpacing: "6px", lineHeight: 1, textTransform: "uppercase",
+                        fontFamily: "'Arial Black', Arial, sans-serif"
+                      }}>
+                        ZAMZAM
+                      </div>
+                      <div style={{ fontSize: "5.5pt", color: "#999", letterSpacing: "3px", textTransform: "uppercase", fontStyle: "italic", fontWeight: 600 }}>
+                        HOLY WATER
+                      </div>
+                    </div>
+
+                    {/* Gold Divider */}
+                    <div style={{ height: "0.7mm", background: GOLD, marginBottom: "1.5mm" }} />
+
+                    {/* Pilgrim Name */}
                     <div style={{
-                      fontSize: "15pt", fontWeight: 900, color: "#111",
+                      fontSize: "13pt", fontWeight: 900, color: "#111",
                       lineHeight: 1.2, wordBreak: "break-word", textTransform: "uppercase",
-                      fontFamily: "'Arial Black', Arial, sans-serif"
+                      fontFamily: "'Arial Black', Arial, sans-serif", marginBottom: "1.5mm"
                     }}>
                       {displayName}
                     </div>
-                  </div>
 
-                  {/* ── Green Badge ── */}
-                  <div style={{ display: "flex", justifyContent: "center", padding: "0 4mm" }}>
-                    <div style={{
-                      background: DARK_GREEN, color: "#fff", borderRadius: "99px",
-                      padding: "2mm 7mm", fontSize: "7pt", fontWeight: 800,
-                      textAlign: "center", letterSpacing: "0.3px", lineHeight: 1.4
-                    }}>
-                      Al Burhan Tours And Travels — {group.year}
-                    </div>
-                  </div>
-
-                  {/* ── Contact Info Block ── */}
-                  <div style={{ padding: "2mm 4mm 0", fontSize: "6pt", lineHeight: 1.6, color: "#333" }}>
-                    {p.passportNumber && (
-                      <div><span style={{ fontWeight: 700, color: DARK_GREEN }}>Passport No: </span>{p.passportNumber}</div>
-                    )}
-                    {p.mobileIndia && (
-                      <div><span style={{ fontWeight: 700, color: DARK_GREEN }}>Mobile: </span>{p.mobileIndia}</div>
-                    )}
-                    <div><span style={{ fontWeight: 700, color: "#b91c1c" }}>Emergency: </span>0547090786</div>
-                    {(p.address || p.city) && (
-                      <div><span style={{ fontWeight: 700, color: DARK_GREEN }}>Address: </span>{[p.address, p.city].filter(Boolean).join(", ")}</div>
-                    )}
-                  </div>
-
-                  {/* White flex spacer */}
-                  <div style={{ flex: 1 }} />
-
-                  {/* ── Bottom: Barcode + QR ── */}
-                  <div style={{
-                    display: "flex", alignItems: "flex-end",
-                    justifyContent: "space-between",
-                    padding: "0 4mm 3.5mm", gap: "2mm"
-                  }}>
-                    <div>
-                      <Barcode value={barcodeVal} height={30} width={1.1} fontSize={0} />
+                    {/* Green Badge */}
+                    <div style={{ marginBottom: "1.5mm" }}>
                       <div style={{
-                        fontSize: "5pt", color: "#555", fontFamily: "monospace",
-                        marginTop: "0.5mm", letterSpacing: "0.5px"
+                        display: "inline-block",
+                        background: DARK_GREEN, color: "#fff", borderRadius: "99px",
+                        padding: "1mm 4mm", fontSize: "6.5pt", fontWeight: 800,
+                        letterSpacing: "0.3px", lineHeight: 1.4
                       }}>
-                        {barcodeVal}
+                        Al Burhan Tours And Travels — {group.year}
                       </div>
                     </div>
-                    <QRCodeSVG
-                      value={buildQr(p, group)}
-                      size={160}
-                      level="M"
-                      fgColor={DARK_GREEN}
-                    />
+
+                    {/* Flight Info */}
+                    {(group.flightNumber || group.returnDate) && (
+                      <div style={{ marginBottom: "1.5mm", fontSize: "7.5pt", fontWeight: 800, color: DARK_GREEN, lineHeight: 1.5 }}>
+                        {group.flightNumber && (
+                          <span>✈ <b>Flight:</b> {group.flightNumber}</span>
+                        )}
+                        {group.flightNumber && group.returnDate && <span style={{ margin: "0 2mm" }}>|</span>}
+                        {group.returnDate && (
+                          <span>🗓 <b>Return:</b> {group.returnDate}</span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Contact Info — address bold & bigger */}
+                    <div style={{ fontSize: "7pt", lineHeight: 1.55, color: "#333", flex: 1 }}>
+                      {p.passportNumber && (
+                        <div><span style={{ fontWeight: 800, color: DARK_GREEN }}>Passport No: </span><span style={{ fontWeight: 700 }}>{p.passportNumber}</span></div>
+                      )}
+                      {p.mobileIndia && (
+                        <div><span style={{ fontWeight: 800, color: DARK_GREEN }}>Mobile: </span><span style={{ fontWeight: 700 }}>{p.mobileIndia}</span></div>
+                      )}
+                      <div><span style={{ fontWeight: 800, color: "#b91c1c" }}>Emergency: </span><span style={{ fontWeight: 900, color: "#b91c1c" }}>0547090786</span></div>
+                      {(p.address || p.city) && (
+                        <div style={{ fontSize: "8.5pt", fontWeight: 900, color: DARK_GREEN, marginTop: "1mm" }}>
+                          📍 {[p.address, p.city].filter(Boolean).join(", ")}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Bottom: Barcode + QR */}
+                    <div style={{
+                      display: "flex", alignItems: "flex-end",
+                      justifyContent: "space-between", gap: "2mm", marginTop: "1mm"
+                    }}>
+                      <div>
+                        <Barcode value={barcodeVal} height={22} width={1} fontSize={0} />
+                        <div style={{ fontSize: "4.5pt", color: "#555", fontFamily: "monospace", marginTop: "0.5mm", letterSpacing: "0.5px" }}>
+                          {barcodeVal}
+                        </div>
+                      </div>
+                      <QRCodeSVG value={buildQr(p, group)} size={100} level="M" fgColor={DARK_GREEN} />
+                    </div>
                   </div>
 
                 </div>
