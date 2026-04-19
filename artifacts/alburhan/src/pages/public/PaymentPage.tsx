@@ -5,10 +5,6 @@ import { useQuery } from "@tanstack/react-query";
 const API = import.meta.env.VITE_API_URL || "";
 const BASE = import.meta.env.BASE_URL || "/";
 
-declare global {
-  interface Window { Razorpay: new (opts: object) => { open(): void; on(event: string, cb: (r: any) => void): void }; }
-}
-
 type PaymentEntry = {
   id: string;
   amount: number;

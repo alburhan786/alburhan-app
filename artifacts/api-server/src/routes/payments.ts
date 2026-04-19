@@ -1034,6 +1034,15 @@ router.post("/verify-public", async (req, res) => {
     return;
   }
 
+  if (
+    booking.status === "confirmed" &&
+    booking.razorpayOrderId === razorpay_order_id &&
+    booking.razorpayPaymentId === razorpay_payment_id
+  ) {
+    res.json({ success: true, status: "confirmed", idempotent: true });
+    return;
+  }
+
   if (booking.status !== "approved" && booking.status !== "partially_paid") {
     console.error("[verify-public] Booking status not payable:", booking.status, "bookingId:", bookingId);
     res.status(400).json({ success: false, message: "This booking is not in a payable state" });
