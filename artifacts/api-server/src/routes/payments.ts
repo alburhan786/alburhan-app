@@ -707,7 +707,12 @@ router.post("/:bookingId/payment-link", requireAdmin as any, async (req: Authent
     };
 
     const link = await rz.paymentLink.create(linkPayload);
-    const paymentUrl: string = link.short_url || link.id;
+    if (!link.short_url) {
+      console.error("[payment-link] Razorpay returned no short_url:", link);
+      res.status(502).json({ message: "Razorpay did not return a usable payment URL" });
+      return;
+    }
+    const paymentUrl: string = link.short_url;
 
     const waMsg = `Assalamu Alaikum ${booking.customerName},\n\nYour booking #${booking.bookingNumber} has a balance of ₹${remaining.toLocaleString("en-IN")}.\n\nPlease complete your payment using the secure link below:\n${paymentUrl}\n\nThis link expires in 7 days.\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 9893989786`;
 
