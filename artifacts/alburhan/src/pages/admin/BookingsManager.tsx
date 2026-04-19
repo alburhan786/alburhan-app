@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
-import { CheckCircle, XCircle, Eye, ExternalLink, Plus, Trash2, FileText, Download, ImageIcon, RefreshCw, Upload, Wallet, ClipboardList, User } from "lucide-react";
+import { CheckCircle, XCircle, Eye, ExternalLink, Plus, Trash2, FileText, Download, ImageIcon, RefreshCw, Upload, Wallet, ClipboardList, User, Link2, Send } from "lucide-react";
 
 const DOC_TYPE_LABELS: Record<string, string> = {
   passport: "Passport",
@@ -242,6 +242,8 @@ function AdminPaymentLedger({ booking }: { booking: BookingWithAmounts }) {
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [sendingLink, setSendingLink] = useState(false);
+  const [generatedLink, setGeneratedLink] = useState<string | null>(null);
   // livePaidAmount is kept in sync from server responses so the balance bar
   // reflects the latest state even while the modal is open (the booking prop is stale).
   const [livePaidAmount, setLivePaidAmount] = useState<number>(Number(booking.paidAmount ?? 0));
@@ -325,6 +327,32 @@ function AdminPaymentLedger({ booking }: { booking: BookingWithAmounts }) {
     }
   };
 
+  const handleSendPaymentLink = async () => {
+    if (!confirm(`Generate a Razorpay payment link and send via WhatsApp to ${booking.customerName} (${booking.customerMobile})?`)) return;
+    setSendingLink(true);
+    setGeneratedLink(null);
+    try {
+      const res = await fetch(`${API}/api/payments/${booking.id}/payment-link`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = (await res.json()) as { paymentUrl?: string; waSent?: boolean; message?: string };
+      if (!res.ok) throw new Error(data.message ?? "Failed to generate payment link");
+      setGeneratedLink(data.paymentUrl ?? "");
+      toast({
+        title: data.waSent ? "Payment link sent via WhatsApp!" : "Payment link generated",
+        description: data.waSent
+          ? `Link sent to ${booking.customerMobile}`
+          : "WhatsApp not configured — copy the link manually",
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to generate payment link";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setSendingLink(false);
+    }
+  };
+
   const ledgerTotal = entries.reduce((s, e) => s + Number(e.amount), 0);
   // finalAmount is already a number from the generated Booking type
   const finalAmount = booking.finalAmount ?? 0;
@@ -404,9 +432,51 @@ function AdminPaymentLedger({ booking }: { booking: BookingWithAmounts }) {
       )}
 
       {!showForm && (
-        <Button size="sm" className="bg-[#0B3D2E] hover:bg-[#0d5038] text-white h-8 text-xs gap-1.5" onClick={() => setShowForm(true)}>
-          <Plus size={12} /> Record Payment
-        </Button>
+        <div className="flex flex-wrap gap-2 items-center">
+          <Button size="sm" className="bg-[#0B3D2E] hover:bg-[#0d5038] text-white h-8 text-xs gap-1.5" onClick={() => setShowForm(true)}>
+            <Plus size={12} /> Record Payment
+          </Button>
+          {remaining > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 text-xs gap-1.5 border-blue-300 text-blue-700 hover:bg-blue-50"
+              onClick={handleSendPaymentLink}
+              disabled={sendingLink}
+            >
+              {sendingLink ? (
+                <><RefreshCw size={12} className="animate-spin" /> Generating…</>
+              ) : (
+                <><Send size={12} /> Send Payment Link</>
+              )}
+            </Button>
+          )}
+        </div>
+      )}
+
+      {generatedLink && (
+        <div className="border border-blue-200 bg-blue-50 rounded-lg p-3 text-xs space-y-1.5">
+          <div className="flex items-center gap-1.5 font-semibold text-blue-800">
+            <Link2 size={12} /> Payment link generated
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-blue-700 break-all flex-1">{generatedLink}</span>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 px-2 text-xs text-blue-700 hover:bg-blue-100 shrink-0"
+              onClick={() => { navigator.clipboard.writeText(generatedLink); toast({ title: "Copied!" }); }}
+            >
+              Copy
+            </Button>
+            <a href={generatedLink} target="_blank" rel="noopener noreferrer">
+              <Button size="sm" variant="ghost" className="h-6 px-2 text-xs text-blue-700 hover:bg-blue-100">
+                <ExternalLink size={11} />
+              </Button>
+            </a>
+          </div>
+          <p className="text-blue-500 text-[10px]">Sent to {booking.customerMobile} via WhatsApp • Expires in 7 days</p>
+        </div>
       )}
 
       {showForm && (

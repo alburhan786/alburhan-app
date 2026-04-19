@@ -6,7 +6,7 @@ import { eq, sql, inArray, and, lt } from "drizzle-orm";
 // Note: onlinePaidAmount tracks Razorpay-only payments; manual ledger entries are in payment_transactions
 import { CreatePaymentOrderBody, VerifyPaymentBody } from "@workspace/api-zod";
 import { requireAuth, requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
-import { sendPaymentConfirmationNotification, sendPartialPaymentNotification } from "../lib/notifications.js";
+import { sendPaymentConfirmationNotification, sendPartialPaymentNotification, sendWhatsApp } from "../lib/notifications.js";
 
 const router = Router();
 
@@ -609,6 +609,74 @@ router.get("/analytics", requireAdmin as any, async (req: AuthenticatedRequest, 
   } catch (err: any) {
     console.error("[analytics]", err?.message);
     res.status(500).json({ message: "Failed to load analytics" });
+  }
+});
+
+router.post("/:bookingId/payment-link", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  const { bookingId } = req.params;
+  try {
+    const bookings = await db
+      .select()
+      .from(bookingsTable)
+      .where(eq(bookingsTable.id, bookingId))
+      .limit(1);
+    const booking = bookings[0];
+
+    if (!booking) {
+      res.status(404).json({ message: "Booking not found" });
+      return;
+    }
+    if (!booking.finalAmount) {
+      res.status(400).json({ message: "Booking amount not set" });
+      return;
+    }
+
+    const finalAmount = Number(booking.finalAmount);
+    const paidAmount = Number(booking.paidAmount || 0);
+    const remaining = finalAmount - paidAmount;
+
+    if (remaining <= 0) {
+      res.status(400).json({ message: "This booking is already fully paid" });
+      return;
+    }
+
+    const rz = getRazorpay();
+    const expireBy = Math.floor(Date.now() / 1000) + 7 * 24 * 3600;
+
+    const clean = booking.customerMobile.replace(/\D/g, "");
+    const contactE164 = clean.length === 10 ? `+91${clean}` : `+${clean}`;
+
+    const linkPayload = {
+      amount: Math.round(remaining * 100),
+      currency: "INR",
+      description: `Balance payment for booking ${booking.bookingNumber}`,
+      customer: {
+        name: booking.customerName,
+        contact: contactE164,
+      },
+      expire_by: expireBy,
+      reminder_enable: false,
+      notify: { sms: false, email: false },
+    };
+
+    const link = await (rz as any).paymentLink.create(linkPayload);
+    const paymentUrl: string = link.short_url || link.id;
+
+    const waMsg = `Assalamu Alaikum ${booking.customerName},\n\nYour booking #${booking.bookingNumber} has a balance of ₹${remaining.toLocaleString("en-IN")}.\n\nPlease complete your payment using the secure link below:\n${paymentUrl}\n\nThis link expires in 7 days.\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 9893989786`;
+
+    const waSent = await sendWhatsApp(booking.customerMobile, waMsg);
+
+    res.json({
+      paymentUrl,
+      waSent,
+      remaining,
+      customerName: booking.customerName,
+      bookingNumber: booking.bookingNumber,
+    });
+  } catch (err: any) {
+    console.error("[payment-link]", err?.message, err?.error);
+    const msg = err?.error?.description || err?.message || "Failed to create payment link";
+    res.status(500).json({ message: msg });
   }
 });
 
