@@ -1,12 +1,13 @@
 import { Router } from "express";
 import Razorpay from "razorpay";
 import crypto from "crypto";
-import { db, bookingsTable, paymentTransactionsTable } from "@workspace/db";
-import { eq, sql, inArray, and, lt } from "drizzle-orm";
+import { db, bookingsTable, paymentTransactionsTable, reminderLogsTable } from "@workspace/db";
+import { eq, sql, inArray, and, lt, desc } from "drizzle-orm";
 // Note: onlinePaidAmount tracks Razorpay-only payments; manual ledger entries are in payment_transactions
 import { CreatePaymentOrderBody, VerifyPaymentBody } from "@workspace/api-zod";
 import { requireAuth, requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendPaymentConfirmationNotification, sendPartialPaymentNotification, sendWhatsApp } from "../lib/notifications.js";
+import { sendReminderForBookingId, getReminderHistory, runDailyReminders } from "../jobs/paymentReminder.js";
 
 const router = Router();
 
@@ -1091,6 +1092,42 @@ router.post("/verify-public", async (req, res) => {
   }).where(eq(bookingsTable.id, bookingId));
 
   res.json({ success: true, status: newStatus });
+});
+
+router.post("/:bookingId/send-reminder", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  const { bookingId } = req.params;
+  try {
+    const result = await sendReminderForBookingId(bookingId, "admin");
+    if (!result.success) {
+      res.status(400).json({ message: result.message });
+      return;
+    }
+    res.json({ success: true, message: result.message });
+  } catch (err: any) {
+    console.error("[send-reminder]", err?.message);
+    res.status(500).json({ message: "Failed to send reminder" });
+  }
+});
+
+router.get("/:bookingId/reminder-history", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  const { bookingId } = req.params;
+  try {
+    const logs = await getReminderHistory(bookingId);
+    res.json(logs);
+  } catch (err: any) {
+    console.error("[reminder-history]", err?.message);
+    res.status(500).json({ message: "Failed to load reminder history" });
+  }
+});
+
+router.post("/reminders/run-now", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    void runDailyReminders();
+    res.json({ success: true, message: "Reminder run started — check server logs for results" });
+  } catch (err: any) {
+    console.error("[reminders/run-now]", err?.message);
+    res.status(500).json({ message: "Failed to start reminder run" });
+  }
 });
 
 export default router;

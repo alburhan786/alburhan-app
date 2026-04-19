@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
-import { CheckCircle, XCircle, Eye, ExternalLink, Plus, Trash2, FileText, Download, ImageIcon, RefreshCw, Upload, Wallet, ClipboardList, User, Link2, Send } from "lucide-react";
+import { CheckCircle, XCircle, Eye, ExternalLink, Plus, Trash2, FileText, Download, ImageIcon, RefreshCw, Upload, Wallet, ClipboardList, User, Link2, Send, Bell } from "lucide-react";
 
 const DOC_TYPE_LABELS: Record<string, string> = {
   passport: "Passport",
@@ -244,6 +244,8 @@ function AdminPaymentLedger({ booking }: { booking: BookingWithAmounts }) {
   const [submitting, setSubmitting] = useState(false);
   const [sendingLink, setSendingLink] = useState(false);
   const [generatedLink, setGeneratedLink] = useState<{ url: string; waSent: boolean } | null>(null);
+  const [sendingReminder, setSendingReminder] = useState(false);
+  const [lastReminderSent, setLastReminderSent] = useState<string | null>(null);
   // livePaidAmount is kept in sync from server responses so the balance bar
   // reflects the latest state even while the modal is open (the booking prop is stale).
   const [livePaidAmount, setLivePaidAmount] = useState<number>(Number(booking.paidAmount ?? 0));
@@ -353,6 +355,26 @@ function AdminPaymentLedger({ booking }: { booking: BookingWithAmounts }) {
     }
   };
 
+  const handleSendReminder = async () => {
+    if (!confirm(`Send a WhatsApp payment reminder to ${booking.customerName} (${booking.customerMobile})?`)) return;
+    setSendingReminder(true);
+    try {
+      const res = await fetch(`${API}/api/payments/${booking.id}/send-reminder`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = (await res.json()) as { success?: boolean; message?: string };
+      if (!res.ok) throw new Error(data.message ?? "Failed to send reminder");
+      setLastReminderSent(new Date().toLocaleTimeString());
+      toast({ title: "Reminder sent!", description: data.message ?? `WhatsApp reminder sent to ${booking.customerMobile}` });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to send reminder";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setSendingReminder(false);
+    }
+  };
+
   const ledgerTotal = entries.reduce((s, e) => s + Number(e.amount), 0);
   // finalAmount is already a number from the generated Booking type
   const finalAmount = booking.finalAmount ?? 0;
@@ -448,6 +470,22 @@ function AdminPaymentLedger({ booking }: { booking: BookingWithAmounts }) {
                 <><RefreshCw size={12} className="animate-spin" /> Generating…</>
               ) : (
                 <><Send size={12} /> Send Payment Link</>
+              )}
+            </Button>
+          )}
+          {remaining > 0 && (booking.status === "approved" || booking.status === "partially_paid") && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 text-xs gap-1.5 border-amber-300 text-amber-700 hover:bg-amber-50"
+              onClick={handleSendReminder}
+              disabled={sendingReminder}
+              title={lastReminderSent ? `Last sent at ${lastReminderSent}` : "Send WhatsApp payment reminder"}
+            >
+              {sendingReminder ? (
+                <><RefreshCw size={12} className="animate-spin" /> Sending…</>
+              ) : (
+                <><Bell size={12} /> {lastReminderSent ? "Resend Reminder" : "Send Reminder"}</>
               )}
             </Button>
           )}
