@@ -12,7 +12,7 @@ type AnalyticsData = {
   totalPending: number;
   totalOverdue: number;
   overdueCount: number;
-  statusBreakdown: Record<string, number>;
+  paymentStatusBreakdown: Record<string, number>;
   bookings: Array<{
     id: string;
     bookingNumber: string;
@@ -114,7 +114,7 @@ export default function PaymentAnalytics() {
     if (filter === "all") return true;
     if (filter === "overdue") {
       return (
-        (b.status === "approved" || b.status === "partially_paid") &&
+        (b.status === "pending" || b.status === "partially_paid") &&
         new Date(b.createdAt).getTime() < thirtyDaysAgo &&
         (b.remainingAmount ?? 0) > 0
       );
@@ -219,11 +219,11 @@ export default function PaymentAnalytics() {
             </div>
 
             {/* Status Breakdown Bar */}
-            {Object.keys(data.statusBreakdown).length > 0 && (
+            {Object.keys(data.paymentStatusBreakdown).length > 0 && (
               <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
                 <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">Booking Status Breakdown</p>
                 <div className="flex flex-wrap gap-3">
-                  {Object.entries(data.statusBreakdown)
+                  {Object.entries(data.paymentStatusBreakdown)
                     .sort((a, b) => b[1] - a[1])
                     .map(([status, count]) => {
                       const cfg = STATUS_CONFIG[status] || { label: status, bg: "bg-gray-100", text: "text-gray-700" };
@@ -328,7 +328,7 @@ export default function PaymentAnalytics() {
                     ) : (
                       sorted.map(b => {
                         const isOverdue =
-                          (b.status === "approved" || b.status === "partially_paid") &&
+                          (b.status === "pending" || b.status === "partially_paid") &&
                           new Date(b.createdAt).getTime() < thirtyDaysAgo &&
                           (b.remainingAmount ?? 0) > 0;
 

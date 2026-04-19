@@ -523,15 +523,15 @@ router.get("/analytics", requireAdmin as any, async (req: AuthenticatedRequest, 
         .from(paymentTransactionsTable)
         .where(sql`${paymentTransactionsTable.paymentDate} LIKE ${monthPrefix + "%"}`),
 
-      // Total pending: sum of remaining for all non-fully-paid bookings
+      // Total pending: outstanding balance for pending + approved bookings
       db
         .select({
           total: sql<string>`COALESCE(SUM(GREATEST(COALESCE(${bookingsTable.finalAmount}, 0) - COALESCE(${bookingsTable.paidAmount}, 0), 0)), 0)`,
         })
         .from(bookingsTable)
-        .where(inArray(bookingsTable.status, ["pending", "approved", "partially_paid"])),
+        .where(inArray(bookingsTable.status, ["pending", "approved"])),
 
-      // Overdue: open bookings created > 30 days ago with positive remaining balance
+      // Overdue: partially_paid + pending bookings older than 30 days with positive balance
       db
         .select({
           total: sql<string>`COALESCE(SUM(GREATEST(COALESCE(${bookingsTable.finalAmount}, 0) - COALESCE(${bookingsTable.paidAmount}, 0), 0)), 0)`,
@@ -540,7 +540,7 @@ router.get("/analytics", requireAdmin as any, async (req: AuthenticatedRequest, 
         .from(bookingsTable)
         .where(
           and(
-            inArray(bookingsTable.status, ["pending", "approved", "partially_paid"]),
+            inArray(bookingsTable.status, ["pending", "partially_paid"]),
             lt(bookingsTable.createdAt, thirtyDaysAgo),
             sql`COALESCE(${bookingsTable.finalAmount}, 0) - COALESCE(${bookingsTable.paidAmount}, 0) > 0`,
           ),
@@ -581,7 +581,7 @@ router.get("/analytics", requireAdmin as any, async (req: AuthenticatedRequest, 
     const totalOverdue = Number(overdueRes[0]?.total || 0);
     const overdueCount = Number(overdueRes[0]?.count || 0);
 
-    const statusBreakdown = statusRes.reduce<Record<string, number>>((acc, row) => {
+    const paymentStatusBreakdown = statusRes.reduce<Record<string, number>>((acc, row) => {
       acc[row.status] = Number(row.count);
       return acc;
     }, {});
@@ -603,7 +603,7 @@ router.get("/analytics", requireAdmin as any, async (req: AuthenticatedRequest, 
       totalPending,
       totalOverdue,
       overdueCount,
-      statusBreakdown,
+      paymentStatusBreakdown,
       bookings: bookingsWithRemaining,
     });
   } catch (err: any) {
