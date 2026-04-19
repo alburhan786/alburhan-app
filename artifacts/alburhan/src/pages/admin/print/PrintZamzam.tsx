@@ -228,7 +228,7 @@ export default function PrintZamzam() {
                       }}>
                         ZAMZAM
                       </div>
-                      <div style={{ fontSize: "7pt", color: "#999", letterSpacing: "3px", textTransform: "uppercase", fontStyle: "italic", fontWeight: 600 }}>
+                      <div style={{ fontSize: "7pt", color: "#999", letterSpacing: "3px", textTransform: "uppercase", fontStyle: "italic", fontWeight: 600, marginTop: "2.5mm" }}>
                         HOLY WATER
                       </div>
                     </div>
@@ -240,7 +240,7 @@ export default function PrintZamzam() {
                     <div style={{
                       fontSize: "17pt", fontWeight: 900, color: "#111",
                       lineHeight: 1.2, wordBreak: "break-word", textTransform: "uppercase",
-                      fontFamily: "'Arial Black', Arial, sans-serif", marginBottom: "1.5mm"
+                      fontFamily: "'Arial Black', Arial, sans-serif", marginBottom: "4mm"
                     }}>
                       {displayName}
                     </div>
