@@ -746,6 +746,10 @@ router.post("/by-number/:bookingNumber/create-order", async (req, res) => {
       res.status(404).json({ message: "Booking not found" });
       return;
     }
+    if (booking.status !== "approved" && booking.status !== "partially_paid") {
+      res.status(400).json({ message: "This booking is not currently eligible for online payment. Please contact Al Burhan for assistance." });
+      return;
+    }
     if (!booking.finalAmount) {
       res.status(400).json({ message: "Booking amount not set — contact Al Burhan to confirm your package amount." });
       return;
@@ -1027,6 +1031,12 @@ router.post("/verify-public", async (req, res) => {
 
   if (!booking) {
     res.status(404).json({ success: false, message: "Booking not found" });
+    return;
+  }
+
+  if (booking.status !== "approved" && booking.status !== "partially_paid") {
+    console.error("[verify-public] Booking status not payable:", booking.status, "bookingId:", bookingId);
+    res.status(400).json({ success: false, message: "This booking is not in a payable state" });
     return;
   }
 

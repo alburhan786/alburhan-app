@@ -625,26 +625,40 @@ router.get("/by-number/:bookingNumber/payment-page", async (req, res) => {
     const paidAmount = Number(booking.paidAmount || 0);
     const remainingAmount = finalAmount != null ? Math.max(0, finalAmount - paidAmount) : null;
 
+    const manualHistory = txRows.map(t => ({
+      id: t.id,
+      amount: Number(t.amount),
+      paymentDate: t.paymentDate,
+      paymentMode: t.paymentMode,
+      referenceNumber: t.referenceNumber,
+      notes: t.notes,
+    }));
+
+    const onlinePaidAmount = Number(booking.onlinePaidAmount || 0);
+    if (onlinePaidAmount > 0 && booking.razorpayPaymentId) {
+      manualHistory.unshift({
+        id: `rzp-${booking.razorpayPaymentId}`,
+        amount: onlinePaidAmount,
+        paymentDate: booking.updatedAt ? booking.updatedAt.toISOString().split("T")[0] : "",
+        paymentMode: "online",
+        referenceNumber: booking.razorpayPaymentId,
+        notes: "Online payment via Razorpay",
+      });
+    }
+
     res.json({
       id: booking.id,
       bookingNumber: booking.bookingNumber,
       customerName: booking.customerName,
-      customerMobile: booking.customerMobile,
       packageName: pkgRows[0]?.name ?? null,
       status: booking.status,
+      totalAmount: finalAmount,
       finalAmount,
       paidAmount,
       remainingAmount,
       invoiceNumber: booking.invoiceNumber,
       createdAt: booking.createdAt?.toISOString(),
-      paymentHistory: txRows.map(t => ({
-        id: t.id,
-        amount: Number(t.amount),
-        paymentDate: t.paymentDate,
-        paymentMode: t.paymentMode,
-        referenceNumber: t.referenceNumber,
-        notes: t.notes,
-      })),
+      paymentHistory: manualHistory,
     });
   } catch (err: any) {
     console.error("[payment-page]", err?.message);

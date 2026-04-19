@@ -22,9 +22,9 @@ type PageData = {
   id: string;
   bookingNumber: string;
   customerName: string;
-  customerMobile: string;
   packageName: string | null;
   status: string;
+  totalAmount: number | null;
   finalAmount: number | null;
   paidAmount: number;
   remainingAmount: number | null;
@@ -100,7 +100,8 @@ export default function PaymentPage() {
       });
       const order = (await res.json()) as {
         orderId?: string; amount?: number; currency?: string;
-        razorpayKeyId?: string; bookingId?: string; message?: string;
+        razorpayKeyId?: string; bookingId?: string;
+        customerName?: string; customerMobile?: string; message?: string;
       };
       if (!res.ok) throw new Error(order.message || "Failed to initialize payment");
       if (!order.orderId || !order.razorpayKeyId) throw new Error("Invalid payment order response");
@@ -114,8 +115,8 @@ export default function PaymentPage() {
         image: `${BASE}images/logo.png`,
         order_id: order.orderId,
         prefill: {
-          name: data.customerName,
-          contact: data.customerMobile,
+          name: order.customerName ?? data.customerName,
+          contact: order.customerMobile,
         },
         theme: { color: "#0B3D2E" },
         modal: {
