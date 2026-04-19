@@ -40,7 +40,7 @@ const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }>
   confirmed:     { label: "Paid",      bg: "bg-emerald-100", text: "text-emerald-800" },
   partially_paid:{ label: "Partial",   bg: "bg-amber-100",   text: "text-amber-800" },
   approved:      { label: "Approved",  bg: "bg-blue-100",    text: "text-blue-800" },
-  pending:       { label: "Pending",   bg: "bg-gray-100",    text: "text-gray-700" },
+  pending:       { label: "Pending",   bg: "bg-red-100",     text: "text-red-800" },
   rejected:      { label: "Rejected",  bg: "bg-red-100",     text: "text-red-800" },
   cancelled:     { label: "Cancelled", bg: "bg-gray-100",    text: "text-gray-500" },
 };
@@ -122,19 +122,19 @@ export default function PaymentAnalytics() {
     return b.status === filter;
   });
 
+  const STRING_SORT_KEYS: SortKey[] = ["bookingNumber", "customerName", "updatedAt"];
   const sorted = [...filtered].sort((a, b) => {
-    let av: any = a[sortKey];
-    let bv: any = b[sortKey];
-    if (sortKey === "updatedAt" || sortKey === "bookingNumber") {
-      av = String(av ?? "");
-      bv = String(bv ?? "");
+    let cmp = 0;
+    if (STRING_SORT_KEYS.includes(sortKey)) {
+      const av = String(a[sortKey] ?? "");
+      const bv = String(b[sortKey] ?? "");
+      cmp = av.localeCompare(bv);
     } else {
-      av = Number(av ?? 0);
-      bv = Number(bv ?? 0);
+      const av = Number(a[sortKey] ?? 0);
+      const bv = Number(b[sortKey] ?? 0);
+      cmp = av < bv ? -1 : av > bv ? 1 : 0;
     }
-    if (av < bv) return sortDir === "asc" ? -1 : 1;
-    if (av > bv) return sortDir === "asc" ? 1 : -1;
-    return 0;
+    return sortDir === "asc" ? cmp : -cmp;
   });
 
   const today = new Date().toLocaleDateString("en-IN", { month: "long", year: "numeric" });

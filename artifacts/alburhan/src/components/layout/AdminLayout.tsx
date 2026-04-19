@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/use-auth";
 import {
   LayoutDashboard, PackageSearch, Users, BookOpen, MessageSquare, LogOut,
   ImageIcon, UsersRound, Receipt, ClipboardPlus, ScanLine, BarChart2,
-  Printer, Menu, Megaphone, ShieldCheck, Inbox
+  Printer, Menu, Megaphone, ShieldCheck, Inbox, PieChart
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -33,6 +33,7 @@ const MENU: MenuSection[] = [
       { icon: BookOpen, label: "Bookings", href: "/admin/bookings" },
       { icon: ClipboardPlus, label: "Offline Booking", href: "/admin/offline-bookings" },
       { icon: Receipt, label: "Invoices", href: "/admin/invoices" },
+      { icon: PieChart, label: "Payment Analytics", href: "/admin/payment-analytics" },
     ],
   },
   {

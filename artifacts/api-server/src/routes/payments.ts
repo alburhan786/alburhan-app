@@ -531,7 +531,7 @@ router.get("/analytics", requireAdmin as any, async (req: AuthenticatedRequest, 
         .from(bookingsTable)
         .where(inArray(bookingsTable.status, ["pending", "approved", "partially_paid"])),
 
-      // Overdue: partial/pending bookings created > 30 days ago with remaining balance
+      // Overdue: open bookings created > 30 days ago with positive remaining balance
       db
         .select({
           total: sql<string>`COALESCE(SUM(GREATEST(COALESCE(${bookingsTable.finalAmount}, 0) - COALESCE(${bookingsTable.paidAmount}, 0), 0)), 0)`,
@@ -540,8 +540,9 @@ router.get("/analytics", requireAdmin as any, async (req: AuthenticatedRequest, 
         .from(bookingsTable)
         .where(
           and(
-            inArray(bookingsTable.status, ["approved", "partially_paid"]),
+            inArray(bookingsTable.status, ["pending", "approved", "partially_paid"]),
             lt(bookingsTable.createdAt, thirtyDaysAgo),
+            sql`COALESCE(${bookingsTable.finalAmount}, 0) - COALESCE(${bookingsTable.paidAmount}, 0) > 0`,
           ),
         ),
 
