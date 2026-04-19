@@ -7,7 +7,7 @@ import { eq, sql, inArray, and, lt, desc } from "drizzle-orm";
 import { CreatePaymentOrderBody, VerifyPaymentBody } from "@workspace/api-zod";
 import { requireAuth, requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendPaymentConfirmationNotification, sendPartialPaymentNotification, sendWhatsApp } from "../lib/notifications.js";
-import { sendReminderForBookingId, getReminderHistory, runDailyReminders } from "../jobs/paymentReminder.js";
+import { sendReminderForBookingId, getReminderHistory, runDailyReminders, isRemindersEnabled, setRemindersEnabled } from "../jobs/paymentReminder.js";
 
 const router = Router();
 
@@ -1128,6 +1128,20 @@ router.post("/reminders/run-now", requireAdmin as any, async (req: Authenticated
     console.error("[reminders/run-now]", err?.message);
     res.status(500).json({ message: "Failed to start reminder run" });
   }
+});
+
+router.get("/reminders/status", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  res.json({ enabled: isRemindersEnabled() });
+});
+
+router.post("/reminders/enable", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  setRemindersEnabled(true);
+  res.json({ success: true, enabled: true, message: "Daily payment reminders enabled" });
+});
+
+router.post("/reminders/disable", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  setRemindersEnabled(false);
+  res.json({ success: true, enabled: false, message: "Daily payment reminders disabled" });
 });
 
 export default router;

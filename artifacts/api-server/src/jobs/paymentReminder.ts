@@ -5,6 +5,19 @@ import { sendWhatsApp } from "../lib/notifications.js";
 
 const PROD_DOMAIN = "https://alburhantravels.com";
 
+let remindersEnabled: boolean = process.env.PAYMENT_REMINDERS_ENABLED !== "false";
+
+export function isRemindersEnabled(): boolean {
+  return remindersEnabled;
+}
+
+export function setRemindersEnabled(enabled: boolean): void {
+  remindersEnabled = enabled;
+  console.log(`[PaymentReminder] Reminders ${enabled ? "ENABLED" : "DISABLED"} by admin`);
+}
+
+const ELIGIBLE_STATUSES = ["pending", "approved", "partially_paid"] as const;
+
 function fmt(n: number): string {
   return "₹" + n.toLocaleString("en-IN", { maximumFractionDigits: 0 });
 }
@@ -37,7 +50,7 @@ export async function sendReminderForBookingId(
 
   if (!booking) return { success: false, message: "Booking not found" };
   if (!booking.customerMobile) return { success: false, message: "No mobile number on booking" };
-  if (!["approved", "partially_paid"].includes(booking.status)) {
+  if (!(ELIGIBLE_STATUSES as readonly string[]).includes(booking.status)) {
     return { success: false, message: `Booking status "${booking.status}" is not eligible for reminder` };
   }
 
@@ -74,6 +87,11 @@ export async function sendReminderForBookingId(
 }
 
 export async function runDailyReminders(): Promise<void> {
+  if (!remindersEnabled) {
+    console.log("[PaymentReminder] Reminders are disabled — skipping run");
+    return;
+  }
+
   console.log("[PaymentReminder] Starting daily reminder run…");
   try {
     const eligible = await db
@@ -81,10 +99,10 @@ export async function runDailyReminders(): Promise<void> {
       .from(bookingsTable)
       .where(
         and(
-          inArray(bookingsTable.status, ["approved", "partially_paid"]),
+          inArray(bookingsTable.status, [...ELIGIBLE_STATUSES]),
           gt(sql`CAST(${bookingsTable.finalAmount} AS numeric)`, sql`0`),
           gt(
-            sql`CAST(${bookingsTable.finalAmount} AS numeric) - CAST(${bookingsTable.paidAmount} AS numeric)`,
+            sql`CAST(${bookingsTable.finalAmount} AS numeric) - CAST(COALESCE(${bookingsTable.paidAmount}, '0') AS numeric)`,
             sql`0`
           )
         )

@@ -246,6 +246,7 @@ function AdminPaymentLedger({ booking }: { booking: BookingWithAmounts }) {
   const [generatedLink, setGeneratedLink] = useState<{ url: string; waSent: boolean } | null>(null);
   const [sendingReminder, setSendingReminder] = useState(false);
   const [lastReminderSent, setLastReminderSent] = useState<string | null>(null);
+  const [reminderHistory, setReminderHistory] = useState<Array<{ id: string; sentAt: string; status: string; triggeredBy: string; notes: string | null }>>([]);
   // livePaidAmount is kept in sync from server responses so the balance bar
   // reflects the latest state even while the modal is open (the booking prop is stale).
   const [livePaidAmount, setLivePaidAmount] = useState<number>(Number(booking.paidAmount ?? 0));
@@ -272,8 +273,20 @@ function AdminPaymentLedger({ booking }: { booking: BookingWithAmounts }) {
     }
   };
 
+  const fetchReminderHistory = async () => {
+    try {
+      const res = await fetch(`${API}/api/payments/${booking.id}/reminder-history`, { credentials: "include" });
+      if (!res.ok) return;
+      const data = (await res.json()) as Array<{ id: string; sentAt: string; status: string; triggeredBy: string; notes: string | null }>;
+      setReminderHistory(data);
+    } catch {
+      // non-critical — silently ignore
+    }
+  };
+
   useEffect(() => {
     fetchEntries();
+    fetchReminderHistory();
     setLivePaidAmount(Number(booking.paidAmount ?? 0));
   }, [booking.id]);
 
@@ -367,6 +380,7 @@ function AdminPaymentLedger({ booking }: { booking: BookingWithAmounts }) {
       if (!res.ok) throw new Error(data.message ?? "Failed to send reminder");
       setLastReminderSent(new Date().toLocaleTimeString());
       toast({ title: "Reminder sent!", description: data.message ?? `WhatsApp reminder sent to ${booking.customerMobile}` });
+      fetchReminderHistory();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to send reminder";
       toast({ title: "Error", description: msg, variant: "destructive" });
@@ -473,7 +487,7 @@ function AdminPaymentLedger({ booking }: { booking: BookingWithAmounts }) {
               )}
             </Button>
           )}
-          {remaining > 0 && (booking.status === "approved" || booking.status === "partially_paid") && (
+          {remaining > 0 && (booking.status === "approved" || booking.status === "partially_paid" || booking.status === "pending") && (
             <Button
               size="sm"
               variant="outline"
@@ -518,6 +532,25 @@ function AdminPaymentLedger({ booking }: { booking: BookingWithAmounts }) {
               ? `Sent to ${booking.customerMobile} via WhatsApp • Expires in 7 days`
               : "WhatsApp not sent — share the link above manually • Expires in 7 days"}
           </p>
+        </div>
+      )}
+
+      {reminderHistory.length > 0 && (
+        <div className="border border-amber-100 bg-amber-50/50 rounded-lg p-3 space-y-1.5">
+          <div className="flex items-center gap-1.5 text-[10px] font-bold text-amber-700 uppercase tracking-wide">
+            <Bell size={10} /> Reminder History
+          </div>
+          <div className="space-y-1">
+            {reminderHistory.slice(0, 5).map(log => (
+              <div key={log.id} className="flex items-center justify-between text-[10px] text-gray-500">
+                <span>{new Date(log.sentAt).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                <span className="text-[9px] text-gray-400">{log.triggeredBy}</span>
+                <span className={`px-1.5 py-0.5 rounded-full font-semibold ${log.status === "sent" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                  {log.status}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

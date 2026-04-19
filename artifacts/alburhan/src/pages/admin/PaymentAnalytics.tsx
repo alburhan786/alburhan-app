@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { useQuery } from "@tanstack/react-query";
-import { IndianRupee, TrendingUp, Clock, AlertTriangle, ChevronUp, ChevronDown } from "lucide-react";
+import { IndianRupee, TrendingUp, Clock, AlertTriangle, ChevronUp, ChevronDown, Bell, BellOff, Play } from "lucide-react";
 import { Link } from "wouter";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -77,6 +77,41 @@ export default function PaymentAnalytics() {
   const [sortKey, setSortKey] = useState<SortKey>("updatedAt");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [search, setSearch] = useState("");
+  const [remindersEnabled, setRemindersEnabledState] = useState<boolean | null>(null);
+  const [reminderActionLoading, setReminderActionLoading] = useState(false);
+
+  useEffect(() => {
+    fetch(`${API}/api/payments/reminders/status`, { credentials: "include" })
+      .then(r => r.json())
+      .then((d: { enabled?: boolean }) => setRemindersEnabledState(d.enabled ?? true))
+      .catch(() => {});
+  }, []);
+
+  const toggleReminders = async () => {
+    if (remindersEnabled === null) return;
+    setReminderActionLoading(true);
+    try {
+      const endpoint = remindersEnabled ? "disable" : "enable";
+      const res = await fetch(`${API}/api/payments/reminders/${endpoint}`, { method: "POST", credentials: "include" });
+      const d = (await res.json()) as { enabled?: boolean };
+      setRemindersEnabledState(d.enabled ?? !remindersEnabled);
+    } catch {
+      // ignore
+    } finally {
+      setReminderActionLoading(false);
+    }
+  };
+
+  const runRemindersNow = async () => {
+    setReminderActionLoading(true);
+    try {
+      await fetch(`${API}/api/payments/reminders/run-now`, { method: "POST", credentials: "include" });
+    } catch {
+      // ignore
+    } finally {
+      setReminderActionLoading(false);
+    }
+  };
 
   const { data, isLoading, error } = useQuery<AnalyticsData>({
     queryKey: ["payment-analytics"],
@@ -159,11 +194,37 @@ export default function PaymentAnalytics() {
             <h1 className="text-2xl font-bold text-[#0B3D2E]">Payment Analytics</h1>
             <p className="text-sm text-gray-500 mt-0.5">Real-time payment overview — {today}</p>
           </div>
-          <Link href="/admin/bookings">
-            <button className="text-sm text-[#0B3D2E] border border-[#0B3D2E] rounded-lg px-4 py-2 hover:bg-[#0B3D2E] hover:text-white transition-colors font-medium">
-              Manage Bookings →
-            </button>
-          </Link>
+          <div className="flex items-center gap-2">
+            {remindersEnabled !== null && (
+              <>
+                <button
+                  onClick={runRemindersNow}
+                  disabled={reminderActionLoading || !remindersEnabled}
+                  title="Send reminders to all pending/partial bookings now"
+                  className="flex items-center gap-1.5 text-xs border border-amber-300 text-amber-700 hover:bg-amber-50 disabled:opacity-50 rounded-lg px-3 py-2 transition-colors font-medium"
+                >
+                  <Play size={12} /> Run Now
+                </button>
+                <button
+                  onClick={toggleReminders}
+                  disabled={reminderActionLoading}
+                  title={remindersEnabled ? "Disable daily WhatsApp reminders" : "Enable daily WhatsApp reminders"}
+                  className={`flex items-center gap-1.5 text-xs border rounded-lg px-3 py-2 transition-colors font-medium ${
+                    remindersEnabled
+                      ? "border-green-300 text-green-700 hover:bg-green-50"
+                      : "border-gray-300 text-gray-500 hover:bg-gray-50"
+                  }`}
+                >
+                  {remindersEnabled ? <><Bell size={12} /> Reminders ON</> : <><BellOff size={12} /> Reminders OFF</>}
+                </button>
+              </>
+            )}
+            <Link href="/admin/bookings">
+              <button className="text-sm text-[#0B3D2E] border border-[#0B3D2E] rounded-lg px-4 py-2 hover:bg-[#0B3D2E] hover:text-white transition-colors font-medium">
+                Manage Bookings →
+              </button>
+            </Link>
+          </div>
         </div>
 
         {isLoading && (
