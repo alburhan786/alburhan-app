@@ -732,6 +732,63 @@ router.post("/:bookingId/payment-link", requireAdmin as any, async (req: Authent
   }
 });
 
+router.post("/by-number/:bookingNumber/create-order", async (req, res) => {
+  const { bookingNumber } = req.params;
+  try {
+    const bookings = await db
+      .select()
+      .from(bookingsTable)
+      .where(eq(bookingsTable.bookingNumber, bookingNumber))
+      .limit(1);
+    const booking = bookings[0];
+
+    if (!booking) {
+      res.status(404).json({ message: "Booking not found" });
+      return;
+    }
+    if (!booking.finalAmount) {
+      res.status(400).json({ message: "Booking amount not set — contact Al Burhan to confirm your package amount." });
+      return;
+    }
+
+    const finalAmount = Number(booking.finalAmount);
+    const paidAmount = Number(booking.paidAmount || 0);
+    const remaining = finalAmount - paidAmount;
+
+    if (remaining <= 0) {
+      res.status(400).json({ message: "This booking is already fully paid" });
+      return;
+    }
+
+    const rz = getRazorpay();
+    const order = await rz.orders.create({
+      amount: Math.round(remaining * 100),
+      currency: "INR",
+      receipt: `pay-${bookingNumber}`,
+    });
+
+    await db
+      .update(bookingsTable)
+      .set({ razorpayOrderId: order.id, updatedAt: new Date() })
+      .where(eq(bookingsTable.id, booking.id));
+
+    res.json({
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      razorpayKeyId: process.env.RAZORPAY_KEY_ID ?? "",
+      bookingId: booking.id,
+      customerName: booking.customerName,
+      customerMobile: booking.customerMobile,
+      remainingAmount: remaining,
+    });
+  } catch (err: any) {
+    console.error("[create-order-public]", err?.message, err?.error);
+    const msg = err?.error?.description || err?.message || "Failed to create payment order";
+    res.status(500).json({ message: msg });
+  }
+});
+
 router.get("/razorpay-key", (req, res) => {
   const keyId = process.env.RAZORPAY_KEY_ID ?? "";
   res.json({ keyId });

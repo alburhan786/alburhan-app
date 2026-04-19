@@ -15,6 +15,7 @@ import About from "@/pages/public/About";
 import Contact from "@/pages/public/Contact";
 import { PrivacyPolicy, TermsAndConditions, CancellationPolicy, RefundPolicy } from "@/pages/public/Legal";
 import Invoice from "@/pages/public/Invoice";
+import PaymentPage from "@/pages/public/PaymentPage";
 import Login from "@/pages/auth/Login";
 import CustomerDashboard from "@/pages/customer/Dashboard";
 import AdminDashboard from "@/pages/admin/Dashboard";
@@ -92,6 +93,7 @@ function Router() {
       <Route path="/refund" component={RefundPolicy} />
       <Route path="/login" component={Login} />
       <Route path="/invoice/:bookingNumber" component={Invoice} />
+      <Route path="/pay/:bookingNumber" component={PaymentPage} />
 
       {/* Customer Routes */}
       <Route path="/customer/dashboard" component={() => <CustomerRoute component={CustomerDashboard} />} />

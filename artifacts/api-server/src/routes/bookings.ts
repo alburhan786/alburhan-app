@@ -1,5 +1,5 @@
 import { Router, type Request } from "express";
-import { db, bookingsTable, packagesTable, usersTable, hajjGroupsTable, customerProfilesTable } from "@workspace/db";
+import { db, bookingsTable, packagesTable, usersTable, hajjGroupsTable, customerProfilesTable, paymentTransactionsTable } from "@workspace/db";
 import { eq, and, desc, count, sql } from "drizzle-orm";
 import multer from "multer";
 import { uploadToGCS } from "../lib/gcsUpload.js";
@@ -587,5 +587,69 @@ router.patch(
     res.json({ booking: formatBooking(updatedBooking), group, pilgrim, autoFilled: !!pilgrim });
   }
 );
+
+router.get("/by-number/:bookingNumber/payment-page", async (req, res) => {
+  try {
+    const { bookingNumber } = req.params;
+    const bookings = await db
+      .select()
+      .from(bookingsTable)
+      .where(eq(bookingsTable.bookingNumber, bookingNumber))
+      .limit(1);
+    const booking = bookings[0];
+
+    if (!booking) {
+      res.status(404).json({ message: "Booking not found" });
+      return;
+    }
+
+    const [pkgRows, txRows] = await Promise.all([
+      booking.packageId
+        ? db.select({ name: packagesTable.name }).from(packagesTable).where(eq(packagesTable.id, booking.packageId)).limit(1)
+        : Promise.resolve([]),
+      db
+        .select({
+          id: paymentTransactionsTable.id,
+          amount: paymentTransactionsTable.amount,
+          paymentDate: paymentTransactionsTable.paymentDate,
+          paymentMode: paymentTransactionsTable.paymentMode,
+          referenceNumber: paymentTransactionsTable.referenceNumber,
+          notes: paymentTransactionsTable.notes,
+        })
+        .from(paymentTransactionsTable)
+        .where(eq(paymentTransactionsTable.bookingId, booking.id))
+        .orderBy(desc(paymentTransactionsTable.paymentDate)),
+    ]);
+
+    const finalAmount = booking.finalAmount ? Number(booking.finalAmount) : null;
+    const paidAmount = Number(booking.paidAmount || 0);
+    const remainingAmount = finalAmount != null ? Math.max(0, finalAmount - paidAmount) : null;
+
+    res.json({
+      id: booking.id,
+      bookingNumber: booking.bookingNumber,
+      customerName: booking.customerName,
+      customerMobile: booking.customerMobile,
+      packageName: pkgRows[0]?.name ?? null,
+      status: booking.status,
+      finalAmount,
+      paidAmount,
+      remainingAmount,
+      invoiceNumber: booking.invoiceNumber,
+      createdAt: booking.createdAt?.toISOString(),
+      paymentHistory: txRows.map(t => ({
+        id: t.id,
+        amount: Number(t.amount),
+        paymentDate: t.paymentDate,
+        paymentMode: t.paymentMode,
+        referenceNumber: t.referenceNumber,
+        notes: t.notes,
+      })),
+    });
+  } catch (err: any) {
+    console.error("[payment-page]", err?.message);
+    res.status(500).json({ message: "Failed to load payment page data" });
+  }
+});
 
 export default router;
