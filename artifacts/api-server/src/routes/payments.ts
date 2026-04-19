@@ -1,11 +1,11 @@
 import { Router } from "express";
 import Razorpay from "razorpay";
 import crypto from "crypto";
-import { db, bookingsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, bookingsTable, paymentTransactionsTable } from "@workspace/db";
+import { eq, sql, inArray, and, lt } from "drizzle-orm";
 // Note: onlinePaidAmount tracks Razorpay-only payments; manual ledger entries are in payment_transactions
 import { CreatePaymentOrderBody, VerifyPaymentBody } from "@workspace/api-zod";
-import { requireAuth, type AuthenticatedRequest } from "../lib/auth.js";
+import { requireAuth, requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendPaymentConfirmationNotification, sendPartialPaymentNotification } from "../lib/notifications.js";
 
 const router = Router();
@@ -494,6 +494,120 @@ router.post("/webhook", async (req: any, res) => {
   } catch (err: any) {
     console.error("[Webhook] Processing error:", err?.message);
     res.status(500).json({ message: "Webhook processing failed" });
+  }
+});
+
+router.get("/analytics", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const monthPrefix = today.slice(0, 7); // YYYY-MM
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    const [
+      todayRes,
+      monthlyRes,
+      pendingRes,
+      overdueRes,
+      statusRes,
+      recentBookings,
+    ] = await Promise.all([
+      // Today's collection from payment_transactions
+      db
+        .select({ total: sql<string>`COALESCE(SUM(${paymentTransactionsTable.amount}), 0)` })
+        .from(paymentTransactionsTable)
+        .where(eq(paymentTransactionsTable.paymentDate, today)),
+
+      // Monthly revenue from payment_transactions
+      db
+        .select({ total: sql<string>`COALESCE(SUM(${paymentTransactionsTable.amount}), 0)` })
+        .from(paymentTransactionsTable)
+        .where(sql`${paymentTransactionsTable.paymentDate} LIKE ${monthPrefix + "%"}`),
+
+      // Total pending: sum of remaining for all non-fully-paid bookings
+      db
+        .select({
+          total: sql<string>`COALESCE(SUM(GREATEST(COALESCE(${bookingsTable.finalAmount}, 0) - COALESCE(${bookingsTable.paidAmount}, 0), 0)), 0)`,
+        })
+        .from(bookingsTable)
+        .where(inArray(bookingsTable.status, ["pending", "approved", "partially_paid"])),
+
+      // Overdue: partial/pending bookings created > 30 days ago with remaining balance
+      db
+        .select({
+          total: sql<string>`COALESCE(SUM(GREATEST(COALESCE(${bookingsTable.finalAmount}, 0) - COALESCE(${bookingsTable.paidAmount}, 0), 0)), 0)`,
+          count: sql<string>`COUNT(*)`,
+        })
+        .from(bookingsTable)
+        .where(
+          and(
+            inArray(bookingsTable.status, ["approved", "partially_paid"]),
+            lt(bookingsTable.createdAt, thirtyDaysAgo),
+          ),
+        ),
+
+      // Status breakdown
+      db
+        .select({
+          status: bookingsTable.status,
+          count: sql<string>`COUNT(*)`,
+        })
+        .from(bookingsTable)
+        .groupBy(bookingsTable.status),
+
+      // Recent bookings with payment info (last 100)
+      db
+        .select({
+          id: bookingsTable.id,
+          bookingNumber: bookingsTable.bookingNumber,
+          customerName: bookingsTable.customerName,
+          customerMobile: bookingsTable.customerMobile,
+          status: bookingsTable.status,
+          finalAmount: bookingsTable.finalAmount,
+          paidAmount: bookingsTable.paidAmount,
+          invoiceNumber: bookingsTable.invoiceNumber,
+          createdAt: bookingsTable.createdAt,
+          updatedAt: bookingsTable.updatedAt,
+          isOffline: bookingsTable.isOffline,
+        })
+        .from(bookingsTable)
+        .orderBy(sql`${bookingsTable.updatedAt} DESC`)
+        .limit(100),
+    ]);
+
+    const todayCollection = Number(todayRes[0]?.total || 0);
+    const monthlyRevenue = Number(monthlyRes[0]?.total || 0);
+    const totalPending = Number(pendingRes[0]?.total || 0);
+    const totalOverdue = Number(overdueRes[0]?.total || 0);
+    const overdueCount = Number(overdueRes[0]?.count || 0);
+
+    const statusBreakdown = statusRes.reduce<Record<string, number>>((acc, row) => {
+      acc[row.status] = Number(row.count);
+      return acc;
+    }, {});
+
+    const bookingsWithRemaining = recentBookings.map(b => ({
+      ...b,
+      finalAmount: b.finalAmount ? Number(b.finalAmount) : null,
+      paidAmount: b.paidAmount ? Number(b.paidAmount) : 0,
+      remainingAmount: b.finalAmount
+        ? Math.max(0, Number(b.finalAmount) - Number(b.paidAmount || 0))
+        : null,
+      createdAt: b.createdAt?.toISOString?.(),
+      updatedAt: b.updatedAt?.toISOString?.(),
+    }));
+
+    res.json({
+      todayCollection,
+      monthlyRevenue,
+      totalPending,
+      totalOverdue,
+      overdueCount,
+      statusBreakdown,
+      bookings: bookingsWithRemaining,
+    });
+  } catch (err: any) {
+    console.error("[analytics]", err?.message);
+    res.status(500).json({ message: "Failed to load analytics" });
   }
 });
 
