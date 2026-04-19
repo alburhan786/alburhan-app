@@ -243,7 +243,7 @@ function AdminPaymentLedger({ booking }: { booking: BookingWithAmounts }) {
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [sendingLink, setSendingLink] = useState(false);
-  const [generatedLink, setGeneratedLink] = useState<string | null>(null);
+  const [generatedLink, setGeneratedLink] = useState<{ url: string; waSent: boolean } | null>(null);
   // livePaidAmount is kept in sync from server responses so the balance bar
   // reflects the latest state even while the modal is open (the booking prop is stale).
   const [livePaidAmount, setLivePaidAmount] = useState<number>(Number(booking.paidAmount ?? 0));
@@ -338,7 +338,7 @@ function AdminPaymentLedger({ booking }: { booking: BookingWithAmounts }) {
       });
       const data = (await res.json()) as { paymentUrl?: string; waSent?: boolean; message?: string };
       if (!res.ok) throw new Error(data.message ?? "Failed to generate payment link");
-      setGeneratedLink(data.paymentUrl ?? "");
+      setGeneratedLink({ url: data.paymentUrl ?? "", waSent: !!data.waSent });
       toast({
         title: data.waSent ? "Payment link sent via WhatsApp!" : "Payment link generated",
         description: data.waSent
@@ -460,22 +460,26 @@ function AdminPaymentLedger({ booking }: { booking: BookingWithAmounts }) {
             <Link2 size={12} /> Payment link generated
           </div>
           <div className="flex items-center gap-2">
-            <span className="font-mono text-blue-700 break-all flex-1">{generatedLink}</span>
+            <span className="font-mono text-blue-700 break-all flex-1">{generatedLink.url}</span>
             <Button
               size="sm"
               variant="ghost"
               className="h-6 px-2 text-xs text-blue-700 hover:bg-blue-100 shrink-0"
-              onClick={() => { navigator.clipboard.writeText(generatedLink); toast({ title: "Copied!" }); }}
+              onClick={() => { navigator.clipboard.writeText(generatedLink.url); toast({ title: "Copied!" }); }}
             >
               Copy
             </Button>
-            <a href={generatedLink} target="_blank" rel="noopener noreferrer">
+            <a href={generatedLink.url} target="_blank" rel="noopener noreferrer">
               <Button size="sm" variant="ghost" className="h-6 px-2 text-xs text-blue-700 hover:bg-blue-100">
                 <ExternalLink size={11} />
               </Button>
             </a>
           </div>
-          <p className="text-blue-500 text-[10px]">Sent to {booking.customerMobile} via WhatsApp • Expires in 7 days</p>
+          <p className="text-[10px] text-blue-500">
+            {generatedLink.waSent
+              ? `Sent to ${booking.customerMobile} via WhatsApp • Expires in 7 days`
+              : "WhatsApp not sent — share the link above manually • Expires in 7 days"}
+          </p>
         </div>
       )}
 

@@ -10,13 +10,34 @@ import { sendPaymentConfirmationNotification, sendPartialPaymentNotification, se
 
 const router = Router();
 
-function getRazorpay() {
+interface RazorpayPaymentLinkPayload {
+  amount: number;
+  currency: string;
+  description?: string;
+  customer?: { name?: string; contact?: string };
+  expire_by?: number;
+  reminder_enable?: boolean;
+  notify?: { sms?: boolean; email?: boolean };
+}
+
+interface RazorpayPaymentLinkResponse {
+  id: string;
+  short_url: string;
+}
+
+interface RazorpayWithPaymentLink extends Razorpay {
+  paymentLink: {
+    create(payload: RazorpayPaymentLinkPayload): Promise<RazorpayPaymentLinkResponse>;
+  };
+}
+
+function getRazorpay(): RazorpayWithPaymentLink {
   const keyId = process.env.RAZORPAY_KEY_ID;
   const secret = process.env.RAZORPAY_SECRET;
   if (!keyId || !secret) {
     throw new Error("Razorpay keys not configured");
   }
-  return new Razorpay({ key_id: keyId, key_secret: secret });
+  return new Razorpay({ key_id: keyId, key_secret: secret }) as RazorpayWithPaymentLink;
 }
 
 router.post("/create-order", requireAuth as any, async (req: AuthenticatedRequest, res) => {
@@ -644,22 +665,22 @@ router.post("/:bookingId/payment-link", requireAdmin as any, async (req: Authent
     const expireBy = Math.floor(Date.now() / 1000) + 7 * 24 * 3600;
 
     const clean = booking.customerMobile.replace(/\D/g, "");
-    const contactE164 = clean.length === 10 ? `+91${clean}` : `+${clean}`;
+    const contact = clean.length === 10 ? `91${clean}` : clean;
 
-    const linkPayload = {
+    const linkPayload: RazorpayPaymentLinkPayload = {
       amount: Math.round(remaining * 100),
       currency: "INR",
       description: `Balance payment for booking ${booking.bookingNumber}`,
       customer: {
         name: booking.customerName,
-        contact: contactE164,
+        contact,
       },
       expire_by: expireBy,
       reminder_enable: false,
       notify: { sms: false, email: false },
     };
 
-    const link = await (rz as any).paymentLink.create(linkPayload);
+    const link = await rz.paymentLink.create(linkPayload);
     const paymentUrl: string = link.short_url || link.id;
 
     const waMsg = `Assalamu Alaikum ${booking.customerName},\n\nYour booking #${booking.bookingNumber} has a balance of ₹${remaining.toLocaleString("en-IN")}.\n\nPlease complete your payment using the secure link below:\n${paymentUrl}\n\nThis link expires in 7 days.\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 9893989786`;
