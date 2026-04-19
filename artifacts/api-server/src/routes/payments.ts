@@ -14,6 +14,7 @@ interface RazorpayPaymentLinkPayload {
   amount: number;
   currency: string;
   description?: string;
+  reference_id?: string;
   customer?: { name?: string; contact?: string };
   expire_by?: number;
   reminder_enable?: boolean;
@@ -419,37 +420,61 @@ router.post("/webhook", async (req: any, res) => {
   const eventType: string = event?.event || "";
   console.log("[Webhook] Received event:", eventType);
 
-  if (eventType !== "payment.captured" && eventType !== "order.paid") {
+  const PROCESSED_EVENTS = ["payment.captured", "order.paid", "payment_link.paid"];
+  if (!PROCESSED_EVENTS.includes(eventType)) {
     res.json({ message: "Event received, not processed" });
     return;
   }
 
   try {
-    const orderId: string | undefined =
-      event?.payload?.payment?.entity?.order_id ||
-      event?.payload?.order?.entity?.id;
     const paymentId: string | undefined =
       event?.payload?.payment?.entity?.id;
     const amountPaise: number | undefined =
       event?.payload?.payment?.entity?.amount;
 
-    if (!orderId) {
-      console.error("[Webhook] No order_id in payload");
-      res.json({ message: "No order_id in payload" });
-      return;
-    }
+    let booking: typeof bookingsTable.$inferSelect | undefined;
 
-    const bookings = await db
-      .select()
-      .from(bookingsTable)
-      .where(eq(bookingsTable.razorpayOrderId, orderId))
-      .limit(1);
-    const booking = bookings[0];
-
-    if (!booking) {
-      console.warn("[Webhook] No booking found for orderId:", orderId);
-      res.json({ message: "Booking not found" });
-      return;
+    if (eventType === "payment_link.paid") {
+      // Payment link flow: booking ID stored as reference_id
+      const referenceId: string | undefined =
+        event?.payload?.payment_link?.entity?.reference_id;
+      if (!referenceId) {
+        console.error("[Webhook] payment_link.paid: no reference_id in payload");
+        res.json({ message: "No reference_id in payment_link payload" });
+        return;
+      }
+      const rows = await db
+        .select()
+        .from(bookingsTable)
+        .where(eq(bookingsTable.id, referenceId))
+        .limit(1);
+      booking = rows[0];
+      if (!booking) {
+        console.warn("[Webhook] payment_link.paid: no booking found for reference_id:", referenceId);
+        res.json({ message: "Booking not found for payment link" });
+        return;
+      }
+    } else {
+      // Standard order flow: match on razorpayOrderId
+      const orderId: string | undefined =
+        event?.payload?.payment?.entity?.order_id ||
+        event?.payload?.order?.entity?.id;
+      if (!orderId) {
+        console.error("[Webhook] No order_id in payload");
+        res.json({ message: "No order_id in payload" });
+        return;
+      }
+      const rows = await db
+        .select()
+        .from(bookingsTable)
+        .where(eq(bookingsTable.razorpayOrderId, orderId))
+        .limit(1);
+      booking = rows[0];
+      if (!booking) {
+        console.warn("[Webhook] No booking found for orderId:", orderId);
+        res.json({ message: "Booking not found" });
+        return;
+      }
     }
 
     if (booking.status === "confirmed") {
@@ -671,6 +696,7 @@ router.post("/:bookingId/payment-link", requireAdmin as any, async (req: Authent
       amount: Math.round(remaining * 100),
       currency: "INR",
       description: `Balance payment for booking ${booking.bookingNumber}`,
+      reference_id: booking.id,
       customer: {
         name: booking.customerName,
         contact,
