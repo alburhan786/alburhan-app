@@ -30,7 +30,7 @@ interface Group {
   returnDate?: string;
 }
 
-function buildQr(p: Pilgrim, group: Group): string {
+function buildQr(p: Pilgrim, group: Group, phoneSaudi: string): string {
   const lines = [
     `Name: ${p.fullName}`,
     `Serial: ${String(p.serialNumber).padStart(3, "0")}`,
@@ -39,7 +39,7 @@ function buildQr(p: Pilgrim, group: Group): string {
     ...(group.returnDate ? [`Return: ${group.returnDate}`] : []),
     ...(p.passportNumber ? [`Passport No: ${p.passportNumber}`] : []),
     ...(p.mobileIndia ? [`Mobile: ${p.mobileIndia}`] : []),
-    `Emergency: 0547090786`,
+    `Emergency: ${phoneSaudi}`,
     ...([p.address, p.city].filter(Boolean).length ? [`Address: ${[p.address, p.city].filter(Boolean).join(", ")}`] : []),
   ];
   return lines.join("\n");
@@ -287,7 +287,7 @@ export default function PrintZamzam() {
                       {p.mobileIndia && (
                         <div><span style={{ fontWeight: 900, color: DARK_GREEN }}>Mobile: </span><span style={{ fontWeight: 900 }}>{p.mobileIndia}</span></div>
                       )}
-                      <div><span style={{ fontWeight: 900, color: "#b91c1c" }}>Emergency: </span><span style={{ fontWeight: 900, color: "#b91c1c" }}>0547090786</span></div>
+                      <div><span style={{ fontWeight: 900, color: "#b91c1c" }}>Emergency: </span><span style={{ fontWeight: 900, color: "#b91c1c" }}>{company.phoneSaudi}</span></div>
                       {(p.address || p.city) && (
                         <div style={{ fontSize: "11pt", fontWeight: 900, color: DARK_GREEN, marginTop: "1mm" }}>
                           <span>Address: </span>{[p.address, p.city].filter(Boolean).join(", ")}
@@ -306,7 +306,7 @@ export default function PrintZamzam() {
                           {barcodeVal}
                         </div>
                       </div>
-                      <QRCodeSVG value={buildQr(p, group)} size={130} level="M" fgColor={DARK_GREEN} />
+                      <QRCodeSVG value={buildQr(p, group, company.phoneSaudi)} size={130} level="M" fgColor={DARK_GREEN} />
                     </div>
                   </div>
 

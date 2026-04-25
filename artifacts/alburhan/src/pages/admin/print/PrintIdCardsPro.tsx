@@ -27,7 +27,7 @@ const GOLD = "#C9A23F";
 const W = "85mm";
 const H = "55mm";
 
-function buildQrData(p: Pilgrim, group: Group, phone: string): string {
+function buildQrData(p: Pilgrim, group: Group, phone: string, phoneSaudi: string): string {
   const lines = [
     `Name: ${p.fullName}`,
     `Passport: ${p.passportNumber || "N/A"}`,
@@ -41,7 +41,7 @@ function buildQrData(p: Pilgrim, group: Group, phone: string): string {
   if (p.busNumber) lines.push(`Bus: ${p.busNumber}`);
   if (p.seatNumber) lines.push(`Seat: ${p.seatNumber}`);
   if (group.hotels?.groupLeader) lines.push(`Group Leader: ${group.hotels.groupLeader}`);
-  lines.push(`Emergency (Saudi): 0547090786 / 0568780786`);
+  lines.push(`Emergency (Saudi): ${phoneSaudi}`);
   lines.push(`Emergency (India): ${phone}`);
   return lines.join("\n");
 }
@@ -225,7 +225,7 @@ export default function PrintIdCardsPro() {
 
                         {/* QR code — absolute bottom-right */}
                         <div style={{ position: "absolute", bottom: "1mm", right: "1.5mm" }}>
-                          <QRCodeSVG value={buildQrData(p, group, company.phone)} size={50} level="M" fgColor={DARK} />
+                          <QRCodeSVG value={buildQrData(p, group, company.phone, company.phoneSaudi)} size={50} level="M" fgColor={DARK} />
                         </div>
                       </div>
                     </div>
@@ -290,8 +290,7 @@ export default function PrintIdCardsPro() {
                         <div style={{ flex: 1.2 }}>
                           <div style={{ fontSize: "4pt", fontWeight: 800, color: "#b91c1c", textTransform: "uppercase", letterSpacing: "0.3px" }}>Emergency</div>
                           <div style={{ fontSize: "4pt", color: "#888", textTransform: "uppercase", letterSpacing: "0.2px", lineHeight: 1.2 }}>Saudi</div>
-                          <div style={{ fontSize: "6.5pt", fontWeight: 900, color: DARK, lineHeight: 1.3 }}>0547090786</div>
-                          <div style={{ fontSize: "6.5pt", fontWeight: 900, color: DARK, lineHeight: 1.3 }}>0568780786</div>
+                          <div style={{ fontSize: "6.5pt", fontWeight: 900, color: DARK, lineHeight: 1.3 }}>{company.phoneSaudi}</div>
                           <div style={{ fontSize: "4pt", color: "#888", textTransform: "uppercase", letterSpacing: "0.2px", lineHeight: 1.2, marginTop: "0.5mm" }}>India</div>
                           <div style={{ fontSize: "6.5pt", fontWeight: 900, color: DARK, lineHeight: 1.3 }}>{company.phone}</div>
                         </div>

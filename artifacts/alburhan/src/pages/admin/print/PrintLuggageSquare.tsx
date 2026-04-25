@@ -197,7 +197,7 @@ export default function PrintLuggageSquare() {
                   </div>
 
                   <div style={{ position: "relative", zIndex: 2, background: DARK, color: GOLD, padding: "1.2mm 3mm", fontSize: "6pt", textAlign: "center", fontWeight: 600, letterSpacing: "0.3px" }}>
-                    Emergency: 0547090786 | {company.phone}
+                    Emergency: {company.phoneSaudi} | {company.phone}
                   </div>
                 </div>
               </div>

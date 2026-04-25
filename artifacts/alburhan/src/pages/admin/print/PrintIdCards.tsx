@@ -21,7 +21,7 @@ const DARK = "#052316";
 const GOLD = "#C9A84C";
 const GOLD_LIGHT = "#E8D48B";
 
-function buildQrData(p: Pilgrim, group: Group, phone: string): string {
+function buildQrData(p: Pilgrim, group: Group, phone: string, phoneSaudi: string): string {
   const lines = [
     `Name: ${p.fullName}`,
     `Passport: ${p.passportNumber || "N/A"}`,
@@ -32,7 +32,7 @@ function buildQrData(p: Pilgrim, group: Group, phone: string): string {
   if (group.hotels?.makkah?.name) lines.push(`Hotel Makkah: ${group.hotels.makkah.name}`);
   if (group.hotels?.madinah?.name) lines.push(`Hotel Madinah: ${group.hotels.madinah.name}`);
   if (group.maktabNumber) lines.push(`Maktab: ${group.maktabNumber}`);
-  lines.push(`Emergency (Saudi): 0547090786 | 0568780786`);
+  lines.push(`Emergency (Saudi): ${phoneSaudi}`);
   lines.push(`Emergency (India): ${phone}`);
   return lines.join("\n");
 }
@@ -212,7 +212,7 @@ export default function PrintIdCards() {
 
                 {/* QR code — above footer bar, right-aligned */}
                 <div style={{ position: "absolute", bottom: "14mm", right: "3mm", zIndex: 3, background: "#fff", padding: "1px", borderRadius: "2px" }}>
-                  <QRCodeSVG value={buildQrData(p, group, company.phone)} size={34} level="M" />
+                  <QRCodeSVG value={buildQrData(p, group, company.phone, company.phoneSaudi)} size={34} level="M" />
                 </div>
 
                 {/* Barcode + footer — absolute at bottom */}
@@ -273,7 +273,7 @@ export default function PrintIdCards() {
                   {/* QR code centered */}
                   <div style={{ display: "flex", justifyContent: "center", marginTop: "2mm", marginBottom: "1.5mm" }}>
                     <div style={{ background: "#fff", padding: "2px", borderRadius: "3px", border: `1px solid ${GOLD}` }}>
-                      <QRCodeSVG value={buildQrData(p, group, company.phone)} size={50} level="M" />
+                      <QRCodeSVG value={buildQrData(p, group, company.phone, company.phoneSaudi)} size={50} level="M" />
                     </div>
                   </div>
 

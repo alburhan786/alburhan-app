@@ -8,6 +8,7 @@ export interface CompanyInfo {
   address: string;
   phone: string;
   mobile: string;
+  phoneSaudi: string;
   email: string;
   website: string;
   logoUrl: string | null;
@@ -23,6 +24,7 @@ export const COMPANIES: CompanyInfo[] = [
     address: "Shop No 8-5, Khanka Masjid Complex, Sanwara Road, Burhanpur 450331 M.P.",
     phone: "+91 9893225590 / +91 9893989786",
     mobile: "+91 9893989786",
+    phoneSaudi: "0547090786 | 0568780786",
     email: "info@alburhantravels.com",
     website: "www.alburhantravels.com",
     logoUrl: `${BASE}images/logo.png`,
@@ -36,6 +38,7 @@ export const COMPANIES: CompanyInfo[] = [
     address: "201, 2nd Floor, Vardhman City-2 Plaza, Near Haji Manzil, Asaf Ali Road, New Delhi - 110002",
     phone: "+91-11-4576873 / +91-11-23210377",
     mobile: "+91-9811797327",
+    phoneSaudi: "0568780786",
     email: "horizontravels900@yahoo.co.in",
     website: "www.horizontravels.in",
     logoUrl: null,

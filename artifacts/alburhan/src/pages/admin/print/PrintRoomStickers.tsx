@@ -6,7 +6,6 @@ import { COMPANIES, getCompanyById } from "@/lib/companies";
 const API = import.meta.env.VITE_API_URL || "";
 const DARK_GREEN = "#0B3D2E";
 const GOLD = "#C9A23F";
-const SUPPORT_PHONE = "0547090786";
 
 interface Pilgrim {
   id: string;
@@ -74,6 +73,7 @@ interface RoomStickerProps {
   group: Group;
   companyName: string;
   companyPhone: string;
+  companyPhoneSaudi: string;
 }
 
 function HotelRow({ label, info }: { label: string; info?: HotelInfo }) {
@@ -93,7 +93,7 @@ function HotelRow({ label, info }: { label: string; info?: HotelInfo }) {
   );
 }
 
-function RoomSticker({ roomNumber, pilgrims, group, companyName, companyPhone }: RoomStickerProps) {
+function RoomSticker({ roomNumber, pilgrims, group, companyName, companyPhone, companyPhoneSaudi }: RoomStickerProps) {
   const roomType = pilgrims[0]?.roomType || `${pilgrims.length} Bed`;
   const { makkah, madinah, aziziah } = group.hotels || {};
   const hasHotels = makkah?.name || madinah?.name || aziziah?.name;
@@ -183,7 +183,7 @@ function RoomSticker({ roomNumber, pilgrims, group, companyName, companyPhone }:
         padding: "1.5mm 3mm", display: "flex", justifyContent: "space-between",
         alignItems: "center", fontSize: "6pt", color: "#555"
       }}>
-        <span>📞 Support: <strong>{SUPPORT_PHONE}</strong></span>
+        <span>📞 Support: <strong>{companyPhoneSaudi}</strong></span>
         <span style={{ color: GOLD, fontWeight: 700 }}>{companyName} · {group.groupName}</span>
       </div>
     </div>
@@ -334,7 +334,7 @@ export default function PrintRoomStickers() {
         ) : (
           <div className="sticker-grid">
             {roomsToShow.map(([room, ps]) => (
-              <RoomSticker key={room} roomNumber={room} pilgrims={ps} group={group!} companyName={company.name} companyPhone={company.phone} />
+              <RoomSticker key={room} roomNumber={room} pilgrims={ps} group={group!} companyName={company.name} companyPhone={company.phone} companyPhoneSaudi={company.phoneSaudi} />
             ))}
           </div>
         )}
