@@ -225,7 +225,7 @@ export default function PrintIdCards() {
                     )}
                   </div>
                   <div style={{ background: DARK, color: GOLD, padding: "1mm 2mm", fontSize: "4pt", textAlign: "center", fontWeight: 800, letterSpacing: "0.2px" }}>
-                    Mohammed Altaf: 0547090786 | Mohammed Wasim: 0568780786
+                    {company.name} | {company.phone}
                   </div>
                 </div>
               </div>
@@ -287,8 +287,8 @@ export default function PrintIdCards() {
                     <div>Year: <b style={{ color: DARK }}>{group.year}</b></div>
                   </div>
                   <div style={{ background: DARK, color: "#fff", padding: "1.2mm 2mm", fontSize: "3.8pt", textAlign: "center", lineHeight: 1.5 }}>
-                    <div>Khanka Masjid, Sanwara Rd, Burhanpur 450331 M.P.</div>
-                    <div style={{ color: GOLD, fontWeight: 800, fontSize: "4pt", letterSpacing: "0.2px" }}>Mohammed Altaf: 0547090786 | Mohammed Wasim: 0568780786</div>
+                    <div>{company.address}</div>
+                    <div style={{ color: GOLD, fontWeight: 800, fontSize: "4pt", letterSpacing: "0.2px" }}>{company.phone}</div>
                   </div>
                 </div>
               </div>

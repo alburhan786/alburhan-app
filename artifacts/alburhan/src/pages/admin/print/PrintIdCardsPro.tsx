@@ -239,7 +239,7 @@ export default function PrintIdCardsPro() {
                         textAlign: "center", fontSize: "3.5pt", color: "#b91c1c",
                         fontWeight: 700, padding: "0.3mm 2mm 1mm", letterSpacing: "0.3px",
                       }}>
-                        #{serial} | Emergency: 0547090786 | 0568780786
+                        #{serial} | {company.nameShort} | {company.phone}
                       </div>
                     </div>
 
