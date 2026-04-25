@@ -225,7 +225,7 @@ export default function PrintIdCards() {
                     )}
                   </div>
                   <div style={{ background: DARK, color: GOLD, padding: "1mm 2mm", fontSize: "4pt", textAlign: "center", fontWeight: 800, letterSpacing: "0.2px" }}>
-                    {company.name} | {company.phone}
+                    {company.name} | 🇮🇳 {company.phone} | 🇸🇦 {company.phoneSaudi}
                   </div>
                 </div>
               </div>
