@@ -288,7 +288,9 @@ export default function PrintIdCards() {
                   </div>
                   <div style={{ background: DARK, color: "#fff", padding: "1.2mm 2mm", fontSize: "3.8pt", textAlign: "center", lineHeight: 1.5 }}>
                     <div>{company.address}</div>
-                    <div style={{ color: GOLD, fontWeight: 800, fontSize: "4pt", letterSpacing: "0.2px" }}>{company.phone}</div>
+                    <div style={{ color: GOLD, fontWeight: 800, fontSize: "4pt", letterSpacing: "0.2px" }}>
+                      🇮🇳 {company.phone} &nbsp;|&nbsp; 🇸🇦 {company.phoneSaudi}
+                    </div>
                   </div>
                 </div>
               </div>

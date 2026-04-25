@@ -41,7 +41,7 @@ export const COMPANIES: CompanyInfo[] = [
     phoneSaudi: "0568780786",
     email: "horizontravels900@yahoo.co.in",
     website: "www.horizontravels.in",
-    logoUrl: null,
+    logoUrl: `${BASE}images/horizon_logo.png`,
     isDefault: false,
   },
 ];
