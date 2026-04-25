@@ -4,6 +4,7 @@ export const hajjGroupsTable = pgTable("hajj_groups", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   groupName: text("group_name").notNull(),
   year: integer("year").notNull(),
+  companyId: text("company_id"),
   departureDate: text("departure_date"),
   returnDate: text("return_date"),
   flightNumber: text("flight_number"),
