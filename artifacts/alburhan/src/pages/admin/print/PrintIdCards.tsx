@@ -3,6 +3,7 @@ import { downloadPdf } from "@/lib/pdf-download";
 import { useRoute } from "wouter";
 import { Barcode } from "@/components/print/Barcode";
 import { QRCodeSVG } from "qrcode.react";
+import { COMPANIES, getCompanyById, type CompanyInfo } from "@/lib/companies";
 
 const API = import.meta.env.VITE_API_URL || "";
 const BASE = import.meta.env.BASE_URL || "/";
@@ -20,7 +21,7 @@ const DARK = "#052316";
 const GOLD = "#C9A84C";
 const GOLD_LIGHT = "#E8D48B";
 
-function buildQrData(p: Pilgrim, group: Group): string {
+function buildQrData(p: Pilgrim, group: Group, phone: string): string {
   const lines = [
     `Name: ${p.fullName}`,
     `Passport: ${p.passportNumber || "N/A"}`,
@@ -32,7 +33,7 @@ function buildQrData(p: Pilgrim, group: Group): string {
   if (group.hotels?.madinah?.name) lines.push(`Hotel Madinah: ${group.hotels.madinah.name}`);
   if (group.maktabNumber) lines.push(`Maktab: ${group.maktabNumber}`);
   lines.push(`Emergency (Saudi): 0547090786 | 0568780786`);
-  lines.push(`Emergency (India): +91 9893989786`);
+  lines.push(`Emergency (India): ${phone}`);
   return lines.join("\n");
 }
 
@@ -78,7 +79,7 @@ function WaveShapesBack() {
   );
 }
 
-function LogoHeader({ size }: { size?: "small" }) {
+function LogoHeader({ size, company }: { size?: "small"; company: CompanyInfo }) {
   const isSmall = size === "small";
   const flagImgSize = isSmall ? "6mm" : "8mm";
   const nameSize = isSmall ? "7pt" : "8pt";
@@ -91,11 +92,14 @@ function LogoHeader({ size }: { size?: "small" }) {
         <div style={{ fontSize: indiaSize, fontWeight: 700, color: DARK, letterSpacing: "0.3px", marginTop: "0.3mm", lineHeight: 1 }}>INDIA</div>
       </div>
       <div style={{ flex: 1, textAlign: "center", minWidth: 0, background: "rgba(255,255,255,0.92)", borderRadius: "2px", padding: "0.5mm 1mm" }}>
-        <div style={{ fontSize: nameSize, fontWeight: 900, color: DARK, letterSpacing: "0.5px", lineHeight: 1.1 }}>AL-BURHAN</div>
+        <div style={{ fontSize: nameSize, fontWeight: 900, color: DARK, letterSpacing: "0.5px", lineHeight: 1.1 }}>{company.nameShort}</div>
         <div style={{ fontSize: tagSize, fontWeight: 700, color: GOLD, letterSpacing: "0.5px", lineHeight: 1.2 }}>TOURS & TRAVELS</div>
       </div>
       <div style={{ flexShrink: 0 }}>
-        <img src={BASE + "images/logo.png"} alt="" style={{ width: flagImgSize, height: flagImgSize, borderRadius: "50%", objectFit: "cover" }} />
+        {company.logoUrl
+          ? <img src={company.logoUrl} alt="" style={{ width: flagImgSize, height: flagImgSize, borderRadius: "50%", objectFit: "cover" }} />
+          : <div style={{ width: flagImgSize, height: flagImgSize, borderRadius: "50%", background: DARK, display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "4pt" }}>{company.nameShort.slice(0, 1)}</div>
+        }
       </div>
     </div>
   );
@@ -106,6 +110,8 @@ export default function PrintIdCards() {
   const groupId = params?.groupId || "";
   const [group, setGroup] = useState<Group | null>(null);
   const [pilgrims, setPilgrims] = useState<Pilgrim[]>([]);
+  const [companyId, setCompanyId] = useState("alburhan");
+  const company = getCompanyById(companyId);
   const contentRef = useRef<HTMLDivElement>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
 
@@ -154,8 +160,11 @@ export default function PrintIdCards() {
         .page-break { page-break-after: always; }
       `}</style>
 
-      <div className="no-print" style={{ padding: "16px", background: "#fef3c7", textAlign: "center" }}>
-        <button onClick={handleDownload} disabled={pdfLoading} style={{ padding: "10px 24px", background: DARK, color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", marginRight: "12px", opacity: pdfLoading ? 0.6 : 1 }}>{pdfLoading ? "Generating PDF..." : "⬇ Download PDF"}</button>
+      <div className="no-print" style={{ padding: "16px", background: "#fef3c7", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", flexWrap: "wrap" }}>
+        <select value={companyId} onChange={e => setCompanyId(e.target.value)} style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "13px", background: "#fff" }}>
+          {COMPANIES.map(c => <option key={c.id} value={c.id}>{c.id === "alburhan" ? "Al Burhan Tours & Travels" : c.name}</option>)}
+        </select>
+        <button onClick={handleDownload} disabled={pdfLoading} style={{ padding: "10px 24px", background: DARK, color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", opacity: pdfLoading ? 0.6 : 1 }}>{pdfLoading ? "Generating PDF..." : "⬇ Download PDF"}</button>
         <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
       </div>
 
@@ -168,7 +177,7 @@ export default function PrintIdCards() {
                 <WaveShapes />
 
                 <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", height: "100%", padding: "2.5mm 3mm 0" }}>
-                  <LogoHeader />
+                  <LogoHeader company={company} />
 
                   <div style={{ display: "flex", justifyContent: "center", marginBottom: "1.5mm" }}>
                     {p.photoUrl ? (
@@ -203,7 +212,7 @@ export default function PrintIdCards() {
 
                 {/* QR code — above footer bar, right-aligned */}
                 <div style={{ position: "absolute", bottom: "14mm", right: "3mm", zIndex: 3, background: "#fff", padding: "1px", borderRadius: "2px" }}>
-                  <QRCodeSVG value={buildQrData(p, group)} size={34} level="M" />
+                  <QRCodeSVG value={buildQrData(p, group, company.phone)} size={34} level="M" />
                 </div>
 
                 {/* Barcode + footer — absolute at bottom */}
@@ -232,7 +241,7 @@ export default function PrintIdCards() {
                 <WaveShapesBack />
 
                 <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", height: "100%", padding: "2.5mm 3mm 0" }}>
-                  <LogoHeader size="small" />
+                  <LogoHeader size="small" company={company} />
 
                   <div style={{ display: "flex", flexDirection: "column", gap: "1.2mm", fontSize: "5.5pt", lineHeight: 1.4 }}>
                     <div style={{ display: "flex", alignItems: "flex-start", gap: "1.5mm" }}>
@@ -264,7 +273,7 @@ export default function PrintIdCards() {
                   {/* QR code centered */}
                   <div style={{ display: "flex", justifyContent: "center", marginTop: "2mm", marginBottom: "1.5mm" }}>
                     <div style={{ background: "#fff", padding: "2px", borderRadius: "3px", border: `1px solid ${GOLD}` }}>
-                      <QRCodeSVG value={buildQrData(p, group)} size={50} level="M" />
+                      <QRCodeSVG value={buildQrData(p, group, company.phone)} size={50} level="M" />
                     </div>
                   </div>
 

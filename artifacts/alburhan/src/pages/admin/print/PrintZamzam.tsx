@@ -3,6 +3,7 @@ import { downloadPdf } from "@/lib/pdf-download";
 import { useRoute } from "wouter";
 import { Barcode } from "@/components/print/Barcode";
 import { QRCodeSVG } from "qrcode.react";
+import { COMPANIES, getCompanyById } from "@/lib/companies";
 
 const API = import.meta.env.VITE_API_URL || "";
 const BASE = import.meta.env.BASE_URL || "/";
@@ -49,6 +50,8 @@ export default function PrintZamzam() {
   const groupId = params?.groupId || "";
   const [group, setGroup] = useState<Group | null>(null);
   const [pilgrims, setPilgrims] = useState<Pilgrim[]>([]);
+  const [companyId, setCompanyId] = useState("alburhan");
+  const company = getCompanyById(companyId);
   const contentRef = useRef<HTMLDivElement>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
 
@@ -115,6 +118,9 @@ export default function PrintZamzam() {
         display: "flex", gap: "10px", alignItems: "center", justifyContent: "center",
         flexWrap: "wrap"
       }}>
+        <select value={companyId} onChange={e => setCompanyId(e.target.value)} style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "13px", background: "#fff" }}>
+          {COMPANIES.map(c => <option key={c.id} value={c.id}>{c.id === "alburhan" ? "Al Burhan Tours & Travels" : c.name}</option>)}
+        </select>
         <strong style={{ fontSize: "15px", color: DARK_GREEN, marginRight: "8px" }}>
           🏷️ Zamzam Tags — {group.groupName} ({group.year}) — {pilgrims.length} pilgrims
         </strong>
@@ -170,7 +176,10 @@ export default function PrintZamzam() {
                     {/* Top: Big flag + Big logo only (no text) */}
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "3mm", marginBottom: "2mm" }}>
                       <img src={`${BASE}images/india_flag.jpg`} alt="" style={{ width: "16mm", height: "16mm", borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
-                      <img src={`${BASE}images/logo.png`} alt="" style={{ width: "28mm", height: "28mm", objectFit: "contain", flexShrink: 0 }} />
+                      {company.logoUrl
+                        ? <img src={company.logoUrl} alt="" style={{ width: "28mm", height: "28mm", objectFit: "contain", flexShrink: 0 }} />
+                        : <div style={{ width: "28mm", height: "28mm", flexShrink: 0, background: DARK_GREEN, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "14pt" }}>{company.nameShort.slice(0, 1)}</div>
+                      }
                     </div>
 
                     {/* Circular Photo */}
@@ -209,7 +218,7 @@ export default function PrintZamzam() {
                       marginTop: "2mm", borderTop: `1px solid ${GOLD}`,
                       paddingTop: "2mm", width: "100%", textAlign: "center",
                     }}>
-                      <div style={{ fontWeight: 900, fontSize: "11pt", color: GOLD, letterSpacing: "0.5px", lineHeight: 1.1 }}>AL-BURHAN</div>
+                      <div style={{ fontWeight: 900, fontSize: "11pt", color: GOLD, letterSpacing: "0.5px", lineHeight: 1.1 }}>{company.nameShort}</div>
                       <div style={{ fontWeight: 700, fontSize: "8pt", color: DARK_GREEN, letterSpacing: "0.5px", lineHeight: 1.2 }}>TOURS &amp; TRAVELS</div>
                     </div>
                   </div>
@@ -253,7 +262,7 @@ export default function PrintZamzam() {
                         padding: "1.5mm 5mm", fontSize: "9pt", fontWeight: 800,
                         letterSpacing: "0.3px", lineHeight: 1.4
                       }}>
-                        Al Burhan Tours And Travels — {group.year}
+                        {company.name} — {group.year}
                       </div>
                     </div>
 

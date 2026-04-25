@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { downloadPdf } from "@/lib/pdf-download";
 import { useRoute } from "wouter";
+import { COMPANIES, getCompanyById } from "@/lib/companies";
 
 const API = import.meta.env.VITE_API_URL || "";
 const DARK_GREEN = "#0B3D2E";
@@ -71,6 +72,8 @@ interface RoomStickerProps {
   roomNumber: string;
   pilgrims: Pilgrim[];
   group: Group;
+  companyName: string;
+  companyPhone: string;
 }
 
 function HotelRow({ label, info }: { label: string; info?: HotelInfo }) {
@@ -90,7 +93,7 @@ function HotelRow({ label, info }: { label: string; info?: HotelInfo }) {
   );
 }
 
-function RoomSticker({ roomNumber, pilgrims, group }: RoomStickerProps) {
+function RoomSticker({ roomNumber, pilgrims, group, companyName, companyPhone }: RoomStickerProps) {
   const roomType = pilgrims[0]?.roomType || `${pilgrims.length} Bed`;
   const { makkah, madinah, aziziah } = group.hotels || {};
   const hasHotels = makkah?.name || madinah?.name || aziziah?.name;
@@ -115,10 +118,10 @@ function RoomSticker({ roomNumber, pilgrims, group }: RoomStickerProps) {
             <span style={{ fontSize: "14pt" }}>🕋</span>
             <div>
               <div style={{ fontSize: "9.5pt", fontWeight: 900, letterSpacing: "0.2px", lineHeight: 1.1 }}>
-                AL BURHAN TOURS &amp; TRAVELS
+                {companyName}
               </div>
               <div style={{ fontSize: "6pt", color: "#a8d5c2", marginTop: "0.3mm" }}>
-                Tel: {SUPPORT_PHONE}
+                Tel: {companyPhone}
               </div>
             </div>
           </div>
@@ -181,7 +184,7 @@ function RoomSticker({ roomNumber, pilgrims, group }: RoomStickerProps) {
         alignItems: "center", fontSize: "6pt", color: "#555"
       }}>
         <span>📞 Support: <strong>{SUPPORT_PHONE}</strong></span>
-        <span style={{ color: GOLD, fontWeight: 700 }}>Al Burhan Tours &amp; Travels · {group.groupName}</span>
+        <span style={{ color: GOLD, fontWeight: 700 }}>{companyName} · {group.groupName}</span>
       </div>
     </div>
   );
@@ -196,6 +199,8 @@ export default function PrintRoomStickers() {
   const [loading, setLoading] = useState(true);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState<string>("ALL");
+  const [companyId, setCompanyId] = useState("alburhan");
+  const company = getCompanyById(companyId);
 
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -271,6 +276,15 @@ export default function PrintRoomStickers() {
           </div>
         </div>
 
+        {/* Company selector */}
+        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+          <label style={{ fontSize: "12px", fontWeight: 600, color: "#555" }}>Company:</label>
+          <select value={companyId} onChange={e => setCompanyId(e.target.value)}
+            style={{ padding: "6px 10px", borderRadius: "6px", border: "1px solid #ccc", fontSize: "13px" }}>
+            {COMPANIES.map(c => <option key={c.id} value={c.id}>{c.id === "alburhan" ? "Al Burhan Tours & Travels" : c.name}</option>)}
+          </select>
+        </div>
+
         {/* Room selector */}
         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
           <label style={{ fontSize: "12px", fontWeight: 600, color: "#555" }}>Room:</label>
@@ -320,12 +334,12 @@ export default function PrintRoomStickers() {
         ) : (
           <div className="sticker-grid">
             {roomsToShow.map(([room, ps]) => (
-              <RoomSticker key={room} roomNumber={room} pilgrims={ps} group={group!} />
+              <RoomSticker key={room} roomNumber={room} pilgrims={ps} group={group!} companyName={company.name} companyPhone={company.phone} />
             ))}
           </div>
         )}
         <div style={{ padding: "2mm 4mm", fontSize: "7pt", color: "#bbb", textAlign: "center" }}>
-          Al Burhan Tours &amp; Travels · {group.groupName} {group.year} · Generated {new Date().toLocaleDateString("en-IN")}
+          {company.name} · {group.groupName} {group.year} · Generated {new Date().toLocaleDateString("en-IN")}
         </div>
       </div>
     </>

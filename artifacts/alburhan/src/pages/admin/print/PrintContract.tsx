@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { downloadPdf } from "@/lib/pdf-download";
 import { useRoute } from "wouter";
 import { PrintHeader } from "./PrintHeader";
+import { COMPANIES, getCompanyById } from "@/lib/companies";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -19,6 +20,8 @@ export default function PrintContract() {
   const groupId = params?.groupId || "";
   const [group, setGroup] = useState<Group | null>(null);
   const [pilgrims, setPilgrims] = useState<Pilgrim[]>([]);
+  const [companyId, setCompanyId] = useState("alburhan");
+  const company = getCompanyById(companyId);
   const contentRef = useRef<HTMLDivElement>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
 
@@ -46,7 +49,7 @@ export default function PrintContract() {
 
   const renderContract = (pilgrim: Pilgrim, idx: number) => (
     <div key={pilgrim.id} style={{ ...s, maxWidth: "210mm", margin: "0 auto", padding: "2mm", pageBreakAfter: idx < pilgrims.length - 1 ? "always" : "auto" }}>
-      <PrintHeader title="BOOKING AGREEMENT / CONTRACT" />
+      <PrintHeader title="BOOKING AGREEMENT / CONTRACT" company={company} />
 
       <div style={{ display: "flex", gap: "4mm", fontSize: "9pt", marginBottom: "5mm", padding: "3mm 4mm", background: "#f5faf7", borderRadius: "4px", border: "1px solid #e0e0e0" }}>
         <div style={{ flexShrink: 0 }}>
@@ -66,7 +69,7 @@ export default function PrintContract() {
         </div>
       </div>
 
-      <p>This Agreement is entered into between <b>Al Burhan Tours & Travels</b> (hereinafter referred to as "the Company") and <b>{pilgrim.fullName}</b> (hereinafter referred to as "the Pilgrim") for the services outlined below.</p>
+      <p>This Agreement is entered into between <b>{company.name}</b> (hereinafter referred to as "the Company") and <b>{pilgrim.fullName}</b> (hereinafter referred to as "the Pilgrim") for the services outlined below.</p>
 
       <div style={heading}>1. Package & Amount</div>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "9pt", marginBottom: "3mm" }}>
@@ -140,7 +143,7 @@ export default function PrintContract() {
       </ol>
 
       <div style={heading}>7. Acknowledgment</div>
-      <p>I, <b>{pilgrim.fullName}</b>, have read and understood the above terms and conditions. I agree to abide by them and confirm my booking with Al Burhan Tours & Travels for the <b>{group!.groupName}</b> package.</p>
+      <p>I, <b>{pilgrim.fullName}</b>, have read and understood the above terms and conditions. I agree to abide by them and confirm my booking with {company.name} for the <b>{group!.groupName}</b> package.</p>
 
       <div style={{ display: "flex", justifyContent: "space-between", marginTop: "16mm", paddingTop: "2mm" }}>
         <div style={{ textAlign: "center", width: "45%" }}>
@@ -153,7 +156,7 @@ export default function PrintContract() {
         <div style={{ textAlign: "center", width: "45%" }}>
           <div style={{ marginBottom: "18mm" }} />
           <div style={{ borderTop: "1px solid #333", paddingTop: "2mm" }}>
-            <div style={{ fontWeight: 700, fontSize: "9pt" }}>For Al Burhan Tours & Travels</div>
+            <div style={{ fontWeight: 700, fontSize: "9pt" }}>For {company.name.split(" ").slice(0, 2).join(" ")} {company.name.includes("&") ? "& " : ""}Travels</div>
             <div style={{ fontSize: "7pt", color: "#888" }}>Authorized Signatory & Stamp</div>
           </div>
         </div>
@@ -176,8 +179,11 @@ export default function PrintContract() {
         * { box-sizing: border-box; }
       `}</style>
 
-      <div className="no-print" style={{ padding: "16px", background: "#fef3c7", textAlign: "center" }}>
-        <button onClick={handleDownload} disabled={pdfLoading} style={{ padding: "10px 24px", background: "#0A3D2A", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", marginRight: "12px", opacity: pdfLoading ? 0.6 : 1 }}>{pdfLoading ? "Generating PDF..." : `⬇ Download PDF (${pilgrims.length})`}</button>
+      <div className="no-print" style={{ padding: "16px", background: "#fef3c7", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", flexWrap: "wrap" }}>
+        <select value={companyId} onChange={e => setCompanyId(e.target.value)} style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "13px", background: "#fff" }}>
+          {COMPANIES.map(c => <option key={c.id} value={c.id}>{c.id === "alburhan" ? "Al Burhan Tours & Travels" : c.name}</option>)}
+        </select>
+        <button onClick={handleDownload} disabled={pdfLoading} style={{ padding: "10px 24px", background: "#0A3D2A", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", opacity: pdfLoading ? 0.6 : 1 }}>{pdfLoading ? "Generating PDF..." : `⬇ Download PDF (${pilgrims.length})`}</button>
         <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
       </div>
 

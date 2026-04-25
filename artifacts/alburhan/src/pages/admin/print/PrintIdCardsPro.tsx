@@ -3,6 +3,7 @@ import { downloadPdf } from "@/lib/pdf-download";
 import { useRoute } from "wouter";
 import { Barcode } from "@/components/print/Barcode";
 import { QRCodeSVG } from "qrcode.react";
+import { COMPANIES, getCompanyById } from "@/lib/companies";
 
 const API = import.meta.env.VITE_API_URL || "";
 const BASE = import.meta.env.BASE_URL || "/";
@@ -26,7 +27,7 @@ const GOLD = "#C9A23F";
 const W = "85mm";
 const H = "55mm";
 
-function buildQrData(p: Pilgrim, group: Group): string {
+function buildQrData(p: Pilgrim, group: Group, phone: string): string {
   const lines = [
     `Name: ${p.fullName}`,
     `Passport: ${p.passportNumber || "N/A"}`,
@@ -41,7 +42,7 @@ function buildQrData(p: Pilgrim, group: Group): string {
   if (p.seatNumber) lines.push(`Seat: ${p.seatNumber}`);
   if (group.hotels?.groupLeader) lines.push(`Group Leader: ${group.hotels.groupLeader}`);
   lines.push(`Emergency (Saudi): 0547090786 / 0568780786`);
-  lines.push(`Emergency (India): +91 9893989786`);
+  lines.push(`Emergency (India): ${phone}`);
   return lines.join("\n");
 }
 
@@ -76,6 +77,8 @@ export default function PrintIdCardsPro() {
   const groupId = params?.groupId || "";
   const [group, setGroup] = useState<Group | null>(null);
   const [pilgrims, setPilgrims] = useState<Pilgrim[]>([]);
+  const [companyId, setCompanyId] = useState("alburhan");
+  const company = getCompanyById(companyId);
   const contentRef = useRef<HTMLDivElement>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
 
@@ -119,9 +122,12 @@ export default function PrintIdCardsPro() {
         .pro-page-break { page-break-after: always; }
       `}</style>
 
-      <div className="no-print" style={{ padding: "16px", background: "#fef3c7", textAlign: "center" }}>
-        <button onClick={handleDownload} disabled={pdfLoading} style={{ padding: "10px 24px", background: DARK, color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", marginRight: "12px", opacity: pdfLoading ? 0.6 : 1 }}>{pdfLoading ? "Generating PDF..." : "⬇ Download PDF"}</button>
-        <button onClick={() => window.print()} style={{ padding: "10px 24px", background: "#fff", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", marginRight: "12px" }}>🖨 Print</button>
+      <div className="no-print" style={{ padding: "16px", background: "#fef3c7", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", flexWrap: "wrap" }}>
+        <select value={companyId} onChange={e => setCompanyId(e.target.value)} style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "13px", background: "#fff" }}>
+          {COMPANIES.map(c => <option key={c.id} value={c.id}>{c.id === "alburhan" ? "Al Burhan Tours & Travels" : c.name}</option>)}
+        </select>
+        <button onClick={handleDownload} disabled={pdfLoading} style={{ padding: "10px 24px", background: DARK, color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", opacity: pdfLoading ? 0.6 : 1 }}>{pdfLoading ? "Generating PDF..." : "⬇ Download PDF"}</button>
+        <button onClick={() => window.print()} style={{ padding: "10px 24px", background: "#fff", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer" }}>🖨 Print</button>
         <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
       </div>
 
@@ -144,7 +150,7 @@ export default function PrintIdCardsPro() {
                       flexShrink: 0, minHeight: "7mm",
                     }}>
                       <span style={{ fontSize: "4.5pt", fontWeight: 800, color: "#fff", letterSpacing: "0.5px", textTransform: "uppercase" }}>
-                        Al Burhan Tours And Travels
+                        {company.name}
                       </span>
                       <span style={{ fontSize: "4pt", fontWeight: 900, color: GOLD, letterSpacing: "0.5px", textTransform: "uppercase", background: "rgba(255,255,255,0.1)", padding: "0.5mm 1.5mm", borderRadius: "2px" }}>
                         Hajj Pilgrim
@@ -160,13 +166,12 @@ export default function PrintIdCardsPro() {
                         display: "flex", flexDirection: "column", alignItems: "center",
                         padding: "2mm 1.5mm", gap: "1mm",
                       }}>
-                        <img
-                          src={`${BASE}images/logo.png`}
-                          alt=""
-                          style={{ width: "11mm", height: "11mm", objectFit: "contain" }}
-                        />
+                        {company.logoUrl
+                          ? <img src={company.logoUrl} alt="" style={{ width: "11mm", height: "11mm", objectFit: "contain" }} />
+                          : <div style={{ width: "11mm", height: "11mm", background: DARK, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "7pt" }}>{company.nameShort.slice(0, 1)}</div>
+                        }
                         <div style={{ textAlign: "center", lineHeight: 1.15 }}>
-                          <div style={{ fontSize: "6.5pt", fontWeight: 900, color: GOLD, letterSpacing: "0.3px" }}>AL BURHAN</div>
+                          <div style={{ fontSize: "6.5pt", fontWeight: 900, color: GOLD, letterSpacing: "0.3px" }}>{company.nameShort}</div>
                           <div style={{ fontSize: "3.5pt", fontWeight: 700, color: DARK, letterSpacing: "0.3px" }}>TOURS &amp; TRAVELS</div>
                           <div style={{ fontSize: "3.5pt", fontWeight: 800, color: DARK, marginTop: "0.3mm" }}>HAJJ {group.year}</div>
                         </div>
@@ -220,7 +225,7 @@ export default function PrintIdCardsPro() {
 
                         {/* QR code — absolute bottom-right */}
                         <div style={{ position: "absolute", bottom: "1mm", right: "1.5mm" }}>
-                          <QRCodeSVG value={buildQrData(p, group)} size={50} level="M" fgColor={DARK} />
+                          <QRCodeSVG value={buildQrData(p, group, company.phone)} size={50} level="M" fgColor={DARK} />
                         </div>
                       </div>
                     </div>
@@ -263,7 +268,7 @@ export default function PrintIdCardsPro() {
                         fontSize: "5pt", fontWeight: 900, color: "#fff",
                         textTransform: "uppercase", letterSpacing: "0.5px", textAlign: "center", lineHeight: 1.3,
                       }}>
-                        Hajj Pilgrim Identification — Al Burhan Tours And Travels
+                        Hajj Pilgrim Identification — {company.name}
                       </span>
                     </div>
 
@@ -288,7 +293,7 @@ export default function PrintIdCardsPro() {
                           <div style={{ fontSize: "6.5pt", fontWeight: 900, color: DARK, lineHeight: 1.3 }}>0547090786</div>
                           <div style={{ fontSize: "6.5pt", fontWeight: 900, color: DARK, lineHeight: 1.3 }}>0568780786</div>
                           <div style={{ fontSize: "4pt", color: "#888", textTransform: "uppercase", letterSpacing: "0.2px", lineHeight: 1.2, marginTop: "0.5mm" }}>India</div>
-                          <div style={{ fontSize: "6.5pt", fontWeight: 900, color: DARK, lineHeight: 1.3 }}>+91 9893989786</div>
+                          <div style={{ fontSize: "6.5pt", fontWeight: 900, color: DARK, lineHeight: 1.3 }}>{company.phone}</div>
                         </div>
                       </div>
 
@@ -335,10 +340,10 @@ export default function PrintIdCardsPro() {
                       textAlign: "center",
                     }}>
                       <div style={{ fontSize: "3pt", color: "rgba(255,255,255,0.7)", lineHeight: 1.4 }}>
-                        Khanka Masjid Complex, Sanwara Rd, Burhanpur 450331 M.P.
+                        {company.address}
                       </div>
                       <div style={{ fontSize: "3.5pt", color: GOLD, fontWeight: 800, letterSpacing: "0.2px", lineHeight: 1.4 }}>
-                        AL BURHAN TOURS &amp; TRAVELS | +91 9893989786
+                        {company.nameShort} TOURS &amp; TRAVELS | {company.phone}
                       </div>
                     </div>
 

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { downloadPdf } from "@/lib/pdf-download";
 import { useRoute } from "wouter";
 import { PrintHeader } from "./PrintHeader";
+import { COMPANIES, getCompanyById } from "@/lib/companies";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -45,6 +46,8 @@ export default function PrintHajiList() {
   const groupId = params?.groupId || "";
   const [group, setGroup] = useState<Group | null>(null);
   const [pilgrims, setPilgrims] = useState<Pilgrim[]>([]);
+  const [companyId, setCompanyId] = useState("alburhan");
+  const company = getCompanyById(companyId);
 
   const contentRef = useRef<HTMLDivElement>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
@@ -112,31 +115,24 @@ export default function PrintHajiList() {
         * { box-sizing: border-box; }
       `}</style>
 
-      <div className="no-print" style={{ padding: "16px", background: "#f0fdf4", borderBottom: "2px solid #0A3D2A", textAlign: "center" }}>
-        <button
-          onClick={handleDownload}
-          disabled={pdfLoading}
-          style={{ padding: "10px 24px", background: "#0A3D2A", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", marginRight: "12px", opacity: pdfLoading ? 0.6 : 1 }}
-        >
+      <div className="no-print" style={{ padding: "16px", background: "#f0fdf4", borderBottom: "2px solid #0A3D2A", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", flexWrap: "wrap" }}>
+        <select value={companyId} onChange={e => setCompanyId(e.target.value)} style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "13px", background: "#fff" }}>
+          {COMPANIES.map(c => <option key={c.id} value={c.id}>{c.id === "alburhan" ? "Al Burhan Tours & Travels" : c.name}</option>)}
+        </select>
+        <button onClick={handleDownload} disabled={pdfLoading} style={{ padding: "10px 24px", background: "#0A3D2A", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", opacity: pdfLoading ? 0.6 : 1 }}>
           {pdfLoading ? "Generating PDF..." : "⬇ Download PDF"}
         </button>
-        <button
-          onClick={() => window.print()}
-          style={{ padding: "10px 24px", background: "#C9A23F", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", marginRight: "12px" }}
-        >
+        <button onClick={() => window.print()} style={{ padding: "10px 24px", background: "#C9A23F", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>
           🖨 Print
         </button>
-        <button
-          onClick={() => window.history.back()}
-          style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}
-        >
+        <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>
           Back
         </button>
       </div>
 
       <div ref={contentRef}>
         <div style={{ padding: "5mm", fontFamily: "'Inter', Arial, sans-serif" }}>
-          <PrintHeader title="HAJI LIST" subtitle={`${group.groupName} (${group.year})`} />
+          <PrintHeader title="HAJI LIST" subtitle={`${group.groupName} (${group.year})`} company={company} />
 
           {groupMeta && (
             <div style={{

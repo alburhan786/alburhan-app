@@ -3,6 +3,7 @@ import { downloadPdf } from "@/lib/pdf-download";
 import { useRoute } from "wouter";
 import { Barcode } from "@/components/print/Barcode";
 import { QRCodeSVG } from "qrcode.react";
+import { COMPANIES, getCompanyById } from "@/lib/companies";
 
 const API = import.meta.env.VITE_API_URL || "";
 const BASE = import.meta.env.BASE_URL || "/";
@@ -37,7 +38,7 @@ function getGroupColor(groupName: string): string {
   return GROUP_COLORS[last] || "#6B7280";
 }
 
-function buildQrData(p: Pilgrim, group: Group): string {
+function buildQrData(p: Pilgrim, group: Group, phone: string): string {
   return [
     `Name: ${p.fullName}`,
     `Passport: ${p.passportNumber || "N/A"}`,
@@ -49,7 +50,7 @@ function buildQrData(p: Pilgrim, group: Group): string {
     `Group Leader: ${group.hotels?.groupLeader || "N/A"}`,
     `India: ${p.mobileIndia || "N/A"}`,
     `Saudi: ${p.mobileSaudi || "N/A"}`,
-    `Emergency: +91 9893989786`,
+    `Emergency: ${phone}`,
   ].join("\n");
 }
 
@@ -58,6 +59,8 @@ export default function PrintLuggage() {
   const groupId = params?.groupId || "";
   const [group, setGroup] = useState<Group | null>(null);
   const [pilgrims, setPilgrims] = useState<Pilgrim[]>([]);
+  const [companyId, setCompanyId] = useState("alburhan");
+  const company = getCompanyById(companyId);
   const contentRef = useRef<HTMLDivElement>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
 
@@ -102,9 +105,12 @@ export default function PrintLuggage() {
         .luggage-sticker:last-child { page-break-after: auto; }
       `}</style>
 
-      <div className="no-print" style={{ padding: "16px", background: "#fef3c7", textAlign: "center" }}>
-        <button onClick={handleDownload} disabled={pdfLoading} style={{ padding: "10px 24px", background: DARK, color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", marginRight: "12px", opacity: pdfLoading ? 0.6 : 1 }}>{pdfLoading ? "Generating PDF..." : "⬇ Download PDF"}</button>
-        <button onClick={() => window.print()} style={{ padding: "10px 24px", background: "#fff", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", marginRight: "12px" }}>🖨 Print</button>
+      <div className="no-print" style={{ padding: "16px", background: "#fef3c7", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", flexWrap: "wrap" }}>
+        <select value={companyId} onChange={e => setCompanyId(e.target.value)} style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "13px", background: "#fff" }}>
+          {COMPANIES.map(c => <option key={c.id} value={c.id}>{c.id === "alburhan" ? "Al Burhan Tours & Travels" : c.name}</option>)}
+        </select>
+        <button onClick={handleDownload} disabled={pdfLoading} style={{ padding: "10px 24px", background: DARK, color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", opacity: pdfLoading ? 0.6 : 1 }}>{pdfLoading ? "Generating PDF..." : "⬇ Download PDF"}</button>
+        <button onClick={() => window.print()} style={{ padding: "10px 24px", background: "#fff", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer" }}>🖨 Print</button>
         <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
       </div>
 
@@ -126,11 +132,14 @@ export default function PrintLuggage() {
 
             <div style={{ position: "relative", zIndex: 1, padding: "4mm 6mm 2mm", display: "flex", alignItems: "center", gap: "4mm" }}>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1.5mm", flexShrink: 0 }}>
-                <img src={`${BASE}images/logo.png`} alt="" style={{ height: "20mm", objectFit: "contain" }} />
+                {company.logoUrl
+                  ? <img src={company.logoUrl} alt="" style={{ height: "20mm", objectFit: "contain" }} />
+                  : <div style={{ height: "20mm", width: "20mm", background: DARK, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "12pt" }}>{company.nameShort.slice(0, 1)}</div>
+                }
                 <img src={`${BASE}images/india_flag.jpg`} alt="" style={{ width: "14mm", height: "14mm", borderRadius: "50%", objectFit: "cover" }} />
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 900, fontSize: "14pt", color: "#1A7A4A", letterSpacing: "1px", textTransform: "uppercase", lineHeight: 1.1 }}>AL-BURHAN</div>
+                <div style={{ fontWeight: 900, fontSize: "14pt", color: "#1A7A4A", letterSpacing: "1px", textTransform: "uppercase", lineHeight: 1.1 }}>{company.nameShort}</div>
                 <div style={{ fontWeight: 700, fontSize: "8pt", color: GOLD, letterSpacing: "1.5px", textTransform: "uppercase" }}>TOURS & TRAVELS</div>
               </div>
               <div style={{ textAlign: "right" }}>
@@ -200,7 +209,7 @@ export default function PrintLuggage() {
               </div>
 
               <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "5mm", marginTop: "auto", paddingBottom: "1mm" }}>
-                <QRCodeSVG value={buildQrData(p, group)} size={80} level="M" />
+                <QRCodeSVG value={buildQrData(p, group, company.phone)} size={80} level="M" />
                 <Barcode value={p.passportNumber || `H${String(p.serialNumber).padStart(3, "0")}`} height={40} width={2} fontSize={0} />
               </div>
             </div>

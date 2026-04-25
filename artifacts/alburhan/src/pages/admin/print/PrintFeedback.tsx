@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { downloadPdf } from "@/lib/pdf-download";
 import { useRoute } from "wouter";
 import { PrintHeader } from "./PrintHeader";
+import { COMPANIES, getCompanyById } from "@/lib/companies";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -21,6 +22,8 @@ export default function PrintFeedback() {
   const [, params] = useRoute("/admin/groups/:groupId/print/feedback");
   const groupId = params?.groupId || "";
   const [group, setGroup] = useState<Group | null>(null);
+  const [companyId, setCompanyId] = useState("alburhan");
+  const company = getCompanyById(companyId);
 
     const contentRef = useRef<HTMLDivElement>(null);
     const [pdfLoading, setPdfLoading] = useState(false);
@@ -50,14 +53,17 @@ export default function PrintFeedback() {
         * { box-sizing: border-box; }
       `}</style>
 
-      <div className="no-print" style={{ padding: "16px", background: "#fef3c7", textAlign: "center" }}>
-        <button onClick={handleDownload} disabled={pdfLoading} style={{ padding: "10px 24px", background: "#0A3D2A", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", marginRight: "12px", opacity: pdfLoading ? 0.6 : 1 }}>{pdfLoading ? "Generating PDF..." : "⬇ Download PDF"}</button>
+      <div className="no-print" style={{ padding: "16px", background: "#fef3c7", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", flexWrap: "wrap" }}>
+        <select value={companyId} onChange={e => setCompanyId(e.target.value)} style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "13px", background: "#fff" }}>
+          {COMPANIES.map(c => <option key={c.id} value={c.id}>{c.id === "alburhan" ? "Al Burhan Tours & Travels" : c.name}</option>)}
+        </select>
+        <button onClick={handleDownload} disabled={pdfLoading} style={{ padding: "10px 24px", background: "#0A3D2A", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", opacity: pdfLoading ? 0.6 : 1 }}>{pdfLoading ? "Generating PDF..." : "⬇ Download PDF"}</button>
         <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
       </div>
 
       <div ref={contentRef}>
       <div style={{ padding: "2mm", fontFamily: "'Inter', Arial, sans-serif", maxWidth: "210mm", margin: "0 auto" }}>
-        <PrintHeader title="Customer Feedback Form" subtitle={`${group.groupName} — ${group.year}${group.departureDate ? ` | ${group.departureDate}` : ""}${group.returnDate ? ` to ${group.returnDate}` : ""}`} />
+        <PrintHeader title="Customer Feedback Form" subtitle={`${group.groupName} — ${group.year}${group.departureDate ? ` | ${group.departureDate}` : ""}${group.returnDate ? ` to ${group.returnDate}` : ""}`} company={company} />
 
         <div style={{ marginBottom: "6mm" }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4mm", fontSize: "10pt" }}>
@@ -117,7 +123,7 @@ export default function PrintFeedback() {
         </div>
 
         <div style={{ marginBottom: "6mm" }}>
-          <div style={{ fontWeight: 700, fontSize: "10pt", marginBottom: "2mm" }}>Would you recommend Al Burhan Tours & Travels to others?</div>
+          <div style={{ fontWeight: 700, fontSize: "10pt", marginBottom: "2mm" }}>Would you recommend {company.name} to others?</div>
           <div style={{ display: "flex", gap: "8mm", fontSize: "10pt", alignItems: "center" }}>
             <label style={{ display: "flex", alignItems: "center", gap: "2mm" }}>
               <div style={{ width: "5mm", height: "5mm", border: "1.5px solid #888", borderRadius: "2px" }} />
@@ -144,7 +150,7 @@ export default function PrintFeedback() {
         </div>
 
         <div style={{ marginTop: "8mm", textAlign: "center", fontSize: "7pt", color: "#aaa", borderTop: "1px solid #e0e0e0", paddingTop: "3mm" }}>
-          Thank you for your valuable feedback. It helps us serve you better. — Al Burhan Tours & Travels, Burhanpur
+          Thank you for your valuable feedback. It helps us serve you better. — {company.name}
         </div>
       </div>
       </div>

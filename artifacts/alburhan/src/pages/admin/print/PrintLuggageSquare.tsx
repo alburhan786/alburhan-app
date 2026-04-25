@@ -3,6 +3,7 @@ import { downloadPdf } from "@/lib/pdf-download";
 import { useRoute } from "wouter";
 import { Barcode } from "@/components/print/Barcode";
 import { QRCodeSVG } from "qrcode.react";
+import { COMPANIES, getCompanyById } from "@/lib/companies";
 
 const API = import.meta.env.VITE_API_URL || "";
 const BASE = import.meta.env.BASE_URL || "/";
@@ -36,7 +37,7 @@ function getGroupColor(groupName: string): string {
   return GROUP_COLORS[last] || "#6B7280";
 }
 
-function buildQrData(p: Pilgrim, group: Group): string {
+function buildQrData(p: Pilgrim, group: Group, phone: string): string {
   return [
     `Name: ${p.fullName}`,
     `Passport: ${p.passportNumber || "N/A"}`,
@@ -48,7 +49,7 @@ function buildQrData(p: Pilgrim, group: Group): string {
     `Hotel Aziziah: ${group.hotels?.aziziah?.name || "N/A"}`,
     `India: ${p.mobileIndia || "N/A"}`,
     `Saudi: ${p.mobileSaudi || "N/A"}`,
-    `Emergency: 0547090786`,
+    `Emergency: ${phone}`,
   ].join("\n");
 }
 
@@ -57,6 +58,8 @@ export default function PrintLuggageSquare() {
   const groupId = params?.groupId || "";
   const [group, setGroup] = useState<Group | null>(null);
   const [pilgrims, setPilgrims] = useState<Pilgrim[]>([]);
+  const [companyId, setCompanyId] = useState("alburhan");
+  const company = getCompanyById(companyId);
   const contentRef = useRef<HTMLDivElement>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
 
@@ -107,8 +110,11 @@ export default function PrintLuggageSquare() {
         .sq-row:last-child { page-break-after: auto; }
       `}</style>
 
-      <div className="no-print" style={{ padding: "16px", background: "#fef3c7", textAlign: "center" }}>
-        <button onClick={handleDownload} disabled={pdfLoading} style={{ padding: "10px 24px", background: DARK, color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", marginRight: "12px", opacity: pdfLoading ? 0.6 : 1 }}>{pdfLoading ? "Generating PDF..." : "⬇ Download PDF"}</button>
+      <div className="no-print" style={{ padding: "16px", background: "#fef3c7", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", flexWrap: "wrap" }}>
+        <select value={companyId} onChange={e => setCompanyId(e.target.value)} style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "13px", background: "#fff" }}>
+          {COMPANIES.map(c => <option key={c.id} value={c.id}>{c.id === "alburhan" ? "Al Burhan Tours & Travels" : c.name}</option>)}
+        </select>
+        <button onClick={handleDownload} disabled={pdfLoading} style={{ padding: "10px 24px", background: DARK, color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", opacity: pdfLoading ? 0.6 : 1 }}>{pdfLoading ? "Generating PDF..." : "⬇ Download PDF"}</button>
         <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
       </div>
 
@@ -125,9 +131,12 @@ export default function PrintLuggageSquare() {
                   }} />
 
                   <div style={{ position: "relative", zIndex: 1, padding: "2mm 3.5mm 1mm", display: "flex", alignItems: "center", gap: "2mm" }}>
-                    <img src={`${BASE}images/logo.png`} alt="" style={{ height: "10mm", objectFit: "contain", flexShrink: 0 }} />
+                    {company.logoUrl
+                      ? <img src={company.logoUrl} alt="" style={{ height: "10mm", objectFit: "contain", flexShrink: 0 }} />
+                      : <div style={{ height: "10mm", width: "10mm", flexShrink: 0, background: DARK, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "6pt" }}>{company.nameShort.slice(0, 1)}</div>
+                    }
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 900, fontSize: "8pt", color: "#1A7A4A", letterSpacing: "0.8px", textTransform: "uppercase", lineHeight: 1.1 }}>AL-BURHAN</div>
+                      <div style={{ fontWeight: 900, fontSize: "8pt", color: "#1A7A4A", letterSpacing: "0.8px", textTransform: "uppercase", lineHeight: 1.1 }}>{company.nameShort}</div>
                       <div style={{ fontWeight: 700, fontSize: "5.5pt", color: GOLD, letterSpacing: "1px", textTransform: "uppercase" }}>TOURS & TRAVELS</div>
                     </div>
                     <div style={{ textAlign: "right", flexShrink: 0 }}>
@@ -182,13 +191,13 @@ export default function PrintLuggageSquare() {
                     </div>
 
                     <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "2.5mm", marginTop: "auto" }}>
-                      <QRCodeSVG value={buildQrData(p, group)} size={48} level="M" />
+                      <QRCodeSVG value={buildQrData(p, group, company.phone)} size={48} level="M" />
                       <Barcode value={p.passportNumber || `H${String(p.serialNumber).padStart(3, "0")}`} height={20} width={1.3} fontSize={0} />
                     </div>
                   </div>
 
                   <div style={{ position: "relative", zIndex: 2, background: DARK, color: GOLD, padding: "1.2mm 3mm", fontSize: "6pt", textAlign: "center", fontWeight: 600, letterSpacing: "0.3px" }}>
-                    Emergency: 0547090786 | +91 9893989786
+                    Emergency: 0547090786 | {company.phone}
                   </div>
                 </div>
               </div>
