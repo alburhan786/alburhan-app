@@ -300,28 +300,28 @@ export function BulkImportModal({ groupId, open, onClose, onImported, existingPa
                       </table>
                     </div>
                   </div>
+                </div>
+              )}
 
-                  {importResult && (
-                    <div className="mt-3 rounded-xl overflow-hidden border border-emerald-200">
-                      <div className="p-3 bg-emerald-50 flex items-center gap-2">
-                        <CheckCircle2 size={15} className="text-emerald-700 shrink-0" />
-                        <span className="text-sm font-semibold text-emerald-800">
-                          Import Complete — {importResult.created} added{importResult.skipped > 0 ? `, ${importResult.skipped} skipped` : ""}
-                        </span>
-                      </div>
-                      {importResult.skippedRows && importResult.skippedRows.length > 0 && (
-                        <div className="border-t border-emerald-100">
-                          <p className="text-xs font-semibold text-muted-foreground px-3 py-1.5 bg-muted/30">Skipped rows</p>
-                          <div className="max-h-36 overflow-y-auto">
-                            {importResult.skippedRows.map((row: any, i: number) => (
-                              <div key={i} className="flex items-center justify-between px-3 py-1.5 text-xs border-t bg-red-50">
-                                <span className="font-medium truncate max-w-[200px]">{row.fullName || <em className="text-muted-foreground">No name</em>}</span>
-                                <span className="text-red-600 flex items-center gap-1 shrink-0"><AlertCircle size={10} /> {row.reason}</span>
-                              </div>
-                            ))}
+              {importResult && (
+                <div className="rounded-xl overflow-hidden border border-emerald-200">
+                  <div className="p-3 bg-emerald-50 flex items-center gap-2">
+                    <CheckCircle2 size={15} className="text-emerald-700 shrink-0" />
+                    <span className="text-sm font-semibold text-emerald-800">
+                      Import Complete — {importResult.created} added{importResult.skipped > 0 ? `, ${importResult.skipped} skipped` : ""}
+                    </span>
+                  </div>
+                  {importResult.skippedRows && importResult.skippedRows.length > 0 && (
+                    <div className="border-t border-emerald-100">
+                      <p className="text-xs font-semibold text-muted-foreground px-3 py-1.5 bg-muted/30">Skipped rows</p>
+                      <div className="max-h-36 overflow-y-auto">
+                        {importResult.skippedRows.map((row: any, i: number) => (
+                          <div key={i} className="flex items-center justify-between px-3 py-1.5 text-xs border-t bg-red-50">
+                            <span className="font-medium truncate max-w-[200px]">{row.fullName || <em className="text-muted-foreground">No name</em>}</span>
+                            <span className="text-red-600 flex items-center gap-1 shrink-0"><AlertCircle size={10} /> {row.reason}</span>
                           </div>
-                        </div>
-                      )}
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>

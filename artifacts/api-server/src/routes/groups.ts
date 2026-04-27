@@ -366,7 +366,7 @@ router.post(
     const passportMap = new Map(
       groupPilgrims
         .filter(p => p.passportNumber)
-        .map(p => [p.passportNumber!.toUpperCase(), p.id])
+        .map(p => [p.passportNumber!.trim().toUpperCase(), p.id])
     );
 
     const entries = zip.getEntries();
