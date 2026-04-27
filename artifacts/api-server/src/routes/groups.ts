@@ -241,20 +241,36 @@ router.post("/:groupId/pilgrims/bulk", requireAdmin as any, async (req: Authenti
     .from(pilgrimsTable).where(eq(pilgrimsTable.groupId, groupId));
   let nextSerial = (maxSerial || 0) + 1;
 
+  const existingPilgrims = await db
+    .select({ passportNumber: pilgrimsTable.passportNumber })
+    .from(pilgrimsTable)
+    .where(eq(pilgrimsTable.groupId, groupId));
+  const existingPassports = new Set<string>(
+    existingPilgrims.filter(p => p.passportNumber).map(p => p.passportNumber!.toUpperCase().trim())
+  );
+
   const valid: any[] = [];
   const skippedRows: any[] = [];
-  const existingPassports = new Set<string>();
+  const batchPassports = new Set<string>();
 
   for (const row of rows) {
     if (!row.fullName?.toString().trim()) {
       skippedRows.push({ ...row, reason: "Missing name" });
       continue;
     }
-    if (row.passportNumber && existingPassports.has(row.passportNumber.toString().toUpperCase())) {
+    const passportKey = row.passportNumber ? row.passportNumber.toString().toUpperCase().trim() : null;
+    if (passportKey && existingPassports.has(passportKey)) {
+      skippedRows.push({ ...row, reason: "Passport already exists in group" });
+      continue;
+    }
+    if (passportKey && batchPassports.has(passportKey)) {
       skippedRows.push({ ...row, reason: "Duplicate passport in import" });
       continue;
     }
-    if (row.passportNumber) existingPassports.add(row.passportNumber.toString().toUpperCase());
+    if (passportKey) {
+      existingPassports.add(passportKey);
+      batchPassports.add(passportKey);
+    }
     valid.push(row);
   }
 

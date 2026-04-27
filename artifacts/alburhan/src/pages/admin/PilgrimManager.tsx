@@ -984,6 +984,7 @@ export default function PilgrimManager() {
         open={bulkImportOpen}
         onClose={() => setBulkImportOpen(false)}
         onImported={fetchData}
+        existingPassports={pilgrims.map(p => p.passportNumber).filter(Boolean) as string[]}
       />
     </AdminLayout>
   );

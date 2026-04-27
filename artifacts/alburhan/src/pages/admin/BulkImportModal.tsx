@@ -68,6 +68,7 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onImported: () => void;
+  existingPassports?: string[];
 }
 
 function downloadTemplate() {
@@ -78,7 +79,7 @@ function downloadTemplate() {
   XLSX.writeFile(wb, "pilgrim_import_template.xlsx");
 }
 
-export function BulkImportModal({ groupId, open, onClose, onImported }: Props) {
+export function BulkImportModal({ groupId, open, onClose, onImported, existingPassports = [] }: Props) {
   const [tab, setTab] = useState<"excel" | "photos">("excel");
   const { toast } = useToast();
 
@@ -116,6 +117,9 @@ export function BulkImportModal({ groupId, open, onClose, onImported }: Props) {
         const headers: string[] = raw[0].map((h: any) => String(h).trim().toLowerCase());
         const rows: ParsedRow[] = [];
 
+        const groupPassports = new Set(existingPassports.map(p => p.toUpperCase().trim()));
+        const batchPassports = new Set<string>();
+
         for (let i = 1; i < raw.length; i++) {
           const row = raw[i];
           const hasAnyValue = row.some((cell: any) => String(cell).trim() !== "");
@@ -127,7 +131,20 @@ export function BulkImportModal({ groupId, open, onClose, onImported }: Props) {
             if (key) data[key] = String(row[idx] ?? "").trim();
           });
 
-          const error = !data.fullName ? "Missing Full Name" : undefined;
+          let error: string | undefined;
+          if (!data.fullName) {
+            error = "Missing Full Name";
+          } else if (data.passportNumber) {
+            const pk = data.passportNumber.toUpperCase().trim();
+            if (groupPassports.has(pk)) {
+              error = "Passport already in group";
+            } else if (batchPassports.has(pk)) {
+              error = "Duplicate passport in file";
+            } else {
+              batchPassports.add(pk);
+            }
+          }
+
           rows.push({ index: i, data, error });
         }
 
@@ -138,7 +155,7 @@ export function BulkImportModal({ groupId, open, onClose, onImported }: Props) {
       }
     };
     reader.readAsArrayBuffer(file);
-  }, [toast]);
+  }, [toast, existingPassports]);
 
   const handleImport = async () => {
     const validRows = parsedRows.filter(r => !r.error);
@@ -230,7 +247,7 @@ export function BulkImportModal({ groupId, open, onClose, onImported }: Props) {
               <div className="p-4 bg-muted/30 rounded-xl border border-dashed border-muted-foreground/30">
                 <p className="text-sm font-semibold mb-2">Step 2: Upload your filled Excel file</p>
                 <div className="flex items-center gap-3">
-                  <input ref={excelRef} type="file" accept=".xlsx,.xls" className="hidden"
+                  <input ref={excelRef} type="file" accept=".xlsx" className="hidden"
                     onChange={e => { if (e.target.files?.[0]) handleExcelFile(e.target.files[0]); }} />
                   <Button variant="outline" size="sm" className="gap-1.5" onClick={() => excelRef.current?.click()}>
                     <FileSpreadsheet size={14} /> Choose Excel File
