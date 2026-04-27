@@ -18,7 +18,7 @@ interface Group {
   hotels?: {
     makkah?: { name?: string };
     madinah?: { name?: string };
-    aziziah?: { name?: string };
+    aziziah?: { name?: string; address?: string };
   };
 }
 
@@ -185,8 +185,9 @@ export default function PrintLuggageSquare() {
                         <div style={{ fontWeight: 700, color: "#222", fontSize: "6pt" }}>{group.hotels?.madinah?.name || "—"}</div>
                       </div>
                       <div>
-                        <div style={{ fontSize: "4.5pt", color: "#999", textTransform: "uppercase", fontWeight: 600 }}>HOTEL AZIZIAH</div>
+                        <div style={{ fontSize: "4.5pt", color: "#999", textTransform: "uppercase", fontWeight: 600 }}>HOTEL AZIZIA</div>
                         <div style={{ fontWeight: 700, color: "#222", fontSize: "6pt" }}>{group.hotels?.aziziah?.name || "—"}</div>
+                        {group.hotels?.aziziah?.address && <div style={{ fontSize: "4.5pt", color: "#666", lineHeight: 1.2 }}>{group.hotels.aziziah.address}</div>}
                       </div>
                     </div>
 

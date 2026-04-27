@@ -17,8 +17,9 @@ interface Group {
   id: string; groupName: string; year: number; maktabNumber?: string;
   hotels?: {
     groupLeader?: string;
-    makkah?: { name?: string };
-    madinah?: { name?: string };
+    makkah?: { name?: string; address?: string };
+    madinah?: { name?: string; address?: string };
+    aziziah?: { name?: string; address?: string };
   };
 }
 
@@ -47,6 +48,8 @@ function buildQrData(p: Pilgrim, group: Group, phone: string): string {
     `Bus: ${p.busNumber || "N/A"}`,
     `Hotel Makkah: ${group.hotels?.makkah?.name || "N/A"}`,
     `Hotel Madinah: ${group.hotels?.madinah?.name || "N/A"}`,
+    `Hotel Azizia: ${group.hotels?.aziziah?.name || "N/A"}`,
+    `Azizia Address: ${group.hotels?.aziziah?.address || "N/A"}`,
     `Group Leader: ${group.hotels?.groupLeader || "N/A"}`,
     `India: ${p.mobileIndia || "N/A"}`,
     `Saudi: ${p.mobileSaudi || "N/A"}`,
@@ -178,14 +181,21 @@ export default function PrintLuggage() {
                 </div>
               </div>
 
-              <div style={{ width: "100%", display: "flex", gap: "3mm", marginBottom: "2mm" }}>
-                <div style={{ flex: 1, background: "#fefce8", border: "1px solid #e5e7eb", borderRadius: "4px", padding: "2mm 4mm" }}>
-                  <div style={{ fontSize: "6.5pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: 600 }}>HOTEL MAKKAH</div>
-                  <div style={{ fontWeight: 700, fontSize: "10pt", color: "#222" }}>{group.hotels?.makkah?.name || "—"}</div>
+              <div style={{ width: "100%", display: "flex", gap: "2mm", marginBottom: "2mm" }}>
+                <div style={{ flex: 1, background: "#fefce8", border: "1px solid #e5e7eb", borderRadius: "4px", padding: "1.5mm 3mm" }}>
+                  <div style={{ fontSize: "6pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: 600 }}>HOTEL MAKKAH</div>
+                  <div style={{ fontWeight: 700, fontSize: "9pt", color: "#222" }}>{group.hotels?.makkah?.name || "—"}</div>
+                  {group.hotels?.makkah?.address && <div style={{ fontSize: "6pt", color: "#666", lineHeight: 1.2 }}>{group.hotels.makkah.address}</div>}
                 </div>
-                <div style={{ flex: 1, background: "#fefce8", border: "1px solid #e5e7eb", borderRadius: "4px", padding: "2mm 4mm" }}>
-                  <div style={{ fontSize: "6.5pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: 600 }}>HOTEL MADINAH</div>
-                  <div style={{ fontWeight: 700, fontSize: "10pt", color: "#222" }}>{group.hotels?.madinah?.name || "—"}</div>
+                <div style={{ flex: 1, background: "#fefce8", border: "1px solid #e5e7eb", borderRadius: "4px", padding: "1.5mm 3mm" }}>
+                  <div style={{ fontSize: "6pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: 600 }}>HOTEL MADINAH</div>
+                  <div style={{ fontWeight: 700, fontSize: "9pt", color: "#222" }}>{group.hotels?.madinah?.name || "—"}</div>
+                  {group.hotels?.madinah?.address && <div style={{ fontSize: "6pt", color: "#666", lineHeight: 1.2 }}>{group.hotels.madinah.address}</div>}
+                </div>
+                <div style={{ flex: 1, background: "#fefce8", border: "1px solid #e5e7eb", borderRadius: "4px", padding: "1.5mm 3mm" }}>
+                  <div style={{ fontSize: "6pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: 600 }}>HOTEL AZIZIA</div>
+                  <div style={{ fontWeight: 700, fontSize: "9pt", color: "#222" }}>{group.hotels?.aziziah?.name || "—"}</div>
+                  {group.hotels?.aziziah?.address && <div style={{ fontSize: "6pt", color: "#666", lineHeight: 1.2 }}>{group.hotels.aziziah.address}</div>}
                 </div>
               </div>
 
