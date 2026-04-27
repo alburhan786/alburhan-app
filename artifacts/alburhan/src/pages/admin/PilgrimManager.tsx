@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Plus, Edit, Trash2, ArrowLeft, Upload, Printer, CreditCard, Luggage, Heart,
   Building2, Bus, DoorOpen, FileDown, Hotel, BedDouble, Users, Wand2, X, AlertTriangle, Sticker, Layers } from "lucide-react";
 import { Link, useRoute } from "wouter";
+import { BulkImportModal } from "./BulkImportModal";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -117,6 +118,7 @@ export default function PilgrimManager() {
   const [bulkRoomDialogOpen, setBulkRoomDialogOpen] = useState(false);
   const [bulkRoomForm, setBulkRoomForm] = useState({ hotel: "makkah", roomType: "gents", totalBeds: "4", floor: "", fromRoom: "", toRoom: "" });
   const [bulkAdding, setBulkAdding] = useState(false);
+  const [bulkImportOpen, setBulkImportOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -443,9 +445,14 @@ export default function PilgrimManager() {
               </div>
             </div>
             {activeTab === "pilgrims" && (
-              <Button onClick={openCreate} className="bg-primary text-white gap-1 rounded-xl">
-                <Plus size={16} /> Add Pilgrim
-              </Button>
+              <>
+                <Button variant="outline" onClick={() => setBulkImportOpen(true)} className="gap-1.5 rounded-xl border-blue-300 text-blue-700 hover:bg-blue-50">
+                  <Upload size={15} /> Bulk Import
+                </Button>
+                <Button onClick={openCreate} className="bg-primary text-white gap-1 rounded-xl">
+                  <Plus size={16} /> Add Pilgrim
+                </Button>
+              </>
             )}
             {activeTab === "rooms" && (
               <Button onClick={openCreateRoom} className="bg-primary text-white gap-1 rounded-xl">
@@ -972,6 +979,12 @@ export default function PilgrimManager() {
           </div>
         </DialogContent>
       </Dialog>
+      <BulkImportModal
+        groupId={groupId}
+        open={bulkImportOpen}
+        onClose={() => setBulkImportOpen(false)}
+        onImported={fetchData}
+      />
     </AdminLayout>
   );
 }

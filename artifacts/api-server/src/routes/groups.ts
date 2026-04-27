@@ -225,6 +225,146 @@ router.post(
   }
 );
 
+const uploadZip = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 200 * 1024 * 1024 },
+});
+
+router.post("/:groupId/pilgrims/bulk", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  const groupId = String(req.params.groupId);
+  const rows: any[] = Array.isArray(req.body.pilgrims) ? req.body.pilgrims : [];
+
+  const groups = await db.select().from(hajjGroupsTable).where(eq(hajjGroupsTable.id, groupId)).limit(1);
+  if (!groups[0]) { res.status(404).json({ message: "Group not found" }); return; }
+
+  const [{ maxSerial }] = await db.select({ maxSerial: max(pilgrimsTable.serialNumber) })
+    .from(pilgrimsTable).where(eq(pilgrimsTable.groupId, groupId));
+  let nextSerial = (maxSerial || 0) + 1;
+
+  const valid: any[] = [];
+  const skippedRows: any[] = [];
+  const existingPassports = new Set<string>();
+
+  for (const row of rows) {
+    if (!row.fullName?.toString().trim()) {
+      skippedRows.push({ ...row, reason: "Missing name" });
+      continue;
+    }
+    if (row.passportNumber && existingPassports.has(row.passportNumber.toString().toUpperCase())) {
+      skippedRows.push({ ...row, reason: "Duplicate passport in import" });
+      continue;
+    }
+    if (row.passportNumber) existingPassports.add(row.passportNumber.toString().toUpperCase());
+    valid.push(row);
+  }
+
+  if (valid.length === 0) {
+    res.json({ created: 0, skipped: skippedRows.length, skippedRows });
+    return;
+  }
+
+  const inserts = valid.map(r => ({
+    groupId,
+    serialNumber: nextSerial++,
+    fullName: String(r.fullName).trim(),
+    salutation: r.salutation || null,
+    passportNumber: r.passportNumber ? String(r.passportNumber).trim() : null,
+    visaNumber: r.visaNumber ? String(r.visaNumber).trim() : null,
+    dateOfBirth: r.dateOfBirth ? String(r.dateOfBirth).trim() : null,
+    gender: r.gender ? String(r.gender).trim() : null,
+    bloodGroup: r.bloodGroup ? String(r.bloodGroup).trim() : null,
+    mobileIndia: r.mobileIndia ? String(r.mobileIndia).trim() : null,
+    mobileSaudi: r.mobileSaudi ? String(r.mobileSaudi).trim() : null,
+    address: r.address ? String(r.address).trim() : null,
+    city: r.city ? String(r.city).trim() : null,
+    state: r.state ? String(r.state).trim() : null,
+    busNumber: r.busNumber ? String(r.busNumber).trim() : null,
+    seatNumber: r.seatNumber ? String(r.seatNumber).trim() : null,
+    coverNumber: r.coverNumber ? String(r.coverNumber).trim() : null,
+    relation: r.relation ? String(r.relation).trim() : null,
+    medicalCondition: r.medicalCondition ? String(r.medicalCondition).trim() : null,
+    passportIssueDate: r.passportIssueDate ? String(r.passportIssueDate).trim() : null,
+    passportExpiryDate: r.passportExpiryDate ? String(r.passportExpiryDate).trim() : null,
+    passportPlaceOfIssue: r.passportPlaceOfIssue ? String(r.passportPlaceOfIssue).trim() : null,
+  }));
+
+  try {
+    await db.insert(pilgrimsTable).values(inserts);
+    res.json({ created: valid.length, skipped: skippedRows.length, skippedRows });
+  } catch (err: any) {
+    console.error("[groups] bulk pilgrim insert error:", err);
+    res.status(500).json({ message: err?.message || "Failed to insert pilgrims" });
+  }
+});
+
+router.post(
+  "/:groupId/pilgrims/bulk-photos",
+  requireAdmin as any,
+  uploadZip.single("photos"),
+  async (req: AuthenticatedRequest, res) => {
+    const groupId = String(req.params.groupId);
+    if (!req.file) { res.status(400).json({ message: "No ZIP file provided" }); return; }
+
+    let AdmZip: any;
+    try {
+      const mod = await import("adm-zip");
+      AdmZip = mod.default ?? mod;
+    } catch {
+      res.status(500).json({ message: "ZIP processing unavailable" });
+      return;
+    }
+
+    const groupPilgrims = await db.select({ id: pilgrimsTable.id, passportNumber: pilgrimsTable.passportNumber })
+      .from(pilgrimsTable).where(eq(pilgrimsTable.groupId, groupId));
+    const passportMap = new Map(
+      groupPilgrims
+        .filter(p => p.passportNumber)
+        .map(p => [p.passportNumber!.toUpperCase(), p.id])
+    );
+
+    const zip = new AdmZip(req.file.buffer);
+    const entries = zip.getEntries();
+    const results: { filename: string; status: "matched" | "unmatched" | "skipped"; passportNumber?: string }[] = [];
+
+    const imageExts = new Set([".jpg", ".jpeg", ".png", ".webp"]);
+
+    for (const entry of entries) {
+      if (entry.isDirectory) continue;
+      const filename = path.basename(entry.entryName);
+      const ext = path.extname(filename).toLowerCase();
+      if (!imageExts.has(ext)) continue;
+
+      const passportKey = path.basename(filename, ext).toUpperCase();
+      const pilgrimId = passportMap.get(passportKey);
+
+      if (!pilgrimId) {
+        results.push({ filename, status: "unmatched" });
+        continue;
+      }
+
+      try {
+        const buffer = entry.getData();
+        const mimetype = ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg";
+        const photoUrl = await uploadToGCS(buffer, filename, mimetype, "private_uploads");
+        await db.update(pilgrimsTable)
+          .set({ photoUrl, updatedAt: new Date() })
+          .where(and(eq(pilgrimsTable.id, pilgrimId), eq(pilgrimsTable.groupId, groupId)));
+        results.push({ filename, status: "matched", passportNumber: passportKey });
+      } catch (err) {
+        console.error("[groups] bulk-photos upload error for", filename, err);
+        results.push({ filename, status: "unmatched" });
+      }
+    }
+
+    res.json({
+      total: results.length,
+      matched: results.filter(r => r.status === "matched").length,
+      unmatched: results.filter(r => r.status === "unmatched").length,
+      results,
+    });
+  }
+);
+
 router.get("/:groupId/haji-list/pdf", requireAdmin as any, async (req, res) => {
   try {
     const groupId = String(req.params.groupId);
