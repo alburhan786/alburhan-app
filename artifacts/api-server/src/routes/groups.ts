@@ -348,6 +348,19 @@ router.post(
       return;
     }
 
+    const MAX_ENTRIES = 500;
+    const MAX_UNCOMPRESSED_BYTES = 300 * 1024 * 1024;
+    const allEntries = zip.getEntries();
+    if (allEntries.length > MAX_ENTRIES) {
+      res.status(400).json({ message: `ZIP contains too many files (max ${MAX_ENTRIES})` });
+      return;
+    }
+    const totalUncompressed: number = allEntries.reduce((sum: number, e: any) => sum + (e.header?.size ?? 0), 0);
+    if (totalUncompressed > MAX_UNCOMPRESSED_BYTES) {
+      res.status(400).json({ message: "ZIP uncompressed content exceeds 300 MB limit" });
+      return;
+    }
+
     const groupPilgrims = await db.select({ id: pilgrimsTable.id, passportNumber: pilgrimsTable.passportNumber })
       .from(pilgrimsTable).where(eq(pilgrimsTable.groupId, groupId));
     const passportMap = new Map(
