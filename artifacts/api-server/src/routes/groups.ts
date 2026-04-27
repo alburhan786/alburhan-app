@@ -321,12 +321,30 @@ router.post(
     const groupId = String(req.params.groupId);
     if (!req.file) { res.status(400).json({ message: "No ZIP file provided" }); return; }
 
+    const buf = req.file.buffer;
+    if (buf.length < 4 || buf[0] !== 0x50 || buf[1] !== 0x4B || buf[2] !== 0x03 || buf[3] !== 0x04) {
+      res.status(400).json({ message: "Uploaded file is not a valid ZIP archive" });
+      return;
+    }
+
+    const groupExists = await db.select({ id: hajjGroupsTable.id }).from(hajjGroupsTable)
+      .where(eq(hajjGroupsTable.id, groupId)).limit(1);
+    if (!groupExists[0]) { res.status(404).json({ message: "Group not found" }); return; }
+
     let AdmZip: any;
     try {
       const mod = await import("adm-zip");
       AdmZip = mod.default ?? mod;
     } catch {
       res.status(500).json({ message: "ZIP processing unavailable" });
+      return;
+    }
+
+    let zip: any;
+    try {
+      zip = new AdmZip(buf);
+    } catch {
+      res.status(400).json({ message: "Could not open ZIP archive — file may be corrupt" });
       return;
     }
 
@@ -338,7 +356,6 @@ router.post(
         .map(p => [p.passportNumber!.toUpperCase(), p.id])
     );
 
-    const zip = new AdmZip(req.file.buffer);
     const entries = zip.getEntries();
     const results: { filename: string; status: "matched" | "unmatched" | "skipped"; passportNumber?: string }[] = [];
 
