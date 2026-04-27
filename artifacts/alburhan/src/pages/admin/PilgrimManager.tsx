@@ -9,8 +9,33 @@ import { Plus, Edit, Trash2, ArrowLeft, Upload, Printer, CreditCard, Luggage, He
   Building2, Bus, DoorOpen, FileDown, Hotel, BedDouble, Users, Wand2, X, AlertTriangle, Sticker, Layers } from "lucide-react";
 import { Link, useRoute } from "wouter";
 import { BulkImportModal } from "./BulkImportModal";
+import * as XLSX from "xlsx";
 
 const API = import.meta.env.VITE_API_URL || "";
+
+const EXPORT_COLUMNS: { label: string; key: string }[] = [
+  { label: "Serial No", key: "serialNumber" },
+  { label: "Full Name", key: "fullName" },
+  { label: "Salutation", key: "salutation" },
+  { label: "Gender", key: "gender" },
+  { label: "Date of Birth", key: "dateOfBirth" },
+  { label: "Passport Number", key: "passportNumber" },
+  { label: "Passport Issue Date", key: "passportIssueDate" },
+  { label: "Passport Expiry Date", key: "passportExpiryDate" },
+  { label: "Passport Place of Issue", key: "passportPlaceOfIssue" },
+  { label: "Visa Number", key: "visaNumber" },
+  { label: "Blood Group", key: "bloodGroup" },
+  { label: "Mobile India", key: "mobileIndia" },
+  { label: "Mobile Saudi", key: "mobileSaudi" },
+  { label: "City", key: "city" },
+  { label: "State", key: "state" },
+  { label: "Address", key: "address" },
+  { label: "Bus Number", key: "busNumber" },
+  { label: "Seat Number", key: "seatNumber" },
+  { label: "Cover Number", key: "coverNumber" },
+  { label: "Relation", key: "relation" },
+  { label: "Medical Condition", key: "medicalCondition" },
+];
 
 interface Pilgrim {
   id: string;
@@ -134,6 +159,20 @@ export default function PilgrimManager() {
   }, [groupId]);
 
   useEffect(() => { if (groupId) fetchData(); }, [groupId, fetchData]);
+
+  const exportToExcel = () => {
+    const headers = EXPORT_COLUMNS.map(c => c.label);
+    const rows = pilgrims
+      .slice()
+      .sort((a, b) => (a.serialNumber ?? 0) - (b.serialNumber ?? 0))
+      .map(p => EXPORT_COLUMNS.map(c => (p as any)[c.key] ?? ""));
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    ws["!cols"] = EXPORT_COLUMNS.map((_, i) => ({ wch: i === 0 ? 10 : 22 }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Pilgrims");
+    const safeName = (group?.groupName ?? groupId).replace(/[^a-zA-Z0-9\u0600-\u06FF]+/g, "-");
+    XLSX.writeFile(wb, `pilgrims-${safeName}.xlsx`);
+  };
 
   const openCreate = () => { setEditingId(null); setForm(emptyPilgrim); setDialogOpen(true); };
   const openEdit = (p: Pilgrim) => {
@@ -446,6 +485,9 @@ export default function PilgrimManager() {
             </div>
             {activeTab === "pilgrims" && (
               <>
+                <Button variant="outline" onClick={exportToExcel} disabled={pilgrims.length === 0} className="gap-1.5 rounded-xl border-emerald-300 text-emerald-700 hover:bg-emerald-50">
+                  <FileDown size={15} /> Export Excel
+                </Button>
                 <Button variant="outline" onClick={() => setBulkImportOpen(true)} className="gap-1.5 rounded-xl border-blue-300 text-blue-700 hover:bg-blue-50">
                   <Upload size={15} /> Bulk Import
                 </Button>
