@@ -232,7 +232,8 @@ const uploadZip = multer({
 
 router.post("/:groupId/pilgrims/bulk", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   const groupId = String(req.params.groupId);
-  const rows: any[] = Array.isArray(req.body.pilgrims) ? req.body.pilgrims : [];
+  const rawBody = req.body;
+  const rows: any[] = Array.isArray(rawBody) ? rawBody : Array.isArray(rawBody?.pilgrims) ? rawBody.pilgrims : [];
 
   const groups = await db.select().from(hajjGroupsTable).where(eq(hajjGroupsTable.id, groupId)).limit(1);
   if (!groups[0]) { res.status(404).json({ message: "Group not found" }); return; }
@@ -378,7 +379,10 @@ router.post(
       if (entry.isDirectory) continue;
       const filename = path.basename(entry.entryName);
       const ext = path.extname(filename).toLowerCase();
-      if (!imageExts.has(ext)) continue;
+      if (!imageExts.has(ext)) {
+        results.push({ filename, status: "skipped" });
+        continue;
+      }
 
       const passportKey = path.basename(filename, ext).toUpperCase();
       const pilgrimId = passportMap.get(passportKey);
