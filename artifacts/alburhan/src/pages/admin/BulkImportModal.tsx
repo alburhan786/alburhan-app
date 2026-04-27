@@ -94,6 +94,7 @@ export function BulkImportModal({ groupId, open, onClose, onImported, existingPa
   const zipRef = useRef<HTMLInputElement>(null);
 
   const resetExcel = () => { setParsedRows([]); setImportResult(null); if (excelRef.current) excelRef.current.value = ""; };
+  const clearExcelFile = () => { setParsedRows([]); if (excelRef.current) excelRef.current.value = ""; };
   const resetPhotos = () => { setZipFile(null); setPhotoResult(null); if (zipRef.current) zipRef.current.value = ""; };
 
   const handleClose = () => { resetExcel(); resetPhotos(); onClose(); };
@@ -173,7 +174,7 @@ export function BulkImportModal({ groupId, open, onClose, onImported, existingPa
       setImportResult(result);
       toast({ title: `Imported ${result.created} pilgrims${result.skipped ? `, ${result.skipped} skipped` : ""}` });
       onImported();
-      resetExcel();
+      clearExcelFile();
     } catch (err: any) {
       toast({ title: err.message || "Import failed", variant: "destructive" });
     } finally {
