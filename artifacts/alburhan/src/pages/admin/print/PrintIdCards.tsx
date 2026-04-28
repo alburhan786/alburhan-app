@@ -14,6 +14,7 @@ interface Pilgrim {
 }
 interface Group {
   id: string; groupName: string; year: number; maktabNumber?: string;
+  startingSerialNumber?: number;
   hotels?: { makkah?: { name?: string; address?: string; nameAr?: string; addressAr?: string }; madinah?: { name?: string; address?: string; nameAr?: string; addressAr?: string }; aziziah?: { name?: string; address?: string; nameAr?: string; addressAr?: string } };
 }
 
@@ -196,7 +197,7 @@ export default function PrintIdCards() {
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.8mm", fontSize: "5.5pt", flex: 1 }}>
                     <div style={{ display: "flex", alignItems: "flex-start", gap: "1.5mm" }}>
                       <div style={bulletDot} />
-                      <div><span style={{ color: "#888", fontSize: "4.5pt" }}>Serial No. </span><span style={{ fontWeight: 700, color: DARK }}>#{String(p.serialNumber).padStart(3, "0")}</span></div>
+                      <div><span style={{ color: "#888", fontSize: "4.5pt" }}>Serial No. </span><span style={{ fontWeight: 700, color: DARK }}>#{String((group?.startingSerialNumber ?? 1) - 1 + p.serialNumber).padStart(3, "0")}</span></div>
                     </div>
                     <div style={{ display: "flex", alignItems: "flex-start", gap: "1.5mm" }}>
                       <div style={bulletDot} />

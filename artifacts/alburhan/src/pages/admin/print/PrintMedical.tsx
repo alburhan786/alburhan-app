@@ -11,7 +11,7 @@ interface Pilgrim {
   mobileIndia?: string; mobileSaudi?: string; address?: string; city?: string; state?: string;
   coverNumber?: string; medicalCondition?: string; relation?: string;
 }
-interface Group { id: string; groupName: string; year: number; }
+interface Group { id: string; groupName: string; year: number; startingSerialNumber?: number; }
 
 function calcAge(dob?: string): string {
   if (!dob) return "—";
@@ -43,7 +43,7 @@ function MedCard({ p, group }: { p: Pilgrim; group: Group }) {
       <div style={{ flex: 1, padding: "3mm 3mm", display: "flex", flexDirection: "column", gap: "0.7mm", fontSize: "6.5pt", lineHeight: 1.35, minWidth: 0 }}>
         <div><b>COVER NUMBER:</b> {p.coverNumber || "—"}</div>
         <div><b>PASSPORT NO:</b> {p.passportNumber || "—"}</div>
-        <div><b>NAME:</b> {p.serialNumber} &nbsp; {p.fullName.toUpperCase()}</div>
+        <div><b>NAME:</b> {(group?.startingSerialNumber ?? 1) - 1 + p.serialNumber} &nbsp; {p.fullName.toUpperCase()}</div>
         <div style={{ marginTop: "1.5mm" }}>
           <div><b>GUARDIAN / ACCOMPANYING</b></div>
           <div><b>PERSON'S NAME:</b> {p.relation || "—"}</div>
@@ -91,7 +91,7 @@ function MedCard({ p, group }: { p: Pilgrim; group: Group }) {
             justifyContent: "center",
           }}>
             <Barcode
-              value={p.passportNumber || String(p.serialNumber).padStart(6, "0")}
+              value={p.passportNumber || String((group?.startingSerialNumber ?? 1) - 1 + p.serialNumber).padStart(6, "0")}
               height={16}
               width={1}
               fontSize={6}

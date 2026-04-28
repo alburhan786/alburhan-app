@@ -15,6 +15,7 @@ interface Pilgrim {
 }
 interface Group {
   id: string; groupName: string; year: number; maktabNumber?: string;
+  startingSerialNumber?: number;
   hotels?: {
     makkah?: { name?: string; address?: string; nameAr?: string; addressAr?: string };
     madinah?: { name?: string; address?: string; nameAr?: string; addressAr?: string };
@@ -140,7 +141,7 @@ export default function PrintLuggageSquare() {
                       <div style={{ fontWeight: 700, fontSize: "5.5pt", color: GOLD, letterSpacing: "1px", textTransform: "uppercase" }}>TOURS & TRAVELS</div>
                     </div>
                     <div style={{ textAlign: "right", flexShrink: 0 }}>
-                      <div style={{ fontSize: "20pt", fontWeight: 900, color: "#fff", lineHeight: 1 }}>#{String(p.serialNumber).padStart(3, "0")}</div>
+                      <div style={{ fontSize: "20pt", fontWeight: 900, color: "#fff", lineHeight: 1 }}>#{String((group?.startingSerialNumber ?? 1) - 1 + p.serialNumber).padStart(3, "0")}</div>
                       <div style={{ fontSize: "5pt", color: "#fff", opacity: 0.9 }}>HAJJ {group.year}</div>
                     </div>
                   </div>
@@ -201,7 +202,7 @@ export default function PrintLuggageSquare() {
 
                     <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "2.5mm", marginTop: "auto" }}>
                       <QRCodeSVG value={buildQrData(p, group, company.phone)} size={48} level="M" />
-                      <Barcode value={p.passportNumber || `H${String(p.serialNumber).padStart(3, "0")}`} height={20} width={1.3} fontSize={0} />
+                      <Barcode value={p.passportNumber || `H${String((group?.startingSerialNumber ?? 1) - 1 + p.serialNumber).padStart(3, "0")}`} height={20} width={1.3} fontSize={0} />
                     </div>
                   </div>
 

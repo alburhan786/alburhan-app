@@ -15,6 +15,7 @@ interface HajjGroup {
   id: string;
   groupName: string;
   year: number;
+  startingSerialNumber?: number;
   departureDate?: string;
   returnDate?: string;
   flightNumber?: string;
@@ -27,6 +28,7 @@ interface HajjGroup {
 const emptyForm = {
   groupName: "", year: new Date().getFullYear(), departureDate: "", returnDate: "",
   flightNumber: "", maktabNumber: "", notes: "", groupLeader: "",
+  startingSerialNumber: 1,
   hotelMakkahName: "", hotelMakkahAddress: "", hotelMakkahNameAr: "", hotelMakkahAddressAr: "", hotelMakkahCheckIn: "", hotelMakkahCheckOut: "", hotelMakkahGoogleMaps: "",
   hotelMadinahName: "", hotelMadinahAddress: "", hotelMadinahNameAr: "", hotelMadinahAddressAr: "", hotelMadinahCheckIn: "", hotelMadinahCheckOut: "", hotelMadinahGoogleMaps: "",
   hotelAziziahName: "", hotelAziziahAddress: "", hotelAziziahNameAr: "", hotelAziziahAddressAr: "", hotelAziziahCheckIn: "", hotelAziziahCheckOut: "", hotelAziziahGoogleMaps: "",
@@ -100,6 +102,7 @@ export default function GroupsManager() {
       groupName: g.groupName, year: g.year, departureDate: g.departureDate || "",
       returnDate: g.returnDate || "", flightNumber: g.flightNumber || "",
       maktabNumber: g.maktabNumber || "", notes: g.notes || "",
+      startingSerialNumber: g.startingSerialNumber || 1,
       groupLeader: g.hotels?.groupLeader || "",
       hotelMakkahName: g.hotels?.makkah?.name || "",
       hotelMakkahAddress: g.hotels?.makkah?.address || "",
@@ -132,6 +135,7 @@ export default function GroupsManager() {
       groupName: form.groupName, year: form.year, departureDate: form.departureDate || null,
       returnDate: form.returnDate || null, flightNumber: form.flightNumber || null,
       maktabNumber: form.maktabNumber || null, notes: form.notes || null,
+      startingSerialNumber: Number(form.startingSerialNumber) || 1,
       hotels: {
         groupLeader: form.groupLeader || null,
         makkah: { name: form.hotelMakkahName, address: form.hotelMakkahAddress, nameAr: form.hotelMakkahNameAr || null, addressAr: form.hotelMakkahAddressAr || null, checkIn: form.hotelMakkahCheckIn, checkOut: form.hotelMakkahCheckOut, googleMapsLink: form.hotelMakkahGoogleMaps || null },
@@ -242,6 +246,7 @@ export default function GroupsManager() {
                 <div className="space-y-1"><label className="text-sm font-medium">Return Date</label><Input value={form.returnDate} onChange={e => f("returnDate", e.target.value)} placeholder="e.g. 15 Jul 2027" /></div>
                 <div className="space-y-1"><label className="text-sm font-medium">Flight Number</label><Input value={form.flightNumber} onChange={e => f("flightNumber", e.target.value)} /></div>
                 <div className="space-y-1"><label className="text-sm font-medium">Maktab Number</label><Input value={form.maktabNumber} onChange={e => f("maktabNumber", e.target.value)} /></div>
+                <div className="space-y-1"><label className="text-sm font-medium">Starting Serial No. <span className="text-xs text-muted-foreground">(e.g. 56 if prev group ended at 55)</span></label><Input type="number" min="1" value={form.startingSerialNumber} onChange={e => f("startingSerialNumber", Number(e.target.value))} /></div>
                 <div className="space-y-1"><label className="text-sm font-medium">Group Leader</label><Input value={form.groupLeader} onChange={e => f("groupLeader", e.target.value)} placeholder="e.g. Mohammed Altaf" /></div>
               </div>
             </div>

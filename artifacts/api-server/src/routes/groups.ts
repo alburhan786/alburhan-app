@@ -74,7 +74,7 @@ router.get("/", requireAdmin as any, async (_req, res) => {
 });
 
 router.post("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
-  const { groupName, year, departureDate, returnDate, flightNumber, maktabNumber, hotels, notes } = req.body;
+  const { groupName, year, departureDate, returnDate, flightNumber, maktabNumber, hotels, notes, startingSerialNumber } = req.body;
   if (!groupName || !year) {
     res.status(400).json({ message: "groupName and year are required" });
     return;
@@ -87,6 +87,7 @@ router.post("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => 
       returnDate: returnDate || null,
       flightNumber: flightNumber || null,
       maktabNumber: maktabNumber || null,
+      startingSerialNumber: startingSerialNumber ? Number(startingSerialNumber) : 1,
       hotels: hotels || {},
       notes: notes || null,
     }).returning();
@@ -106,10 +107,11 @@ router.get("/:id", requireAdmin as any, async (req, res) => {
 
 router.put("/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   const id = String(req.params.id);
-  const { groupName, year, departureDate, returnDate, flightNumber, maktabNumber, hotels, notes } = req.body;
+  const { groupName, year, departureDate, returnDate, flightNumber, maktabNumber, hotels, notes, startingSerialNumber } = req.body;
   try {
     const [updated] = await db.update(hajjGroupsTable).set({
       groupName, year: Number(year), departureDate, returnDate, flightNumber, maktabNumber,
+      startingSerialNumber: startingSerialNumber ? Number(startingSerialNumber) : 1,
       hotels: hotels || {}, notes, updatedAt: new Date(),
     }).where(eq(hajjGroupsTable.id, id)).returning();
     if (!updated) { res.status(404).json({ message: "Group not found" }); return; }
@@ -426,6 +428,8 @@ router.get("/:groupId/haji-list/pdf", requireAdmin as any, async (req, res) => {
       .where(eq(pilgrimsTable.groupId, groupId))
       .orderBy(asc(pilgrimsTable.serialNumber));
 
+    const serialOffset = (group.startingSerialNumber ?? 1) - 1;
+
     const doc = new PDFDocument({ size: "A4", layout: "landscape", margin: 0 });
     const safeName = group.groupName.replace(/[^a-zA-Z0-9]/g, "-");
     res.setHeader("Content-Type", "application/pdf");
@@ -523,7 +527,7 @@ router.get("/:groupId/haji-list/pdf", requireAdmin as any, async (req, res) => {
       let cx = tableX;
 
       doc.font("Helvetica-Bold").fontSize(9)
-        .text(String(p.serialNumber), cx + 1, y + ROW_H / 2 - 6, { width: colWidths[0] - 2, align: "center", lineBreak: false });
+        .text(String(p.serialNumber + serialOffset), cx + 1, y + ROW_H / 2 - 6, { width: colWidths[0] - 2, align: "center", lineBreak: false });
       cx += colWidths[0];
 
       if (imgBuf) {
@@ -811,6 +815,8 @@ router.get("/:groupId/rooms/list/pdf", requireAdmin as any, async (req, res) => 
       .where(eq(pilgrimsTable.groupId, groupId))
       .orderBy(asc(pilgrimsTable.serialNumber));
 
+    const serialOffset = (group.startingSerialNumber ?? 1) - 1;
+
     const pilgrimsByRoom = new Map<string, typeof pilgrims>();
     const unassigned: typeof pilgrims = [];
     for (const p of pilgrims) {
@@ -962,7 +968,7 @@ router.get("/:groupId/rooms/list/pdf", requireAdmin as any, async (req, res) => 
             doc.fill("black");
 
             doc.font("Helvetica-Bold").fontSize(8)
-              .text(String(p.serialNumber), cx + 1, y + ROW_H / 2 - 5, { width: colWidths[0] - 2, align: "center", lineBreak: false });
+              .text(String(p.serialNumber + serialOffset), cx + 1, y + ROW_H / 2 - 5, { width: colWidths[0] - 2, align: "center", lineBreak: false });
             cx += colWidths[0];
 
             if (imgBuf) {
@@ -1031,7 +1037,7 @@ router.get("/:groupId/rooms/list/pdf", requireAdmin as any, async (req, res) => 
         else doc.rect(tableX, y, totalTableW, ROW_H).fill("white");
         let cx = tableX;
         doc.fill("black").font("Helvetica-Bold").fontSize(8)
-          .text(String(p.serialNumber), cx + 1, y + ROW_H / 2 - 5, { width: colWidths[0] - 2, align: "center", lineBreak: false });
+          .text(String(p.serialNumber + serialOffset), cx + 1, y + ROW_H / 2 - 5, { width: colWidths[0] - 2, align: "center", lineBreak: false });
         cx += colWidths[0] + colWidths[1];
         doc.font("Helvetica-Bold").fontSize(8)
           .text([p.salutation, p.fullName].filter(Boolean).join(" "), cx + 3, y + 4, { width: colWidths[2] - 6, lineBreak: true });

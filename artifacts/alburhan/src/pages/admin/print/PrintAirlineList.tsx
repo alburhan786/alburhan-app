@@ -12,7 +12,9 @@ interface Pilgrim {
   photoUrl?: string; busNumber?: string; roomNumber?: string;
 }
 interface Group {
-  id: string; groupName: string; year: number; departureDate?: string;
+  id: string; groupName: string; year: number;
+  startingSerialNumber?: number;
+  departureDate?: string;
   returnDate?: string; flightNumber?: string; departureCity?: string;
 }
 
@@ -97,7 +99,7 @@ export default function PrintAirlineList() {
             <tbody>
               {pilgrims.map((p, i) => (
                 <tr key={p.id} style={{ background: i % 2 === 0 ? "#fff" : "#f0f4fa" }}>
-                  <td style={{ ...tdStyle, textAlign: "center", fontWeight: 700 }}>{p.serialNumber}</td>
+                  <td style={{ ...tdStyle, textAlign: "center", fontWeight: 700 }}>{(group?.startingSerialNumber ?? 1) - 1 + p.serialNumber}</td>
                   <td style={{ ...tdStyle, padding: "1mm 2mm" }}>
                     {p.photoUrl ? (
                       <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "8mm", height: "10mm", objectFit: "cover", borderRadius: "2px" }} />

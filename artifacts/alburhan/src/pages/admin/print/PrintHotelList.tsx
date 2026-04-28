@@ -12,6 +12,7 @@ interface Pilgrim {
 }
 interface Group {
   id: string; groupName: string; year: number;
+  startingSerialNumber?: number;
   hotels?: {
     makkah?: { name?: string; address?: string; checkIn?: string; checkOut?: string };
     madinah?: { name?: string; address?: string; checkIn?: string; checkOut?: string };
@@ -111,7 +112,7 @@ export default function PrintHotelList() {
             <tbody>
               {pilgrims.map((p, i) => (
                 <tr key={p.id} style={{ background: i % 2 === 0 ? "#fff" : "#f5faf7" }}>
-                  <td style={{ ...tdStyle, fontWeight: 700, textAlign: "center" }}>{p.serialNumber}</td>
+                  <td style={{ ...tdStyle, fontWeight: 700, textAlign: "center" }}>{(group?.startingSerialNumber ?? 1) - 1 + p.serialNumber}</td>
                   <td style={{ ...tdStyle, padding: "1mm 2mm" }}>
                     {p.photoUrl ? (
                       <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "8mm", height: "10mm", objectFit: "cover", borderRadius: "2px" }} />

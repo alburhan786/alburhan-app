@@ -27,6 +27,7 @@ interface Group {
   id: string;
   groupName: string;
   year: number;
+  startingSerialNumber?: number;
   departureDate?: string;
   returnDate?: string;
   flightNumber?: string;
@@ -207,7 +208,7 @@ export default function PrintHajiList() {
                 return (
                   <tr key={p.id} style={{ background: i % 2 === 0 ? "#fff" : "#f5faf7" }}>
                     <td style={{ ...tdStyle, textAlign: "center", fontWeight: 700, fontSize: "9pt", color: "#0A3D2A" }}>
-                      {p.serialNumber}
+                      {(group?.startingSerialNumber ?? 1) - 1 + p.serialNumber}
                     </td>
                     <td style={{ ...tdStyle, padding: "1mm", textAlign: "center" }}>
                       {p.photoUrl ? (

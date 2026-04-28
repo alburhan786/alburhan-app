@@ -15,6 +15,7 @@ interface Pilgrim {
 }
 interface Group {
   id: string; groupName: string; year: number; maktabNumber?: string;
+  startingSerialNumber?: number;
   hotels?: {
     groupLeader?: string;
     makkah?: { name?: string; address?: string; nameAr?: string; addressAr?: string };
@@ -146,7 +147,7 @@ export default function PrintLuggage() {
                 <div style={{ fontWeight: 700, fontSize: "8pt", color: GOLD, letterSpacing: "1.5px", textTransform: "uppercase" }}>TOURS & TRAVELS</div>
               </div>
               <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: "22pt", fontWeight: 800, color: "#fff" }}>#{String(p.serialNumber).padStart(3, "0")}</div>
+                <div style={{ fontSize: "22pt", fontWeight: 800, color: "#fff" }}>#{String((group?.startingSerialNumber ?? 1) - 1 + p.serialNumber).padStart(3, "0")}</div>
                 <div style={{ fontSize: "8pt", color: "#fff", opacity: 0.9 }}>HAJJ {group.year}</div>
               </div>
             </div>
@@ -226,7 +227,7 @@ export default function PrintLuggage() {
 
               <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "5mm", marginTop: "auto", paddingBottom: "1mm" }}>
                 <QRCodeSVG value={buildQrData(p, group, company.phone)} size={80} level="M" />
-                <Barcode value={p.passportNumber || `H${String(p.serialNumber).padStart(3, "0")}`} height={40} width={2} fontSize={0} />
+                <Barcode value={p.passportNumber || `H${String((group?.startingSerialNumber ?? 1) - 1 + p.serialNumber).padStart(3, "0")}`} height={40} width={2} fontSize={0} />
               </div>
             </div>
 

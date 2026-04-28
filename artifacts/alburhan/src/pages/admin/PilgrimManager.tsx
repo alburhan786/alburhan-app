@@ -71,6 +71,7 @@ interface Group {
   id: string;
   groupName: string;
   year: number;
+  startingSerialNumber?: number;
   departureDate?: string;
   returnDate?: string;
   flightNumber?: string;
@@ -548,7 +549,7 @@ export default function PilgrimManager() {
                   <tr><td colSpan={10} className="text-center py-8 text-muted-foreground">No pilgrims yet. Click "Add Pilgrim" to start.</td></tr>
                 ) : pilgrims.map(p => (
                   <tr key={p.id} className="hover:bg-muted/30">
-                    <td className="px-4 py-3 font-mono font-bold text-primary">{p.serialNumber}</td>
+                    <td className="px-4 py-3 font-mono font-bold text-primary">{(group?.startingSerialNumber ?? 1) - 1 + p.serialNumber}</td>
                     <td className="px-4 py-3">
                       <div className="w-10 h-10 rounded-lg bg-muted overflow-hidden cursor-pointer"
                         onClick={() => { setUploadingId(p.id); fileRef.current?.click(); }}>
@@ -631,7 +632,7 @@ export default function PilgrimManager() {
               <div className="flex flex-wrap gap-1.5">
                 {unassignedPilgrims.map(p => (
                   <span key={p.id} className="text-xs bg-amber-100 border border-amber-200 text-amber-900 px-2 py-0.5 rounded-full font-medium">
-                    {p.serialNumber}. {p.fullName}
+                    {(group?.startingSerialNumber ?? 1) - 1 + p.serialNumber}. {p.fullName}
                   </span>
                 ))}
               </div>
@@ -765,7 +766,7 @@ export default function PilgrimManager() {
                         <tr><td colSpan={9} className="text-center py-8 text-muted-foreground">No pilgrims yet.</td></tr>
                       ) : pilgrimsForTable.map(p => (
                         <tr key={p.id} className="hover:bg-muted/30">
-                          <td className="px-4 py-2.5 font-mono font-bold text-primary text-xs">{p.serialNumber}</td>
+                          <td className="px-4 py-2.5 font-mono font-bold text-primary text-xs">{(group?.startingSerialNumber ?? 1) - 1 + p.serialNumber}</td>
                           <td className="px-4 py-2.5">
                             <div className="w-8 h-8 rounded-md bg-muted overflow-hidden">
                               {p.photoUrl
