@@ -12,7 +12,7 @@ interface Pilgrim {
 }
 interface Group {
   id: string; groupName: string; year: number; departureDate?: string; returnDate?: string;
-  hotels?: { makkah?: { name?: string }; madinah?: { name?: string } };
+  hotels?: { makkah?: { name?: string }; madinah?: { name?: string }; aziziah?: { name?: string } };
 }
 
 export default function PrintContract() {
@@ -97,8 +97,9 @@ export default function PrintContract() {
       <p>The Company shall provide the following services as part of the <b>{group!.groupName}</b> package:</p>
       <ul style={{ paddingLeft: "6mm", margin: "2mm 0" }}>
         <li>Return airfare (Economy class) — India to Saudi Arabia and back</li>
-        <li>Accommodation in Makkah{group!.hotels?.makkah?.name ? ` (${group!.hotels.makkah.name})` : ""}</li>
-        <li>Accommodation in Madinah{group!.hotels?.madinah?.name ? ` (${group!.hotels.madinah.name})` : ""}</li>
+        <li>Accommodation in Makkah 1 (Aziziah){group!.hotels?.aziziah?.name ? ` — ${group!.hotels.aziziah.name}` : ""}</li>
+        <li>Accommodation in Makkah 2{group!.hotels?.makkah?.name ? ` — ${group!.hotels.makkah.name}` : ""}</li>
+        <li>Accommodation in Madinah{group!.hotels?.madinah?.name ? ` — ${group!.hotels.madinah.name}` : ""}</li>
         <li>Transport between Makkah, Madinah, and Jeddah Airport</li>
         <li>Visa processing and documentation</li>
         <li>Hajj/Umrah guide and group leader services</li>

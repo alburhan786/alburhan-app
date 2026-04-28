@@ -9,7 +9,8 @@ const API = import.meta.env.VITE_API_URL || "";
 interface Group { id: string; groupName: string; year: number; departureDate?: string; returnDate?: string; }
 
 const categories = [
-  "Accommodation — Makkah",
+  "Accommodation — Makkah 1 (Aziziah)",
+  "Accommodation — Makkah 2",
   "Accommodation — Madinah",
   "Transportation",
   "Food & Meals",

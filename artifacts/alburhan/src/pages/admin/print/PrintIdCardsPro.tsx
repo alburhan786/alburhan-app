@@ -19,6 +19,7 @@ interface Group {
     groupLeader?: string;
     makkah?: { name?: string; address?: string; googleMapsLink?: string };
     madinah?: { name?: string; address?: string; googleMapsLink?: string };
+    aziziah?: { name?: string; address?: string; googleMapsLink?: string };
   };
 }
 
