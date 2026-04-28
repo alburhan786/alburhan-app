@@ -16,9 +16,9 @@ interface Pilgrim {
 interface Group {
   id: string; groupName: string; year: number; maktabNumber?: string;
   hotels?: {
-    makkah?: { name?: string };
-    madinah?: { name?: string };
-    aziziah?: { name?: string; address?: string };
+    makkah?: { name?: string; address?: string; nameAr?: string; addressAr?: string };
+    madinah?: { name?: string; address?: string; nameAr?: string; addressAr?: string };
+    aziziah?: { name?: string; address?: string; nameAr?: string; addressAr?: string };
   };
 }
 
@@ -179,15 +179,23 @@ export default function PrintLuggageSquare() {
                       <div>
                         <div style={{ fontSize: "4.5pt", color: "#999", textTransform: "uppercase", fontWeight: 600 }}>HOTEL MAKKAH 1</div>
                         <div style={{ fontWeight: 700, color: "#222", fontSize: "6pt" }}>{group.hotels?.aziziah?.name || "—"}</div>
+                        {group.hotels?.aziziah?.nameAr && <div style={{ fontWeight: 700, color: "#222", fontSize: "5.5pt", direction: "rtl", textAlign: "right" }}>{group.hotels.aziziah.nameAr}</div>}
                         {group.hotels?.aziziah?.address && <div style={{ fontSize: "4.5pt", color: "#666", lineHeight: 1.2 }}>{group.hotels.aziziah.address}</div>}
+                        {group.hotels?.aziziah?.addressAr && <div style={{ fontSize: "4pt", color: "#666", lineHeight: 1.2, direction: "rtl", textAlign: "right" }}>{group.hotels.aziziah.addressAr}</div>}
                       </div>
                       <div>
                         <div style={{ fontSize: "4.5pt", color: "#999", textTransform: "uppercase", fontWeight: 600 }}>HOTEL MAKKAH 2</div>
                         <div style={{ fontWeight: 700, color: "#222", fontSize: "6pt" }}>{group.hotels?.makkah?.name || "—"}</div>
+                        {group.hotels?.makkah?.nameAr && <div style={{ fontWeight: 700, color: "#222", fontSize: "5.5pt", direction: "rtl", textAlign: "right" }}>{group.hotels.makkah.nameAr}</div>}
+                        {group.hotels?.makkah?.address && <div style={{ fontSize: "4.5pt", color: "#666", lineHeight: 1.2 }}>{group.hotels.makkah.address}</div>}
+                        {group.hotels?.makkah?.addressAr && <div style={{ fontSize: "4pt", color: "#666", lineHeight: 1.2, direction: "rtl", textAlign: "right" }}>{group.hotels.makkah.addressAr}</div>}
                       </div>
                       <div>
                         <div style={{ fontSize: "4.5pt", color: "#999", textTransform: "uppercase", fontWeight: 600 }}>HOTEL MADINAH</div>
                         <div style={{ fontWeight: 700, color: "#222", fontSize: "6pt" }}>{group.hotels?.madinah?.name || "—"}</div>
+                        {group.hotels?.madinah?.nameAr && <div style={{ fontWeight: 700, color: "#222", fontSize: "5.5pt", direction: "rtl", textAlign: "right" }}>{group.hotels.madinah.nameAr}</div>}
+                        {group.hotels?.madinah?.address && <div style={{ fontSize: "4.5pt", color: "#666", lineHeight: 1.2 }}>{group.hotels.madinah.address}</div>}
+                        {group.hotels?.madinah?.addressAr && <div style={{ fontSize: "4pt", color: "#666", lineHeight: 1.2, direction: "rtl", textAlign: "right" }}>{group.hotels.madinah.addressAr}</div>}
                       </div>
                     </div>
 

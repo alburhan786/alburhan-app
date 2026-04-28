@@ -17,9 +17,9 @@ interface Group {
   id: string; groupName: string; year: number; maktabNumber?: string;
   hotels?: {
     groupLeader?: string;
-    makkah?: { name?: string; address?: string; googleMapsLink?: string };
-    madinah?: { name?: string; address?: string; googleMapsLink?: string };
-    aziziah?: { name?: string; address?: string; googleMapsLink?: string };
+    makkah?: { name?: string; address?: string; nameAr?: string; addressAr?: string; googleMapsLink?: string };
+    madinah?: { name?: string; address?: string; nameAr?: string; addressAr?: string; googleMapsLink?: string };
+    aziziah?: { name?: string; address?: string; nameAr?: string; addressAr?: string; googleMapsLink?: string };
   };
 }
 
@@ -303,14 +303,17 @@ export default function PrintIdCardsPro() {
                         <div>
                           <div style={{ fontSize: "3pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Hotel Makkah 1</div>
                           <div style={{ fontSize: "5.5pt", fontWeight: 900, color: DARK, lineHeight: 1.2 }}>{group.hotels?.aziziah?.name || "—"}</div>
+                          {group.hotels?.aziziah?.nameAr && <div style={{ fontSize: "5pt", fontWeight: 700, color: DARK, lineHeight: 1.1, direction: "rtl", textAlign: "right" }}>{group.hotels.aziziah.nameAr}</div>}
                         </div>
                         <div>
                           <div style={{ fontSize: "3pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Hotel Makkah 2</div>
                           <div style={{ fontSize: "5.5pt", fontWeight: 900, color: DARK, lineHeight: 1.2 }}>{group.hotels?.makkah?.name || "—"}</div>
+                          {group.hotels?.makkah?.nameAr && <div style={{ fontSize: "5pt", fontWeight: 700, color: DARK, lineHeight: 1.1, direction: "rtl", textAlign: "right" }}>{group.hotels.makkah.nameAr}</div>}
                         </div>
                         <div>
                           <div style={{ fontSize: "3pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Hotel Madinah</div>
                           <div style={{ fontSize: "5.5pt", fontWeight: 900, color: DARK, lineHeight: 1.2 }}>{group.hotels?.madinah?.name || "—"}</div>
+                          {group.hotels?.madinah?.nameAr && <div style={{ fontSize: "5pt", fontWeight: 700, color: DARK, lineHeight: 1.1, direction: "rtl", textAlign: "right" }}>{group.hotels.madinah.nameAr}</div>}
                         </div>
                       </div>
 

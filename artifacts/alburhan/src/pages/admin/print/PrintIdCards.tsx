@@ -14,7 +14,7 @@ interface Pilgrim {
 }
 interface Group {
   id: string; groupName: string; year: number; maktabNumber?: string;
-  hotels?: { makkah?: { name?: string; address?: string }; madinah?: { name?: string; address?: string }; aziziah?: { name?: string; address?: string } };
+  hotels?: { makkah?: { name?: string; address?: string; nameAr?: string; addressAr?: string }; madinah?: { name?: string; address?: string; nameAr?: string; addressAr?: string }; aziziah?: { name?: string; address?: string; nameAr?: string; addressAr?: string } };
 }
 
 const DARK = "#052316";
@@ -258,7 +258,9 @@ export default function PrintIdCards() {
                       <div>
                         <span style={{ color: "#888", fontSize: "4.5pt" }}>Makkah 2 Hotel: </span>
                         <span style={{ fontWeight: 600 }}>{group.hotels?.makkah?.name || "—"}</span>
+                        {group.hotels?.makkah?.nameAr && <div style={{ fontWeight: 600, fontSize: "4.5pt", direction: "rtl", textAlign: "right" }}>{group.hotels.makkah.nameAr}</div>}
                         {group.hotels?.makkah?.address && <div style={{ fontSize: "4pt", color: "#888", marginTop: "0.3mm" }}>{group.hotels.makkah.address}</div>}
+                        {group.hotels?.makkah?.addressAr && <div style={{ fontSize: "4pt", color: "#888", direction: "rtl", textAlign: "right" }}>{group.hotels.makkah.addressAr}</div>}
                       </div>
                     </div>
                     <div style={{ display: "flex", alignItems: "flex-start", gap: "1.5mm" }}>
@@ -266,7 +268,9 @@ export default function PrintIdCards() {
                       <div>
                         <span style={{ color: "#888", fontSize: "4.5pt" }}>Madinah Hotel: </span>
                         <span style={{ fontWeight: 600 }}>{group.hotels?.madinah?.name || "—"}</span>
+                        {group.hotels?.madinah?.nameAr && <div style={{ fontWeight: 600, fontSize: "4.5pt", direction: "rtl", textAlign: "right" }}>{group.hotels.madinah.nameAr}</div>}
                         {group.hotels?.madinah?.address && <div style={{ fontSize: "4pt", color: "#888", marginTop: "0.3mm" }}>{group.hotels.madinah.address}</div>}
+                        {group.hotels?.madinah?.addressAr && <div style={{ fontSize: "4pt", color: "#888", direction: "rtl", textAlign: "right" }}>{group.hotels.madinah.addressAr}</div>}
                       </div>
                     </div>
                   </div>
