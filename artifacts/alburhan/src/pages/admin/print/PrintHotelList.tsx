@@ -79,7 +79,7 @@ export default function PrintHotelList() {
           {(group.hotels?.makkah?.name || group.hotels?.madinah?.name) && (
             <div style={{ display: "flex", gap: "6mm", justifyContent: "flex-end", fontSize: "8pt", color: "#333", lineHeight: 1.7, marginTop: "-3mm", marginBottom: "4mm" }}>
               {group.hotels?.makkah?.name && (
-                <div>Makkah: <b style={{ color: "#0A3D2A" }}>{group.hotels.makkah.name}</b>
+                <div>Makkah 2: <b style={{ color: "#0A3D2A" }}>{group.hotels.makkah.name}</b>
                   {group.hotels.makkah.checkIn && <span style={{ color: "#888" }}> (Check-in: {group.hotels.makkah.checkIn})</span>}
                 </div>
               )}
@@ -100,9 +100,9 @@ export default function PrintHotelList() {
                 <th style={thStyle}>Passport</th>
                 <th style={{ ...thStyle, textAlign: "center" }}>Room No.</th>
                 <th style={{ ...thStyle, textAlign: "center" }}>Bus No.</th>
-                <th style={thStyle}>Makkah Hotel</th>
-                <th style={thStyle}>Makkah Check-in</th>
-                <th style={thStyle}>Makkah Check-out</th>
+                <th style={thStyle}>Makkah 2 Hotel</th>
+                <th style={thStyle}>Makkah 2 Check-in</th>
+                <th style={thStyle}>Makkah 2 Check-out</th>
                 <th style={thStyle}>Madinah Hotel</th>
                 <th style={thStyle}>Madinah Check-in</th>
                 <th style={thStyle}>Madinah Check-out</th>

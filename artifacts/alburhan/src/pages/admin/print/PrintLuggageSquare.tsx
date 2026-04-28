@@ -44,9 +44,9 @@ function buildQrData(p: Pilgrim, group: Group, phone: string): string {
     `Group: ${group.groupName}`,
     `Maktab: ${group.maktabNumber || "N/A"}`,
     `Bus: ${p.busNumber || "N/A"}`,
-    `Hotel Makkah: ${group.hotels?.makkah?.name || "N/A"}`,
+    `Hotel Makkah 1: ${group.hotels?.aziziah?.name || "N/A"}`,
+    `Hotel Makkah 2: ${group.hotels?.makkah?.name || "N/A"}`,
     `Hotel Madinah: ${group.hotels?.madinah?.name || "N/A"}`,
-    `Hotel Aziziah: ${group.hotels?.aziziah?.name || "N/A"}`,
     `India: ${p.mobileIndia || "N/A"}`,
     `Saudi: ${p.mobileSaudi || "N/A"}`,
     `Emergency: ${phone}`,
@@ -177,17 +177,17 @@ export default function PrintLuggageSquare() {
 
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.8mm 2mm", marginBottom: "1mm", fontSize: "6.5pt" }}>
                       <div>
-                        <div style={{ fontSize: "4.5pt", color: "#999", textTransform: "uppercase", fontWeight: 600 }}>HOTEL MAKKAH</div>
+                        <div style={{ fontSize: "4.5pt", color: "#999", textTransform: "uppercase", fontWeight: 600 }}>HOTEL MAKKAH 1</div>
+                        <div style={{ fontWeight: 700, color: "#222", fontSize: "6pt" }}>{group.hotels?.aziziah?.name || "—"}</div>
+                        {group.hotels?.aziziah?.address && <div style={{ fontSize: "4.5pt", color: "#666", lineHeight: 1.2 }}>{group.hotels.aziziah.address}</div>}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: "4.5pt", color: "#999", textTransform: "uppercase", fontWeight: 600 }}>HOTEL MAKKAH 2</div>
                         <div style={{ fontWeight: 700, color: "#222", fontSize: "6pt" }}>{group.hotels?.makkah?.name || "—"}</div>
                       </div>
                       <div>
                         <div style={{ fontSize: "4.5pt", color: "#999", textTransform: "uppercase", fontWeight: 600 }}>HOTEL MADINAH</div>
                         <div style={{ fontWeight: 700, color: "#222", fontSize: "6pt" }}>{group.hotels?.madinah?.name || "—"}</div>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: "4.5pt", color: "#999", textTransform: "uppercase", fontWeight: 600 }}>HOTEL AZIZIA</div>
-                        <div style={{ fontWeight: 700, color: "#222", fontSize: "6pt" }}>{group.hotels?.aziziah?.name || "—"}</div>
-                        {group.hotels?.aziziah?.address && <div style={{ fontSize: "4.5pt", color: "#666", lineHeight: 1.2 }}>{group.hotels.aziziah.address}</div>}
                       </div>
                     </div>
 

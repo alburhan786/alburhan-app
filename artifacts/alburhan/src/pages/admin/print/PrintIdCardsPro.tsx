@@ -35,7 +35,8 @@ function buildQrData(p: Pilgrim, group: Group, phone: string, phoneSaudi: string
   ];
   if (p.mobileIndia) lines.push(`Mobile (India): ${p.mobileIndia}`);
   if (p.mobileSaudi) lines.push(`Mobile (Saudi): ${p.mobileSaudi}`);
-  if (group.hotels?.makkah?.name) lines.push(`Hotel Makkah: ${group.hotels.makkah.name}`);
+  if (group.hotels?.aziziah?.name) lines.push(`Hotel Makkah 1: ${group.hotels.aziziah.name}`);
+  if (group.hotels?.makkah?.name) lines.push(`Hotel Makkah 2: ${group.hotels.makkah.name}`);
   if (group.hotels?.madinah?.name) lines.push(`Hotel Madinah: ${group.hotels.madinah.name}`);
   if (p.roomNumber) lines.push(`Room: ${p.roomNumber}`);
   if (p.busNumber) lines.push(`Bus: ${p.busNumber}`);
@@ -299,7 +300,7 @@ export default function PrintIdCardsPro() {
                       {/* Hotels */}
                       <div style={{ display: "flex", flexDirection: "column", gap: "0.8mm" }}>
                         <div>
-                          <div style={{ fontSize: "3.5pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Hotel Makkah</div>
+                          <div style={{ fontSize: "3.5pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Hotel Makkah 2</div>
                           <div style={{ fontSize: "6pt", fontWeight: 900, color: DARK, lineHeight: 1.2 }}>{group.hotels?.makkah?.name || "—"}</div>
                         </div>
                         <div>

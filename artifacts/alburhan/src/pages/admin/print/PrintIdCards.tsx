@@ -14,7 +14,7 @@ interface Pilgrim {
 }
 interface Group {
   id: string; groupName: string; year: number; maktabNumber?: string;
-  hotels?: { makkah?: { name?: string; address?: string }; madinah?: { name?: string; address?: string } };
+  hotels?: { makkah?: { name?: string; address?: string }; madinah?: { name?: string; address?: string }; aziziah?: { name?: string; address?: string } };
 }
 
 const DARK = "#052316";
@@ -29,7 +29,8 @@ function buildQrData(p: Pilgrim, group: Group, phone: string, phoneSaudi: string
     `Gender: ${p.gender || "N/A"}`,
   ];
   if (p.mobileIndia) lines.push(`Mobile (India): ${p.mobileIndia}`);
-  if (group.hotels?.makkah?.name) lines.push(`Hotel Makkah: ${group.hotels.makkah.name}`);
+  if (group.hotels?.aziziah?.name) lines.push(`Hotel Makkah 1: ${group.hotels.aziziah.name}`);
+  if (group.hotels?.makkah?.name) lines.push(`Hotel Makkah 2: ${group.hotels.makkah.name}`);
   if (group.hotels?.madinah?.name) lines.push(`Hotel Madinah: ${group.hotels.madinah.name}`);
   if (group.maktabNumber) lines.push(`Maktab: ${group.maktabNumber}`);
   lines.push(`Emergency (Saudi): ${phoneSaudi}`);
@@ -255,7 +256,7 @@ export default function PrintIdCards() {
                     <div style={{ display: "flex", alignItems: "flex-start", gap: "1.5mm" }}>
                       <div style={bulletDot} />
                       <div>
-                        <span style={{ color: "#888", fontSize: "4.5pt" }}>Makkah Hotel: </span>
+                        <span style={{ color: "#888", fontSize: "4.5pt" }}>Makkah 2 Hotel: </span>
                         <span style={{ fontWeight: 600 }}>{group.hotels?.makkah?.name || "—"}</span>
                         {group.hotels?.makkah?.address && <div style={{ fontSize: "4pt", color: "#888", marginTop: "0.3mm" }}>{group.hotels.makkah.address}</div>}
                       </div>

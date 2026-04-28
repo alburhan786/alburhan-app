@@ -198,9 +198,9 @@ export default function GroupsManager() {
               <div className="space-y-1 text-sm text-muted-foreground mb-4">
                 {g.flightNumber && <p>Flight: {g.flightNumber}</p>}
                 {g.departureDate && <p>Departure: {g.departureDate}</p>}
-                {g.hotels?.makkah?.name && <p>Makkah: {g.hotels.makkah.name}</p>}
+                {g.hotels?.aziziah?.name && <p>Makkah 1: {g.hotels.aziziah.name}</p>}
+                {g.hotels?.makkah?.name && <p>Makkah 2: {g.hotels.makkah.name}</p>}
                 {g.hotels?.madinah?.name && <p>Madinah: {g.hotels.madinah.name}</p>}
-                {g.hotels?.aziziah?.name && <p>Aziziah: {g.hotels.aziziah.name}</p>}
               </div>
               <div className="flex items-center justify-between border-t pt-4">
                 <div className="flex items-center gap-2 text-primary font-bold">
@@ -240,7 +240,17 @@ export default function GroupsManager() {
               </div>
             </div>
             <div>
-              <h3 className="text-sm font-bold uppercase tracking-wider mb-3">Hotel Makkah</h3>
+              <h3 className="text-sm font-bold uppercase tracking-wider mb-3">Hotel Makkah 1 (Aziziah)</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1"><label className="text-sm font-medium">Name</label><Input value={form.hotelAziziahName} onChange={e => f("hotelAziziahName", e.target.value)} /></div>
+                <div className="space-y-1"><label className="text-sm font-medium">Address</label><Input value={form.hotelAziziahAddress} onChange={e => f("hotelAziziahAddress", e.target.value)} /></div>
+                <div className="space-y-1"><label className="text-sm font-medium">Check-in</label><Input value={form.hotelAziziahCheckIn} onChange={e => f("hotelAziziahCheckIn", e.target.value)} /></div>
+                <div className="space-y-1"><label className="text-sm font-medium">Check-out</label><Input value={form.hotelAziziahCheckOut} onChange={e => f("hotelAziziahCheckOut", e.target.value)} /></div>
+                <div className="col-span-2 space-y-1"><label className="text-sm font-medium">Google Maps Link</label><Input value={form.hotelAziziahGoogleMaps} onChange={e => f("hotelAziziahGoogleMaps", e.target.value)} placeholder="https://maps.google.com/?q=..." /></div>
+              </div>
+            </div>
+            <div>
+              <h3 className="text-sm font-bold uppercase tracking-wider mb-3">Hotel Makkah 2</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1"><label className="text-sm font-medium">Name</label><Input value={form.hotelMakkahName} onChange={e => f("hotelMakkahName", e.target.value)} /></div>
                 <div className="space-y-1"><label className="text-sm font-medium">Address</label><Input value={form.hotelMakkahAddress} onChange={e => f("hotelMakkahAddress", e.target.value)} /></div>
@@ -257,16 +267,6 @@ export default function GroupsManager() {
                 <div className="space-y-1"><label className="text-sm font-medium">Check-in</label><Input value={form.hotelMadinahCheckIn} onChange={e => f("hotelMadinahCheckIn", e.target.value)} /></div>
                 <div className="space-y-1"><label className="text-sm font-medium">Check-out</label><Input value={form.hotelMadinahCheckOut} onChange={e => f("hotelMadinahCheckOut", e.target.value)} /></div>
                 <div className="col-span-2 space-y-1"><label className="text-sm font-medium">Google Maps Link</label><Input value={form.hotelMadinahGoogleMaps} onChange={e => f("hotelMadinahGoogleMaps", e.target.value)} placeholder="https://maps.google.com/?q=..." /></div>
-              </div>
-            </div>
-            <div>
-              <h3 className="text-sm font-bold uppercase tracking-wider mb-3">Hotel Aziziah</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1"><label className="text-sm font-medium">Name</label><Input value={form.hotelAziziahName} onChange={e => f("hotelAziziahName", e.target.value)} /></div>
-                <div className="space-y-1"><label className="text-sm font-medium">Address</label><Input value={form.hotelAziziahAddress} onChange={e => f("hotelAziziahAddress", e.target.value)} /></div>
-                <div className="space-y-1"><label className="text-sm font-medium">Check-in</label><Input value={form.hotelAziziahCheckIn} onChange={e => f("hotelAziziahCheckIn", e.target.value)} /></div>
-                <div className="space-y-1"><label className="text-sm font-medium">Check-out</label><Input value={form.hotelAziziahCheckOut} onChange={e => f("hotelAziziahCheckOut", e.target.value)} /></div>
-                <div className="col-span-2 space-y-1"><label className="text-sm font-medium">Google Maps Link</label><Input value={form.hotelAziziahGoogleMaps} onChange={e => f("hotelAziziahGoogleMaps", e.target.value)} placeholder="https://maps.google.com/?q=..." /></div>
               </div>
             </div>
             <div className="space-y-1">

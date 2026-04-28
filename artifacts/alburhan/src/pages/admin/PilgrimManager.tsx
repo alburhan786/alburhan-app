@@ -911,9 +911,9 @@ export default function PilgrimManager() {
               <div className="space-y-1">
                 <label className="text-sm font-medium">Hotel *</label>
                 <select value={roomForm.hotel} onChange={e => rf("hotel", e.target.value)} className="w-full h-10 px-3 rounded-md border bg-background text-sm">
-                  <option value="makkah">Makkah</option>
+                  <option value="aziziah">Makkah 1 (Aziziah)</option>
+                  <option value="makkah">Makkah 2</option>
                   <option value="madinah">Madinah</option>
-                  <option value="aziziah">Aziziah</option>
                 </select>
               </div>
               <div className="space-y-1">
@@ -975,9 +975,9 @@ export default function PilgrimManager() {
               <div className="space-y-1">
                 <label className="text-sm font-medium">Hotel *</label>
                 <select value={bulkRoomForm.hotel} onChange={e => brf("hotel", e.target.value)} className="w-full h-10 px-3 rounded-md border bg-background text-sm">
-                  <option value="makkah">Makkah</option>
+                  <option value="aziziah">Makkah 1 (Aziziah)</option>
+                  <option value="makkah">Makkah 2</option>
                   <option value="madinah">Madinah</option>
-                  <option value="aziziah">Aziziah</option>
                 </select>
               </div>
               <div className="space-y-1">

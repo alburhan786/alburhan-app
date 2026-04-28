@@ -139,9 +139,9 @@ function RoomSticker({ roomNumber, pilgrims, group, companyName, companyPhone, c
         {/* Hotel rows */}
         {hasHotels && (
           <div style={{ borderTop: "0.5px solid rgba(255,255,255,0.2)", paddingTop: "2mm", marginTop: "1mm" }}>
-            <HotelRow label="Makkah" info={makkah} />
+            <HotelRow label="Makkah 1" info={aziziah} />
+            <HotelRow label="Makkah 2" info={makkah} />
             <HotelRow label="Madinah" info={madinah} />
-            <HotelRow label="Aziziah" info={aziziah} />
           </div>
         )}
       </div>
@@ -270,9 +270,9 @@ export default function PrintRoomStickers() {
           </div>
           {/* Hotel names preview */}
           <div style={{ fontSize: "11px", color: "#0B3D2E", marginTop: "3px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
-            {group.hotels?.makkah?.name && <span>🕌 Makkah: <strong>{group.hotels.makkah.name}</strong></span>}
+            {group.hotels?.aziziah?.name && <span>🕌 Makkah 1: <strong>{group.hotels.aziziah.name}</strong></span>}
+            {group.hotels?.makkah?.name && <span>🕌 Makkah 2: <strong>{group.hotels.makkah.name}</strong></span>}
             {group.hotels?.madinah?.name && <span>🕌 Madinah: <strong>{group.hotels.madinah.name}</strong></span>}
-            {group.hotels?.aziziah?.name && <span>🏨 Aziziah: <strong>{group.hotels.aziziah.name}</strong></span>}
           </div>
         </div>
 
