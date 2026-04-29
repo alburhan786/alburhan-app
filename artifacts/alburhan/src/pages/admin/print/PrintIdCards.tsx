@@ -90,7 +90,7 @@ function LogoHeader({ size, company, showTopFlag }: { size?: "small"; company: C
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: isSmall ? "1mm" : "1.5mm" }}>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
-        <div style={{ fontSize: isSmall ? "14pt" : "18pt", lineHeight: 1 }}>🇮🇳</div>
+        <div style={{ fontSize: isSmall ? "18pt" : "22pt", lineHeight: 1 }}>🇮🇳</div>
       </div>
       <div style={{ flex: 1, textAlign: "center", minWidth: 0, background: "rgba(255,255,255,0.92)", borderRadius: "2px", padding: "0.5mm 1mm" }}>
         <div style={{ fontSize: nameSize, fontWeight: 900, color: DARK, letterSpacing: "0.5px", lineHeight: 1.1 }}>{company.nameShort}</div>

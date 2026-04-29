@@ -167,7 +167,6 @@ export default function PrintIdCardsPro() {
                         <span style={{ fontSize: "4pt", fontWeight: 900, color: GOLD, letterSpacing: "0.5px", textTransform: "uppercase", background: "rgba(255,255,255,0.1)", padding: "0.5mm 1.5mm", borderRadius: "2px" }}>
                           Hajj Pilgrim
                         </span>
-                        <span style={{ fontSize: "8pt", lineHeight: 1 }}>🇮🇳</span>
                       </div>
                     </div>
 
@@ -210,13 +209,21 @@ export default function PrintIdCardsPro() {
 
                       {/* Right content */}
                       <div style={{ flex: 1, padding: "1.5mm 2.5mm 1mm 2.5mm", display: "flex", flexDirection: "column", position: "relative", overflow: "hidden" }}>
-                        {/* Serial */}
-                        <div style={{
-                          fontSize: "20pt", fontWeight: 900, color: GOLD,
-                          lineHeight: 1, letterSpacing: "0.5px",
-                          fontFamily: "'Arial Black', Arial, sans-serif",
-                        }}>
-                          NO: {serial}
+                        {/* QR code — absolute top-right */}
+                        <div style={{ position: "absolute", top: "1mm", right: "1.5mm" }}>
+                          <QRCodeSVG value={buildQrData(p, group, company.phone, company.phoneSaudi)} size={42} level="M" fgColor={DARK} />
+                        </div>
+
+                        {/* Serial + Flag */}
+                        <div style={{ display: "flex", alignItems: "center", gap: "2mm" }}>
+                          <div style={{
+                            fontSize: "20pt", fontWeight: 900, color: GOLD,
+                            lineHeight: 1, letterSpacing: "0.5px",
+                            fontFamily: "'Arial Black', Arial, sans-serif",
+                          }}>
+                            NO: {serial}
+                          </div>
+                          <span style={{ fontSize: "16pt", lineHeight: 1 }}>🇮🇳</span>
                         </div>
                         {/* Name */}
                         <div style={{
@@ -235,11 +242,6 @@ export default function PrintIdCardsPro() {
                           <BulletRow label="Maktab" value={group.maktabNumber} badge />
                           <BulletRow label="India Mobile" value={p.mobileIndia} />
                           <BulletRow label="Saudi Mobile" value={p.mobileSaudi} />
-                        </div>
-
-                        {/* QR code — absolute bottom-right */}
-                        <div style={{ position: "absolute", bottom: "1mm", right: "1.5mm" }}>
-                          <QRCodeSVG value={buildQrData(p, group, company.phone, company.phoneSaudi)} size={50} level="M" fgColor={DARK} />
                         </div>
                       </div>
                     </div>

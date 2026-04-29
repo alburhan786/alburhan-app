@@ -176,7 +176,7 @@ export default function PrintZamzam() {
                   }}>
                     {/* Top: Big flag + Big logo only (no text) */}
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "3mm", marginBottom: "2mm" }}>
-                      <div style={{ fontSize: "28pt", lineHeight: 1, flexShrink: 0 }}>🇮🇳</div>
+                      <div style={{ fontSize: "36pt", lineHeight: 1, flexShrink: 0 }}>🇮🇳</div>
                       {company.logoUrl
                         ? <img src={company.logoUrl} alt="" style={{ width: "28mm", height: "28mm", objectFit: "contain", flexShrink: 0 }} />
                         : <div style={{ width: "28mm", height: "28mm", flexShrink: 0, background: DARK_GREEN, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "14pt" }}>{company.nameShort.slice(0, 1)}</div>
