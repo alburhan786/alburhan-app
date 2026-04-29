@@ -209,8 +209,8 @@ export default function PrintIdCardsPro() {
 
                       {/* Right content */}
                       <div style={{ flex: 1, padding: "1.5mm 2.5mm 1mm 2.5mm", display: "flex", flexDirection: "column", position: "relative", overflow: "hidden" }}>
-                        {/* QR code — absolute top-right */}
-                        <div style={{ position: "absolute", top: "1mm", right: "1.5mm" }}>
+                        {/* QR code — absolute bottom-right */}
+                        <div style={{ position: "absolute", bottom: "1mm", right: "1.5mm" }}>
                           <QRCodeSVG value={buildQrData(p, group, company.phone, company.phoneSaudi)} size={42} level="M" fgColor={DARK} />
                         </div>
 
