@@ -139,10 +139,12 @@ router.post("/verify-otp", async (req, res) => {
 });
 
 router.post("/submit", async (req, res) => {
-  const { mobile, verifiedToken, pilgrimName, bookingId, companyId, groupId, groupName,
+  const { mobile,
     ratingOverall, ratingAccommodationMakkah1, ratingAccommodationMakkah2,
     ratingAccommodationMadinah, ratingTransportation, ratingFood, ratingGuide,
-    ratingVisaDocumentation, comment, whatDidYouLike, suggestions, wouldRecommend } = req.body;
+    ratingVisaDocumentation, comment, whatDidYouLike, suggestions, wouldRecommend,
+    bookingId: clientBookingId,
+  } = req.body;
 
   if (!mobile) {
     res.status(400).json({ message: "Mobile number is required." });
@@ -169,6 +171,59 @@ router.post("/submit", async (req, res) => {
     return;
   }
 
+  const pilgrims = await db
+    .select()
+    .from(pilgrimsTable)
+    .where(eq(pilgrimsTable.mobileIndia, cleanedMobile))
+    .limit(1);
+
+  let pilgrimName: string | null = null;
+  let groupId: string | null = null;
+  let groupName: string | null = null;
+  let companyId: string | null = null;
+  let bookingId: string | null = null;
+
+  if (pilgrims[0]) {
+    pilgrimName = pilgrims[0].fullName;
+    groupId = pilgrims[0].groupId;
+
+    const groups = await db
+      .select()
+      .from(hajjGroupsTable)
+      .where(eq(hajjGroupsTable.id, pilgrims[0].groupId))
+      .limit(1);
+
+    if (groups[0]) {
+      groupName = groups[0].groupName;
+      companyId = groups[0].companyId ?? null;
+    }
+  }
+
+  const bookings = await db
+    .select()
+    .from(bookingsTable)
+    .where(eq(bookingsTable.customerMobile, cleanedMobile))
+    .orderBy(desc(bookingsTable.createdAt))
+    .limit(1);
+
+  if (bookings[0]) {
+    bookingId = bookings[0].bookingNumber;
+  }
+
+  if (clientBookingId && clientBookingId !== bookingId) {
+    const matched = await db
+      .select()
+      .from(bookingsTable)
+      .where(eq(bookingsTable.bookingNumber, clientBookingId))
+      .limit(1);
+
+    if (!matched[0] || matched[0].customerMobile !== cleanedMobile) {
+      res.status(403).json({ message: "Booking ID does not belong to your mobile number." });
+      return;
+    }
+    bookingId = clientBookingId;
+  }
+
   if (bookingId) {
     const existing = await db
       .select({ id: feedbackTable.id })
@@ -191,11 +246,11 @@ router.post("/submit", async (req, res) => {
 
   const [inserted] = await db.insert(feedbackTable).values({
     pilgrimMobile: cleanedMobile,
-    pilgrimName: pilgrimName || null,
-    bookingId: bookingId || null,
-    companyId: companyId || null,
-    groupId: groupId || null,
-    groupName: groupName || null,
+    pilgrimName,
+    bookingId,
+    companyId,
+    groupId,
+    groupName,
     ratingOverall: ratingOverall ? Number(ratingOverall) : null,
     ratingAccommodationMakkah1: ratingAccommodationMakkah1 ? Number(ratingAccommodationMakkah1) : null,
     ratingAccommodationMakkah2: ratingAccommodationMakkah2 ? Number(ratingAccommodationMakkah2) : null,
