@@ -342,17 +342,7 @@ export default function PrintIdCardsPro() {
                           </div>
                           <div style={{ fontSize: "3pt", color: "#15803d", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Rate Trip</div>
                         </div>
-                      ) : (
-                        <img
-                          src={`${BASE}images/india_flag.jpg`}
-                          alt=""
-                          style={{
-                            position: "absolute", bottom: "1mm", right: "2mm",
-                            width: "10mm", height: "10mm", borderRadius: "50%", objectFit: "cover",
-                            border: `1.5px solid ${GOLD}`,
-                          }}
-                        />
-                      )}
+                      ) : null}
 
                       {/* Pilgrim name */}
                       <div style={{ marginTop: "auto", paddingTop: "1mm" }}>
