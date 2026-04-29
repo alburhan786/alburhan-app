@@ -89,7 +89,9 @@ function LogoHeader({ size, company, showTopFlag }: { size?: "small"; company: C
   const tagSize = isSmall ? "3.5pt" : "4.5pt";
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: isSmall ? "1mm" : "1.5mm" }}>
-      <div style={{ width: flagImgSize, flexShrink: 0 }} />
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
+        <img src={BASE + "images/india_flag.jpg"} alt="" style={{ width: flagImgSize, height: flagImgSize, borderRadius: "50%", objectFit: "cover" }} />
+      </div>
       <div style={{ flex: 1, textAlign: "center", minWidth: 0, background: "rgba(255,255,255,0.92)", borderRadius: "2px", padding: "0.5mm 1mm" }}>
         <div style={{ fontSize: nameSize, fontWeight: 900, color: DARK, letterSpacing: "0.5px", lineHeight: 1.1 }}>{company.nameShort}</div>
         <div style={{ fontSize: tagSize, fontWeight: 700, color: GOLD, letterSpacing: "0.5px", lineHeight: 1.2 }}>TOURS & TRAVELS</div>
@@ -99,9 +101,6 @@ function LogoHeader({ size, company, showTopFlag }: { size?: "small"; company: C
           ? <img src={company.logoUrl} alt="" style={{ width: flagImgSize, height: flagImgSize, borderRadius: "50%", objectFit: "cover" }} />
           : <div style={{ width: flagImgSize, height: flagImgSize, borderRadius: "50%", background: DARK, display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "4pt" }}>{company.nameShort.slice(0, 1)}</div>
         }
-        {showTopFlag && (
-          <img src={`${BASE}images/india_flag.jpg`} alt="" style={{ width: isSmall ? "4.5mm" : "5.5mm", height: isSmall ? "4.5mm" : "5.5mm", borderRadius: "50%", objectFit: "cover", border: "0.2mm solid rgba(0,0,0,0.12)" }} />
-        )}
       </div>
     </div>
   );
