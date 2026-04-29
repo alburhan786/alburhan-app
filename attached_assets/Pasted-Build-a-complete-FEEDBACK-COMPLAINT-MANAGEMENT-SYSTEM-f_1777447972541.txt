@@ -1,0 +1,198 @@
+Build a complete FEEDBACK & COMPLAINT MANAGEMENT SYSTEM for my Hajj/Umrah ERP (Al Burhan Tours & Travels) with multi-company support.
+
+IMPORTANT:
+- Do NOT use Aadhaar or biometric data.
+- Use OTP-based verification (SMS/WhatsApp).
+- System must be secure, simple, and scalable.
+
+----------------------------------------
+1) DATABASE STRUCTURE
+----------------------------------------
+
+Create collections/tables:
+
+companies:
+- id
+- name
+- arabic_name
+- logo_url
+- phone
+
+pilgrims:
+- id
+- name
+- mobile
+- booking_id
+- company_id
+- group_id
+
+feedbacks:
+- id
+- pilgrim_id
+- booking_id
+- company_id
+- rating (1–5)
+- service_type (hotel, food, transport, staff, overall)
+- comment
+- is_complaint (boolean)
+- status (open, in_progress, resolved)
+- assigned_to (admin/staff id)
+- created_at
+
+otp_verifications:
+- id
+- mobile
+- otp_code
+- expires_at
+- verified (boolean)
+
+----------------------------------------
+2) FRONTEND (CUSTOMER SIDE)
+----------------------------------------
+
+Create public page:
+URL: /feedback?booking_id=XXXX
+
+Flow:
+1. User enters mobile number
+2. Send OTP
+3. Verify OTP
+4. Fetch pilgrim data (auto-fill name + booking)
+5. Show feedback form
+
+Form Fields:
+- Name (read-only)
+- Booking ID (read-only)
+- Rating (1–5 stars)
+- Service Type (dropdown)
+- Comment (text)
+- Complaint? (checkbox)
+
+Rules:
+- If rating <= 3 → auto set is_complaint = true
+- Prevent multiple submissions per booking (1 per pilgrim)
+
+----------------------------------------
+3) OTP SYSTEM
+----------------------------------------
+
+Create APIs:
+POST /api/send-otp
+POST /api/verify-otp
+
+Logic:
+- Generate 6-digit OTP
+- Save with expiry (5 minutes)
+- Send via SMS or WhatsApp API
+- Verify before allowing feedback submission
+
+----------------------------------------
+4) ADMIN DASHBOARD
+----------------------------------------
+
+Add new sidebar section: "Feedback"
+
+Pages:
+
+A) Feedback Overview
+- Total feedback count
+- Average rating
+- Complaints count
+- Company-wise stats
+
+B) Feedback List
+- Filter by:
+  - Company
+  - Rating
+  - Service type
+  - Status
+- Table columns:
+  Name, Booking ID, Rating, Service, Comment, Status
+
+C) Complaint Management
+- Show only complaints (rating <= 3)
+- Actions:
+  - Assign staff
+  - Change status (open → in_progress → resolved)
+  - Add internal notes
+
+----------------------------------------
+5) AUTOMATION (VERY IMPORTANT)
+----------------------------------------
+
+Auto-send feedback request after:
+
+- Makkah arrival
+- Ziyarat completed
+- Return journey
+
+Message (WhatsApp/SMS):
+Assalamu Alaikum {{name}},
+Please share your feedback:
+https://yourdomain.com/feedback?booking_id={{booking_id}}
+
+----------------------------------------
+6) QR CODE INTEGRATION
+----------------------------------------
+
+Generate QR code for each pilgrim:
+URL → /feedback?booking_id=XXXX
+
+Add QR in:
+- ID Cards
+- Print Center
+
+----------------------------------------
+7) PRINT CENTER UPDATE
+----------------------------------------
+
+Add "Feedback QR" option in print menu.
+
+Include:
+- Name
+- Booking ID
+- QR Code
+
+----------------------------------------
+8) API ENDPOINTS
+----------------------------------------
+
+POST /api/feedback/submit
+GET /api/feedback/list
+GET /api/feedback/stats
+POST /api/feedback/update-status
+
+----------------------------------------
+9) SECURITY RULES
+----------------------------------------
+
+- OTP verification required
+- Booking ID must exist
+- Mobile must match pilgrim
+- Rate limit OTP (max 3 attempts)
+- No sensitive data stored
+
+----------------------------------------
+10) UI STYLE
+----------------------------------------
+
+- Clean, mobile-friendly design
+- Match existing green theme
+- Simple form (easy for elderly users)
+
+----------------------------------------
+GOAL:
+- Genuine feedback only (no fake entries)
+- Easy complaint tracking
+- Protect company reputation
+- Fully automated system
+
+----------------------------------------
+BONUS (IF POSSIBLE):
+- Push notification reminder (Firebase)
+- Export feedback to Excel
+- Dashboard charts (ratings, complaints)
+
+----------------------------------------
+
+Build full frontend + backend working system ready to deploy on Replit.
