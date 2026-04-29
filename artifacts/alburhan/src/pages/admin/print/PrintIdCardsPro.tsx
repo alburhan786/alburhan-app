@@ -155,9 +155,12 @@ export default function PrintIdCardsPro() {
                       <span style={{ fontSize: "4.5pt", fontWeight: 800, color: "#fff", letterSpacing: "0.5px", textTransform: "uppercase" }}>
                         {company.name}
                       </span>
-                      <span style={{ fontSize: "4pt", fontWeight: 900, color: GOLD, letterSpacing: "0.5px", textTransform: "uppercase", background: "rgba(255,255,255,0.1)", padding: "0.5mm 1.5mm", borderRadius: "2px" }}>
-                        Hajj Pilgrim
-                      </span>
+                      <div style={{ display: "flex", alignItems: "center", gap: "1.5mm" }}>
+                        <span style={{ fontSize: "4pt", fontWeight: 900, color: GOLD, letterSpacing: "0.5px", textTransform: "uppercase", background: "rgba(255,255,255,0.1)", padding: "0.5mm 1.5mm", borderRadius: "2px" }}>
+                          Hajj Pilgrim
+                        </span>
+                        <img src={`${BASE}images/india_flag.jpg`} alt="" style={{ width: "5mm", height: "5mm", borderRadius: "50%", objectFit: "cover", border: "0.3mm solid rgba(255,255,255,0.3)" }} />
+                      </div>
                     </div>
 
                     {/* ── Body row ── */}
