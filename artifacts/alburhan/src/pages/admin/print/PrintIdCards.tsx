@@ -81,7 +81,7 @@ function WaveShapesBack() {
   );
 }
 
-function LogoHeader({ size, company }: { size?: "small"; company: CompanyInfo }) {
+function LogoHeader({ size, company, showTopFlag }: { size?: "small"; company: CompanyInfo; showTopFlag?: boolean }) {
   const isSmall = size === "small";
   const flagImgSize = isSmall ? "6mm" : "8mm";
   const nameSize = isSmall ? "7pt" : "8pt";
@@ -102,7 +102,9 @@ function LogoHeader({ size, company }: { size?: "small"; company: CompanyInfo })
           ? <img src={company.logoUrl} alt="" style={{ width: flagImgSize, height: flagImgSize, borderRadius: "50%", objectFit: "cover" }} />
           : <div style={{ width: flagImgSize, height: flagImgSize, borderRadius: "50%", background: DARK, display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "4pt" }}>{company.nameShort.slice(0, 1)}</div>
         }
-        <img src={`${BASE}images/india_flag.jpg`} alt="" style={{ width: isSmall ? "4.5mm" : "5.5mm", height: isSmall ? "4.5mm" : "5.5mm", borderRadius: "50%", objectFit: "cover", border: "0.2mm solid rgba(0,0,0,0.12)" }} />
+        {showTopFlag && (
+          <img src={`${BASE}images/india_flag.jpg`} alt="" style={{ width: isSmall ? "4.5mm" : "5.5mm", height: isSmall ? "4.5mm" : "5.5mm", borderRadius: "50%", objectFit: "cover", border: "0.2mm solid rgba(0,0,0,0.12)" }} />
+        )}
       </div>
     </div>
   );
@@ -180,7 +182,7 @@ export default function PrintIdCards() {
                 <WaveShapes />
 
                 <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", height: "100%", padding: "2.5mm 3mm 0" }}>
-                  <LogoHeader company={company} />
+                  <LogoHeader company={company} showTopFlag />
 
                   <div style={{ display: "flex", justifyContent: "center", marginBottom: "1.5mm" }}>
                     {p.photoUrl ? (
