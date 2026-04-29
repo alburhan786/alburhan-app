@@ -132,6 +132,7 @@ export default function PrintLuggageSquare() {
                   }} />
 
                   <div style={{ position: "relative", zIndex: 1, padding: "2mm 3.5mm 1mm", display: "flex", alignItems: "center", gap: "2mm" }}>
+                    <div style={{ fontSize: "14pt", lineHeight: 1, flexShrink: 0 }}>🇮🇳</div>
                     {company.logoUrl
                       ? <img src={company.logoUrl} alt="" style={{ height: "10mm", objectFit: "contain", flexShrink: 0 }} />
                       : <div style={{ height: "10mm", width: "10mm", flexShrink: 0, background: DARK, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "6pt" }}>{company.nameShort.slice(0, 1)}</div>
