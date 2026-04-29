@@ -267,7 +267,8 @@ function DetailDrawer({ feedback, onClose, onUpdate }: { feedback: Feedback; onC
 }
 
 export default function FeedbackManager() {
-  const [tab, setTab] = useState<"overview" | "list" | "complaints">("overview");
+  type TabId = "overview" | "list" | "complaints";
+  const [tab, setTab] = useState<TabId>("overview");
   const [stats, setStats] = useState<Stats | null>(null);
   const [feedbackList, setFeedbackList] = useState<Feedback[]>([]);
   const [total, setTotal] = useState(0);
@@ -377,7 +378,7 @@ export default function FeedbackManager() {
           ].map(t => (
             <button
               key={t.id}
-              onClick={() => setTab(t.id as any)}
+              onClick={() => setTab(t.id as TabId)}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 tab === t.id ? "bg-white shadow-sm text-primary" : "text-gray-500 hover:text-gray-700"
               }`}

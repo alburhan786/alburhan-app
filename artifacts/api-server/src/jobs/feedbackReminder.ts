@@ -3,7 +3,7 @@ import { db, hajjGroupsTable, pilgrimsTable, bookingsTable } from "@workspace/db
 import { eq, and } from "drizzle-orm";
 import { sendWhatsApp } from "../lib/notifications.js";
 
-const PROD_DOMAIN = "https://alburhantravels.com";
+const PROD_DOMAIN = process.env.PUBLIC_DOMAIN || "https://alburhantravels.com";
 
 const COMPANY_NAMES: Record<string, string> = {
   alburhan: "Al Burhan Tours & Travels",

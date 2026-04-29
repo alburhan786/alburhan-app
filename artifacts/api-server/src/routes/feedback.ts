@@ -237,11 +237,22 @@ router.post("/submit", async (req, res) => {
     }
   }
 
-  const ratings = [ratingOverall, ratingAccommodationMakkah1, ratingAccommodationMakkah2,
-    ratingAccommodationMadinah, ratingTransportation, ratingFood, ratingGuide, ratingVisaDocumentation]
-    .filter(r => r != null && !isNaN(Number(r)))
-    .map(Number);
+  if (!ratingOverall) {
+    res.status(400).json({ message: "Overall rating is required." });
+    return;
+  }
 
+  const allRatingFields = [ratingOverall, ratingAccommodationMakkah1, ratingAccommodationMakkah2,
+    ratingAccommodationMadinah, ratingTransportation, ratingFood, ratingGuide, ratingVisaDocumentation];
+
+  for (const r of allRatingFields) {
+    if (r != null && (isNaN(Number(r)) || Number(r) < 1 || Number(r) > 5)) {
+      res.status(400).json({ message: "Rating values must be between 1 and 5." });
+      return;
+    }
+  }
+
+  const ratings = allRatingFields.filter(r => r != null).map(Number);
   const isComplaint = ratings.some(r => r <= 3);
 
   const [inserted] = await db.insert(feedbackTable).values({
