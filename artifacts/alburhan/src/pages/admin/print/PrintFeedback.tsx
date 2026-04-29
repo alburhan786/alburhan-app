@@ -27,6 +27,7 @@ export default function PrintFeedback() {
   const groupId = params?.groupId || "";
   const [group, setGroup] = useState<Group | null>(null);
   const [pilgrims, setPilgrims] = useState<Pilgrim[]>([]);
+  const [bookingMap, setBookingMap] = useState<Record<string, string>>({});
   const [companyId, setCompanyId] = useState("alburhan");
   const [showQR, setShowQR] = useState(false);
   const company = getCompanyById(companyId);
@@ -60,11 +61,20 @@ export default function PrintFeedback() {
     fetch(`${API}/api/groups/${groupId}/pilgrims`, { credentials: "include" }).then(r => r.json()).then(data => {
       setPilgrims(Array.isArray(data) ? data : data.pilgrims || []);
     });
+    fetch(`${API}/api/feedback/admin/group-bookings/${groupId}`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : {})
+      .then(map => setBookingMap(map))
+      .catch(() => {});
   }, [groupId]);
 
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
 
-  const feedbackUrl = `${PROD_DOMAIN}/feedback`;
+  const feedbackBaseUrl = `${PROD_DOMAIN}/feedback`;
+  function getPilgrimQrUrl(p: Pilgrim): string {
+    const bookingNumber = p.mobileIndia ? bookingMap[p.mobileIndia] : undefined;
+    if (bookingNumber) return `${feedbackBaseUrl}?booking_id=${encodeURIComponent(bookingNumber)}`;
+    return feedbackBaseUrl;
+  }
 
   return (
     <>
@@ -236,7 +246,7 @@ export default function PrintFeedback() {
                     )}
                     <div style={{ display: "flex", justifyContent: "center", marginBottom: "2mm" }}>
                       <QRCodeSVG
-                        value={feedbackUrl}
+                        value={getPilgrimQrUrl(p)}
                         size={80}
                         bgColor="#ffffff"
                         fgColor="#0A3D2A"
@@ -244,7 +254,7 @@ export default function PrintFeedback() {
                       />
                     </div>
                     <div style={{ fontSize: "6.5pt", color: "#555", wordBreak: "break-all" }}>
-                      {feedbackUrl}
+                      {getPilgrimQrUrl(p)}
                     </div>
                     <div style={{ fontSize: "7pt", color: "#0A3D2A", fontWeight: 600, marginTop: "1.5mm" }}>
                       اسکین کریں اور تاثرات دیں

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, feedbackTable, otpsTable, pilgrimsTable, hajjGroupsTable, bookingsTable } from "@workspace/db";
-import { eq, and, gt, lt, desc, count, avg, sql, gte } from "drizzle-orm";
+import { eq, and, gt, desc, count, avg, sql, gte } from "drizzle-orm";
 import { requireAuth, requireAdmin, generateOtp, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendOtpSMS, sendWhatsApp } from "../lib/notifications.js";
 
@@ -52,7 +52,7 @@ router.post("/send-otp", async (req, res) => {
     `Assalamu Alaikum! Your Al Burhan feedback verification OTP is: *${otp}*\n\nValid for 5 minutes. JazakAllah Khair.`
   ).catch(console.error);
 
-  console.log(`[Feedback OTP] Mobile: ${cleanedMobile}, OTP: ${otp}, SMS: ${smsSent}`);
+  console.log(`[Feedback OTP] Mobile: ${cleanedMobile}, SMS: ${smsSent}`);
 
   res.json({ success: true, message: smsSent ? "OTP sent via SMS and WhatsApp" : "OTP sent via WhatsApp" });
 });
@@ -238,6 +238,26 @@ router.get(
       .groupBy(feedbackTable.ratingOverall)
       .orderBy(feedbackTable.ratingOverall);
 
+    const [serviceRow] = await db.select({
+      accommodation1: avg(feedbackTable.ratingAccommodationMakkah1),
+      accommodation2: avg(feedbackTable.ratingAccommodationMakkah2),
+      accommodationMadinah: avg(feedbackTable.ratingAccommodationMadinah),
+      transportation: avg(feedbackTable.ratingTransportation),
+      food: avg(feedbackTable.ratingFood),
+      guide: avg(feedbackTable.ratingGuide),
+      visa: avg(feedbackTable.ratingVisaDocumentation),
+      overall: avg(feedbackTable.ratingOverall),
+    }).from(feedbackTable);
+
+    const byCompanyRaw = await db
+      .select({
+        companyId: feedbackTable.companyId,
+        cnt: count(),
+        avgRating: avg(feedbackTable.ratingOverall),
+      })
+      .from(feedbackTable)
+      .groupBy(feedbackTable.companyId);
+
     res.json({
       total: totalRow.total,
       avgRating: avgRow.avg ? Number(avgRow.avg).toFixed(1) : null,
@@ -247,6 +267,21 @@ router.get(
       resolved: resolvedRow.total,
       resolvedToday: resolvedTodayRow.total,
       ratingDistribution: ratingDist,
+      byServiceType: {
+        "Accommodation (Aziziah)": serviceRow.accommodation1 ? Number(serviceRow.accommodation1).toFixed(1) : null,
+        "Accommodation (Makkah 2)": serviceRow.accommodation2 ? Number(serviceRow.accommodation2).toFixed(1) : null,
+        "Accommodation (Madinah)": serviceRow.accommodationMadinah ? Number(serviceRow.accommodationMadinah).toFixed(1) : null,
+        "Transportation": serviceRow.transportation ? Number(serviceRow.transportation).toFixed(1) : null,
+        "Food & Meals": serviceRow.food ? Number(serviceRow.food).toFixed(1) : null,
+        "Guide / Tour Leader": serviceRow.guide ? Number(serviceRow.guide).toFixed(1) : null,
+        "Visa & Documentation": serviceRow.visa ? Number(serviceRow.visa).toFixed(1) : null,
+        "Overall Experience": serviceRow.overall ? Number(serviceRow.overall).toFixed(1) : null,
+      },
+      byCompany: byCompanyRaw.map(r => ({
+        companyId: r.companyId || "unknown",
+        count: r.cnt,
+        avgRating: r.avgRating ? Number(r.avgRating).toFixed(1) : null,
+      })),
     });
   }
 );
@@ -256,7 +291,7 @@ router.get(
   requireAuth as any,
   requireAdmin as any,
   async (req, res) => {
-    const { status, companyId, isComplaint, page = "1", limit = "50" } = req.query as Record<string, string>;
+    const { status, companyId, isComplaint, minRating, page = "1", limit = "50" } = req.query as Record<string, string>;
 
     const conditions = [];
     if (status && ["open", "in_progress", "resolved"].includes(status)) {
@@ -265,6 +300,9 @@ router.get(
     if (companyId) conditions.push(eq(feedbackTable.companyId, companyId));
     if (isComplaint === "true") conditions.push(eq(feedbackTable.isComplaint, true));
     if (isComplaint === "false") conditions.push(eq(feedbackTable.isComplaint, false));
+    if (minRating && !isNaN(parseInt(minRating))) {
+      conditions.push(gte(feedbackTable.ratingOverall, parseInt(minRating)));
+    }
 
     const pageNum = Math.max(1, parseInt(page));
     const limitNum = Math.min(100, parseInt(limit) || 50);
@@ -288,6 +326,27 @@ router.get(
 );
 
 router.get(
+  "/admin/group-bookings/:groupId",
+  requireAuth as any,
+  requireAdmin as any,
+  async (req, res) => {
+    const { groupId } = req.params;
+    const rows = await db
+      .select()
+      .from(bookingsTable)
+      .where(eq(bookingsTable.groupId, groupId));
+
+    const map: Record<string, string> = {};
+    for (const r of rows) {
+      if (r.customerMobile && r.bookingNumber) {
+        map[r.customerMobile] = r.bookingNumber;
+      }
+    }
+    res.json(map);
+  }
+);
+
+router.get(
   "/admin/:id",
   requireAuth as any,
   requireAdmin as any,
@@ -301,6 +360,8 @@ router.get(
   }
 );
 
+const STATUS_ORDER: Record<string, number> = { open: 0, in_progress: 1, resolved: 2 };
+
 router.patch(
   "/admin/:id",
   requireAuth as any,
@@ -308,8 +369,24 @@ router.patch(
   async (req: AuthenticatedRequest, res) => {
     const { status, assignedTo, internalNotes } = req.body;
 
+    const current = await db.select().from(feedbackTable).where(eq(feedbackTable.id, req.params.id)).limit(1);
+    if (!current[0]) {
+      res.status(404).json({ message: "Feedback not found" });
+      return;
+    }
+
     const updates: Record<string, any> = { updatedAt: new Date() };
-    if (status && ["open", "in_progress", "resolved"].includes(status)) updates.status = status;
+
+    if (status && ["open", "in_progress", "resolved"].includes(status)) {
+      const currentOrder = STATUS_ORDER[current[0].status] ?? 0;
+      const newOrder = STATUS_ORDER[status] ?? 0;
+      if (newOrder < currentOrder) {
+        res.status(400).json({ message: `Cannot move status backward from "${current[0].status}" to "${status}".` });
+        return;
+      }
+      updates.status = status;
+    }
+
     if (assignedTo !== undefined) updates.assignedTo = assignedTo || null;
     if (internalNotes !== undefined) updates.internalNotes = internalNotes || null;
 
@@ -319,10 +396,6 @@ router.patch(
       .where(eq(feedbackTable.id, req.params.id))
       .returning();
 
-    if (!updated) {
-      res.status(404).json({ message: "Feedback not found" });
-      return;
-    }
     res.json(updated);
   }
 );

@@ -273,7 +273,7 @@ export default function FeedbackManager() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<Feedback | null>(null);
-  const [filters, setFilters] = useState({ status: "", companyId: "", isComplaint: "" });
+  const [filters, setFilters] = useState({ status: "", companyId: "", isComplaint: "", minRating: "" });
 
   const fetchStats = useCallback(async () => {
     try {
@@ -291,6 +291,7 @@ export default function FeedbackManager() {
         if (filters.status) params.set("status", filters.status);
         if (filters.companyId) params.set("companyId", filters.companyId);
         if (filters.isComplaint) params.set("isComplaint", filters.isComplaint);
+        if (filters.minRating) params.set("minRating", filters.minRating);
       }
       params.set("limit", "100");
       const r = await fetch(`${API}/api/feedback/admin/list?${params}`, { credentials: "include" });
@@ -484,6 +485,17 @@ export default function FeedbackManager() {
                   <option value="">All Types</option>
                   <option value="true">Complaints Only</option>
                   <option value="false">Positive Only</option>
+                </select>
+                <select
+                  value={filters.minRating}
+                  onChange={e => setFilters(f => ({ ...f, minRating: e.target.value }))}
+                  className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-green-600"
+                >
+                  <option value="">Min Rating</option>
+                  <option value="5">5★ Only</option>
+                  <option value="4">4★ & above</option>
+                  <option value="3">3★ & above</option>
+                  <option value="2">2★ & above</option>
                 </select>
                 <span className="text-sm text-gray-400 ml-auto">{total} records</span>
               </div>

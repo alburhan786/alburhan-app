@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useSearch } from "wouter";
 import { Star, CheckCircle, Send, Smartphone, RotateCcw } from "lucide-react";
+import { getCompanyById, getDefaultCompany, type CompanyInfo } from "@/lib/companies";
 
 const API = import.meta.env.VITE_API_URL || "";
 const BASE = import.meta.env.BASE_URL || "/";
@@ -62,6 +63,7 @@ export default function FeedbackPage() {
   const [mobile, setMobile] = useState("");
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [pilgrimInfo, setPilgrimInfo] = useState<PilgrimInfo | null>(null);
+  const [company, setCompany] = useState<CompanyInfo>(getDefaultCompany());
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [comment, setComment] = useState("");
   const [whatLiked, setWhatLiked] = useState("");
@@ -73,10 +75,9 @@ export default function FeedbackPage() {
   const otpInputs = useRef<HTMLInputElement[]>([]);
 
   useEffect(() => {
-    if (resendTimer > 0) {
-      const t = setTimeout(() => setResendTimer(r => r - 1), 1000);
-      return () => clearTimeout(t);
-    }
+    if (resendTimer <= 0) return;
+    const t = setTimeout(() => setResendTimer(r => r - 1), 1000);
+    return () => clearTimeout(t);
   }, [resendTimer]);
 
   const cleanMobile = (m: string) => m.replace(/\D/g, "").slice(-10);
@@ -125,6 +126,9 @@ export default function FeedbackPage() {
       setPilgrimInfo(data);
       if (bookingIdParam && !data.bookingId) {
         data.bookingId = bookingIdParam;
+      }
+      if (data.companyId) {
+        setCompany(getCompanyById(data.companyId));
       }
       setStep("form");
     } catch (e: any) {
@@ -191,13 +195,15 @@ export default function FeedbackPage() {
     <div className="min-h-screen" style={{ background: "linear-gradient(135deg, #0A3D2A 0%, #1a5c3a 100%)" }}>
       <div className="max-w-lg mx-auto px-4 py-8">
         <div className="text-center mb-8">
-          <img
-            src={`${BASE}images/logo.png`}
-            alt="Al Burhan"
-            className="w-16 h-16 object-contain mx-auto mb-3 brightness-0 invert opacity-90"
-            onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
-          />
-          <h1 className="text-2xl font-bold text-white">Al Burhan Tours & Travels</h1>
+          {company.logoUrl && (
+            <img
+              src={company.logoUrl}
+              alt={company.nameShort}
+              className="w-16 h-16 object-contain mx-auto mb-3 brightness-0 invert opacity-90"
+              onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+            />
+          )}
+          <h1 className="text-2xl font-bold text-white">{company.name}</h1>
           <p className="text-white/70 text-sm mt-1">آپ کا تجربہ ہمارے لیے اہم ہے</p>
           <p className="text-white/70 text-sm">Your feedback matters to us</p>
         </div>
@@ -431,8 +437,8 @@ export default function FeedbackPage() {
                 آپ کے قیمتی تاثرات کا شکریہ۔ اللہ تعالیٰ آپ کی حج/عمرہ کو قبول فرمائے۔
               </p>
               <div className="mt-8 pt-6 border-t border-gray-100">
-                <p className="text-xs text-gray-400">Al Burhan Tours & Travels | Burhanpur M.P.</p>
-                <p className="text-xs text-gray-400">+91 8989701701</p>
+                <p className="text-xs text-gray-400">{company.name}</p>
+                <p className="text-xs text-gray-400">{company.mobile}</p>
               </div>
             </div>
           )}
