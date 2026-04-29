@@ -7,6 +7,7 @@ import { COMPANIES, getCompanyById } from "@/lib/companies";
 
 const API = import.meta.env.VITE_API_URL || "";
 const BASE = import.meta.env.BASE_URL || "/";
+const PROD_DOMAIN = "https://alburhantravels.com";
 
 interface Pilgrim {
   id: string; serialNumber: number; fullName: string; passportNumber?: string;
@@ -84,6 +85,8 @@ export default function PrintIdCardsPro() {
   const company = getCompanyById(companyId);
   const contentRef = useRef<HTMLDivElement>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [showFeedbackQr, setShowFeedbackQr] = useState(false);
+  const [bookingMap, setBookingMap] = useState<Record<string, string>>({});
 
   const handleDownload = useCallback(async () => {
     if (!contentRef.current || pdfLoading) return;
@@ -98,7 +101,8 @@ export default function PrintIdCardsPro() {
     Promise.all([
       fetch(`${API}/api/groups/${groupId}`, { credentials: "include" }).then(r => r.json()),
       fetch(`${API}/api/groups/${groupId}/pilgrims`, { credentials: "include" }).then(r => r.json()),
-    ]).then(([g, p]) => { setGroup(g); setPilgrims(Array.isArray(p) ? p : []); });
+      fetch(`${API}/api/feedback/admin/group-bookings/${groupId}`, { credentials: "include" }).then(r => r.ok ? r.json() : {}),
+    ]).then(([g, p, bm]) => { setGroup(g); setPilgrims(Array.isArray(p) ? p : []); setBookingMap(bm || {}); });
   }, [groupId]);
 
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
@@ -129,6 +133,10 @@ export default function PrintIdCardsPro() {
         <select value={companyId} onChange={e => setCompanyId(e.target.value)} style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "13px", background: "#fff" }}>
           {COMPANIES.map(c => <option key={c.id} value={c.id}>{c.id === "alburhan" ? "Al Burhan Tours & Travels" : c.name}</option>)}
         </select>
+        <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "13px", fontWeight: 500, userSelect: "none" }}>
+          <input type="checkbox" checked={showFeedbackQr} onChange={e => setShowFeedbackQr(e.target.checked)} style={{ width: "15px", height: "15px", cursor: "pointer" }} />
+          Show Feedback QR
+        </label>
         <button onClick={handleDownload} disabled={pdfLoading} style={{ padding: "10px 24px", background: DARK, color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", opacity: pdfLoading ? 0.6 : 1 }}>{pdfLoading ? "Generating PDF..." : "⬇ Download PDF"}</button>
         <button onClick={() => window.print()} style={{ padding: "10px 24px", background: "#fff", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer" }}>🖨 Print</button>
         <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
@@ -321,16 +329,30 @@ export default function PrintIdCardsPro() {
                         </div>
                       </div>
 
-                      {/* India flag — absolute bottom-right */}
-                      <img
-                        src={`${BASE}images/india_flag.jpg`}
-                        alt=""
-                        style={{
-                          position: "absolute", bottom: "1mm", right: "2mm",
-                          width: "10mm", height: "10mm", borderRadius: "50%", objectFit: "cover",
-                          border: `1.5px solid ${GOLD}`,
-                        }}
-                      />
+                      {/* Bottom-right: feedback QR or India flag */}
+                      {showFeedbackQr ? (
+                        <div style={{ position: "absolute", bottom: "1mm", right: "2mm", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5mm" }}>
+                          <div style={{ background: "#fff", padding: "1.5px", borderRadius: "2px", border: "1.5px solid #16a34a" }}>
+                            <QRCodeSVG
+                              value={p.mobileIndia && bookingMap[p.mobileIndia]
+                                ? `${PROD_DOMAIN}/feedback?booking_id=${bookingMap[p.mobileIndia]}`
+                                : `${PROD_DOMAIN}/feedback`}
+                              size={28} level="M" fgColor="#15803d"
+                            />
+                          </div>
+                          <div style={{ fontSize: "3pt", color: "#15803d", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Rate Trip</div>
+                        </div>
+                      ) : (
+                        <img
+                          src={`${BASE}images/india_flag.jpg`}
+                          alt=""
+                          style={{
+                            position: "absolute", bottom: "1mm", right: "2mm",
+                            width: "10mm", height: "10mm", borderRadius: "50%", objectFit: "cover",
+                            border: `1.5px solid ${GOLD}`,
+                          }}
+                        />
+                      )}
 
                       {/* Pilgrim name */}
                       <div style={{ marginTop: "auto", paddingTop: "1mm" }}>
