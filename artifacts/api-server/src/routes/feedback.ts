@@ -255,30 +255,34 @@ router.post("/submit", async (req, res) => {
   const ratings = allRatingFields.filter(r => r != null).map(Number);
   const isComplaint = ratings.some(r => r <= 3);
 
-  const [inserted] = await db.insert(feedbackTable).values({
-    pilgrimMobile: cleanedMobile,
-    pilgrimName,
-    bookingId,
-    companyId,
-    groupId,
-    groupName,
-    ratingOverall: ratingOverall ? Number(ratingOverall) : null,
-    ratingAccommodationMakkah1: ratingAccommodationMakkah1 ? Number(ratingAccommodationMakkah1) : null,
-    ratingAccommodationMakkah2: ratingAccommodationMakkah2 ? Number(ratingAccommodationMakkah2) : null,
-    ratingAccommodationMadinah: ratingAccommodationMadinah ? Number(ratingAccommodationMadinah) : null,
-    ratingTransportation: ratingTransportation ? Number(ratingTransportation) : null,
-    ratingFood: ratingFood ? Number(ratingFood) : null,
-    ratingGuide: ratingGuide ? Number(ratingGuide) : null,
-    ratingVisaDocumentation: ratingVisaDocumentation ? Number(ratingVisaDocumentation) : null,
-    comment: comment || null,
-    whatDidYouLike: whatDidYouLike || null,
-    suggestions: suggestions || null,
-    wouldRecommend: wouldRecommend || null,
-    isComplaint,
-    status: "open",
-  }).returning();
+  try {
+    const [inserted] = await db.insert(feedbackTable).values({
+      pilgrimMobile: cleanedMobile,
+      pilgrimName,
+      bookingId,
+      companyId,
+      groupId,
+      groupName,
+      ratingOverall: ratingOverall ? Number(ratingOverall) : null,
+      ratingAccommodationMakkah1: ratingAccommodationMakkah1 ? Number(ratingAccommodationMakkah1) : null,
+      ratingAccommodationMakkah2: ratingAccommodationMakkah2 ? Number(ratingAccommodationMakkah2) : null,
+      ratingAccommodationMadinah: ratingAccommodationMadinah ? Number(ratingAccommodationMadinah) : null,
+      ratingTransportation: ratingTransportation ? Number(ratingTransportation) : null,
+      ratingFood: ratingFood ? Number(ratingFood) : null,
+      ratingGuide: ratingGuide ? Number(ratingGuide) : null,
+      ratingVisaDocumentation: ratingVisaDocumentation ? Number(ratingVisaDocumentation) : null,
+      comment: comment || null,
+      whatDidYouLike: whatDidYouLike || null,
+      suggestions: suggestions || null,
+      wouldRecommend: wouldRecommend || null,
+      isComplaint,
+    }).returning();
 
-  res.status(201).json({ success: true, id: inserted.id, isComplaint });
+    res.status(201).json({ success: true, id: inserted.id, isComplaint });
+  } catch (err: any) {
+    console.error("[Feedback Submit Error]", err?.message || err);
+    res.status(500).json({ message: err?.message || "Failed to save feedback. Please try again." });
+  }
 });
 
 router.get(
