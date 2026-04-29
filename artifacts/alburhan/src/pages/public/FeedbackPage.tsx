@@ -311,7 +311,7 @@ export default function FeedbackPage() {
           )}
 
           {step === "form" && (
-            <form onSubmit={handleSubmit} className="p-6 md:p-8">
+            <form onSubmit={handleSubmit} noValidate className="p-6 md:p-8">
               <h2 className="text-xl font-bold text-gray-800 mb-1">Your Feedback</h2>
               <p className="text-sm text-gray-500 mb-6">اپنا تجربہ ہمارے ساتھ شیئر کریں</p>
 
