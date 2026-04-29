@@ -29,3 +29,9 @@ id = "Itvyxl4MVdBBCOvWH07o3"
 uri = "file://attached_assets/stock_images/petra-jordan-heritage.jpg"
 type = "image"
 title = "Petra Jordan ancient treasury rose-red rock monument heritage"
+
+[[outputs]]
+id = "7N7yxQd0-q8dCOURZRJDg"
+uri = "file://alburhan_data_export.tar.gz"
+type = "unspecified"
+title = "Database Export (alburhan_data_export.tar.gz)"
