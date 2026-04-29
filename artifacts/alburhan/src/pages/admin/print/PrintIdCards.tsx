@@ -97,11 +97,12 @@ function LogoHeader({ size, company }: { size?: "small"; company: CompanyInfo })
         <div style={{ fontSize: nameSize, fontWeight: 900, color: DARK, letterSpacing: "0.5px", lineHeight: 1.1 }}>{company.nameShort}</div>
         <div style={{ fontSize: tagSize, fontWeight: 700, color: GOLD, letterSpacing: "0.5px", lineHeight: 1.2 }}>TOURS & TRAVELS</div>
       </div>
-      <div style={{ flexShrink: 0 }}>
+      <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: "0.3mm" }}>
         {company.logoUrl
           ? <img src={company.logoUrl} alt="" style={{ width: flagImgSize, height: flagImgSize, borderRadius: "50%", objectFit: "cover" }} />
           : <div style={{ width: flagImgSize, height: flagImgSize, borderRadius: "50%", background: DARK, display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "4pt" }}>{company.nameShort.slice(0, 1)}</div>
         }
+        <img src={`${BASE}images/india_flag.jpg`} alt="" style={{ width: isSmall ? "4.5mm" : "5.5mm", height: isSmall ? "4.5mm" : "5.5mm", borderRadius: "50%", objectFit: "cover", border: "0.2mm solid rgba(0,0,0,0.12)" }} />
       </div>
     </div>
   );
