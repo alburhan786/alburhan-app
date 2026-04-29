@@ -16,6 +16,7 @@ import kycRouter from "./kyc.js";
 import storageRouter from "./storage.js";
 import requestsRouter from "./requests.js";
 import adminPaymentsRouter from "./admin-payments.js";
+import feedbackRouter from "./feedback.js";
 
 const router: IRouter = Router();
 
@@ -35,6 +36,7 @@ router.use("/groups", groupsRouter);
 router.use("/kyc", kycRouter);
 router.use("/requests", requestsRouter);
 router.use("/admin/bookings", adminPaymentsRouter);
+router.use("/feedback", feedbackRouter);
 router.use(storageRouter);
 
 export default router;

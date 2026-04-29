@@ -49,6 +49,8 @@ import PrintCenter from "@/pages/admin/PrintCenter";
 import BroadcastManager from "@/pages/admin/BroadcastManager";
 import KYCManager from "@/pages/admin/KYCManager";
 import KYCPage from "@/pages/customer/KYC";
+import FeedbackPage from "@/pages/public/FeedbackPage";
+import FeedbackManager from "@/pages/admin/FeedbackManager";
 import NotFound from "@/pages/not-found";
 import { useAuth } from "@/hooks/use-auth";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -94,6 +96,7 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/invoice/:bookingNumber" component={Invoice} />
       <Route path="/pay/:bookingNumber" component={PaymentPage} />
+      <Route path="/feedback" component={FeedbackPage} />
 
       {/* Customer Routes */}
       <Route path="/customer/dashboard" component={() => <CustomerRoute component={CustomerDashboard} />} />
@@ -130,6 +133,7 @@ function Router() {
       <Route path="/admin/inquiries" component={() => <AdminRoute component={InquiryManager} />} />
       <Route path="/admin/broadcast" component={() => <AdminRoute component={BroadcastManager} />} />
       <Route path="/admin/kyc" component={() => <AdminRoute component={KYCManager} />} />
+      <Route path="/admin/feedback" component={() => <AdminRoute component={FeedbackManager} />} />
 
       <Route component={NotFound} />
     </Switch>

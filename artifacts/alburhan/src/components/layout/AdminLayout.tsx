@@ -1,18 +1,20 @@
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import {
   LayoutDashboard, PackageSearch, Users, BookOpen, MessageSquare, LogOut,
   ImageIcon, UsersRound, Receipt, ClipboardPlus, ScanLine, BarChart2,
-  Printer, Menu, Megaphone, ShieldCheck, Inbox, PieChart
+  Printer, Menu, Megaphone, ShieldCheck, Inbox, PieChart, Star
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+
+const API = import.meta.env.VITE_API_URL || "";
 
 interface MenuItem {
   icon: React.ElementType;
   label: string;
   href: string;
+  badge?: number;
 }
 
 interface MenuSection {
@@ -20,55 +22,67 @@ interface MenuSection {
   items: MenuItem[];
 }
 
-const MENU: MenuSection[] = [
-  {
-    section: "Overview",
-    items: [
-      { icon: LayoutDashboard, label: "Dashboard", href: "/admin/dashboard" },
-    ],
-  },
-  {
-    section: "Bookings & Finance",
-    items: [
-      { icon: BookOpen, label: "Bookings", href: "/admin/bookings" },
-      { icon: ClipboardPlus, label: "Offline Booking", href: "/admin/offline-bookings" },
-      { icon: Receipt, label: "Invoices", href: "/admin/invoices" },
-      { icon: PieChart, label: "Payment Analytics", href: "/admin/payment-analytics" },
-    ],
-  },
-  {
-    section: "Pilgrims & Groups",
-    items: [
-      { icon: UsersRound, label: "Hajj Groups", href: "/admin/groups" },
-      { icon: ScanLine, label: "QR Tracker", href: "/admin/qr-tracker" },
-      { icon: Printer, label: "Print Center", href: "/admin/print-center" },
-    ],
-  },
-  {
-    section: "Packages & Content",
-    items: [
-      { icon: PackageSearch, label: "Packages", href: "/admin/packages" },
-      { icon: ImageIcon, label: "Gallery", href: "/admin/gallery" },
-    ],
-  },
-  {
-    section: "Customers & Reports",
-    items: [
-      { icon: Users, label: "Customers", href: "/admin/customers" },
-      { icon: ShieldCheck, label: "KYC Management", href: "/admin/kyc" },
-      { icon: Inbox, label: "Package Requests", href: "/admin/requests" },
-      { icon: MessageSquare, label: "Inquiries", href: "/admin/inquiries" },
-      { icon: Megaphone, label: "Broadcast Messages", href: "/admin/broadcast" },
-      { icon: BarChart2, label: "Reports", href: "/admin/reports" },
-    ],
-  },
-];
+function buildMenu(openComplaints: number): MenuSection[] {
+  return [
+    {
+      section: "Overview",
+      items: [
+        { icon: LayoutDashboard, label: "Dashboard", href: "/admin/dashboard" },
+      ],
+    },
+    {
+      section: "Bookings & Finance",
+      items: [
+        { icon: BookOpen, label: "Bookings", href: "/admin/bookings" },
+        { icon: ClipboardPlus, label: "Offline Booking", href: "/admin/offline-bookings" },
+        { icon: Receipt, label: "Invoices", href: "/admin/invoices" },
+        { icon: PieChart, label: "Payment Analytics", href: "/admin/payment-analytics" },
+      ],
+    },
+    {
+      section: "Pilgrims & Groups",
+      items: [
+        { icon: UsersRound, label: "Hajj Groups", href: "/admin/groups" },
+        { icon: ScanLine, label: "QR Tracker", href: "/admin/qr-tracker" },
+        { icon: Printer, label: "Print Center", href: "/admin/print-center" },
+      ],
+    },
+    {
+      section: "Packages & Content",
+      items: [
+        { icon: PackageSearch, label: "Packages", href: "/admin/packages" },
+        { icon: ImageIcon, label: "Gallery", href: "/admin/gallery" },
+      ],
+    },
+    {
+      section: "Customers & Reports",
+      items: [
+        { icon: Users, label: "Customers", href: "/admin/customers" },
+        { icon: ShieldCheck, label: "KYC Management", href: "/admin/kyc" },
+        { icon: Star, label: "Feedback", href: "/admin/feedback", badge: openComplaints },
+        { icon: Inbox, label: "Package Requests", href: "/admin/requests" },
+        { icon: MessageSquare, label: "Inquiries", href: "/admin/inquiries" },
+        { icon: Megaphone, label: "Broadcast Messages", href: "/admin/broadcast" },
+        { icon: BarChart2, label: "Reports", href: "/admin/reports" },
+      ],
+    },
+  ];
+}
 
 export function AdminLayout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const { logout, user } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [openComplaints, setOpenComplaints] = useState(0);
 
+  useEffect(() => {
+    fetch(`${API}/api/feedback/admin/stats`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.openComplaints) setOpenComplaints(Number(data.openComplaints)); })
+      .catch(() => {});
+  }, []);
+
+  const MENU = buildMenu(openComplaints);
   const isActive = (href: string) => location === href || location.startsWith(href + "/");
 
   const SidebarContent = () => (
@@ -93,7 +107,12 @@ export function AdminLayout({ children }: { children: ReactNode }) {
                     : "hover:bg-primary-foreground/10 text-primary-foreground/75 hover:text-white"
                 }`}>
                   <item.icon size={17} />
-                  {item.label}
+                  <span className="flex-1">{item.label}</span>
+                  {item.badge != null && item.badge > 0 && (
+                    <span className="bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                      {item.badge}
+                    </span>
+                  )}
                 </span>
               </Link>
             ))}

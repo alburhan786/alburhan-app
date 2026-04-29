@@ -3,6 +3,7 @@ import { db, usersTable } from "@workspace/db";
 import { inArray } from "drizzle-orm";
 import { ADMIN_MOBILES } from "./routes/auth.js";
 import { startPaymentReminderCron } from "./jobs/paymentReminder.js";
+import { startFeedbackReminderCron } from "./jobs/feedbackReminder.js";
 
 const rawPort = process.env["PORT"];
 
@@ -31,4 +32,5 @@ app.listen(port, async () => {
   }
 
   startPaymentReminderCron();
+  startFeedbackReminderCron();
 });

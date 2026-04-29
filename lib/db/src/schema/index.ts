@@ -13,3 +13,4 @@ export * from "./package_media";
 export * from "./payment_transactions";
 export * from "./reminder_logs";
 export * from "./companies";
+export * from "./feedback";

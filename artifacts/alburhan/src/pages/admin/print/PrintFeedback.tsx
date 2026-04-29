@@ -3,10 +3,13 @@ import { downloadPdf } from "@/lib/pdf-download";
 import { useRoute } from "wouter";
 import { PrintHeader } from "./PrintHeader";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
+import { QRCodeSVG } from "qrcode.react";
 
 const API = import.meta.env.VITE_API_URL || "";
+const PROD_DOMAIN = "https://alburhantravels.com";
 
-interface Group { id: string; groupName: string; year: number; departureDate?: string; returnDate?: string; }
+interface Group { id: string; groupName: string; year: number; departureDate?: string; returnDate?: string; companyId?: string; }
+interface Pilgrim { id: string; serialNumber: number; fullName: string; mobileIndia?: string; passportNumber?: string; }
 
 const categories = [
   "Accommodation — Makkah 1 (Aziziah)",
@@ -23,25 +26,45 @@ export default function PrintFeedback() {
   const [, params] = useRoute("/admin/groups/:groupId/print/feedback");
   const groupId = params?.groupId || "";
   const [group, setGroup] = useState<Group | null>(null);
+  const [pilgrims, setPilgrims] = useState<Pilgrim[]>([]);
   const [companyId, setCompanyId] = useState("alburhan");
+  const [showQR, setShowQR] = useState(false);
   const company = getCompanyById(companyId);
 
-    const contentRef = useRef<HTMLDivElement>(null);
-    const [pdfLoading, setPdfLoading] = useState(false);
+  const formRef = useRef<HTMLDivElement>(null);
+  const qrRef = useRef<HTMLDivElement>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
 
-    const handleDownload = useCallback(async () => {
-      if (!contentRef.current || pdfLoading) return;
-      setPdfLoading(true);
-      try {
-        await downloadPdf(contentRef.current, { filename: `Feedback-Form-${group?.groupName || "group"}.pdf` });
-      } finally { setPdfLoading(false); }
-    }, [group, pdfLoading]);
+  const handleDownloadForm = useCallback(async () => {
+    if (!formRef.current || pdfLoading) return;
+    setPdfLoading(true);
+    try {
+      await downloadPdf(formRef.current, { filename: `Feedback-Form-${group?.groupName || "group"}.pdf` });
+    } finally { setPdfLoading(false); }
+  }, [group, pdfLoading]);
+
+  const handleDownloadQR = useCallback(async () => {
+    if (!qrRef.current || pdfLoading) return;
+    setPdfLoading(true);
+    try {
+      await downloadPdf(qrRef.current, { filename: `Feedback-QR-${group?.groupName || "group"}.pdf` });
+    } finally { setPdfLoading(false); }
+  }, [group, pdfLoading]);
+
   useEffect(() => {
     if (!groupId) return;
-    fetch(`${API}/api/groups/${groupId}`, { credentials: "include" }).then(r => r.json()).then(setGroup);
+    fetch(`${API}/api/groups/${groupId}`, { credentials: "include" }).then(r => r.json()).then(g => {
+      setGroup(g);
+      if (g.companyId) setCompanyId(g.companyId);
+    });
+    fetch(`${API}/api/groups/${groupId}/pilgrims`, { credentials: "include" }).then(r => r.json()).then(data => {
+      setPilgrims(Array.isArray(data) ? data : data.pilgrims || []);
+    });
   }, [groupId]);
 
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
+
+  const feedbackUrl = `${PROD_DOMAIN}/feedback`;
 
   return (
     <>
@@ -58,103 +81,188 @@ export default function PrintFeedback() {
         <select value={companyId} onChange={e => setCompanyId(e.target.value)} style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "13px", background: "#fff" }}>
           {COMPANIES.map(c => <option key={c.id} value={c.id}>{c.id === "alburhan" ? "Al Burhan Tours & Travels" : c.name}</option>)}
         </select>
-        <button onClick={handleDownload} disabled={pdfLoading} style={{ padding: "10px 24px", background: "#0A3D2A", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", opacity: pdfLoading ? 0.6 : 1 }}>{pdfLoading ? "Generating PDF..." : "⬇ Download PDF"}</button>
+        <button
+          onClick={() => setShowQR(false)}
+          style={{ padding: "10px 20px", background: showQR ? "#fff" : "#0A3D2A", color: showQR ? "#374151" : "#fff", border: "1px solid #ccc", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}
+        >
+          📄 Feedback Form
+        </button>
+        <button
+          onClick={() => setShowQR(true)}
+          style={{ padding: "10px 20px", background: showQR ? "#0A3D2A" : "#fff", color: showQR ? "#fff" : "#374151", border: "1px solid #ccc", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}
+        >
+          📱 QR Code Sheet ({pilgrims.length})
+        </button>
+        {!showQR && (
+          <button onClick={handleDownloadForm} disabled={pdfLoading} style={{ padding: "10px 24px", background: "#1d4ed8", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", opacity: pdfLoading ? 0.6 : 1 }}>
+            {pdfLoading ? "Generating..." : "⬇ Download Form PDF"}
+          </button>
+        )}
+        {showQR && (
+          <button onClick={handleDownloadQR} disabled={pdfLoading} style={{ padding: "10px 24px", background: "#1d4ed8", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", opacity: pdfLoading ? 0.6 : 1 }}>
+            {pdfLoading ? "Generating..." : "⬇ Download QR PDF"}
+          </button>
+        )}
         <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
       </div>
 
-      <div ref={contentRef}>
-      <div style={{ padding: "2mm", fontFamily: "'Inter', Arial, sans-serif", maxWidth: "210mm", margin: "0 auto" }}>
-        <PrintHeader title="Customer Feedback Form" subtitle={`${group.groupName} — ${group.year}${group.departureDate ? ` | ${group.departureDate}` : ""}${group.returnDate ? ` to ${group.returnDate}` : ""}`} company={company} />
+      {!showQR && (
+        <div ref={formRef}>
+          <div style={{ padding: "2mm", fontFamily: "'Inter', Arial, sans-serif", maxWidth: "210mm", margin: "0 auto" }}>
+            <PrintHeader title="Customer Feedback Form" subtitle={`${group.groupName} — ${group.year}${group.departureDate ? ` | ${group.departureDate}` : ""}${group.returnDate ? ` to ${group.returnDate}` : ""}`} company={company} />
 
-        <div style={{ marginBottom: "6mm" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4mm", fontSize: "10pt" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "3mm" }}>
-              <span style={{ fontWeight: 600, whiteSpace: "nowrap" }}>Pilgrim Name:</span>
-              <div style={{ flex: 1, borderBottom: "1px solid #999", minHeight: "7mm" }} />
+            <div style={{ marginBottom: "6mm" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4mm", fontSize: "10pt" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "3mm" }}>
+                  <span style={{ fontWeight: 600, whiteSpace: "nowrap" }}>Pilgrim Name:</span>
+                  <div style={{ flex: 1, borderBottom: "1px solid #999", minHeight: "7mm" }} />
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "3mm" }}>
+                  <span style={{ fontWeight: 600, whiteSpace: "nowrap" }}>Mobile:</span>
+                  <div style={{ flex: 1, borderBottom: "1px solid #999", minHeight: "7mm" }} />
+                </div>
+              </div>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "3mm" }}>
-              <span style={{ fontWeight: 600, whiteSpace: "nowrap" }}>Mobile:</span>
-              <div style={{ flex: 1, borderBottom: "1px solid #999", minHeight: "7mm" }} />
-            </div>
-          </div>
-        </div>
 
-        <div style={{ marginBottom: "6mm" }}>
-          <div style={{ fontSize: "9pt", color: "#666", marginBottom: "3mm" }}>
-            Please rate each aspect of your trip on a scale of 1 to 5 (1 = Poor, 5 = Excellent). Mark the appropriate box.
-          </div>
+            <div style={{ marginBottom: "6mm" }}>
+              <div style={{ fontSize: "9pt", color: "#666", marginBottom: "3mm" }}>
+                Please rate each aspect of your trip on a scale of 1 to 5 (1 = Poor, 5 = Excellent). Mark the appropriate box.
+              </div>
 
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "10pt" }}>
-            <thead>
-              <tr>
-                <th style={{ background: "#0A3D2A", color: "#fff", padding: "3mm 4mm", textAlign: "left", fontSize: "8pt", textTransform: "uppercase", letterSpacing: "0.5px", border: "1px solid #0A3D2A" }}>Service Category</th>
-                {[1, 2, 3, 4, 5].map(n => (
-                  <th key={n} style={{ background: "#0A3D2A", color: "#fff", padding: "3mm 2mm", textAlign: "center", fontSize: "8pt", width: "14mm", border: "1px solid #0A3D2A" }}>
-                    <div>{n}</div>
-                    <div style={{ fontSize: "5pt", opacity: 0.8, marginTop: "0.5mm" }}>
-                      {n === 1 ? "Poor" : n === 2 ? "Fair" : n === 3 ? "Good" : n === 4 ? "V.Good" : "Excellent"}
-                    </div>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {categories.map((cat, i) => (
-                <tr key={cat} style={{ background: i % 2 === 0 ? "#fff" : "#f5faf7" }}>
-                  <td style={{ border: "1px solid #ddd", padding: "3mm 4mm", fontWeight: 600 }}>{cat}</td>
-                  {[1, 2, 3, 4, 5].map(n => (
-                    <td key={n} style={{ border: "1px solid #ddd", padding: "3mm 2mm", textAlign: "center" }}>
-                      <div style={{ width: "6mm", height: "6mm", border: "1.5px solid #888", borderRadius: "2px", margin: "0 auto" }} />
-                    </td>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "10pt" }}>
+                <thead>
+                  <tr>
+                    <th style={{ background: "#0A3D2A", color: "#fff", padding: "3mm 4mm", textAlign: "left", fontSize: "8pt", textTransform: "uppercase", letterSpacing: "0.5px", border: "1px solid #0A3D2A" }}>Service Category</th>
+                    {[1, 2, 3, 4, 5].map(n => (
+                      <th key={n} style={{ background: "#0A3D2A", color: "#fff", padding: "3mm 2mm", textAlign: "center", fontSize: "8pt", width: "14mm", border: "1px solid #0A3D2A" }}>
+                        <div>{n}</div>
+                        <div style={{ fontSize: "5pt", opacity: 0.8, marginTop: "0.5mm" }}>
+                          {n === 1 ? "Poor" : n === 2 ? "Fair" : n === 3 ? "Good" : n === 4 ? "V.Good" : "Excellent"}
+                        </div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {categories.map((cat, i) => (
+                    <tr key={cat} style={{ background: i % 2 === 0 ? "#fff" : "#f5faf7" }}>
+                      <td style={{ border: "1px solid #ddd", padding: "3mm 4mm", fontWeight: 600 }}>{cat}</td>
+                      {[1, 2, 3, 4, 5].map(n => (
+                        <td key={n} style={{ border: "1px solid #ddd", padding: "3mm 2mm", textAlign: "center" }}>
+                          <div style={{ width: "6mm", height: "6mm", border: "1.5px solid #888", borderRadius: "2px", margin: "0 auto" }} />
+                        </td>
+                      ))}
+                    </tr>
                   ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                </tbody>
+              </table>
+            </div>
 
-        <div style={{ marginBottom: "6mm" }}>
-          <div style={{ fontWeight: 700, fontSize: "10pt", marginBottom: "2mm" }}>What did you like most about the trip?</div>
-          <div style={{ border: "1px solid #ccc", borderRadius: "4px", minHeight: "22mm", padding: "2mm" }} />
-        </div>
+            <div style={{ marginBottom: "6mm" }}>
+              <div style={{ fontWeight: 700, fontSize: "10pt", marginBottom: "2mm" }}>What did you like most about the trip?</div>
+              <div style={{ border: "1px solid #ccc", borderRadius: "4px", minHeight: "22mm", padding: "2mm" }} />
+            </div>
 
-        <div style={{ marginBottom: "6mm" }}>
-          <div style={{ fontWeight: 700, fontSize: "10pt", marginBottom: "2mm" }}>Areas for improvement / Suggestions:</div>
-          <div style={{ border: "1px solid #ccc", borderRadius: "4px", minHeight: "22mm", padding: "2mm" }} />
-        </div>
+            <div style={{ marginBottom: "6mm" }}>
+              <div style={{ fontWeight: 700, fontSize: "10pt", marginBottom: "2mm" }}>Areas for improvement / Suggestions:</div>
+              <div style={{ border: "1px solid #ccc", borderRadius: "4px", minHeight: "22mm", padding: "2mm" }} />
+            </div>
 
-        <div style={{ marginBottom: "6mm" }}>
-          <div style={{ fontWeight: 700, fontSize: "10pt", marginBottom: "2mm" }}>Would you recommend {company.name} to others?</div>
-          <div style={{ display: "flex", gap: "8mm", fontSize: "10pt", alignItems: "center" }}>
-            <label style={{ display: "flex", alignItems: "center", gap: "2mm" }}>
-              <div style={{ width: "5mm", height: "5mm", border: "1.5px solid #888", borderRadius: "2px" }} />
-              Yes, definitely
-            </label>
-            <label style={{ display: "flex", alignItems: "center", gap: "2mm" }}>
-              <div style={{ width: "5mm", height: "5mm", border: "1.5px solid #888", borderRadius: "2px" }} />
-              Maybe
-            </label>
-            <label style={{ display: "flex", alignItems: "center", gap: "2mm" }}>
-              <div style={{ width: "5mm", height: "5mm", border: "1.5px solid #888", borderRadius: "2px" }} />
-              No
-            </label>
+            <div style={{ marginBottom: "6mm" }}>
+              <div style={{ fontWeight: 700, fontSize: "10pt", marginBottom: "2mm" }}>Would you recommend {company.name} to others?</div>
+              <div style={{ display: "flex", gap: "8mm", fontSize: "10pt", alignItems: "center" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: "2mm" }}>
+                  <div style={{ width: "5mm", height: "5mm", border: "1.5px solid #888", borderRadius: "2px" }} />
+                  Yes, definitely
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: "2mm" }}>
+                  <div style={{ width: "5mm", height: "5mm", border: "1.5px solid #888", borderRadius: "2px" }} />
+                  Maybe
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: "2mm" }}>
+                  <div style={{ width: "5mm", height: "5mm", border: "1.5px solid #888", borderRadius: "2px" }} />
+                  No
+                </label>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: "12mm", paddingTop: "8mm" }}>
+              <div>
+                <div style={{ fontSize: "9pt", color: "#666", marginBottom: "1mm" }}>Date: _______________</div>
+              </div>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ borderTop: "1px solid #333", width: "60mm", paddingTop: "2mm", fontSize: "8pt" }}>Pilgrim Signature</div>
+              </div>
+            </div>
+
+            <div style={{ marginTop: "8mm", textAlign: "center", fontSize: "7pt", color: "#aaa", borderTop: "1px solid #e0e0e0", paddingTop: "3mm" }}>
+              Thank you for your valuable feedback. It helps us serve you better. — {company.name}
+            </div>
           </div>
         </div>
+      )}
 
-        <div style={{ display: "flex", justifyContent: "space-between", marginTop: "12mm", paddingTop: "8mm" }}>
-          <div>
-            <div style={{ fontSize: "9pt", color: "#666", marginBottom: "1mm" }}>Date: _______________</div>
-          </div>
-          <div style={{ textAlign: "center" }}>
-            <div style={{ borderTop: "1px solid #333", width: "60mm", paddingTop: "2mm", fontSize: "8pt" }}>Pilgrim Signature</div>
+      {showQR && (
+        <div ref={qrRef}>
+          <div style={{ padding: "4mm", fontFamily: "'Inter', Arial, sans-serif", maxWidth: "210mm", margin: "0 auto" }}>
+            <div style={{ textAlign: "center", marginBottom: "6mm", borderBottom: "2px solid #0A3D2A", paddingBottom: "4mm" }}>
+              <div style={{ fontSize: "14pt", fontWeight: 700, color: "#0A3D2A" }}>{company.name}</div>
+              <div style={{ fontSize: "10pt", color: "#555", marginTop: "1mm" }}>Feedback QR Codes — {group.groupName} {group.year}</div>
+              <div style={{ fontSize: "8pt", color: "#888", marginTop: "1mm" }}>Pilgrims: scan the QR code to share your feedback online</div>
+            </div>
+
+            {pilgrims.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "20mm", color: "#999", fontSize: "10pt" }}>
+                No pilgrims found for this group.
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "4mm" }}>
+                {pilgrims.map((p) => (
+                  <div key={p.id} style={{
+                    border: "1.5px solid #0A3D2A",
+                    borderRadius: "4mm",
+                    padding: "4mm",
+                    textAlign: "center",
+                    background: "#fff",
+                    breakInside: "avoid",
+                  }}>
+                    <div style={{ fontSize: "8pt", fontWeight: 700, color: "#0A3D2A", marginBottom: "2mm" }}>
+                      #{p.serialNumber} — {p.fullName}
+                    </div>
+                    {p.passportNumber && (
+                      <div style={{ fontSize: "7pt", color: "#888", marginBottom: "2mm" }}>
+                        PP: {p.passportNumber}
+                      </div>
+                    )}
+                    <div style={{ display: "flex", justifyContent: "center", marginBottom: "2mm" }}>
+                      <QRCodeSVG
+                        value={feedbackUrl}
+                        size={80}
+                        bgColor="#ffffff"
+                        fgColor="#0A3D2A"
+                        level="M"
+                      />
+                    </div>
+                    <div style={{ fontSize: "6.5pt", color: "#555", wordBreak: "break-all" }}>
+                      {feedbackUrl}
+                    </div>
+                    <div style={{ fontSize: "7pt", color: "#0A3D2A", fontWeight: 600, marginTop: "1.5mm" }}>
+                      اسکین کریں اور تاثرات دیں
+                    </div>
+                    <div style={{ fontSize: "6.5pt", color: "#888", marginTop: "0.5mm" }}>
+                      Scan to give feedback
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={{ marginTop: "6mm", textAlign: "center", fontSize: "7pt", color: "#aaa", borderTop: "1px solid #e0e0e0", paddingTop: "3mm" }}>
+              {company.name} — Feedback QR Sheet — {group.groupName} {group.year} — {pilgrims.length} Pilgrims
+            </div>
           </div>
         </div>
-
-        <div style={{ marginTop: "8mm", textAlign: "center", fontSize: "7pt", color: "#aaa", borderTop: "1px solid #e0e0e0", paddingTop: "3mm" }}>
-          Thank you for your valuable feedback. It helps us serve you better. — {company.name}
-        </div>
-      </div>
-      </div>
+      )}
     </>
   );
 }
