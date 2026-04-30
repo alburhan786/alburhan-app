@@ -201,14 +201,37 @@ export default function PrintLuggageSquare() {
                       </div>
                     </div>
 
+                    {/* Lost & Found Banner */}
+                    <div style={{ background: "#CC0000", borderRadius: "3px", padding: "1.2mm 3mm", textAlign: "center", marginBottom: "1.5mm" }}>
+                      <div style={{ color: "#fff", fontWeight: 900, fontSize: "8pt", letterSpacing: "0.5px", lineHeight: 1.3, textTransform: "uppercase" }}>
+                        IN CASE OF LOST / FOUND
+                      </div>
+                      <div style={{ color: "#fff", fontWeight: 900, fontSize: "7.5pt", letterSpacing: "0.5px", lineHeight: 1.3, textTransform: "uppercase" }}>
+                        KINDLY CONTACT
+                      </div>
+                    </div>
+
+                    {/* Emergency Contacts */}
+                    <div style={{ display: "flex", justifyContent: "center", gap: "4mm", marginBottom: "1.5mm" }}>
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: "5pt", color: "#999", textTransform: "uppercase", fontWeight: 600, marginBottom: "0.3mm" }}>🇸🇦 Saudi</div>
+                        <div style={{ fontSize: "8pt", fontWeight: 900, color: DARK, letterSpacing: "0.3px" }}>{company.phoneSaudi}</div>
+                      </div>
+                      <div style={{ width: "0.3mm", background: "#ddd", flexShrink: 0 }} />
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: "5pt", color: "#999", textTransform: "uppercase", fontWeight: 600, marginBottom: "0.3mm" }}>🇮🇳 India</div>
+                        <div style={{ fontSize: "8pt", fontWeight: 900, color: DARK, letterSpacing: "0.3px" }}>{company.phone}</div>
+                      </div>
+                    </div>
+
                     <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "2.5mm", marginTop: "auto" }}>
-                      <QRCodeSVG value={buildQrData(p, group, company.phone)} size={48} level="M" />
-                      <Barcode value={p.passportNumber || `H${String((group?.startingSerialNumber ?? 1) - 1 + p.serialNumber).padStart(3, "0")}`} height={20} width={1.3} fontSize={0} />
+                      <QRCodeSVG value={buildQrData(p, group, company.phone)} size={40} level="M" />
+                      <Barcode value={p.passportNumber || `H${String((group?.startingSerialNumber ?? 1) - 1 + p.serialNumber).padStart(3, "0")}`} height={16} width={1.1} fontSize={0} />
                     </div>
                   </div>
 
-                  <div style={{ position: "relative", zIndex: 2, background: DARK, color: GOLD, padding: "1.2mm 3mm", fontSize: "6pt", textAlign: "center", fontWeight: 600, letterSpacing: "0.3px" }}>
-                    Emergency: {company.phoneSaudi} | {company.phone}
+                  <div style={{ position: "relative", zIndex: 2, background: "#FFC107", color: "#CC0000", padding: "1.5mm 3mm", fontSize: "8pt", textAlign: "center", fontWeight: 900, letterSpacing: "1px", textTransform: "uppercase" }}>
+                    BAGGAGE TAG
                   </div>
                 </div>
               </div>
