@@ -1,3 +1,5 @@
+import { HORIZON_LOGO_DATA_URL } from "./horizonLogoData";
+
 const BASE = import.meta.env.BASE_URL || "/";
 
 export interface CompanyInfo {
@@ -41,7 +43,7 @@ export const COMPANIES: CompanyInfo[] = [
     phoneSaudi: "0568780786",
     email: "horizontravels900@yahoo.co.in",
     website: "www.horizontravels.in",
-    logoUrl: `${BASE}images/horizon_logo.png`,
+    logoUrl: HORIZON_LOGO_DATA_URL,
     isDefault: false,
   },
 ];
