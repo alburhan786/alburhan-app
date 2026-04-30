@@ -140,7 +140,7 @@ export default function PrintLuggage() {
                   ? <img src={company.logoUrl} alt="" style={{ height: "20mm", objectFit: "contain" }} />
                   : <div style={{ height: "20mm", width: "20mm", background: DARK, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "12pt" }}>{company.nameShort.slice(0, 1)}</div>
                 }
-                <div style={{ fontSize: "28pt", lineHeight: 1 }}>🇮🇳</div>
+                <div style={{ fontSize: "44pt", lineHeight: 1 }}>🇮🇳</div>
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 900, fontSize: "14pt", color: "#1A7A4A", letterSpacing: "1px", textTransform: "uppercase", lineHeight: 1.1 }}>{company.nameShort}</div>

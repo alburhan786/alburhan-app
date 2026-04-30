@@ -223,7 +223,7 @@ export default function PrintIdCardsPro() {
                           }}>
                             NO: {serial}
                           </div>
-                          <span style={{ fontSize: "22pt", lineHeight: 1 }}>🇮🇳</span>
+                          <span style={{ fontSize: "32pt", lineHeight: 1 }}>🇮🇳</span>
                         </div>
                         {/* Name */}
                         <div style={{
