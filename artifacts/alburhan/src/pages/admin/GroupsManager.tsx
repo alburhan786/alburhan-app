@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit, Trash2, Users, Eye, Printer, ChevronDown } from "lucide-react";
+import { Plus, Edit, Trash2, Users, Eye, Printer, ChevronDown, Hash, Wand2, Save } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 
@@ -85,10 +85,21 @@ export default function GroupsManager() {
   const [form, setForm] = useState(emptyForm);
   const { toast } = useToast();
 
+  // Serial number management state
+  const [serialEdits, setSerialEdits] = useState<Record<string, number>>({});
+  const [serialSaving, setSerialSaving] = useState(false);
+  const [showSerialManager, setShowSerialManager] = useState(false);
+
   const fetchGroups = useCallback(async () => {
     try {
       const res = await fetch(`${API}/api/groups`, { credentials: "include" });
-      if (res.ok) setGroups(await res.json());
+      if (res.ok) {
+        const data: HajjGroup[] = await res.json();
+        setGroups(data);
+        const edits: Record<string, number> = {};
+        data.forEach(g => { edits[g.id] = g.startingSerialNumber || 1; });
+        setSerialEdits(edits);
+      }
     } catch {} finally { setLoading(false); }
   }, []);
 
@@ -170,6 +181,38 @@ export default function GroupsManager() {
     } catch { toast({ title: "Error", variant: "destructive" }); }
   };
 
+  // Auto-number: assign serial numbers sequentially based on group order & pilgrim count
+  const handleAutoNumber = () => {
+    const newEdits: Record<string, number> = {};
+    let next = 1;
+    groups.forEach(g => {
+      newEdits[g.id] = next;
+      next += g.pilgrimCount || 0;
+    });
+    setSerialEdits(newEdits);
+    toast({ title: "Auto-numbered!", description: "Review the ranges below then click Save." });
+  };
+
+  // Save all serial number changes
+  const handleSaveSerials = async () => {
+    setSerialSaving(true);
+    try {
+      const promises = groups.map(g =>
+        fetch(`${API}/api/groups/${g.id}`, {
+          method: "PUT",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ startingSerialNumber: serialEdits[g.id] || 1 }),
+        })
+      );
+      await Promise.all(promises);
+      toast({ title: "Serial numbers saved!", description: "All groups updated successfully." });
+      fetchGroups();
+    } catch {
+      toast({ title: "Error saving serial numbers", variant: "destructive" });
+    } finally { setSerialSaving(false); }
+  };
+
   const f = (key: keyof typeof form, val: any) => setForm(prev => ({ ...prev, [key]: val }));
 
   return (
@@ -179,10 +222,88 @@ export default function GroupsManager() {
           <h1 className="text-3xl font-serif font-bold">Hajj Groups</h1>
           <p className="text-muted-foreground mt-1">Manage pilgrim groups for Hajj & Umrah.</p>
         </div>
-        <Button onClick={openCreate} className="bg-primary text-white gap-2 rounded-xl">
-          <Plus size={18} /> Create Group
-        </Button>
+        <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" onClick={() => setShowSerialManager(v => !v)} className="rounded-xl gap-2 border-amber-400 text-amber-700 hover:bg-amber-50">
+            <Hash size={16} /> Serial Numbers
+          </Button>
+          <Button onClick={openCreate} className="bg-primary text-white gap-2 rounded-xl">
+            <Plus size={18} /> Create Group
+          </Button>
+        </div>
       </div>
+
+      {/* ── Serial Number Manager Panel ── */}
+      {showSerialManager && groups.length > 0 && (
+        <Card className="mb-8 p-6 rounded-2xl border-amber-200 bg-amber-50">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+            <div>
+              <h2 className="text-lg font-bold flex items-center gap-2"><Hash size={18} className="text-amber-600" /> Serial Number Manager</h2>
+              <p className="text-sm text-muted-foreground mt-0.5">Set continuous serial numbers across all groups. Use "Auto-Number" to calculate automatically.</p>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={handleAutoNumber} className="gap-2 rounded-lg border-amber-400 text-amber-700 hover:bg-amber-100">
+                <Wand2 size={15} /> Auto-Number
+              </Button>
+              <Button onClick={handleSaveSerials} disabled={serialSaving} className="gap-2 rounded-lg bg-green-700 hover:bg-green-800 text-white">
+                <Save size={15} /> {serialSaving ? "Saving..." : "Save All"}
+              </Button>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="border-b border-amber-200">
+                  <th className="text-left py-2 px-3 font-semibold text-muted-foreground">#</th>
+                  <th className="text-left py-2 px-3 font-semibold text-muted-foreground">Group Name</th>
+                  <th className="text-center py-2 px-3 font-semibold text-muted-foreground">Pilgrims</th>
+                  <th className="text-center py-2 px-3 font-semibold text-muted-foreground">Starting Serial</th>
+                  <th className="text-center py-2 px-3 font-semibold text-muted-foreground">Range</th>
+                </tr>
+              </thead>
+              <tbody>
+                {groups.map((g, idx) => {
+                  const start = serialEdits[g.id] || 1;
+                  const end = start + g.pilgrimCount - 1;
+                  return (
+                    <tr key={g.id} className={idx % 2 === 0 ? "bg-white/60" : ""}>
+                      <td className="py-2 px-3 text-muted-foreground font-mono">{idx + 1}</td>
+                      <td className="py-2 px-3 font-semibold">{g.groupName}</td>
+                      <td className="py-2 px-3 text-center">
+                        <span className="inline-flex items-center gap-1 bg-primary/10 text-primary rounded-full px-2 py-0.5 text-xs font-bold">
+                          <Users size={11} /> {g.pilgrimCount}
+                        </span>
+                      </td>
+                      <td className="py-2 px-3 text-center">
+                        <Input
+                          type="number"
+                          min="1"
+                          value={serialEdits[g.id] || 1}
+                          onChange={e => setSerialEdits(prev => ({ ...prev, [g.id]: Number(e.target.value) || 1 }))}
+                          className="w-24 mx-auto text-center font-mono font-bold h-8"
+                        />
+                      </td>
+                      <td className="py-2 px-3 text-center">
+                        <span className="font-mono font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded text-xs">
+                          {String(start).padStart(3, "0")} → {g.pilgrimCount > 0 ? String(end).padStart(3, "0") : "—"}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-amber-200">
+                  <td colSpan={2} className="py-2 px-3 font-bold">Total</td>
+                  <td className="py-2 px-3 text-center font-bold text-primary">{groups.reduce((s, g) => s + g.pilgrimCount, 0)}</td>
+                  <td colSpan={2} className="py-2 px-3 text-center text-xs text-muted-foreground">
+                    Grand range: 001 → {String(groups.reduce((s, g) => s + g.pilgrimCount, 0)).padStart(3, "0")}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </Card>
+      )}
 
       {loading ? <div className="py-12 text-center text-muted-foreground animate-pulse">Loading...</div> : groups.length === 0 ? (
         <Card className="p-12 text-center border-dashed border-2">
@@ -193,41 +314,51 @@ export default function GroupsManager() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {groups.map(g => (
-            <Card key={g.id} className="p-6 rounded-2xl border-none shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h3 className="font-bold text-lg">{g.groupName}</h3>
-                  <p className="text-sm text-muted-foreground">Year: {g.year}</p>
+          {groups.map(g => {
+            const start = g.startingSerialNumber || 1;
+            const end = start + g.pilgrimCount - 1;
+            return (
+              <Card key={g.id} className="p-6 rounded-2xl border-none shadow-sm hover:shadow-md transition-shadow">
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <h3 className="font-bold text-lg">{g.groupName}</h3>
+                    <p className="text-sm text-muted-foreground">Year: {g.year}</p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon" onClick={() => openEdit(g)}><Edit size={16} /></Button>
+                    <Button variant="ghost" size="icon" className="text-red-600" onClick={() => handleDelete(g.id)}><Trash2 size={16} /></Button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="icon" onClick={() => openEdit(g)}><Edit size={16} /></Button>
-                  <Button variant="ghost" size="icon" className="text-red-600" onClick={() => handleDelete(g.id)}><Trash2 size={16} /></Button>
+                <div className="space-y-1 text-sm text-muted-foreground mb-3">
+                  {g.flightNumber && <p>Flight: {g.flightNumber}</p>}
+                  {g.departureDate && <p>Departure: {g.departureDate}</p>}
+                  {g.hotels?.aziziah?.name && <p>Makkah 1: {g.hotels.aziziah.name}</p>}
+                  {g.hotels?.makkah?.name && <p>Makkah 2: {g.hotels.makkah.name}</p>}
+                  {g.hotels?.madinah?.name && <p>Madinah: {g.hotels.madinah.name}</p>}
                 </div>
-              </div>
-              <div className="space-y-1 text-sm text-muted-foreground mb-4">
-                {g.flightNumber && <p>Flight: {g.flightNumber}</p>}
-                {g.departureDate && <p>Departure: {g.departureDate}</p>}
-                {g.hotels?.aziziah?.name && <p>Makkah 1: {g.hotels.aziziah.name}</p>}
-                {g.hotels?.makkah?.name && <p>Makkah 2: {g.hotels.makkah.name}</p>}
-                {g.hotels?.madinah?.name && <p>Madinah: {g.hotels.madinah.name}</p>}
-              </div>
-              <div className="flex items-center justify-between border-t pt-4">
-                <div className="flex items-center gap-2 text-primary font-bold">
-                  <Users size={18} />
-                  <span>{g.pilgrimCount} Pilgrims</span>
+                {/* Serial range badge */}
+                <div className="mb-3">
+                  <span className="inline-flex items-center gap-1 text-xs font-mono font-bold bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2.5 py-0.5">
+                    <Hash size={10} /> Serial: {String(start).padStart(3, "0")} – {g.pilgrimCount > 0 ? String(end).padStart(3, "0") : "—"}
+                  </span>
                 </div>
-                <div className="flex gap-2">
-                  <PrintDropdown groupId={g.id} />
-                  <Link href={`/admin/groups/${g.id}/pilgrims`}>
-                    <Button size="sm" variant="outline" className="rounded-lg gap-1">
-                      <Eye size={14} /> Manage
-                    </Button>
-                  </Link>
+                <div className="flex items-center justify-between border-t pt-4">
+                  <div className="flex items-center gap-2 text-primary font-bold">
+                    <Users size={18} />
+                    <span>{g.pilgrimCount} Pilgrims</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <PrintDropdown groupId={g.id} />
+                    <Link href={`/admin/groups/${g.id}/pilgrims`}>
+                      <Button size="sm" variant="outline" className="rounded-lg gap-1">
+                        <Eye size={14} /> Manage
+                      </Button>
+                    </Link>
+                  </div>
                 </div>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
         </div>
       )}
 
@@ -246,7 +377,7 @@ export default function GroupsManager() {
                 <div className="space-y-1"><label className="text-sm font-medium">Return Date</label><Input value={form.returnDate} onChange={e => f("returnDate", e.target.value)} placeholder="e.g. 15 Jul 2027" /></div>
                 <div className="space-y-1"><label className="text-sm font-medium">Flight Number</label><Input value={form.flightNumber} onChange={e => f("flightNumber", e.target.value)} /></div>
                 <div className="space-y-1"><label className="text-sm font-medium">Maktab Number</label><Input value={form.maktabNumber} onChange={e => f("maktabNumber", e.target.value)} /></div>
-                <div className="space-y-1"><label className="text-sm font-medium">Starting Serial No. <span className="text-xs text-muted-foreground">(e.g. 56 if prev group ended at 55)</span></label><Input type="number" min="1" value={form.startingSerialNumber} onChange={e => f("startingSerialNumber", Number(e.target.value))} /></div>
+                <div className="space-y-1"><label className="text-sm font-medium">Starting Serial No. <span className="text-xs text-muted-foreground">(e.g. 79 if prev group ended at 78)</span></label><Input type="number" min="1" value={form.startingSerialNumber} onChange={e => f("startingSerialNumber", Number(e.target.value))} /></div>
                 <div className="space-y-1"><label className="text-sm font-medium">Group Leader</label><Input value={form.groupLeader} onChange={e => f("groupLeader", e.target.value)} placeholder="e.g. Mohammed Altaf" /></div>
               </div>
             </div>
