@@ -1,24 +1,16 @@
 import { useEffect, useState } from "react";
 import { CheckCircle, XCircle, AlertCircle, Shield } from "lucide-react";
 import { MainLayout } from "@/components/layout/MainLayout";
-import { getCompanyById } from "@/lib/companies";
 
 const API = import.meta.env.VITE_API_URL || "";
 
 interface StaffInfo {
-  id: string;
   staffId?: string;
   fullName: string;
-  fatherName?: string;
-  designation?: string;
-  department?: string;
   role: string;
-  companyId: string;
-  groupId?: string;
-  bloodGroup?: string;
+  designation?: string;
   validUpto?: string;
   status: string;
-  mobileIndia?: string;
   photoUrl?: string;
 }
 
@@ -112,9 +104,7 @@ export default function StaffVerify() {
                   )}
                   <div>
                     <h2 className="text-xl font-bold text-gray-900">{staff.fullName}</h2>
-                    {staff.fatherName && <p className="text-sm text-muted-foreground">S/o {staff.fatherName}</p>}
                     {staff.designation && <p className="text-sm font-semibold text-primary">{staff.designation}</p>}
-                    {staff.department && <p className="text-sm text-muted-foreground">{staff.department}</p>}
                     <span className={`inline-block mt-1 text-xs font-bold px-2 py-0.5 rounded-full ${
                       staff.role === "catering_staff" ? "bg-orange-100 text-orange-700" : "bg-blue-100 text-blue-700"
                     }`}>
@@ -128,16 +118,6 @@ export default function StaffVerify() {
                     <div className="flex justify-between py-1.5 border-b border-black/5">
                       <span className="text-muted-foreground font-medium">Employee ID</span>
                       <span className="font-bold font-mono">{staff.staffId}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between py-1.5 border-b border-black/5">
-                    <span className="text-muted-foreground font-medium">Company</span>
-                    <span className="font-semibold">{getCompanyById(staff.companyId).name}</span>
-                  </div>
-                  {staff.bloodGroup && (
-                    <div className="flex justify-between py-1.5 border-b border-black/5">
-                      <span className="text-muted-foreground font-medium">Blood Group</span>
-                      <span className="font-bold text-red-600">{staff.bloodGroup}</span>
                     </div>
                   )}
                   {staff.validUpto && (

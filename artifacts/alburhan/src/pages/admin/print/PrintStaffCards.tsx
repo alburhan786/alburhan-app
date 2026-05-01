@@ -47,7 +47,7 @@ const ROLE_COLORS: Record<string, string> = {
   catering_staff: CATERING_COLOR,
 };
 
-function StaffCardFront({ s }: { s: StaffMember }) {
+function StaffCardFront({ s, groupName }: { s: StaffMember; groupName?: string }) {
   const company = getCompanyById(s.companyId);
   const accentColor = ROLE_COLORS[s.role] || AIRPORT_COLOR;
 
@@ -150,6 +150,17 @@ function StaffCardFront({ s }: { s: StaffMember }) {
           {s.department && (
             <div style={{ fontSize: "4pt", color: "#666", marginBottom: "0.5mm" }}>
               {s.department}
+            </div>
+          )}
+
+          {/* Group */}
+          {groupName && (
+            <div style={{
+              fontSize: "3.8pt", color: "#fff", fontWeight: 700, marginBottom: "0.5mm",
+              background: accentColor, borderRadius: "2px",
+              padding: "0.4mm 1.5mm", display: "inline-block", maxWidth: "fit-content",
+            }}>
+              {groupName}
             </div>
           )}
 
@@ -260,6 +271,20 @@ function StaffCardBack({ s }: { s: StaffMember }) {
         </div>
       </div>
 
+      {/* Arabic motto + emergency note */}
+      <div style={{
+        padding: "0.5mm 3mm", flexShrink: 0,
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+        background: "#fafafa", borderTop: `1px solid ${accentColor}22`,
+      }}>
+        <span style={{ fontSize: "3.5pt", color: "#b91c1c", fontWeight: 700, letterSpacing: "0.2px" }}>
+          If found, please call emergency contact
+        </span>
+        <span style={{ fontSize: "5pt", color: accentColor, fontWeight: 700, fontFamily: "Arial, sans-serif", direction: "rtl" }}>
+          خدمة الحجاج شرف لنا
+        </span>
+      </div>
+
       {/* Footer */}
       <div style={{ background: accentColor, padding: "0.8mm 3mm", flexShrink: 0, textAlign: "center" }}>
         <div style={{ fontSize: "3pt", color: "rgba(255,255,255,0.75)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -275,6 +300,7 @@ function StaffCardBack({ s }: { s: StaffMember }) {
 
 export default function PrintStaffCards() {
   const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [groups, setGroups] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [companyFilter, setCompanyFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
@@ -283,10 +309,18 @@ export default function PrintStaffCards() {
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetch(`${API}/api/staff`, { credentials: "include" })
-      .then(r => r.ok ? r.json() : [])
-      .then(data => { setStaff(Array.isArray(data) ? data : []); setLoading(false); })
-      .catch(() => setLoading(false));
+    Promise.all([
+      fetch(`${API}/api/staff`, { credentials: "include" }).then(r => r.ok ? r.json() : []),
+      fetch(`${API}/api/groups`, { credentials: "include" }).then(r => r.ok ? r.json() : []),
+    ]).then(([staffData, groupsData]) => {
+      setStaff(Array.isArray(staffData) ? staffData : []);
+      const map: Record<string, string> = {};
+      if (Array.isArray(groupsData)) {
+        groupsData.forEach((g: any) => { map[g.id] = g.groupName; });
+      }
+      setGroups(map);
+      setLoading(false);
+    }).catch(() => setLoading(false));
   }, []);
 
   const filtered = staff.filter(s => {
@@ -368,7 +402,7 @@ export default function PrintStaffCards() {
             <div key={pi} className={pi < pages.length - 1 ? "pro-page-break" : ""} style={{ marginBottom: "4mm" }}>
               {/* Front faces */}
               <div className="pro-cards-row">
-                {page.map(s => <StaffCardFront key={`f-${s.id}`} s={s} />)}
+                {page.map(s => <StaffCardFront key={`f-${s.id}`} s={s} groupName={s.groupId ? groups[s.groupId] : undefined} />)}
                 {Array.from({ length: 2 - page.length }).map((_, i) => (
                   <div key={`ph-f-${i}`} className="pro-card" style={{ border: "1px dashed #ddd", opacity: 0.2 }} />
                 ))}

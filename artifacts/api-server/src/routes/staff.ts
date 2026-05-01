@@ -65,19 +65,12 @@ router.get("/verify", async (req, res) => {
     }
     const s = results[0];
     res.json({
-      id: s.id,
       staffId: s.staffId,
       fullName: s.fullName,
-      fatherName: s.fatherName,
-      designation: s.designation,
-      department: s.department,
       role: s.role,
-      companyId: s.companyId,
-      groupId: s.groupId,
-      bloodGroup: s.bloodGroup,
+      designation: s.designation,
       validUpto: s.validUpto,
       status: s.status,
-      mobileIndia: s.mobileIndia,
       photoUrl: s.photoUrl,
     });
   } catch (err) {
@@ -199,7 +192,7 @@ router.post(
       if (existing[0].photoUrl) {
         await deleteFromGCS(existing[0].photoUrl).catch(() => {});
       }
-      const photoUrl = await uploadToGCS(req.file.buffer, req.file.originalname, req.file.mimetype, "private_uploads");
+      const photoUrl = await uploadToGCS(req.file.buffer, req.file.originalname, req.file.mimetype, "uploads");
       await db.update(staffTable).set({ photoUrl, updatedAt: new Date() }).where(eq(staffTable.id, req.params.id));
       res.json({ photoUrl });
     } catch (err) {
