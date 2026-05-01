@@ -62,7 +62,7 @@ function PrintDropdown({ groupId }: { groupId: string }) {
           <Printer size={14} /> Print <ChevronDown size={12} />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-52">
+      <DropdownMenuContent align="end" side="bottom" className="w-52">
         {items.map((item, i) =>
           "sep" in item ? (
             <DropdownMenuSeparator key={`sep-${i}`} />
