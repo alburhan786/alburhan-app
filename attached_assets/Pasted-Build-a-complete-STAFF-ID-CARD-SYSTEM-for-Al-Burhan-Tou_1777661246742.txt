@@ -1,0 +1,160 @@
+Build a complete STAFF ID CARD SYSTEM for Al Burhan Tours & Travels (Hajj 2026).
+
+The system must support two staff types:
+1. Airport Staff
+2. Catering Staff
+
+----------------------------------------
+1) DATABASE STRUCTURE
+----------------------------------------
+
+Create table/collection: staff
+
+Fields:
+- id
+- name
+- father_name
+- mobile
+- photo_url
+- aadhaar_number (optional, masked)
+- role (airport / catering)
+- designation
+- company_name (Al Burhan / others)
+- group_name
+- id_number (auto generated: ABT-STAFF-001)
+- qr_code_url
+- status (active/inactive)
+- created_at
+
+----------------------------------------
+2) ADMIN PANEL
+----------------------------------------
+
+Create "Staff Management" section:
+
+Features:
+- Add Staff
+- Upload Photo
+- Select Role (Airport / Catering)
+- Auto generate ID number
+- Assign group
+- Assign company
+
+Buttons:
+- Generate ID Card
+- Download PDF
+- Print
+
+----------------------------------------
+3) ID CARD DESIGN (FRONT)
+----------------------------------------
+
+Design professional ID card:
+
+Top:
+AL BURHAN TOURS & TRAVELS
+(Logo)
+
+Center:
+Staff Photo
+
+Below:
+Name: {{name}}
+Role: {{role}}
+Designation: {{designation}}
+
+Bottom:
+ID: {{id_number}}
+Group: {{group_name}}
+
+Footer:
+"Serving Pilgrims with Care"
+
+----------------------------------------
+4) ID CARD DESIGN (BACK)
+----------------------------------------
+
+Include:
+
+QR Code (for verification)
+
+Company Details:
+Al Burhan Tours & Travels
+Phone: +91 9893989786
+
+Arabic Text:
+خدمة الحجاج شرف لنا
+
+Emergency Instructions:
+"This ID must be carried at all times"
+
+----------------------------------------
+5) QR CODE SYSTEM
+----------------------------------------
+
+Generate QR:
+URL → /verify-staff?id=ID_NUMBER
+
+Verification page shows:
+- Name
+- Photo
+- Role
+- Status
+
+----------------------------------------
+6) PDF GENERATION
+----------------------------------------
+
+Use HTML → PDF (puppeteer)
+
+Layout:
+- Card size: 3.5 x 2 inch
+- Multiple cards per page (grid)
+
+Download options:
+- Single ID
+- Bulk ID (all staff)
+
+----------------------------------------
+7) API ENDPOINTS
+----------------------------------------
+
+POST /api/staff/create
+GET /api/staff/list
+GET /api/staff/:id
+GET /api/staff/print
+GET /verify-staff?id=
+
+----------------------------------------
+8) PRINT CENTER INTEGRATION
+----------------------------------------
+
+Add in existing Print Center:
+
+- Staff ID Cards
+- Filter:
+   - Company
+   - Role (Airport / Catering)
+   - Group
+
+----------------------------------------
+9) SECURITY
+----------------------------------------
+
+- Mask Aadhaar (show only last 4 digits)
+- QR verification must be public
+- Admin login required for edit
+
+----------------------------------------
+10) UI DESIGN
+----------------------------------------
+
+- Green + Gold theme
+- Clean professional layout
+- Mobile friendly
+
+----------------------------------------
+GOAL:
+Generate professional staff ID cards with QR verification and bulk print support for Hajj 2026 operations.
+
+Make system fully functional in Replit (frontend + backend).
