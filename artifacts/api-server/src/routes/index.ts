@@ -23,20 +23,20 @@ import staffRouter from "./staff.js";
 
 const router: IRouter = Router();
 
-// Temporary: serve patch script for VPS deployment
-router.get("/download-patch", (_req, res) => {
+// Temporary: serve pre-built frontend dist for VPS deployment
+router.get("/download-dist", (_req, res) => {
   const candidates = [
-    "/home/runner/workspace/patch-staff.py",
-    path.resolve(process.cwd(), "../../patch-staff.py"),
-    path.resolve(process.cwd(), "patch-staff.py"),
+    "/home/runner/workspace/frontend-dist.tar.gz",
+    path.resolve(process.cwd(), "../../frontend-dist.tar.gz"),
+    path.resolve(process.cwd(), "frontend-dist.tar.gz"),
   ];
   const found = candidates.find(p => fs.existsSync(p));
   if (found) {
-    res.setHeader("Content-Type", "text/plain; charset=utf-8");
-    res.setHeader("Content-Disposition", 'attachment; filename="patch-staff.py"');
+    res.setHeader("Content-Type", "application/gzip");
+    res.setHeader("Content-Disposition", 'attachment; filename="frontend-dist.tar.gz"');
     res.sendFile(found);
   } else {
-    res.status(404).json({ error: "Patch script not found", tried: candidates });
+    res.status(404).json({ error: "Dist archive not found", tried: candidates });
   }
 });
 
