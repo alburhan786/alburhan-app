@@ -15,7 +15,9 @@ interface StaffMember {
   id: string;
   staffId?: string;
   companyId: string;
+  groupId?: string;
   fullName: string;
+  fatherName?: string;
   designation?: string;
   department?: string;
   role: string;
@@ -24,6 +26,7 @@ interface StaffMember {
   bloodGroup?: string;
   dateOfBirth?: string;
   address?: string;
+  aadhaarLast4?: string;
   emergencyContact?: string;
   emergencyMobile?: string;
   joiningDate?: string;
@@ -35,9 +38,17 @@ interface StaffMember {
   createdAt: string;
 }
 
+interface HajjGroup {
+  id: string;
+  groupName: string;
+  year: number;
+}
+
 const emptyForm = {
   companyId: "alburhan",
+  groupId: "",
   fullName: "",
+  fatherName: "",
   designation: "",
   department: "",
   role: "airport_staff",
@@ -46,6 +57,7 @@ const emptyForm = {
   bloodGroup: "",
   dateOfBirth: "",
   address: "",
+  aadhaarLast4: "",
   emergencyContact: "",
   emergencyMobile: "",
   joiningDate: "",
@@ -63,6 +75,7 @@ const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
 export default function StaffManager() {
   const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [groups, setGroups] = useState<HajjGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -73,23 +86,29 @@ export default function StaffManager() {
   const [uploadTargetId, setUploadTargetId] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const fetchStaff = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     try {
-      const res = await fetch(`${API}/api/staff`, { credentials: "include" });
-      if (res.ok) setStaff(await res.json());
+      const [staffRes, groupsRes] = await Promise.all([
+        fetch(`${API}/api/staff`, { credentials: "include" }),
+        fetch(`${API}/api/groups`, { credentials: "include" }),
+      ]);
+      if (staffRes.ok) setStaff(await staffRes.json());
+      if (groupsRes.ok) setGroups(await groupsRes.json());
     } catch {} finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { fetchStaff(); }, [fetchStaff]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
-  const f = (key: keyof typeof form, val: string) => setForm(prev => ({ ...prev, [key]: val }));
+  const f = (key: keyof typeof emptyForm, val: string) => setForm(prev => ({ ...prev, [key]: val }));
 
   const openCreate = () => { setEditingId(null); setForm(emptyForm); setDialogOpen(true); };
   const openEdit = (s: StaffMember) => {
     setEditingId(s.id);
     setForm({
       companyId: s.companyId,
+      groupId: s.groupId || "",
       fullName: s.fullName,
+      fatherName: s.fatherName || "",
       designation: s.designation || "",
       department: s.department || "",
       role: s.role,
@@ -98,6 +117,7 @@ export default function StaffManager() {
       bloodGroup: s.bloodGroup || "",
       dateOfBirth: s.dateOfBirth || "",
       address: s.address || "",
+      aadhaarLast4: s.aadhaarLast4 || "",
       emergencyContact: s.emergencyContact || "",
       emergencyMobile: s.emergencyMobile || "",
       joiningDate: s.joiningDate || "",
@@ -113,13 +133,18 @@ export default function StaffManager() {
       toast({ title: "Full name is required", variant: "destructive" });
       return;
     }
+    if (form.aadhaarLast4 && !/^\d{4}$/.test(form.aadhaarLast4)) {
+      toast({ title: "Aadhaar last 4 digits must be exactly 4 digits", variant: "destructive" });
+      return;
+    }
     try {
       const url = editingId ? `${API}/api/staff/${editingId}` : `${API}/api/staff`;
+      const body = { ...form, groupId: form.groupId || null };
       const res = await fetch(url, {
         method: editingId ? "PUT" : "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -127,7 +152,7 @@ export default function StaffManager() {
       }
       toast({ title: editingId ? "Staff member updated" : "Staff member created" });
       setDialogOpen(false);
-      fetchStaff();
+      fetchData();
     } catch (err: unknown) {
       toast({ title: "Error", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
     }
@@ -138,7 +163,7 @@ export default function StaffManager() {
     try {
       await fetch(`${API}/api/staff/${id}`, { method: "DELETE", credentials: "include" });
       toast({ title: "Staff member deleted" });
-      fetchStaff();
+      fetchData();
     } catch { toast({ title: "Error deleting", variant: "destructive" }); }
   };
 
@@ -161,7 +186,7 @@ export default function StaffManager() {
       });
       if (!res.ok) throw new Error("Upload failed");
       toast({ title: "Photo uploaded" });
-      fetchStaff();
+      fetchData();
     } catch {
       toast({ title: "Photo upload failed", variant: "destructive" });
     } finally {
@@ -223,7 +248,7 @@ export default function StaffManager() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filtered.map(s => {
-            const company = COMPANIES.find(c => c.id === s.companyId) || COMPANIES[0];
+            const group = groups.find(g => g.id === s.groupId);
             return (
               <Card key={s.id} className="p-4 rounded-2xl border-none shadow-sm hover:shadow-md transition-shadow">
                 <div className="flex items-start gap-3">
@@ -246,11 +271,7 @@ export default function StaffManager() {
                       className="absolute -bottom-1 -right-1 w-5 h-5 bg-primary rounded-full flex items-center justify-center text-white hover:bg-primary/80 transition-colors"
                       title="Upload photo"
                     >
-                      {photoUploading === s.id ? (
-                        <span className="text-[6px]">...</span>
-                      ) : (
-                        <Upload size={10} />
-                      )}
+                      {photoUploading === s.id ? <span className="text-[6px]">...</span> : <Upload size={10} />}
                     </button>
                   </div>
 
@@ -258,6 +279,7 @@ export default function StaffManager() {
                     <div className="flex items-start justify-between gap-1">
                       <div className="min-w-0">
                         <h3 className="font-bold text-sm truncate">{s.fullName}</h3>
+                        {s.fatherName && <p className="text-xs text-muted-foreground truncate">S/o {s.fatherName}</p>}
                         <p className="text-xs text-muted-foreground truncate">{s.designation || "—"}</p>
                       </div>
                       <div className="flex gap-0.5 shrink-0">
@@ -266,34 +288,28 @@ export default function StaffManager() {
                       </div>
                     </div>
 
-                    <div className="mt-1.5 space-y-0.5">
+                    <div className="mt-1 space-y-0.5">
                       <span className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                        s.role === "catering_staff"
-                          ? "bg-orange-100 text-orange-700"
-                          : "bg-blue-100 text-blue-700"
+                        s.role === "catering_staff" ? "bg-orange-100 text-orange-700" : "bg-blue-100 text-blue-700"
                       }`}>
                         {ROLE_LABELS[s.role] || s.role}
                       </span>
                       {s.staffId && <p className="text-[10px] font-mono text-muted-foreground">{s.staffId}</p>}
-                      {s.department && <p className="text-xs text-muted-foreground">{s.department}</p>}
+                      {group && <p className="text-[10px] text-muted-foreground">{group.groupName}</p>}
                     </div>
 
                     <div className="mt-2 flex items-center justify-between">
                       <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                        s.status === "active"
-                          ? "bg-green-100 text-green-700"
-                          : "bg-red-100 text-red-700"
+                        s.status === "active" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
                       }`}>
                         {s.status === "active" ? "Active" : "Inactive"}
                       </span>
-                      {s.validUpto && (
-                        <span className="text-[10px] text-muted-foreground">Valid: {s.validUpto}</span>
-                      )}
+                      {s.validUpto && <span className="text-[10px] text-muted-foreground">Valid: {s.validUpto}</span>}
                     </div>
                   </div>
                 </div>
                 <div className="mt-3 pt-2 border-t text-[10px] text-muted-foreground">
-                  {company.nameShort}
+                  {COMPANIES.find(c => c.id === s.companyId)?.nameShort || s.companyId}
                 </div>
               </Card>
             );
@@ -317,6 +333,10 @@ export default function StaffManager() {
                   <label className="text-sm font-medium">Full Name *</label>
                   <Input value={form.fullName} onChange={e => f("fullName", e.target.value)} placeholder="e.g. Mohammed Altaf" />
                 </div>
+                <div className="col-span-2 space-y-1">
+                  <label className="text-sm font-medium">Father's Name</label>
+                  <Input value={form.fatherName} onChange={e => f("fatherName", e.target.value)} placeholder="e.g. Abdul Rahman" />
+                </div>
                 <div className="space-y-1">
                   <label className="text-sm font-medium">Company</label>
                   <select value={form.companyId} onChange={e => f("companyId", e.target.value)} className="w-full h-9 px-3 border border-input rounded-md text-sm bg-background">
@@ -339,6 +359,13 @@ export default function StaffManager() {
                   <Input value={form.department} onChange={e => f("department", e.target.value)} placeholder="e.g. Operations" />
                 </div>
                 <div className="space-y-1">
+                  <label className="text-sm font-medium">Hajj Group (optional)</label>
+                  <select value={form.groupId} onChange={e => f("groupId", e.target.value)} className="w-full h-9 px-3 border border-input rounded-md text-sm bg-background">
+                    <option value="">No group</option>
+                    {groups.map(g => <option key={g.id} value={g.id}>{g.groupName} ({g.year})</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1">
                   <label className="text-sm font-medium">Employee Code</label>
                   <Input value={form.employeeCode} onChange={e => f("employeeCode", e.target.value)} placeholder="e.g. EMP-001" />
                 </div>
@@ -354,7 +381,7 @@ export default function StaffManager() {
 
             {/* Contact */}
             <div>
-              <h3 className="text-sm font-bold uppercase tracking-wider mb-3 text-muted-foreground">Contact</h3>
+              <h3 className="text-sm font-bold uppercase tracking-wider mb-3 text-muted-foreground">Contact & Identity</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-sm font-medium">Mobile (India)</label>
@@ -363,6 +390,15 @@ export default function StaffManager() {
                 <div className="space-y-1">
                   <label className="text-sm font-medium">Date of Birth</label>
                   <Input value={form.dateOfBirth} onChange={e => f("dateOfBirth", e.target.value)} placeholder="e.g. 15 Jan 1990" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">Aadhaar Last 4 Digits</label>
+                  <Input
+                    value={form.aadhaarLast4}
+                    onChange={e => f("aadhaarLast4", e.target.value.replace(/\D/g, "").slice(0, 4))}
+                    placeholder="e.g. 7890"
+                    maxLength={4}
+                  />
                 </div>
                 <div className="col-span-2 space-y-1">
                   <label className="text-sm font-medium">Address</label>

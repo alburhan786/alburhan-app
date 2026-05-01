@@ -10,7 +10,9 @@ interface StaffMember {
   id: string;
   staffId?: string;
   companyId: string;
+  groupId?: string;
   fullName: string;
+  fatherName?: string;
   designation?: string;
   department?: string;
   role: string;
@@ -19,6 +21,7 @@ interface StaffMember {
   bloodGroup?: string;
   dateOfBirth?: string;
   address?: string;
+  aadhaarLast4?: string;
   emergencyContact?: string;
   emergencyMobile?: string;
   joiningDate?: string;
@@ -28,12 +31,11 @@ interface StaffMember {
   status: string;
 }
 
-const DARK = "#0B3D2E";
 const GOLD = "#C9A23F";
 const AIRPORT_COLOR = "#1e3a5f";
 const CATERING_COLOR = "#7c2d12";
 const W = "85mm";
-const H = "55mm";
+const H = "54mm";
 
 const ROLE_LABELS: Record<string, string> = {
   airport_staff: "AIRPORT STAFF",
@@ -45,9 +47,9 @@ const ROLE_COLORS: Record<string, string> = {
   catering_staff: CATERING_COLOR,
 };
 
-function StaffCardFront({ s, companyId }: { s: StaffMember; companyId: string }) {
-  const company = getCompanyById(companyId || s.companyId);
-  const accentColor = ROLE_COLORS[s.role] || DARK;
+function StaffCardFront({ s }: { s: StaffMember }) {
+  const company = getCompanyById(s.companyId);
+  const accentColor = ROLE_COLORS[s.role] || AIRPORT_COLOR;
 
   return (
     <div className="pro-card" style={{ background: "#fff" }}>
@@ -55,15 +57,15 @@ function StaffCardFront({ s, companyId }: { s: StaffMember; companyId: string })
       <div style={{
         background: accentColor,
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "1.5mm 3mm", flexShrink: 0, minHeight: "7mm",
+        padding: "1.5mm 3mm", flexShrink: 0, minHeight: "6.5mm",
       }}>
-        <span style={{ fontSize: "4pt", fontWeight: 800, color: "#fff", letterSpacing: "0.5px", textTransform: "uppercase" }}>
+        <span style={{ fontSize: "3.8pt", fontWeight: 800, color: "#fff", letterSpacing: "0.4px", textTransform: "uppercase" }}>
           {company.name}
         </span>
         <span style={{
-          fontSize: "4pt", fontWeight: 900, color: GOLD,
-          background: "rgba(255,255,255,0.12)", padding: "0.5mm 1.5mm",
-          borderRadius: "2px", letterSpacing: "0.5px", textTransform: "uppercase",
+          fontSize: "3.8pt", fontWeight: 900, color: GOLD,
+          background: "rgba(255,255,255,0.12)", padding: "0.4mm 1.5mm",
+          borderRadius: "2px", letterSpacing: "0.4px", textTransform: "uppercase",
         }}>
           {ROLE_LABELS[s.role] || "STAFF"}
         </span>
@@ -73,25 +75,24 @@ function StaffCardFront({ s, companyId }: { s: StaffMember; companyId: string })
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         {/* Left sidebar */}
         <div style={{
-          width: "26mm", flexShrink: 0,
-          background: "#f5f7fa",
+          width: "25mm", flexShrink: 0, background: "#f5f7fa",
           display: "flex", flexDirection: "column", alignItems: "center",
-          padding: "2mm 1.5mm", gap: "1mm",
+          padding: "1.5mm 1.5mm", gap: "1mm",
         }}>
           {company.logoUrl
-            ? <img src={company.logoUrl} alt="" style={{ width: "10mm", height: "10mm", objectFit: "contain" }} />
-            : <div style={{ width: "10mm", height: "10mm", background: accentColor, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "7pt" }}>{company.nameShort.slice(0, 1)}</div>
+            ? <img src={company.logoUrl} alt="" style={{ width: "9mm", height: "9mm", objectFit: "contain" }} />
+            : <div style={{ width: "9mm", height: "9mm", background: accentColor, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "6pt" }}>{company.nameShort.slice(0, 1)}</div>
           }
           <div style={{ flex: 1, width: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
             {s.photoUrl ? (
               <img
                 src={`${API}${s.photoUrl}`}
                 alt=""
-                style={{ width: "18mm", height: "20mm", objectFit: "cover", border: `2px solid ${GOLD}`, borderRadius: "2px" }}
+                style={{ width: "17mm", height: "19mm", objectFit: "cover", border: `2px solid ${GOLD}`, borderRadius: "2px" }}
               />
             ) : (
               <div style={{
-                width: "18mm", height: "20mm", background: "#e8ede8",
+                width: "17mm", height: "19mm", background: "#e8ede8",
                 border: `2px solid ${GOLD}`, borderRadius: "2px",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 fontSize: "4pt", color: "#aaa", fontWeight: 700,
@@ -109,66 +110,71 @@ function StaffCardFront({ s, companyId }: { s: StaffMember; companyId: string })
         </div>
 
         {/* Right content */}
-        <div style={{ flex: 1, padding: "2mm 2.5mm 1mm", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ flex: 1, padding: "1.5mm 2mm 1mm", display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
           {/* Staff ID */}
-          <div style={{
-            fontSize: "5pt", fontWeight: 900, color: accentColor,
-            letterSpacing: "0.5px", marginBottom: "0.5mm",
-            fontFamily: "'Arial Black', Arial, sans-serif",
-          }}>
-            {s.staffId || s.employeeCode || "ID: —"}
-          </div>
+          {s.staffId && (
+            <div style={{
+              fontSize: "4.5pt", fontWeight: 900, color: accentColor,
+              letterSpacing: "0.5px", marginBottom: "0.5mm",
+              fontFamily: "'Arial Black', Arial, sans-serif",
+            }}>
+              {s.staffId}
+            </div>
+          )}
 
           {/* Name */}
           <div style={{
-            fontSize: "8.5pt", fontWeight: 900, color: "#111",
+            fontSize: "8pt", fontWeight: 900, color: "#111",
             textTransform: "uppercase", lineHeight: 1.15,
-            wordBreak: "break-word", marginBottom: "1mm",
+            wordBreak: "break-word", marginBottom: "0.3mm",
+            maxWidth: "calc(100% - 2mm)",
           }}>
             {s.fullName}
           </div>
 
+          {/* Father's name */}
+          {s.fatherName && (
+            <div style={{ fontSize: "4pt", color: "#555", marginBottom: "0.5mm", lineHeight: 1.2 }}>
+              S/o {s.fatherName}
+            </div>
+          )}
+
           {/* Designation */}
           {s.designation && (
-            <div style={{ fontSize: "5pt", fontWeight: 700, color: accentColor, marginBottom: "0.5mm", lineHeight: 1.2 }}>
+            <div style={{ fontSize: "5pt", fontWeight: 700, color: accentColor, marginBottom: "0.3mm", lineHeight: 1.2 }}>
               {s.designation}
             </div>
           )}
 
           {/* Department */}
           {s.department && (
-            <div style={{ fontSize: "4.5pt", color: "#666", marginBottom: "1mm" }}>
+            <div style={{ fontSize: "4pt", color: "#666", marginBottom: "0.5mm" }}>
               {s.department}
             </div>
           )}
 
-          <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: "0.5mm" }}>
+          <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: "0.4mm" }}>
             {s.mobileIndia && (
               <div style={{ display: "flex", gap: "1mm", alignItems: "center" }}>
-                <span style={{ fontSize: "3.5pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px", minWidth: "12mm" }}>Mobile</span>
+                <span style={{ fontSize: "3pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px", minWidth: "11mm" }}>Mobile</span>
                 <span style={{ fontSize: "4.5pt", fontWeight: 800, color: "#111" }}>{s.mobileIndia}</span>
               </div>
             )}
             {s.validUpto && (
               <div style={{ display: "flex", gap: "1mm", alignItems: "center" }}>
-                <span style={{ fontSize: "3.5pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px", minWidth: "12mm" }}>Valid Upto</span>
+                <span style={{ fontSize: "3pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px", minWidth: "11mm" }}>Valid Upto</span>
                 <span style={{ fontSize: "4.5pt", fontWeight: 900, color: "#b91c1c" }}>{s.validUpto}</span>
               </div>
             )}
           </div>
 
           {/* 🇮🇳 Flag */}
-          <div style={{ position: "absolute" as const, bottom: "1mm", right: "2mm", fontSize: "18pt", lineHeight: 1 }}>
-            🇮🇳
-          </div>
+          <span style={{ position: "absolute", bottom: "1mm", right: "1.5mm", fontSize: "16pt", lineHeight: 1 }}>🇮🇳</span>
         </div>
       </div>
 
       {/* Footer strip */}
-      <div style={{
-        background: accentColor, padding: "1mm 3mm",
-        textAlign: "center", flexShrink: 0,
-      }}>
+      <div style={{ background: accentColor, padding: "0.8mm 3mm", textAlign: "center", flexShrink: 0 }}>
         <div style={{ fontSize: "3pt", color: "rgba(255,255,255,0.75)", letterSpacing: "0.3px" }}>
           {company.nameShort} | {company.phone}
         </div>
@@ -177,11 +183,11 @@ function StaffCardFront({ s, companyId }: { s: StaffMember; companyId: string })
   );
 }
 
-function StaffCardBack({ s, companyId }: { s: StaffMember; companyId: string }) {
-  const company = getCompanyById(companyId || s.companyId);
-  const accentColor = ROLE_COLORS[s.role] || DARK;
-  const verifyUrl = s.qrToken
-    ? `${PROD_DOMAIN}/verify-staff/${s.qrToken}`
+function StaffCardBack({ s }: { s: StaffMember }) {
+  const company = getCompanyById(s.companyId);
+  const accentColor = ROLE_COLORS[s.role] || AIRPORT_COLOR;
+  const verifyUrl = s.staffId
+    ? `${PROD_DOMAIN}/verify-staff?id=${encodeURIComponent(s.staffId)}`
     : `${PROD_DOMAIN}/verify-staff`;
 
   return (
@@ -190,43 +196,44 @@ function StaffCardBack({ s, companyId }: { s: StaffMember; companyId: string }) 
       <div style={{
         background: accentColor, padding: "1.5mm 3mm",
         display: "flex", alignItems: "center", justifyContent: "center",
-        flexShrink: 0, minHeight: "7mm",
+        flexShrink: 0, minHeight: "6.5mm",
       }}>
-        <span style={{ fontSize: "4.5pt", fontWeight: 900, color: "#fff", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+        <span style={{ fontSize: "4pt", fontWeight: 900, color: "#fff", textTransform: "uppercase", letterSpacing: "0.5px" }}>
           Employee ID Card — {company.nameShort}
         </span>
       </div>
 
       {/* Body */}
-      <div style={{ flex: 1, display: "flex", padding: "2mm 3mm 1mm", gap: "3mm", overflow: "hidden" }}>
+      <div style={{ flex: 1, display: "flex", padding: "1.5mm 3mm 1mm", gap: "3mm", overflow: "hidden" }}>
         {/* Left: info */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "1mm" }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "0.8mm", overflow: "hidden" }}>
           <div>
-            <div style={{ fontSize: "3.5pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px" }}>Employee Name</div>
-            <div style={{ fontSize: "6pt", fontWeight: 900, color: "#111", textTransform: "uppercase", lineHeight: 1.2 }}>{s.fullName}</div>
+            <div style={{ fontSize: "3pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px" }}>Name</div>
+            <div style={{ fontSize: "5.5pt", fontWeight: 900, color: "#111", textTransform: "uppercase", lineHeight: 1.2 }}>{s.fullName}</div>
+            {s.fatherName && <div style={{ fontSize: "4pt", color: "#555" }}>S/o {s.fatherName}</div>}
           </div>
           {s.designation && (
             <div>
-              <div style={{ fontSize: "3.5pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px" }}>Designation</div>
-              <div style={{ fontSize: "5pt", fontWeight: 700, color: accentColor }}>{s.designation}</div>
-            </div>
-          )}
-          {s.department && (
-            <div>
-              <div style={{ fontSize: "3.5pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px" }}>Department</div>
-              <div style={{ fontSize: "5pt", fontWeight: 700, color: "#111" }}>{s.department}</div>
+              <div style={{ fontSize: "3pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px" }}>Designation</div>
+              <div style={{ fontSize: "4.5pt", fontWeight: 700, color: accentColor }}>{s.designation}</div>
             </div>
           )}
           {s.address && (
             <div>
-              <div style={{ fontSize: "3.5pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px" }}>Address</div>
-              <div style={{ fontSize: "4pt", color: "#444", lineHeight: 1.3 }}>{s.address}</div>
+              <div style={{ fontSize: "3pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px" }}>Address</div>
+              <div style={{ fontSize: "3.8pt", color: "#444", lineHeight: 1.3, overflow: "hidden", maxHeight: "7mm" }}>{s.address}</div>
+            </div>
+          )}
+          {s.aadhaarLast4 && (
+            <div>
+              <div style={{ fontSize: "3pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px" }}>Aadhaar</div>
+              <div style={{ fontSize: "4.5pt", fontWeight: 700, color: "#111" }}>XXXX-XXXX-{s.aadhaarLast4}</div>
             </div>
           )}
           {s.emergencyContact && (
             <div>
-              <div style={{ fontSize: "3.5pt", color: "#b91c1c", textTransform: "uppercase", letterSpacing: "0.3px", fontWeight: 700 }}>Emergency</div>
-              <div style={{ fontSize: "4.5pt", fontWeight: 800, color: "#111" }}>{s.emergencyContact}</div>
+              <div style={{ fontSize: "3pt", color: "#b91c1c", textTransform: "uppercase", letterSpacing: "0.3px", fontWeight: 700 }}>Emergency</div>
+              <div style={{ fontSize: "4pt", fontWeight: 800, color: "#111" }}>{s.emergencyContact}</div>
               {s.emergencyMobile && <div style={{ fontSize: "4.5pt", fontWeight: 900, color: "#111" }}>{s.emergencyMobile}</div>}
             </div>
           )}
@@ -235,11 +242,16 @@ function StaffCardBack({ s, companyId }: { s: StaffMember; companyId: string }) 
         {/* Right: QR code */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1mm", flexShrink: 0 }}>
           <div style={{ background: "#fff", padding: "1.5px", border: `2px solid ${accentColor}`, borderRadius: "3px" }}>
-            <QRCodeSVG value={verifyUrl} size={36} level="M" fgColor={accentColor} />
+            <QRCodeSVG value={verifyUrl} size={34} level="M" fgColor={accentColor} />
           </div>
           <div style={{ fontSize: "3pt", color: "#666", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.3px", textAlign: "center" }}>
             Scan to Verify
           </div>
+          {s.staffId && (
+            <div style={{ fontSize: "3pt", fontFamily: "monospace", color: accentColor, fontWeight: 700, textAlign: "center" }}>
+              {s.staffId}
+            </div>
+          )}
           {s.validUpto && (
             <div style={{ fontSize: "3.5pt", color: "#b91c1c", fontWeight: 900, textAlign: "center" }}>
               Valid: {s.validUpto}
@@ -249,10 +261,8 @@ function StaffCardBack({ s, companyId }: { s: StaffMember; companyId: string }) 
       </div>
 
       {/* Footer */}
-      <div style={{
-        background: accentColor, padding: "1mm 3mm", flexShrink: 0, textAlign: "center",
-      }}>
-        <div style={{ fontSize: "3pt", color: "rgba(255,255,255,0.75)" }}>
+      <div style={{ background: accentColor, padding: "0.8mm 3mm", flexShrink: 0, textAlign: "center" }}>
+        <div style={{ fontSize: "3pt", color: "rgba(255,255,255,0.75)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           {company.address}
         </div>
         <div style={{ fontSize: "3.5pt", color: GOLD, fontWeight: 800 }}>
@@ -358,14 +368,14 @@ export default function PrintStaffCards() {
             <div key={pi} className={pi < pages.length - 1 ? "pro-page-break" : ""} style={{ marginBottom: "4mm" }}>
               {/* Front faces */}
               <div className="pro-cards-row">
-                {page.map(s => <StaffCardFront key={`f-${s.id}`} s={s} companyId={s.companyId} />)}
+                {page.map(s => <StaffCardFront key={`f-${s.id}`} s={s} />)}
                 {Array.from({ length: 2 - page.length }).map((_, i) => (
                   <div key={`ph-f-${i}`} className="pro-card" style={{ border: "1px dashed #ddd", opacity: 0.2 }} />
                 ))}
               </div>
               {/* Back faces */}
               <div className="pro-cards-row">
-                {page.map(s => <StaffCardBack key={`b-${s.id}`} s={s} companyId={s.companyId} />)}
+                {page.map(s => <StaffCardBack key={`b-${s.id}`} s={s} />)}
                 {Array.from({ length: 2 - page.length }).map((_, i) => (
                   <div key={`ph-b-${i}`} className="pro-card" style={{ border: "1px dashed #ddd", opacity: 0.2 }} />
                 ))}

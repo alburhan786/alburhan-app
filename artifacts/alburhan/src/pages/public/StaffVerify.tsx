@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useRoute } from "wouter";
 import { CheckCircle, XCircle, AlertCircle, Shield } from "lucide-react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { getCompanyById } from "@/lib/companies";
@@ -10,10 +9,12 @@ interface StaffInfo {
   id: string;
   staffId?: string;
   fullName: string;
+  fatherName?: string;
   designation?: string;
   department?: string;
   role: string;
   companyId: string;
+  groupId?: string;
   bloodGroup?: string;
   validUpto?: string;
   status: string;
@@ -27,19 +28,23 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 export default function StaffVerify() {
-  const [, params] = useRoute("/verify-staff/:qrToken");
-  const qrToken = params?.qrToken || "";
   const [staff, setStaff] = useState<StaffInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!qrToken) { setError("Invalid verification link."); setLoading(false); return; }
-    fetch(`${API}/api/staff/verify/${qrToken}`)
+    const params = new URLSearchParams(window.location.search);
+    const staffId = params.get("id") || "";
+    if (!staffId) {
+      setError("No staff ID provided. Please scan a valid QR code.");
+      setLoading(false);
+      return;
+    }
+    fetch(`${API}/api/staff/verify?id=${encodeURIComponent(staffId)}`)
       .then(r => { if (!r.ok) throw new Error("Staff member not found"); return r.json(); })
       .then(data => { setStaff(data); setLoading(false); })
       .catch(err => { setError(err.message || "Verification failed"); setLoading(false); });
-  }, [qrToken]);
+  }, []);
 
   const isExpired = staff?.validUpto
     ? (() => {
@@ -68,14 +73,10 @@ export default function StaffVerify() {
             </div>
           ) : staff ? (
             <div className={`rounded-2xl border-2 overflow-hidden shadow-lg ${
-              isValid
-                ? "border-green-400 bg-green-50"
-                : "border-red-400 bg-red-50"
+              isValid ? "border-green-400 bg-green-50" : "border-red-400 bg-red-50"
             }`}>
               {/* Status banner */}
-              <div className={`p-4 flex items-center gap-3 ${
-                isValid ? "bg-green-600" : "bg-red-600"
-              }`}>
+              <div className={`p-4 flex items-center gap-3 ${isValid ? "bg-green-600" : "bg-red-600"}`}>
                 {isValid
                   ? <CheckCircle className="w-8 h-8 text-white shrink-0" />
                   : <XCircle className="w-8 h-8 text-white shrink-0" />
@@ -111,19 +112,17 @@ export default function StaffVerify() {
                   )}
                   <div>
                     <h2 className="text-xl font-bold text-gray-900">{staff.fullName}</h2>
+                    {staff.fatherName && <p className="text-sm text-muted-foreground">S/o {staff.fatherName}</p>}
                     {staff.designation && <p className="text-sm font-semibold text-primary">{staff.designation}</p>}
                     {staff.department && <p className="text-sm text-muted-foreground">{staff.department}</p>}
                     <span className={`inline-block mt-1 text-xs font-bold px-2 py-0.5 rounded-full ${
-                      staff.role === "catering_staff"
-                        ? "bg-orange-100 text-orange-700"
-                        : "bg-blue-100 text-blue-700"
+                      staff.role === "catering_staff" ? "bg-orange-100 text-orange-700" : "bg-blue-100 text-blue-700"
                     }`}>
                       {ROLE_LABELS[staff.role] || staff.role}
                     </span>
                   </div>
                 </div>
 
-                {/* Detail rows */}
                 <div className="space-y-2 text-sm">
                   {staff.staffId && (
                     <div className="flex justify-between py-1.5 border-b border-black/5">
@@ -163,7 +162,6 @@ export default function StaffVerify() {
                 )}
               </div>
 
-              {/* Footer */}
               <div className="bg-white/60 px-5 py-3 text-center text-xs text-muted-foreground border-t">
                 Verified by Al Burhan Tours & Travels • {new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
               </div>

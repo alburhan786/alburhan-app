@@ -3,7 +3,7 @@ import { AdminLayout } from "@/components/layout/AdminLayout";
 import { Link } from "wouter";
 import {
   Printer, CreditCard, Luggage, Stethoscope, Plane, Hotel, Bus,
-  FileText, Star, Users, Hash, AlertCircle, DoorOpen, ScrollText
+  FileText, Star, Users, Hash, AlertCircle, DoorOpen, ScrollText, BadgeCheck
 } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -79,7 +79,42 @@ export default function PrintCenter() {
         </div>
       </div>
 
-      {/* Groups */}
+      {/* Staff ID Cards — standalone section */}
+      <div className="bg-white rounded-2xl shadow-sm border border-border/50 overflow-hidden mb-8">
+        <div className="flex items-center justify-between px-6 py-4">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center">
+              <BadgeCheck size={18} className="text-blue-700" />
+            </div>
+            <div>
+              <h3 className="font-bold text-foreground text-base">Staff ID Cards</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">Airport & Catering Staff — 85×54mm credit-card format</p>
+            </div>
+          </div>
+          <Link href="/admin/staff/print">
+            <button className="flex items-center gap-2 px-4 py-2 bg-blue-700 text-white rounded-xl text-sm font-semibold hover:bg-blue-800 transition">
+              <Printer size={14} /> Print / Download
+            </button>
+          </Link>
+        </div>
+        <div className="px-6 pb-4 border-t border-border/30 pt-3">
+          <div className="flex flex-wrap gap-2">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold bg-blue-50 text-blue-700 border-blue-200">
+              <BadgeCheck size={12} /> Airport Staff
+            </div>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold bg-orange-50 text-orange-700 border-orange-200">
+              <BadgeCheck size={12} /> Catering Staff
+            </div>
+            <Link href="/admin/staff">
+              <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#0B3D2E] border border-[#0B3D2E]/30 rounded-full hover:bg-[#0B3D2E]/5 transition">
+                <Users size={12} /> Manage Staff
+              </button>
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* Hajj Groups */}
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {[1, 2, 3, 4].map(i => <div key={i} className="h-40 bg-gray-100 rounded-2xl animate-pulse" />)}

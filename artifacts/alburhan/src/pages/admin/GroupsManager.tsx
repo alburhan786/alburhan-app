@@ -53,6 +53,8 @@ function PrintDropdown({ groupId }: { groupId: string }) {
     { label: "Booking Contract", path: "contract" },
     { sep: true },
     { label: "Room Stickers", path: "room-stickers" },
+    { sep: true },
+    { label: "Staff ID Cards", path: "staff-id", globalPath: "/admin/staff/print" },
   ] as const;
 
   return (
@@ -66,6 +68,10 @@ function PrintDropdown({ groupId }: { groupId: string }) {
         {items.map((item, i) =>
           "sep" in item ? (
             <DropdownMenuSeparator key={`sep-${i}`} />
+          ) : "globalPath" in item ? (
+            <DropdownMenuItem key={item.path} className="cursor-pointer" onSelect={() => navigate(item.globalPath)}>
+              {item.label}
+            </DropdownMenuItem>
           ) : (
             <DropdownMenuItem key={item.path} className="cursor-pointer" onSelect={() => navigate(`/admin/groups/${groupId}/print/${item.path}`)}>
               {item.label}

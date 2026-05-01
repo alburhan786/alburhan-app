@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, staffTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, like } from "drizzle-orm";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import multer from "multer";
 import { uploadToGCS, deleteFromGCS } from "../lib/gcsUpload.js";
@@ -17,11 +17,24 @@ const upload = multer({
 
 const router = Router();
 
-function generateStaffId(companyId: string, role: string, index: number): string {
+async function generateStaffId(companyId: string): Promise<string> {
   const prefix = companyId === "horizon" ? "HZN" : "ABT";
-  const roleTag = role === "catering_staff" ? "CAT" : "AIR";
-  const year = new Date().getFullYear();
-  return `${prefix}-${roleTag}-${year}-${String(index).padStart(3, "0")}`;
+  const pattern = `${prefix}-STAFF-%`;
+  const existing = await db
+    .select({ staffId: staffTable.staffId })
+    .from(staffTable)
+    .where(like(staffTable.staffId, pattern))
+    .orderBy(desc(staffTable.createdAt));
+
+  let maxNum = 0;
+  for (const row of existing) {
+    if (row.staffId) {
+      const parts = row.staffId.split("-");
+      const num = parseInt(parts[parts.length - 1], 10);
+      if (!isNaN(num) && num > maxNum) maxNum = num;
+    }
+  }
+  return `${prefix}-STAFF-${String(maxNum + 1).padStart(3, "0")}`;
 }
 
 router.get("/", requireAdmin, async (_req, res) => {
@@ -34,10 +47,18 @@ router.get("/", requireAdmin, async (_req, res) => {
   }
 });
 
-router.get("/verify/:qrToken", async (req, res) => {
+router.get("/verify", async (req, res) => {
   try {
-    const { qrToken } = req.params;
-    const results = await db.select().from(staffTable).where(eq(staffTable.qrToken, qrToken)).limit(1);
+    const staffId = (req.query.id as string) || "";
+    if (!staffId) {
+      res.status(400).json({ error: "Staff ID is required (?id=ABT-STAFF-001)" });
+      return;
+    }
+    const results = await db
+      .select()
+      .from(staffTable)
+      .where(eq(staffTable.staffId, staffId))
+      .limit(1);
     if (!results.length) {
       res.status(404).json({ error: "Staff member not found" });
       return;
@@ -47,10 +68,12 @@ router.get("/verify/:qrToken", async (req, res) => {
       id: s.id,
       staffId: s.staffId,
       fullName: s.fullName,
+      fatherName: s.fatherName,
       designation: s.designation,
       department: s.department,
       role: s.role,
       companyId: s.companyId,
+      groupId: s.groupId,
       bloodGroup: s.bloodGroup,
       validUpto: s.validUpto,
       status: s.status,
@@ -58,7 +81,7 @@ router.get("/verify/:qrToken", async (req, res) => {
       photoUrl: s.photoUrl,
     });
   } catch (err) {
-    console.error("[staff] GET /verify/:qrToken", err);
+    console.error("[staff] GET /verify", err);
     res.status(500).json({ error: "Verification failed" });
   }
 });
@@ -75,28 +98,29 @@ router.get("/:id", requireAdmin, async (req, res) => {
 
 router.post("/", requireAdmin, async (req: AuthenticatedRequest, res) => {
   try {
-    const { fullName, designation, department, role, companyId, employeeCode,
-      mobileIndia, bloodGroup, dateOfBirth, address, emergencyContact,
-      emergencyMobile, joiningDate, validUpto, notes, status } = req.body;
+    const { fullName, fatherName, designation, department, role, companyId, employeeCode,
+      mobileIndia, bloodGroup, dateOfBirth, address, aadhaarLast4, emergencyContact,
+      emergencyMobile, joiningDate, validUpto, notes, status, groupId } = req.body;
 
     if (!fullName) { res.status(400).json({ error: "Full name is required" }); return; }
 
-    const count = await db.select().from(staffTable);
-    const nextIndex = count.length + 1;
-    const staffId = generateStaffId(companyId || "alburhan", role || "airport_staff", nextIndex);
+    const staffId = await generateStaffId(companyId || "alburhan");
 
     const inserted = await db.insert(staffTable).values({
       staffId,
       fullName,
+      fatherName: fatherName || null,
       designation: designation || null,
       department: department || null,
       role: role || "airport_staff",
       companyId: companyId || "alburhan",
+      groupId: groupId || null,
       employeeCode: employeeCode || null,
       mobileIndia: mobileIndia || null,
       bloodGroup: bloodGroup || null,
       dateOfBirth: dateOfBirth || null,
       address: address || null,
+      aadhaarLast4: aadhaarLast4 || null,
       emergencyContact: emergencyContact || null,
       emergencyMobile: emergencyMobile || null,
       joiningDate: joiningDate || null,
@@ -114,22 +138,25 @@ router.post("/", requireAdmin, async (req: AuthenticatedRequest, res) => {
 
 router.put("/:id", requireAdmin, async (req: AuthenticatedRequest, res) => {
   try {
-    const { fullName, designation, department, role, companyId, employeeCode,
-      mobileIndia, bloodGroup, dateOfBirth, address, emergencyContact,
-      emergencyMobile, joiningDate, validUpto, notes, status, staffId } = req.body;
+    const { fullName, fatherName, designation, department, role, companyId, employeeCode,
+      mobileIndia, bloodGroup, dateOfBirth, address, aadhaarLast4, emergencyContact,
+      emergencyMobile, joiningDate, validUpto, notes, status, staffId, groupId } = req.body;
 
     const updated = await db.update(staffTable).set({
       staffId: staffId || undefined,
       fullName,
+      fatherName: fatherName || null,
       designation: designation || null,
       department: department || null,
       role: role || "airport_staff",
       companyId: companyId || "alburhan",
+      groupId: groupId || null,
       employeeCode: employeeCode || null,
       mobileIndia: mobileIndia || null,
       bloodGroup: bloodGroup || null,
       dateOfBirth: dateOfBirth || null,
       address: address || null,
+      aadhaarLast4: aadhaarLast4 || null,
       emergencyContact: emergencyContact || null,
       emergencyMobile: emergencyMobile || null,
       joiningDate: joiningDate || null,

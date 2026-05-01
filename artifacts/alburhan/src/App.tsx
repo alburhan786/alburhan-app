@@ -100,7 +100,7 @@ function Router() {
       <Route path="/invoice/:bookingNumber" component={Invoice} />
       <Route path="/pay/:bookingNumber" component={PaymentPage} />
       <Route path="/feedback" component={FeedbackPage} />
-      <Route path="/verify-staff/:qrToken" component={StaffVerify} />
+      <Route path="/verify-staff" component={StaffVerify} />
 
       {/* Customer Routes */}
       <Route path="/customer/dashboard" component={() => <CustomerRoute component={CustomerDashboard} />} />
