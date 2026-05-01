@@ -82,6 +82,7 @@ export default function StaffManager() {
   const [form, setForm] = useState(emptyForm);
   const [photoUploading, setPhotoUploading] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "airport_staff" | "catering_staff">("all");
+  const [search, setSearch] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadTargetId, setUploadTargetId] = useState<string | null>(null);
   const { toast } = useToast();
@@ -196,7 +197,19 @@ export default function StaffManager() {
     }
   };
 
-  const filtered = filter === "all" ? staff : staff.filter(s => s.role === filter);
+  const filtered = staff.filter(s => {
+    if (filter !== "all" && s.role !== filter) return false;
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      return (
+        s.fullName.toLowerCase().includes(q) ||
+        (s.staffId || "").toLowerCase().includes(q) ||
+        (s.mobileIndia || "").includes(q) ||
+        (s.designation || "").toLowerCase().includes(q)
+      );
+    }
+    return true;
+  });
 
   return (
     <AdminLayout>
@@ -219,8 +232,8 @@ export default function StaffManager() {
         </div>
       </div>
 
-      {/* Filter tabs */}
-      <div className="flex gap-2 mb-6">
+      {/* Filter tabs + search */}
+      <div className="flex flex-wrap gap-2 mb-6 items-center">
         {(["all", "airport_staff", "catering_staff"] as const).map(r => (
           <button
             key={r}
@@ -234,6 +247,14 @@ export default function StaffManager() {
             {r === "all" ? `All (${staff.length})` : `${ROLE_LABELS[r]} (${staff.filter(s => s.role === r).length})`}
           </button>
         ))}
+        <div className="ml-auto">
+          <Input
+            placeholder="Search by name, ID, mobile..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="h-8 w-56 rounded-full text-sm"
+          />
+        </div>
       </div>
 
       {loading ? (

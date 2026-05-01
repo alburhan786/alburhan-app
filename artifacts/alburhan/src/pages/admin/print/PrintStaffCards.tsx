@@ -6,6 +6,11 @@ import { COMPANIES, getCompanyById } from "@/lib/companies";
 const API = import.meta.env.VITE_API_URL || "";
 const PROD_DOMAIN = "https://alburhantravels.com";
 
+interface HajjGroup {
+  id: string;
+  groupName: string;
+}
+
 interface StaffMember {
   id: string;
   staffId?: string;
@@ -316,7 +321,7 @@ export default function PrintStaffCards() {
       setStaff(Array.isArray(staffData) ? staffData : []);
       const map: Record<string, string> = {};
       if (Array.isArray(groupsData)) {
-        groupsData.forEach((g: any) => { map[g.id] = g.groupName; });
+        (groupsData as HajjGroup[]).forEach(g => { map[g.id] = g.groupName; });
       }
       setGroups(map);
       setLoading(false);
