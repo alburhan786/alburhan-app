@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/use-auth";
 import {
   LayoutDashboard, PackageSearch, Users, BookOpen, MessageSquare, LogOut,
   ImageIcon, UsersRound, Receipt, ClipboardPlus, ScanLine, BarChart2,
-  Printer, Menu, Megaphone, ShieldCheck, Inbox, PieChart, Star
+  Printer, Menu, Megaphone, ShieldCheck, Inbox, PieChart, Star, BadgeCheck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -43,6 +43,7 @@ function buildMenu(openComplaints: number): MenuSection[] {
       section: "Pilgrims & Groups",
       items: [
         { icon: UsersRound, label: "Hajj Groups", href: "/admin/groups" },
+        { icon: BadgeCheck, label: "Staff ID Cards", href: "/admin/staff" },
         { icon: ScanLine, label: "QR Tracker", href: "/admin/qr-tracker" },
         { icon: Printer, label: "Print Center", href: "/admin/print-center" },
       ],

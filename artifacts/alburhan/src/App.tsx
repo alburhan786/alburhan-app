@@ -51,6 +51,9 @@ import KYCManager from "@/pages/admin/KYCManager";
 import KYCPage from "@/pages/customer/KYC";
 import FeedbackPage from "@/pages/public/FeedbackPage";
 import FeedbackManager from "@/pages/admin/FeedbackManager";
+import StaffManager from "@/pages/admin/StaffManager";
+import PrintStaffCards from "@/pages/admin/print/PrintStaffCards";
+import StaffVerify from "@/pages/public/StaffVerify";
 import NotFound from "@/pages/not-found";
 import { useAuth } from "@/hooks/use-auth";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -97,6 +100,7 @@ function Router() {
       <Route path="/invoice/:bookingNumber" component={Invoice} />
       <Route path="/pay/:bookingNumber" component={PaymentPage} />
       <Route path="/feedback" component={FeedbackPage} />
+      <Route path="/verify-staff/:qrToken" component={StaffVerify} />
 
       {/* Customer Routes */}
       <Route path="/customer/dashboard" component={() => <CustomerRoute component={CustomerDashboard} />} />
@@ -134,6 +138,8 @@ function Router() {
       <Route path="/admin/broadcast" component={() => <AdminRoute component={BroadcastManager} />} />
       <Route path="/admin/kyc" component={() => <AdminRoute component={KYCManager} />} />
       <Route path="/admin/feedback" component={() => <AdminRoute component={FeedbackManager} />} />
+      <Route path="/admin/staff" component={() => <AdminRoute component={StaffManager} />} />
+      <Route path="/admin/staff/print" component={() => <AdminRoute component={PrintStaffCards} />} />
 
       <Route component={NotFound} />
     </Switch>
