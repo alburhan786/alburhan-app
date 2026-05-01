@@ -207,7 +207,7 @@ export default function GroupsManager() {
     toast({ title: "Auto-numbered!", description: "Review the ranges below then click Save." });
   };
 
-  // Save all serial number changes
+  // Save all serial number changes — must send full group body to avoid wiping fields
   const handleSaveSerials = async () => {
     setSerialSaving(true);
     try {
@@ -216,14 +216,27 @@ export default function GroupsManager() {
           method: "PUT",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ startingSerialNumber: serialEdits[g.id] || 1 }),
+          body: JSON.stringify({
+            groupName: g.groupName,
+            year: g.year,
+            departureDate: g.departureDate || null,
+            returnDate: g.returnDate || null,
+            flightNumber: g.flightNumber || null,
+            maktabNumber: g.maktabNumber || null,
+            notes: g.notes || null,
+            hotels: g.hotels || {},
+            startingSerialNumber: serialEdits[g.id] || 1,
+          }),
         })
       );
-      await Promise.all(promises);
+      const results = await Promise.all(promises);
+      const failed = results.filter(r => !r.ok);
+      if (failed.length > 0) throw new Error(`${failed.length} group(s) failed to save`);
       toast({ title: "Serial numbers saved!", description: "All groups updated successfully." });
       fetchGroups();
-    } catch {
-      toast({ title: "Error saving serial numbers", variant: "destructive" });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Error saving";
+      toast({ title: "Error saving serial numbers", description: msg, variant: "destructive" });
     } finally { setSerialSaving(false); }
   };
 
