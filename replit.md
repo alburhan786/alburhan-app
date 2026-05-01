@@ -157,7 +157,7 @@ Packages have a `details` JSONB column for structured fields:
   - **Hotel Room List**: A4 landscape table with room assignments and hotel check-in/out dates
   - **Bus List**: A4 portrait table with bus assignments and contact info
 - Emergency contacts on printed docs: Saudi 0547090786, India 0568780786
-- **Staff ID Cards** (`/admin/staff`): Manage Airport & Catering staff members with photo, designation, blood group, validity, emergency contact. Print credit-card-sized ID cards (85×54mm front+back) with QR code linking to public verify page at `/verify-staff/:qrToken`. DB table: `staff`. API routes: `GET/POST/PUT/DELETE /api/staff`, `POST /api/staff/:id/photo`, `GET /api/staff/verify/:qrToken` (public).
+- **Staff ID Cards** (`/admin/staff`): Manage Airport & Catering staff members with photo, designation, blood group, validity, emergency contact. Print credit-card-sized ID cards (85×54mm front+back) with QR code linking to public verify page at `/verify-staff?id=ABT-STAFF-001`. DB table: `staff`. API routes: `GET/POST/PUT/DELETE /api/staff`, `POST /api/staff/:id/photo`, `GET /api/staff/verify?id=<staffId>` (public, returns minimal fields: staffId, fullName, role, designation, validUpto, status, photoUrl).
 
 ## Design Theme
 

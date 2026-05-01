@@ -343,6 +343,14 @@ export default function StaffManager() {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-serif text-2xl">{editingId ? "Edit Staff Member" : "Add Staff Member"}</DialogTitle>
+            {editingId && (() => {
+              const s = staff.find(x => x.id === editingId);
+              return s?.staffId ? (
+                <p className="text-sm text-muted-foreground font-mono mt-0.5">
+                  ID: <span className="font-bold text-primary">{s.staffId}</span>
+                </p>
+              ) : null;
+            })()}
           </DialogHeader>
           <div className="space-y-6 mt-4">
 
