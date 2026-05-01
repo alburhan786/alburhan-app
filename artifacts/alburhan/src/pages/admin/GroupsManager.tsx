@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit, Trash2, Users, Eye, Printer, ChevronDown, Hash, Wand2, Save } from "lucide-react";
+import { Plus, Edit, Trash2, Users, Eye, Printer, ChevronDown, Hash, Wand2, Save, ChevronUp, ChevronDown as ChevronDownIcon } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 
@@ -87,6 +87,7 @@ export default function GroupsManager() {
 
   // Serial number management state
   const [serialEdits, setSerialEdits] = useState<Record<string, number>>({});
+  const [serialOrder, setSerialOrder] = useState<string[]>([]); // group ids in desired serial order
   const [serialSaving, setSerialSaving] = useState(false);
   const [showSerialManager, setShowSerialManager] = useState(false);
 
@@ -99,9 +100,19 @@ export default function GroupsManager() {
         const edits: Record<string, number> = {};
         data.forEach(g => { edits[g.id] = g.startingSerialNumber || 1; });
         setSerialEdits(edits);
+        setSerialOrder(data.map(g => g.id));
       }
     } catch {} finally { setLoading(false); }
   }, []);
+
+  // Move a group up/down in the serial order
+  const moveGroup = (idx: number, dir: -1 | 1) => {
+    const newOrder = [...serialOrder];
+    const swap = idx + dir;
+    if (swap < 0 || swap >= newOrder.length) return;
+    [newOrder[idx], newOrder[swap]] = [newOrder[swap], newOrder[idx]];
+    setSerialOrder(newOrder);
+  };
 
   useEffect(() => { fetchGroups(); }, [fetchGroups]);
 
@@ -181,12 +192,15 @@ export default function GroupsManager() {
     } catch { toast({ title: "Error", variant: "destructive" }); }
   };
 
-  // Auto-number: assign serial numbers sequentially based on group order & pilgrim count
+  // Auto-number: assign serial numbers sequentially based on serialOrder
   const handleAutoNumber = () => {
+    const groupMap = Object.fromEntries(groups.map(g => [g.id, g]));
     const newEdits: Record<string, number> = {};
     let next = 1;
-    groups.forEach(g => {
-      newEdits[g.id] = next;
+    serialOrder.forEach(id => {
+      const g = groupMap[id];
+      if (!g) return;
+      newEdits[id] = next;
       next += g.pilgrimCount || 0;
     });
     setSerialEdits(newEdits);
@@ -249,11 +263,16 @@ export default function GroupsManager() {
               </Button>
             </div>
           </div>
+          <p className="text-xs text-amber-700 mb-3 bg-amber-100 rounded-lg px-3 py-2">
+            <strong>Step 1:</strong> Use ▲ ▼ to arrange groups in the order you want serials assigned. &nbsp;
+            <strong>Step 2:</strong> Click <strong>Auto-Number</strong>. &nbsp;
+            <strong>Step 3:</strong> Click <strong>Save All</strong>.
+          </p>
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="border-b border-amber-200">
-                  <th className="text-left py-2 px-3 font-semibold text-muted-foreground">#</th>
+                  <th className="text-left py-2 px-3 font-semibold text-muted-foreground">Order</th>
                   <th className="text-left py-2 px-3 font-semibold text-muted-foreground">Group Name</th>
                   <th className="text-center py-2 px-3 font-semibold text-muted-foreground">Pilgrims</th>
                   <th className="text-center py-2 px-3 font-semibold text-muted-foreground">Starting Serial</th>
@@ -261,12 +280,26 @@ export default function GroupsManager() {
                 </tr>
               </thead>
               <tbody>
-                {groups.map((g, idx) => {
+                {serialOrder.map((id, idx) => {
+                  const g = groups.find(x => x.id === id);
+                  if (!g) return null;
                   const start = serialEdits[g.id] || 1;
                   const end = start + g.pilgrimCount - 1;
                   return (
                     <tr key={g.id} className={idx % 2 === 0 ? "bg-white/60" : ""}>
-                      <td className="py-2 px-3 text-muted-foreground font-mono">{idx + 1}</td>
+                      <td className="py-2 px-2">
+                        <div className="flex flex-col gap-0.5">
+                          <button onClick={() => moveGroup(idx, -1)} disabled={idx === 0}
+                            className="p-0.5 rounded hover:bg-amber-100 disabled:opacity-20 disabled:cursor-not-allowed">
+                            <ChevronUp size={14} />
+                          </button>
+                          <span className="text-center font-mono text-xs text-muted-foreground">{idx + 1}</span>
+                          <button onClick={() => moveGroup(idx, 1)} disabled={idx === serialOrder.length - 1}
+                            className="p-0.5 rounded hover:bg-amber-100 disabled:opacity-20 disabled:cursor-not-allowed">
+                            <ChevronDownIcon size={14} />
+                          </button>
+                        </div>
+                      </td>
                       <td className="py-2 px-3 font-semibold">{g.groupName}</td>
                       <td className="py-2 px-3 text-center">
                         <span className="inline-flex items-center gap-1 bg-primary/10 text-primary rounded-full px-2 py-0.5 text-xs font-bold">
@@ -293,10 +326,10 @@ export default function GroupsManager() {
               </tbody>
               <tfoot>
                 <tr className="border-t border-amber-200">
-                  <td colSpan={2} className="py-2 px-3 font-bold">Total</td>
+                  <td colSpan={3} className="py-2 px-3 font-bold">Total Pilgrims</td>
                   <td className="py-2 px-3 text-center font-bold text-primary">{groups.reduce((s, g) => s + g.pilgrimCount, 0)}</td>
-                  <td colSpan={2} className="py-2 px-3 text-center text-xs text-muted-foreground">
-                    Grand range: 001 → {String(groups.reduce((s, g) => s + g.pilgrimCount, 0)).padStart(3, "0")}
+                  <td className="py-2 px-3 text-center text-xs font-mono font-bold text-green-700">
+                    001 → {String(groups.reduce((s, g) => s + g.pilgrimCount, 0)).padStart(3, "0")}
                   </td>
                 </tr>
               </tfoot>
