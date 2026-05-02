@@ -153,11 +153,11 @@ function LuggageStickerBack({
             }}>
               <div style={{
                 fontFamily: "Arial, sans-serif", direction: "rtl",
-                fontSize: "7pt", fontWeight: 900, color: "#222", lineHeight: 1.2,
+                fontSize: "11pt", fontWeight: 900, color: "#111", lineHeight: 1.2,
               }}>
                 مركز تقديم الخدمة
               </div>
-              <div style={{ fontSize: "5.5pt", fontWeight: 700, color: "#444" }}>
+              <div style={{ fontSize: "8pt", fontWeight: 900, color: "#222" }}>
                 Service Center No &nbsp;<span style={{ fontFamily: "Arial", direction: "rtl" }}>رقم</span>
               </div>
             </div>
@@ -276,7 +276,7 @@ function LuggageStickerBack({
         }}>
           <div>
             <div style={{ fontSize: "6pt", fontWeight: 900, color: GREEN }}>🌐 {company.website}</div>
-            <div style={{ fontSize: "4pt", color: "#666", lineHeight: 1.3 }}>{company.email}</div>
+            <div style={{ fontSize: "5.5pt", fontWeight: 900, color: "#25D366", lineHeight: 1.3 }}>💬 +91 98939 89786</div>
           </div>
         </div>
 
