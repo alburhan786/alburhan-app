@@ -122,38 +122,40 @@ function LuggageStickerBack({
           {/* Thin vertical divider */}
           <div style={{ width: "0.5mm", background: "#e0e0e0", flexShrink: 0 }} />
 
-          {/* Right: company branding (like almasiah logo block) */}
+          {/* Right: company branding */}
           <div style={{
-            flex: 1, padding: "2.5mm 3mm 2mm 3mm",
+            flex: 1, padding: "2mm 3mm 2mm 2mm",
             display: "flex", flexDirection: "column", justifyContent: "center",
           }}>
-            {/* Service name (like "الماسية / almasiah") */}
+            {/* Arabic service name */}
             <div style={{
               fontFamily: "Arial, sans-serif", direction: "rtl",
-              fontSize: "11pt", fontWeight: 900, color: GREEN,
-              lineHeight: 1, marginBottom: "0.5mm", textAlign: "right",
+              fontSize: "12pt", fontWeight: 900, color: GREEN,
+              lineHeight: 1, marginBottom: "0.3mm", textAlign: "right",
             }}>
               رحمت الحرام
             </div>
+            {/* English service name — ALL CAPS bold */}
             <div style={{
-              fontSize: "9pt", fontWeight: 900, color: GREEN,
-              letterSpacing: "0.3px", lineHeight: 1, marginBottom: "1mm",
+              fontSize: "8.5pt", fontWeight: 900, color: GREEN,
+              letterSpacing: "0.5px", lineHeight: 1, marginBottom: "1.5mm",
+              textTransform: "uppercase",
             }}>
-              Rehmat E Haram CHGo
+              REHMAT E HARAM CHGO
             </div>
             {/* Logo image */}
             {company.logoUrl && (
-              <img src={company.logoUrl} alt="" style={{ height: "7mm", objectFit: "contain", objectPosition: "left", marginBottom: "1mm" }} />
+              <img src={company.logoUrl} alt="" style={{ height: "6.5mm", objectFit: "contain", objectPosition: "left", marginBottom: "1mm" }} />
             )}
-            {/* Arabic company name */}
+            {/* Arabic company name — big & bold */}
             <div style={{
               fontFamily: "Arial, sans-serif", direction: "rtl", textAlign: "right",
-              fontSize: "4.5pt", color: "#333", fontWeight: 700, lineHeight: 1.3,
+              fontSize: "5.5pt", color: "#111", fontWeight: 900, lineHeight: 1.3,
             }}>
               {company.arabicName}
             </div>
-            {/* English company name */}
-            <div style={{ fontSize: "4pt", color: "#555", lineHeight: 1.2 }}>
+            {/* English company name — big & bold */}
+            <div style={{ fontSize: "5pt", color: "#111", fontWeight: 900, lineHeight: 1.3 }}>
               {company.name}
             </div>
           </div>
@@ -191,15 +193,16 @@ function LuggageStickerBack({
               {/* Maktab number — big green-bordered box like "612" in reference */}
               <div style={{
                 flex: 1,
-                border: `2.5px solid ${GREEN}`,
+                border: `3px solid ${GREEN}`,
                 borderRadius: "4px",
-                padding: "1.5mm 2mm",
+                padding: "2mm 2mm",
                 textAlign: "center",
                 background: "#fff",
               }}>
                 <div style={{
-                  fontSize: "30pt", fontWeight: 900, color: "#111",
+                  fontSize: "38pt", fontWeight: 900, color: "#000",
                   lineHeight: 1, fontFamily: "'Courier New', monospace",
+                  letterSpacing: "-1px",
                 }}>
                   {group.maktabNumber || "—"}
                 </div>
@@ -221,25 +224,28 @@ function LuggageStickerBack({
             </div>
 
             {/* Bilingual rows — India / الهند and Hajj / حج */}
-            <div style={{ margin: "0 3mm", border: `1px solid #ddd`, borderRadius: "3px", overflow: "hidden" }}>
+            <div style={{ margin: "0 3mm", border: `1.5px solid #ccc`, borderRadius: "3px", overflow: "hidden" }}>
               <div style={{
-                display: "flex", borderBottom: "1px solid #ddd",
+                display: "flex", borderBottom: "1.5px solid #ccc",
                 background: "#fafafa",
               }}>
-                <div style={{ flex: 1, padding: "1mm 2.5mm", fontSize: "7.5pt", fontWeight: 800, color: "#111" }}>India</div>
-                <div style={{ width: "0.5px", background: "#ddd" }} />
+                <div style={{ flex: 1, padding: "1.5mm 2.5mm", fontSize: "9pt", fontWeight: 900, color: "#111" }}>India</div>
+                <div style={{ width: "1px", background: "#ccc" }} />
                 <div style={{
-                  flex: 1, padding: "1mm 2.5mm", fontSize: "8pt", fontWeight: 800,
+                  flex: 1, padding: "1.5mm 2.5mm", fontSize: "9.5pt", fontWeight: 900,
                   color: "#111", direction: "rtl", textAlign: "right", fontFamily: "Arial, sans-serif",
                 }}>الهند</div>
               </div>
               <div style={{ display: "flex", background: "#fff" }}>
-                <div style={{ flex: 1, padding: "1mm 2.5mm", fontSize: "7.5pt", fontWeight: 800, color: GREEN }}>Hajj {group.year}</div>
-                <div style={{ width: "0.5px", background: "#ddd" }} />
-                <div style={{
-                  flex: 1, padding: "1mm 2.5mm", fontSize: "8pt", fontWeight: 800,
-                  color: GREEN, direction: "rtl", textAlign: "right", fontFamily: "Arial, sans-serif",
-                }}>حج 1447</div>
+                <div style={{ flex: 1, padding: "1.5mm 2.5mm" }}>
+                  <div style={{ fontSize: "9pt", fontWeight: 900, color: GREEN }}>Hajj {group.year}</div>
+                  <div style={{ fontSize: "6pt", fontWeight: 800, color: GREEN }}>1447 Hijri</div>
+                </div>
+                <div style={{ width: "1px", background: "#ccc" }} />
+                <div style={{ flex: 1, padding: "1.5mm 2.5mm", textAlign: "right" }}>
+                  <div style={{ fontSize: "9.5pt", fontWeight: 900, color: GREEN, fontFamily: "Arial, sans-serif" }}>حج 1447</div>
+                  <div style={{ fontSize: "6pt", fontWeight: 800, color: GREEN, fontFamily: "Arial, sans-serif" }}>هجري</div>
+                </div>
               </div>
             </div>
           </div>
@@ -252,32 +258,34 @@ function LuggageStickerBack({
             display: "flex", justifyContent: "space-between", alignItems: "center",
             marginBottom: "1mm",
           }}>
-            <div style={{ fontSize: "5.5pt", fontWeight: 900, color: "#fff", letterSpacing: "0.3px" }}>
+            <div style={{ fontSize: "6pt", fontWeight: 900, color: "#fff", letterSpacing: "0.3px" }}>
               Call Center
             </div>
-            <div style={{ fontSize: "6pt", fontWeight: 900, color: "#fff", fontFamily: "Arial, sans-serif" }}>
+            <div style={{ fontSize: "6.5pt", fontWeight: 900, color: "#fff", fontFamily: "Arial, sans-serif" }}>
               مركزالتواصل
             </div>
           </div>
-          {/* Two white phone boxes */}
+          {/* Two white phone boxes: toll-free + saudi */}
           <div style={{ display: "flex", gap: "2mm" }}>
+            {/* Toll-free box (like "8006120033" in reference) */}
             <div style={{
               flex: 1, background: "#fff", borderRadius: "3px",
-              padding: "1mm 2mm", display: "flex", alignItems: "center", gap: "1.5mm",
+              padding: "1.2mm 2mm", display: "flex", alignItems: "center", gap: "1.5mm",
             }}>
-              <div style={{ fontSize: "8pt", color: GREEN, flexShrink: 0 }}>🎧</div>
+              <div style={{ fontSize: "10pt", color: GREEN, flexShrink: 0 }}>🎧</div>
               <div>
-                <div style={{ fontSize: "4.5pt", color: "#888", fontWeight: 600 }}>🇮🇳 India</div>
-                <div style={{ fontSize: "7pt", fontWeight: 900, color: DARK, letterSpacing: "0.3px", lineHeight: 1.2 }}>{company.mobile}</div>
+                <div style={{ fontSize: "4pt", color: "#888", fontWeight: 700, textTransform: "uppercase" }}>Toll Free 🇮🇳</div>
+                <div style={{ fontSize: "9pt", fontWeight: 900, color: DARK, letterSpacing: "0.5px", lineHeight: 1.1, fontFamily: "monospace" }}>8006120033</div>
               </div>
             </div>
+            {/* Saudi number box */}
             <div style={{
               flex: 1, background: "#fff", borderRadius: "3px",
-              padding: "1mm 2mm", display: "flex", alignItems: "center", gap: "1.5mm",
+              padding: "1.2mm 2mm", display: "flex", alignItems: "center", gap: "1.5mm",
             }}>
-              <div style={{ fontSize: "8pt", color: GREEN, flexShrink: 0 }}>🎧</div>
+              <div style={{ fontSize: "10pt", color: GREEN, flexShrink: 0 }}>🎧</div>
               <div>
-                <div style={{ fontSize: "4.5pt", color: "#888", fontWeight: 600 }}>🇸🇦 Saudi</div>
+                <div style={{ fontSize: "4pt", color: "#888", fontWeight: 700, textTransform: "uppercase" }}>Saudi 🇸🇦</div>
                 <div style={{ fontSize: "7pt", fontWeight: 900, color: DARK, letterSpacing: "0.3px", lineHeight: 1.2 }}>{company.phoneSaudi}</div>
               </div>
             </div>
