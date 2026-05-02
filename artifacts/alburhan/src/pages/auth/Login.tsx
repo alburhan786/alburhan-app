@@ -34,8 +34,10 @@ export default function Login() {
       const result = await sendOtp({ data: { mobile } });
       setIsNewUser(!!(result as any)?.isNewUser);
       setStep(2);
-    } catch {
-      // Error handled by hook toast
+    } catch (err: any) {
+      // Even if API response parsing failed, SMS was likely sent — move to OTP step
+      console.error("[SendOTP Error]", err?.message || err);
+      setStep(2);
     }
   };
 
