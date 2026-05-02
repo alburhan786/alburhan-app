@@ -109,6 +109,15 @@ function StaffCardFront({ s, groupName }: { s: StaffMember; groupName?: string }
         }}>
           SERVING PILGRIMS WITH CARE
         </div>
+        {/* HAJJ 2026 gold pill */}
+        <div style={{
+          background: GOLD, borderRadius: "20px", padding: "0.6mm 4mm",
+          marginTop: "0.5mm",
+          fontSize: "6pt", fontWeight: 900, color: GREEN,
+          letterSpacing: "1.5px", textAlign: "center",
+        }}>
+          HAJJ 2026
+        </div>
       </div>
 
       {/* ── ROLE BADGE (full-width green bar) ~7mm ── */}
@@ -225,6 +234,16 @@ function StaffCardFront({ s, groupName }: { s: StaffMember; groupName?: string }
             whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
           }}>
             GROUP : <span style={{ fontWeight: 800, color: "#333" }}>{groupName}</span>
+          </div>
+        )}
+
+        {/* Mobile */}
+        {s.mobileIndia && (
+          <div style={{
+            fontSize: "4pt", color: "#555", textAlign: "center", lineHeight: 1.2,
+            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+          }}>
+            MOBILE : <span style={{ fontWeight: 800, color: "#333" }}>+91 {s.mobileIndia.replace(/^\+?91/, "")}</span>
           </div>
         )}
       </div>
