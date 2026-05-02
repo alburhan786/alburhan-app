@@ -137,12 +137,12 @@ function LuggageStickerBack({
             {/* Arabic company name — BIG & BOLD */}
             <div style={{
               fontFamily: "Arial, sans-serif", direction: "rtl", textAlign: "right",
-              fontSize: "8.5pt", color: GREEN, fontWeight: 900, lineHeight: 1.3,
+              fontSize: "13pt", color: GREEN, fontWeight: 900, lineHeight: 1.25,
             }}>
               شركة مشارق الماسية لخدمات الحجاج
             </div>
             {/* English company name — bold */}
-            <div style={{ fontSize: "5.5pt", color: "#111", fontWeight: 900, lineHeight: 1.4 }}>
+            <div style={{ fontSize: "6.5pt", color: "#111", fontWeight: 900, lineHeight: 1.4 }}>
               Mashariq Almasiah Company for Pilgrim Services
             </div>
           </div>
