@@ -4,9 +4,9 @@ import { useRoute } from "wouter";
 import { Barcode } from "@/components/print/Barcode";
 import { QRCodeSVG } from "qrcode.react";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
+import almasiahLogoUrl from "@/assets/almasiah-logo.png";
 
 const API  = import.meta.env.VITE_API_URL || "";
-const BASE = import.meta.env.BASE_URL || "/";
 
 interface Pilgrim {
   id: string; serialNumber: number; fullName: string; photoUrl?: string;
@@ -130,7 +130,7 @@ function LuggageStickerBack({
           }}>
             {/* Almasiah logo image */}
             <img
-              src={`${BASE}images/almasiah-logo.png`}
+              src={almasiahLogoUrl}
               alt="almasiah"
               style={{ height: "11mm", objectFit: "contain", objectPosition: "right", marginBottom: "1.5mm" }}
             />
