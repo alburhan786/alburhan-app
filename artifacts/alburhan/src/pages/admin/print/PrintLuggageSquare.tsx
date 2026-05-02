@@ -4,7 +4,7 @@ import { useRoute } from "wouter";
 import { Barcode } from "@/components/print/Barcode";
 import { QRCodeSVG } from "qrcode.react";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
-import { almasiahLogoBase64 as almasiahLogoUrl } from "@/assets/almasiah-logo-data";
+import { mashariqLogoBase64 as mashariqLogoUrl } from "@/assets/mashariq-logo-data";
 
 const API  = import.meta.env.VITE_API_URL || "";
 
@@ -102,37 +102,23 @@ function LuggageStickerBack({
     <div className="sq-sticker">
       <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "#fff" }}>
 
-        {/* ══ TOP: snowflake left + logo right ══ */}
+        {/* ══ TOP: logo + branding (no snowflake) ══ */}
         <div style={{
           display: "flex", alignItems: "stretch",
           borderBottom: `2px solid ${GREEN}`,
           flexShrink: 0,
           minHeight: "28mm",
         }}>
-          {/* Left: big snowflake decoration */}
+          {/* Branding — full width */}
           <div style={{
-            width: "28mm", flexShrink: 0, background: "#fff",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            overflow: "hidden", position: "relative",
-          }}>
-            <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)" }}>
-              <SnowflakeSVG size={106} color={GREEN} opacity={0.22} />
-            </div>
-          </div>
-
-          {/* Thin vertical divider */}
-          <div style={{ width: "0.5mm", background: "#e0e0e0", flexShrink: 0 }} />
-
-          {/* Right: Mashariq Almasiah branding */}
-          <div style={{
-            flex: 1, padding: "2mm 3mm 2mm 2mm",
+            flex: 1, padding: "2mm 3mm 2mm 3mm",
             display: "flex", flexDirection: "column", justifyContent: "center",
           }}>
-            {/* Almasiah logo image */}
+            {/* Mashariq logo image */}
             <img
-              src={almasiahLogoUrl}
-              alt="almasiah"
-              style={{ height: "11mm", objectFit: "contain", objectPosition: "right", marginBottom: "1.5mm" }}
+              src={mashariqLogoUrl}
+              alt="mashariq"
+              style={{ height: "11mm", objectFit: "contain", objectPosition: "left", marginBottom: "1.5mm" }}
             />
             {/* Arabic company name — BIG & BOLD */}
             <div style={{
@@ -261,7 +247,7 @@ function LuggageStickerBack({
             }}>
               <div style={{ fontSize: "10pt", color: GREEN, flexShrink: 0 }}>🎧</div>
               <div>
-                <div style={{ fontSize: "4pt", color: "#888", fontWeight: 700, textTransform: "uppercase" }}>Toll Free 🇮🇳</div>
+                <div style={{ fontSize: "4pt", color: "#888", fontWeight: 700, textTransform: "uppercase" }}>Toll Free 🇸🇦</div>
                 <div style={{ fontSize: "9pt", fontWeight: 900, color: DARK, letterSpacing: "0.5px", lineHeight: 1.1, fontFamily: "monospace" }}>8006120033</div>
               </div>
             </div>
