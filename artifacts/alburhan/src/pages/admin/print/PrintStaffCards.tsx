@@ -27,34 +27,33 @@ const ROLE_LABELS: Record<string, string> = {
   catering_staff: "CATERING STAFF",
 };
 
-/* ── Premium Kaaba Icon (minimal modern) ── */
-function KaabaIcon({ color = GOLD, size = "100%" }: { color?: string; size?: string | number }) {
+/* ── Premium Kaaba Icon — solid cube with kiswa & gold accents ── */
+function KaabaIcon({ color = "#d4af37", size = "100%" }: { color?: string; size?: string | number }) {
   return (
-    <svg viewBox="0 0 65 70" width={size} height={size} xmlns="http://www.w3.org/2000/svg" fill="none">
-      {/* Crescent moon */}
-      <path d="M34,8 a5,5 0 1,1 -4,8 a4,4 0 1,0 4,-8 Z" fill={color} />
-      <circle cx="37" cy="9" r="1.2" fill={color} />
-      {/* Top face */}
-      <path d="M10,28 L22,15 L62,15 L50,28 Z"
-        stroke={color} strokeWidth="2" strokeLinejoin="round"
-        fill={color} fillOpacity="0.15" />
-      {/* Right face */}
-      <path d="M50,28 L62,15 L62,52 L50,65 Z"
-        stroke={color} strokeWidth="2" strokeLinejoin="round"
-        fill={color} fillOpacity="0.22" />
-      {/* Front face */}
-      <rect x="10" y="28" width="40" height="37"
-        stroke={color} strokeWidth="2" strokeLinejoin="round"
-        fill={color} fillOpacity="0.08" />
-      {/* Kiswah band — front */}
-      <rect x="10" y="38" width="40" height="7" fill={color} fillOpacity="0.55" />
-      <line x1="10" y1="38" x2="50" y2="38" stroke={color} strokeWidth="0.6" />
-      <line x1="10" y1="45" x2="50" y2="45" stroke={color} strokeWidth="0.6" />
-      {/* Kiswah band — right face */}
-      <path d="M50,38 L62,25 L62,32 L50,45 Z" fill={color} fillOpacity="0.4" />
-      {/* Arched door — centred on front face */}
-      <path d="M26,65 L26,49 Q30,43 34,49 L34,65"
-        stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+    <svg viewBox="0 0 100 96" width={size} height={size} xmlns="http://www.w3.org/2000/svg">
+      {/* Platform base */}
+      <rect x="11" y="84" width="78" height="8" rx="4" fill="#0d1710" />
+      <rect x="11" y="84" width="78" height="2" rx="1" fill={color} opacity="0.85" />
+      {/* Left wall face (slightly lighter dark) */}
+      <path d="M17,37 L50,22 L50,84 L17,84 Z" fill="#141d18" />
+      {/* Right wall face (darker) */}
+      <path d="M50,22 L83,37 L83,84 L50,84 Z" fill="#0a120e" />
+      {/* Top ridge — gold V outline */}
+      <path d="M17,37 L50,22 L83,37" stroke={color} strokeWidth="2" fill="none" strokeLinecap="round" />
+      {/* Centre vertical seam — gold */}
+      <line x1="50" y1="22" x2="50" y2="84" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+      {/* Kiswa band — left face (white stripe) */}
+      <path d="M17,51 L50,40 L50,47 L17,58 Z" fill="rgba(255,255,255,0.88)" />
+      {/* Kiswa band — right face (slightly dimmer) */}
+      <path d="M50,40 L83,51 L83,58 L50,47 Z" fill="rgba(255,255,255,0.72)" />
+      {/* Gold decorative dashes — left face (below kiswa, follow face slope) */}
+      <path d="M21,65.3 L29,63.9 L29,66.4 L21,67.8 Z" fill={color} />
+      <path d="M33,63.3 L41,61.9 L41,64.4 L33,65.8 Z" fill={color} />
+      <path d="M43,61.6 L49,60.4 L49,62.9 L43,64.1 Z" fill={color} />
+      {/* Gold decorative dashes — right face (mirrored slope) */}
+      <path d="M51,60.5 L59,61.9 L59,64.4 L51,63 Z" fill={color} />
+      <path d="M61,62.2 L69,63.6 L69,66.1 L61,64.7 Z" fill={color} />
+      <path d="M71,64 L79,65.3 L79,67.8 L71,66.5 Z" fill={color} />
     </svg>
   );
 }
