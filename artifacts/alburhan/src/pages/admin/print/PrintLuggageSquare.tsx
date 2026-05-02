@@ -4,7 +4,7 @@ import { useRoute } from "wouter";
 import { Barcode } from "@/components/print/Barcode";
 import { QRCodeSVG } from "qrcode.react";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
-import almasiahLogoUrl from "@/assets/almasiah-logo.png";
+import { almasiahLogoBase64 as almasiahLogoUrl } from "@/assets/almasiah-logo-data";
 
 const API  = import.meta.env.VITE_API_URL || "";
 
