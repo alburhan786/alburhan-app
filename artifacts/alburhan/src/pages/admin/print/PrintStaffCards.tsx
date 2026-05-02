@@ -420,9 +420,9 @@ function StaffCardBack({ s, groupName }: { s: StaffMember; groupName?: string })
 
       {/* ── FOOTER ── */}
       <div style={{
-        background: GREEN, padding: "0.8mm", textAlign: "center", flexShrink: 0,
+        background: GOLD, padding: "0.8mm", textAlign: "center", flexShrink: 0,
       }}>
-        <span style={{ fontSize: "3.5pt", color: GOLD, fontWeight: 900, letterSpacing: "1.2px" }}>
+        <span style={{ fontSize: "3.5pt", color: GREEN, fontWeight: 900, letterSpacing: "1.2px" }}>
           ❖&nbsp; SERVING PILGRIMS WITH CARE &nbsp;❖
         </span>
       </div>
