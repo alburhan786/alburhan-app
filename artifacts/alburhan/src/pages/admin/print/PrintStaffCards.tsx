@@ -454,6 +454,7 @@ export default function PrintStaffCards() {
   const [roleFilter,    setRoleFilter]     = useState("all");
   const [statusFilter,  setStatusFilter]   = useState("active");
   const [pdfLoading,    setPdfLoading]     = useState(false);
+  const [pdfMode,       setPdfMode]        = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -483,8 +484,10 @@ export default function PrintStaffCards() {
   const handleDownload = useCallback(async () => {
     if (!contentRef.current || pdfLoading) return;
     setPdfLoading(true);
+    setPdfMode(true);
+    await new Promise(r => setTimeout(r, 120));
     try { await downloadPdf(contentRef.current, { filename: "Staff-ID-Cards.pdf" }); }
-    finally { setPdfLoading(false); }
+    finally { setPdfLoading(false); setPdfMode(false); }
   }, [pdfLoading]);
 
   if (loading) return (
@@ -522,7 +525,10 @@ export default function PrintStaffCards() {
         }
         .page-break { page-break-after: always; }
         @media screen {
-          .staff-card { box-shadow: 0 4px 16px rgba(0,0,0,0.18); }
+          .staff-card { box-shadow: 0 6px 24px rgba(0,0,0,0.22); }
+          .cards-area:not(.pdf-mode) .staff-card { zoom: 2.2; }
+          .cards-area:not(.pdf-mode) .cards-row  { gap: 16mm; margin-bottom: 10mm; }
+          .cards-area:not(.pdf-mode) { padding: 12mm; }
         }
       `}</style>
 
@@ -586,7 +592,7 @@ export default function PrintStaffCards() {
           <div style={{ fontSize: "13px", color: "#aaa", marginTop: "4px" }}>Add staff first from the Staff ID Cards admin page.</div>
         </div>
       ) : (
-        <div ref={contentRef} style={{ background: "#f0f4f0", padding: "8mm" }}>
+        <div ref={contentRef} className={`cards-area${pdfMode ? " pdf-mode" : ""}`} style={{ background: "#f0f4f0", padding: "8mm" }}>
           {pages.map((page, pi) => (
             <div key={pi} className={pi < pages.length - 1 ? "page-break" : ""} style={{ marginBottom: "6mm" }}>
               {/* Front faces */}
