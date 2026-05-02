@@ -5,6 +5,7 @@ import { Barcode } from "@/components/print/Barcode";
 import { QRCodeSVG } from "qrcode.react";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
 import { mashariqLogoBase64 as mashariqLogoUrl } from "@/assets/mashariq-logo-data";
+import { almasiahLogoBase64 as almasiahLogoUrl } from "@/assets/almasiah-logo-data";
 
 const API  = import.meta.env.VITE_API_URL || "";
 
@@ -114,12 +115,12 @@ function LuggageStickerBack({
             flex: 1, padding: "2mm 3mm 2mm 3mm",
             display: "flex", flexDirection: "column", justifyContent: "center",
           }}>
-            {/* Mashariq logo image */}
-            <img
-              src={mashariqLogoUrl}
-              alt="mashariq"
-              style={{ height: "11mm", objectFit: "contain", objectPosition: "left", marginBottom: "1.5mm" }}
-            />
+            {/* Both logos side by side */}
+            <div style={{ display: "flex", alignItems: "center", gap: "2mm", marginBottom: "1.5mm" }}>
+              <img src={mashariqLogoUrl} alt="mashariq" style={{ height: "10mm", objectFit: "contain", flex: 1 }} />
+              <div style={{ width: "0.5mm", background: "#ddd", alignSelf: "stretch" }} />
+              <img src={almasiahLogoUrl} alt="almasiah" style={{ height: "10mm", objectFit: "contain", flex: 1 }} />
+            </div>
             {/* Arabic company name — BIG & BOLD */}
             <div style={{
               fontFamily: "Arial, sans-serif", direction: "rtl", textAlign: "right",
