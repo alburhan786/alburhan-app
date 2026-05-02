@@ -154,9 +154,9 @@ function StaffCardFront({ s, groupName }: { s: StaffMember; groupName?: string }
           flex: 1, display: "flex", flexDirection: "column",
           alignItems: "center", justifyContent: "center", gap: "2mm",
         }}>
-          <KaabaIcon color={GOLD} size="18mm" />
+          <KaabaIcon color="#d4af37" size="18mm" />
           <div style={{
-            fontSize: "7.5pt", fontWeight: 900, color: GOLD,
+            fontSize: "7.5pt", fontWeight: 900, color: "#d4af37",
             letterSpacing: "2px", textAlign: "center", lineHeight: 1,
           }}>
             HAJJ 2026
@@ -387,7 +387,7 @@ function StaffCardBack({ s, groupName }: { s: StaffMember; groupName?: string })
           <div style={{ fontSize: "4.5pt", color: GOLD, lineHeight: 1.4, textAlign: "center", direction: "rtl", fontFamily: "Arial, sans-serif" }}>
             الحمد لله على توفيقه
           </div>
-          <KaabaIcon color={GOLD} size="13mm" />
+          <KaabaIcon color="#d4af37" size="16mm" />
         </div>
       </div>
 
