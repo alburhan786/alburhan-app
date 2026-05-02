@@ -51,137 +51,256 @@ function buildQrData(p: Pilgrim, group: Group, phone: string): string {
   ].join("\n");
 }
 
-/* ── BACK STICKER (100×100mm) — Almasiah-style ── */
+/* ── SVG SNOWFLAKE / GEOMETRIC PATTERN (like the Almasiah reference) ── */
+function SnowflakeSVG({ size = 120, color = "#1A7A4A", opacity = 0.12 }: { size?: number; color?: string; opacity?: number }) {
+  const cx = size / 2, cy = size / 2, r = size * 0.46;
+  const arm = (angleDeg: number, len: number) => {
+    const a = (angleDeg * Math.PI) / 180;
+    return `M${cx},${cy} L${cx + Math.cos(a) * len},${cy + Math.sin(a) * len}`;
+  };
+  const branch = (angleDeg: number, dist: number, bLen: number, bAngle: number) => {
+    const a = (angleDeg * Math.PI) / 180;
+    const bx = cx + Math.cos(a) * dist, by = cy + Math.sin(a) * dist;
+    const b1 = ((angleDeg + bAngle) * Math.PI) / 180;
+    const b2 = ((angleDeg - bAngle) * Math.PI) / 180;
+    return [
+      `M${bx},${by} L${bx + Math.cos(b1) * bLen},${by + Math.sin(b1) * bLen}`,
+      `M${bx},${by} L${bx + Math.cos(b2) * bLen},${by + Math.sin(b2) * bLen}`,
+    ].join(" ");
+  };
+  const arms = [0, 60, 120, 180, 240, 300];
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ display: "block" }}>
+      <g stroke={color} strokeWidth={size * 0.028} strokeLinecap="round" opacity={opacity} fill="none">
+        {arms.map(a => (
+          <g key={a}>
+            <path d={arm(a, r)} />
+            <path d={branch(a, r * 0.35, r * 0.22, a + 90)} />
+            <path d={branch(a, r * 0.6, r * 0.16, a + 90)} />
+            <path d={branch(a, r * 0.82, r * 0.11, a + 90)} />
+          </g>
+        ))}
+        <circle cx={cx} cy={cy} r={size * 0.04} fill={color} opacity={opacity} />
+        {arms.map(a => {
+          const rad = (a * Math.PI) / 180;
+          const tx = cx + Math.cos(rad) * r, ty = cy + Math.sin(rad) * r;
+          return <circle key={`tip-${a}`} cx={tx} cy={ty} r={size * 0.025} fill={color} opacity={opacity} />;
+        })}
+      </g>
+    </svg>
+  );
+}
+
+/* ── BACK STICKER (100×100mm) — exact Almasiah layout ── */
 function LuggageStickerBack({
   p, group, company,
 }: {
   p: Pilgrim; group: Group; company: ReturnType<typeof getCompanyById>;
 }) {
-  const serialNo = String((group.startingSerialNumber ?? 1) - 1 + p.serialNumber).padStart(3, "0");
   return (
     <div className="sq-sticker">
       <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "#fff" }}>
 
-        {/* ── HEADER ── */}
+        {/* ══ TOP: snowflake left + logo right ══ */}
         <div style={{
-          padding: "2.5mm 3mm 2mm",
-          borderBottom: `1.5px solid ${GREEN}`,
-          display: "flex", alignItems: "center", gap: "2mm",
+          display: "flex", alignItems: "stretch",
+          borderBottom: `2px solid ${GREEN}`,
+          flexShrink: 0,
+          minHeight: "28mm",
         }}>
-          {company.logoUrl
-            ? <img src={company.logoUrl} alt="" style={{ height: "10mm", objectFit: "contain", flexShrink: 0 }} />
-            : <div style={{ width: "10mm", height: "10mm", flexShrink: 0, background: DARK, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "5pt" }}>{company.nameShort[0]}</div>
-          }
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: "8pt", fontWeight: 900, color: GREEN, lineHeight: 1.1, letterSpacing: "0.3px" }}>
+          {/* Left: big snowflake decoration */}
+          <div style={{
+            width: "28mm", flexShrink: 0, background: "#fff",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            overflow: "hidden", position: "relative",
+          }}>
+            <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)" }}>
+              <SnowflakeSVG size={106} color={GREEN} opacity={0.22} />
+            </div>
+          </div>
+
+          {/* Thin vertical divider */}
+          <div style={{ width: "0.5mm", background: "#e0e0e0", flexShrink: 0 }} />
+
+          {/* Right: company branding (like almasiah logo block) */}
+          <div style={{
+            flex: 1, padding: "2.5mm 3mm 2mm 3mm",
+            display: "flex", flexDirection: "column", justifyContent: "center",
+          }}>
+            {/* Service name (like "الماسية / almasiah") */}
+            <div style={{
+              fontFamily: "Arial, sans-serif", direction: "rtl",
+              fontSize: "11pt", fontWeight: 900, color: GREEN,
+              lineHeight: 1, marginBottom: "0.5mm", textAlign: "right",
+            }}>
+              رحمت الحرام
+            </div>
+            <div style={{
+              fontSize: "9pt", fontWeight: 900, color: GREEN,
+              letterSpacing: "0.3px", lineHeight: 1, marginBottom: "1mm",
+            }}>
               Rehmat E Haram CHGo
             </div>
-            <div style={{ fontSize: "5.5pt", fontWeight: 800, color: DARK, lineHeight: 1.2 }}>
-              {company.nameShort}
-            </div>
-            <div style={{ fontSize: "4.5pt", color: GOLD, fontWeight: 700, lineHeight: 1 }}>
-              TOURS &amp; TRAVELS
-            </div>
-          </div>
-          <div style={{ fontSize: "28pt", lineHeight: 1, flexShrink: 0 }}>🇮🇳</div>
-        </div>
-
-        {/* ── SERVICE CENTER LABEL ── */}
-        <div style={{
-          background: "#f5f5f5", borderBottom: `1px solid #ddd`,
-          padding: "1mm 3mm", display: "flex", justifyContent: "space-between", alignItems: "center",
-        }}>
-          <div style={{ fontSize: "5.5pt", fontWeight: 700, color: "#444", letterSpacing: "0.3px" }}>
-            Service Center No
-          </div>
-          <div style={{ fontSize: "5.5pt", fontWeight: 700, color: "#444", direction: "rtl", fontFamily: "Arial, sans-serif" }}>
-            مركز تقديم الخدمة &nbsp; رقم
-          </div>
-        </div>
-
-        {/* ── MAKTAB NUMBER + FLAG ── */}
-        <div style={{
-          padding: "2.5mm 3mm", display: "flex", gap: "3mm",
-          alignItems: "center", borderBottom: `1px solid #eee`,
-        }}>
-          {/* Big maktab number box */}
-          <div style={{
-            flex: 1, border: `2.5px solid ${DARK}`, borderRadius: "5px",
-            padding: "2mm 3mm", textAlign: "center",
-          }}>
-            <div style={{ fontSize: "32pt", fontWeight: 900, color: DARK, lineHeight: 1, fontFamily: "monospace" }}>
-              {group.maktabNumber || "—"}
-            </div>
-          </div>
-          {/* Indian flag + serial */}
-          <div style={{
-            flexShrink: 0, display: "flex", flexDirection: "column",
-            alignItems: "center", gap: "1.5mm",
-          }}>
-            <div style={{ fontSize: "36pt", lineHeight: 1 }}>🇮🇳</div>
+            {/* Logo image */}
+            {company.logoUrl && (
+              <img src={company.logoUrl} alt="" style={{ height: "7mm", objectFit: "contain", objectPosition: "left", marginBottom: "1mm" }} />
+            )}
+            {/* Arabic company name */}
             <div style={{
-              background: DARK, borderRadius: "3px", padding: "0.8mm 2mm",
-              fontSize: "7pt", fontWeight: 900, color: "#fff", letterSpacing: "0.5px",
+              fontFamily: "Arial, sans-serif", direction: "rtl", textAlign: "right",
+              fontSize: "4.5pt", color: "#333", fontWeight: 700, lineHeight: 1.3,
             }}>
-              #{serialNo}
+              {company.arabicName}
+            </div>
+            {/* English company name */}
+            <div style={{ fontSize: "4pt", color: "#555", lineHeight: 1.2 }}>
+              {company.name}
             </div>
           </div>
         </div>
 
-        {/* ── BILINGUAL ROWS ── */}
-        <div style={{ borderBottom: `1px solid #ddd` }}>
+        {/* ══ MIDDLE: service center label + number box + flag ══ */}
+        <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
+          {/* Faint snowflake background pattern */}
           <div style={{
-            display: "flex", alignItems: "center", padding: "1.2mm 3mm",
-            borderBottom: `0.5px solid #eee`,
+            position: "absolute", top: "50%", left: "50%",
+            transform: "translate(-50%,-50%)", pointerEvents: "none", zIndex: 0,
           }}>
-            <div style={{ flex: 1, fontSize: "7.5pt", fontWeight: 800, color: "#222" }}>India</div>
-            <div style={{ flex: 1, fontSize: "8pt", fontWeight: 800, color: "#222", direction: "rtl", textAlign: "right", fontFamily: "Arial, sans-serif" }}>الهند</div>
+            <SnowflakeSVG size={160} color={GREEN} opacity={0.07} />
           </div>
-          <div style={{ display: "flex", alignItems: "center", padding: "1.2mm 3mm" }}>
-            <div style={{ flex: 1, fontSize: "7.5pt", fontWeight: 800, color: GREEN }}>Hajj {group.year}</div>
-            <div style={{ flex: 1, fontSize: "8pt", fontWeight: 800, color: GREEN, direction: "rtl", textAlign: "right", fontFamily: "Arial, sans-serif" }}>حج 1447</div>
+
+          <div style={{ position: "relative", zIndex: 1, height: "100%", display: "flex", flexDirection: "column" }}>
+            {/* Service center label — right aligned like reference */}
+            <div style={{
+              padding: "1.5mm 3mm 0.5mm",
+              textAlign: "right",
+            }}>
+              <div style={{
+                fontFamily: "Arial, sans-serif", direction: "rtl",
+                fontSize: "7pt", fontWeight: 900, color: "#222", lineHeight: 1.2,
+              }}>
+                مركز تقديم الخدمة
+              </div>
+              <div style={{ fontSize: "5.5pt", fontWeight: 700, color: "#444" }}>
+                Service Center No &nbsp;<span style={{ fontFamily: "Arial", direction: "rtl" }}>رقم</span>
+              </div>
+            </div>
+
+            {/* Number box (left) + Flag box (right) */}
+            <div style={{ display: "flex", gap: "3mm", padding: "1mm 3mm 1.5mm", alignItems: "center" }}>
+              {/* Maktab number — big green-bordered box like "612" in reference */}
+              <div style={{
+                flex: 1,
+                border: `2.5px solid ${GREEN}`,
+                borderRadius: "4px",
+                padding: "1.5mm 2mm",
+                textAlign: "center",
+                background: "#fff",
+              }}>
+                <div style={{
+                  fontSize: "30pt", fontWeight: 900, color: "#111",
+                  lineHeight: 1, fontFamily: "'Courier New', monospace",
+                }}>
+                  {group.maktabNumber || "—"}
+                </div>
+              </div>
+
+              {/* Indian flag — bordered box like reference */}
+              <div style={{
+                width: "28mm",
+                border: `2.5px solid ${GREEN}`,
+                borderRadius: "4px",
+                padding: "1.5mm",
+                textAlign: "center",
+                background: "#fff",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                flexShrink: 0,
+              }}>
+                <div style={{ fontSize: "28pt", lineHeight: 1 }}>🇮🇳</div>
+              </div>
+            </div>
+
+            {/* Bilingual rows — India / الهند and Hajj / حج */}
+            <div style={{ margin: "0 3mm", border: `1px solid #ddd`, borderRadius: "3px", overflow: "hidden" }}>
+              <div style={{
+                display: "flex", borderBottom: "1px solid #ddd",
+                background: "#fafafa",
+              }}>
+                <div style={{ flex: 1, padding: "1mm 2.5mm", fontSize: "7.5pt", fontWeight: 800, color: "#111" }}>India</div>
+                <div style={{ width: "0.5px", background: "#ddd" }} />
+                <div style={{
+                  flex: 1, padding: "1mm 2.5mm", fontSize: "8pt", fontWeight: 800,
+                  color: "#111", direction: "rtl", textAlign: "right", fontFamily: "Arial, sans-serif",
+                }}>الهند</div>
+              </div>
+              <div style={{ display: "flex", background: "#fff" }}>
+                <div style={{ flex: 1, padding: "1mm 2.5mm", fontSize: "7.5pt", fontWeight: 800, color: GREEN }}>Hajj {group.year}</div>
+                <div style={{ width: "0.5px", background: "#ddd" }} />
+                <div style={{
+                  flex: 1, padding: "1mm 2.5mm", fontSize: "8pt", fontWeight: 800,
+                  color: GREEN, direction: "rtl", textAlign: "right", fontFamily: "Arial, sans-serif",
+                }}>حج 1447</div>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* ── GREEN EMERGENCY STRIP ── */}
-        <div style={{
-          background: GREEN, padding: "2mm 3mm", flex: 1,
-          display: "flex", flexDirection: "column", justifyContent: "center", gap: "1mm",
-        }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5mm" }}>
-            <div style={{ fontSize: "6pt", fontWeight: 900, color: "#fff", letterSpacing: "0.5px" }}>
-              📞 Call Center &nbsp; مركز التواصل
+        {/* ══ BOTTOM GREEN: Call Center strip (like reference) ══ */}
+        <div style={{ background: GREEN, padding: "2mm 3mm 1.5mm", flexShrink: 0 }}>
+          {/* Label row */}
+          <div style={{
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+            marginBottom: "1mm",
+          }}>
+            <div style={{ fontSize: "5.5pt", fontWeight: 900, color: "#fff", letterSpacing: "0.3px" }}>
+              Call Center
             </div>
-            <div style={{ fontSize: "5.5pt", fontWeight: 700, color: "rgba(255,255,255,0.85)" }}>
-              🌐 {company.website}
+            <div style={{ fontSize: "6pt", fontWeight: 900, color: "#fff", fontFamily: "Arial, sans-serif" }}>
+              مركزالتواصل
             </div>
           </div>
-          <div style={{ display: "flex", gap: "2mm", alignItems: "center" }}>
+          {/* Two white phone boxes */}
+          <div style={{ display: "flex", gap: "2mm" }}>
             <div style={{
-              background: "#fff", borderRadius: "3px", padding: "1mm 3mm",
-              flex: 1, textAlign: "center",
+              flex: 1, background: "#fff", borderRadius: "3px",
+              padding: "1mm 2mm", display: "flex", alignItems: "center", gap: "1.5mm",
             }}>
-              <div style={{ fontSize: "5pt", color: "#888", fontWeight: 600 }}>🇮🇳 India</div>
-              <div style={{ fontSize: "9pt", fontWeight: 900, color: DARK, letterSpacing: "0.5px" }}>{company.phone}</div>
+              <div style={{ fontSize: "8pt", color: GREEN, flexShrink: 0 }}>🎧</div>
+              <div>
+                <div style={{ fontSize: "4.5pt", color: "#888", fontWeight: 600 }}>🇮🇳 India</div>
+                <div style={{ fontSize: "7pt", fontWeight: 900, color: DARK, letterSpacing: "0.3px", lineHeight: 1.2 }}>{company.mobile}</div>
+              </div>
             </div>
             <div style={{
-              background: "#fff", borderRadius: "3px", padding: "1mm 3mm",
-              flex: 1, textAlign: "center",
+              flex: 1, background: "#fff", borderRadius: "3px",
+              padding: "1mm 2mm", display: "flex", alignItems: "center", gap: "1.5mm",
             }}>
-              <div style={{ fontSize: "5pt", color: "#888", fontWeight: 600 }}>🇸🇦 Saudi</div>
-              <div style={{ fontSize: "9pt", fontWeight: 900, color: DARK, letterSpacing: "0.5px" }}>{company.phoneSaudi}</div>
+              <div style={{ fontSize: "8pt", color: GREEN, flexShrink: 0 }}>🎧</div>
+              <div>
+                <div style={{ fontSize: "4.5pt", color: "#888", fontWeight: 600 }}>🇸🇦 Saudi</div>
+                <div style={{ fontSize: "7pt", fontWeight: 900, color: DARK, letterSpacing: "0.3px", lineHeight: 1.2 }}>{company.phoneSaudi}</div>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* ── FOOTER ── */}
+        {/* ══ FOOTER WHITE: website + address + email (like almasiah bottom) ══ */}
         <div style={{
-          background: DARK, padding: "1.5mm 3mm",
-          display: "flex", justifyContent: "space-between", alignItems: "center",
+          background: "#f7faf8",
+          borderTop: `1.5px solid ${GREEN}`,
+          padding: "1.2mm 3mm",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          flexShrink: 0,
         }}>
-          <div style={{ fontSize: "4.5pt", color: "rgba(255,255,255,0.75)", flex: 1, marginRight: "2mm", lineHeight: 1.3 }}>{company.address}</div>
-          <div style={{ fontSize: "5pt", color: GOLD, fontWeight: 700, flexShrink: 0 }}>{company.email}</div>
+          <div>
+            <div style={{ fontSize: "6pt", fontWeight: 900, color: GREEN }}>🌐 {company.website}</div>
+            <div style={{ fontSize: "4pt", color: "#666", lineHeight: 1.3 }}>{company.email}</div>
+          </div>
+          {company.logoUrl && (
+            <img src={company.logoUrl} alt="" style={{ height: "5mm", objectFit: "contain", opacity: 0.7 }} />
+          )}
         </div>
+
       </div>
     </div>
   );
