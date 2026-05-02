@@ -130,7 +130,7 @@ function LuggageStickerBack({
           }}>
             {/* Almasiah logo image */}
             <img
-              src={`${BASE}images/almasiah-logo.jpg`}
+              src={`${BASE}images/almasiah-logo.png`}
               alt="almasiah"
               style={{ height: "11mm", objectFit: "contain", objectPosition: "right", marginBottom: "1.5mm" }}
             />
