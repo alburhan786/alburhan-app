@@ -1,17 +1,12 @@
 #!/bin/bash
-echo "=== API Server Status ==="
-pm2 status api-server
+echo "=== Nginx Config ==="
+cat /etc/nginx/sites-enabled/alburhantravels.com 2>/dev/null || cat /etc/nginx/sites-enabled/default 2>/dev/null || ls /etc/nginx/sites-enabled/
 
 echo ""
-echo "=== Testing API routes ==="
-curl -s http://localhost:5000/api/packages | head -c 200
+echo "=== Testing API from outside (as browser sees it) ==="
+curl -s "https://alburhantravels.com/api/packages" | head -c 300
 echo ""
-curl -s http://localhost:5000/api/packages/categories | head -c 200
 
 echo ""
-echo "=== Database check ==="
-PGPASSWORD=AlBurhan2026Secure psql -U alburhan -d alburhandb -h localhost -c "SELECT COUNT(*) as packages FROM packages; SELECT COUNT(*) as bookings FROM bookings; SELECT COUNT(*) as users FROM users;" 2>&1
-
-echo ""
-echo "=== ENV check in PM2 ==="
-pm2 env 0 | grep -E "NODE_ENV|PORT|FAST2SMS|DATABASE_URL" | head -10
+echo "=== Testing login from outside ==="
+curl -s -X POST "https://alburhantravels.com/api/auth/send-otp"   -H "Content-Type: application/json"   -d '{"mobile":"9893989786"}' | head -c 200
