@@ -152,6 +152,9 @@ function LuggageStickerBack({
             <div style={{ fontSize: "6pt", fontWeight: 900, color: "#fff", letterSpacing: "0.5px" }}>
               📞 Call Center &nbsp; مركز التواصل
             </div>
+            <div style={{ fontSize: "5.5pt", fontWeight: 700, color: "rgba(255,255,255,0.85)" }}>
+              🌐 {company.website}
+            </div>
           </div>
           <div style={{ display: "flex", gap: "2mm", alignItems: "center" }}>
             <div style={{
@@ -176,8 +179,8 @@ function LuggageStickerBack({
           background: DARK, padding: "1.5mm 3mm",
           display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
-          <div style={{ fontSize: "5pt", color: GOLD, fontWeight: 700 }}>{company.website}</div>
-          <div style={{ fontSize: "5pt", color: "rgba(255,255,255,0.7)" }}>{company.email}</div>
+          <div style={{ fontSize: "4.5pt", color: "rgba(255,255,255,0.75)", flex: 1, marginRight: "2mm", lineHeight: 1.3 }}>{company.address}</div>
+          <div style={{ fontSize: "5pt", color: GOLD, fontWeight: 700, flexShrink: 0 }}>{company.email}</div>
         </div>
       </div>
     </div>
@@ -364,6 +367,7 @@ export default function PrintLuggageSquare() {
                                 <div style={{ fontWeight: 700, color: "#222", fontSize: "6pt" }}>{data?.name || "—"}</div>
                                 {data?.nameAr && <div style={{ fontWeight: 700, color: "#222", fontSize: "5.5pt", direction: "rtl", textAlign: "right" }}>{data.nameAr}</div>}
                                 {data?.address && <div style={{ fontSize: "4.5pt", color: "#666", lineHeight: 1.2 }}>{data.address}</div>}
+                                {data?.addressAr && <div style={{ fontSize: "4pt", color: "#666", lineHeight: 1.2, direction: "rtl", textAlign: "right" }}>{data.addressAr}</div>}
                               </div>
                             ))}
                           </div>
