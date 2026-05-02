@@ -5,7 +5,8 @@ import { Barcode } from "@/components/print/Barcode";
 import { QRCodeSVG } from "qrcode.react";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
 
-const API = import.meta.env.VITE_API_URL || "";
+const API  = import.meta.env.VITE_API_URL || "";
+const BASE = import.meta.env.BASE_URL || "/";
 
 interface Pilgrim {
   id: string; serialNumber: number; fullName: string; photoUrl?: string;
@@ -122,37 +123,27 @@ function LuggageStickerBack({
           {/* Thin vertical divider */}
           <div style={{ width: "0.5mm", background: "#e0e0e0", flexShrink: 0 }} />
 
-          {/* Right: company branding */}
+          {/* Right: Mashariq Almasiah branding */}
           <div style={{
             flex: 1, padding: "2mm 3mm 2mm 2mm",
             display: "flex", flexDirection: "column", justifyContent: "center",
           }}>
-            {/* Arabic service name — largest element, like "الماسية" in reference */}
-            <div style={{
-              fontFamily: "Arial, sans-serif", direction: "rtl",
-              fontSize: "16pt", fontWeight: 900, color: GREEN,
-              lineHeight: 1, marginBottom: "0.5mm", textAlign: "right",
-            }}>
-              رحمت الحرام
-            </div>
-            {/* English service name — ALL CAPS bold */}
-            <div style={{
-              fontSize: "10pt", fontWeight: 900, color: GREEN,
-              letterSpacing: "0.5px", lineHeight: 1, marginBottom: "2mm",
-              textTransform: "uppercase",
-            }}>
-              REHMAT E HARAM CHGO
-            </div>
-            {/* Arabic company name — bold */}
+            {/* Almasiah logo image */}
+            <img
+              src={`${BASE}images/almasiah-logo.jpg`}
+              alt="almasiah"
+              style={{ height: "11mm", objectFit: "contain", objectPosition: "right", marginBottom: "1.5mm" }}
+            />
+            {/* Arabic company name — BIG & BOLD */}
             <div style={{
               fontFamily: "Arial, sans-serif", direction: "rtl", textAlign: "right",
-              fontSize: "6pt", color: "#111", fontWeight: 900, lineHeight: 1.4,
+              fontSize: "8.5pt", color: GREEN, fontWeight: 900, lineHeight: 1.3,
             }}>
-              {company.arabicName}
+              شركة مشارق الماسية لخدمات الحجاج
             </div>
             {/* English company name — bold */}
             <div style={{ fontSize: "5.5pt", color: "#111", fontWeight: 900, lineHeight: 1.4 }}>
-              {company.name}
+              Mashariq Almasiah Company for Pilgrim Services
             </div>
           </div>
         </div>
