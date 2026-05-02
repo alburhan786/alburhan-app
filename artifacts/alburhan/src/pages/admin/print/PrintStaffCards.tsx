@@ -19,8 +19,8 @@ interface StaffMember {
 
 const GREEN = "#0B3D2E";
 const GOLD  = "#C9A23F";
-const W = "86mm";
-const H = "54mm";
+const W = "54mm";
+const H = "86mm";
 
 const ROLE_LABELS: Record<string, string> = {
   airport_staff:  "AIRPORT STAFF",
@@ -70,7 +70,7 @@ function KaabaSVG({ color = GOLD, size = "100%" }: { color?: string; size?: stri
   );
 }
 
-/* ── FRONT CARD ── */
+/* ── FRONT CARD (portrait 54×86mm) ── */
 function StaffCardFront({ s, groupName }: { s: StaffMember; groupName?: string }) {
   const company   = getCompanyById(s.companyId);
   const roleLabel = ROLE_LABELS[s.role] || "STAFF";
@@ -78,139 +78,126 @@ function StaffCardFront({ s, groupName }: { s: StaffMember; groupName?: string }
   return (
     <div className="staff-card" style={{ background: "#fff", display: "flex", flexDirection: "column" }}>
 
-      {/* ── HEADER ── */}
+      {/* ── HEADER (green, centered) ~14mm ── */}
       <div style={{
-        background: GREEN, display: "flex", alignItems: "center",
-        padding: "1.5mm 2.5mm", gap: "2mm", flexShrink: 0, minHeight: "12mm",
+        background: GREEN, display: "flex", flexDirection: "column",
+        alignItems: "center", justifyContent: "center",
+        padding: "2mm 2mm 1.5mm", gap: "0.5mm", flexShrink: 0,
       }}>
         {company.logoUrl && (
           <img src={company.logoUrl} alt="" style={{
-            width: "10mm", height: "10mm", objectFit: "contain",
-            flexShrink: 0, borderRadius: "50%", background: "#fff", padding: "1px",
-            border: `1px solid ${GOLD}`,
+            width: "11mm", height: "11mm", objectFit: "contain",
+            borderRadius: "50%", background: "#fff", padding: "1px",
+            border: `1.5px solid ${GOLD}`,
           }} />
         )}
-        <div style={{ flex: 1 }}>
-          <div style={{
-            fontSize: "11pt", fontWeight: 900, color: "#fff",
-            lineHeight: 1.0, letterSpacing: "0.5px", textTransform: "uppercase",
-          }}>
-            {company.nameShort}
-          </div>
-          <div style={{
-            fontSize: "7.5pt", fontWeight: 800, color: GOLD,
-            lineHeight: 1.1, letterSpacing: "0.4px",
-          }}>
-            TOURS &amp; TRAVELS
-          </div>
-          <div style={{
-            fontSize: "3.5pt", color: "rgba(255,255,255,0.8)",
-            letterSpacing: "0.6px", marginTop: "0.5mm", textTransform: "uppercase",
-          }}>
-            SERVING PILGRIMS WITH CARE
-          </div>
+        <div style={{
+          fontSize: "11pt", fontWeight: 900, color: "#fff",
+          lineHeight: 1.0, letterSpacing: "0.8px", textTransform: "uppercase", textAlign: "center",
+        }}>
+          {company.nameShort}
+        </div>
+        <div style={{
+          fontSize: "6.5pt", fontWeight: 800, color: GOLD,
+          lineHeight: 1.0, letterSpacing: "1px", textAlign: "center",
+        }}>
+          TOURS &amp; TRAVELS
+        </div>
+        <div style={{
+          fontSize: "3pt", color: "rgba(255,255,255,0.7)",
+          letterSpacing: "0.8px", textTransform: "uppercase", textAlign: "center",
+        }}>
+          SERVING PILGRIMS WITH CARE
         </div>
       </div>
 
-      {/* ── MIDDLE AREA ── */}
-      <div style={{ display: "flex", flex: 1, overflow: "hidden", background: "#eef4ee" }}>
-
-        {/* Left: Role badge (green box, words stacked) */}
-        <div style={{
-          width: "18mm", flexShrink: 0,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          padding: "2mm 1.5mm",
+      {/* ── ROLE BADGE (full-width green bar) ~7mm ── */}
+      <div style={{
+        background: "#1a5c41", display: "flex", alignItems: "center",
+        justifyContent: "center", padding: "1.8mm 2mm", flexShrink: 0,
+        borderTop: `1px solid ${GOLD}44`, borderBottom: `1px solid ${GOLD}44`,
+      }}>
+        <span style={{
+          fontSize: "7pt", fontWeight: 900, color: "#fff",
+          letterSpacing: "2px", textTransform: "uppercase", textAlign: "center",
         }}>
+          {roleLabel}
+        </span>
+      </div>
+
+      {/* ── PHOTO SECTION ~26mm ── */}
+      <div style={{
+        background: "#eef4ee", display: "flex", alignItems: "center",
+        justifyContent: "center", padding: "2mm", flexShrink: 0, height: "28mm",
+      }}>
+        {s.photoUrl ? (
+          <img src={`${API}${s.photoUrl}`} alt="" style={{
+            width: "22mm", height: "100%", objectFit: "cover",
+            border: `2px solid ${GOLD}`, borderRadius: "4px",
+          }} />
+        ) : (
           <div style={{
-            background: GREEN, borderRadius: "6px",
-            padding: "3mm 2mm",
-            display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-            width: "100%", gap: "0.5mm",
+            width: "22mm", height: "100%",
+            background: "#d4e0d4", border: `2px solid ${GOLD}`, borderRadius: "4px",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            flexDirection: "column", gap: "1.5mm",
           }}>
-            {roleLabel.split(" ").map((word, i) => (
-              <span key={i} style={{
-                fontSize: "6pt", fontWeight: 900, color: "#fff",
-                letterSpacing: "0.5px", textTransform: "uppercase",
-                textAlign: "center", lineHeight: 1.2, display: "block",
-              }}>
-                {word}
-              </span>
-            ))}
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#888" strokeWidth="1.5">
+              <circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+            </svg>
+            <div style={{ fontSize: "3.5pt", color: "#999", fontWeight: 700, letterSpacing: "0.5px" }}>PHOTO</div>
           </div>
-        </div>
+        )}
+      </div>
 
-        {/* Centre: Photo */}
-        <div style={{
-          width: "24mm", flexShrink: 0,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          padding: "1.5mm",
-        }}>
-          {s.photoUrl ? (
-            <img src={`${API}${s.photoUrl}`} alt="" style={{
-              width: "20mm", height: "100%", maxHeight: "100%",
-              objectFit: "cover", border: `2.5px solid ${GOLD}`, borderRadius: "4px",
-            }} />
-          ) : (
-            <div style={{
-              width: "20mm", height: "100%",
-              background: "#d4e0d4", border: `2.5px solid ${GOLD}`, borderRadius: "4px",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              flexDirection: "column", gap: "1mm",
-            }}>
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#888" strokeWidth="1.5">
-                <circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
-              </svg>
-              <div style={{ fontSize: "3.5pt", color: "#999", fontWeight: 700 }}>PHOTO</div>
-            </div>
-          )}
+      {/* ── HAJJ 2026 STRIP ~10mm ── */}
+      <div style={{
+        background: "#d8ead8", display: "flex", alignItems: "center",
+        justifyContent: "center", gap: "2mm", padding: "1mm 3mm", flexShrink: 0,
+        borderTop: `0.5px solid ${GREEN}33`, borderBottom: `0.5px solid ${GREEN}33`,
+      }}>
+        <div style={{ width: "22mm", height: "10mm", flexShrink: 0 }}>
+          <KaabaSVG color={GREEN} size="100%" />
         </div>
-
-        {/* Right: HAJJ 2026 */}
-        <div style={{
-          flex: 1, display: "flex", flexDirection: "column",
-          alignItems: "center", justifyContent: "center",
-          padding: "1mm 1.5mm",
-        }}>
-          <div style={{ width: "100%", flex: 1 }}>
-            <KaabaSVG color={GREEN} size="100%" />
-          </div>
-          <div style={{ textAlign: "center", lineHeight: 1.0, marginTop: "0.5mm" }}>
-            <div style={{ fontSize: "8pt", fontWeight: 900, color: GREEN, letterSpacing: "3px" }}>HAJJ</div>
-            <div style={{ fontSize: "14pt", fontWeight: 900, color: GOLD, letterSpacing: "1px", lineHeight: 0.9 }}>2026</div>
-          </div>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: "9pt", fontWeight: 900, color: GREEN, letterSpacing: "3px", lineHeight: 1 }}>HAJJ</div>
+          <div style={{ fontSize: "15pt", fontWeight: 900, color: GOLD, letterSpacing: "1px", lineHeight: 0.9 }}>2026</div>
         </div>
       </div>
 
-      {/* ── INFO SECTION ── */}
-      <div style={{ background: "#fff", padding: "1mm 2.5mm 0.8mm", flexShrink: 0 }}>
+      {/* ── INFO SECTION (flex: 1) ── */}
+      <div style={{ background: "#fff", padding: "1.5mm 2.5mm 1mm", flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: "0.8mm" }}>
 
         {/* Name */}
         <div style={{
-          fontSize: "10.5pt", fontWeight: 900, color: "#111",
+          fontSize: "9.5pt", fontWeight: 900, color: "#111",
           textTransform: "uppercase", textAlign: "center",
-          lineHeight: 1.0, letterSpacing: "0.5px", marginBottom: "0.6mm",
+          lineHeight: 1.0, letterSpacing: "0.5px",
           whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
         }}>
           {s.fullName}
         </div>
 
-        {/* Role — own line */}
+        {/* Gold divider */}
+        <div style={{ height: "0.4mm", background: GOLD, borderRadius: "1px" }} />
+
+        {/* Role row */}
         <div style={{
           fontSize: "4.5pt", fontWeight: 700, color: "#444",
-          textAlign: "center", lineHeight: 1.3, marginBottom: "0.1mm",
+          textAlign: "center", lineHeight: 1.3,
           whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
         }}>
           ROLE : <span style={{ color: GREEN, fontWeight: 900 }}>{roleLabel}</span>
         </div>
 
-        {/* Designation — own line */}
+        {/* Designation row */}
         {s.designation && (
           <div style={{
             fontSize: "4.5pt", fontWeight: 700, color: "#444",
-            textAlign: "center", lineHeight: 1.3, marginBottom: "0.6mm",
+            textAlign: "center", lineHeight: 1.3,
             whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
           }}>
-            DESIGNATION : <span style={{ color: GREEN, fontWeight: 900 }}>{s.designation.toUpperCase()}</span>
+            DESIG. : <span style={{ color: GREEN, fontWeight: 900 }}>{s.designation.toUpperCase()}</span>
           </div>
         )}
 
@@ -219,15 +206,14 @@ function StaffCardFront({ s, groupName }: { s: StaffMember; groupName?: string }
           <div style={{
             display: "flex", alignItems: "center", justifyContent: "center",
             background: GREEN, borderRadius: "5px", padding: "1mm 2mm",
-            marginBottom: "0.6mm",
           }}>
             <svg viewBox="0 0 16 12" width="9" height="7" style={{ marginRight: "1.5mm", flexShrink: 0 }}>
               <rect x="0.5" y="0.5" width="15" height="11" rx="2" fill="none" stroke={GOLD} strokeWidth="1.2"/>
               <line x1="4" y1="4" x2="12" y2="4" stroke={GOLD} strokeWidth="1.1"/>
               <line x1="4" y1="7.5" x2="10" y2="7.5" stroke={GOLD} strokeWidth="1.1"/>
             </svg>
-            <span style={{ fontSize: "6.5pt", fontWeight: 900, color: "#fff", letterSpacing: "0.5px" }}>
-              ID NO. :&nbsp;{s.staffId}
+            <span style={{ fontSize: "6pt", fontWeight: 900, color: "#fff", letterSpacing: "0.5px" }}>
+              ID : {s.staffId}
             </span>
           </div>
         )}
@@ -235,39 +221,38 @@ function StaffCardFront({ s, groupName }: { s: StaffMember; groupName?: string }
         {/* Group */}
         {groupName && (
           <div style={{
-            fontSize: "4pt", color: "#555", textAlign: "center",
-            letterSpacing: "0.2px", lineHeight: 1.2,
+            fontSize: "4pt", color: "#555", textAlign: "center", lineHeight: 1.2,
             whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
           }}>
-            GROUP : &nbsp;<span style={{ fontWeight: 800, color: "#333" }}>{groupName}</span>
+            GROUP : <span style={{ fontWeight: 800, color: "#333" }}>{groupName}</span>
           </div>
         )}
       </div>
 
       {/* ── FOOTER ── */}
       <div style={{
-        background: GREEN, padding: "1.2mm 3mm", flexShrink: 0,
+        background: GREEN, padding: "1.5mm 3mm", flexShrink: 0,
         display: "flex", alignItems: "center", justifyContent: "space-between",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: "1.5mm" }}>
           <svg viewBox="0 0 24 24" width="8" height="8" fill="none" stroke={GOLD} strokeWidth="2.5">
             <path d="M22 16.92v3a2 2 0 0 1-2.18 2A19.79 19.79 0 0 1 3.08 5.18 2 2 0 0 1 5.07 3h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L9.09 10.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 23 18z" />
           </svg>
-          <span style={{ fontSize: "4pt", color: "#fff", fontWeight: 700 }}>{company.mobile}</span>
+          <span style={{ fontSize: "3.5pt", color: "#fff", fontWeight: 700 }}>{company.mobile}</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "1.5mm" }}>
           <svg viewBox="0 0 24 24" width="8" height="8" fill="none" stroke={GOLD} strokeWidth="2">
             <circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" />
             <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
           </svg>
-          <span style={{ fontSize: "4pt", color: "#fff", fontWeight: 700 }}>{company.website}</span>
+          <span style={{ fontSize: "3.5pt", color: "#fff", fontWeight: 700 }}>{company.website}</span>
         </div>
       </div>
     </div>
   );
 }
 
-/* ── BACK CARD ── */
+/* ── BACK CARD (portrait 54×86mm) ── */
 function StaffCardBack({ s, groupName }: { s: StaffMember; groupName?: string }) {
   const company   = getCompanyById(s.companyId);
   const roleLabel = ROLE_LABELS[s.role] || "STAFF";
@@ -278,134 +263,117 @@ function StaffCardBack({ s, groupName }: { s: StaffMember; groupName?: string })
   return (
     <div className="staff-card" style={{ background: "#fff", display: "flex", flexDirection: "column" }}>
 
-      {/* ── HEADER ── */}
+      {/* ── HEADER (centered) ~13mm ── */}
       <div style={{
-        background: GREEN, display: "flex", alignItems: "center",
-        padding: "1.5mm 2.5mm", gap: "2mm", flexShrink: 0, minHeight: "11mm",
+        background: GREEN, display: "flex", flexDirection: "column",
+        alignItems: "center", justifyContent: "center",
+        padding: "1.5mm 2mm 1mm", gap: "0.4mm", flexShrink: 0,
       }}>
         {company.logoUrl && (
           <img src={company.logoUrl} alt="" style={{
-            width: "9mm", height: "9mm", objectFit: "contain",
-            flexShrink: 0, borderRadius: "50%", background: "#fff", padding: "1px",
-            border: `1px solid ${GOLD}`,
+            width: "10mm", height: "10mm", objectFit: "contain",
+            borderRadius: "50%", background: "#fff", padding: "1px",
+            border: `1.5px solid ${GOLD}`,
           }} />
         )}
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: "10pt", fontWeight: 900, color: "#fff", lineHeight: 1.0, letterSpacing: "0.5px" }}>
-            {company.nameShort}
-          </div>
-          <div style={{ fontSize: "7pt", fontWeight: 800, color: GOLD, lineHeight: 1.1, letterSpacing: "0.3px" }}>
-            TOURS &amp; TRAVELS
-          </div>
-          <div style={{
-            fontSize: "4pt", color: "rgba(255,255,255,0.85)", lineHeight: 1.2,
-            direction: "rtl", fontFamily: "Arial, sans-serif", marginTop: "0.3mm",
-          }}>
-            {company.arabicName}
-          </div>
+        <div style={{ fontSize: "10pt", fontWeight: 900, color: "#fff", lineHeight: 1.0, letterSpacing: "0.6px", textAlign: "center" }}>
+          {company.nameShort}
+        </div>
+        <div style={{ fontSize: "6pt", fontWeight: 800, color: GOLD, lineHeight: 1.0, letterSpacing: "1px", textAlign: "center" }}>
+          TOURS &amp; TRAVELS
+        </div>
+        <div style={{ fontSize: "4.5pt", color: "rgba(255,255,255,0.85)", lineHeight: 1.2, direction: "rtl", fontFamily: "Arial, sans-serif", textAlign: "center" }}>
+          {company.arabicName}
         </div>
       </div>
 
-      {/* ── IDENTITY CARD LABEL ── */}
-      <div style={{ display: "flex", justifyContent: "center", padding: "0.8mm 2mm 0.3mm", flexShrink: 0 }}>
-        <div style={{
-          background: GREEN, borderRadius: "20px", padding: "0.5mm 5mm",
-          fontSize: "4.2pt", fontWeight: 900, color: "#fff", letterSpacing: "1px",
-          border: `0.5px solid ${GOLD}33`,
-        }}>
-          STAFF IDENTITY CARD
-        </div>
+      {/* ── IDENTITY CARD BANNER ~6mm ── */}
+      <div style={{
+        background: "#1a5c41", display: "flex", alignItems: "center",
+        justifyContent: "center", padding: "1.5mm 2mm", flexShrink: 0,
+        borderTop: `1px solid ${GOLD}44`, borderBottom: `1px solid ${GOLD}44`,
+      }}>
+        <span style={{ fontSize: "5.5pt", fontWeight: 900, color: "#fff", letterSpacing: "1.5px" }}>
+          HAJJ STAFF IDENTITY CARD 2026
+        </span>
       </div>
 
-      {/* ── QR + DETAILS ROW ── */}
-      <div style={{ display: "flex", padding: "0.5mm 2mm", gap: "2.5mm", flexShrink: 0, flex: 1, overflow: "hidden" }}>
-
-        {/* QR code column */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.8mm", flexShrink: 0 }}>
-          <div style={{ border: `2px solid ${GREEN}`, borderRadius: "3px", padding: "1.5px", background: "#fff" }}>
-            <QRCodeSVG value={verifyUrl} size={36} level="M" fgColor={GREEN} bgColor="#fff" />
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.8mm" }}>
-            <svg viewBox="0 0 24 24" width="6" height="6" fill="none" stroke={GREEN} strokeWidth="2">
-              <rect x="5" y="2" width="14" height="20" rx="2" /><line x1="12" y1="18" x2="12.01" y2="18" strokeWidth="3" />
-            </svg>
-            <span style={{ fontSize: "2.8pt", fontWeight: 800, color: GREEN, letterSpacing: "0.3px" }}>SCAN TO VERIFY</span>
-          </div>
+      {/* ── QR CODE (centered) ~20mm ── */}
+      <div style={{
+        display: "flex", flexDirection: "column", alignItems: "center",
+        justifyContent: "center", padding: "2mm 2mm 1mm", gap: "1mm", flexShrink: 0,
+      }}>
+        <div style={{ border: `2.5px solid ${GREEN}`, borderRadius: "4px", padding: "2px", background: "#fff" }}>
+          <QRCodeSVG value={verifyUrl} size={48} level="M" fgColor={GREEN} bgColor="#fff" />
         </div>
-
-        {/* Details table */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "0.55mm", overflow: "hidden", justifyContent: "center" }}>
-          {([
-            ["NAME",        s.fullName.toUpperCase()],
-            ["ROLE",        roleLabel],
-            s.designation ? ["DESIGNATION", s.designation.toUpperCase()] : null,
-            s.staffId     ? ["ID NO.",       s.staffId]                   : null,
-            groupName     ? ["GROUP",        groupName]                   : null,
-            s.mobileIndia ? ["MOBILE",       `+91 ${s.mobileIndia.replace(/^\+?91/, "")}`] : null,
-            s.bloodGroup  ? ["BLOOD GROUP",  s.bloodGroup]                : null,
-          ] as ([string, string] | null)[]).filter((x): x is [string, string] => x !== null).map(([label, value], i) => (
-            <div key={i} style={{ display: "flex", gap: "0.8mm", alignItems: "baseline" }}>
-              <span style={{
-                fontSize: "3pt", fontWeight: 800, color: GREEN,
-                minWidth: "15mm", letterSpacing: "0.1px", flexShrink: 0,
-              }}>{label}</span>
-              <span style={{ fontSize: "3pt", color: "#555" }}>:</span>
-              <span style={{
-                fontSize: "3pt",
-                fontWeight: label === "ID NO." ? 900 : label === "NAME" ? 800 : 600,
-                color: label === "BLOOD GROUP" ? "#b91c1c" : label === "ID NO." ? GREEN : "#111",
-                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1,
-              }}>{value}</span>
-            </div>
-          ))}
+        <div style={{ display: "flex", alignItems: "center", gap: "1mm" }}>
+          <svg viewBox="0 0 24 24" width="6" height="6" fill="none" stroke={GREEN} strokeWidth="2">
+            <rect x="5" y="2" width="14" height="20" rx="2" /><line x1="12" y1="18" x2="12.01" y2="18" strokeWidth="3" />
+          </svg>
+          <span style={{ fontSize: "3pt", fontWeight: 900, color: GREEN, letterSpacing: "0.5px" }}>SCAN TO VERIFY</span>
         </div>
       </div>
 
       {/* ── GOLD DIVIDER ── */}
       <div style={{ height: "0.4mm", background: GOLD, margin: "0 2mm", flexShrink: 0 }} />
 
-      {/* ── INSTRUCTIONS + ARABIC ── */}
-      <div style={{ display: "flex", padding: "0.8mm 2mm 0.5mm", gap: "2mm", flexShrink: 0 }}>
+      {/* ── DETAILS TABLE ~20mm ── */}
+      <div style={{ padding: "1mm 2.5mm", flexShrink: 0, display: "flex", flexDirection: "column", gap: "0.7mm" }}>
+        {([
+          ["NAME",        s.fullName.toUpperCase()],
+          ["ROLE",        roleLabel],
+          s.designation ? ["DESIGNATION", s.designation.toUpperCase()] : null,
+          s.staffId     ? ["ID NO.",       s.staffId]                   : null,
+          groupName     ? ["GROUP",        groupName]                   : null,
+          s.mobileIndia ? ["MOBILE",       `+91 ${s.mobileIndia.replace(/^\+?91/, "")}`] : null,
+          s.bloodGroup  ? ["BLOOD",        s.bloodGroup]                : null,
+        ] as ([string, string] | null)[]).filter((x): x is [string, string] => x !== null).map(([label, value], i) => (
+          <div key={i} style={{ display: "flex", gap: "1mm", alignItems: "baseline" }}>
+            <span style={{ fontSize: "3.2pt", fontWeight: 800, color: GREEN, minWidth: "16mm", flexShrink: 0, letterSpacing: "0.1px" }}>{label}</span>
+            <span style={{ fontSize: "3.2pt", color: "#888" }}>:</span>
+            <span style={{
+              fontSize: "3.2pt",
+              fontWeight: label === "ID NO." ? 900 : label === "NAME" ? 800 : 600,
+              color: label === "BLOOD" ? "#b91c1c" : label === "ID NO." ? GREEN : "#111",
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1,
+            }}>{value}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* ── GOLD DIVIDER ── */}
+      <div style={{ height: "0.4mm", background: GOLD, margin: "0 2mm", flexShrink: 0 }} />
+
+      {/* ── ARABIC + INSTRUCTIONS (flex: 1) ── */}
+      <div style={{ flex: 1, display: "flex", gap: "2mm", padding: "1mm 2.5mm 0.5mm", overflow: "hidden" }}>
 
         {/* Instructions */}
         <div style={{ flex: 1 }}>
-          <div style={{
-            fontSize: "3pt", fontWeight: 900, color: GREEN,
-            letterSpacing: "0.4px", marginBottom: "0.6mm", textTransform: "uppercase",
-          }}>
-            Important Instructions
+          <div style={{ fontSize: "3.2pt", fontWeight: 900, color: GREEN, letterSpacing: "0.4px", marginBottom: "0.6mm" }}>
+            IMPORTANT INSTRUCTIONS
           </div>
           {[
-            "This ID card is issued for official duty only.",
-            "This card must be carried at all times.",
-            "If found, please return to the nearest Al Burhan office.",
-            "Misuse of this card will lead to strict action.",
+            "Carry this card at all times during duty.",
+            "This card is issued for official use only.",
+            "If found, return to nearest Al Burhan office.",
+            "Misuse will result in strict disciplinary action.",
           ].map((line, i) => (
             <div key={i} style={{ display: "flex", gap: "0.8mm", alignItems: "flex-start", marginBottom: "0.5mm" }}>
               <span style={{ fontSize: "3pt", color: GOLD, flexShrink: 0, lineHeight: 1.3, fontWeight: 900 }}>•</span>
-              <span style={{ fontSize: "2.6pt", color: "#444", lineHeight: 1.3 }}>{line}</span>
+              <span style={{ fontSize: "2.8pt", color: "#444", lineHeight: 1.35 }}>{line}</span>
             </div>
           ))}
         </div>
 
-        {/* Arabic text + Kaaba illustration */}
-        <div style={{
-          width: "21mm", flexShrink: 0, display: "flex", flexDirection: "column",
-          alignItems: "center", justifyContent: "center", gap: "0.5mm",
-        }}>
-          <div style={{
-            fontSize: "5pt", fontWeight: 900, color: GREEN, lineHeight: 1.4,
-            textAlign: "center", direction: "rtl", fontFamily: "Arial, sans-serif",
-          }}>
+        {/* Arabic + Kaaba */}
+        <div style={{ width: "17mm", flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "0.5mm" }}>
+          <div style={{ fontSize: "5pt", fontWeight: 900, color: GREEN, lineHeight: 1.4, textAlign: "center", direction: "rtl", fontFamily: "Arial, sans-serif" }}>
             خدمة الحجاج شرف لنا
           </div>
-          <div style={{
-            fontSize: "4pt", color: GOLD, lineHeight: 1.4,
-            textAlign: "center", direction: "rtl", fontFamily: "Arial, sans-serif",
-          }}>
+          <div style={{ fontSize: "4pt", color: GOLD, lineHeight: 1.3, textAlign: "center", direction: "rtl", fontFamily: "Arial, sans-serif" }}>
             الحمد لله على توفيقه
           </div>
-          <div style={{ width: "18mm", height: "10mm", marginTop: "0.3mm", opacity: 0.85 }}>
+          <div style={{ width: "15mm", height: "9mm", marginTop: "0.5mm", opacity: 0.8 }}>
             <KaabaSVG color={GREEN} />
           </div>
         </div>
@@ -413,8 +381,8 @@ function StaffCardBack({ s, groupName }: { s: StaffMember; groupName?: string })
 
       {/* ── ADDRESS ROW ── */}
       <div style={{
-        background: "#f0f6f0", padding: "0.6mm 2.5mm", flexShrink: 0,
-        display: "flex", alignItems: "flex-start", gap: "3mm",
+        background: "#f0f6f0", padding: "0.8mm 2.5mm", flexShrink: 0,
+        display: "flex", alignItems: "flex-start", gap: "2mm",
         borderTop: `0.5px solid ${GREEN}33`,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: "1mm", flexShrink: 0 }}>
@@ -433,10 +401,8 @@ function StaffCardBack({ s, groupName }: { s: StaffMember; groupName?: string })
         </div>
       </div>
 
-      {/* ── FOOTER ── */}
-      <div style={{
-        background: GOLD, padding: "0.8mm", textAlign: "center", flexShrink: 0,
-      }}>
+      {/* ── FOOTER (gold) ── */}
+      <div style={{ background: GOLD, padding: "1mm", textAlign: "center", flexShrink: 0 }}>
         <span style={{ fontSize: "3.5pt", color: GREEN, fontWeight: 900, letterSpacing: "1.2px" }}>
           ❖&nbsp; SERVING PILGRIMS WITH CARE &nbsp;❖
         </span>
