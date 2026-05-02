@@ -72,7 +72,7 @@ function KaabaSVG({ color = GOLD, size = "100%" }: { color?: string; size?: stri
 
 /* ── FRONT CARD ── */
 function StaffCardFront({ s, groupName }: { s: StaffMember; groupName?: string }) {
-  const company  = getCompanyById(s.companyId);
+  const company   = getCompanyById(s.companyId);
   const roleLabel = ROLE_LABELS[s.role] || "STAFF";
 
   return (
@@ -81,30 +81,31 @@ function StaffCardFront({ s, groupName }: { s: StaffMember; groupName?: string }
       {/* ── HEADER ── */}
       <div style={{
         background: GREEN, display: "flex", alignItems: "center",
-        padding: "1.2mm 2.5mm", gap: "1.8mm", flexShrink: 0, minHeight: "9mm",
+        padding: "1.5mm 2.5mm", gap: "2mm", flexShrink: 0, minHeight: "12mm",
       }}>
         {company.logoUrl && (
           <img src={company.logoUrl} alt="" style={{
-            width: "8mm", height: "8mm", objectFit: "contain",
-            flexShrink: 0, borderRadius: "50%", background: "#fff", padding: "0.5px",
+            width: "10mm", height: "10mm", objectFit: "contain",
+            flexShrink: 0, borderRadius: "50%", background: "#fff", padding: "1px",
+            border: `1px solid ${GOLD}`,
           }} />
         )}
         <div style={{ flex: 1 }}>
           <div style={{
-            fontSize: "8pt", fontWeight: 900, color: "#fff",
-            lineHeight: 1.05, letterSpacing: "0.5px", textTransform: "uppercase",
+            fontSize: "11pt", fontWeight: 900, color: "#fff",
+            lineHeight: 1.0, letterSpacing: "0.5px", textTransform: "uppercase",
           }}>
             {company.nameShort}
           </div>
           <div style={{
-            fontSize: "5.5pt", fontWeight: 800, color: GOLD,
-            lineHeight: 1.1, letterSpacing: "0.3px",
+            fontSize: "7.5pt", fontWeight: 800, color: GOLD,
+            lineHeight: 1.1, letterSpacing: "0.4px",
           }}>
             TOURS &amp; TRAVELS
           </div>
           <div style={{
-            fontSize: "3pt", color: "rgba(255,255,255,0.75)",
-            letterSpacing: "0.5px", marginTop: "0.4mm", textTransform: "uppercase",
+            fontSize: "3.5pt", color: "rgba(255,255,255,0.8)",
+            letterSpacing: "0.6px", marginTop: "0.5mm", textTransform: "uppercase",
           }}>
             SERVING PILGRIMS WITH CARE
           </div>
@@ -114,22 +115,22 @@ function StaffCardFront({ s, groupName }: { s: StaffMember; groupName?: string }
       {/* ── MIDDLE AREA ── */}
       <div style={{ display: "flex", flex: 1, overflow: "hidden", background: "#eef4ee" }}>
 
-        {/* Left: Role badge (horizontal green box) */}
+        {/* Left: Role badge (green box, words stacked) */}
         <div style={{
           width: "18mm", flexShrink: 0,
           display: "flex", alignItems: "center", justifyContent: "center",
           padding: "2mm 1.5mm",
         }}>
           <div style={{
-            background: GREEN, borderRadius: "5px",
-            padding: "2mm 1mm",
+            background: GREEN, borderRadius: "6px",
+            padding: "3mm 2mm",
             display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-            width: "100%", gap: "0.3mm",
+            width: "100%", gap: "0.5mm",
           }}>
             {roleLabel.split(" ").map((word, i) => (
               <span key={i} style={{
-                fontSize: "4.5pt", fontWeight: 900, color: "#fff",
-                letterSpacing: "0.6px", textTransform: "uppercase",
+                fontSize: "6pt", fontWeight: 900, color: "#fff",
+                letterSpacing: "0.5px", textTransform: "uppercase",
                 textAlign: "center", lineHeight: 1.2, display: "block",
               }}>
                 {word}
@@ -140,42 +141,42 @@ function StaffCardFront({ s, groupName }: { s: StaffMember; groupName?: string }
 
         {/* Centre: Photo */}
         <div style={{
-          width: "25mm", flexShrink: 0,
+          width: "24mm", flexShrink: 0,
           display: "flex", alignItems: "center", justifyContent: "center",
-          padding: "1.5mm 1.5mm",
+          padding: "1.5mm",
         }}>
           {s.photoUrl ? (
             <img src={`${API}${s.photoUrl}`} alt="" style={{
-              width: "21mm", height: "26mm", objectFit: "cover",
-              border: `2.5px solid ${GOLD}`, borderRadius: "4px",
+              width: "20mm", height: "100%", maxHeight: "100%",
+              objectFit: "cover", border: `2.5px solid ${GOLD}`, borderRadius: "4px",
             }} />
           ) : (
             <div style={{
-              width: "21mm", height: "26mm",
+              width: "20mm", height: "100%",
               background: "#d4e0d4", border: `2.5px solid ${GOLD}`, borderRadius: "4px",
               display: "flex", alignItems: "center", justifyContent: "center",
               flexDirection: "column", gap: "1mm",
             }}>
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#888" strokeWidth="1.5">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#888" strokeWidth="1.5">
                 <circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
               </svg>
-              <div style={{ fontSize: "3pt", color: "#999", fontWeight: 700, letterSpacing: "0.3px" }}>PHOTO</div>
+              <div style={{ fontSize: "3.5pt", color: "#999", fontWeight: 700 }}>PHOTO</div>
             </div>
           )}
         </div>
 
-        {/* Right: HAJJ 2026 Kaaba badge */}
+        {/* Right: HAJJ 2026 */}
         <div style={{
           flex: 1, display: "flex", flexDirection: "column",
           alignItems: "center", justifyContent: "center",
-          padding: "1mm 2mm",
+          padding: "1mm 1.5mm",
         }}>
-          <div style={{ width: "100%", height: "20mm" }}>
-            <KaabaSVG color={GREEN} />
+          <div style={{ width: "100%", flex: 1 }}>
+            <KaabaSVG color={GREEN} size="100%" />
           </div>
-          <div style={{ textAlign: "center", lineHeight: 1.05 }}>
-            <div style={{ fontSize: "6pt", fontWeight: 900, color: GREEN, letterSpacing: "2px" }}>HAJJ</div>
-            <div style={{ fontSize: "10pt", fontWeight: 900, color: GOLD, letterSpacing: "0.5px", lineHeight: 1 }}>2026</div>
+          <div style={{ textAlign: "center", lineHeight: 1.0, marginTop: "0.5mm" }}>
+            <div style={{ fontSize: "8pt", fontWeight: 900, color: GREEN, letterSpacing: "3px" }}>HAJJ</div>
+            <div style={{ fontSize: "14pt", fontWeight: 900, color: GOLD, letterSpacing: "1px", lineHeight: 0.9 }}>2026</div>
           </div>
         </div>
       </div>
@@ -185,9 +186,9 @@ function StaffCardFront({ s, groupName }: { s: StaffMember; groupName?: string }
 
         {/* Name */}
         <div style={{
-          fontSize: "9pt", fontWeight: 900, color: "#111",
+          fontSize: "10.5pt", fontWeight: 900, color: "#111",
           textTransform: "uppercase", textAlign: "center",
-          lineHeight: 1.05, letterSpacing: "0.5px", marginBottom: "0.5mm",
+          lineHeight: 1.0, letterSpacing: "0.5px", marginBottom: "0.6mm",
           whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
         }}>
           {s.fullName}
@@ -195,21 +196,21 @@ function StaffCardFront({ s, groupName }: { s: StaffMember; groupName?: string }
 
         {/* Role — own line */}
         <div style={{
-          fontSize: "4pt", fontWeight: 700, color: "#444",
-          textAlign: "center", lineHeight: 1.2, marginBottom: "0.2mm",
+          fontSize: "4.5pt", fontWeight: 700, color: "#444",
+          textAlign: "center", lineHeight: 1.3, marginBottom: "0.1mm",
           whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
         }}>
-          ROLE : <span style={{ color: GREEN, fontWeight: 800 }}>{roleLabel}</span>
+          ROLE : <span style={{ color: GREEN, fontWeight: 900 }}>{roleLabel}</span>
         </div>
 
         {/* Designation — own line */}
         {s.designation && (
           <div style={{
-            fontSize: "4pt", fontWeight: 700, color: "#444",
-            textAlign: "center", lineHeight: 1.2, marginBottom: "0.5mm",
+            fontSize: "4.5pt", fontWeight: 700, color: "#444",
+            textAlign: "center", lineHeight: 1.3, marginBottom: "0.6mm",
             whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
           }}>
-            DESIGNATION : <span style={{ color: GREEN, fontWeight: 800 }}>{s.designation.toUpperCase()}</span>
+            DESIGNATION : <span style={{ color: GREEN, fontWeight: 900 }}>{s.designation.toUpperCase()}</span>
           </div>
         )}
 
@@ -217,15 +218,15 @@ function StaffCardFront({ s, groupName }: { s: StaffMember; groupName?: string }
         {s.staffId && (
           <div style={{
             display: "flex", alignItems: "center", justifyContent: "center",
-            background: GREEN, borderRadius: "5px", padding: "0.8mm 2mm",
-            marginBottom: "0.5mm",
+            background: GREEN, borderRadius: "5px", padding: "1mm 2mm",
+            marginBottom: "0.6mm",
           }}>
-            <svg viewBox="0 0 16 12" width="8" height="6" style={{ marginRight: "1.5mm", flexShrink: 0 }}>
+            <svg viewBox="0 0 16 12" width="9" height="7" style={{ marginRight: "1.5mm", flexShrink: 0 }}>
               <rect x="0.5" y="0.5" width="15" height="11" rx="2" fill="none" stroke={GOLD} strokeWidth="1.2"/>
               <line x1="4" y1="4" x2="12" y2="4" stroke={GOLD} strokeWidth="1.1"/>
               <line x1="4" y1="7.5" x2="10" y2="7.5" stroke={GOLD} strokeWidth="1.1"/>
             </svg>
-            <span style={{ fontSize: "5.5pt", fontWeight: 900, color: "#fff", letterSpacing: "0.6px" }}>
+            <span style={{ fontSize: "6.5pt", fontWeight: 900, color: "#fff", letterSpacing: "0.5px" }}>
               ID NO. :&nbsp;{s.staffId}
             </span>
           </div>
@@ -234,7 +235,7 @@ function StaffCardFront({ s, groupName }: { s: StaffMember; groupName?: string }
         {/* Group */}
         {groupName && (
           <div style={{
-            fontSize: "3.8pt", color: "#555", textAlign: "center",
+            fontSize: "4pt", color: "#555", textAlign: "center",
             letterSpacing: "0.2px", lineHeight: 1.2,
             whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
           }}>
@@ -245,21 +246,21 @@ function StaffCardFront({ s, groupName }: { s: StaffMember; groupName?: string }
 
       {/* ── FOOTER ── */}
       <div style={{
-        background: GREEN, padding: "1mm 3mm", flexShrink: 0,
+        background: GREEN, padding: "1.2mm 3mm", flexShrink: 0,
         display: "flex", alignItems: "center", justifyContent: "space-between",
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "1.2mm" }}>
-          <svg viewBox="0 0 24 24" width="7" height="7" fill="none" stroke={GOLD} strokeWidth="2.5">
+        <div style={{ display: "flex", alignItems: "center", gap: "1.5mm" }}>
+          <svg viewBox="0 0 24 24" width="8" height="8" fill="none" stroke={GOLD} strokeWidth="2.5">
             <path d="M22 16.92v3a2 2 0 0 1-2.18 2A19.79 19.79 0 0 1 3.08 5.18 2 2 0 0 1 5.07 3h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L9.09 10.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 23 18z" />
           </svg>
-          <span style={{ fontSize: "3.5pt", color: "#fff", fontWeight: 700 }}>{company.mobile}</span>
+          <span style={{ fontSize: "4pt", color: "#fff", fontWeight: 700 }}>{company.mobile}</span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "1.2mm" }}>
-          <svg viewBox="0 0 24 24" width="7" height="7" fill="none" stroke={GOLD} strokeWidth="2">
+        <div style={{ display: "flex", alignItems: "center", gap: "1.5mm" }}>
+          <svg viewBox="0 0 24 24" width="8" height="8" fill="none" stroke={GOLD} strokeWidth="2">
             <circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" />
             <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
           </svg>
-          <span style={{ fontSize: "3.5pt", color: "#fff", fontWeight: 700 }}>{company.website}</span>
+          <span style={{ fontSize: "4pt", color: "#fff", fontWeight: 700 }}>{company.website}</span>
         </div>
       </div>
     </div>
@@ -280,24 +281,25 @@ function StaffCardBack({ s, groupName }: { s: StaffMember; groupName?: string })
       {/* ── HEADER ── */}
       <div style={{
         background: GREEN, display: "flex", alignItems: "center",
-        padding: "1mm 2.5mm", gap: "1.8mm", flexShrink: 0, minHeight: "8mm",
+        padding: "1.5mm 2.5mm", gap: "2mm", flexShrink: 0, minHeight: "11mm",
       }}>
         {company.logoUrl && (
           <img src={company.logoUrl} alt="" style={{
-            width: "7mm", height: "7mm", objectFit: "contain",
-            flexShrink: 0, borderRadius: "50%", background: "#fff", padding: "0.5px",
+            width: "9mm", height: "9mm", objectFit: "contain",
+            flexShrink: 0, borderRadius: "50%", background: "#fff", padding: "1px",
+            border: `1px solid ${GOLD}`,
           }} />
         )}
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: "7pt", fontWeight: 900, color: "#fff", lineHeight: 1.05, letterSpacing: "0.4px" }}>
+          <div style={{ fontSize: "10pt", fontWeight: 900, color: "#fff", lineHeight: 1.0, letterSpacing: "0.5px" }}>
             {company.nameShort}
           </div>
-          <div style={{ fontSize: "5pt", fontWeight: 800, color: GOLD, lineHeight: 1.1, letterSpacing: "0.2px" }}>
+          <div style={{ fontSize: "7pt", fontWeight: 800, color: GOLD, lineHeight: 1.1, letterSpacing: "0.3px" }}>
             TOURS &amp; TRAVELS
           </div>
           <div style={{
-            fontSize: "3.5pt", color: "rgba(255,255,255,0.8)", lineHeight: 1.2,
-            direction: "rtl", fontFamily: "Arial, sans-serif", marginTop: "0.2mm",
+            fontSize: "4pt", color: "rgba(255,255,255,0.85)", lineHeight: 1.2,
+            direction: "rtl", fontFamily: "Arial, sans-serif", marginTop: "0.3mm",
           }}>
             {company.arabicName}
           </div>
