@@ -127,35 +127,31 @@ function LuggageStickerBack({
             flex: 1, padding: "2mm 3mm 2mm 2mm",
             display: "flex", flexDirection: "column", justifyContent: "center",
           }}>
-            {/* Arabic service name */}
+            {/* Arabic service name — largest element, like "الماسية" in reference */}
             <div style={{
               fontFamily: "Arial, sans-serif", direction: "rtl",
-              fontSize: "12pt", fontWeight: 900, color: GREEN,
-              lineHeight: 1, marginBottom: "0.3mm", textAlign: "right",
+              fontSize: "16pt", fontWeight: 900, color: GREEN,
+              lineHeight: 1, marginBottom: "0.5mm", textAlign: "right",
             }}>
               رحمت الحرام
             </div>
             {/* English service name — ALL CAPS bold */}
             <div style={{
-              fontSize: "8.5pt", fontWeight: 900, color: GREEN,
-              letterSpacing: "0.5px", lineHeight: 1, marginBottom: "1.5mm",
+              fontSize: "10pt", fontWeight: 900, color: GREEN,
+              letterSpacing: "0.5px", lineHeight: 1, marginBottom: "2mm",
               textTransform: "uppercase",
             }}>
               REHMAT E HARAM CHGO
             </div>
-            {/* Logo image */}
-            {company.logoUrl && (
-              <img src={company.logoUrl} alt="" style={{ height: "6.5mm", objectFit: "contain", objectPosition: "left", marginBottom: "1mm" }} />
-            )}
-            {/* Arabic company name — big & bold */}
+            {/* Arabic company name — bold */}
             <div style={{
               fontFamily: "Arial, sans-serif", direction: "rtl", textAlign: "right",
-              fontSize: "5.5pt", color: "#111", fontWeight: 900, lineHeight: 1.3,
+              fontSize: "6pt", color: "#111", fontWeight: 900, lineHeight: 1.4,
             }}>
               {company.arabicName}
             </div>
-            {/* English company name — big & bold */}
-            <div style={{ fontSize: "5pt", color: "#111", fontWeight: 900, lineHeight: 1.3 }}>
+            {/* English company name — bold */}
+            <div style={{ fontSize: "5.5pt", color: "#111", fontWeight: 900, lineHeight: 1.4 }}>
               {company.name}
             </div>
           </div>
@@ -304,9 +300,6 @@ function LuggageStickerBack({
             <div style={{ fontSize: "6pt", fontWeight: 900, color: GREEN }}>🌐 {company.website}</div>
             <div style={{ fontSize: "4pt", color: "#666", lineHeight: 1.3 }}>{company.email}</div>
           </div>
-          {company.logoUrl && (
-            <img src={company.logoUrl} alt="" style={{ height: "5mm", objectFit: "contain", opacity: 0.7 }} />
-          )}
         </div>
 
       </div>
