@@ -1,0 +1,177 @@
+Create an EXACT pixel-perfect Staff ID Card design based on the reference layout provided for "Al Burhan Tours & Travels – Hajj 2026".
+
+This must NOT be a generic card. It must MATCH the given design structure, spacing, colors, and alignment exactly.
+
+-----------------------------------
+
+🎯 CARD SPECIFICATIONS:
+- Size: 86mm × 54mm
+- Border radius: 12px
+- High resolution (300 DPI)
+- Print-ready (no margins cut)
+
+-----------------------------------
+
+🎨 COLOR SYSTEM (STRICT):
+- Dark Green: #0b3d2e
+- Medium Green: #145c44
+- Light Green strip: #e6f0ea
+- Gold: #d4af37
+- White: #ffffff
+- Text dark: #1a1a1a
+
+Use gradient:
+background: linear-gradient(to bottom, #0b3d2e, #145c44)
+
+-----------------------------------
+
+🪪 FRONT SIDE — EXACT STRUCTURE:
+
+1. TOP HEADER (dark green block):
+- Center circular logo
+- Below logo:
+  AL BURHAN (bold, white, large)
+  TOURS & TRAVELS (gold)
+  Tagline small: "SERVING PILGRIMS WITH CARE"
+- Gold rounded badge: "HAJJ 2026"
+
+2. GREEN STRIP:
+- Full width
+- Text center: "AIRPORT STAFF" (white, bold)
+
+3. PHOTO SECTION:
+- Center aligned
+- Rectangle photo
+- GOLD BORDER (3px)
+- Slight shadow
+
+4. BELOW PHOTO (light background section):
+- Left: Mosque icon (line style)
+- Right: "HAJJ 2026" text (gold)
+
+5. NAME:
+- Large bold uppercase (dark green)
+- Example: MOHAMMED AFTAB
+
+6. DETAILS:
+- ROLE : AIRPORT STAFF
+- DESIGNATION : ASSISTANT
+
+7. ID BOX:
+- Green rounded rectangle
+- White text:
+  ID NO : ABT-STAFF-0001
+
+8. GROUP:
+- GROUP : GROUP A - HAJJ 2026
+
+9. FOOTER BAR:
+- Dark green strip
+- Left: phone icon + number
+- Right: globe icon + website
+
+-----------------------------------
+
+🪪 BACK SIDE — EXACT STRUCTURE:
+
+1. HEADER:
+- Dark green header
+- Logo left
+- Text:
+  AL BURHAN TOURS & TRAVELS
+  Arabic below
+
+2. TITLE:
+- Rounded pill:
+  "STAFF IDENTITY CARD"
+
+3. QR SECTION:
+- QR code LEFT
+- Square box with border
+- Below:
+  "SCAN TO VERIFY" button (green)
+
+4. DETAILS RIGHT SIDE (aligned properly):
+- NAME
+- ROLE
+- DESIGNATION
+- ID NO
+- GROUP
+- MOBILE
+- BLOOD GROUP
+
+Label left, value right (clean spacing)
+
+5. DIVIDER LINE
+
+6. IMPORTANT INSTRUCTIONS:
+- Bullet points (small text)
+
+7. RIGHT SIDE:
+- Arabic text
+- Mosque illustration (gold)
+
+8. BOTTOM FOOTER:
+- Green strip
+- Phone + Address
+- Gold bottom bar:
+  "SERVING PILGRIMS WITH CARE"
+
+-----------------------------------
+
+⚙️ DYNAMIC DATA:
+Use placeholders:
+
+{{name}}
+{{photo}}
+{{role}}
+{{designation}}
+{{id}}
+{{group}}
+{{mobile}}
+{{blood}}
+{{qr}}
+
+-----------------------------------
+
+⚙️ FUNCTIONALITY:
+
+- Generate QR dynamically:
+https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={{qr}}
+
+- Add:
+  ✅ Print button (exact card size)
+  ✅ Download PDF (Puppeteer)
+  ✅ Preview front + back
+
+-----------------------------------
+
+🎯 UI RULES (VERY IMPORTANT):
+
+- Exact spacing like design
+- No random padding
+- Center alignment must match
+- Use flexbox/grid properly
+- Keep clean professional look
+
+-----------------------------------
+
+🚫 DO NOT:
+- Change layout
+- Add extra elements
+- Use random colors
+- Make it generic
+
+-----------------------------------
+
+🎯 FINAL RESULT:
+
+- EXACT SAME design as reference
+- Premium clean layout
+- Ready for printing
+- Looks like professional Hajj ID
+
+-----------------------------------
+
+IMPORTANT:
+Follow the layout strictly. Do not redesign — replicat
