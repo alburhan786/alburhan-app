@@ -27,45 +27,34 @@ const ROLE_LABELS: Record<string, string> = {
   catering_staff: "CATERING STAFF",
 };
 
-/* ── Kaaba + Masjid SVG ── */
-function KaabaSVG({ color = GOLD, size = "100%" }: { color?: string; size?: string | number }) {
+/* ── Premium Kaaba Icon (minimal modern) ── */
+function KaabaIcon({ color = GOLD, size = "100%" }: { color?: string; size?: string | number }) {
   return (
-    <svg viewBox="0 0 100 80" width={size} height={size} xmlns="http://www.w3.org/2000/svg">
-      {/* Masjid arches background */}
-      <line x1="2" y1="66" x2="98" y2="66" stroke={color} strokeWidth="1" />
-      {/* Left minaret */}
-      <rect x="4" y="28" width="6" height="38" rx="1" fill="none" stroke={color} strokeWidth="1.2" />
-      <ellipse cx="7" cy="28" rx="4" ry="5" fill="none" stroke={color} strokeWidth="1.2" />
-      <rect x="6" y="17" width="2" height="11" fill="none" stroke={color} strokeWidth="1" />
-      <path d="M5,17 Q7,13 9,17 Z" fill={color} opacity="0.8" />
-      {/* Right minaret */}
-      <rect x="90" y="28" width="6" height="38" rx="1" fill="none" stroke={color} strokeWidth="1.2" />
-      <ellipse cx="93" cy="28" rx="4" ry="5" fill="none" stroke={color} strokeWidth="1.2" />
-      <rect x="92" y="17" width="2" height="11" fill="none" stroke={color} strokeWidth="1" />
-      <path d="M91,17 Q93,13 95,17 Z" fill={color} opacity="0.8" />
-      {/* Masjid arches */}
-      <path d="M14,66 Q14,54 22,54 Q30,54 30,66" fill="none" stroke={color} strokeWidth="1.1" />
-      <path d="M30,66 Q30,54 38,54 Q46,54 46,66" fill="none" stroke={color} strokeWidth="1.1" />
-      <path d="M54,66 Q54,54 62,54 Q70,54 70,66" fill="none" stroke={color} strokeWidth="1.1" />
-      <path d="M70,66 Q70,54 78,54 Q86,54 86,66" fill="none" stroke={color} strokeWidth="1.1" />
-      {/* Kaaba cube */}
-      <rect x="36" y="30" width="28" height="36" rx="1.5" fill={color} opacity="0.15" stroke={color} strokeWidth="1.5" />
-      <rect x="36" y="30" width="28" height="36" rx="1.5" fill="none" stroke={color} strokeWidth="1.8" />
-      {/* Kaaba kiswa gold band */}
-      <rect x="36" y="38" width="28" height="6" fill={color} opacity="0.5" />
-      <line x1="36" y1="38" x2="64" y2="38" stroke={color} strokeWidth="0.8" />
-      <line x1="36" y1="44" x2="64" y2="44" stroke={color} strokeWidth="0.8" />
-      {/* Kaaba door */}
-      <rect x="46" y="49" width="8" height="17" rx="1" fill="none" stroke={color} strokeWidth="1.2" />
-      <path d="M46,53 Q50,49 54,53" fill="none" stroke={color} strokeWidth="1" />
-      {/* Gold trim line on Kaaba */}
-      <rect x="36" y="30" width="28" height="1.5" rx="0.5" fill={color} opacity="0.7" />
-      {/* Crescent on top */}
-      <path d="M46,27 a5,5 0 0,1 8,0" fill="none" stroke={color} strokeWidth="1.3" />
-      <circle cx="55" cy="24" r="1.2" fill={color} />
-      {/* Column supports */}
-      <line x1="36" y1="50" x2="33" y2="66" stroke={color} strokeWidth="1" />
-      <line x1="64" y1="50" x2="67" y2="66" stroke={color} strokeWidth="1" />
+    <svg viewBox="0 0 65 70" width={size} height={size} xmlns="http://www.w3.org/2000/svg" fill="none">
+      {/* Crescent moon */}
+      <path d="M34,8 a5,5 0 1,1 -4,8 a4,4 0 1,0 4,-8 Z" fill={color} />
+      <circle cx="37" cy="9" r="1.2" fill={color} />
+      {/* Top face */}
+      <path d="M10,28 L22,15 L62,15 L50,28 Z"
+        stroke={color} strokeWidth="2" strokeLinejoin="round"
+        fill={color} fillOpacity="0.15" />
+      {/* Right face */}
+      <path d="M50,28 L62,15 L62,52 L50,65 Z"
+        stroke={color} strokeWidth="2" strokeLinejoin="round"
+        fill={color} fillOpacity="0.22" />
+      {/* Front face */}
+      <rect x="10" y="28" width="40" height="37"
+        stroke={color} strokeWidth="2" strokeLinejoin="round"
+        fill={color} fillOpacity="0.08" />
+      {/* Kiswah band — front */}
+      <rect x="10" y="38" width="40" height="7" fill={color} fillOpacity="0.55" />
+      <line x1="10" y1="38" x2="50" y2="38" stroke={color} strokeWidth="0.6" />
+      <line x1="10" y1="45" x2="50" y2="45" stroke={color} strokeWidth="0.6" />
+      {/* Kiswah band — right face */}
+      <path d="M50,38 L62,25 L62,32 L50,45 Z" fill={color} fillOpacity="0.4" />
+      {/* Arched door — centred on front face */}
+      <path d="M26,65 L26,49 Q30,43 34,49 L34,65"
+        stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -160,17 +149,17 @@ function StaffCardFront({ s, groupName }: { s: StaffMember; groupName?: string }
             <div style={{ fontSize: "3.5pt", color: "#999", fontWeight: 700 }}>PHOTO</div>
           </div>
         )}
-        {/* Kaaba + HAJJ 2026 */}
+        {/* Kaaba icon + HAJJ 2026 */}
         <div style={{
           flex: 1, display: "flex", flexDirection: "column",
-          alignItems: "center", justifyContent: "center", gap: "0.5mm",
+          alignItems: "center", justifyContent: "center", gap: "2mm",
         }}>
-          <div style={{ width: "100%", flex: 1 }}>
-            <KaabaSVG color={GREEN} size="100%" />
-          </div>
-          <div style={{ textAlign: "center", lineHeight: 1.0 }}>
-            <div style={{ fontSize: "8pt", fontWeight: 900, color: GREEN, letterSpacing: "3px" }}>HAJJ</div>
-            <div style={{ fontSize: "14pt", fontWeight: 900, color: GOLD, letterSpacing: "1px", lineHeight: 0.95 }}>2026</div>
+          <KaabaIcon color={GOLD} size="18mm" />
+          <div style={{
+            fontSize: "7.5pt", fontWeight: 900, color: GOLD,
+            letterSpacing: "2px", textAlign: "center", lineHeight: 1,
+          }}>
+            HAJJ 2026
           </div>
         </div>
       </div>
@@ -390,17 +379,15 @@ function StaffCardBack({ s, groupName }: { s: StaffMember; groupName?: string })
           ))}
         </div>
 
-        {/* Arabic + Kaaba illustration */}
-        <div style={{ width: "18mm", flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "1mm" }}>
+        {/* Arabic text + Kaaba icon */}
+        <div style={{ width: "18mm", flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: "1mm" }}>
           <div style={{ fontSize: "5.5pt", fontWeight: 900, color: GREEN, lineHeight: 1.5, textAlign: "center", direction: "rtl", fontFamily: "Arial, sans-serif" }}>
             خدمة الحجاج شرف لنا
           </div>
           <div style={{ fontSize: "4.5pt", color: GOLD, lineHeight: 1.4, textAlign: "center", direction: "rtl", fontFamily: "Arial, sans-serif" }}>
             الحمد لله على توفيقه
           </div>
-          <div style={{ width: "16mm", height: "11mm", opacity: 0.85 }}>
-            <KaabaSVG color={GREEN} />
-          </div>
+          <KaabaIcon color={GOLD} size="13mm" />
         </div>
       </div>
 
