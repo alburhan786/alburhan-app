@@ -84,7 +84,9 @@ function LogoHeader({ size, company, showTopFlag }: { size?: "small"; company: C
       </div>
       <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: "0.3mm" }}>
         {company.logoUrl
-          ? <img src={company.logoUrl} alt="" style={{ width: flagImgSize, height: flagImgSize, borderRadius: "50%", objectFit: "cover", border: `1.5px solid ${GOLD}` }} />
+          ? <div style={{ width: flagImgSize, height: flagImgSize, borderRadius: "50%", background: "#fff", border: `2px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0 }}>
+              <img src={company.logoUrl} alt="" style={{ width: "90%", height: "90%", objectFit: "contain" }} />
+            </div>
           : <div style={{ width: flagImgSize, height: flagImgSize, borderRadius: "50%", background: DARK, display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "4pt" }}>{company.nameShort.slice(0, 1)}</div>
         }
       </div>
@@ -174,11 +176,11 @@ export default function PrintIdCards() {
                 <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", height: "100%", padding: "2.5mm 3mm 0" }}>
                   <LogoHeader company={company} showTopFlag />
 
-                  <div style={{ display: "flex", justifyContent: "center", marginBottom: "1.5mm" }}>
+                  <div style={{ display: "flex", justifyContent: "center", marginBottom: "1mm" }}>
                     {p.photoUrl ? (
-                      <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "22mm", height: "22mm", objectFit: "cover", borderRadius: "50%", border: `2.5px solid ${GOLD}` }} />
+                      <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "25mm", height: "25mm", objectFit: "cover", borderRadius: "50%", border: `2.5px solid ${GOLD}` }} />
                     ) : (
-                      <div style={{ width: "22mm", height: "22mm", background: "#f0f0f0", borderRadius: "50%", border: `2.5px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "6pt", color: "#aaa" }}>PHOTO</div>
+                      <div style={{ width: "25mm", height: "25mm", background: "#f0f0f0", borderRadius: "50%", border: `2.5px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "6pt", color: "#aaa" }}>PHOTO</div>
                     )}
                   </div>
 
