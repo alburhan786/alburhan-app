@@ -243,17 +243,27 @@ export default function PrintIdCardsPro() {
 
                     {/* ── Footer strip ── */}
                     <div style={{ flexShrink: 0 }}>
-                      <div style={{ background: DARK, textAlign: "center", padding: "1.2mm 2mm" }}>
+                      {/* Name + company — dark band */}
+                      <div style={{
+                        background: DARK, textAlign: "center", padding: "0.8mm 2mm",
+                        WebkitPrintColorAdjust: "exact", printColorAdjust: "exact",
+                      } as React.CSSProperties}>
                         <div style={{ fontSize: "7pt", fontWeight: 900, color: "#fff", textTransform: "uppercase", lineHeight: 1.2, letterSpacing: "0.3px" }}>
                           {p.fullName}
                         </div>
-                        <div style={{ fontSize: "5.5pt", fontWeight: 900, color: GOLD, letterSpacing: "0.2px", lineHeight: 1.3 }}>
+                        <div style={{ fontSize: "5.5pt", fontWeight: 900, color: GOLD, letterSpacing: "0.2px", lineHeight: 1.2 }}>
                           {company.name}
                         </div>
-                        <div style={{ fontSize: "5pt", fontWeight: 800, color: "#fff", lineHeight: 1.3, letterSpacing: "0.1px" }}>
+                      </div>
+                      {/* Address — white background, pure black text — always prints */}
+                      <div style={{
+                        background: "#fff", textAlign: "center", padding: "0.6mm 2mm",
+                        borderTop: `1px solid ${DARK}`,
+                      }}>
+                        <div style={{ fontSize: "5pt", fontWeight: 900, color: "#000", lineHeight: 1.3, letterSpacing: "0.1px" }}>
                           {company.address}
                         </div>
-                        <div style={{ fontSize: "5pt", fontWeight: 800, color: GOLD, letterSpacing: "0.2px", lineHeight: 1.2 }}>
+                        <div style={{ fontSize: "5pt", fontWeight: 900, color: DARK, letterSpacing: "0.2px", lineHeight: 1.2 }}>
                           📞 {company.phone}
                         </div>
                       </div>
@@ -370,18 +380,30 @@ export default function PrintIdCardsPro() {
                     </div>
 
                     {/* ── Footer ── */}
-                    <div style={{ background: DARK, padding: "1.2mm 3mm", flexShrink: 0, textAlign: "center" }}>
-                      <div style={{ fontSize: "7pt", fontWeight: 900, color: "#fff", textTransform: "uppercase", lineHeight: 1.2, letterSpacing: "0.3px" }}>
-                        {p.fullName}
+                    <div style={{ flexShrink: 0 }}>
+                      {/* Name + company — dark band */}
+                      <div style={{
+                        background: DARK, textAlign: "center", padding: "0.8mm 3mm",
+                        WebkitPrintColorAdjust: "exact", printColorAdjust: "exact",
+                      } as React.CSSProperties}>
+                        <div style={{ fontSize: "7pt", fontWeight: 900, color: "#fff", textTransform: "uppercase", lineHeight: 1.2, letterSpacing: "0.3px" }}>
+                          {p.fullName}
+                        </div>
+                        <div style={{ fontSize: "5.5pt", fontWeight: 900, color: GOLD, letterSpacing: "0.3px", lineHeight: 1.2 }}>
+                          {company.name}
+                        </div>
                       </div>
-                      <div style={{ fontSize: "5.5pt", fontWeight: 900, color: GOLD, letterSpacing: "0.3px", lineHeight: 1.3 }}>
-                        {company.name}
-                      </div>
-                      <div style={{ fontSize: "5pt", fontWeight: 800, color: "#fff", lineHeight: 1.3, letterSpacing: "0.1px" }}>
-                        {company.address}
-                      </div>
-                      <div style={{ fontSize: "5pt", fontWeight: 800, color: GOLD, letterSpacing: "0.2px", lineHeight: 1.2 }}>
-                        📞 {company.phone}
+                      {/* Address — white background, pure black text — always prints */}
+                      <div style={{
+                        background: "#fff", textAlign: "center", padding: "0.6mm 3mm",
+                        borderTop: `1px solid ${DARK}`,
+                      }}>
+                        <div style={{ fontSize: "5pt", fontWeight: 900, color: "#000", lineHeight: 1.3, letterSpacing: "0.1px" }}>
+                          {company.address}
+                        </div>
+                        <div style={{ fontSize: "5pt", fontWeight: 900, color: DARK, letterSpacing: "0.2px", lineHeight: 1.2 }}>
+                          📞 {company.phone}
+                        </div>
                       </div>
                     </div>
 
