@@ -1,5 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { downloadPdf } from "@/lib/pdf-download";
+import { useState, useEffect } from "react";
 import { useRoute } from "wouter";
 import { Barcode } from "@/components/print/Barcode";
 import { QRCodeSVG } from "qrcode.react";
@@ -304,16 +303,6 @@ export default function PrintLuggageSquare() {
   const [companyId, setCompanyId] = useState("alburhan");
   const [view, setView]       = useState<"front" | "back" | "both">("both");
   const company = getCompanyById(companyId);
-  const contentRef = useRef<HTMLDivElement>(null);
-  const [pdfLoading, setPdfLoading] = useState(false);
-
-  const handleDownload = useCallback(async () => {
-    if (!contentRef.current || pdfLoading) return;
-    setPdfLoading(true);
-    try {
-      await downloadPdf(contentRef.current, { filename: `Square-Stickers-${group?.groupName || "group"}.pdf` });
-    } finally { setPdfLoading(false); }
-  }, [group, pdfLoading]);
 
   useEffect(() => {
     if (!groupId) return;
@@ -390,13 +379,13 @@ export default function PrintLuggageSquare() {
           </button>
         ))}
 
-        <button onClick={handleDownload} disabled={pdfLoading} style={{ padding: "10px 24px", background: DARK, color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", opacity: pdfLoading ? 0.6 : 1 }}>
-          {pdfLoading ? "Generating PDF..." : "⬇ Download PDF"}
+        <button onClick={() => window.print()} style={{ padding: "10px 24px", background: DARK, color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>
+          🖨 Print
         </button>
         <button onClick={() => window.history.back()} style={{ padding: "10px 20px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
       </div>
 
-      <div ref={contentRef}>
+      <div>
 
         {/* ══ FRONT STICKERS ══ */}
         {showFront && (

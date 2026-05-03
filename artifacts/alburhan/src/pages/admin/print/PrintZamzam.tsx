@@ -1,5 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { downloadPdf } from "@/lib/pdf-download";
+import { useState, useEffect } from "react";
 import { useRoute } from "wouter";
 import { Barcode } from "@/components/print/Barcode";
 import { QRCodeSVG } from "qrcode.react";
@@ -53,22 +52,6 @@ export default function PrintZamzam() {
   const [pilgrims, setPilgrims] = useState<Pilgrim[]>([]);
   const [companyId, setCompanyId] = useState("alburhan");
   const company = getCompanyById(companyId);
-  const contentRef = useRef<HTMLDivElement>(null);
-  const [pdfLoading, setPdfLoading] = useState(false);
-
-  const handleDownload = useCallback(async () => {
-    if (!contentRef.current || pdfLoading) return;
-    setPdfLoading(true);
-    try {
-      await downloadPdf(contentRef.current, {
-        filename: `Zamzam-Tags-${group?.groupName || "group"}.pdf`,
-        orientation: "portrait",
-        format: "a4",
-        margin: [5, 5],
-        scale: 2,
-      });
-    } finally { setPdfLoading(false); }
-  }, [group, pdfLoading]);
 
   useEffect(() => {
     if (!groupId) return;
@@ -125,15 +108,8 @@ export default function PrintZamzam() {
         <strong style={{ fontSize: "15px", color: DARK_GREEN, marginRight: "8px" }}>
           🏷️ Zamzam Tags — {group.groupName} ({group.year}) — {pilgrims.length} pilgrims
         </strong>
-        <button onClick={handleDownload} disabled={pdfLoading} style={{
-          padding: "8px 20px", background: DARK_GREEN, color: "#fff", border: "none",
-          borderRadius: "7px", fontWeight: 700, cursor: "pointer", fontSize: "13px",
-          opacity: pdfLoading ? 0.6 : 1
-        }}>
-          {pdfLoading ? "Generating..." : "⬇ Download PDF"}
-        </button>
         <button onClick={() => window.print()} style={{
-          padding: "8px 18px", background: "#1a2744", color: "#fff", border: "none",
+          padding: "8px 20px", background: DARK_GREEN, color: "#fff", border: "none",
           borderRadius: "7px", fontWeight: 700, cursor: "pointer", fontSize: "13px"
         }}>
           🖨 Print
@@ -146,7 +122,7 @@ export default function PrintZamzam() {
         </button>
       </div>
 
-      <div ref={contentRef} style={{ background: "#fff" }}>
+      <div style={{ background: "#fff" }}>
         {pages.map((page, pageIdx) => (
           <div key={pageIdx} className="zz-page">
             {page.map(p => {

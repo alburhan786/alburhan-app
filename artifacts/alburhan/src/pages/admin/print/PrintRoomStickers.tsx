@@ -1,5 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { downloadPdf } from "@/lib/pdf-download";
+import { useState, useEffect } from "react";
 import { useRoute } from "wouter";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
 
@@ -197,12 +196,9 @@ export default function PrintRoomStickers() {
   const [group, setGroup] = useState<Group | null>(null);
   const [pilgrims, setPilgrims] = useState<Pilgrim[]>([]);
   const [loading, setLoading] = useState(true);
-  const [pdfLoading, setPdfLoading] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState<string>("ALL");
   const [companyId, setCompanyId] = useState("alburhan");
   const company = getCompanyById(companyId);
-
-  const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!groupId) return;
@@ -222,20 +218,6 @@ export default function PrintRoomStickers() {
     ? [...roomMap.entries()]
     : roomMap.has(selectedRoom) ? [[selectedRoom, roomMap.get(selectedRoom)!]] : [];
 
-  const handleDownload = useCallback(async () => {
-    if (!contentRef.current || pdfLoading) return;
-    setPdfLoading(true);
-    try {
-      const roomLabel = selectedRoom === "ALL" ? "All-Rooms" : `Room-${selectedRoom}`;
-      await downloadPdf(contentRef.current, {
-        filename: `Room-Stickers-${group?.groupName || "group"}-${roomLabel}.pdf`,
-        orientation: "portrait",
-        format: "a4",
-        margin: [5, 5],
-        scale: 2,
-      });
-    } finally { setPdfLoading(false); }
-  }, [group, selectedRoom, pdfLoading]);
 
   if (loading) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial", color: "#666" }}>Loading room data...</div>;
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial", color: "#c00" }}>Group not found.</div>;
@@ -297,12 +279,8 @@ export default function PrintRoomStickers() {
           </select>
         </div>
 
-        <button onClick={handleDownload} disabled={pdfLoading || roomsToShow.length === 0}
-          style={{ padding: "8px 18px", background: "#0B3D2E", color: "#fff", border: "none", borderRadius: "7px", fontWeight: 700, cursor: "pointer", fontSize: "13px", opacity: (pdfLoading || roomsToShow.length === 0) ? 0.6 : 1 }}>
-          {pdfLoading ? "Generating..." : "⬇ Download PDF"}
-        </button>
         <button onClick={() => window.print()}
-          style={{ padding: "8px 18px", background: "#1a2744", color: "#fff", border: "none", borderRadius: "7px", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
+          style={{ padding: "8px 18px", background: "#0B3D2E", color: "#fff", border: "none", borderRadius: "7px", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
           🖨 Print
         </button>
         <button onClick={() => window.history.back()}
@@ -326,7 +304,7 @@ export default function PrintRoomStickers() {
       </div>
 
       {/* Print content */}
-      <div ref={contentRef}>
+      <div>
         {roomsToShow.length === 0 ? (
           <div style={{ padding: "60px", textAlign: "center", color: "#666", fontFamily: "Arial" }}>
             No rooms with assigned pilgrims found.
