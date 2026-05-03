@@ -204,35 +204,44 @@ export default function PrintIdCardsPro() {
                         <div style={{ fontSize: "6pt", fontWeight: 900, color: DARK, textAlign: "center", lineHeight: 1 }}>#{serial}</div>
                       </div>
 
-                      {/* Right content */}
-                      <div style={{ flex: 1, padding: "1mm 2mm 1mm 2.5mm", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-                        {/* Serial + Flag */}
-                        <div style={{ display: "flex", alignItems: "center", gap: "2mm", marginBottom: "0.5mm" }}>
-                          <div style={{ fontSize: "14pt", fontWeight: 900, color: GOLD, lineHeight: 1, fontFamily: "'Arial Black', Arial, sans-serif" }}>
-                            NO: {serial}
+                      {/* Right content — info col + QR col */}
+                      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+
+                        {/* Info column */}
+                        <div style={{ flex: 1, padding: "1mm 1.5mm 1mm 2.5mm", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                          {/* Serial + Flag */}
+                          <div style={{ display: "flex", alignItems: "center", gap: "1.5mm", marginBottom: "0.5mm" }}>
+                            <div style={{ fontSize: "13pt", fontWeight: 900, color: GOLD, lineHeight: 1, fontFamily: "'Arial Black', Arial, sans-serif" }}>
+                              NO: {serial}
+                            </div>
+                            <span style={{ fontSize: "18pt", lineHeight: 1 }}>🇮🇳</span>
                           </div>
-                          <span style={{ fontSize: "20pt", lineHeight: 1 }}>🇮🇳</span>
-                        </div>
-                        {/* Name */}
-                        <div style={{ fontSize: "6.5pt", fontWeight: 900, color: DARK, textTransform: "uppercase", lineHeight: 1.2, wordBreak: "break-word", marginBottom: "0.8mm" }}>
-                          {p.fullName}
+                          {/* Name */}
+                          <div style={{ fontSize: "6pt", fontWeight: 900, color: DARK, textTransform: "uppercase", lineHeight: 1.2, wordBreak: "break-word", marginBottom: "1mm" }}>
+                            {p.fullName}
+                          </div>
+                          {/* Bullet list */}
+                          <div style={{ display: "flex", flexDirection: "column", gap: "0.3mm" }}>
+                            <BulletRow label="Passport No." value={p.passportNumber} />
+                            <BulletRow label="Bus No." value={p.busNumber} />
+                            <BulletRow label="Service Ctr." value={group.maktabNumber} badge />
+                            <BulletRow label="India Mobile" value={p.mobileIndia} />
+                          </div>
                         </div>
 
-                        {/* Bullet list — 4 rows */}
-                        <div style={{ display: "flex", flexDirection: "column", gap: "0.2mm", flex: 1 }}>
-                          <BulletRow label="Passport No." value={p.passportNumber} />
-                          <BulletRow label="Bus No." value={p.busNumber} />
-                          <BulletRow label="Service Ctr." value={group.maktabNumber} badge />
-                          <BulletRow label="India Mobile" value={p.mobileIndia} />
-                        </div>
-
-                        {/* QR + Barcode row at bottom */}
-                        <div style={{ display: "flex", alignItems: "center", gap: "2mm", marginTop: "1mm", paddingTop: "1mm", borderTop: `0.5px solid ${GOLD}40` }}>
-                          <div style={{ background: "#fff", padding: "1px", borderRadius: "2px", border: `1.5px solid ${DARK}`, flexShrink: 0 }}>
-                            <QRCodeSVG value={buildQrData(p, group, company.phone, company.phoneSaudi)} size={26} level="M" fgColor={DARK} />
+                        {/* QR + Barcode column — fills open space */}
+                        <div style={{
+                          width: "28mm", flexShrink: 0,
+                          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                          padding: "1.5mm 2mm 1mm",
+                          borderLeft: `1px solid ${GOLD}50`,
+                          gap: "1mm",
+                        }}>
+                          <div style={{ background: "#fff", padding: "2px", borderRadius: "3px", border: `2px solid ${DARK}` }}>
+                            <QRCodeSVG value={buildQrData(p, group, company.phone, company.phoneSaudi)} size={42} level="M" fgColor={DARK} />
                           </div>
-                          <div style={{ flex: 1, overflow: "hidden" }}>
-                            <Barcode value={barcodeVal} height={16} displayValue fontSize={5} />
+                          <div style={{ width: "100%", overflow: "hidden" }}>
+                            <Barcode value={barcodeVal} height={14} displayValue fontSize={4} />
                           </div>
                         </div>
 
