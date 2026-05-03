@@ -250,7 +250,7 @@ export default function PrintIdCardsPro() {
 
                     {/* ── Footer strip ── */}
                     <div style={{ flexShrink: 0 }}>
-                      {/* Name + company — dark band */}
+                      {/* Name — dark band */}
                       <div style={{
                         background: DARK, textAlign: "center", padding: "0.8mm 2mm",
                         WebkitPrintColorAdjust: "exact", printColorAdjust: "exact",
@@ -258,11 +258,8 @@ export default function PrintIdCardsPro() {
                         <div style={{ fontSize: "7pt", fontWeight: 900, color: "#fff", textTransform: "uppercase", lineHeight: 1.2, letterSpacing: "0.3px" }}>
                           {p.fullName}
                         </div>
-                        <div style={{ fontSize: "5.5pt", fontWeight: 900, color: GOLD, letterSpacing: "0.2px", lineHeight: 1.2 }}>
-                          {company.name}
-                        </div>
                       </div>
-                      {/* Address — dark band, white text — always prints clearly */}
+                      {/* Address + big phone — dark band */}
                       <div style={{
                         background: DARK, textAlign: "center", padding: "0.7mm 2mm",
                         WebkitPrintColorAdjust: "exact", printColorAdjust: "exact",
@@ -270,7 +267,7 @@ export default function PrintIdCardsPro() {
                         <div style={{ fontSize: "5.5pt", fontWeight: 900, color: "#fff", lineHeight: 1.3, letterSpacing: "0.1px" }}>
                           {company.address}
                         </div>
-                        <div style={{ fontSize: "5.5pt", fontWeight: 900, color: GOLD, letterSpacing: "0.2px", lineHeight: 1.2 }}>
+                        <div style={{ fontSize: "8pt", fontWeight: 900, color: GOLD, letterSpacing: "0.5px", lineHeight: 1.3 }}>
                           📞 {company.phone}
                         </div>
                       </div>
@@ -388,7 +385,7 @@ export default function PrintIdCardsPro() {
 
                     {/* ── Footer ── */}
                     <div style={{ flexShrink: 0 }}>
-                      {/* Name + company — dark band */}
+                      {/* Name — dark band */}
                       <div style={{
                         background: DARK, textAlign: "center", padding: "0.8mm 3mm",
                         WebkitPrintColorAdjust: "exact", printColorAdjust: "exact",
@@ -396,11 +393,8 @@ export default function PrintIdCardsPro() {
                         <div style={{ fontSize: "7pt", fontWeight: 900, color: "#fff", textTransform: "uppercase", lineHeight: 1.2, letterSpacing: "0.3px" }}>
                           {p.fullName}
                         </div>
-                        <div style={{ fontSize: "5.5pt", fontWeight: 900, color: GOLD, letterSpacing: "0.3px", lineHeight: 1.2 }}>
-                          {company.name}
-                        </div>
                       </div>
-                      {/* Address — dark band, white text — always prints clearly */}
+                      {/* Address + big phone — dark band */}
                       <div style={{
                         background: DARK, textAlign: "center", padding: "0.7mm 3mm",
                         WebkitPrintColorAdjust: "exact", printColorAdjust: "exact",
@@ -408,7 +402,7 @@ export default function PrintIdCardsPro() {
                         <div style={{ fontSize: "5.5pt", fontWeight: 900, color: "#fff", lineHeight: 1.3, letterSpacing: "0.1px" }}>
                           {company.address}
                         </div>
-                        <div style={{ fontSize: "5.5pt", fontWeight: 900, color: GOLD, letterSpacing: "0.2px", lineHeight: 1.2 }}>
+                        <div style={{ fontSize: "8pt", fontWeight: 900, color: GOLD, letterSpacing: "0.5px", lineHeight: 1.3 }}>
                           📞 {company.phone}
                         </div>
                       </div>
