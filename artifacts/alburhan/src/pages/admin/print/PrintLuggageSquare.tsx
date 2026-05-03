@@ -37,15 +37,17 @@ function getGroupColor(groupName: string): string {
 }
 
 function buildQrData(p: Pilgrim, group: Group, phone: string): string {
-  const lines = [
-    `Name: ${p.fullName}`,
-    `PP: ${p.passportNumber || "N/A"}`,
-    `Bus: ${p.busNumber || "N/A"} | Svc: ${group.maktabNumber || "N/A"}`,
+  const parts = [
+    "BEGIN:VCARD",
+    "VERSION:3.0",
+    `FN:${p.fullName}`,
+    ...(p.mobileIndia  ? [`TEL;TYPE=CELL:${p.mobileIndia}`]  : []),
+    ...(p.mobileSaudi  ? [`TEL;TYPE=CELL:${p.mobileSaudi}`]  : []),
+    `TEL;TYPE=WORK:${phone}`,
+    `NOTE:PP:${p.passportNumber || "N/A"} | Svc:${group.maktabNumber || "N/A"} | ${group.groupName} ${group.year}`,
+    "END:VCARD",
   ];
-  if (p.mobileIndia)  lines.push(`IN: ${p.mobileIndia}`);
-  if (p.mobileSaudi)  lines.push(`SA: ${p.mobileSaudi}`);
-  lines.push(`Emer: ${phone}`);
-  return lines.join("\n");
+  return parts.join("\n");
 }
 
 /* ── SVG SNOWFLAKE / GEOMETRIC PATTERN (like the Almasiah reference) ── */

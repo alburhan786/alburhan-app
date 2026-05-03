@@ -31,18 +31,18 @@ interface Group {
 }
 
 function buildQr(p: Pilgrim, group: Group, phoneSaudi: string): string {
-  const lines = [
-    `Name: ${p.fullName}`,
-    `Serial: ${String(p.serialNumber).padStart(3, "0")}`,
-    `Group: ${group.groupName} ${group.year}`,
-    ...(group.flightNumber ? [`Flight: ${group.flightNumber}`] : []),
-    ...(group.returnDate ? [`Return: ${group.returnDate}`] : []),
-    ...(p.passportNumber ? [`Passport No: ${p.passportNumber}`] : []),
-    ...(p.mobileIndia ? [`Mobile: ${p.mobileIndia}`] : []),
-    `Emergency: ${phoneSaudi}`,
-    ...([p.address, p.city].filter(Boolean).length ? [`Address: ${[p.address, p.city].filter(Boolean).join(", ")}`] : []),
+  const addr = [p.address, p.city].filter(Boolean).join(", ");
+  const parts = [
+    "BEGIN:VCARD",
+    "VERSION:3.0",
+    `FN:${[p.salutation, p.fullName].filter(Boolean).join(" ")}`,
+    ...(p.mobileIndia ? [`TEL;TYPE=CELL:${p.mobileIndia}`] : []),
+    `TEL;TYPE=WORK:${phoneSaudi}`,
+    ...(addr ? [`ADR:;;${addr};;;;`] : []),
+    `NOTE:PP:${p.passportNumber || "N/A"} | Group:${group.groupName} ${group.year}${group.flightNumber ? " | Flight:" + group.flightNumber : ""}${group.returnDate ? " | Return:" + group.returnDate : ""}`,
+    "END:VCARD",
   ];
-  return lines.join("\n");
+  return parts.join("\n");
 }
 
 export default function PrintZamzam() {

@@ -30,15 +30,18 @@ const W = "95mm";
 const H = "60mm";
 
 function buildQrData(p: Pilgrim, group: Group, phone: string, phoneSaudi: string): string {
-  const lines = [
-    `Name: ${p.fullName}`,
-    `PP: ${p.passportNumber || "N/A"}`,
-    `Bus: ${p.busNumber || "N/A"} | Svc: ${group.maktabNumber || "N/A"}`,
+  const parts = [
+    "BEGIN:VCARD",
+    "VERSION:3.0",
+    `FN:${p.fullName}`,
+    ...(p.mobileIndia  ? [`TEL;TYPE=CELL:${p.mobileIndia}`]  : []),
+    ...(p.mobileSaudi  ? [`TEL;TYPE=CELL:${p.mobileSaudi}`]  : []),
+    `TEL;TYPE=WORK:${phone}`,
+    `TEL;TYPE=WORK:${phoneSaudi}`,
+    `NOTE:PP:${p.passportNumber || "N/A"} | Svc:${group.maktabNumber || "N/A"} | ${group.groupName} ${group.year}`,
+    "END:VCARD",
   ];
-  if (p.mobileIndia)  lines.push(`IN: ${p.mobileIndia}`);
-  if (p.mobileSaudi)  lines.push(`SA: ${p.mobileSaudi}`);
-  lines.push(`Emer: ${phoneSaudi}`);
-  return lines.join("\n");
+  return parts.join("\n");
 }
 
 function BulletRow({ label, value, badge }: { label: string; value?: string; badge?: boolean }) {

@@ -23,14 +23,17 @@ const GOLD = "#C9A84C";
 const GOLD_LIGHT = "#E8D48B";
 
 function buildQrData(p: Pilgrim, group: Group, phone: string, phoneSaudi: string): string {
-  const lines = [
-    `Name: ${p.fullName}`,
-    `PP: ${p.passportNumber || "N/A"}`,
-    `Bus: ${(p as any).busNumber || "N/A"} | Svc: ${group.maktabNumber || "N/A"}`,
+  const parts = [
+    "BEGIN:VCARD",
+    "VERSION:3.0",
+    `FN:${p.fullName}`,
+    ...(p.mobileIndia  ? [`TEL;TYPE=CELL:${p.mobileIndia}`]  : []),
+    `TEL;TYPE=WORK:${phone}`,
+    `TEL;TYPE=WORK:${phoneSaudi}`,
+    `NOTE:PP:${p.passportNumber || "N/A"} | Svc:${group.maktabNumber || "N/A"} | ${group.groupName} ${group.year}`,
+    "END:VCARD",
   ];
-  if (p.mobileIndia) lines.push(`IN: ${p.mobileIndia}`);
-  lines.push(`Emer: ${phoneSaudi}`);
-  return lines.join("\n");
+  return parts.join("\n");
 }
 
 function WaveShapes() {
