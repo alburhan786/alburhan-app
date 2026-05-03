@@ -273,8 +273,14 @@ function LuggageStickerBack({
           display: "flex", alignItems: "center", justifyContent: "space-between",
           flexShrink: 0,
         }}>
-          <div>
-            <div style={{ fontSize: "6pt", fontWeight: 900, color: GREEN }}>🌐 {company.website}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: "1.5mm" }}>
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" style={{ flexShrink: 0 }}>
+              <path d="M8 11V7a4 4 0 0 1 8 0v4" stroke={GREEN} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+              <rect x="4.5" y="10.5" width="15" height="11" rx="2.5" fill={GREEN} />
+              <circle cx="12" cy="16.2" r="1.9" fill="#fff" />
+              <rect x="11" y="17.7" width="2" height="2.3" rx="1" fill="#fff" />
+            </svg>
+            <div style={{ fontSize: "8.5pt", fontWeight: 900, color: GREEN, letterSpacing: "0.3px", lineHeight: 1 }}>{company.website}</div>
           </div>
           {/* WhatsApp — right corner, big & bold */}
           <div style={{
@@ -500,6 +506,20 @@ export default function PrintLuggageSquare() {
                             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5mm" }}>
                               <Barcode value={p.passportNumber || `H${serialNo}`} height={28} width={1.4} fontSize={7} />
                             </div>
+                          </div>
+                        </div>
+
+                        {/* ── Website + Lock band ── */}
+                        <div style={{ position: "relative", zIndex: 2, background: DARK, padding: "2mm 3mm", display: "flex", alignItems: "center", justifyContent: "center", gap: "2.5mm" }}>
+                          {/* Padlock icon */}
+                          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" style={{ flexShrink: 0 }}>
+                            <path d="M8 11V7a4 4 0 0 1 8 0v4" stroke={GOLD} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                            <rect x="4.5" y="10.5" width="15" height="11" rx="2.5" fill={GOLD} />
+                            <circle cx="12" cy="16.2" r="1.9" fill={DARK} />
+                            <rect x="11" y="17.7" width="2" height="2.3" rx="1" fill={DARK} />
+                          </svg>
+                          <div style={{ fontSize: "10.5pt", fontWeight: 900, color: "#fff", letterSpacing: "0.6px", lineHeight: 1, textTransform: "lowercase" }}>
+                            www.alburhantravels.com
                           </div>
                         </div>
 
