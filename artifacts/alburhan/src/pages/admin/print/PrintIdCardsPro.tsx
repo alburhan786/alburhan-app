@@ -226,15 +226,6 @@ export default function PrintIdCardsPro() {
                           <BulletRow label="India Mobile" value={p.mobileIndia} />
                         </div>
 
-                        {/* QR + Barcode row at bottom */}
-                        <div style={{ display: "flex", alignItems: "center", gap: "2mm", marginTop: "0.5mm", paddingTop: "0.5mm", borderTop: `0.5px solid ${GOLD}40` }}>
-                          <div style={{ background: "#fff", padding: "1px", borderRadius: "2px", border: `1.5px solid ${DARK}`, flexShrink: 0 }}>
-                            <QRCodeSVG value={buildQrData(p, group, company.phone, company.phoneSaudi)} size={28} level="M" fgColor={DARK} />
-                          </div>
-                          <div style={{ flex: 1, overflow: "hidden" }}>
-                            <Barcode value={barcodeVal} height={18} displayValue fontSize={5} />
-                          </div>
-                        </div>
                       </div>
                     </div>
 
