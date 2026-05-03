@@ -16,7 +16,7 @@ interface StaffMember {
   validUpto?: string; photoUrl?: string; qrToken?: string; status: string;
 }
 
-const GREEN = "#1a6b55";
+const GREEN = "#0d5040";
 const GOLD  = "#C9A23F";
 const W = "54mm";
 const H = "86mm";

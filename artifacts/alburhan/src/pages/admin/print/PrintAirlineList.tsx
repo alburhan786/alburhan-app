@@ -66,7 +66,7 @@ export default function PrintAirlineList() {
           {COMPANIES.map(c => <option key={c.id} value={c.id}>{c.id === "alburhan" ? "Al Burhan Tours & Travels" : c.name}</option>)}
         </select>
         <button onClick={handleDownload} disabled={pdfLoading} style={{ padding: "10px 24px", background: "#1a2744", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", opacity: pdfLoading ? 0.6 : 1 }}>{pdfLoading ? "Generating PDF..." : "⬇ Download PDF"}</button>
-        <button onClick={() => window.print()} style={{ padding: "10px 24px", background: "#1a6b55", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>🖨 Print</button>
+        <button onClick={() => window.print()} style={{ padding: "10px 24px", background: "#0d5040", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>🖨 Print</button>
         <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
       </div>
 
@@ -113,7 +113,7 @@ export default function PrintAirlineList() {
                   <td style={tdStyle}>{p.dateOfBirth || "—"}</td>
                   <td style={{ ...tdStyle, textAlign: "center" }}>{p.gender || "—"}</td>
                   <td style={tdStyle}>{p.city || "—"}</td>
-                  <td style={{ ...tdStyle, textAlign: "center", fontWeight: 700, color: "#1a6b55" }}>{p.busNumber || "—"}</td>
+                  <td style={{ ...tdStyle, textAlign: "center", fontWeight: 700, color: "#0d5040" }}>{p.busNumber || "—"}</td>
                   <td style={{ ...tdStyle, textAlign: "center", fontWeight: 700, color: "#C9A23F" }}>{p.roomNumber || "—"}</td>
                   <td style={{ ...tdStyle, fontWeight: 600 }}>{group.flightNumber || "—"}</td>
                   <td style={tdStyle}>{group.departureDate || "—"}</td>

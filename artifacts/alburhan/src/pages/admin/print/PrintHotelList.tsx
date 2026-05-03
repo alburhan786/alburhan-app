@@ -49,7 +49,7 @@ export default function PrintHotelList() {
 
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
 
-  const thStyle: React.CSSProperties = { background: "#1a6b55", color: "#fff", padding: "2.5mm 2.5mm", textAlign: "left", fontSize: "7pt", textTransform: "uppercase", letterSpacing: "0.5px", border: "1px solid #1a6b55" };
+  const thStyle: React.CSSProperties = { background: "#0d5040", color: "#fff", padding: "2.5mm 2.5mm", textAlign: "left", fontSize: "7pt", textTransform: "uppercase", letterSpacing: "0.5px", border: "1px solid #0d5040" };
   const tdStyle: React.CSSProperties = { border: "1px solid #ddd", padding: "2mm 2.5mm", fontSize: "8pt" };
 
   return (
@@ -67,7 +67,7 @@ export default function PrintHotelList() {
         <select value={companyId} onChange={e => setCompanyId(e.target.value)} style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "13px", background: "#fff" }}>
           {COMPANIES.map(c => <option key={c.id} value={c.id}>{c.id === "alburhan" ? "Al Burhan Tours & Travels" : c.name}</option>)}
         </select>
-        <button onClick={handleDownload} disabled={pdfLoading} style={{ padding: "10px 24px", background: "#1a6b55", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", opacity: pdfLoading ? 0.6 : 1 }}>{pdfLoading ? "Generating PDF..." : "⬇ Download PDF"}</button>
+        <button onClick={handleDownload} disabled={pdfLoading} style={{ padding: "10px 24px", background: "#0d5040", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", opacity: pdfLoading ? 0.6 : 1 }}>{pdfLoading ? "Generating PDF..." : "⬇ Download PDF"}</button>
         <button onClick={() => window.print()} style={{ padding: "10px 24px", background: "#1a2744", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>🖨 Print</button>
         <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
       </div>
@@ -80,12 +80,12 @@ export default function PrintHotelList() {
           {(group.hotels?.makkah?.name || group.hotels?.madinah?.name) && (
             <div style={{ display: "flex", gap: "6mm", justifyContent: "flex-end", fontSize: "8pt", color: "#333", lineHeight: 1.7, marginTop: "-3mm", marginBottom: "4mm" }}>
               {group.hotels?.makkah?.name && (
-                <div>Makkah 2: <b style={{ color: "#1a6b55" }}>{group.hotels.makkah.name}</b>
+                <div>Makkah 2: <b style={{ color: "#0d5040" }}>{group.hotels.makkah.name}</b>
                   {group.hotels.makkah.checkIn && <span style={{ color: "#888" }}> (Check-in: {group.hotels.makkah.checkIn})</span>}
                 </div>
               )}
               {group.hotels?.madinah?.name && (
-                <div>Madinah: <b style={{ color: "#1a6b55" }}>{group.hotels.madinah.name}</b>
+                <div>Madinah: <b style={{ color: "#0d5040" }}>{group.hotels.madinah.name}</b>
                   {group.hotels.madinah.checkIn && <span style={{ color: "#888" }}> (Check-in: {group.hotels.madinah.checkIn})</span>}
                 </div>
               )}
@@ -122,7 +122,7 @@ export default function PrintHotelList() {
                   </td>
                   <td style={{ ...tdStyle, fontWeight: 600 }}>{p.fullName}</td>
                   <td style={{ ...tdStyle, fontFamily: "monospace", fontSize: "7.5pt" }}>{p.passportNumber || "—"}</td>
-                  <td style={{ ...tdStyle, fontWeight: 700, textAlign: "center", color: "#1a6b55", fontSize: "10pt" }}>{p.roomNumber || "—"}</td>
+                  <td style={{ ...tdStyle, fontWeight: 700, textAlign: "center", color: "#0d5040", fontSize: "10pt" }}>{p.roomNumber || "—"}</td>
                   <td style={{ ...tdStyle, textAlign: "center", fontWeight: 700, color: "#1a2744" }}>{p.busNumber || "—"}</td>
                   <td style={tdStyle}>{group.hotels?.makkah?.name || "—"}</td>
                   <td style={{ ...tdStyle, color: "#C9A23F", fontWeight: 600 }}>{group.hotels?.makkah?.checkIn || "—"}</td>

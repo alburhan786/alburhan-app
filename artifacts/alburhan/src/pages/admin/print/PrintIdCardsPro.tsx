@@ -24,7 +24,7 @@ interface Group {
   };
 }
 
-const DARK = "#1a6b55";
+const DARK = "#0d5040";
 const GOLD = "#C9A23F";
 const W = "88mm";
 const H = "60mm";

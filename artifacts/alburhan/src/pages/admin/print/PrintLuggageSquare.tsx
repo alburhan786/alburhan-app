@@ -23,13 +23,13 @@ interface Group {
   };
 }
 
-const DARK  = "#1a6b55";
-const GREEN = "#2a9d7a";
+const DARK  = "#0d5040";
+const GREEN = "#1a7a5e";
 const GOLD  = "#C9A84C";
 const RED   = "#CC0000";
 
 const GROUP_COLORS: Record<string, string> = {
-  A: "#2a9d7a", B: "#2563EB", C: "#D97706", D: "#DC2626",
+  A: "#1a7a5e", B: "#2563EB", C: "#D97706", D: "#DC2626",
 };
 function getGroupColor(groupName: string): string {
   const last = groupName.trim().slice(-1).toUpperCase();
@@ -53,7 +53,7 @@ function buildQrData(p: Pilgrim, group: Group, phone: string): string {
 }
 
 /* ── SVG SNOWFLAKE / GEOMETRIC PATTERN (like the Almasiah reference) ── */
-function SnowflakeSVG({ size = 120, color = "#2a9d7a", opacity = 0.12 }: { size?: number; color?: string; opacity?: number }) {
+function SnowflakeSVG({ size = 120, color = "#1a7a5e", opacity = 0.12 }: { size?: number; color?: string; opacity?: number }) {
   const cx = size / 2, cy = size / 2, r = size * 0.46;
   const arm = (angleDeg: number, len: number) => {
     const a = (angleDeg * Math.PI) / 180;
@@ -415,7 +415,7 @@ export default function PrintLuggageSquare() {
                             : <div style={{ height: "10mm", width: "10mm", flexShrink: 0, background: DARK, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "6pt" }}>{company.nameShort[0]}</div>
                           }
                           <div style={{ flex: 1 }}>
-                            <div style={{ fontWeight: 900, fontSize: "8pt", color: "#2a9d7a", letterSpacing: "0.8px", textTransform: "uppercase", lineHeight: 1.1 }}>{company.nameShort}</div>
+                            <div style={{ fontWeight: 900, fontSize: "8pt", color: "#1a7a5e", letterSpacing: "0.8px", textTransform: "uppercase", lineHeight: 1.1 }}>{company.nameShort}</div>
                             <div style={{ fontWeight: 700, fontSize: "5.5pt", color: GOLD, letterSpacing: "1px", textTransform: "uppercase" }}>TOURS &amp; TRAVELS</div>
                           </div>
                           <div style={{ textAlign: "right", flexShrink: 0 }}>

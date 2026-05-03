@@ -34,7 +34,7 @@ export default function PrintContract() {
   if (pilgrims.length === 0) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>No pilgrims in this group.</div>;
 
   const s: React.CSSProperties = { fontFamily: "'Inter', Arial, sans-serif", fontSize: "10pt", lineHeight: 1.8, color: "#333" };
-  const heading: React.CSSProperties = { fontWeight: 700, fontSize: "11pt", color: "#1a6b55", marginTop: "5mm", marginBottom: "2mm" };
+  const heading: React.CSSProperties = { fontWeight: 700, fontSize: "11pt", color: "#0d5040", marginTop: "5mm", marginBottom: "2mm" };
 
   const renderContract = (pilgrim: Pilgrim, idx: number) => (
     <div key={pilgrim.id} style={{ ...s, maxWidth: "210mm", margin: "0 auto", padding: "2mm", pageBreakAfter: idx < pilgrims.length - 1 ? "always" : "auto" }}>
@@ -43,7 +43,7 @@ export default function PrintContract() {
       <div style={{ display: "flex", gap: "4mm", fontSize: "9pt", marginBottom: "5mm", padding: "3mm 4mm", background: "#f0fdf4", borderRadius: "4px", border: "1px solid #e0e0e0" }}>
         <div style={{ flexShrink: 0 }}>
           {pilgrim.photoUrl ? (
-            <img src={`${API}${pilgrim.photoUrl}`} alt="" style={{ width: "18mm", height: "22mm", objectFit: "cover", borderRadius: "3px", border: "1.5px solid #1a6b55" }} />
+            <img src={`${API}${pilgrim.photoUrl}`} alt="" style={{ width: "18mm", height: "22mm", objectFit: "cover", borderRadius: "3px", border: "1.5px solid #0d5040" }} />
           ) : (
             <div style={{ width: "18mm", height: "22mm", background: "#e8e8e8", borderRadius: "3px", border: "1.5px solid #ccc", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "6pt", color: "#aaa" }}>PHOTO</div>
           )}
@@ -173,7 +173,7 @@ export default function PrintContract() {
         <select value={companyId} onChange={e => setCompanyId(e.target.value)} style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "13px", background: "#fff" }}>
           {COMPANIES.map(c => <option key={c.id} value={c.id}>{c.id === "alburhan" ? "Al Burhan Tours & Travels" : c.name}</option>)}
         </select>
-        <button onClick={() => window.print()} style={{ padding: "10px 24px", background: "#1a6b55", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>🖨 Print ({pilgrims.length})</button>
+        <button onClick={() => window.print()} style={{ padding: "10px 24px", background: "#0d5040", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>🖨 Print ({pilgrims.length})</button>
         <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
       </div>
 

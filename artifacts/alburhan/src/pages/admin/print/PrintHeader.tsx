@@ -18,7 +18,7 @@ export function PrintHeader({ title, subtitle, company }: PrintHeaderProps) {
       gap: "5mm",
       paddingBottom: "4mm",
       marginBottom: "5mm",
-      borderBottom: "3px solid #1a6b55",
+      borderBottom: "3px solid #0d5040",
       fontFamily: "'Inter', Arial, sans-serif",
     }}>
       {co.logoUrl ? (
@@ -30,7 +30,7 @@ export function PrintHeader({ title, subtitle, company }: PrintHeaderProps) {
       ) : (
         <div style={{
           width: "52px", height: "52px", flexShrink: 0,
-          background: "#1a6b55", borderRadius: "50%",
+          background: "#0d5040", borderRadius: "50%",
           display: "flex", alignItems: "center", justifyContent: "center",
           color: "#C9A84C", fontWeight: 900, fontSize: "13pt", letterSpacing: "0.5px",
         }}>
@@ -38,7 +38,7 @@ export function PrintHeader({ title, subtitle, company }: PrintHeaderProps) {
         </div>
       )}
       <div style={{ flex: 1 }}>
-        <div style={{ fontWeight: 800, fontSize: "16pt", color: "#1a6b55", letterSpacing: "0.5px", lineHeight: 1.2 }}>
+        <div style={{ fontWeight: 800, fontSize: "16pt", color: "#0d5040", letterSpacing: "0.5px", lineHeight: 1.2 }}>
           {co.name}
         </div>
         {co.arabicName && (
