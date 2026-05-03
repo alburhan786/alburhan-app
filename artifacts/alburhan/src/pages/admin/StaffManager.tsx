@@ -67,8 +67,9 @@ const emptyForm = {
 };
 
 const ROLE_LABELS: Record<string, string> = {
-  airport_staff: "Airport Staff",
+  airport_staff:  "Airport Staff",
   catering_staff: "Catering Staff",
+  office_staff:   "Office Staff",
 };
 
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
@@ -81,7 +82,7 @@ export default function StaffManager() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [photoUploading, setPhotoUploading] = useState<string | null>(null);
-  const [filter, setFilter] = useState<"all" | "airport_staff" | "catering_staff">("all");
+  const [filter, setFilter] = useState<"all" | "airport_staff" | "catering_staff" | "office_staff">("all");
   const [search, setSearch] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadTargetId, setUploadTargetId] = useState<string | null>(null);
@@ -234,7 +235,7 @@ export default function StaffManager() {
 
       {/* Filter tabs + search */}
       <div className="flex flex-wrap gap-2 mb-6 items-center">
-        {(["all", "airport_staff", "catering_staff"] as const).map(r => (
+        {(["all", "airport_staff", "catering_staff", "office_staff"] as const).map(r => (
           <button
             key={r}
             onClick={() => setFilter(r)}
@@ -377,6 +378,7 @@ export default function StaffManager() {
                   <select value={form.role} onChange={e => f("role", e.target.value)} className="w-full h-9 px-3 border border-input rounded-md text-sm bg-background">
                     <option value="airport_staff">Airport Staff</option>
                     <option value="catering_staff">Catering Staff</option>
+                    <option value="office_staff">Office Staff</option>
                   </select>
                 </div>
                 <div className="space-y-1">

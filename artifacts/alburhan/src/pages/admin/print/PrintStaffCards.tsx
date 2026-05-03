@@ -24,6 +24,7 @@ const H = "86mm";
 const ROLE_LABELS: Record<string, string> = {
   airport_staff:  "AIRPORT STAFF",
   catering_staff: "CATERING STAFF",
+  office_staff:   "OFFICE STAFF",
 };
 
 /* ── Premium Kaaba Icon — solid cube with kiswa & gold accents ── */
@@ -452,7 +453,7 @@ export default function PrintStaffCards() {
   });
 
   const pages: StaffMember[][] = [];
-  for (let i = 0; i < filtered.length; i += 3) pages.push(filtered.slice(i, i + 3));
+  for (let i = 0; i < filtered.length; i += 9) pages.push(filtered.slice(i, i + 9));
 
   if (loading) return (
     <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial", color: GREEN }}>
@@ -517,6 +518,7 @@ export default function PrintStaffCards() {
           <option value="all">All Roles</option>
           <option value="airport_staff">Airport Staff</option>
           <option value="catering_staff">Catering Staff</option>
+          <option value="office_staff">Office Staff</option>
         </select>
 
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
@@ -554,18 +556,28 @@ export default function PrintStaffCards() {
       ) : (
         <div className="cards-area" style={{ background: "#f0fdf4", padding: "8mm" }}>
           {pages.map((page, pi) => (
-            <div key={pi} className="page-block" style={{ marginBottom: "6mm" }}>
-              {/* Front faces */}
-              <div className="cards-row">
-                {page.map(s => (
-                  <StaffCardFront key={`f-${s.id}`} s={s} groupName={s.groupId ? groups[s.groupId] : undefined} />
-                ))}
+            <div key={pi}>
+              {/* ── FRONT PAGE ── */}
+              <div className="page-block">
+                <div className="no-print" style={{ textAlign: "center", fontSize: "11px", color: "#888", padding: "4px 0 6px", fontStyle: "italic" }}>
+                  ▶ FRONT — Page {pi + 1} &nbsp;({page.length} cards)
+                </div>
+                <div className="cards-row">
+                  {page.map(s => (
+                    <StaffCardFront key={`f-${s.id}`} s={s} groupName={s.groupId ? groups[s.groupId] : undefined} />
+                  ))}
+                </div>
               </div>
-              {/* Back faces */}
-              <div className="cards-row">
-                {page.map(s => (
-                  <StaffCardBack key={`b-${s.id}`} s={s} groupName={s.groupId ? groups[s.groupId] : undefined} />
-                ))}
+              {/* ── BACK PAGE ── */}
+              <div className="page-block">
+                <div className="no-print" style={{ textAlign: "center", fontSize: "11px", color: "#888", padding: "4px 0 6px", fontStyle: "italic" }}>
+                  ◀ BACK — Page {pi + 1} &nbsp;({page.length} cards)
+                </div>
+                <div className="cards-row">
+                  {page.map(s => (
+                    <StaffCardBack key={`b-${s.id}`} s={s} groupName={s.groupId ? groups[s.groupId] : undefined} />
+                  ))}
+                </div>
               </div>
             </div>
           ))}
