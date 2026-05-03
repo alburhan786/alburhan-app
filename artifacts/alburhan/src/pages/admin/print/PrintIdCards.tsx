@@ -208,8 +208,11 @@ export default function PrintIdCards() {
                 </div>
 
                 {/* QR code — above footer bar, right-aligned */}
-                <div style={{ position: "absolute", bottom: "14mm", right: "3mm", zIndex: 3, background: "#fff", padding: "1px", borderRadius: "2px" }}>
-                  <QRCodeSVG value={buildQrData(p, group, company.phone, company.phoneSaudi)} size={34} level="M" />
+                <div style={{ position: "absolute", bottom: "14mm", right: "2mm", zIndex: 3, display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5mm" }}>
+                  <div style={{ background: "#fff", padding: "2px", borderRadius: "3px", border: `2px solid ${DARK}` }}>
+                    <QRCodeSVG value={buildQrData(p, group, company.phone, company.phoneSaudi)} size={44} level="M" fgColor={DARK} />
+                  </div>
+                  <div style={{ fontSize: "3pt", color: DARK, fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.4px", background: "#fff", padding: "0.3mm 1mm", borderRadius: "2px" }}>SCAN</div>
                 </div>
 
                 {/* Barcode + footer — absolute at bottom */}
@@ -286,16 +289,21 @@ export default function PrintIdCards() {
                             value={p.mobileIndia && bookingMap[p.mobileIndia]
                               ? `${PROD_DOMAIN}/feedback?booking_id=${bookingMap[p.mobileIndia]}`
                               : `${PROD_DOMAIN}/feedback`}
-                            size={36} level="M" fgColor="#15803d"
+                            size={36} level="M" fgColor="#16a34a"
                           />
                         </div>
-                        <div style={{ fontSize: "3pt", color: "#15803d", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.3px" }}>Rate Your Trip</div>
+                        <div style={{ fontSize: "3pt", color: "#16a34a", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.3px" }}>Rate Your Trip</div>
                       </div>
                     </div>
                   ) : (
-                    <div style={{ display: "flex", justifyContent: "center", marginTop: "2mm", marginBottom: "1.5mm" }}>
-                      <div style={{ background: "#fff", padding: "2px", borderRadius: "3px", border: `1px solid ${GOLD}` }}>
-                        <QRCodeSVG value={buildQrData(p, group, company.phone, company.phoneSaudi)} size={50} level="M" />
+                    <div style={{ display: "flex", justifyContent: "center", marginTop: "2mm", marginBottom: "1mm" }}>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1mm" }}>
+                        <div style={{ background: "#fff", padding: "3px", borderRadius: "4px", border: `2.5px solid ${DARK}`, boxShadow: "0 1px 4px rgba(0,0,0,0.15)" }}>
+                          <QRCodeSVG value={buildQrData(p, group, company.phone, company.phoneSaudi)} size={62} level="M" fgColor={DARK} />
+                        </div>
+                        <div style={{ background: DARK, color: "#fff", fontSize: "3.5pt", fontWeight: 900, letterSpacing: "1px", padding: "0.5mm 3mm", borderRadius: "10px", textTransform: "uppercase" }}>
+                          📱 Scan to Verify
+                        </div>
                       </div>
                     </div>
                   )}

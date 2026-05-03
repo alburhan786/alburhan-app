@@ -354,18 +354,18 @@ export default function PrintIdCardsPro() {
                         </div>
                       </div>
 
-                      {/* Bottom-right: feedback QR or India flag */}
+                      {/* Bottom-right: feedback QR */}
                       {showFeedbackQr ? (
-                        <div style={{ position: "absolute", bottom: "1mm", right: "2mm", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5mm" }}>
-                          <div style={{ background: "#fff", padding: "1.5px", borderRadius: "2px", border: "1.5px solid #16a34a" }}>
+                        <div style={{ position: "absolute", bottom: "1mm", right: "2mm", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.8mm" }}>
+                          <div style={{ background: "#fff", padding: "2px", borderRadius: "3px", border: `2px solid ${DARK}` }}>
                             <QRCodeSVG
                               value={p.mobileIndia && bookingMap[p.mobileIndia]
                                 ? `${PROD_DOMAIN}/feedback?booking_id=${bookingMap[p.mobileIndia]}`
                                 : `${PROD_DOMAIN}/feedback`}
-                              size={28} level="M" fgColor="#15803d"
+                              size={38} level="M" fgColor={DARK}
                             />
                           </div>
-                          <div style={{ fontSize: "3pt", color: "#15803d", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Rate Trip</div>
+                          <div style={{ background: DARK, color: "#fff", fontSize: "3pt", fontWeight: 900, letterSpacing: "0.8px", padding: "0.4mm 2mm", borderRadius: "8px", textTransform: "uppercase" }}>Rate Trip</div>
                         </div>
                       ) : null}
 
