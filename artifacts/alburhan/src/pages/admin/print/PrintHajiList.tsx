@@ -49,6 +49,8 @@ export default function PrintHajiList() {
   const [pilgrims, setPilgrims] = useState<Pilgrim[]>([]);
   const [companyId, setCompanyId] = useState("alburhan");
   const company = getCompanyById(companyId);
+  const [editingSerial, setEditingSerial] = useState<{ id: string; value: string } | null>(null);
+  const [savingSerial, setSavingSerial] = useState<string | null>(null);
 
   const contentRef = useRef<HTMLDivElement>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
@@ -66,7 +68,7 @@ export default function PrintHajiList() {
     }
   }, [group, pdfLoading]);
 
-  useEffect(() => {
+  const fetchPilgrims = useCallback(() => {
     if (!groupId) return;
     Promise.all([
       fetch(`${API}/api/groups/${groupId}`, { credentials: "include" }).then(r => r.json()),
@@ -76,6 +78,31 @@ export default function PrintHajiList() {
       setPilgrims(Array.isArray(p) ? p : []);
     });
   }, [groupId]);
+
+  useEffect(() => { fetchPilgrims(); }, [fetchPilgrims]);
+
+  const handleSerialSave = useCallback(async (p: Pilgrim, newVal: string) => {
+    const n = parseInt(newVal, 10);
+    setEditingSerial(null);
+    if (isNaN(n) || n < 1 || n === p.serialNumber) return;
+    setSavingSerial(p.id);
+    try {
+      await fetch(`${API}/api/groups/${groupId}/pilgrims/${p.id}`, {
+        method: "PUT", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName: p.fullName, passportNumber: p.passportNumber, visaNumber: p.visaNumber,
+          dateOfBirth: p.dateOfBirth, gender: p.gender, bloodGroup: p.bloodGroup,
+          mobileIndia: p.mobileIndia, salutation: p.salutation,
+          passportIssueDate: p.passportIssueDate, passportExpiryDate: p.passportExpiryDate,
+          passportPlaceOfIssue: p.passportPlaceOfIssue,
+          serialNumber: n,
+        }),
+      });
+      fetchPilgrims();
+    } catch { /* silent */ }
+    setSavingSerial(null);
+  }, [groupId, fetchPilgrims]);
 
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
 
@@ -207,8 +234,38 @@ export default function PrintHajiList() {
                 const title = p.salutation || deriveTitle(p.gender);
                 return (
                   <tr key={p.id} style={{ background: i % 2 === 0 ? "#fff" : "#f0fdf4" }}>
-                    <td style={{ ...tdStyle, textAlign: "center", fontWeight: 700, fontSize: "9pt", color: "#0d5040" }}>
-                      {p.serialNumber}
+                    <td style={{ ...tdStyle, textAlign: "center", padding: "0.5mm" }} className="no-print-edit">
+                      {editingSerial?.id === p.id ? (
+                        <input
+                          autoFocus
+                          type="number" min="1"
+                          value={editingSerial.value}
+                          onChange={e => setEditingSerial({ id: p.id, value: e.target.value })}
+                          onBlur={() => handleSerialSave(p, editingSerial.value)}
+                          onKeyDown={e => {
+                            if (e.key === "Enter") handleSerialSave(p, editingSerial.value);
+                            if (e.key === "Escape") setEditingSerial(null);
+                          }}
+                          style={{ width: "32px", textAlign: "center", fontWeight: 700, fontSize: "8pt", color: "#0d5040", border: "2px solid #0d5040", borderRadius: "3px", padding: "1px 2px" }}
+                        />
+                      ) : (
+                        <span
+                          title="Click to change serial number"
+                          onClick={() => setEditingSerial({ id: p.id, value: String(p.serialNumber) })}
+                          style={{
+                            fontWeight: 700, fontSize: "9pt", color: "#0d5040",
+                            cursor: "pointer", display: "inline-block",
+                            padding: "1mm 2mm", borderRadius: "3px",
+                            background: savingSerial === p.id ? "#d1fae5" : "transparent",
+                            border: "1px dashed transparent",
+                            transition: "all 0.15s",
+                          }}
+                          onMouseEnter={e => (e.currentTarget.style.borderColor = "#0d5040")}
+                          onMouseLeave={e => (e.currentTarget.style.borderColor = "transparent")}
+                        >
+                          {savingSerial === p.id ? "…" : p.serialNumber}
+                        </span>
+                      )}
                     </td>
                     <td style={{ ...tdStyle, padding: "1mm", textAlign: "center" }}>
                       {p.photoUrl ? (
