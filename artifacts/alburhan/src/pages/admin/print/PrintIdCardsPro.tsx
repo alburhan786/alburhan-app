@@ -214,13 +214,13 @@ export default function PrintIdCardsPro() {
 
                         {/* QR column — fills open space */}
                         <div style={{
-                          width: "28mm", flexShrink: 0,
+                          width: "22mm", flexShrink: 0,
                           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
                           padding: "1.5mm 2mm 1mm",
                           borderLeft: `1px solid ${GOLD}50`,
                         }}>
                           <div style={{ background: "#fff", padding: "2px", borderRadius: "3px", border: `2px solid ${DARK}` }}>
-                            <QRCodeSVG value={buildVerifyUrl(p.id)} size={68} level="M" fgColor={DARK} />
+                            <QRCodeSVG value={buildVerifyUrl(p.id)} size={50} level="M" fgColor={DARK} />
                           </div>
                         </div>
 
