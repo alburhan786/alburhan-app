@@ -427,9 +427,8 @@ export default function PrintLuggageSquare() {
                         </div>
 
                         {/* Group bar */}
-                        <div style={{ background: groupColor, padding: "1mm 3.5mm", display: "flex", justifyContent: "space-between", alignItems: "center", position: "relative", zIndex: 1 }}>
+                        <div style={{ background: groupColor, padding: "1mm 3.5mm", display: "flex", justifyContent: "center", alignItems: "center", position: "relative", zIndex: 1 }}>
                           <span style={{ color: "#fff", fontWeight: 800, fontSize: "7.5pt", letterSpacing: "0.8px" }}>GROUP: {groupLabel}</span>
-                          <span style={{ color: "#fff", fontWeight: 700, fontSize: "7pt" }}>BUS: {p.busNumber || "—"}</span>
                         </div>
 
                         {/* Body */}

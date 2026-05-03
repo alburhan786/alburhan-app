@@ -215,7 +215,6 @@ export default function PrintIdCardsPro() {
                           {/* Bullet list */}
                           <div style={{ display: "flex", flexDirection: "column", gap: "0.3mm" }}>
                             <BulletRow label="Passport No." value={p.passportNumber} />
-                            <BulletRow label="Bus No." value={p.busNumber} />
                             <BulletRow label="Service Ctr." value={group.maktabNumber} badge />
                             <BulletRow label="India Mobile" value={p.mobileIndia} />
                           </div>
@@ -293,8 +292,6 @@ export default function PrintIdCardsPro() {
                       <div style={{ width: "38mm", flexShrink: 0, padding: "1.5mm 2mm", borderRight: `1px solid ${GOLD}40` }}>
                         <div style={{ fontSize: "3.5pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px" }}>Service Center No.</div>
                         <div style={{ fontSize: "13pt", fontWeight: 900, color: DARK, lineHeight: 1, marginBottom: "0.5mm" }}>{group.maktabNumber || "—"}</div>
-                        <div style={{ fontSize: "3.5pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px" }}>Bus No.</div>
-                        <div style={{ fontSize: "7pt", fontWeight: 900, color: DARK, marginBottom: "1mm" }}>{p.busNumber || "—"}</div>
                         <div style={{ fontSize: "3.5pt", fontWeight: 800, color: "#b91c1c", textTransform: "uppercase", letterSpacing: "0.3px" }}>Emergency</div>
                         <div style={{ fontSize: "3pt", color: "#888", textTransform: "uppercase", lineHeight: 1 }}>Saudi:</div>
                         <div style={{ fontSize: "7pt", fontWeight: 900, color: DARK, lineHeight: 1.2, letterSpacing: "0.3px" }}>{company.phoneSaudi}</div>
@@ -320,7 +317,7 @@ export default function PrintIdCardsPro() {
                         {showFeedbackQr && (
                           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", marginTop: "auto" }}>
                             <div style={{ background: "#fff", padding: "1px", borderRadius: "2px", border: `1.5px solid ${DARK}` }}>
-                              <QRCodeSVG value={p.mobileIndia && bookingMap[p.mobileIndia] ? `${PROD_DOMAIN}/feedback?booking_id=${bookingMap[p.mobileIndia]}` : `${PROD_DOMAIN}/feedback`} size={48} level="L" fgColor={DARK} />
+                              <QRCodeSVG value={p.mobileIndia && bookingMap[p.mobileIndia] ? `${PROD_DOMAIN}/feedback?booking_id=${bookingMap[p.mobileIndia]}` : `${PROD_DOMAIN}/feedback`} size={28} level="L" fgColor={DARK} />
                             </div>
                             <div style={{ fontSize: "3pt", color: "#888", textTransform: "uppercase", marginTop: "0.3mm" }}>Rate Trip</div>
                           </div>

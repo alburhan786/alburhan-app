@@ -133,9 +133,8 @@ export default function PrintLuggage() {
               </div>
             </div>
 
-            <div style={{ background: groupColor, padding: "2mm 6mm", display: "flex", justifyContent: "space-between", alignItems: "center", position: "relative", zIndex: 1 }}>
+            <div style={{ background: groupColor, padding: "2mm 6mm", display: "flex", justifyContent: "center", alignItems: "center", position: "relative", zIndex: 1 }}>
               <span style={{ color: "#fff", fontWeight: 800, fontSize: "11pt", letterSpacing: "1px" }}>GROUP: {groupLabel}</span>
-              <span style={{ color: "#fff", fontWeight: 700, fontSize: "10pt" }}>BUS: {p.busNumber || "—"}</span>
             </div>
 
             <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", alignItems: "center", padding: "3mm 6mm 2mm", flex: 1 }}>

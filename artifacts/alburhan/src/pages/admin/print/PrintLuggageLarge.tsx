@@ -166,9 +166,6 @@ export default function PrintLuggageLarge() {
             <span style={{ color: "#fff", fontWeight: 900, fontSize: "10pt", letterSpacing: "1px" }}>
               GROUP: {groupLabel} — HAJJ {group.year}
             </span>
-            <span style={{ color: "#fff", fontWeight: 800, fontSize: "10pt" }}>
-              BUS: {p.busNumber || "—"}
-            </span>
             <span style={{ color: "#fff", fontWeight: 900, fontSize: "12pt" }}>
               #{serial}
             </span>

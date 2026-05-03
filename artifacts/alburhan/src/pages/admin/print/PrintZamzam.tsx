@@ -265,11 +265,12 @@ export default function PrintZamzam() {
                         <div><span style={{ fontWeight: 900, color: DARK_GREEN }}>Mobile: </span><span style={{ fontWeight: 900 }}>{p.mobileIndia}</span></div>
                       )}
                       <div><span style={{ fontWeight: 900, color: "#b91c1c" }}>Emergency: </span><span style={{ fontWeight: 900, color: "#b91c1c" }}>{company.phoneSaudi}</span></div>
-                      {(p.address || p.city) && (
-                        <div style={{ fontSize: "11pt", fontWeight: 900, color: DARK_GREEN, marginTop: "1mm" }}>
-                          <span>Address: </span>{[p.address, p.city].filter(Boolean).join(", ")}
+                      <div style={{ marginTop: "2mm", background: "#f0fdf4", border: `1.5px solid ${DARK_GREEN}`, borderRadius: "4px", padding: "1.5mm 3mm" }}>
+                        <div style={{ fontSize: "6pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: 700 }}>HOME ADDRESS</div>
+                        <div style={{ fontSize: "11pt", fontWeight: 900, color: DARK_GREEN, lineHeight: 1.3 }}>
+                          {[p.address, p.city].filter(Boolean).join(", ") || "—"}
                         </div>
-                      )}
+                      </div>
                     </div>
 
                     {/* Bottom: Barcode + QR */}
