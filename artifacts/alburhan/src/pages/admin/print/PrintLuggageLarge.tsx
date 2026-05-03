@@ -181,9 +181,9 @@ export default function PrintLuggageLarge() {
             <div style={{ display: "flex", alignItems: "center", gap: "4mm" }}>
               <div style={{ flexShrink: 0 }}>
                 {p.photoUrl ? (
-                  <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "38mm", height: "38mm", objectFit: "cover", borderRadius: "50%", border: `3px solid ${GOLD}`, boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }} />
+                  <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "55mm", height: "55mm", objectFit: "cover", borderRadius: "50%", border: `4px solid ${GOLD}`, boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }} />
                 ) : (
-                  <div style={{ width: "38mm", height: "38mm", background: "#f0fdf4", borderRadius: "50%", border: `3px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "9pt", color: "#aaa" }}>PHOTO</div>
+                  <div style={{ width: "55mm", height: "55mm", background: "#f0fdf4", borderRadius: "50%", border: `4px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "9pt", color: "#aaa" }}>PHOTO</div>
                 )}
               </div>
               <div style={{ flex: 1 }}>
@@ -250,7 +250,7 @@ export default function PrintLuggageLarge() {
             {/* QR + Barcode + Lost/Found */}
             <div style={{ display: "flex", alignItems: "center", gap: "4mm", marginTop: "auto", paddingTop: "2mm", borderTop: `1px dashed ${DARK}40` }}>
               <div style={{ background: "#fff", padding: "3px", borderRadius: "4px", border: `2px solid ${DARK}` }}>
-                <QRCodeSVG value={buildQrData(p, group, company.phone)} size={80} level="L" fgColor={DARK} />
+                <QRCodeSVG value={buildQrData(p, group, company.phone)} size={110} level="L" fgColor={DARK} />
               </div>
               <div style={{ flex: 1, overflow: "hidden" }}>
                 <Barcode value={barcodeVal} height={36} displayValue fontSize={7} />
@@ -265,8 +265,8 @@ export default function PrintLuggageLarge() {
                 <div style={{ color: "#fff", fontWeight: 900, fontSize: "7.5pt", textTransform: "uppercase", lineHeight: 1.3, letterSpacing: "0.5px" }}>IN CASE OF LOST / FOUND</div>
                 <div style={{ color: "#FFD700", fontWeight: 900, fontSize: "8pt", textTransform: "uppercase", lineHeight: 1.3, letterSpacing: "0.5px" }}>KINDLY CONTACT</div>
                 <div style={{ color: "#fff", fontWeight: 900, fontSize: "8pt", textTransform: "uppercase", lineHeight: 1.3, letterSpacing: "0.5px", marginTop: "0.5mm" }}>AL BURHAN</div>
-                <div style={{ color: "#FFD700", fontWeight: 900, fontSize: "10pt", lineHeight: 1.4, fontFamily: "monospace", letterSpacing: "0.5px" }}>{SVC_PHONE_1}</div>
-                <div style={{ color: "#FFD700", fontWeight: 900, fontSize: "10pt", lineHeight: 1.4, fontFamily: "monospace", letterSpacing: "0.5px" }}>{SVC_PHONE_2}</div>
+                <div style={{ color: "#FFD700", fontWeight: 900, fontSize: "14pt", lineHeight: 1.4, fontFamily: "monospace", letterSpacing: "0.5px" }}>{SVC_PHONE_1}</div>
+                <div style={{ color: "#FFD700", fontWeight: 900, fontSize: "14pt", lineHeight: 1.4, fontFamily: "monospace", letterSpacing: "0.5px" }}>{SVC_PHONE_2}</div>
               </div>
             </div>
           </div>
