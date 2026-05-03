@@ -229,23 +229,24 @@ export default function PrintIdCardsPro() {
                           </div>
                         </div>
 
-                        {/* QR + Barcode column — fills open space */}
+                        {/* QR column — fills open space */}
                         <div style={{
                           width: "28mm", flexShrink: 0,
                           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
                           padding: "1.5mm 2mm 1mm",
                           borderLeft: `1px solid ${GOLD}50`,
-                          gap: "1mm",
                         }}>
                           <div style={{ background: "#fff", padding: "2px", borderRadius: "3px", border: `2px solid ${DARK}` }}>
                             <QRCodeSVG value={buildQrData(p, group, company.phone, company.phoneSaudi)} size={42} level="M" fgColor={DARK} />
                           </div>
-                          <div style={{ width: "100%", overflow: "hidden" }}>
-                            <Barcode value={barcodeVal} height={14} displayValue fontSize={4} />
-                          </div>
                         </div>
 
                       </div>
+                    </div>
+
+                    {/* ── Barcode strip (above footer name) ── */}
+                    <div style={{ flexShrink: 0, padding: "0 2mm 0.5mm", background: "#fff" }}>
+                      <Barcode value={barcodeVal} height={18} displayValue fontSize={5} />
                     </div>
 
                     {/* ── Footer strip ── */}
@@ -303,16 +304,23 @@ export default function PrintIdCardsPro() {
                         <div style={{ fontSize: "3.5pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px" }}>Bus No.</div>
                         <div style={{ fontSize: "7pt", fontWeight: 900, color: DARK, marginBottom: "1mm" }}>{p.busNumber || "—"}</div>
                         <div style={{ fontSize: "3.5pt", fontWeight: 800, color: "#b91c1c", textTransform: "uppercase", letterSpacing: "0.3px" }}>Emergency</div>
-                        <div style={{ fontSize: "3.5pt", color: "#888", textTransform: "uppercase" }}>Saudi: <strong style={{ color: DARK }}>{company.phoneSaudi}</strong></div>
-                        <div style={{ fontSize: "3.5pt", color: "#888", textTransform: "uppercase" }}>India: <strong style={{ color: DARK }}>{company.phone}</strong></div>
+                        <div style={{ fontSize: "3pt", color: "#888", textTransform: "uppercase", lineHeight: 1 }}>Saudi:</div>
+                        <div style={{ fontSize: "7pt", fontWeight: 900, color: DARK, lineHeight: 1.2, letterSpacing: "0.3px" }}>{company.phoneSaudi}</div>
+                        <div style={{ fontSize: "3pt", color: "#888", textTransform: "uppercase", lineHeight: 1, marginTop: "0.5mm" }}>India:</div>
+                        <div style={{ fontSize: "5pt", fontWeight: 900, color: DARK, lineHeight: 1.2 }}>{company.phone}</div>
                       </div>
                       {/* Right: hotels + pilgrim name */}
                       <div style={{ flex: 1, padding: "1.5mm 2mm", display: "flex", flexDirection: "column", overflow: "hidden" }}>
                         <div style={{ display: "flex", flexDirection: "column", gap: "0.5mm", flex: 1 }}>
-                          {[["Hotel Makkah 1", group.hotels?.aziziah?.name], ["Hotel Makkah 2", group.hotels?.makkah?.name], ["Hotel Madinah", group.hotels?.madinah?.name]].map(([lbl, val]) => val ? (
-                            <div key={lbl as string}>
+                          {([
+                            ["Hotel Makkah 1", group.hotels?.aziziah?.name, group.hotels?.aziziah?.nameAr],
+                            ["Hotel Makkah 2", group.hotels?.makkah?.name, group.hotels?.makkah?.nameAr],
+                            ["Hotel Madinah",  group.hotels?.madinah?.name, group.hotels?.madinah?.nameAr],
+                          ] as [string, string|undefined, string|undefined][]).map(([lbl, val, valAr]) => val ? (
+                            <div key={lbl}>
                               <div style={{ fontSize: "3pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>{lbl}</div>
                               <div style={{ fontSize: "5pt", fontWeight: 900, color: DARK, lineHeight: 1.2 }}>{val}</div>
+                              {valAr && <div style={{ fontSize: "5.5pt", fontWeight: 900, color: DARK, lineHeight: 1.2, direction: "rtl", textAlign: "right", fontFamily: "Arial, sans-serif" }}>{valAr}</div>}
                             </div>
                           ) : null)}
                         </div>
