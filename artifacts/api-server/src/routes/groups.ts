@@ -195,6 +195,38 @@ router.put("/:groupId/pilgrims/:pilgrimId", requireAdmin as any, async (req: Aut
   res.json(fmtPilgrim(updated));
 });
 
+router.post("/:groupId/pilgrims/generate-barcodes", requireAdmin as any, async (req, res) => {
+  const groupId = String(req.params.groupId);
+  try {
+    const [group] = await db.select().from(hajjGroupsTable).where(eq(hajjGroupsTable.id, groupId)).limit(1);
+    if (!group) { res.status(404).json({ message: "Group not found" }); return; }
+
+    const yy = String(group.year).slice(-2);
+    const prefix = `ABT-HJ${yy}`;
+
+    const allPilgrims = await db.select().from(pilgrimsTable)
+      .where(eq(pilgrimsTable.groupId, groupId))
+      .orderBy(asc(pilgrimsTable.serialNumber));
+
+    let generated = 0;
+    let skipped = 0;
+
+    for (const p of allPilgrims) {
+      if (p.barcodeId) { skipped++; continue; }
+      const barcodeId = `${prefix}-${String(p.serialNumber).padStart(4, "0")}`;
+      await db.update(pilgrimsTable)
+        .set({ barcodeId, updatedAt: new Date() })
+        .where(eq(pilgrimsTable.id, p.id));
+      generated++;
+    }
+
+    res.json({ message: `Barcodes generated`, generated, skipped, total: allPilgrims.length });
+  } catch (err: any) {
+    console.error("[generate-barcodes] Error:", err);
+    res.status(500).json({ message: err?.message || "Failed to generate barcodes" });
+  }
+});
+
 router.delete("/:groupId/pilgrims/:pilgrimId", requireAdmin as any, async (req, res) => {
   const groupId = String(req.params.groupId);
   const pilgrimId = String(req.params.pilgrimId);

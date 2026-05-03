@@ -11,6 +11,7 @@ const PROD_DOMAIN = "https://alburhantravels.com";
 interface Pilgrim {
   id: string; serialNumber: number; fullName: string; passportNumber?: string;
   visaNumber?: string; photoUrl?: string; mobileIndia?: string; gender?: string;
+  barcodeId?: string;
 }
 interface Group {
   id: string; groupName: string; year: number; maktabNumber?: string;
@@ -218,8 +219,12 @@ export default function PrintIdCards() {
                 {/* Barcode + footer — absolute at bottom */}
                 <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 2 }}>
                   <div style={{ display: "flex", justifyContent: "flex-start", overflow: "hidden", paddingLeft: "2mm", marginBottom: "0.5mm" }}>
-                    {p.passportNumber ? (
-                      <Barcode value={p.passportNumber} height={14} width={1.0} fontSize={0} />
+                    {(p.barcodeId || p.passportNumber) ? (
+                      <Barcode
+                        value={p.barcodeId || p.passportNumber!}
+                        format={p.barcodeId ? "CODE128" : "CODE39"}
+                        height={14} width={1.0} fontSize={0}
+                      />
                     ) : (
                       <div style={{ fontSize: "5pt", color: "#999" }}>{group.groupName}</div>
                     )}

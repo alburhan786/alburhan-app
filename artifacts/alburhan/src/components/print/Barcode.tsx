@@ -16,7 +16,10 @@ export function Barcode({ value, width = 1, height = 25, fontSize = 8, displayVa
   useEffect(() => {
     if (svgRef.current && value) {
       try {
-        JsBarcode(svgRef.current, value.toUpperCase().replace(/[^A-Z0-9\-.\s$/+%]/g, ""), {
+        const safeValue = format === "CODE128"
+          ? value.replace(/[^\x00-\x7F]/g, "")
+          : value.toUpperCase().replace(/[^A-Z0-9\-.\s$/+%]/g, "");
+        JsBarcode(svgRef.current, safeValue, {
           format,
           width,
           height,

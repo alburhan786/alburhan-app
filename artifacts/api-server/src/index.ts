@@ -1,9 +1,18 @@
 import app from "./app";
 import { db, usersTable } from "@workspace/db";
-import { inArray } from "drizzle-orm";
+import { inArray, sql } from "drizzle-orm";
 import { ADMIN_MOBILES } from "./routes/auth.js";
 import { startPaymentReminderCron } from "./jobs/paymentReminder.js";
 import { startFeedbackReminderCron } from "./jobs/feedbackReminder.js";
+
+async function runMigrations() {
+  try {
+    await db.execute(sql`ALTER TABLE pilgrims ADD COLUMN IF NOT EXISTS barcode_id TEXT`);
+    console.log("[Migration] barcode_id column ensured");
+  } catch (err) {
+    console.error("[Migration] Failed:", err);
+  }
+}
 
 const rawPort = process.env["PORT"];
 
@@ -21,6 +30,8 @@ if (Number.isNaN(port) || port <= 0) {
 
 app.listen(port, async () => {
   console.log(`Server listening on port ${port}`);
+
+  await runMigrations();
 
   try {
     await db.update(usersTable)

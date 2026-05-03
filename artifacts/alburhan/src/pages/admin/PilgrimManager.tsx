@@ -147,6 +147,7 @@ export default function PilgrimManager() {
   const [bulkAdding, setBulkAdding] = useState(false);
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
   const [editingSerial, setEditingSerial] = useState<{ id: string; value: string } | null>(null);
+  const [generatingBarcodes, setGeneratingBarcodes] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -162,6 +163,24 @@ export default function PilgrimManager() {
   }, [groupId]);
 
   useEffect(() => { if (groupId) fetchData(); }, [groupId, fetchData]);
+
+  const generateBarcodes = async () => {
+    setGeneratingBarcodes(true);
+    try {
+      const res = await fetch(`${API}/api/groups/${groupId}/pilgrims/generate-barcodes`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed");
+      toast({ title: "Barcodes Generated", description: `${data.generated} new · ${data.skipped} already had barcodes` });
+      await fetchData();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setGeneratingBarcodes(false);
+    }
+  };
 
   const exportToExcel = () => {
     const headers = EXPORT_COLUMNS.map(c => c.label);
@@ -514,6 +533,14 @@ export default function PilgrimManager() {
             </div>
             {activeTab === "pilgrims" && (
               <>
+                <Button
+                  variant="outline"
+                  onClick={generateBarcodes}
+                  disabled={generatingBarcodes || pilgrims.length === 0}
+                  className="gap-1.5 rounded-xl border-purple-300 text-purple-700 hover:bg-purple-50"
+                >
+                  <Layers size={15} /> {generatingBarcodes ? "Generating…" : "Generate Barcodes"}
+                </Button>
                 <Button variant="outline" onClick={exportToExcel} disabled={pilgrims.length === 0} className="gap-1.5 rounded-xl border-emerald-300 text-emerald-700 hover:bg-emerald-50">
                   <FileDown size={15} /> Export Excel
                 </Button>
