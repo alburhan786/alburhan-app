@@ -320,7 +320,7 @@ export default function PrintLuggageSquare() {
   const groupLabel = group.groupName.toUpperCase();
 
   const pages: Pilgrim[][] = [];
-  for (let i = 0; i < pilgrims.length; i += 2) pages.push(pilgrims.slice(i, i + 2));
+  for (let i = 0; i < pilgrims.length; i += 4) pages.push(pilgrims.slice(i, i + 4));
 
   const showFront = view === "front" || view === "both";
   const showBack  = view === "back"  || view === "both";
