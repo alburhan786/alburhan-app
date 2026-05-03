@@ -80,14 +80,17 @@ export default function PrintIdCardsPro() {
 
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
 
-  const pages: Pilgrim[][] = [];
-  for (let i = 0; i < pilgrims.length; i += 4) pages.push(pilgrims.slice(i, i + 4));
+  const frontPages: Pilgrim[][] = [];
+  for (let i = 0; i < pilgrims.length; i += 9) frontPages.push(pilgrims.slice(i, i + 9));
+
+  const backPages: Pilgrim[][] = [];
+  for (let i = 0; i < pilgrims.length; i += 6) backPages.push(pilgrims.slice(i, i + 6));
 
   return (
     <>
       <style>{`
         @media print {
-          @page { size: A4 portrait; margin: 5mm; }
+          @page { size: A4 landscape; margin: 5mm 8mm; }
           body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; margin: 0; }
           .no-print { display: none !important; }
         }
@@ -98,9 +101,20 @@ export default function PrintIdCardsPro() {
           page-break-inside: avoid; font-family: Arial, sans-serif;
           background: #fff; position: relative; display: flex; flex-direction: column;
         }
-        .pro-cards-row { display: flex; gap: 5mm; justify-content: center; margin-bottom: 2mm; }
-        .pro-customer-block { page-break-inside: avoid; page-break-after: always; }
-        .pro-customer-block:last-child { page-break-after: auto; }
+        .pro-print-page { page-break-after: always; }
+        .pro-print-page:last-child { page-break-after: auto; }
+        .pro-front-grid {
+          display: grid;
+          grid-template-columns: repeat(3, ${W});
+          gap: 5mm;
+          justify-content: center;
+        }
+        .pro-back-grid {
+          display: grid;
+          grid-template-columns: repeat(3, ${W});
+          gap: 5mm;
+          justify-content: center;
+        }
       `}</style>
 
       <div className="no-print" style={{ padding: "16px", background: "#fef3c7", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", flexWrap: "wrap" }}>
@@ -116,17 +130,14 @@ export default function PrintIdCardsPro() {
       </div>
 
       <div style={{ background: "#fff", padding: "4mm" }}>
-        {pages.map((page, pi) => {
-          const rows = [page.slice(0, 2), page.slice(2, 4)].filter(r => r.length > 0);
-          return (
-          <div key={pi} className="pro-customer-block">
 
-            {/* ══ FRONT FACES — up to 2 rows ══ */}
-            {rows.map((row, ri) => (
-              <div key={`fr-${pi}-${ri}`} className="pro-cards-row">
-                {row.map(p => {
-                  const serial = String(p.serialNumber).padStart(3, "0");
-                  const barcodeVal = p.passportNumber || `HAJ${serial}`;
+        {/* ══ ALL FRONT PAGES — 9 per page, 3×3 grid ══ */}
+        {frontPages.map((page, pi) => (
+          <div key={`fp-${pi}`} className="pro-print-page">
+            <div className="pro-front-grid">
+              {page.map(p => {
+                const serial = String(p.serialNumber).padStart(3, "0");
+                const barcodeVal = p.passportNumber || `HAJ${serial}`;
                 return (
                   <div key={`f-${p.id}`} className="pro-card">
 
@@ -250,93 +261,86 @@ export default function PrintIdCardsPro() {
                   </div>
                 );
               })}
-              {Array.from({ length: Math.max(0, 2 - row.length) }).map((_, i) => (
-                <div key={`ph-f-${i}`} className="pro-card" style={{ border: "1px dashed #ddd", opacity: 0.2 }} />
-              ))}
             </div>
-            ))}
-
-            {/* ══ BACK FACES — up to 2 rows ══ */}
-            {rows.map((row, ri) => (
-              <div key={`br-${pi}-${ri}`} className="pro-cards-row">
-                {row.map(p => {
-                  const serial = String(p.serialNumber).padStart(3, "0");
-                  return (
-                  <div key={`b-${p.id}`} className="pro-card">
-
-                    {/* ── Header bar ── */}
-                    <div style={{
-                      background: DARK, padding: "1mm 3mm", flexShrink: 0,
-                      display: "flex", alignItems: "center", justifyContent: "space-between",
-                      minHeight: "8mm",
-                    }}>
-                      <div style={{ fontSize: "7pt", fontWeight: 900, color: "#fff", textTransform: "uppercase", letterSpacing: "0.5px", lineHeight: 1.2 }}>
-                        {company.name}
-                      </div>
-                      <div style={{ fontSize: "5.5pt", fontWeight: 900, color: GOLD, letterSpacing: "0.3px", lineHeight: 1.2 }}>
-                        📞 {company.phone} | {company.phoneSaudi}
-                      </div>
-                    </div>
-
-                    {/* ── Body ── */}
-                    <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
-                      {/* Left: service ctr + bus + emergency */}
-                      <div style={{ width: "38mm", flexShrink: 0, padding: "1.5mm 2mm", borderRight: `1px solid ${GOLD}40` }}>
-                        <div style={{ fontSize: "3.5pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px" }}>Service Center No.</div>
-                        <div style={{ fontSize: "13pt", fontWeight: 900, color: DARK, lineHeight: 1, marginBottom: "0.5mm" }}>{group.maktabNumber || "—"}</div>
-                        <div style={{ fontSize: "3.5pt", fontWeight: 800, color: "#b91c1c", textTransform: "uppercase", letterSpacing: "0.3px" }}>Emergency</div>
-                        <div style={{ fontSize: "3pt", color: "#888", textTransform: "uppercase", lineHeight: 1 }}>Saudi:</div>
-                        <div style={{ fontSize: "7pt", fontWeight: 900, color: DARK, lineHeight: 1.2, letterSpacing: "0.3px" }}>{company.phoneSaudi}</div>
-                        <div style={{ fontSize: "3pt", color: "#888", textTransform: "uppercase", lineHeight: 1, marginTop: "0.5mm" }}>India:</div>
-                        <div style={{ fontSize: "5pt", fontWeight: 900, color: DARK, lineHeight: 1.2 }}>{company.phone}</div>
-                      </div>
-                      {/* Right: hotels + pilgrim name */}
-                      <div style={{ flex: 1, padding: "1.5mm 2mm", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-                        <div style={{ display: "flex", flexDirection: "column", gap: "0.5mm", flex: 1 }}>
-                          {([
-                            ["Hotel Makkah 1", group.hotels?.aziziah?.name, group.hotels?.aziziah?.nameAr],
-                            ["Hotel Makkah 2", group.hotels?.makkah?.name, group.hotels?.makkah?.nameAr],
-                            ["Hotel Madinah",  group.hotels?.madinah?.name, group.hotels?.madinah?.nameAr],
-                          ] as [string, string|undefined, string|undefined][]).map(([lbl, val, valAr]) => val ? (
-                            <div key={lbl}>
-                              <div style={{ fontSize: "3pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>{lbl}</div>
-                              <div style={{ fontSize: "5pt", fontWeight: 900, color: DARK, lineHeight: 1.2 }}>{val}</div>
-                              {valAr && <div style={{ fontSize: "5.5pt", fontWeight: 900, color: DARK, lineHeight: 1.2, direction: "rtl", textAlign: "right", fontFamily: "Arial, sans-serif" }}>{valAr}</div>}
-                            </div>
-                          ) : null)}
-                        </div>
-                        {/* Feedback QR */}
-                        {showFeedbackQr && (
-                          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", marginTop: "auto" }}>
-                            <div style={{ background: "#fff", padding: "1px", borderRadius: "2px", border: `1.5px solid ${DARK}` }}>
-                              <QRCodeSVG value={p.mobileIndia && bookingMap[p.mobileIndia] ? `${PROD_DOMAIN}/feedback?booking_id=${bookingMap[p.mobileIndia]}` : `${PROD_DOMAIN}/feedback`} size={28} level="L" fgColor={DARK} />
-                            </div>
-                            <div style={{ fontSize: "3pt", color: "#888", textTransform: "uppercase", marginTop: "0.3mm" }}>Rate Trip</div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* ── Footer ── */}
-                    <div style={{ flexShrink: 0 }}>
-                      <div style={{ background: DARK, textAlign: "center", padding: "0.7mm 2mm", WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" } as React.CSSProperties}>
-                        <div style={{ fontSize: "6.5pt", fontWeight: 900, color: "#fff", textTransform: "uppercase", lineHeight: 1.2 }}>{p.fullName}</div>
-                        <div style={{ fontSize: "4.5pt", fontWeight: 900, color: GOLD, lineHeight: 1.2 }}>{company.address}</div>
-                      </div>
-                    </div>
-
-                  </div>
-                  );
-                })}
-                {Array.from({ length: Math.max(0, 2 - row.length) }).map((_, i) => (
-                  <div key={`ph-b-${i}`} className="pro-card" style={{ border: "1px dashed #ddd", opacity: 0.2 }} />
-                ))}
-              </div>
-            ))}
-
           </div>
-          );
-        })}
+        ))}
+
+        {/* ══ ALL BACK PAGES — 6 per page (3×2), landscape A4 ══ */}
+        {backPages.map((page, pi) => (
+          <div key={`bp-${pi}`} className="pro-print-page">
+            <div className="pro-back-grid">
+              {page.map(p => {
+                const serial = String(p.serialNumber).padStart(3, "0");
+                return (
+                <div key={`b-${p.id}`} className="pro-card">
+
+                  {/* ── Header bar ── */}
+                  <div style={{
+                    background: DARK, padding: "1mm 3mm", flexShrink: 0,
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    minHeight: "8mm",
+                  }}>
+                    <div style={{ fontSize: "7pt", fontWeight: 900, color: "#fff", textTransform: "uppercase", letterSpacing: "0.5px", lineHeight: 1.2 }}>
+                      {company.name}
+                    </div>
+                    <div style={{ fontSize: "5.5pt", fontWeight: 900, color: GOLD, letterSpacing: "0.3px", lineHeight: 1.2 }}>
+                      📞 {company.phone} | {company.phoneSaudi}
+                    </div>
+                  </div>
+
+                  {/* ── Body ── */}
+                  <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+                    {/* Left: service ctr + emergency */}
+                    <div style={{ width: "38mm", flexShrink: 0, padding: "1.5mm 2mm", borderRight: `1px solid ${GOLD}40` }}>
+                      <div style={{ fontSize: "3.5pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px" }}>Service Center No.</div>
+                      <div style={{ fontSize: "13pt", fontWeight: 900, color: DARK, lineHeight: 1, marginBottom: "0.5mm" }}>{group.maktabNumber || "—"}</div>
+                      <div style={{ fontSize: "3.5pt", fontWeight: 800, color: "#b91c1c", textTransform: "uppercase", letterSpacing: "0.3px" }}>Emergency</div>
+                      <div style={{ fontSize: "3pt", color: "#888", textTransform: "uppercase", lineHeight: 1 }}>Saudi:</div>
+                      <div style={{ fontSize: "7pt", fontWeight: 900, color: DARK, lineHeight: 1.2, letterSpacing: "0.3px" }}>{company.phoneSaudi}</div>
+                      <div style={{ fontSize: "3pt", color: "#888", textTransform: "uppercase", lineHeight: 1, marginTop: "0.5mm" }}>India:</div>
+                      <div style={{ fontSize: "5pt", fontWeight: 900, color: DARK, lineHeight: 1.2 }}>{company.phone}</div>
+                    </div>
+                    {/* Right: hotels + feedback QR */}
+                    <div style={{ flex: 1, padding: "1.5mm 2mm", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0.5mm", flex: 1 }}>
+                        {([
+                          ["Hotel Makkah 1", group.hotels?.aziziah?.name, group.hotels?.aziziah?.nameAr],
+                          ["Hotel Makkah 2", group.hotels?.makkah?.name, group.hotels?.makkah?.nameAr],
+                          ["Hotel Madinah",  group.hotels?.madinah?.name, group.hotels?.madinah?.nameAr],
+                        ] as [string, string|undefined, string|undefined][]).map(([lbl, val, valAr]) => val ? (
+                          <div key={lbl}>
+                            <div style={{ fontSize: "3pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>{lbl}</div>
+                            <div style={{ fontSize: "5pt", fontWeight: 900, color: DARK, lineHeight: 1.2 }}>{val}</div>
+                            {valAr && <div style={{ fontSize: "5.5pt", fontWeight: 900, color: DARK, lineHeight: 1.2, direction: "rtl", textAlign: "right", fontFamily: "Arial, sans-serif" }}>{valAr}</div>}
+                          </div>
+                        ) : null)}
+                      </div>
+                      {showFeedbackQr && (
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", marginTop: "auto" }}>
+                          <div style={{ background: "#fff", padding: "1px", borderRadius: "2px", border: `1.5px solid ${DARK}` }}>
+                            <QRCodeSVG value={p.mobileIndia && bookingMap[p.mobileIndia] ? `${PROD_DOMAIN}/feedback?booking_id=${bookingMap[p.mobileIndia]}` : `${PROD_DOMAIN}/feedback`} size={28} level="L" fgColor={DARK} />
+                          </div>
+                          <div style={{ fontSize: "3pt", color: "#888", textTransform: "uppercase", marginTop: "0.3mm" }}>Rate Trip</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* ── Footer ── */}
+                  <div style={{ flexShrink: 0 }}>
+                    <div style={{ background: DARK, textAlign: "center", padding: "0.7mm 2mm", WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" } as React.CSSProperties}>
+                      <div style={{ fontSize: "6.5pt", fontWeight: 900, color: "#fff", textTransform: "uppercase", lineHeight: 1.2 }}>{p.fullName}</div>
+                      <div style={{ fontSize: "4.5pt", fontWeight: 900, color: GOLD, lineHeight: 1.2 }}>{company.address}</div>
+                    </div>
+                  </div>
+
+                </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+
       </div>
     </>
   );
