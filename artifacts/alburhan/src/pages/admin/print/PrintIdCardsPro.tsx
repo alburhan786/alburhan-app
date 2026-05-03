@@ -97,7 +97,7 @@ export default function PrintIdCardsPro() {
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
 
   const pages: Pilgrim[][] = [];
-  for (let i = 0; i < pilgrims.length; i += 2) pages.push(pilgrims.slice(i, i + 2));
+  for (let i = 0; i < pilgrims.length; i += 4) pages.push(pilgrims.slice(i, i + 4));
 
   return (
     <>
@@ -114,9 +114,9 @@ export default function PrintIdCardsPro() {
           page-break-inside: avoid; font-family: Arial, sans-serif;
           background: #fff; position: relative; display: flex; flex-direction: column;
         }
-        .pro-cards-row { display: flex; gap: 5mm; justify-content: center; margin-bottom: 3mm; }
-        .pro-customer-block { page-break-inside: avoid; }
-        .pro-page-break { page-break-after: always; }
+        .pro-cards-row { display: flex; gap: 5mm; justify-content: center; margin-bottom: 2mm; }
+        .pro-customer-block { page-break-inside: avoid; page-break-after: always; }
+        .pro-customer-block:last-child { page-break-after: auto; }
       `}</style>
 
       <div className="no-print" style={{ padding: "16px", background: "#fef3c7", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", flexWrap: "wrap" }}>
@@ -132,14 +132,17 @@ export default function PrintIdCardsPro() {
       </div>
 
       <div style={{ background: "#fff", padding: "4mm" }}>
-        {pages.map((page, pi) => (
-          <div key={pi} className={`pro-customer-block${pi < pages.length - 1 ? " pro-page-break" : ""}`} style={{ marginBottom: "4mm" }}>
+        {pages.map((page, pi) => {
+          const rows = [page.slice(0, 2), page.slice(2, 4)].filter(r => r.length > 0);
+          return (
+          <div key={pi} className="pro-customer-block">
 
-            {/* ══ FRONT FACES ══ */}
-            <div className="pro-cards-row">
-              {page.map(p => {
-                const serial = String(p.serialNumber).padStart(3, "0");
-                const barcodeVal = p.passportNumber || `HAJ${serial}`;
+            {/* ══ FRONT FACES — up to 2 rows ══ */}
+            {rows.map((row, ri) => (
+              <div key={`fr-${pi}-${ri}`} className="pro-cards-row">
+                {row.map(p => {
+                  const serial = String(p.serialNumber).padStart(3, "0");
+                  const barcodeVal = p.passportNumber || `HAJ${serial}`;
                 return (
                   <div key={`f-${p.id}`} className="pro-card">
 
@@ -253,148 +256,88 @@ export default function PrintIdCardsPro() {
                   </div>
                 );
               })}
-              {Array.from({ length: 2 - page.length }).map((_, i) => (
+              {Array.from({ length: Math.max(0, 2 - row.length) }).map((_, i) => (
                 <div key={`ph-f-${i}`} className="pro-card" style={{ border: "1px dashed #ddd", opacity: 0.2 }} />
               ))}
             </div>
+            ))}
 
-            {/* ══ BACK FACES ══ */}
-            <div className="pro-cards-row">
-              {page.map(p => {
-                const serial = String(p.serialNumber).padStart(3, "0");
-                return (
+            {/* ══ BACK FACES — up to 2 rows ══ */}
+            {rows.map((row, ri) => (
+              <div key={`br-${pi}-${ri}`} className="pro-cards-row">
+                {row.map(p => {
+                  const serial = String(p.serialNumber).padStart(3, "0");
+                  return (
                   <div key={`b-${p.id}`} className="pro-card">
 
                     {/* ── Header bar ── */}
                     <div style={{
-                      background: DARK, padding: "1.5mm 3mm", flexShrink: 0,
-                      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                      minHeight: "9mm",
+                      background: DARK, padding: "1mm 3mm", flexShrink: 0,
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      minHeight: "8mm",
                     }}>
                       <div style={{ fontSize: "7pt", fontWeight: 900, color: "#fff", textTransform: "uppercase", letterSpacing: "0.5px", lineHeight: 1.2 }}>
                         {company.name}
                       </div>
-                      <div style={{ fontSize: "6pt", fontWeight: 900, color: GOLD, letterSpacing: "0.3px", lineHeight: 1.2 }}>
-                        📞 9893989786 &nbsp;|&nbsp; 9893225590
-                      </div>
-                    </div>
-                    {/* ── Pilgrim name at top (back) ── */}
-                    <div style={{
-                      background: "#f0f7f2", borderBottom: `1.5px solid ${GOLD}`,
-                      padding: "0.8mm 3mm", flexShrink: 0, textAlign: "center",
-                    }}>
-                      <div style={{ fontSize: "8pt", fontWeight: 900, color: DARK, textTransform: "uppercase", lineHeight: 1.2, letterSpacing: "0.3px" }}>
-                        {p.fullName}
+                      <div style={{ fontSize: "5.5pt", fontWeight: 900, color: GOLD, letterSpacing: "0.3px", lineHeight: 1.2 }}>
+                        📞 {company.phone} | {company.phoneSaudi}
                       </div>
                     </div>
 
                     {/* ── Body ── */}
-                    <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "2mm 3mm 1mm", position: "relative", overflow: "hidden" }}>
-
-                      {/* Two-column: maktab/bus | emergency */}
-                      <div style={{ display: "flex", gap: "3mm", marginBottom: "1.5mm" }}>
-                        {/* Left col */}
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: "4pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Service Center No.</div>
-                          <div style={{ fontSize: "14pt", fontWeight: 900, color: DARK, lineHeight: 1 }}>
-                            {group.maktabNumber || "—"}
-                          </div>
-                          <div style={{ fontSize: "4pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1, marginTop: "1mm" }}>Bus No.</div>
-                          <div style={{ fontSize: "7pt", fontWeight: 900, color: DARK }}>{p.busNumber || "—"}</div>
-                        </div>
-                        {/* Right col */}
-                        <div style={{ flex: 1.2 }}>
-                          <div style={{ fontSize: "4pt", fontWeight: 800, color: "#b91c1c", textTransform: "uppercase", letterSpacing: "0.3px" }}>Emergency</div>
-                          <div style={{ fontSize: "4pt", color: "#888", textTransform: "uppercase", letterSpacing: "0.2px", lineHeight: 1.2 }}>Saudi</div>
-                          <div style={{ fontSize: "6.5pt", fontWeight: 900, color: DARK, lineHeight: 1.3 }}>{company.phoneSaudi}</div>
-                          <div style={{ fontSize: "4pt", color: "#888", textTransform: "uppercase", letterSpacing: "0.2px", lineHeight: 1.2, marginTop: "0.5mm" }}>India</div>
-                          <div style={{ fontSize: "6.5pt", fontWeight: 900, color: DARK, lineHeight: 1.3 }}>{company.phone}</div>
-                        </div>
+                    <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+                      {/* Left: service ctr + bus + emergency */}
+                      <div style={{ width: "38mm", flexShrink: 0, padding: "1.5mm 2mm", borderRight: `1px solid ${GOLD}40` }}>
+                        <div style={{ fontSize: "3.5pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px" }}>Service Center No.</div>
+                        <div style={{ fontSize: "13pt", fontWeight: 900, color: DARK, lineHeight: 1, marginBottom: "0.5mm" }}>{group.maktabNumber || "—"}</div>
+                        <div style={{ fontSize: "3.5pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px" }}>Bus No.</div>
+                        <div style={{ fontSize: "7pt", fontWeight: 900, color: DARK, marginBottom: "1mm" }}>{p.busNumber || "—"}</div>
+                        <div style={{ fontSize: "3.5pt", fontWeight: 800, color: "#b91c1c", textTransform: "uppercase", letterSpacing: "0.3px" }}>Emergency</div>
+                        <div style={{ fontSize: "3.5pt", color: "#888", textTransform: "uppercase" }}>Saudi: <strong style={{ color: DARK }}>{company.phoneSaudi}</strong></div>
+                        <div style={{ fontSize: "3.5pt", color: "#888", textTransform: "uppercase" }}>India: <strong style={{ color: DARK }}>{company.phone}</strong></div>
                       </div>
-
-                      {/* Hotels */}
-                      <div style={{ display: "flex", flexDirection: "column", gap: "0.6mm" }}>
-                        <div>
-                          <div style={{ fontSize: "3pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Hotel Makkah 1</div>
-                          <div style={{ fontSize: "5.5pt", fontWeight: 900, color: DARK, lineHeight: 1.2 }}>{group.hotels?.aziziah?.name || "—"}</div>
-                          {group.hotels?.aziziah?.nameAr && <div style={{ fontSize: "5pt", fontWeight: 700, color: DARK, lineHeight: 1.1, direction: "rtl", textAlign: "right" }}>{group.hotels.aziziah.nameAr}</div>}
+                      {/* Right: hotels + pilgrim name */}
+                      <div style={{ flex: 1, padding: "1.5mm 2mm", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "0.5mm", flex: 1 }}>
+                          {[["Hotel Makkah 1", group.hotels?.aziziah?.name], ["Hotel Makkah 2", group.hotels?.makkah?.name], ["Hotel Madinah", group.hotels?.madinah?.name]].map(([lbl, val]) => val ? (
+                            <div key={lbl as string}>
+                              <div style={{ fontSize: "3pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>{lbl}</div>
+                              <div style={{ fontSize: "5pt", fontWeight: 900, color: DARK, lineHeight: 1.2 }}>{val}</div>
+                            </div>
+                          ) : null)}
                         </div>
-                        <div>
-                          <div style={{ fontSize: "3pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Hotel Makkah 2</div>
-                          <div style={{ fontSize: "5.5pt", fontWeight: 900, color: DARK, lineHeight: 1.2 }}>{group.hotels?.makkah?.name || "—"}</div>
-                          {group.hotels?.makkah?.nameAr && <div style={{ fontSize: "5pt", fontWeight: 700, color: DARK, lineHeight: 1.1, direction: "rtl", textAlign: "right" }}>{group.hotels.makkah.nameAr}</div>}
-                        </div>
-                        <div>
-                          <div style={{ fontSize: "3pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Hotel Madinah</div>
-                          <div style={{ fontSize: "5.5pt", fontWeight: 900, color: DARK, lineHeight: 1.2 }}>{group.hotels?.madinah?.name || "—"}</div>
-                          {group.hotels?.madinah?.nameAr && <div style={{ fontSize: "5pt", fontWeight: 700, color: DARK, lineHeight: 1.1, direction: "rtl", textAlign: "right" }}>{group.hotels.madinah.nameAr}</div>}
-                        </div>
-                      </div>
-
-                      {/* Bottom-right: feedback QR */}
-                      {showFeedbackQr ? (
-                        <div style={{ position: "absolute", bottom: "1mm", right: "2mm", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.8mm" }}>
-                          <div style={{ background: "#fff", padding: "2px", borderRadius: "3px", border: `2px solid ${DARK}` }}>
-                            <QRCodeSVG
-                              value={p.mobileIndia && bookingMap[p.mobileIndia]
-                                ? `${PROD_DOMAIN}/feedback?booking_id=${bookingMap[p.mobileIndia]}`
-                                : `${PROD_DOMAIN}/feedback`}
-                              size={38} level="M" fgColor={DARK}
-                            />
+                        {/* Feedback QR */}
+                        {showFeedbackQr && (
+                          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", marginTop: "auto" }}>
+                            <div style={{ background: "#fff", padding: "1px", borderRadius: "2px", border: `1.5px solid ${DARK}` }}>
+                              <QRCodeSVG value={p.mobileIndia && bookingMap[p.mobileIndia] ? `${PROD_DOMAIN}/feedback?booking_id=${bookingMap[p.mobileIndia]}` : `${PROD_DOMAIN}/feedback`} size={28} level="M" fgColor={DARK} />
+                            </div>
+                            <div style={{ fontSize: "3pt", color: "#888", textTransform: "uppercase", marginTop: "0.3mm" }}>Rate Trip</div>
                           </div>
-                          <div style={{ background: DARK, color: "#fff", fontSize: "3pt", fontWeight: 900, letterSpacing: "0.8px", padding: "0.4mm 2mm", borderRadius: "8px", textTransform: "uppercase" }}>Rate Trip</div>
-                        </div>
-                      ) : null}
-
-                      {/* Pilgrim name */}
-                      <div style={{ marginTop: "auto", paddingTop: "1mm" }}>
-                        <div style={{ fontSize: "3.5pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Pilgrim</div>
-                        <div style={{
-                          fontSize: "11pt", fontWeight: 900, color: DARK,
-                          textTransform: "uppercase", lineHeight: 1.15,
-                          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-                          maxWidth: "calc(100% - 14mm)",
-                        }}>
-                          {p.fullName}
-                        </div>
+                        )}
                       </div>
                     </div>
 
                     {/* ── Footer ── */}
                     <div style={{ flexShrink: 0 }}>
-                      {/* Name — dark band */}
-                      <div style={{
-                        background: DARK, textAlign: "center", padding: "0.8mm 3mm",
-                        WebkitPrintColorAdjust: "exact", printColorAdjust: "exact",
-                      } as React.CSSProperties}>
-                        <div style={{ fontSize: "7pt", fontWeight: 900, color: "#fff", textTransform: "uppercase", lineHeight: 1.2, letterSpacing: "0.3px" }}>
-                          {p.fullName}
-                        </div>
-                      </div>
-                      {/* Address + big phone — dark band */}
-                      <div style={{
-                        background: DARK, textAlign: "center", padding: "0.7mm 3mm",
-                        WebkitPrintColorAdjust: "exact", printColorAdjust: "exact",
-                      } as React.CSSProperties}>
-                        <div style={{ fontSize: "5.5pt", fontWeight: 900, color: "#fff", lineHeight: 1.3, letterSpacing: "0.1px" }}>
-                          {company.address}
-                        </div>
-                        <div style={{ fontSize: "8pt", fontWeight: 900, color: GOLD, letterSpacing: "0.5px", lineHeight: 1.3 }}>
-                          📞 {company.phone}
-                        </div>
+                      <div style={{ background: DARK, textAlign: "center", padding: "0.7mm 2mm", WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" } as React.CSSProperties}>
+                        <div style={{ fontSize: "6.5pt", fontWeight: 900, color: "#fff", textTransform: "uppercase", lineHeight: 1.2 }}>{p.fullName}</div>
+                        <div style={{ fontSize: "4.5pt", fontWeight: 900, color: GOLD, lineHeight: 1.2 }}>{company.address}</div>
                       </div>
                     </div>
 
                   </div>
-                );
-              })}
-              {Array.from({ length: 2 - page.length }).map((_, i) => (
-                <div key={`ph-b-${i}`} className="pro-card" style={{ border: "1px dashed #ddd", opacity: 0.2 }} />
-              ))}
-            </div>
+                  );
+                })}
+                {Array.from({ length: Math.max(0, 2 - row.length) }).map((_, i) => (
+                  <div key={`ph-b-${i}`} className="pro-card" style={{ border: "1px dashed #ddd", opacity: 0.2 }} />
+                ))}
+              </div>
+            ))}
 
           </div>
-        ))}
+          );
+        })}
       </div>
     </>
   );
