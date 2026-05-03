@@ -71,7 +71,7 @@ function WaveShapesBack() {
 
 function LogoHeader({ size, company, showTopFlag }: { size?: "small"; company: CompanyInfo; showTopFlag?: boolean }) {
   const isSmall = size === "small";
-  const flagImgSize = isSmall ? "6mm" : "13mm";
+  const flagImgSize = isSmall ? "5mm" : "9mm";
   const nameSize = isSmall ? "7pt" : "11pt";
   const tagSize = isSmall ? "3.5pt" : "5.5pt";
   return (
