@@ -1,5 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { downloadPdf } from "@/lib/pdf-download";
+import { useState, useEffect } from "react";
 import { useRoute } from "wouter";
 import { PrintHeader } from "./PrintHeader";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
@@ -32,25 +31,6 @@ export default function PrintFeedback() {
   const [showQR, setShowQR] = useState(false);
   const company = getCompanyById(companyId);
 
-  const formRef = useRef<HTMLDivElement>(null);
-  const qrRef = useRef<HTMLDivElement>(null);
-  const [pdfLoading, setPdfLoading] = useState(false);
-
-  const handleDownloadForm = useCallback(async () => {
-    if (!formRef.current || pdfLoading) return;
-    setPdfLoading(true);
-    try {
-      await downloadPdf(formRef.current, { filename: `Feedback-Form-${group?.groupName || "group"}.pdf` });
-    } finally { setPdfLoading(false); }
-  }, [group, pdfLoading]);
-
-  const handleDownloadQR = useCallback(async () => {
-    if (!qrRef.current || pdfLoading) return;
-    setPdfLoading(true);
-    try {
-      await downloadPdf(qrRef.current, { filename: `Feedback-QR-${group?.groupName || "group"}.pdf` });
-    } finally { setPdfLoading(false); }
-  }, [group, pdfLoading]);
 
   useEffect(() => {
     if (!groupId) return;
@@ -103,21 +83,14 @@ export default function PrintFeedback() {
         >
           📱 QR Code Sheet ({pilgrims.length})
         </button>
-        {!showQR && (
-          <button onClick={handleDownloadForm} disabled={pdfLoading} style={{ padding: "10px 24px", background: "#1d4ed8", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", opacity: pdfLoading ? 0.6 : 1 }}>
-            {pdfLoading ? "Generating..." : "⬇ Download Form PDF"}
-          </button>
-        )}
-        {showQR && (
-          <button onClick={handleDownloadQR} disabled={pdfLoading} style={{ padding: "10px 24px", background: "#1d4ed8", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", opacity: pdfLoading ? 0.6 : 1 }}>
-            {pdfLoading ? "Generating..." : "⬇ Download QR PDF"}
-          </button>
-        )}
+        <button onClick={() => window.print()} style={{ padding: "10px 24px", background: "#0A3D2A", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>
+          🖨 Print
+        </button>
         <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
       </div>
 
       {!showQR && (
-        <div ref={formRef}>
+        <div>
           <div style={{ padding: "2mm", fontFamily: "'Inter', Arial, sans-serif", maxWidth: "210mm", margin: "0 auto" }}>
             <PrintHeader title="Customer Feedback Form" subtitle={`${group.groupName} — ${group.year}${group.departureDate ? ` | ${group.departureDate}` : ""}${group.returnDate ? ` to ${group.returnDate}` : ""}`} company={company} />
 
@@ -213,7 +186,7 @@ export default function PrintFeedback() {
       )}
 
       {showQR && (
-        <div ref={qrRef}>
+        <div>
           <div style={{ padding: "4mm", fontFamily: "'Inter', Arial, sans-serif", maxWidth: "210mm", margin: "0 auto" }}>
             <div style={{ textAlign: "center", marginBottom: "6mm", borderBottom: "2px solid #0A3D2A", paddingBottom: "4mm" }}>
               <div style={{ fontSize: "14pt", fontWeight: 700, color: "#0A3D2A" }}>{company.name}</div>
