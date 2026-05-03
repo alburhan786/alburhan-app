@@ -3,7 +3,7 @@ import { useRoute } from "wouter";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
 
 const API = import.meta.env.VITE_API_URL || "";
-const DARK_GREEN = "#0B3D2E";
+const DARK_GREEN = "#16a34a";
 const GOLD = "#C9A23F";
 
 interface Pilgrim {
@@ -78,7 +78,7 @@ interface RoomStickerProps {
 function HotelRow({ label, info }: { label: string; info?: HotelInfo }) {
   if (!info?.name) return null;
   return (
-    <div style={{ borderBottom: "0.5px solid #d1e8dc", paddingBottom: "1.5mm", marginBottom: "1.5mm" }}>
+    <div style={{ borderBottom: "0.5px solid #bbf7d0", paddingBottom: "1.5mm", marginBottom: "1.5mm" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "2mm" }}>
         <span style={{ color: DARK_GREEN, minWidth: "16mm", fontWeight: 800, textTransform: "uppercase", fontSize: "5.5pt", letterSpacing: "0.3px", flexShrink: 0 }}>{label}</span>
         <span style={{ color: "#111", fontWeight: 800, fontSize: "7pt" }}>{info.name}</span>
@@ -130,17 +130,17 @@ function RoomSticker({ roomNumber, pilgrims, group, companyName, companyPhone, c
               <div style={{ fontSize: "9.5pt", fontWeight: 900, letterSpacing: "0.2px", lineHeight: 1.1 }}>
                 {companyName}
               </div>
-              <div style={{ fontSize: "6pt", color: "#a8d5c2", marginTop: "0.3mm" }}>
+              <div style={{ fontSize: "6pt", color: "#86efac", marginTop: "0.3mm" }}>
                 Tel: {companyPhone}
               </div>
             </div>
           </div>
           <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: "5.5pt", color: "#a8d5c2", textTransform: "uppercase", letterSpacing: "0.4px" }}>Room No.</div>
+            <div style={{ fontSize: "5.5pt", color: "#86efac", textTransform: "uppercase", letterSpacing: "0.4px" }}>Room No.</div>
             <div style={{ fontSize: "24pt", fontWeight: 900, color: GOLD, lineHeight: 0.9, letterSpacing: "-0.5px" }}>
               {roomNumber}
             </div>
-            <div style={{ fontSize: "6pt", color: "#a8d5c2", marginTop: "5mm" }}>
+            <div style={{ fontSize: "6pt", color: "#86efac", marginTop: "5mm" }}>
               {roomType} · {pilgrims.length} person{pilgrims.length !== 1 ? "s" : ""}
             </div>
           </div>
@@ -151,7 +151,7 @@ function RoomSticker({ roomNumber, pilgrims, group, companyName, companyPhone, c
       {/* Hotel rows — light background so dates are clearly visible */}
       {hasHotels && (
         <div style={{
-          background: "#f0f7f4", borderBottom: `1.5px solid ${DARK_GREEN}30`,
+          background: "#f0fdf4", borderBottom: `1.5px solid ${DARK_GREEN}30`,
           padding: "2mm 3.5mm 1mm",
         }}>
           <HotelRow label="Makkah 1" info={aziziah} />
@@ -163,7 +163,7 @@ function RoomSticker({ roomNumber, pilgrims, group, companyName, companyPhone, c
       {/* Pilgrim Table */}
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "8pt" }}>
         <thead>
-          <tr style={{ background: "#f0f7f4" }}>
+          <tr style={{ background: "#f0fdf4" }}>
             <th style={{ padding: "1.5mm 2.5mm", textAlign: "left", color: DARK_GREEN, fontWeight: 800, borderBottom: `1.5px solid ${DARK_GREEN}`, fontSize: "6pt", textTransform: "uppercase", letterSpacing: "0.3px", width: "40%" }}>Name</th>
             <th style={{ padding: "1.5mm 2mm", textAlign: "left", color: DARK_GREEN, fontWeight: 800, borderBottom: `1.5px solid ${DARK_GREEN}`, fontSize: "6pt", textTransform: "uppercase", letterSpacing: "0.3px", width: "28%" }}>Passport No.</th>
             <th style={{ padding: "1.5mm 2mm", textAlign: "center", color: DARK_GREEN, fontWeight: 800, borderBottom: `1.5px solid ${DARK_GREEN}`, fontSize: "6pt", textTransform: "uppercase", letterSpacing: "0.3px", width: "12%" }}>Age/Sex</th>
@@ -193,7 +193,7 @@ function RoomSticker({ roomNumber, pilgrims, group, companyName, companyPhone, c
 
       {/* Footer */}
       <div style={{
-        background: "#f0f7f4", borderTop: `1px solid ${DARK_GREEN}20`,
+        background: "#f0fdf4", borderTop: `1px solid ${DARK_GREEN}20`,
         padding: "1.5mm 3mm", display: "flex", justifyContent: "space-between",
         alignItems: "center", fontSize: "6pt", color: "#555"
       }}>
@@ -258,7 +258,7 @@ export default function PrintRoomStickers() {
         display: "flex", flexWrap: "wrap", gap: "10px", alignItems: "center"
       }}>
         <div style={{ flex: 1, minWidth: "200px" }}>
-          <strong style={{ fontSize: "15px", color: "#0B3D2E" }}>🏷️ Room Sticker Generator</strong>
+          <strong style={{ fontSize: "15px", color: "#16a34a" }}>🏷️ Room Sticker Generator</strong>
           <div style={{ fontSize: "12px", color: "#666", marginTop: "2px" }}>
             {group.groupName} ({group.year}) &nbsp;|&nbsp;
             <span style={{ color: "#c00" }}>{roomMap.size} rooms</span> &nbsp;|&nbsp;
@@ -266,7 +266,7 @@ export default function PrintRoomStickers() {
             {withoutRoom > 0 && <span style={{ color: "#f59e0b" }}> · {withoutRoom} without room</span>}
           </div>
           {/* Hotel names preview */}
-          <div style={{ fontSize: "11px", color: "#0B3D2E", marginTop: "3px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
+          <div style={{ fontSize: "11px", color: "#16a34a", marginTop: "3px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
             {group.hotels?.aziziah?.name && <span>🕌 Makkah 1: <strong>{group.hotels.aziziah.name}</strong></span>}
             {group.hotels?.makkah?.name && <span>🕌 Makkah 2: <strong>{group.hotels.makkah.name}</strong></span>}
             {group.hotels?.madinah?.name && <span>🕌 Madinah: <strong>{group.hotels.madinah.name}</strong></span>}
@@ -295,7 +295,7 @@ export default function PrintRoomStickers() {
         </div>
 
         <button onClick={() => window.print()}
-          style={{ padding: "8px 18px", background: "#0B3D2E", color: "#fff", border: "none", borderRadius: "7px", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
+          style={{ padding: "8px 18px", background: "#16a34a", color: "#fff", border: "none", borderRadius: "7px", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
           🖨 Print
         </button>
         <button onClick={() => window.history.back()}
@@ -307,12 +307,12 @@ export default function PrintRoomStickers() {
       {/* Room pill quick-filter */}
       <div className="no-print" style={{ padding: "8px 20px", background: "#fff", borderBottom: "1px solid #e5e7eb", display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
         <button onClick={() => setSelectedRoom("ALL")}
-          style={{ padding: "3px 10px", borderRadius: "99px", fontSize: "11px", fontWeight: 700, cursor: "pointer", border: "1.5px solid", background: selectedRoom === "ALL" ? DARK_GREEN : "#f0f7f4", color: selectedRoom === "ALL" ? "#fff" : DARK_GREEN, borderColor: selectedRoom === "ALL" ? DARK_GREEN : "#c9e0d4" }}>
+          style={{ padding: "3px 10px", borderRadius: "99px", fontSize: "11px", fontWeight: 700, cursor: "pointer", border: "1.5px solid", background: selectedRoom === "ALL" ? DARK_GREEN : "#f0fdf4", color: selectedRoom === "ALL" ? "#fff" : DARK_GREEN, borderColor: selectedRoom === "ALL" ? DARK_GREEN : "#bbf7d0" }}>
           All ({roomMap.size})
         </button>
         {allRoomKeys.map(r => (
           <button key={r} onClick={() => setSelectedRoom(r === selectedRoom ? "ALL" : r)}
-            style={{ padding: "3px 10px", borderRadius: "99px", fontSize: "11px", fontWeight: 700, cursor: "pointer", border: "1.5px solid", background: selectedRoom === r ? DARK_GREEN : "#f0f7f4", color: selectedRoom === r ? "#fff" : DARK_GREEN, borderColor: selectedRoom === r ? DARK_GREEN : "#c9e0d4" }}>
+            style={{ padding: "3px 10px", borderRadius: "99px", fontSize: "11px", fontWeight: 700, cursor: "pointer", border: "1.5px solid", background: selectedRoom === r ? DARK_GREEN : "#f0fdf4", color: selectedRoom === r ? "#fff" : DARK_GREEN, borderColor: selectedRoom === r ? DARK_GREEN : "#bbf7d0" }}>
             {r} &bull; {roomMap.get(r)?.length}p
           </button>
         ))}

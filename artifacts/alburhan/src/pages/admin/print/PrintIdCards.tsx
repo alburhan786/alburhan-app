@@ -18,7 +18,7 @@ interface Group {
   hotels?: { makkah?: { name?: string; address?: string; nameAr?: string; addressAr?: string }; madinah?: { name?: string; address?: string; nameAr?: string; addressAr?: string }; aziziah?: { name?: string; address?: string; nameAr?: string; addressAr?: string } };
 }
 
-const DARK = "#052316";
+const DARK = "#16a34a";
 const GOLD = "#C9A84C";
 const GOLD_LIGHT = "#E8D48B";
 

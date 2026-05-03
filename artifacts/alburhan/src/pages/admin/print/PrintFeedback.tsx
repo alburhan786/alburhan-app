@@ -73,17 +73,17 @@ export default function PrintFeedback() {
         </select>
         <button
           onClick={() => setShowQR(false)}
-          style={{ padding: "10px 20px", background: showQR ? "#fff" : "#0A3D2A", color: showQR ? "#374151" : "#fff", border: "1px solid #ccc", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}
+          style={{ padding: "10px 20px", background: showQR ? "#fff" : "#16a34a", color: showQR ? "#374151" : "#fff", border: "1px solid #ccc", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}
         >
           📄 Feedback Form
         </button>
         <button
           onClick={() => setShowQR(true)}
-          style={{ padding: "10px 20px", background: showQR ? "#0A3D2A" : "#fff", color: showQR ? "#fff" : "#374151", border: "1px solid #ccc", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}
+          style={{ padding: "10px 20px", background: showQR ? "#16a34a" : "#fff", color: showQR ? "#fff" : "#374151", border: "1px solid #ccc", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}
         >
           📱 QR Code Sheet ({pilgrims.length})
         </button>
-        <button onClick={() => window.print()} style={{ padding: "10px 24px", background: "#0A3D2A", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>
+        <button onClick={() => window.print()} style={{ padding: "10px 24px", background: "#16a34a", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>
           🖨 Print
         </button>
         <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
@@ -115,9 +115,9 @@ export default function PrintFeedback() {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "10pt" }}>
                 <thead>
                   <tr>
-                    <th style={{ background: "#0A3D2A", color: "#fff", padding: "3mm 4mm", textAlign: "left", fontSize: "8pt", textTransform: "uppercase", letterSpacing: "0.5px", border: "1px solid #0A3D2A" }}>Service Category</th>
+                    <th style={{ background: "#16a34a", color: "#fff", padding: "3mm 4mm", textAlign: "left", fontSize: "8pt", textTransform: "uppercase", letterSpacing: "0.5px", border: "1px solid #16a34a" }}>Service Category</th>
                     {[1, 2, 3, 4, 5].map(n => (
-                      <th key={n} style={{ background: "#0A3D2A", color: "#fff", padding: "3mm 2mm", textAlign: "center", fontSize: "8pt", width: "14mm", border: "1px solid #0A3D2A" }}>
+                      <th key={n} style={{ background: "#16a34a", color: "#fff", padding: "3mm 2mm", textAlign: "center", fontSize: "8pt", width: "14mm", border: "1px solid #16a34a" }}>
                         <div>{n}</div>
                         <div style={{ fontSize: "5pt", opacity: 0.8, marginTop: "0.5mm" }}>
                           {n === 1 ? "Poor" : n === 2 ? "Fair" : n === 3 ? "Good" : n === 4 ? "V.Good" : "Excellent"}
@@ -128,7 +128,7 @@ export default function PrintFeedback() {
                 </thead>
                 <tbody>
                   {categories.map((cat, i) => (
-                    <tr key={cat} style={{ background: i % 2 === 0 ? "#fff" : "#f5faf7" }}>
+                    <tr key={cat} style={{ background: i % 2 === 0 ? "#fff" : "#f0fdf4" }}>
                       <td style={{ border: "1px solid #ddd", padding: "3mm 4mm", fontWeight: 600 }}>{cat}</td>
                       {[1, 2, 3, 4, 5].map(n => (
                         <td key={n} style={{ border: "1px solid #ddd", padding: "3mm 2mm", textAlign: "center" }}>
@@ -188,8 +188,8 @@ export default function PrintFeedback() {
       {showQR && (
         <div>
           <div style={{ padding: "4mm", fontFamily: "'Inter', Arial, sans-serif", maxWidth: "210mm", margin: "0 auto" }}>
-            <div style={{ textAlign: "center", marginBottom: "6mm", borderBottom: "2px solid #0A3D2A", paddingBottom: "4mm" }}>
-              <div style={{ fontSize: "14pt", fontWeight: 700, color: "#0A3D2A" }}>{company.name}</div>
+            <div style={{ textAlign: "center", marginBottom: "6mm", borderBottom: "2px solid #16a34a", paddingBottom: "4mm" }}>
+              <div style={{ fontSize: "14pt", fontWeight: 700, color: "#16a34a" }}>{company.name}</div>
               <div style={{ fontSize: "10pt", color: "#555", marginTop: "1mm" }}>Feedback QR Codes — {group.groupName} {group.year}</div>
               <div style={{ fontSize: "8pt", color: "#888", marginTop: "1mm" }}>Pilgrims: scan the QR code to share your feedback online</div>
             </div>
@@ -202,14 +202,14 @@ export default function PrintFeedback() {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "4mm" }}>
                 {pilgrims.map((p) => (
                   <div key={p.id} style={{
-                    border: "1.5px solid #0A3D2A",
+                    border: "1.5px solid #16a34a",
                     borderRadius: "4mm",
                     padding: "4mm",
                     textAlign: "center",
                     background: "#fff",
                     breakInside: "avoid",
                   }}>
-                    <div style={{ fontSize: "8pt", fontWeight: 700, color: "#0A3D2A", marginBottom: "2mm" }}>
+                    <div style={{ fontSize: "8pt", fontWeight: 700, color: "#16a34a", marginBottom: "2mm" }}>
                       #{p.serialNumber} — {p.fullName}
                     </div>
                     {p.passportNumber && (
@@ -222,14 +222,14 @@ export default function PrintFeedback() {
                         value={getPilgrimQrUrl(p)}
                         size={80}
                         bgColor="#ffffff"
-                        fgColor="#0A3D2A"
+                        fgColor="#16a34a"
                         level="M"
                       />
                     </div>
                     <div style={{ fontSize: "6.5pt", color: "#555", wordBreak: "break-all" }}>
                       {getPilgrimQrUrl(p)}
                     </div>
-                    <div style={{ fontSize: "7pt", color: "#0A3D2A", fontWeight: 600, marginTop: "1.5mm" }}>
+                    <div style={{ fontSize: "7pt", color: "#16a34a", fontWeight: 600, marginTop: "1.5mm" }}>
                       اسکین کریں اور تاثرات دیں
                     </div>
                     <div style={{ fontSize: "6.5pt", color: "#888", marginTop: "0.5mm" }}>

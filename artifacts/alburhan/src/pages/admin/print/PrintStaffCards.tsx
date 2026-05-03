@@ -16,7 +16,7 @@ interface StaffMember {
   validUpto?: string; photoUrl?: string; qrToken?: string; status: string;
 }
 
-const GREEN = "#0B3D2E";
+const GREEN = "#16a34a";
 const GOLD  = "#C9A23F";
 const W = "54mm";
 const H = "86mm";
@@ -126,7 +126,7 @@ function StaffCardFront({ s, groupName }: { s: StaffMember; groupName?: string }
 
       {/* ── MIDDLE: photo LEFT + Kaaba/HAJJ RIGHT ~30mm ── */}
       <div style={{
-        background: "#eef4ee", display: "flex", alignItems: "stretch",
+        background: "#f0fdf4", display: "flex", alignItems: "stretch",
         padding: "2mm 2mm 1.5mm", gap: "2mm", flexShrink: 0, height: "32mm",
       }}>
         {/* Photo */}
@@ -138,7 +138,7 @@ function StaffCardFront({ s, groupName }: { s: StaffMember; groupName?: string }
         ) : (
           <div style={{
             width: "22mm", height: "100%", flexShrink: 0,
-            background: "#d4e0d4", border: `2.5px solid ${GOLD}`, borderRadius: "4px",
+            background: "#dcfce7", border: `2.5px solid ${GOLD}`, borderRadius: "4px",
             display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "1.5mm",
           }}>
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#888" strokeWidth="1.5">
@@ -391,7 +391,7 @@ function StaffCardBack({ s, groupName }: { s: StaffMember; groupName?: string })
 
       {/* ── ADDRESS ROW (light green) ── */}
       <div style={{
-        background: "#f0f6f0", padding: "1mm 2.5mm", flexShrink: 0,
+        background: "#f0fdf4", padding: "1mm 2.5mm", flexShrink: 0,
         display: "flex", alignItems: "flex-start", gap: "2mm",
         borderTop: `0.5px solid ${GREEN}33`,
       }}>
@@ -552,7 +552,7 @@ export default function PrintStaffCards() {
           <div style={{ fontSize: "13px", color: "#aaa", marginTop: "4px" }}>Add staff first from the Staff ID Cards admin page.</div>
         </div>
       ) : (
-        <div className="cards-area" style={{ background: "#f0f4f0", padding: "8mm" }}>
+        <div className="cards-area" style={{ background: "#f0fdf4", padding: "8mm" }}>
           {pages.map((page, pi) => (
             <div key={pi} className="page-block" style={{ marginBottom: "6mm" }}>
               {/* Front faces */}

@@ -56,7 +56,7 @@ export default function PrintBusList() {
         <select value={companyId} onChange={e => setCompanyId(e.target.value)} style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "13px", background: "#fff" }}>
           {COMPANIES.map(c => <option key={c.id} value={c.id}>{c.id === "alburhan" ? "Al Burhan Tours & Travels" : c.name}</option>)}
         </select>
-        <button onClick={handleDownload} disabled={pdfLoading} style={{ padding: "10px 24px", background: "#0A3D2A", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", opacity: pdfLoading ? 0.6 : 1 }}>{pdfLoading ? "Generating PDF..." : "⬇ Download PDF"}</button>
+        <button onClick={handleDownload} disabled={pdfLoading} style={{ padding: "10px 24px", background: "#16a34a", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", opacity: pdfLoading ? 0.6 : 1 }}>{pdfLoading ? "Generating PDF..." : "⬇ Download PDF"}</button>
         <button onClick={() => window.print()} style={{ padding: "10px 24px", background: "#1a2744", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>🖨 Print</button>
         <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
       </div>
@@ -68,14 +68,14 @@ export default function PrintBusList() {
         <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "'Inter', Arial, sans-serif", fontSize: "8.5pt" }}>
           <thead>
             <tr>
-              <th style={{ background: "#0A3D2A", color: "#fff", padding: "2.5mm 2mm", textAlign: "center", fontSize: "7.5pt", textTransform: "uppercase", letterSpacing: "0.5px", border: "1px solid #0A3D2A" }}>Sr.</th>
-              <th style={{ background: "#0A3D2A", color: "#fff", padding: "2.5mm 2mm", textAlign: "center", fontSize: "7.5pt", textTransform: "uppercase", letterSpacing: "0.5px", border: "1px solid #0A3D2A" }}>Photo</th>
-              <th style={{ background: "#0A3D2A", color: "#fff", padding: "2.5mm 3mm", textAlign: "left", fontSize: "7.5pt", textTransform: "uppercase", letterSpacing: "0.5px", border: "1px solid #0A3D2A" }}>Name</th>
-              <th style={{ background: "#0A3D2A", color: "#fff", padding: "2.5mm 3mm", textAlign: "left", fontSize: "7.5pt", textTransform: "uppercase", letterSpacing: "0.5px", border: "1px solid #0A3D2A" }}>Passport</th>
-              <th style={{ background: "#0A3D2A", color: "#fff", padding: "2.5mm 2mm", textAlign: "center", fontSize: "7.5pt", textTransform: "uppercase", letterSpacing: "0.5px", border: "1px solid #0A3D2A" }}>Bus</th>
-              <th style={{ background: "#0A3D2A", color: "#fff", padding: "2.5mm 3mm", textAlign: "left", fontSize: "7.5pt", textTransform: "uppercase", letterSpacing: "0.5px", border: "1px solid #0A3D2A" }}>Mobile (India)</th>
-              <th style={{ background: "#0A3D2A", color: "#fff", padding: "2.5mm 3mm", textAlign: "left", fontSize: "7.5pt", textTransform: "uppercase", letterSpacing: "0.5px", border: "1px solid #0A3D2A" }}>City</th>
-              <th style={{ background: "#0A3D2A", color: "#fff", padding: "2.5mm 3mm", textAlign: "left", fontSize: "7.5pt", textTransform: "uppercase", letterSpacing: "0.5px", border: "1px solid #0A3D2A" }}>Relation</th>
+              <th style={{ background: "#16a34a", color: "#fff", padding: "2.5mm 2mm", textAlign: "center", fontSize: "7.5pt", textTransform: "uppercase", letterSpacing: "0.5px", border: "1px solid #16a34a" }}>Sr.</th>
+              <th style={{ background: "#16a34a", color: "#fff", padding: "2.5mm 2mm", textAlign: "center", fontSize: "7.5pt", textTransform: "uppercase", letterSpacing: "0.5px", border: "1px solid #16a34a" }}>Photo</th>
+              <th style={{ background: "#16a34a", color: "#fff", padding: "2.5mm 3mm", textAlign: "left", fontSize: "7.5pt", textTransform: "uppercase", letterSpacing: "0.5px", border: "1px solid #16a34a" }}>Name</th>
+              <th style={{ background: "#16a34a", color: "#fff", padding: "2.5mm 3mm", textAlign: "left", fontSize: "7.5pt", textTransform: "uppercase", letterSpacing: "0.5px", border: "1px solid #16a34a" }}>Passport</th>
+              <th style={{ background: "#16a34a", color: "#fff", padding: "2.5mm 2mm", textAlign: "center", fontSize: "7.5pt", textTransform: "uppercase", letterSpacing: "0.5px", border: "1px solid #16a34a" }}>Bus</th>
+              <th style={{ background: "#16a34a", color: "#fff", padding: "2.5mm 3mm", textAlign: "left", fontSize: "7.5pt", textTransform: "uppercase", letterSpacing: "0.5px", border: "1px solid #16a34a" }}>Mobile (India)</th>
+              <th style={{ background: "#16a34a", color: "#fff", padding: "2.5mm 3mm", textAlign: "left", fontSize: "7.5pt", textTransform: "uppercase", letterSpacing: "0.5px", border: "1px solid #16a34a" }}>City</th>
+              <th style={{ background: "#16a34a", color: "#fff", padding: "2.5mm 3mm", textAlign: "left", fontSize: "7.5pt", textTransform: "uppercase", letterSpacing: "0.5px", border: "1px solid #16a34a" }}>Relation</th>
             </tr>
           </thead>
           <tbody>
@@ -91,7 +91,7 @@ export default function PrintBusList() {
                 </td>
                 <td style={{ border: "1px solid #ddd", padding: "1.5mm 3mm", fontWeight: 600 }}>{p.fullName}</td>
                 <td style={{ border: "1px solid #ddd", padding: "1.5mm 3mm", fontFamily: "monospace", fontSize: "7.5pt" }}>{p.passportNumber || "—"}</td>
-                <td style={{ border: "1px solid #ddd", padding: "1.5mm 2mm", textAlign: "center", fontWeight: 700, color: "#0A3D2A" }}>{p.busNumber || "—"}</td>
+                <td style={{ border: "1px solid #ddd", padding: "1.5mm 2mm", textAlign: "center", fontWeight: 700, color: "#16a34a" }}>{p.busNumber || "—"}</td>
                 <td style={{ border: "1px solid #ddd", padding: "1.5mm 3mm" }}>{p.mobileIndia || "—"}</td>
                 <td style={{ border: "1px solid #ddd", padding: "1.5mm 3mm" }}>{p.city || "—"}</td>
                 <td style={{ border: "1px solid #ddd", padding: "1.5mm 3mm" }}>{p.relation || "—"}</td>
