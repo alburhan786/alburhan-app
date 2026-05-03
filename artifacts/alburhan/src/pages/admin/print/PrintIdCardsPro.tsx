@@ -29,19 +29,8 @@ const GOLD = "#C9A23F";
 const W = "95mm";
 const H = "60mm";
 
-function buildQrData(p: Pilgrim, group: Group, phone: string, phoneSaudi: string): string {
-  const parts = [
-    "BEGIN:VCARD",
-    "VERSION:3.0",
-    `FN:${p.fullName}`,
-    ...(p.mobileIndia  ? [`TEL;TYPE=CELL:${p.mobileIndia}`]  : []),
-    ...(p.mobileSaudi  ? [`TEL;TYPE=CELL:${p.mobileSaudi}`]  : []),
-    `TEL;TYPE=WORK:${phone}`,
-    `TEL;TYPE=WORK:${phoneSaudi}`,
-    `NOTE:PP:${p.passportNumber || "N/A"} | Svc:${group.maktabNumber || "N/A"} | ${group.groupName} ${group.year}`,
-    "END:VCARD",
-  ];
-  return parts.join("\n");
+function buildVerifyUrl(id: string): string {
+  return `${window.location.origin}${import.meta.env.BASE_URL}verify/${id}`;
 }
 
 function BulletRow({ label, value, badge }: { label: string; value?: string; badge?: boolean }) {
@@ -231,7 +220,7 @@ export default function PrintIdCardsPro() {
                           borderLeft: `1px solid ${GOLD}50`,
                         }}>
                           <div style={{ background: "#fff", padding: "2px", borderRadius: "3px", border: `2px solid ${DARK}` }}>
-                            <QRCodeSVG value={buildQrData(p, group, company.phone, company.phoneSaudi)} size={68} level="L" fgColor={DARK} />
+                            <QRCodeSVG value={buildVerifyUrl(p.id)} size={68} level="M" fgColor={DARK} />
                           </div>
                         </div>
 

@@ -43,18 +43,8 @@ function buildHotelMapUrl(name?: string, address?: string): string {
   return `https://maps.google.com/?q=${encodeURIComponent(q)}`;
 }
 
-function buildQrData(p: Pilgrim, group: Group, phone: string): string {
-  const parts = [
-    "BEGIN:VCARD",
-    "VERSION:3.0",
-    `FN:${p.fullName}`,
-    ...(p.mobileIndia  ? [`TEL;TYPE=CELL:${p.mobileIndia}`]  : []),
-    ...(p.mobileSaudi  ? [`TEL;TYPE=CELL:${p.mobileSaudi}`]  : []),
-    `TEL;TYPE=WORK:${phone}`,
-    `NOTE:PP:${p.passportNumber || "N/A"} | Svc:${group.maktabNumber || "N/A"} | ${group.groupName} ${group.year}`,
-    "END:VCARD",
-  ];
-  return parts.join("\n");
+function buildVerifyUrl(id: string): string {
+  return `${window.location.origin}${import.meta.env.BASE_URL}verify/${id}`;
 }
 
 export default function PrintLuggage() {
@@ -213,7 +203,7 @@ export default function PrintLuggage() {
               </div>
 
               <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "5mm", marginTop: "auto", paddingBottom: "1mm" }}>
-                <QRCodeSVG value={buildQrData(p, group, company.phone)} size={68} level="L" />
+                <QRCodeSVG value={buildVerifyUrl(p.id)} size={68} level="M" />
                 <Barcode value={p.passportNumber || `H${String(p.serialNumber).padStart(3, "0")}`} height={40} width={2} fontSize={0} />
               </div>
             </div>

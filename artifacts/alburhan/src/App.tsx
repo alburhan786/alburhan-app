@@ -55,6 +55,7 @@ import FeedbackManager from "@/pages/admin/FeedbackManager";
 import StaffManager from "@/pages/admin/StaffManager";
 import PrintStaffCards from "@/pages/admin/print/PrintStaffCards";
 import StaffVerify from "@/pages/public/StaffVerify";
+import VerifyPilgrim from "@/pages/public/VerifyPilgrim";
 import NotFound from "@/pages/not-found";
 import { useAuth } from "@/hooks/use-auth";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -102,6 +103,7 @@ function Router() {
       <Route path="/pay/:bookingNumber" component={PaymentPage} />
       <Route path="/feedback" component={FeedbackPage} />
       <Route path="/verify-staff" component={StaffVerify} />
+      <Route path="/verify/:id" component={VerifyPilgrim} />
 
       {/* Customer Routes */}
       <Route path="/customer/dashboard" component={() => <CustomerRoute component={CustomerDashboard} />} />

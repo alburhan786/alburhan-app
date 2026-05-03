@@ -46,18 +46,8 @@ function buildHotelMapUrl(name?: string, address?: string): string {
   return `https://maps.google.com/?q=${encodeURIComponent(q)}`;
 }
 
-function buildQrData(p: Pilgrim, group: Group, phone: string): string {
-  const parts = [
-    "BEGIN:VCARD",
-    "VERSION:3.0",
-    `FN:${p.fullName}`,
-    ...(p.mobileIndia  ? [`TEL;TYPE=CELL:${p.mobileIndia}`]  : []),
-    ...(p.mobileSaudi  ? [`TEL;TYPE=CELL:${p.mobileSaudi}`]  : []),
-    `TEL;TYPE=WORK:${phone}`,
-    `NOTE:PP:${p.passportNumber || "N/A"} | Svc:${group.maktabNumber || "N/A"} | ${group.groupName} ${group.year}`,
-    "END:VCARD",
-  ];
-  return parts.join("\n");
+function buildVerifyUrl(id: string): string {
+  return `${window.location.origin}${import.meta.env.BASE_URL}verify/${id}`;
 }
 
 export default function PrintLuggageLarge() {
@@ -261,7 +251,7 @@ export default function PrintLuggageLarge() {
             {/* QR + Barcode + Lost/Found */}
             <div style={{ display: "flex", alignItems: "center", gap: "4mm", marginTop: "auto", paddingTop: "2mm", borderTop: `1px dashed ${DARK}40` }}>
               <div style={{ background: "#fff", padding: "3px", borderRadius: "4px", border: `2px solid ${DARK}` }}>
-                <QRCodeSVG value={buildQrData(p, group, company.phone)} size={110} level="L" fgColor={DARK} />
+                <QRCodeSVG value={buildVerifyUrl(p.id)} size={110} level="M" fgColor={DARK} />
               </div>
               <div style={{ flex: 1, overflow: "hidden" }}>
                 <Barcode value={barcodeVal} height={55} width={2.2} displayValue fontSize={9} />

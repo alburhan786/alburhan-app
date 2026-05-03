@@ -30,19 +30,8 @@ interface Group {
   returnDate?: string;
 }
 
-function buildQr(p: Pilgrim, group: Group, phoneSaudi: string): string {
-  const addr = [p.address, p.city].filter(Boolean).join(", ");
-  const parts = [
-    "BEGIN:VCARD",
-    "VERSION:3.0",
-    `FN:${[p.salutation, p.fullName].filter(Boolean).join(" ")}`,
-    ...(p.mobileIndia ? [`TEL;TYPE=CELL:${p.mobileIndia}`] : []),
-    `TEL;TYPE=WORK:${phoneSaudi}`,
-    ...(addr ? [`ADR:;;${addr};;;;`] : []),
-    `NOTE:PP:${p.passportNumber || "N/A"} | Group:${group.groupName} ${group.year}${group.flightNumber ? " | Flight:" + group.flightNumber : ""}${group.returnDate ? " | Return:" + group.returnDate : ""}`,
-    "END:VCARD",
-  ];
-  return parts.join("\n");
+function buildVerifyUrl(id: string): string {
+  return `${window.location.origin}${import.meta.env.BASE_URL}verify/${id}`;
 }
 
 export default function PrintZamzam() {
@@ -284,7 +273,7 @@ export default function PrintZamzam() {
                           {barcodeVal}
                         </div>
                       </div>
-                      <QRCodeSVG value={buildQr(p, group, company.phoneSaudi)} size={130} level="L" fgColor={DARK_GREEN} />
+                      <QRCodeSVG value={buildVerifyUrl(p.id)} size={130} level="M" fgColor={DARK_GREEN} />
                     </div>
                   </div>
 

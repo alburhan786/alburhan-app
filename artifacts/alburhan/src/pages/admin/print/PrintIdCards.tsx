@@ -22,18 +22,8 @@ const DARK = "#0d5040";
 const GOLD = "#C9A84C";
 const GOLD_LIGHT = "#E8D48B";
 
-function buildQrData(p: Pilgrim, group: Group, phone: string, phoneSaudi: string): string {
-  const parts = [
-    "BEGIN:VCARD",
-    "VERSION:3.0",
-    `FN:${p.fullName}`,
-    ...(p.mobileIndia  ? [`TEL;TYPE=CELL:${p.mobileIndia}`]  : []),
-    `TEL;TYPE=WORK:${phone}`,
-    `TEL;TYPE=WORK:${phoneSaudi}`,
-    `NOTE:PP:${p.passportNumber || "N/A"} | Svc:${group.maktabNumber || "N/A"} | ${group.groupName} ${group.year}`,
-    "END:VCARD",
-  ];
-  return parts.join("\n");
+function buildVerifyUrl(id: string): string {
+  return `${window.location.origin}${import.meta.env.BASE_URL}verify/${id}`;
 }
 
 function WaveShapes() {
@@ -207,7 +197,7 @@ export default function PrintIdCards() {
                 {/* QR code — above footer bar, right-aligned */}
                 <div style={{ position: "absolute", bottom: "14mm", right: "2mm", zIndex: 3, display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5mm" }}>
                   <div style={{ background: "#fff", padding: "2px", borderRadius: "3px", border: `2px solid ${DARK}` }}>
-                    <QRCodeSVG value={buildQrData(p, group, company.phone, company.phoneSaudi)} size={60} level="L" fgColor={DARK} />
+                    <QRCodeSVG value={buildVerifyUrl(p.id)} size={60} level="M" fgColor={DARK} />
                   </div>
                   <div style={{ fontSize: "3pt", color: DARK, fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.4px", background: "#fff", padding: "0.3mm 1mm", borderRadius: "2px" }}>SCAN</div>
                 </div>
@@ -276,7 +266,7 @@ export default function PrintIdCards() {
                     <div style={{ display: "flex", justifyContent: "center", gap: "3mm", marginTop: "2mm", marginBottom: "1mm" }}>
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5mm" }}>
                         <div style={{ background: "#fff", padding: "2px", borderRadius: "3px", border: `1px solid ${GOLD}` }}>
-                          <QRCodeSVG value={buildQrData(p, group, company.phone, company.phoneSaudi)} size={36} level="M" />
+                          <QRCodeSVG value={buildVerifyUrl(p.id)} size={36} level="M" />
                         </div>
                         <div style={{ fontSize: "3pt", color: "#888", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.3px" }}>Emergency Info</div>
                       </div>
@@ -296,7 +286,7 @@ export default function PrintIdCards() {
                     <div style={{ display: "flex", justifyContent: "center", marginTop: "2mm", marginBottom: "1mm" }}>
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1mm" }}>
                         <div style={{ background: "#fff", padding: "2px", borderRadius: "3px", border: `2px solid ${DARK}` }}>
-                          <QRCodeSVG value={buildQrData(p, group, company.phone, company.phoneSaudi)} size={56} level="L" fgColor={DARK} />
+                          <QRCodeSVG value={buildVerifyUrl(p.id)} size={56} level="M" fgColor={DARK} />
                         </div>
                       </div>
                     </div>

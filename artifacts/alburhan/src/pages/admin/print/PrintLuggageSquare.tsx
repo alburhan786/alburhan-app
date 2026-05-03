@@ -41,18 +41,8 @@ function buildHotelMapUrl(name?: string, address?: string): string {
   return `https://maps.google.com/?q=${encodeURIComponent(q)}`;
 }
 
-function buildQrData(p: Pilgrim, group: Group, phone: string): string {
-  const parts = [
-    "BEGIN:VCARD",
-    "VERSION:3.0",
-    `FN:${p.fullName}`,
-    ...(p.mobileIndia  ? [`TEL;TYPE=CELL:${p.mobileIndia}`]  : []),
-    ...(p.mobileSaudi  ? [`TEL;TYPE=CELL:${p.mobileSaudi}`]  : []),
-    `TEL;TYPE=WORK:${phone}`,
-    `NOTE:PP:${p.passportNumber || "N/A"} | Svc:${group.maktabNumber || "N/A"} | ${group.groupName} ${group.year}`,
-    "END:VCARD",
-  ];
-  return parts.join("\n");
+function buildVerifyUrl(id: string): string {
+  return `${window.location.origin}${import.meta.env.BASE_URL}verify/${id}`;
 }
 
 /* ── SVG SNOWFLAKE / GEOMETRIC PATTERN (like the Almasiah reference) ── */
@@ -508,7 +498,7 @@ export default function PrintLuggageSquare() {
                             {/* QR — big + styled */}
                             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.8mm" }}>
                               <div style={{ background: "#fff", padding: "2.5px", borderRadius: "4px", border: `2.5px solid ${DARK}`, boxShadow: "0 1px 4px rgba(0,0,0,0.12)" }}>
-                                <QRCodeSVG value={buildQrData(p, group, company.phone)} size={80} level="L" fgColor={DARK} />
+                                <QRCodeSVG value={buildVerifyUrl(p.id)} size={80} level="M" fgColor={DARK} />
                               </div>
                               <div style={{ background: DARK, color: "#fff", fontSize: "4pt", fontWeight: 900, letterSpacing: "1px", padding: "0.4mm 2.5mm", borderRadius: "8px", textTransform: "uppercase" }}>📱 Scan</div>
                             </div>

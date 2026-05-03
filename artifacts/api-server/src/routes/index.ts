@@ -20,6 +20,7 @@ import requestsRouter from "./requests.js";
 import adminPaymentsRouter from "./admin-payments.js";
 import feedbackRouter from "./feedback.js";
 import staffRouter from "./staff.js";
+import verifyRouter from "./verify.js";
 
 const router: IRouter = Router();
 
@@ -58,6 +59,7 @@ router.use("/requests", requestsRouter);
 router.use("/admin/bookings", adminPaymentsRouter);
 router.use("/feedback", feedbackRouter);
 router.use("/staff", staffRouter);
+router.use("/verify", verifyRouter);
 router.use(storageRouter);
 
 export default router;
