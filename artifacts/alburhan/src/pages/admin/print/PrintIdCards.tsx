@@ -309,9 +309,13 @@ export default function PrintIdCards() {
                     <div><b style={{ color: DARK }}>{p.fullName}</b></div>
                     <div>Year: <b style={{ color: DARK }}>{group.year}</b></div>
                   </div>
-                  <div style={{ background: DARK, color: "#fff", padding: "1.2mm 2mm", fontSize: "3.8pt", textAlign: "center", lineHeight: 1.5 }}>
-                    <div>{company.address}</div>
-                    <div style={{ color: GOLD, fontWeight: 800, fontSize: "4pt", letterSpacing: "0.2px" }}>
+                  <div style={{
+                    background: DARK, color: "#fff", padding: "1.5mm 2mm",
+                    fontSize: "5pt", fontWeight: 900, textAlign: "center", lineHeight: 1.5,
+                    WebkitPrintColorAdjust: "exact", printColorAdjust: "exact",
+                  } as React.CSSProperties}>
+                    <div style={{ color: "#fff", fontWeight: 900 }}>{company.address}</div>
+                    <div style={{ color: GOLD, fontWeight: 900, fontSize: "5pt", letterSpacing: "0.2px" }}>
                       🇮🇳 {company.phone} &nbsp;|&nbsp; 🇸🇦 {company.phoneSaudi}
                     </div>
                   </div>
