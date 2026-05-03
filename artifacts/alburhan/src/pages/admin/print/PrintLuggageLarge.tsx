@@ -203,13 +203,13 @@ export default function PrintLuggageLarge() {
                 </div>
               </div>
               {/* Al Burhan logo + Indian flag */}
-              <div style={{ flexShrink: 0, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "1mm" }}>
+              <div style={{ flexShrink: 0, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "1.5mm" }}>
                 {company.logoUrl
-                  ? <img src={company.logoUrl} alt="" style={{ height: "18mm", objectFit: "contain" }} />
-                  : <div style={{ width: "18mm", height: "18mm", background: DARK, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "9pt" }}>{company.nameShort.slice(0, 1)}</div>
+                  ? <img src={company.logoUrl} alt="" style={{ height: "28mm", objectFit: "contain" }} />
+                  : <div style={{ width: "28mm", height: "28mm", background: DARK, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "12pt" }}>{company.nameShort.slice(0, 1)}</div>
                 }
-                <div style={{ fontSize: "5pt", fontWeight: 800, color: DARK, textTransform: "uppercase" }}>{company.nameShort}</div>
-                <div style={{ fontSize: "26pt", lineHeight: 1 }}>🇮🇳</div>
+                <div style={{ fontSize: "6pt", fontWeight: 900, color: DARK, textTransform: "uppercase", letterSpacing: "0.5px" }}>{company.nameShort}</div>
+                <div style={{ fontSize: "40pt", lineHeight: 1 }}>🇮🇳</div>
               </div>
             </div>
 
@@ -253,20 +253,20 @@ export default function PrintLuggageLarge() {
                 <QRCodeSVG value={buildQrData(p, group, company.phone)} size={110} level="L" fgColor={DARK} />
               </div>
               <div style={{ flex: 1, overflow: "hidden" }}>
-                <Barcode value={barcodeVal} height={36} displayValue fontSize={7} />
+                <Barcode value={barcodeVal} height={55} width={2.2} displayValue fontSize={9} />
               </div>
 
               {/* IN CASE OF LOST/FOUND — red box with Al Burhan + phones */}
               <div style={{
-                background: RED, borderRadius: "6px", padding: "2.5mm 5mm", textAlign: "center",
+                background: RED, borderRadius: "6px", padding: "3mm 5mm", textAlign: "center",
                 WebkitPrintColorAdjust: "exact", printColorAdjust: "exact",
-                minWidth: "44mm",
+                minWidth: "52mm", flexShrink: 0,
               } as React.CSSProperties}>
-                <div style={{ color: "#fff", fontWeight: 900, fontSize: "7.5pt", textTransform: "uppercase", lineHeight: 1.3, letterSpacing: "0.5px" }}>IN CASE OF LOST / FOUND</div>
-                <div style={{ color: "#FFD700", fontWeight: 900, fontSize: "8pt", textTransform: "uppercase", lineHeight: 1.3, letterSpacing: "0.5px" }}>KINDLY CONTACT</div>
-                <div style={{ color: "#fff", fontWeight: 900, fontSize: "8pt", textTransform: "uppercase", lineHeight: 1.3, letterSpacing: "0.5px", marginTop: "0.5mm" }}>AL BURHAN</div>
-                <div style={{ color: "#FFD700", fontWeight: 900, fontSize: "14pt", lineHeight: 1.4, fontFamily: "monospace", letterSpacing: "0.5px" }}>{SVC_PHONE_1}</div>
-                <div style={{ color: "#FFD700", fontWeight: 900, fontSize: "14pt", lineHeight: 1.4, fontFamily: "monospace", letterSpacing: "0.5px" }}>{SVC_PHONE_2}</div>
+                <div style={{ color: "#fff", fontWeight: 900, fontSize: "9pt", textTransform: "uppercase", lineHeight: 1.3, letterSpacing: "0.5px" }}>IN CASE OF LOST / FOUND</div>
+                <div style={{ color: "#FFD700", fontWeight: 900, fontSize: "9pt", textTransform: "uppercase", lineHeight: 1.3, letterSpacing: "0.5px" }}>KINDLY CONTACT</div>
+                <div style={{ color: "#fff", fontWeight: 900, fontSize: "12pt", textTransform: "uppercase", lineHeight: 1.3, letterSpacing: "1px", marginTop: "1mm" }}>AL BURHAN</div>
+                <div style={{ color: "#FFD700", fontWeight: 900, fontSize: "16pt", lineHeight: 1.4, fontFamily: "monospace", letterSpacing: "0.5px" }}>{SVC_PHONE_1}</div>
+                <div style={{ color: "#FFD700", fontWeight: 900, fontSize: "16pt", lineHeight: 1.4, fontFamily: "monospace", letterSpacing: "0.5px" }}>{SVC_PHONE_2}</div>
               </div>
             </div>
           </div>
