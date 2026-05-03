@@ -1,5 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { downloadPdf } from "@/lib/pdf-download";
+import { useState, useEffect } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
 
@@ -430,9 +429,6 @@ export default function PrintStaffCards() {
   const [companyFilter, setCompanyFilter]  = useState("all");
   const [roleFilter,    setRoleFilter]     = useState("all");
   const [statusFilter,  setStatusFilter]   = useState("active");
-  const [pdfLoading,    setPdfLoading]     = useState(false);
-  const [pdfMode,       setPdfMode]        = useState(false);
-  const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     Promise.all([
@@ -456,16 +452,7 @@ export default function PrintStaffCards() {
   });
 
   const pages: StaffMember[][] = [];
-  for (let i = 0; i < filtered.length; i += 2) pages.push(filtered.slice(i, i + 2));
-
-  const handleDownload = useCallback(async () => {
-    if (!contentRef.current || pdfLoading) return;
-    setPdfLoading(true);
-    setPdfMode(true);
-    await new Promise(r => setTimeout(r, 120));
-    try { await downloadPdf(contentRef.current, { filename: "Staff-ID-Cards.pdf" }); }
-    finally { setPdfLoading(false); setPdfMode(false); }
-  }, [pdfLoading]);
+  for (let i = 0; i < filtered.length; i += 3) pages.push(filtered.slice(i, i + 3));
 
   if (loading) return (
     <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial", color: GREEN }}>
@@ -496,16 +483,18 @@ export default function PrintStaffCards() {
         }
         .cards-row {
           display: flex;
-          gap: 6mm;
+          flex-wrap: wrap;
+          gap: 4mm;
           justify-content: center;
           margin-bottom: 4mm;
         }
-        .page-break { page-break-after: always; }
+        .page-block { page-break-after: always; }
+        .page-block:last-child { page-break-after: auto; }
         @media screen {
           .staff-card { box-shadow: 0 6px 24px rgba(0,0,0,0.22); }
-          .cards-area:not(.pdf-mode) .staff-card { zoom: 2.2; }
-          .cards-area:not(.pdf-mode) .cards-row  { gap: 16mm; margin-bottom: 10mm; }
-          .cards-area:not(.pdf-mode) { padding: 12mm; }
+          .cards-area .staff-card { zoom: 1.8; }
+          .cards-area .cards-row  { gap: 14mm; margin-bottom: 8mm; }
+          .cards-area { padding: 10mm; }
         }
       `}</style>
 
@@ -540,16 +529,10 @@ export default function PrintStaffCards() {
         <span style={{ fontSize: "12px", color: "#666", marginLeft: "4px" }}>{filtered.length} card(s)</span>
 
         <div style={{ marginLeft: "auto", display: "flex", gap: "8px" }}>
-          <button onClick={handleDownload} disabled={pdfLoading || filtered.length === 0} style={{
+          <button onClick={() => window.print()} disabled={filtered.length === 0} style={{
             padding: "8px 20px", background: GREEN, color: "#fff",
             border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer",
-            opacity: pdfLoading || filtered.length === 0 ? 0.5 : 1,
-          }}>
-            {pdfLoading ? "Generating…" : "⬇ Download PDF"}
-          </button>
-          <button onClick={() => window.print()} style={{
-            padding: "8px 20px", background: "#fff", border: `1px solid ${GREEN}`,
-            color: GREEN, borderRadius: "8px", cursor: "pointer", fontWeight: 600,
+            opacity: filtered.length === 0 ? 0.5 : 1,
           }}>
             🖨 Print
           </button>
@@ -569,9 +552,9 @@ export default function PrintStaffCards() {
           <div style={{ fontSize: "13px", color: "#aaa", marginTop: "4px" }}>Add staff first from the Staff ID Cards admin page.</div>
         </div>
       ) : (
-        <div ref={contentRef} className={`cards-area${pdfMode ? " pdf-mode" : ""}`} style={{ background: "#f0f4f0", padding: "8mm" }}>
+        <div className="cards-area" style={{ background: "#f0f4f0", padding: "8mm" }}>
           {pages.map((page, pi) => (
-            <div key={pi} className={pi < pages.length - 1 ? "page-break" : ""} style={{ marginBottom: "6mm" }}>
+            <div key={pi} className="page-block" style={{ marginBottom: "6mm" }}>
               {/* Front faces */}
               <div className="cards-row">
                 {page.map(s => (
