@@ -146,127 +146,106 @@ export default function PrintIdCardsPro() {
                     {/* ── Header bar ── */}
                     <div style={{
                       background: DARK, display: "flex", alignItems: "center",
-                      justifyContent: "space-between", padding: "1.5mm 3mm",
-                      flexShrink: 0, minHeight: "9mm",
+                      justifyContent: "space-between", padding: "1mm 3mm",
+                      flexShrink: 0, minHeight: "8mm",
                     }}>
                       <div>
                         <div style={{ fontSize: "7pt", fontWeight: 900, color: "#fff", letterSpacing: "0.5px", textTransform: "uppercase", lineHeight: 1.2 }}>
                           {company.name}
                         </div>
-                        <div style={{ fontSize: "6pt", fontWeight: 900, color: GOLD, letterSpacing: "0.3px", lineHeight: 1.2 }}>
-                          📞 9893989786 &nbsp;|&nbsp; 9893225590
+                        <div style={{ fontSize: "5.5pt", fontWeight: 900, color: GOLD, letterSpacing: "0.3px", lineHeight: 1.2 }}>
+                          📞 {company.phone} &nbsp;|&nbsp; {company.phoneSaudi}
                         </div>
                       </div>
                       <span style={{ fontSize: "4pt", fontWeight: 900, color: GOLD, letterSpacing: "0.5px", textTransform: "uppercase", background: "rgba(255,255,255,0.1)", padding: "0.5mm 1.5mm", borderRadius: "2px", flexShrink: 0 }}>
                         Hajj Pilgrim
                       </span>
                     </div>
-                    {/* ── Pilgrim name at top ── */}
-                    <div style={{
-                      background: "#f0f7f2", borderBottom: `1.5px solid ${GOLD}`,
-                      padding: "0.8mm 3mm", flexShrink: 0, textAlign: "center",
-                    }}>
-                      <div style={{ fontSize: "8pt", fontWeight: 900, color: DARK, textTransform: "uppercase", lineHeight: 1.2, letterSpacing: "0.3px" }}>
-                        {p.fullName}
-                      </div>
-                    </div>
 
                     {/* ── Body row ── */}
                     <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
 
-                      {/* Left sidebar — photo prominent */}
+                      {/* Left sidebar — photo only */}
                       <div style={{
-                        width: "28mm", flexShrink: 0, background: "#f0f7f2",
+                        width: "25mm", flexShrink: 0, background: "#f0f7f2",
                         display: "flex", flexDirection: "column", alignItems: "center",
-                        padding: "1.5mm 1.5mm 1mm", gap: "1mm",
+                        justifyContent: "center",
+                        padding: "1mm 1mm", gap: "0.8mm",
                         borderRight: `1.5px solid ${GOLD}`,
                       }}>
-                        {/* Logo */}
-                        {company.logoUrl
-                          ? <img src={company.logoUrl} alt="" style={{ width: "8mm", height: "8mm", objectFit: "contain" }} />
-                          : <div style={{ width: "8mm", height: "8mm", background: DARK, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "5pt" }}>{company.nameShort.slice(0, 1)}</div>
-                        }
-                        {/* Photo — passport portrait, face centred */}
+                        {/* Photo — passport portrait, face centred, small & fit */}
                         {p.photoUrl ? (
                           <img
                             src={`${API}${p.photoUrl}`}
                             alt=""
                             crossOrigin="anonymous"
                             style={{
-                              width: "24mm", height: "28mm",
+                              width: "20mm", height: "24mm",
                               objectFit: "cover", objectPosition: "top center",
                               border: `2px solid ${GOLD}`, borderRadius: "2px", display: "block",
+                              flexShrink: 0,
                             }}
                           />
                         ) : (
                           <div style={{
-                            width: "24mm", height: "28mm", background: "#e0e8e4",
-                            border: `2px solid ${GOLD}`, borderRadius: "2px",
+                            width: "20mm", height: "24mm", background: "#e0e8e4",
+                            border: `2px solid ${GOLD}`, borderRadius: "2px", flexShrink: 0,
                             display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
                             fontSize: "4pt", color: "#888", fontWeight: 700, gap: "1mm",
                           }}>
-                            <div style={{ fontSize: "15pt", color: GOLD }}>👤</div>
+                            <div style={{ fontSize: "13pt", color: GOLD }}>👤</div>
                             <div>PHOTO</div>
                           </div>
                         )}
                         {/* Serial under photo */}
-                        <div style={{ fontSize: "6pt", fontWeight: 900, color: DARK, textAlign: "center" }}>#{serial}</div>
+                        <div style={{ fontSize: "6pt", fontWeight: 900, color: DARK, textAlign: "center", lineHeight: 1 }}>#{serial}</div>
                       </div>
 
                       {/* Right content */}
-                      <div style={{ flex: 1, padding: "1.5mm 2.5mm 1mm 2.5mm", display: "flex", flexDirection: "column", position: "relative", overflow: "hidden" }}>
+                      <div style={{ flex: 1, padding: "1mm 2mm 1mm 2.5mm", display: "flex", flexDirection: "column", overflow: "hidden" }}>
                         {/* Serial + Flag */}
-                        <div style={{ display: "flex", alignItems: "center", gap: "3mm", marginBottom: "1mm" }}>
-                          <div style={{
-                            fontSize: "17pt", fontWeight: 900, color: GOLD,
-                            lineHeight: 1, letterSpacing: "0.5px",
-                            fontFamily: "'Arial Black', Arial, sans-serif",
-                          }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "2mm", marginBottom: "0.5mm" }}>
+                          <div style={{ fontSize: "14pt", fontWeight: 900, color: GOLD, lineHeight: 1, fontFamily: "'Arial Black', Arial, sans-serif" }}>
                             NO: {serial}
                           </div>
-                          <span style={{ fontSize: "26pt", lineHeight: 1 }}>🇮🇳</span>
+                          <span style={{ fontSize: "20pt", lineHeight: 1 }}>🇮🇳</span>
                         </div>
                         {/* Name */}
-                        <div style={{
-                          fontSize: "7pt", fontWeight: 900, color: DARK,
-                          textTransform: "uppercase", lineHeight: 1.2,
-                          wordBreak: "break-word", marginBottom: "1mm",
-                        }}>
+                        <div style={{ fontSize: "6.5pt", fontWeight: 900, color: DARK, textTransform: "uppercase", lineHeight: 1.2, wordBreak: "break-word", marginBottom: "0.8mm" }}>
                           {p.fullName}
                         </div>
 
-                        {/* Bullet list */}
-                        <div style={{ display: "flex", flexDirection: "column", gap: "0.3mm" }}>
+                        {/* Bullet list — 4 rows */}
+                        <div style={{ display: "flex", flexDirection: "column", gap: "0.2mm", flex: 1 }}>
                           <BulletRow label="Passport No." value={p.passportNumber} />
                           <BulletRow label="Bus No." value={p.busNumber} />
-                          <BulletRow label="Maktab" value={group.maktabNumber} badge />
+                          <BulletRow label="Service Ctr." value={group.maktabNumber} badge />
                           <BulletRow label="India Mobile" value={p.mobileIndia} />
-                          <BulletRow label="Saudi Mobile" value={p.mobileSaudi} />
+                        </div>
+
+                        {/* QR + Barcode row at bottom */}
+                        <div style={{ display: "flex", alignItems: "center", gap: "2mm", marginTop: "0.5mm", paddingTop: "0.5mm", borderTop: `0.5px solid ${GOLD}40` }}>
+                          <div style={{ background: "#fff", padding: "1px", borderRadius: "2px", border: `1.5px solid ${DARK}`, flexShrink: 0 }}>
+                            <QRCodeSVG value={buildQrData(p, group, company.phone, company.phoneSaudi)} size={28} level="M" fgColor={DARK} />
+                          </div>
+                          <div style={{ flex: 1, overflow: "hidden" }}>
+                            <Barcode value={barcodeVal} height={18} displayValue fontSize={5} />
+                          </div>
                         </div>
                       </div>
                     </div>
 
                     {/* ── Footer strip ── */}
                     <div style={{ flexShrink: 0 }}>
-                      {/* Name — dark band */}
                       <div style={{
                         background: DARK, textAlign: "center", padding: "0.8mm 2mm",
                         WebkitPrintColorAdjust: "exact", printColorAdjust: "exact",
                       } as React.CSSProperties}>
-                        <div style={{ fontSize: "7pt", fontWeight: 900, color: "#fff", textTransform: "uppercase", lineHeight: 1.2, letterSpacing: "0.3px" }}>
+                        <div style={{ fontSize: "6.5pt", fontWeight: 900, color: "#fff", textTransform: "uppercase", lineHeight: 1.2, letterSpacing: "0.3px" }}>
                           {p.fullName}
                         </div>
-                      </div>
-                      {/* Address + big phone — dark band */}
-                      <div style={{
-                        background: DARK, textAlign: "center", padding: "0.7mm 2mm",
-                        WebkitPrintColorAdjust: "exact", printColorAdjust: "exact",
-                      } as React.CSSProperties}>
-                        <div style={{ fontSize: "5.5pt", fontWeight: 900, color: "#fff", lineHeight: 1.3, letterSpacing: "0.1px" }}>
+                        <div style={{ fontSize: "5pt", fontWeight: 900, color: GOLD, lineHeight: 1.2 }}>
                           {company.address}
-                        </div>
-                        <div style={{ fontSize: "8pt", fontWeight: 900, color: GOLD, letterSpacing: "0.5px", lineHeight: 1.3 }}>
-                          📞 {company.phone}
                         </div>
                       </div>
                     </div>
@@ -316,8 +295,8 @@ export default function PrintIdCardsPro() {
                       <div style={{ display: "flex", gap: "3mm", marginBottom: "1.5mm" }}>
                         {/* Left col */}
                         <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: "4pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Maktab No.</div>
-                          <div style={{ fontSize: "16pt", fontWeight: 900, color: DARK, lineHeight: 1 }}>
+                          <div style={{ fontSize: "4pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Service Center No.</div>
+                          <div style={{ fontSize: "14pt", fontWeight: 900, color: DARK, lineHeight: 1 }}>
                             {group.maktabNumber || "—"}
                           </div>
                           <div style={{ fontSize: "4pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1, marginTop: "1mm" }}>Bus No.</div>
