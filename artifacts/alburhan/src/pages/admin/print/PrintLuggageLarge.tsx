@@ -203,13 +203,12 @@ export default function PrintLuggageLarge() {
                 </div>
               </div>
               {/* Al Burhan logo + Indian flag */}
-              <div style={{ flexShrink: 0, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "1.5mm" }}>
+              <div style={{ flexShrink: 0, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "2mm" }}>
                 {company.logoUrl
-                  ? <img src={company.logoUrl} alt="" style={{ height: "28mm", objectFit: "contain" }} />
-                  : <div style={{ width: "28mm", height: "28mm", background: DARK, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "12pt" }}>{company.nameShort.slice(0, 1)}</div>
+                  ? <img src={company.logoUrl} alt="" style={{ height: "80pt", objectFit: "contain" }} />
+                  : <div style={{ width: "80pt", height: "80pt", background: DARK, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "14pt" }}>{company.nameShort.slice(0, 1)}</div>
                 }
-                <div style={{ fontSize: "6pt", fontWeight: 900, color: DARK, textTransform: "uppercase", letterSpacing: "0.5px" }}>{company.nameShort}</div>
-                <div style={{ fontSize: "40pt", lineHeight: 1 }}>🇮🇳</div>
+                <div style={{ fontSize: "80pt", lineHeight: 1 }}>🇮🇳</div>
               </div>
             </div>
 
