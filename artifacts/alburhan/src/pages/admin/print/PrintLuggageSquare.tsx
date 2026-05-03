@@ -36,6 +36,11 @@ function getGroupColor(groupName: string): string {
   return GROUP_COLORS[last] || "#6B7280";
 }
 
+function buildHotelMapUrl(name?: string, address?: string): string {
+  const q = [name, address].filter(Boolean).join(" ");
+  return `https://maps.google.com/?q=${encodeURIComponent(q)}`;
+}
+
 function buildQrData(p: Pilgrim, group: Group, phone: string): string {
   const parts = [
     "BEGIN:VCARD",
@@ -464,12 +469,20 @@ export default function PrintLuggageSquare() {
                               { label: "HOTEL MAKKAH 2", data: group.hotels?.makkah },
                               { label: "HOTEL MADINAH",  data: group.hotels?.madinah },
                             ].map(({ label, data }) => (
-                              <div key={label}>
-                                <div style={{ fontSize: "4.5pt", color: "#999", textTransform: "uppercase", fontWeight: 600 }}>{label}</div>
-                                <div style={{ fontWeight: 700, color: "#222", fontSize: "6pt" }}>{data?.name || "—"}</div>
-                                {data?.nameAr && <div style={{ fontWeight: 700, color: "#222", fontSize: "5.5pt", direction: "rtl", textAlign: "right" }}>{data.nameAr}</div>}
-                                {data?.address && <div style={{ fontSize: "4.5pt", color: "#666", lineHeight: 1.2 }}>{data.address}</div>}
-                                {data?.addressAr && <div style={{ fontSize: "4pt", color: "#666", lineHeight: 1.2, direction: "rtl", textAlign: "right" }}>{data.addressAr}</div>}
+                              <div key={label} style={{ display: "flex", gap: "1mm", alignItems: "flex-start" }}>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontSize: "4.5pt", color: "#999", textTransform: "uppercase", fontWeight: 600 }}>{label}</div>
+                                  <div style={{ fontWeight: 700, color: "#222", fontSize: "6pt" }}>{data?.name || "—"}</div>
+                                  {data?.nameAr && <div style={{ fontWeight: 700, color: "#222", fontSize: "5.5pt", direction: "rtl", textAlign: "right" }}>{data.nameAr}</div>}
+                                  {data?.address && <div style={{ fontSize: "4.5pt", color: "#666", lineHeight: 1.2 }}>{data.address}</div>}
+                                  {(data as any)?.addressAr && <div style={{ fontSize: "4pt", color: "#666", lineHeight: 1.2, direction: "rtl", textAlign: "right" }}>{(data as any).addressAr}</div>}
+                                </div>
+                                {data?.name && (
+                                  <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: "0.3mm" }}>
+                                    <QRCodeSVG value={buildHotelMapUrl(data.name, data.address)} size={28} level="M" fgColor={DARK} />
+                                    <div style={{ fontSize: "3.5pt", color: "#999" }}>MAP</div>
+                                  </div>
+                                )}
                               </div>
                             ))}
                           </div>

@@ -38,6 +38,11 @@ function getGroupColor(groupName: string): string {
   return GROUP_COLORS[last] || "#6B7280";
 }
 
+function buildHotelMapUrl(name?: string, address?: string): string {
+  const q = [name, address].filter(Boolean).join(" ");
+  return `https://maps.google.com/?q=${encodeURIComponent(q)}`;
+}
+
 function buildQrData(p: Pilgrim, group: Group, phone: string): string {
   const parts = [
     "BEGIN:VCARD",
@@ -165,27 +170,27 @@ export default function PrintLuggage() {
               </div>
 
               <div style={{ width: "100%", display: "flex", gap: "2mm", marginBottom: "2mm" }}>
-                <div style={{ flex: 1, background: "#fefce8", border: "1px solid #e5e7eb", borderRadius: "4px", padding: "1.5mm 3mm" }}>
-                  <div style={{ fontSize: "6pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: 600 }}>HOTEL MAKKAH 1</div>
-                  <div style={{ fontWeight: 700, fontSize: "9pt", color: "#222" }}>{group.hotels?.aziziah?.name || "—"}</div>
-                  {group.hotels?.aziziah?.nameAr && <div style={{ fontWeight: 700, fontSize: "8pt", color: "#222", direction: "rtl", textAlign: "right" }}>{group.hotels.aziziah.nameAr}</div>}
-                  {group.hotels?.aziziah?.address && <div style={{ fontSize: "6pt", color: "#666", lineHeight: 1.2 }}>{group.hotels.aziziah.address}</div>}
-                  {group.hotels?.aziziah?.addressAr && <div style={{ fontSize: "6pt", color: "#666", lineHeight: 1.2, direction: "rtl", textAlign: "right" }}>{group.hotels.aziziah.addressAr}</div>}
-                </div>
-                <div style={{ flex: 1, background: "#fefce8", border: "1px solid #e5e7eb", borderRadius: "4px", padding: "1.5mm 3mm" }}>
-                  <div style={{ fontSize: "6pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: 600 }}>HOTEL MAKKAH 2</div>
-                  <div style={{ fontWeight: 700, fontSize: "9pt", color: "#222" }}>{group.hotels?.makkah?.name || "—"}</div>
-                  {group.hotels?.makkah?.nameAr && <div style={{ fontWeight: 700, fontSize: "8pt", color: "#222", direction: "rtl", textAlign: "right" }}>{group.hotels.makkah.nameAr}</div>}
-                  {group.hotels?.makkah?.address && <div style={{ fontSize: "6pt", color: "#666", lineHeight: 1.2 }}>{group.hotels.makkah.address}</div>}
-                  {group.hotels?.makkah?.addressAr && <div style={{ fontSize: "6pt", color: "#666", lineHeight: 1.2, direction: "rtl", textAlign: "right" }}>{group.hotels.makkah.addressAr}</div>}
-                </div>
-                <div style={{ flex: 1, background: "#fefce8", border: "1px solid #e5e7eb", borderRadius: "4px", padding: "1.5mm 3mm" }}>
-                  <div style={{ fontSize: "6pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: 600 }}>HOTEL MADINAH</div>
-                  <div style={{ fontWeight: 700, fontSize: "9pt", color: "#222" }}>{group.hotels?.madinah?.name || "—"}</div>
-                  {group.hotels?.madinah?.nameAr && <div style={{ fontWeight: 700, fontSize: "8pt", color: "#222", direction: "rtl", textAlign: "right" }}>{group.hotels.madinah.nameAr}</div>}
-                  {group.hotels?.madinah?.address && <div style={{ fontSize: "6pt", color: "#666", lineHeight: 1.2 }}>{group.hotels.madinah.address}</div>}
-                  {group.hotels?.madinah?.addressAr && <div style={{ fontSize: "6pt", color: "#666", lineHeight: 1.2, direction: "rtl", textAlign: "right" }}>{group.hotels.madinah.addressAr}</div>}
-                </div>
+                {([
+                  { lbl: "HOTEL MAKKAH 1", h: group.hotels?.aziziah },
+                  { lbl: "HOTEL MAKKAH 2", h: group.hotels?.makkah },
+                  { lbl: "HOTEL MADINAH",  h: group.hotels?.madinah },
+                ]).map(({ lbl, h }) => (
+                  <div key={lbl} style={{ flex: 1, background: "#fefce8", border: "1px solid #e5e7eb", borderRadius: "4px", padding: "1.5mm 3mm", display: "flex", gap: "2mm", alignItems: "flex-start" }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: "6pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: 600 }}>{lbl}</div>
+                      <div style={{ fontWeight: 700, fontSize: "9pt", color: "#222" }}>{h?.name || "—"}</div>
+                      {h?.nameAr && <div style={{ fontWeight: 700, fontSize: "8pt", color: "#222", direction: "rtl", textAlign: "right" }}>{h.nameAr}</div>}
+                      {h?.address && <div style={{ fontSize: "6pt", color: "#666", lineHeight: 1.2 }}>{h.address}</div>}
+                      {(h as any)?.addressAr && <div style={{ fontSize: "6pt", color: "#666", lineHeight: 1.2, direction: "rtl", textAlign: "right" }}>{(h as any).addressAr}</div>}
+                    </div>
+                    {h?.name && (
+                      <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5mm" }}>
+                        <QRCodeSVG value={buildHotelMapUrl(h.name, h.address)} size={38} level="M" />
+                        <div style={{ fontSize: "4pt", color: "#999", textAlign: "center" }}>MAP</div>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
 
               <div style={{
