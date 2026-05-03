@@ -26,8 +26,8 @@ interface Group {
 
 const DARK = "#0d5040";
 const GOLD = "#C9A23F";
-const W = "96mm";
-const H = "68mm";
+const W = "60mm";
+const H = "95mm";
 
 function buildQrData(p: Pilgrim, group: Group, phone: string, phoneSaudi: string): string {
   const lines = [
@@ -97,7 +97,7 @@ export default function PrintIdCardsPro() {
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
 
   const pages: Pilgrim[][] = [];
-  for (let i = 0; i < pilgrims.length; i += 2) pages.push(pilgrims.slice(i, i + 2));
+  for (let i = 0; i < pilgrims.length; i += 3) pages.push(pilgrims.slice(i, i + 3));
 
   return (
     <>
@@ -176,19 +176,19 @@ export default function PrintIdCardsPro() {
 
                       {/* Left sidebar — photo prominent */}
                       <div style={{
-                        width: "35mm", flexShrink: 0, background: "#f0f7f2",
+                        width: "22mm", flexShrink: 0, background: "#f0f7f2",
                         display: "flex", flexDirection: "column", alignItems: "center",
-                        padding: "1.5mm 1.5mm 1mm", gap: "1mm",
+                        padding: "1.5mm 1mm 1mm", gap: "1mm",
                         borderRight: `1.5px solid ${GOLD}`,
                       }}>
                         {/* Logo + label */}
-                        <div style={{ display: "flex", alignItems: "center", gap: "1.5mm" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "1mm" }}>
                           {company.logoUrl
-                            ? <img src={company.logoUrl} alt="" style={{ width: "9mm", height: "9mm", objectFit: "contain" }} />
-                            : <div style={{ width: "9mm", height: "9mm", background: DARK, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "6pt" }}>{company.nameShort.slice(0, 1)}</div>
+                            ? <img src={company.logoUrl} alt="" style={{ width: "7mm", height: "7mm", objectFit: "contain" }} />
+                            : <div style={{ width: "7mm", height: "7mm", background: DARK, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "5pt" }}>{company.nameShort.slice(0, 1)}</div>
                           }
                           <div style={{ textAlign: "center", lineHeight: 1.15 }}>
-                            <div style={{ fontSize: "5pt", fontWeight: 900, color: GOLD }}>{company.nameShort}</div>
+                            <div style={{ fontSize: "4pt", fontWeight: 900, color: GOLD }}>{company.nameShort}</div>
                             <div style={{ fontSize: "3pt", fontWeight: 700, color: DARK }}>HAJJ {group.year}</div>
                           </div>
                         </div>
@@ -199,19 +199,19 @@ export default function PrintIdCardsPro() {
                             alt=""
                             crossOrigin="anonymous"
                             style={{
-                              width: "30mm", height: "36mm",
+                              width: "19mm", height: "26mm",
                               objectFit: "cover", objectPosition: "top center",
-                              border: `2.5px solid ${GOLD}`, borderRadius: "2px", display: "block",
+                              border: `2px solid ${GOLD}`, borderRadius: "2px", display: "block",
                             }}
                           />
                         ) : (
                           <div style={{
-                            width: "30mm", height: "36mm", background: "#e0e8e4",
-                            border: `2.5px solid ${GOLD}`, borderRadius: "2px",
+                            width: "19mm", height: "26mm", background: "#e0e8e4",
+                            border: `2px solid ${GOLD}`, borderRadius: "2px",
                             display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                            fontSize: "5pt", color: "#888", fontWeight: 700, gap: "1mm",
+                            fontSize: "4pt", color: "#888", fontWeight: 700, gap: "1mm",
                           }}>
-                            <div style={{ fontSize: "18pt", color: GOLD }}>👤</div>
+                            <div style={{ fontSize: "14pt", color: GOLD }}>👤</div>
                             <div>PHOTO</div>
                           </div>
                         )}
@@ -222,15 +222,15 @@ export default function PrintIdCardsPro() {
                       {/* Right content */}
                       <div style={{ flex: 1, padding: "1.5mm 2.5mm 1mm 2.5mm", display: "flex", flexDirection: "column", position: "relative", overflow: "hidden" }}>
                         {/* Serial + Flag */}
-                        <div style={{ display: "flex", alignItems: "center", gap: "4mm", marginBottom: "1mm" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "2mm", marginBottom: "1mm" }}>
                           <div style={{
-                            fontSize: "20pt", fontWeight: 900, color: GOLD,
+                            fontSize: "13pt", fontWeight: 900, color: GOLD,
                             lineHeight: 1, letterSpacing: "0.5px",
                             fontFamily: "'Arial Black', Arial, sans-serif",
                           }}>
                             NO: {serial}
                           </div>
-                          <span style={{ fontSize: "32pt", lineHeight: 1 }}>🇮🇳</span>
+                          <span style={{ fontSize: "20pt", lineHeight: 1 }}>🇮🇳</span>
                         </div>
                         {/* Name */}
                         <div style={{
@@ -280,7 +280,7 @@ export default function PrintIdCardsPro() {
                   </div>
                 );
               })}
-              {Array.from({ length: 2 - page.length }).map((_, i) => (
+              {Array.from({ length: 3 - page.length }).map((_, i) => (
                 <div key={`ph-f-${i}`} className="pro-card" style={{ border: "1px dashed #ddd", opacity: 0.2 }} />
               ))}
             </div>
@@ -323,7 +323,7 @@ export default function PrintIdCardsPro() {
                         {/* Left col */}
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: "4pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Maktab No.</div>
-                          <div style={{ fontSize: "16pt", fontWeight: 900, color: DARK, lineHeight: 1 }}>
+                          <div style={{ fontSize: "11pt", fontWeight: 900, color: DARK, lineHeight: 1 }}>
                             {group.maktabNumber || "—"}
                           </div>
                           <div style={{ fontSize: "4pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1, marginTop: "1mm" }}>Bus No.</div>
@@ -366,7 +366,7 @@ export default function PrintIdCardsPro() {
                               value={p.mobileIndia && bookingMap[p.mobileIndia]
                                 ? `${PROD_DOMAIN}/feedback?booking_id=${bookingMap[p.mobileIndia]}`
                                 : `${PROD_DOMAIN}/feedback`}
-                              size={38} level="M" fgColor={DARK}
+                              size={30} level="M" fgColor={DARK}
                             />
                           </div>
                           <div style={{ background: DARK, color: "#fff", fontSize: "3pt", fontWeight: 900, letterSpacing: "0.8px", padding: "0.4mm 2mm", borderRadius: "8px", textTransform: "uppercase" }}>Rate Trip</div>
@@ -377,10 +377,10 @@ export default function PrintIdCardsPro() {
                       <div style={{ marginTop: "auto", paddingTop: "1mm" }}>
                         <div style={{ fontSize: "3.5pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Pilgrim</div>
                         <div style={{
-                          fontSize: "11pt", fontWeight: 900, color: DARK,
+                          fontSize: "8pt", fontWeight: 900, color: DARK,
                           textTransform: "uppercase", lineHeight: 1.15,
                           whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-                          maxWidth: "calc(100% - 14mm)",
+                          maxWidth: "calc(100% - 10mm)",
                         }}>
                           {p.fullName}
                         </div>
@@ -415,7 +415,7 @@ export default function PrintIdCardsPro() {
                   </div>
                 );
               })}
-              {Array.from({ length: 2 - page.length }).map((_, i) => (
+              {Array.from({ length: 3 - page.length }).map((_, i) => (
                 <div key={`ph-b-${i}`} className="pro-card" style={{ border: "1px dashed #ddd", opacity: 0.2 }} />
               ))}
             </div>
