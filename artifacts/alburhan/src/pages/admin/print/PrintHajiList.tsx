@@ -80,14 +80,14 @@ export default function PrintHajiList() {
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
 
   const thStyle: React.CSSProperties = {
-    background: "#16a34a",
+    background: "#1a6b55",
     color: "#fff",
     padding: "2.5mm 2mm",
     textAlign: "center",
     fontSize: "6.5pt",
     textTransform: "uppercase",
     letterSpacing: "0.4px",
-    border: "1px solid #16a34a",
+    border: "1px solid #1a6b55",
     fontWeight: 700,
   };
   const tdStyle: React.CSSProperties = {
@@ -116,11 +116,11 @@ export default function PrintHajiList() {
         * { box-sizing: border-box; }
       `}</style>
 
-      <div className="no-print" style={{ padding: "16px", background: "#f0fdf4", borderBottom: "2px solid #16a34a", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", flexWrap: "wrap" }}>
+      <div className="no-print" style={{ padding: "16px", background: "#f0fdf4", borderBottom: "2px solid #1a6b55", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", flexWrap: "wrap" }}>
         <select value={companyId} onChange={e => setCompanyId(e.target.value)} style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "13px", background: "#fff" }}>
           {COMPANIES.map(c => <option key={c.id} value={c.id}>{c.id === "alburhan" ? "Al Burhan Tours & Travels" : c.name}</option>)}
         </select>
-        <button onClick={handleDownload} disabled={pdfLoading} style={{ padding: "10px 24px", background: "#16a34a", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", opacity: pdfLoading ? 0.6 : 1 }}>
+        <button onClick={handleDownload} disabled={pdfLoading} style={{ padding: "10px 24px", background: "#1a6b55", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", opacity: pdfLoading ? 0.6 : 1 }}>
           {pdfLoading ? "Generating PDF..." : "⬇ Download PDF"}
         </button>
         <button onClick={() => window.print()} style={{ padding: "10px 24px", background: "#C9A23F", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>
@@ -158,7 +158,7 @@ export default function PrintHajiList() {
                 return (
                   <span key={i}>
                     {i > 0 && <span style={{ color: "#C9A23F", margin: "0 2mm" }}>|</span>}
-                    <b style={{ color: "#16a34a" }}>{label}</b>{value}
+                    <b style={{ color: "#1a6b55" }}>{label}</b>{value}
                   </span>
                 );
               })}
@@ -207,7 +207,7 @@ export default function PrintHajiList() {
                 const title = p.salutation || deriveTitle(p.gender);
                 return (
                   <tr key={p.id} style={{ background: i % 2 === 0 ? "#fff" : "#f0fdf4" }}>
-                    <td style={{ ...tdStyle, textAlign: "center", fontWeight: 700, fontSize: "9pt", color: "#16a34a" }}>
+                    <td style={{ ...tdStyle, textAlign: "center", fontWeight: 700, fontSize: "9pt", color: "#1a6b55" }}>
                       {(group?.startingSerialNumber ?? 1) - 1 + p.serialNumber}
                     </td>
                     <td style={{ ...tdStyle, padding: "1mm", textAlign: "center" }}>
@@ -268,7 +268,7 @@ export default function PrintHajiList() {
             paddingTop: "3mm",
           }}>
             <div>
-              Total Pilgrims: <b style={{ color: "#16a34a", fontSize: "9pt" }}>{pilgrims.length}</b>
+              Total Pilgrims: <b style={{ color: "#1a6b55", fontSize: "9pt" }}>{pilgrims.length}</b>
             </div>
             <div>Generated: {new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })}</div>
           </div>

@@ -6,7 +6,7 @@ import { COMPANIES, getCompanyById } from "@/lib/companies";
 
 const API = import.meta.env.VITE_API_URL || "";
 const BASE = import.meta.env.BASE_URL || "/";
-const DARK_GREEN = "#16a34a";
+const DARK_GREEN = "#1a6b55";
 const GOLD = "#C9A23F";
 
 interface Pilgrim {

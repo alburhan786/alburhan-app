@@ -23,12 +23,12 @@ interface Group {
   };
 }
 
-const DARK = "#16a34a";
+const DARK = "#1a6b55";
 const GOLD = "#C9A84C";
 const GOLD_LIGHT = "#E8D48B";
 
 const GROUP_COLORS: Record<string, string> = {
-  A: "#22c55e",
+  A: "#2a9d7a",
   B: "#2563EB",
   C: "#D97706",
   D: "#DC2626",
@@ -131,7 +131,7 @@ export default function PrintLuggage() {
                 <div style={{ fontSize: "44pt", lineHeight: 1 }}>🇮🇳</div>
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 900, fontSize: "14pt", color: "#22c55e", letterSpacing: "1px", textTransform: "uppercase", lineHeight: 1.1 }}>{company.nameShort}</div>
+                <div style={{ fontWeight: 900, fontSize: "14pt", color: "#2a9d7a", letterSpacing: "1px", textTransform: "uppercase", lineHeight: 1.1 }}>{company.nameShort}</div>
                 <div style={{ fontWeight: 700, fontSize: "8pt", color: GOLD, letterSpacing: "1.5px", textTransform: "uppercase" }}>TOURS & TRAVELS</div>
               </div>
               <div style={{ textAlign: "right" }}>

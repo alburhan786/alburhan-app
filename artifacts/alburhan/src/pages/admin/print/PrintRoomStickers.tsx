@@ -3,7 +3,7 @@ import { useRoute } from "wouter";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
 
 const API = import.meta.env.VITE_API_URL || "";
-const DARK_GREEN = "#16a34a";
+const DARK_GREEN = "#1a6b55";
 const GOLD = "#C9A23F";
 
 interface Pilgrim {
@@ -258,7 +258,7 @@ export default function PrintRoomStickers() {
         display: "flex", flexWrap: "wrap", gap: "10px", alignItems: "center"
       }}>
         <div style={{ flex: 1, minWidth: "200px" }}>
-          <strong style={{ fontSize: "15px", color: "#16a34a" }}>🏷️ Room Sticker Generator</strong>
+          <strong style={{ fontSize: "15px", color: "#1a6b55" }}>🏷️ Room Sticker Generator</strong>
           <div style={{ fontSize: "12px", color: "#666", marginTop: "2px" }}>
             {group.groupName} ({group.year}) &nbsp;|&nbsp;
             <span style={{ color: "#c00" }}>{roomMap.size} rooms</span> &nbsp;|&nbsp;
@@ -266,7 +266,7 @@ export default function PrintRoomStickers() {
             {withoutRoom > 0 && <span style={{ color: "#f59e0b" }}> · {withoutRoom} without room</span>}
           </div>
           {/* Hotel names preview */}
-          <div style={{ fontSize: "11px", color: "#16a34a", marginTop: "3px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
+          <div style={{ fontSize: "11px", color: "#1a6b55", marginTop: "3px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
             {group.hotels?.aziziah?.name && <span>🕌 Makkah 1: <strong>{group.hotels.aziziah.name}</strong></span>}
             {group.hotels?.makkah?.name && <span>🕌 Makkah 2: <strong>{group.hotels.makkah.name}</strong></span>}
             {group.hotels?.madinah?.name && <span>🕌 Madinah: <strong>{group.hotels.madinah.name}</strong></span>}
@@ -295,7 +295,7 @@ export default function PrintRoomStickers() {
         </div>
 
         <button onClick={() => window.print()}
-          style={{ padding: "8px 18px", background: "#16a34a", color: "#fff", border: "none", borderRadius: "7px", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
+          style={{ padding: "8px 18px", background: "#1a6b55", color: "#fff", border: "none", borderRadius: "7px", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
           🖨 Print
         </button>
         <button onClick={() => window.history.back()}

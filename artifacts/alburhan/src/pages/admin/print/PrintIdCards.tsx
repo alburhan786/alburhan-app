@@ -18,7 +18,7 @@ interface Group {
   hotels?: { makkah?: { name?: string; address?: string; nameAr?: string; addressAr?: string }; madinah?: { name?: string; address?: string; nameAr?: string; addressAr?: string }; aziziah?: { name?: string; address?: string; nameAr?: string; addressAr?: string } };
 }
 
-const DARK = "#16a34a";
+const DARK = "#1a6b55";
 const GOLD = "#C9A84C";
 const GOLD_LIGHT = "#E8D48B";
 
@@ -284,15 +284,15 @@ export default function PrintIdCards() {
                         <div style={{ fontSize: "3pt", color: "#888", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.3px" }}>Emergency Info</div>
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5mm" }}>
-                        <div style={{ background: "#fff", padding: "2px", borderRadius: "3px", border: `1.5px solid #16a34a` }}>
+                        <div style={{ background: "#fff", padding: "2px", borderRadius: "3px", border: `1.5px solid #1a6b55` }}>
                           <QRCodeSVG
                             value={p.mobileIndia && bookingMap[p.mobileIndia]
                               ? `${PROD_DOMAIN}/feedback?booking_id=${bookingMap[p.mobileIndia]}`
                               : `${PROD_DOMAIN}/feedback`}
-                            size={36} level="M" fgColor="#16a34a"
+                            size={36} level="M" fgColor="#1a6b55"
                           />
                         </div>
-                        <div style={{ fontSize: "3pt", color: "#16a34a", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.3px" }}>Rate Your Trip</div>
+                        <div style={{ fontSize: "3pt", color: "#1a6b55", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.3px" }}>Rate Your Trip</div>
                       </div>
                     </div>
                   ) : (
