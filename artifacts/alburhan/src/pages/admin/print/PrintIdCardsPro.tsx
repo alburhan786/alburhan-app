@@ -221,11 +221,6 @@ export default function PrintIdCardsPro() {
 
                       {/* Right content */}
                       <div style={{ flex: 1, padding: "1.5mm 2.5mm 1mm 2.5mm", display: "flex", flexDirection: "column", position: "relative", overflow: "hidden" }}>
-                        {/* QR code — absolute bottom-right */}
-                        <div style={{ position: "absolute", bottom: "1mm", right: "1.5mm" }}>
-                          <QRCodeSVG value={buildQrData(p, group, company.phone, company.phoneSaudi)} size={42} level="M" fgColor={DARK} />
-                        </div>
-
                         {/* Serial + Flag */}
                         <div style={{ display: "flex", alignItems: "center", gap: "4mm", marginBottom: "1mm" }}>
                           <div style={{
@@ -258,11 +253,8 @@ export default function PrintIdCardsPro() {
                       </div>
                     </div>
 
-                    {/* ── Barcode + footer strip ── */}
-                    <div style={{ flexShrink: 0, borderTop: "0.5px solid #ddd" }}>
-                      <div style={{ display: "flex", justifyContent: "center", padding: "0.5mm 3mm 0" }}>
-                        <Barcode value={barcodeVal} height={10} width={0.75} fontSize={0} />
-                      </div>
+                    {/* ── Footer strip ── */}
+                    <div style={{ flexShrink: 0 }}>
                       {/* Name at bottom */}
                       <div style={{
                         background: DARK, textAlign: "center",

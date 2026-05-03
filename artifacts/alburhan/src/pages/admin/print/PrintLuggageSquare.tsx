@@ -344,14 +344,14 @@ export default function PrintLuggageSquare() {
         }
         * { box-sizing: border-box; }
         .sq-sticker {
-          width: 100mm; height: 100mm;
+          width: 195mm; height: 130mm;
           border: 1.5px solid ${DARK}; border-radius: 5px; overflow: hidden;
           page-break-inside: avoid;
           font-family: 'Inter', Arial, sans-serif;
           background: #fff; position: relative;
         }
         .sq-row {
-          display: flex; gap: 0; align-items: flex-start;
+          display: flex; flex-direction: column; gap: 4mm; align-items: flex-start;
           page-break-after: always;
         }
         .sq-row:last-child { page-break-after: auto; }
