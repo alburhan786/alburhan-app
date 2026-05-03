@@ -283,7 +283,7 @@ export default function PrintZamzam() {
                           {barcodeVal}
                         </div>
                       </div>
-                      <QRCodeSVG value={buildQr(p, group, company.phoneSaudi)} size={130} level="M" fgColor={DARK_GREEN} />
+                      <QRCodeSVG value={buildQr(p, group, company.phoneSaudi)} size={130} level="L" fgColor={DARK_GREEN} />
                     </div>
                   </div>
 

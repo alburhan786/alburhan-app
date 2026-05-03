@@ -32,20 +32,12 @@ const H = "60mm";
 function buildQrData(p: Pilgrim, group: Group, phone: string, phoneSaudi: string): string {
   const lines = [
     `Name: ${p.fullName}`,
-    `Passport: ${p.passportNumber || "N/A"}`,
-    `Group: ${group.groupName} (${group.year})`,
+    `PP: ${p.passportNumber || "N/A"}`,
+    `Bus: ${p.busNumber || "N/A"} | Svc: ${group.maktabNumber || "N/A"}`,
   ];
-  if (p.mobileIndia) lines.push(`Mobile (India): ${p.mobileIndia}`);
-  if (p.mobileSaudi) lines.push(`Mobile (Saudi): ${p.mobileSaudi}`);
-  if (group.hotels?.aziziah?.name) lines.push(`Hotel Makkah 1: ${group.hotels.aziziah.name}`);
-  if (group.hotels?.makkah?.name) lines.push(`Hotel Makkah 2: ${group.hotels.makkah.name}`);
-  if (group.hotels?.madinah?.name) lines.push(`Hotel Madinah: ${group.hotels.madinah.name}`);
-  if (p.roomNumber) lines.push(`Room: ${p.roomNumber}`);
-  if (p.busNumber) lines.push(`Bus: ${p.busNumber}`);
-  if (p.seatNumber) lines.push(`Seat: ${p.seatNumber}`);
-  if (group.hotels?.groupLeader) lines.push(`Group Leader: ${group.hotels.groupLeader}`);
-  lines.push(`Emergency (Saudi): ${phoneSaudi}`);
-  lines.push(`Emergency (India): ${phone}`);
+  if (p.mobileIndia)  lines.push(`IN: ${p.mobileIndia}`);
+  if (p.mobileSaudi)  lines.push(`SA: ${p.mobileSaudi}`);
+  lines.push(`Emer: ${phoneSaudi}`);
   return lines.join("\n");
 }
 
@@ -237,7 +229,7 @@ export default function PrintIdCardsPro() {
                           borderLeft: `1px solid ${GOLD}50`,
                         }}>
                           <div style={{ background: "#fff", padding: "2px", borderRadius: "3px", border: `2px solid ${DARK}` }}>
-                            <QRCodeSVG value={buildQrData(p, group, company.phone, company.phoneSaudi)} size={42} level="M" fgColor={DARK} />
+                            <QRCodeSVG value={buildQrData(p, group, company.phone, company.phoneSaudi)} size={68} level="L" fgColor={DARK} />
                           </div>
                         </div>
 
@@ -328,7 +320,7 @@ export default function PrintIdCardsPro() {
                         {showFeedbackQr && (
                           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", marginTop: "auto" }}>
                             <div style={{ background: "#fff", padding: "1px", borderRadius: "2px", border: `1.5px solid ${DARK}` }}>
-                              <QRCodeSVG value={p.mobileIndia && bookingMap[p.mobileIndia] ? `${PROD_DOMAIN}/feedback?booking_id=${bookingMap[p.mobileIndia]}` : `${PROD_DOMAIN}/feedback`} size={28} level="M" fgColor={DARK} />
+                              <QRCodeSVG value={p.mobileIndia && bookingMap[p.mobileIndia] ? `${PROD_DOMAIN}/feedback?booking_id=${bookingMap[p.mobileIndia]}` : `${PROD_DOMAIN}/feedback`} size={48} level="L" fgColor={DARK} />
                             </div>
                             <div style={{ fontSize: "3pt", color: "#888", textTransform: "uppercase", marginTop: "0.3mm" }}>Rate Trip</div>
                           </div>

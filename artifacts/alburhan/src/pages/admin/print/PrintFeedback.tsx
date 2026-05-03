@@ -223,7 +223,7 @@ export default function PrintFeedback() {
                         size={80}
                         bgColor="#ffffff"
                         fgColor="#0d5040"
-                        level="M"
+                        level="L"
                       />
                     </div>
                     <div style={{ fontSize: "6.5pt", color: "#555", wordBreak: "break-all" }}>

@@ -37,19 +37,15 @@ function getGroupColor(groupName: string): string {
 }
 
 function buildQrData(p: Pilgrim, group: Group, phone: string): string {
-  return [
+  const lines = [
     `Name: ${p.fullName}`,
-    `Passport: ${p.passportNumber || "N/A"}`,
-    `Group: ${group.groupName}`,
-    `Maktab: ${group.maktabNumber || "N/A"}`,
-    `Bus: ${p.busNumber || "N/A"}`,
-    `Hotel Makkah 1: ${group.hotels?.aziziah?.name || "N/A"}`,
-    `Hotel Makkah 2: ${group.hotels?.makkah?.name || "N/A"}`,
-    `Hotel Madinah: ${group.hotels?.madinah?.name || "N/A"}`,
-    `India: ${p.mobileIndia || "N/A"}`,
-    `Saudi: ${p.mobileSaudi || "N/A"}`,
-    `Emergency: ${phone}`,
-  ].join("\n");
+    `PP: ${p.passportNumber || "N/A"}`,
+    `Bus: ${p.busNumber || "N/A"} | Svc: ${group.maktabNumber || "N/A"}`,
+  ];
+  if (p.mobileIndia)  lines.push(`IN: ${p.mobileIndia}`);
+  if (p.mobileSaudi)  lines.push(`SA: ${p.mobileSaudi}`);
+  lines.push(`Emer: ${phone}`);
+  return lines.join("\n");
 }
 
 /* ── SVG SNOWFLAKE / GEOMETRIC PATTERN (like the Almasiah reference) ── */
@@ -498,7 +494,7 @@ export default function PrintLuggageSquare() {
                             {/* QR — big + styled */}
                             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.8mm" }}>
                               <div style={{ background: "#fff", padding: "2.5px", borderRadius: "4px", border: `2.5px solid ${DARK}`, boxShadow: "0 1px 4px rgba(0,0,0,0.12)" }}>
-                                <QRCodeSVG value={buildQrData(p, group, company.phone)} size={60} level="M" fgColor={DARK} />
+                                <QRCodeSVG value={buildQrData(p, group, company.phone)} size={80} level="L" fgColor={DARK} />
                               </div>
                               <div style={{ background: DARK, color: "#fff", fontSize: "4pt", fontWeight: 900, letterSpacing: "1px", padding: "0.4mm 2.5mm", borderRadius: "8px", textTransform: "uppercase" }}>📱 Scan</div>
                             </div>

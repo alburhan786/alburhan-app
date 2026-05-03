@@ -39,21 +39,15 @@ function getGroupColor(groupName: string): string {
 }
 
 function buildQrData(p: Pilgrim, group: Group, phone: string): string {
-  return [
+  const lines = [
     `Name: ${p.fullName}`,
-    `Passport: ${p.passportNumber || "N/A"}`,
-    `Group: ${group.groupName}`,
-    `Maktab: ${group.maktabNumber || "N/A"}`,
-    `Bus: ${p.busNumber || "N/A"}`,
-    `Hotel Makkah 1: ${group.hotels?.aziziah?.name || "N/A"}`,
-    `Hotel Makkah 2: ${group.hotels?.makkah?.name || "N/A"}`,
-    `Hotel Madinah: ${group.hotels?.madinah?.name || "N/A"}`,
-    `Makkah 1 Address: ${group.hotels?.aziziah?.address || "N/A"}`,
-    `Group Leader: ${group.hotels?.groupLeader || "N/A"}`,
-    `India: ${p.mobileIndia || "N/A"}`,
-    `Saudi: ${p.mobileSaudi || "N/A"}`,
-    `Emergency: ${phone}`,
-  ].join("\n");
+    `PP: ${p.passportNumber || "N/A"}`,
+    `Bus: ${p.busNumber || "N/A"} | Svc: ${group.maktabNumber || "N/A"}`,
+  ];
+  if (p.mobileIndia)  lines.push(`IN: ${p.mobileIndia}`);
+  if (p.mobileSaudi)  lines.push(`SA: ${p.mobileSaudi}`);
+  lines.push(`Emer: ${phone}`);
+  return lines.join("\n");
 }
 
 export default function PrintLuggage() {
@@ -218,7 +212,7 @@ export default function PrintLuggage() {
                     </div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: "3mm", flexShrink: 0 }}>
-                    <QRCodeSVG value={buildQrData(p, group, company.phone)} size={52} level="M" />
+                    <QRCodeSVG value={buildQrData(p, group, company.phone)} size={68} level="L" />
                     <Barcode value={p.passportNumber || `H${String(p.serialNumber).padStart(3, "0")}`} height={26} width={1.5} fontSize={0} />
                   </div>
                 </div>

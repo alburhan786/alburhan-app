@@ -25,17 +25,11 @@ const GOLD_LIGHT = "#E8D48B";
 function buildQrData(p: Pilgrim, group: Group, phone: string, phoneSaudi: string): string {
   const lines = [
     `Name: ${p.fullName}`,
-    `Passport: ${p.passportNumber || "N/A"}`,
-    `Group: ${group.groupName} (${group.year})`,
-    `Gender: ${p.gender || "N/A"}`,
+    `PP: ${p.passportNumber || "N/A"}`,
+    `Bus: ${(p as any).busNumber || "N/A"} | Svc: ${group.maktabNumber || "N/A"}`,
   ];
-  if (p.mobileIndia) lines.push(`Mobile (India): ${p.mobileIndia}`);
-  if (group.hotels?.aziziah?.name) lines.push(`Hotel Makkah 1: ${group.hotels.aziziah.name}`);
-  if (group.hotels?.makkah?.name) lines.push(`Hotel Makkah 2: ${group.hotels.makkah.name}`);
-  if (group.hotels?.madinah?.name) lines.push(`Hotel Madinah: ${group.hotels.madinah.name}`);
-  if (group.maktabNumber) lines.push(`Maktab: ${group.maktabNumber}`);
-  lines.push(`Emergency (Saudi): ${phoneSaudi}`);
-  lines.push(`Emergency (India): ${phone}`);
+  if (p.mobileIndia) lines.push(`IN: ${p.mobileIndia}`);
+  lines.push(`Emer: ${phoneSaudi}`);
   return lines.join("\n");
 }
 
@@ -210,7 +204,7 @@ export default function PrintIdCards() {
                 {/* QR code — above footer bar, right-aligned */}
                 <div style={{ position: "absolute", bottom: "14mm", right: "2mm", zIndex: 3, display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5mm" }}>
                   <div style={{ background: "#fff", padding: "2px", borderRadius: "3px", border: `2px solid ${DARK}` }}>
-                    <QRCodeSVG value={buildQrData(p, group, company.phone, company.phoneSaudi)} size={44} level="M" fgColor={DARK} />
+                    <QRCodeSVG value={buildQrData(p, group, company.phone, company.phoneSaudi)} size={60} level="L" fgColor={DARK} />
                   </div>
                   <div style={{ fontSize: "3pt", color: DARK, fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.4px", background: "#fff", padding: "0.3mm 1mm", borderRadius: "2px" }}>SCAN</div>
                 </div>
@@ -289,7 +283,7 @@ export default function PrintIdCards() {
                             value={p.mobileIndia && bookingMap[p.mobileIndia]
                               ? `${PROD_DOMAIN}/feedback?booking_id=${bookingMap[p.mobileIndia]}`
                               : `${PROD_DOMAIN}/feedback`}
-                            size={36} level="M" fgColor="#0d5040"
+                            size={52} level="L" fgColor="#0d5040"
                           />
                         </div>
                         <div style={{ fontSize: "3pt", color: "#0d5040", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.3px" }}>Rate Your Trip</div>
@@ -299,7 +293,7 @@ export default function PrintIdCards() {
                     <div style={{ display: "flex", justifyContent: "center", marginTop: "2mm", marginBottom: "1mm" }}>
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1mm" }}>
                         <div style={{ background: "#fff", padding: "2px", borderRadius: "3px", border: `2px solid ${DARK}` }}>
-                          <QRCodeSVG value={buildQrData(p, group, company.phone, company.phoneSaudi)} size={42} level="M" fgColor={DARK} />
+                          <QRCodeSVG value={buildQrData(p, group, company.phone, company.phoneSaudi)} size={56} level="L" fgColor={DARK} />
                         </div>
                       </div>
                     </div>

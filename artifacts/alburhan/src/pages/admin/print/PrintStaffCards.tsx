@@ -321,7 +321,7 @@ function StaffCardBack({ s, groupName }: { s: StaffMember; groupName?: string })
         {/* QR column */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1mm", flexShrink: 0 }}>
           <div style={{ border: `2.5px solid ${GREEN}`, borderRadius: "4px", padding: "2px", background: "#fff" }}>
-            <QRCodeSVG value={verifyUrl} size={44} level="M" fgColor={GREEN} bgColor="#fff" />
+            <QRCodeSVG value={verifyUrl} size={64} level="L" fgColor={GREEN} bgColor="#fff" />
           </div>
           <div style={{
             background: GREEN, borderRadius: "12px", padding: "0.5mm 1.5mm",
