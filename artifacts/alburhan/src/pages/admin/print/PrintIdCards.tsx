@@ -301,9 +301,6 @@ export default function PrintIdCards() {
                         <div style={{ background: "#fff", padding: "2px", borderRadius: "3px", border: `2px solid ${DARK}` }}>
                           <QRCodeSVG value={buildQrData(p, group, company.phone, company.phoneSaudi)} size={42} level="M" fgColor={DARK} />
                         </div>
-                        <div style={{ background: DARK, color: "#fff", fontSize: "3.5pt", fontWeight: 900, letterSpacing: "1px", padding: "0.5mm 3mm", borderRadius: "10px", textTransform: "uppercase" }}>
-                          📱 Scan to Verify
-                        </div>
                       </div>
                     </div>
                   )}

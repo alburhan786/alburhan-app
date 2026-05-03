@@ -26,8 +26,8 @@ interface Group {
 
 const DARK = "#0d5040";
 const GOLD = "#C9A23F";
-const W = "96mm";
-const H = "68mm";
+const W = "60mm";
+const H = "95mm";
 
 function buildQrData(p: Pilgrim, group: Group, phone: string, phoneSaudi: string): string {
   const lines = [
@@ -176,67 +176,61 @@ export default function PrintIdCardsPro() {
 
                       {/* Left sidebar — photo prominent */}
                       <div style={{
-                        width: "35mm", flexShrink: 0, background: "#f0f7f2",
+                        width: "20mm", flexShrink: 0, background: "#f0f7f2",
                         display: "flex", flexDirection: "column", alignItems: "center",
-                        padding: "1.5mm 1.5mm 1mm", gap: "1mm",
+                        padding: "1.5mm 1mm 1mm", gap: "1mm",
                         borderRight: `1.5px solid ${GOLD}`,
                       }}>
-                        {/* Logo + label */}
-                        <div style={{ display: "flex", alignItems: "center", gap: "1.5mm" }}>
-                          {company.logoUrl
-                            ? <img src={company.logoUrl} alt="" style={{ width: "9mm", height: "9mm", objectFit: "contain" }} />
-                            : <div style={{ width: "9mm", height: "9mm", background: DARK, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "6pt" }}>{company.nameShort.slice(0, 1)}</div>
-                          }
-                          <div style={{ textAlign: "center", lineHeight: 1.15 }}>
-                            <div style={{ fontSize: "5pt", fontWeight: 900, color: GOLD }}>{company.nameShort}</div>
-                            <div style={{ fontSize: "3pt", fontWeight: 700, color: DARK }}>HAJJ {group.year}</div>
-                          </div>
-                        </div>
-                        {/* Photo — large portrait, face at top */}
+                        {/* Logo */}
+                        {company.logoUrl
+                          ? <img src={company.logoUrl} alt="" style={{ width: "7mm", height: "7mm", objectFit: "contain" }} />
+                          : <div style={{ width: "7mm", height: "7mm", background: DARK, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "5pt" }}>{company.nameShort.slice(0, 1)}</div>
+                        }
+                        {/* Photo — passport portrait, face centred */}
                         {p.photoUrl ? (
                           <img
                             src={`${API}${p.photoUrl}`}
                             alt=""
                             crossOrigin="anonymous"
                             style={{
-                              width: "30mm", height: "36mm",
+                              width: "17mm", height: "23mm",
                               objectFit: "cover", objectPosition: "top center",
-                              border: `2.5px solid ${GOLD}`, borderRadius: "2px", display: "block",
+                              border: `2px solid ${GOLD}`, borderRadius: "2px", display: "block",
                             }}
                           />
                         ) : (
                           <div style={{
-                            width: "30mm", height: "36mm", background: "#e0e8e4",
-                            border: `2.5px solid ${GOLD}`, borderRadius: "2px",
+                            width: "17mm", height: "23mm", background: "#e0e8e4",
+                            border: `2px solid ${GOLD}`, borderRadius: "2px",
                             display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                            fontSize: "5pt", color: "#888", fontWeight: 700, gap: "1mm",
+                            fontSize: "4pt", color: "#888", fontWeight: 700, gap: "1mm",
                           }}>
-                            <div style={{ fontSize: "18pt", color: GOLD }}>👤</div>
+                            <div style={{ fontSize: "13pt", color: GOLD }}>👤</div>
                             <div>PHOTO</div>
                           </div>
                         )}
                         {/* Serial under photo */}
-                        <div style={{ fontSize: "7pt", fontWeight: 900, color: DARK, textAlign: "center" }}>#{serial}</div>
+                        <div style={{ fontSize: "6pt", fontWeight: 900, color: DARK, textAlign: "center" }}>#{serial}</div>
                       </div>
 
                       {/* Right content */}
                       <div style={{ flex: 1, padding: "1.5mm 2.5mm 1mm 2.5mm", display: "flex", flexDirection: "column", position: "relative", overflow: "hidden" }}>
                         {/* Serial + Flag */}
-                        <div style={{ display: "flex", alignItems: "center", gap: "4mm", marginBottom: "1mm" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "2mm", marginBottom: "0.8mm" }}>
                           <div style={{
-                            fontSize: "20pt", fontWeight: 900, color: GOLD,
+                            fontSize: "13pt", fontWeight: 900, color: GOLD,
                             lineHeight: 1, letterSpacing: "0.5px",
                             fontFamily: "'Arial Black', Arial, sans-serif",
                           }}>
                             NO: {serial}
                           </div>
-                          <span style={{ fontSize: "32pt", lineHeight: 1 }}>🇮🇳</span>
+                          <span style={{ fontSize: "18pt", lineHeight: 1 }}>🇮🇳</span>
                         </div>
                         {/* Name */}
                         <div style={{
-                          fontSize: "7.5pt", fontWeight: 900, color: DARK,
+                          fontSize: "6.5pt", fontWeight: 900, color: DARK,
                           textTransform: "uppercase", lineHeight: 1.2,
-                          wordBreak: "break-word", marginBottom: "1mm",
+                          wordBreak: "break-word", marginBottom: "0.8mm",
                         }}>
                           {p.fullName}
                         </div>

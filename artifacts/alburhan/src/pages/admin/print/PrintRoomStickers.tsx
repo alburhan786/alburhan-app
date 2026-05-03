@@ -110,15 +110,12 @@ function RoomSticker({ roomNumber, pilgrims, group, companyName, companyPhone, c
 
   return (
     <div className="no-break" style={{
-      width: "120mm",
       border: `2.5px solid ${DARK_GREEN}`,
       borderRadius: "4mm",
       fontFamily: "'Arial', sans-serif",
       overflow: "hidden",
       background: "#fff",
       pageBreakInside: "avoid",
-      display: "inline-block",
-      verticalAlign: "top",
     }}>
       {/* Header */}
       <div style={{ background: DARK_GREEN, color: "#fff", padding: "3mm 4mm 2.5mm" }}>
@@ -248,7 +245,8 @@ export default function PrintRoomStickers() {
           .no-print { display: none !important; }
         }
         * { box-sizing: border-box; }
-        .sticker-grid { display: flex; flex-wrap: wrap; gap: 6mm; padding: 4mm; }
+        .sticker-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; padding: 4mm; }
+        .sticker-page { page-break-after: always; display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; padding: 4mm; }
         .no-break { page-break-inside: avoid; break-inside: avoid; }
       `}</style>
 
@@ -325,11 +323,19 @@ export default function PrintRoomStickers() {
             No rooms with assigned pilgrims found.
           </div>
         ) : (
-          <div className="sticker-grid">
-            {roomsToShow.map(([room, ps]) => (
-              <RoomSticker key={room} roomNumber={room} pilgrims={ps} group={group!} companyName={company.name} companyPhone={company.phone} companyPhoneSaudi={company.phoneSaudi} />
-            ))}
-          </div>
+          <>
+            {Array.from({ length: Math.ceil(roomsToShow.length / 4) }, (_, pi) => {
+              const chunk = roomsToShow.slice(pi * 4, pi * 4 + 4);
+              const isLast = pi === Math.ceil(roomsToShow.length / 4) - 1;
+              return (
+                <div key={pi} className={isLast ? "sticker-grid" : "sticker-page"}>
+                  {chunk.map(([room, ps]) => (
+                    <RoomSticker key={room} roomNumber={room} pilgrims={ps} group={group!} companyName={company.name} companyPhone={company.phone} companyPhoneSaudi={company.phoneSaudi} />
+                  ))}
+                </div>
+              );
+            })}
+          </>
         )}
         <div style={{ padding: "2mm 4mm", fontSize: "7pt", color: "#bbb", textAlign: "center" }}>
           {company.name} · {group.groupName} {group.year} · Generated {new Date().toLocaleDateString("en-IN")}
