@@ -26,8 +26,8 @@ interface Group {
 
 const DARK = "#0d5040";
 const GOLD = "#C9A23F";
-const W = "95mm";
-const H = "60mm";
+const W = "90mm";
+const H = "55mm";
 
 function buildVerifyUrl(id: string): string {
   return `${window.location.origin}${import.meta.env.BASE_URL}verify/${id}`;
