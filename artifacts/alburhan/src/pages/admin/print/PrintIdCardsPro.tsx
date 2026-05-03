@@ -158,15 +158,27 @@ export default function PrintIdCardsPro() {
                     <div style={{
                       background: DARK, display: "flex", alignItems: "center",
                       justifyContent: "space-between", padding: "1.5mm 3mm",
-                      flexShrink: 0, minHeight: "7mm",
+                      flexShrink: 0, minHeight: "9mm",
                     }}>
-                      <span style={{ fontSize: "4.5pt", fontWeight: 800, color: "#fff", letterSpacing: "0.5px", textTransform: "uppercase" }}>
-                        {company.name}
+                      <div>
+                        <div style={{ fontSize: "7pt", fontWeight: 900, color: "#fff", letterSpacing: "0.5px", textTransform: "uppercase", lineHeight: 1.2 }}>
+                          {company.name}
+                        </div>
+                        <div style={{ fontSize: "6pt", fontWeight: 900, color: GOLD, letterSpacing: "0.3px", lineHeight: 1.2 }}>
+                          📞 9893989786 &nbsp;|&nbsp; 9893225590
+                        </div>
+                      </div>
+                      <span style={{ fontSize: "4pt", fontWeight: 900, color: GOLD, letterSpacing: "0.5px", textTransform: "uppercase", background: "rgba(255,255,255,0.1)", padding: "0.5mm 1.5mm", borderRadius: "2px", flexShrink: 0 }}>
+                        Hajj Pilgrim
                       </span>
-                      <div style={{ display: "flex", alignItems: "center", gap: "1.5mm" }}>
-                        <span style={{ fontSize: "4pt", fontWeight: 900, color: GOLD, letterSpacing: "0.5px", textTransform: "uppercase", background: "rgba(255,255,255,0.1)", padding: "0.5mm 1.5mm", borderRadius: "2px" }}>
-                          Hajj Pilgrim
-                        </span>
+                    </div>
+                    {/* ── Pilgrim name at top ── */}
+                    <div style={{
+                      background: "#f0f7f2", borderBottom: `1.5px solid ${GOLD}`,
+                      padding: "0.8mm 3mm", flexShrink: 0, textAlign: "center",
+                    }}>
+                      <div style={{ fontSize: "8pt", fontWeight: 900, color: DARK, textTransform: "uppercase", lineHeight: 1.2, letterSpacing: "0.3px" }}>
+                        {p.fullName}
                       </div>
                     </div>
 
@@ -251,11 +263,17 @@ export default function PrintIdCardsPro() {
                       <div style={{ display: "flex", justifyContent: "center", padding: "0.5mm 3mm 0" }}>
                         <Barcode value={barcodeVal} height={10} width={0.75} fontSize={0} />
                       </div>
+                      {/* Name at bottom */}
                       <div style={{
-                        textAlign: "center", fontSize: "3.5pt", color: "#b91c1c",
-                        fontWeight: 700, padding: "0.3mm 2mm 1mm", letterSpacing: "0.3px",
+                        background: DARK, textAlign: "center",
+                        padding: "1mm 2mm", 
                       }}>
-                        #{serial} | {company.nameShort} | {company.phone}
+                        <div style={{ fontSize: "7pt", fontWeight: 900, color: "#fff", textTransform: "uppercase", lineHeight: 1.2, letterSpacing: "0.3px" }}>
+                          {p.fullName}
+                        </div>
+                        <div style={{ fontSize: "4pt", color: GOLD, fontWeight: 800, letterSpacing: "0.2px" }}>
+                          #{serial} | {company.phone}
+                        </div>
                       </div>
                     </div>
 
@@ -276,16 +294,25 @@ export default function PrintIdCardsPro() {
 
                     {/* ── Header bar ── */}
                     <div style={{
-                      background: DARK, padding: "2mm 3mm", flexShrink: 0,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      minHeight: "8mm",
+                      background: DARK, padding: "1.5mm 3mm", flexShrink: 0,
+                      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                      minHeight: "9mm",
                     }}>
-                      <span style={{
-                        fontSize: "5pt", fontWeight: 900, color: "#fff",
-                        textTransform: "uppercase", letterSpacing: "0.5px", textAlign: "center", lineHeight: 1.3,
-                      }}>
-                        Hajj Pilgrim Identification — {company.name}
-                      </span>
+                      <div style={{ fontSize: "7pt", fontWeight: 900, color: "#fff", textTransform: "uppercase", letterSpacing: "0.5px", lineHeight: 1.2 }}>
+                        {company.name}
+                      </div>
+                      <div style={{ fontSize: "6pt", fontWeight: 900, color: GOLD, letterSpacing: "0.3px", lineHeight: 1.2 }}>
+                        📞 9893989786 &nbsp;|&nbsp; 9893225590
+                      </div>
+                    </div>
+                    {/* ── Pilgrim name at top (back) ── */}
+                    <div style={{
+                      background: "#f0f7f2", borderBottom: `1.5px solid ${GOLD}`,
+                      padding: "0.8mm 3mm", flexShrink: 0, textAlign: "center",
+                    }}>
+                      <div style={{ fontSize: "8pt", fontWeight: 900, color: DARK, textTransform: "uppercase", lineHeight: 1.2, letterSpacing: "0.3px" }}>
+                        {p.fullName}
+                      </div>
                     </div>
 
                     {/* ── Body ── */}
@@ -362,14 +389,14 @@ export default function PrintIdCardsPro() {
 
                     {/* ── Footer ── */}
                     <div style={{
-                      background: DARK, padding: "1.2mm 3mm", flexShrink: 0,
+                      background: DARK, padding: "1.5mm 3mm", flexShrink: 0,
                       textAlign: "center",
                     }}>
-                      <div style={{ fontSize: "3pt", color: "rgba(255,255,255,0.7)", lineHeight: 1.4 }}>
-                        {company.address}
+                      <div style={{ fontSize: "7pt", fontWeight: 900, color: "#fff", textTransform: "uppercase", lineHeight: 1.2, letterSpacing: "0.3px" }}>
+                        {p.fullName}
                       </div>
-                      <div style={{ fontSize: "3.5pt", color: GOLD, fontWeight: 800, letterSpacing: "0.2px", lineHeight: 1.4 }}>
-                        {company.nameShort} TOURS &amp; TRAVELS | {company.phone}
+                      <div style={{ fontSize: "5.5pt", fontWeight: 900, color: GOLD, letterSpacing: "0.3px", lineHeight: 1.3 }}>
+                        {company.name} | 9893989786 | 9893225590
                       </div>
                     </div>
 
