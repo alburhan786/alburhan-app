@@ -97,6 +97,7 @@ const emptyPilgrim = {
   state: "", roomNumber: "", roomType: "", busNumber: "", seatNumber: "",
   relation: "", coverNumber: "", medicalCondition: "",
   salutation: "", passportIssueDate: "", passportExpiryDate: "", passportPlaceOfIssue: "",
+  serialNumber: "",
 };
 
 const emptyRoomForm = {
@@ -145,6 +146,7 @@ export default function PilgrimManager() {
   const [bulkRoomForm, setBulkRoomForm] = useState({ hotel: "makkah", roomType: "gents", totalBeds: "4", floor: "", fromRoom: "", toRoom: "" });
   const [bulkAdding, setBulkAdding] = useState(false);
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
+  const [editingSerial, setEditingSerial] = useState<{ id: string; value: string } | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -190,8 +192,34 @@ export default function PilgrimManager() {
       passportIssueDate: p.passportIssueDate || "",
       passportExpiryDate: p.passportExpiryDate || "",
       passportPlaceOfIssue: p.passportPlaceOfIssue || "",
+      serialNumber: String(p.serialNumber ?? ""),
     });
     setDialogOpen(true);
+  };
+
+  const handleSerialUpdate = async (p: Pilgrim, newVal: string) => {
+    const n = parseInt(newVal, 10);
+    if (isNaN(n) || n < 1) { fetchData(); return; }
+    if (n === p.serialNumber) { setEditingSerial(null); return; }
+    try {
+      await fetch(`${API}/api/groups/${groupId}/pilgrims/${p.id}`, {
+        method: "PUT", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName: p.fullName, passportNumber: p.passportNumber, visaNumber: p.visaNumber,
+          dateOfBirth: p.dateOfBirth, gender: p.gender, bloodGroup: p.bloodGroup,
+          mobileIndia: p.mobileIndia, mobileSaudi: p.mobileSaudi, address: p.address,
+          city: p.city, state: p.state, busNumber: p.busNumber, seatNumber: p.seatNumber,
+          relation: p.relation, coverNumber: p.coverNumber, medicalCondition: p.medicalCondition,
+          salutation: p.salutation, passportIssueDate: p.passportIssueDate,
+          passportExpiryDate: p.passportExpiryDate, passportPlaceOfIssue: p.passportPlaceOfIssue,
+          serialNumber: n,
+        }),
+      });
+      toast({ title: `Serial updated to ${n}` });
+      fetchData();
+    } catch { toast({ title: "Failed to update serial", variant: "destructive" }); }
+    setEditingSerial(null);
   };
 
   const handleSave = async () => {
@@ -549,7 +577,30 @@ export default function PilgrimManager() {
                   <tr><td colSpan={10} className="text-center py-8 text-muted-foreground">No pilgrims yet. Click "Add Pilgrim" to start.</td></tr>
                 ) : pilgrims.map(p => (
                   <tr key={p.id} className="hover:bg-muted/30">
-                    <td className="px-4 py-3 font-mono font-bold text-primary">{(group?.startingSerialNumber ?? 1) - 1 + p.serialNumber}</td>
+                    <td className="px-4 py-3">
+                      {editingSerial?.id === p.id ? (
+                        <input
+                          autoFocus
+                          type="number" min="1"
+                          value={editingSerial.value}
+                          onChange={e => setEditingSerial({ id: p.id, value: e.target.value })}
+                          onBlur={() => handleSerialUpdate(p, editingSerial.value)}
+                          onKeyDown={e => {
+                            if (e.key === "Enter") handleSerialUpdate(p, editingSerial.value);
+                            if (e.key === "Escape") setEditingSerial(null);
+                          }}
+                          className="w-14 h-7 text-center font-mono font-bold text-primary border-2 border-primary rounded focus:outline-none text-sm"
+                        />
+                      ) : (
+                        <span
+                          title="Click to edit serial number"
+                          onClick={() => setEditingSerial({ id: p.id, value: String(p.serialNumber) })}
+                          className="font-mono font-bold text-primary cursor-pointer hover:bg-primary/10 px-1.5 py-0.5 rounded transition-colors"
+                        >
+                          {p.serialNumber}
+                        </span>
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       <div className="w-10 h-10 rounded-lg bg-muted overflow-hidden cursor-pointer"
                         onClick={() => { setUploadingId(p.id); fileRef.current?.click(); }}>
@@ -632,7 +683,7 @@ export default function PilgrimManager() {
               <div className="flex flex-wrap gap-1.5">
                 {unassignedPilgrims.map(p => (
                   <span key={p.id} className="text-xs bg-amber-100 border border-amber-200 text-amber-900 px-2 py-0.5 rounded-full font-medium">
-                    {(group?.startingSerialNumber ?? 1) - 1 + p.serialNumber}. {p.fullName}
+                    {p.serialNumber}. {p.fullName}
                   </span>
                 ))}
               </div>
@@ -766,7 +817,7 @@ export default function PilgrimManager() {
                         <tr><td colSpan={9} className="text-center py-8 text-muted-foreground">No pilgrims yet.</td></tr>
                       ) : pilgrimsForTable.map(p => (
                         <tr key={p.id} className="hover:bg-muted/30">
-                          <td className="px-4 py-2.5 font-mono font-bold text-primary text-xs">{(group?.startingSerialNumber ?? 1) - 1 + p.serialNumber}</td>
+                          <td className="px-4 py-2.5 font-mono font-bold text-primary text-xs">{p.serialNumber}</td>
                           <td className="px-4 py-2.5">
                             <div className="w-8 h-8 rounded-md bg-muted overflow-hidden">
                               {p.photoUrl
@@ -891,6 +942,19 @@ export default function PilgrimManager() {
                 </div>
                 <Input value={form.medicalCondition} onChange={e => f("medicalCondition", e.target.value)} placeholder="e.g. Diabetic, BP Patient" />
               </div>
+              {editingId && (
+                <div className="col-span-2 space-y-1 border-t pt-3">
+                  <label className="text-sm font-semibold text-primary">Serial Number</label>
+                  <p className="text-xs text-muted-foreground mb-1">Change this pilgrim's position/order number within the group.</p>
+                  <Input
+                    type="number" min="1"
+                    value={form.serialNumber}
+                    onChange={e => f("serialNumber", e.target.value)}
+                    placeholder="e.g. 5"
+                    className="w-32"
+                  />
+                </div>
+              )}
             </div>
             <Button onClick={handleSave} className="w-full">{editingId ? "Save Changes" : "Add Pilgrim"}</Button>
           </div>
