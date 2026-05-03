@@ -78,15 +78,26 @@ interface RoomStickerProps {
 function HotelRow({ label, info }: { label: string; info?: HotelInfo }) {
   if (!info?.name) return null;
   return (
-    <div style={{ display: "flex", alignItems: "baseline", gap: "3mm", fontSize: "7pt", borderBottom: "0.5px solid rgba(255,255,255,0.15)", paddingBottom: "1mm", marginBottom: "1mm" }}>
-      <span style={{ color: "#a8d5c2", minWidth: "14mm", fontWeight: 700, textTransform: "uppercase", fontSize: "5.5pt", letterSpacing: "0.3px" }}>{label}</span>
-      <span style={{ color: "#fff", fontWeight: 700 }}>{info.name}</span>
+    <div style={{ borderBottom: "0.5px solid #d1e8dc", paddingBottom: "1.5mm", marginBottom: "1.5mm" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "2mm" }}>
+        <span style={{ color: DARK_GREEN, minWidth: "16mm", fontWeight: 800, textTransform: "uppercase", fontSize: "5.5pt", letterSpacing: "0.3px", flexShrink: 0 }}>{label}</span>
+        <span style={{ color: "#111", fontWeight: 800, fontSize: "7pt" }}>{info.name}</span>
+      </div>
       {(info.checkIn || info.checkOut) && (
-        <span style={{ color: "#c9e0d4", fontSize: "6pt", marginLeft: "auto" }}>
-          {info.checkIn && `In: ${info.checkIn}`}
-          {info.checkIn && info.checkOut && " · "}
-          {info.checkOut && `Out: ${info.checkOut}`}
-        </span>
+        <div style={{ display: "flex", gap: "4mm", marginTop: "0.8mm", paddingLeft: "18mm" }}>
+          {info.checkIn && (
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <span style={{ fontSize: "4.5pt", color: "#666", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.3px" }}>CHECK IN</span>
+              <span style={{ fontSize: "9pt", fontWeight: 900, color: DARK_GREEN, lineHeight: 1.1 }}>{info.checkIn}</span>
+            </div>
+          )}
+          {info.checkOut && (
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <span style={{ fontSize: "4.5pt", color: "#666", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.3px" }}>CHECK OUT</span>
+              <span style={{ fontSize: "9pt", fontWeight: 900, color: "#b91c1c", lineHeight: 1.1 }}>{info.checkOut}</span>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
@@ -135,15 +146,19 @@ function RoomSticker({ roomNumber, pilgrims, group, companyName, companyPhone, c
           </div>
         </div>
 
-        {/* Hotel rows */}
-        {hasHotels && (
-          <div style={{ borderTop: "0.5px solid rgba(255,255,255,0.2)", paddingTop: "2mm", marginTop: "1mm" }}>
-            <HotelRow label="Makkah 1" info={aziziah} />
-            <HotelRow label="Makkah 2" info={makkah} />
-            <HotelRow label="Madinah" info={madinah} />
-          </div>
-        )}
       </div>
+
+      {/* Hotel rows — light background so dates are clearly visible */}
+      {hasHotels && (
+        <div style={{
+          background: "#f0f7f4", borderBottom: `1.5px solid ${DARK_GREEN}30`,
+          padding: "2mm 3.5mm 1mm",
+        }}>
+          <HotelRow label="Makkah 1" info={aziziah} />
+          <HotelRow label="Makkah 2" info={makkah} />
+          <HotelRow label="Madinah"  info={madinah} />
+        </div>
+      )}
 
       {/* Pilgrim Table */}
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "8pt" }}>
