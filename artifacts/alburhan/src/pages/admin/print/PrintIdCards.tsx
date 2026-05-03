@@ -113,8 +113,11 @@ export default function PrintIdCards() {
 
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
 
-  const pages: Pilgrim[][] = [];
-  for (let i = 0; i < pilgrims.length; i += 3) pages.push(pilgrims.slice(i, i + 3));
+  const frontPages: Pilgrim[][] = [];
+  for (let i = 0; i < pilgrims.length; i += 9) frontPages.push(pilgrims.slice(i, i + 9));
+
+  const backPages: Pilgrim[][] = [];
+  for (let i = 0; i < pilgrims.length; i += 9) backPages.push(pilgrims.slice(i, i + 9));
 
   const bulletDot: React.CSSProperties = {
     width: "3mm", height: "3mm", borderRadius: "50%", background: GOLD,
@@ -136,8 +139,14 @@ export default function PrintIdCards() {
           page-break-inside: avoid; font-family: 'Inter', Arial, sans-serif;
           background: #fff; position: relative;
         }
-        .cards-row { display: flex; gap: 5mm; justify-content: center; margin-bottom: 5mm; }
-        .page-break { page-break-after: always; }
+        .id-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 50mm);
+          gap: 5mm;
+          justify-content: center;
+        }
+        .print-page { page-break-after: always; }
+        .print-page:last-child { page-break-after: auto; }
       `}</style>
 
       <div className="no-print" style={{ padding: "16px", background: "#fef3c7", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", flexWrap: "wrap" }}>
@@ -153,10 +162,12 @@ export default function PrintIdCards() {
       </div>
 
       <div>
-      {pages.map((page, pi) => (
-        <div key={pi} className={pi < pages.length - 1 ? "page-break" : ""} style={{ padding: "6mm 0" }}>
-          <div className="cards-row">
-            {page.map(p => (
+
+        {/* ══ ALL FRONT PAGES — 9 per page, 3×3 grid ══ */}
+        {frontPages.map((page, pi) => (
+          <div key={`fp-${pi}`} className="print-page" style={{ padding: "2mm 0" }}>
+            <div className="id-grid">
+              {page.map(p => (
               <div key={`front-${p.id}`} className="id-card">
                 <WaveShapes />
 
@@ -216,14 +227,16 @@ export default function PrintIdCards() {
                   </div>
                 </div>
               </div>
-            ))}
-            {Array.from({ length: 3 - page.length }).map((_, i) => (
-              <div key={`ph-f-${i}`} className="id-card" style={{ border: "1px dashed #ddd", opacity: 0.2 }} />
-            ))}
+              ))}
+            </div>
           </div>
+        ))}
 
-          <div className="cards-row">
-            {page.map(p => (
+        {/* ══ ALL BACK PAGES — 9 per page, 3×3 grid ══ */}
+        {backPages.map((page, pi) => (
+          <div key={`bp-${pi}`} className="print-page" style={{ padding: "2mm 0" }}>
+            <div className="id-grid">
+              {page.map(p => (
               <div key={`back-${p.id}`} className="id-card">
                 <WaveShapesBack />
 
@@ -313,13 +326,11 @@ export default function PrintIdCards() {
                   </div>
                 </div>
               </div>
-            ))}
-            {Array.from({ length: 3 - page.length }).map((_, i) => (
-              <div key={`ph-b-${i}`} className="id-card" style={{ border: "1px dashed #ddd", opacity: 0.2 }} />
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+
       </div>
     </>
   );
