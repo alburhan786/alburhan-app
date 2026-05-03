@@ -318,7 +318,7 @@ export default function PrintLuggageSquare() {
   const groupLabel = group.groupName.toUpperCase();
 
   const pages: Pilgrim[][] = [];
-  for (let i = 0; i < pilgrims.length; i += 2) pages.push(pilgrims.slice(i, i + 2));
+  for (let i = 0; i < pilgrims.length; i += 4) pages.push(pilgrims.slice(i, i + 4));
 
   const showFront = view === "front" || view === "both";
   const showBack  = view === "back"  || view === "both";
@@ -333,14 +333,16 @@ export default function PrintLuggageSquare() {
         }
         * { box-sizing: border-box; }
         .sq-sticker {
-          width: 195mm; height: 130mm;
+          width: 96mm; height: 135mm;
           border: 1.5px solid ${DARK}; border-radius: 5px; overflow: hidden;
           page-break-inside: avoid;
           font-family: 'Inter', Arial, sans-serif;
           background: #fff; position: relative;
+          flex-shrink: 0;
         }
         .sq-row {
-          display: flex; flex-direction: column; gap: 4mm; align-items: stretch;
+          display: flex; flex-wrap: wrap; gap: 3mm;
+          width: 200mm;
           page-break-after: always;
         }
         .sq-row:last-child { page-break-after: auto; }
