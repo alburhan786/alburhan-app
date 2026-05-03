@@ -241,7 +241,7 @@ export default function PrintIdCards() {
                 <WaveShapesBack />
 
                 <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", height: "100%", padding: "2.5mm 3mm 0" }}>
-                  <LogoHeader size="small" company={company} />
+                  <LogoHeader company={company} />
 
                   <div style={{ display: "flex", flexDirection: "column", gap: "1.2mm", fontSize: "5.5pt", lineHeight: 1.4 }}>
                     <div style={{ display: "flex", alignItems: "flex-start", gap: "1.5mm" }}>
