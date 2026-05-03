@@ -103,7 +103,7 @@ export default function PrintIdCardsPro() {
     <>
       <style>{`
         @media print {
-          @page { size: A4 portrait; margin: 8mm; }
+          @page { size: A4 portrait; margin: 6mm; }
           body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; margin: 0; }
           .no-print { display: none !important; }
         }
@@ -114,7 +114,8 @@ export default function PrintIdCardsPro() {
           page-break-inside: avoid; font-family: Arial, sans-serif;
           background: #fff; position: relative; display: flex; flex-direction: column;
         }
-        .pro-cards-row { display: flex; gap: 5mm; justify-content: center; margin-bottom: 3mm; }
+        .pro-cards-row { display: flex; gap: 4mm; justify-content: center; margin-bottom: 2mm; }
+        .pro-customer-block { page-break-inside: avoid; }
         .pro-page-break { page-break-after: always; }
       `}</style>
 
@@ -132,7 +133,7 @@ export default function PrintIdCardsPro() {
 
       <div style={{ background: "#fff", padding: "4mm" }}>
         {pages.map((page, pi) => (
-          <div key={pi} className={pi < pages.length - 1 ? "pro-page-break" : ""} style={{ marginBottom: "4mm" }}>
+          <div key={pi} className={`pro-customer-block${pi < pages.length - 1 ? " pro-page-break" : ""}`} style={{ marginBottom: "4mm" }}>
 
             {/* ══ FRONT FACES ══ */}
             <div className="pro-cards-row">
@@ -173,38 +174,45 @@ export default function PrintIdCardsPro() {
                     {/* ── Body row ── */}
                     <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
 
-                      {/* Left sidebar */}
+                      {/* Left sidebar — photo prominent */}
                       <div style={{
-                        width: "28mm", flexShrink: 0, background: "#f0f7f2",
+                        width: "30mm", flexShrink: 0, background: "#f0f7f2",
                         display: "flex", flexDirection: "column", alignItems: "center",
-                        padding: "2mm 1.5mm", gap: "1mm",
+                        padding: "1.5mm 1.5mm 1.5mm", gap: "1mm",
+                        borderRight: `1px solid ${GOLD}`,
                       }}>
-                        {company.logoUrl
-                          ? <img src={company.logoUrl} alt="" style={{ width: "11mm", height: "11mm", objectFit: "contain" }} />
-                          : <div style={{ width: "11mm", height: "11mm", background: DARK, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "7pt" }}>{company.nameShort.slice(0, 1)}</div>
-                        }
-                        <div style={{ textAlign: "center", lineHeight: 1.15 }}>
-                          <div style={{ fontSize: "6.5pt", fontWeight: 900, color: GOLD, letterSpacing: "0.3px" }}>{company.nameShort}</div>
-                          <div style={{ fontSize: "3.5pt", fontWeight: 700, color: DARK, letterSpacing: "0.3px" }}>TOURS &amp; TRAVELS</div>
-                          <div style={{ fontSize: "3.5pt", fontWeight: 800, color: DARK, marginTop: "0.3mm" }}>HAJJ {group.year}</div>
+                        {/* Logo + label */}
+                        <div style={{ display: "flex", alignItems: "center", gap: "1.5mm" }}>
+                          {company.logoUrl
+                            ? <img src={company.logoUrl} alt="" style={{ width: "8mm", height: "8mm", objectFit: "contain" }} />
+                            : <div style={{ width: "8mm", height: "8mm", background: DARK, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "6pt" }}>{company.nameShort.slice(0, 1)}</div>
+                          }
+                          <div style={{ textAlign: "center", lineHeight: 1.15 }}>
+                            <div style={{ fontSize: "5pt", fontWeight: 900, color: GOLD }}>{company.nameShort}</div>
+                            <div style={{ fontSize: "3pt", fontWeight: 700, color: DARK }}>HAJJ {group.year}</div>
+                          </div>
                         </div>
-                        {/* Photo */}
-                        <div style={{ flex: 1, width: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                          {p.photoUrl ? (
-                            <img
-                              src={`${API}${p.photoUrl}`}
-                              alt=""
-                              style={{ width: "20mm", height: "20mm", objectFit: "cover", border: `2px solid ${GOLD}`, borderRadius: "2px" }}
-                            />
-                          ) : (
-                            <div style={{
-                              width: "20mm", height: "20mm", background: "#e8ede8",
-                              border: `2px solid ${GOLD}`, borderRadius: "2px",
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                              fontSize: "4.5pt", color: "#aaa", fontWeight: 700, letterSpacing: "0.5px",
-                            }}>PHOTO</div>
-                          )}
-                        </div>
+                        {/* Photo — large portrait */}
+                        {p.photoUrl ? (
+                          <img
+                            src={`${API}${p.photoUrl}`}
+                            alt=""
+                            crossOrigin="anonymous"
+                            style={{ width: "25mm", height: "30mm", objectFit: "cover", border: `2.5px solid ${GOLD}`, borderRadius: "2px", display: "block" }}
+                          />
+                        ) : (
+                          <div style={{
+                            width: "25mm", height: "30mm", background: "#e0e8e4",
+                            border: `2.5px solid ${GOLD}`, borderRadius: "2px",
+                            display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                            fontSize: "5pt", color: "#888", fontWeight: 700, gap: "1mm",
+                          }}>
+                            <div style={{ fontSize: "14pt", color: GOLD }}>👤</div>
+                            <div>PHOTO</div>
+                          </div>
+                        )}
+                        {/* Serial under photo */}
+                        <div style={{ fontSize: "7pt", fontWeight: 900, color: DARK, textAlign: "center" }}>#{serial}</div>
                       </div>
 
                       {/* Right content */}
@@ -222,10 +230,9 @@ export default function PrintIdCardsPro() {
                         </div>
                         {/* Name */}
                         <div style={{
-                          fontSize: "8pt", fontWeight: 900, color: DARK,
+                          fontSize: "7.5pt", fontWeight: 900, color: DARK,
                           textTransform: "uppercase", lineHeight: 1.2,
                           wordBreak: "break-word", marginBottom: "1mm",
-                          maxWidth: "calc(100% - 18mm)",
                         }}>
                           {p.fullName}
                         </div>
