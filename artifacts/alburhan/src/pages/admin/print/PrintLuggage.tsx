@@ -5,7 +5,6 @@ import { QRCodeSVG } from "qrcode.react";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
 
 const API = import.meta.env.VITE_API_URL || "";
-const BASE = import.meta.env.BASE_URL || "/";
 
 interface Pilgrim {
   id: string; serialNumber: number; fullName: string; photoUrl?: string;
@@ -78,24 +77,32 @@ export default function PrintLuggage() {
   const groupColor = getGroupColor(group.groupName);
   const groupLabel = group.groupName.toUpperCase();
 
+  /* 2 pilgrims per A4 page */
+  const pages: Pilgrim[][] = [];
+  for (let i = 0; i < pilgrims.length; i += 2) pages.push(pilgrims.slice(i, i + 2));
+
   return (
     <>
       <style>{`
         @media print {
-          @page { size: A4 portrait; margin: 10mm; }
+          @page { size: A4 portrait; margin: 8mm; }
           body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
           .no-print { display: none !important; }
         }
         * { box-sizing: border-box; }
+        .luggage-pair {
+          display: flex; flex-direction: column; gap: 5mm;
+          page-break-after: always; page-break-inside: avoid;
+          margin-bottom: 5mm;
+        }
+        .luggage-pair:last-child { page-break-after: auto; }
         .luggage-sticker {
-          width: 150mm; height: 200mm;
+          width: 190mm; height: 128mm;
           border: 1.5px solid ${DARK}; border-radius: 6px; overflow: hidden;
-          page-break-inside: avoid; page-break-after: always;
+          page-break-inside: avoid;
           font-family: 'Inter', Arial, sans-serif;
           background: #fff; position: relative;
-          margin: 0 auto 5mm;
         }
-        .luggage-sticker:last-child { page-break-after: auto; }
       `}</style>
 
       <div className="no-print" style={{ padding: "16px", background: "#fef3c7", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", flexWrap: "wrap" }}>
@@ -107,122 +114,123 @@ export default function PrintLuggage() {
       </div>
 
       <div>
-      {pilgrims.map(p => (
-        <div key={p.id} className="luggage-sticker">
-          <div style={{ position: "relative", overflow: "hidden", height: "100%", display: "flex", flexDirection: "column" }}>
-            <div style={{
-              position: "absolute", top: "-15mm", right: "-10mm",
-              width: "70mm", height: "70mm",
-              background: DARK, borderRadius: "0 0 0 60%", zIndex: 0,
-            }} />
-            <div style={{
-              position: "absolute", bottom: "-10mm", left: "-8mm",
-              width: "55mm", height: "55mm",
-              background: `linear-gradient(135deg, ${GOLD}, ${GOLD_LIGHT})`,
-              borderRadius: "0 60% 0 0", zIndex: 0,
-            }} />
-
-            <div style={{ position: "relative", zIndex: 1, padding: "4mm 6mm 2mm", display: "flex", alignItems: "center", gap: "4mm" }}>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1.5mm", flexShrink: 0 }}>
-                {company.logoUrl
-                  ? <img src={company.logoUrl} alt="" style={{ height: "20mm", objectFit: "contain" }} />
-                  : <div style={{ height: "20mm", width: "20mm", background: DARK, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "12pt" }}>{company.nameShort.slice(0, 1)}</div>
-                }
-                <div style={{ fontSize: "44pt", lineHeight: 1 }}>🇮🇳</div>
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 900, fontSize: "14pt", color: "#1a7a5e", letterSpacing: "1px", textTransform: "uppercase", lineHeight: 1.1 }}>{company.nameShort}</div>
-                <div style={{ fontWeight: 700, fontSize: "8pt", color: GOLD, letterSpacing: "1.5px", textTransform: "uppercase" }}>TOURS & TRAVELS</div>
-              </div>
-              <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: "22pt", fontWeight: 800, color: "#fff" }}>#{String(p.serialNumber).padStart(3, "0")}</div>
-                <div style={{ fontSize: "8pt", color: "#fff", opacity: 0.9 }}>HAJJ {group.year}</div>
-              </div>
-            </div>
-
-            <div style={{ background: groupColor, padding: "2mm 6mm", display: "flex", justifyContent: "space-between", alignItems: "center", position: "relative", zIndex: 1 }}>
-              <span style={{ color: "#fff", fontWeight: 800, fontSize: "11pt", letterSpacing: "1px" }}>GROUP: {groupLabel}</span>
-              <span style={{ color: "#fff", fontWeight: 700, fontSize: "10pt" }}>BUS: {p.busNumber || "—"}</span>
-            </div>
-
-            <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", alignItems: "center", padding: "3mm 6mm 2mm", flex: 1 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "5mm", width: "100%", marginBottom: "2mm" }}>
-                <div style={{ flexShrink: 0 }}>
-                  {p.photoUrl ? (
-                    <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "34mm", height: "34mm", objectFit: "cover", borderRadius: "50%", border: `3px solid ${GOLD}`, boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }} />
-                  ) : (
-                    <div style={{ width: "34mm", height: "34mm", background: "#f0f0f0", borderRadius: "50%", border: `3px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10pt", color: "#aaa" }}>PHOTO</div>
-                  )}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: "26pt", fontWeight: 900, color: DARK, lineHeight: 1.1, wordBreak: "break-word", textTransform: "uppercase" }}>{p.fullName}</div>
-                </div>
-              </div>
-
-              <div style={{ width: "100%", display: "flex", gap: "3mm", marginBottom: "2mm" }}>
-                <div style={{ flex: 1, background: "#f0fdf4", border: `1.5px solid ${DARK}`, borderRadius: "4px", padding: "2mm 4mm", textAlign: "center" }}>
-                  <div style={{ fontSize: "7pt", color: "#666", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: 600 }}>PASSPORT</div>
-                  <div style={{ fontSize: "16pt", fontWeight: 900, fontFamily: "monospace", letterSpacing: "1px", color: DARK }}>{p.passportNumber || "—"}</div>
-                </div>
-                <div style={{ flex: 1, background: "#f0fdf4", border: `1.5px solid ${DARK}`, borderRadius: "4px", padding: "2mm 4mm", textAlign: "center" }}>
-                  <div style={{ fontSize: "7pt", color: "#666", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: 600 }}>MAKTAB</div>
-                  <div style={{ fontSize: "16pt", fontWeight: 900, color: DARK }}>{group.maktabNumber || "—"}</div>
-                </div>
-              </div>
-
-              <div style={{ width: "100%", display: "flex", gap: "2mm", marginBottom: "2mm" }}>
-                <div style={{ flex: 1, background: "#fefce8", border: "1px solid #e5e7eb", borderRadius: "4px", padding: "1.5mm 3mm" }}>
-                  <div style={{ fontSize: "6pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: 600 }}>HOTEL MAKKAH 1</div>
-                  <div style={{ fontWeight: 700, fontSize: "9pt", color: "#222" }}>{group.hotels?.aziziah?.name || "—"}</div>
-                  {group.hotels?.aziziah?.nameAr && <div style={{ fontWeight: 700, fontSize: "8pt", color: "#222", direction: "rtl", textAlign: "right" }}>{group.hotels.aziziah.nameAr}</div>}
-                  {group.hotels?.aziziah?.address && <div style={{ fontSize: "6pt", color: "#666", lineHeight: 1.2 }}>{group.hotels.aziziah.address}</div>}
-                  {group.hotels?.aziziah?.addressAr && <div style={{ fontSize: "6pt", color: "#666", lineHeight: 1.2, direction: "rtl", textAlign: "right" }}>{group.hotels.aziziah.addressAr}</div>}
-                </div>
-                <div style={{ flex: 1, background: "#fefce8", border: "1px solid #e5e7eb", borderRadius: "4px", padding: "1.5mm 3mm" }}>
-                  <div style={{ fontSize: "6pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: 600 }}>HOTEL MAKKAH 2</div>
-                  <div style={{ fontWeight: 700, fontSize: "9pt", color: "#222" }}>{group.hotels?.makkah?.name || "—"}</div>
-                  {group.hotels?.makkah?.nameAr && <div style={{ fontWeight: 700, fontSize: "8pt", color: "#222", direction: "rtl", textAlign: "right" }}>{group.hotels.makkah.nameAr}</div>}
-                  {group.hotels?.makkah?.address && <div style={{ fontSize: "6pt", color: "#666", lineHeight: 1.2 }}>{group.hotels.makkah.address}</div>}
-                  {group.hotels?.makkah?.addressAr && <div style={{ fontSize: "6pt", color: "#666", lineHeight: 1.2, direction: "rtl", textAlign: "right" }}>{group.hotels.makkah.addressAr}</div>}
-                </div>
-                <div style={{ flex: 1, background: "#fefce8", border: "1px solid #e5e7eb", borderRadius: "4px", padding: "1.5mm 3mm" }}>
-                  <div style={{ fontSize: "6pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: 600 }}>HOTEL MADINAH</div>
-                  <div style={{ fontWeight: 700, fontSize: "9pt", color: "#222" }}>{group.hotels?.madinah?.name || "—"}</div>
-                  {group.hotels?.madinah?.nameAr && <div style={{ fontWeight: 700, fontSize: "8pt", color: "#222", direction: "rtl", textAlign: "right" }}>{group.hotels.madinah.nameAr}</div>}
-                  {group.hotels?.madinah?.address && <div style={{ fontSize: "6pt", color: "#666", lineHeight: 1.2 }}>{group.hotels.madinah.address}</div>}
-                  {group.hotels?.madinah?.addressAr && <div style={{ fontSize: "6pt", color: "#666", lineHeight: 1.2, direction: "rtl", textAlign: "right" }}>{group.hotels.madinah.addressAr}</div>}
-                </div>
-              </div>
-
+      {pages.map((pair, pi) => (
+        <div key={pi} className="luggage-pair">
+          {pair.map(p => (
+          <div key={p.id} className="luggage-sticker">
+            <div style={{ position: "relative", overflow: "hidden", height: "100%", display: "flex", flexDirection: "column" }}>
+              {/* Background decorations */}
               <div style={{
-                width: "100%", background: "#f9f9f9", borderRadius: "4px",
-                padding: "2mm 4mm", marginBottom: "2mm",
-                display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1mm 4mm",
-              }}>
-                <div>
-                  <div style={{ fontSize: "6pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.5px" }}>City</div>
-                  <div style={{ fontWeight: 700, fontSize: "9pt" }}>{p.city || "—"}</div>
+                position: "absolute", top: "-10mm", right: "-8mm",
+                width: "45mm", height: "45mm",
+                background: DARK, borderRadius: "0 0 0 60%", zIndex: 0,
+              }} />
+              <div style={{
+                position: "absolute", bottom: "-7mm", left: "-6mm",
+                width: "35mm", height: "35mm",
+                background: `linear-gradient(135deg, ${GOLD}, ${GOLD_LIGHT})`,
+                borderRadius: "0 60% 0 0", zIndex: 0,
+              }} />
+
+              {/* Header */}
+              <div style={{ position: "relative", zIndex: 1, padding: "2mm 4mm 1.5mm", display: "flex", alignItems: "center", gap: "3mm" }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1mm", flexShrink: 0 }}>
+                  {company.logoUrl
+                    ? <img src={company.logoUrl} alt="" style={{ height: "13mm", objectFit: "contain" }} />
+                    : <div style={{ height: "13mm", width: "13mm", background: DARK, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "8pt" }}>{company.nameShort.slice(0, 1)}</div>
+                  }
+                  <div style={{ fontSize: "28pt", lineHeight: 1 }}>🇮🇳</div>
                 </div>
-                <div>
-                  <div style={{ fontSize: "6pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.5px" }}>India Mobile</div>
-                  <div style={{ fontWeight: 700, fontSize: "9pt" }}>{p.mobileIndia || "—"}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 900, fontSize: "9pt", color: "#1a7a5e", letterSpacing: "1px", textTransform: "uppercase", lineHeight: 1.1 }}>{company.nameShort}</div>
+                  <div style={{ fontWeight: 700, fontSize: "5.5pt", color: GOLD, letterSpacing: "1px", textTransform: "uppercase" }}>TOURS &amp; TRAVELS</div>
                 </div>
-                <div>
-                  <div style={{ fontSize: "6pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.5px" }}>Saudi Mobile</div>
-                  <div style={{ fontWeight: 700, fontSize: "9pt" }}>{p.mobileSaudi || "—"}</div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: "14pt", fontWeight: 800, color: "#fff" }}>#{String(p.serialNumber).padStart(3, "0")}</div>
+                  <div style={{ fontSize: "5.5pt", color: "#fff", opacity: 0.9 }}>HAJJ {group.year}</div>
                 </div>
               </div>
 
-              <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "5mm", marginTop: "auto", paddingBottom: "1mm" }}>
-                <QRCodeSVG value={buildQrData(p, group, company.phone)} size={80} level="M" />
-                <Barcode value={p.passportNumber || `H${String(p.serialNumber).padStart(3, "0")}`} height={40} width={2} fontSize={0} />
+              {/* Group / Bus bar */}
+              <div style={{ background: groupColor, padding: "1.2mm 4mm", display: "flex", justifyContent: "space-between", alignItems: "center", position: "relative", zIndex: 1 }}>
+                <span style={{ color: "#fff", fontWeight: 800, fontSize: "7pt", letterSpacing: "1px" }}>GROUP: {groupLabel}</span>
+                <span style={{ color: "#fff", fontWeight: 700, fontSize: "7pt" }}>BUS: {p.busNumber || "—"}</span>
               </div>
-            </div>
 
-            <div style={{ position: "relative", zIndex: 2, background: DARK, color: GOLD, padding: "2mm 5mm", fontSize: "8pt", textAlign: "center", fontWeight: 600, letterSpacing: "0.3px" }}>
-              {company.name} | {company.phone}
+              {/* Body */}
+              <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", padding: "2mm 4mm 1.5mm", flex: 1 }}>
+                {/* Photo + Name row */}
+                <div style={{ display: "flex", alignItems: "center", gap: "3mm", width: "100%", marginBottom: "1.5mm" }}>
+                  <div style={{ flexShrink: 0 }}>
+                    {p.photoUrl ? (
+                      <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "22mm", height: "22mm", objectFit: "cover", borderRadius: "50%", border: `2.5px solid ${GOLD}`, boxShadow: "0 2px 6px rgba(0,0,0,0.15)" }} />
+                    ) : (
+                      <div style={{ width: "22mm", height: "22mm", background: "#f0f0f0", borderRadius: "50%", border: `2.5px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "6pt", color: "#aaa" }}>PHOTO</div>
+                    )}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: "16pt", fontWeight: 900, color: DARK, lineHeight: 1.1, wordBreak: "break-word", textTransform: "uppercase" }}>{p.fullName}</div>
+                  </div>
+                </div>
+
+                {/* Passport + Maktab */}
+                <div style={{ width: "100%", display: "flex", gap: "2mm", marginBottom: "1.5mm" }}>
+                  <div style={{ flex: 1, background: "#f0fdf4", border: `1.5px solid ${DARK}`, borderRadius: "4px", padding: "1mm 2mm", textAlign: "center" }}>
+                    <div style={{ fontSize: "5pt", color: "#666", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: 600 }}>PASSPORT</div>
+                    <div style={{ fontSize: "10pt", fontWeight: 900, fontFamily: "monospace", letterSpacing: "1px", color: DARK }}>{p.passportNumber || "—"}</div>
+                  </div>
+                  <div style={{ flex: 1, background: "#f0fdf4", border: `1.5px solid ${DARK}`, borderRadius: "4px", padding: "1mm 2mm", textAlign: "center" }}>
+                    <div style={{ fontSize: "5pt", color: "#666", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: 600 }}>MAKTAB</div>
+                    <div style={{ fontSize: "10pt", fontWeight: 900, color: DARK }}>{group.maktabNumber || "—"}</div>
+                  </div>
+                </div>
+
+                {/* Hotels */}
+                <div style={{ width: "100%", display: "flex", gap: "1.5mm", marginBottom: "1.5mm" }}>
+                  {([
+                    ["HOTEL MAKKAH 1", group.hotels?.aziziah],
+                    ["HOTEL MAKKAH 2", group.hotels?.makkah],
+                    ["HOTEL MADINAH",  group.hotels?.madinah],
+                  ] as [string, { name?: string; address?: string; nameAr?: string; addressAr?: string } | undefined][]).map(([lbl, h]) => (
+                    <div key={lbl} style={{ flex: 1, background: "#fefce8", border: "1px solid #e5e7eb", borderRadius: "4px", padding: "1mm 2mm" }}>
+                      <div style={{ fontSize: "4pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.4px", fontWeight: 600 }}>{lbl}</div>
+                      <div style={{ fontWeight: 700, fontSize: "6pt", color: "#222", lineHeight: 1.2 }}>{h?.name || "—"}</div>
+                      {h?.nameAr && <div style={{ fontWeight: 700, fontSize: "5.5pt", color: "#222", direction: "rtl", textAlign: "right", lineHeight: 1.2 }}>{h.nameAr}</div>}
+                      {h?.address && <div style={{ fontSize: "4pt", color: "#666", lineHeight: 1.2 }}>{h.address}</div>}
+                    </div>
+                  ))}
+                </div>
+
+                {/* City + Mobiles + QR/Barcode row */}
+                <div style={{ display: "flex", gap: "3mm", alignItems: "flex-end", marginTop: "auto" }}>
+                  <div style={{ flex: 1, background: "#f9f9f9", borderRadius: "4px", padding: "1mm 2mm", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.5mm 2mm" }}>
+                    <div>
+                      <div style={{ fontSize: "4pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.4px" }}>City</div>
+                      <div style={{ fontWeight: 700, fontSize: "6pt" }}>{p.city || "—"}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: "4pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.4px" }}>India Mobile</div>
+                      <div style={{ fontWeight: 700, fontSize: "6pt" }}>{p.mobileIndia || "—"}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: "4pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.4px" }}>Saudi Mobile</div>
+                      <div style={{ fontWeight: 700, fontSize: "6pt" }}>{p.mobileSaudi || "—"}</div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "3mm", flexShrink: 0 }}>
+                    <QRCodeSVG value={buildQrData(p, group, company.phone)} size={52} level="M" />
+                    <Barcode value={p.passportNumber || `H${String(p.serialNumber).padStart(3, "0")}`} height={26} width={1.5} fontSize={0} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div style={{ position: "relative", zIndex: 2, background: DARK, color: GOLD, padding: "1.5mm 4mm", fontSize: "6pt", textAlign: "center", fontWeight: 600, letterSpacing: "0.3px", flexShrink: 0 }}>
+                {company.name} | {company.phone}
+              </div>
             </div>
           </div>
+          ))}
         </div>
       ))}
       </div>
