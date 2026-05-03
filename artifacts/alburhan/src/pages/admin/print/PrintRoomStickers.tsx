@@ -247,7 +247,7 @@ export default function PrintRoomStickers() {
         * { box-sizing: border-box; }
         .sticker-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; padding: 4mm; }
         .sticker-page { page-break-after: always; display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; padding: 4mm; }
-        .no-break { page-break-inside: avoid; break-inside: avoid; }
+        .no-break { page-break-inside: avoid; break-inside: avoid; max-height: 136mm; overflow: hidden; }
       `}</style>
 
       {/* Controls — hidden on print */}
