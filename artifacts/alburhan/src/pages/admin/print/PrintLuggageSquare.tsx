@@ -163,7 +163,7 @@ function LuggageStickerBack({
 
             {/* Number box (left) + Flag box (right) */}
             <div style={{ display: "flex", gap: "3mm", padding: "1mm 3mm 1.5mm", alignItems: "center" }}>
-              {/* Maktab number — big green-bordered box like "612" in reference */}
+              {/* Service Center No — big green-bordered box */}
               <div style={{
                 flex: 1,
                 border: `3px solid ${GREEN}`,
@@ -340,7 +340,7 @@ export default function PrintLuggageSquare() {
           background: #fff; position: relative;
         }
         .sq-row {
-          display: flex; flex-direction: column; gap: 4mm; align-items: flex-start;
+          display: flex; flex-direction: column; gap: 4mm; align-items: stretch;
           page-break-after: always;
         }
         .sq-row:last-child { page-break-after: auto; }
@@ -448,7 +448,7 @@ export default function PrintLuggageSquare() {
                               <div style={{ fontSize: "12pt", fontWeight: 900, fontFamily: "monospace", letterSpacing: "0.5px", color: DARK }}>{p.passportNumber || "—"}</div>
                             </div>
                             <div style={{ flex: 1, background: "#f0fdf4", border: `1px solid ${DARK}`, borderRadius: "3px", padding: "0.8mm 2mm", textAlign: "center" }}>
-                              <div style={{ fontSize: "5pt", color: "#666", textTransform: "uppercase", fontWeight: 600 }}>MAKTAB</div>
+                              <div style={{ fontSize: "5pt", color: "#666", textTransform: "uppercase", fontWeight: 600 }}>SERVICE CENTER NO</div>
                               <div style={{ fontSize: "10pt", fontWeight: 900, color: DARK }}>{group.maktabNumber || "—"}</div>
                             </div>
                           </div>
