@@ -5,6 +5,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { COMPANIES, getCompanyById, type CompanyInfo } from "@/lib/companies";
 
 const API = import.meta.env.VITE_API_URL || "";
+const BASE = import.meta.env.BASE_URL || "/";
 const PROD_DOMAIN = "https://alburhantravels.com";
 
 interface Pilgrim {
@@ -38,23 +39,23 @@ function buildQrData(p: Pilgrim, group: Group, phone: string, phoneSaudi: string
   return lines.join("\n");
 }
 
-function WaveShapesFront() {
+function WaveShapes() {
   return (
     <>
       <div style={{
-        position: "absolute", top: 0, right: 0, width: "18mm", height: "20mm",
+        position: "absolute", top: 0, right: 0, width: "22mm", height: "32mm",
         background: DARK, borderRadius: "0 0 0 100%", zIndex: 0,
       }} />
       <div style={{
-        position: "absolute", top: "7mm", right: 0, width: "11mm", height: "11mm",
+        position: "absolute", top: "10mm", right: 0, width: "16mm", height: "16mm",
         background: "rgba(255,255,255,0.08)", borderRadius: "0 0 0 100%", zIndex: 0,
       }} />
       <div style={{
-        position: "absolute", bottom: 0, left: 0, width: "14mm", height: "18mm",
+        position: "absolute", bottom: 0, left: 0, width: "18mm", height: "24mm",
         background: `linear-gradient(135deg, ${GOLD}, ${GOLD_LIGHT})`, borderRadius: "0 100% 0 0", zIndex: 0,
       }} />
       <div style={{
-        position: "absolute", bottom: "5mm", left: 0, width: "8mm", height: "10mm",
+        position: "absolute", bottom: "6mm", left: 0, width: "10mm", height: "12mm",
         background: "rgba(255,255,255,0.15)", borderRadius: "0 100% 0 0", zIndex: 0,
       }} />
     </>
@@ -65,211 +66,40 @@ function WaveShapesBack() {
   return (
     <>
       <div style={{
-        position: "absolute", top: 0, right: 0, width: "16mm", height: "17mm",
+        position: "absolute", top: 0, right: 0, width: "22mm", height: "28mm",
         background: DARK, borderRadius: "0 0 0 100%", zIndex: 0,
       }} />
       <div style={{
-        position: "absolute", top: "6mm", right: 0, width: "9mm", height: "9mm",
+        position: "absolute", top: "8mm", right: 0, width: "14mm", height: "14mm",
         background: "rgba(255,255,255,0.08)", borderRadius: "0 0 0 100%", zIndex: 0,
       }} />
       <div style={{
-        position: "absolute", bottom: 0, left: 0, width: "12mm", height: "14mm",
+        position: "absolute", bottom: 0, left: 0, width: "16mm", height: "20mm",
         background: `linear-gradient(135deg, ${GOLD}, ${GOLD_LIGHT})`, borderRadius: "0 100% 0 0", zIndex: 0,
       }} />
     </>
   );
 }
 
-function HeaderBar({ company }: { company: CompanyInfo }) {
+function LogoHeader({ size, company, showTopFlag }: { size?: "small"; company: CompanyInfo; showTopFlag?: boolean }) {
+  const isSmall = size === "small";
+  const flagImgSize = isSmall ? "6mm" : "8mm";
+  const nameSize = isSmall ? "7pt" : "8pt";
+  const tagSize = isSmall ? "3.5pt" : "4.5pt";
   return (
-    <div style={{
-      display: "flex", alignItems: "center", justifyContent: "space-between",
-      padding: "1mm 2.5mm", background: "rgba(255,255,255,0.92)",
-      borderBottom: `1.5px solid ${GOLD}`, flexShrink: 0,
-    }}>
-      <div style={{ fontSize: "20pt", lineHeight: 1 }}>🇮🇳</div>
-      <div style={{ flex: 1, textAlign: "center", padding: "0 1mm" }}>
-        <div style={{ fontSize: "5.5pt", fontWeight: 900, color: DARK, letterSpacing: "0.4px", lineHeight: 1.1 }}>{company.nameShort}</div>
-        <div style={{ fontSize: "3pt", fontWeight: 700, color: GOLD, letterSpacing: "0.6px" }}>TOURS & TRAVELS</div>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: isSmall ? "1mm" : "1.5mm" }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
+        <div style={{ fontSize: isSmall ? "26pt" : "32pt", lineHeight: 1 }}>🇮🇳</div>
       </div>
-      {company.logoUrl
-        ? <img src={company.logoUrl} alt="" style={{ width: "5.5mm", height: "5.5mm", borderRadius: "50%", objectFit: "cover" }} />
-        : <div style={{ width: "5.5mm", height: "5.5mm", borderRadius: "50%", background: DARK, display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "3pt" }}>{company.nameShort.slice(0, 1)}</div>
-      }
-    </div>
-  );
-}
-
-function FrontCard({ p, group, company }: { p: Pilgrim; group: Group; company: CompanyInfo }) {
-  return (
-    <div style={{
-      width: "86mm", height: "54mm",
-      border: "1px solid #ddd", borderRadius: "3px", overflow: "hidden",
-      fontFamily: "'Inter', Arial, sans-serif", background: "#fff",
-      position: "relative", flexShrink: 0,
-      pageBreakInside: "avoid",
-    }}>
-      <WaveShapesFront />
-
-      <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", height: "100%" }}>
-        <HeaderBar company={company} />
-
-        <div style={{ display: "flex", flex: 1, padding: "1.5mm 2mm 0", gap: "2mm", minHeight: 0 }}>
-          <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", paddingTop: "0.5mm" }}>
-            {p.photoUrl ? (
-              <img src={`${API}${p.photoUrl}`} alt="" style={{
-                width: "18mm", height: "22mm", objectFit: "cover",
-                objectPosition: "top center", borderRadius: "2px",
-                border: `2px solid ${GOLD}`,
-              }} />
-            ) : (
-              <div style={{
-                width: "18mm", height: "22mm", background: "#f0f0f0",
-                borderRadius: "2px", border: `2px solid ${GOLD}`,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: "4pt", color: "#aaa",
-              }}>PHOTO</div>
-            )}
-          </div>
-
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "0.6mm", minWidth: 0 }}>
-            <div style={{ fontSize: "6.5pt", fontWeight: 900, color: DARK, lineHeight: 1.2, wordBreak: "break-word", textTransform: "uppercase" }}>
-              {p.fullName || "—"}
-            </div>
-            <div style={{ fontSize: "4pt", color: GOLD, fontWeight: 700, letterSpacing: "0.3px" }}>HAJJ {group.year}</div>
-            <div style={{ fontSize: "4.5pt", color: "#555" }}>
-              <span style={{ color: "#999", fontSize: "4pt" }}>S.No. </span>
-              <span style={{ fontWeight: 700, color: DARK }}>#{String(p.serialNumber).padStart(3, "0")}</span>
-            </div>
-            <div style={{ fontSize: "4.5pt", color: "#555" }}>
-              <span style={{ color: "#999", fontSize: "4pt" }}>Passport </span>
-              <span style={{ fontFamily: "monospace", fontWeight: 600, letterSpacing: "0.3px" }}>{p.passportNumber || "—"}</span>
-            </div>
-            <div style={{ fontSize: "4.5pt", color: "#555" }}>
-              <span style={{ color: "#999", fontSize: "4pt" }}>Mobile </span>
-              <span style={{ fontWeight: 600 }}>{p.mobileIndia || "—"}</span>
-            </div>
-          </div>
-
-          <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", paddingTop: "0.5mm" }}>
-            <div style={{ background: "#fff", padding: "1.5px", borderRadius: "2px", border: `1.5px solid ${DARK}` }}>
-              <QRCodeSVG value={buildQrData(p, group, company.phone, company.phoneSaudi)} size={34} level="M" fgColor={DARK} />
-            </div>
-            <div style={{ fontSize: "3pt", color: DARK, fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.4px", marginTop: "0.5mm" }}>SCAN</div>
-          </div>
-        </div>
-
-        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 3 }}>
-          <div style={{ display: "flex", justifyContent: "flex-start", overflow: "hidden", paddingLeft: "2mm", marginBottom: "0.3mm" }}>
-            {p.passportNumber ? (
-              <Barcode value={p.passportNumber} height={10} width={0.85} fontSize={0} />
-            ) : (
-              <div style={{ fontSize: "4pt", color: "#999" }}>{group.groupName}</div>
-            )}
-          </div>
-          <div style={{
-            background: DARK, color: GOLD, padding: "0.8mm 2mm",
-            fontSize: "3.5pt", textAlign: "center", fontWeight: 800, letterSpacing: "0.1px",
-            WebkitPrintColorAdjust: "exact", printColorAdjust: "exact",
-          } as React.CSSProperties}>
-            {company.name} &nbsp;|&nbsp; 🇮🇳 {company.phone} &nbsp;|&nbsp; 🇸🇦 {company.phoneSaudi}
-          </div>
-        </div>
+      <div style={{ flex: 1, textAlign: "center", minWidth: 0, background: "rgba(255,255,255,0.92)", borderRadius: "2px", padding: "0.5mm 1mm" }}>
+        <div style={{ fontSize: nameSize, fontWeight: 900, color: DARK, letterSpacing: "0.5px", lineHeight: 1.1 }}>{company.nameShort}</div>
+        <div style={{ fontSize: tagSize, fontWeight: 700, color: GOLD, letterSpacing: "0.5px", lineHeight: 1.2 }}>TOURS & TRAVELS</div>
       </div>
-    </div>
-  );
-}
-
-function BackCard({ p, group, company, showFeedbackQr, bookingMap }: {
-  p: Pilgrim; group: Group; company: CompanyInfo; showFeedbackQr: boolean; bookingMap: Record<string, string>;
-}) {
-  return (
-    <div style={{
-      width: "86mm", height: "54mm",
-      border: "1px solid #ddd", borderRadius: "3px", overflow: "hidden",
-      fontFamily: "'Inter', Arial, sans-serif", background: "#fff",
-      position: "relative", flexShrink: 0,
-      pageBreakInside: "avoid",
-    }}>
-      <WaveShapesBack />
-
-      <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", height: "100%" }}>
-        <HeaderBar company={company} />
-
-        <div style={{ display: "flex", flex: 1, padding: "1mm 2mm", gap: "2mm", minHeight: 0 }}>
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "1mm", fontSize: "4.5pt", lineHeight: 1.35 }}>
-            <div>
-              <span style={{ color: "#999", fontSize: "4pt" }}>Passport No. </span>
-              <span style={{ fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.3px" }}>{p.passportNumber || "—"}</span>
-            </div>
-            <div>
-              <span style={{ color: "#999", fontSize: "4pt" }}>Maktab: </span>
-              <span style={{ fontWeight: 700, color: DARK }}>{group.maktabNumber || "—"}</span>
-            </div>
-            {group.hotels?.makkah?.name && (
-              <div>
-                <span style={{ color: "#999", fontSize: "4pt" }}>Makkah Hotel: </span>
-                <span style={{ fontWeight: 600 }}>{group.hotels.makkah.name}</span>
-                {group.hotels.makkah.nameAr && <div style={{ fontWeight: 600, direction: "rtl", textAlign: "right", fontSize: "4pt" }}>{group.hotels.makkah.nameAr}</div>}
-                {group.hotels.makkah.address && <div style={{ fontSize: "3.5pt", color: "#888" }}>{group.hotels.makkah.address}</div>}
-              </div>
-            )}
-            {group.hotels?.madinah?.name && (
-              <div>
-                <span style={{ color: "#999", fontSize: "4pt" }}>Madinah Hotel: </span>
-                <span style={{ fontWeight: 600 }}>{group.hotels.madinah.name}</span>
-                {group.hotels.madinah.nameAr && <div style={{ fontWeight: 600, direction: "rtl", textAlign: "right", fontSize: "4pt" }}>{group.hotels.madinah.nameAr}</div>}
-                {group.hotels.madinah.address && <div style={{ fontSize: "3.5pt", color: "#888" }}>{group.hotels.madinah.address}</div>}
-              </div>
-            )}
-          </div>
-
-          <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "1.5mm" }}>
-            {showFeedbackQr ? (
-              <>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5mm" }}>
-                  <div style={{ background: "#fff", padding: "1.5px", borderRadius: "2px", border: `1px solid ${GOLD}` }}>
-                    <QRCodeSVG value={buildQrData(p, group, company.phone, company.phoneSaudi)} size={26} level="M" />
-                  </div>
-                  <div style={{ fontSize: "3pt", color: "#888", fontWeight: 600, textTransform: "uppercase" }}>Emergency</div>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5mm" }}>
-                  <div style={{ background: "#fff", padding: "1.5px", borderRadius: "2px", border: `1.5px solid ${DARK}` }}>
-                    <QRCodeSVG
-                      value={p.mobileIndia && bookingMap[p.mobileIndia]
-                        ? `${PROD_DOMAIN}/feedback?booking_id=${bookingMap[p.mobileIndia]}`
-                        : `${PROD_DOMAIN}/feedback`}
-                      size={26} level="M" fgColor={DARK}
-                    />
-                  </div>
-                  <div style={{ fontSize: "3pt", color: DARK, fontWeight: 700, textTransform: "uppercase" }}>Rate Trip</div>
-                </div>
-              </>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5mm" }}>
-                <div style={{ background: "#fff", padding: "1.5px", borderRadius: "2px", border: `2px solid ${DARK}` }}>
-                  <QRCodeSVG value={buildQrData(p, group, company.phone, company.phoneSaudi)} size={34} level="M" fgColor={DARK} />
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 3 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "3.5pt", color: "#777", padding: "0 2mm", marginBottom: "0.3mm" }}>
-            <div>Group: <b style={{ color: DARK }}>{group.groupName}</b></div>
-            <div><b style={{ color: DARK }}>{p.fullName}</b></div>
-            <div>Year: <b style={{ color: DARK }}>{group.year}</b></div>
-          </div>
-          <div style={{
-            background: DARK, color: "#fff", padding: "0.8mm 2mm",
-            fontSize: "3.5pt", fontWeight: 900, textAlign: "center", lineHeight: 1.4,
-            WebkitPrintColorAdjust: "exact", printColorAdjust: "exact",
-          } as React.CSSProperties}>
-            <div>{company.address}</div>
-            <div style={{ color: GOLD }}>🇮🇳 {company.phone} &nbsp;|&nbsp; 🇸🇦 {company.phoneSaudi}</div>
-          </div>
-        </div>
+      <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: "0.3mm" }}>
+        {company.logoUrl
+          ? <img src={company.logoUrl} alt="" style={{ width: flagImgSize, height: flagImgSize, borderRadius: "50%", objectFit: "cover" }} />
+          : <div style={{ width: flagImgSize, height: flagImgSize, borderRadius: "50%", background: DARK, display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "4pt" }}>{company.nameShort.slice(0, 1)}</div>
+        }
       </div>
     </div>
   );
@@ -297,32 +127,30 @@ export default function PrintIdCards() {
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
 
   const pages: Pilgrim[][] = [];
-  for (let i = 0; i < pilgrims.length; i += 9) pages.push(pilgrims.slice(i, i + 9));
+  for (let i = 0; i < pilgrims.length; i += 3) pages.push(pilgrims.slice(i, i + 3));
 
-  const allPrintPages: Array<{ type: "front" | "back"; pilgrimPage: Pilgrim[]; pageIdx: number }> = [];
-  pages.forEach((pp, pi) => {
-    allPrintPages.push({ type: "front", pilgrimPage: pp, pageIdx: pi });
-    allPrintPages.push({ type: "back", pilgrimPage: pp, pageIdx: pi });
-  });
+  const bulletDot: React.CSSProperties = {
+    width: "3mm", height: "3mm", borderRadius: "50%", background: GOLD,
+    flexShrink: 0, marginTop: "0.8mm",
+  };
 
   return (
     <>
       <style>{`
         @media print {
-          @page { size: A4 landscape; margin: 5mm; }
+          @page { size: A4 portrait; margin: 6mm; }
           body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; margin: 0; }
           .no-print { display: none !important; }
-          .print-page { page-break-after: always; }
-          .print-page:last-child { page-break-after: auto; }
         }
         * { box-sizing: border-box; }
-        .cards-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 86mm);
-          gap: 4mm 5mm;
-          justify-content: center;
-          padding: 2mm;
+        .id-card {
+          width: 50mm; height: 80mm;
+          border: 1px solid #ddd; border-radius: 4px; overflow: hidden;
+          page-break-inside: avoid; font-family: 'Inter', Arial, sans-serif;
+          background: #fff; position: relative;
         }
+        .cards-row { display: flex; gap: 5mm; justify-content: center; margin-bottom: 5mm; }
+        .page-break { page-break-after: always; }
       `}</style>
 
       <div className="no-print" style={{ padding: "16px", background: "#fef3c7", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", flexWrap: "wrap" }}>
@@ -333,36 +161,181 @@ export default function PrintIdCards() {
           <input type="checkbox" checked={showFeedbackQr} onChange={e => setShowFeedbackQr(e.target.checked)} style={{ width: "15px", height: "15px", cursor: "pointer" }} />
           Show Feedback QR
         </label>
-        <div className="no-print" style={{ fontSize: "12px", color: "#666", padding: "4px 8px", background: "#fff", borderRadius: "6px", border: "1px solid #ddd" }}>
-          9 cards/page · A4 Landscape · 86×54mm
-        </div>
         <button onClick={() => window.print()} style={{ padding: "10px 24px", background: DARK, color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>🖨 Print</button>
         <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
       </div>
 
       <div>
-        {allPrintPages.map((ap, idx) => (
-          <div key={`${ap.type}-${ap.pageIdx}`} className={idx < allPrintPages.length - 1 ? "print-page" : ""}>
-            <div className="no-print" style={{ textAlign: "center", fontSize: "11px", color: "#888", padding: "4px 0 2px", fontStyle: "italic" }}>
-              {ap.type === "front" ? `▶ FRONT — Page ${ap.pageIdx + 1}` : `◀ BACK — Page ${ap.pageIdx + 1}`}
-            </div>
-            <div className="cards-grid">
-              {ap.pilgrimPage.map(p =>
-                ap.type === "front" ? (
-                  <FrontCard key={`front-${p.id}`} p={p} group={group} company={company} />
-                ) : (
-                  <BackCard key={`back-${p.id}`} p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
-                )
-              )}
-              {Array.from({ length: 9 - ap.pilgrimPage.length }).map((_, i) => (
-                <div key={`ph-${ap.type}-${i}`} style={{
-                  width: "86mm", height: "54mm",
-                  border: "1px dashed #ddd", borderRadius: "3px", opacity: 0.2,
-                }} />
-              ))}
-            </div>
+      {pages.map((page, pi) => (
+        <div key={pi} className={pi < pages.length - 1 ? "page-break" : ""} style={{ padding: "6mm 0" }}>
+          <div className="cards-row">
+            {page.map(p => (
+              <div key={`front-${p.id}`} className="id-card">
+                <WaveShapes />
+
+                <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", height: "100%", padding: "2.5mm 3mm 0" }}>
+                  <LogoHeader company={company} showTopFlag />
+
+                  <div style={{ display: "flex", justifyContent: "center", marginBottom: "1.5mm" }}>
+                    {p.photoUrl ? (
+                      <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "22mm", height: "22mm", objectFit: "cover", borderRadius: "50%", border: `2.5px solid ${GOLD}` }} />
+                    ) : (
+                      <div style={{ width: "22mm", height: "22mm", background: "#f0f0f0", borderRadius: "50%", border: `2.5px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "6pt", color: "#aaa" }}>PHOTO</div>
+                    )}
+                  </div>
+
+                  <div style={{ textAlign: "center", marginBottom: "1mm" }}>
+                    <div style={{ fontSize: "7.5pt", fontWeight: 900, color: DARK, lineHeight: 1.25, wordBreak: "break-word", textTransform: "uppercase" }}>{p.fullName || "—"}</div>
+                    <div style={{ fontSize: "5.5pt", color: GOLD, fontWeight: 700, marginTop: "0.5mm" }}>HAJJ {group.year}</div>
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.8mm", fontSize: "5.5pt", flex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: "1.5mm" }}>
+                      <div style={bulletDot} />
+                      <div><span style={{ color: "#888", fontSize: "4.5pt" }}>Serial No. </span><span style={{ fontWeight: 700, color: DARK }}>#{String(p.serialNumber).padStart(3, "0")}</span></div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: "1.5mm" }}>
+                      <div style={bulletDot} />
+                      <div><span style={{ color: "#888", fontSize: "4.5pt" }}>Passport No. </span><span style={{ fontWeight: 600, fontFamily: "monospace", letterSpacing: "0.3px" }}>{p.passportNumber || "—"}</span></div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: "1.5mm" }}>
+                      <div style={bulletDot} />
+                      <div><span style={{ color: "#888", fontSize: "4.5pt" }}>Mobile (India) </span><span style={{ fontWeight: 600 }}>{p.mobileIndia || "—"}</span></div>
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: "auto", paddingBottom: "14mm" }} />
+                </div>
+
+                {/* QR code — above footer bar, right-aligned */}
+                <div style={{ position: "absolute", bottom: "14mm", right: "2mm", zIndex: 3, display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5mm" }}>
+                  <div style={{ background: "#fff", padding: "2px", borderRadius: "3px", border: `2px solid ${DARK}` }}>
+                    <QRCodeSVG value={buildQrData(p, group, company.phone, company.phoneSaudi)} size={44} level="M" fgColor={DARK} />
+                  </div>
+                  <div style={{ fontSize: "3pt", color: DARK, fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.4px", background: "#fff", padding: "0.3mm 1mm", borderRadius: "2px" }}>SCAN</div>
+                </div>
+
+                {/* Barcode + footer — absolute at bottom */}
+                <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 2 }}>
+                  <div style={{ display: "flex", justifyContent: "flex-start", overflow: "hidden", paddingLeft: "2mm", marginBottom: "0.5mm" }}>
+                    {p.passportNumber ? (
+                      <Barcode value={p.passportNumber} height={14} width={1.0} fontSize={0} />
+                    ) : (
+                      <div style={{ fontSize: "5pt", color: "#999" }}>{group.groupName}</div>
+                    )}
+                  </div>
+                  <div style={{ background: DARK, color: GOLD, padding: "1mm 2mm", fontSize: "4pt", textAlign: "center", fontWeight: 800, letterSpacing: "0.2px" }}>
+                    {company.name} | 🇮🇳 {company.phone} | 🇸🇦 {company.phoneSaudi}
+                  </div>
+                </div>
+              </div>
+            ))}
+            {Array.from({ length: 3 - page.length }).map((_, i) => (
+              <div key={`ph-f-${i}`} className="id-card" style={{ border: "1px dashed #ddd", opacity: 0.2 }} />
+            ))}
           </div>
-        ))}
+
+          <div className="cards-row">
+            {page.map(p => (
+              <div key={`back-${p.id}`} className="id-card">
+                <WaveShapesBack />
+
+                <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", height: "100%", padding: "2.5mm 3mm 0" }}>
+                  <LogoHeader size="small" company={company} />
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: "1.2mm", fontSize: "5.5pt", lineHeight: 1.4 }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: "1.5mm" }}>
+                      <div style={bulletDot} />
+                      <div><span style={{ color: "#888", fontSize: "4.5pt" }}>Passport No. </span><span style={{ fontFamily: "monospace", letterSpacing: "0.3px", fontWeight: 600 }}>{p.passportNumber || "—"}</span></div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: "1.5mm" }}>
+                      <div style={bulletDot} />
+                      <div><span style={{ color: "#888", fontSize: "4.5pt" }}>Maktab: </span><span style={{ fontWeight: 600 }}>{group.maktabNumber || "—"}</span></div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: "1.5mm" }}>
+                      <div style={bulletDot} />
+                      <div>
+                        <span style={{ color: "#888", fontSize: "4.5pt" }}>Makkah 2 Hotel: </span>
+                        <span style={{ fontWeight: 600 }}>{group.hotels?.makkah?.name || "—"}</span>
+                        {group.hotels?.makkah?.nameAr && <div style={{ fontWeight: 600, fontSize: "4.5pt", direction: "rtl", textAlign: "right" }}>{group.hotels.makkah.nameAr}</div>}
+                        {group.hotels?.makkah?.address && <div style={{ fontSize: "4pt", color: "#888", marginTop: "0.3mm" }}>{group.hotels.makkah.address}</div>}
+                        {group.hotels?.makkah?.addressAr && <div style={{ fontSize: "4pt", color: "#888", direction: "rtl", textAlign: "right" }}>{group.hotels.makkah.addressAr}</div>}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: "1.5mm" }}>
+                      <div style={bulletDot} />
+                      <div>
+                        <span style={{ color: "#888", fontSize: "4.5pt" }}>Madinah Hotel: </span>
+                        <span style={{ fontWeight: 600 }}>{group.hotels?.madinah?.name || "—"}</span>
+                        {group.hotels?.madinah?.nameAr && <div style={{ fontWeight: 600, fontSize: "4.5pt", direction: "rtl", textAlign: "right" }}>{group.hotels.madinah.nameAr}</div>}
+                        {group.hotels?.madinah?.address && <div style={{ fontSize: "4pt", color: "#888", marginTop: "0.3mm" }}>{group.hotels.madinah.address}</div>}
+                        {group.hotels?.madinah?.addressAr && <div style={{ fontSize: "4pt", color: "#888", direction: "rtl", textAlign: "right" }}>{group.hotels.madinah.addressAr}</div>}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* QR code area */}
+                  {showFeedbackQr ? (
+                    <div style={{ display: "flex", justifyContent: "center", gap: "3mm", marginTop: "2mm", marginBottom: "1mm" }}>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5mm" }}>
+                        <div style={{ background: "#fff", padding: "2px", borderRadius: "3px", border: `1px solid ${GOLD}` }}>
+                          <QRCodeSVG value={buildQrData(p, group, company.phone, company.phoneSaudi)} size={36} level="M" />
+                        </div>
+                        <div style={{ fontSize: "3pt", color: "#888", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.3px" }}>Emergency Info</div>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5mm" }}>
+                        <div style={{ background: "#fff", padding: "2px", borderRadius: "3px", border: `1.5px solid #0d5040` }}>
+                          <QRCodeSVG
+                            value={p.mobileIndia && bookingMap[p.mobileIndia]
+                              ? `${PROD_DOMAIN}/feedback?booking_id=${bookingMap[p.mobileIndia]}`
+                              : `${PROD_DOMAIN}/feedback`}
+                            size={36} level="M" fgColor="#0d5040"
+                          />
+                        </div>
+                        <div style={{ fontSize: "3pt", color: "#0d5040", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.3px" }}>Rate Your Trip</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", justifyContent: "center", marginTop: "2mm", marginBottom: "1mm" }}>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1mm" }}>
+                        <div style={{ background: "#fff", padding: "2px", borderRadius: "3px", border: `2px solid ${DARK}` }}>
+                          <QRCodeSVG value={buildQrData(p, group, company.phone, company.phoneSaudi)} size={42} level="M" fgColor={DARK} />
+                        </div>
+                        <div style={{ background: DARK, color: "#fff", fontSize: "3.5pt", fontWeight: 900, letterSpacing: "1px", padding: "0.5mm 3mm", borderRadius: "10px", textTransform: "uppercase" }}>
+                          📱 Scan to Verify
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+
+                {/* Back footer — absolute */}
+                <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 3 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "4.5pt", color: "#666", padding: "0 3mm", marginBottom: "1mm" }}>
+                    <div>Group: <b style={{ color: DARK }}>{group.groupName}</b></div>
+                    <div><b style={{ color: DARK }}>{p.fullName}</b></div>
+                    <div>Year: <b style={{ color: DARK }}>{group.year}</b></div>
+                  </div>
+                  <div style={{
+                    background: DARK, color: "#fff", padding: "1.5mm 2mm",
+                    fontSize: "5pt", fontWeight: 900, textAlign: "center", lineHeight: 1.5,
+                    WebkitPrintColorAdjust: "exact", printColorAdjust: "exact",
+                  } as React.CSSProperties}>
+                    <div style={{ color: "#fff", fontWeight: 900 }}>{company.address}</div>
+                    <div style={{ color: GOLD, fontWeight: 900, fontSize: "5pt", letterSpacing: "0.2px" }}>
+                      🇮🇳 {company.phone} &nbsp;|&nbsp; 🇸🇦 {company.phoneSaudi}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {Array.from({ length: 3 - page.length }).map((_, i) => (
+              <div key={`ph-b-${i}`} className="id-card" style={{ border: "1px dashed #ddd", opacity: 0.2 }} />
+            ))}
+          </div>
+        </div>
+      ))}
       </div>
     </>
   );
