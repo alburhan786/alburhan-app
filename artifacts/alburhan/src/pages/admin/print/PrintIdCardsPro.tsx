@@ -26,8 +26,8 @@ interface Group {
 
 const DARK = "#0d5040";
 const GOLD = "#C9A23F";
-const W = "88mm";
-const H = "60mm";
+const W = "96mm";
+const H = "68mm";
 
 function buildQrData(p: Pilgrim, group: Group, phone: string, phoneSaudi: string): string {
   const lines = [
@@ -103,18 +103,18 @@ export default function PrintIdCardsPro() {
     <>
       <style>{`
         @media print {
-          @page { size: A4 portrait; margin: 6mm; }
+          @page { size: A4 portrait; margin: 5mm; }
           body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; margin: 0; }
           .no-print { display: none !important; }
         }
         * { box-sizing: border-box; }
         .pro-card {
           width: ${W}; height: ${H};
-          border: 1px solid #bbb; border-radius: 4px; overflow: hidden;
+          border: 1.5px solid #aaa; border-radius: 4px; overflow: hidden;
           page-break-inside: avoid; font-family: Arial, sans-serif;
           background: #fff; position: relative; display: flex; flex-direction: column;
         }
-        .pro-cards-row { display: flex; gap: 4mm; justify-content: center; margin-bottom: 2mm; }
+        .pro-cards-row { display: flex; gap: 5mm; justify-content: center; margin-bottom: 3mm; }
         .pro-customer-block { page-break-inside: avoid; }
         .pro-page-break { page-break-after: always; }
       `}</style>
@@ -176,38 +176,42 @@ export default function PrintIdCardsPro() {
 
                       {/* Left sidebar — photo prominent */}
                       <div style={{
-                        width: "30mm", flexShrink: 0, background: "#f0f7f2",
+                        width: "35mm", flexShrink: 0, background: "#f0f7f2",
                         display: "flex", flexDirection: "column", alignItems: "center",
-                        padding: "1.5mm 1.5mm 1.5mm", gap: "1mm",
-                        borderRight: `1px solid ${GOLD}`,
+                        padding: "1.5mm 1.5mm 1mm", gap: "1mm",
+                        borderRight: `1.5px solid ${GOLD}`,
                       }}>
                         {/* Logo + label */}
                         <div style={{ display: "flex", alignItems: "center", gap: "1.5mm" }}>
                           {company.logoUrl
-                            ? <img src={company.logoUrl} alt="" style={{ width: "8mm", height: "8mm", objectFit: "contain" }} />
-                            : <div style={{ width: "8mm", height: "8mm", background: DARK, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "6pt" }}>{company.nameShort.slice(0, 1)}</div>
+                            ? <img src={company.logoUrl} alt="" style={{ width: "9mm", height: "9mm", objectFit: "contain" }} />
+                            : <div style={{ width: "9mm", height: "9mm", background: DARK, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "6pt" }}>{company.nameShort.slice(0, 1)}</div>
                           }
                           <div style={{ textAlign: "center", lineHeight: 1.15 }}>
                             <div style={{ fontSize: "5pt", fontWeight: 900, color: GOLD }}>{company.nameShort}</div>
                             <div style={{ fontSize: "3pt", fontWeight: 700, color: DARK }}>HAJJ {group.year}</div>
                           </div>
                         </div>
-                        {/* Photo — large portrait */}
+                        {/* Photo — large portrait, face at top */}
                         {p.photoUrl ? (
                           <img
                             src={`${API}${p.photoUrl}`}
                             alt=""
                             crossOrigin="anonymous"
-                            style={{ width: "25mm", height: "30mm", objectFit: "cover", border: `2.5px solid ${GOLD}`, borderRadius: "2px", display: "block" }}
+                            style={{
+                              width: "30mm", height: "36mm",
+                              objectFit: "cover", objectPosition: "top center",
+                              border: `2.5px solid ${GOLD}`, borderRadius: "2px", display: "block",
+                            }}
                           />
                         ) : (
                           <div style={{
-                            width: "25mm", height: "30mm", background: "#e0e8e4",
+                            width: "30mm", height: "36mm", background: "#e0e8e4",
                             border: `2.5px solid ${GOLD}`, borderRadius: "2px",
                             display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
                             fontSize: "5pt", color: "#888", fontWeight: 700, gap: "1mm",
                           }}>
-                            <div style={{ fontSize: "14pt", color: GOLD }}>👤</div>
+                            <div style={{ fontSize: "18pt", color: GOLD }}>👤</div>
                             <div>PHOTO</div>
                           </div>
                         )}
