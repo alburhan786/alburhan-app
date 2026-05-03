@@ -25,6 +25,7 @@ const PRINT_OPTIONS = [
   { label: "ID Cards (Pro)", icon: <Star size={14} />, path: "id-cards-pro", color: "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100" },
   { label: "Luggage Labels", icon: <Luggage size={14} />, path: "luggage", color: "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100" },
   { label: "Luggage Square", icon: <Luggage size={14} />, path: "luggage-square", color: "bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100" },
+  { label: "Luggage Large (18×22cm)", icon: <Luggage size={14} />, path: "luggage-large", color: "bg-yellow-50 text-yellow-800 border-yellow-300 hover:bg-yellow-100" },
   { label: "Medical Cards", icon: <Stethoscope size={14} />, path: "medical", color: "bg-red-50 text-red-700 border-red-200 hover:bg-red-100" },
   { label: "Hotel List", icon: <Hotel size={14} />, path: "hotel-list", color: "bg-teal-50 text-teal-700 border-teal-200 hover:bg-teal-100" },
   { label: "Bus List", icon: <Bus size={14} />, path: "bus-list", color: "bg-green-50 text-green-700 border-green-200 hover:bg-green-100" },

@@ -41,6 +41,7 @@ function PrintDropdown({ groupId }: { groupId: string }) {
     { label: "Pro ID Cards (85×54)", path: "id-cards-pro" },
     { label: "Luggage Stickers", path: "luggage" },
     { label: "Square Luggage Sticker", path: "luggage-square" },
+    { label: "Large Luggage Sticker (18×22cm)", path: "luggage-large" },
     { label: "Medical Stickers", path: "medical" },
     { label: "Zamzam Stickers", path: "zamzam" },
     { sep: true },
