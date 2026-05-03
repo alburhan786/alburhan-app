@@ -70,9 +70,9 @@ function WaveShapesBack() {
 
 function LogoHeader({ size, company, showTopFlag }: { size?: "small"; company: CompanyInfo; showTopFlag?: boolean }) {
   const isSmall = size === "small";
-  const flagImgSize = isSmall ? "6mm" : "8mm";
-  const nameSize = isSmall ? "7pt" : "8pt";
-  const tagSize = isSmall ? "3.5pt" : "4.5pt";
+  const flagImgSize = isSmall ? "6mm" : "13mm";
+  const nameSize = isSmall ? "7pt" : "11pt";
+  const tagSize = isSmall ? "3.5pt" : "5.5pt";
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: isSmall ? "1mm" : "1.5mm" }}>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
@@ -84,7 +84,7 @@ function LogoHeader({ size, company, showTopFlag }: { size?: "small"; company: C
       </div>
       <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: "0.3mm" }}>
         {company.logoUrl
-          ? <img src={company.logoUrl} alt="" style={{ width: flagImgSize, height: flagImgSize, borderRadius: "50%", objectFit: "cover" }} />
+          ? <img src={company.logoUrl} alt="" style={{ width: flagImgSize, height: flagImgSize, borderRadius: "50%", objectFit: "cover", border: `1.5px solid ${GOLD}` }} />
           : <div style={{ width: flagImgSize, height: flagImgSize, borderRadius: "50%", background: DARK, display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "4pt" }}>{company.nameShort.slice(0, 1)}</div>
         }
       </div>
@@ -276,10 +276,10 @@ export default function PrintIdCards() {
 
                   {/* QR code area */}
                   {showFeedbackQr ? (
-                    <div style={{ display: "flex", justifyContent: "center", gap: "3mm", marginTop: "2mm", marginBottom: "1mm" }}>
+                    <div style={{ display: "flex", justifyContent: "center", gap: "3mm", marginTop: "1.5mm", marginBottom: "1mm" }}>
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5mm" }}>
                         <div style={{ background: "#fff", padding: "2px", borderRadius: "3px", border: `1px solid ${GOLD}` }}>
-                          <QRCodeSVG value={buildVerifyUrl(p.id)} size={36} level="M" />
+                          <QRCodeSVG value={buildVerifyUrl(p.id)} size={26} level="M" />
                         </div>
                         <div style={{ fontSize: "3pt", color: "#888", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.3px" }}>Emergency Info</div>
                       </div>
@@ -289,17 +289,17 @@ export default function PrintIdCards() {
                             value={p.mobileIndia && bookingMap[p.mobileIndia]
                               ? `${PROD_DOMAIN}/feedback?booking_id=${bookingMap[p.mobileIndia]}`
                               : `${PROD_DOMAIN}/feedback`}
-                            size={52} level="L" fgColor="#0d5040"
+                            size={36} level="L" fgColor="#0d5040"
                           />
                         </div>
                         <div style={{ fontSize: "3pt", color: "#0d5040", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.3px" }}>Rate Your Trip</div>
                       </div>
                     </div>
                   ) : (
-                    <div style={{ display: "flex", justifyContent: "center", marginTop: "2mm", marginBottom: "1mm" }}>
+                    <div style={{ display: "flex", justifyContent: "center", marginTop: "1.5mm", marginBottom: "1mm" }}>
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1mm" }}>
                         <div style={{ background: "#fff", padding: "2px", borderRadius: "3px", border: `2px solid ${DARK}` }}>
-                          <QRCodeSVG value={buildVerifyUrl(p.id)} size={56} level="M" fgColor={DARK} />
+                          <QRCodeSVG value={buildVerifyUrl(p.id)} size={38} level="M" fgColor={DARK} />
                         </div>
                       </div>
                     </div>
