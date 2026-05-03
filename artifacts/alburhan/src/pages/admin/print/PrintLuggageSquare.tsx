@@ -488,9 +488,18 @@ export default function PrintLuggageSquare() {
                             </div>
                           </div>
 
-                          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "2.5mm", marginTop: "auto" }}>
-                            <QRCodeSVG value={buildQrData(p, group, company.phone)} size={40} level="M" />
-                            <Barcode value={p.passportNumber || `H${serialNo}`} height={16} width={1.1} fontSize={0} />
+                          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "3mm", marginTop: "auto" }}>
+                            {/* QR — big + styled */}
+                            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.8mm" }}>
+                              <div style={{ background: "#fff", padding: "2.5px", borderRadius: "4px", border: `2.5px solid ${DARK}`, boxShadow: "0 1px 4px rgba(0,0,0,0.12)" }}>
+                                <QRCodeSVG value={buildQrData(p, group, company.phone)} size={60} level="M" fgColor={DARK} />
+                              </div>
+                              <div style={{ background: DARK, color: "#fff", fontSize: "4pt", fontWeight: 900, letterSpacing: "1px", padding: "0.4mm 2.5mm", borderRadius: "8px", textTransform: "uppercase" }}>📱 Scan</div>
+                            </div>
+                            {/* Barcode — taller */}
+                            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5mm" }}>
+                              <Barcode value={p.passportNumber || `H${serialNo}`} height={28} width={1.4} fontSize={7} />
+                            </div>
                           </div>
                         </div>
 
