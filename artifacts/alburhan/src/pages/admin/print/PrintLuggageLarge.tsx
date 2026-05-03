@@ -78,7 +78,7 @@ export default function PrintLuggageLarge() {
     <>
       <style>{`
         @media print {
-          @page { size: A4 portrait; margin: 8mm; }
+          @page { size: A4 portrait; margin: 6mm; }
           body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
           .no-print { display: none !important; }
         }
@@ -116,42 +116,43 @@ export default function PrintLuggageLarge() {
             display: "flex", alignItems: "stretch",
             WebkitPrintColorAdjust: "exact", printColorAdjust: "exact",
           } as React.CSSProperties}>
+
             {/* Left logo — Mashariq */}
-            <div style={{ width: "42mm", flexShrink: 0, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", padding: "3mm 4mm" }}>
-              <img src={mashariqLogoUrl} alt="Mashariq" style={{ maxHeight: "20mm", maxWidth: "100%", objectFit: "contain" }} />
+            <div style={{ width: "48mm", flexShrink: 0, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", padding: "3mm 4mm", borderRight: `2px solid ${DARK}` }}>
+              <img src={mashariqLogoUrl} alt="Mashariq" style={{ maxHeight: "28mm", maxWidth: "100%", objectFit: "contain" }} />
             </div>
 
             {/* Centre — service info */}
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "3mm 4mm", textAlign: "center" }}>
-              <div style={{ fontSize: "7pt", color: GOLD, textTransform: "uppercase", letterSpacing: "1px", fontWeight: 700, lineHeight: 1 }}>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "2mm 3mm", textAlign: "center" }}>
+              <div style={{ fontSize: "7pt", color: GOLD, textTransform: "uppercase", letterSpacing: "1.5px", fontWeight: 800, lineHeight: 1 }}>
                 SERVICE CENTER NO.
               </div>
               <div style={{
-                fontSize: "36pt", fontWeight: 900, color: "#fff", lineHeight: 1, letterSpacing: "2px",
+                fontSize: "48pt", fontWeight: 900, color: "#fff", lineHeight: 0.95, letterSpacing: "3px",
                 fontFamily: "'Arial Black', Arial, sans-serif",
                 WebkitPrintColorAdjust: "exact", printColorAdjust: "exact",
               } as React.CSSProperties}>
                 {SVC_CENTER}
               </div>
-              <div style={{ fontSize: "6.5pt", fontWeight: 700, color: GOLD, lineHeight: 1.3, marginTop: "1mm" }}>
+              <div style={{ fontSize: "6pt", fontWeight: 700, color: GOLD, lineHeight: 1.2, marginTop: "1mm" }}>
                 {SVC_NAME_EN}
               </div>
-              <div style={{ fontSize: "8pt", fontWeight: 700, color: "#fff", lineHeight: 1.3, direction: "rtl", fontFamily: "Arial, sans-serif" }}>
+              <div style={{ fontSize: "11pt", fontWeight: 900, color: "#fff", lineHeight: 1.3, direction: "rtl", fontFamily: "Arial, sans-serif", marginTop: "1mm" }}>
                 {SVC_NAME_AR}
               </div>
-              <div style={{ display: "flex", gap: "4mm", marginTop: "2mm" }}>
-                <div style={{ background: GOLD, borderRadius: "12px", padding: "1mm 3mm" }}>
-                  <span style={{ fontSize: "9pt", fontWeight: 900, color: DARK, letterSpacing: "0.5px" }}>📞 {SVC_PHONE_1}</span>
+              <div style={{ display: "flex", gap: "3mm", marginTop: "2mm" }}>
+                <div style={{ background: GOLD, borderRadius: "12px", padding: "1.5mm 4mm" }}>
+                  <span style={{ fontSize: "11pt", fontWeight: 900, color: DARK, letterSpacing: "0.5px", fontFamily: "monospace" }}>{SVC_PHONE_1}</span>
                 </div>
-                <div style={{ background: GOLD, borderRadius: "12px", padding: "1mm 3mm" }}>
-                  <span style={{ fontSize: "9pt", fontWeight: 900, color: DARK, letterSpacing: "0.5px" }}>📞 {SVC_PHONE_2}</span>
+                <div style={{ background: GOLD, borderRadius: "12px", padding: "1.5mm 4mm" }}>
+                  <span style={{ fontSize: "11pt", fontWeight: 900, color: DARK, letterSpacing: "0.5px", fontFamily: "monospace" }}>{SVC_PHONE_2}</span>
                 </div>
               </div>
             </div>
 
             {/* Right logo — Almasiah */}
-            <div style={{ width: "42mm", flexShrink: 0, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", padding: "3mm 4mm" }}>
-              <img src={almasiahLogoUrl} alt="Almasiah" style={{ maxHeight: "20mm", maxWidth: "100%", objectFit: "contain" }} />
+            <div style={{ width: "48mm", flexShrink: 0, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", padding: "3mm 4mm", borderLeft: `2px solid ${DARK}` }}>
+              <img src={almasiahLogoUrl} alt="Almasiah" style={{ maxHeight: "28mm", maxWidth: "100%", objectFit: "contain" }} />
             </div>
           </div>
 
@@ -174,10 +175,10 @@ export default function PrintLuggageLarge() {
           </div>
 
           {/* ── Body ── */}
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "4mm 6mm", gap: "3mm" }}>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "3mm 6mm", gap: "2.5mm" }}>
 
-            {/* Photo + Name row */}
-            <div style={{ display: "flex", alignItems: "center", gap: "5mm" }}>
+            {/* Photo + Name + Flag row */}
+            <div style={{ display: "flex", alignItems: "center", gap: "4mm" }}>
               <div style={{ flexShrink: 0 }}>
                 {p.photoUrl ? (
                   <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "38mm", height: "38mm", objectFit: "cover", borderRadius: "50%", border: `3px solid ${GOLD}`, boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }} />
@@ -201,14 +202,14 @@ export default function PrintLuggageLarge() {
                   </div>
                 </div>
               </div>
-              {/* Company logo (top right of body) */}
-              <div style={{ flexShrink: 0, textAlign: "center" }}>
+              {/* Al Burhan logo + Indian flag */}
+              <div style={{ flexShrink: 0, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "1mm" }}>
                 {company.logoUrl
-                  ? <img src={company.logoUrl} alt="" style={{ height: "16mm", objectFit: "contain" }} />
-                  : <div style={{ width: "16mm", height: "16mm", background: DARK, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "9pt" }}>{company.nameShort.slice(0, 1)}</div>
+                  ? <img src={company.logoUrl} alt="" style={{ height: "18mm", objectFit: "contain" }} />
+                  : <div style={{ width: "18mm", height: "18mm", background: DARK, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "9pt" }}>{company.nameShort.slice(0, 1)}</div>
                 }
-                <div style={{ fontSize: "5pt", fontWeight: 700, color: DARK, textTransform: "uppercase", marginTop: "0.5mm" }}>{company.nameShort}</div>
-                <div style={{ fontSize: "6pt" }}>🇮🇳</div>
+                <div style={{ fontSize: "5pt", fontWeight: 800, color: DARK, textTransform: "uppercase" }}>{company.nameShort}</div>
+                <div style={{ fontSize: "26pt", lineHeight: 1 }}>🇮🇳</div>
               </div>
             </div>
 
@@ -230,7 +231,7 @@ export default function PrintLuggageLarge() {
               )}
             </div>
 
-            {/* Hotels */}
+            {/* Hotels — bigger names */}
             <div style={{ display: "flex", gap: "2mm" }}>
               {([
                 ["HOTEL MAKKAH 1", group.hotels?.aziziah],
@@ -238,32 +239,34 @@ export default function PrintLuggageLarge() {
                 ["HOTEL MADINAH",  group.hotels?.madinah],
               ] as [string, { name?: string; address?: string; nameAr?: string } | undefined][]).map(([lbl, h]) => (
                 <div key={lbl} style={{ flex: 1, background: "#fefce8", border: "1px solid #e5e7eb", borderRadius: "4px", padding: "2mm 3mm" }}>
-                  <div style={{ fontSize: "5pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: 600 }}>{lbl}</div>
-                  <div style={{ fontWeight: 700, fontSize: "7pt", color: "#222", lineHeight: 1.3 }}>{h?.name || "—"}</div>
-                  {h?.nameAr && <div style={{ fontWeight: 700, fontSize: "7pt", color: "#222", lineHeight: 1.3, direction: "rtl", textAlign: "right", fontFamily: "Arial, sans-serif" }}>{h.nameAr}</div>}
+                  <div style={{ fontSize: "5.5pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: 700 }}>{lbl}</div>
+                  <div style={{ fontWeight: 900, fontSize: "10pt", color: DARK, lineHeight: 1.2 }}>{h?.name || "—"}</div>
+                  {h?.nameAr && <div style={{ fontWeight: 900, fontSize: "10pt", color: DARK, lineHeight: 1.2, direction: "rtl", textAlign: "right", fontFamily: "Arial, sans-serif" }}>{h.nameAr}</div>}
                   {h?.address && <div style={{ fontSize: "5pt", color: "#666", lineHeight: 1.2, marginTop: "0.5mm" }}>{h.address}</div>}
                 </div>
               ))}
             </div>
 
-            {/* QR + Barcode */}
-            <div style={{ display: "flex", alignItems: "center", gap: "5mm", marginTop: "auto", paddingTop: "2mm", borderTop: `1px dashed ${DARK}40` }}>
+            {/* QR + Barcode + Lost/Found */}
+            <div style={{ display: "flex", alignItems: "center", gap: "4mm", marginTop: "auto", paddingTop: "2mm", borderTop: `1px dashed ${DARK}40` }}>
               <div style={{ background: "#fff", padding: "3px", borderRadius: "4px", border: `2px solid ${DARK}` }}>
                 <QRCodeSVG value={buildQrData(p, group, company.phone)} size={80} level="L" fgColor={DARK} />
               </div>
               <div style={{ flex: 1, overflow: "hidden" }}>
                 <Barcode value={barcodeVal} height={36} displayValue fontSize={7} />
               </div>
-              {/* IN CASE OF LOST box */}
+
+              {/* IN CASE OF LOST/FOUND — red box with Al Burhan + phones */}
               <div style={{
-                background: RED, borderRadius: "6px", padding: "2mm 4mm", textAlign: "center",
+                background: RED, borderRadius: "6px", padding: "2.5mm 5mm", textAlign: "center",
                 WebkitPrintColorAdjust: "exact", printColorAdjust: "exact",
+                minWidth: "44mm",
               } as React.CSSProperties}>
-                <div style={{ color: "#fff", fontWeight: 900, fontSize: "6.5pt", textTransform: "uppercase", lineHeight: 1.3 }}>IN CASE OF</div>
-                <div style={{ color: "#fff", fontWeight: 900, fontSize: "6.5pt", textTransform: "uppercase", lineHeight: 1.3 }}>LOST / FOUND</div>
-                <div style={{ color: "#fff", fontWeight: 700, fontSize: "5.5pt", textTransform: "uppercase", lineHeight: 1.3, marginTop: "0.5mm" }}>KINDLY CONTACT</div>
-                <div style={{ color: "#FFD700", fontWeight: 900, fontSize: "7pt", lineHeight: 1.3 }}>{SVC_PHONE_1}</div>
-                <div style={{ color: "#FFD700", fontWeight: 900, fontSize: "7pt", lineHeight: 1.3 }}>{SVC_PHONE_2}</div>
+                <div style={{ color: "#fff", fontWeight: 900, fontSize: "7.5pt", textTransform: "uppercase", lineHeight: 1.3, letterSpacing: "0.5px" }}>IN CASE OF LOST / FOUND</div>
+                <div style={{ color: "#FFD700", fontWeight: 900, fontSize: "8pt", textTransform: "uppercase", lineHeight: 1.3, letterSpacing: "0.5px" }}>KINDLY CONTACT</div>
+                <div style={{ color: "#fff", fontWeight: 900, fontSize: "8pt", textTransform: "uppercase", lineHeight: 1.3, letterSpacing: "0.5px", marginTop: "0.5mm" }}>AL BURHAN</div>
+                <div style={{ color: "#FFD700", fontWeight: 900, fontSize: "10pt", lineHeight: 1.4, fontFamily: "monospace", letterSpacing: "0.5px" }}>{SVC_PHONE_1}</div>
+                <div style={{ color: "#FFD700", fontWeight: 900, fontSize: "10pt", lineHeight: 1.4, fontFamily: "monospace", letterSpacing: "0.5px" }}>{SVC_PHONE_2}</div>
               </div>
             </div>
           </div>
@@ -274,10 +277,10 @@ export default function PrintLuggageLarge() {
             textAlign: "center", padding: "1.5mm 4mm",
             WebkitPrintColorAdjust: "exact", printColorAdjust: "exact",
           } as React.CSSProperties}>
-            <div style={{ fontSize: "7pt", fontWeight: 900, color: "#fff", textTransform: "uppercase", lineHeight: 1.2, letterSpacing: "0.3px" }}>
+            <div style={{ fontSize: "8pt", fontWeight: 900, color: "#fff", textTransform: "uppercase", lineHeight: 1.2, letterSpacing: "0.3px" }}>
               {p.fullName}
             </div>
-            <div style={{ fontSize: "6pt", fontWeight: 700, color: GOLD, lineHeight: 1.2 }}>
+            <div style={{ fontSize: "7pt", fontWeight: 700, color: GOLD, lineHeight: 1.2 }}>
               {company.name} | {company.phone}
             </div>
           </div>
