@@ -81,7 +81,7 @@ export default function PrintBusList() {
           <tbody>
             {pilgrims.map((p, i) => (
               <tr key={p.id} style={{ background: i % 2 === 0 ? "#fff" : "#f8faf8" }}>
-                <td style={{ border: "1px solid #ddd", padding: "1.5mm 2mm", textAlign: "center", fontWeight: 700 }}>{(group?.startingSerialNumber ?? 1) - 1 + p.serialNumber}</td>
+                <td style={{ border: "1px solid #ddd", padding: "1.5mm 2mm", textAlign: "center", fontWeight: 700 }}>{p.serialNumber}</td>
                 <td style={{ border: "1px solid #ddd", padding: "1mm", textAlign: "center" }}>
                   {p.photoUrl ? (
                     <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "8mm", height: "10mm", objectFit: "cover", borderRadius: "2px" }} />

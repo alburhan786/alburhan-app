@@ -208,7 +208,7 @@ export default function PrintHajiList() {
                 return (
                   <tr key={p.id} style={{ background: i % 2 === 0 ? "#fff" : "#f0fdf4" }}>
                     <td style={{ ...tdStyle, textAlign: "center", fontWeight: 700, fontSize: "9pt", color: "#0d5040" }}>
-                      {(group?.startingSerialNumber ?? 1) - 1 + p.serialNumber}
+                      {p.serialNumber}
                     </td>
                     <td style={{ ...tdStyle, padding: "1mm", textAlign: "center" }}>
                       {p.photoUrl ? (

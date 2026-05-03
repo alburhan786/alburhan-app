@@ -138,7 +138,7 @@ export default function PrintIdCardsPro() {
             {/* ══ FRONT FACES ══ */}
             <div className="pro-cards-row">
               {page.map(p => {
-                const serial = String((group?.startingSerialNumber ?? 1) - 1 + p.serialNumber).padStart(3, "0");
+                const serial = String(p.serialNumber).padStart(3, "0");
                 const barcodeVal = p.passportNumber || `HAJ${serial}`;
                 return (
                   <div key={`f-${p.id}`} className="pro-card">
@@ -284,7 +284,7 @@ export default function PrintIdCardsPro() {
             {/* ══ BACK FACES ══ */}
             <div className="pro-cards-row">
               {page.map(p => {
-                const serial = String((group?.startingSerialNumber ?? 1) - 1 + p.serialNumber).padStart(3, "0");
+                const serial = String(p.serialNumber).padStart(3, "0");
                 return (
                   <div key={`b-${p.id}`} className="pro-card">
 

@@ -396,7 +396,7 @@ export default function PrintLuggageSquare() {
             {pages.map((page, pageIdx) => (
               <div key={`front-${pageIdx}`} className="sq-row">
                 {page.map(p => {
-                  const serialNo = String((group.startingSerialNumber ?? 1) - 1 + p.serialNumber).padStart(3, "0");
+                  const serialNo = String(p.serialNumber).padStart(3, "0");
                   return (
                     <div key={p.id} className="sq-sticker">
                       <div style={{ position: "relative", overflow: "hidden", height: "100%", display: "flex", flexDirection: "column" }}>

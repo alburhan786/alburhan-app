@@ -33,7 +33,7 @@ interface Group {
 function buildQr(p: Pilgrim, group: Group, phoneSaudi: string): string {
   const lines = [
     `Name: ${p.fullName}`,
-    `Serial: ${String((group.startingSerialNumber ?? 1) - 1 + p.serialNumber).padStart(3, "0")}`,
+    `Serial: ${String(p.serialNumber).padStart(3, "0")}`,
     `Group: ${group.groupName} ${group.year}`,
     ...(group.flightNumber ? [`Flight: ${group.flightNumber}`] : []),
     ...(group.returnDate ? [`Return: ${group.returnDate}`] : []),
@@ -128,7 +128,7 @@ export default function PrintZamzam() {
             {page.map(p => {
               const displayName = [p.salutation, p.fullName]
                 .filter(Boolean).join(" ").toUpperCase();
-              const serial = String((group?.startingSerialNumber ?? 1) - 1 + p.serialNumber).padStart(3, "0");
+              const serial = String(p.serialNumber).padStart(3, "0");
               const barcodeVal = p.passportNumber || `ZAM${serial}`;
 
               return (
