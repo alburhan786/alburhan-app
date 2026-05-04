@@ -54,6 +54,7 @@ import FeedbackPage from "@/pages/public/FeedbackPage";
 import FeedbackManager from "@/pages/admin/FeedbackManager";
 import StaffManager from "@/pages/admin/StaffManager";
 import PrintStaffCards from "@/pages/admin/print/PrintStaffCards";
+import PrintSprayLabel from "@/pages/admin/print/PrintSprayLabel";
 import StaffVerify from "@/pages/public/StaffVerify";
 import VerifyPilgrim from "@/pages/public/VerifyPilgrim";
 import ScanPilgrim from "@/pages/public/ScanPilgrim";
@@ -146,6 +147,7 @@ function Router() {
       <Route path="/admin/feedback" component={() => <AdminRoute component={FeedbackManager} />} />
       <Route path="/admin/staff" component={() => <AdminRoute component={StaffManager} />} />
       <Route path="/admin/staff/print" component={() => <AdminRoute component={PrintStaffCards} />} />
+      <Route path="/admin/print/spray-label" component={() => <AdminRoute component={PrintSprayLabel} />} />
 
       <Route component={NotFound} />
     </Switch>
