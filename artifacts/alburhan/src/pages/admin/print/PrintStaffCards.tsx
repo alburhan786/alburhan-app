@@ -466,9 +466,19 @@ export default function PrintStaffCards() {
     <>
       <style>{`
         @media print {
-          @page { size: A4 portrait; margin: 8mm; }
+          @page { size: A4 portrait; margin: 5mm; }
           body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; margin: 0; }
           .no-print { display: none !important; }
+          /* Print: lock grid to 3×3, zero extra spacing */
+          .cards-area { padding: 0 !important; }
+          .cards-row {
+            display: grid !important;
+            grid-template-columns: repeat(3, 54mm) !important;
+            gap: 2mm !important;
+            margin: 0 !important;
+            justify-content: center !important;
+          }
+          .page-block { padding: 0 !important; margin: 0 !important; }
         }
         * { box-sizing: border-box; }
         .staff-card {
@@ -476,6 +486,7 @@ export default function PrintStaffCards() {
           height: ${H};
           border-radius: 5px;
           overflow: hidden;
+          break-inside: avoid;
           page-break-inside: avoid;
           font-family: Arial, Helvetica, sans-serif;
           background: #fff;
@@ -484,19 +495,17 @@ export default function PrintStaffCards() {
           border: 0.5px solid #c8d8c8;
         }
         .cards-row {
-          display: flex;
-          flex-wrap: wrap;
+          display: grid;
+          grid-template-columns: repeat(3, ${W});
           gap: 4mm;
           justify-content: center;
-          margin-bottom: 4mm;
+          margin-bottom: 6mm;
         }
-        .page-block { page-break-after: always; }
-        .page-block:last-child { page-break-after: auto; }
+        .page-block { break-after: page; page-break-after: always; }
+        .page-block:last-child { break-after: auto; page-break-after: auto; }
         @media screen {
           .staff-card { box-shadow: 0 6px 24px rgba(0,0,0,0.22); }
-          .cards-area .staff-card { zoom: 1.8; }
-          .cards-area .cards-row  { gap: 14mm; margin-bottom: 8mm; }
-          .cards-area { padding: 10mm; }
+          .cards-area { padding: 10mm; background: #f0fdf4; }
         }
       `}</style>
 
