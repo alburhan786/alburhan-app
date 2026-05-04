@@ -8,9 +8,13 @@ const API = import.meta.env.VITE_API_URL || "";
 const BASE = import.meta.env.BASE_URL || "/";
 const PROD_DOMAIN = "https://alburhantravels.com";
 
-// Mashariq Al-Masiyah — pilgrim service company (Arabic from image: شركة مشارق الماسية)
 const MASHARIQ_EN = "Mashariq Al-Masiyah Company";
 const MASHARIQ_AR = "شركة مشارق الماسية";
+
+// Company India phones (shown big on front)
+const INDIA_PHONES = ["9893989786", "9893225590"];
+// Emergency Saudi phones (shown in front footer white)
+const SAUDI_EMERGENCY = ["0547090786", "0568780786"];
 
 interface Pilgrim {
   id: string; serialNumber: number; fullName: string; passportNumber?: string;
@@ -23,7 +27,7 @@ interface Group {
   startingSerialNumber?: number;
   hotels?: {
     groupLeader?: string;
-    makkah?: { name?: string; address?: string; nameAr?: string; addressAr?: string };
+    makkah?:  { name?: string; address?: string; nameAr?: string; addressAr?: string };
     madinah?: { name?: string; address?: string; nameAr?: string; addressAr?: string };
     aziziah?: { name?: string; address?: string; nameAr?: string; addressAr?: string };
   };
@@ -31,8 +35,6 @@ interface Group {
 
 const DARK = "#0d5040";
 const GOLD = "#C9A23F";
-
-// Short address hardcoded for card
 const SHORT_ADDRESS = "Shop No. 8, Khanka Masjid Complex, Shanwara Road, Burhanpur";
 
 function buildVerifyUrl(id: string): string {
@@ -40,11 +42,9 @@ function buildVerifyUrl(id: string): string {
 }
 
 interface CardProps {
-  p: Pilgrim;
-  group: Group;
+  p: Pilgrim; group: Group;
   company: ReturnType<typeof getCompanyById>;
-  showFeedbackQr: boolean;
-  bookingMap: Record<string, string>;
+  showFeedbackQr: boolean; bookingMap: Record<string, string>;
 }
 
 function FrontCard({ p, group, company }: CardProps) {
@@ -58,50 +58,38 @@ function FrontCard({ p, group, company }: CardProps) {
       {/* ── Header ── */}
       <div style={{
         background: DARK, flexShrink: 0,
-        padding: "1.5mm 2.5mm 1mm",
+        padding: "1.2mm 2mm 1mm", display: "flex", alignItems: "center", gap: "2mm",
       }}>
-        {/* Row 1: Flag | Company name | Logo */}
-        <div style={{ display: "flex", alignItems: "center", gap: "2mm" }}>
-          {/* Indian flag */}
-          <div style={{ fontSize: "22pt", lineHeight: 1, flexShrink: 0 }}>🇮🇳</div>
+        {/* Big Indian flag */}
+        <div style={{ fontSize: "26pt", lineHeight: 1, flexShrink: 0 }}>🇮🇳</div>
 
-          {/* Company name */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{
-              fontSize: "8.5pt", fontWeight: 900, color: "#fff",
-              letterSpacing: "0.6px", textTransform: "uppercase", lineHeight: 1.1,
-            }}>
-              AL BURHAN TOURS AND TRAVELS
-            </div>
-            <div style={{
-              fontSize: "7pt", fontWeight: 900, color: GOLD,
-              letterSpacing: "1px", lineHeight: 1.2, marginTop: "0.2mm",
-            }}>
-              HAJJ {group.year}
-            </div>
+        {/* Company + year */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: "8pt", fontWeight: 900, color: "#fff", textTransform: "uppercase", letterSpacing: "0.5px", lineHeight: 1.1 }}>
+            AL BURHAN TOURS AND TRAVELS
           </div>
-
-          {/* Logo circle */}
-          {company.logoUrl ? (
-            <div style={{
-              width: "11mm", height: "11mm", borderRadius: "50%",
-              background: "#fff", border: `2px solid ${GOLD}`,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              overflow: "hidden", flexShrink: 0,
-            }}>
-              <img src={company.logoUrl} alt="" style={{ width: "88%", height: "88%", objectFit: "contain" }} />
-            </div>
-          ) : (
-            <div style={{
-              width: "11mm", height: "11mm", borderRadius: "50%",
-              background: GOLD, display: "flex", alignItems: "center",
-              justifyContent: "center", color: DARK, fontWeight: 900,
-              fontSize: "7pt", flexShrink: 0,
-            }}>
-              AB
-            </div>
-          )}
+          <div style={{ fontSize: "6.5pt", fontWeight: 900, color: GOLD, letterSpacing: "1px", lineHeight: 1.2 }}>
+            HAJJ {group.year}
+          </div>
         </div>
+
+        {/* Logo circle */}
+        {company.logoUrl ? (
+          <div style={{
+            width: "10mm", height: "10mm", borderRadius: "50%",
+            background: "#fff", border: `2px solid ${GOLD}`,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            overflow: "hidden", flexShrink: 0,
+          }}>
+            <img src={company.logoUrl} alt="" style={{ width: "88%", height: "88%", objectFit: "contain" }} />
+          </div>
+        ) : (
+          <div style={{
+            width: "10mm", height: "10mm", borderRadius: "50%",
+            background: GOLD, display: "flex", alignItems: "center",
+            justifyContent: "center", color: DARK, fontWeight: 900, fontSize: "6pt", flexShrink: 0,
+          }}>AB</div>
+        )}
       </div>
 
       {/* ── Body ── */}
@@ -109,104 +97,98 @@ function FrontCard({ p, group, company }: CardProps) {
 
         {/* Photo sidebar */}
         <div style={{
-          width: "21mm", flexShrink: 0, background: "#f0f7f2",
+          width: "19mm", flexShrink: 0, background: "#f0f7f2",
           display: "flex", flexDirection: "column", alignItems: "center",
-          justifyContent: "center", padding: "1mm",
+          justifyContent: "center", padding: "0.8mm",
           borderRight: `1.5px solid ${GOLD}`,
         }}>
           {p.photoUrl ? (
-            <img
-              src={`${API}${p.photoUrl}`}
-              alt="" crossOrigin="anonymous"
-              style={{
-                width: "17mm", height: "20mm",
-                objectFit: "cover", objectPosition: "top center",
-                border: `2px solid ${GOLD}`, borderRadius: "2px",
-              }}
-            />
+            <img src={`${API}${p.photoUrl}`} alt="" crossOrigin="anonymous"
+              style={{ width: "16mm", height: "19mm", objectFit: "cover", objectPosition: "top center", border: `2px solid ${GOLD}`, borderRadius: "2px" }} />
           ) : (
             <div style={{
-              width: "17mm", height: "20mm", background: "#e0e8e4",
+              width: "16mm", height: "19mm", background: "#e0e8e4",
               border: `2px solid ${GOLD}`, borderRadius: "2px",
-              display: "flex", flexDirection: "column", alignItems: "center",
-              justifyContent: "center", fontSize: "3.5pt", color: "#888", fontWeight: 700,
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+              fontSize: "3pt", color: "#888", fontWeight: 700,
             }}>
-              <div style={{ fontSize: "10pt", color: GOLD }}>👤</div>
+              <div style={{ fontSize: "9pt", color: GOLD }}>👤</div>
               <div>PHOTO</div>
             </div>
           )}
-          <div style={{ fontSize: "6pt", fontWeight: 900, color: DARK, textAlign: "center", marginTop: "0.5mm", lineHeight: 1 }}>
-            #{serial}
-          </div>
+          <div style={{ fontSize: "5.5pt", fontWeight: 900, color: DARK, marginTop: "0.5mm" }}>#{serial}</div>
         </div>
 
-        {/* Info + QR */}
-        <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+        {/* Info column */}
+        <div style={{ flex: 1, padding: "1.2mm 1mm 0.5mm 2mm", display: "flex", flexDirection: "column", overflow: "hidden", gap: "0.9mm" }}>
 
-          {/* Info column */}
-          <div style={{ flex: 1, padding: "1.5mm 1mm 0.5mm 2mm", display: "flex", flexDirection: "column", justifyContent: "flex-start", overflow: "hidden" }}>
-
-            {/* Pilgrim name — BIG */}
-            <div style={{
-              fontSize: "7pt", fontWeight: 900, color: DARK,
-              textTransform: "uppercase", lineHeight: 1.2,
-              wordBreak: "break-word", marginBottom: "1.5mm",
-              borderBottom: `1px solid ${GOLD}60`, paddingBottom: "0.8mm",
-            }}>
-              {p.salutation ? `${p.salutation} ` : ""}{p.fullName}
-            </div>
-
-            {/* Fields */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "1mm" }}>
-              {p.passportNumber && (
-                <div>
-                  <div style={{ fontSize: "3pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Passport No.</div>
-                  <div style={{ fontSize: "6.5pt", fontWeight: 900, color: DARK, lineHeight: 1.15, letterSpacing: "0.5px" }}>{p.passportNumber}</div>
-                </div>
-              )}
-              {p.mobileIndia && (
-                <div>
-                  <div style={{ fontSize: "3pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Mobile (India)</div>
-                  <div style={{ fontSize: "6.5pt", fontWeight: 900, color: DARK, lineHeight: 1.15 }}>{p.mobileIndia}</div>
-                </div>
-              )}
-              {group.maktabNumber && (
-                <div>
-                  <div style={{ fontSize: "3pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Service Ctr.</div>
-                  <div style={{ fontSize: "6.5pt", fontWeight: 900, color: DARK, lineHeight: 1.15 }}>{group.maktabNumber}</div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* QR column */}
+          {/* Pilgrim name */}
           <div style={{
-            width: "18mm", flexShrink: 0,
-            display: "flex", flexDirection: "column", alignItems: "center",
-            justifyContent: "center", padding: "1mm 1.5mm",
-            borderLeft: `1px solid ${GOLD}50`,
+            fontSize: "6.5pt", fontWeight: 900, color: DARK,
+            textTransform: "uppercase", lineHeight: 1.2, wordBreak: "break-word",
+            borderBottom: `1px solid ${GOLD}50`, paddingBottom: "0.6mm",
           }}>
-            <div style={{ background: "#fff", padding: "2px", borderRadius: "3px", border: `2px solid ${DARK}` }}>
-              <QRCodeSVG value={buildVerifyUrl(p.id)} size={38} level="M" fgColor={DARK} />
-            </div>
-            <div style={{ fontSize: "2.5pt", color: "#888", textTransform: "uppercase", marginTop: "0.5mm", letterSpacing: "0.2px", textAlign: "center" }}>SCAN TO VERIFY</div>
+            {p.salutation ? `${p.salutation} ` : ""}{p.fullName}
           </div>
 
+          {/* Passport No — BIG BOLD */}
+          {p.passportNumber && (
+            <div>
+              <div style={{ fontSize: "2.8pt", color: "#999", textTransform: "uppercase", lineHeight: 1 }}>Passport No.</div>
+              <div style={{ fontSize: "7pt", fontWeight: 900, color: DARK, letterSpacing: "0.8px", lineHeight: 1.1 }}>{p.passportNumber}</div>
+            </div>
+          )}
+
+          {/* Mobile India — BIG BOLD */}
+          {p.mobileIndia && (
+            <div>
+              <div style={{ fontSize: "2.8pt", color: "#999", textTransform: "uppercase", lineHeight: 1 }}>Mobile (India)</div>
+              <div style={{ fontSize: "7pt", fontWeight: 900, color: DARK, lineHeight: 1.1 }}>{p.mobileIndia}</div>
+            </div>
+          )}
+
+          {/* Service Center — BIG BOLD */}
+          {group.maktabNumber && (
+            <div>
+              <div style={{ fontSize: "2.8pt", color: "#999", textTransform: "uppercase", lineHeight: 1 }}>Service Ctr. No.</div>
+              <div style={{ fontSize: "8pt", fontWeight: 900, color: DARK, lineHeight: 1.1 }}>{group.maktabNumber}</div>
+            </div>
+          )}
+
+          {/* Company India phones — big bold */}
+          <div style={{ marginTop: "auto", borderTop: `1px solid ${GOLD}40`, paddingTop: "0.5mm" }}>
+            <div style={{ fontSize: "2.5pt", color: "#999", textTransform: "uppercase", lineHeight: 1 }}>India Contact</div>
+            <div style={{ fontSize: "5pt", fontWeight: 900, color: DARK, lineHeight: 1.3 }}>
+              {INDIA_PHONES.join(" | ")}
+            </div>
+          </div>
+        </div>
+
+        {/* QR column — TOP RIGHT, BIG */}
+        <div style={{
+          width: "22mm", flexShrink: 0, padding: "1.5mm 1.5mm 0.5mm",
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start",
+          borderLeft: `1px solid ${GOLD}50`,
+        }}>
+          <div style={{ background: "#fff", padding: "2px", borderRadius: "3px", border: `2.5px solid ${DARK}` }}>
+            <QRCodeSVG value={buildVerifyUrl(p.id)} size={56} level="M" fgColor={DARK} />
+          </div>
+          <div style={{ fontSize: "2.5pt", color: "#888", textTransform: "uppercase", marginTop: "0.5mm", letterSpacing: "0.2px", textAlign: "center" }}>SCAN TO VERIFY</div>
         </div>
       </div>
 
-      {/* Barcode */}
-      <div style={{ flexShrink: 0, padding: "0 2mm 0.3mm", background: "#fff" }}>
-        <Barcode value={barcodeVal} format={barcodeFormat} height={12} displayValue fontSize={4} />
+      {/* ── Barcode — BIG ── */}
+      <div style={{ flexShrink: 0, padding: "0 1.5mm 0.3mm", background: "#fff" }}>
+        <Barcode value={barcodeVal} format={barcodeFormat} height={22} displayValue fontSize={5} />
       </div>
 
-      {/* Footer — Address BIG BOLD */}
-      <div style={{ background: DARK, textAlign: "center", padding: "0.8mm 2mm", flexShrink: 0 } as React.CSSProperties}>
-        <div style={{ fontSize: "5pt", fontWeight: 900, color: "#fff", textTransform: "uppercase", lineHeight: 1.2, letterSpacing: "0.3px" }}>
+      {/* ── Footer — Name + Emergency numbers WHITE (no address) ── */}
+      <div style={{ background: DARK, textAlign: "center", padding: "1mm 2mm", flexShrink: 0 } as React.CSSProperties}>
+        <div style={{ fontSize: "4.5pt", fontWeight: 900, color: "#fff", textTransform: "uppercase", lineHeight: 1.2, letterSpacing: "0.3px" }}>
           {p.fullName}
         </div>
-        <div style={{ fontSize: "4.5pt", fontWeight: 900, color: GOLD, lineHeight: 1.3, letterSpacing: "0.2px" }}>
-          {SHORT_ADDRESS}
+        <div style={{ fontSize: "5pt", fontWeight: 900, color: "#fff", lineHeight: 1.3, letterSpacing: "0.5px" }}>
+          🆘 {SAUDI_EMERGENCY[0]} &nbsp;|&nbsp; {SAUDI_EMERGENCY[1]}
         </div>
       </div>
     </div>
@@ -228,7 +210,7 @@ function BackCard({ p, group, company, showFeedbackQr, bookingMap }: CardProps) 
           <div style={{ fontSize: "7pt", fontWeight: 900, color: "#fff", textTransform: "uppercase", letterSpacing: "0.5px", lineHeight: 1.1 }}>
             AL BURHAN TOURS AND TRAVELS
           </div>
-          <div style={{ fontSize: "5.5pt", fontWeight: 900, color: GOLD, lineHeight: 1.2, letterSpacing: "0.5px" }}>
+          <div style={{ fontSize: "5.5pt", fontWeight: 900, color: GOLD, letterSpacing: "0.5px", lineHeight: 1.2 }}>
             HAJJ {group.year}
           </div>
         </div>
@@ -240,48 +222,42 @@ function BackCard({ p, group, company, showFeedbackQr, bookingMap }: CardProps) 
       {/* ── Body ── */}
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
 
-        {/* Left column */}
+        {/* Left: service info */}
         <div style={{
           width: "43mm", flexShrink: 0, padding: "1.2mm 2mm 1mm",
           borderRight: `1px solid ${GOLD}40`,
           display: "flex", flexDirection: "column", gap: "1mm",
         }}>
-          {/* Maktab */}
+          {/* Maktab big */}
           {group.maktabNumber && (
             <div>
-              <div style={{ fontSize: "3pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Service Center No.</div>
+              <div style={{ fontSize: "2.8pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Service Center No.</div>
               <div style={{ fontSize: "13pt", fontWeight: 900, color: DARK, lineHeight: 1 }}>{group.maktabNumber}</div>
             </div>
           )}
 
-          {/* Mashariq — English + Arabic */}
+          {/* Mashariq — EN + AR */}
           <div style={{
             background: `${GOLD}20`, borderRadius: "2px", padding: "1mm 1.5mm",
             borderLeft: `2.5px solid ${GOLD}`,
           }}>
-            <div style={{ fontSize: "5pt", fontWeight: 900, color: DARK, lineHeight: 1.3, letterSpacing: "0.2px" }}>
-              {MASHARIQ_EN}
-            </div>
-            <div style={{ fontSize: "6pt", fontWeight: 900, color: DARK, lineHeight: 1.35, direction: "rtl", textAlign: "right", fontFamily: "Arial, sans-serif" }}>
-              {MASHARIQ_AR}
-            </div>
-            <div style={{ fontSize: "3pt", color: "#777", textTransform: "uppercase", lineHeight: 1, marginTop: "0.3mm" }}>Pilgrim Service Company</div>
+            <div style={{ fontSize: "5pt", fontWeight: 900, color: DARK, lineHeight: 1.3, letterSpacing: "0.2px" }}>{MASHARIQ_EN}</div>
+            <div style={{ fontSize: "6pt", fontWeight: 900, color: DARK, lineHeight: 1.35, direction: "rtl", textAlign: "right", fontFamily: "Arial, sans-serif" }}>{MASHARIQ_AR}</div>
+            <div style={{ fontSize: "2.8pt", color: "#777", textTransform: "uppercase", lineHeight: 1, marginTop: "0.3mm" }}>Pilgrim Service Company</div>
           </div>
 
-          {/* Saudi emergency numbers BIG */}
+          {/* Saudi emergency — BIG */}
           <div>
-            <div style={{ fontSize: "3.5pt", fontWeight: 900, color: "#b91c1c", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1, marginBottom: "0.8mm" }}>
+            <div style={{ fontSize: "3pt", fontWeight: 900, color: "#b91c1c", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1, marginBottom: "0.5mm" }}>
               🆘 Emergency (Saudi)
             </div>
             {saudiPhones.map((num, i) => (
-              <div key={i} style={{ fontSize: "9.5pt", fontWeight: 900, color: DARK, lineHeight: 1.3, letterSpacing: "0.5px" }}>
-                {num}
-              </div>
+              <div key={i} style={{ fontSize: "9.5pt", fontWeight: 900, color: DARK, lineHeight: 1.3, letterSpacing: "0.5px" }}>{num}</div>
             ))}
           </div>
         </div>
 
-        {/* Right column: hotels + QR */}
+        {/* Right: hotels + feedback QR */}
         <div style={{ flex: 1, padding: "1.2mm 1.5mm", display: "flex", flexDirection: "column", overflow: "hidden" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: "1.2mm", flex: 1 }}>
             {([
@@ -290,7 +266,7 @@ function BackCard({ p, group, company, showFeedbackQr, bookingMap }: CardProps) 
               ["Hotel Madinah",  group.hotels?.madinah?.name,  group.hotels?.madinah?.nameAr,  group.hotels?.madinah?.address],
             ] as [string, string|undefined, string|undefined, string|undefined][]).map(([lbl, val, valAr, addr]) => val ? (
               <div key={lbl}>
-                <div style={{ fontSize: "3pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>{lbl}</div>
+                <div style={{ fontSize: "2.8pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>{lbl}</div>
                 <div style={{ fontSize: "5.5pt", fontWeight: 900, color: DARK, lineHeight: 1.2 }}>{val}</div>
                 {valAr && <div style={{ fontSize: "6pt", fontWeight: 900, color: DARK, lineHeight: 1.2, direction: "rtl", textAlign: "right" }}>{valAr}</div>}
                 {addr && <div style={{ fontSize: "4pt", fontWeight: 700, color: "#555", lineHeight: 1.2 }}>{addr}</div>}
@@ -308,16 +284,20 @@ function BackCard({ p, group, company, showFeedbackQr, bookingMap }: CardProps) 
                   size={26} level="L" fgColor={DARK}
                 />
               </div>
-              <div style={{ fontSize: "3pt", color: "#888", textTransform: "uppercase", marginTop: "0.3mm" }}>Rate Trip</div>
+              <div style={{ fontSize: "2.8pt", color: "#888", textTransform: "uppercase", marginTop: "0.3mm" }}>Rate Trip</div>
             </div>
           )}
         </div>
       </div>
 
-      {/* ── Footer ── */}
-      <div style={{ background: DARK, textAlign: "center", padding: "0.8mm 2mm", flexShrink: 0 } as React.CSSProperties}>
-        <div style={{ fontSize: "5pt", fontWeight: 900, color: "#fff", textTransform: "uppercase", lineHeight: 1.2 }}>{p.fullName}</div>
-        <div style={{ fontSize: "4.5pt", fontWeight: 900, color: GOLD, lineHeight: 1.3 }}>{SHORT_ADDRESS}</div>
+      {/* ── Footer — Address BIG BOLD WHITE ── */}
+      <div style={{ background: DARK, textAlign: "center", padding: "1mm 2mm", flexShrink: 0 } as React.CSSProperties}>
+        <div style={{ fontSize: "5pt", fontWeight: 900, color: "#fff", textTransform: "uppercase", lineHeight: 1.2, letterSpacing: "0.2px" }}>
+          {p.fullName}
+        </div>
+        <div style={{ fontSize: "5pt", fontWeight: 900, color: "#fff", lineHeight: 1.3, letterSpacing: "0.3px" }}>
+          {SHORT_ADDRESS}
+        </div>
       </div>
     </div>
   );
