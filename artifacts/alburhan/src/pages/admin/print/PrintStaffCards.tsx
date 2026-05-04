@@ -529,6 +529,12 @@ export default function PrintStaffCards() {
           <option value="inactive">Inactive Only</option>
         </select>
 
+        <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "12px", fontWeight: 600, color: GREEN, userSelect: "none" }}>
+          <input type="checkbox" checked={frontOnly} onChange={e => setFrontOnly(e.target.checked)}
+            style={{ width: "14px", height: "14px", cursor: "pointer", accentColor: GREEN }} />
+          Front Only (9/page)
+        </label>
+
         <span style={{ fontSize: "12px", color: "#666", marginLeft: "4px" }}>{filtered.length} card(s)</span>
 
         <div style={{ marginLeft: "auto", display: "flex", gap: "8px" }}>
@@ -569,17 +575,19 @@ export default function PrintStaffCards() {
                   ))}
                 </div>
               </div>
-              {/* ── BACK PAGE ── */}
-              <div className="page-block">
-                <div className="no-print" style={{ textAlign: "center", fontSize: "11px", color: "#888", padding: "4px 0 6px", fontStyle: "italic" }}>
-                  ◀ BACK — Page {pi + 1} &nbsp;({page.length} cards)
+              {/* ── BACK PAGE — only when not frontOnly ── */}
+              {!frontOnly && (
+                <div className="page-block">
+                  <div className="no-print" style={{ textAlign: "center", fontSize: "11px", color: "#888", padding: "4px 0 6px", fontStyle: "italic" }}>
+                    ◀ BACK — Page {pi + 1} &nbsp;({page.length} cards)
+                  </div>
+                  <div className="cards-row">
+                    {page.map(s => (
+                      <StaffCardBack key={`b-${s.id}`} s={s} groupName={s.groupId ? groups[s.groupId] : undefined} />
+                    ))}
+                  </div>
                 </div>
-                <div className="cards-row">
-                  {page.map(s => (
-                    <StaffCardBack key={`b-${s.id}`} s={s} groupName={s.groupId ? groups[s.groupId] : undefined} />
-                  ))}
-                </div>
-              </div>
+              )}
             </div>
           ))}
         </div>
