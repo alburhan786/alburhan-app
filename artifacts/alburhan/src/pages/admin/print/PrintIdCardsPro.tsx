@@ -157,9 +157,9 @@ function FrontCard({ p, group, company }: CardProps) {
 
           {/* Company India phones — big bold */}
           <div style={{ marginTop: "auto", borderTop: `1px solid ${GOLD}40`, paddingTop: "0.5mm" }}>
-            <div style={{ fontSize: "2.5pt", color: "#999", textTransform: "uppercase", lineHeight: 1 }}>India Contact</div>
+            <div style={{ fontSize: "2.5pt", color: "#999", textTransform: "uppercase", lineHeight: 1 }}>Company (India)</div>
             <div style={{ fontSize: "5pt", fontWeight: 900, color: DARK, lineHeight: 1.3 }}>
-              {INDIA_PHONES.join(" | ")}
+              {INDIA_PHONES[0]} &nbsp;|&nbsp; {INDIA_PHONES[1]}
             </div>
           </div>
         </div>
@@ -182,13 +182,28 @@ function FrontCard({ p, group, company }: CardProps) {
         <Barcode value={barcodeVal} format={barcodeFormat} height={22} displayValue fontSize={5} />
       </div>
 
-      {/* ── Footer — Name + Emergency numbers WHITE (no address) ── */}
-      <div style={{ background: DARK, textAlign: "center", padding: "1mm 2mm", flexShrink: 0 } as React.CSSProperties}>
-        <div style={{ fontSize: "4.5pt", fontWeight: 900, color: "#fff", textTransform: "uppercase", lineHeight: 1.2, letterSpacing: "0.3px" }}>
-          {p.fullName}
+      {/* ── Footer — Mobile + Emergency numbers BIG BOLD WHITE SQUARE ── */}
+      <div style={{ background: DARK, flexShrink: 0, padding: "1.5mm 2.5mm" } as React.CSSProperties}>
+        {/* Row 1: label + mobile */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.8mm" }}>
+          <div style={{ fontSize: "3pt", fontWeight: 700, color: "rgba(255,255,255,0.55)", textTransform: "uppercase", letterSpacing: "0.3px" }}>
+            {p.salutation ? `${p.salutation} ` : ""}{p.fullName}
+          </div>
+          <div style={{ fontSize: "3pt", fontWeight: 700, color: "rgba(255,255,255,0.55)", textTransform: "uppercase" }}>Mobile No.</div>
         </div>
-        <div style={{ fontSize: "5pt", fontWeight: 900, color: "#fff", lineHeight: 1.3, letterSpacing: "0.5px" }}>
-          🆘 {SAUDI_EMERGENCY[0]} &nbsp;|&nbsp; {SAUDI_EMERGENCY[1]}
+        {/* Row 2: emergency | mobile */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "2mm" }}>
+          <div>
+            <div style={{ fontSize: "3pt", fontWeight: 700, color: "#f87171", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>🆘 Emergency (Saudi)</div>
+            <div style={{ fontSize: "7.5pt", fontWeight: 900, color: "#fff", lineHeight: 1.25, letterSpacing: "0.5px" }}>{SAUDI_EMERGENCY[0]}</div>
+            <div style={{ fontSize: "7.5pt", fontWeight: 900, color: "#fff", lineHeight: 1.25, letterSpacing: "0.5px" }}>{SAUDI_EMERGENCY[1]}</div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: "3pt", fontWeight: 700, color: GOLD, textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Pilgrim Mobile</div>
+            <div style={{ fontSize: "8.5pt", fontWeight: 900, color: "#fff", lineHeight: 1.25, letterSpacing: "0.5px" }}>
+              {p.mobileIndia || "—"}
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -290,13 +305,24 @@ function BackCard({ p, group, company, showFeedbackQr, bookingMap }: CardProps) 
         </div>
       </div>
 
-      {/* ── Footer — Address BIG BOLD WHITE ── */}
-      <div style={{ background: DARK, textAlign: "center", padding: "1mm 2mm", flexShrink: 0 } as React.CSSProperties}>
-        <div style={{ fontSize: "5pt", fontWeight: 900, color: "#fff", textTransform: "uppercase", lineHeight: 1.2, letterSpacing: "0.2px" }}>
-          {p.fullName}
-        </div>
-        <div style={{ fontSize: "5pt", fontWeight: 900, color: "#fff", lineHeight: 1.3, letterSpacing: "0.3px" }}>
-          {SHORT_ADDRESS}
+      {/* ── Footer — Address + Emergency BIG BOLD WHITE SQUARE ── */}
+      <div style={{ background: DARK, flexShrink: 0, padding: "1.5mm 2.5mm" } as React.CSSProperties}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "2mm" }}>
+          {/* Left: address */}
+          <div>
+            <div style={{ fontSize: "3pt", fontWeight: 700, color: "rgba(255,255,255,0.55)", textTransform: "uppercase", lineHeight: 1, marginBottom: "0.5mm" }}>
+              {p.fullName}
+            </div>
+            <div style={{ fontSize: "5.5pt", fontWeight: 900, color: "#fff", lineHeight: 1.35, letterSpacing: "0.2px" }}>
+              {SHORT_ADDRESS}
+            </div>
+          </div>
+          {/* Right: emergency Saudi */}
+          <div style={{ textAlign: "right", flexShrink: 0 }}>
+            <div style={{ fontSize: "3pt", fontWeight: 700, color: "#f87171", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1, marginBottom: "0.3mm" }}>🆘 Emergency</div>
+            <div style={{ fontSize: "7pt", fontWeight: 900, color: "#fff", lineHeight: 1.25, letterSpacing: "0.5px" }}>{SAUDI_EMERGENCY[0]}</div>
+            <div style={{ fontSize: "7pt", fontWeight: 900, color: "#fff", lineHeight: 1.25, letterSpacing: "0.5px" }}>{SAUDI_EMERGENCY[1]}</div>
+          </div>
         </div>
       </div>
     </div>
