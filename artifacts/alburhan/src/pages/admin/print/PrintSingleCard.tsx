@@ -5,7 +5,6 @@ import { Barcode } from "@/components/print/Barcode";
 import { getCompanyById } from "@/lib/companies";
 
 const API = import.meta.env.VITE_API_URL || "";
-const PROD_DOMAIN = "https://alburhantravels.com";
 const MASHARIQ_EN = "Mashariq Al-Masiyah Company";
 const MASHARIQ_AR = "شركة مشارق الماسية";
 const INDIA_PHONES = ["9893989786", "9893225590"];
@@ -34,7 +33,6 @@ function buildVerifyUrl(id: string) {
 }
 
 function FrontCard({ p, group }: { p: Pilgrim; group: Group }) {
-  const company = getCompanyById("alburhan");
   const serial = String(p.serialNumber).padStart(3, "0");
   const barcodeVal = p.barcodeId || p.passportNumber || `HAJ${serial}`;
   const barcodeFormat = p.barcodeId ? "CODE128" : "CODE39";
@@ -59,7 +57,6 @@ function FrontCard({ p, group }: { p: Pilgrim; group: Group }) {
             ? <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#ccc", fontSize: "20pt" }}>👤</div>}
         </div>
-
         <div style={{ flex: 1, padding: "1.5mm 2mm", display: "flex", flexDirection: "column", justifyContent: "space-between", overflow: "hidden" }}>
           <div>
             <div style={{ fontSize: "9.5pt", fontWeight: 900, color: DARK, lineHeight: 1.2, wordBreak: "break-word", textTransform: "uppercase" }}>
@@ -72,7 +69,6 @@ function FrontCard({ p, group }: { p: Pilgrim; group: Group }) {
             )}
             {p.city && <div style={{ fontSize: "5.5pt", color: "#666", marginTop: "0.5mm" }}>{p.city}</div>}
           </div>
-
           <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "2mm" }}>
             <div>
               {INDIA_PHONES.map((ph, i) => (
@@ -97,7 +93,7 @@ function FrontCard({ p, group }: { p: Pilgrim; group: Group }) {
 
       <div style={{ background: DARK, flexShrink: 0, padding: "1.2mm 2.5mm" } as React.CSSProperties}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "2mm" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.3mm" }}>
+          <div>
             {SAUDI_EMERGENCY.map((ph, i) => (
               <div key={i} style={{ fontSize: "7pt", fontWeight: 900, color: "#fff", lineHeight: 1.2, letterSpacing: "0.5px" }}>{ph}</div>
             ))}
@@ -124,7 +120,7 @@ function BackCard({ p, group }: { p: Pilgrim; group: Group }) {
           <div style={{ fontSize: "7pt", fontWeight: 900, color: "#fff", textTransform: "uppercase", letterSpacing: "0.5px", lineHeight: 1.1 }}>AL BURHAN TOURS AND TRAVELS</div>
           <div style={{ fontSize: "5.5pt", fontWeight: 900, color: GOLD, letterSpacing: "0.5px", lineHeight: 1.2 }}>HAJJ {group.year}</div>
         </div>
-        <div style={{ fontSize: "3.5pt", fontWeight: 700, color: "rgba(255,255,255,0.6)", lineHeight: 1.3, textAlign: "right", flexShrink: 0 }}>{company.phone}</div>
+        <div style={{ fontSize: "3.5pt", fontWeight: 700, color: "rgba(255,255,255,0.6)", lineHeight: 1.3, textAlign: "right" }}>{company.phone}</div>
       </div>
 
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
@@ -136,7 +132,7 @@ function BackCard({ p, group }: { p: Pilgrim; group: Group }) {
             </div>
           )}
           <div style={{ background: `${GOLD}20`, borderRadius: "2px", padding: "1mm 1.5mm", borderLeft: `2.5px solid ${GOLD}` }}>
-            <div style={{ fontSize: "5pt", fontWeight: 900, color: DARK, lineHeight: 1.3, letterSpacing: "0.2px" }}>{MASHARIQ_EN}</div>
+            <div style={{ fontSize: "5pt", fontWeight: 900, color: DARK, lineHeight: 1.3 }}>{MASHARIQ_EN}</div>
             <div style={{ fontSize: "6pt", fontWeight: 900, color: DARK, lineHeight: 1.35, direction: "rtl", textAlign: "right" }}>{MASHARIQ_AR}</div>
             <div style={{ fontSize: "2.8pt", color: "#777", textTransform: "uppercase", lineHeight: 1, marginTop: "0.3mm" }}>Pilgrim Service Company</div>
           </div>
@@ -147,7 +143,6 @@ function BackCard({ p, group }: { p: Pilgrim; group: Group }) {
             ))}
           </div>
         </div>
-
         <div style={{ flex: 1, padding: "1.2mm 1.5mm", display: "flex", flexDirection: "column", overflow: "hidden" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: "1.2mm", flex: 1 }}>
             {([
@@ -213,92 +208,162 @@ export default function PrintSingleCard() {
       <style>{`
         @media print {
           @page { size: A4 portrait; margin: 0; }
-          body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; margin: 0; }
-          .no-print { display: none !important; }
-          .single-page {
-            width: 210mm; height: 297mm;
-            display: flex; align-items: center; justify-content: center;
-            page-break-after: always; break-after: page;
+          body {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            margin: 0;
           }
-          .single-page:last-child { page-break-after: auto; break-after: auto; }
+          .no-print { display: none !important; }
+          .fold-page {
+            width: 210mm;
+            height: 297mm;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+          }
+          .fold-half {
+            width: 210mm;
+            height: 148.5mm;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+          }
+          .fold-line { display: none; }
         }
         * { box-sizing: border-box; }
+
         .pro-card {
-          width: 90mm; height: 60mm;
-          border: 1px solid #ccc; border-radius: 3px;
-          overflow: hidden; font-family: Arial, sans-serif;
-          background: #fff; display: flex; flex-direction: column;
+          width: 90mm;
+          height: 60mm;
+          border: 1px solid #ccc;
+          border-radius: 3px;
+          overflow: hidden;
+          font-family: Arial, sans-serif;
+          background: #fff;
+          display: flex;
+          flex-direction: column;
         }
-        .single-page {
-          width: 210mm; min-height: 297mm;
-          display: flex; align-items: center; justify-content: center;
-          page-break-after: always; break-after: page;
+
+        /* Screen layout */
+        .fold-page {
+          width: 210mm;
+          min-height: 297mm;
+          display: flex;
+          flex-direction: column;
+          background: white;
         }
-        .single-page:last-child { page-break-after: auto; break-after: auto; }
+        .fold-half {
+          width: 210mm;
+          height: 148.5mm;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+        .fold-line {
+          width: 100%;
+          border-top: 2px dashed #94a3b8;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          position: relative;
+          flex-shrink: 0;
+        }
+        .fold-line-label {
+          background: #f1f5f9;
+          padding: 2px 10px;
+          font-size: 9px;
+          color: #64748b;
+          font-family: Arial, sans-serif;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+          border-radius: 20px;
+          border: 1px dashed #94a3b8;
+          position: absolute;
+        }
+
         @media screen {
-          body { background: #e5e7eb; }
-          .single-page {
-            background: white;
-            box-shadow: 0 4px 24px rgba(0,0,0,0.15);
-            margin: 20px auto;
+          body { background: #e2e8f0; font-family: Arial, sans-serif; }
+          .fold-page {
+            box-shadow: 0 4px 32px rgba(0,0,0,0.18);
+            margin: 80px auto 40px;
             border-radius: 4px;
           }
         }
       `}</style>
 
-      {/* ── Toolbar ── */}
+      {/* ── Fixed Toolbar ── */}
       <div className="no-print" style={{
-        position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
-        padding: "12px 20px", background: DARK, color: "#fff",
+        position: "fixed", top: 0, left: 0, right: 0, zIndex: 200,
+        padding: "10px 20px", background: DARK, color: "#fff",
         display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap",
         boxShadow: "0 2px 12px rgba(0,0,0,0.3)",
       }}>
         <div>
-          <div style={{ fontWeight: 900, fontSize: "15px" }}>🖨 Print ID Card — {pilgrim.fullName}</div>
-          <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.7)" }}>Page 1 = FRONT · Page 2 = BACK · Same person guaranteed</div>
+          <div style={{ fontWeight: 900, fontSize: "15px" }}>🖨 ID Card — {pilgrim.fullName}</div>
+          <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.7)" }}>
+            Front + Back on 1 A4 page · Print single-sided · Fold &amp; Laminate
+          </div>
         </div>
-
         <div style={{ marginLeft: "auto", display: "flex", gap: "10px", alignItems: "center" }}>
-          <button onClick={() => window.history.back()} style={{ padding: "8px 16px", background: "rgba(255,255,255,0.15)", color: "#fff", border: "1px solid rgba(255,255,255,0.3)", borderRadius: "7px", cursor: "pointer", fontSize: "13px" }}>
-            ← Back
-          </button>
-          <button onClick={() => window.print()} style={{ padding: "10px 28px", background: GOLD, color: "#000", border: "none", borderRadius: "8px", fontWeight: 900, cursor: "pointer", fontSize: "15px" }}>
-            🖨 PRINT NOW
-          </button>
+          <button onClick={() => window.history.back()} style={{
+            padding: "8px 16px", background: "rgba(255,255,255,0.15)", color: "#fff",
+            border: "1px solid rgba(255,255,255,0.3)", borderRadius: "7px", cursor: "pointer", fontSize: "13px",
+          }}>← Back</button>
+          <button onClick={() => window.print()} style={{
+            padding: "10px 32px", background: GOLD, color: "#000",
+            border: "none", borderRadius: "8px", fontWeight: 900, cursor: "pointer", fontSize: "15px",
+          }}>🖨 PRINT</button>
         </div>
       </div>
 
-      {/* ── Big instruction banner ── */}
+      {/* ── Instruction Banner ── */}
       <div className="no-print" style={{
-        marginTop: "70px",
-        padding: "14px 24px",
-        background: "#fef9c3",
+        position: "fixed", top: "58px", left: 0, right: 0, zIndex: 199,
+        padding: "10px 24px", background: "#fef9c3",
         borderBottom: "2px solid #facc15",
-        textAlign: "center",
-        fontSize: "14px",
-        fontWeight: 700,
-        color: "#854d0e",
+        fontSize: "13px", fontWeight: 700, color: "#854d0e",
+        display: "flex", gap: "24px", flexWrap: "wrap", alignItems: "center",
       }}>
-        ⚙️ In the print dialog: enable <strong>Two-sided printing</strong> → Flip on <strong>Short Edge</strong>
-        &nbsp;·&nbsp; Page 1 = <strong>{pilgrim.fullName} FRONT</strong>
-        &nbsp;·&nbsp; Page 2 = <strong>{pilgrim.fullName} BACK</strong>
-        &nbsp;·&nbsp; Printer puts them on <strong>same physical paper</strong> ✅
+        <span>① Print Single-sided (NO duplex)</span>
+        <span>✂ ② Fold along the dashed line in the middle</span>
+        <span>🪪 ③ Front faces out · Back faces in → Laminate</span>
+        <span style={{ color: "#166534", background: "#dcfce7", padding: "3px 10px", borderRadius: "20px", border: "1px solid #86efac" }}>
+          ✅ Works on ANY printer — no duplex setting needed
+        </span>
       </div>
 
-      {/* ── Page 1: FRONT ── */}
-      <div style={{ textAlign: "center", padding: "6px 0 2px", fontSize: "11px", color: "#666", fontFamily: "Arial" }} className="no-print">
-        ↓ Page 1 · {pilgrim.fullName} · FRONT
-      </div>
-      <div className="single-page">
-        <FrontCard p={pilgrim} group={group} />
-      </div>
+      {/* ── The single A4 page ── */}
+      <div className="fold-page">
 
-      {/* ── Page 2: BACK ── */}
-      <div style={{ textAlign: "center", padding: "6px 0 2px", fontSize: "11px", color: "#666", fontFamily: "Arial" }} className="no-print">
-        ↓ Page 2 · {pilgrim.fullName} · BACK (prints on the physical back of Page 1)
-      </div>
-      <div className="single-page">
-        <BackCard p={pilgrim} group={group} />
+        {/* TOP HALF — FRONT card (normal orientation) */}
+        <div className="fold-half" style={{ borderBottom: "none" }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3mm" }}>
+            <div className="no-print" style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", fontFamily: "Arial" }}>
+              ▼ FRONT SIDE
+            </div>
+            <FrontCard p={pilgrim} group={group} />
+          </div>
+        </div>
+
+        {/* FOLD LINE */}
+        <div className="fold-line">
+          <span className="fold-line-label no-print">✂ Fold here</span>
+        </div>
+
+        {/* BOTTOM HALF — BACK card rotated 180° */}
+        {/* After folding bottom UP behind the top, the 180° rotation makes it appear correctly */}
+        <div className="fold-half" style={{ transform: "rotate(180deg)" }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3mm" }}>
+            <div className="no-print" style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", fontFamily: "Arial" }}>
+              ▼ BACK SIDE (rotated — will be correct after folding)
+            </div>
+            <BackCard p={pilgrim} group={group} />
+          </div>
+        </div>
+
       </div>
     </>
   );
