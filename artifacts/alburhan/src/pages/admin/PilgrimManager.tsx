@@ -649,6 +649,14 @@ export default function PilgrimManager() {
                     <td className="px-4 py-3 text-xs">{p.relation || "—"}</td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost" size="icon"
+                          title={`Print ID card for ${p.fullName}`}
+                          onClick={() => window.open(`/admin/groups/${groupId}/print/single-card/${p.id}`, "_blank")}
+                          className="text-emerald-700 hover:bg-emerald-50"
+                        >
+                          <Printer size={14} />
+                        </Button>
                         <Button variant="ghost" size="icon" onClick={() => openEdit(p)}><Edit size={14} /></Button>
                         <Button variant="ghost" size="icon" className="text-red-600" onClick={() => handleDelete(p.id)}><Trash2 size={14} /></Button>
                       </div>
