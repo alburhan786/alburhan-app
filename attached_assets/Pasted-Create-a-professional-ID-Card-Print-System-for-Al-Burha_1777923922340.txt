@@ -1,0 +1,109 @@
+Create a professional ID Card Print System for Al Burhan Tours & Travels.
+
+OBJECTIVE:
+When admin clicks PRINT → system should generate a PDF with:
+- Front side of ID card (Mohammed Altaf)
+- Back side of SAME ID (Mohammed Altaf)
+- Ready for duplex printing (front + back alignment)
+
+-------------------------------------
+CARD SETTINGS
+-------------------------------------
+- Card size: 86mm x 54mm
+- DPI: 300
+- Margin: 5mm
+- Page: A4
+
+-------------------------------------
+PRINT LAYOUT (VERY IMPORTANT)
+-------------------------------------
+
+PAGE 1 (FRONT SIDE):
+- Show ID card FRONT design
+- Center aligned
+- Option: multiple cards grid (optional)
+- Example: Mohammed Altaf FRONT
+
+PAGE 2 (BACK SIDE):
+- Show SAME ID BACK design
+- EXACT SAME POSITION as front
+- Example: Mohammed Altaf BACK
+
+⚠️ IMPORTANT:
+Front and Back must be perfectly aligned for duplex printing.
+
+-------------------------------------
+DATA BINDING
+-------------------------------------
+
+When printing:
+- Use SAME user ID
+- Fetch:
+  name
+  photo
+  passport
+  mobile
+  QR code
+  ID number
+
+Example:
+{
+  name: "Mohammed Altaf",
+  id: "ABT-001",
+  role: "Airport Staff",
+  mobile: "+91 9893989786"
+}
+
+-------------------------------------
+QR CODE LOGIC
+-------------------------------------
+QR should open:
+https://alburhantravels.com/verify/ABT-001
+
+-------------------------------------
+BACK SIDE CONTENT
+-------------------------------------
+- QR code (large)
+- Scan to verify text
+- Staff details
+- Instructions
+- Contact info
+
+-------------------------------------
+FRONT SIDE CONTENT
+-------------------------------------
+- Logo + Company name
+- Staff photo
+- Name (bold)
+- Role
+- ID number
+- Hajj 2026 badge
+
+-------------------------------------
+PDF GENERATION
+-------------------------------------
+Use:
+- html2pdf OR Puppeteer
+
+-------------------------------------
+DUPLEX PRINT SETTINGS
+-------------------------------------
+Add print instructions:
+- Flip on short edge
+- Maintain same alignment
+- No scaling (100%)
+
+-------------------------------------
+BUTTON FUNCTION
+-------------------------------------
+When clicking PRINT:
+1. Generate PDF
+2. Auto download
+3. Ready for print
+
+-------------------------------------
+EXTRA FEATURE (OPTIONAL)
+-------------------------------------
+- Print multiple IDs (bulk)
+- Grid layout (2x4 per page)
+- Export ZIP of PDFs

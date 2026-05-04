@@ -329,6 +329,8 @@ function BackCard({ p, group, company, showFeedbackQr, bookingMap }: CardProps) 
   );
 }
 
+type DuplexMode = "none" | "short-edge" | "long-edge" | "single";
+
 export default function PrintIdCardsPro() {
   const [, params] = useRoute("/admin/groups/:groupId/print/id-cards-pro");
   const groupId = params?.groupId || "";
@@ -338,6 +340,7 @@ export default function PrintIdCardsPro() {
   const company = getCompanyById(companyId);
   const [showFeedbackQr, setShowFeedbackQr] = useState(false);
   const [bookingMap, setBookingMap] = useState<Record<string, string>>({});
+  const [duplexMode, setDuplexMode] = useState<DuplexMode>("single");
 
   useEffect(() => {
     if (!groupId) return;
@@ -350,17 +353,48 @@ export default function PrintIdCardsPro() {
 
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
 
-  // 9 cards per A4 landscape side — 3 cols × 3 rows
-  const BATCH = 9;
-  const COLS  = 3;
+  const COLS = 3;
+  const BATCH = duplexMode === "single" ? 1 : 9;
+
   const batches: Pilgrim[][] = [];
   for (let i = 0; i < pilgrims.length; i += BATCH) batches.push(pilgrims.slice(i, i + BATCH));
+
+  /** Compute back-page order based on duplex mode */
+  function getBackOrder(padded: (Pilgrim | null)[], totalRows: number): (Pilgrim | null)[] {
+    if (duplexMode === "short-edge") {
+      // Landscape short-edge flip = mirror columns per row
+      const out: (Pilgrim | null)[] = [];
+      for (let r = 0; r < totalRows; r++)
+        for (let c = COLS - 1; c >= 0; c--)
+          out.push(padded[r * COLS + c] ?? null);
+      return out;
+    }
+    if (duplexMode === "long-edge") {
+      // Landscape long-edge flip = reverse row order, columns stay
+      const out: (Pilgrim | null)[] = [];
+      for (let r = totalRows - 1; r >= 0; r--)
+        for (let c = 0; c < COLS; c++)
+          out.push(padded[r * COLS + c] ?? null);
+      return out;
+    }
+    // "none" or "single" → same order, printer handles flip
+    return padded;
+  }
+
+  const duplexTip: Record<DuplexMode, string> = {
+    single:       "✅ Guaranteed alignment — 1 card front+back per page pair. Select Two-sided in print dialog.",
+    none:         "💡 Printer handles alignment. Select Two-sided → Flip on long edge.",
+    "short-edge": "💡 Columns mirrored. Select Two-sided → Flip on short edge.",
+    "long-edge":  "💡 Rows reversed. Select Two-sided → Flip on long edge.",
+  };
+
+  const isSingle = duplexMode === "single";
 
   return (
     <>
       <style>{`
         @media print {
-          @page { size: A4 landscape; margin: 6mm 8mm; }
+          @page { size: A4 ${isSingle ? "portrait" : "landscape"}; margin: ${isSingle ? "15mm 20mm" : "6mm 8mm"}; }
           body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; margin: 0; }
           .no-print { display: none !important; }
           .pro-print-page { margin-bottom: 0 !important; box-shadow: none !important; padding: 0 !important; }
@@ -382,15 +416,16 @@ export default function PrintIdCardsPro() {
           flex-shrink: 0;
         }
 
-        /* ── A4 landscape grid: 3 cols × 3 rows ── */
+        /* Landscape 3×3 grid */
         .pro-print-page {
-          width: 277mm;
+          width: ${isSingle ? "90mm" : "277mm"};
           margin: 0 auto;
           display: grid;
-          grid-template-columns: 90mm 90mm 90mm;
-          gap: 3.5mm;
+          grid-template-columns: ${isSingle ? "90mm" : "90mm 90mm 90mm"};
+          gap: ${isSingle ? "0" : "3.5mm"};
           justify-content: center;
-          align-content: start;
+          align-content: ${isSingle ? "center" : "start"};
+          ${isSingle ? "min-height: 60mm;" : ""}
           page-break-after: always;
           break-after: page;
         }
@@ -423,24 +458,39 @@ export default function PrintIdCardsPro() {
         borderBottom: "2px solid #d1d5db",
       }}>
         <div>
-          <div style={{ fontWeight: 800, fontSize: "15px", color: DARK }}>ID Card Print — Duplex A4 Landscape</div>
+          <div style={{ fontWeight: 800, fontSize: "15px", color: DARK }}>ID Card Print — Duplex</div>
           <div style={{ fontSize: "12px", color: "#666" }}>
-            9 cards/side · 3×3 grid · Front page → Back page (rows mirrored for duplex)
+            {isSingle ? "1 card per page pair — guaranteed alignment" : "9 cards/side · 3×3 landscape grid"}
           </div>
         </div>
-        <select value={companyId} onChange={e => setCompanyId(e.target.value)} style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "13px", background: "#fff" }}>
+
+        {/* Company selector */}
+        <select value={companyId} onChange={e => setCompanyId(e.target.value)}
+          style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "13px", background: "#fff" }}>
           {COMPANIES.map(c => <option key={c.id} value={c.id}>{c.id === "alburhan" ? "Al Burhan Tours & Travels" : c.name}</option>)}
         </select>
+
+        {/* Feedback QR */}
         <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "13px", fontWeight: 500, userSelect: "none" }}>
-          <input type="checkbox" checked={showFeedbackQr} onChange={e => setShowFeedbackQr(e.target.checked)} style={{ width: "15px", height: "15px", cursor: "pointer" }} />
-          Show Feedback QR
+          <input type="checkbox" checked={showFeedbackQr} onChange={e => setShowFeedbackQr(e.target.checked)} style={{ width: "15px", height: "15px" }} />
+          Feedback QR
         </label>
-        <span style={{ fontSize: "12px", color: "#555", background: "#fff", padding: "4px 10px", borderRadius: "6px", border: "1px solid #d1d5db" }}>
-          📄 9 cards/side · 3×3 grid · A4 Landscape · Duplex long-edge
-        </span>
+
+        {/* ── Duplex mode selector ── */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+          <div style={{ fontSize: "10px", fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.5px" }}>Duplex Mode</div>
+          <select value={duplexMode} onChange={e => setDuplexMode(e.target.value as DuplexMode)}
+            style={{ padding: "8px 12px", border: `2px solid ${DARK}`, borderRadius: "6px", fontSize: "13px", fontWeight: 600, background: "#fff", color: DARK }}>
+            <option value="single">✅ Single card / page pair (Recommended)</option>
+            <option value="none">9-card grid · Printer handles flip</option>
+            <option value="short-edge">9-card grid · Short-edge flip (columns mirror)</option>
+            <option value="long-edge">9-card grid · Long-edge flip (rows reverse)</option>
+          </select>
+        </div>
+
         <div style={{ marginLeft: "auto", display: "flex", gap: "8px" }}>
-          <button onClick={() => window.print()} style={{ padding: "10px 24px", background: DARK, color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", fontSize: "13px" }}>
-            🖨 Print (Duplex)
+          <button onClick={() => window.print()} style={{ padding: "10px 24px", background: DARK, color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
+            🖨 Print
           </button>
           <button onClick={() => window.history.back()} style={{ padding: "10px 20px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff", fontSize: "13px" }}>
             ← Back
@@ -448,61 +498,58 @@ export default function PrintIdCardsPro() {
         </div>
       </div>
 
-      {/* ── Print tip ── */}
+      {/* ── Tip bar ── */}
       <div className="no-print" style={{
-        padding: "8px 20px", background: "#f0f9ff",
-        borderBottom: "1px solid #bae6fd",
-        fontSize: "12px", color: "#0369a1",
-        display: "flex", gap: "16px", flexWrap: "wrap",
+        padding: "8px 20px", background: isSingle ? "#f0fdf4" : "#f0f9ff",
+        borderBottom: `1px solid ${isSingle ? "#86efac" : "#bae6fd"}`,
+        fontSize: "12px", color: isSingle ? "#166534" : "#0369a1",
+        display: "flex", gap: "16px", flexWrap: "wrap", alignItems: "center",
       }}>
-        <span>💡 In print dialog: enable <strong>Two-sided (duplex)</strong> → <strong>Flip on long edge</strong></span>
-        <span>📐 Card size: <strong>9cm × 6cm</strong> &nbsp;|&nbsp; Layout: <strong>3 cols × 3 rows = 9 per side</strong></span>
-        <span>✅ Back rows auto-reversed for landscape duplex alignment</span>
+        <span>{duplexTip[duplexMode]}</span>
+        {isSingle && <span>📄 Each person gets <strong>Page N = Front</strong> + <strong>Page N+1 = Back</strong> — perfect for any duplex printer</span>}
+        {!isSingle && <span>📐 Card: <strong>9×6cm</strong> · 9 per side · {pilgrims.length} cards = {batches.length} batch{batches.length !== 1 ? "es" : ""}</span>}
       </div>
 
       {/* ── Pages ── */}
       <div style={{ background: "#f5f5f0", padding: "8mm", display: "flex", flexDirection: "column", gap: "10mm" }}>
         {batches.map((batch, bi) => {
-          const totalRows = Math.ceil(batch.length / COLS);
-          // Pad batch to full grid (multiple of COLS)
+          const totalRows = isSingle ? 1 : Math.ceil(batch.length / COLS);
           const padded = [...batch];
-          while (padded.length % COLS !== 0) padded.push(null as unknown as Pilgrim);
+          if (!isSingle) while (padded.length % COLS !== 0) padded.push(null as unknown as Pilgrim);
+          const backOrder = getBackOrder(padded, totalRows);
+          const p0 = batch[0];
 
-          // ── FRONT PAGE ──
-          const frontPage = (
+          return [
+            /* FRONT PAGE */
             <div key={`front-${bi}`}>
               <div className="no-print" style={{ fontSize: "11px", color: "#999", marginBottom: "3mm", fontStyle: "italic" }}>
-                Batch {bi + 1} · FRONT SIDE (Page {bi * 2 + 1}) — {batch.length} cards · 3×3 landscape
+                {isSingle
+                  ? `Card ${bi + 1} · ${p0?.fullName || ""} — FRONT (Page ${bi * 2 + 1})`
+                  : `Batch ${bi + 1} · FRONT (Page ${bi * 2 + 1}) — ${batch.length} cards`}
               </div>
               <div className="pro-print-page">
-                {padded.map((p, idx) =>
-                  p
-                    ? <FrontCard key={p.id} p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
-                    : <div key={`fph-${idx}`} className="card-placeholder" />
+                {padded.map((p, idx) => p
+                  ? <FrontCard key={p.id} p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
+                  : <div key={`fph-${idx}`} className="card-placeholder" />
                 )}
               </div>
-            </div>
-          );
+            </div>,
 
-          // ── BACK PAGE — SAME POSITION ORDER as front ──
-          // Duplex printer handles the physical flip internally.
-          // Back P1 must be at grid position 0,0 so it prints behind Front P1.
-          const backPage = (
+            /* BACK PAGE */
             <div key={`back-${bi}`}>
               <div className="no-print" style={{ fontSize: "11px", color: "#999", marginBottom: "3mm", fontStyle: "italic" }}>
-                Batch {bi + 1} · BACK SIDE (Page {bi * 2 + 2}) — same positions as front, printer handles flip
+                {isSingle
+                  ? `Card ${bi + 1} · ${p0?.fullName || ""} — BACK (Page ${bi * 2 + 2})`
+                  : `Batch ${bi + 1} · BACK (Page ${bi * 2 + 2}) · mode: ${duplexMode}`}
               </div>
               <div className="pro-print-page">
-                {padded.map((p, idx) =>
-                  p
-                    ? <BackCard key={`${p.id}-back`} p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
-                    : <div key={`bph-${idx}`} className="card-placeholder" />
+                {backOrder.map((p, idx) => p
+                  ? <BackCard key={`${p.id}-back-${idx}`} p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
+                  : <div key={`bph-${idx}`} className="card-placeholder" />
                 )}
               </div>
-            </div>
-          );
-
-          return [frontPage, backPage];
+            </div>,
+          ];
         })}
       </div>
     </>
