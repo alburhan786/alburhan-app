@@ -80,6 +80,24 @@ export default function PrintCenter() {
         </div>
       </div>
 
+      {/* Spray Bottle Label — standalone section */}
+      <div className="bg-white rounded-2xl shadow-sm border border-border/50 overflow-hidden mb-4">
+        <div className="flex items-center justify-between px-6 py-4">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 rounded-full bg-[#0F3D2E]/10 flex items-center justify-center text-2xl">🧴</div>
+            <div>
+              <h3 className="font-bold text-foreground text-base">Spray Bottle Label</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">3×2 inch · Multi Purpose Spray · 10 labels/page</p>
+            </div>
+          </div>
+          <Link href="/admin/print/spray-label">
+            <button className="flex items-center gap-2 px-4 py-2 bg-[#0F3D2E] text-white rounded-xl text-sm font-semibold hover:bg-[#0d5038] transition">
+              <Printer size={14} /> Print Labels
+            </button>
+          </Link>
+        </div>
+      </div>
+
       {/* Staff ID Cards — standalone section */}
       <div className="bg-white rounded-2xl shadow-sm border border-border/50 overflow-hidden mb-8">
         <div className="flex items-center justify-between px-6 py-4">
@@ -112,24 +130,6 @@ export default function PrintCenter() {
               </button>
             </Link>
           </div>
-        </div>
-      </div>
-
-      {/* Spray Bottle Label */}
-      <div className="bg-white rounded-2xl shadow-sm border border-border/50 overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-full bg-[#0F3D2E]/10 flex items-center justify-center text-lg">🧴</div>
-            <div>
-              <h3 className="font-bold text-foreground text-base">Spray Bottle Label</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">3×2 inch · Multi Purpose Spray · 10 labels/page</p>
-            </div>
-          </div>
-          <Link href="/admin/print/spray-label">
-            <button className="flex items-center gap-2 px-4 py-2 bg-[#0F3D2E] text-white rounded-xl text-sm font-semibold hover:bg-[#0d5038] transition">
-              <Printer size={14} /> Print Labels
-            </button>
-          </Link>
         </div>
       </div>
 
