@@ -41,7 +41,7 @@ function ShieldIcon({ size = 45 }: { size?: number }) {
   );
 }
 
-/* ── Single Label (150mm × 100mm) ── */
+/* ── Single Label (140mm × 80mm) ── */
 function SprayLabel() {
   return (
     <div className="spray-label">
@@ -52,16 +52,16 @@ function SprayLabel() {
 
           {/* LEFT — Logo + QR */}
           <div style={{
-            width: "42mm", flexShrink: 0, padding: "4mm 3mm 2mm 4mm",
+            width: "40mm", flexShrink: 0, padding: "3mm 2.5mm 2mm 3mm",
             display: "flex", flexDirection: "column", alignItems: "flex-start",
             borderRight: `1pt solid ${GOLD}55`,
             background: `linear-gradient(180deg, #f8fdf9 0%, #ffffff 100%)`,
           }}>
             {/* Logo circle */}
-            <div style={{ display: "flex", alignItems: "center", gap: "2.5mm", marginBottom: "3mm" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "2mm", marginBottom: "2mm" }}>
               {COMPANY.logoUrl ? (
                 <div style={{
-                  width: "18mm", height: "18mm", borderRadius: "50%",
+                  width: "15mm", height: "15mm", borderRadius: "50%",
                   border: `2pt solid ${GOLD}`, overflow: "hidden",
                   background: WHITE, flexShrink: 0,
                   boxShadow: `0 0 0 1pt ${GOLD}44`,
@@ -70,121 +70,121 @@ function SprayLabel() {
                 </div>
               ) : (
                 <div style={{
-                  width: "18mm", height: "18mm", borderRadius: "50%",
+                  width: "15mm", height: "15mm", borderRadius: "50%",
                   background: GOLD, display: "flex", alignItems: "center",
-                  justifyContent: "center", fontSize: "11pt", fontWeight: 900, color: GREEN,
+                  justifyContent: "center", fontSize: "10pt", fontWeight: 900, color: GREEN,
                 }}>AB</div>
               )}
             </div>
 
             {/* Company Name */}
             <div style={{
-              fontSize: "13pt", fontWeight: 900, color: GREEN,
+              fontSize: "11pt", fontWeight: 900, color: GREEN,
               lineHeight: 1.05, letterSpacing: "0.5px",
               textTransform: "uppercase",
             }}>
               AL BURHAN
             </div>
             <div style={{
-              fontSize: "8pt", fontWeight: 800, color: GREEN,
+              fontSize: "6.5pt", fontWeight: 800, color: GREEN,
               lineHeight: 1.2, letterSpacing: "0.8px",
-              textTransform: "uppercase", marginBottom: "2.5mm",
+              textTransform: "uppercase", marginBottom: "2mm",
             }}>
               TOURS &amp; TRAVELS
             </div>
 
             {/* Gold rule */}
-            <div style={{ width: "36mm", height: "1pt", background: GOLD, marginBottom: "2.5mm" }} />
+            <div style={{ width: "34mm", height: "1pt", background: GOLD, marginBottom: "2mm" }} />
 
             {/* Hajj Mubarak slogan */}
             <div style={{
-              fontSize: "12pt", fontWeight: 900, color: GREEN,
+              fontSize: "10pt", fontWeight: 900, color: GREEN,
               letterSpacing: "0.5px", lineHeight: 1.2,
-              marginBottom: "3mm",
+              marginBottom: "2mm",
             }}>
               Hajj Mubarak
             </div>
 
             {/* QR code — big */}
             <div style={{ marginTop: "auto" }}>
-              <QRCodeSVG value={WEBSITE} size={70} level="M" fgColor={GREEN} bgColor={WHITE} />
+              <QRCodeSVG value={WEBSITE} size={55} level="M" fgColor={GREEN} bgColor={WHITE} />
               <div style={{
-                fontSize: "4.5pt", color: "#666", letterSpacing: "1px",
-                marginTop: "1mm", fontWeight: 700, textTransform: "uppercase",
+                fontSize: "4pt", color: "#666", letterSpacing: "1px",
+                marginTop: "0.8mm", fontWeight: 700, textTransform: "uppercase",
               }}>SCAN QR CODE</div>
             </div>
           </div>
 
           {/* CENTER — Product Name */}
           <div style={{
-            flex: 1, padding: "4mm 3mm",
+            flex: 1, padding: "3mm 2.5mm",
             display: "flex", flexDirection: "column",
             alignItems: "center", justifyContent: "center",
             background: `linear-gradient(180deg, ${WHITE} 0%, ${LIGHT} 100%)`,
           }}>
             {/* Top star rule */}
-            <div style={{ display: "flex", alignItems: "center", gap: "2mm", marginBottom: "3mm", width: "100%" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "1.5mm", marginBottom: "2mm", width: "100%" }}>
               <div style={{ flex: 1, height: "1pt", background: GOLD }} />
-              <div style={{ fontSize: "6pt", color: GOLD, letterSpacing: "2px", fontWeight: 900 }}>★ ★</div>
+              <div style={{ fontSize: "5pt", color: GOLD, letterSpacing: "2px", fontWeight: 900 }}>★ ★</div>
               <div style={{ flex: 1, height: "1pt", background: GOLD }} />
             </div>
 
             <div style={{
-              fontSize: "8pt", fontWeight: 900, color: GREEN,
-              letterSpacing: "4px", textTransform: "uppercase",
-              lineHeight: 1, marginBottom: "2mm", textAlign: "center",
+              fontSize: "7pt", fontWeight: 900, color: GREEN,
+              letterSpacing: "3.5px", textTransform: "uppercase",
+              lineHeight: 1, marginBottom: "1.5mm", textAlign: "center",
             }}>
               MULTI PURPOSE
             </div>
 
             <div style={{
-              fontSize: "34pt", fontWeight: 900, color: GREEN,
+              fontSize: "28pt", fontWeight: 900, color: GREEN,
               letterSpacing: "2px", textTransform: "uppercase",
-              lineHeight: 1.0, textAlign: "center", marginBottom: "3mm",
+              lineHeight: 1.0, textAlign: "center", marginBottom: "2mm",
             }}>
               SPRAY
             </div>
 
             {/* Gold rule */}
-            <div style={{ width: "100%", height: "1.5pt", background: GOLD, marginBottom: "3mm" }} />
+            <div style={{ width: "100%", height: "1.5pt", background: GOLD, marginBottom: "2mm" }} />
 
             <div style={{
-              fontSize: "9pt", fontWeight: 800, color: "#2d6a4f",
-              letterSpacing: "1.5px", textAlign: "center", lineHeight: 1.4,
-              textTransform: "uppercase", marginBottom: "3mm",
+              fontSize: "7.5pt", fontWeight: 800, color: "#2d6a4f",
+              letterSpacing: "1.5px", textAlign: "center", lineHeight: 1.3,
+              textTransform: "uppercase", marginBottom: "2mm",
             }}>
               Hygiene &amp; Cleaning
             </div>
 
             {/* Bottom star rule */}
-            <div style={{ display: "flex", alignItems: "center", gap: "2mm", marginBottom: "3mm", width: "100%" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "1.5mm", marginBottom: "2mm", width: "100%" }}>
               <div style={{ flex: 1, height: "1pt", background: GOLD }} />
-              <div style={{ fontSize: "6pt", color: GOLD, fontWeight: 900 }}>✦</div>
+              <div style={{ fontSize: "5pt", color: GOLD, fontWeight: 900 }}>✦</div>
               <div style={{ flex: 1, height: "1pt", background: GOLD }} />
             </div>
 
-            {/* Hajj 2026 big badge */}
+            {/* Hajj 2026 badge */}
             <div style={{
-              background: GREEN, borderRadius: "6pt",
-              padding: "2.5mm 6mm", textAlign: "center",
+              background: GREEN, borderRadius: "5pt",
+              padding: "2mm 5mm", textAlign: "center",
               border: `1.5pt solid ${GOLD}`,
               boxShadow: `0 0 0 1pt ${GOLD}44`,
             }}>
-              <div style={{ fontSize: "7pt", fontWeight: 900, color: GOLD, letterSpacing: "3px" }}>HAJJ</div>
-              <div style={{ fontSize: "20pt", fontWeight: 900, color: WHITE, letterSpacing: "1px", lineHeight: 1 }}>2026</div>
+              <div style={{ fontSize: "6pt", fontWeight: 900, color: GOLD, letterSpacing: "3px" }}>HAJJ</div>
+              <div style={{ fontSize: "16pt", fontWeight: 900, color: WHITE, letterSpacing: "1px", lineHeight: 1 }}>2026</div>
             </div>
           </div>
 
           {/* RIGHT — Spray + Shield icons */}
           <div style={{
-            width: "38mm", flexShrink: 0, padding: "4mm 3mm",
+            width: "36mm", flexShrink: 0, padding: "3mm 2.5mm",
             display: "flex", flexDirection: "column",
             alignItems: "center", justifyContent: "space-around",
             borderLeft: `1pt solid ${GOLD}55`,
             background: `${GREEN}06`,
           }}>
-            <SprayIcon size={65} />
-            <ShieldIcon size={55} />
+            <SprayIcon size={52} />
+            <ShieldIcon size={42} />
           </div>
         </div>
 
@@ -237,9 +237,9 @@ function SprayLabel() {
 
 /* ── MAIN PAGE ── */
 export default function PrintSprayLabel() {
-  // 2 labels per A4 page (1 col × 2 rows) at 150mm width
-  const labelsPerPage = 2;
-  const totalLabels   = 6;
+  // 3 labels per A4 page (1 col × 3 rows) at 140mm × 80mm
+  const labelsPerPage = 3;
+  const totalLabels   = 3;
   const pages: number[][] = [];
   for (let i = 0; i < totalLabels; i += labelsPerPage) {
     pages.push(Array.from({ length: Math.min(labelsPerPage, totalLabels - i) }, (_, k) => i + k));
@@ -259,8 +259,8 @@ export default function PrintSprayLabel() {
         * { box-sizing: border-box; }
 
         .spray-label {
-          width: 150mm;
-          height: 100mm;
+          width: 140mm;
+          height: 80mm;
           position: relative;
           flex-shrink: 0;
           border: 1.5pt dashed #bbb;
@@ -286,8 +286,8 @@ export default function PrintSprayLabel() {
 
         .label-grid {
           display: grid;
-          grid-template-columns: 150mm;
-          gap: 8mm;
+          grid-template-columns: 140mm;
+          gap: 6mm;
           justify-content: center;
         }
 
@@ -317,7 +317,7 @@ export default function PrintSprayLabel() {
       }}>
         <div>
           <div style={{ fontWeight: 800, fontSize: "16px", color: GREEN }}>Spray Bottle Label</div>
-          <div style={{ fontSize: "12px", color: "#666" }}>15cm × 10cm · 2 labels/A4 page · Print-ready</div>
+          <div style={{ fontSize: "12px", color: "#666" }}>14cm × 8cm · 3 labels/A4 page · Print-ready</div>
         </div>
         <div style={{ marginLeft: "auto", display: "flex", gap: "8px" }}>
           <button onClick={() => window.print()} style={{
@@ -338,8 +338,8 @@ export default function PrintSprayLabel() {
         display: "flex", gap: "16px", flexWrap: "wrap",
         fontSize: "12px", color: "#555",
       }}>
-        <span>📐 Label size: <strong>15cm × 10cm</strong> (150mm × 100mm)</span>
-        <span>🖨 Layout: <strong>1 column × 2 rows = 2 labels/page</strong></span>
+        <span>📐 Label size: <strong>14cm × 8cm</strong> (140mm × 80mm)</span>
+        <span>🖨 Layout: <strong>1 column × 3 rows = 3 labels/page</strong></span>
         <span>✂ Dashed border = cut line</span>
         <span>🎨 Enable "Print background graphics"</span>
       </div>
