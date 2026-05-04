@@ -484,24 +484,16 @@ export default function PrintIdCardsPro() {
             </div>
           );
 
-          // ── BACK PAGE — rows reversed for landscape long-edge duplex ──
-          // When A4 landscape is flipped on the long (horizontal) edge, row order reverses.
-          // Row 3 becomes row 1, row 2 stays middle, row 1 becomes row 3.
-          const backPadded = [...padded];
-          const reversedRows: (Pilgrim | null)[] = [];
-          for (let r = totalRows - 1; r >= 0; r--) {
-            for (let c = 0; c < COLS; c++) {
-              reversedRows.push(backPadded[r * COLS + c] ?? null);
-            }
-          }
-
+          // ── BACK PAGE — SAME POSITION ORDER as front ──
+          // Duplex printer handles the physical flip internally.
+          // Back P1 must be at grid position 0,0 so it prints behind Front P1.
           const backPage = (
             <div key={`back-${bi}`}>
               <div className="no-print" style={{ fontSize: "11px", color: "#999", marginBottom: "3mm", fontStyle: "italic" }}>
-                Batch {bi + 1} · BACK SIDE (Page {bi * 2 + 2}) — rows reversed for landscape duplex
+                Batch {bi + 1} · BACK SIDE (Page {bi * 2 + 2}) — same positions as front, printer handles flip
               </div>
               <div className="pro-print-page">
-                {reversedRows.map((p, idx) =>
+                {padded.map((p, idx) =>
                   p
                     ? <BackCard key={`${p.id}-back`} p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
                     : <div key={`bph-${idx}`} className="card-placeholder" />
