@@ -430,6 +430,7 @@ export default function PrintStaffCards() {
   const [companyFilter, setCompanyFilter]  = useState("all");
   const [roleFilter,    setRoleFilter]     = useState("all");
   const [statusFilter,  setStatusFilter]   = useState("active");
+  const [frontOnly,     setFrontOnly]      = useState(true);
 
   useEffect(() => {
     Promise.all([
