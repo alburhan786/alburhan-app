@@ -329,7 +329,7 @@ function BackCard({ p, group, company, showFeedbackQr, bookingMap }: CardProps) 
   );
 }
 
-type DuplexMode = "none" | "short-edge" | "long-edge" | "single";
+type PrintMode = "sidebyside" | "duplex";
 
 export default function PrintIdCardsPro() {
   const [, params] = useRoute("/admin/groups/:groupId/print/id-cards-pro");
@@ -340,7 +340,7 @@ export default function PrintIdCardsPro() {
   const company = getCompanyById(companyId);
   const [showFeedbackQr, setShowFeedbackQr] = useState(false);
   const [bookingMap, setBookingMap] = useState<Record<string, string>>({});
-  const [duplexMode, setDuplexMode] = useState<DuplexMode>("single");
+  const [printMode, setPrintMode] = useState<PrintMode>("sidebyside");
 
   useEffect(() => {
     if (!groupId) return;
@@ -353,99 +353,105 @@ export default function PrintIdCardsPro() {
 
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
 
-  const COLS = 3;
-  const BATCH = duplexMode === "single" ? 1 : 9;
+  // Side-by-side: 4 pairs per A4 portrait page
+  // Duplex: 1 card per page, front then back (2 pages per person)
+  const PAIRS_PER_PAGE = 4;
+  const pages: Pilgrim[][] = [];
+  for (let i = 0; i < pilgrims.length; i += PAIRS_PER_PAGE)
+    pages.push(pilgrims.slice(i, i + PAIRS_PER_PAGE));
 
-  const batches: Pilgrim[][] = [];
-  for (let i = 0; i < pilgrims.length; i += BATCH) batches.push(pilgrims.slice(i, i + BATCH));
-
-  /** Compute back-page order based on duplex mode */
-  function getBackOrder(padded: (Pilgrim | null)[], totalRows: number): (Pilgrim | null)[] {
-    if (duplexMode === "short-edge") {
-      // Landscape short-edge flip = mirror columns per row
-      const out: (Pilgrim | null)[] = [];
-      for (let r = 0; r < totalRows; r++)
-        for (let c = COLS - 1; c >= 0; c--)
-          out.push(padded[r * COLS + c] ?? null);
-      return out;
-    }
-    if (duplexMode === "long-edge") {
-      // Landscape long-edge flip = reverse row order, columns stay
-      const out: (Pilgrim | null)[] = [];
-      for (let r = totalRows - 1; r >= 0; r--)
-        for (let c = 0; c < COLS; c++)
-          out.push(padded[r * COLS + c] ?? null);
-      return out;
-    }
-    // "none" or "single" → same order, printer handles flip
-    return padded;
-  }
-
-  const duplexTip: Record<DuplexMode, string> = {
-    single:       "✅ Guaranteed alignment — 1 card front+back per page pair. Select Two-sided in print dialog.",
-    none:         "💡 Printer handles alignment. Select Two-sided → Flip on long edge.",
-    "short-edge": "💡 Columns mirrored. Select Two-sided → Flip on short edge.",
-    "long-edge":  "💡 Rows reversed. Select Two-sided → Flip on long edge.",
-  };
-
-  const isSingle = duplexMode === "single";
+  const isSBS = printMode === "sidebyside";
 
   return (
     <>
       <style>{`
         @media print {
-          @page { size: A4 ${isSingle ? "portrait" : "landscape"}; margin: ${isSingle ? "15mm 20mm" : "6mm 8mm"}; }
+          @page { size: A4 portrait; margin: 8mm 10mm; }
           body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; margin: 0; }
           .no-print { display: none !important; }
-          .pro-print-page { margin-bottom: 0 !important; box-shadow: none !important; padding: 0 !important; }
+          .id-print-page { box-shadow: none !important; margin-bottom: 0 !important; }
         }
         * { box-sizing: border-box; }
 
         .pro-card {
           width: 90mm;
           height: 60mm;
-          border: 1px solid #aaa;
+          border: 1px solid #ccc;
           border-radius: 3px;
           overflow: hidden;
-          page-break-inside: avoid;
-          break-inside: avoid;
           font-family: Arial, sans-serif;
           background: #fff;
           display: flex;
           flex-direction: column;
           flex-shrink: 0;
+          page-break-inside: avoid;
+          break-inside: avoid;
         }
 
-        /* Landscape 3×3 grid */
-        .pro-print-page {
-          width: ${isSingle ? "90mm" : "277mm"};
-          margin: 0 auto;
-          display: grid;
-          grid-template-columns: ${isSingle ? "90mm" : "90mm 90mm 90mm"};
-          gap: ${isSingle ? "0" : "3.5mm"};
-          justify-content: center;
-          align-content: ${isSingle ? "center" : "start"};
-          ${isSingle ? "min-height: 60mm;" : ""}
+        /* ── Side-by-side page: 4 rows, each row = front | cut | back ── */
+        .id-print-page {
+          width: 190mm;
+          margin: 0 auto 0;
+          display: flex;
+          flex-direction: column;
+          gap: 5mm;
           page-break-after: always;
           break-after: page;
         }
-        .pro-print-page:last-child {
+        .id-print-page:last-child {
           page-break-after: auto;
           break-after: auto;
         }
 
-        .card-placeholder {
-          width: 90mm;
-          height: 60mm;
-          visibility: hidden;
+        /* One row = front card + cut line + back card */
+        .card-pair-row {
+          display: flex;
+          align-items: center;
+          gap: 0;
+          page-break-inside: avoid;
+          break-inside: avoid;
+        }
+
+        /* Dashed cut line between front and back */
+        .cut-line {
+          width: 10mm;
           flex-shrink: 0;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 1mm;
+        }
+        .cut-line-inner {
+          width: 1px;
+          height: 60mm;
+          border-left: 1.5px dashed #bbb;
+          position: relative;
+        }
+
+        /* Single-card pages for duplex mode */
+        .duplex-page {
+          width: 90mm;
+          margin: 0 auto;
+          page-break-after: always;
+          break-after: page;
+        }
+        .duplex-page:last-child {
+          page-break-after: auto;
+          break-after: auto;
         }
 
         @media screen {
-          .pro-print-page {
+          .id-print-page {
             background: white;
-            box-shadow: 0 2px 16px rgba(0,0,0,0.12);
             padding: 8mm;
+            box-shadow: 0 2px 16px rgba(0,0,0,0.12);
+            border-radius: 4px;
+          }
+          .duplex-page {
+            background: white;
+            padding: 8mm;
+            box-shadow: 0 2px 16px rgba(0,0,0,0.12);
             border-radius: 4px;
           }
         }
@@ -454,103 +460,121 @@ export default function PrintIdCardsPro() {
       {/* ── Toolbar ── */}
       <div className="no-print" style={{
         padding: "14px 20px", background: "#fef3c7",
-        display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap",
+        display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap",
         borderBottom: "2px solid #d1d5db",
       }}>
         <div>
-          <div style={{ fontWeight: 800, fontSize: "15px", color: DARK }}>ID Card Print — Duplex</div>
-          <div style={{ fontSize: "12px", color: "#666" }}>
-            {isSingle ? "1 card per page pair — guaranteed alignment" : "9 cards/side · 3×3 landscape grid"}
+          <div style={{ fontWeight: 800, fontSize: "15px", color: DARK }}>ID Card Print</div>
+          <div style={{ fontSize: "12px", color: "#555" }}>
+            {isSBS
+              ? "Side-by-side · Front | Back on same sheet · Cut & stack"
+              : "Duplex mode · Front on page N, Back on page N+1"}
           </div>
         </div>
 
-        {/* Company selector */}
         <select value={companyId} onChange={e => setCompanyId(e.target.value)}
           style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "13px", background: "#fff" }}>
           {COMPANIES.map(c => <option key={c.id} value={c.id}>{c.id === "alburhan" ? "Al Burhan Tours & Travels" : c.name}</option>)}
         </select>
 
-        {/* Feedback QR */}
         <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "13px", fontWeight: 500, userSelect: "none" }}>
           <input type="checkbox" checked={showFeedbackQr} onChange={e => setShowFeedbackQr(e.target.checked)} style={{ width: "15px", height: "15px" }} />
           Feedback QR
         </label>
 
-        {/* ── Duplex mode selector ── */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-          <div style={{ fontSize: "10px", fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.5px" }}>Duplex Mode</div>
-          <select value={duplexMode} onChange={e => setDuplexMode(e.target.value as DuplexMode)}
-            style={{ padding: "8px 12px", border: `2px solid ${DARK}`, borderRadius: "6px", fontSize: "13px", fontWeight: 600, background: "#fff", color: DARK }}>
-            <option value="single">✅ Single card / page pair (Recommended)</option>
-            <option value="none">9-card grid · Printer handles flip</option>
-            <option value="short-edge">9-card grid · Short-edge flip (columns mirror)</option>
-            <option value="long-edge">9-card grid · Long-edge flip (rows reverse)</option>
-          </select>
+        {/* Print mode */}
+        <div style={{ display: "flex", gap: "6px" }}>
+          {([
+            { val: "sidebyside", label: "✂ Side-by-Side (No duplex needed)", bg: "#dcfce7", border: "#16a34a" },
+            { val: "duplex",     label: "🖨 Auto-Duplex",                    bg: "#dbeafe", border: "#2563eb" },
+          ] as { val: PrintMode; label: string; bg: string; border: string }[]).map(({ val, label, bg, border }) => (
+            <button key={val} onClick={() => setPrintMode(val)} style={{
+              padding: "8px 14px", borderRadius: "7px", fontSize: "12px", fontWeight: 700, cursor: "pointer",
+              border: `2px solid ${printMode === val ? border : "#d1d5db"}`,
+              background: printMode === val ? bg : "#fff",
+              color: printMode === val ? border : "#555",
+            }}>{label}</button>
+          ))}
         </div>
 
         <div style={{ marginLeft: "auto", display: "flex", gap: "8px" }}>
-          <button onClick={() => window.print()} style={{ padding: "10px 24px", background: DARK, color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
+          <button onClick={() => window.print()} style={{ padding: "10px 24px", background: DARK, color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "14px" }}>
             🖨 Print
           </button>
-          <button onClick={() => window.history.back()} style={{ padding: "10px 20px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff", fontSize: "13px" }}>
-            ← Back
-          </button>
+          <button onClick={() => window.history.back()} style={{ padding: "10px 18px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff", fontSize: "13px" }}>← Back</button>
         </div>
       </div>
 
-      {/* ── Tip bar ── */}
+      {/* ── Instruction bar ── */}
       <div className="no-print" style={{
-        padding: "8px 20px", background: isSingle ? "#f0fdf4" : "#f0f9ff",
-        borderBottom: `1px solid ${isSingle ? "#86efac" : "#bae6fd"}`,
-        fontSize: "12px", color: isSingle ? "#166534" : "#0369a1",
-        display: "flex", gap: "16px", flexWrap: "wrap", alignItems: "center",
+        padding: "10px 20px", fontSize: "13px", fontWeight: 600,
+        background: isSBS ? "#f0fdf4" : "#eff6ff",
+        borderBottom: `2px solid ${isSBS ? "#86efac" : "#93c5fd"}`,
+        color: isSBS ? "#15803d" : "#1d4ed8",
+        display: "flex", gap: "20px", flexWrap: "wrap", alignItems: "center",
       }}>
-        <span>{duplexTip[duplexMode]}</span>
-        {isSingle && <span>📄 Each person gets <strong>Page N = Front</strong> + <strong>Page N+1 = Back</strong> — perfect for any duplex printer</span>}
-        {!isSingle && <span>📐 Card: <strong>9×6cm</strong> · 9 per side · {pilgrims.length} cards = {batches.length} batch{batches.length !== 1 ? "es" : ""}</span>}
+        {isSBS ? (
+          <>
+            <span>✅ Each row = one person's FRONT card + BACK card side by side</span>
+            <span>✂ Cut along the dashed line · Stack front &amp; back together · Laminate</span>
+            <span>📄 No duplex setting needed — works on any printer</span>
+          </>
+        ) : (
+          <>
+            <span>✅ Each person: Page 1 = FRONT · Page 2 = BACK (consecutive pages)</span>
+            <span>🖨 In print dialog: enable <strong>Two-sided</strong> → <strong>Flip on short edge</strong></span>
+            <span>⚠ Mohammed Altaf front (page 1) + Mohammed Altaf back (page 2) = Sheet 1</span>
+          </>
+        )}
       </div>
 
-      {/* ── Pages ── */}
-      <div style={{ background: "#f5f5f0", padding: "8mm", display: "flex", flexDirection: "column", gap: "10mm" }}>
-        {batches.map((batch, bi) => {
-          const totalRows = isSingle ? 1 : Math.ceil(batch.length / COLS);
-          const padded = [...batch];
-          if (!isSingle) while (padded.length % COLS !== 0) padded.push(null as unknown as Pilgrim);
-          const backOrder = getBackOrder(padded, totalRows);
-          const p0 = batch[0];
+      {/* ── Content ── */}
+      <div style={{ background: "#f5f5f0", padding: "8mm", display: "flex", flexDirection: "column", gap: "8mm" }}>
 
-          return [
-            /* FRONT PAGE */
-            <div key={`front-${bi}`}>
+        {isSBS ? (
+          /* ── SIDE-BY-SIDE MODE: 4 rows per A4 ── */
+          pages.map((pagePilgrims, pi) => (
+            <div key={pi}>
               <div className="no-print" style={{ fontSize: "11px", color: "#999", marginBottom: "3mm", fontStyle: "italic" }}>
-                {isSingle
-                  ? `Card ${bi + 1} · ${p0?.fullName || ""} — FRONT (Page ${bi * 2 + 1})`
-                  : `Batch ${bi + 1} · FRONT (Page ${bi * 2 + 1}) — ${batch.length} cards`}
+                Page {pi + 1} · {pagePilgrims.length} cards (Front | Back side by side) · Cut dashed line after printing
               </div>
-              <div className="pro-print-page">
-                {padded.map((p, idx) => p
-                  ? <FrontCard key={p.id} p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
-                  : <div key={`fph-${idx}`} className="card-placeholder" />
-                )}
+              <div className="id-print-page">
+                {pagePilgrims.map(p => (
+                  <div key={p.id} className="card-pair-row">
+                    {/* FRONT */}
+                    <FrontCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
+                    {/* Cut line */}
+                    <div className="cut-line">
+                      <div className="cut-line-inner" />
+                    </div>
+                    {/* BACK */}
+                    <BackCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))
+        ) : (
+          /* ── DUPLEX MODE: front page then back page per person ── */
+          pilgrims.map((p, idx) => [
+            <div key={`df-${p.id}`}>
+              <div className="no-print" style={{ fontSize: "11px", color: "#999", marginBottom: "3mm", fontStyle: "italic" }}>
+                {p.fullName} — FRONT (Page {idx * 2 + 1})
+              </div>
+              <div className="duplex-page">
+                <FrontCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
               </div>
             </div>,
-
-            /* BACK PAGE */
-            <div key={`back-${bi}`}>
+            <div key={`db-${p.id}`}>
               <div className="no-print" style={{ fontSize: "11px", color: "#999", marginBottom: "3mm", fontStyle: "italic" }}>
-                {isSingle
-                  ? `Card ${bi + 1} · ${p0?.fullName || ""} — BACK (Page ${bi * 2 + 2})`
-                  : `Batch ${bi + 1} · BACK (Page ${bi * 2 + 2}) · mode: ${duplexMode}`}
+                {p.fullName} — BACK (Page {idx * 2 + 2})
               </div>
-              <div className="pro-print-page">
-                {backOrder.map((p, idx) => p
-                  ? <BackCard key={`${p.id}-back-${idx}`} p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
-                  : <div key={`bph-${idx}`} className="card-placeholder" />
-                )}
+              <div className="duplex-page">
+                <BackCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
               </div>
             </div>,
-          ];
-        })}
+          ])
+        )}
       </div>
     </>
   );
