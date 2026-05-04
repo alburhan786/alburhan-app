@@ -350,8 +350,9 @@ export default function PrintIdCardsPro() {
 
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
 
-  // 6 cards per A4 side — 2 cols × 3 rows
-  const BATCH = 6;
+  // 9 cards per A4 landscape side — 3 cols × 3 rows
+  const BATCH = 9;
+  const COLS  = 3;
   const batches: Pilgrim[][] = [];
   for (let i = 0; i < pilgrims.length; i += BATCH) batches.push(pilgrims.slice(i, i + BATCH));
 
@@ -359,20 +360,21 @@ export default function PrintIdCardsPro() {
     <>
       <style>{`
         @media print {
-          @page { size: A4 portrait; margin: 8mm 10mm; }
+          @page { size: A4 landscape; margin: 6mm 8mm; }
           body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; margin: 0; }
           .no-print { display: none !important; }
-          .pro-print-page { margin-bottom: 0 !important; }
+          .pro-print-page { margin-bottom: 0 !important; box-shadow: none !important; padding: 0 !important; }
         }
         * { box-sizing: border-box; }
 
         .pro-card {
           width: 90mm;
           height: 60mm;
-          border: 1.5px solid #aaa;
+          border: 1px solid #aaa;
           border-radius: 3px;
           overflow: hidden;
           page-break-inside: avoid;
+          break-inside: avoid;
           font-family: Arial, sans-serif;
           background: #fff;
           display: flex;
@@ -380,13 +382,13 @@ export default function PrintIdCardsPro() {
           flex-shrink: 0;
         }
 
-        /* ── A4 page wrapper ── */
+        /* ── A4 landscape grid: 3 cols × 3 rows ── */
         .pro-print-page {
-          width: 190mm;
+          width: 277mm;
           margin: 0 auto;
           display: grid;
-          grid-template-columns: 90mm 90mm;
-          gap: 5mm;
+          grid-template-columns: 90mm 90mm 90mm;
+          gap: 3.5mm;
           justify-content: center;
           align-content: start;
           page-break-after: always;
@@ -397,7 +399,6 @@ export default function PrintIdCardsPro() {
           break-after: auto;
         }
 
-        /* placeholder keeps grid alignment when batch has odd count */
         .card-placeholder {
           width: 90mm;
           height: 60mm;
@@ -405,11 +406,10 @@ export default function PrintIdCardsPro() {
           flex-shrink: 0;
         }
 
-        /* screen only */
         @media screen {
           .pro-print-page {
             background: white;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.12);
+            box-shadow: 0 2px 16px rgba(0,0,0,0.12);
             padding: 8mm;
             border-radius: 4px;
           }
@@ -423,9 +423,9 @@ export default function PrintIdCardsPro() {
         borderBottom: "2px solid #d1d5db",
       }}>
         <div>
-          <div style={{ fontWeight: 800, fontSize: "15px", color: DARK }}>ID Card Print — Duplex A4</div>
+          <div style={{ fontWeight: 800, fontSize: "15px", color: DARK }}>ID Card Print — Duplex A4 Landscape</div>
           <div style={{ fontSize: "12px", color: "#666" }}>
-            Front cards → Page 1 &nbsp;|&nbsp; Back cards → Page 2 (aligned for duplex flip)
+            9 cards/side · 3×3 grid · Front page → Back page (rows mirrored for duplex)
           </div>
         </div>
         <select value={companyId} onChange={e => setCompanyId(e.target.value)} style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "13px", background: "#fff" }}>
@@ -436,7 +436,7 @@ export default function PrintIdCardsPro() {
           Show Feedback QR
         </label>
         <span style={{ fontSize: "12px", color: "#555", background: "#fff", padding: "4px 10px", borderRadius: "6px", border: "1px solid #d1d5db" }}>
-          📄 6 cards/side · 2×3 grid · Duplex long-edge
+          📄 9 cards/side · 3×3 grid · A4 Landscape · Duplex long-edge
         </span>
         <div style={{ marginLeft: "auto", display: "flex", gap: "8px" }}>
           <button onClick={() => window.print()} style={{ padding: "10px 24px", background: DARK, color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", fontSize: "13px" }}>
@@ -456,49 +456,56 @@ export default function PrintIdCardsPro() {
         display: "flex", gap: "16px", flexWrap: "wrap",
       }}>
         <span>💡 In print dialog: enable <strong>Two-sided (duplex)</strong> → <strong>Flip on long edge</strong></span>
-        <span>📐 Card size: <strong>9cm × 6cm</strong> &nbsp;|&nbsp; Layout: <strong>2 cols × 3 rows = 6 per side</strong></span>
-        <span>✅ Back cards auto-mirrored for correct alignment</span>
+        <span>📐 Card size: <strong>9cm × 6cm</strong> &nbsp;|&nbsp; Layout: <strong>3 cols × 3 rows = 9 per side</strong></span>
+        <span>✅ Back rows auto-reversed for landscape duplex alignment</span>
       </div>
 
       {/* ── Pages ── */}
       <div style={{ background: "#f5f5f0", padding: "8mm", display: "flex", flexDirection: "column", gap: "10mm" }}>
         {batches.map((batch, bi) => {
-          const rows = Math.ceil(batch.length / 2);
+          const totalRows = Math.ceil(batch.length / COLS);
+          // Pad batch to full grid (multiple of COLS)
+          const padded = [...batch];
+          while (padded.length % COLS !== 0) padded.push(null as unknown as Pilgrim);
 
           // ── FRONT PAGE ──
           const frontPage = (
             <div key={`front-${bi}`}>
               <div className="no-print" style={{ fontSize: "11px", color: "#999", marginBottom: "3mm", fontStyle: "italic" }}>
-                Batch {bi + 1} · FRONT SIDE (Page {bi * 2 + 1}) — {batch.length} cards
+                Batch {bi + 1} · FRONT SIDE (Page {bi * 2 + 1}) — {batch.length} cards · 3×3 landscape
               </div>
               <div className="pro-print-page">
-                {batch.map(p => (
-                  <FrontCard key={p.id} p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
-                ))}
-                {batch.length % 2 !== 0 && <div className="card-placeholder" />}
+                {padded.map((p, idx) =>
+                  p
+                    ? <FrontCard key={p.id} p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
+                    : <div key={`fph-${idx}`} className="card-placeholder" />
+                )}
               </div>
             </div>
           );
 
-          // ── BACK PAGE — columns swapped per row for long-edge duplex alignment ──
-          const backRows: Pilgrim[][] = Array.from({ length: rows }, (_, r) => {
-            const left  = batch[r * 2];
-            const right = batch[r * 2 + 1];
-            // Swap: right goes first in the grid so it ends up behind left when flipped
-            return right ? [right, left] : [left];
-          });
+          // ── BACK PAGE — rows reversed for landscape long-edge duplex ──
+          // When A4 landscape is flipped on the long (horizontal) edge, row order reverses.
+          // Row 3 becomes row 1, row 2 stays middle, row 1 becomes row 3.
+          const backPadded = [...padded];
+          const reversedRows: (Pilgrim | null)[] = [];
+          for (let r = totalRows - 1; r >= 0; r--) {
+            for (let c = 0; c < COLS; c++) {
+              reversedRows.push(backPadded[r * COLS + c] ?? null);
+            }
+          }
 
           const backPage = (
             <div key={`back-${bi}`}>
               <div className="no-print" style={{ fontSize: "11px", color: "#999", marginBottom: "3mm", fontStyle: "italic" }}>
-                Batch {bi + 1} · BACK SIDE (Page {bi * 2 + 2}) — columns mirrored for duplex
+                Batch {bi + 1} · BACK SIDE (Page {bi * 2 + 2}) — rows reversed for landscape duplex
               </div>
               <div className="pro-print-page">
-                {backRows.map((row, ri) => row.map((p, ci) => (
+                {reversedRows.map((p, idx) =>
                   p
                     ? <BackCard key={`${p.id}-back`} p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
-                    : <div key={`ph-${ri}-${ci}`} className="card-placeholder" />
-                )))}
+                    : <div key={`bph-${idx}`} className="card-placeholder" />
+                )}
               </div>
             </div>
           );
