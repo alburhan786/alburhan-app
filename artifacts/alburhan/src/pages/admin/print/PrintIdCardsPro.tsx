@@ -350,8 +350,10 @@ export default function PrintIdCardsPro() {
 
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
 
-  const pages: Pilgrim[][] = [];
-  for (let i = 0; i < pilgrims.length; i += 4) pages.push(pilgrims.slice(i, i + 4));
+  // 6 cards per A4 side — 2 cols × 3 rows
+  const BATCH = 6;
+  const batches: Pilgrim[][] = [];
+  for (let i = 0; i < pilgrims.length; i += BATCH) batches.push(pilgrims.slice(i, i + BATCH));
 
   return (
     <>
@@ -360,8 +362,10 @@ export default function PrintIdCardsPro() {
           @page { size: A4 portrait; margin: 8mm 10mm; }
           body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; margin: 0; }
           .no-print { display: none !important; }
+          .pro-print-page { margin-bottom: 0 !important; }
         }
         * { box-sizing: border-box; }
+
         .pro-card {
           width: 90mm;
           height: 60mm;
@@ -375,24 +379,55 @@ export default function PrintIdCardsPro() {
           flex-direction: column;
           flex-shrink: 0;
         }
-        .pair-row {
-          display: flex;
-          gap: 5mm;
-          align-items: flex-start;
-          page-break-inside: avoid;
-        }
+
+        /* ── A4 page wrapper ── */
         .pro-print-page {
-          display: flex;
-          flex-direction: column;
+          width: 190mm;
+          margin: 0 auto;
+          display: grid;
+          grid-template-columns: 90mm 90mm;
           gap: 5mm;
+          justify-content: center;
+          align-content: start;
           page-break-after: always;
+          break-after: page;
         }
         .pro-print-page:last-child {
           page-break-after: auto;
+          break-after: auto;
+        }
+
+        /* placeholder keeps grid alignment when batch has odd count */
+        .card-placeholder {
+          width: 90mm;
+          height: 60mm;
+          visibility: hidden;
+          flex-shrink: 0;
+        }
+
+        /* screen only */
+        @media screen {
+          .pro-print-page {
+            background: white;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.12);
+            padding: 8mm;
+            border-radius: 4px;
+          }
         }
       `}</style>
 
-      <div className="no-print" style={{ padding: "16px", background: "#fef3c7", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", flexWrap: "wrap" }}>
+      {/* ── Toolbar ── */}
+      <div className="no-print" style={{
+        padding: "14px 20px", background: "#fef3c7",
+        display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap",
+        borderBottom: "2px solid #d1d5db",
+      }}>
+        <div>
+          <div style={{ fontWeight: 800, fontSize: "15px", color: DARK }}>ID Card Print — Duplex A4</div>
+          <div style={{ fontSize: "12px", color: "#666" }}>
+            Front cards → Page 1 &nbsp;|&nbsp; Back cards → Page 2 (aligned for duplex flip)
+          </div>
+        </div>
         <select value={companyId} onChange={e => setCompanyId(e.target.value)} style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "13px", background: "#fff" }}>
           {COMPANIES.map(c => <option key={c.id} value={c.id}>{c.id === "alburhan" ? "Al Burhan Tours & Travels" : c.name}</option>)}
         </select>
@@ -400,24 +435,76 @@ export default function PrintIdCardsPro() {
           <input type="checkbox" checked={showFeedbackQr} onChange={e => setShowFeedbackQr(e.target.checked)} style={{ width: "15px", height: "15px", cursor: "pointer" }} />
           Show Feedback QR
         </label>
-        <span style={{ fontSize: "12px", color: "#666", background: "#fff", padding: "4px 10px", borderRadius: "6px", border: "1px solid #d1d5db" }}>
-          A4 Portrait · 4 cards/page · 9×6cm · Front+Back
+        <span style={{ fontSize: "12px", color: "#555", background: "#fff", padding: "4px 10px", borderRadius: "6px", border: "1px solid #d1d5db" }}>
+          📄 6 cards/side · 2×3 grid · Duplex long-edge
         </span>
-        <button onClick={() => window.print()} style={{ padding: "10px 24px", background: DARK, color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>🖨 Print</button>
-        <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
+        <div style={{ marginLeft: "auto", display: "flex", gap: "8px" }}>
+          <button onClick={() => window.print()} style={{ padding: "10px 24px", background: DARK, color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", fontSize: "13px" }}>
+            🖨 Print (Duplex)
+          </button>
+          <button onClick={() => window.history.back()} style={{ padding: "10px 20px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff", fontSize: "13px" }}>
+            ← Back
+          </button>
+        </div>
       </div>
 
-      <div style={{ background: "#f5f5f5", padding: "8mm" }}>
-        {pages.map((page, pi) => (
-          <div key={`page-${pi}`} className="pro-print-page" style={{ marginBottom: pi < pages.length - 1 ? "10mm" : 0 }}>
-            {page.map(p => (
-              <div key={p.id} className="pair-row">
-                <FrontCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
-                <BackCard  p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
+      {/* ── Print tip ── */}
+      <div className="no-print" style={{
+        padding: "8px 20px", background: "#f0f9ff",
+        borderBottom: "1px solid #bae6fd",
+        fontSize: "12px", color: "#0369a1",
+        display: "flex", gap: "16px", flexWrap: "wrap",
+      }}>
+        <span>💡 In print dialog: enable <strong>Two-sided (duplex)</strong> → <strong>Flip on long edge</strong></span>
+        <span>📐 Card size: <strong>9cm × 6cm</strong> &nbsp;|&nbsp; Layout: <strong>2 cols × 3 rows = 6 per side</strong></span>
+        <span>✅ Back cards auto-mirrored for correct alignment</span>
+      </div>
+
+      {/* ── Pages ── */}
+      <div style={{ background: "#f5f5f0", padding: "8mm", display: "flex", flexDirection: "column", gap: "10mm" }}>
+        {batches.map((batch, bi) => {
+          const rows = Math.ceil(batch.length / 2);
+
+          // ── FRONT PAGE ──
+          const frontPage = (
+            <div key={`front-${bi}`}>
+              <div className="no-print" style={{ fontSize: "11px", color: "#999", marginBottom: "3mm", fontStyle: "italic" }}>
+                Batch {bi + 1} · FRONT SIDE (Page {bi * 2 + 1}) — {batch.length} cards
               </div>
-            ))}
-          </div>
-        ))}
+              <div className="pro-print-page">
+                {batch.map(p => (
+                  <FrontCard key={p.id} p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
+                ))}
+                {batch.length % 2 !== 0 && <div className="card-placeholder" />}
+              </div>
+            </div>
+          );
+
+          // ── BACK PAGE — columns swapped per row for long-edge duplex alignment ──
+          const backRows: Pilgrim[][] = Array.from({ length: rows }, (_, r) => {
+            const left  = batch[r * 2];
+            const right = batch[r * 2 + 1];
+            // Swap: right goes first in the grid so it ends up behind left when flipped
+            return right ? [right, left] : [left];
+          });
+
+          const backPage = (
+            <div key={`back-${bi}`}>
+              <div className="no-print" style={{ fontSize: "11px", color: "#999", marginBottom: "3mm", fontStyle: "italic" }}>
+                Batch {bi + 1} · BACK SIDE (Page {bi * 2 + 2}) — columns mirrored for duplex
+              </div>
+              <div className="pro-print-page">
+                {backRows.map((row, ri) => row.map((p, ci) => (
+                  p
+                    ? <BackCard key={`${p.id}-back`} p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
+                    : <div key={`ph-${ri}-${ci}`} className="card-placeholder" />
+                )))}
+              </div>
+            </div>
+          );
+
+          return [frontPage, backPage];
+        })}
       </div>
     </>
   );
