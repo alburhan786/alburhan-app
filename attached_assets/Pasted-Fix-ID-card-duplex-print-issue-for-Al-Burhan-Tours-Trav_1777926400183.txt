@@ -1,0 +1,97 @@
+Fix ID card duplex print issue for Al Burhan Tours & Travels.
+
+PROBLEM:
+Front side prints correctly for all pilgrims.
+Back side shows SAME person data (first record / Mohammed Altaf) for all cards.
+
+OBJECTIVE:
+Ensure each pilgrim prints:
+- Front side = correct person
+- Back side = SAME correct person
+
+----------------------------------------
+ROOT CAUSE FIX
+----------------------------------------
+
+Ensure BOTH FRONT and BACK use SAME LOOP DATA.
+
+Use map() properly:
+
+----------------------------------------
+CORRECT CODE STRUCTURE
+----------------------------------------
+
+const pilgrims = data;
+
+const frontHTML = pilgrims.map(p => `
+  <div class="card">
+    <img src="${p.photo}" />
+    <h2>${p.name}</h2>
+    <p>ID: ${p.id}</p>
+    <p>Passport: ${p.passport}</p>
+  </div>
+`).join("");
+
+const backHTML = pilgrims.map(p => `
+  <div class="card back">
+    <h3>${p.name}</h3>
+    <p>Maktab: ${p.maktab}</p>
+    <p>Hotel: ${p.hotel}</p>
+    <img src="${p.qr}" />
+  </div>
+`).join("");
+
+----------------------------------------
+IMPORTANT RULES
+----------------------------------------
+
+1. NEVER use fixed index like:
+   pilgrims[0]
+
+2. NEVER reuse single object variable
+
+3. ALWAYS use same loop variable (p)
+
+4. Order must match EXACTLY:
+   front[0] ↔ back[0]
+   front[1] ↔ back[1]
+
+----------------------------------------
+DUPLEX PRINT LOGIC
+----------------------------------------
+
+Page 1 → All FRONT cards
+Page 2 → All BACK cards (same order)
+
+----------------------------------------
+EXTRA SAFETY CHECK
+----------------------------------------
+
+Add console log:
+
+console.log("Printing:", p.name);
+
+----------------------------------------
+EXPECTED RESULT
+----------------------------------------
+
+Mohammed Altaf → front + back ✅  
+Nahid Parveen → front + back ✅  
+Nayyar Sahab → front + back ✅  
+
+NO duplicate data ❌
+
+----------------------------------------
+OUTPUT
+----------------------------------------
+
+Generate PDF using:
+- Puppeteer OR html2pdf
+
+----------------------------------------
+PRINT SETTINGS
+----------------------------------------
+
+- Duplex ON
+- Flip on SHORT EDGE
+- Scale: 100%
