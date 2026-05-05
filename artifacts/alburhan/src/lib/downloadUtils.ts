@@ -22,7 +22,7 @@ export async function fetchAsDataUrl(url: string): Promise<string> {
 }
 
 const CAPTURE_OPTS = {
-  scale: 2,
+  scale: 4,
   useCORS: true,
   allowTaint: true,
   backgroundColor: "#ffffff",
