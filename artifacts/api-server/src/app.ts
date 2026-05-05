@@ -18,14 +18,6 @@ app.use(helmet({
 
 app.use(compression());
 
-app.use((req, res, next) => {
-  const host = req.headers.host || '';
-  if (host.startsWith('www.')) {
-    const newHost = host.slice(4);
-    return res.redirect(308, `${req.protocol}://${newHost}${req.originalUrl}`);
-  }
-  next();
-});
 
 app.use(cors({
   origin: process.env.CORS_ORIGIN
