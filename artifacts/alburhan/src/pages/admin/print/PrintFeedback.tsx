@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRoute } from "wouter";
+import { downloadAsPdf } from "@/lib/downloadUtils";
 import { PrintHeader } from "./PrintHeader";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
 import { QRCodeSVG } from "qrcode.react";
@@ -30,7 +31,8 @@ export default function PrintFeedback() {
   const [companyId, setCompanyId] = useState("alburhan");
   const [showQR, setShowQR] = useState(false);
   const company = getCompanyById(companyId);
-
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [dlState, setDlState] = useState<string | null>(null);
 
   useEffect(() => {
     if (!groupId) return;
@@ -86,9 +88,14 @@ export default function PrintFeedback() {
         <button onClick={() => window.print()} style={{ padding: "10px 24px", background: "#0d5040", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>
           🖨 Print
         </button>
+        <button onClick={async () => { if (!contentRef.current) return; setDlState("pdf"); try { await downloadAsPdf(contentRef.current, `feedback-${group?.groupName || "group"}`); } finally { setDlState(null); } }}
+          disabled={!!dlState} style={{ padding: "10px 20px", background: dlState ? "#6b7280" : "#1d4ed8", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>
+          {dlState ? "⏳..." : "⬇ PDF"}
+        </button>
         <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
       </div>
 
+      <div ref={contentRef}>
       {!showQR && (
         <div>
           <div style={{ padding: "2mm", fontFamily: "'Inter', Arial, sans-serif", maxWidth: "210mm", margin: "0 auto" }}>
@@ -246,6 +253,7 @@ export default function PrintFeedback() {
           </div>
         </div>
       )}
+      </div>
     </>
   );
 }

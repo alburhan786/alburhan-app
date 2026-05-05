@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRoute } from "wouter";
+import { downloadAsPdf } from "@/lib/downloadUtils";
 import { PrintHeader } from "./PrintHeader";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
 
@@ -21,6 +22,8 @@ export default function PrintContract() {
   const [pilgrims, setPilgrims] = useState<Pilgrim[]>([]);
   const [companyId, setCompanyId] = useState("alburhan");
   const company = getCompanyById(companyId);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [dlState, setDlState] = useState<string | null>(null);
 
   useEffect(() => {
     if (!groupId) return;
@@ -174,10 +177,14 @@ export default function PrintContract() {
           {COMPANIES.map(c => <option key={c.id} value={c.id}>{c.id === "alburhan" ? "Al Burhan Tours & Travels" : c.name}</option>)}
         </select>
         <button onClick={() => window.print()} style={{ padding: "10px 24px", background: "#0d5040", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>🖨 Print ({pilgrims.length})</button>
+        <button onClick={async () => { if (!contentRef.current) return; setDlState("pdf"); try { await downloadAsPdf(contentRef.current, `contracts-${group?.groupName || "group"}`); } finally { setDlState(null); } }}
+          disabled={!!dlState} style={{ padding: "10px 20px", background: dlState ? "#6b7280" : "#1d4ed8", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>
+          {dlState ? "⏳..." : "⬇ PDF"}
+        </button>
         <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
       </div>
 
-      <div>
+      <div ref={contentRef}>
         {pilgrims.map((p, i) => renderContract(p, i))}
       </div>
     </>

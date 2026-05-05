@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRoute } from "wouter";
+import { downloadAsPdf } from "@/lib/downloadUtils";
 import { Barcode } from "@/components/print/Barcode";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -108,6 +109,8 @@ export default function PrintMedical() {
   const groupId = params?.groupId || "";
   const [group, setGroup] = useState<Group | null>(null);
   const [pilgrims, setPilgrims] = useState<Pilgrim[]>([]);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [dlState, setDlState] = useState<string | null>(null);
 
   useEffect(() => {
     if (!groupId) return;
@@ -135,12 +138,16 @@ export default function PrintMedical() {
         * { box-sizing: border-box; }
       `}</style>
 
-      <div className="no-print" style={{ padding: "16px", background: "#fef3c7", textAlign: "center" }}>
-        <button onClick={() => window.print()} style={{ padding: "10px 24px", background: "#c0392b", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", marginRight: "12px" }}>🖨 Print</button>
+      <div className="no-print" style={{ padding: "16px", background: "#fef3c7", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", flexWrap: "wrap" }}>
+        <button onClick={() => window.print()} style={{ padding: "10px 24px", background: "#c0392b", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>🖨 Print</button>
+        <button onClick={async () => { if (!contentRef.current) return; setDlState("pdf"); try { await downloadAsPdf(contentRef.current, `medical-${group?.groupName || "group"}`); } finally { setDlState(null); } }}
+          disabled={!!dlState} style={{ padding: "10px 20px", background: dlState ? "#6b7280" : "#1d4ed8", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>
+          {dlState ? "⏳..." : "⬇ PDF"}
+        </button>
         <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
       </div>
 
-      <div>
+      <div ref={contentRef}>
         {pairs.map((pair, pi) => (
           <div key={pi} className={pi < pairs.length - 1 ? "med-page-break" : ""} style={{ display: "flex", flexDirection: "column", gap: "6mm", padding: "4mm" }}>
             {pair.map(p => (

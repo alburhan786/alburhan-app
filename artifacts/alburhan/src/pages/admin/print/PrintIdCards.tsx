@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRoute } from "wouter";
+import { downloadAsPdf, downloadAsJpg } from "@/lib/downloadUtils";
 import { Barcode } from "@/components/print/Barcode";
 import { QRCodeSVG } from "qrcode.react";
 import { COMPANIES, getCompanyById, type CompanyInfo } from "@/lib/companies";
@@ -104,6 +105,18 @@ export default function PrintIdCards() {
   const company = getCompanyById(companyId);
   const [showFeedbackQr, setShowFeedbackQr] = useState(false);
   const [bookingMap, setBookingMap] = useState<Record<string, string>>({});
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [dlState, setDlState] = useState<string | null>(null);
+
+  const dlCards = async (fmt: "pdf" | "jpg") => {
+    if (!contentRef.current) return;
+    setDlState(fmt);
+    try {
+      const name = `id-cards-${group?.groupName || "group"}`;
+      if (fmt === "pdf") await downloadAsPdf(contentRef.current, name);
+      else await downloadAsJpg(contentRef.current, name);
+    } finally { setDlState(null); }
+  };
 
   useEffect(() => {
     if (!groupId) return;
@@ -161,10 +174,16 @@ export default function PrintIdCards() {
           Show Feedback QR
         </label>
         <button onClick={() => window.print()} style={{ padding: "10px 24px", background: DARK, color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>🖨 Print</button>
+        <button onClick={() => dlCards("pdf")} disabled={!!dlState} style={{ padding: "10px 20px", background: dlState === "pdf" ? "#6b7280" : "#1d4ed8", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>
+          {dlState === "pdf" ? "⏳..." : "⬇ PDF"}
+        </button>
+        <button onClick={() => dlCards("jpg")} disabled={!!dlState} style={{ padding: "10px 20px", background: dlState === "jpg" ? "#6b7280" : "#7c3aed", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>
+          {dlState === "jpg" ? "⏳..." : "⬇ JPG"}
+        </button>
         <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
       </div>
 
-      <div>
+      <div ref={contentRef}>
 
         {/* ══ ALL FRONT PAGES — 9 per page, 3×3 grid ══ */}
         {frontPages.map((page, pi) => (

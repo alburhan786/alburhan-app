@@ -1,5 +1,7 @@
+import { useState, useRef } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { getCompanyById } from "@/lib/companies";
+import { downloadAsPdf } from "@/lib/downloadUtils";
 
 const GREEN   = "#0F3D2E";
 const GOLD    = "#D4AF37";
@@ -237,6 +239,8 @@ function SprayLabel() {
 
 /* ── MAIN PAGE ── */
 export default function PrintSprayLabel() {
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [dlState, setDlState] = useState<string | null>(null);
   // 3 labels per A4 page (1 col × 3 rows) at 140mm × 80mm
   const labelsPerPage = 3;
   const totalLabels   = 3;
@@ -324,6 +328,10 @@ export default function PrintSprayLabel() {
             padding: "10px 24px", background: GREEN, color: WHITE,
             border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "13px",
           }}>🖨 Print Labels</button>
+          <button onClick={async () => { if (!contentRef.current) return; setDlState("pdf"); try { await downloadAsPdf(contentRef.current, "spray-labels"); } finally { setDlState(null); } }}
+            disabled={!!dlState} style={{ padding: "10px 20px", background: dlState ? "#6b7280" : "#1d4ed8", color: WHITE, border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
+            {dlState ? "⏳..." : "⬇ PDF"}
+          </button>
           <button onClick={() => window.history.back()} style={{
             padding: "10px 20px", border: "1px solid #ccc", borderRadius: "8px",
             cursor: "pointer", background: WHITE, fontSize: "13px",
@@ -345,7 +353,7 @@ export default function PrintSprayLabel() {
       </div>
 
       {/* Labels */}
-      <div style={{ background: "#f5f5f0", padding: "8mm" }}>
+      <div ref={contentRef} style={{ background: "#f5f5f0", padding: "8mm" }}>
         {pages.map((page, pi) => (
           <div key={pi} className="label-page">
             <div className="no-print" style={{ fontSize: "11px", color: "#999", marginBottom: "2mm", fontStyle: "italic" }}>

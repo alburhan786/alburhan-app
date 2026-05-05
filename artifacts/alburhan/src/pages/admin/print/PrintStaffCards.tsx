@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { QRCodeSVG } from "qrcode.react";
+import { downloadAsPdf, downloadAsJpg } from "@/lib/downloadUtils";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -431,6 +432,17 @@ export default function PrintStaffCards() {
   const [roleFilter,    setRoleFilter]     = useState("all");
   const [statusFilter,  setStatusFilter]   = useState("active");
   const [frontOnly,     setFrontOnly]      = useState(true);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [dlState, setDlState] = useState<string | null>(null);
+
+  const dlCards = async (fmt: "pdf" | "jpg") => {
+    if (!contentRef.current) return;
+    setDlState(fmt);
+    try {
+      if (fmt === "pdf") await downloadAsPdf(contentRef.current, "staff-cards");
+      else await downloadAsJpg(contentRef.current, "staff-cards");
+    } finally { setDlState(null); }
+  };
 
   useEffect(() => {
     Promise.all([
@@ -551,15 +563,17 @@ export default function PrintStaffCards() {
             padding: "8px 20px", background: GREEN, color: "#fff",
             border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer",
             opacity: filtered.length === 0 ? 0.5 : 1,
-          }}>
-            🖨 Print
+          }}>🖨 Print</button>
+          <button onClick={() => dlCards("pdf")} disabled={!!dlState || filtered.length === 0} style={{ padding: "8px 16px", background: dlState === "pdf" ? "#6b7280" : "#1d4ed8", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>
+            {dlState === "pdf" ? "⏳..." : "⬇ PDF"}
+          </button>
+          <button onClick={() => dlCards("jpg")} disabled={!!dlState || filtered.length === 0} style={{ padding: "8px 16px", background: dlState === "jpg" ? "#6b7280" : "#7c3aed", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>
+            {dlState === "jpg" ? "⏳..." : "⬇ JPG"}
           </button>
           <button onClick={() => window.history.back()} style={{
             padding: "8px 20px", border: "1px solid #ccc",
             borderRadius: "8px", cursor: "pointer", background: "#fff",
-          }}>
-            ← Back
-          </button>
+          }}>← Back</button>
         </div>
       </div>
 
@@ -570,7 +584,7 @@ export default function PrintStaffCards() {
           <div style={{ fontSize: "13px", color: "#aaa", marginTop: "4px" }}>Add staff first from the Staff ID Cards admin page.</div>
         </div>
       ) : (
-        <div className="cards-area" style={{ background: "#f0fdf4", padding: "8mm" }}>
+        <div ref={contentRef} className="cards-area" style={{ background: "#f0fdf4", padding: "8mm" }}>
           {pages.map((page, pi) => (
             <div key={pi}>
               {/* ── FRONT PAGE ── */}
