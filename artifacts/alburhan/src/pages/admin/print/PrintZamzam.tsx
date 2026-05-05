@@ -75,21 +75,28 @@ export default function PrintZamzam() {
       <style>{`
         @media print {
           @page { size: A4 portrait; margin: 5mm; }
-          body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; margin: 0; }
           .no-print { display: none !important; }
+          .zz-wrap { background: white !important; padding: 0 !important; }
         }
         * { box-sizing: border-box; }
         .zz-page {
           display: flex;
           flex-direction: column;
-          gap: 4mm;
+          gap: 7mm;
           width: 200mm;
-          height: 284mm;
+          height: 280mm;
+          max-height: 280mm;
           page-break-after: always;
+          break-after: page;
+          overflow: hidden;
         }
-        .zz-page:last-child { page-break-after: auto; }
+        .zz-page:last-child { page-break-after: auto; break-after: auto; }
         .zz-sticker {
-          flex: 1;
+          width: 200mm;
+          height: 136mm;
+          max-height: 136mm;
+          flex-shrink: 0;
           display: flex;
           flex-direction: row;
           font-family: Arial, sans-serif;
@@ -98,6 +105,8 @@ export default function PrintZamzam() {
           border-radius: 3px;
           overflow: hidden;
           position: relative;
+          page-break-inside: avoid;
+          break-inside: avoid;
         }
       `}</style>
 
@@ -126,7 +135,7 @@ export default function PrintZamzam() {
         }}>← Back</button>
       </div>
 
-      <div ref={contentRef} style={{ background: "#fff" }}>
+      <div ref={contentRef} className="zz-wrap" style={{ background: "#f5f5f0", padding: "8mm" }}>
         {pages.map((page, pageIdx) => (
           <div key={pageIdx} className="zz-page">
             {page.map(p => {
