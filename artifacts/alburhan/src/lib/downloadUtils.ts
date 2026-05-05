@@ -108,3 +108,36 @@ export async function downloadPagesAsJpg(pages: HTMLElement[], filename: string)
     if (i < pages.length - 1) await new Promise(r => setTimeout(r, 300));
   }
 }
+
+/**
+ * Captures an element with html2canvas and downloads it as an SVG file.
+ * The SVG embeds the rendered card as a PNG image at the correct physical mm size.
+ * widthMm / heightMm set the real-world dimensions (default: 85×54mm standard ID card).
+ */
+export async function downloadElementAsSvg(
+  el: HTMLElement,
+  filename: string,
+  widthMm = 85,
+  heightMm = 54,
+) {
+  const canvas = await html2canvas(el, CAPTURE_OPTS);
+  const pngData = canvas.toDataURL("image/png");
+  const w = canvas.width;
+  const h = canvas.height;
+  const svgStr = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     xmlns:xlink="http://www.w3.org/1999/xlink"
+     width="${widthMm}mm" height="${heightMm}mm"
+     viewBox="0 0 ${w} ${h}">
+  <image xlink:href="${pngData}" x="0" y="0" width="${w}" height="${h}" preserveAspectRatio="none"/>
+</svg>`;
+  const blob = new Blob([svgStr], { type: "image/svg+xml" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.download = filename.endsWith(".svg") ? filename : filename + ".svg";
+  a.href = url;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useRoute } from "wouter";
-import { downloadMultiPagePdf, downloadPagesAsJpg, downloadAsPdf, downloadAsJpg, fetchAsDataUrl } from "@/lib/downloadUtils";
+import { downloadMultiPagePdf, downloadPagesAsJpg, downloadAsPdf, downloadAsJpg, fetchAsDataUrl, downloadElementAsSvg } from "@/lib/downloadUtils";
 import { Barcode } from "@/components/print/Barcode";
 import { QRCodeCanvas } from "qrcode.react";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
@@ -347,6 +347,9 @@ export default function PrintIdCardsPro() {
   const contentRef = useRef<HTMLDivElement>(null);
   // Refs set directly on each page div during render — avoids querySelectorAll timing issues
   const pageElsRef = useRef<HTMLElement[]>([]);
+  // Per-pilgrim card element refs for SVG export
+  const frontCardRefs = useRef<Map<string, HTMLElement>>(new Map());
+  const backCardRefs = useRef<Map<string, HTMLElement>>(new Map());
 
   const dlCards = async (fmt: "pdf" | "jpg") => {
     // Snapshot the page elements NOW (before any state change)
@@ -361,6 +364,25 @@ export default function PrintIdCardsPro() {
         // Fallback: capture entire content area at once
         if (fmt === "pdf") await downloadAsPdf(contentRef.current, name);
         else await downloadAsJpg(contentRef.current, name);
+      }
+    } finally { setDlState(null); }
+  };
+
+  const dlPilgrimSvg = async (p: Pilgrim) => {
+    const frontEl = frontCardRefs.current.get(p.id);
+    const backEl = backCardRefs.current.get(p.id);
+    const safeName = p.fullName.replace(/[^a-z0-9]/gi, "-").toLowerCase();
+    if (frontEl) await downloadElementAsSvg(frontEl, `id-card-front-${safeName}.svg`);
+    await new Promise(r => setTimeout(r, 300));
+    if (backEl) await downloadElementAsSvg(backEl, `id-card-back-${safeName}.svg`);
+  };
+
+  const dlAllSvg = async () => {
+    setDlState("svg");
+    try {
+      for (const p of pilgrims) {
+        await dlPilgrimSvg(p);
+        await new Promise(r => setTimeout(r, 400));
       }
     } finally { setDlState(null); }
   };
@@ -533,6 +555,9 @@ export default function PrintIdCardsPro() {
           <button onClick={() => dlCards("jpg")} disabled={!!dlState} style={{ padding: "10px 18px", background: dlState === "jpg" ? "#6b7280" : "#7c3aed", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
             {dlState === "jpg" ? "⏳..." : "⬇ JPG"}
           </button>
+          <button onClick={dlAllSvg} disabled={!!dlState} style={{ padding: "10px 18px", background: dlState === "svg" ? "#6b7280" : "#b45309", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
+            {dlState === "svg" ? "⏳ SVG..." : "⬇ SVG"}
+          </button>
           <button onClick={() => window.history.back()} style={{ padding: "10px 18px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff", fontSize: "13px" }}>← Back</button>
         </div>
       </div>
@@ -574,13 +599,29 @@ export default function PrintIdCardsPro() {
                 {pagePilgrims.map(p => (
                   <div key={p.id} className="card-pair-row">
                     {/* FRONT */}
-                    <FrontCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
+                    <div ref={el => { if (el) frontCardRefs.current.set(p.id, el as HTMLElement); }}>
+                      <FrontCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
+                    </div>
                     {/* Cut line */}
-                    <div className="cut-line">
+                    <div className="cut-line no-print" style={{ position: "relative" }}>
                       <div className="cut-line-inner" />
+                      <button
+                        onClick={() => dlPilgrimSvg(p)}
+                        title="Download SVG (front + back)"
+                        style={{
+                          position: "absolute", top: "50%", left: "50%",
+                          transform: "translate(-50%,-50%)",
+                          background: "#b45309", color: "#fff", border: "none",
+                          borderRadius: "4px", padding: "3px 5px", fontSize: "8px",
+                          cursor: "pointer", fontWeight: 700, whiteSpace: "nowrap",
+                          writingMode: "vertical-rl", textOrientation: "mixed",
+                        }}
+                      >SVG</button>
                     </div>
                     {/* BACK */}
-                    <BackCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
+                    <div ref={el => { if (el) backCardRefs.current.set(p.id, el as HTMLElement); }}>
+                      <BackCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
+                    </div>
                   </div>
                 ))}
               </div>
@@ -590,11 +631,14 @@ export default function PrintIdCardsPro() {
           /* ── DUPLEX MODE: front page then back page per person ── */
           pilgrims.map((p, idx) => [
             <div key={`df-${p.id}`}>
-              <div className="no-print" style={{ fontSize: "11px", color: "#999", marginBottom: "3mm", fontStyle: "italic" }}>
-                {p.fullName} — FRONT (Page {idx * 2 + 1})
+              <div className="no-print" style={{ fontSize: "11px", color: "#999", marginBottom: "3mm", fontStyle: "italic", display: "flex", alignItems: "center", gap: "8px" }}>
+                <span>{p.fullName} — FRONT (Page {idx * 2 + 1})</span>
+                <button onClick={() => dlPilgrimSvg(p)} style={{ background: "#b45309", color: "#fff", border: "none", borderRadius: "4px", padding: "2px 8px", fontSize: "10px", cursor: "pointer", fontWeight: 700 }}>⬇ SVG</button>
               </div>
               <div className="duplex-page" ref={el => { if (el) pageElsRef.current[idx * 2] = el as HTMLElement; }}>
-                <FrontCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
+                <div ref={el => { if (el) frontCardRefs.current.set(p.id, el as HTMLElement); }}>
+                  <FrontCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
+                </div>
               </div>
             </div>,
             <div key={`db-${p.id}`}>
@@ -602,7 +646,9 @@ export default function PrintIdCardsPro() {
                 {p.fullName} — BACK (Page {idx * 2 + 2})
               </div>
               <div className="duplex-page" ref={el => { if (el) pageElsRef.current[idx * 2 + 1] = el as HTMLElement; }}>
-                <BackCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
+                <div ref={el => { if (el) backCardRefs.current.set(p.id, el as HTMLElement); }}>
+                  <BackCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
+                </div>
               </div>
             </div>,
           ])
