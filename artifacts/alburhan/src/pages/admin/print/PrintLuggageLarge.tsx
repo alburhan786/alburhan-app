@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRoute } from "wouter";
+import { downloadAsPdf } from "@/lib/downloadUtils";
 import { Barcode } from "@/components/print/Barcode";
 import { QRCodeSVG } from "qrcode.react";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
@@ -57,6 +58,15 @@ export default function PrintLuggageLarge() {
   const [pilgrims, setPilgrims] = useState<Pilgrim[]>([]);
   const [companyId, setCompanyId] = useState("alburhan");
   const company = getCompanyById(companyId);
+  const [downloading, setDownloading] = useState<string | null>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  const dl = async () => {
+    if (!contentRef.current) return;
+    setDownloading("pdf");
+    try { await downloadAsPdf(contentRef.current, `luggage-large-${group?.groupName || "group"}`); }
+    finally { setDownloading(null); }
+  };
 
   useEffect(() => {
     if (!groupId) return;
@@ -97,10 +107,13 @@ export default function PrintLuggageLarge() {
           {COMPANIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
         <button onClick={() => window.print()} style={{ padding: "10px 24px", background: DARK, color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>🖨 Print</button>
+        <button onClick={dl} disabled={!!downloading} style={{ padding: "10px 20px", background: downloading === "pdf" ? "#6b7280" : "#1d4ed8", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>
+          {downloading === "pdf" ? "⏳..." : "⬇ PDF"}
+        </button>
         <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
       </div>
 
-      <div>
+      <div ref={contentRef}>
       {pilgrims.map(p => {
         const serial = String(p.serialNumber).padStart(3, "0");
         const barcodeVal = p.passportNumber || `H${serial}`;

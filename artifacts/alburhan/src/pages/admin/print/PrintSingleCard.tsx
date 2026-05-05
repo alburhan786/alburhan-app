@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRoute } from "wouter";
+import { downloadAsPdf, downloadAsJpg } from "@/lib/downloadUtils";
 import { QRCodeSVG } from "qrcode.react";
 import { Barcode } from "@/components/print/Barcode";
 import { getCompanyById } from "@/lib/companies";
@@ -186,6 +187,18 @@ export default function PrintSingleCard() {
   const [group, setGroup] = useState<Group | null>(null);
   const [pilgrim, setPilgrim] = useState<Pilgrim | null>(null);
   const [error, setError] = useState("");
+  const [dlState, setDlState] = useState<string | null>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  const dlCard = async (fmt: "pdf" | "jpg") => {
+    if (!contentRef.current) return;
+    setDlState(fmt);
+    try {
+      const name = `id-card-${pilgrim?.fullName?.replace(/\s+/g, "-") || "card"}`;
+      if (fmt === "pdf") await downloadAsPdf(contentRef.current, name);
+      else await downloadAsJpg(contentRef.current, name);
+    } finally { setDlState(null); }
+  };
 
   useEffect(() => {
     if (!groupId || !pilgrimId) return;
@@ -312,6 +325,14 @@ export default function PrintSingleCard() {
             padding: "8px 16px", background: "rgba(255,255,255,0.15)", color: "#fff",
             border: "1px solid rgba(255,255,255,0.3)", borderRadius: "7px", cursor: "pointer", fontSize: "13px",
           }}>← Back</button>
+          <button onClick={() => dlCard("pdf")} disabled={!!dlState} style={{
+            padding: "10px 20px", background: dlState === "pdf" ? "#6b7280" : "#1d4ed8",
+            color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "13px",
+          }}>{dlState === "pdf" ? "⏳..." : "⬇ PDF"}</button>
+          <button onClick={() => dlCard("jpg")} disabled={!!dlState} style={{
+            padding: "10px 20px", background: dlState === "jpg" ? "#6b7280" : "#7c3aed",
+            color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "13px",
+          }}>{dlState === "jpg" ? "⏳..." : "⬇ JPG"}</button>
           <button onClick={() => window.print()} style={{
             padding: "10px 32px", background: GOLD, color: "#000",
             border: "none", borderRadius: "8px", fontWeight: 900, cursor: "pointer", fontSize: "15px",
@@ -336,7 +357,7 @@ export default function PrintSingleCard() {
       </div>
 
       {/* ── The single A4 page ── */}
-      <div className="fold-page">
+      <div ref={contentRef} className="fold-page">
 
         {/* TOP HALF — FRONT card (normal orientation) */}
         <div className="fold-half" style={{ borderBottom: "none" }}>

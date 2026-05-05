@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRoute } from "wouter";
+import { downloadAsPdf } from "@/lib/downloadUtils";
 import { Barcode } from "@/components/print/Barcode";
 import { QRCodeSVG } from "qrcode.react";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
@@ -41,6 +42,8 @@ export default function PrintZamzam() {
   const [pilgrims, setPilgrims] = useState<Pilgrim[]>([]);
   const [companyId, setCompanyId] = useState("alburhan");
   const company = getCompanyById(companyId);
+  const [dlState, setDl] = useState<string | null>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!groupId) return;
@@ -100,18 +103,18 @@ export default function PrintZamzam() {
         <button onClick={() => window.print()} style={{
           padding: "8px 20px", background: DARK_GREEN, color: "#fff", border: "none",
           borderRadius: "7px", fontWeight: 700, cursor: "pointer", fontSize: "13px"
-        }}>
-          🖨 Print
+        }}>🖨 Print</button>
+        <button onClick={async () => { if (!contentRef.current) return; setDl("pdf"); try { await downloadAsPdf(contentRef.current, `zamzam-${group.groupName}`); } finally { setDl(null); } }}
+          disabled={!!dlState} style={{ padding: "8px 16px", background: dlState === "pdf" ? "#6b7280" : "#1d4ed8", color: "#fff", border: "none", borderRadius: "7px", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
+          {dlState === "pdf" ? "⏳..." : "⬇ PDF"}
         </button>
         <button onClick={() => window.history.back()} style={{
           padding: "8px 14px", border: "1px solid #ccc", borderRadius: "7px",
           cursor: "pointer", background: "#fff", fontSize: "13px"
-        }}>
-          ← Back
-        </button>
+        }}>← Back</button>
       </div>
 
-      <div style={{ background: "#fff" }}>
+      <div ref={contentRef} style={{ background: "#fff" }}>
         {pages.map((page, pageIdx) => (
           <div key={pageIdx} className="zz-page">
             {page.map(p => {

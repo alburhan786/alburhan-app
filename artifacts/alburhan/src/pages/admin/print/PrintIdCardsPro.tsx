@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRoute } from "wouter";
+import { downloadAsPdf, downloadAsJpg } from "@/lib/downloadUtils";
 import { Barcode } from "@/components/print/Barcode";
 import { QRCodeSVG } from "qrcode.react";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
@@ -341,6 +342,18 @@ export default function PrintIdCardsPro() {
   const [showFeedbackQr, setShowFeedbackQr] = useState(false);
   const [bookingMap, setBookingMap] = useState<Record<string, string>>({});
   const [printMode, setPrintMode] = useState<PrintMode>("sidebyside");
+  const [dlState, setDlState] = useState<string | null>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  const dlCards = async (fmt: "pdf" | "jpg") => {
+    if (!contentRef.current) return;
+    setDlState(fmt);
+    try {
+      const name = `id-cards-${group?.groupName || "group"}`;
+      if (fmt === "pdf") await downloadAsPdf(contentRef.current, name);
+      else await downloadAsJpg(contentRef.current, name);
+    } finally { setDlState(null); }
+  };
 
   useEffect(() => {
     if (!groupId) return;
@@ -482,24 +495,15 @@ export default function PrintIdCardsPro() {
           Feedback QR
         </label>
 
-        {/* Print mode */}
-        <div style={{ display: "flex", gap: "6px" }}>
-          {([
-            { val: "sidebyside", label: "✂ Side-by-Side (No duplex needed)", bg: "#dcfce7", border: "#16a34a" },
-            { val: "duplex",     label: "🖨 Auto-Duplex",                    bg: "#dbeafe", border: "#2563eb" },
-          ] as { val: PrintMode; label: string; bg: string; border: string }[]).map(({ val, label, bg, border }) => (
-            <button key={val} onClick={() => setPrintMode(val)} style={{
-              padding: "8px 14px", borderRadius: "7px", fontSize: "12px", fontWeight: 700, cursor: "pointer",
-              border: `2px solid ${printMode === val ? border : "#d1d5db"}`,
-              background: printMode === val ? bg : "#fff",
-              color: printMode === val ? border : "#555",
-            }}>{label}</button>
-          ))}
-        </div>
-
         <div style={{ marginLeft: "auto", display: "flex", gap: "8px" }}>
           <button onClick={() => window.print()} style={{ padding: "10px 24px", background: DARK, color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "14px" }}>
             🖨 Print
+          </button>
+          <button onClick={() => dlCards("pdf")} disabled={!!dlState} style={{ padding: "10px 18px", background: dlState === "pdf" ? "#6b7280" : "#1d4ed8", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
+            {dlState === "pdf" ? "⏳..." : "⬇ PDF"}
+          </button>
+          <button onClick={() => dlCards("jpg")} disabled={!!dlState} style={{ padding: "10px 18px", background: dlState === "jpg" ? "#6b7280" : "#7c3aed", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
+            {dlState === "jpg" ? "⏳..." : "⬇ JPG"}
           </button>
           <button onClick={() => window.history.back()} style={{ padding: "10px 18px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff", fontSize: "13px" }}>← Back</button>
         </div>
@@ -529,7 +533,7 @@ export default function PrintIdCardsPro() {
       </div>
 
       {/* ── Content ── */}
-      <div style={{ background: "#f5f5f0", padding: "8mm", display: "flex", flexDirection: "column", gap: "8mm" }}>
+      <div ref={contentRef} style={{ background: "#f5f5f0", padding: "8mm", display: "flex", flexDirection: "column", gap: "8mm" }}>
 
         {isSBS ? (
           /* ── SIDE-BY-SIDE MODE: 4 rows per A4 ── */

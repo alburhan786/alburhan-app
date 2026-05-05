@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRoute } from "wouter";
+import { downloadAsPdf } from "@/lib/downloadUtils";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -211,6 +212,8 @@ export default function PrintRoomStickers() {
   const [selectedRoom, setSelectedRoom] = useState<string>("ALL");
   const [companyId, setCompanyId] = useState("alburhan");
   const company = getCompanyById(companyId);
+  const [dlState, setDlState] = useState<string | null>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!groupId) return;
@@ -296,6 +299,11 @@ export default function PrintRoomStickers() {
           style={{ padding: "8px 18px", background: "#0d5040", color: "#fff", border: "none", borderRadius: "7px", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
           🖨 Print
         </button>
+        <button onClick={async () => { if (!contentRef.current) return; setDlState("pdf"); try { await downloadAsPdf(contentRef.current, `room-stickers-${group?.groupName || "group"}`); } finally { setDlState(null); } }}
+          disabled={!!dlState}
+          style={{ padding: "8px 16px", background: dlState === "pdf" ? "#6b7280" : "#1d4ed8", color: "#fff", border: "none", borderRadius: "7px", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
+          {dlState === "pdf" ? "⏳..." : "⬇ PDF"}
+        </button>
         <button onClick={() => window.history.back()}
           style={{ padding: "8px 14px", border: "1px solid #ccc", borderRadius: "7px", cursor: "pointer", background: "#fff", fontSize: "13px" }}>
           ← Back
@@ -317,7 +325,7 @@ export default function PrintRoomStickers() {
       </div>
 
       {/* Print content */}
-      <div>
+      <div ref={contentRef}>
         {roomsToShow.length === 0 ? (
           <div style={{ padding: "60px", textAlign: "center", color: "#666", fontFamily: "Arial" }}>
             No rooms with assigned pilgrims found.
