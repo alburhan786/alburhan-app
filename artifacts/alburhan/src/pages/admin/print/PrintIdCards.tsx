@@ -74,18 +74,19 @@ function LogoHeader({ size, company }: { size?: "small"; company: CompanyInfo })
   );
 }
 
-function FrontCard({ p, group, company, showFeedbackQr, bookingMap }: {
-  p: Pilgrim; group: Group; company: CompanyInfo; showFeedbackQr: boolean; bookingMap: Record<string, string>;
+function FrontCard({ p, group, company, showFeedbackQr, bookingMap, photoDataUrls }: {
+  p: Pilgrim; group: Group; company: CompanyInfo; showFeedbackQr: boolean; bookingMap: Record<string, string>; photoDataUrls: Record<string, string>;
 }) {
   const bulletDot: React.CSSProperties = { width: "3mm", height: "3mm", borderRadius: "50%", background: GOLD, flexShrink: 0, marginTop: "0.8mm" };
+  const photoSrc = photoDataUrls[p.id] || (p.photoUrl ? `${API}${p.photoUrl}` : "");
   return (
     <div className="id-card">
       <WaveShapes />
       <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", height: "100%", padding: "2.5mm 3mm 0" }}>
         <LogoHeader company={company} />
         <div style={{ display: "flex", justifyContent: "center", marginBottom: "1mm" }}>
-          {p.photoUrl
-            ? <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "25mm", height: "25mm", objectFit: "cover", borderRadius: "50%", border: `2.5px solid ${GOLD}` }} />
+          {photoSrc
+            ? <img src={photoSrc} alt="" style={{ width: "25mm", height: "25mm", objectFit: "cover", borderRadius: "50%", border: `2.5px solid ${GOLD}` }} />
             : <div style={{ width: "25mm", height: "25mm", background: "#f0f0f0", borderRadius: "50%", border: `2.5px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "6pt", color: "#aaa" }}>PHOTO</div>
           }
         </div>
@@ -221,6 +222,22 @@ function BackCard({ p, group, company, showFeedbackQr, bookingMap }: {
   );
 }
 
+async function toDataUrl(url: string): Promise<string> {
+  try {
+    const res = await fetch(url, { credentials: "include" });
+    if (!res.ok) return "";
+    const blob = await res.blob();
+    return await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => resolve("");
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return "";
+  }
+}
+
 export default function PrintIdCards() {
   const [, params] = useRoute("/admin/groups/:groupId/print/id-cards");
   const groupId = params?.groupId || "";
@@ -230,6 +247,7 @@ export default function PrintIdCards() {
   const company = getCompanyById(companyId);
   const [showFeedbackQr, setShowFeedbackQr] = useState(false);
   const [bookingMap, setBookingMap] = useState<Record<string, string>>({});
+  const [photoDataUrls, setPhotoDataUrls] = useState<Record<string, string>>({});
   const contentRef = useRef<HTMLDivElement>(null);
   const [dlState, setDlState] = useState<string | null>(null);
 
@@ -249,7 +267,20 @@ export default function PrintIdCards() {
       fetch(`${API}/api/groups/${groupId}`, { credentials: "include" }).then(r => r.json()),
       fetch(`${API}/api/groups/${groupId}/pilgrims`, { credentials: "include" }).then(r => r.json()),
       fetch(`${API}/api/feedback/admin/group-bookings/${groupId}`, { credentials: "include" }).then(r => r.ok ? r.json() : {}),
-    ]).then(([g, p, bm]) => { setGroup(g); setPilgrims(p); setBookingMap(bm || {}); });
+    ]).then(async ([g, p, bm]) => {
+      setGroup(g);
+      setPilgrims(p);
+      setBookingMap(bm || {});
+      const entries = await Promise.all(
+        (p as Pilgrim[])
+          .filter((pilgrim) => pilgrim.photoUrl)
+          .map(async (pilgrim) => {
+            const dataUrl = await toDataUrl(`${API}${pilgrim.photoUrl}`);
+            return [pilgrim.id, dataUrl] as [string, string];
+          })
+      );
+      setPhotoDataUrls(Object.fromEntries(entries.filter(([, v]) => v)));
+    });
   }, [groupId]);
 
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
@@ -347,7 +378,7 @@ export default function PrintIdCards() {
 
             <div className="id-row">
               {page.map(p => (
-                <FrontCard key={`f-${p.id}`} p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
+                <FrontCard key={`f-${p.id}`} p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} photoDataUrls={photoDataUrls} />
               ))}
             </div>
 

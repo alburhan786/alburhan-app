@@ -11,27 +11,27 @@ interface BarcodeProps {
 }
 
 export function Barcode({ value, width = 1, height = 25, fontSize = 8, displayValue = false, format = "CODE39" }: BarcodeProps) {
-  const svgRef = useRef<SVGSVGElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    if (svgRef.current && value) {
+    if (canvasRef.current && value) {
       try {
         const safeValue = format === "CODE128"
           ? value.replace(/[^\x00-\x7F]/g, "")
           : value.toUpperCase().replace(/[^A-Z0-9\-.\s$/+%]/g, "");
-        JsBarcode(svgRef.current, safeValue, {
+        JsBarcode(canvasRef.current, safeValue, {
           format,
           width,
           height,
           fontSize,
           displayValue,
           margin: 0,
-          background: "transparent",
+          background: "#ffffff",
         });
       } catch {}
     }
   }, [value, width, height, fontSize, displayValue, format]);
 
   if (!value) return null;
-  return <svg ref={svgRef} />;
+  return <canvas ref={canvasRef} style={{ display: "block" }} />;
 }
