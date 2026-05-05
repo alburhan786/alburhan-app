@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useRoute } from "wouter";
-import { downloadMultiPagePdf, downloadPagesAsJpg, fetchAsDataUrl } from "@/lib/downloadUtils";
+import { downloadMultiPagePdf, downloadPagesAsJpg, downloadAsPdf, downloadAsJpg, fetchAsDataUrl } from "@/lib/downloadUtils";
 import { Barcode } from "@/components/print/Barcode";
 import { QRCodeCanvas } from "qrcode.react";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
@@ -348,16 +348,25 @@ export default function PrintIdCardsPro() {
 
   const dlCards = async (fmt: "pdf" | "jpg") => {
     if (!contentRef.current) return;
+
+    // Query DOM BEFORE any setState — a setState call triggers React reconciliation
+    // which can temporarily detach elements, making querySelectorAll return 0 results.
+    const selector = isSBS ? ".id-print-page" : ".duplex-page";
+    const pageEls = Array.from(
+      contentRef.current.querySelectorAll<HTMLElement>(selector)
+    );
+
     setDlState(fmt);
     try {
       const name = `id-cards-pro-${group?.groupName || "group"}`;
-      const selector = isSBS ? ".id-print-page" : ".duplex-page";
-      const pageEls = Array.from(
-        contentRef.current.querySelectorAll(selector)
-      ) as HTMLElement[];
-      if (pageEls.length === 0) return;
-      if (fmt === "pdf") await downloadMultiPagePdf(pageEls, name);
-      else await downloadPagesAsJpg(pageEls, name);
+      if (pageEls.length > 0) {
+        if (fmt === "pdf") await downloadMultiPagePdf(pageEls, name);
+        else await downloadPagesAsJpg(pageEls, name);
+      } else {
+        // Fallback: capture entire content area at once
+        if (fmt === "pdf") await downloadAsPdf(contentRef.current, name);
+        else await downloadAsJpg(contentRef.current, name);
+      }
     } finally { setDlState(null); }
   };
 
