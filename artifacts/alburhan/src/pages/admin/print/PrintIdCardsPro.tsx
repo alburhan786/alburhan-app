@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRoute } from "wouter";
 import { downloadMultiPagePdf, downloadPagesAsJpg, downloadAsPdf, downloadAsJpg, fetchAsDataUrl, downloadElementAsSvg } from "@/lib/downloadUtils";
 import { Barcode } from "@/components/print/Barcode";
-import { QRCodeSVG } from "qrcode.react";
+import { QRCodeCanvas } from "qrcode.react";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -172,7 +172,7 @@ function FrontCard({ p, group, company }: CardProps) {
           borderLeft: `1px solid ${GOLD}50`,
         }}>
           <div style={{ background: "#fff", padding: "2px", borderRadius: "3px", border: `2.5px solid ${DARK}` }}>
-            <QRCodeSVG value={buildVerifyUrl(p.id)} size={72} level="L" fgColor={DARK} bgColor="#ffffff" />
+            <QRCodeCanvas value={buildVerifyUrl(p.id)} size={56} level="M" fgColor={DARK} />
           </div>
           <div style={{ fontSize: "2.5pt", color: "#888", textTransform: "uppercase", marginTop: "0.5mm", letterSpacing: "0.2px", textAlign: "center" }}>SCAN TO VERIFY</div>
         </div>
@@ -293,11 +293,11 @@ function BackCard({ p, group, company, showFeedbackQr, bookingMap }: CardProps) 
           {showFeedbackQr && (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", marginTop: "auto" }}>
               <div style={{ background: "#fff", padding: "1px", borderRadius: "2px", border: `1.5px solid ${DARK}` }}>
-                <QRCodeSVG
+                <QRCodeCanvas
                   value={p.mobileIndia && bookingMap[p.mobileIndia]
                     ? `${PROD_DOMAIN}/feedback?booking_id=${bookingMap[p.mobileIndia]}`
                     : `${PROD_DOMAIN}/feedback`}
-                  size={40} level="L" fgColor={DARK} bgColor="#ffffff"
+                  size={26} level="L" fgColor={DARK}
                 />
               </div>
               <div style={{ fontSize: "2.8pt", color: "#888", textTransform: "uppercase", marginTop: "0.3mm" }}>Rate Trip</div>
