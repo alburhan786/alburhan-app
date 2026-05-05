@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useRoute } from "wouter";
-import { downloadAsPdf, downloadAsJpg, fetchAsDataUrl } from "@/lib/downloadUtils";
+import { downloadMultiPagePdf, downloadPagesAsJpg, fetchAsDataUrl } from "@/lib/downloadUtils";
 import { Barcode } from "@/components/print/Barcode";
 import { QRCodeCanvas } from "qrcode.react";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
@@ -350,9 +350,14 @@ export default function PrintIdCardsPro() {
     if (!contentRef.current) return;
     setDlState(fmt);
     try {
-      const name = `id-cards-${group?.groupName || "group"}`;
-      if (fmt === "pdf") await downloadAsPdf(contentRef.current, name);
-      else await downloadAsJpg(contentRef.current, name);
+      const name = `id-cards-pro-${group?.groupName || "group"}`;
+      const selector = isSBS ? ".id-print-page" : ".duplex-page";
+      const pageEls = Array.from(
+        contentRef.current.querySelectorAll(selector)
+      ) as HTMLElement[];
+      if (pageEls.length === 0) return;
+      if (fmt === "pdf") await downloadMultiPagePdf(pageEls, name);
+      else await downloadPagesAsJpg(pageEls, name);
     } finally { setDlState(null); }
   };
 

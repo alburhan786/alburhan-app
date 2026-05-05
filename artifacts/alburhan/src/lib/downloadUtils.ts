@@ -59,7 +59,7 @@ export async function downloadAsPdf(el: HTMLElement, filename: string) {
 /**
  * Captures each element in `pages` separately and adds it as a new PDF page.
  * Use this when the printable content is split into distinct page blocks
- * (e.g. .pair-block divs) so html2canvas never has to render a giant tall element.
+ * (e.g. .id-print-page divs) so html2canvas never hits the ~32 767px height limit.
  */
 export async function downloadMultiPagePdf(pages: HTMLElement[], filename: string) {
   if (pages.length === 0) return;
@@ -86,4 +86,25 @@ export async function downloadMultiPagePdf(pages: HTMLElement[], filename: strin
   }
 
   pdf!.save(filename.endsWith(".pdf") ? filename : filename + ".pdf");
+}
+
+/**
+ * Captures each element in `pages` separately and downloads each as a
+ * numbered JPG file (filename-1.jpg, filename-2.jpg, …).
+ * Avoids the html2canvas height limit for multi-page layouts.
+ */
+export async function downloadPagesAsJpg(pages: HTMLElement[], filename: string) {
+  if (pages.length === 0) return;
+  const base = filename.replace(/\.jpg$/i, "");
+  for (let i = 0; i < pages.length; i++) {
+    const canvas = await html2canvas(pages[i], CAPTURE_OPTS);
+    const a = document.createElement("a");
+    a.download = pages.length === 1 ? `${base}.jpg` : `${base}-${i + 1}.jpg`;
+    a.href = canvas.toDataURL("image/jpeg", 0.93);
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    // Small delay between downloads so the browser doesn't block them
+    if (i < pages.length - 1) await new Promise(r => setTimeout(r, 300));
+  }
 }
