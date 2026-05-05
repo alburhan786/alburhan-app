@@ -39,6 +39,7 @@ function PrintDropdown({ groupId }: { groupId: string }) {
   const items = [
     { label: "Photo ID Cards", path: "id-cards" },
     { label: "Pro ID Cards (85×54)", path: "id-cards-pro" },
+    { label: "Duplex ID Cards (3×3 Grid)", path: "id-cards-duplex" },
     { label: "Luggage Stickers", path: "luggage" },
     { label: "Square Luggage Sticker", path: "luggage-square" },
     { label: "Large Luggage Sticker (18×22cm)", path: "luggage-large" },

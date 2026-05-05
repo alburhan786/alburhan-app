@@ -23,6 +23,7 @@ interface HajjGroup {
 const PRINT_OPTIONS = [
   { label: "ID Cards (Basic)", icon: <CreditCard size={14} />, path: "id-cards", color: "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100" },
   { label: "ID Cards (Pro)", icon: <Star size={14} />, path: "id-cards-pro", color: "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100" },
+  { label: "ID Cards (Duplex 3×3)", icon: <CreditCard size={14} />, path: "id-cards-duplex", color: "bg-teal-50 text-teal-700 border-teal-200 hover:bg-teal-100" },
   { label: "Luggage Labels", icon: <Luggage size={14} />, path: "luggage", color: "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100" },
   { label: "Luggage Square", icon: <Luggage size={14} />, path: "luggage-square", color: "bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100" },
   { label: "Luggage Large (18×22cm)", icon: <Luggage size={14} />, path: "luggage-large", color: "bg-yellow-50 text-yellow-800 border-yellow-300 hover:bg-yellow-100" },

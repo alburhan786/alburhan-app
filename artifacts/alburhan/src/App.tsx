@@ -36,6 +36,7 @@ import PrintContract from "@/pages/admin/print/PrintContract";
 import PrintLuggageSquare from "@/pages/admin/print/PrintLuggageSquare";
 import PrintLuggageLarge from "@/pages/admin/print/PrintLuggageLarge";
 import PrintIdCardsPro from "@/pages/admin/print/PrintIdCardsPro";
+import PrintIdCardsDuplex from "@/pages/admin/print/PrintIdCardsDuplex";
 import PrintRoomStickers from "@/pages/admin/print/PrintRoomStickers";
 import PrintHajiList from "@/pages/admin/print/PrintHajiList";
 import InvoiceManager from "@/pages/admin/InvoiceManager";
@@ -123,6 +124,7 @@ function Router() {
       <Route path="/admin/groups/:groupId/pilgrims" component={() => <AdminRoute component={PilgrimManager} />} />
       <Route path="/admin/groups/:groupId/print/id-cards" component={() => <AdminRoute component={PrintIdCards} />} />
       <Route path="/admin/groups/:groupId/print/id-cards-pro" component={() => <AdminRoute component={PrintIdCardsPro} />} />
+      <Route path="/admin/groups/:groupId/print/id-cards-duplex" component={() => <AdminRoute component={PrintIdCardsDuplex} />} />
       <Route path="/admin/groups/:groupId/print/luggage" component={() => <AdminRoute component={PrintLuggage} />} />
       <Route path="/admin/groups/:groupId/print/luggage-square" component={() => <AdminRoute component={PrintLuggageSquare} />} />
       <Route path="/admin/groups/:groupId/print/luggage-large" component={() => <AdminRoute component={PrintLuggageLarge} />} />
