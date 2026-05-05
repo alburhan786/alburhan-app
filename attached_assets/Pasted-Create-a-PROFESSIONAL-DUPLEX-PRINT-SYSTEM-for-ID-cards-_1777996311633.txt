@@ -1,0 +1,143 @@
+Create a PROFESSIONAL DUPLEX PRINT SYSTEM for ID cards (A4 layout).
+
+OBJECTIVE:
+Print 9 pilgrims FRONT on page 1 and SAME 9 pilgrims BACK on page 2.
+Must be perfectly aligned for duplex printing.
+
+----------------------------------------
+PAGE LAYOUT
+----------------------------------------
+
+Paper size: A4
+Grid: 3 columns × 3 rows
+Total: 9 cards per page
+
+Card size: 86mm × 54mm
+Gap between cards: 5mm
+
+----------------------------------------
+DATA RULE (VERY IMPORTANT)
+----------------------------------------
+
+Use SAME array for both pages.
+
+const pilgrims = data.slice(0, 9);
+
+----------------------------------------
+FRONT PAGE GENERATION
+----------------------------------------
+
+const frontHTML = pilgrims.map((p, index) => `
+  <div class="card">
+    <img src="${p.photo}" class="photo"/>
+    <h3>${p.name}</h3>
+    <p>ID: ${p.id}</p>
+    <p>Passport: ${p.passport}</p>
+    <img src="${p.qr}" class="qr"/>
+  </div>
+`).join("");
+
+----------------------------------------
+BACK PAGE GENERATION
+----------------------------------------
+
+const backHTML = pilgrims.map((p, index) => `
+  <div class="card">
+    <h4>${p.name}</h4>
+    <p>Maktab: ${p.maktab}</p>
+    <p>Hotel: ${p.hotel}</p>
+    <p>Mobile: ${p.mobile}</p>
+    <img src="${p.qr}" class="qr"/>
+  </div>
+`).join("");
+
+----------------------------------------
+HTML STRUCTURE
+----------------------------------------
+
+<div class="page front">
+  ${frontHTML}
+</div>
+
+<div class="page back">
+  ${backHTML}
+</div>
+
+----------------------------------------
+CSS GRID SYSTEM
+----------------------------------------
+
+.page {
+  width: 210mm;
+  height: 297mm;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 5mm;
+  padding: 10mm;
+  box-sizing: border-box;
+}
+
+.card {
+  width: 86mm;
+  height: 54mm;
+  border: 1px solid #ddd;
+  position: relative;
+  overflow: hidden;
+}
+
+----------------------------------------
+PRINT SETTINGS CSS
+----------------------------------------
+
+@media print {
+  body {
+    margin: 0;
+  }
+
+  .page {
+    page-break-after: always;
+  }
+}
+
+----------------------------------------
+CRITICAL ALIGNMENT RULE
+----------------------------------------
+
+DO NOT:
+❌ shuffle data
+❌ change order
+❌ use different arrays
+
+MUST:
+✔ Same array
+✔ Same order
+✔ Same index
+
+----------------------------------------
+PRINT INSTRUCTION (SHOW TO USER)
+----------------------------------------
+
+Display message:
+
+"Print Settings:
+✔ Enable Duplex Printing
+✔ Flip on SHORT EDGE
+✔ Scale: 100%
+✔ Paper: A4"
+
+----------------------------------------
+PDF GENERATION
+----------------------------------------
+
+Use:
+- Puppeteer OR html2pdf
+
+----------------------------------------
+EXPECTED RESULT
+----------------------------------------
+
+Page 1 → 9 FRONT cards  
+Page 2 → SAME 9 BACK cards  
+
+Perfect front-back alignment after printing.
