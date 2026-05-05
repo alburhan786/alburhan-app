@@ -490,166 +490,194 @@ export default function PrintLuggageSquare() {
 
       <div ref={contentRef} className="sq-wrap" style={{ background: "#f5f5f0", padding: "8mm", display: "flex", flexDirection: "column", gap: "8mm" }}>
 
-        {/* ══ BOTH MODE: front + back on same page ══ */}
+        {/* ══ BOTH MODE: front row + cut line + back row on same A4 page, 2 pilgrims per page ══ */}
         {view === "both" && pages.map((page, pageIdx) => (
           <div key={`both-${pageIdx}`} className="sq-page-both">
-            {/* Front row */}
+
+            {/* ── FRONT ROW ── */}
             <div className="sq-row">
-              {page.map(p => {
-                  const serialNo = String(p.serialNumber).padStart(3, "0");
-                  return (
-                    <div key={p.id} className="sq-sticker">
-                      <div style={{ position: "relative", overflow: "hidden", height: "100%", display: "flex", flexDirection: "column" }}>
-                        {/* Decorative corner */}
-                        <div style={{
-                          position: "absolute", top: "-8mm", right: "-6mm",
-                          width: "38mm", height: "38mm",
-                          background: DARK, borderRadius: "0 0 0 60%", zIndex: 0,
-                        }} />
+              {page.map(p => <FrontSticker key={p.id} p={p} group={group} company={company} groupColor={groupColor} groupLabel={groupLabel} photoDataUrls={photoDataUrls} />)}
+            </div>
 
-                        {/* Header */}
-                        <div style={{ position: "relative", zIndex: 1, padding: "2mm 3.5mm 1mm", display: "flex", alignItems: "center", gap: "2mm" }}>
-                          <div style={{ fontSize: "32pt", lineHeight: 1, flexShrink: 0 }}>🇮🇳</div>
-                          {company.logoUrl
-                            ? <img src={company.logoUrl} alt="" style={{ height: "10mm", objectFit: "contain", flexShrink: 0 }} />
-                            : <div style={{ height: "10mm", width: "10mm", flexShrink: 0, background: DARK, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "6pt" }}>{company.nameShort[0]}</div>
-                          }
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontWeight: 900, fontSize: "8pt", color: "#1a7a5e", letterSpacing: "0.8px", textTransform: "uppercase", lineHeight: 1.1 }}>{company.nameShort}</div>
-                            <div style={{ fontWeight: 700, fontSize: "5.5pt", color: GOLD, letterSpacing: "1px", textTransform: "uppercase" }}>TOURS &amp; TRAVELS</div>
-                          </div>
-                          <div style={{ textAlign: "right", flexShrink: 0 }}>
-                            <div style={{ fontSize: "20pt", fontWeight: 900, color: "#fff", lineHeight: 1 }}>#{serialNo}</div>
-                            <div style={{ fontSize: "5pt", color: "#fff", opacity: 0.9 }}>HAJJ {group.year}</div>
-                          </div>
-                        </div>
+            {/* ── DASHED CUT LINE ── */}
+            <div className="sq-cut-line">
+              <div className="sq-cut-dash" />
+              <span className="sq-cut-label">✂ CUT HERE</span>
+              <div className="sq-cut-dash" />
+            </div>
 
-                        {/* Group bar */}
-                        <div style={{ background: groupColor, padding: "1mm 3.5mm", display: "flex", justifyContent: "center", alignItems: "center", position: "relative", zIndex: 1 }}>
-                          <span style={{ color: "#fff", fontWeight: 800, fontSize: "7.5pt", letterSpacing: "0.8px" }}>GROUP: {groupLabel}</span>
-                        </div>
+            {/* ── BACK ROW ── */}
+            <div className="sq-row">
+              {page.map(p => (
+                <LuggageStickerBack key={p.id} p={p} group={group} company={company} />
+              ))}
+            </div>
 
-                        {/* Body */}
-                        <div style={{ position: "relative", zIndex: 1, padding: "1.5mm 3.5mm 1mm", flex: 1, display: "flex", flexDirection: "column" }}>
-                          <div style={{ display: "flex", gap: "2.5mm", alignItems: "flex-start", marginBottom: "1mm" }}>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontSize: "12pt", fontWeight: 900, color: DARK, lineHeight: 1.15, textTransform: "uppercase", wordBreak: "break-word" }}>{p.fullName}</div>
-                            </div>
-                            <div style={{ flexShrink: 0 }}>
-                              {p.photoUrl
-                                ? <img src={photoDataUrls[p.id] || `${API}${p.photoUrl}`} alt="" style={{ width: "15mm", height: "15mm", objectFit: "cover", borderRadius: "50%", border: `2px solid ${GOLD}` }} />
-                                : <div style={{ width: "15mm", height: "15mm", background: "#f0f0f0", borderRadius: "50%", border: `2px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "5pt", color: "#aaa" }}>PHOTO</div>
-                              }
-                            </div>
-                          </div>
+          </div>
+        ))}
 
-                          <div style={{ display: "flex", gap: "2mm", marginBottom: "1mm" }}>
-                            <div style={{ flex: 1, background: "#f0fdf4", border: `1px solid ${DARK}`, borderRadius: "3px", padding: "0.8mm 2mm", textAlign: "center" }}>
-                              <div style={{ fontSize: "5pt", color: "#666", textTransform: "uppercase", fontWeight: 600 }}>PASSPORT</div>
-                              <div style={{ fontSize: "12pt", fontWeight: 900, fontFamily: "monospace", letterSpacing: "0.5px", color: DARK }}>{p.passportNumber || "—"}</div>
-                            </div>
-                            <div style={{ flex: 1, background: "#f0fdf4", border: `1px solid ${DARK}`, borderRadius: "3px", padding: "0.8mm 2mm", textAlign: "center" }}>
-                              <div style={{ fontSize: "5pt", color: "#666", textTransform: "uppercase", fontWeight: 600 }}>SERVICE CENTER NO</div>
-                              <div style={{ fontSize: "10pt", fontWeight: 900, color: DARK }}>{group.maktabNumber || "—"}</div>
-                            </div>
-                          </div>
+        {/* ══ FRONT ONLY: 4 per page (2×2 grid) ══ */}
+        {view === "front" && pages.map((page, pageIdx) => (
+          <div key={`front-${pageIdx}`} className="sq-page-single">
+            {page.map(p => <FrontSticker key={p.id} p={p} group={group} company={company} groupColor={groupColor} groupLabel={groupLabel} photoDataUrls={photoDataUrls} />)}
+          </div>
+        ))}
 
-                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.8mm 2mm", marginBottom: "1mm", fontSize: "6.5pt" }}>
-                            {[
-                              { label: "HOTEL MAKKAH 1", data: group.hotels?.aziziah },
-                              { label: "HOTEL MAKKAH 2", data: group.hotels?.makkah },
-                              { label: "HOTEL MADINAH",  data: group.hotels?.madinah },
-                            ].map(({ label, data }) => (
-                              <div key={label} style={{ display: "flex", gap: "1mm", alignItems: "flex-start" }}>
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ fontSize: "4.5pt", color: "#999", textTransform: "uppercase", fontWeight: 600 }}>{label}</div>
-                                  <div style={{ fontWeight: 700, color: "#222", fontSize: "6pt" }}>{data?.name || "—"}</div>
-                                  {data?.nameAr && <div style={{ fontWeight: 700, color: "#222", fontSize: "5.5pt", direction: "rtl", textAlign: "right" }}>{data.nameAr}</div>}
-                                  {data?.address && <div style={{ fontSize: "4.5pt", color: "#666", lineHeight: 1.2 }}>{data.address}</div>}
-                                  {(data as any)?.addressAr && <div style={{ fontSize: "4pt", color: "#666", lineHeight: 1.2, direction: "rtl", textAlign: "right" }}>{(data as any).addressAr}</div>}
-                                </div>
-                                {data?.name && (
-                                  <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: "0.3mm" }}>
-                                    <QRCodeCanvas value={buildHotelMapUrl(data.name, data.address)} size={28} level="M" fgColor={DARK} />
-                                    <div style={{ fontSize: "3.5pt", color: "#999" }}>MAP</div>
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-
-                          <div style={{ background: RED, borderRadius: "3px", padding: "1.2mm 3mm", textAlign: "center", marginBottom: "1.5mm" }}>
-                            <div style={{ color: "#fff", fontWeight: 900, fontSize: "8pt", textTransform: "uppercase" }}>IN CASE OF LOST / FOUND</div>
-                            <div style={{ color: "#fff", fontWeight: 900, fontSize: "7.5pt", textTransform: "uppercase" }}>KINDLY CONTACT</div>
-                          </div>
-
-                          <div style={{ display: "flex", justifyContent: "center", gap: "4mm", marginBottom: "1.5mm" }}>
-                            <div style={{ textAlign: "center" }}>
-                              <div style={{ fontSize: "5pt", color: "#999", textTransform: "uppercase", fontWeight: 600, marginBottom: "0.3mm" }}>🇸🇦 Saudi</div>
-                              <div style={{ fontSize: "8pt", fontWeight: 900, color: DARK }}>{company.phoneSaudi}</div>
-                            </div>
-                            <div style={{ width: "0.3mm", background: "#ddd", flexShrink: 0 }} />
-                            <div style={{ textAlign: "center" }}>
-                              <div style={{ fontSize: "5pt", color: "#999", textTransform: "uppercase", fontWeight: 600, marginBottom: "0.3mm" }}>🇮🇳 India</div>
-                              <div style={{ fontSize: "8pt", fontWeight: 900, color: DARK }}>{company.phone}</div>
-                            </div>
-                          </div>
-
-                          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "3mm", marginTop: "auto" }}>
-                            {/* QR — big + styled */}
-                            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.8mm" }}>
-                              <div style={{ background: "#fff", padding: "2.5px", borderRadius: "4px", border: `2.5px solid ${DARK}`, boxShadow: "0 1px 4px rgba(0,0,0,0.12)" }}>
-                                <QRCodeCanvas value={buildVerifyUrl(p.id)} size={80} level="M" fgColor={DARK} />
-                              </div>
-                              <div style={{ background: DARK, color: "#fff", fontSize: "4pt", fontWeight: 900, letterSpacing: "1px", padding: "0.4mm 2.5mm", borderRadius: "8px", textTransform: "uppercase" }}>📱 Scan</div>
-                            </div>
-                            {/* Barcode — taller */}
-                            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5mm" }}>
-                              <Barcode value={p.passportNumber || `H${serialNo}`} height={28} width={1.4} fontSize={7} />
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* ── Website + Lock band ── */}
-                        <div style={{ position: "relative", zIndex: 2, background: DARK, padding: "2mm 3mm", display: "flex", alignItems: "center", justifyContent: "center", gap: "2.5mm" }}>
-                          {/* Padlock icon */}
-                          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" style={{ flexShrink: 0 }}>
-                            <path d="M8 11V7a4 4 0 0 1 8 0v4" stroke={GOLD} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                            <rect x="4.5" y="10.5" width="15" height="11" rx="2.5" fill={GOLD} />
-                            <circle cx="12" cy="16.2" r="1.9" fill={DARK} />
-                            <rect x="11" y="17.7" width="2" height="2.3" rx="1" fill={DARK} />
-                          </svg>
-                          <div style={{ fontSize: "10.5pt", fontWeight: 900, color: "#fff", letterSpacing: "0.6px", lineHeight: 1, textTransform: "lowercase" }}>
-                            www.alburhantravels.com
-                          </div>
-                        </div>
-
-                        <div style={{ position: "relative", zIndex: 2, background: "#FFC107", color: RED, padding: "1.5mm 3mm", fontSize: "8pt", textAlign: "center", fontWeight: 900, letterSpacing: "1px", textTransform: "uppercase" }}>
-                          BAGGAGE TAG
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+        {/* ══ BACK ONLY: 4 per page (2×2 grid) ══ */}
+        {view === "back" && pages.map((page, pageIdx) => (
+          <div key={`back-${pageIdx}`} className="sq-page-single">
+            {page.map(p => (
+              <LuggageStickerBack key={p.id} p={p} group={group} company={company} />
             ))}
-          </>
-        )}
+          </div>
+        ))}
 
-        {/* ══ BACK STICKERS ══ */}
-        {showBack && (
-          <>
-            <div className="no-print sq-section-label">BACK SIDE — Flip paper &amp; print</div>
-            {pages.map((page, pageIdx) => (
-              <div key={`back-${pageIdx}`} className="sq-row">
-                {page.map(p => (
-                  <LuggageStickerBack key={p.id} p={p} group={group} company={company} />
-                ))}
-              </div>
-            ))}
-          </>
-        )}
       </div>
     </>
+  );
+}
+
+/* ── FRONT STICKER component ── */
+function FrontSticker({
+  p, group, company, groupColor, groupLabel, photoDataUrls,
+}: {
+  p: Pilgrim; group: Group; company: ReturnType<typeof getCompanyById>;
+  groupColor: string; groupLabel: string; photoDataUrls: Record<string, string>;
+}) {
+  const serialNo = String(p.serialNumber).padStart(3, "0");
+  const DARK  = "#0d5040";
+  const GOLD  = "#C9A84C";
+  const RED   = "#CC0000";
+  const API   = import.meta.env.VITE_API_URL || "";
+
+  return (
+    <div className="sq-sticker">
+      <div style={{ position: "relative", overflow: "hidden", height: "100%", display: "flex", flexDirection: "column" }}>
+        {/* Decorative corner */}
+        <div style={{
+          position: "absolute", top: "-8mm", right: "-6mm",
+          width: "38mm", height: "38mm",
+          background: DARK, borderRadius: "0 0 0 60%", zIndex: 0,
+        }} />
+
+        {/* Header */}
+        <div style={{ position: "relative", zIndex: 1, padding: "2mm 3.5mm 1mm", display: "flex", alignItems: "center", gap: "2mm" }}>
+          <div style={{ fontSize: "28pt", lineHeight: 1, flexShrink: 0 }}>🇮🇳</div>
+          {company.logoUrl
+            ? <img src={company.logoUrl} alt="" style={{ height: "9mm", objectFit: "contain", flexShrink: 0 }} />
+            : <div style={{ height: "9mm", width: "9mm", flexShrink: 0, background: DARK, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "6pt" }}>{company.nameShort[0]}</div>
+          }
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 900, fontSize: "7.5pt", color: "#1a7a5e", letterSpacing: "0.8px", textTransform: "uppercase", lineHeight: 1.1 }}>{company.nameShort}</div>
+            <div style={{ fontWeight: 700, fontSize: "5pt", color: GOLD, letterSpacing: "1px", textTransform: "uppercase" }}>TOURS &amp; TRAVELS</div>
+          </div>
+          <div style={{ textAlign: "right", flexShrink: 0 }}>
+            <div style={{ fontSize: "18pt", fontWeight: 900, color: "#fff", lineHeight: 1 }}>#{serialNo}</div>
+            <div style={{ fontSize: "5pt", color: "#fff", opacity: 0.9 }}>HAJJ {group.year}</div>
+          </div>
+        </div>
+
+        {/* Group bar */}
+        <div style={{ background: groupColor, padding: "0.8mm 3.5mm", display: "flex", justifyContent: "center", alignItems: "center", position: "relative", zIndex: 1 }}>
+          <span style={{ color: "#fff", fontWeight: 800, fontSize: "7pt", letterSpacing: "0.8px" }}>GROUP: {groupLabel}</span>
+        </div>
+
+        {/* Body */}
+        <div style={{ position: "relative", zIndex: 1, padding: "1.2mm 3.5mm 1mm", flex: 1, display: "flex", flexDirection: "column" }}>
+          <div style={{ display: "flex", gap: "2.5mm", alignItems: "flex-start", marginBottom: "1mm" }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: "11pt", fontWeight: 900, color: DARK, lineHeight: 1.15, textTransform: "uppercase", wordBreak: "break-word" }}>{p.fullName}</div>
+            </div>
+            <div style={{ flexShrink: 0 }}>
+              {p.photoUrl
+                ? <img src={photoDataUrls[p.id] || `${API}${p.photoUrl}`} alt="" style={{ width: "14mm", height: "14mm", objectFit: "cover", borderRadius: "50%", border: `2px solid ${GOLD}` }} />
+                : <div style={{ width: "14mm", height: "14mm", background: "#f0f0f0", borderRadius: "50%", border: `2px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "5pt", color: "#aaa" }}>PHOTO</div>
+              }
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: "2mm", marginBottom: "1mm" }}>
+            <div style={{ flex: 1, background: "#f0fdf4", border: `1px solid ${DARK}`, borderRadius: "3px", padding: "0.6mm 2mm", textAlign: "center" }}>
+              <div style={{ fontSize: "4.5pt", color: "#666", textTransform: "uppercase", fontWeight: 600 }}>PASSPORT</div>
+              <div style={{ fontSize: "11pt", fontWeight: 900, fontFamily: "monospace", letterSpacing: "0.5px", color: DARK }}>{p.passportNumber || "—"}</div>
+            </div>
+            <div style={{ flex: 1, background: "#f0fdf4", border: `1px solid ${DARK}`, borderRadius: "3px", padding: "0.6mm 2mm", textAlign: "center" }}>
+              <div style={{ fontSize: "4.5pt", color: "#666", textTransform: "uppercase", fontWeight: 600 }}>SERVICE CENTER NO</div>
+              <div style={{ fontSize: "9pt", fontWeight: 900, color: DARK }}>{group.maktabNumber || "—"}</div>
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.5mm 2mm", marginBottom: "1mm" }}>
+            {[
+              { label: "HOTEL MAKKAH 1", data: group.hotels?.aziziah },
+              { label: "HOTEL MAKKAH 2", data: group.hotels?.makkah },
+              { label: "HOTEL MADINAH",  data: group.hotels?.madinah },
+            ].map(({ label, data }) => (
+              <div key={label} style={{ display: "flex", gap: "1mm", alignItems: "flex-start" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: "4pt", color: "#999", textTransform: "uppercase", fontWeight: 600 }}>{label}</div>
+                  <div style={{ fontWeight: 700, color: "#222", fontSize: "5.5pt" }}>{data?.name || "—"}</div>
+                  {data?.nameAr && <div style={{ fontWeight: 700, color: "#222", fontSize: "5pt", direction: "rtl", textAlign: "right" }}>{data.nameAr}</div>}
+                  {data?.address && <div style={{ fontSize: "4pt", color: "#666", lineHeight: 1.2 }}>{data.address}</div>}
+                  {(data as any)?.addressAr && <div style={{ fontSize: "3.5pt", color: "#666", lineHeight: 1.2, direction: "rtl", textAlign: "right" }}>{(data as any).addressAr}</div>}
+                </div>
+                {data?.name && (
+                  <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: "0.3mm" }}>
+                    <QRCodeCanvas value={buildHotelMapUrl(data.name, data.address)} size={24} level="M" fgColor={DARK} />
+                    <div style={{ fontSize: "3pt", color: "#999" }}>MAP</div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div style={{ background: RED, borderRadius: "3px", padding: "1mm 3mm", textAlign: "center", marginBottom: "1mm" }}>
+            <div style={{ color: "#fff", fontWeight: 900, fontSize: "7.5pt", textTransform: "uppercase" }}>IN CASE OF LOST / FOUND</div>
+            <div style={{ color: "#fff", fontWeight: 900, fontSize: "7pt", textTransform: "uppercase" }}>KINDLY CONTACT</div>
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "center", gap: "4mm", marginBottom: "1mm" }}>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: "4.5pt", color: "#999", textTransform: "uppercase", fontWeight: 600, marginBottom: "0.3mm" }}>🇸🇦 Saudi</div>
+              <div style={{ fontSize: "7.5pt", fontWeight: 900, color: DARK }}>{company.phoneSaudi}</div>
+            </div>
+            <div style={{ width: "0.3mm", background: "#ddd", flexShrink: 0 }} />
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: "4.5pt", color: "#999", textTransform: "uppercase", fontWeight: 600, marginBottom: "0.3mm" }}>🇮🇳 India</div>
+              <div style={{ fontSize: "7.5pt", fontWeight: 900, color: DARK }}>{company.phone}</div>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "3mm", marginTop: "auto" }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.8mm" }}>
+              <div style={{ background: "#fff", padding: "2px", borderRadius: "4px", border: `2px solid ${DARK}` }}>
+                <QRCodeCanvas value={buildVerifyUrl(p.id)} size={68} level="M" fgColor={DARK} />
+              </div>
+              <div style={{ background: DARK, color: "#fff", fontSize: "4pt", fontWeight: 900, letterSpacing: "1px", padding: "0.4mm 2.5mm", borderRadius: "8px", textTransform: "uppercase" }}>📱 Scan</div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5mm" }}>
+              <Barcode value={p.passportNumber || `H${serialNo}`} height={24} width={1.3} fontSize={7} />
+            </div>
+          </div>
+        </div>
+
+        {/* Website band */}
+        <div style={{ position: "relative", zIndex: 2, background: DARK, padding: "1.5mm 3mm", display: "flex", alignItems: "center", justifyContent: "center", gap: "2.5mm" }}>
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" style={{ flexShrink: 0 }}>
+            <path d="M8 11V7a4 4 0 0 1 8 0v4" stroke={GOLD} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            <rect x="4.5" y="10.5" width="15" height="11" rx="2.5" fill={GOLD} />
+            <circle cx="12" cy="16.2" r="1.9" fill={DARK} />
+            <rect x="11" y="17.7" width="2" height="2.3" rx="1" fill={DARK} />
+          </svg>
+          <div style={{ fontSize: "9.5pt", fontWeight: 900, color: "#fff", letterSpacing: "0.6px", lineHeight: 1 }}>
+            www.alburhantravels.com
+          </div>
+        </div>
+
+        <div style={{ position: "relative", zIndex: 2, background: "#FFC107", color: RED, padding: "1mm 3mm", fontSize: "7.5pt", textAlign: "center", fontWeight: 900, letterSpacing: "1px", textTransform: "uppercase" }}>
+          BAGGAGE TAG
+        </div>
+      </div>
+    </div>
   );
 }
