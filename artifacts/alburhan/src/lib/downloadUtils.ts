@@ -1,14 +1,16 @@
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
+const CAPTURE_OPTS = {
+  scale: 2,
+  useCORS: true,
+  allowTaint: true,
+  backgroundColor: "#ffffff",
+  logging: false,
+};
+
 async function capture(el: HTMLElement): Promise<HTMLCanvasElement> {
-  return html2canvas(el, {
-    scale: 2,
-    useCORS: true,
-    allowTaint: true,
-    backgroundColor: "#ffffff",
-    logging: false,
-  });
+  return html2canvas(el, CAPTURE_OPTS);
 }
 
 export async function downloadAsJpg(el: HTMLElement, filename: string) {
@@ -23,7 +25,7 @@ export async function downloadAsJpg(el: HTMLElement, filename: string) {
 
 export async function downloadAsPdf(el: HTMLElement, filename: string) {
   const canvas = await capture(el);
-  const w = canvas.width / 2;   // divide by scale
+  const w = canvas.width / 2;
   const h = canvas.height / 2;
   const pdf = new jsPDF({
     orientation: w > h ? "landscape" : "portrait",
@@ -32,4 +34,36 @@ export async function downloadAsPdf(el: HTMLElement, filename: string) {
   });
   pdf.addImage(canvas.toDataURL("image/jpeg", 0.93), "JPEG", 0, 0, w, h);
   pdf.save(filename.endsWith(".pdf") ? filename : filename + ".pdf");
+}
+
+/**
+ * Captures each element in `pages` separately and adds it as a new PDF page.
+ * Use this when the printable content is split into distinct page blocks
+ * (e.g. .pair-block divs) so html2canvas never has to render a giant tall element.
+ */
+export async function downloadMultiPagePdf(pages: HTMLElement[], filename: string) {
+  if (pages.length === 0) return;
+
+  let pdf: jsPDF | null = null;
+
+  for (let i = 0; i < pages.length; i++) {
+    const canvas = await html2canvas(pages[i], CAPTURE_OPTS);
+    const w = canvas.width / 2;
+    const h = canvas.height / 2;
+    const imgData = canvas.toDataURL("image/jpeg", 0.93);
+
+    if (i === 0) {
+      pdf = new jsPDF({
+        orientation: w > h ? "landscape" : "portrait",
+        unit: "pt",
+        format: [w, h],
+      });
+      pdf.addImage(imgData, "JPEG", 0, 0, w, h);
+    } else {
+      pdf!.addPage([w, h], w > h ? "landscape" : "portrait");
+      pdf!.addImage(imgData, "JPEG", 0, 0, w, h);
+    }
+  }
+
+  pdf!.save(filename.endsWith(".pdf") ? filename : filename + ".pdf");
 }
