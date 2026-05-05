@@ -293,7 +293,7 @@ function BackCard({ p, group, company, showFeedbackQr, bookingMap }: CardProps) 
           {showFeedbackQr && (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", marginTop: "auto" }}>
               <div style={{ background: "#fff", padding: "1px", borderRadius: "2px", border: `1.5px solid ${DARK}` }}>
-                <QRCodeSVG
+                <QRCodeCanvas
                   value={p.mobileIndia && bookingMap[p.mobileIndia]
                     ? `${PROD_DOMAIN}/feedback?booking_id=${bookingMap[p.mobileIndia]}`
                     : `${PROD_DOMAIN}/feedback`}
@@ -396,12 +396,14 @@ export default function PrintIdCardsPro() {
           body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; margin: 0; }
           .no-print { display: none !important; }
           .id-print-page { box-shadow: none !important; margin-bottom: 0 !important; }
+          /* Zero out outer wrapper padding so all 4 rows land on one page */
+          .id-print-content { padding: 0 !important; gap: 0 !important; background: white !important; }
         }
         * { box-sizing: border-box; }
 
         .pro-card {
           width: 90mm;
-          height: 60mm;
+          height: 55mm;
           border: 1px solid #ccc;
           border-radius: 3px;
           overflow: hidden;
@@ -415,12 +417,13 @@ export default function PrintIdCardsPro() {
         }
 
         /* ── Side-by-side page: 4 rows, each row = front | cut | back ── */
+        /* 4 × 55mm + 3 × 3mm gap = 229mm — well within A4's 281mm usable height */
         .id-print-page {
           width: 190mm;
-          margin: 0 auto 0;
+          margin: 0 auto;
           display: flex;
           flex-direction: column;
-          gap: 5mm;
+          gap: 3mm;
           page-break-after: always;
           break-after: page;
         }
@@ -450,7 +453,7 @@ export default function PrintIdCardsPro() {
         }
         .cut-line-inner {
           width: 1px;
-          height: 60mm;
+          height: 55mm;
           border-left: 1.5px dashed #bbb;
           position: relative;
         }
@@ -546,7 +549,7 @@ export default function PrintIdCardsPro() {
       </div>
 
       {/* ── Content ── */}
-      <div ref={contentRef} style={{ background: "#f5f5f0", padding: "8mm", display: "flex", flexDirection: "column", gap: "8mm" }}>
+      <div ref={contentRef} className="id-print-content" style={{ background: "#f5f5f0", padding: "8mm", display: "flex", flexDirection: "column", gap: "8mm" }}>
 
         {isSBS ? (
           /* ── SIDE-BY-SIDE MODE: 4 rows per A4 ── */
