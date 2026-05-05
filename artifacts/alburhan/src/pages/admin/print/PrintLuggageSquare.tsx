@@ -341,8 +341,10 @@ export default function PrintLuggageSquare() {
   const groupColor = getGroupColor(group.groupName);
   const groupLabel = group.groupName.toUpperCase();
 
+  // "both" mode: 2 pilgrims per page. "front"/"back" only: 4 per page.
+  const pairsPerPage = view === "both" ? 2 : 4;
   const pages: Pilgrim[][] = [];
-  for (let i = 0; i < pilgrims.length; i += 4) pages.push(pilgrims.slice(i, i + 4));
+  for (let i = 0; i < pilgrims.length; i += pairsPerPage) pages.push(pilgrims.slice(i, i + pairsPerPage));
 
   const showFront = view === "front" || view === "both";
   const showBack  = view === "back"  || view === "both";
@@ -352,24 +354,78 @@ export default function PrintLuggageSquare() {
       <style>{`
         @media print {
           @page { size: A4 portrait; margin: 5mm; }
-          body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; margin: 0; }
           .no-print { display: none !important; }
+          .sq-wrap { background: white !important; padding: 0 !important; }
         }
         * { box-sizing: border-box; }
+
+        /* ── Single sticker ── */
         .sq-sticker {
-          width: 96mm; height: 135mm;
+          width: 96mm; height: 128mm;
           border: 1.5px solid ${DARK}; border-radius: 5px; overflow: hidden;
-          page-break-inside: avoid;
+          page-break-inside: avoid; break-inside: avoid;
           font-family: 'Inter', Arial, sans-serif;
           background: #fff; position: relative;
           flex-shrink: 0;
         }
+
+        /* ── A row of 2 stickers side-by-side ── */
         .sq-row {
-          display: flex; flex-wrap: wrap; gap: 3mm;
-          width: 200mm;
-          page-break-after: always;
+          display: flex; gap: 3mm;
+          width: 195mm;
+          flex-shrink: 0;
         }
-        .sq-row:last-child { page-break-after: auto; }
+
+        /* ── Full A4 page: front row + cut line + back row ── */
+        .sq-page-both {
+          width: 195mm;
+          height: 278mm;
+          max-height: 278mm;
+          display: flex;
+          flex-direction: column;
+          gap: 0;
+          page-break-after: always;
+          break-after: page;
+          overflow: hidden;
+        }
+        .sq-page-both:last-child { page-break-after: auto; break-after: auto; }
+
+        /* ── Front-only / back-only page: 4 per page (2×2) ── */
+        .sq-page-single {
+          width: 195mm;
+          height: 278mm;
+          max-height: 278mm;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 3mm;
+          align-content: flex-start;
+          page-break-after: always;
+          break-after: page;
+          overflow: hidden;
+        }
+        .sq-page-single:last-child { page-break-after: auto; break-after: auto; }
+
+        /* Cut line between front and back in "both" mode */
+        .sq-cut-line {
+          width: 195mm;
+          display: flex;
+          align-items: center;
+          gap: 2mm;
+          padding: 3mm 0;
+          flex-shrink: 0;
+        }
+        .sq-cut-dash {
+          flex: 1;
+          border-top: 1.5px dashed #aaa;
+        }
+        .sq-cut-label {
+          font-size: 7pt;
+          color: #999;
+          white-space: nowrap;
+          font-family: Arial, sans-serif;
+        }
+
         .sq-section-label {
           font-family: Arial, sans-serif;
           font-size: 11px; font-weight: 700;
@@ -379,6 +435,15 @@ export default function PrintLuggageSquare() {
           background: #f3f4f6;
           border-left: 4px solid ${DARK};
           margin: 8px 0 4px;
+        }
+
+        @media screen {
+          .sq-page-both, .sq-page-single {
+            background: white;
+            padding: 5mm 7.5mm;
+            box-shadow: 0 2px 16px rgba(0,0,0,0.12);
+            border-radius: 4px;
+          }
         }
       `}</style>
 
@@ -401,7 +466,7 @@ export default function PrintLuggageSquare() {
             color: view === v ? "#fff" : DARK,
             borderColor: DARK,
           }}>
-            {v === "front" ? "🪪 Fronts" : v === "back" ? "🔄 Backs" : "📄 Both"}
+            {v === "front" ? "🪪 Fronts only" : v === "back" ? "🔄 Backs only" : "📄 Both sides"}
           </button>
         ))}
 
@@ -417,15 +482,20 @@ export default function PrintLuggageSquare() {
         <button onClick={() => window.history.back()} style={{ padding: "10px 20px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
       </div>
 
-      <div ref={contentRef}>
+      {view === "both" && (
+        <div className="no-print" style={{ padding: "8px 16px", background: "#f0fdf4", borderBottom: "2px solid #86efac", fontSize: "12px", fontWeight: 600, color: "#15803d", textAlign: "center" }}>
+          ✅ Both sides mode: 2 pilgrims per A4 page · Front on top · Back on bottom · Cut along dashed line · Stack &amp; laminate
+        </div>
+      )}
 
-        {/* ══ FRONT STICKERS ══ */}
-        {showFront && (
-          <>
-            <div className="no-print sq-section-label">FRONT SIDE — Print first</div>
-            {pages.map((page, pageIdx) => (
-              <div key={`front-${pageIdx}`} className="sq-row">
-                {page.map(p => {
+      <div ref={contentRef} className="sq-wrap" style={{ background: "#f5f5f0", padding: "8mm", display: "flex", flexDirection: "column", gap: "8mm" }}>
+
+        {/* ══ BOTH MODE: front + back on same page ══ */}
+        {view === "both" && pages.map((page, pageIdx) => (
+          <div key={`both-${pageIdx}`} className="sq-page-both">
+            {/* Front row */}
+            <div className="sq-row">
+              {page.map(p => {
                   const serialNo = String(p.serialNumber).padStart(3, "0");
                   return (
                     <div key={p.id} className="sq-sticker">
