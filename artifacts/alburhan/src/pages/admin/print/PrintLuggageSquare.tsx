@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useRoute } from "wouter";
-import { downloadAsPdf, downloadAsJpg } from "@/lib/downloadUtils";
+import { downloadAsPdf, downloadAsJpg, fetchAsDataUrl } from "@/lib/downloadUtils";
 import { Barcode } from "@/components/print/Barcode";
-import { QRCodeSVG } from "qrcode.react";
+import { QRCodeCanvas } from "qrcode.react";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
 import { mashariqLogoBase64 as mashariqLogoUrl } from "@/assets/mashariq-logo-data";
 import { almasiahLogoBase64 as almasiahLogoUrl } from "@/assets/almasiah-logo-data";
@@ -304,6 +304,7 @@ export default function PrintLuggageSquare() {
   const [view, setView]       = useState<"front" | "back" | "both">("both");
   const company = getCompanyById(companyId);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [photoDataUrls, setPhotoDataUrls] = useState<Record<string, string>>({});
   const contentRef = useRef<HTMLDivElement>(null);
 
   const dl = async (fmt: "pdf" | "jpg") => {
@@ -321,7 +322,18 @@ export default function PrintLuggageSquare() {
     Promise.all([
       fetch(`${API}/api/groups/${groupId}`, { credentials: "include" }).then(r => r.json()),
       fetch(`${API}/api/groups/${groupId}/pilgrims`, { credentials: "include" }).then(r => r.json()),
-    ]).then(([g, p]) => { setGroup(g); setPilgrims(p); });
+    ]).then(async ([g, p]) => {
+      setGroup(g);
+      const list: Pilgrim[] = Array.isArray(p) ? p : [];
+      setPilgrims(list);
+      const entries = await Promise.all(
+        list.filter(x => x.photoUrl).map(async x => {
+          const d = await fetchAsDataUrl(`${API}${x.photoUrl}`);
+          return [x.id, d] as [string, string];
+        })
+      );
+      setPhotoDataUrls(Object.fromEntries(entries.filter(([, v]) => v)));
+    });
   }, [groupId]);
 
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
@@ -455,7 +467,7 @@ export default function PrintLuggageSquare() {
                             </div>
                             <div style={{ flexShrink: 0 }}>
                               {p.photoUrl
-                                ? <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "15mm", height: "15mm", objectFit: "cover", borderRadius: "50%", border: `2px solid ${GOLD}` }} />
+                                ? <img src={photoDataUrls[p.id] || `${API}${p.photoUrl}`} alt="" style={{ width: "15mm", height: "15mm", objectFit: "cover", borderRadius: "50%", border: `2px solid ${GOLD}` }} />
                                 : <div style={{ width: "15mm", height: "15mm", background: "#f0f0f0", borderRadius: "50%", border: `2px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "5pt", color: "#aaa" }}>PHOTO</div>
                               }
                             </div>
@@ -488,7 +500,7 @@ export default function PrintLuggageSquare() {
                                 </div>
                                 {data?.name && (
                                   <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: "0.3mm" }}>
-                                    <QRCodeSVG value={buildHotelMapUrl(data.name, data.address)} size={28} level="M" fgColor={DARK} />
+                                    <QRCodeCanvas value={buildHotelMapUrl(data.name, data.address)} size={28} level="M" fgColor={DARK} />
                                     <div style={{ fontSize: "3.5pt", color: "#999" }}>MAP</div>
                                   </div>
                                 )}
@@ -517,7 +529,7 @@ export default function PrintLuggageSquare() {
                             {/* QR — big + styled */}
                             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.8mm" }}>
                               <div style={{ background: "#fff", padding: "2.5px", borderRadius: "4px", border: `2.5px solid ${DARK}`, boxShadow: "0 1px 4px rgba(0,0,0,0.12)" }}>
-                                <QRCodeSVG value={buildVerifyUrl(p.id)} size={80} level="M" fgColor={DARK} />
+                                <QRCodeCanvas value={buildVerifyUrl(p.id)} size={80} level="M" fgColor={DARK} />
                               </div>
                               <div style={{ background: DARK, color: "#fff", fontSize: "4pt", fontWeight: 900, letterSpacing: "1px", padding: "0.4mm 2.5mm", borderRadius: "8px", textTransform: "uppercase" }}>📱 Scan</div>
                             </div>

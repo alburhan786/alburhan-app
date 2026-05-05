@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useRoute } from "wouter";
-import { downloadAsPdf, downloadAsJpg } from "@/lib/downloadUtils";
-import { QRCodeSVG } from "qrcode.react";
+import { downloadAsPdf, downloadAsJpg, fetchAsDataUrl } from "@/lib/downloadUtils";
+import { QRCodeCanvas } from "qrcode.react";
 import { Barcode } from "@/components/print/Barcode";
 import { getCompanyById } from "@/lib/companies";
 
@@ -33,7 +33,7 @@ function buildVerifyUrl(id: string) {
   return `${window.location.origin}${import.meta.env.BASE_URL}verify/${id}`;
 }
 
-function FrontCard({ p, group }: { p: Pilgrim; group: Group }) {
+function FrontCard({ p, group, photoSrc }: { p: Pilgrim; group: Group; photoSrc?: string }) {
   const serial = String(p.serialNumber).padStart(3, "0");
   const barcodeVal = p.barcodeId || p.passportNumber || `HAJ${serial}`;
   const barcodeFormat = p.barcodeId ? "CODE128" : "CODE39";
@@ -55,7 +55,7 @@ function FrontCard({ p, group }: { p: Pilgrim; group: Group }) {
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
         <div style={{ width: "20mm", flexShrink: 0, borderRight: `1px solid ${GOLD}40`, overflow: "hidden", background: "#f9f9f9", display: "flex", alignItems: "center", justifyContent: "center" }}>
           {p.photoUrl
-            ? <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            ? <img src={photoSrc || `${API}${p.photoUrl}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#ccc", fontSize: "20pt" }}>👤</div>}
         </div>
         <div style={{ flex: 1, padding: "1.5mm 2mm", display: "flex", flexDirection: "column", justifyContent: "space-between", overflow: "hidden" }}>
@@ -80,7 +80,7 @@ function FrontCard({ p, group }: { p: Pilgrim; group: Group }) {
             <div style={{ display: "flex", gap: "1.5mm" }}>
               <div style={{ textAlign: "center" }}>
                 <div style={{ background: "#fff", padding: "1px", borderRadius: "2px", border: `1px solid ${DARK}40` }}>
-                  <QRCodeSVG value={verifyUrl} size={24} level="L" fgColor={DARK} />
+                  <QRCodeCanvas value={verifyUrl} size={24} level="L" fgColor={DARK} />
                 </div>
                 <div style={{ fontSize: "2.5pt", color: "#888", textTransform: "uppercase", marginTop: "0.3mm" }}>Verify</div>
               </div>
@@ -186,6 +186,7 @@ export default function PrintSingleCard() {
 
   const [group, setGroup] = useState<Group | null>(null);
   const [pilgrim, setPilgrim] = useState<Pilgrim | null>(null);
+  const [photoSrc, setPhotoSrc] = useState<string>("");
   const [error, setError] = useState("");
   const [dlState, setDlState] = useState<string | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -205,11 +206,18 @@ export default function PrintSingleCard() {
     Promise.all([
       fetch(`${API}/api/groups/${groupId}`, { credentials: "include" }).then(r => r.json()),
       fetch(`${API}/api/groups/${groupId}/pilgrims`, { credentials: "include" }).then(r => r.json()),
-    ]).then(([g, all]) => {
+    ]).then(async ([g, all]) => {
       setGroup(g);
       const found = (Array.isArray(all) ? all : []).find((p: Pilgrim) => p.id === pilgrimId);
-      if (found) setPilgrim(found);
-      else setError("Pilgrim not found");
+      if (found) {
+        setPilgrim(found);
+        if (found.photoUrl) {
+          const d = await fetchAsDataUrl(`${API}${found.photoUrl}`);
+          setPhotoSrc(d || `${API}${found.photoUrl}`);
+        }
+      } else {
+        setError("Pilgrim not found");
+      }
     }).catch(() => setError("Failed to load data"));
   }, [groupId, pilgrimId]);
 
@@ -365,7 +373,7 @@ export default function PrintSingleCard() {
             <div className="no-print" style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", fontFamily: "Arial" }}>
               ▼ FRONT SIDE
             </div>
-            <FrontCard p={pilgrim} group={group} />
+            <FrontCard p={pilgrim} group={group} photoSrc={photoSrc} />
           </div>
         </div>
 

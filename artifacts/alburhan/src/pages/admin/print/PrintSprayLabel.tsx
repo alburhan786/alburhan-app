@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { QRCodeSVG } from "qrcode.react";
+import { QRCodeCanvas } from "qrcode.react";
 import { getCompanyById } from "@/lib/companies";
 import { downloadAsPdf } from "@/lib/downloadUtils";
 
@@ -109,7 +109,7 @@ function SprayLabel() {
 
             {/* QR code — big */}
             <div style={{ marginTop: "auto" }}>
-              <QRCodeSVG value={WEBSITE} size={55} level="M" fgColor={GREEN} bgColor={WHITE} />
+              <QRCodeCanvas value={WEBSITE} size={55} level="M" fgColor={GREEN} bgColor={WHITE} />
               <div style={{
                 fontSize: "4pt", color: "#666", letterSpacing: "1px",
                 marginTop: "0.8mm", fontWeight: 700, textTransform: "uppercase",

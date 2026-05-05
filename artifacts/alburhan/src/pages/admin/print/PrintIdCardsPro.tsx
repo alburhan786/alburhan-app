@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useRoute } from "wouter";
-import { downloadAsPdf, downloadAsJpg } from "@/lib/downloadUtils";
+import { downloadAsPdf, downloadAsJpg, fetchAsDataUrl } from "@/lib/downloadUtils";
 import { Barcode } from "@/components/print/Barcode";
-import { QRCodeSVG } from "qrcode.react";
+import { QRCodeCanvas } from "qrcode.react";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -104,7 +104,7 @@ function FrontCard({ p, group, company }: CardProps) {
           borderRight: `1.5px solid ${GOLD}`,
         }}>
           {p.photoUrl ? (
-            <img src={`${API}${p.photoUrl}`} alt="" crossOrigin="anonymous"
+            <img src={photoDataUrls[p.id] || `${API}${p.photoUrl}`} alt=""
               style={{ width: "16mm", height: "19mm", objectFit: "cover", objectPosition: "top center", border: `2px solid ${GOLD}`, borderRadius: "2px" }} />
           ) : (
             <div style={{
@@ -172,7 +172,7 @@ function FrontCard({ p, group, company }: CardProps) {
           borderLeft: `1px solid ${GOLD}50`,
         }}>
           <div style={{ background: "#fff", padding: "2px", borderRadius: "3px", border: `2.5px solid ${DARK}` }}>
-            <QRCodeSVG value={buildVerifyUrl(p.id)} size={56} level="M" fgColor={DARK} />
+            <QRCodeCanvas value={buildVerifyUrl(p.id)} size={56} level="M" fgColor={DARK} />
           </div>
           <div style={{ fontSize: "2.5pt", color: "#888", textTransform: "uppercase", marginTop: "0.5mm", letterSpacing: "0.2px", textAlign: "center" }}>SCAN TO VERIFY</div>
         </div>
@@ -343,6 +343,7 @@ export default function PrintIdCardsPro() {
   const [bookingMap, setBookingMap] = useState<Record<string, string>>({});
   const [printMode, setPrintMode] = useState<PrintMode>("sidebyside");
   const [dlState, setDlState] = useState<string | null>(null);
+  const [photoDataUrls, setPhotoDataUrls] = useState<Record<string, string>>({});
   const contentRef = useRef<HTMLDivElement>(null);
 
   const dlCards = async (fmt: "pdf" | "jpg") => {
@@ -361,7 +362,19 @@ export default function PrintIdCardsPro() {
       fetch(`${API}/api/groups/${groupId}`, { credentials: "include" }).then(r => r.json()),
       fetch(`${API}/api/groups/${groupId}/pilgrims`, { credentials: "include" }).then(r => r.json()),
       fetch(`${API}/api/feedback/admin/group-bookings/${groupId}`, { credentials: "include" }).then(r => r.ok ? r.json() : {}),
-    ]).then(([g, p, bm]) => { setGroup(g); setPilgrims(Array.isArray(p) ? p : []); setBookingMap(bm || {}); });
+    ]).then(async ([g, p, bm]) => {
+      setGroup(g);
+      const list: Pilgrim[] = Array.isArray(p) ? p : [];
+      setPilgrims(list);
+      setBookingMap(bm || {});
+      const entries = await Promise.all(
+        list.filter(x => x.photoUrl).map(async x => {
+          const d = await fetchAsDataUrl(`${API}${x.photoUrl}`);
+          return [x.id, d] as [string, string];
+        })
+      );
+      setPhotoDataUrls(Object.fromEntries(entries.filter(([, v]) => v)));
+    });
   }, [groupId]);
 
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;

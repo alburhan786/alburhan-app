@@ -1,6 +1,26 @@
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
+/**
+ * Fetches a URL (with credentials) and returns a base64 data URL string.
+ * Use this to pre-load cross-origin images before html2canvas capture.
+ */
+export async function fetchAsDataUrl(url: string): Promise<string> {
+  try {
+    const res = await fetch(url, { credentials: "include" });
+    if (!res.ok) return "";
+    const blob = await res.blob();
+    return await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => resolve("");
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return "";
+  }
+}
+
 const CAPTURE_OPTS = {
   scale: 2,
   useCORS: true,

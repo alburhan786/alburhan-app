@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { QRCodeSVG } from "qrcode.react";
-import { downloadAsPdf, downloadAsJpg } from "@/lib/downloadUtils";
+import { QRCodeCanvas } from "qrcode.react";
+import { downloadAsPdf, downloadAsJpg, fetchAsDataUrl } from "@/lib/downloadUtils";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -133,7 +133,7 @@ function StaffCardFront({ s, groupName }: { s: StaffMember; groupName?: string }
       }}>
         {/* Photo */}
         {s.photoUrl ? (
-          <img src={`${API}${s.photoUrl}`} alt="" style={{
+          <img src={photoDataUrls[s.id] || `${API}${s.photoUrl}`} alt="" style={{
             width: "22mm", height: "100%", objectFit: "cover",
             border: `2.5px solid ${GOLD}`, borderRadius: "4px", flexShrink: 0,
           }} />
@@ -322,7 +322,7 @@ function StaffCardBack({ s, groupName }: { s: StaffMember; groupName?: string })
         {/* QR column */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1mm", flexShrink: 0 }}>
           <div style={{ border: `2.5px solid ${GREEN}`, borderRadius: "4px", padding: "2px", background: "#fff" }}>
-            <QRCodeSVG value={verifyUrl} size={64} level="L" fgColor={GREEN} bgColor="#fff" />
+            <QRCodeCanvas value={verifyUrl} size={64} level="L" fgColor={GREEN} bgColor="#fff" />
           </div>
           <div style={{
             background: GREEN, borderRadius: "12px", padding: "0.5mm 1.5mm",
@@ -432,6 +432,7 @@ export default function PrintStaffCards() {
   const [roleFilter,    setRoleFilter]     = useState("all");
   const [statusFilter,  setStatusFilter]   = useState("active");
   const [frontOnly,     setFrontOnly]      = useState(true);
+  const [photoDataUrls, setPhotoDataUrls]  = useState<Record<string, string>>({});
   const contentRef = useRef<HTMLDivElement>(null);
   const [dlState, setDlState] = useState<string | null>(null);
 
@@ -448,13 +449,21 @@ export default function PrintStaffCards() {
     Promise.all([
       fetch(`${API}/api/staff`,  { credentials: "include" }).then(r => r.ok ? r.json() : []),
       fetch(`${API}/api/groups`, { credentials: "include" }).then(r => r.ok ? r.json() : []),
-    ]).then(([staffData, groupsData]) => {
-      setStaff(Array.isArray(staffData) ? staffData : []);
+    ]).then(async ([staffData, groupsData]) => {
+      const list: StaffMember[] = Array.isArray(staffData) ? staffData : [];
+      setStaff(list);
       const map: Record<string, string> = {};
       if (Array.isArray(groupsData))
         (groupsData as HajjGroup[]).forEach(g => { map[g.id] = g.groupName; });
       setGroups(map);
       setLoading(false);
+      const entries = await Promise.all(
+        list.filter(x => x.photoUrl).map(async x => {
+          const d = await fetchAsDataUrl(`${API}${x.photoUrl}`);
+          return [x.id, d] as [string, string];
+        })
+      );
+      setPhotoDataUrls(Object.fromEntries(entries.filter(([, v]) => v)));
     }).catch(() => setLoading(false));
   }, []);
 

@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useRoute } from "wouter";
-import { downloadAsPdf } from "@/lib/downloadUtils";
+import { downloadAsPdf, fetchAsDataUrl } from "@/lib/downloadUtils";
 import { Barcode } from "@/components/print/Barcode";
-import { QRCodeSVG } from "qrcode.react";
+import { QRCodeCanvas } from "qrcode.react";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
 import { mashariqLogoBase64 as mashariqLogoUrl } from "@/assets/mashariq-logo-data";
 import { almasiahLogoBase64 as almasiahLogoUrl } from "@/assets/almasiah-logo-data";
@@ -59,6 +59,7 @@ export default function PrintLuggageLarge() {
   const [companyId, setCompanyId] = useState("alburhan");
   const company = getCompanyById(companyId);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [photoDataUrls, setPhotoDataUrls] = useState<Record<string, string>>({});
   const contentRef = useRef<HTMLDivElement>(null);
 
   const dl = async () => {
@@ -73,7 +74,18 @@ export default function PrintLuggageLarge() {
     Promise.all([
       fetch(`${API}/api/groups/${groupId}`, { credentials: "include" }).then(r => r.json()),
       fetch(`${API}/api/groups/${groupId}/pilgrims`, { credentials: "include" }).then(r => r.json()),
-    ]).then(([g, p]) => { setGroup(g); setPilgrims(p); });
+    ]).then(async ([g, p]) => {
+      setGroup(g);
+      const list: Pilgrim[] = Array.isArray(p) ? p : [];
+      setPilgrims(list);
+      const entries = await Promise.all(
+        list.filter(x => x.photoUrl).map(async x => {
+          const d = await fetchAsDataUrl(`${API}${x.photoUrl}`);
+          return [x.id, d] as [string, string];
+        })
+      );
+      setPhotoDataUrls(Object.fromEntries(entries.filter(([, v]) => v)));
+    });
   }, [groupId]);
 
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
@@ -188,7 +200,7 @@ export default function PrintLuggageLarge() {
             <div style={{ display: "flex", alignItems: "center", gap: "4mm" }}>
               <div style={{ flexShrink: 0 }}>
                 {p.photoUrl ? (
-                  <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "55mm", height: "55mm", objectFit: "cover", borderRadius: "50%", border: `4px solid ${GOLD}`, boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }} />
+                  <img src={photoDataUrls[p.id] || `${API}${p.photoUrl}`} alt="" style={{ width: "55mm", height: "55mm", objectFit: "cover", borderRadius: "50%", border: `4px solid ${GOLD}`, boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }} />
                 ) : (
                   <div style={{ width: "55mm", height: "55mm", background: "#f0fdf4", borderRadius: "50%", border: `4px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "9pt", color: "#aaa" }}>PHOTO</div>
                 )}
@@ -253,7 +265,7 @@ export default function PrintLuggageLarge() {
                   </div>
                   {h?.name && (
                     <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5mm" }}>
-                      <QRCodeSVG value={buildHotelMapUrl(h.name, h.address)} size={46} level="M" fgColor={DARK} />
+                      <QRCodeCanvas value={buildHotelMapUrl(h.name, h.address)} size={46} level="M" fgColor={DARK} />
                       <div style={{ fontSize: "4pt", color: "#999", textAlign: "center" }}>MAP</div>
                     </div>
                   )}
@@ -264,7 +276,7 @@ export default function PrintLuggageLarge() {
             {/* QR + Barcode + Lost/Found */}
             <div style={{ display: "flex", alignItems: "center", gap: "4mm", marginTop: "auto", paddingTop: "2mm", borderTop: `1px dashed ${DARK}40` }}>
               <div style={{ background: "#fff", padding: "3px", borderRadius: "4px", border: `2px solid ${DARK}` }}>
-                <QRCodeSVG value={buildVerifyUrl(p.id)} size={110} level="M" fgColor={DARK} />
+                <QRCodeCanvas value={buildVerifyUrl(p.id)} size={110} level="M" fgColor={DARK} />
               </div>
               <div style={{ flex: 1, overflow: "hidden" }}>
                 <Barcode value={barcodeVal} height={55} width={2.2} displayValue fontSize={9} />

@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useRoute } from "wouter";
-import { downloadAsPdf } from "@/lib/downloadUtils";
+import { downloadAsPdf, fetchAsDataUrl } from "@/lib/downloadUtils";
 import { Barcode } from "@/components/print/Barcode";
-import { QRCodeSVG } from "qrcode.react";
+import { QRCodeCanvas } from "qrcode.react";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -43,6 +43,7 @@ export default function PrintZamzam() {
   const [companyId, setCompanyId] = useState("alburhan");
   const company = getCompanyById(companyId);
   const [dlState, setDl] = useState<string | null>(null);
+  const [photoDataUrls, setPhotoDataUrls] = useState<Record<string, string>>({});
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -50,7 +51,18 @@ export default function PrintZamzam() {
     Promise.all([
       fetch(`${API}/api/groups/${groupId}`, { credentials: "include" }).then(r => r.json()),
       fetch(`${API}/api/groups/${groupId}/pilgrims`, { credentials: "include" }).then(r => r.json()),
-    ]).then(([g, p]) => { setGroup(g); setPilgrims(Array.isArray(p) ? p : []); });
+    ]).then(async ([g, p]) => {
+      setGroup(g);
+      const list: Pilgrim[] = Array.isArray(p) ? p : [];
+      setPilgrims(list);
+      const entries = await Promise.all(
+        list.filter(x => x.photoUrl).map(async x => {
+          const d = await fetchAsDataUrl(`${API}${x.photoUrl}`);
+          return [x.id, d] as [string, string];
+        })
+      );
+      setPhotoDataUrls(Object.fromEntries(entries.filter(([, v]) => v)));
+    });
   }, [groupId]);
 
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
@@ -160,7 +172,7 @@ export default function PrintZamzam() {
                       marginBottom: "1.5mm",
                     }}>
                       {p.photoUrl ? (
-                        <img src={p.photoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        <img src={photoDataUrls[p.id] || (p.photoUrl ? `${API}${p.photoUrl}` : "")} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                       ) : (
                         <svg width="100%" height="100%" viewBox="0 0 76 76">
                           <circle cx="38" cy="30" r="16" fill="#b0b8b0" />
@@ -276,7 +288,7 @@ export default function PrintZamzam() {
                           {barcodeVal}
                         </div>
                       </div>
-                      <QRCodeSVG value={buildVerifyUrl(p.id)} size={130} level="M" fgColor={DARK_GREEN} />
+                      <QRCodeCanvas value={buildVerifyUrl(p.id)} size={130} level="M" fgColor={DARK_GREEN} />
                     </div>
                   </div>
 

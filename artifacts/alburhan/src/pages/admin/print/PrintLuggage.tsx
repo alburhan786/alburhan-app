@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useRoute } from "wouter";
-import { downloadAsPdf, downloadAsJpg } from "@/lib/downloadUtils";
+import { downloadAsPdf, downloadAsJpg, fetchAsDataUrl } from "@/lib/downloadUtils";
 import { Barcode } from "@/components/print/Barcode";
-import { QRCodeSVG } from "qrcode.react";
+import { QRCodeCanvas } from "qrcode.react";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -56,6 +56,7 @@ export default function PrintLuggage() {
   const [companyId, setCompanyId] = useState("alburhan");
   const company = getCompanyById(companyId);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [photoDataUrls, setPhotoDataUrls] = useState<Record<string, string>>({});
   const contentRef = useRef<HTMLDivElement>(null);
 
   const dl = async (fmt: "pdf" | "jpg") => {
@@ -73,7 +74,18 @@ export default function PrintLuggage() {
     Promise.all([
       fetch(`${API}/api/groups/${groupId}`, { credentials: "include" }).then(r => r.json()),
       fetch(`${API}/api/groups/${groupId}/pilgrims`, { credentials: "include" }).then(r => r.json()),
-    ]).then(([g, p]) => { setGroup(g); setPilgrims(p); });
+    ]).then(async ([g, p]) => {
+      setGroup(g);
+      const list: Pilgrim[] = Array.isArray(p) ? p : p;
+      setPilgrims(list);
+      const entries = await Promise.all(
+        (Array.isArray(list) ? list : []).filter(x => x.photoUrl).map(async x => {
+          const d = await fetchAsDataUrl(`${API}${x.photoUrl}`);
+          return [x.id, d] as [string, string];
+        })
+      );
+      setPhotoDataUrls(Object.fromEntries(entries.filter(([, v]) => v)));
+    });
   }, [groupId]);
 
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
@@ -157,7 +169,7 @@ export default function PrintLuggage() {
               <div style={{ display: "flex", alignItems: "center", gap: "5mm", width: "100%", marginBottom: "2mm" }}>
                 <div style={{ flexShrink: 0 }}>
                   {p.photoUrl ? (
-                    <img src={`${API}${p.photoUrl}`} alt="" style={{ width: "34mm", height: "34mm", objectFit: "cover", borderRadius: "50%", border: `3px solid ${GOLD}`, boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }} />
+                    <img src={photoDataUrls[p.id] || `${API}${p.photoUrl}`} alt="" style={{ width: "34mm", height: "34mm", objectFit: "cover", borderRadius: "50%", border: `3px solid ${GOLD}`, boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }} />
                   ) : (
                     <div style={{ width: "34mm", height: "34mm", background: "#f0f0f0", borderRadius: "50%", border: `3px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10pt", color: "#aaa" }}>PHOTO</div>
                   )}
@@ -194,7 +206,7 @@ export default function PrintLuggage() {
                     </div>
                     {h?.name && (
                       <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5mm" }}>
-                        <QRCodeSVG value={buildHotelMapUrl(h.name, h.address)} size={38} level="M" />
+                        <QRCodeCanvas value={buildHotelMapUrl(h.name, h.address)} size={38} level="M" />
                         <div style={{ fontSize: "4pt", color: "#999", textAlign: "center" }}>MAP</div>
                       </div>
                     )}
@@ -222,7 +234,7 @@ export default function PrintLuggage() {
               </div>
 
               <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "5mm", marginTop: "auto", paddingBottom: "1mm" }}>
-                <QRCodeSVG value={buildVerifyUrl(p.id)} size={68} level="M" />
+                <QRCodeCanvas value={buildVerifyUrl(p.id)} size={68} level="M" />
                 <Barcode value={p.passportNumber || `H${String(p.serialNumber).padStart(3, "0")}`} height={40} width={2} fontSize={0} />
               </div>
             </div>

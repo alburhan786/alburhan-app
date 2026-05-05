@@ -3,7 +3,7 @@ import { useRoute } from "wouter";
 import { downloadAsPdf } from "@/lib/downloadUtils";
 import { PrintHeader } from "./PrintHeader";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
-import { QRCodeSVG } from "qrcode.react";
+import { QRCodeCanvas } from "qrcode.react";
 
 const API = import.meta.env.VITE_API_URL || "";
 const PROD_DOMAIN = "https://alburhantravels.com";
