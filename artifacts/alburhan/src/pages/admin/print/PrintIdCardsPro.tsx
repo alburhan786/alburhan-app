@@ -345,24 +345,19 @@ export default function PrintIdCardsPro() {
   const [dlState, setDlState] = useState<string | null>(null);
   const [photoDataUrls, setPhotoDataUrls] = useState<Record<string, string>>({});
   const contentRef = useRef<HTMLDivElement>(null);
+  // Refs set directly on each page div during render — avoids querySelectorAll timing issues
+  const pageElsRef = useRef<HTMLElement[]>([]);
 
   const dlCards = async (fmt: "pdf" | "jpg") => {
-    if (!contentRef.current) return;
-
-    // Query DOM BEFORE any setState — a setState call triggers React reconciliation
-    // which can temporarily detach elements, making querySelectorAll return 0 results.
-    const selector = isSBS ? ".id-print-page" : ".duplex-page";
-    const pageEls = Array.from(
-      contentRef.current.querySelectorAll<HTMLElement>(selector)
-    );
-
+    // Snapshot the page elements NOW (before any state change)
+    const pageEls = pageElsRef.current.filter(Boolean);
     setDlState(fmt);
     try {
       const name = `id-cards-pro-${group?.groupName || "group"}`;
       if (pageEls.length > 0) {
         if (fmt === "pdf") await downloadMultiPagePdf(pageEls, name);
         else await downloadPagesAsJpg(pageEls, name);
-      } else {
+      } else if (contentRef.current) {
         // Fallback: capture entire content area at once
         if (fmt === "pdf") await downloadAsPdf(contentRef.current, name);
         else await downloadAsJpg(contentRef.current, name);
@@ -401,6 +396,9 @@ export default function PrintIdCardsPro() {
     pages.push(pilgrims.slice(i, i + PAIRS_PER_PAGE));
 
   const isSBS = printMode === "sidebyside";
+
+  // Reset on every render so stale elements from previous data don't linger
+  pageElsRef.current = [];
 
   return (
     <>
@@ -572,7 +570,7 @@ export default function PrintIdCardsPro() {
               <div className="no-print" style={{ fontSize: "11px", color: "#999", marginBottom: "3mm", fontStyle: "italic" }}>
                 Page {pi + 1} · {pagePilgrims.length} cards (Front | Back side by side) · Cut dashed line after printing
               </div>
-              <div className="id-print-page">
+              <div className="id-print-page" ref={el => { if (el) pageElsRef.current[pi] = el as HTMLElement; }}>
                 {pagePilgrims.map(p => (
                   <div key={p.id} className="card-pair-row">
                     {/* FRONT */}
@@ -595,7 +593,7 @@ export default function PrintIdCardsPro() {
               <div className="no-print" style={{ fontSize: "11px", color: "#999", marginBottom: "3mm", fontStyle: "italic" }}>
                 {p.fullName} — FRONT (Page {idx * 2 + 1})
               </div>
-              <div className="duplex-page">
+              <div className="duplex-page" ref={el => { if (el) pageElsRef.current[idx * 2] = el as HTMLElement; }}>
                 <FrontCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
               </div>
             </div>,
@@ -603,7 +601,7 @@ export default function PrintIdCardsPro() {
               <div className="no-print" style={{ fontSize: "11px", color: "#999", marginBottom: "3mm", fontStyle: "italic" }}>
                 {p.fullName} — BACK (Page {idx * 2 + 2})
               </div>
-              <div className="duplex-page">
+              <div className="duplex-page" ref={el => { if (el) pageElsRef.current[idx * 2 + 1] = el as HTMLElement; }}>
                 <BackCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
               </div>
             </div>,
