@@ -486,61 +486,55 @@ export default function PrintLuggageSquare() {
         }
         * { box-sizing: border-box; }
 
-        /* ── Full sticker: 96×128mm → 2×2 per A4 page ── */
+        /* ── Full sticker: 90×125mm → 2×2 per A4 page (2×90+2=182mm fits A4 comfortably) ── */
         .sq-sticker {
-          width: 96mm; height: 128mm;
+          width: 90mm; height: 125mm;
           border: 1px dashed #bbb; border-radius: 5px; overflow: hidden;
           break-inside: avoid;
           font-family: 'Inter', Arial, sans-serif;
           background: #fff; position: relative; flex-shrink: 0;
         }
 
-        /* ── Compact sticker: 96×68mm → 4 pairs (front+back) per A4 page ── */
+        /* ── Compact sticker: 90×64mm → 4 pairs per A4 page ── */
         .sq-sticker-sm {
-          width: 96mm; height: 68mm;
+          width: 90mm; height: 64mm;
           border: 1px dashed #bbb; border-radius: 4px; overflow: hidden;
           break-inside: avoid;
           font-family: 'Inter', Arial, sans-serif;
           background: #fff; position: relative; flex-shrink: 0;
         }
 
-        /* ── "Both" page: 4 rows × [FRONT | BACK] ── */
-        /* width: 2×96 + 3mm gap = 195mm; height: 4×68 + 3×3mm gap = 281mm → fits A4 */
+        /* ── "Both" page: 4 rows × [FRONT | BACK] (unused in current both-mode but kept) ── */
+        /* width: 2×90 + 2mm gap = 182mm; height: 4×64 + 3×2mm = 262mm → fits A4 */
         .sq-page-both {
-          width: 195mm;
+          width: 182mm;
           display: grid;
-          grid-template-columns: 96mm 96mm;
-          grid-template-rows: repeat(4, 68mm);
-          gap: 3mm;
+          grid-template-columns: 90mm 90mm;
+          grid-template-rows: repeat(4, 64mm);
+          gap: 2mm;
           page-break-after: always; break-after: page;
           overflow: hidden;
         }
         .sq-page-both:last-child { page-break-after: auto; break-after: auto; }
 
         /* ── Single-side page: 2×2 full stickers ── */
-        /* width: 195mm; height: 2×128 + 3mm = 259mm → fits A4 */
+        /* width: 182mm; height: 2×125 + 2mm = 252mm → fits A4 (200×287mm usable) */
         .sq-page-single {
-          width: 195mm;
+          width: 182mm;
           display: grid;
-          grid-template-columns: 96mm 96mm;
-          grid-template-rows: 128mm 128mm;
-          gap: 3mm;
+          grid-template-columns: 90mm 90mm;
+          grid-template-rows: 125mm 125mm;
+          gap: 2mm;
           page-break-after: always; break-after: page;
           overflow: hidden;
         }
         .sq-page-single:last-child { page-break-after: auto; break-after: auto; }
 
-        /* Vertical cut guide between columns in "both" mode */
-        .sq-page-both::after {
-          content: "";
-          display: none;
-        }
-
         /* Screen shadows */
         @media screen {
           .sq-page-both, .sq-page-single {
             background: white;
-            padding: 5mm;
+            padding: 4mm;
             box-shadow: 0 2px 16px rgba(0,0,0,0.12);
             border-radius: 4px;
           }
