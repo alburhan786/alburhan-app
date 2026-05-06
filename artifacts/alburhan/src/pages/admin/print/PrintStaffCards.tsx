@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { QRCodeCanvas } from "qrcode.react";
-import { downloadAsPdf, downloadAsJpg, fetchAsDataUrl } from "@/lib/downloadUtils";
+import { downloadAsPdf, downloadAsJpg, downloadAsPng, fetchAsDataUrl } from "@/lib/downloadUtils";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -436,11 +436,12 @@ export default function PrintStaffCards() {
   const contentRef = useRef<HTMLDivElement>(null);
   const [dlState, setDlState] = useState<string | null>(null);
 
-  const dlCards = async (fmt: "pdf" | "jpg") => {
+  const dlCards = async (fmt: "pdf" | "jpg" | "png") => {
     if (!contentRef.current) return;
     setDlState(fmt);
     try {
       if (fmt === "pdf") await downloadAsPdf(contentRef.current, "staff-cards");
+      else if (fmt === "png") await downloadAsPng(contentRef.current, "staff-cards");
       else await downloadAsJpg(contentRef.current, "staff-cards");
     } finally { setDlState(null); }
   };
@@ -575,6 +576,9 @@ export default function PrintStaffCards() {
           }}>🖨 Print</button>
           <button onClick={() => dlCards("pdf")} disabled={!!dlState || filtered.length === 0} style={{ padding: "8px 16px", background: dlState === "pdf" ? "#6b7280" : "#1d4ed8", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>
             {dlState === "pdf" ? "⏳..." : "⬇ PDF"}
+          </button>
+          <button onClick={() => dlCards("png")} disabled={!!dlState || filtered.length === 0} style={{ padding: "8px 16px", background: dlState === "png" ? "#6b7280" : "#059669", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>
+            {dlState === "png" ? "⏳..." : "⬇ PNG"}
           </button>
           <button onClick={() => dlCards("jpg")} disabled={!!dlState || filtered.length === 0} style={{ padding: "8px 16px", background: dlState === "jpg" ? "#6b7280" : "#7c3aed", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>
             {dlState === "jpg" ? "⏳..." : "⬇ JPG"}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useRoute } from "wouter";
-import { downloadMultiPagePdf, downloadPagesAsJpg, downloadAsPdf, downloadAsJpg, fetchAsDataUrl, downloadElementAsSvg } from "@/lib/downloadUtils";
+import { downloadMultiPagePdf, downloadPagesAsJpg, downloadAsPdf, downloadAsJpg, downloadAsPng, fetchAsDataUrl, downloadElementAsSvg } from "@/lib/downloadUtils";
 import { Barcode } from "@/components/print/Barcode";
 import { QRCodeCanvas } from "qrcode.react";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
@@ -363,6 +363,7 @@ export default function PrintIdCardsPro() {
       } else if (contentRef.current) {
         // Fallback: capture entire content area at once
         if (fmt === "pdf") await downloadAsPdf(contentRef.current, name);
+        else if (fmt === "png") await downloadAsPng(contentRef.current, name);
         else await downloadAsJpg(contentRef.current, name);
       }
     } finally { setDlState(null); }
@@ -551,6 +552,9 @@ export default function PrintIdCardsPro() {
           </button>
           <button onClick={() => dlCards("pdf")} disabled={!!dlState} style={{ padding: "10px 18px", background: dlState === "pdf" ? "#6b7280" : "#1d4ed8", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
             {dlState === "pdf" ? "⏳..." : "⬇ PDF"}
+          </button>
+          <button onClick={() => dlCards("png")} disabled={!!dlState} style={{ padding: "10px 18px", background: dlState === "png" ? "#6b7280" : "#059669", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
+            {dlState === "png" ? "⏳..." : "⬇ PNG"}
           </button>
           <button onClick={() => dlCards("jpg")} disabled={!!dlState} style={{ padding: "10px 18px", background: dlState === "jpg" ? "#6b7280" : "#7c3aed", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
             {dlState === "jpg" ? "⏳..." : "⬇ JPG"}

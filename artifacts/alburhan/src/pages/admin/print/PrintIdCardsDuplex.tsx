@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useRoute } from "wouter";
-import { downloadMultiPagePdf, downloadPagesAsJpg, downloadAsPdf, downloadAsJpg, fetchAsDataUrl } from "@/lib/downloadUtils";
+import { downloadMultiPagePdf, downloadPagesAsJpg, downloadAsPdf, downloadAsJpg, downloadAsPng, fetchAsDataUrl } from "@/lib/downloadUtils";
 import { Barcode } from "@/components/print/Barcode";
 import { QRCodeCanvas } from "qrcode.react";
 import { getCompanyById } from "@/lib/companies";
@@ -257,12 +257,14 @@ export default function PrintIdCardsDuplex() {
   const contentRef  = useRef<HTMLDivElement>(null);
   const pageElsRef  = useRef<HTMLElement[]>([]);
 
-  const dlCards = async (fmt: "pdf" | "jpg") => {
+  const dlCards = async (fmt: "pdf" | "jpg" | "png") => {
     const pageEls = pageElsRef.current.filter(Boolean);
     setDlState(fmt);
     try {
       const name = `id-cards-duplex-${group?.groupName || "group"}`;
-      if (pageEls.length > 0) {
+      if (fmt === "png" && contentRef.current) {
+        await downloadAsPng(contentRef.current, name);
+      } else if (pageEls.length > 0) {
         if (fmt === "pdf") await downloadMultiPagePdf(pageEls, name);
         else await downloadPagesAsJpg(pageEls, name);
       } else if (contentRef.current) {
@@ -388,6 +390,9 @@ export default function PrintIdCardsDuplex() {
           </button>
           <button onClick={() => dlCards("pdf")} disabled={!!dlState} style={{ padding: "10px 18px", background: dlState === "pdf" ? "#6b7280" : "#1d4ed8", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
             {dlState === "pdf" ? "⏳ Generating…" : "⬇ PDF"}
+          </button>
+          <button onClick={() => dlCards("png")} disabled={!!dlState} style={{ padding: "10px 18px", background: dlState === "png" ? "#6b7280" : "#059669", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
+            {dlState === "png" ? "⏳ Generating…" : "⬇ PNG"}
           </button>
           <button onClick={() => dlCards("jpg")} disabled={!!dlState} style={{ padding: "10px 18px", background: dlState === "jpg" ? "#6b7280" : "#7c3aed", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
             {dlState === "jpg" ? "⏳ Generating…" : "⬇ JPG"}

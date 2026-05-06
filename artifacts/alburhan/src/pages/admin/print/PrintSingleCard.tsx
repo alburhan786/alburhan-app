@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useRoute } from "wouter";
-import { downloadAsPdf, downloadAsJpg, fetchAsDataUrl } from "@/lib/downloadUtils";
+import { downloadAsPdf, downloadAsJpg, downloadAsPng, fetchAsDataUrl } from "@/lib/downloadUtils";
 import { QRCodeCanvas } from "qrcode.react";
 import { Barcode } from "@/components/print/Barcode";
 import { getCompanyById } from "@/lib/companies";
@@ -191,12 +191,13 @@ export default function PrintSingleCard() {
   const [dlState, setDlState] = useState<string | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
-  const dlCard = async (fmt: "pdf" | "jpg") => {
+  const dlCard = async (fmt: "pdf" | "jpg" | "png") => {
     if (!contentRef.current) return;
     setDlState(fmt);
     try {
       const name = `id-card-${pilgrim?.fullName?.replace(/\s+/g, "-") || "card"}`;
       if (fmt === "pdf") await downloadAsPdf(contentRef.current, name);
+      else if (fmt === "png") await downloadAsPng(contentRef.current, name);
       else await downloadAsJpg(contentRef.current, name);
     } finally { setDlState(null); }
   };
@@ -337,6 +338,10 @@ export default function PrintSingleCard() {
             padding: "10px 20px", background: dlState === "pdf" ? "#6b7280" : "#1d4ed8",
             color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "13px",
           }}>{dlState === "pdf" ? "⏳..." : "⬇ PDF"}</button>
+          <button onClick={() => dlCard("png")} disabled={!!dlState} style={{
+            padding: "10px 20px", background: dlState === "png" ? "#6b7280" : "#059669",
+            color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "13px",
+          }}>{dlState === "png" ? "⏳..." : "⬇ PNG"}</button>
           <button onClick={() => dlCard("jpg")} disabled={!!dlState} style={{
             padding: "10px 20px", background: dlState === "jpg" ? "#6b7280" : "#7c3aed",
             color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "13px",
