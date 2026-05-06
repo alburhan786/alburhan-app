@@ -21,12 +21,15 @@ export async function fetchAsDataUrl(url: string): Promise<string> {
   }
 }
 
+// scale=6 → ~576 DPI (closest to 600 DPI achievable in browser at 96 CSS DPI)
+// PNG used for PDF = lossless, perfect colours, no JPEG artefacts
 const CAPTURE_OPTS = {
-  scale: 4,
+  scale: 6,
   useCORS: true,
   allowTaint: true,
   backgroundColor: "#ffffff",
   logging: false,
+  imageTimeout: 15000,
 };
 
 async function capture(el: HTMLElement): Promise<HTMLCanvasElement> {
@@ -37,7 +40,8 @@ export async function downloadAsJpg(el: HTMLElement, filename: string) {
   const canvas = await capture(el);
   const a = document.createElement("a");
   a.download = filename.endsWith(".jpg") ? filename : filename + ".jpg";
-  a.href = canvas.toDataURL("image/jpeg", 0.93);
+  // JPEG quality 0.97 → near-lossless, vivid colours
+  a.href = canvas.toDataURL("image/jpeg", 0.97);
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -45,14 +49,16 @@ export async function downloadAsJpg(el: HTMLElement, filename: string) {
 
 export async function downloadAsPdf(el: HTMLElement, filename: string) {
   const canvas = await capture(el);
-  const w = canvas.width / 2;
-  const h = canvas.height / 2;
+  // Divide by scale so jsPDF page size matches physical mm dimensions
+  const w = canvas.width / CAPTURE_OPTS.scale;
+  const h = canvas.height / CAPTURE_OPTS.scale;
   const pdf = new jsPDF({
     orientation: w > h ? "landscape" : "portrait",
     unit: "pt",
     format: [w, h],
   });
-  pdf.addImage(canvas.toDataURL("image/jpeg", 0.93), "JPEG", 0, 0, w, h);
+  // PNG = lossless, perfect colour reproduction
+  pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, w, h);
   pdf.save(filename.endsWith(".pdf") ? filename : filename + ".pdf");
 }
 
@@ -68,9 +74,9 @@ export async function downloadMultiPagePdf(pages: HTMLElement[], filename: strin
 
   for (let i = 0; i < pages.length; i++) {
     const canvas = await html2canvas(pages[i], CAPTURE_OPTS);
-    const w = canvas.width / 2;
-    const h = canvas.height / 2;
-    const imgData = canvas.toDataURL("image/jpeg", 0.93);
+    const w = canvas.width / CAPTURE_OPTS.scale;
+    const h = canvas.height / CAPTURE_OPTS.scale;
+    const imgData = canvas.toDataURL("image/png");
 
     if (i === 0) {
       pdf = new jsPDF({
@@ -78,10 +84,10 @@ export async function downloadMultiPagePdf(pages: HTMLElement[], filename: strin
         unit: "pt",
         format: [w, h],
       });
-      pdf.addImage(imgData, "JPEG", 0, 0, w, h);
+      pdf.addImage(imgData, "PNG", 0, 0, w, h);
     } else {
       pdf!.addPage([w, h], w > h ? "landscape" : "portrait");
-      pdf!.addImage(imgData, "JPEG", 0, 0, w, h);
+      pdf!.addImage(imgData, "PNG", 0, 0, w, h);
     }
   }
 
@@ -100,11 +106,10 @@ export async function downloadPagesAsJpg(pages: HTMLElement[], filename: string)
     const canvas = await html2canvas(pages[i], CAPTURE_OPTS);
     const a = document.createElement("a");
     a.download = pages.length === 1 ? `${base}.jpg` : `${base}-${i + 1}.jpg`;
-    a.href = canvas.toDataURL("image/jpeg", 0.93);
+    a.href = canvas.toDataURL("image/jpeg", 0.97);
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    // Small delay between downloads so the browser doesn't block them
     if (i < pages.length - 1) await new Promise(r => setTimeout(r, 300));
   }
 }
