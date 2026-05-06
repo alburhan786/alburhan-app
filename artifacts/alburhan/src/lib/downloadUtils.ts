@@ -48,13 +48,23 @@ export async function downloadAsJpg(el: HTMLElement, filename: string) {
 
 export async function downloadAsPng(el: HTMLElement, filename: string) {
   const canvas = await capture(el);
-  const a = document.createElement("a");
-  a.download = filename.endsWith(".png") ? filename : filename + ".png";
-  // PNG = fully lossless, perfect colours, ~576 DPI
-  a.href = canvas.toDataURL("image/png");
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  const name = filename.endsWith(".png") ? filename : filename + ".png";
+  // Use toBlob + createObjectURL to avoid the ~2MB data-URL size limit
+  // that causes empty files when the canvas is very large (scale 6).
+  await new Promise<void>((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) { reject(new Error("PNG blob was null")); return; }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.download = name;
+      a.href = url;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      resolve();
+    }, "image/png");
+  });
 }
 
 export async function downloadAsPdf(el: HTMLElement, filename: string) {
