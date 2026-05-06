@@ -530,11 +530,10 @@ export default function PrintLuggageSquare() {
         }
         .sq-page-single:last-child { page-break-after: auto; break-after: auto; }
 
-        /* Screen shadows */
+        /* Screen: shadow wrapper, NO extra padding (grid fills exact width) */
         @media screen {
           .sq-page-both, .sq-page-single {
             background: white;
-            padding: 4mm;
             box-shadow: 0 2px 16px rgba(0,0,0,0.12);
             border-radius: 4px;
           }
