@@ -46,9 +46,10 @@ interface CardProps {
   p: Pilgrim; group: Group;
   company: ReturnType<typeof getCompanyById>;
   showFeedbackQr: boolean; bookingMap: Record<string, string>;
+  photoDataUrls: Record<string, string>;
 }
 
-function FrontCard({ p, group, company }: CardProps) {
+function FrontCard({ p, group, company, photoDataUrls }: CardProps) {
   const serial = String(p.serialNumber).padStart(3, "0");
   const barcodeVal = p.barcodeId || p.passportNumber || `HAJ${serial}`;
   const barcodeFormat = p.barcodeId ? "CODE128" : "CODE39";
@@ -599,7 +600,7 @@ export default function PrintIdCardsPro() {
                   <div key={p.id} className="card-pair-row">
                     {/* FRONT */}
                     <div ref={el => { if (el) frontCardRefs.current.set(p.id, el as HTMLElement); }}>
-                      <FrontCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
+                      <FrontCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} photoDataUrls={photoDataUrls} />
                     </div>
                     {/* Cut line */}
                     <div className="cut-line no-print" style={{ position: "relative" }}>
@@ -619,7 +620,7 @@ export default function PrintIdCardsPro() {
                     </div>
                     {/* BACK */}
                     <div ref={el => { if (el) backCardRefs.current.set(p.id, el as HTMLElement); }}>
-                      <BackCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
+                      <BackCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} photoDataUrls={photoDataUrls} />
                     </div>
                   </div>
                 ))}
@@ -636,7 +637,7 @@ export default function PrintIdCardsPro() {
               </div>
               <div className="duplex-page" ref={el => { if (el) pageElsRef.current[idx * 2] = el as HTMLElement; }}>
                 <div ref={el => { if (el) frontCardRefs.current.set(p.id, el as HTMLElement); }}>
-                  <FrontCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
+                  <FrontCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} photoDataUrls={photoDataUrls} />
                 </div>
               </div>
             </div>,
@@ -646,7 +647,7 @@ export default function PrintIdCardsPro() {
               </div>
               <div className="duplex-page" ref={el => { if (el) pageElsRef.current[idx * 2 + 1] = el as HTMLElement; }}>
                 <div ref={el => { if (el) backCardRefs.current.set(p.id, el as HTMLElement); }}>
-                  <BackCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
+                  <BackCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} photoDataUrls={photoDataUrls} />
                 </div>
               </div>
             </div>,

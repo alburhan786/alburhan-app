@@ -60,7 +60,7 @@ function KaabaIcon({ color = "#d4af37", size = "100%" }: { color?: string; size?
 }
 
 /* ── FRONT CARD (portrait 54×86mm) ── */
-function StaffCardFront({ s, groupName }: { s: StaffMember; groupName?: string }) {
+function StaffCardFront({ s, groupName, photoDataUrls }: { s: StaffMember; groupName?: string; photoDataUrls: Record<string, string> }) {
   const company   = getCompanyById(s.companyId);
   const roleLabel = ROLE_LABELS[s.role] || "STAFF";
   const mobile    = s.mobileIndia
@@ -607,7 +607,7 @@ export default function PrintStaffCards() {
                 </div>
                 <div className="cards-row">
                   {page.map(s => (
-                    <StaffCardFront key={`f-${s.id}`} s={s} groupName={s.groupId ? groups[s.groupId] : undefined} />
+                    <StaffCardFront key={`f-${s.id}`} s={s} groupName={s.groupId ? groups[s.groupId] : undefined} photoDataUrls={photoDataUrls} />
                   ))}
                 </div>
               </div>

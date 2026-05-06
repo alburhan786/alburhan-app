@@ -318,7 +318,7 @@ export default function PrintIdCardsDuplex() {
         * { box-sizing: border-box; }
 
         .pro-card {
-          width: 90mm;
+          width: 85mm;
           height: 55mm;
           border: 1px solid #ccc;
           border-radius: 3px;
@@ -352,7 +352,7 @@ export default function PrintIdCardsDuplex() {
         /* 3×3 grid */
         .duplex-grid {
           display: grid;
-          grid-template-columns: repeat(3, 90mm);
+          grid-template-columns: repeat(3, 85mm);
           grid-template-rows: repeat(3, 55mm);
           gap: 3mm;
         }
