@@ -46,25 +46,60 @@ export async function downloadAsJpg(el: HTMLElement, filename: string) {
   document.body.removeChild(a);
 }
 
+/** Trigger a blob-URL download. Returns true on success. */
+function triggerBlobDownload(blob: Blob, name: string): boolean {
+  try {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.download = name;
+    a.href = url;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Render element at the given scale and resolve with a Blob (or null). */
+function captureToBlob(el: HTMLElement, scale: number): Promise<Blob | null> {
+  return new Promise((resolve) => {
+    html2canvas(el, { ...CAPTURE_OPTS, scale }).then((canvas) => {
+      canvas.toBlob((blob) => resolve(blob), "image/png");
+    }).catch(() => resolve(null));
+  });
+}
+
 export async function downloadAsPng(el: HTMLElement, filename: string) {
-  const canvas = await capture(el);
   const name = filename.endsWith(".png") ? filename : filename + ".png";
-  // Use toBlob + createObjectURL to avoid the ~2MB data-URL size limit
-  // that causes empty files when the canvas is very large (scale 6).
-  await new Promise<void>((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (!blob) { reject(new Error("PNG blob was null")); return; }
-      const url = URL.createObjectURL(blob);
+
+  // Try high-res first (scale 6 ≈ 576 DPI), fall back to scale 3 (≈ 288 DPI)
+  // if the canvas is too large for the browser to encode.
+  for (const scale of [6, 3, 2]) {
+    const blob = await captureToBlob(el, scale);
+    if (blob && blob.size > 0) {
+      if (triggerBlobDownload(blob, name)) return;
+    }
+  }
+
+  // Last resort: small scale data-URL
+  try {
+    const canvas = await html2canvas(el, { ...CAPTURE_OPTS, scale: 2 });
+    const dataUrl = canvas.toDataURL("image/png");
+    if (dataUrl && dataUrl !== "data:,") {
       const a = document.createElement("a");
       a.download = name;
-      a.href = url;
+      a.href = dataUrl;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
-      resolve();
-    }, "image/png");
-  });
+      return;
+    }
+  } catch { /* ignore */ }
+
+  alert("PNG download failed — please try the PDF or JPG button instead.");
 }
 
 export async function downloadAsPdf(el: HTMLElement, filename: string) {
