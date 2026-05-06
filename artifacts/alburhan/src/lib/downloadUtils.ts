@@ -1,5 +1,6 @@
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import { saveAs } from "file-saver";
 
 /**
  * Fetches a URL (with credentials) and returns a base64 data URL string.
@@ -31,24 +32,26 @@ const BASE_OPTS = {
 
 // ─── Low-level helpers ───────────────────────────────────────────────────────
 
-/** Render element at given scale, return canvas or null on failure. */
+/** Render element at given scale; returns null if canvas has zero dimensions. */
 async function renderCanvas(el: HTMLElement, scale: number): Promise<HTMLCanvasElement | null> {
   try {
-    return await html2canvas(el, { ...BASE_OPTS, scale });
+    const canvas = await html2canvas(el, { ...BASE_OPTS, scale });
+    if (!canvas || canvas.width === 0 || canvas.height === 0) return null;
+    return canvas;
   } catch {
     return null;
   }
 }
 
 /**
- * Render element and return a Blob + canvas dimensions.
- * Tries scales in order until a non-empty blob is produced.
+ * Render element → Blob at given scale.
+ * Tries scales in order; returns first non-empty valid blob.
  */
 async function renderToBlob(
   el: HTMLElement,
   mime: "image/png" | "image/jpeg",
   quality: number,
-  scales = [6, 3, 2],
+  scales = [3, 2, 1],
 ): Promise<{ blob: Blob; cssW: number; cssH: number } | null> {
   for (const scale of scales) {
     const canvas = await renderCanvas(el, scale);
@@ -56,7 +59,8 @@ async function renderToBlob(
     const blob = await new Promise<Blob | null>((res) =>
       canvas.toBlob((b) => res(b), mime, quality),
     );
-    if (blob && blob.size > 0) {
+    // Require at least 1 KB — a 0×0 or all-white degenerate PNG is ~68 bytes
+    if (blob && blob.size > 1024) {
       return { blob, cssW: canvas.width / scale, cssH: canvas.height / scale };
     }
   }
@@ -64,12 +68,11 @@ async function renderToBlob(
 }
 
 /**
- * Render element and return a lossless PNG data URL + dimensions via toBlob→FileReader.
- * This avoids the silent-empty-string failure of toDataURL on large canvases.
+ * Render element → PNG data URL via toBlob→FileReader (avoids toDataURL size limits).
  */
 async function renderToPngDataUrl(
   el: HTMLElement,
-  scales = [6, 3, 2],
+  scales = [3, 2, 1],
 ): Promise<{ dataUrl: string; cssW: number; cssH: number } | null> {
   const result = await renderToBlob(el, "image/png", 1, scales);
   if (!result) return null;
@@ -79,40 +82,23 @@ async function renderToPngDataUrl(
     reader.onerror = () => resolve("");
     reader.readAsDataURL(result.blob);
   });
-  if (!dataUrl || dataUrl === "data:,") return null;
+  if (!dataUrl || dataUrl === "data:," || dataUrl.length < 100) return null;
   return { dataUrl, cssW: result.cssW, cssH: result.cssH };
-}
-
-/** Trigger a Blob-URL file download. Returns true on success. */
-function triggerBlobDownload(blob: Blob, name: string): boolean {
-  try {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.download = name;
-    a.href = url;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 3000);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 // ─── Public download functions ───────────────────────────────────────────────
 
 export async function downloadAsJpg(el: HTMLElement, filename: string) {
   const name = filename.endsWith(".jpg") ? filename : filename + ".jpg";
-  const result = await renderToBlob(el, "image/jpeg", 0.97);
-  if (result && triggerBlobDownload(result.blob, name)) return;
+  const result = await renderToBlob(el, "image/jpeg", 0.95);
+  if (result) { saveAs(result.blob, name); return; }
   alert("JPG download failed — please try the PDF button instead.");
 }
 
 export async function downloadAsPng(el: HTMLElement, filename: string) {
   const name = filename.endsWith(".png") ? filename : filename + ".png";
   const result = await renderToBlob(el, "image/png", 1);
-  if (result && triggerBlobDownload(result.blob, name)) return;
+  if (result) { saveAs(result.blob, name); return; }
   alert("PNG download failed — please try the PDF or JPG button instead.");
 }
 
@@ -133,7 +119,7 @@ export async function downloadAsPdf(el: HTMLElement, filename: string) {
 /**
  * Captures each element in `pages` separately and adds it as a new PDF page.
  * Use this when the printable content is split into distinct page blocks so
- * html2canvas never hits the ~32 767 px height limit.
+ * html2canvas never hits the canvas height limit.
  */
 export async function downloadMultiPagePdf(pages: HTMLElement[], filename: string) {
   if (pages.length === 0) return;
@@ -169,11 +155,10 @@ export async function downloadPagesAsJpg(pages: HTMLElement[], filename: string)
   const base = filename.replace(/\.jpg$/i, "");
   for (let i = 0; i < pages.length; i++) {
     const name = pages.length === 1 ? `${base}.jpg` : `${base}-${i + 1}.jpg`;
-    const result = await renderToBlob(pages[i], "image/jpeg", 0.97);
-    if (!result || !triggerBlobDownload(result.blob, name)) {
-      alert(`JPG download failed for page ${i + 1}.`);
-    }
-    if (i < pages.length - 1) await new Promise(r => setTimeout(r, 300));
+    const result = await renderToBlob(pages[i], "image/jpeg", 0.95);
+    if (result) { saveAs(result.blob, name); }
+    else { alert(`JPG download failed for page ${i + 1}.`); }
+    if (i < pages.length - 1) await new Promise(r => setTimeout(r, 400));
   }
 }
 
@@ -187,20 +172,19 @@ export async function downloadElementAsSvg(
   widthMm = 85,
   heightMm = 54,
 ) {
-  const result = await renderToPngDataUrl(el);
-  if (!result) { alert("SVG download failed."); return; }
-  const canvas = await renderCanvas(el, 6) ?? await renderCanvas(el, 3);
+  const pngResult = await renderToPngDataUrl(el);
+  if (!pngResult) { alert("SVG download failed."); return; }
+  const canvas = await renderCanvas(el, 3) ?? await renderCanvas(el, 2);
   if (!canvas) { alert("SVG download failed."); return; }
   const w = canvas.width;
   const h = canvas.height;
-  const pngData = result.dataUrl;
   const svgStr = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg"
      xmlns:xlink="http://www.w3.org/1999/xlink"
      width="${widthMm}mm" height="${heightMm}mm"
      viewBox="0 0 ${w} ${h}">
-  <image xlink:href="${pngData}" x="0" y="0" width="${w}" height="${h}" preserveAspectRatio="none"/>
+  <image xlink:href="${pngResult.dataUrl}" x="0" y="0" width="${w}" height="${h}" preserveAspectRatio="none"/>
 </svg>`;
   const blob = new Blob([svgStr], { type: "image/svg+xml" });
-  triggerBlobDownload(blob, filename.endsWith(".svg") ? filename : filename + ".svg");
+  saveAs(blob, filename.endsWith(".svg") ? filename : filename + ".svg");
 }
