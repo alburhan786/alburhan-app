@@ -572,26 +572,39 @@ export default function PrintLuggageSquare() {
 
       {/* ── Info bar ── */}
       {view === "both" && (
-        <div className="no-print" style={{ padding: "8px 16px", background: "#f0fdf4", borderBottom: "2px solid #86efac", fontSize: "12px", fontWeight: 600, color: "#15803d", textAlign: "center" }}>
-          ✅ Both sides: 4 pilgrims per A4 page · Front (left column) + Back (right column) · Cut vertically down the middle · Stack each pair &amp; laminate
+        <div className="no-print" style={{ padding: "10px 16px", background: "#eff6ff", borderBottom: "2px solid #93c5fd", fontSize: "12px", fontWeight: 600, color: "#1e40af", textAlign: "center", lineHeight: 1.6 }}>
+          🖨️ <strong>HOW TO PRINT BOTH SIDES:</strong> &nbsp;
+          1. Click Print → enable <strong>"Print on Both Sides"</strong> (flip on Long Edge) &nbsp;|&nbsp;
+          2. Printer puts fronts on side 1, backs on side 2 automatically &nbsp;|&nbsp;
+          3. Cut the sheet into 4 pieces → each piece is double-sided ✂️ &nbsp;|&nbsp;
+          <strong>No stacking needed!</strong>
         </div>
       )}
 
       <div ref={contentRef} className="sq-wrap" style={{ background: "#f5f5f0", padding: "8mm", display: "flex", flexDirection: "column", gap: "8mm" }}>
 
-        {/* ══ BOTH MODE: 4 rows of [FRONT col | BACK col] ══ */}
+        {/* ══ BOTH MODE: Page 1 = 4 fronts, Page 2 = 4 backs (mirrored columns for duplex alignment) ══ */}
         {view === "both" && pages.map((page, pi) => (
           <>
-            <div key={`lbl-${pi}`} className="no-print sq-page-label">
-              Pilgrims {pi * 4 + 1}–{Math.min(pi * 4 + page.length, pilgrims.length)} · FRONT (left) + BACK (right) · Cut down the middle
+            {/* FRONT PAGE */}
+            <div key={`lbl-f-${pi}`} className="no-print sq-page-label" style={{ borderLeftColor: GREEN }}>
+              📄 SIDE 1 — FRONTS (Pilgrims {pi * 4 + 1}–{Math.min(pi * 4 + page.length, pilgrims.length)})
             </div>
-            <div key={`page-${pi}`} className="sq-page-both">
+            <div key={`fp-${pi}`} className="sq-page-single">
               {page.map(p => (
-                <>
-                  <FrontSticker key={`f-${p.id}`} p={p} group={group} company={company} groupColor={groupColor} groupLabel={groupLabel} photoDataUrls={photoDataUrls} compact={true} />
-                  <BackSticker  key={`b-${p.id}`} p={p} group={group} company={company} compact={true} />
-                </>
+                <FrontSticker key={`f-${p.id}`} p={p} group={group} company={company} groupColor={groupColor} groupLabel={groupLabel} photoDataUrls={photoDataUrls} compact={false} />
               ))}
+            </div>
+
+            {/* BACK PAGE — columns mirrored (P2,P1 / P4,P3) for long-edge flip duplex alignment */}
+            <div key={`lbl-b-${pi}`} className="no-print sq-page-label" style={{ borderLeftColor: "#2563EB" }}>
+              🔄 SIDE 2 — BACKS · columns mirrored for duplex (Pilgrims {pi * 4 + 1}–{Math.min(pi * 4 + page.length, pilgrims.length)})
+            </div>
+            <div key={`bp-${pi}`} className="sq-page-single">
+              {/* Mirror columns: row0→[P2,P1], row1→[P4,P3] so after long-edge flip each cut piece aligns */}
+              {[page[1], page[0], page[3], page[2]].map((p, idx) =>
+                p ? <BackSticker key={`b-${p.id}-${idx}`} p={p} group={group} company={company} compact={false} /> : <div key={`empty-${idx}`} />
+              )}
             </div>
           </>
         ))}
