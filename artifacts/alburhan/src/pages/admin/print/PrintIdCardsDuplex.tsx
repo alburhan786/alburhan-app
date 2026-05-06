@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useRoute } from "wouter";
-import { downloadMultiPagePdf, downloadPagesAsJpg, downloadAsPdf, downloadAsJpg, downloadAsPng, fetchAsDataUrl } from "@/lib/downloadUtils";
+import { downloadMultiPagePdf, downloadPagesAsJpg, downloadPagesAsPng, downloadAsPdf, downloadAsJpg, downloadAsPng, fetchAsDataUrl } from "@/lib/downloadUtils";
 import { Barcode } from "@/components/print/Barcode";
 import { QRCodeCanvas } from "qrcode.react";
 import { getCompanyById } from "@/lib/companies";
@@ -262,15 +262,11 @@ export default function PrintIdCardsDuplex() {
     setDlState(fmt);
     try {
       const name = `id-cards-duplex-${group?.groupName || "group"}`;
-      if (fmt === "png" && contentRef.current) {
-        await downloadAsPng(contentRef.current, name);
-      } else if (pageEls.length > 0) {
-        if (fmt === "pdf") await downloadMultiPagePdf(pageEls, name);
-        else await downloadPagesAsJpg(pageEls, name);
-      } else if (contentRef.current) {
-        if (fmt === "pdf") await downloadAsPdf(contentRef.current, name);
-        else await downloadAsJpg(contentRef.current, name);
-      }
+      const els = pageEls.length > 0 ? pageEls : (contentRef.current ? [contentRef.current] : []);
+      if (els.length === 0) return;
+      if (fmt === "pdf") await downloadMultiPagePdf(els, name);
+      else if (fmt === "png") await downloadPagesAsPng(els, name);
+      else await downloadPagesAsJpg(els, name);
     } finally { setDlState(null); }
   };
 

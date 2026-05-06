@@ -148,6 +148,23 @@ export async function downloadMultiPagePdf(pages: HTMLElement[], filename: strin
 
 /**
  * Captures each element in `pages` separately and downloads each as a
+ * numbered PNG file (filename-1.png, filename-2.png, …).
+ * Use this for large multi-card layouts — avoids the canvas height limit.
+ */
+export async function downloadPagesAsPng(pages: HTMLElement[], filename: string) {
+  if (pages.length === 0) return;
+  const base = filename.replace(/\.png$/i, "");
+  for (let i = 0; i < pages.length; i++) {
+    const name = pages.length === 1 ? `${base}.png` : `${base}-${i + 1}.png`;
+    const result = await renderToBlob(pages[i], "image/png", 1);
+    if (result) { saveAs(result.blob, name); }
+    else { alert(`PNG download failed for page ${i + 1}.`); }
+    if (i < pages.length - 1) await new Promise(r => setTimeout(r, 400));
+  }
+}
+
+/**
+ * Captures each element in `pages` separately and downloads each as a
  * numbered JPG file (filename-1.jpg, filename-2.jpg, …).
  */
 export async function downloadPagesAsJpg(pages: HTMLElement[], filename: string) {

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useRoute } from "wouter";
-import { downloadMultiPagePdf, downloadPagesAsJpg, downloadAsPdf, downloadAsJpg, downloadAsPng, fetchAsDataUrl, downloadElementAsSvg } from "@/lib/downloadUtils";
+import { downloadMultiPagePdf, downloadPagesAsJpg, downloadPagesAsPng, downloadAsPdf, downloadAsJpg, downloadAsPng, fetchAsDataUrl, downloadElementAsSvg } from "@/lib/downloadUtils";
 import { Barcode } from "@/components/print/Barcode";
 import { QRCodeCanvas } from "qrcode.react";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
@@ -351,21 +351,16 @@ export default function PrintIdCardsPro() {
   const frontCardRefs = useRef<Map<string, HTMLElement>>(new Map());
   const backCardRefs = useRef<Map<string, HTMLElement>>(new Map());
 
-  const dlCards = async (fmt: "pdf" | "jpg") => {
-    // Snapshot the page elements NOW (before any state change)
+  const dlCards = async (fmt: "pdf" | "jpg" | "png") => {
     const pageEls = pageElsRef.current.filter(Boolean);
     setDlState(fmt);
     try {
       const name = `id-cards-pro-${group?.groupName || "group"}`;
-      if (pageEls.length > 0) {
-        if (fmt === "pdf") await downloadMultiPagePdf(pageEls, name);
-        else await downloadPagesAsJpg(pageEls, name);
-      } else if (contentRef.current) {
-        // Fallback: capture entire content area at once
-        if (fmt === "pdf") await downloadAsPdf(contentRef.current, name);
-        else if (fmt === "png") await downloadAsPng(contentRef.current, name);
-        else await downloadAsJpg(contentRef.current, name);
-      }
+      const els = pageEls.length > 0 ? pageEls : (contentRef.current ? [contentRef.current] : []);
+      if (els.length === 0) return;
+      if (fmt === "pdf") await downloadMultiPagePdf(els, name);
+      else if (fmt === "png") await downloadPagesAsPng(els, name);
+      else await downloadPagesAsJpg(els, name);
     } finally { setDlState(null); }
   };
 

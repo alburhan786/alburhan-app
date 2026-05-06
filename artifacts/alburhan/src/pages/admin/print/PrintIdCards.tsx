@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useRoute } from "wouter";
-import { downloadMultiPagePdf, downloadAsJpg, downloadAsPng, fetchAsDataUrl } from "@/lib/downloadUtils";
+import { downloadMultiPagePdf, downloadAsJpg, downloadAsPng, downloadPagesAsPng, downloadPagesAsJpg, fetchAsDataUrl } from "@/lib/downloadUtils";
 import { Barcode } from "@/components/print/Barcode";
 import { QRCodeCanvas } from "qrcode.react";
 import { COMPANIES, getCompanyById, type CompanyInfo } from "@/lib/companies";
@@ -240,16 +240,13 @@ export default function PrintIdCards() {
     setDlState(fmt);
     try {
       const name = `id-cards-${group?.groupName || "group"}`;
-      if (fmt === "pdf") {
-        const pageEls = Array.from(
-          contentRef.current.querySelectorAll<HTMLElement>(".pair-block")
-        );
-        await downloadMultiPagePdf(pageEls.length > 0 ? pageEls : [contentRef.current], name);
-      } else if (fmt === "png") {
-        await downloadAsPng(contentRef.current, name);
-      } else {
-        await downloadAsJpg(contentRef.current, name);
-      }
+      const pageEls = Array.from(
+        contentRef.current.querySelectorAll<HTMLElement>(".pair-block")
+      );
+      const els = pageEls.length > 0 ? pageEls : [contentRef.current];
+      if (fmt === "pdf") await downloadMultiPagePdf(els, name);
+      else if (fmt === "png") await downloadPagesAsPng(els, name);
+      else await downloadPagesAsJpg(els, name);
     } finally { setDlState(null); }
   };
 
