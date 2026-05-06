@@ -51,7 +51,7 @@ async function renderToBlob(
   el: HTMLElement,
   mime: "image/png" | "image/jpeg",
   quality: number,
-  scales = [3, 2, 1],
+  scales = [6, 3, 2],
 ): Promise<{ blob: Blob; cssW: number; cssH: number } | null> {
   for (const scale of scales) {
     const canvas = await renderCanvas(el, scale);
@@ -72,7 +72,7 @@ async function renderToBlob(
  */
 async function renderToPngDataUrl(
   el: HTMLElement,
-  scales = [3, 2, 1],
+  scales = [6, 3, 2],
 ): Promise<{ dataUrl: string; cssW: number; cssH: number } | null> {
   const result = await renderToBlob(el, "image/png", 1, scales);
   if (!result) return null;
