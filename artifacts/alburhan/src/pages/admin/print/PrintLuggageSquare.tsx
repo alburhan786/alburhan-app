@@ -7,7 +7,11 @@ import { COMPANIES, getCompanyById } from "@/lib/companies";
 import { mashariqLogoBase64 as mashariqLogoUrl } from "@/assets/mashariq-logo-data";
 import { almasiahLogoBase64 as almasiahLogoUrl } from "@/assets/almasiah-logo-data";
 
-const API  = import.meta.env.VITE_API_URL || "";
+const API   = import.meta.env.VITE_API_URL || "";
+const DARK  = "#0d5040";
+const GREEN = "#1a7a5e";
+const GOLD  = "#C9A84C";
+const RED   = "#CC0000";
 
 interface Pilgrim {
   id: string; serialNumber: number; fullName: string; photoUrl?: string;
@@ -18,290 +22,418 @@ interface Group {
   id: string; groupName: string; year: number; maktabNumber?: string;
   startingSerialNumber?: number;
   hotels?: {
-    makkah?: { name?: string; address?: string; nameAr?: string; addressAr?: string };
+    makkah?:  { name?: string; address?: string; nameAr?: string; addressAr?: string };
     madinah?: { name?: string; address?: string; nameAr?: string; addressAr?: string };
     aziziah?: { name?: string; address?: string; nameAr?: string; addressAr?: string };
   };
 }
 
-const DARK  = "#0d5040";
-const GREEN = "#1a7a5e";
-const GOLD  = "#C9A84C";
-const RED   = "#CC0000";
-
 const GROUP_COLORS: Record<string, string> = {
   A: "#1a7a5e", B: "#2563EB", C: "#D97706", D: "#DC2626",
 };
-function getGroupColor(groupName: string): string {
-  const last = groupName.trim().slice(-1).toUpperCase();
-  return GROUP_COLORS[last] || "#6B7280";
+function getGroupColor(n: string) { return GROUP_COLORS[n.trim().slice(-1).toUpperCase()] || "#6B7280"; }
+function buildHotelMapUrl(name?: string, addr?: string) {
+  return `https://maps.google.com/?q=${encodeURIComponent([name, addr].filter(Boolean).join(" "))}`;
 }
-
-function buildHotelMapUrl(name?: string, address?: string): string {
-  const q = [name, address].filter(Boolean).join(" ");
-  return `https://maps.google.com/?q=${encodeURIComponent(q)}`;
-}
-
-function buildVerifyUrl(id: string): string {
+function buildVerifyUrl(id: string) {
   return `${window.location.origin}${import.meta.env.BASE_URL}verify/${id}`;
 }
 
-/* ── SVG SNOWFLAKE / GEOMETRIC PATTERN (like the Almasiah reference) ── */
-function SnowflakeSVG({ size = 120, color = "#1a7a5e", opacity = 0.12 }: { size?: number; color?: string; opacity?: number }) {
+/* ── Snowflake SVG (back sticker bg) ── */
+function SnowflakeSVG({ size = 120, color = GREEN, opacity = 0.07 }: { size?: number; color?: string; opacity?: number }) {
   const cx = size / 2, cy = size / 2, r = size * 0.46;
-  const arm = (angleDeg: number, len: number) => {
-    const a = (angleDeg * Math.PI) / 180;
-    return `M${cx},${cy} L${cx + Math.cos(a) * len},${cy + Math.sin(a) * len}`;
-  };
-  const branch = (angleDeg: number, dist: number, bLen: number, bAngle: number) => {
-    const a = (angleDeg * Math.PI) / 180;
-    const bx = cx + Math.cos(a) * dist, by = cy + Math.sin(a) * dist;
-    const b1 = ((angleDeg + bAngle) * Math.PI) / 180;
-    const b2 = ((angleDeg - bAngle) * Math.PI) / 180;
-    return [
-      `M${bx},${by} L${bx + Math.cos(b1) * bLen},${by + Math.sin(b1) * bLen}`,
-      `M${bx},${by} L${bx + Math.cos(b2) * bLen},${by + Math.sin(b2) * bLen}`,
-    ].join(" ");
+  const arm = (a: number, l: number) => { const rad = (a * Math.PI) / 180; return `M${cx},${cy} L${cx + Math.cos(rad) * l},${cy + Math.sin(rad) * l}`; };
+  const branch = (a: number, d: number, bl: number, ba: number) => {
+    const rad = (a * Math.PI) / 180, bx = cx + Math.cos(rad) * d, by = cy + Math.sin(rad) * d;
+    const b1 = ((a + ba) * Math.PI) / 180, b2 = ((a - ba) * Math.PI) / 180;
+    return [`M${bx},${by} L${bx + Math.cos(b1) * bl},${by + Math.sin(b1) * bl}`, `M${bx},${by} L${bx + Math.cos(b2) * bl},${by + Math.sin(b2) * bl}`].join(" ");
   };
   const arms = [0, 60, 120, 180, 240, 300];
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ display: "block" }}>
       <g stroke={color} strokeWidth={size * 0.028} strokeLinecap="round" opacity={opacity} fill="none">
-        {arms.map(a => (
-          <g key={a}>
-            <path d={arm(a, r)} />
-            <path d={branch(a, r * 0.35, r * 0.22, a + 90)} />
-            <path d={branch(a, r * 0.6, r * 0.16, a + 90)} />
-            <path d={branch(a, r * 0.82, r * 0.11, a + 90)} />
-          </g>
-        ))}
+        {arms.map(a => <g key={a}><path d={arm(a, r)} /><path d={branch(a, r * 0.35, r * 0.22, a + 90)} /><path d={branch(a, r * 0.6, r * 0.16, a + 90)} /><path d={branch(a, r * 0.82, r * 0.11, a + 90)} /></g>)}
         <circle cx={cx} cy={cy} r={size * 0.04} fill={color} opacity={opacity} />
-        {arms.map(a => {
-          const rad = (a * Math.PI) / 180;
-          const tx = cx + Math.cos(rad) * r, ty = cy + Math.sin(rad) * r;
-          return <circle key={`tip-${a}`} cx={tx} cy={ty} r={size * 0.025} fill={color} opacity={opacity} />;
-        })}
+        {arms.map(a => { const rad = (a * Math.PI) / 180; return <circle key={a} cx={cx + Math.cos(rad) * r} cy={cy + Math.sin(rad) * r} r={size * 0.025} fill={color} opacity={opacity} />; })}
       </g>
     </svg>
   );
 }
 
-/* ── BACK STICKER (100×100mm) — exact Almasiah layout ── */
-function LuggageStickerBack({
-  p, group, company,
-}: {
+/* ════════════════════════════════════════════════════
+   FRONT STICKER — two sizes
+   compact = true  → 96 × 68 mm  (for "both" mode, 4 per page)
+   compact = false → 96 × 128 mm (for front-only mode)
+   ════════════════════════════════════════════════════ */
+function FrontSticker({ p, group, company, groupColor, groupLabel, photoDataUrls, compact }: {
   p: Pilgrim; group: Group; company: ReturnType<typeof getCompanyById>;
+  groupColor: string; groupLabel: string; photoDataUrls: Record<string, string>; compact: boolean;
 }) {
+  const sn = String(p.serialNumber).padStart(3, "0");
+
+  if (compact) {
+    /* ── COMPACT (96 × 68 mm) ── */
+    return (
+      <div className="sq-sticker-sm">
+        <div style={{ position: "relative", overflow: "hidden", height: "100%", display: "flex", flexDirection: "column" }}>
+          {/* Corner decoration */}
+          <div style={{ position: "absolute", top: "-6mm", right: "-5mm", width: "28mm", height: "28mm", background: DARK, borderRadius: "0 0 0 60%", zIndex: 0 }} />
+
+          {/* Header */}
+          <div style={{ position: "relative", zIndex: 1, padding: "1.5mm 3mm 0.5mm", display: "flex", alignItems: "center", gap: "1.5mm" }}>
+            <div style={{ fontSize: "20pt", lineHeight: 1, flexShrink: 0 }}>🇮🇳</div>
+            {company.logoUrl
+              ? <img src={company.logoUrl} alt="" style={{ height: "7mm", objectFit: "contain", flexShrink: 0 }} />
+              : <div style={{ height: "7mm", width: "7mm", flexShrink: 0, background: DARK, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "5pt" }}>{company.nameShort[0]}</div>
+            }
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 900, fontSize: "6.5pt", color: GREEN, textTransform: "uppercase", lineHeight: 1.1 }}>{company.nameShort}</div>
+              <div style={{ fontWeight: 700, fontSize: "4pt", color: GOLD, textTransform: "uppercase" }}>TOURS &amp; TRAVELS</div>
+            </div>
+            <div style={{ textAlign: "right", flexShrink: 0 }}>
+              <div style={{ fontSize: "14pt", fontWeight: 900, color: "#fff", lineHeight: 1 }}>#{sn}</div>
+              <div style={{ fontSize: "4pt", color: "#fff", opacity: 0.9 }}>HAJJ {group.year}</div>
+            </div>
+          </div>
+
+          {/* Group bar */}
+          <div style={{ background: groupColor, padding: "0.6mm 3mm", display: "flex", justifyContent: "center", alignItems: "center", position: "relative", zIndex: 1 }}>
+            <span style={{ color: "#fff", fontWeight: 800, fontSize: "6pt", letterSpacing: "0.5px" }}>GROUP: {groupLabel}</span>
+          </div>
+
+          {/* Body */}
+          <div style={{ position: "relative", zIndex: 1, padding: "1mm 3mm 0.5mm", flex: 1, display: "flex", flexDirection: "column" }}>
+            {/* Name + photo */}
+            <div style={{ display: "flex", gap: "1.5mm", alignItems: "flex-start", marginBottom: "0.8mm" }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: "9pt", fontWeight: 900, color: DARK, lineHeight: 1.1, textTransform: "uppercase", wordBreak: "break-word" }}>{p.fullName}</div>
+              </div>
+              <div style={{ flexShrink: 0 }}>
+                {p.photoUrl
+                  ? <img src={photoDataUrls[p.id] || `${API}${p.photoUrl}`} alt="" style={{ width: "11mm", height: "11mm", objectFit: "cover", borderRadius: "50%", border: `1.5px solid ${GOLD}` }} />
+                  : <div style={{ width: "11mm", height: "11mm", background: "#f0f0f0", borderRadius: "50%", border: `1.5px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "4pt", color: "#aaa" }}>PHOTO</div>
+                }
+              </div>
+            </div>
+
+            {/* Passport + SC No */}
+            <div style={{ display: "flex", gap: "1.5mm", marginBottom: "0.8mm" }}>
+              <div style={{ flex: 1, background: "#f0fdf4", border: `1px solid ${DARK}`, borderRadius: "3px", padding: "0.5mm 1.5mm", textAlign: "center" }}>
+                <div style={{ fontSize: "3.5pt", color: "#666", textTransform: "uppercase", fontWeight: 600 }}>PASSPORT</div>
+                <div style={{ fontSize: "9pt", fontWeight: 900, fontFamily: "monospace", color: DARK }}>{p.passportNumber || "—"}</div>
+              </div>
+              <div style={{ flex: 1, background: "#f0fdf4", border: `1px solid ${DARK}`, borderRadius: "3px", padding: "0.5mm 1.5mm", textAlign: "center" }}>
+                <div style={{ fontSize: "3.5pt", color: "#666", textTransform: "uppercase", fontWeight: 600 }}>SERVICE CENTER</div>
+                <div style={{ fontSize: "8pt", fontWeight: 900, color: DARK }}>{group.maktabNumber || "—"}</div>
+              </div>
+            </div>
+
+            {/* Hotels — 3 columns compact */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.5mm 1.5mm", marginBottom: "0.8mm" }}>
+              {[
+                { label: "MAKKAH 1", data: group.hotels?.aziziah },
+                { label: "MAKKAH 2", data: group.hotels?.makkah },
+                { label: "MADINAH",  data: group.hotels?.madinah },
+              ].map(({ label, data }) => (
+                <div key={label}>
+                  <div style={{ fontSize: "3.5pt", color: "#999", textTransform: "uppercase", fontWeight: 600 }}>{label}</div>
+                  <div style={{ fontWeight: 700, color: "#222", fontSize: "5pt", lineHeight: 1.2 }}>{data?.name || "—"}</div>
+                  {data?.nameAr && <div style={{ fontWeight: 700, color: "#444", fontSize: "4.5pt", direction: "rtl", textAlign: "right" }}>{data.nameAr}</div>}
+                </div>
+              ))}
+            </div>
+
+            {/* Lost/found bar */}
+            <div style={{ background: RED, borderRadius: "2px", padding: "0.6mm 2mm", textAlign: "center", marginBottom: "0.8mm" }}>
+              <div style={{ color: "#fff", fontWeight: 900, fontSize: "6pt", textTransform: "uppercase" }}>IN CASE OF LOST / FOUND — CONTACT</div>
+            </div>
+
+            {/* Phones + QR + Barcode */}
+            <div style={{ display: "flex", gap: "2mm", alignItems: "center", marginTop: "auto" }}>
+              <div>
+                <div style={{ fontSize: "4pt", color: "#999", fontWeight: 600 }}>🇸🇦 {company.phoneSaudi}</div>
+                <div style={{ fontSize: "4pt", color: "#999", fontWeight: 600 }}>🇮🇳 {company.phone}</div>
+              </div>
+              <div style={{ flex: 1, display: "flex", justifyContent: "flex-end", gap: "2mm", alignItems: "center" }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5mm" }}>
+                  <div style={{ border: `1.5px solid ${DARK}`, padding: "1px" }}>
+                    <QRCodeCanvas value={buildVerifyUrl(p.id)} size={40} level="M" fgColor={DARK} />
+                  </div>
+                  <div style={{ fontSize: "3pt", color: "#666" }}>SCAN</div>
+                </div>
+                <div>
+                  <Barcode value={p.passportNumber || `H${sn}`} height={18} width={1.1} fontSize={5} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer band */}
+          <div style={{ position: "relative", zIndex: 2, background: DARK, padding: "1mm 2mm", display: "flex", alignItems: "center", justifyContent: "center", gap: "1.5mm" }}>
+            <svg viewBox="0 0 24 24" width="10" height="10" fill="none"><path d="M8 11V7a4 4 0 0 1 8 0v4" stroke={GOLD} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none" /><rect x="4.5" y="10.5" width="15" height="11" rx="2.5" fill={GOLD} /><circle cx="12" cy="16.2" r="1.9" fill={DARK} /></svg>
+            <div style={{ fontSize: "7.5pt", fontWeight: 900, color: "#fff" }}>www.alburhantravels.com</div>
+          </div>
+          <div style={{ position: "relative", zIndex: 2, background: "#FFC107", color: RED, padding: "0.6mm 2mm", fontSize: "6pt", textAlign: "center", fontWeight: 900, textTransform: "uppercase" }}>BAGGAGE TAG</div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ── FULL SIZE (96 × 128 mm) ── */
   return (
     <div className="sq-sticker">
-      <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "#fff" }}>
+      <div style={{ position: "relative", overflow: "hidden", height: "100%", display: "flex", flexDirection: "column" }}>
+        <div style={{ position: "absolute", top: "-8mm", right: "-6mm", width: "38mm", height: "38mm", background: DARK, borderRadius: "0 0 0 60%", zIndex: 0 }} />
+        <div style={{ position: "relative", zIndex: 1, padding: "2mm 3.5mm 1mm", display: "flex", alignItems: "center", gap: "2mm" }}>
+          <div style={{ fontSize: "28pt", lineHeight: 1, flexShrink: 0 }}>🇮🇳</div>
+          {company.logoUrl ? <img src={company.logoUrl} alt="" style={{ height: "9mm", objectFit: "contain", flexShrink: 0 }} /> : <div style={{ height: "9mm", width: "9mm", flexShrink: 0, background: DARK, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "6pt" }}>{company.nameShort[0]}</div>}
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 900, fontSize: "7.5pt", color: GREEN, textTransform: "uppercase", lineHeight: 1.1 }}>{company.nameShort}</div>
+            <div style={{ fontWeight: 700, fontSize: "5pt", color: GOLD, textTransform: "uppercase" }}>TOURS &amp; TRAVELS</div>
+          </div>
+          <div style={{ textAlign: "right", flexShrink: 0 }}>
+            <div style={{ fontSize: "18pt", fontWeight: 900, color: "#fff", lineHeight: 1 }}>#{sn}</div>
+            <div style={{ fontSize: "5pt", color: "#fff", opacity: 0.9 }}>HAJJ {group.year}</div>
+          </div>
+        </div>
+        <div style={{ background: groupColor, padding: "0.8mm 3.5mm", display: "flex", justifyContent: "center", alignItems: "center", position: "relative", zIndex: 1 }}>
+          <span style={{ color: "#fff", fontWeight: 800, fontSize: "7pt" }}>GROUP: {groupLabel}</span>
+        </div>
+        <div style={{ position: "relative", zIndex: 1, padding: "1.2mm 3.5mm 1mm", flex: 1, display: "flex", flexDirection: "column" }}>
+          <div style={{ display: "flex", gap: "2.5mm", alignItems: "flex-start", marginBottom: "1mm" }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: "11pt", fontWeight: 900, color: DARK, lineHeight: 1.15, textTransform: "uppercase", wordBreak: "break-word" }}>{p.fullName}</div>
+            </div>
+            <div style={{ flexShrink: 0 }}>
+              {p.photoUrl ? <img src={photoDataUrls[p.id] || `${API}${p.photoUrl}`} alt="" style={{ width: "14mm", height: "14mm", objectFit: "cover", borderRadius: "50%", border: `2px solid ${GOLD}` }} /> : <div style={{ width: "14mm", height: "14mm", background: "#f0f0f0", borderRadius: "50%", border: `2px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "5pt", color: "#aaa" }}>PHOTO</div>}
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: "2mm", marginBottom: "1mm" }}>
+            <div style={{ flex: 1, background: "#f0fdf4", border: `1px solid ${DARK}`, borderRadius: "3px", padding: "0.6mm 2mm", textAlign: "center" }}>
+              <div style={{ fontSize: "4.5pt", color: "#666", textTransform: "uppercase", fontWeight: 600 }}>PASSPORT</div>
+              <div style={{ fontSize: "11pt", fontWeight: 900, fontFamily: "monospace", color: DARK }}>{p.passportNumber || "—"}</div>
+            </div>
+            <div style={{ flex: 1, background: "#f0fdf4", border: `1px solid ${DARK}`, borderRadius: "3px", padding: "0.6mm 2mm", textAlign: "center" }}>
+              <div style={{ fontSize: "4.5pt", color: "#666", textTransform: "uppercase", fontWeight: 600 }}>SERVICE CENTER NO</div>
+              <div style={{ fontSize: "9pt", fontWeight: 900, color: DARK }}>{group.maktabNumber || "—"}</div>
+            </div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.5mm 2mm", marginBottom: "1mm" }}>
+            {[{ label: "HOTEL MAKKAH 1", data: group.hotels?.aziziah }, { label: "HOTEL MAKKAH 2", data: group.hotels?.makkah }, { label: "HOTEL MADINAH", data: group.hotels?.madinah }].map(({ label, data }) => (
+              <div key={label} style={{ display: "flex", gap: "1mm", alignItems: "flex-start" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: "4pt", color: "#999", textTransform: "uppercase", fontWeight: 600 }}>{label}</div>
+                  <div style={{ fontWeight: 700, color: "#222", fontSize: "5.5pt" }}>{data?.name || "—"}</div>
+                  {data?.nameAr && <div style={{ fontWeight: 700, color: "#444", fontSize: "5pt", direction: "rtl", textAlign: "right" }}>{data.nameAr}</div>}
+                  {data?.address && <div style={{ fontSize: "4pt", color: "#666", lineHeight: 1.2 }}>{data.address}</div>}
+                </div>
+                {data?.name && <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center" }}><QRCodeCanvas value={buildHotelMapUrl(data.name, data.address)} size={24} level="M" fgColor={DARK} /><div style={{ fontSize: "3pt", color: "#999" }}>MAP</div></div>}
+              </div>
+            ))}
+          </div>
+          <div style={{ background: RED, borderRadius: "3px", padding: "1mm 3mm", textAlign: "center", marginBottom: "1mm" }}>
+            <div style={{ color: "#fff", fontWeight: 900, fontSize: "7.5pt", textTransform: "uppercase" }}>IN CASE OF LOST / FOUND</div>
+            <div style={{ color: "#fff", fontWeight: 900, fontSize: "7pt", textTransform: "uppercase" }}>KINDLY CONTACT</div>
+          </div>
+          <div style={{ display: "flex", justifyContent: "center", gap: "4mm", marginBottom: "1mm" }}>
+            <div style={{ textAlign: "center" }}><div style={{ fontSize: "4.5pt", color: "#999", fontWeight: 600 }}>🇸🇦 Saudi</div><div style={{ fontSize: "7.5pt", fontWeight: 900, color: DARK }}>{company.phoneSaudi}</div></div>
+            <div style={{ width: "0.3mm", background: "#ddd" }} />
+            <div style={{ textAlign: "center" }}><div style={{ fontSize: "4.5pt", color: "#999", fontWeight: 600 }}>🇮🇳 India</div><div style={{ fontSize: "7.5pt", fontWeight: 900, color: DARK }}>{company.phone}</div></div>
+          </div>
+          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "3mm", marginTop: "auto" }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.8mm" }}>
+              <div style={{ background: "#fff", padding: "2px", borderRadius: "4px", border: `2px solid ${DARK}` }}><QRCodeCanvas value={buildVerifyUrl(p.id)} size={68} level="M" fgColor={DARK} /></div>
+              <div style={{ background: DARK, color: "#fff", fontSize: "4pt", fontWeight: 900, padding: "0.4mm 2.5mm", borderRadius: "8px" }}>📱 Scan</div>
+            </div>
+            <div><Barcode value={p.passportNumber || `H${sn}`} height={24} width={1.3} fontSize={7} /></div>
+          </div>
+        </div>
+        <div style={{ position: "relative", zIndex: 2, background: DARK, padding: "1.5mm 3mm", display: "flex", alignItems: "center", justifyContent: "center", gap: "2.5mm" }}>
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none"><path d="M8 11V7a4 4 0 0 1 8 0v4" stroke={GOLD} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none" /><rect x="4.5" y="10.5" width="15" height="11" rx="2.5" fill={GOLD} /><circle cx="12" cy="16.2" r="1.9" fill={DARK} /></svg>
+          <div style={{ fontSize: "9.5pt", fontWeight: 900, color: "#fff" }}>www.alburhantravels.com</div>
+        </div>
+        <div style={{ position: "relative", zIndex: 2, background: "#FFC107", color: RED, padding: "1mm 3mm", fontSize: "7.5pt", textAlign: "center", fontWeight: 900, textTransform: "uppercase" }}>BAGGAGE TAG</div>
+      </div>
+    </div>
+  );
+}
 
-        {/* ══ TOP: logo + branding (no snowflake) ══ */}
-        <div style={{
-          display: "flex", alignItems: "stretch",
-          borderBottom: `2px solid ${GREEN}`,
-          flexShrink: 0,
-          minHeight: "28mm",
-        }}>
-          {/* Branding — full width */}
-          <div style={{
-            flex: 1, padding: "2mm 3mm 2mm 3mm",
-            display: "flex", flexDirection: "column", justifyContent: "center",
-          }}>
-            {/* Both logos side by side */}
-            <div style={{ display: "flex", alignItems: "center", gap: "2mm", marginBottom: "1.5mm" }}>
-              <img src={mashariqLogoUrl} alt="mashariq" style={{ height: "10mm", objectFit: "contain", flex: 1 }} />
+/* ════════════════════════════════════════════════════
+   BACK STICKER — two sizes, both exactly matching front
+   ════════════════════════════════════════════════════ */
+function BackSticker({ p, group, company, compact }: {
+  p: Pilgrim; group: Group; company: ReturnType<typeof getCompanyById>; compact: boolean;
+}) {
+  if (compact) {
+    /* ── COMPACT BACK (96 × 68 mm) ── */
+    return (
+      <div className="sq-sticker-sm">
+        <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "#fff", overflow: "hidden" }}>
+          {/* Header — logos */}
+          <div style={{ borderBottom: `2px solid ${GREEN}`, padding: "1.5mm 2.5mm", flexShrink: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "2mm", marginBottom: "0.8mm" }}>
+              <img src={mashariqLogoUrl} alt="mashariq" style={{ height: "7mm", objectFit: "contain", flex: 1 }} />
               <div style={{ width: "0.5mm", background: "#ddd", alignSelf: "stretch" }} />
-              <img src={almasiahLogoUrl} alt="almasiah" style={{ height: "10mm", objectFit: "contain", flex: 1 }} />
+              <img src={almasiahLogoUrl} alt="almasiah" style={{ height: "7mm", objectFit: "contain", flex: 1 }} />
             </div>
-            {/* Arabic company name — BIG & BOLD */}
-            <div style={{
-              fontFamily: "Arial, sans-serif", direction: "rtl", textAlign: "right",
-              fontSize: "13pt", color: GREEN, fontWeight: 900, lineHeight: 1.25,
-            }}>
-              شركة مشارق الماسية لخدمات الحجاج
+            <div style={{ fontFamily: "Arial", direction: "rtl", textAlign: "right", fontSize: "9pt", color: GREEN, fontWeight: 900, lineHeight: 1.1 }}>شركة مشارق الماسية لخدمات الحجاج</div>
+            <div style={{ fontSize: "5pt", color: "#111", fontWeight: 900 }}>Mashariq Almasiah Company for Pilgrim Services</div>
+          </div>
+
+          {/* Middle — service center + flag */}
+          <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
+            <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", pointerEvents: "none" }}>
+              <SnowflakeSVG size={100} />
             </div>
-            {/* English company name — bold */}
-            <div style={{ fontSize: "6.5pt", color: "#111", fontWeight: 900, lineHeight: 1.4 }}>
-              Mashariq Almasiah Company for Pilgrim Services
+            <div style={{ position: "relative", zIndex: 1, padding: "1mm 2.5mm" }}>
+              <div style={{ textAlign: "right", marginBottom: "0.5mm" }}>
+                <div style={{ fontFamily: "Arial", direction: "rtl", fontSize: "8.5pt", fontWeight: 900, color: "#111" }}>مركز تقديم الخدمة</div>
+                <div style={{ fontSize: "6pt", fontWeight: 900, color: "#222" }}>Service Center No رقم</div>
+              </div>
+              <div style={{ display: "flex", gap: "2mm", alignItems: "center", marginBottom: "0.8mm" }}>
+                <div style={{ flex: 1, border: `2.5px solid ${GREEN}`, borderRadius: "4px", padding: "0.5mm", textAlign: "center" }}>
+                  <div style={{ fontSize: "26pt", fontWeight: 900, color: "#000", lineHeight: 1, fontFamily: "'Courier New', monospace" }}>{group.maktabNumber || "—"}</div>
+                </div>
+                <div style={{ width: "20mm", border: `2px solid ${GREEN}`, borderRadius: "4px", padding: "1mm", textAlign: "center", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <div style={{ fontSize: "20pt", lineHeight: 1 }}>🇮🇳</div>
+                </div>
+              </div>
+              <div style={{ border: "1px solid #ccc", borderRadius: "3px", overflow: "hidden" }}>
+                <div style={{ display: "flex", borderBottom: "1px solid #ccc", background: "#fafafa" }}>
+                  <div style={{ flex: 1, padding: "0.8mm 2mm", fontSize: "7pt", fontWeight: 900 }}>India</div>
+                  <div style={{ width: "1px", background: "#ccc" }} />
+                  <div style={{ flex: 1, padding: "0.8mm 2mm", fontSize: "7.5pt", fontWeight: 900, direction: "rtl", textAlign: "right", fontFamily: "Arial" }}>الهند</div>
+                </div>
+                <div style={{ display: "flex" }}>
+                  <div style={{ flex: 1, padding: "0.8mm 2mm" }}>
+                    <div style={{ fontSize: "7.5pt", fontWeight: 900, color: GREEN }}>Hajj {group.year}</div>
+                    <div style={{ fontSize: "5pt", fontWeight: 800, color: GREEN }}>1447 Hijri</div>
+                  </div>
+                  <div style={{ width: "1px", background: "#ccc" }} />
+                  <div style={{ flex: 1, padding: "0.8mm 2mm", textAlign: "right" }}>
+                    <div style={{ fontSize: "7.5pt", fontWeight: 900, color: GREEN, fontFamily: "Arial" }}>حج 1447</div>
+                    <div style={{ fontSize: "5pt", fontWeight: 800, color: GREEN, fontFamily: "Arial" }}>هجري</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Call center */}
+          <div style={{ background: GREEN, padding: "1mm 2.5mm", flexShrink: 0 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5mm" }}>
+              <div style={{ fontSize: "5pt", fontWeight: 900, color: "#fff" }}>Call Center</div>
+              <div style={{ fontSize: "5pt", fontWeight: 900, color: "#fff", fontFamily: "Arial" }}>مركزالتواصل</div>
+            </div>
+            <div style={{ display: "flex", gap: "1.5mm" }}>
+              <div style={{ flex: 1, background: "#fff", borderRadius: "3px", padding: "0.8mm 1.5mm", display: "flex", alignItems: "center", gap: "1mm" }}>
+                <div style={{ fontSize: "8pt", color: GREEN }}>🎧</div>
+                <div><div style={{ fontSize: "3.5pt", color: "#888", fontWeight: 700 }}>Toll Free 🇸🇦</div><div style={{ fontSize: "7pt", fontWeight: 900, color: DARK, fontFamily: "monospace" }}>8006120033</div></div>
+              </div>
+              <div style={{ flex: 1, background: "#fff", borderRadius: "3px", padding: "0.8mm 1.5mm", display: "flex", alignItems: "center", gap: "1mm" }}>
+                <div style={{ fontSize: "8pt", color: GREEN }}>🎧</div>
+                <div><div style={{ fontSize: "3.5pt", color: "#888", fontWeight: 700 }}>Saudi 🇸🇦</div><div style={{ fontSize: "6pt", fontWeight: 900, color: DARK }}>{company.phoneSaudi}</div></div>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div style={{ background: "#f7faf8", borderTop: `1px solid ${GREEN}`, padding: "0.8mm 2.5mm", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+            <div style={{ fontSize: "7pt", fontWeight: 900, color: GREEN }}>{company.website}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: "1mm", background: "#25D366", borderRadius: "3px", padding: "0.8mm 1.5mm" }}>
+              <div style={{ fontSize: "7pt", fontWeight: 900, color: "#fff" }}>+91 98939 89786</div>
             </div>
           </div>
         </div>
+      </div>
+    );
+  }
 
-        {/* ══ MIDDLE: service center label + number box + flag ══ */}
-        <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
-          {/* Faint snowflake background pattern */}
-          <div style={{
-            position: "absolute", top: "50%", left: "50%",
-            transform: "translate(-50%,-50%)", pointerEvents: "none", zIndex: 0,
-          }}>
-            <SnowflakeSVG size={160} color={GREEN} opacity={0.07} />
+  /* ── FULL SIZE BACK (96 × 128 mm) ── */
+  return (
+    <div className="sq-sticker">
+      <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "#fff", overflow: "hidden" }}>
+        <div style={{ borderBottom: `2px solid ${GREEN}`, padding: "2mm 3mm", flexShrink: 0, height: "26mm", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "2mm", marginBottom: "1.5mm" }}>
+            <img src={mashariqLogoUrl} alt="mashariq" style={{ height: "10mm", objectFit: "contain", flex: 1 }} />
+            <div style={{ width: "0.5mm", background: "#ddd", alignSelf: "stretch" }} />
+            <img src={almasiahLogoUrl} alt="almasiah" style={{ height: "10mm", objectFit: "contain", flex: 1 }} />
           </div>
-
+          <div style={{ fontFamily: "Arial", direction: "rtl", textAlign: "right", fontSize: "13pt", color: GREEN, fontWeight: 900, lineHeight: 1.25 }}>شركة مشارق الماسية لخدمات الحجاج</div>
+          <div style={{ fontSize: "6.5pt", color: "#111", fontWeight: 900, lineHeight: 1.4 }}>Mashariq Almasiah Company for Pilgrim Services</div>
+        </div>
+        <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
+          <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", pointerEvents: "none" }}><SnowflakeSVG size={160} /></div>
           <div style={{ position: "relative", zIndex: 1, height: "100%", display: "flex", flexDirection: "column" }}>
-            {/* Service center label — right aligned like reference */}
-            <div style={{
-              padding: "1.5mm 3mm 0.5mm",
-              textAlign: "right",
-            }}>
-              <div style={{
-                fontFamily: "Arial, sans-serif", direction: "rtl",
-                fontSize: "11pt", fontWeight: 900, color: "#111", lineHeight: 1.2,
-              }}>
-                مركز تقديم الخدمة
-              </div>
-              <div style={{ fontSize: "8pt", fontWeight: 900, color: "#222" }}>
-                Service Center No &nbsp;<span style={{ fontFamily: "Arial", direction: "rtl" }}>رقم</span>
-              </div>
+            <div style={{ padding: "1.5mm 3mm 0.5mm", textAlign: "right" }}>
+              <div style={{ fontFamily: "Arial", direction: "rtl", fontSize: "11pt", fontWeight: 900, color: "#111" }}>مركز تقديم الخدمة</div>
+              <div style={{ fontSize: "8pt", fontWeight: 900, color: "#222" }}>Service Center No &nbsp;<span style={{ fontFamily: "Arial" }}>رقم</span></div>
             </div>
-
-            {/* Number box (left) + Flag box (right) */}
             <div style={{ display: "flex", gap: "3mm", padding: "1mm 3mm 1.5mm", alignItems: "center" }}>
-              {/* Service Center No — big green-bordered box */}
-              <div style={{
-                flex: 1,
-                border: `3px solid ${GREEN}`,
-                borderRadius: "4px",
-                padding: "2mm 2mm",
-                textAlign: "center",
-                background: "#fff",
-              }}>
-                <div style={{
-                  fontSize: "38pt", fontWeight: 900, color: "#000",
-                  lineHeight: 1, fontFamily: "'Courier New', monospace",
-                  letterSpacing: "-1px",
-                }}>
-                  {group.maktabNumber || "—"}
-                </div>
+              <div style={{ flex: 1, border: `3px solid ${GREEN}`, borderRadius: "4px", padding: "2mm", textAlign: "center" }}>
+                <div style={{ fontSize: "38pt", fontWeight: 900, color: "#000", lineHeight: 1, fontFamily: "'Courier New', monospace" }}>{group.maktabNumber || "—"}</div>
               </div>
-
-              {/* Indian flag — bordered box like reference */}
-              <div style={{
-                width: "28mm",
-                border: `2.5px solid ${GREEN}`,
-                borderRadius: "4px",
-                padding: "1.5mm",
-                textAlign: "center",
-                background: "#fff",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                flexShrink: 0,
-              }}>
+              <div style={{ width: "28mm", border: `2.5px solid ${GREEN}`, borderRadius: "4px", padding: "1.5mm", textAlign: "center", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <div style={{ fontSize: "28pt", lineHeight: 1 }}>🇮🇳</div>
               </div>
             </div>
-
-            {/* Bilingual rows — India / الهند and Hajj / حج */}
-            <div style={{ margin: "0 3mm", border: `1.5px solid #ccc`, borderRadius: "3px", overflow: "hidden" }}>
-              <div style={{
-                display: "flex", borderBottom: "1.5px solid #ccc",
-                background: "#fafafa",
-              }}>
-                <div style={{ flex: 1, padding: "1.5mm 2.5mm", fontSize: "9pt", fontWeight: 900, color: "#111" }}>India</div>
+            <div style={{ margin: "0 3mm", border: "1.5px solid #ccc", borderRadius: "3px", overflow: "hidden" }}>
+              <div style={{ display: "flex", borderBottom: "1.5px solid #ccc", background: "#fafafa" }}>
+                <div style={{ flex: 1, padding: "1.5mm 2.5mm", fontSize: "9pt", fontWeight: 900 }}>India</div>
                 <div style={{ width: "1px", background: "#ccc" }} />
-                <div style={{
-                  flex: 1, padding: "1.5mm 2.5mm", fontSize: "9.5pt", fontWeight: 900,
-                  color: "#111", direction: "rtl", textAlign: "right", fontFamily: "Arial, sans-serif",
-                }}>الهند</div>
+                <div style={{ flex: 1, padding: "1.5mm 2.5mm", fontSize: "9.5pt", fontWeight: 900, direction: "rtl", textAlign: "right", fontFamily: "Arial" }}>الهند</div>
               </div>
-              <div style={{ display: "flex", background: "#fff" }}>
+              <div style={{ display: "flex" }}>
                 <div style={{ flex: 1, padding: "1.5mm 2.5mm" }}>
                   <div style={{ fontSize: "9pt", fontWeight: 900, color: GREEN }}>Hajj {group.year}</div>
                   <div style={{ fontSize: "6pt", fontWeight: 800, color: GREEN }}>1447 Hijri</div>
                 </div>
                 <div style={{ width: "1px", background: "#ccc" }} />
                 <div style={{ flex: 1, padding: "1.5mm 2.5mm", textAlign: "right" }}>
-                  <div style={{ fontSize: "9.5pt", fontWeight: 900, color: GREEN, fontFamily: "Arial, sans-serif" }}>حج 1447</div>
-                  <div style={{ fontSize: "6pt", fontWeight: 800, color: GREEN, fontFamily: "Arial, sans-serif" }}>هجري</div>
+                  <div style={{ fontSize: "9.5pt", fontWeight: 900, color: GREEN, fontFamily: "Arial" }}>حج 1447</div>
+                  <div style={{ fontSize: "6pt", fontWeight: 800, color: GREEN, fontFamily: "Arial" }}>هجري</div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-
-        {/* ══ BOTTOM GREEN: Call Center strip (like reference) ══ */}
         <div style={{ background: GREEN, padding: "2mm 3mm 1.5mm", flexShrink: 0 }}>
-          {/* Label row */}
-          <div style={{
-            display: "flex", justifyContent: "space-between", alignItems: "center",
-            marginBottom: "1mm",
-          }}>
-            <div style={{ fontSize: "6pt", fontWeight: 900, color: "#fff", letterSpacing: "0.3px" }}>
-              Call Center
-            </div>
-            <div style={{ fontSize: "6.5pt", fontWeight: 900, color: "#fff", fontFamily: "Arial, sans-serif" }}>
-              مركزالتواصل
-            </div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1mm" }}>
+            <div style={{ fontSize: "6pt", fontWeight: 900, color: "#fff" }}>Call Center</div>
+            <div style={{ fontSize: "6.5pt", fontWeight: 900, color: "#fff", fontFamily: "Arial" }}>مركزالتواصل</div>
           </div>
-          {/* Two white phone boxes: toll-free + saudi */}
           <div style={{ display: "flex", gap: "2mm" }}>
-            {/* Toll-free box (like "8006120033" in reference) */}
-            <div style={{
-              flex: 1, background: "#fff", borderRadius: "3px",
-              padding: "1.2mm 2mm", display: "flex", alignItems: "center", gap: "1.5mm",
-            }}>
-              <div style={{ fontSize: "10pt", color: GREEN, flexShrink: 0 }}>🎧</div>
-              <div>
-                <div style={{ fontSize: "4pt", color: "#888", fontWeight: 700, textTransform: "uppercase" }}>Toll Free 🇸🇦</div>
-                <div style={{ fontSize: "9pt", fontWeight: 900, color: DARK, letterSpacing: "0.5px", lineHeight: 1.1, fontFamily: "monospace" }}>8006120033</div>
-              </div>
+            <div style={{ flex: 1, background: "#fff", borderRadius: "3px", padding: "1.2mm 2mm", display: "flex", alignItems: "center", gap: "1.5mm" }}>
+              <div style={{ fontSize: "10pt", color: GREEN }}>🎧</div>
+              <div><div style={{ fontSize: "4pt", color: "#888", fontWeight: 700 }}>Toll Free 🇸🇦</div><div style={{ fontSize: "9pt", fontWeight: 900, color: DARK, fontFamily: "monospace" }}>8006120033</div></div>
             </div>
-            {/* Saudi number box */}
-            <div style={{
-              flex: 1, background: "#fff", borderRadius: "3px",
-              padding: "1.2mm 2mm", display: "flex", alignItems: "center", gap: "1.5mm",
-            }}>
-              <div style={{ fontSize: "10pt", color: GREEN, flexShrink: 0 }}>🎧</div>
-              <div>
-                <div style={{ fontSize: "4pt", color: "#888", fontWeight: 700, textTransform: "uppercase" }}>Saudi 🇸🇦</div>
-                <div style={{ fontSize: "7pt", fontWeight: 900, color: DARK, letterSpacing: "0.3px", lineHeight: 1.2 }}>{company.phoneSaudi}</div>
-              </div>
+            <div style={{ flex: 1, background: "#fff", borderRadius: "3px", padding: "1.2mm 2mm", display: "flex", alignItems: "center", gap: "1.5mm" }}>
+              <div style={{ fontSize: "10pt", color: GREEN }}>🎧</div>
+              <div><div style={{ fontSize: "4pt", color: "#888", fontWeight: 700 }}>Saudi 🇸🇦</div><div style={{ fontSize: "7pt", fontWeight: 900, color: DARK }}>{company.phoneSaudi}</div></div>
             </div>
           </div>
         </div>
-
-        {/* ══ FOOTER WHITE: website + address + email (like almasiah bottom) ══ */}
-        <div style={{
-          background: "#f7faf8",
-          borderTop: `1.5px solid ${GREEN}`,
-          padding: "1.2mm 3mm",
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          flexShrink: 0,
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "1.5mm" }}>
-            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" style={{ flexShrink: 0 }}>
-              <path d="M8 11V7a4 4 0 0 1 8 0v4" stroke={GREEN} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-              <rect x="4.5" y="10.5" width="15" height="11" rx="2.5" fill={GREEN} />
-              <circle cx="12" cy="16.2" r="1.9" fill="#fff" />
-              <rect x="11" y="17.7" width="2" height="2.3" rx="1" fill="#fff" />
-            </svg>
-            <div style={{ fontSize: "8.5pt", fontWeight: 900, color: GREEN, letterSpacing: "0.3px", lineHeight: 1 }}>{company.website}</div>
-          </div>
-          {/* WhatsApp — right corner, big & bold */}
-          <div style={{
-            display: "flex", alignItems: "center", gap: "1.5mm",
-            background: "#25D366", borderRadius: "4px", padding: "1.5mm 2.5mm",
-          }}>
-            <svg viewBox="0 0 24 24" width="12" height="12" fill="#fff">
-              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
-              <path d="M12 0C5.373 0 0 5.373 0 12c0 2.126.555 4.126 1.528 5.862L.057 23.885l6.194-1.624A11.93 11.93 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.893a9.866 9.866 0 01-5.031-1.378l-.361-.214-3.735.979 1-3.635-.235-.374A9.861 9.861 0 012.107 12C2.107 6.531 6.531 2.107 12 2.107S21.893 6.531 21.893 12 17.469 21.893 12 21.893z"/>
-            </svg>
-            <div style={{ fontSize: "9pt", fontWeight: 900, color: "#fff", letterSpacing: "0.3px", lineHeight: 1 }}>+91 98939 89786</div>
+        <div style={{ background: "#f7faf8", borderTop: `1.5px solid ${GREEN}`, padding: "1.2mm 3mm", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+          <div style={{ fontSize: "8.5pt", fontWeight: 900, color: GREEN }}>{company.website}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: "1.5mm", background: "#25D366", borderRadius: "4px", padding: "1.5mm 2.5mm" }}>
+            <div style={{ fontSize: "9pt", fontWeight: 900, color: "#fff" }}>+91 98939 89786</div>
           </div>
         </div>
-
       </div>
     </div>
   );
 }
 
-/* ── MAIN EXPORT ── */
+/* ════════════════════════════════════════════════════
+   MAIN COMPONENT
+   ════════════════════════════════════════════════════ */
 export default function PrintLuggageSquare() {
   const [, params] = useRoute("/admin/groups/:groupId/print/luggage-square");
   const groupId = params?.groupId || "";
-  const [group, setGroup]     = useState<Group | null>(null);
+  const [group, setGroup]       = useState<Group | null>(null);
   const [pilgrims, setPilgrims] = useState<Pilgrim[]>([]);
   const [companyId, setCompanyId] = useState("alburhan");
-  const [view, setView]       = useState<"front" | "back" | "both">("both");
+  const [view, setView]         = useState<"front" | "back" | "both">("both");
   const company = getCompanyById(companyId);
   const [downloading, setDownloading] = useState<string | null>(null);
   const [photoDataUrls, setPhotoDataUrls] = useState<Record<string, string>>({});
@@ -340,8 +472,6 @@ export default function PrintLuggageSquare() {
 
   const groupColor = getGroupColor(group.groupName);
   const groupLabel = group.groupName.toUpperCase();
-
-  // Always 4 pilgrims per page group
   const pages: Pilgrim[][] = [];
   for (let i = 0; i < pilgrims.length; i += 4) pages.push(pilgrims.slice(i, i + 4));
 
@@ -352,297 +482,139 @@ export default function PrintLuggageSquare() {
           @page { size: A4 portrait; margin: 5mm; }
           body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; margin: 0; }
           .no-print { display: none !important; }
-          .sq-wrap { background: white !important; padding: 0 !important; }
+          .sq-wrap { background: white !important; padding: 0 !important; gap: 0 !important; }
         }
         * { box-sizing: border-box; }
 
-        /* ── Single sticker: 96×128mm fits 2×2 on A4 ── */
+        /* ── Full sticker: 96×128mm → 2×2 per A4 page ── */
         .sq-sticker {
           width: 96mm; height: 128mm;
           border: 1px dashed #bbb; border-radius: 5px; overflow: hidden;
-          page-break-inside: avoid; break-inside: avoid;
+          break-inside: avoid;
           font-family: 'Inter', Arial, sans-serif;
-          background: #fff; position: relative;
-          flex-shrink: 0;
+          background: #fff; position: relative; flex-shrink: 0;
         }
 
-        /* ── A4 page: 2×2 grid of stickers ── */
-        .sq-page {
+        /* ── Compact sticker: 96×68mm → 4 pairs (front+back) per A4 page ── */
+        .sq-sticker-sm {
+          width: 96mm; height: 68mm;
+          border: 1px dashed #bbb; border-radius: 4px; overflow: hidden;
+          break-inside: avoid;
+          font-family: 'Inter', Arial, sans-serif;
+          background: #fff; position: relative; flex-shrink: 0;
+        }
+
+        /* ── "Both" page: 4 rows × [FRONT | BACK] ── */
+        /* width: 2×96 + 3mm gap = 195mm; height: 4×68 + 3×3mm gap = 281mm → fits A4 */
+        .sq-page-both {
           width: 195mm;
-          height: 259mm;
+          display: grid;
+          grid-template-columns: 96mm 96mm;
+          grid-template-rows: repeat(4, 68mm);
+          gap: 3mm;
+          page-break-after: always; break-after: page;
+          overflow: hidden;
+        }
+        .sq-page-both:last-child { page-break-after: auto; break-after: auto; }
+
+        /* ── Single-side page: 2×2 full stickers ── */
+        /* width: 195mm; height: 2×128 + 3mm = 259mm → fits A4 */
+        .sq-page-single {
+          width: 195mm;
           display: grid;
           grid-template-columns: 96mm 96mm;
           grid-template-rows: 128mm 128mm;
-          gap: 1.5mm;
-          page-break-after: always;
-          break-after: page;
+          gap: 3mm;
+          page-break-after: always; break-after: page;
           overflow: hidden;
         }
-        .sq-page:last-child { page-break-after: auto; break-after: auto; }
+        .sq-page-single:last-child { page-break-after: auto; break-after: auto; }
 
-        /* Screen card shadow */
+        /* Vertical cut guide between columns in "both" mode */
+        .sq-page-both::after {
+          content: "";
+          display: none;
+        }
+
+        /* Screen shadows */
         @media screen {
-          .sq-page {
+          .sq-page-both, .sq-page-single {
             background: white;
-            padding: 4mm;
+            padding: 5mm;
             box-shadow: 0 2px 16px rgba(0,0,0,0.12);
             border-radius: 4px;
-            width: auto;
-            height: auto;
-            gap: 3mm;
           }
         }
 
-        /* Page label (screen only) */
         .sq-page-label {
-          font-family: Arial, sans-serif;
-          font-size: 11px; font-weight: 700;
-          color: #555; letter-spacing: 1px;
-          text-transform: uppercase;
-          padding: 6px 12px;
-          background: #f3f4f6;
-          border-left: 4px solid ${DARK};
-          margin-bottom: 4px;
+          font-family: Arial, sans-serif; font-size: 11px; font-weight: 700;
+          color: #555; letter-spacing: 1px; text-transform: uppercase;
+          padding: 6px 12px; background: #f3f4f6;
+          border-left: 4px solid ${DARK}; margin-bottom: 4px;
         }
       `}</style>
 
       {/* ── TOOLBAR ── */}
-      <div className="no-print" style={{
-        padding: "12px 16px", background: "#fef3c7",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        gap: "8px", flexWrap: "wrap",
-      }}>
+      <div className="no-print" style={{ padding: "10px 16px", background: "#fef3c7", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", flexWrap: "wrap" }}>
         <select value={companyId} onChange={e => setCompanyId(e.target.value)} style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "13px", background: "#fff" }}>
           {COMPANIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-
-        {/* View toggle */}
-        {(["front", "back", "both"] as const).map(v => (
-          <button key={v} onClick={() => setView(v)} style={{
-            padding: "8px 16px", borderRadius: "6px", fontSize: "13px", fontWeight: 600,
-            cursor: "pointer", border: "1.5px solid",
-            background: view === v ? DARK : "#fff",
-            color: view === v ? "#fff" : DARK,
-            borderColor: DARK,
-          }}>
+        {(["both", "front", "back"] as const).map(v => (
+          <button key={v} onClick={() => setView(v)} style={{ padding: "8px 16px", borderRadius: "6px", fontSize: "13px", fontWeight: 600, cursor: "pointer", border: "1.5px solid", background: view === v ? DARK : "#fff", color: view === v ? "#fff" : DARK, borderColor: DARK }}>
             {v === "front" ? "🪪 Fronts only" : v === "back" ? "🔄 Backs only" : "📄 Both sides"}
           </button>
         ))}
-
-        <button onClick={() => window.print()} style={{ padding: "10px 24px", background: DARK, color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>
-          🖨 Print
-        </button>
-        <button onClick={() => dl("pdf")} disabled={!!downloading} style={{ padding: "10px 20px", background: downloading === "pdf" ? "#6b7280" : "#1d4ed8", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>
-          {downloading === "pdf" ? "⏳..." : "⬇ PDF"}
-        </button>
-        <button onClick={() => dl("jpg")} disabled={!!downloading} style={{ padding: "10px 20px", background: downloading === "jpg" ? "#6b7280" : "#7c3aed", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>
-          {downloading === "jpg" ? "⏳..." : "⬇ JPG"}
-        </button>
+        <button onClick={() => window.print()} style={{ padding: "10px 24px", background: DARK, color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>🖨 Print</button>
+        <button onClick={() => dl("pdf")} disabled={!!downloading} style={{ padding: "10px 20px", background: downloading === "pdf" ? "#6b7280" : "#1d4ed8", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>{downloading === "pdf" ? "⏳..." : "⬇ PDF"}</button>
+        <button onClick={() => dl("jpg")} disabled={!!downloading} style={{ padding: "10px 20px", background: downloading === "jpg" ? "#6b7280" : "#7c3aed", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>{downloading === "jpg" ? "⏳..." : "⬇ JPG"}</button>
         <button onClick={() => window.history.back()} style={{ padding: "10px 20px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
       </div>
 
+      {/* ── Info bar ── */}
       {view === "both" && (
         <div className="no-print" style={{ padding: "8px 16px", background: "#f0fdf4", borderBottom: "2px solid #86efac", fontSize: "12px", fontWeight: 600, color: "#15803d", textAlign: "center" }}>
-          ✅ Both sides: 4 pilgrims per A4 page pair · Page 1 = Fronts · Page 2 = Backs (mirrored for alignment) · Cut along dashed lines · Stack &amp; laminate
+          ✅ Both sides: 4 pilgrims per A4 page · Front (left column) + Back (right column) · Cut vertically down the middle · Stack each pair &amp; laminate
         </div>
       )}
 
       <div ref={contentRef} className="sq-wrap" style={{ background: "#f5f5f0", padding: "8mm", display: "flex", flexDirection: "column", gap: "8mm" }}>
 
-        {/* ══ BOTH MODE: Page 1 = 4 fronts, Page 2 = 4 backs (mirrored L-R for duplex alignment) ══ */}
-        {view === "both" && pages.map((page, pageIdx) => (
+        {/* ══ BOTH MODE: 4 rows of [FRONT col | BACK col] ══ */}
+        {view === "both" && pages.map((page, pi) => (
           <>
-            {/* — FRONT PAGE — */}
-            <div className="no-print sq-page-label">
-              Pilgrims {pageIdx * 4 + 1}–{Math.min(pageIdx * 4 + page.length, pilgrims.length)} · FRONT (print first)
+            <div key={`lbl-${pi}`} className="no-print sq-page-label">
+              Pilgrims {pi * 4 + 1}–{Math.min(pi * 4 + page.length, pilgrims.length)} · FRONT (left) + BACK (right) · Cut down the middle
             </div>
-            <div key={`front-${pageIdx}`} className="sq-page">
+            <div key={`page-${pi}`} className="sq-page-both">
               {page.map(p => (
-                <FrontSticker key={p.id} p={p} group={group} company={company} groupColor={groupColor} groupLabel={groupLabel} photoDataUrls={photoDataUrls} />
-              ))}
-            </div>
-
-            {/* — BACK PAGE (mirror L-R so stickers align when paper is flipped on long edge) — */}
-            <div className="no-print sq-page-label">
-              Pilgrims {pageIdx * 4 + 1}–{Math.min(pageIdx * 4 + page.length, pilgrims.length)} · BACK (print on reverse side)
-            </div>
-            <div key={`back-${pageIdx}`} className="sq-page">
-              {/* Row 1 mirrored: P2, P1 */}
-              {[page[1], page[0]].filter(Boolean).map(p => (
-                <LuggageStickerBack key={`b-${p.id}`} p={p} group={group} company={company} />
-              ))}
-              {/* Row 2 mirrored: P4, P3 */}
-              {[page[3], page[2]].filter(Boolean).map(p => (
-                <LuggageStickerBack key={`b-${p.id}`} p={p} group={group} company={company} />
+                <>
+                  <FrontSticker key={`f-${p.id}`} p={p} group={group} company={company} groupColor={groupColor} groupLabel={groupLabel} photoDataUrls={photoDataUrls} compact={true} />
+                  <BackSticker  key={`b-${p.id}`} p={p} group={group} company={company} compact={true} />
+                </>
               ))}
             </div>
           </>
         ))}
 
-        {/* ══ FRONT ONLY: 4 per page ══ */}
-        {view === "front" && pages.map((page, pageIdx) => (
-          <div key={`front-${pageIdx}`} className="sq-page">
+        {/* ══ FRONT ONLY: 2×2 grid full size ══ */}
+        {view === "front" && pages.map((page, pi) => (
+          <div key={`fp-${pi}`} className="sq-page-single">
             {page.map(p => (
-              <FrontSticker key={p.id} p={p} group={group} company={company} groupColor={groupColor} groupLabel={groupLabel} photoDataUrls={photoDataUrls} />
+              <FrontSticker key={p.id} p={p} group={group} company={company} groupColor={groupColor} groupLabel={groupLabel} photoDataUrls={photoDataUrls} compact={false} />
             ))}
           </div>
         ))}
 
-        {/* ══ BACK ONLY: 4 per page ══ */}
-        {view === "back" && pages.map((page, pageIdx) => (
-          <div key={`back-${pageIdx}`} className="sq-page">
+        {/* ══ BACK ONLY: 2×2 grid full size ══ */}
+        {view === "back" && pages.map((page, pi) => (
+          <div key={`bp-${pi}`} className="sq-page-single">
             {page.map(p => (
-              <LuggageStickerBack key={p.id} p={p} group={group} company={company} />
+              <BackSticker key={p.id} p={p} group={group} company={company} compact={false} />
             ))}
           </div>
         ))}
 
       </div>
     </>
-  );
-}
-
-/* ── FRONT STICKER component ── */
-function FrontSticker({
-  p, group, company, groupColor, groupLabel, photoDataUrls,
-}: {
-  p: Pilgrim; group: Group; company: ReturnType<typeof getCompanyById>;
-  groupColor: string; groupLabel: string; photoDataUrls: Record<string, string>;
-}) {
-  const serialNo = String(p.serialNumber).padStart(3, "0");
-  const DARK  = "#0d5040";
-  const GOLD  = "#C9A84C";
-  const RED   = "#CC0000";
-  const API   = import.meta.env.VITE_API_URL || "";
-
-  return (
-    <div className="sq-sticker">
-      <div style={{ position: "relative", overflow: "hidden", height: "100%", display: "flex", flexDirection: "column" }}>
-        {/* Decorative corner */}
-        <div style={{
-          position: "absolute", top: "-8mm", right: "-6mm",
-          width: "38mm", height: "38mm",
-          background: DARK, borderRadius: "0 0 0 60%", zIndex: 0,
-        }} />
-
-        {/* Header */}
-        <div style={{ position: "relative", zIndex: 1, padding: "2mm 3.5mm 1mm", display: "flex", alignItems: "center", gap: "2mm" }}>
-          <div style={{ fontSize: "28pt", lineHeight: 1, flexShrink: 0 }}>🇮🇳</div>
-          {company.logoUrl
-            ? <img src={company.logoUrl} alt="" style={{ height: "9mm", objectFit: "contain", flexShrink: 0 }} />
-            : <div style={{ height: "9mm", width: "9mm", flexShrink: 0, background: DARK, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "6pt" }}>{company.nameShort[0]}</div>
-          }
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 900, fontSize: "7.5pt", color: "#1a7a5e", letterSpacing: "0.8px", textTransform: "uppercase", lineHeight: 1.1 }}>{company.nameShort}</div>
-            <div style={{ fontWeight: 700, fontSize: "5pt", color: GOLD, letterSpacing: "1px", textTransform: "uppercase" }}>TOURS &amp; TRAVELS</div>
-          </div>
-          <div style={{ textAlign: "right", flexShrink: 0 }}>
-            <div style={{ fontSize: "18pt", fontWeight: 900, color: "#fff", lineHeight: 1 }}>#{serialNo}</div>
-            <div style={{ fontSize: "5pt", color: "#fff", opacity: 0.9 }}>HAJJ {group.year}</div>
-          </div>
-        </div>
-
-        {/* Group bar */}
-        <div style={{ background: groupColor, padding: "0.8mm 3.5mm", display: "flex", justifyContent: "center", alignItems: "center", position: "relative", zIndex: 1 }}>
-          <span style={{ color: "#fff", fontWeight: 800, fontSize: "7pt", letterSpacing: "0.8px" }}>GROUP: {groupLabel}</span>
-        </div>
-
-        {/* Body */}
-        <div style={{ position: "relative", zIndex: 1, padding: "1.2mm 3.5mm 1mm", flex: 1, display: "flex", flexDirection: "column" }}>
-          <div style={{ display: "flex", gap: "2.5mm", alignItems: "flex-start", marginBottom: "1mm" }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: "11pt", fontWeight: 900, color: DARK, lineHeight: 1.15, textTransform: "uppercase", wordBreak: "break-word" }}>{p.fullName}</div>
-            </div>
-            <div style={{ flexShrink: 0 }}>
-              {p.photoUrl
-                ? <img src={photoDataUrls[p.id] || `${API}${p.photoUrl}`} alt="" style={{ width: "14mm", height: "14mm", objectFit: "cover", borderRadius: "50%", border: `2px solid ${GOLD}` }} />
-                : <div style={{ width: "14mm", height: "14mm", background: "#f0f0f0", borderRadius: "50%", border: `2px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "5pt", color: "#aaa" }}>PHOTO</div>
-              }
-            </div>
-          </div>
-
-          <div style={{ display: "flex", gap: "2mm", marginBottom: "1mm" }}>
-            <div style={{ flex: 1, background: "#f0fdf4", border: `1px solid ${DARK}`, borderRadius: "3px", padding: "0.6mm 2mm", textAlign: "center" }}>
-              <div style={{ fontSize: "4.5pt", color: "#666", textTransform: "uppercase", fontWeight: 600 }}>PASSPORT</div>
-              <div style={{ fontSize: "11pt", fontWeight: 900, fontFamily: "monospace", letterSpacing: "0.5px", color: DARK }}>{p.passportNumber || "—"}</div>
-            </div>
-            <div style={{ flex: 1, background: "#f0fdf4", border: `1px solid ${DARK}`, borderRadius: "3px", padding: "0.6mm 2mm", textAlign: "center" }}>
-              <div style={{ fontSize: "4.5pt", color: "#666", textTransform: "uppercase", fontWeight: 600 }}>SERVICE CENTER NO</div>
-              <div style={{ fontSize: "9pt", fontWeight: 900, color: DARK }}>{group.maktabNumber || "—"}</div>
-            </div>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.5mm 2mm", marginBottom: "1mm" }}>
-            {[
-              { label: "HOTEL MAKKAH 1", data: group.hotels?.aziziah },
-              { label: "HOTEL MAKKAH 2", data: group.hotels?.makkah },
-              { label: "HOTEL MADINAH",  data: group.hotels?.madinah },
-            ].map(({ label, data }) => (
-              <div key={label} style={{ display: "flex", gap: "1mm", alignItems: "flex-start" }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: "4pt", color: "#999", textTransform: "uppercase", fontWeight: 600 }}>{label}</div>
-                  <div style={{ fontWeight: 700, color: "#222", fontSize: "5.5pt" }}>{data?.name || "—"}</div>
-                  {data?.nameAr && <div style={{ fontWeight: 700, color: "#222", fontSize: "5pt", direction: "rtl", textAlign: "right" }}>{data.nameAr}</div>}
-                  {data?.address && <div style={{ fontSize: "4pt", color: "#666", lineHeight: 1.2 }}>{data.address}</div>}
-                  {(data as any)?.addressAr && <div style={{ fontSize: "3.5pt", color: "#666", lineHeight: 1.2, direction: "rtl", textAlign: "right" }}>{(data as any).addressAr}</div>}
-                </div>
-                {data?.name && (
-                  <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: "0.3mm" }}>
-                    <QRCodeCanvas value={buildHotelMapUrl(data.name, data.address)} size={24} level="M" fgColor={DARK} />
-                    <div style={{ fontSize: "3pt", color: "#999" }}>MAP</div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-
-          <div style={{ background: RED, borderRadius: "3px", padding: "1mm 3mm", textAlign: "center", marginBottom: "1mm" }}>
-            <div style={{ color: "#fff", fontWeight: 900, fontSize: "7.5pt", textTransform: "uppercase" }}>IN CASE OF LOST / FOUND</div>
-            <div style={{ color: "#fff", fontWeight: 900, fontSize: "7pt", textTransform: "uppercase" }}>KINDLY CONTACT</div>
-          </div>
-
-          <div style={{ display: "flex", justifyContent: "center", gap: "4mm", marginBottom: "1mm" }}>
-            <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: "4.5pt", color: "#999", textTransform: "uppercase", fontWeight: 600, marginBottom: "0.3mm" }}>🇸🇦 Saudi</div>
-              <div style={{ fontSize: "7.5pt", fontWeight: 900, color: DARK }}>{company.phoneSaudi}</div>
-            </div>
-            <div style={{ width: "0.3mm", background: "#ddd", flexShrink: 0 }} />
-            <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: "4.5pt", color: "#999", textTransform: "uppercase", fontWeight: 600, marginBottom: "0.3mm" }}>🇮🇳 India</div>
-              <div style={{ fontSize: "7.5pt", fontWeight: 900, color: DARK }}>{company.phone}</div>
-            </div>
-          </div>
-
-          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "3mm", marginTop: "auto" }}>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.8mm" }}>
-              <div style={{ background: "#fff", padding: "2px", borderRadius: "4px", border: `2px solid ${DARK}` }}>
-                <QRCodeCanvas value={buildVerifyUrl(p.id)} size={68} level="M" fgColor={DARK} />
-              </div>
-              <div style={{ background: DARK, color: "#fff", fontSize: "4pt", fontWeight: 900, letterSpacing: "1px", padding: "0.4mm 2.5mm", borderRadius: "8px", textTransform: "uppercase" }}>📱 Scan</div>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5mm" }}>
-              <Barcode value={p.passportNumber || `H${serialNo}`} height={24} width={1.3} fontSize={7} />
-            </div>
-          </div>
-        </div>
-
-        {/* Website band */}
-        <div style={{ position: "relative", zIndex: 2, background: DARK, padding: "1.5mm 3mm", display: "flex", alignItems: "center", justifyContent: "center", gap: "2.5mm" }}>
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" style={{ flexShrink: 0 }}>
-            <path d="M8 11V7a4 4 0 0 1 8 0v4" stroke={GOLD} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-            <rect x="4.5" y="10.5" width="15" height="11" rx="2.5" fill={GOLD} />
-            <circle cx="12" cy="16.2" r="1.9" fill={DARK} />
-            <rect x="11" y="17.7" width="2" height="2.3" rx="1" fill={DARK} />
-          </svg>
-          <div style={{ fontSize: "9.5pt", fontWeight: 900, color: "#fff", letterSpacing: "0.6px", lineHeight: 1 }}>
-            www.alburhantravels.com
-          </div>
-        </div>
-
-        <div style={{ position: "relative", zIndex: 2, background: "#FFC107", color: RED, padding: "1mm 3mm", fontSize: "7.5pt", textAlign: "center", fontWeight: 900, letterSpacing: "1px", textTransform: "uppercase" }}>
-          BAGGAGE TAG
-        </div>
-      </div>
-    </div>
   );
 }
