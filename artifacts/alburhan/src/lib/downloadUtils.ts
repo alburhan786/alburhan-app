@@ -40,8 +40,18 @@ export async function downloadAsJpg(el: HTMLElement, filename: string) {
   const canvas = await capture(el);
   const a = document.createElement("a");
   a.download = filename.endsWith(".jpg") ? filename : filename + ".jpg";
-  // JPEG quality 0.97 → near-lossless, vivid colours
   a.href = canvas.toDataURL("image/jpeg", 0.97);
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+export async function downloadAsPng(el: HTMLElement, filename: string) {
+  const canvas = await capture(el);
+  const a = document.createElement("a");
+  a.download = filename.endsWith(".png") ? filename : filename + ".png";
+  // PNG = fully lossless, perfect colours, ~576 DPI
+  a.href = canvas.toDataURL("image/png");
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

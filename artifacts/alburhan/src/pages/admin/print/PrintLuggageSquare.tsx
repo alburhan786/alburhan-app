@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useRoute } from "wouter";
-import { downloadAsPdf, downloadAsJpg, fetchAsDataUrl } from "@/lib/downloadUtils";
+import { downloadAsPdf, downloadAsJpg, downloadAsPng, fetchAsDataUrl } from "@/lib/downloadUtils";
 import { Barcode } from "@/components/print/Barcode";
 import { QRCodeCanvas } from "qrcode.react";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
@@ -439,12 +439,13 @@ export default function PrintLuggageSquare() {
   const [photoDataUrls, setPhotoDataUrls] = useState<Record<string, string>>({});
   const contentRef = useRef<HTMLDivElement>(null);
 
-  const dl = async (fmt: "pdf" | "jpg") => {
+  const dl = async (fmt: "pdf" | "jpg" | "png") => {
     if (!contentRef.current) return;
     setDownloading(fmt);
     try {
       const name = `luggage-square-${group?.groupName || "group"}`;
       if (fmt === "pdf") await downloadAsPdf(contentRef.current, name);
+      else if (fmt === "png") await downloadAsPng(contentRef.current, name);
       else await downloadAsJpg(contentRef.current, name);
     } finally { setDownloading(null); }
   };
@@ -561,6 +562,7 @@ export default function PrintLuggageSquare() {
         ))}
         <button onClick={() => window.print()} style={{ padding: "10px 24px", background: DARK, color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>🖨 Print</button>
         <button onClick={() => dl("pdf")} disabled={!!downloading} style={{ padding: "10px 20px", background: downloading === "pdf" ? "#6b7280" : "#1d4ed8", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>{downloading === "pdf" ? "⏳..." : "⬇ PDF"}</button>
+        <button onClick={() => dl("png")} disabled={!!downloading} style={{ padding: "10px 20px", background: downloading === "png" ? "#6b7280" : "#059669", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>{downloading === "png" ? "⏳..." : "⬇ PNG"}</button>
         <button onClick={() => dl("jpg")} disabled={!!downloading} style={{ padding: "10px 20px", background: downloading === "jpg" ? "#6b7280" : "#7c3aed", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>{downloading === "jpg" ? "⏳..." : "⬇ JPG"}</button>
         <button onClick={() => window.history.back()} style={{ padding: "10px 20px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
       </div>
