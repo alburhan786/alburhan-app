@@ -37,13 +37,16 @@ async function capture(el: HTMLElement): Promise<HTMLCanvasElement> {
 }
 
 export async function downloadAsJpg(el: HTMLElement, filename: string) {
-  const canvas = await capture(el);
-  const a = document.createElement("a");
-  a.download = filename.endsWith(".jpg") ? filename : filename + ".jpg";
-  a.href = canvas.toDataURL("image/jpeg", 0.97);
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  const name = filename.endsWith(".jpg") ? filename : filename + ".jpg";
+  for (const scale of [6, 3, 2]) {
+    const blob = await new Promise<Blob | null>((resolve) => {
+      html2canvas(el, { ...CAPTURE_OPTS, scale })
+        .then((c) => c.toBlob((b) => resolve(b), "image/jpeg", 0.97))
+        .catch(() => resolve(null));
+    });
+    if (blob && blob.size > 0 && triggerBlobDownload(blob, name)) return;
+  }
+  alert("JPG download failed — please try the PDF button instead.");
 }
 
 /** Trigger a blob-URL download. Returns true on success. */
@@ -158,13 +161,17 @@ export async function downloadPagesAsJpg(pages: HTMLElement[], filename: string)
   if (pages.length === 0) return;
   const base = filename.replace(/\.jpg$/i, "");
   for (let i = 0; i < pages.length; i++) {
-    const canvas = await html2canvas(pages[i], CAPTURE_OPTS);
-    const a = document.createElement("a");
-    a.download = pages.length === 1 ? `${base}.jpg` : `${base}-${i + 1}.jpg`;
-    a.href = canvas.toDataURL("image/jpeg", 0.97);
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    const name = pages.length === 1 ? `${base}.jpg` : `${base}-${i + 1}.jpg`;
+    let downloaded = false;
+    for (const scale of [6, 3, 2]) {
+      const blob = await new Promise<Blob | null>((resolve) => {
+        html2canvas(pages[i], { ...CAPTURE_OPTS, scale })
+          .then((c) => c.toBlob((b) => resolve(b), "image/jpeg", 0.97))
+          .catch(() => resolve(null));
+      });
+      if (blob && blob.size > 0 && triggerBlobDownload(blob, name)) { downloaded = true; break; }
+    }
+    if (!downloaded) alert(`JPG download failed for page ${i + 1}.`);
     if (i < pages.length - 1) await new Promise(r => setTimeout(r, 300));
   }
 }
