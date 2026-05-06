@@ -482,7 +482,9 @@ export default function PrintLuggageSquare() {
           @page { size: A4 portrait; margin: 5mm; }
           body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; margin: 0; }
           .no-print { display: none !important; }
-          .sq-wrap { background: white !important; padding: 0 !important; gap: 0 !important; }
+          .sq-wrap { background: white !important; padding: 0 !important; gap: 0 !important; display: block !important; }
+          .sq-page-single, .sq-page-both { display: grid !important; page-break-after: always !important; break-after: page !important; margin-bottom: 0 !important; }
+          .sq-page-single:last-child, .sq-page-both:last-child { page-break-after: auto !important; break-after: auto !important; }
         }
         * { box-sizing: border-box; }
 
@@ -574,7 +576,7 @@ export default function PrintLuggageSquare() {
         </div>
       )}
 
-      <div ref={contentRef} className="sq-wrap" style={{ background: "#f5f5f0", padding: "8mm", display: "flex", flexDirection: "column", gap: "8mm" }}>
+      <div ref={contentRef} className="sq-wrap" style={{ background: "#f5f5f0", padding: "8mm", display: "block" }}>
 
         {/* ══ BOTH MODE: Page 1 = 4 fronts, Page 2 = 4 backs (mirrored columns for duplex alignment) ══ */}
         {view === "both" && pages.map((page, pi) => (
