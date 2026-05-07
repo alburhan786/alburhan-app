@@ -154,7 +154,7 @@ export default function PrintLuggageLarge() {
                 fontFamily: "'Arial Black', Arial, sans-serif",
                 WebkitPrintColorAdjust: "exact", printColorAdjust: "exact",
               } as React.CSSProperties}>
-                {SVC_CENTER}
+                {group.maktabNumber || SVC_CENTER}
               </div>
               <div style={{ fontSize: "6pt", fontWeight: 700, color: GOLD, lineHeight: 1.2, marginTop: "1mm" }}>
                 {SVC_NAME_EN}
