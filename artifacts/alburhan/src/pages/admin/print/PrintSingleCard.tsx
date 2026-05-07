@@ -1,24 +1,24 @@
 import { useEffect, useState, useRef } from "react";
-import { useRoute } from "wouter";
-import { downloadAsPdf, downloadAsJpg, downloadAsPng, fetchAsDataUrl } from "@/lib/downloadUtils";
+import { useRoute, useLocation } from "wouter";
+import { fetchAsDataUrl } from "@/lib/downloadUtils";
 import { QRCodeCanvas } from "qrcode.react";
 import { Barcode } from "@/components/print/Barcode";
-import { getCompanyById } from "@/lib/companies";
+import { COMPANIES, getCompanyById, type CompanyInfo } from "@/lib/companies";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
+import { saveAs } from "file-saver";
 
-const API = import.meta.env.VITE_API_URL || "";
-const MASHARIQ_EN = "Mashariq Al-Masiyah Company";
-const MASHARIQ_AR = "شركة مشارق الماسية";
-const INDIA_PHONES = ["9893989786", "9893225590"];
-const SAUDI_EMERGENCY = ["0547090786", "0568780786"];
-const DARK = "#0d5040";
-const GOLD = "#C9A23F";
-const SHORT_ADDRESS = "Shop No. 8, Khanka Masjid Complex, Shanwara Road, Burhanpur";
+const API         = import.meta.env.VITE_API_URL || "";
+const BASE        = import.meta.env.BASE_URL.replace(/\/$/, "") || "";
+const DARK        = "#0d5040";
+const GOLD        = "#C9A84C";
+const GOLD_LIGHT  = "#E8D48B";
+/* 54 mm × 85 mm at 300 DPI = 638 × 1004 px → scale = 300/96 ≈ 3.125 */
+const PRINT_SCALE = 300 / 96;
 
 interface Pilgrim {
   id: string; serialNumber: number; fullName: string; passportNumber?: string;
-  photoUrl?: string; mobileIndia?: string; mobileSaudi?: string;
-  city?: string; busNumber?: string; roomNumber?: string; seatNumber?: string;
-  barcodeId?: string; salutation?: string; gender?: string;
+  photoUrl?: string; mobileIndia?: string; barcodeId?: string;
 }
 interface Group {
   id: string; groupName: string; year: number; maktabNumber?: string;
@@ -33,188 +33,236 @@ function buildVerifyUrl(id: string) {
   return `${window.location.origin}${import.meta.env.BASE_URL}verify/${id}`;
 }
 
-function FrontCard({ p, group, photoSrc }: { p: Pilgrim; group: Group; photoSrc?: string }) {
-  const serial = String(p.serialNumber).padStart(3, "0");
-  const barcodeVal = p.barcodeId || p.passportNumber || `HAJ${serial}`;
-  const barcodeFormat = p.barcodeId ? "CODE128" : "CODE39";
-  const verifyUrl = buildVerifyUrl(p.id);
-
+/* ─── Wave decorations ─────────────────────────────────────────────────────── */
+function WaveShapes() {
   return (
-    <div className="pro-card">
-      <div style={{ background: DARK, padding: "1.5mm 2.5mm", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: "2mm" }}>
-        <div>
-          <div style={{ fontSize: "7pt", fontWeight: 900, color: "#fff", textTransform: "uppercase", letterSpacing: "0.5px", lineHeight: 1.1 }}>AL BURHAN TOURS AND TRAVELS</div>
-          <div style={{ fontSize: "5.5pt", fontWeight: 900, color: GOLD, letterSpacing: "0.5px", lineHeight: 1.2 }}>HAJJ {group.year}</div>
+    <>
+      <div style={{ position:"absolute", top:0, right:0, width:"16mm", height:"22mm", background:DARK, borderRadius:"0 0 0 100%", zIndex:0 }} />
+      <div style={{ position:"absolute", top:"6mm", right:0, width:"10mm", height:"10mm", background:"rgba(255,255,255,0.08)", borderRadius:"0 0 0 100%", zIndex:0 }} />
+      <div style={{ position:"absolute", bottom:0, left:0, width:"14mm", height:"16mm", background:`linear-gradient(135deg,${GOLD},${GOLD_LIGHT})`, borderRadius:"0 100% 0 0", zIndex:0 }} />
+      <div style={{ position:"absolute", bottom:"4mm", left:0, width:"8mm", height:"9mm", background:"rgba(255,255,255,0.15)", borderRadius:"0 100% 0 0", zIndex:0 }} />
+    </>
+  );
+}
+function WaveShapesBack() {
+  return (
+    <>
+      <div style={{ position:"absolute", top:0, right:0, width:"16mm", height:"20mm", background:DARK, borderRadius:"0 0 0 100%", zIndex:0 }} />
+      <div style={{ position:"absolute", top:"5mm", right:0, width:"10mm", height:"10mm", background:"rgba(255,255,255,0.08)", borderRadius:"0 0 0 100%", zIndex:0 }} />
+      <div style={{ position:"absolute", bottom:0, left:0, width:"12mm", height:"14mm", background:`linear-gradient(135deg,${GOLD},${GOLD_LIGHT})`, borderRadius:"0 100% 0 0", zIndex:0 }} />
+    </>
+  );
+}
+
+/* ─── Logo header ──────────────────────────────────────────────────────────── */
+function LogoHeader({ company }: { company: CompanyInfo }) {
+  return (
+    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"1mm" }}>
+      <div style={{ fontSize:"18pt", lineHeight:1, flexShrink:0 }}>🇮🇳</div>
+      <div style={{ flex:1, textAlign:"center", padding:"0 1.5mm" }}>
+        <div style={{ fontSize:"9.5pt", fontWeight:900, color:DARK, letterSpacing:"0.5px", lineHeight:1.1 }}>{company.nameShort}</div>
+        <div style={{ fontSize:"4.5pt", fontWeight:700, color:GOLD, letterSpacing:"0.5px", lineHeight:1.2 }}>TOURS & TRAVELS</div>
+      </div>
+      <div style={{ flexShrink:0 }}>
+        {company.logoUrl
+          ? <div style={{ width:"9mm", height:"9mm", borderRadius:"50%", background:"#fff", border:`1.5px solid ${GOLD}`, display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden" }}>
+              <img src={company.logoUrl} alt="" style={{ width:"90%", height:"90%", objectFit:"contain" }} />
+            </div>
+          : <div style={{ width:"9mm", height:"9mm", borderRadius:"50%", background:DARK, display:"flex", alignItems:"center", justifyContent:"center", color:GOLD, fontWeight:900, fontSize:"4pt" }}>{company.nameShort.slice(0,1)}</div>
+        }
+      </div>
+    </div>
+  );
+}
+
+/* ─── Front card — 54 mm × 85 mm portrait ─────────────────────────────────── */
+function FrontCard({ p, group, company, photoDataUrl }: { p:Pilgrim; group:Group; company:CompanyInfo; photoDataUrl:string }) {
+  const photoSrc = photoDataUrl || (p.photoUrl ? `${API}${p.photoUrl}` : "");
+  return (
+    <div className="id-card">
+      <WaveShapes />
+      <div style={{ position:"relative", zIndex:1, height:"100%", display:"flex", flexDirection:"column", padding:"2.5mm 3mm 0" }}>
+        <LogoHeader company={company} />
+
+        {/* Photo */}
+        <div style={{ display:"flex", justifyContent:"center", marginTop:"2.5mm", marginBottom:"2mm" }}>
+          {photoSrc
+            ? <img src={photoSrc} alt="" style={{ width:"26mm", height:"26mm", objectFit:"cover", objectPosition:"top center", borderRadius:"50%", border:`2.5px solid ${GOLD}`, WebkitPrintColorAdjust:"exact", printColorAdjust:"exact" } as React.CSSProperties} />
+            : <div style={{ width:"26mm", height:"26mm", background:"#f0f0f0", borderRadius:"50%", border:`2.5px solid ${GOLD}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"5pt", color:"#aaa", fontWeight:600 }}>PHOTO</div>
+          }
         </div>
-        <div style={{ textAlign: "right" }}>
-          <div style={{ fontSize: "4pt", color: "rgba(255,255,255,0.6)", lineHeight: 1.2 }}>alburhantravels.com</div>
-          <div style={{ fontSize: "9pt", fontWeight: 900, color: GOLD, lineHeight: 1 }}>#{serial}</div>
+
+        {/* Name + year */}
+        <div style={{ textAlign:"center", marginBottom:"2mm" }}>
+          <div style={{ fontSize:"8pt", fontWeight:900, color:DARK, textTransform:"uppercase", lineHeight:1.2, wordBreak:"break-word" }}>{p.fullName || "—"}</div>
+          <div style={{ fontSize:"5.5pt", color:GOLD, fontWeight:700, marginTop:"0.5mm" }}>HAJJ {group.year}</div>
+        </div>
+
+        {/* Info rows */}
+        <div style={{ display:"flex", flexDirection:"column", gap:"1.3mm", fontSize:"5.5pt", paddingLeft:"1mm" }}>
+          <div><span style={{ color:"#888", fontSize:"4.5pt" }}>Serial: </span><span style={{ fontWeight:700, color:DARK }}>#{String(p.serialNumber).padStart(3,"0")}</span></div>
+          <div><span style={{ color:"#888", fontSize:"4.5pt" }}>Passport: </span><span style={{ fontWeight:600, fontFamily:"monospace" }}>{p.passportNumber||"—"}</span></div>
+          <div><span style={{ color:"#888", fontSize:"4.5pt" }}>Mobile: </span><span style={{ fontWeight:600 }}>{p.mobileIndia||"—"}</span></div>
+        </div>
+
+        {/* QR */}
+        <div style={{ display:"flex", justifyContent:"center", marginTop:"2mm" }}>
+          <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:"0.5mm" }}>
+            <div style={{ background:"#fff", padding:"2px", borderRadius:"3px", border:`1.5px solid ${DARK}` }}>
+              <QRCodeCanvas value={buildVerifyUrl(p.id)} size={46} level="M" fgColor={DARK} />
+            </div>
+            <div style={{ fontSize:"3pt", color:DARK, fontWeight:900, textTransform:"uppercase", letterSpacing:"0.3px" }}>SCAN TO VERIFY</div>
+          </div>
         </div>
       </div>
 
-      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
-        <div style={{ width: "20mm", flexShrink: 0, borderRight: `1px solid ${GOLD}40`, overflow: "hidden", background: "#f9f9f9", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          {p.photoUrl
-            ? <img src={photoSrc || `${API}${p.photoUrl}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#ccc", fontSize: "20pt" }}>👤</div>}
+      {/* Footer */}
+      <div style={{ position:"absolute", bottom:0, left:0, right:0, zIndex:2 }}>
+        <div style={{ overflow:"hidden", paddingLeft:"2mm", marginBottom:"0.5mm" }}>
+          {(p.barcodeId||p.passportNumber)
+            ? <Barcode value={p.barcodeId||p.passportNumber!} format={p.barcodeId?"CODE128":"CODE39"} height={12} width={1} fontSize={0} />
+            : <div style={{ fontSize:"4pt", color:"#999" }}>{group.groupName}</div>
+          }
         </div>
-        <div style={{ flex: 1, padding: "1.5mm 2mm", display: "flex", flexDirection: "column", justifyContent: "space-between", overflow: "hidden" }}>
-          <div>
-            <div style={{ fontSize: "9.5pt", fontWeight: 900, color: DARK, lineHeight: 1.2, wordBreak: "break-word", textTransform: "uppercase" }}>
-              {p.salutation ? `${p.salutation} ` : ""}{p.fullName}
-            </div>
-            {p.passportNumber && (
-              <div style={{ fontSize: "6.5pt", fontWeight: 700, color: "#444", marginTop: "0.8mm" }}>
-                <span style={{ color: "#888", fontWeight: 400 }}>Passport: </span>{p.passportNumber}
-              </div>
-            )}
-            {p.city && <div style={{ fontSize: "5.5pt", color: "#666", marginTop: "0.5mm" }}>{p.city}</div>}
-          </div>
-          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "2mm" }}>
-            <div>
-              {INDIA_PHONES.map((ph, i) => (
-                <div key={i} style={{ fontSize: "7pt", fontWeight: 900, color: DARK, lineHeight: 1.3, letterSpacing: "0.5px" }}>{ph}</div>
-              ))}
-              <div style={{ fontSize: "3.5pt", color: "#888", textTransform: "uppercase", letterSpacing: "0.3px" }}>Office (India)</div>
-            </div>
-            <div style={{ display: "flex", gap: "1.5mm" }}>
-              <div style={{ textAlign: "center" }}>
-                <div style={{ background: "#fff", padding: "1px", borderRadius: "2px", border: `1px solid ${DARK}40` }}>
-                  <QRCodeCanvas value={verifyUrl} size={24} level="L" fgColor={DARK} />
-                </div>
-                <div style={{ fontSize: "2.5pt", color: "#888", textTransform: "uppercase", marginTop: "0.3mm" }}>Verify</div>
-              </div>
-              <div style={{ textAlign: "center" }}>
-                <Barcode value={barcodeVal} format={barcodeFormat} width={0.8} height={18} fontSize={4} />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div style={{ background: DARK, flexShrink: 0, padding: "1.2mm 2.5mm" } as React.CSSProperties}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "2mm" }}>
-          <div>
-            {SAUDI_EMERGENCY.map((ph, i) => (
-              <div key={i} style={{ fontSize: "7pt", fontWeight: 900, color: "#fff", lineHeight: 1.2, letterSpacing: "0.5px" }}>{ph}</div>
-            ))}
-            <div style={{ fontSize: "3pt", color: "rgba(255,255,255,0.55)", textTransform: "uppercase", letterSpacing: "0.3px" }}>Emergency (Saudi)</div>
-          </div>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: "3pt", fontWeight: 700, color: GOLD, textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Pilgrim Mobile</div>
-            <div style={{ fontSize: "8.5pt", fontWeight: 900, color: "#fff", lineHeight: 1.25, letterSpacing: "0.5px" }}>{p.mobileIndia || "—"}</div>
-          </div>
+        <div style={{ background:DARK, color:GOLD, padding:"1mm 2mm", fontSize:"3.5pt", textAlign:"center", fontWeight:800, letterSpacing:"0.2px", WebkitPrintColorAdjust:"exact", printColorAdjust:"exact" } as React.CSSProperties}>
+          {company.name} | 🇮🇳 {company.phone} | 🇸🇦 {company.phoneSaudi}
         </div>
       </div>
     </div>
   );
 }
 
-function BackCard({ p, group }: { p: Pilgrim; group: Group }) {
-  const company = getCompanyById("alburhan");
-  const saudiPhones = (company.phoneSaudi || "").split(/[|,]/).map(s => s.trim()).filter(Boolean);
-
+/* ─── Back card — 54 mm × 85 mm portrait ──────────────────────────────────── */
+function BackCard({ p, group, company }: { p:Pilgrim; group:Group; company:CompanyInfo }) {
+  const dot: React.CSSProperties = { width:"2.5mm", height:"2.5mm", borderRadius:"50%", background:GOLD, flexShrink:0, marginTop:"0.6mm" };
   return (
-    <div className="pro-card">
-      <div style={{ background: DARK, padding: "1mm 2.5mm", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: "2mm" }}>
-        <div>
-          <div style={{ fontSize: "7pt", fontWeight: 900, color: "#fff", textTransform: "uppercase", letterSpacing: "0.5px", lineHeight: 1.1 }}>AL BURHAN TOURS AND TRAVELS</div>
-          <div style={{ fontSize: "5.5pt", fontWeight: 900, color: GOLD, letterSpacing: "0.5px", lineHeight: 1.2 }}>HAJJ {group.year}</div>
-        </div>
-        <div style={{ fontSize: "3.5pt", fontWeight: 700, color: "rgba(255,255,255,0.6)", lineHeight: 1.3, textAlign: "right" }}>{company.phone}</div>
-      </div>
+    <div className="id-card">
+      <WaveShapesBack />
+      <div style={{ position:"relative", zIndex:1, height:"100%", display:"flex", flexDirection:"column", padding:"2.5mm 3mm 0" }}>
+        <LogoHeader company={company} />
 
-      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
-        <div style={{ width: "43mm", flexShrink: 0, padding: "1.2mm 2mm 1mm", borderRight: `1px solid ${GOLD}40`, display: "flex", flexDirection: "column", gap: "1mm" }}>
-          {group.maktabNumber && (
+        {/* Info */}
+        <div style={{ display:"flex", flexDirection:"column", gap:"1.8mm", marginTop:"2.5mm", fontSize:"5.5pt", lineHeight:1.4 }}>
+          <div style={{ display:"flex", alignItems:"flex-start", gap:"1.5mm" }}>
+            <div style={dot} />
+            <div><span style={{ color:"#888", fontSize:"4.5pt" }}>Passport No. </span><span style={{ fontFamily:"monospace", fontWeight:600 }}>{p.passportNumber||"—"}</span></div>
+          </div>
+          <div style={{ display:"flex", alignItems:"flex-start", gap:"1.5mm" }}>
+            <div style={dot} />
+            <div><span style={{ color:"#888", fontSize:"4.5pt" }}>Maktab: </span><span style={{ fontWeight:600 }}>{group.maktabNumber||"—"}</span></div>
+          </div>
+          <div style={{ display:"flex", alignItems:"flex-start", gap:"1.5mm" }}>
+            <div style={dot} />
             <div>
-              <div style={{ fontSize: "2.8pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Service Center No.</div>
-              <div style={{ fontSize: "13pt", fontWeight: 900, color: DARK, lineHeight: 1 }}>{group.maktabNumber}</div>
+              <span style={{ color:"#888", fontSize:"4.5pt" }}>Makkah Hotel: </span>
+              <span style={{ fontWeight:600 }}>{group.hotels?.makkah?.name||"—"}</span>
+              {group.hotels?.makkah?.nameAr && <div style={{ fontSize:"4.5pt", direction:"rtl", textAlign:"right" }}>{group.hotels.makkah.nameAr}</div>}
             </div>
-          )}
-          <div style={{ background: `${GOLD}20`, borderRadius: "2px", padding: "1mm 1.5mm", borderLeft: `2.5px solid ${GOLD}` }}>
-            <div style={{ fontSize: "5pt", fontWeight: 900, color: DARK, lineHeight: 1.3 }}>{MASHARIQ_EN}</div>
-            <div style={{ fontSize: "6pt", fontWeight: 900, color: DARK, lineHeight: 1.35, direction: "rtl", textAlign: "right" }}>{MASHARIQ_AR}</div>
-            <div style={{ fontSize: "2.8pt", color: "#777", textTransform: "uppercase", lineHeight: 1, marginTop: "0.3mm" }}>Pilgrim Service Company</div>
           </div>
-          <div>
-            <div style={{ fontSize: "3pt", fontWeight: 900, color: "#b91c1c", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1, marginBottom: "0.5mm" }}>🆘 Emergency (Saudi)</div>
-            {saudiPhones.map((num, i) => (
-              <div key={i} style={{ fontSize: "9.5pt", fontWeight: 900, color: DARK, lineHeight: 1.3, letterSpacing: "0.5px" }}>{num}</div>
-            ))}
+          <div style={{ display:"flex", alignItems:"flex-start", gap:"1.5mm" }}>
+            <div style={dot} />
+            <div>
+              <span style={{ color:"#888", fontSize:"4.5pt" }}>Madinah Hotel: </span>
+              <span style={{ fontWeight:600 }}>{group.hotels?.madinah?.name||"—"}</span>
+              {group.hotels?.madinah?.nameAr && <div style={{ fontSize:"4.5pt", direction:"rtl", textAlign:"right" }}>{group.hotels.madinah.nameAr}</div>}
+            </div>
           </div>
         </div>
-        <div style={{ flex: 1, padding: "1.2mm 1.5mm", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: "1.2mm", flex: 1 }}>
-            {([
-              ["Hotel Makkah 1", group.hotels?.aziziah?.name, group.hotels?.aziziah?.nameAr, group.hotels?.aziziah?.address],
-              ["Hotel Makkah 2", group.hotels?.makkah?.name,  group.hotels?.makkah?.nameAr,  group.hotels?.makkah?.address],
-              ["Hotel Madinah",  group.hotels?.madinah?.name,  group.hotels?.madinah?.nameAr,  group.hotels?.madinah?.address],
-            ] as [string, string|undefined, string|undefined, string|undefined][]).map(([lbl, val, valAr, addr]) => val ? (
-              <div key={lbl}>
-                <div style={{ fontSize: "2.8pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>{lbl}</div>
-                <div style={{ fontSize: "5.5pt", fontWeight: 900, color: DARK, lineHeight: 1.2 }}>{val}</div>
-                {valAr && <div style={{ fontSize: "6pt", fontWeight: 900, color: DARK, lineHeight: 1.2, direction: "rtl", textAlign: "right" }}>{valAr}</div>}
-                {addr && <div style={{ fontSize: "4pt", fontWeight: 700, color: "#555", lineHeight: 1.2 }}>{addr}</div>}
-              </div>
-            ) : null)}
+
+        {/* QR */}
+        <div style={{ display:"flex", justifyContent:"center", marginTop:"2.5mm" }}>
+          <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:"0.5mm" }}>
+            <div style={{ background:"#fff", padding:"2px", borderRadius:"3px", border:`1.5px solid ${DARK}` }}>
+              <QRCodeCanvas value={buildVerifyUrl(p.id)} size={46} level="M" fgColor={DARK} />
+            </div>
+            <div style={{ fontSize:"3pt", color:DARK, fontWeight:700, textTransform:"uppercase" }}>SCAN</div>
           </div>
         </div>
       </div>
 
-      <div style={{ background: DARK, flexShrink: 0, padding: "1.5mm 2.5mm" } as React.CSSProperties}>
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "2mm" }}>
-          <div>
-            <div style={{ fontSize: "3pt", fontWeight: 700, color: "rgba(255,255,255,0.55)", textTransform: "uppercase", lineHeight: 1, marginBottom: "0.5mm" }}>{p.fullName}</div>
-            <div style={{ fontSize: "5.5pt", fontWeight: 900, color: "#fff", lineHeight: 1.35, letterSpacing: "0.2px" }}>{SHORT_ADDRESS}</div>
-          </div>
-          <div style={{ textAlign: "right", flexShrink: 0 }}>
-            <div style={{ fontSize: "3pt", fontWeight: 700, color: "#f87171", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1, marginBottom: "0.3mm" }}>🆘 Emergency</div>
-            <div style={{ fontSize: "7pt", fontWeight: 900, color: "#fff", lineHeight: 1.25, letterSpacing: "0.5px" }}>{SAUDI_EMERGENCY[0]}</div>
-            <div style={{ fontSize: "7pt", fontWeight: 900, color: "#fff", lineHeight: 1.25, letterSpacing: "0.5px" }}>{SAUDI_EMERGENCY[1]}</div>
-          </div>
+      {/* Footer */}
+      <div style={{ position:"absolute", bottom:0, left:0, right:0, zIndex:3 }}>
+        <div style={{ display:"flex", justifyContent:"space-between", fontSize:"3.5pt", color:"#666", padding:"0 3mm", marginBottom:"0.5mm" }}>
+          <div>Group: <b style={{ color:DARK }}>{group.groupName}</b></div>
+          <div><b style={{ color:DARK }}>{p.fullName}</b></div>
+          <div>Year: <b style={{ color:DARK }}>{group.year}</b></div>
+        </div>
+        <div style={{ background:DARK, color:"#fff", padding:"1mm 2mm", fontSize:"3.5pt", fontWeight:900, textAlign:"center", lineHeight:1.5, WebkitPrintColorAdjust:"exact", printColorAdjust:"exact" } as React.CSSProperties}>
+          <div>{company.address}</div>
+          <div style={{ color:GOLD, marginTop:"0.3mm" }}>🇮🇳 {company.phone} | 🇸🇦 {company.phoneSaudi}</div>
         </div>
       </div>
     </div>
   );
 }
 
+/* ─── Crop marks ───────────────────────────────────────────────────────────── */
+function CropMarks() {
+  const g = "4mm"; const l = "6mm"; const w = "0.35px"; const c = "#555";
+  const m = (t:string,l2:string,w2:string,h:string): React.CSSProperties => ({ position:"absolute", background:c, top:t, left:l2, width:w2, height:h });
+  return (
+    <>
+      <div style={m(`calc(-1*${g})`,"0",w,l)} /><div style={m(`calc(-1*${l} - ${g})`,`calc(-1*${g})`,l,w)} />
+      <div style={m(`calc(-1*${g})`,`100%`,w,l)} /><div style={m(`calc(-1*${l} - ${g})`,`calc(100% - ${g} + 1px)`,l,w)} />
+      <div style={m(`100%`,"0",w,l)} /><div style={m(`calc(100% + ${g})`,`calc(-1*${g})`,l,w)} />
+      <div style={m(`100%`,`100%`,w,l)} /><div style={m(`calc(100% + ${g})`,`calc(100% - ${g} + 1px)`,l,w)} />
+    </>
+  );
+}
+
+/* ─── Canvas capture helper ────────────────────────────────────────────────── */
+async function captureEl(el: HTMLElement, scale: number): Promise<HTMLCanvasElement|null> {
+  try {
+    const c = await html2canvas(el, { useCORS:true, allowTaint:true, backgroundColor:"#ffffff", logging:false, imageTimeout:15000, scale });
+    return c.width > 0 && c.height > 0 ? c : null;
+  } catch { return null; }
+}
+
+/* ─── Main component ───────────────────────────────────────────────────────── */
 export default function PrintSingleCard() {
-  const [, params] = useRoute("/admin/groups/:groupId/print/single-card/:pilgrimId");
-  const groupId = params?.groupId || "";
+  /* Route matching — three entry points all handled here */
+  const [, pFront] = useRoute("/admin/groups/:groupId/print/id-card-front/:pilgrimId");
+  const [, pBack]  = useRoute("/admin/groups/:groupId/print/id-card-back/:pilgrimId");
+  const [, pOld]   = useRoute("/admin/groups/:groupId/print/single-card/:pilgrimId");
+  const params    = pFront || pBack || pOld;
+  const groupId   = params?.groupId   || "";
   const pilgrimId = params?.pilgrimId || "";
+  const side: "front"|"back" = pBack ? "back" : "front";
 
-  const [group, setGroup] = useState<Group | null>(null);
-  const [pilgrim, setPilgrim] = useState<Pilgrim | null>(null);
-  const [photoSrc, setPhotoSrc] = useState<string>("");
-  const [error, setError] = useState("");
-  const [dlState, setDlState] = useState<string | null>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
+  const [, navigate] = useLocation();
 
-  const dlCard = async (fmt: "pdf" | "jpg" | "png") => {
-    if (!contentRef.current) return;
-    setDlState(fmt);
-    try {
-      const name = `id-card-${pilgrim?.fullName?.replace(/\s+/g, "-") || "card"}`;
-      if (fmt === "pdf") await downloadAsPdf(contentRef.current, name);
-      else if (fmt === "png") await downloadAsPng(contentRef.current, name);
-      else await downloadAsJpg(contentRef.current, name);
-    } finally { setDlState(null); }
-  };
+  const [group,        setGroup]        = useState<Group   |null>(null);
+  const [pilgrim,      setPilgrim]      = useState<Pilgrim |null>(null);
+  const [allPilgrims,  setAllPilgrims]  = useState<Pilgrim[]>([]);
+  const [photoDataUrl, setPhotoDataUrl] = useState("");
+  const [companyId,    setCompanyId]    = useState("alburhan");
+  const [error,        setError]        = useState("");
+  const [dlState,      setDlState]      = useState<string|null>(null);
+  const [printTarget,  setPrintTarget]  = useState<"front"|"back"|null>(null);
+
+  const frontRef = useRef<HTMLDivElement>(null);
+  const backRef  = useRef<HTMLDivElement>(null);
+  const company  = getCompanyById(companyId);
+
+  const frontUrl = (pid: string) => `${BASE}/admin/groups/${groupId}/print/id-card-front/${pid}`;
+  const backUrl  = (pid: string) => `${BASE}/admin/groups/${groupId}/print/id-card-back/${pid}`;
 
   useEffect(() => {
     if (!groupId || !pilgrimId) return;
+    setPhotoDataUrl("");
     Promise.all([
-      fetch(`${API}/api/groups/${groupId}`, { credentials: "include" }).then(r => r.json()),
-      fetch(`${API}/api/groups/${groupId}/pilgrims`, { credentials: "include" }).then(r => r.json()),
+      fetch(`${API}/api/groups/${groupId}`,          { credentials:"include" }).then(r => r.json()),
+      fetch(`${API}/api/groups/${groupId}/pilgrims`, { credentials:"include" }).then(r => r.json()),
     ]).then(async ([g, all]) => {
       setGroup(g);
-      const found = (Array.isArray(all) ? all : []).find((p: Pilgrim) => p.id === pilgrimId);
+      const list: Pilgrim[] = Array.isArray(all) ? all : [];
+      setAllPilgrims(list);
+      const found = list.find(p => p.id === pilgrimId);
       if (found) {
         setPilgrim(found);
         if (found.photoUrl) {
           const d = await fetchAsDataUrl(`${API}${found.photoUrl}`);
-          setPhotoSrc(d || `${API}${found.photoUrl}`);
+          setPhotoDataUrl(d || "");
         }
       } else {
         setError("Pilgrim not found");
@@ -222,182 +270,179 @@ export default function PrintSingleCard() {
     }).catch(() => setError("Failed to load data"));
   }, [groupId, pilgrimId]);
 
-  if (error) return <div style={{ padding: "40px", textAlign: "center", color: "red", fontFamily: "Arial" }}>{error}</div>;
-  if (!group || !pilgrim) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
+  const currentIdx  = allPilgrims.findIndex(p => p.id === pilgrimId);
+  const prevPilgrim = currentIdx > 0                        ? allPilgrims[currentIdx - 1] : null;
+  const nextPilgrim = currentIdx < allPilgrims.length - 1   ? allPilgrims[currentIdx + 1] : null;
+  const goTo = (pid: string) => navigate(side === "back" ? backUrl(pid) : frontUrl(pid));
+
+  /* Download one side as PDF or PNG */
+  const dl = async (dlSide:"front"|"back", fmt:"pdf"|"png") => {
+    const el = dlSide === "front" ? frontRef.current : backRef.current;
+    if (!el || !pilgrim) return;
+    const key = `${dlSide}-${fmt}`;
+    setDlState(key);
+    const slug = pilgrim.fullName.replace(/[^a-z0-9]/gi,"-").toLowerCase();
+    try {
+      const canvas =
+        await captureEl(el, PRINT_SCALE) ??
+        await captureEl(el, 3)          ??
+        await captureEl(el, 2);
+      if (!canvas) { alert(`Failed to render ${dlSide} card.`); return; }
+
+      if (fmt === "png") {
+        const blob = await new Promise<Blob|null>(res => canvas.toBlob(res,"image/png",1));
+        if (blob) saveAs(blob, `id-card-${dlSide}-${slug}.png`);
+      } else {
+        /* Centre the 54×85 mm card on A4 */
+        const dataUrl = canvas.toDataURL("image/png");
+        const pdf = new jsPDF({ orientation:"portrait", unit:"mm", format:"a4" });
+        const cardW = 54; const cardH = 85;
+        pdf.addImage(dataUrl,"PNG",(210-cardW)/2,(297-cardH)/2,cardW,cardH);
+        /* Thin dashed crop guide */
+        pdf.setDrawColor(180); pdf.setLineWidth(0.15);
+        pdf.setLineDashPattern([1,1],0);
+        pdf.rect((210-cardW)/2-3,(297-cardH)/2-3,cardW+6,cardH+6);
+        pdf.save(`id-card-${dlSide}-${slug}.pdf`);
+      }
+    } finally { setDlState(null); }
+  };
+
+  /* Print — hide one side via CSS class, then restore */
+  const doPrint = (target:"front"|"back") => {
+    setPrintTarget(target);
+    setTimeout(() => { window.print(); setTimeout(() => setPrintTarget(null), 800); }, 120);
+  };
+
+  if (error) return <div style={{ padding:"60px", textAlign:"center", color:"red", fontFamily:"Arial", fontSize:"16px" }}>{error}</div>;
+  if (!group||!pilgrim) return <div style={{ padding:"60px", textAlign:"center", fontFamily:"Arial", fontSize:"16px" }}>Loading…</div>;
+
+  const btnBase: React.CSSProperties = { border:"none", borderRadius:"6px", fontWeight:700, cursor:"pointer", fontSize:"11px", padding:"8px 12px", color:"#fff" };
 
   return (
     <>
       <style>{`
         @media print {
           @page { size: A4 portrait; margin: 0; }
-          body {
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-            margin: 0;
-          }
-          .no-print { display: none !important; }
-          .fold-page {
-            width: 210mm;
-            height: 297mm;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-          }
-          .fold-half {
-            width: 210mm;
-            height: 148.5mm;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-          }
-          .fold-line { display: none; }
+          body { -webkit-print-color-adjust:exact!important; print-color-adjust:exact!important; margin:0; padding:0; background:#fff!important; }
+          .no-print  { display:none!important; }
+          .a4-page   { box-shadow:none!important; margin:0!important; page-break-after:always; break-after:page; }
+          .a4-page:last-of-type { page-break-after:auto; break-after:auto; }
+          .hide-print { display:none!important; }
         }
-        * { box-sizing: border-box; }
-
-        .pro-card {
-          width: 90mm;
-          height: 60mm;
-          border: 1px solid #ccc;
-          border-radius: 3px;
-          overflow: hidden;
-          font-family: Arial, sans-serif;
-          background: #fff;
-          display: flex;
-          flex-direction: column;
+        * { box-sizing:border-box; }
+        .id-card {
+          width:54mm; height:85mm;
+          overflow:hidden; border-radius:4px;
+          font-family:'Inter',Arial,sans-serif;
+          background:#fff; position:relative; flex-shrink:0;
         }
-
-        /* Screen layout */
-        .fold-page {
-          width: 210mm;
-          min-height: 297mm;
-          display: flex;
-          flex-direction: column;
-          background: white;
+        .a4-page {
+          width:210mm; height:297mm; background:#fff;
+          display:flex; align-items:center; justify-content:center;
+          position:relative;
         }
-        .fold-half {
-          width: 210mm;
-          height: 148.5mm;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
+        .card-wrap { position:relative; display:inline-flex; }
+        .crop-mark { position:absolute; background:#555; }
+        .cut-guide {
+          position:absolute; inset:-4mm;
+          border:0.8px dashed #bbb; pointer-events:none;
         }
-        .fold-line {
-          width: 100%;
-          border-top: 2px dashed #94a3b8;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          position: relative;
-          flex-shrink: 0;
+        .side-badge {
+          position:absolute; top:9mm; left:50%; transform:translateX(-50%);
+          font-size:9px; font-weight:700; padding:3px 12px; border-radius:20px;
+          font-family:Arial,sans-serif; white-space:nowrap; letter-spacing:0.3px;
         }
-        .fold-line-label {
-          background: #f1f5f9;
-          padding: 2px 10px;
-          font-size: 9px;
-          color: #64748b;
-          font-family: Arial, sans-serif;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 1px;
-          border-radius: 20px;
-          border: 1px dashed #94a3b8;
-          position: absolute;
-        }
-
         @media screen {
-          body { background: #e2e8f0; font-family: Arial, sans-serif; }
-          .fold-page {
-            box-shadow: 0 4px 32px rgba(0,0,0,0.18);
-            margin: 80px auto 40px;
-            border-radius: 4px;
-          }
+          body { background:#374151; margin:0; padding:0; font-family:Arial,sans-serif; }
+          .a4-page { box-shadow:0 8px 48px rgba(0,0,0,0.4); margin:72px auto 40px; }
+          .id-card  { box-shadow:0 2px 12px rgba(0,0,0,0.18); }
         }
       `}</style>
 
       {/* ── Fixed Toolbar ── */}
       <div className="no-print" style={{
-        position: "fixed", top: 0, left: 0, right: 0, zIndex: 200,
-        padding: "10px 20px", background: DARK, color: "#fff",
-        display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap",
-        boxShadow: "0 2px 12px rgba(0,0,0,0.3)",
+        position:"fixed", top:0, left:0, right:0, zIndex:500,
+        background:DARK, padding:"7px 12px",
+        display:"flex", alignItems:"center", gap:"7px", flexWrap:"wrap",
+        boxShadow:"0 2px 20px rgba(0,0,0,0.5)",
       }}>
+        {/* Back */}
+        <button onClick={() => navigate(`${BASE}/admin/groups/${groupId}/print/id-cards`)}
+          style={{ padding:"7px 11px", background:"rgba(255,255,255,0.12)", color:"#fff", border:"none", borderRadius:"6px", fontWeight:700, cursor:"pointer", fontSize:"12px" }}>
+          ← Back
+        </button>
+
+        {/* Pilgrim nav */}
+        <button onClick={() => prevPilgrim&&goTo(prevPilgrim.id)} disabled={!prevPilgrim}
+          style={{ padding:"6px 10px", background:prevPilgrim?"rgba(255,255,255,0.15)":"rgba(255,255,255,0.05)", color:prevPilgrim?"#fff":"rgba(255,255,255,0.25)", border:"none", borderRadius:"6px", fontWeight:900, cursor:prevPilgrim?"pointer":"default", fontSize:"15px" }}>
+          ‹
+        </button>
         <div>
-          <div style={{ fontWeight: 900, fontSize: "15px" }}>🖨 ID Card — {pilgrim.fullName}</div>
-          <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.7)" }}>
-            Front + Back on 1 A4 page · Print single-sided · Fold &amp; Laminate
+          <div style={{ fontWeight:900, fontSize:"13px", color:"#fff" }}>{pilgrim.fullName}</div>
+          <div style={{ fontSize:"10px", color:"rgba(255,255,255,0.5)" }}>
+            #{String(pilgrim.serialNumber).padStart(3,"0")} · {currentIdx+1}/{allPilgrims.length} · {group.groupName} {group.year}
           </div>
         </div>
-        <div style={{ marginLeft: "auto", display: "flex", gap: "10px", alignItems: "center" }}>
-          <button onClick={() => window.history.back()} style={{
-            padding: "8px 16px", background: "rgba(255,255,255,0.15)", color: "#fff",
-            border: "1px solid rgba(255,255,255,0.3)", borderRadius: "7px", cursor: "pointer", fontSize: "13px",
-          }}>← Back</button>
-          <button onClick={() => dlCard("pdf")} disabled={!!dlState} style={{
-            padding: "10px 20px", background: dlState === "pdf" ? "#6b7280" : "#1d4ed8",
-            color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "13px",
-          }}>{dlState === "pdf" ? "⏳..." : "⬇ PDF"}</button>
-          <button onClick={() => dlCard("png")} disabled={!!dlState} style={{
-            padding: "10px 20px", background: dlState === "png" ? "#6b7280" : "#059669",
-            color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "13px",
-          }}>{dlState === "png" ? "⏳..." : "⬇ PNG"}</button>
-          <button onClick={() => dlCard("jpg")} disabled={!!dlState} style={{
-            padding: "10px 20px", background: dlState === "jpg" ? "#6b7280" : "#7c3aed",
-            color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "13px",
-          }}>{dlState === "jpg" ? "⏳..." : "⬇ JPG"}</button>
-          <button onClick={() => window.print()} style={{
-            padding: "10px 32px", background: GOLD, color: "#000",
-            border: "none", borderRadius: "8px", fontWeight: 900, cursor: "pointer", fontSize: "15px",
-          }}>🖨 PRINT</button>
+        <button onClick={() => nextPilgrim&&goTo(nextPilgrim.id)} disabled={!nextPilgrim}
+          style={{ padding:"6px 10px", background:nextPilgrim?"rgba(255,255,255,0.15)":"rgba(255,255,255,0.05)", color:nextPilgrim?"#fff":"rgba(255,255,255,0.25)", border:"none", borderRadius:"6px", fontWeight:900, cursor:nextPilgrim?"pointer":"default", fontSize:"15px" }}>
+          ›
+        </button>
+
+        {/* Pilgrim dropdown */}
+        <select value={pilgrimId} onChange={e=>goTo(e.target.value)}
+          style={{ padding:"6px 8px", borderRadius:"6px", border:"none", fontSize:"11px", background:"rgba(255,255,255,0.12)", color:"#fff", cursor:"pointer", maxWidth:"170px" }}>
+          {allPilgrims.map(p=>(
+            <option key={p.id} value={p.id} style={{ background:DARK }}>
+              #{String(p.serialNumber).padStart(3,"0")} {p.fullName}
+            </option>
+          ))}
+        </select>
+
+        {/* Front / Back toggle */}
+        <div style={{ display:"flex", gap:"3px", background:"rgba(0,0,0,0.3)", borderRadius:"8px", padding:"3px" }}>
+          <a href={frontUrl(pilgrimId)} style={{ padding:"6px 14px", borderRadius:"6px", fontWeight:700, fontSize:"12px", textDecoration:"none", cursor:"pointer", background:side==="front"?GOLD:"transparent", color:side==="front"?DARK:"rgba(255,255,255,0.7)" }}>FRONT</a>
+          <a href={backUrl(pilgrimId)}  style={{ padding:"6px 14px", borderRadius:"6px", fontWeight:700, fontSize:"12px", textDecoration:"none", cursor:"pointer", background:side==="back"?GOLD:"transparent", color:side==="back"?DARK:"rgba(255,255,255,0.7)" }}>BACK</a>
+        </div>
+
+        {/* Company */}
+        <select value={companyId} onChange={e=>setCompanyId(e.target.value)}
+          style={{ padding:"6px 8px", borderRadius:"6px", border:"none", fontSize:"11px", background:"rgba(255,255,255,0.12)", color:"#fff", cursor:"pointer", maxWidth:"155px" }}>
+          {COMPANIES.map(c=><option key={c.id} value={c.id} style={{ background:DARK }}>{c.id==="alburhan"?"Al Burhan":c.name}</option>)}
+        </select>
+
+        {/* ── 6 action buttons ── */}
+        <div style={{ marginLeft:"auto", display:"flex", gap:"5px", flexWrap:"wrap", alignItems:"center" }}>
+          <button onClick={()=>doPrint("front")} style={{ ...btnBase, background:"#fff", color:DARK, fontSize:"12px", fontWeight:900 }}>🖨 Print Front</button>
+          <button onClick={()=>doPrint("back")}  style={{ ...btnBase, background:GOLD, color:DARK, fontSize:"12px", fontWeight:900 }}>🖨 Print Back</button>
+          <button onClick={()=>dl("front","pdf")} disabled={!!dlState} style={{ ...btnBase, background:dlState==="front-pdf"?"#6b7280":"#1d4ed8" }}>{dlState==="front-pdf"?"⏳…":"⬇ Front PDF"}</button>
+          <button onClick={()=>dl("front","png")} disabled={!!dlState} style={{ ...btnBase, background:dlState==="front-png"?"#6b7280":"#059669" }}>{dlState==="front-png"?"⏳…":"⬇ Front PNG"}</button>
+          <button onClick={()=>dl("back","pdf")}  disabled={!!dlState} style={{ ...btnBase, background:dlState==="back-pdf"?"#6b7280":"#7c3aed" }}>{dlState==="back-pdf"?"⏳…":"⬇ Back PDF"}</button>
+          <button onClick={()=>dl("back","png")}  disabled={!!dlState} style={{ ...btnBase, background:dlState==="back-png"?"#6b7280":"#b45309" }}>{dlState==="back-png"?"⏳…":"⬇ Back PNG"}</button>
         </div>
       </div>
 
-      {/* ── Instruction Banner ── */}
-      <div className="no-print" style={{
-        position: "fixed", top: "58px", left: 0, right: 0, zIndex: 199,
-        padding: "10px 24px", background: "#fef9c3",
-        borderBottom: "2px solid #facc15",
-        fontSize: "13px", fontWeight: 700, color: "#854d0e",
-        display: "flex", gap: "24px", flexWrap: "wrap", alignItems: "center",
-      }}>
-        <span>① Print Single-sided (NO duplex)</span>
-        <span>✂ ② Fold along the dashed line in the middle</span>
-        <span>🪪 ③ Front faces out · Back faces in → Laminate</span>
-        <span style={{ color: "#166534", background: "#dcfce7", padding: "3px 10px", borderRadius: "20px", border: "1px solid #86efac" }}>
-          ✅ Works on ANY printer — no duplex setting needed
-        </span>
+      {/* ── FRONT — A4 page ── */}
+      <div ref={frontRef} className={`a4-page${printTarget==="back"?" hide-print":""}`}>
+        <div className="card-wrap">
+          <CropMarks />
+          <div className="cut-guide" />
+          <FrontCard p={pilgrim} group={group} company={company} photoDataUrl={photoDataUrl} />
+        </div>
+        <div className="side-badge no-print" style={{ background:"#dbeafe", color:"#1e40af" }}>
+          ▲ FRONT — {pilgrim.fullName} &nbsp;·&nbsp; 54 mm × 85 mm &nbsp;·&nbsp; 300 DPI ready
+        </div>
       </div>
 
-      {/* ── The single A4 page ── */}
-      <div ref={contentRef} className="fold-page">
-
-        {/* TOP HALF — FRONT card (normal orientation) */}
-        <div className="fold-half" style={{ borderBottom: "none" }}>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3mm" }}>
-            <div className="no-print" style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", fontFamily: "Arial" }}>
-              ▼ FRONT SIDE
-            </div>
-            <FrontCard p={pilgrim} group={group} photoSrc={photoSrc} />
-          </div>
+      {/* ── BACK — A4 page ── */}
+      <div ref={backRef} className={`a4-page${printTarget==="front"?" hide-print":""}`}>
+        <div className="card-wrap">
+          <CropMarks />
+          <div className="cut-guide" />
+          <BackCard p={pilgrim} group={group} company={company} />
         </div>
-
-        {/* FOLD LINE */}
-        <div className="fold-line">
-          <span className="fold-line-label no-print">✂ Fold here</span>
+        <div className="side-badge no-print" style={{ background:"#fee2e2", color:"#991b1b" }}>
+          ▼ BACK — {pilgrim.fullName} &nbsp;·&nbsp; 54 mm × 85 mm &nbsp;·&nbsp; 300 DPI ready
         </div>
-
-        {/* BOTTOM HALF — BACK card rotated 180° */}
-        {/* After folding bottom UP behind the top, the 180° rotation makes it appear correctly */}
-        <div className="fold-half" style={{ transform: "rotate(180deg)" }}>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3mm" }}>
-            <div className="no-print" style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", fontFamily: "Arial" }}>
-              ▼ BACK SIDE (rotated — will be correct after folding)
-            </div>
-            <BackCard p={pilgrim} group={group} />
-          </div>
-        </div>
-
       </div>
     </>
   );

@@ -5,7 +5,8 @@ import { Barcode } from "@/components/print/Barcode";
 import { QRCodeCanvas } from "qrcode.react";
 import { COMPANIES, getCompanyById, type CompanyInfo } from "@/lib/companies";
 
-const API = import.meta.env.VITE_API_URL || "";
+const API  = import.meta.env.VITE_API_URL || "";
+const BASE = import.meta.env.BASE_URL.replace(/\/$/, "") || "";
 const PROD_DOMAIN = "https://alburhantravels.com";
 
 interface Pilgrim {
@@ -425,6 +426,13 @@ export default function PrintIdCards() {
           style={{ padding: "10px 20px", background: dlState === "percards" ? "#6b7280" : "#b45309", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", minWidth: "140px" }}>
           {dlState === "percards" ? `⏳ ${dlProgress || "..."}` : "⬇ PNG Cards 560dpi"}
         </button>
+        {pilgrims.length > 0 && (
+          <a
+            href={`${BASE}/admin/groups/${groupId}/print/id-card-front/${pilgrims[0].id}`}
+            style={{ padding: "10px 16px", background: "#0f766e", color: "#fff", borderRadius: "8px", fontWeight: 700, fontSize: "12px", textDecoration: "none", whiteSpace: "nowrap" }}>
+            🪪 Single Card
+          </a>
+        )}
         <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
       </div>
 

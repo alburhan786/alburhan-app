@@ -154,7 +154,9 @@ function Router() {
       <Route path="/admin/staff/print" component={() => <AdminRoute component={PrintStaffCards} />} />
       <Route path="/admin/print/spray-label" component={() => <AdminRoute component={PrintSprayLabel} />} />
       <Route path="/admin/print/id-card-svg" component={() => <AdminRoute component={PrintIdCardSVG} />} />
-      <Route path="/admin/groups/:groupId/print/single-card/:pilgrimId" component={() => <AdminRoute component={PrintSingleCard} />} />
+      <Route path="/admin/groups/:groupId/print/single-card/:pilgrimId"    component={() => <AdminRoute component={PrintSingleCard} />} />
+      <Route path="/admin/groups/:groupId/print/id-card-front/:pilgrimId" component={() => <AdminRoute component={PrintSingleCard} />} />
+      <Route path="/admin/groups/:groupId/print/id-card-back/:pilgrimId"  component={() => <AdminRoute component={PrintSingleCard} />} />
       <Route path="/admin/groups/:groupId/print/card-front/:pilgrimId" component={() => <AdminRoute component={PrintSingleCardPro} />} />
       <Route path="/admin/groups/:groupId/print/card-back/:pilgrimId"  component={() => <AdminRoute component={PrintSingleCardPro} />} />
 
