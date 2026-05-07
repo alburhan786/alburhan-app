@@ -99,26 +99,26 @@ function FrontCard({ p, group, company, photoDataUrls }: CardProps) {
 
         {/* Photo sidebar */}
         <div style={{
-          width: "22mm", flexShrink: 0, background: "#f0f7f2",
+          width: "20mm", flexShrink: 0, background: "#f0f7f2",
           display: "flex", flexDirection: "column", alignItems: "center",
           justifyContent: "center", padding: "0.8mm",
           borderRight: `1.5px solid ${GOLD}`,
         }}>
           {p.photoUrl ? (
             <img src={photoDataUrls[p.id] || `${API}${p.photoUrl}`} alt=""
-              style={{ width: "19mm", height: "24mm", objectFit: "cover", objectPosition: "top center", border: `2px solid ${GOLD}`, borderRadius: "2px" }} />
+              style={{ width: "16mm", height: "18mm", objectFit: "cover", objectPosition: "top center", border: `2px solid ${GOLD}`, borderRadius: "2px" }} />
           ) : (
             <div style={{
-              width: "19mm", height: "24mm", background: "#e0e8e4",
+              width: "16mm", height: "18mm", background: "#e0e8e4",
               border: `2px solid ${GOLD}`, borderRadius: "2px",
               display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
               fontSize: "3pt", color: "#888", fontWeight: 700,
             }}>
-              <div style={{ fontSize: "10pt", color: GOLD }}>👤</div>
+              <div style={{ fontSize: "9pt", color: GOLD }}>👤</div>
               <div>PHOTO</div>
             </div>
           )}
-          <div style={{ fontSize: "6pt", fontWeight: 900, color: DARK, marginTop: "0.8mm" }}>#{serial}</div>
+          <div style={{ fontSize: "5.5pt", fontWeight: 900, color: DARK, marginTop: "0.5mm" }}>#{serial}</div>
         </div>
 
         {/* Info column */}
@@ -166,22 +166,22 @@ function FrontCard({ p, group, company, photoDataUrls }: CardProps) {
           </div>
         </div>
 
-        {/* QR column — TOP RIGHT, BIG */}
+        {/* QR column — TOP RIGHT */}
         <div style={{
-          width: "22mm", flexShrink: 0, padding: "1.5mm 1.5mm 0.5mm",
-          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start",
+          width: "20mm", flexShrink: 0, padding: "1mm 1mm 0.5mm",
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
           borderLeft: `1px solid ${GOLD}50`,
         }}>
-          <div style={{ background: "#fff", padding: "3px", borderRadius: "3px", border: `2.5px solid #000` }}>
-            <QRCodeCanvas value={buildVerifyUrl(p.id)} size={60} level="M" fgColor="#000000" bgColor="#ffffff" />
+          <div style={{ background: "#fff", padding: "2px", borderRadius: "3px", border: `1.5px solid #000` }}>
+            <QRCodeCanvas value={buildVerifyUrl(p.id)} size={52} level="M" fgColor="#000000" bgColor="#ffffff" />
           </div>
           <div style={{ fontSize: "2.5pt", color: "#888", textTransform: "uppercase", marginTop: "0.5mm", letterSpacing: "0.2px", textAlign: "center" }}>SCAN TO VERIFY</div>
         </div>
       </div>
 
-      {/* ── Barcode — BIG ── */}
-      <div style={{ flexShrink: 0, padding: "1.5mm 1.5mm 0.3mm", background: "#fff", borderTop: `1px solid ${GOLD}40` }}>
-        <Barcode value={barcodeVal} format={barcodeFormat} height={20} displayValue fontSize={5} />
+      {/* ── Barcode ── */}
+      <div style={{ flexShrink: 0, padding: "0.8mm 1.5mm 0.2mm", background: "#fff", borderTop: `1px solid ${GOLD}40` }}>
+        <Barcode value={barcodeVal} format={barcodeFormat} height={14} displayValue fontSize={4} />
       </div>
 
       {/* ── Footer — Mobile + Emergency numbers BIG BOLD WHITE SQUARE ── */}
