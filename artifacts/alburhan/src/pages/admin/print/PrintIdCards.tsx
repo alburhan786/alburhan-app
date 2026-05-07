@@ -222,6 +222,8 @@ function BackCard({ p, group, company, showFeedbackQr, bookingMap }: {
   );
 }
 
+type PrintMode = "strip" | "sheets";
+
 export default function PrintIdCards() {
   const [, params] = useRoute("/admin/groups/:groupId/print/id-cards");
   const groupId = params?.groupId || "";
@@ -234,6 +236,7 @@ export default function PrintIdCards() {
   const [photoDataUrls, setPhotoDataUrls] = useState<Record<string, string>>({});
   const contentRef = useRef<HTMLDivElement>(null);
   const [dlState, setDlState] = useState<string | null>(null);
+  const [printMode, setPrintMode] = useState<PrintMode>("strip");
 
   const dlCards = async (fmt: "pdf" | "jpg" | "png") => {
     if (!contentRef.current) return;
@@ -334,9 +337,46 @@ export default function PrintIdCards() {
         @media print {
           .row-label { display: none; }
         }
+
+        /* ── Sheets mode: all fronts page 1, all backs page 2 ── */
+        .sheets-block {
+          page-break-after: always;
+          page-break-inside: avoid;
+        }
+        .sheets-block:last-child { page-break-after: auto; }
+        .sheets-grid {
+          display: flex;
+          flex-direction: column;
+          gap: 5mm;
+        }
+        .sheets-page-label {
+          font-size: 8pt;
+          font-weight: 700;
+          padding: 3px 8px;
+          border-radius: 4px;
+          margin-bottom: 3mm;
+          font-family: Arial, sans-serif;
+        }
+        @media print {
+          .sheets-page-label { display: none !important; }
+        }
       `}</style>
 
       <div className="no-print" style={{ padding: "16px", background: "#fef3c7", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", flexWrap: "wrap" }}>
+        {/* Mode toggle */}
+        <div style={{ display: "flex", gap: "4px", background: "#e5e7eb", borderRadius: "8px", padding: "3px" }}>
+          {(["strip", "sheets"] as PrintMode[]).map(m => (
+            <button key={m} onClick={() => setPrintMode(m)} style={{
+              padding: "7px 14px", border: "none", borderRadius: "6px", cursor: "pointer",
+              fontSize: "12px", fontWeight: 700,
+              background: printMode === m ? DARK : "transparent",
+              color: printMode === m ? "#fff" : "#374151",
+            }}>
+              {m === "strip" ? "Strip 3" : "Sheets"}
+            </button>
+          ))}
+        </div>
+
         <select value={companyId} onChange={e => setCompanyId(e.target.value)} style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "13px", background: "#fff" }}>
           {COMPANIES.map(c => <option key={c.id} value={c.id}>{c.id === "alburhan" ? "Al Burhan Tours & Travels" : c.name}</option>)}
         </select>
@@ -357,35 +397,81 @@ export default function PrintIdCards() {
         <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
       </div>
 
-      <div className="no-print" style={{ padding: "10px 16px", background: "#f0fdf4", borderBottom: "1px solid #d1fae5", fontSize: "12px", color: "#065f46", textAlign: "center", lineHeight: 1.8 }}>
-        <strong>How to use:</strong> Each A4 page = {CARDS_PER_ROW} pilgrims (front cards on top, back cards on bottom).
-        &nbsp;① Print &nbsp;② Cut along the dashed line &nbsp;③ Stack back strip below front strip &nbsp;④ Cut vertically for individual paired cards &nbsp;⑤ Laminate
+      <div className="no-print" style={{
+        padding: "10px 16px", fontSize: "12px", textAlign: "center", lineHeight: 1.8,
+        background: printMode === "sheets" ? "#f0f9ff" : "#f0fdf4",
+        borderBottom: `1px solid ${printMode === "sheets" ? "#bae6fd" : "#d1fae5"}`,
+        color: printMode === "sheets" ? "#0c4a6e" : "#065f46",
+      }}>
+        {printMode === "sheets" ? (
+          <><strong>Sheets mode:</strong> Page 1 = ALL front cards · Page 2 = ALL back cards (same order).
+          &nbsp;① Print both pages &nbsp;② Cut each page into individual cards &nbsp;③ Pair front + back &nbsp;④ Laminate</>
+        ) : (
+          <><strong>How to use:</strong> Each A4 page = {CARDS_PER_ROW} pilgrims (front cards on top, back cards on bottom).
+          &nbsp;① Print &nbsp;② Cut along the dashed line &nbsp;③ Stack back strip below front strip &nbsp;④ Cut vertically for individual paired cards &nbsp;⑤ Laminate</>
+        )}
       </div>
 
       <div ref={contentRef} style={{ padding: "6mm", fontFamily: "'Inter', Arial, sans-serif" }}>
-        {pages.map((page, pi) => (
-          <div key={pi} className="pair-block">
-
-            <div className="row-label" style={{ color: DARK }}>▼ FRONT SIDE — {page.map(p => p.fullName.split(" ")[0]).join(", ")}</div>
-
-            <div className="id-row">
-              {page.map(p => (
-                <FrontCard key={`f-${p.id}`} p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} photoDataUrls={photoDataUrls} />
-              ))}
+        {printMode === "sheets" ? (
+          <>
+            {/* Page 1: All fronts */}
+            <div className="sheets-block">
+              <div className="sheets-page-label" style={{ background: "#dbeafe", color: "#1e40af" }}>
+                📄 PAGE 1 — FRONT SIDE ({pilgrims.length} cards)
+              </div>
+              <div className="sheets-grid">
+                {pages.map((page, pi) => (
+                  <div key={pi} className="id-row">
+                    {page.map(p => (
+                      <FrontCard key={`sf-${p.id}`} p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} photoDataUrls={photoDataUrls} />
+                    ))}
+                  </div>
+                ))}
+              </div>
             </div>
 
-            <div className="cut-line">✂ Cut here — then stack back strip below front strip and cut vertically for individual cards</div>
-
-            <div className="row-label" style={{ color: "#7c3aed" }}>▲ BACK SIDE — same {page.length} pilgrim{page.length > 1 ? "s" : ""} (same left-to-right order)</div>
-
-            <div className="id-row">
-              {page.map(p => (
-                <BackCard key={`b-${p.id}`} p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
-              ))}
+            {/* Page 2: All backs */}
+            <div className="sheets-block">
+              <div className="sheets-page-label" style={{ background: "#fee2e2", color: "#991b1b" }}>
+                📄 PAGE 2 — BACK SIDE ({pilgrims.length} cards, same order)
+              </div>
+              <div className="sheets-grid">
+                {pages.map((page, pi) => (
+                  <div key={pi} className="id-row">
+                    {page.map(p => (
+                      <BackCard key={`sb-${p.id}`} p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
+                    ))}
+                  </div>
+                ))}
+              </div>
             </div>
+          </>
+        ) : (
+          pages.map((page, pi) => (
+            <div key={pi} className="pair-block">
 
-          </div>
-        ))}
+              <div className="row-label" style={{ color: DARK }}>▼ FRONT SIDE — {page.map(p => p.fullName.split(" ")[0]).join(", ")}</div>
+
+              <div className="id-row">
+                {page.map(p => (
+                  <FrontCard key={`f-${p.id}`} p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} photoDataUrls={photoDataUrls} />
+                ))}
+              </div>
+
+              <div className="cut-line">✂ Cut here — then stack back strip below front strip and cut vertically for individual cards</div>
+
+              <div className="row-label" style={{ color: "#7c3aed" }}>▲ BACK SIDE — same {page.length} pilgrim{page.length > 1 ? "s" : ""} (same left-to-right order)</div>
+
+              <div className="id-row">
+                {page.map(p => (
+                  <BackCard key={`b-${p.id}`} p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
+                ))}
+              </div>
+
+            </div>
+          ))
+        )}
       </div>
     </>
   );
