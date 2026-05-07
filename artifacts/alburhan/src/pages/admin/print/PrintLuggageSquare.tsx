@@ -13,6 +13,10 @@ const GREEN = "#1a7a5e";
 const GOLD  = "#C9A84C";
 const RED   = "#CC0000";
 
+const SVC_CENTER   = "621";
+const SVC_NAME_EN  = "Horizon Service Center";
+const SVC_NAME_AR  = "مركز خدمة هورايزون";
+
 interface Pilgrim {
   id: string; serialNumber: number; fullName: string; photoUrl?: string;
   passportNumber?: string; busNumber?: string;
@@ -278,6 +282,11 @@ function BackSticker({ p, group, company, compact }: {
             </div>
             <div style={{ fontFamily: "Arial", direction: "rtl", textAlign: "right", fontSize: "9pt", color: GREEN, fontWeight: 900, lineHeight: 1.1 }}>شركة مشارق الماسية لخدمات الحجاج</div>
             <div style={{ fontSize: "5pt", color: "#111", fontWeight: 900 }}>Mashariq Almasiah Company for Pilgrim Services</div>
+            <div style={{ marginTop: "0.6mm", background: DARK, borderRadius: "2px", padding: "0.5mm 2mm", display: "inline-flex", alignItems: "center", gap: "2mm" }}>
+              <span style={{ fontSize: "4.5pt", color: GOLD, fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.5px" }}>SERVICE CENTER NO.</span>
+              <span style={{ fontSize: "9pt", fontWeight: 900, color: "#fff", fontFamily: "monospace", letterSpacing: "1px" }}>{SVC_CENTER}</span>
+              <span style={{ fontSize: "4pt", color: GOLD, fontWeight: 700 }}>{SVC_NAME_EN}</span>
+            </div>
           </div>
 
           {/* Middle — service center + flag */}
@@ -361,6 +370,11 @@ function BackSticker({ p, group, company, compact }: {
           </div>
           <div style={{ fontFamily: "Arial", direction: "rtl", textAlign: "right", fontSize: "13pt", color: GREEN, fontWeight: 900, lineHeight: 1.25 }}>شركة مشارق الماسية لخدمات الحجاج</div>
           <div style={{ fontSize: "6.5pt", color: "#111", fontWeight: 900, lineHeight: 1.4 }}>Mashariq Almasiah Company for Pilgrim Services</div>
+          <div style={{ marginTop: "1mm", background: DARK, borderRadius: "3px", padding: "0.8mm 3mm", display: "inline-flex", alignItems: "center", gap: "3mm" }}>
+            <span style={{ fontSize: "5.5pt", color: GOLD, fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.5px" }}>SERVICE CENTER NO.</span>
+            <span style={{ fontSize: "13pt", fontWeight: 900, color: "#fff", fontFamily: "monospace", letterSpacing: "1px" }}>{SVC_CENTER}</span>
+            <span style={{ fontSize: "5pt", color: GOLD, fontWeight: 700 }}>{SVC_NAME_EN}</span>
+          </div>
         </div>
         <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
           <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", pointerEvents: "none" }}><SnowflakeSVG size={160} /></div>

@@ -9,7 +9,7 @@ import { almasiahLogoBase64 as almasiahLogoUrl } from "@/assets/almasiah-logo-da
 
 const API = import.meta.env.VITE_API_URL || "";
 
-const SVC_CENTER = "612";
+const SVC_CENTER = "621";
 const SVC_PHONE_1 = "0547090786";
 const SVC_PHONE_2 = "0568780786";
 const SVC_NAME_EN = "Mashariq Al Masiah Company for Pilgrim Services";
