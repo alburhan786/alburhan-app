@@ -331,7 +331,7 @@ function BackCard({ p, group, company, showFeedbackQr, bookingMap }: CardProps) 
   );
 }
 
-type PrintMode = "sidebyside" | "duplex";
+type PrintMode = "sidebyside" | "duplex" | "strip";
 
 export default function PrintIdCardsPro() {
   const [, params] = useRoute("/admin/groups/:groupId/print/id-cards-pro");
@@ -342,7 +342,7 @@ export default function PrintIdCardsPro() {
   const company = getCompanyById(companyId);
   const [showFeedbackQr, setShowFeedbackQr] = useState(false);
   const [bookingMap, setBookingMap] = useState<Record<string, string>>({});
-  const [printMode, setPrintMode] = useState<PrintMode>("sidebyside");
+  const [printMode, setPrintMode] = useState<PrintMode>("strip");
   const [dlState, setDlState] = useState<string | null>(null);
   const [photoDataUrls, setPhotoDataUrls] = useState<Record<string, string>>({});
   const contentRef = useRef<HTMLDivElement>(null);
@@ -486,13 +486,19 @@ export default function PrintIdCardsPro() {
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
 
   // Side-by-side: 4 pairs per A4 portrait page
+  // Strip: 3 pilgrims per A4 landscape page (fronts top, backs bottom)
   // Duplex: 1 card per page, front then back (2 pages per person)
   const PAIRS_PER_PAGE = 4;
+  const STRIP_PER_PAGE = 3;
   const pages: Pilgrim[][] = [];
   for (let i = 0; i < pilgrims.length; i += PAIRS_PER_PAGE)
     pages.push(pilgrims.slice(i, i + PAIRS_PER_PAGE));
+  const stripPages: Pilgrim[][] = [];
+  for (let i = 0; i < pilgrims.length; i += STRIP_PER_PAGE)
+    stripPages.push(pilgrims.slice(i, i + STRIP_PER_PAGE));
 
-  const isSBS = printMode === "sidebyside";
+  const isSBS   = printMode === "sidebyside";
+  const isStrip = printMode === "strip";
 
   // Reset on every render so stale elements from previous data don't linger
   pageElsRef.current = [];
@@ -579,6 +585,48 @@ export default function PrintIdCardsPro() {
           break-after: auto;
         }
 
+        /* ── Strip page: 3 per row, fronts top, backs bottom (A4 landscape) ── */
+        /* 3 × 90mm + 2 × 5mm gaps = 280mm — fits A4 landscape usable 281mm */
+        .strip-page {
+          width: 280mm;
+          margin: 0 auto;
+          page-break-after: always;
+          break-after: page;
+        }
+        .strip-page:last-child {
+          page-break-after: auto;
+          break-after: auto;
+        }
+        .strip-row {
+          display: flex;
+          flex-direction: row;
+          justify-content: center;
+          gap: 5mm;
+        }
+        .h-cut-line {
+          width: 280mm;
+          margin: 5mm auto;
+          border-top: 1.5px dashed #bbb;
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .h-cut-label {
+          position: absolute;
+          background: #f5f5f0;
+          padding: 0 8px;
+          font-size: 9px;
+          color: #aaa;
+          font-style: italic;
+          white-space: nowrap;
+        }
+
+        @media print {
+          .strip-page { box-shadow: none !important; }
+          .h-cut-label { background: white !important; }
+        }
+
         @media screen {
           .id-print-page {
             background: white;
@@ -592,8 +640,15 @@ export default function PrintIdCardsPro() {
             box-shadow: 0 2px 16px rgba(0,0,0,0.12);
             border-radius: 4px;
           }
+          .strip-page {
+            background: white;
+            padding: 8mm;
+            box-shadow: 0 2px 16px rgba(0,0,0,0.12);
+            border-radius: 4px;
+          }
         }
       `}</style>
+      {isStrip && <style>{`@media print { @page { size: A4 landscape; margin: 8mm; } }`}</style>}
 
       {/* ── Toolbar ── */}
       <div className="no-print" style={{
@@ -604,10 +659,23 @@ export default function PrintIdCardsPro() {
         <div>
           <div style={{ fontWeight: 800, fontSize: "15px", color: DARK }}>ID Card Print</div>
           <div style={{ fontSize: "12px", color: "#555" }}>
-            {isSBS
-              ? "Side-by-side · Front | Back on same sheet · Cut & stack"
-              : "Duplex mode · Front on page N, Back on page N+1"}
+            {isStrip ? "Strip 3 · 3 fronts on top · 3 backs on bottom · A4 landscape"
+             : isSBS  ? "Side-by-side · Front | Back on same sheet · Cut & stack"
+             :          "Duplex mode · Front on page N, Back on page N+1"}
           </div>
+        </div>
+        {/* Mode toggle */}
+        <div style={{ display: "flex", gap: "4px", background: "#e5e7eb", borderRadius: "8px", padding: "3px" }}>
+          {(["strip", "sidebyside", "duplex"] as PrintMode[]).map(m => (
+            <button key={m} onClick={() => setPrintMode(m)} style={{
+              padding: "6px 12px", border: "none", borderRadius: "6px", cursor: "pointer",
+              fontSize: "12px", fontWeight: 700,
+              background: printMode === m ? DARK : "transparent",
+              color: printMode === m ? "#fff" : "#374151",
+            }}>
+              {m === "strip" ? "Strip 3" : m === "sidebyside" ? "Side-by-Side" : "Duplex"}
+            </button>
+          ))}
         </div>
 
         <select value={companyId} onChange={e => setCompanyId(e.target.value)}
@@ -655,12 +723,17 @@ export default function PrintIdCardsPro() {
       {/* ── Instruction bar ── */}
       <div className="no-print" style={{
         padding: "10px 20px", fontSize: "13px", fontWeight: 600,
-        background: isSBS ? "#f0fdf4" : "#eff6ff",
-        borderBottom: `2px solid ${isSBS ? "#86efac" : "#93c5fd"}`,
-        color: isSBS ? "#15803d" : "#1d4ed8",
+        background: isStrip ? "#fefce8" : isSBS ? "#f0fdf4" : "#eff6ff",
+        borderBottom: `2px solid ${isStrip ? "#fde047" : isSBS ? "#86efac" : "#93c5fd"}`,
+        color: isStrip ? "#854d0e" : isSBS ? "#15803d" : "#1d4ed8",
         display: "flex", gap: "20px", flexWrap: "wrap", alignItems: "center",
       }}>
-        {isSBS ? (
+        {isStrip ? (
+          <>
+            <span>✅ Each A4 page = {STRIP_PER_PAGE} pilgrims (front cards on top, back cards on bottom)</span>
+            <span>🖨 Print → ✂ Cut along the dashed line → Stack back strip below front strip and cut vertically for individual paired cards → Laminate</span>
+          </>
+        ) : isSBS ? (
           <>
             <span>✅ Each row = one person's FRONT card + BACK card side by side</span>
             <span>✂ Cut along the dashed line · Stack front &amp; back together · Laminate</span>
@@ -678,7 +751,45 @@ export default function PrintIdCardsPro() {
       {/* ── Content ── */}
       <div ref={contentRef} className="id-print-content" style={{ background: "#f5f5f0", padding: "8mm", display: "flex", flexDirection: "column", gap: "8mm" }}>
 
-        {isSBS ? (
+        {isStrip ? (
+          /* ── STRIP MODE: 3 fronts on top, cut line, 3 backs on bottom, A4 landscape ── */
+          stripPages.map((pagePilgrims, pi) => (
+            <div key={pi}>
+              <div className="no-print" style={{ fontSize: "11px", color: "#999", marginBottom: "3mm", fontStyle: "italic" }}>
+                ▼ FRONT SIDE — {pagePilgrims.map(p => p.fullName.split(" ")[0]).join(", ")}
+              </div>
+              <div className="strip-page" ref={el => { if (el) pageElsRef.current[pi] = el as HTMLElement; }}>
+                {/* Front strip */}
+                <div className="strip-row">
+                  {pagePilgrims.map(p => (
+                    <div key={p.id} ref={el => { if (el) frontCardRefs.current.set(p.id, el as HTMLElement); }}>
+                      <FrontCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} photoDataUrls={photoDataUrls} />
+                    </div>
+                  ))}
+                </div>
+
+                {/* Horizontal cut line */}
+                <div className="h-cut-line">
+                  <span className="h-cut-label no-print">
+                    ✂ Cut here — then stack back strip below front strip and cut vertically for individual paired cards
+                  </span>
+                </div>
+
+                {/* Back strip */}
+                <div className="no-print" style={{ fontSize: "11px", color: "#c2410c", marginBottom: "2mm", fontStyle: "italic", fontWeight: 700 }}>
+                  ▲ BACK SIDE — SAME {pagePilgrims.length} PILGRIMS (SAME LEFT-TO-RIGHT ORDER)
+                </div>
+                <div className="strip-row">
+                  {pagePilgrims.map(p => (
+                    <div key={p.id} ref={el => { if (el) backCardRefs.current.set(p.id, el as HTMLElement); }}>
+                      <BackCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} photoDataUrls={photoDataUrls} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))
+        ) : isSBS ? (
           /* ── SIDE-BY-SIDE MODE: 4 rows per A4 ── */
           pages.map((pagePilgrims, pi) => (
             <div key={pi}>
