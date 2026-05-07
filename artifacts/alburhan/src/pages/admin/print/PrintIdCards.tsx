@@ -77,44 +77,38 @@ function LogoHeader({ size, company }: { size?: "small"; company: CompanyInfo })
 function FrontCard({ p, group, company, showFeedbackQr, bookingMap, photoDataUrls }: {
   p: Pilgrim; group: Group; company: CompanyInfo; showFeedbackQr: boolean; bookingMap: Record<string, string>; photoDataUrls: Record<string, string>;
 }) {
-  const dot: React.CSSProperties = { width: "2.5mm", height: "2.5mm", borderRadius: "50%", background: GOLD, flexShrink: 0, marginTop: "0.5mm" };
   const photoSrc = photoDataUrls[p.id] || (p.photoUrl ? `${API}${p.photoUrl}` : "");
   return (
     <div className="id-card">
       <WaveShapes />
-      <div style={{ position: "relative", zIndex: 1, height: "100%", display: "flex", flexDirection: "column", padding: "2mm 2.5mm 0" }}>
-        <LogoHeader company={company} size="small" />
-        {/* Body: photo | info | QR */}
-        <div style={{ display: "flex", flex: 1, gap: "2mm", alignItems: "flex-start", marginTop: "1mm" }}>
-          {/* Photo */}
-          <div style={{ flexShrink: 0 }}>
-            {photoSrc
-              ? <img src={photoSrc} alt="" style={{ width: "19mm", height: "19mm", objectFit: "cover", borderRadius: "50%", border: `2px solid ${GOLD}` }} />
-              : <div style={{ width: "19mm", height: "19mm", background: "#f0f0f0", borderRadius: "50%", border: `2px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "3.5pt", color: "#aaa" }}>PHOTO</div>
-            }
-          </div>
-          {/* Info */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: "6pt", fontWeight: 900, color: DARK, textTransform: "uppercase", lineHeight: 1.2, wordBreak: "break-word" }}>{p.fullName || "—"}</div>
-            <div style={{ fontSize: "4.5pt", color: GOLD, fontWeight: 700, marginBottom: "1.2mm" }}>HAJJ {group.year}</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.7mm" }}>
-              <div style={{ display: "flex", alignItems: "flex-start", gap: "1mm" }}>
-                <div style={dot} /><div style={{ fontSize: "4.5pt" }}><span style={{ color: "#888", fontSize: "3.5pt" }}>Serial </span><span style={{ fontWeight: 700, color: DARK }}>#{String(p.serialNumber).padStart(3, "0")}</span></div>
-              </div>
-              <div style={{ display: "flex", alignItems: "flex-start", gap: "1mm" }}>
-                <div style={dot} /><div style={{ fontSize: "4.5pt" }}><span style={{ color: "#888", fontSize: "3.5pt" }}>Passport </span><span style={{ fontWeight: 600, fontFamily: "monospace" }}>{p.passportNumber || "—"}</span></div>
-              </div>
-              <div style={{ display: "flex", alignItems: "flex-start", gap: "1mm" }}>
-                <div style={dot} /><div style={{ fontSize: "4.5pt" }}><span style={{ color: "#888", fontSize: "3.5pt" }}>Mobile </span><span style={{ fontWeight: 600 }}>{p.mobileIndia || "—"}</span></div>
-              </div>
-            </div>
-          </div>
-          {/* QR */}
-          <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5mm", paddingTop: "0.5mm" }}>
+      <div style={{ position: "relative", zIndex: 1, height: "100%", display: "flex", flexDirection: "column", padding: "2.5mm 3mm 0" }}>
+        {/* Header */}
+        <LogoHeader company={company} />
+        {/* Photo — centered */}
+        <div style={{ display: "flex", justifyContent: "center", marginTop: "2mm", marginBottom: "1.5mm" }}>
+          {photoSrc
+            ? <img src={photoSrc} alt="" style={{ width: "22mm", height: "22mm", objectFit: "cover", borderRadius: "50%", border: `2.5px solid ${GOLD}` }} />
+            : <div style={{ width: "22mm", height: "22mm", background: "#f0f0f0", borderRadius: "50%", border: `2.5px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "4pt", color: "#aaa" }}>PHOTO</div>
+          }
+        </div>
+        {/* Name + year */}
+        <div style={{ textAlign: "center", marginBottom: "1.5mm" }}>
+          <div style={{ fontSize: "7pt", fontWeight: 900, color: DARK, textTransform: "uppercase", lineHeight: 1.2, wordBreak: "break-word" }}>{p.fullName || "—"}</div>
+          <div style={{ fontSize: "5pt", color: GOLD, fontWeight: 700, marginTop: "0.5mm" }}>HAJJ {group.year}</div>
+        </div>
+        {/* Info rows */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "1mm", fontSize: "5pt", paddingLeft: "1mm" }}>
+          <div><span style={{ color: "#888", fontSize: "4pt" }}>Serial: </span><span style={{ fontWeight: 700, color: DARK }}>#{String(p.serialNumber).padStart(3, "0")}</span></div>
+          <div><span style={{ color: "#888", fontSize: "4pt" }}>Passport: </span><span style={{ fontWeight: 600, fontFamily: "monospace" }}>{p.passportNumber || "—"}</span></div>
+          <div><span style={{ color: "#888", fontSize: "4pt" }}>Mobile: </span><span style={{ fontWeight: 600 }}>{p.mobileIndia || "—"}</span></div>
+        </div>
+        {/* QR centered */}
+        <div style={{ display: "flex", justifyContent: "center", marginTop: "1.5mm" }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5mm" }}>
             <div style={{ background: "#fff", padding: "2px", borderRadius: "3px", border: `1.5px solid ${DARK}` }}>
               <QRCodeCanvas value={buildVerifyUrl(p.id)} size={36} level="M" fgColor={DARK} />
             </div>
-            <div style={{ fontSize: "3pt", color: DARK, fontWeight: 900, textTransform: "uppercase" }}>SCAN</div>
+            <div style={{ fontSize: "3pt", color: DARK, fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.3px" }}>SCAN</div>
           </div>
         </div>
       </div>
@@ -126,7 +120,7 @@ function FrontCard({ p, group, company, showFeedbackQr, bookingMap, photoDataUrl
             : <div style={{ fontSize: "4pt", color: "#999" }}>{group.groupName}</div>
           }
         </div>
-        <div style={{ background: DARK, color: GOLD, padding: "0.8mm 2mm", fontSize: "3.5pt", textAlign: "center", fontWeight: 800, letterSpacing: "0.2px" }}>
+        <div style={{ background: DARK, color: GOLD, padding: "1mm 2mm", fontSize: "3.5pt", textAlign: "center", fontWeight: 800, letterSpacing: "0.2px" }}>
           {company.name} | 🇮🇳 {company.phone} | 🇸🇦 {company.phoneSaudi}
         </div>
       </div>
@@ -137,65 +131,66 @@ function FrontCard({ p, group, company, showFeedbackQr, bookingMap, photoDataUrl
 function BackCard({ p, group, company, showFeedbackQr, bookingMap }: {
   p: Pilgrim; group: Group; company: CompanyInfo; showFeedbackQr: boolean; bookingMap: Record<string, string>;
 }) {
-  const dot: React.CSSProperties = { width: "2.5mm", height: "2.5mm", borderRadius: "50%", background: GOLD, flexShrink: 0, marginTop: "0.5mm" };
+  const dot: React.CSSProperties = { width: "2.5mm", height: "2.5mm", borderRadius: "50%", background: GOLD, flexShrink: 0, marginTop: "0.6mm" };
   return (
     <div className="id-card">
       <WaveShapesBack />
-      <div style={{ position: "relative", zIndex: 1, height: "100%", display: "flex", flexDirection: "column", padding: "2mm 2.5mm 0" }}>
-        <LogoHeader company={company} size="small" />
-        {/* Body: info left | QR right */}
-        <div style={{ display: "flex", flex: 1, gap: "2mm", alignItems: "flex-start", marginTop: "1mm" }}>
-          {/* Hotel / info column */}
-          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "0.8mm" }}>
-            <div style={{ display: "flex", alignItems: "flex-start", gap: "1mm" }}>
-              <div style={dot} /><div style={{ fontSize: "4.5pt" }}><span style={{ color: "#888", fontSize: "3.5pt" }}>Passport </span><span style={{ fontFamily: "monospace", fontWeight: 600 }}>{p.passportNumber || "—"}</span></div>
-            </div>
-            <div style={{ display: "flex", alignItems: "flex-start", gap: "1mm" }}>
-              <div style={dot} /><div style={{ fontSize: "4.5pt" }}><span style={{ color: "#888", fontSize: "3.5pt" }}>Maktab </span><span style={{ fontWeight: 600 }}>{group.maktabNumber || "—"}</span></div>
-            </div>
-            <div style={{ display: "flex", alignItems: "flex-start", gap: "1mm" }}>
-              <div style={dot} />
-              <div style={{ fontSize: "4.5pt", minWidth: 0 }}>
-                <span style={{ color: "#888", fontSize: "3.5pt" }}>Makkah Hotel </span>
-                <span style={{ fontWeight: 600 }}>{group.hotels?.makkah?.name || "—"}</span>
-                {group.hotels?.makkah?.nameAr && <div style={{ fontSize: "3.5pt", direction: "rtl" }}>{group.hotels.makkah.nameAr}</div>}
-              </div>
-            </div>
-            <div style={{ display: "flex", alignItems: "flex-start", gap: "1mm" }}>
-              <div style={dot} />
-              <div style={{ fontSize: "4.5pt", minWidth: 0 }}>
-                <span style={{ color: "#888", fontSize: "3.5pt" }}>Madinah Hotel </span>
-                <span style={{ fontWeight: 600 }}>{group.hotels?.madinah?.name || "—"}</span>
-                {group.hotels?.madinah?.nameAr && <div style={{ fontSize: "3.5pt", direction: "rtl" }}>{group.hotels.madinah.nameAr}</div>}
-              </div>
+      <div style={{ position: "relative", zIndex: 1, height: "100%", display: "flex", flexDirection: "column", padding: "2.5mm 3mm 0" }}>
+        <LogoHeader company={company} />
+        {/* Info list */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "1.5mm", marginTop: "2mm", fontSize: "5.5pt", lineHeight: 1.4 }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: "1.5mm" }}>
+            <div style={dot} />
+            <div><span style={{ color: "#888", fontSize: "4.5pt" }}>Passport No. </span><span style={{ fontFamily: "monospace", fontWeight: 600 }}>{p.passportNumber || "—"}</span></div>
+          </div>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: "1.5mm" }}>
+            <div style={dot} />
+            <div><span style={{ color: "#888", fontSize: "4.5pt" }}>Maktab: </span><span style={{ fontWeight: 600 }}>{group.maktabNumber || "—"}</span></div>
+          </div>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: "1.5mm" }}>
+            <div style={dot} />
+            <div>
+              <span style={{ color: "#888", fontSize: "4.5pt" }}>Makkah Hotel: </span>
+              <span style={{ fontWeight: 600 }}>{group.hotels?.makkah?.name || "—"}</span>
+              {group.hotels?.makkah?.nameAr && <div style={{ fontSize: "4.5pt", direction: "rtl", textAlign: "right" }}>{group.hotels.makkah.nameAr}</div>}
             </div>
           </div>
-          {/* QR column */}
-          <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5mm", paddingTop: "0.5mm" }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: "1.5mm" }}>
+            <div style={dot} />
+            <div>
+              <span style={{ color: "#888", fontSize: "4.5pt" }}>Madinah Hotel: </span>
+              <span style={{ fontWeight: 600 }}>{group.hotels?.madinah?.name || "—"}</span>
+              {group.hotels?.madinah?.nameAr && <div style={{ fontSize: "4.5pt", direction: "rtl", textAlign: "right" }}>{group.hotels.madinah.nameAr}</div>}
+            </div>
+          </div>
+        </div>
+        {/* QR centered */}
+        <div style={{ display: "flex", justifyContent: "center", marginTop: "2mm" }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5mm" }}>
             <div style={{ background: "#fff", padding: "2px", borderRadius: "3px", border: `1.5px solid ${DARK}` }}>
               <QRCodeCanvas
                 value={showFeedbackQr && p.mobileIndia && bookingMap[p.mobileIndia]
                   ? `${PROD_DOMAIN}/feedback?booking_id=${bookingMap[p.mobileIndia]}`
                   : buildVerifyUrl(p.id)}
-                size={34} level="M" fgColor={DARK}
+                size={40} level="M" fgColor={DARK}
               />
             </div>
             <div style={{ fontSize: "3pt", color: DARK, fontWeight: 700, textTransform: "uppercase" }}>
-              {showFeedbackQr ? "FEEDBACK" : "SCAN"}
+              {showFeedbackQr ? "RATE YOUR TRIP" : "SCAN"}
             </div>
           </div>
         </div>
       </div>
       {/* Footer */}
       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 3 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "3.5pt", color: "#666", padding: "0 2.5mm", marginBottom: "0.5mm" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "3.5pt", color: "#666", padding: "0 3mm", marginBottom: "0.5mm" }}>
           <div>Group: <b style={{ color: DARK }}>{group.groupName}</b></div>
           <div><b style={{ color: DARK }}>{p.fullName}</b></div>
           <div>Year: <b style={{ color: DARK }}>{group.year}</b></div>
         </div>
         <div style={{
-          background: DARK, color: "#fff", padding: "0.8mm 2mm",
-          fontSize: "3.5pt", fontWeight: 900, textAlign: "center",
+          background: DARK, color: "#fff", padding: "1mm 2mm",
+          fontSize: "3.5pt", fontWeight: 900, textAlign: "center", lineHeight: 1.5,
           WebkitPrintColorAdjust: "exact", printColorAdjust: "exact",
         } as React.CSSProperties}>
           <div>{company.address}</div>
@@ -280,7 +275,7 @@ export default function PrintIdCards() {
 
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
 
-  const CARDS_PER_ROW = 2; // 2×85mm + 5mm gap = 175mm — fits A4 portrait usable 190mm
+  const CARDS_PER_ROW = 3; // 3×54mm + 2×5mm = 172mm — fits A4 portrait usable 190mm
   const pages: Pilgrim[][] = [];
   for (let i = 0; i < pilgrims.length; i += CARDS_PER_ROW) {
     pages.push(pilgrims.slice(i, i + CARDS_PER_ROW));
@@ -297,7 +292,7 @@ export default function PrintIdCards() {
         }
         * { box-sizing: border-box; }
         .id-card {
-          width: 85mm; height: 54mm;
+          width: 54mm; height: 85mm;
           border: 1px solid #ddd; border-radius: 4px; overflow: hidden;
           page-break-inside: avoid; font-family: 'Inter', Arial, sans-serif;
           background: #fff; position: relative; flex-shrink: 0;
@@ -342,7 +337,7 @@ export default function PrintIdCards() {
         }
 
         /* ── Direct mode: one card per full A4 page, scaled to fill ── */
-        /* Card 85×54mm, scale 2.28 → 194×123mm, centered on A4 usable 194×281mm */
+        /* Card 54×85mm, scale 3.27 → 177×278mm, centered on A4 usable 194×281mm */
         .direct-page {
           width: 194mm;
           height: 281mm;
@@ -354,7 +349,7 @@ export default function PrintIdCards() {
         }
         .direct-page:last-child { page-break-after: auto; break-after: auto; }
         .direct-card-wrap {
-          zoom: 2.28;
+          zoom: 3.27;
           transform-origin: center center;
         }
         .direct-page-label {
