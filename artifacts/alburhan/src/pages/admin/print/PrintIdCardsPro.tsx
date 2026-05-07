@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useRoute } from "wouter";
-import { downloadMultiPagePdf, downloadPagesAsJpg, downloadPagesAsPng, downloadAsPdf, downloadAsJpg, downloadAsPng, fetchAsDataUrl, downloadElementAsSvg } from "@/lib/downloadUtils";
+import { downloadMultiPagePdf, downloadPagesAsJpg, downloadPagesAsPng, downloadAsPdf, downloadAsJpg, downloadAsPng, fetchAsDataUrl, downloadElementAsSvg, downloadCardsAsSheet } from "@/lib/downloadUtils";
 import { Barcode } from "@/components/print/Barcode";
 import { QRCodeCanvas } from "qrcode.react";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
@@ -403,6 +403,24 @@ export default function PrintIdCardsPro() {
     } finally { setDlState(null); }
   };
 
+  const dlFrontSheet = async () => {
+    setDlState("front-sheet");
+    try {
+      const els = pilgrims.map(p => frontCardRefs.current.get(p.id)).filter(Boolean) as HTMLElement[];
+      const name = `id-cards-fronts-${group?.groupName || "group"}.png`;
+      await downloadCardsAsSheet(els, name, 2);
+    } finally { setDlState(null); }
+  };
+
+  const dlBackSheet = async () => {
+    setDlState("back-sheet");
+    try {
+      const els = pilgrims.map(p => backCardRefs.current.get(p.id)).filter(Boolean) as HTMLElement[];
+      const name = `id-cards-backs-${group?.groupName || "group"}.png`;
+      await downloadCardsAsSheet(els, name, 2);
+    } finally { setDlState(null); }
+  };
+
   useEffect(() => {
     if (!groupId) return;
     Promise.all([
@@ -574,8 +592,14 @@ export default function PrintIdCardsPro() {
           <button onClick={() => dlCards("jpg")} disabled={!!dlState} style={{ padding: "10px 18px", background: dlState === "jpg" ? "#6b7280" : "#7c3aed", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
             {dlState === "jpg" ? "⏳..." : "⬇ JPG"}
           </button>
-          <button onClick={dlAllPng} disabled={!!dlState} style={{ padding: "10px 18px", background: dlState === "png-singles" ? "#6b7280" : "#0e7490", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
-            {dlState === "png-singles" ? "⏳ PNG..." : "⬇ PNG Front/Back"}
+          <button onClick={dlFrontSheet} disabled={!!dlState} style={{ padding: "10px 18px", background: dlState === "front-sheet" ? "#6b7280" : "#0e7490", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
+            {dlState === "front-sheet" ? "⏳ Fronts..." : "⬇ All Fronts PNG"}
+          </button>
+          <button onClick={dlBackSheet} disabled={!!dlState} style={{ padding: "10px 18px", background: dlState === "back-sheet" ? "#6b7280" : "#0d5040", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
+            {dlState === "back-sheet" ? "⏳ Backs..." : "⬇ All Backs PNG"}
+          </button>
+          <button onClick={dlAllPng} disabled={!!dlState} style={{ padding: "10px 18px", background: dlState === "png-singles" ? "#6b7280" : "#475569", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "12px" }}>
+            {dlState === "png-singles" ? "⏳ PNG..." : "⬇ PNG (individual)"}
           </button>
           <button onClick={dlAllSvg} disabled={!!dlState} style={{ padding: "10px 18px", background: dlState === "svg" ? "#6b7280" : "#b45309", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
             {dlState === "svg" ? "⏳ SVG..." : "⬇ SVG"}

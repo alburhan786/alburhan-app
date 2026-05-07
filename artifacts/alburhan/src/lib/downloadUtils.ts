@@ -180,6 +180,53 @@ export async function downloadPagesAsJpg(pages: HTMLElement[], filename: string)
 }
 
 /**
+ * Renders each element at `scale` (≈ 560/96 ≈ 5.83 for 560 DPI) and stitches
+ * them into a single PNG sheet laid out in `cardsPerRow` columns.
+ * White gap between cards = `gapPx` canvas pixels.
+ */
+export async function downloadCardsAsSheet(
+  elements: HTMLElement[],
+  filename: string,
+  cardsPerRow = 2,
+  scale = 560 / 96,
+  gapPx = 12,
+) {
+  if (elements.length === 0) return;
+
+  const canvases: HTMLCanvasElement[] = [];
+  for (const el of elements) {
+    let c = await renderCanvas(el, scale);
+    if (!c) c = await renderCanvas(el, 4);
+    if (!c) c = await renderCanvas(el, 2);
+    if (c) canvases.push(c);
+  }
+  if (canvases.length === 0) { alert("Sheet PNG download failed — no cards rendered."); return; }
+
+  const cardW = canvases[0].width;
+  const cardH = canvases[0].height;
+  const cols  = Math.min(cardsPerRow, canvases.length);
+  const rows  = Math.ceil(canvases.length / cols);
+
+  const master = document.createElement("canvas");
+  master.width  = cols * cardW + (cols - 1) * gapPx;
+  master.height = rows * cardH + (rows - 1) * gapPx;
+
+  const ctx = master.getContext("2d")!;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, master.width, master.height);
+
+  for (let i = 0; i < canvases.length; i++) {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    ctx.drawImage(canvases[i], col * (cardW + gapPx), row * (cardH + gapPx));
+  }
+
+  const blob = await new Promise<Blob | null>(res => master.toBlob(res, "image/png", 1));
+  if (blob) saveAs(blob, filename.endsWith(".png") ? filename : filename + ".png");
+  else alert("Sheet PNG download failed.");
+}
+
+/**
  * Captures an element and downloads it as an SVG file embedding the rendered
  * image at the given physical mm dimensions.
  */
