@@ -25,8 +25,11 @@ export function Barcode({ value, width = 1, height = 25, fontSize = 8, displayVa
           height,
           fontSize,
           displayValue,
-          margin: 0,
+          margin: 10,        // quiet zone — required for scanners
+          marginLeft: 12,
+          marginRight: 12,
           background: "#ffffff",
+          lineColor: "#000000",
         });
       } catch {}
     }

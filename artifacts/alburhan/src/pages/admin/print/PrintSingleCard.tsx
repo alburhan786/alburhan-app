@@ -113,7 +113,7 @@ function FrontCard({ p, group, company, photoDataUrl }: { p:Pilgrim; group:Group
         <div style={{ display:"flex", justifyContent:"center", padding:"1.5mm 2mm 1mm", background:"#fff" }}>
           <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:"0.5mm" }}>
             <div style={{ background:"#fff", padding:"3px", border:"1.5px solid #333", borderRadius:"3px" }}>
-              <QRCodeCanvas value={buildVerifyUrl(p.id)} size={64} level="H" fgColor="#000000" bgColor="#ffffff" />
+              <QRCodeCanvas value={buildVerifyUrl(p.id)} size={64} level="M" fgColor="#000000" bgColor="#ffffff" />
             </div>
             <div style={{ fontSize:"3pt", color:DARK, fontWeight:900, textTransform:"uppercase", letterSpacing:"0.3px" }}>SCAN TO VERIFY</div>
           </div>
@@ -175,7 +175,7 @@ function BackCard({ p, group, company }: { p:Pilgrim; group:Group; company:Compa
         <div style={{ display:"flex", justifyContent:"center", marginTop:"2.5mm" }}>
           <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:"0.5mm" }}>
             <div style={{ background:"#fff", padding:"4px", borderRadius:"3px", border:`1.5px solid #333` }}>
-              <QRCodeCanvas value={buildVerifyUrl(p.id)} size={72} level="H" fgColor="#000000" bgColor="#ffffff" />
+              <QRCodeCanvas value={buildVerifyUrl(p.id)} size={72} level="M" fgColor="#000000" bgColor="#ffffff" />
             </div>
             <div style={{ fontSize:"3pt", color:DARK, fontWeight:700, textTransform:"uppercase" }}>SCAN</div>
           </div>

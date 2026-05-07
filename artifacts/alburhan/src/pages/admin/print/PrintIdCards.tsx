@@ -107,7 +107,7 @@ function FrontCard({ p, group, company, showFeedbackQr, bookingMap, photoDataUrl
         <div style={{ display: "flex", justifyContent: "center", marginTop: "1.5mm" }}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5mm" }}>
             <div style={{ background: "#fff", padding: "3px", borderRadius: "3px", border: `1.5px solid #333` }}>
-              <QRCodeCanvas value={buildVerifyUrl(p.id)} size={52} level="H" fgColor="#000000" bgColor="#ffffff" />
+              <QRCodeCanvas value={buildVerifyUrl(p.id)} size={52} level="M" fgColor="#000000" bgColor="#ffffff" />
             </div>
             <div style={{ fontSize: "3pt", color: DARK, fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.3px" }}>SCAN</div>
           </div>
@@ -173,7 +173,7 @@ function BackCard({ p, group, company, showFeedbackQr, bookingMap }: {
                 value={showFeedbackQr && p.mobileIndia && bookingMap[p.mobileIndia]
                   ? `${PROD_DOMAIN}/feedback?booking_id=${bookingMap[p.mobileIndia]}`
                   : buildVerifyUrl(p.id)}
-                size={52} level="H" fgColor="#000000" bgColor="#ffffff"
+                size={52} level="M" fgColor="#000000" bgColor="#ffffff"
               />
             </div>
             <div style={{ fontSize: "3pt", color: DARK, fontWeight: 700, textTransform: "uppercase" }}>
