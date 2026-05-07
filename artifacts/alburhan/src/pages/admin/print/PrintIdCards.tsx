@@ -222,7 +222,7 @@ function BackCard({ p, group, company, showFeedbackQr, bookingMap }: {
   );
 }
 
-type PrintMode = "strip" | "sheets";
+type PrintMode = "strip" | "sheets" | "direct";
 
 export default function PrintIdCards() {
   const [, params] = useRoute("/admin/groups/:groupId/print/id-cards");
@@ -338,6 +338,32 @@ export default function PrintIdCards() {
           .row-label { display: none; }
         }
 
+        /* ── Direct mode: one card per full A4 page, scaled to fill ── */
+        /* Card 54×86mm, scale 3.27 → 177×281mm, centered on A4 usable 194×281mm */
+        .direct-page {
+          width: 194mm;
+          height: 281mm;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          page-break-after: always;
+          break-after: page;
+        }
+        .direct-page:last-child { page-break-after: auto; break-after: auto; }
+        .direct-card-wrap {
+          zoom: 3.27;
+          transform-origin: center center;
+        }
+        .direct-page-label {
+          font-size: 9pt; font-weight: 700; padding: 4px 10px;
+          border-radius: 4px; margin-bottom: 4mm;
+          font-family: Arial, sans-serif; text-align: center;
+        }
+        @media print {
+          .direct-page-label { display: none !important; }
+          .direct-page { width: 100%; height: 100%; }
+        }
+
         /* ── Sheets mode: all fronts page 1, all backs page 2 ── */
         .sheets-block {
           page-break-after: always;
@@ -365,14 +391,14 @@ export default function PrintIdCards() {
       <div className="no-print" style={{ padding: "16px", background: "#fef3c7", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", flexWrap: "wrap" }}>
         {/* Mode toggle */}
         <div style={{ display: "flex", gap: "4px", background: "#e5e7eb", borderRadius: "8px", padding: "3px" }}>
-          {(["strip", "sheets"] as PrintMode[]).map(m => (
+          {(["direct", "strip", "sheets"] as PrintMode[]).map(m => (
             <button key={m} onClick={() => setPrintMode(m)} style={{
               padding: "7px 14px", border: "none", borderRadius: "6px", cursor: "pointer",
               fontSize: "12px", fontWeight: 700,
               background: printMode === m ? DARK : "transparent",
               color: printMode === m ? "#fff" : "#374151",
             }}>
-              {m === "strip" ? "Strip 3" : "Sheets"}
+              {m === "direct" ? "Direct Print" : m === "strip" ? "Strip 3" : "Sheets"}
             </button>
           ))}
         </div>
@@ -399,11 +425,13 @@ export default function PrintIdCards() {
 
       <div className="no-print" style={{
         padding: "10px 16px", fontSize: "12px", textAlign: "center", lineHeight: 1.8,
-        background: printMode === "sheets" ? "#f0f9ff" : "#f0fdf4",
-        borderBottom: `1px solid ${printMode === "sheets" ? "#bae6fd" : "#d1fae5"}`,
-        color: printMode === "sheets" ? "#0c4a6e" : "#065f46",
+        background: printMode === "direct" ? "#fff7ed" : printMode === "sheets" ? "#f0f9ff" : "#f0fdf4",
+        borderBottom: `1px solid ${printMode === "direct" ? "#fed7aa" : printMode === "sheets" ? "#bae6fd" : "#d1fae5"}`,
+        color: printMode === "direct" ? "#9a3412" : printMode === "sheets" ? "#0c4a6e" : "#065f46",
       }}>
-        {printMode === "sheets" ? (
+        {printMode === "direct" ? (
+          <><strong>Direct Print:</strong> Each card fills one full A4 page. Front on page 1, Back on page 2 — per pilgrim. No cutting needed. Just print &amp; laminate.</>
+        ) : printMode === "sheets" ? (
           <><strong>Sheets mode:</strong> Page 1 = ALL front cards · Page 2 = ALL back cards (same order).
           &nbsp;① Print both pages &nbsp;② Cut each page into individual cards &nbsp;③ Pair front + back &nbsp;④ Laminate</>
         ) : (
@@ -412,8 +440,34 @@ export default function PrintIdCards() {
         )}
       </div>
 
-      <div ref={contentRef} style={{ padding: "6mm", fontFamily: "'Inter', Arial, sans-serif" }}>
-        {printMode === "sheets" ? (
+      <div ref={contentRef} style={{ padding: printMode === "direct" ? "0" : "6mm", fontFamily: "'Inter', Arial, sans-serif" }}>
+        {printMode === "direct" ? (
+          /* ── DIRECT PRINT: one card per full A4 page, scaled to fill ── */
+          pilgrims.flatMap(p => [
+            /* Front page */
+            <div key={`df-${p.id}`} className="direct-page">
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                <div className="direct-page-label no-print" style={{ background: "#dbeafe", color: "#1e40af" }}>
+                  FRONT — {p.fullName} #{String(p.serialNumber).padStart(3, "0")}
+                </div>
+                <div className="direct-card-wrap">
+                  <FrontCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} photoDataUrls={photoDataUrls} />
+                </div>
+              </div>
+            </div>,
+            /* Back page */
+            <div key={`db-${p.id}`} className="direct-page">
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                <div className="direct-page-label no-print" style={{ background: "#fee2e2", color: "#991b1b" }}>
+                  BACK — {p.fullName} #{String(p.serialNumber).padStart(3, "0")}
+                </div>
+                <div className="direct-card-wrap">
+                  <BackCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
+                </div>
+              </div>
+            </div>,
+          ])
+        ) : printMode === "sheets" ? (
           <>
             {/* Page 1: All fronts */}
             <div className="sheets-block">
