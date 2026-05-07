@@ -106,8 +106,8 @@ function FrontCard({ p, group, company, showFeedbackQr, bookingMap, photoDataUrl
         {/* QR centered */}
         <div style={{ display: "flex", justifyContent: "center", marginTop: "1.5mm" }}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5mm" }}>
-            <div style={{ background: "#fff", padding: "2px", borderRadius: "3px", border: `1.5px solid ${DARK}` }}>
-              <QRCodeCanvas value={buildVerifyUrl(p.id)} size={36} level="M" fgColor={DARK} />
+            <div style={{ background: "#fff", padding: "3px", borderRadius: "3px", border: `1.5px solid #333` }}>
+              <QRCodeCanvas value={buildVerifyUrl(p.id)} size={52} level="H" fgColor="#000000" bgColor="#ffffff" />
             </div>
             <div style={{ fontSize: "3pt", color: DARK, fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.3px" }}>SCAN</div>
           </div>
@@ -115,9 +115,9 @@ function FrontCard({ p, group, company, showFeedbackQr, bookingMap, photoDataUrl
       </div>
       {/* Footer */}
       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 2 }}>
-        <div style={{ overflow: "hidden", paddingLeft: "2mm", marginBottom: "0.5mm" }}>
+        <div style={{ overflow: "hidden", padding: "0 2mm 1mm", background: "#fff" }}>
           {(p.barcodeId || p.passportNumber)
-            ? <Barcode value={p.barcodeId || p.passportNumber!} format={p.barcodeId ? "CODE128" : "CODE39"} height={10} width={0.9} fontSize={0} />
+            ? <Barcode value={p.barcodeId || p.passportNumber!} format="CODE128" height={16} width={1.2} fontSize={0} />
             : <div style={{ fontSize: "4pt", color: "#999" }}>{group.groupName}</div>
           }
         </div>
@@ -168,12 +168,12 @@ function BackCard({ p, group, company, showFeedbackQr, bookingMap }: {
         {/* QR centered */}
         <div style={{ display: "flex", justifyContent: "center", marginTop: "2mm" }}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5mm" }}>
-            <div style={{ background: "#fff", padding: "2px", borderRadius: "3px", border: `1.5px solid ${DARK}` }}>
+            <div style={{ background: "#fff", padding: "3px", borderRadius: "3px", border: `1.5px solid #333` }}>
               <QRCodeCanvas
                 value={showFeedbackQr && p.mobileIndia && bookingMap[p.mobileIndia]
                   ? `${PROD_DOMAIN}/feedback?booking_id=${bookingMap[p.mobileIndia]}`
                   : buildVerifyUrl(p.id)}
-                size={40} level="M" fgColor={DARK}
+                size={52} level="H" fgColor="#000000" bgColor="#ffffff"
               />
             </div>
             <div style={{ fontSize: "3pt", color: DARK, fontWeight: 700, textTransform: "uppercase" }}>

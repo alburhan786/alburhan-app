@@ -108,8 +108,8 @@ function FrontCard({ p, group, company, photoDataUrl }: { p:Pilgrim; group:Group
         {/* QR */}
         <div style={{ display:"flex", justifyContent:"center", marginTop:"2mm" }}>
           <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:"0.5mm" }}>
-            <div style={{ background:"#fff", padding:"2px", borderRadius:"3px", border:`1.5px solid ${DARK}` }}>
-              <QRCodeCanvas value={buildVerifyUrl(p.id)} size={46} level="M" fgColor={DARK} />
+            <div style={{ background:"#fff", padding:"4px", borderRadius:"3px", border:`1.5px solid #333` }}>
+              <QRCodeCanvas value={buildVerifyUrl(p.id)} size={72} level="H" fgColor="#000000" bgColor="#ffffff" />
             </div>
             <div style={{ fontSize:"3pt", color:DARK, fontWeight:900, textTransform:"uppercase", letterSpacing:"0.3px" }}>SCAN TO VERIFY</div>
           </div>
@@ -118,9 +118,9 @@ function FrontCard({ p, group, company, photoDataUrl }: { p:Pilgrim; group:Group
 
       {/* Footer */}
       <div style={{ position:"absolute", bottom:0, left:0, right:0, zIndex:2 }}>
-        <div style={{ overflow:"hidden", paddingLeft:"2mm", marginBottom:"0.5mm" }}>
+        <div style={{ overflow:"hidden", padding:"0 2mm 1mm", background:"#fff" }}>
           {(p.barcodeId||p.passportNumber)
-            ? <Barcode value={p.barcodeId||p.passportNumber!} format={p.barcodeId?"CODE128":"CODE39"} height={12} width={1} fontSize={0} />
+            ? <Barcode value={p.barcodeId||p.passportNumber!} format="CODE128" height={20} width={1.4} fontSize={6} />
             : <div style={{ fontSize:"4pt", color:"#999" }}>{group.groupName}</div>
           }
         </div>
@@ -172,8 +172,8 @@ function BackCard({ p, group, company }: { p:Pilgrim; group:Group; company:Compa
         {/* QR */}
         <div style={{ display:"flex", justifyContent:"center", marginTop:"2.5mm" }}>
           <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:"0.5mm" }}>
-            <div style={{ background:"#fff", padding:"2px", borderRadius:"3px", border:`1.5px solid ${DARK}` }}>
-              <QRCodeCanvas value={buildVerifyUrl(p.id)} size={46} level="M" fgColor={DARK} />
+            <div style={{ background:"#fff", padding:"4px", borderRadius:"3px", border:`1.5px solid #333` }}>
+              <QRCodeCanvas value={buildVerifyUrl(p.id)} size={72} level="H" fgColor="#000000" bgColor="#ffffff" />
             </div>
             <div style={{ fontSize:"3pt", color:DARK, fontWeight:700, textTransform:"uppercase" }}>SCAN</div>
           </div>
