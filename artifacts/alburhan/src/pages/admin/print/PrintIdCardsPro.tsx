@@ -51,8 +51,8 @@ interface CardProps {
 
 function FrontCard({ p, group, company, photoDataUrls }: CardProps) {
   const serial = String(p.serialNumber).padStart(3, "0");
-  const barcodeVal = p.barcodeId || p.passportNumber || `HAJ${serial}`;
-  const barcodeFormat = p.barcodeId ? "CODE128" : "CODE39";
+  const barcodeVal = (p.barcodeId || p.passportNumber || `HAJ${serial}`).replace(/[^\x00-\x7F]/g, "").trim();
+  const barcodeFormat = "CODE128";
 
   return (
     <div className="pro-card">
@@ -99,26 +99,26 @@ function FrontCard({ p, group, company, photoDataUrls }: CardProps) {
 
         {/* Photo sidebar */}
         <div style={{
-          width: "19mm", flexShrink: 0, background: "#f0f7f2",
+          width: "22mm", flexShrink: 0, background: "#f0f7f2",
           display: "flex", flexDirection: "column", alignItems: "center",
           justifyContent: "center", padding: "0.8mm",
           borderRight: `1.5px solid ${GOLD}`,
         }}>
           {p.photoUrl ? (
             <img src={photoDataUrls[p.id] || `${API}${p.photoUrl}`} alt=""
-              style={{ width: "16mm", height: "19mm", objectFit: "cover", objectPosition: "top center", border: `2px solid ${GOLD}`, borderRadius: "2px" }} />
+              style={{ width: "19mm", height: "24mm", objectFit: "cover", objectPosition: "top center", border: `2px solid ${GOLD}`, borderRadius: "2px" }} />
           ) : (
             <div style={{
-              width: "16mm", height: "19mm", background: "#e0e8e4",
+              width: "19mm", height: "24mm", background: "#e0e8e4",
               border: `2px solid ${GOLD}`, borderRadius: "2px",
               display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
               fontSize: "3pt", color: "#888", fontWeight: 700,
             }}>
-              <div style={{ fontSize: "9pt", color: GOLD }}>👤</div>
+              <div style={{ fontSize: "10pt", color: GOLD }}>👤</div>
               <div>PHOTO</div>
             </div>
           )}
-          <div style={{ fontSize: "5.5pt", fontWeight: 900, color: DARK, marginTop: "0.5mm" }}>#{serial}</div>
+          <div style={{ fontSize: "6pt", fontWeight: 900, color: DARK, marginTop: "0.8mm" }}>#{serial}</div>
         </div>
 
         {/* Info column */}
@@ -172,16 +172,16 @@ function FrontCard({ p, group, company, photoDataUrls }: CardProps) {
           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start",
           borderLeft: `1px solid ${GOLD}50`,
         }}>
-          <div style={{ background: "#fff", padding: "2px", borderRadius: "3px", border: `2.5px solid ${DARK}` }}>
-            <QRCodeCanvas value={buildVerifyUrl(p.id)} size={56} level="M" fgColor={DARK} />
+          <div style={{ background: "#fff", padding: "3px", borderRadius: "3px", border: `2.5px solid #000` }}>
+            <QRCodeCanvas value={buildVerifyUrl(p.id)} size={60} level="M" fgColor="#000000" bgColor="#ffffff" />
           </div>
           <div style={{ fontSize: "2.5pt", color: "#888", textTransform: "uppercase", marginTop: "0.5mm", letterSpacing: "0.2px", textAlign: "center" }}>SCAN TO VERIFY</div>
         </div>
       </div>
 
       {/* ── Barcode — BIG ── */}
-      <div style={{ flexShrink: 0, padding: "0 1.5mm 0.3mm", background: "#fff" }}>
-        <Barcode value={barcodeVal} format={barcodeFormat} height={22} displayValue fontSize={5} />
+      <div style={{ flexShrink: 0, padding: "1.5mm 1.5mm 0.3mm", background: "#fff", borderTop: `1px solid ${GOLD}40` }}>
+        <Barcode value={barcodeVal} format={barcodeFormat} height={20} displayValue fontSize={5} />
       </div>
 
       {/* ── Footer — Mobile + Emergency numbers BIG BOLD WHITE SQUARE ── */}
@@ -196,13 +196,13 @@ function FrontCard({ p, group, company, photoDataUrls }: CardProps) {
         {/* Row 2: emergency | mobile */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "2mm" }}>
           <div>
-            <div style={{ fontSize: "3pt", fontWeight: 700, color: "#f87171", textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>🆘 Emergency (Saudi)</div>
-            <div style={{ fontSize: "7.5pt", fontWeight: 900, color: "#fff", lineHeight: 1.25, letterSpacing: "0.5px" }}>{SAUDI_EMERGENCY[0]}</div>
-            <div style={{ fontSize: "7.5pt", fontWeight: 900, color: "#fff", lineHeight: 1.25, letterSpacing: "0.5px" }}>{SAUDI_EMERGENCY[1]}</div>
+            <div style={{ fontSize: "3.5pt", fontWeight: 900, color: "#ff2020", textTransform: "uppercase", letterSpacing: "0.5px", lineHeight: 1, marginBottom: "0.4mm" }}>🆘 EMERGENCY (SAUDI)</div>
+            <div style={{ fontSize: "9pt", fontWeight: 900, color: "#fff", lineHeight: 1.2, letterSpacing: "0.5px" }}>{SAUDI_EMERGENCY[0]}</div>
+            <div style={{ fontSize: "9pt", fontWeight: 900, color: "#fff", lineHeight: 1.2, letterSpacing: "0.5px" }}>{SAUDI_EMERGENCY[1]}</div>
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ fontSize: "3pt", fontWeight: 700, color: GOLD, textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Pilgrim Mobile</div>
-            <div style={{ fontSize: "8.5pt", fontWeight: 900, color: "#fff", lineHeight: 1.25, letterSpacing: "0.5px" }}>
+            <div style={{ fontSize: "9pt", fontWeight: 900, color: "#fff", lineHeight: 1.25, letterSpacing: "0.5px" }}>
               {p.mobileIndia || "—"}
             </div>
           </div>
