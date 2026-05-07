@@ -403,6 +403,24 @@ export default function PrintIdCardsPro() {
     } finally { setDlState(null); }
   };
 
+  const dlPilgrimBoth = async (p: Pilgrim) => {
+    const frontEl = frontCardRefs.current.get(p.id);
+    const backEl  = backCardRefs.current.get(p.id);
+    const safeName = p.fullName.replace(/[^a-z0-9]/gi, "-").toLowerCase();
+    const els = [frontEl, backEl].filter(Boolean) as HTMLElement[];
+    if (els.length > 0) await downloadCardsAsSheet(els, `id-card-${safeName}.png`, 2);
+  };
+
+  const dlAllBoth = async () => {
+    setDlState("png-both");
+    try {
+      for (const p of pilgrims) {
+        await dlPilgrimBoth(p);
+        await new Promise(r => setTimeout(r, 400));
+      }
+    } finally { setDlState(null); }
+  };
+
   const dlFrontSheet = async () => {
     setDlState("front-sheet");
     try {
@@ -591,6 +609,9 @@ export default function PrintIdCardsPro() {
           </button>
           <button onClick={() => dlCards("jpg")} disabled={!!dlState} style={{ padding: "10px 18px", background: dlState === "jpg" ? "#6b7280" : "#7c3aed", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
             {dlState === "jpg" ? "⏳..." : "⬇ JPG"}
+          </button>
+          <button onClick={dlAllBoth} disabled={!!dlState} style={{ padding: "10px 18px", background: dlState === "png-both" ? "#6b7280" : "#be185d", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
+            {dlState === "png-both" ? "⏳ PNG..." : "⬇ PNG Per Person"}
           </button>
           <button onClick={dlFrontSheet} disabled={!!dlState} style={{ padding: "10px 18px", background: dlState === "front-sheet" ? "#6b7280" : "#0e7490", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
             {dlState === "front-sheet" ? "⏳ Fronts..." : "⬇ All Fronts PNG"}
