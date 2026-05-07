@@ -384,6 +384,25 @@ export default function PrintIdCardsPro() {
     } finally { setDlState(null); }
   };
 
+  const dlPilgrimPng = async (p: Pilgrim) => {
+    const frontEl = frontCardRefs.current.get(p.id);
+    const backEl  = backCardRefs.current.get(p.id);
+    const safeName = p.fullName.replace(/[^a-z0-9]/gi, "-").toLowerCase();
+    if (frontEl) await downloadAsPng(frontEl, `id-card-front-${safeName}.png`);
+    await new Promise(r => setTimeout(r, 300));
+    if (backEl)  await downloadAsPng(backEl,  `id-card-back-${safeName}.png`);
+  };
+
+  const dlAllPng = async () => {
+    setDlState("png-singles");
+    try {
+      for (const p of pilgrims) {
+        await dlPilgrimPng(p);
+        await new Promise(r => setTimeout(r, 400));
+      }
+    } finally { setDlState(null); }
+  };
+
   useEffect(() => {
     if (!groupId) return;
     Promise.all([
@@ -555,6 +574,9 @@ export default function PrintIdCardsPro() {
           <button onClick={() => dlCards("jpg")} disabled={!!dlState} style={{ padding: "10px 18px", background: dlState === "jpg" ? "#6b7280" : "#7c3aed", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
             {dlState === "jpg" ? "⏳..." : "⬇ JPG"}
           </button>
+          <button onClick={dlAllPng} disabled={!!dlState} style={{ padding: "10px 18px", background: dlState === "png-singles" ? "#6b7280" : "#0e7490", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
+            {dlState === "png-singles" ? "⏳ PNG..." : "⬇ PNG Front/Back"}
+          </button>
           <button onClick={dlAllSvg} disabled={!!dlState} style={{ padding: "10px 18px", background: dlState === "svg" ? "#6b7280" : "#b45309", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
             {dlState === "svg" ? "⏳ SVG..." : "⬇ SVG"}
           </button>
@@ -606,11 +628,23 @@ export default function PrintIdCardsPro() {
                     <div className="cut-line no-print" style={{ position: "relative" }}>
                       <div className="cut-line-inner" />
                       <button
+                        onClick={() => dlPilgrimPng(p)}
+                        title="Download PNG (front + back)"
+                        style={{
+                          position: "absolute", top: "50%", left: "50%",
+                          transform: "translate(-50%,-60%)",
+                          background: "#0e7490", color: "#fff", border: "none",
+                          borderRadius: "4px", padding: "3px 5px", fontSize: "8px",
+                          cursor: "pointer", fontWeight: 700, whiteSpace: "nowrap",
+                          writingMode: "vertical-rl", textOrientation: "mixed",
+                        }}
+                      >PNG</button>
+                      <button
                         onClick={() => dlPilgrimSvg(p)}
                         title="Download SVG (front + back)"
                         style={{
                           position: "absolute", top: "50%", left: "50%",
-                          transform: "translate(-50%,-50%)",
+                          transform: "translate(-50%,10%)",
                           background: "#b45309", color: "#fff", border: "none",
                           borderRadius: "4px", padding: "3px 5px", fontSize: "8px",
                           cursor: "pointer", fontWeight: 700, whiteSpace: "nowrap",
