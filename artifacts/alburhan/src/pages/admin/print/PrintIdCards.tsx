@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useRoute } from "wouter";
-import { downloadMultiPagePdf, downloadAsJpg, downloadAsPng, downloadPagesAsPng, downloadPagesAsJpg, fetchAsDataUrl } from "@/lib/downloadUtils";
+import { downloadMultiPagePdf, downloadAsJpg, downloadAsPng, downloadPagesAsPng, downloadPagesAsJpg, fetchAsDataUrl, downloadPerPilgrimAsPng } from "@/lib/downloadUtils";
 import { Barcode } from "@/components/print/Barcode";
 import { QRCodeCanvas } from "qrcode.react";
 import { COMPANIES, getCompanyById, type CompanyInfo } from "@/lib/companies";
@@ -219,7 +219,9 @@ export default function PrintIdCards() {
   const [bookingMap, setBookingMap] = useState<Record<string, string>>({});
   const [photoDataUrls, setPhotoDataUrls] = useState<Record<string, string>>({});
   const contentRef = useRef<HTMLDivElement>(null);
+  const captureRef = useRef<HTMLDivElement>(null);
   const [dlState, setDlState] = useState<string | null>(null);
+  const [dlProgress, setDlProgress] = useState<string | null>(null);
   const [printMode, setPrintMode] = useState<PrintMode>("strip");
 
   const dlCards = async (fmt: "pdf" | "jpg" | "png") => {
@@ -235,6 +237,23 @@ export default function PrintIdCards() {
       else if (fmt === "png") await downloadPagesAsPng(els, name);
       else await downloadPagesAsJpg(els, name);
     } finally { setDlState(null); }
+  };
+
+  const dlPerPilgrim = async () => {
+    if (!captureRef.current || pilgrims.length === 0) return;
+    setDlState("percards");
+    setDlProgress(`0 / ${pilgrims.length * 2}`);
+    try {
+      const cards = pilgrims.map(p => {
+        const frontEl = captureRef.current!.querySelector<HTMLElement>(`[data-card-front="${p.id}"] .id-card`);
+        const backEl  = captureRef.current!.querySelector<HTMLElement>(`[data-card-back="${p.id}"] .id-card`);
+        return { name: p.fullName, frontEl, backEl };
+      }).filter(c => c.frontEl && c.backEl) as { name: string; frontEl: HTMLElement; backEl: HTMLElement }[];
+      await downloadPerPilgrimAsPng(cards, 560, (done, total) => setDlProgress(`${done} / ${total}`));
+    } finally {
+      setDlState(null);
+      setDlProgress(null);
+    }
   };
 
   useEffect(() => {
@@ -404,6 +423,13 @@ export default function PrintIdCards() {
         <button onClick={() => dlCards("jpg")} disabled={!!dlState} style={{ padding: "10px 20px", background: dlState === "jpg" ? "#6b7280" : "#7c3aed", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>
           {dlState === "jpg" ? "⏳..." : "⬇ JPG"}
         </button>
+        <button
+          onClick={dlPerPilgrim}
+          disabled={!!dlState}
+          title="Download each pilgrim's front + back as a separate 85×54mm PNG at 560 DPI"
+          style={{ padding: "10px 20px", background: dlState === "percards" ? "#6b7280" : "#b45309", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", minWidth: "140px" }}>
+          {dlState === "percards" ? `⏳ ${dlProgress || "..."}` : "⬇ PNG Cards 560dpi"}
+        </button>
         <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
       </div>
 
@@ -510,6 +536,23 @@ export default function PrintIdCards() {
             </div>
           ))
         )}
+      </div>
+
+      {/* ── Hidden off-screen capture zone for per-pilgrim PNG download ── */}
+      <div
+        ref={captureRef}
+        className="no-print"
+        style={{ position: "fixed", left: "-9999px", top: 0, zIndex: -1, pointerEvents: "none" }}
+        aria-hidden="true"
+      >
+        {pilgrims.flatMap(p => [
+          <div key={`cap-f-${p.id}`} data-card-front={p.id}>
+            <FrontCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} photoDataUrls={photoDataUrls} />
+          </div>,
+          <div key={`cap-b-${p.id}`} data-card-back={p.id}>
+            <BackCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
+          </div>,
+        ])}
       </div>
     </>
   );

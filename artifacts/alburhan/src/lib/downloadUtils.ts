@@ -227,6 +227,37 @@ export async function downloadCardsAsSheet(
 }
 
 /**
+ * Captures front and back card elements for each pilgrim and downloads them
+ * as separate PNG files at the specified DPI.
+ * Files are named: {slug}_front.png and {slug}_back.png
+ */
+export async function downloadPerPilgrimAsPng(
+  cards: Array<{ name: string; frontEl: HTMLElement; backEl: HTMLElement }>,
+  dpi = 560,
+  onProgress?: (done: number, total: number) => void,
+) {
+  if (cards.length === 0) return;
+  const scale = dpi / 96;
+  const total = cards.length * 2;
+  let done = 0;
+
+  for (const { name, frontEl, backEl } of cards) {
+    const slug = name.replace(/[^a-zA-Z0-9_\-]/g, "_").replace(/_+/g, "_");
+
+    for (const [side, el] of [["front", frontEl], ["back", backEl]] as [string, HTMLElement][]) {
+      let canvas = await renderCanvas(el, scale);
+      if (!canvas) canvas = await renderCanvas(el, 4);
+      if (!canvas) { done++; onProgress?.(done, total); continue; }
+      const blob = await new Promise<Blob | null>(res => canvas!.toBlob(res, "image/png", 1));
+      if (blob) saveAs(blob, `${slug}_${side}.png`);
+      done++;
+      onProgress?.(done, total);
+      await new Promise(r => setTimeout(r, 250));
+    }
+  }
+}
+
+/**
  * Captures an element and downloads it as an SVG file embedding the rendered
  * image at the given physical mm dimensions.
  */
