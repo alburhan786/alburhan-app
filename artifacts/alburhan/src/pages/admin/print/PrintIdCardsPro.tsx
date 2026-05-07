@@ -408,7 +408,7 @@ export default function PrintIdCardsPro() {
     const backEl  = backCardRefs.current.get(p.id);
     const safeName = p.fullName.replace(/[^a-z0-9]/gi, "-").toLowerCase();
     const els = [frontEl, backEl].filter(Boolean) as HTMLElement[];
-    if (els.length > 0) await downloadCardsAsSheet(els, `id-card-${safeName}.png`, 2);
+    if (els.length > 0) await downloadCardsAsSheet(els, `id-card-${safeName}.png`, 1);
   };
 
   const dlAllBoth = async () => {
