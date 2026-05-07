@@ -81,49 +81,51 @@ function FrontCard({ p, group, company, photoDataUrl }: { p:Pilgrim; group:Group
   return (
     <div className="id-card">
       <WaveShapes />
-      <div style={{ position:"relative", zIndex:1, height:"100%", display:"flex", flexDirection:"column", padding:"2.5mm 3mm 0" }}>
+      {/* Main content — stops before footer */}
+      <div style={{ position:"relative", zIndex:1, display:"flex", flexDirection:"column", padding:"2mm 3mm 0", height:"52mm" }}>
         <LogoHeader company={company} />
 
-        {/* Photo */}
-        <div style={{ display:"flex", justifyContent:"center", marginTop:"2.5mm", marginBottom:"2mm" }}>
+        {/* Photo — passport style, larger */}
+        <div style={{ display:"flex", justifyContent:"center", marginTop:"1.5mm", marginBottom:"1.5mm" }}>
           {photoSrc
-            ? <img src={photoSrc} alt="" style={{ width:"26mm", height:"26mm", objectFit:"cover", objectPosition:"top center", borderRadius:"50%", border:`2.5px solid ${GOLD}`, WebkitPrintColorAdjust:"exact", printColorAdjust:"exact" } as React.CSSProperties} />
-            : <div style={{ width:"26mm", height:"26mm", background:"#f0f0f0", borderRadius:"50%", border:`2.5px solid ${GOLD}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"5pt", color:"#aaa", fontWeight:600 }}>PHOTO</div>
+            ? <img src={photoSrc} alt="" style={{ width:"28mm", height:"32mm", objectFit:"cover", objectPosition:"top center", borderRadius:"4px", border:`3px solid ${GOLD}`, boxShadow:`0 0 0 1.5px ${DARK}`, WebkitPrintColorAdjust:"exact", printColorAdjust:"exact" } as React.CSSProperties} />
+            : <div style={{ width:"28mm", height:"32mm", background:"#f0f0f0", borderRadius:"4px", border:`3px solid ${GOLD}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"5pt", color:"#aaa", fontWeight:600 }}>PHOTO</div>
           }
         </div>
 
         {/* Name + year */}
-        <div style={{ textAlign:"center", marginBottom:"2mm" }}>
-          <div style={{ fontSize:"8pt", fontWeight:900, color:DARK, textTransform:"uppercase", lineHeight:1.2, wordBreak:"break-word" }}>{p.fullName || "—"}</div>
-          <div style={{ fontSize:"5.5pt", color:GOLD, fontWeight:700, marginTop:"0.5mm" }}>HAJJ {group.year}</div>
+        <div style={{ textAlign:"center", marginBottom:"1.5mm" }}>
+          <div style={{ fontSize:"7.5pt", fontWeight:900, color:DARK, textTransform:"uppercase", lineHeight:1.2, wordBreak:"break-word" }}>{p.fullName || "—"}</div>
+          <div style={{ fontSize:"5pt", color:GOLD, fontWeight:700, marginTop:"0.5mm" }}>HAJJ {group.year}</div>
         </div>
 
         {/* Info rows */}
-        <div style={{ display:"flex", flexDirection:"column", gap:"1.3mm", fontSize:"5.5pt", paddingLeft:"1mm" }}>
-          <div><span style={{ color:"#888", fontSize:"4.5pt" }}>Serial: </span><span style={{ fontWeight:700, color:DARK }}>#{String(p.serialNumber).padStart(3,"0")}</span></div>
-          <div><span style={{ color:"#888", fontSize:"4.5pt" }}>Passport: </span><span style={{ fontWeight:600, fontFamily:"monospace" }}>{p.passportNumber||"—"}</span></div>
-          <div><span style={{ color:"#888", fontSize:"4.5pt" }}>Mobile: </span><span style={{ fontWeight:600 }}>{p.mobileIndia||"—"}</span></div>
+        <div style={{ display:"flex", flexDirection:"column", gap:"1mm", fontSize:"5pt", paddingLeft:"1mm" }}>
+          <div><span style={{ color:"#888", fontSize:"4pt" }}>Serial: </span><span style={{ fontWeight:700, color:DARK }}>#{String(p.serialNumber).padStart(3,"0")}</span></div>
+          <div><span style={{ color:"#888", fontSize:"4pt" }}>Passport: </span><span style={{ fontWeight:600, fontFamily:"monospace" }}>{p.passportNumber||"—"}</span></div>
+          <div><span style={{ color:"#888", fontSize:"4pt" }}>Mobile: </span><span style={{ fontWeight:600 }}>{p.mobileIndia||"—"}</span></div>
         </div>
+      </div>
 
-        {/* QR */}
-        <div style={{ display:"flex", justifyContent:"center", marginTop:"2mm" }}>
+      {/* Footer — QR + barcode + contact bar, all stacked cleanly */}
+      <div style={{ position:"absolute", bottom:0, left:0, right:0, zIndex:2 }}>
+        {/* QR — separate from barcode with its own white zone */}
+        <div style={{ display:"flex", justifyContent:"center", padding:"1.5mm 2mm 1mm", background:"#fff" }}>
           <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:"0.5mm" }}>
-            <div style={{ background:"#fff", padding:"4px", borderRadius:"3px", border:`1.5px solid #333` }}>
-              <QRCodeCanvas value={buildVerifyUrl(p.id)} size={72} level="H" fgColor="#000000" bgColor="#ffffff" />
+            <div style={{ background:"#fff", padding:"3px", border:"1.5px solid #333", borderRadius:"3px" }}>
+              <QRCodeCanvas value={buildVerifyUrl(p.id)} size={64} level="H" fgColor="#000000" bgColor="#ffffff" />
             </div>
             <div style={{ fontSize:"3pt", color:DARK, fontWeight:900, textTransform:"uppercase", letterSpacing:"0.3px" }}>SCAN TO VERIFY</div>
           </div>
         </div>
-      </div>
-
-      {/* Footer */}
-      <div style={{ position:"absolute", bottom:0, left:0, right:0, zIndex:2 }}>
-        <div style={{ overflow:"hidden", padding:"0 2mm 1mm", background:"#fff" }}>
+        {/* Barcode — clear white zone */}
+        <div style={{ background:"#fff", padding:"0.5mm 2mm 1mm", borderTop:"0.5px solid #eee" }}>
           {(p.barcodeId||p.passportNumber)
-            ? <Barcode value={p.barcodeId||p.passportNumber!} format="CODE128" height={20} width={1.4} fontSize={6} />
-            : <div style={{ fontSize:"4pt", color:"#999" }}>{group.groupName}</div>
+            ? <Barcode value={p.barcodeId||p.passportNumber!} format="CODE128" height={18} width={1.3} fontSize={5} />
+            : <div style={{ fontSize:"4pt", color:"#999", textAlign:"center" }}>{group.groupName}</div>
           }
         </div>
+        {/* Contact bar */}
         <div style={{ background:DARK, color:GOLD, padding:"1mm 2mm", fontSize:"3.5pt", textAlign:"center", fontWeight:800, letterSpacing:"0.2px", WebkitPrintColorAdjust:"exact", printColorAdjust:"exact" } as React.CSSProperties}>
           {company.name} | 🇮🇳 {company.phone} | 🇸🇦 {company.phoneSaudi}
         </div>
