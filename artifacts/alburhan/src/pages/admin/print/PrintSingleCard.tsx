@@ -79,7 +79,7 @@ function LogoHeader({ company }: { company: CompanyInfo }) {
 function FrontCard({ p, group, company, photoDataUrl }: { p:Pilgrim; group:Group; company:CompanyInfo; photoDataUrl:string }) {
   const photoSrc = photoDataUrl || (p.photoUrl ? `${API}${p.photoUrl}` : "");
   return (
-    <div className="id-card">
+    <div className="id-card" style={{ width:"54mm", height:"85mm" }}>
       <WaveShapes />
       {/* Main content — stops before footer */}
       <div style={{ position:"relative", zIndex:1, display:"flex", flexDirection:"column", padding:"2mm 3mm 0", height:"52mm" }}>
@@ -138,7 +138,7 @@ function FrontCard({ p, group, company, photoDataUrl }: { p:Pilgrim; group:Group
 function BackCard({ p, group, company }: { p:Pilgrim; group:Group; company:CompanyInfo }) {
   const dot: React.CSSProperties = { width:"2.5mm", height:"2.5mm", borderRadius:"50%", background:GOLD, flexShrink:0, marginTop:"0.6mm" };
   return (
-    <div className="id-card">
+    <div className="id-card" style={{ width:"54mm", height:"85mm" }}>
       <WaveShapesBack />
       <div style={{ position:"relative", zIndex:1, height:"100%", display:"flex", flexDirection:"column", padding:"2.5mm 3mm 0" }}>
         <LogoHeader company={company} />
@@ -245,6 +245,14 @@ export default function PrintSingleCard() {
   const frontRef = useRef<HTMLDivElement>(null);
   const backRef  = useRef<HTMLDivElement>(null);
   const company  = getCompanyById(companyId);
+
+  // Auto-scroll to the correct card when side changes
+  useEffect(() => {
+    const ref = side === "back" ? backRef : frontRef;
+    if (ref.current) {
+      setTimeout(() => ref.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 100);
+    }
+  }, [side, pilgrimId]);
 
   const frontUrl = (pid: string) => `${BASE}/admin/groups/${groupId}/print/id-card-front/${pid}`;
   const backUrl  = (pid: string) => `${BASE}/admin/groups/${groupId}/print/id-card-back/${pid}`;
