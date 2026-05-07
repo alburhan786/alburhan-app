@@ -63,10 +63,10 @@ function FrontCard({ p, group, company, photoDataUrls }: CardProps) {
       {/* ── Header ── */}
       <div style={{
         background: DARK, flexShrink: 0,
-        padding: "1.2mm 2mm 1mm", display: "flex", alignItems: "center", gap: "2mm",
+        padding: "0.8mm 2mm 0.6mm", display: "flex", alignItems: "center", gap: "1.5mm",
       }}>
-        {/* Big Indian flag */}
-        <div style={{ fontSize: "26pt", lineHeight: 1, flexShrink: 0 }}>🇮🇳</div>
+        {/* Indian flag */}
+        <div style={{ fontSize: "20pt", lineHeight: 1, flexShrink: 0 }}>🇮🇳</div>
 
         {/* Company + year */}
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -104,7 +104,7 @@ function FrontCard({ p, group, company, photoDataUrls }: CardProps) {
         <div style={{
           width: "20mm", flexShrink: 0, background: DARK,
           display: "flex", flexDirection: "column", alignItems: "center",
-          justifyContent: "center", padding: "1mm",
+          justifyContent: "flex-start", padding: "2mm 1mm 1mm",
           borderRight: `2px solid ${GOLD}`,
         }}>
           {/* Gold frame wrapper */}
@@ -159,13 +159,11 @@ function FrontCard({ p, group, company, photoDataUrls }: CardProps) {
             </div>
           )}
 
-          {/* Service Center — BIG BOLD */}
-          {group.maktabNumber && (
-            <div>
-              <div style={{ fontSize: "2.8pt", color: "#999", textTransform: "uppercase", lineHeight: 1 }}>Service Ctr. No.</div>
-              <div style={{ fontSize: "8pt", fontWeight: 900, color: DARK, lineHeight: 1.1 }}>{group.maktabNumber}</div>
-            </div>
-          )}
+          {/* Service Center — always shown, BIG BOLD highlighted */}
+          <div style={{ background: `${GOLD}22`, borderRadius: "2px", padding: "0.5mm 1mm", border: `1px solid ${GOLD}60` }}>
+            <div style={{ fontSize: "2.8pt", color: "#888", textTransform: "uppercase", lineHeight: 1 }}>Service Ctr. No.</div>
+            <div style={{ fontSize: "9pt", fontWeight: 900, color: DARK, lineHeight: 1.1 }}>{group.maktabNumber || "—"}</div>
+          </div>
 
           {/* Company India phones — big bold */}
           <div style={{ marginTop: "auto", borderTop: `1px solid ${GOLD}40`, paddingTop: "0.5mm" }}>
@@ -190,12 +188,12 @@ function FrontCard({ p, group, company, photoDataUrls }: CardProps) {
       </div>
 
       {/* ── Barcode ── */}
-      <div style={{ flexShrink: 0, padding: "2mm 2mm 0.3mm", background: "#fff", borderTop: `2px solid ${GOLD}` }}>
-        <Barcode value={barcodeVal} format={barcodeFormat} width={1.5} height={16} displayValue fontSize={5} />
+      <div style={{ flexShrink: 0, padding: "1mm 1.5mm 0.2mm", background: "#fff", borderTop: `2px solid ${GOLD}` }}>
+        <Barcode value={barcodeVal} format={barcodeFormat} width={1.5} height={14} displayValue fontSize={5} />
       </div>
 
       {/* ── Footer — Mobile + Emergency numbers BIG BOLD WHITE SQUARE ── */}
-      <div style={{ background: DARK, flexShrink: 0, padding: "1.5mm 2.5mm" } as React.CSSProperties}>
+      <div style={{ background: DARK, flexShrink: 0, padding: "1mm 2.5mm" } as React.CSSProperties}>
         {/* Row 1: label + mobile */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.8mm" }}>
           <div style={{ fontSize: "3pt", fontWeight: 700, color: "rgba(255,255,255,0.55)", textTransform: "uppercase", letterSpacing: "0.3px" }}>
