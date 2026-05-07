@@ -406,9 +406,32 @@ export default function PrintIdCardsPro() {
   const dlPilgrimBoth = async (p: Pilgrim) => {
     const frontEl = frontCardRefs.current.get(p.id);
     const backEl  = backCardRefs.current.get(p.id);
+    if (!frontEl && !backEl) return;
     const safeName = p.fullName.replace(/[^a-z0-9]/gi, "-").toLowerCase();
-    const els = [frontEl, backEl].filter(Boolean) as HTMLElement[];
-    if (els.length > 0) await downloadCardsAsSheet(els, `id-card-${safeName}.png`, 1);
+
+    // Build a temporary off-screen container with front stacked above back
+    const wrap = document.createElement("div");
+    wrap.style.cssText = [
+      "position:fixed",
+      "top:-99999px",
+      "left:-99999px",
+      "width:90mm",
+      "background:#ffffff",
+      "display:flex",
+      "flex-direction:column",
+      "gap:0",
+    ].join(";");
+
+    if (frontEl) wrap.appendChild(frontEl.cloneNode(true) as HTMLElement);
+    if (backEl)  wrap.appendChild(backEl.cloneNode(true)  as HTMLElement);
+
+    document.body.appendChild(wrap);
+    await new Promise(r => setTimeout(r, 120));
+    try {
+      await downloadAsPng(wrap, `id-card-${safeName}.png`);
+    } finally {
+      document.body.removeChild(wrap);
+    }
   };
 
   const dlAllBoth = async () => {
