@@ -36,5 +36,5 @@ export function Barcode({ value, width = 1, height = 25, fontSize = 8, displayVa
   }, [value, width, height, fontSize, displayValue, format]);
 
   if (!value) return null;
-  return <canvas ref={canvasRef} style={{ display: "block" }} />;
+  return <canvas ref={canvasRef} style={{ display: "block", maxWidth: "100%" }} />;
 }

@@ -51,7 +51,10 @@ interface CardProps {
 
 function FrontCard({ p, group, company, photoDataUrls }: CardProps) {
   const serial = String(p.serialNumber).padStart(3, "0");
-  const barcodeVal = (p.barcodeId || p.passportNumber || `HAJ${serial}`).replace(/[^\x00-\x7F]/g, "").trim();
+  const barcodeVal = (p.barcodeId || p.passportNumber || `HAJ${serial}`)
+    .replace(/[^\x00-\x7F]/g, "")
+    .replace(/[^A-Za-z0-9\-. ]/g, "")
+    .trim();
   const barcodeFormat = "CODE128";
 
   return (
@@ -99,26 +102,33 @@ function FrontCard({ p, group, company, photoDataUrls }: CardProps) {
 
         {/* Photo sidebar */}
         <div style={{
-          width: "20mm", flexShrink: 0, background: "#f0f7f2",
+          width: "20mm", flexShrink: 0, background: DARK,
           display: "flex", flexDirection: "column", alignItems: "center",
-          justifyContent: "center", padding: "0.8mm",
-          borderRight: `1.5px solid ${GOLD}`,
+          justifyContent: "center", padding: "1mm",
+          borderRight: `2px solid ${GOLD}`,
         }}>
-          {p.photoUrl ? (
-            <img src={photoDataUrls[p.id] || `${API}${p.photoUrl}`} alt=""
-              style={{ width: "16mm", height: "18mm", objectFit: "cover", objectPosition: "top center", border: `2px solid ${GOLD}`, borderRadius: "2px" }} />
-          ) : (
-            <div style={{
-              width: "16mm", height: "18mm", background: "#e0e8e4",
-              border: `2px solid ${GOLD}`, borderRadius: "2px",
-              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-              fontSize: "3pt", color: "#888", fontWeight: 700,
-            }}>
-              <div style={{ fontSize: "9pt", color: GOLD }}>👤</div>
-              <div>PHOTO</div>
-            </div>
-          )}
-          <div style={{ fontSize: "5.5pt", fontWeight: 900, color: DARK, marginTop: "0.5mm" }}>#{serial}</div>
+          {/* Gold frame wrapper */}
+          <div style={{
+            padding: "1.5px",
+            background: `linear-gradient(135deg, ${GOLD} 0%, #E8D48B 50%, ${GOLD} 100%)`,
+            borderRadius: "3px",
+            boxShadow: `0 0 4px ${GOLD}99`,
+          }}>
+            {p.photoUrl ? (
+              <img src={photoDataUrls[p.id] || `${API}${p.photoUrl}`} alt=""
+                style={{ width: "15mm", height: "18mm", objectFit: "cover", objectPosition: "top center", display: "block", borderRadius: "2px" }} />
+            ) : (
+              <div style={{
+                width: "15mm", height: "18mm", background: "#e0e8e4",
+                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                fontSize: "3pt", color: "#888", fontWeight: 700, borderRadius: "2px",
+              }}>
+                <div style={{ fontSize: "9pt", color: GOLD }}>👤</div>
+                <div>PHOTO</div>
+              </div>
+            )}
+          </div>
+          <div style={{ fontSize: "5.5pt", fontWeight: 900, color: GOLD, marginTop: "0.8mm", letterSpacing: "0.3px" }}>#{serial}</div>
         </div>
 
         {/* Info column */}
@@ -180,8 +190,8 @@ function FrontCard({ p, group, company, photoDataUrls }: CardProps) {
       </div>
 
       {/* ── Barcode ── */}
-      <div style={{ flexShrink: 0, padding: "0.8mm 1.5mm 0.2mm", background: "#fff", borderTop: `1px solid ${GOLD}40` }}>
-        <Barcode value={barcodeVal} format={barcodeFormat} height={14} displayValue fontSize={4} />
+      <div style={{ flexShrink: 0, padding: "2mm 2mm 0.3mm", background: "#fff", borderTop: `2px solid ${GOLD}` }}>
+        <Barcode value={barcodeVal} format={barcodeFormat} width={1.5} height={16} displayValue fontSize={5} />
       </div>
 
       {/* ── Footer — Mobile + Emergency numbers BIG BOLD WHITE SQUARE ── */}
