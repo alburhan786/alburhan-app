@@ -30,10 +30,10 @@ function buildVerifyUrl(id: string): string {
 function WaveShapes() {
   return (
     <>
-      <div style={{ position: "absolute", top: 0, right: 0, width: "22mm", height: "32mm", background: DARK, borderRadius: "0 0 0 100%", zIndex: 0 }} />
-      <div style={{ position: "absolute", top: "10mm", right: 0, width: "16mm", height: "16mm", background: "rgba(255,255,255,0.08)", borderRadius: "0 0 0 100%", zIndex: 0 }} />
-      <div style={{ position: "absolute", bottom: 0, left: 0, width: "18mm", height: "24mm", background: `linear-gradient(135deg, ${GOLD}, ${GOLD_LIGHT})`, borderRadius: "0 100% 0 0", zIndex: 0 }} />
-      <div style={{ position: "absolute", bottom: "6mm", left: 0, width: "10mm", height: "12mm", background: "rgba(255,255,255,0.15)", borderRadius: "0 100% 0 0", zIndex: 0 }} />
+      <div style={{ position: "absolute", top: 0, right: 0, width: "16mm", height: "22mm", background: DARK, borderRadius: "0 0 0 100%", zIndex: 0 }} />
+      <div style={{ position: "absolute", top: "6mm", right: 0, width: "10mm", height: "10mm", background: "rgba(255,255,255,0.08)", borderRadius: "0 0 0 100%", zIndex: 0 }} />
+      <div style={{ position: "absolute", bottom: 0, left: 0, width: "14mm", height: "16mm", background: `linear-gradient(135deg, ${GOLD}, ${GOLD_LIGHT})`, borderRadius: "0 100% 0 0", zIndex: 0 }} />
+      <div style={{ position: "absolute", bottom: "4mm", left: 0, width: "8mm", height: "9mm", background: "rgba(255,255,255,0.15)", borderRadius: "0 100% 0 0", zIndex: 0 }} />
     </>
   );
 }
@@ -41,9 +41,9 @@ function WaveShapes() {
 function WaveShapesBack() {
   return (
     <>
-      <div style={{ position: "absolute", top: 0, right: 0, width: "22mm", height: "28mm", background: DARK, borderRadius: "0 0 0 100%", zIndex: 0 }} />
-      <div style={{ position: "absolute", top: "8mm", right: 0, width: "14mm", height: "14mm", background: "rgba(255,255,255,0.08)", borderRadius: "0 0 0 100%", zIndex: 0 }} />
-      <div style={{ position: "absolute", bottom: 0, left: 0, width: "16mm", height: "20mm", background: `linear-gradient(135deg, ${GOLD}, ${GOLD_LIGHT})`, borderRadius: "0 100% 0 0", zIndex: 0 }} />
+      <div style={{ position: "absolute", top: 0, right: 0, width: "16mm", height: "20mm", background: DARK, borderRadius: "0 0 0 100%", zIndex: 0 }} />
+      <div style={{ position: "absolute", top: "5mm", right: 0, width: "10mm", height: "10mm", background: "rgba(255,255,255,0.08)", borderRadius: "0 0 0 100%", zIndex: 0 }} />
+      <div style={{ position: "absolute", bottom: 0, left: 0, width: "12mm", height: "14mm", background: `linear-gradient(135deg, ${GOLD}, ${GOLD_LIGHT})`, borderRadius: "0 100% 0 0", zIndex: 0 }} />
     </>
   );
 }
@@ -77,54 +77,56 @@ function LogoHeader({ size, company }: { size?: "small"; company: CompanyInfo })
 function FrontCard({ p, group, company, showFeedbackQr, bookingMap, photoDataUrls }: {
   p: Pilgrim; group: Group; company: CompanyInfo; showFeedbackQr: boolean; bookingMap: Record<string, string>; photoDataUrls: Record<string, string>;
 }) {
-  const bulletDot: React.CSSProperties = { width: "3mm", height: "3mm", borderRadius: "50%", background: GOLD, flexShrink: 0, marginTop: "0.8mm" };
+  const dot: React.CSSProperties = { width: "2.5mm", height: "2.5mm", borderRadius: "50%", background: GOLD, flexShrink: 0, marginTop: "0.5mm" };
   const photoSrc = photoDataUrls[p.id] || (p.photoUrl ? `${API}${p.photoUrl}` : "");
   return (
     <div className="id-card">
       <WaveShapes />
-      <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", height: "100%", padding: "2.5mm 3mm 0" }}>
-        <LogoHeader company={company} />
-        <div style={{ display: "flex", justifyContent: "center", marginBottom: "1mm" }}>
-          {photoSrc
-            ? <img src={photoSrc} alt="" style={{ width: "25mm", height: "25mm", objectFit: "cover", borderRadius: "50%", border: `2.5px solid ${GOLD}` }} />
-            : <div style={{ width: "25mm", height: "25mm", background: "#f0f0f0", borderRadius: "50%", border: `2.5px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "6pt", color: "#aaa" }}>PHOTO</div>
+      <div style={{ position: "relative", zIndex: 1, height: "100%", display: "flex", flexDirection: "column", padding: "2mm 2.5mm 0" }}>
+        <LogoHeader company={company} size="small" />
+        {/* Body: photo | info | QR */}
+        <div style={{ display: "flex", flex: 1, gap: "2mm", alignItems: "flex-start", marginTop: "1mm" }}>
+          {/* Photo */}
+          <div style={{ flexShrink: 0 }}>
+            {photoSrc
+              ? <img src={photoSrc} alt="" style={{ width: "19mm", height: "19mm", objectFit: "cover", borderRadius: "50%", border: `2px solid ${GOLD}` }} />
+              : <div style={{ width: "19mm", height: "19mm", background: "#f0f0f0", borderRadius: "50%", border: `2px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "3.5pt", color: "#aaa" }}>PHOTO</div>
+            }
+          </div>
+          {/* Info */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: "6pt", fontWeight: 900, color: DARK, textTransform: "uppercase", lineHeight: 1.2, wordBreak: "break-word" }}>{p.fullName || "—"}</div>
+            <div style={{ fontSize: "4.5pt", color: GOLD, fontWeight: 700, marginBottom: "1.2mm" }}>HAJJ {group.year}</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.7mm" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: "1mm" }}>
+                <div style={dot} /><div style={{ fontSize: "4.5pt" }}><span style={{ color: "#888", fontSize: "3.5pt" }}>Serial </span><span style={{ fontWeight: 700, color: DARK }}>#{String(p.serialNumber).padStart(3, "0")}</span></div>
+              </div>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: "1mm" }}>
+                <div style={dot} /><div style={{ fontSize: "4.5pt" }}><span style={{ color: "#888", fontSize: "3.5pt" }}>Passport </span><span style={{ fontWeight: 600, fontFamily: "monospace" }}>{p.passportNumber || "—"}</span></div>
+              </div>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: "1mm" }}>
+                <div style={dot} /><div style={{ fontSize: "4.5pt" }}><span style={{ color: "#888", fontSize: "3.5pt" }}>Mobile </span><span style={{ fontWeight: 600 }}>{p.mobileIndia || "—"}</span></div>
+              </div>
+            </div>
+          </div>
+          {/* QR */}
+          <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5mm", paddingTop: "0.5mm" }}>
+            <div style={{ background: "#fff", padding: "2px", borderRadius: "3px", border: `1.5px solid ${DARK}` }}>
+              <QRCodeCanvas value={buildVerifyUrl(p.id)} size={36} level="M" fgColor={DARK} />
+            </div>
+            <div style={{ fontSize: "3pt", color: DARK, fontWeight: 900, textTransform: "uppercase" }}>SCAN</div>
+          </div>
+        </div>
+      </div>
+      {/* Footer */}
+      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 2 }}>
+        <div style={{ overflow: "hidden", paddingLeft: "2mm", marginBottom: "0.5mm" }}>
+          {(p.barcodeId || p.passportNumber)
+            ? <Barcode value={p.barcodeId || p.passportNumber!} format={p.barcodeId ? "CODE128" : "CODE39"} height={10} width={0.9} fontSize={0} />
+            : <div style={{ fontSize: "4pt", color: "#999" }}>{group.groupName}</div>
           }
         </div>
-        <div style={{ textAlign: "center", marginBottom: "1mm" }}>
-          <div style={{ fontSize: "7.5pt", fontWeight: 900, color: DARK, lineHeight: 1.25, wordBreak: "break-word", textTransform: "uppercase" }}>{p.fullName || "—"}</div>
-          <div style={{ fontSize: "5.5pt", color: GOLD, fontWeight: 700, marginTop: "0.5mm" }}>HAJJ {group.year}</div>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.8mm", fontSize: "5.5pt", flex: 1 }}>
-          <div style={{ display: "flex", alignItems: "flex-start", gap: "1.5mm" }}>
-            <div style={bulletDot} />
-            <div><span style={{ color: "#888", fontSize: "4.5pt" }}>Serial No. </span><span style={{ fontWeight: 700, color: DARK }}>#{String(p.serialNumber).padStart(3, "0")}</span></div>
-          </div>
-          <div style={{ display: "flex", alignItems: "flex-start", gap: "1.5mm" }}>
-            <div style={bulletDot} />
-            <div><span style={{ color: "#888", fontSize: "4.5pt" }}>Passport No. </span><span style={{ fontWeight: 600, fontFamily: "monospace", letterSpacing: "0.3px" }}>{p.passportNumber || "—"}</span></div>
-          </div>
-          <div style={{ display: "flex", alignItems: "flex-start", gap: "1.5mm" }}>
-            <div style={bulletDot} />
-            <div><span style={{ color: "#888", fontSize: "4.5pt" }}>Mobile (India) </span><span style={{ fontWeight: 600 }}>{p.mobileIndia || "—"}</span></div>
-          </div>
-        </div>
-        <div style={{ marginTop: "auto", paddingBottom: "14mm" }} />
-      </div>
-      <div style={{ position: "absolute", bottom: "14mm", right: "2mm", zIndex: 3, display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5mm" }}>
-        <div style={{ background: "#fff", padding: "2px", borderRadius: "3px", border: `2px solid ${DARK}` }}>
-          <QRCodeCanvas value={buildVerifyUrl(p.id)} size={44} level="M" fgColor={DARK} />
-        </div>
-        <div style={{ fontSize: "3pt", color: DARK, fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.4px", background: "#fff", padding: "0.3mm 1mm", borderRadius: "2px" }}>SCAN</div>
-      </div>
-      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 2 }}>
-        <div style={{ display: "flex", justifyContent: "flex-start", overflow: "hidden", paddingLeft: "2mm", marginBottom: "0.5mm" }}>
-          {(p.barcodeId || p.passportNumber) ? (
-            <Barcode value={p.barcodeId || p.passportNumber!} format={p.barcodeId ? "CODE128" : "CODE39"} height={14} width={1.0} fontSize={0} />
-          ) : (
-            <div style={{ fontSize: "5pt", color: "#999" }}>{group.groupName}</div>
-          )}
-        </div>
-        <div style={{ background: DARK, color: GOLD, padding: "1mm 2mm", fontSize: "4pt", textAlign: "center", fontWeight: 800, letterSpacing: "0.2px" }}>
+        <div style={{ background: DARK, color: GOLD, padding: "0.8mm 2mm", fontSize: "3.5pt", textAlign: "center", fontWeight: 800, letterSpacing: "0.2px" }}>
           {company.name} | 🇮🇳 {company.phone} | 🇸🇦 {company.phoneSaudi}
         </div>
       </div>
