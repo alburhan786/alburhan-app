@@ -57,6 +57,7 @@ import StaffManager from "@/pages/admin/StaffManager";
 import PrintStaffCards from "@/pages/admin/print/PrintStaffCards";
 import PrintSprayLabel from "@/pages/admin/print/PrintSprayLabel";
 import PrintSingleCard from "@/pages/admin/print/PrintSingleCard";
+import PrintSingleCardPro from "@/pages/admin/print/PrintSingleCardPro";
 import PrintIdCardSVG from "@/pages/admin/print/PrintIdCardSVG";
 import StaffVerify from "@/pages/public/StaffVerify";
 import VerifyPilgrim from "@/pages/public/VerifyPilgrim";
@@ -154,6 +155,8 @@ function Router() {
       <Route path="/admin/print/spray-label" component={() => <AdminRoute component={PrintSprayLabel} />} />
       <Route path="/admin/print/id-card-svg" component={() => <AdminRoute component={PrintIdCardSVG} />} />
       <Route path="/admin/groups/:groupId/print/single-card/:pilgrimId" component={() => <AdminRoute component={PrintSingleCard} />} />
+      <Route path="/admin/groups/:groupId/print/card-front/:pilgrimId" component={() => <AdminRoute component={PrintSingleCardPro} />} />
+      <Route path="/admin/groups/:groupId/print/card-back/:pilgrimId"  component={() => <AdminRoute component={PrintSingleCardPro} />} />
 
       <Route component={NotFound} />
     </Switch>

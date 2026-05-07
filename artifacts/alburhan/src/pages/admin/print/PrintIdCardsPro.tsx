@@ -695,12 +695,26 @@ export default function PrintIdCardsPro() {
                     {/* Cut line */}
                     <div className="cut-line no-print" style={{ position: "relative" }}>
                       <div className="cut-line-inner" />
+                      <a
+                        href={`${BASE}admin/groups/${groupId}/print/card-front/${p.id}`}
+                        target="_blank" rel="noopener noreferrer"
+                        title="Open single-card print page"
+                        style={{
+                          position: "absolute", top: "50%", left: "50%",
+                          transform: "translate(-50%,-75%)",
+                          background: DARK, color: "#fff", border: "none",
+                          borderRadius: "4px", padding: "3px 5px", fontSize: "7px",
+                          cursor: "pointer", fontWeight: 700, whiteSpace: "nowrap",
+                          writingMode: "vertical-rl", textOrientation: "mixed",
+                          textDecoration: "none", display: "block",
+                        }}
+                      >🖨</a>
                       <button
                         onClick={() => dlPilgrimPng(p)}
                         title="Download PNG (front + back)"
                         style={{
                           position: "absolute", top: "50%", left: "50%",
-                          transform: "translate(-50%,-60%)",
+                          transform: "translate(-50%,-15%)",
                           background: "#0e7490", color: "#fff", border: "none",
                           borderRadius: "4px", padding: "3px 5px", fontSize: "8px",
                           cursor: "pointer", fontWeight: 700, whiteSpace: "nowrap",
