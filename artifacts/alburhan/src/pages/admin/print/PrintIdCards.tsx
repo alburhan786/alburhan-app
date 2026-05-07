@@ -80,7 +80,7 @@ function FrontCard({ p, group, company, showFeedbackQr, bookingMap, photoDataUrl
 }) {
   const photoSrc = photoDataUrls[p.id] || (p.photoUrl ? `${API}${p.photoUrl}` : "");
   return (
-    <div className="id-card">
+    <div className="id-card" style={{ width: "54mm", height: "85mm" }}>
       <WaveShapes />
       <div style={{ position: "relative", zIndex: 1, height: "100%", display: "flex", flexDirection: "column", padding: "2.5mm 3mm 0" }}>
         {/* Header */}
@@ -134,7 +134,7 @@ function BackCard({ p, group, company, showFeedbackQr, bookingMap }: {
 }) {
   const dot: React.CSSProperties = { width: "2.5mm", height: "2.5mm", borderRadius: "50%", background: GOLD, flexShrink: 0, marginTop: "0.6mm" };
   return (
-    <div className="id-card">
+    <div className="id-card" style={{ width: "54mm", height: "85mm" }}>
       <WaveShapesBack />
       <div style={{ position: "relative", zIndex: 1, height: "100%", display: "flex", flexDirection: "column", padding: "2.5mm 3mm 0" }}>
         <LogoHeader company={company} />
@@ -293,7 +293,7 @@ export default function PrintIdCards() {
         }
         * { box-sizing: border-box; }
         .id-card {
-          width: 54mm; height: 85mm;
+          width: 54mm !important; height: 85mm !important;
           border: 1px solid #ddd; border-radius: 4px; overflow: hidden;
           page-break-inside: avoid; font-family: 'Inter', Arial, sans-serif;
           background: #fff; position: relative; flex-shrink: 0;
