@@ -331,6 +331,34 @@ function BackCard({ p, group, company, showFeedbackQr, bookingMap }: CardProps) 
   );
 }
 
+/* ── Corner crop marks around each card ───────────────────────────────────── */
+function CropMarkCard({ children }: { children: React.ReactNode }) {
+  const G = "1mm"; const L = "4mm"; const W = "0.5px"; const C = "#444";
+  const hm = (top: string, left: string): React.CSSProperties => ({
+    position:"absolute", background:C, top, left, width:L, height:W, pointerEvents:"none", zIndex:10,
+  });
+  const vm = (top: string, left: string): React.CSSProperties => ({
+    position:"absolute", background:C, top, left, width:W, height:L, pointerEvents:"none", zIndex:10,
+  });
+  return (
+    <div style={{ position:"relative", display:"inline-block" }}>
+      {/* Top-left */}
+      <div style={hm(`calc(-1*${G})`, `calc(-1*${L} - ${G})`)} />
+      <div style={vm(`calc(-1*${L} - ${G})`, `calc(-1*${G})`)} />
+      {/* Top-right */}
+      <div style={hm(`calc(-1*${G})`, `calc(100% + ${G})`)} />
+      <div style={vm(`calc(-1*${L} - ${G})`, `calc(100% + ${G})`)} />
+      {/* Bottom-left */}
+      <div style={hm(`calc(100% + ${G})`, `calc(-1*${L} - ${G})`)} />
+      <div style={vm(`calc(100% + ${G})`, `calc(-1*${G})`)} />
+      {/* Bottom-right */}
+      <div style={hm(`calc(100% + ${G})`, `calc(100% + ${G})`)} />
+      <div style={vm(`calc(100% + ${G})`, `calc(100% + ${G})`)} />
+      {children}
+    </div>
+  );
+}
+
 type PrintMode = "sidebyside" | "duplex" | "strip" | "sheets";
 
 export default function PrintIdCardsPro() {
@@ -565,19 +593,58 @@ export default function PrintIdCardsPro() {
 
         /* Dashed cut line between front and back */
         .cut-line {
-          width: 10mm;
+          width: 8mm;
           flex-shrink: 0;
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          gap: 1mm;
+          position: relative;
         }
         .cut-line-inner {
           width: 1px;
           height: 55mm;
-          border-left: 1.5px dashed #bbb;
+          border-left: 1px dashed #333;
           position: relative;
+        }
+        .cut-scissors-v {
+          position: absolute;
+          font-size: 9px;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%) rotate(90deg);
+          background: #fff;
+          padding: 1px 2px;
+          color: #444;
+          line-height: 1;
+          pointer-events: none;
+        }
+        /* Vertical cut lines between cards in strip/sheets */
+        .v-cut-line {
+          width: 5mm;
+          flex-shrink: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          position: relative;
+          height: 55mm;
+        }
+        .v-cut-line-inner {
+          height: 100%;
+          border-left: 1px dashed #333;
+          position: relative;
+        }
+        .v-cut-scissors {
+          position: absolute;
+          font-size: 8px;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%) rotate(90deg);
+          background: #fff;
+          padding: 1px;
+          color: #555;
+          line-height: 1;
+          pointer-events: none;
         }
 
         /* Single-card pages for duplex mode */
@@ -611,22 +678,34 @@ export default function PrintIdCardsPro() {
           gap: 5mm;
         }
         .h-cut-line {
-          width: 280mm;
-          margin: 5mm auto;
-          border-top: 1.5px dashed #bbb;
+          width: 100%;
+          margin: 4mm 0;
+          border-top: 1px dashed #333;
           position: relative;
           display: flex;
           align-items: center;
-          justify-content: center;
+          justify-content: flex-start;
         }
         .h-cut-label {
           position: absolute;
           background: #f5f5f0;
           padding: 0 8px;
-          font-size: 9px;
-          color: #aaa;
+          font-size: 8px;
+          color: #666;
           font-style: italic;
           white-space: nowrap;
+          left: 8mm;
+        }
+        .h-cut-scissors {
+          position: absolute;
+          left: 0;
+          top: 50%;
+          transform: translateY(-50%);
+          font-size: 10px;
+          background: #f5f5f0;
+          padding: 0 2px;
+          color: #333;
+          line-height: 1;
         }
 
         /* ── Sheets page: all fronts on p1, all backs on p2 (A4 landscape) ── */
@@ -660,10 +739,14 @@ export default function PrintIdCardsPro() {
         }
 
         @media print {
-          .strip-page  { box-shadow: none !important; }
-          .sheets-page { box-shadow: none !important; }
-          .h-cut-label { background: white !important; }
+          .strip-page    { box-shadow: none !important; }
+          .sheets-page   { box-shadow: none !important; }
+          .h-cut-label   { background: white !important; }
+          .h-cut-scissors{ background: white !important; }
           .sheets-header { display: none !important; }
+          .cut-line      { display: flex !important; }
+          .v-cut-line    { display: flex !important; }
+          .cut-btn       { display: none !important; }
         }
 
         @media screen {
@@ -811,12 +894,25 @@ export default function PrintIdCardsPro() {
                 </div>
                 <div className="sheets-grid">
                   {sheetsRows.map((row, ri) => (
-                    <div key={ri} className="sheets-row">
-                      {row.map(p => (
-                        <div key={p.id} ref={el => { if (el) frontCardRefs.current.set(p.id, el as HTMLElement); }}>
-                          <FrontCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} photoDataUrls={photoDataUrls} />
-                        </div>
-                      ))}
+                    <div key={ri}>
+                      {ri > 0 && <div className="h-cut-line" style={{ margin:"3mm 0" }}><span className="h-cut-scissors">✂</span></div>}
+                      <div className="sheets-row" style={{ gap: 0 }}>
+                        {row.map((p, ci) => (
+                          <div key={p.id} style={{ display:"flex", alignItems:"center" }}>
+                            {ci > 0 && (
+                              <div className="v-cut-line">
+                                <div className="v-cut-line-inner" />
+                                <span className="v-cut-scissors">✂</span>
+                              </div>
+                            )}
+                            <CropMarkCard>
+                              <div ref={el => { if (el) frontCardRefs.current.set(p.id, el as HTMLElement); }}>
+                                <FrontCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} photoDataUrls={photoDataUrls} />
+                              </div>
+                            </CropMarkCard>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -834,12 +930,25 @@ export default function PrintIdCardsPro() {
                 </div>
                 <div className="sheets-grid">
                   {sheetsRows.map((row, ri) => (
-                    <div key={ri} className="sheets-row">
-                      {row.map(p => (
-                        <div key={p.id} ref={el => { if (el) backCardRefs.current.set(p.id, el as HTMLElement); }}>
-                          <BackCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} photoDataUrls={photoDataUrls} />
-                        </div>
-                      ))}
+                    <div key={ri}>
+                      {ri > 0 && <div className="h-cut-line" style={{ margin:"3mm 0" }}><span className="h-cut-scissors">✂</span></div>}
+                      <div className="sheets-row" style={{ gap: 0 }}>
+                        {row.map((p, ci) => (
+                          <div key={p.id} style={{ display:"flex", alignItems:"center" }}>
+                            {ci > 0 && (
+                              <div className="v-cut-line">
+                                <div className="v-cut-line-inner" />
+                                <span className="v-cut-scissors">✂</span>
+                              </div>
+                            )}
+                            <CropMarkCard>
+                              <div ref={el => { if (el) backCardRefs.current.set(p.id, el as HTMLElement); }}>
+                                <BackCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} photoDataUrls={photoDataUrls} />
+                              </div>
+                            </CropMarkCard>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -855,18 +964,29 @@ export default function PrintIdCardsPro() {
               </div>
               <div className="strip-page" ref={el => { if (el) pageElsRef.current[pi] = el as HTMLElement; }}>
                 {/* Front strip */}
-                <div className="strip-row">
-                  {pagePilgrims.map(p => (
-                    <div key={p.id} ref={el => { if (el) frontCardRefs.current.set(p.id, el as HTMLElement); }}>
-                      <FrontCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} photoDataUrls={photoDataUrls} />
+                <div className="strip-row" style={{ gap: 0 }}>
+                  {pagePilgrims.map((p, ci) => (
+                    <div key={p.id} style={{ display:"flex", alignItems:"center" }}>
+                      {ci > 0 && (
+                        <div className="v-cut-line">
+                          <div className="v-cut-line-inner" />
+                          <span className="v-cut-scissors">✂</span>
+                        </div>
+                      )}
+                      <CropMarkCard>
+                        <div ref={el => { if (el) frontCardRefs.current.set(p.id, el as HTMLElement); }}>
+                          <FrontCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} photoDataUrls={photoDataUrls} />
+                        </div>
+                      </CropMarkCard>
                     </div>
                   ))}
                 </div>
 
                 {/* Horizontal cut line */}
                 <div className="h-cut-line">
+                  <span className="h-cut-scissors">✂</span>
                   <span className="h-cut-label no-print">
-                    ✂ Cut here — then stack back strip below front strip and cut vertically for individual paired cards
+                    Cut here — stack back strip below front strip, then cut vertically for paired cards
                   </span>
                 </div>
 
@@ -874,10 +994,20 @@ export default function PrintIdCardsPro() {
                 <div className="no-print" style={{ fontSize: "11px", color: "#c2410c", marginBottom: "2mm", fontStyle: "italic", fontWeight: 700 }}>
                   ▲ BACK SIDE — SAME {pagePilgrims.length} PILGRIMS (SAME LEFT-TO-RIGHT ORDER)
                 </div>
-                <div className="strip-row">
-                  {pagePilgrims.map(p => (
-                    <div key={p.id} ref={el => { if (el) backCardRefs.current.set(p.id, el as HTMLElement); }}>
-                      <BackCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} photoDataUrls={photoDataUrls} />
+                <div className="strip-row" style={{ gap: 0 }}>
+                  {pagePilgrims.map((p, ci) => (
+                    <div key={p.id} style={{ display:"flex", alignItems:"center" }}>
+                      {ci > 0 && (
+                        <div className="v-cut-line">
+                          <div className="v-cut-line-inner" />
+                          <span className="v-cut-scissors">✂</span>
+                        </div>
+                      )}
+                      <CropMarkCard>
+                        <div ref={el => { if (el) backCardRefs.current.set(p.id, el as HTMLElement); }}>
+                          <BackCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} photoDataUrls={photoDataUrls} />
+                        </div>
+                      </CropMarkCard>
                     </div>
                   ))}
                 </div>
@@ -895,55 +1025,60 @@ export default function PrintIdCardsPro() {
                 {pagePilgrims.map(p => (
                   <div key={p.id} className="card-pair-row">
                     {/* FRONT */}
-                    <div ref={el => { if (el) frontCardRefs.current.set(p.id, el as HTMLElement); }}>
-                      <FrontCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} photoDataUrls={photoDataUrls} />
-                    </div>
-                    {/* Cut line */}
-                    <div className="cut-line no-print" style={{ position: "relative" }}>
+                    <CropMarkCard>
+                      <div ref={el => { if (el) frontCardRefs.current.set(p.id, el as HTMLElement); }}>
+                        <FrontCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} photoDataUrls={photoDataUrls} />
+                      </div>
+                    </CropMarkCard>
+                    {/* Cut line — visible on screen AND print */}
+                    <div className="cut-line">
                       <div className="cut-line-inner" />
-                      <a
+                      <span className="cut-scissors-v">✂</span>
+                      {/* Action buttons — screen only */}
+                      <a className="cut-btn"
                         href={`${BASE}admin/groups/${groupId}/print/card-front/${p.id}`}
                         target="_blank" rel="noopener noreferrer"
                         title="Open single-card print page"
                         style={{
-                          position: "absolute", top: "50%", left: "50%",
-                          transform: "translate(-50%,-75%)",
-                          background: DARK, color: "#fff", border: "none",
-                          borderRadius: "4px", padding: "3px 5px", fontSize: "7px",
-                          cursor: "pointer", fontWeight: 700, whiteSpace: "nowrap",
-                          writingMode: "vertical-rl", textOrientation: "mixed",
-                          textDecoration: "none", display: "block",
+                          position:"absolute", top:"50%", left:"50%",
+                          transform:"translate(-50%,-80%)",
+                          background:DARK, color:"#fff", border:"none",
+                          borderRadius:"4px", padding:"3px 5px", fontSize:"7px",
+                          cursor:"pointer", fontWeight:700, whiteSpace:"nowrap",
+                          writingMode:"vertical-rl", textDecoration:"none", display:"block",
                         }}
                       >🖨</a>
-                      <button
+                      <button className="cut-btn"
                         onClick={() => dlPilgrimPng(p)}
-                        title="Download PNG (front + back)"
+                        title="Download PNG"
                         style={{
-                          position: "absolute", top: "50%", left: "50%",
-                          transform: "translate(-50%,-15%)",
-                          background: "#0e7490", color: "#fff", border: "none",
-                          borderRadius: "4px", padding: "3px 5px", fontSize: "8px",
-                          cursor: "pointer", fontWeight: 700, whiteSpace: "nowrap",
-                          writingMode: "vertical-rl", textOrientation: "mixed",
+                          position:"absolute", top:"50%", left:"50%",
+                          transform:"translate(-50%,-10%)",
+                          background:"#0e7490", color:"#fff", border:"none",
+                          borderRadius:"4px", padding:"3px 5px", fontSize:"8px",
+                          cursor:"pointer", fontWeight:700, whiteSpace:"nowrap",
+                          writingMode:"vertical-rl",
                         }}
                       >PNG</button>
-                      <button
+                      <button className="cut-btn"
                         onClick={() => dlPilgrimSvg(p)}
-                        title="Download SVG (front + back)"
+                        title="Download SVG"
                         style={{
-                          position: "absolute", top: "50%", left: "50%",
-                          transform: "translate(-50%,10%)",
-                          background: "#b45309", color: "#fff", border: "none",
-                          borderRadius: "4px", padding: "3px 5px", fontSize: "8px",
-                          cursor: "pointer", fontWeight: 700, whiteSpace: "nowrap",
-                          writingMode: "vertical-rl", textOrientation: "mixed",
+                          position:"absolute", top:"50%", left:"50%",
+                          transform:"translate(-50%,20%)",
+                          background:"#b45309", color:"#fff", border:"none",
+                          borderRadius:"4px", padding:"3px 5px", fontSize:"8px",
+                          cursor:"pointer", fontWeight:700, whiteSpace:"nowrap",
+                          writingMode:"vertical-rl",
                         }}
                       >SVG</button>
                     </div>
                     {/* BACK */}
-                    <div ref={el => { if (el) backCardRefs.current.set(p.id, el as HTMLElement); }}>
-                      <BackCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} photoDataUrls={photoDataUrls} />
-                    </div>
+                    <CropMarkCard>
+                      <div ref={el => { if (el) backCardRefs.current.set(p.id, el as HTMLElement); }}>
+                        <BackCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} photoDataUrls={photoDataUrls} />
+                      </div>
+                    </CropMarkCard>
                   </div>
                 ))}
               </div>
