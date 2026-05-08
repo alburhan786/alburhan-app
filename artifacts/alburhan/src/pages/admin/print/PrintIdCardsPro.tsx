@@ -741,8 +741,8 @@ export default function PrintIdCardsPro() {
         * { box-sizing: border-box; }
 
         .pro-card {
-          width: 90mm;
-          height: 60mm;
+          width: 86mm;
+          height: 54mm;
           border: 1px solid #ccc;
           border-radius: 3px;
           overflow: hidden;
@@ -792,7 +792,7 @@ export default function PrintIdCardsPro() {
         }
         .cut-line-inner {
           width: 1px;
-          height: 60mm;
+          height: 54mm;
           border-left: 1px dashed #333;
           position: relative;
         }
@@ -816,7 +816,7 @@ export default function PrintIdCardsPro() {
           align-items: center;
           justify-content: center;
           position: relative;
-          height: 60mm;
+          height: 54mm;
         }
         .v-cut-line-inner {
           height: 100%;
@@ -838,7 +838,7 @@ export default function PrintIdCardsPro() {
 
         /* Single-card pages for duplex mode */
         .duplex-page {
-          width: 90mm;
+          width: 86mm;
           margin: 0 auto;
           page-break-after: always;
           break-after: page;
@@ -849,9 +849,9 @@ export default function PrintIdCardsPro() {
         }
 
         /* ── Strip page: 3 per row, fronts top, backs bottom (A4 landscape) ── */
-        /* 3 × 90mm + 2 × 5mm gaps = 280mm — fits A4 landscape usable 281mm */
+        /* 3 × 86mm + 2 × 5mm gaps = 268mm — fits A4 landscape usable 281mm */
         .strip-page {
-          width: 280mm;
+          width: 268mm;
           margin: 0 auto;
           page-break-after: always;
           break-after: page;
@@ -899,7 +899,7 @@ export default function PrintIdCardsPro() {
 
         /* ── Sheets page: all fronts on p1, all backs on p2 (A4 landscape) ── */
         .sheets-page {
-          width: 280mm;
+          width: 268mm;
           margin: 0 auto;
           page-break-after: always;
           break-after: page;
@@ -927,9 +927,11 @@ export default function PrintIdCardsPro() {
           border-radius: 4px;
         }
 
-        /* ── Grid9: 9 portrait front cards per A4 portrait page (3×3, 70×99mm) ── */
+        /* ── Grid9: 9 landscape front cards per A4 landscape page (3×3, 86×54mm) ── */
+        /* 3 × 86mm = 258mm — fits A4 landscape usable 281mm width */
+        /* 3 × 54mm = 162mm — fits A4 landscape usable 210mm height */
         .grid9-page {
-          width: 210mm;
+          width: 258mm;
           margin: 0 auto;
           page-break-after: always;
           break-after: page;
@@ -940,27 +942,10 @@ export default function PrintIdCardsPro() {
         }
         .grid9-grid {
           display: grid;
-          grid-template-columns: repeat(3, 70mm);
-          grid-template-rows: repeat(3, 99mm);
+          grid-template-columns: repeat(3, 86mm);
+          grid-template-rows: repeat(3, 54mm);
           gap: 0;
-          width: 210mm;
-        }
-        .pro-card-portrait {
-          width: 70mm;
-          height: 99mm;
-          border: 0.3px solid #ccc;
-          overflow: hidden;
-          font-family: Arial, sans-serif;
-          background: #fff;
-          display: flex;
-          flex-direction: column;
-          flex-shrink: 0;
-          page-break-inside: avoid;
-          break-inside: avoid;
-          box-sizing: border-box;
-        }
-        @media print {
-          .pro-card-portrait { border-color: transparent; }
+          width: 258mm;
         }
 
         @media print {
@@ -996,8 +981,7 @@ export default function PrintIdCardsPro() {
           }
         }
       `}</style>
-      {(isStrip || isSheets) && <style>{`@media print { @page { size: A4 landscape; margin: 8mm; } }`}</style>}
-      {isGrid9 && <style>{`@media print { @page { size: A4 portrait; margin: 0; } }`}</style>}
+      {(isStrip || isSheets || isGrid9) && <style>{`@media print { @page { size: A4 landscape; margin: 8mm; } }`}</style>}
 
       {/* ── Toolbar ── */}
       <div className="no-print" style={{
@@ -1008,7 +992,7 @@ export default function PrintIdCardsPro() {
         <div>
           <div style={{ fontWeight: 800, fontSize: "15px", color: DARK }}>ID Card Print</div>
           <div style={{ fontSize: "12px", color: "#555" }}>
-            {isGrid9  ? "Grid 9 · 9 portrait front cards per A4 · 70×99mm (≈3\"×4\") · Cut & laminate"
+            {isGrid9  ? "Grid 9 · 9 landscape cards per A4 landscape · 86×54mm (CR80) · Cut & laminate"
              : isSheets ? "Sheets · All fronts = Page 1 · All backs = Page 2 · A4 landscape"
              : isStrip ? "Strip 3 · 3 fronts on top · 3 backs on bottom · A4 landscape"
              : isSBS   ? "Side-by-side · Front | Back on same sheet · Cut & stack"
@@ -1081,8 +1065,8 @@ export default function PrintIdCardsPro() {
       }}>
         {isGrid9 ? (
           <>
-            <span>✅ 9 FRONT cards per A4 portrait · 70×99mm each (≈ 2¾" × 3¾") · 3 cols × 3 rows · fills entire A4</span>
-            <span>🖨 Printer → A4 Portrait · One-sided · Scale 100% · Margins None → ✂ Cut at every 70mm (width) &amp; 99mm (height) → Laminate</span>
+            <span>✅ 9 FRONT cards per A4 landscape · 86×54mm each (CR80 credit-card size) · 3 cols × 3 rows</span>
+            <span>🖨 Printer → A4 Landscape · One-sided · Scale 100% · Margins None → ✂ Cut at every 86mm (width) &amp; 54mm (height) → Laminate</span>
           </>
         ) : isSheets ? (
           <>
@@ -1114,22 +1098,22 @@ export default function PrintIdCardsPro() {
       <div ref={contentRef} className="id-print-content" style={{ background: "#f5f5f0", padding: "8mm", display: "flex", flexDirection: "column", gap: "8mm" }}>
 
         {isGrid9 ? (
-          /* ── GRID9 MODE: 9 front cards per A4 landscape page (3×3), 90×60mm ── */
+          /* ── GRID9 MODE: 9 landscape front cards per A4 landscape page (3×3), 86×54mm CR80 ── */
           grid9Pages.map((cells, pi) => (
             <div key={pi}>
               <div className="no-print" style={{ fontSize: "11px", color: "#14532d", fontWeight: 700, marginBottom: "3mm" }}>
-                📄 Sheet {pi + 1} of {grid9Pages.length} — 9 FRONT cards
+                📄 Sheet {pi + 1} of {grid9Pages.length} — 9 FRONT cards (landscape 86×54mm)
               </div>
               <div className="grid9-page" ref={el => { if (el) pageElsRef.current[pi] = el as HTMLElement; }}>
                 <div className="grid9-grid">
                   {cells.map((p, i) => (
-                    <div key={i} style={{ width: "70mm", height: "99mm", position: "relative" }}>
+                    <div key={i} style={{ width: "86mm", height: "54mm", position: "relative" }}>
                       {p ? (
                         <div ref={el => { if (el) frontCardRefs.current.set(p.id, el as HTMLElement); }}>
-                          <FrontCardPortrait p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} photoDataUrls={photoDataUrls} />
+                          <FrontCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} photoDataUrls={photoDataUrls} />
                         </div>
                       ) : (
-                        <div className="pro-card-portrait" style={{ background: "#f9fafb", border: "0.5px dashed #ccc" }} />
+                        <div className="pro-card" style={{ background: "#f9fafb", border: "0.5px dashed #ccc" }} />
                       )}
                     </div>
                   ))}
