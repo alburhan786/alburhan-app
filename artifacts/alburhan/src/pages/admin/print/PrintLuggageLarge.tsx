@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useRoute } from "wouter";
-import { downloadAsPdf, fetchAsDataUrl } from "@/lib/downloadUtils";
+import { downloadMultiPagePdf, fetchAsDataUrl } from "@/lib/downloadUtils";
 import { Barcode } from "@/components/print/Barcode";
 import { QRCodeCanvas } from "qrcode.react";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
@@ -60,12 +60,13 @@ export default function PrintLuggageLarge() {
   const company = getCompanyById(companyId);
   const [downloading, setDownloading] = useState<string | null>(null);
   const [photoDataUrls, setPhotoDataUrls] = useState<Record<string, string>>({});
-  const contentRef = useRef<HTMLDivElement>(null);
+  const stickerRefs = useRef<HTMLDivElement[]>([]);
 
   const dl = async () => {
-    if (!contentRef.current) return;
+    const pages = stickerRefs.current.filter(Boolean);
+    if (pages.length === 0) return;
     setDownloading("pdf");
-    try { await downloadAsPdf(contentRef.current, `luggage-large-${group?.groupName || "group"}`); }
+    try { await downloadMultiPagePdf(pages, `luggage-large-${group?.groupName || "group"}`); }
     finally { setDownloading(null); }
   };
 
@@ -125,12 +126,12 @@ export default function PrintLuggageLarge() {
         <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
       </div>
 
-      <div ref={contentRef}>
-      {pilgrims.map(p => {
+      <div>
+      {pilgrims.map((p, idx) => {
         const serial = String(p.serialNumber).padStart(3, "0");
         const barcodeVal = p.passportNumber || `H${serial}`;
         return (
-        <div key={p.id} className="ll-sticker">
+        <div key={p.id} className="ll-sticker" ref={el => { if (el) stickerRefs.current[idx] = el; }}>
 
           {/* ── TOP HEADER: logos + service centre info ── */}
           <div style={{
