@@ -487,12 +487,13 @@ export default function PrintIdCardsDuplex() {
         }
 
         @media screen {
-          body { background:#374151; margin:0; padding:0; font-family:Arial,sans-serif; }
+          body { background:#374151; margin:0; padding:0; font-family:Arial,sans-serif; overflow-x:hidden; }
+          /* zoom scales the rendered page to fit the viewport while keeping print at 100% */
           .a4l {
+            zoom:0.65;
             box-shadow:0 8px 48px rgba(0,0,0,0.4);
-            margin:100px auto 0;
+            margin:24px auto;
           }
-          .a4l:last-of-type { margin-bottom:80px; }
           .lcard { box-shadow:0 2px 10px rgba(0,0,0,0.16); }
         }
       `}</style>
@@ -526,7 +527,7 @@ export default function PrintIdCardsDuplex() {
           &nbsp;Page 1 = FRONT &nbsp;|&nbsp; Page 2 = BACK (columns auto-mirrored so every back aligns with its front after flipping).
         </div>
       </div>
-      <div className="no-print" style={{ height: "112px" }} />
+      <div className="no-print" style={{ height: "116px" }} />
 
       {/* ── Sheet pairs ── */}
       {pages.map((pg, pi) => {
