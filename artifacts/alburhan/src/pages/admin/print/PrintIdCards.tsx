@@ -202,7 +202,7 @@ function BackCard({ p, group, company, showFeedbackQr, bookingMap }: {
   );
 }
 
-type PrintMode = "strip" | "sheets" | "direct";
+type PrintMode = "strip" | "sheets" | "direct" | "grid9";
 
 export default function PrintIdCards() {
   const [, params] = useRoute("/admin/groups/:groupId/print/id-cards");
@@ -385,19 +385,65 @@ export default function PrintIdCards() {
         @media print {
           .sheets-page-label { display: none !important; }
         }
+
+        /* ── Grid-9 mode: 3×3 portrait cards on A4 ── */
+        /* Card 54×85mm · 3 cols: 162mm · 3 rows: 255mm — fits A4 210×297mm */
+        .g9-page {
+          width: 210mm;
+          height: 297mm;
+          background: #fff;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          position: relative;
+          page-break-after: always;
+          break-after: page;
+          flex-shrink: 0;
+        }
+        .g9-page:last-of-type { page-break-after: auto; break-after: auto; }
+        .g9-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 54mm);
+          grid-template-rows: repeat(3, 85mm);
+          gap: 0;
+        }
+        .g9-label {
+          position: absolute;
+          top: 7mm;
+          left: 50%;
+          transform: translateX(-50%);
+          font-size: 9px;
+          font-weight: 700;
+          padding: 3px 14px;
+          border-radius: 20px;
+          font-family: Arial, sans-serif;
+          white-space: nowrap;
+          letter-spacing: 0.4px;
+        }
+        @media print {
+          .g9-label { display: none !important; }
+          .g9-page { box-shadow: none !important; margin: 0 !important; }
+        }
+        @media screen {
+          .g9-page {
+            box-shadow: 0 8px 48px rgba(0,0,0,0.35);
+            margin: 72px auto 0;
+          }
+          .g9-page:last-of-type { margin-bottom: 72px; }
+        }
       `}</style>
 
       <div className="no-print" style={{ padding: "16px", background: "#fef3c7", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", flexWrap: "wrap" }}>
         {/* Mode toggle */}
         <div style={{ display: "flex", gap: "4px", background: "#e5e7eb", borderRadius: "8px", padding: "3px" }}>
-          {(["direct", "strip", "sheets"] as PrintMode[]).map(m => (
+          {(["direct", "strip", "sheets", "grid9"] as PrintMode[]).map(m => (
             <button key={m} onClick={() => setPrintMode(m)} style={{
               padding: "7px 14px", border: "none", borderRadius: "6px", cursor: "pointer",
               fontSize: "12px", fontWeight: 700,
               background: printMode === m ? DARK : "transparent",
               color: printMode === m ? "#fff" : "#374151",
             }}>
-              {m === "direct" ? "Direct Print" : m === "strip" ? "Strip 3" : "Sheets"}
+              {m === "direct" ? "Direct Print" : m === "strip" ? "Strip 3" : m === "sheets" ? "Sheets" : "Grid 9"}
             </button>
           ))}
         </div>
@@ -447,6 +493,9 @@ export default function PrintIdCards() {
         ) : printMode === "sheets" ? (
           <><strong>Sheets mode:</strong> Page 1 = ALL front cards · Page 2 = ALL back cards (same order).
           &nbsp;① Print both pages &nbsp;② Cut each page into individual cards &nbsp;③ Pair front + back &nbsp;④ Laminate</>
+        ) : printMode === "grid9" ? (
+          <><strong>Grid 9 mode:</strong> 9 vertical cards (3×3) per A4 page · Page 1 = all fronts · Page 2 = all backs (same position).
+          &nbsp;① Print both pages on same paper (duplex) or separately &nbsp;② Cut into 9 cards &nbsp;③ Pair front + back &nbsp;④ Laminate</>
         ) : (
           <><strong>How to use:</strong> Each A4 page = {CARDS_PER_ROW} pilgrims (front cards on top, back cards on bottom).
           &nbsp;① Print &nbsp;② Cut along the dashed line &nbsp;③ Stack back strip below front strip &nbsp;④ Cut vertically for individual paired cards &nbsp;⑤ Laminate</>
@@ -514,6 +563,46 @@ export default function PrintIdCards() {
               </div>
             </div>
           </>
+        ) : printMode === "grid9" ? (
+          (() => {
+            /* Split all pilgrims into pages of 9 */
+            const g9Pages: Pilgrim[][] = [];
+            for (let i = 0; i < pilgrims.length; i += 9) g9Pages.push(pilgrims.slice(i, i + 9));
+            /* Pad the last page to 9 cells */
+            const pad = (pg: Pilgrim[]) => { const a: (Pilgrim|null)[] = [...pg]; while (a.length < 9) a.push(null); return a; };
+            return (
+              <>
+                {/* All FRONT pages */}
+                {g9Pages.map((pg, pi) => (
+                  <div key={`gf-${pi}`} className="g9-page">
+                    <div className="g9-label no-print" style={{ background: "#dbeafe", color: "#1e40af" }}>
+                      FRONT — Sheet {pi + 1} of {g9Pages.length} &nbsp;({pg.length} cards)
+                    </div>
+                    <div className="g9-grid">
+                      {pad(pg).map((p, i) => p
+                        ? <FrontCard key={p.id} p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} photoDataUrls={photoDataUrls} />
+                        : <div key={`empty-${i}`} className="id-card" style={{ background: "#f9fafb", border: "0.5px dashed #ddd" }} />
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {/* All BACK pages — same position order */}
+                {g9Pages.map((pg, pi) => (
+                  <div key={`gb-${pi}`} className="g9-page">
+                    <div className="g9-label no-print" style={{ background: "#fee2e2", color: "#991b1b" }}>
+                      BACK — Sheet {pi + 1} of {g9Pages.length} &nbsp;(same position as front)
+                    </div>
+                    <div className="g9-grid">
+                      {pad(pg).map((p, i) => p
+                        ? <BackCard key={p.id} p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
+                        : <div key={`empty-${i}`} className="id-card" style={{ background: "#f9fafb", border: "0.5px dashed #ddd" }} />
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </>
+            );
+          })()
         ) : (
           pages.map((page, pi) => (
             <div key={pi} className="pair-block">
