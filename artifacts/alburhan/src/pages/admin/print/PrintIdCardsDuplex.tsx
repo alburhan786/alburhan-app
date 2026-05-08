@@ -322,29 +322,64 @@ function BackCard({ p, group, company, showFeedbackQr, bookingMap }: {
   );
 }
 
-/* ─── Crop marks ─────────────────────────────────────────────────────────────── */
-function CropMarks() {
-  const G = "2mm"; const L = "4mm"; const W = "0.4px"; const C = "#555";
-  const mk = (t: string, l: string, w: string, h: string): React.CSSProperties =>
-    ({ position: "absolute", background: C, top: t, left: l, width: w, height: h });
+/* ─── SVG Crop-mark overlay ──────────────────────────────────────────────────
+   Page:  297 mm × 210 mm  (A4 landscape)
+   Grid:  3 cols × 85 mm  +  3 rows × 55 mm
+   H margin (each side): (297 − 255) / 2 = 21 mm
+   V margin (each side): (210 − 165) / 2 = 22.5 mm
+
+   Cut X positions: 21, 106, 191, 276 mm
+   Cut Y positions: 22.5, 77.5, 132.5, 187.5 mm
+
+   For every cut-X → draw a vertical line in the TOP margin (0 → 20mm)
+                      and in the BOTTOM margin (190mm → 210mm)
+   For every cut-Y → draw a horizontal line in the LEFT margin (0 → 19mm)
+                      and in the RIGHT margin (278mm → 297mm)
+   2 mm gap between line end and card edge keeps the mark out of the bleed.
+──────────────────────────────────────────────────────────────────────────── */
+function CropOverlay() {
+  const cutX  = [21, 106, 191, 276];          // mm from left
+  const cutY  = [22.5, 77.5, 132.5, 187.5];  // mm from top
+  const gap   = 2;   // mm gap between mark and card edge
+  const vTop  = 22.5 - gap;   // 20.5 mm  — top of grid minus gap
+  const vBot  = 187.5 + gap;  // 189.5 mm — bottom of grid plus gap
+  const hLeft = 21 - gap;     // 19 mm
+  const hRight= 276 + gap;    // 278 mm
+
+  const lp = (v: number) => `${v}mm`;
+
   return (
-    <>
-      <div style={mk(`calc(-1*${G})`, "0", W, L)} />
-      <div style={mk(`calc(-1*${L}-${G})`, `calc(-1*${G})`, L, W)} />
-      <div style={mk(`calc(-1*${G})`, "100%", W, L)} />
-      <div style={mk(`calc(-1*${L}-${G})`, `calc(100% - ${G} + 0.5px)`, L, W)} />
-      <div style={mk("100%", "0", W, L)} />
-      <div style={mk(`calc(100%+${G})`, `calc(-1*${G})`, L, W)} />
-      <div style={mk("100%", "100%", W, L)} />
-      <div style={mk(`calc(100%+${G})`, `calc(100% - ${G} + 0.5px)`, L, W)} />
-    </>
+    <svg
+      style={{ position: "absolute", top: 0, left: 0, width: "297mm", height: "210mm", pointerEvents: "none", zIndex: 5, overflow: "visible" }}
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      {/* Vertical cut lines — drawn only in top & bottom margins */}
+      {cutX.map(x => (
+        <g key={`vx-${x}`}>
+          <line x1={lp(x)} y1="0"       x2={lp(x)} y2={lp(vTop)} stroke="#444" strokeWidth="0.4" />
+          <line x1={lp(x)} y1={lp(vBot)} x2={lp(x)} y2="210mm"   stroke="#444" strokeWidth="0.4" />
+        </g>
+      ))}
+
+      {/* Horizontal cut lines — drawn only in left & right margins */}
+      {cutY.map(y => (
+        <g key={`hy-${y}`}>
+          <line x1="0"        y1={lp(y)} x2={lp(hLeft)}  y2={lp(y)} stroke="#444" strokeWidth="0.4" />
+          <line x1={lp(hRight)} y1={lp(y)} x2="297mm"    y2={lp(y)} stroke="#444" strokeWidth="0.4" />
+        </g>
+      ))}
+
+      {/* Small crosshair dots at every cut intersection on the outer edges */}
+      {cutX.flatMap(x => cutY.map(y => (
+        <circle key={`dot-${x}-${y}`} cx={lp(x)} cy={lp(y)} r="0.6mm" fill="none" stroke="#888" strokeWidth="0.3" />
+      )))}
+    </svg>
   );
 }
 
 function CardCell({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ position: "relative", display: "inline-flex", flexShrink: 0, width: "85mm", height: "55mm" }}>
-      <CropMarks />
+    <div style={{ width: "85mm", height: "55mm", flexShrink: 0, overflow: "hidden" }}>
       {children}
     </div>
   );
@@ -357,6 +392,9 @@ function A4Page({ children, label, pageRef }: {
 }) {
   return (
     <div className="a4l" ref={pageRef}>
+      {/* Precise SVG crop-mark overlay */}
+      <CropOverlay />
+
       {label && (
         <div className="no-print" style={{
           position: "absolute", top: "6mm", left: "50%", transform: "translateX(-50%)",
@@ -365,6 +403,8 @@ function A4Page({ children, label, pageRef }: {
           fontFamily: "Arial,sans-serif", whiteSpace: "nowrap", zIndex: 10,
         }}>{label}</div>
       )}
+
+      {/* Card grid — exactly centred by the flex parent (.a4l) */}
       <div style={{
         display: "grid",
         gridTemplateColumns: `repeat(${COLS}, 85mm)`,
