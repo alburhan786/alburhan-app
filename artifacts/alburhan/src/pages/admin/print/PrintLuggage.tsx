@@ -57,6 +57,7 @@ export default function PrintLuggage() {
   const company = getCompanyById(companyId);
   const [downloading, setDownloading] = useState<string | null>(null);
   const [photoDataUrls, setPhotoDataUrls] = useState<Record<string, string>>({});
+  const [logoDataUrl, setLogoDataUrl] = useState<string>("");
   const stickerRefs = useRef<HTMLDivElement[]>([]);
 
   const dl = async (fmt: "pdf" | "jpg" | "png") => {
@@ -70,6 +71,12 @@ export default function PrintLuggage() {
       else await downloadPagesAsJpg(pages, name);
     } finally { setDownloading(null); }
   };
+
+  useEffect(() => {
+    if (!company.logoUrl) { setLogoDataUrl(""); return; }
+    if (company.logoUrl.startsWith("data:")) { setLogoDataUrl(company.logoUrl); return; }
+    fetchAsDataUrl(company.logoUrl).then(d => setLogoDataUrl(d || company.logoUrl!));
+  }, [companyId]);
 
   useEffect(() => {
     if (!groupId) return;
@@ -151,7 +158,7 @@ export default function PrintLuggage() {
             <div style={{ position: "relative", zIndex: 1, padding: "4mm 6mm 2mm", display: "flex", alignItems: "center", gap: "4mm" }}>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1.5mm", flexShrink: 0 }}>
                 {company.logoUrl
-                  ? <img src={company.logoUrl} alt="" style={{ height: "20mm", objectFit: "contain" }} />
+                  ? <img src={logoDataUrl || company.logoUrl} alt="" style={{ height: "20mm", objectFit: "contain" }} />
                   : <div style={{ height: "20mm", width: "20mm", background: DARK, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "12pt" }}>{company.nameShort.slice(0, 1)}</div>
                 }
                 <div style={{ fontSize: "44pt", lineHeight: 1 }}>🇮🇳</div>

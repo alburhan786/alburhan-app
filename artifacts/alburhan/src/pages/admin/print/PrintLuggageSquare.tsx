@@ -83,7 +83,7 @@ function FrontSticker({ p, group, company, groupColor, groupLabel, photoDataUrls
           <div style={{ position: "relative", zIndex: 1, padding: "1.5mm 3mm 0.5mm", display: "flex", alignItems: "center", gap: "1.5mm" }}>
             <div style={{ fontSize: "20pt", lineHeight: 1, flexShrink: 0 }}>🇮🇳</div>
             {company.logoUrl
-              ? <img src={company.logoUrl} alt="" style={{ height: "7mm", objectFit: "contain", flexShrink: 0 }} />
+              ? <img src={logoDataUrl || company.logoUrl} alt="" style={{ height: "7mm", objectFit: "contain", flexShrink: 0 }} />
               : <div style={{ height: "7mm", width: "7mm", flexShrink: 0, background: DARK, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "5pt" }}>{company.nameShort[0]}</div>
             }
             <div style={{ flex: 1 }}>
@@ -186,7 +186,7 @@ function FrontSticker({ p, group, company, groupColor, groupLabel, photoDataUrls
         <div style={{ position: "absolute", top: "-8mm", right: "-6mm", width: "38mm", height: "38mm", background: DARK, borderRadius: "0 0 0 60%", zIndex: 0 }} />
         <div style={{ position: "relative", zIndex: 1, padding: "2mm 3.5mm 1mm", display: "flex", alignItems: "center", gap: "2mm" }}>
           <div style={{ fontSize: "28pt", lineHeight: 1, flexShrink: 0 }}>🇮🇳</div>
-          {company.logoUrl ? <img src={company.logoUrl} alt="" style={{ height: "9mm", objectFit: "contain", flexShrink: 0 }} /> : <div style={{ height: "9mm", width: "9mm", flexShrink: 0, background: DARK, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "6pt" }}>{company.nameShort[0]}</div>}
+          {company.logoUrl ? <img src={logoDataUrl || company.logoUrl} alt="" style={{ height: "9mm", objectFit: "contain", flexShrink: 0 }} /> : <div style={{ height: "9mm", width: "9mm", flexShrink: 0, background: DARK, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "6pt" }}>{company.nameShort[0]}</div>}
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 900, fontSize: "7.5pt", color: GREEN, textTransform: "uppercase", lineHeight: 1.1 }}>{company.nameShort}</div>
             <div style={{ fontWeight: 700, fontSize: "5pt", color: GOLD, textTransform: "uppercase" }}>TOURS &amp; TRAVELS</div>
@@ -437,6 +437,7 @@ export default function PrintLuggageSquare() {
   const company = getCompanyById(companyId);
   const [downloading, setDownloading] = useState<string | null>(null);
   const [photoDataUrls, setPhotoDataUrls] = useState<Record<string, string>>({});
+  const [logoDataUrl, setLogoDataUrl] = useState<string>("");
   const pageRefs = useRef<HTMLDivElement[]>([]);
 
   const dl = async (fmt: "pdf" | "jpg" | "png") => {
@@ -450,6 +451,12 @@ export default function PrintLuggageSquare() {
       else await downloadPagesAsJpg(pages, name);
     } finally { setDownloading(null); }
   };
+
+  useEffect(() => {
+    if (!company.logoUrl) { setLogoDataUrl(""); return; }
+    if (company.logoUrl.startsWith("data:")) { setLogoDataUrl(company.logoUrl); return; }
+    fetchAsDataUrl(company.logoUrl).then(d => setLogoDataUrl(d || company.logoUrl!));
+  }, [companyId]);
 
   useEffect(() => {
     if (!groupId) return;

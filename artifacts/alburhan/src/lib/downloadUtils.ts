@@ -24,7 +24,7 @@ export async function fetchAsDataUrl(url: string): Promise<string> {
 
 const BASE_OPTS = {
   useCORS: true,
-  allowTaint: true,
+  allowTaint: false,
   backgroundColor: "#ffffff",
   logging: false,
   imageTimeout: 15000,
@@ -56,12 +56,18 @@ async function renderToBlob(
   for (const scale of scales) {
     const canvas = await renderCanvas(el, scale);
     if (!canvas) continue;
-    const blob = await new Promise<Blob | null>((res) =>
-      canvas.toBlob((b) => res(b), mime, quality),
-    );
-    // Require at least 1 KB — a 0×0 or all-white degenerate PNG is ~68 bytes
-    if (blob && blob.size > 1024) {
-      return { blob, cssW: canvas.width / scale, cssH: canvas.height / scale };
+    try {
+      const blob = await new Promise<Blob | null>((res, rej) => {
+        try { canvas.toBlob((b) => res(b), mime, quality); }
+        catch (e) { rej(e); }
+      });
+      // Require at least 1 KB — a 0×0 or all-white degenerate PNG is ~68 bytes
+      if (blob && blob.size > 1024) {
+        return { blob, cssW: canvas.width / scale, cssH: canvas.height / scale };
+      }
+    } catch {
+      // Canvas tainted or toBlob failed — try next scale
+      continue;
     }
   }
   return null;

@@ -60,6 +60,7 @@ export default function PrintLuggageLarge() {
   const company = getCompanyById(companyId);
   const [downloading, setDownloading] = useState<string | null>(null);
   const [photoDataUrls, setPhotoDataUrls] = useState<Record<string, string>>({});
+  const [logoDataUrl, setLogoDataUrl] = useState<string>("");
   const stickerRefs = useRef<HTMLDivElement[]>([]);
 
   const dl = async () => {
@@ -69,6 +70,12 @@ export default function PrintLuggageLarge() {
     try { await downloadMultiPagePdf(pages, `luggage-large-${group?.groupName || "group"}`); }
     finally { setDownloading(null); }
   };
+
+  useEffect(() => {
+    if (!company.logoUrl) { setLogoDataUrl(""); return; }
+    if (company.logoUrl.startsWith("data:")) { setLogoDataUrl(company.logoUrl); return; }
+    fetchAsDataUrl(company.logoUrl).then(d => setLogoDataUrl(d || company.logoUrl!));
+  }, [companyId]);
 
   useEffect(() => {
     if (!groupId) return;
@@ -225,7 +232,7 @@ export default function PrintLuggageLarge() {
               {/* Al Burhan logo + Indian flag */}
               <div style={{ flexShrink: 0, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "2mm" }}>
                 {company.logoUrl
-                  ? <img src={company.logoUrl} alt="" style={{ height: "80pt", objectFit: "contain" }} />
+                  ? <img src={logoDataUrl || company.logoUrl} alt="" style={{ height: "80pt", objectFit: "contain" }} />
                   : <div style={{ width: "80pt", height: "80pt", background: DARK, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "14pt" }}>{company.nameShort.slice(0, 1)}</div>
                 }
                 <div style={{ fontSize: "80pt", lineHeight: 1 }}>🇮🇳</div>
