@@ -731,7 +731,7 @@ export default function PrintIdCardsPro() {
     <>
       <style>{`
         @media print {
-          @page { size: A4 portrait; margin: 8mm 10mm; }
+          @page { margin: 8mm; }
           body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; margin: 0; }
           .no-print { display: none !important; }
           .id-print-page { box-shadow: none !important; margin-bottom: 0 !important; }
@@ -981,7 +981,7 @@ export default function PrintIdCardsPro() {
           }
         }
       `}</style>
-      {(isStrip || isSheets || isGrid9) && <style>{`@media print { @page { size: A4 landscape; margin: 8mm; } }`}</style>}
+      <style>{`@media print { @page { size: ${(isGrid9 || isStrip || isSheets) ? "A4 landscape" : "A4 portrait"}; margin: 8mm; } }`}</style>
 
       {/* ── Toolbar ── */}
       <div className="no-print" style={{
