@@ -5,9 +5,27 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
+import { useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+
+const API_BASE = import.meta.env.VITE_API_URL || "";
+
+async function postJson(url: string, body: object) {
+  const res = await fetch(`${API_BASE}${url}`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.message || `HTTP ${res.status}`);
+  return data;
+}
 
 export default function Login() {
-  const { sendOtp, isSendingOtp, verifyOtp, isVerifyingOtp, updateProfile, isAuthenticated, isAdmin } = useAuth();
+  const { updateProfile, isAuthenticated, isAdmin } = useAuth();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [mobile, setMobile] = useState("");
   const [otp, setOtp] = useState("");
   const [name, setName] = useState("");
@@ -15,6 +33,8 @@ export default function Login() {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [isNewUser, setIsNewUser] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [, setLocation] = useLocation();
 
   useEffect(() => {
@@ -30,29 +50,45 @@ export default function Login() {
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (mobile.length < 10) return;
+    setIsSendingOtp(true);
     try {
-      const result = await sendOtp({ data: { mobile } });
-      setIsNewUser(!!(result as any)?.isNewUser);
+      const result = await postJson("/api/auth/send-otp", { mobile });
+      setIsNewUser(!!result?.isNewUser);
       setStep(2);
     } catch (err: any) {
-      // Even if API response parsing failed, SMS was likely sent — move to OTP step
       console.error("[SendOTP Error]", err?.message || err);
+      // Move to OTP step anyway — SMS may still have been sent
       setStep(2);
+    } finally {
+      setIsSendingOtp(false);
     }
   };
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (otp.length < 4) return;
+    setIsVerifyingOtp(true);
     try {
-      const result = await verifyOtp({ data: { mobile, otp } });
-      if ((result as any)?.isNewUser) {
+      const result = await postJson("/api/auth/verify-otp", { mobile, otp });
+      queryClient.setQueryData(["/api/auth/me"], result.user);
+      if (result?.isNewUser) {
         setIsNewUser(true);
         setStep(3);
+      } else {
+        toast({
+          title: "Welcome back!",
+          description: `Assalamu Alaikum${result.user?.name ? `, ${result.user.name}` : ""}! You have logged in.`,
+        });
+        setLocation(result.user?.role === "admin" ? "/admin/dashboard" : "/customer/dashboard");
       }
-      // If not new user, use-auth hook handles redirect
-    } catch {
-      // Error handled by hook
+    } catch (err: any) {
+      toast({
+        title: "Login failed",
+        description: err?.message || "Invalid OTP. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsVerifyingOtp(false);
     }
   };
 
