@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useRoute } from "wouter";
-import { downloadAsPdf, downloadAsJpg, downloadAsPng, fetchAsDataUrl } from "@/lib/downloadUtils";
+import { downloadMultiPagePdf, downloadPagesAsPng, downloadPagesAsJpg, fetchAsDataUrl } from "@/lib/downloadUtils";
 import { Barcode } from "@/components/print/Barcode";
 import { QRCodeCanvas } from "qrcode.react";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
@@ -57,16 +57,17 @@ export default function PrintLuggage() {
   const company = getCompanyById(companyId);
   const [downloading, setDownloading] = useState<string | null>(null);
   const [photoDataUrls, setPhotoDataUrls] = useState<Record<string, string>>({});
-  const contentRef = useRef<HTMLDivElement>(null);
+  const stickerRefs = useRef<HTMLDivElement[]>([]);
 
   const dl = async (fmt: "pdf" | "jpg" | "png") => {
-    if (!contentRef.current) return;
+    const pages = stickerRefs.current.filter(Boolean);
+    if (pages.length === 0) return;
     setDownloading(fmt);
     try {
       const name = `luggage-stickers-${group?.groupName || "group"}`;
-      if (fmt === "pdf") await downloadAsPdf(contentRef.current, name);
-      else if (fmt === "png") await downloadAsPng(contentRef.current, name);
-      else await downloadAsJpg(contentRef.current, name);
+      if (fmt === "pdf") await downloadMultiPagePdf(pages, name);
+      else if (fmt === "png") await downloadPagesAsPng(pages, name);
+      else await downloadPagesAsJpg(pages, name);
     } finally { setDownloading(null); }
   };
 
@@ -131,9 +132,9 @@ export default function PrintLuggage() {
         <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
       </div>
 
-      <div ref={contentRef}>
-      {pilgrims.map(p => (
-        <div key={p.id} className="luggage-sticker">
+      <div>
+      {pilgrims.map((p, idx) => (
+        <div key={p.id} className="luggage-sticker" ref={el => { if (el) stickerRefs.current[idx] = el; }}>
           <div style={{ position: "relative", overflow: "hidden", height: "100%", display: "flex", flexDirection: "column" }}>
             <div style={{
               position: "absolute", top: "-15mm", right: "-10mm",

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useRoute } from "wouter";
-import { downloadAsPdf, downloadAsJpg, downloadAsPng, fetchAsDataUrl } from "@/lib/downloadUtils";
+import { downloadMultiPagePdf, downloadPagesAsPng, downloadPagesAsJpg, fetchAsDataUrl } from "@/lib/downloadUtils";
 import { Barcode } from "@/components/print/Barcode";
 import { QRCodeCanvas } from "qrcode.react";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
@@ -437,16 +437,17 @@ export default function PrintLuggageSquare() {
   const company = getCompanyById(companyId);
   const [downloading, setDownloading] = useState<string | null>(null);
   const [photoDataUrls, setPhotoDataUrls] = useState<Record<string, string>>({});
-  const contentRef = useRef<HTMLDivElement>(null);
+  const pageRefs = useRef<HTMLDivElement[]>([]);
 
   const dl = async (fmt: "pdf" | "jpg" | "png") => {
-    if (!contentRef.current) return;
+    const pages = pageRefs.current.filter(Boolean);
+    if (pages.length === 0) return;
     setDownloading(fmt);
     try {
       const name = `luggage-square-${group?.groupName || "group"}`;
-      if (fmt === "pdf") await downloadAsPdf(contentRef.current, name);
-      else if (fmt === "png") await downloadAsPng(contentRef.current, name);
-      else await downloadAsJpg(contentRef.current, name);
+      if (fmt === "pdf") await downloadMultiPagePdf(pages, name);
+      else if (fmt === "png") await downloadPagesAsPng(pages, name);
+      else await downloadPagesAsJpg(pages, name);
     } finally { setDownloading(null); }
   };
 
@@ -578,7 +579,7 @@ export default function PrintLuggageSquare() {
         </div>
       )}
 
-      <div ref={contentRef} className="sq-wrap" style={{ background: "#f5f5f0", padding: "8mm", display: "block" }}>
+      <div className="sq-wrap" style={{ background: "#f5f5f0", padding: "8mm", display: "block" }}>
 
         {/* ══ BOTH MODE: Page 1 = 4 fronts, Page 2 = 4 backs (mirrored columns for duplex alignment) ══ */}
         {view === "both" && pages.map((page, pi) => (
@@ -587,7 +588,7 @@ export default function PrintLuggageSquare() {
             <div key={`lbl-f-${pi}`} className="no-print sq-page-label" style={{ borderLeftColor: GREEN }}>
               📄 SIDE 1 — FRONTS (Pilgrims {pi * 4 + 1}–{Math.min(pi * 4 + page.length, pilgrims.length)})
             </div>
-            <div key={`fp-${pi}`} className="sq-page-single">
+            <div key={`fp-${pi}`} className="sq-page-single" ref={el => { if (el) pageRefs.current[pi * 2] = el; }}>
               {page.map(p => (
                 <FrontSticker key={`f-${p.id}`} p={p} group={group} company={company} groupColor={groupColor} groupLabel={groupLabel} photoDataUrls={photoDataUrls} compact={false} />
               ))}
@@ -597,8 +598,7 @@ export default function PrintLuggageSquare() {
             <div key={`lbl-b-${pi}`} className="no-print sq-page-label" style={{ borderLeftColor: "#2563EB" }}>
               🔄 SIDE 2 — BACKS · columns mirrored for duplex (Pilgrims {pi * 4 + 1}–{Math.min(pi * 4 + page.length, pilgrims.length)})
             </div>
-            <div key={`bp-${pi}`} className="sq-page-single">
-              {/* Mirror columns: row0→[P2,P1], row1→[P4,P3] so after long-edge flip each cut piece aligns */}
+            <div key={`bp-${pi}`} className="sq-page-single" ref={el => { if (el) pageRefs.current[pi * 2 + 1] = el; }}>
               {[page[1], page[0], page[3], page[2]].map((p, idx) =>
                 p ? <BackSticker key={`b-${p.id}-${idx}`} p={p} group={group} company={company} compact={false} /> : <div key={`empty-${idx}`} />
               )}
@@ -608,7 +608,7 @@ export default function PrintLuggageSquare() {
 
         {/* ══ FRONT ONLY: 2×2 grid full size ══ */}
         {view === "front" && pages.map((page, pi) => (
-          <div key={`fp-${pi}`} className="sq-page-single">
+          <div key={`fp-${pi}`} className="sq-page-single" ref={el => { if (el) pageRefs.current[pi] = el; }}>
             {page.map(p => (
               <FrontSticker key={p.id} p={p} group={group} company={company} groupColor={groupColor} groupLabel={groupLabel} photoDataUrls={photoDataUrls} compact={false} />
             ))}
@@ -617,7 +617,7 @@ export default function PrintLuggageSquare() {
 
         {/* ══ BACK ONLY: 2×2 grid full size ══ */}
         {view === "back" && pages.map((page, pi) => (
-          <div key={`bp-${pi}`} className="sq-page-single">
+          <div key={`bp-${pi}`} className="sq-page-single" ref={el => { if (el) pageRefs.current[pi] = el; }}>
             {page.map(p => (
               <BackSticker key={p.id} p={p} group={group} company={company} compact={false} />
             ))}
