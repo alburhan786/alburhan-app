@@ -427,6 +427,7 @@ export default function PrintIdCardsDuplex() {
   const [photoDataUrls,  setPhotoDataUrls]  = useState<Record<string, string>>({});
   const [companyId,      setCompanyId]      = useState("alburhan");
   const [showFeedbackQr, setShowFeedbackQr] = useState(false);
+  const [frontOnly,      setFrontOnly]      = useState(true);
   const [bookingMap,     setBookingMap]     = useState<Record<string, string>>({});
   const [photosReady,    setPhotosReady]    = useState(false);
   const [error,          setError]          = useState("");
@@ -546,25 +547,52 @@ export default function PrintIdCardsDuplex() {
         gap: "10px", flexWrap: "wrap",
       }}>
         <div style={{ color: "#fff", fontWeight: 800, fontSize: "13px", fontFamily: "Arial,sans-serif" }}>
-          🖨️ Duplex ID Cards (90×60mm) &nbsp;—&nbsp;
+          🖨️ {frontOnly ? "Front ID Cards" : "Duplex ID Cards"} (90×60mm) &nbsp;—&nbsp;
           <span style={{ color: GOLD }}>{group.groupName}</span>
           <span style={{ color: "#9ca3af", fontWeight: 400, marginLeft: "8px" }}>
-            {pilgrims.length} pilgrims · {pages.length} sheet{pages.length !== 1 ? "s" : ""} ×2 pages · 9 per sheet
+            {pilgrims.length} pilgrims · {pages.length} sheet{pages.length !== 1 ? "s" : ""}
+            {frontOnly ? " · Front only" : " ×2 pages"} · 9 per sheet
           </span>
         </div>
+
         <div style={{ marginLeft: "auto", display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+          {/* Mode toggle */}
+          <div style={{ display: "flex", borderRadius: "6px", overflow: "hidden", border: "1px solid #4b5563" }}>
+            <button
+              onClick={() => setFrontOnly(true)}
+              style={{ ...btnBase, borderRadius: 0, padding: "7px 14px", fontSize: "11px",
+                background: frontOnly ? GOLD : "#374151", color: frontOnly ? DARK : "#d1d5db", fontWeight: frontOnly ? 900 : 600 }}>
+              Front Only
+            </button>
+            <button
+              onClick={() => setFrontOnly(false)}
+              style={{ ...btnBase, borderRadius: 0, padding: "7px 14px", fontSize: "11px",
+                background: !frontOnly ? GOLD : "#374151", color: !frontOnly ? DARK : "#d1d5db", fontWeight: !frontOnly ? 900 : 600 }}>
+              Front + Back
+            </button>
+          </div>
+
           <label style={{ display: "flex", alignItems: "center", gap: "6px", color: "#d1d5db", fontSize: "12px", cursor: "pointer", fontFamily: "Arial,sans-serif" }}>
             <input type="checkbox" checked={showFeedbackQr} onChange={e => setShowFeedbackQr(e.target.checked)} />
             Feedback QR
           </label>
           {!photosReady && <span style={{ color: GOLD, fontSize: "11px", fontFamily: "Arial,sans-serif" }}>⏳ Loading photos…</span>}
-          <button onClick={() => window.print()} style={{ ...btnBase, background: "#16a34a", fontSize: "13px", padding: "10px 26px" }}>🖨️ Print Duplex</button>
+          <button onClick={() => window.print()} style={{ ...btnBase, background: "#16a34a", fontSize: "13px", padding: "10px 26px" }}>
+            🖨️ {frontOnly ? "Print Fronts" : "Print Duplex"}
+          </button>
           <button onClick={() => history.back()} style={{ ...btnBase, background: "#4b5563" }}>← Back</button>
         </div>
+
         <div style={{ width: "100%", background: "#374151", borderRadius: "6px", padding: "8px 12px", color: "#d1d5db", fontSize: "11px", fontFamily: "Arial,sans-serif", lineHeight: 1.7 }}>
-          <b style={{ color: GOLD }}>✅ How to print duplex:</b>&nbsp;
-          Printer → Paper: <b>A4 Landscape</b> · Two-sided: <b>Long-edge binding (Flip on Long Edge)</b> · Scale: 100% · Margins: None.
-          &nbsp;Page 1 = FRONT &nbsp;|&nbsp; Page 2 = BACK (columns auto-mirrored so every back aligns with its front after flipping).
+          {frontOnly ? (
+            <><b style={{ color: GOLD }}>✅ Front Only print:</b>&nbsp;
+              Printer → Paper: <b>A4 Landscape</b> · One-sided · Scale: 100% · Margins: None.
+              9 ID cards per sheet — cut along the crop lines.</>
+          ) : (
+            <><b style={{ color: GOLD }}>✅ Duplex print:</b>&nbsp;
+              Printer → Paper: <b>A4 Landscape</b> · Two-sided: <b>Long-edge binding</b> · Scale: 100% · Margins: None.
+              Page 1 = FRONT · Page 2 = BACK (columns auto-mirrored for alignment).</>
+          )}
         </div>
       </div>
       <div className="no-print" style={{ height: "116px" }} />
@@ -575,20 +603,31 @@ export default function PrintIdCardsDuplex() {
         const backCells  = mirrorCols(pg);
         return (
           <div key={pi}>
-            <A4Page label={`FRONT — Sheet ${pi + 1} of ${pages.length}`} pageRef={el => { if (el) pageElsRef.current[pi * 2] = el!; }}>
+            {/* FRONT page — always shown */}
+            <A4Page
+              label={frontOnly ? `Sheet ${pi + 1} of ${pages.length}` : `FRONT — Sheet ${pi + 1} of ${pages.length}`}
+              pageRef={el => { if (el) pageElsRef.current[pi * 2] = el!; }}
+            >
               {frontCells.map((p, i) => (
                 <CardCell key={i}>
                   {p ? <FrontCard {...cardProps(p)} /> : <div className="lcard" style={{ background: "#f9fafb", border: "0.5px dashed #ccc" }} />}
                 </CardCell>
               ))}
             </A4Page>
-            <A4Page label={`BACK — Sheet ${pi + 1} · mirrored for long-edge duplex`} pageRef={el => { if (el) pageElsRef.current[pi * 2 + 1] = el!; }}>
-              {backCells.map((p, i) => (
-                <CardCell key={i}>
-                  {p ? <BackCard {...cardProps(p)} /> : <div className="lcard" style={{ background: "#f9fafb", border: "0.5px dashed #ccc" }} />}
-                </CardCell>
-              ))}
-            </A4Page>
+
+            {/* BACK page — only in duplex mode */}
+            {!frontOnly && (
+              <A4Page
+                label={`BACK — Sheet ${pi + 1} · mirrored for long-edge duplex`}
+                pageRef={el => { if (el) pageElsRef.current[pi * 2 + 1] = el!; }}
+              >
+                {backCells.map((p, i) => (
+                  <CardCell key={i}>
+                    {p ? <BackCard {...cardProps(p)} /> : <div className="lcard" style={{ background: "#f9fafb", border: "0.5px dashed #ccc" }} />}
+                  </CardCell>
+                ))}
+              </A4Page>
+            )}
           </div>
         );
       })}
