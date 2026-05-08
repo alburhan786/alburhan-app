@@ -438,17 +438,19 @@ export default function PrintLuggageSquare() {
   const [downloading, setDownloading] = useState<string | null>(null);
   const [photoDataUrls, setPhotoDataUrls] = useState<Record<string, string>>({});
   const [logoDataUrl, setLogoDataUrl] = useState<string>("");
-  const pageRefs = useRef<HTMLDivElement[]>([]);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   const dl = async (fmt: "pdf" | "jpg" | "png") => {
-    const pages = pageRefs.current.filter(Boolean);
-    if (pages.length === 0) return;
+    const pages = Array.from(containerRef.current?.querySelectorAll(".sq-page-single") ?? []) as HTMLElement[];
+    if (pages.length === 0) { alert("No sticker pages found — please wait for the page to load and try again."); return; }
     setDownloading(fmt);
     try {
       const name = `luggage-square-${group?.groupName || "group"}`;
       if (fmt === "pdf") await downloadMultiPagePdf(pages, name);
       else if (fmt === "png") await downloadPagesAsPng(pages, name);
       else await downloadPagesAsJpg(pages, name);
+    } catch (e) {
+      alert(`Download failed: ${e}`);
     } finally { setDownloading(null); }
   };
 
@@ -586,7 +588,7 @@ export default function PrintLuggageSquare() {
         </div>
       )}
 
-      <div className="sq-wrap" style={{ background: "#f5f5f0", padding: "8mm", display: "block" }}>
+      <div ref={containerRef} className="sq-wrap" style={{ background: "#f5f5f0", padding: "8mm", display: "block" }}>
 
         {/* ══ BOTH MODE: Page 1 = 4 fronts, Page 2 = 4 backs (mirrored columns for duplex alignment) ══ */}
         {view === "both" && pages.map((page, pi) => (
@@ -595,7 +597,7 @@ export default function PrintLuggageSquare() {
             <div key={`lbl-f-${pi}`} className="no-print sq-page-label" style={{ borderLeftColor: GREEN }}>
               📄 SIDE 1 — FRONTS (Pilgrims {pi * 4 + 1}–{Math.min(pi * 4 + page.length, pilgrims.length)})
             </div>
-            <div key={`fp-${pi}`} className="sq-page-single" ref={el => { if (el) pageRefs.current[pi * 2] = el; }}>
+            <div key={`fp-${pi}`} className="sq-page-single">
               {page.map(p => (
                 <FrontSticker key={`f-${p.id}`} p={p} group={group} company={company} groupColor={groupColor} groupLabel={groupLabel} photoDataUrls={photoDataUrls} compact={false} />
               ))}
@@ -605,7 +607,7 @@ export default function PrintLuggageSquare() {
             <div key={`lbl-b-${pi}`} className="no-print sq-page-label" style={{ borderLeftColor: "#2563EB" }}>
               🔄 SIDE 2 — BACKS · columns mirrored for duplex (Pilgrims {pi * 4 + 1}–{Math.min(pi * 4 + page.length, pilgrims.length)})
             </div>
-            <div key={`bp-${pi}`} className="sq-page-single" ref={el => { if (el) pageRefs.current[pi * 2 + 1] = el; }}>
+            <div key={`bp-${pi}`} className="sq-page-single">
               {[page[1], page[0], page[3], page[2]].map((p, idx) =>
                 p ? <BackSticker key={`b-${p.id}-${idx}`} p={p} group={group} company={company} compact={false} /> : <div key={`empty-${idx}`} />
               )}
@@ -615,7 +617,7 @@ export default function PrintLuggageSquare() {
 
         {/* ══ FRONT ONLY: 2×2 grid full size ══ */}
         {view === "front" && pages.map((page, pi) => (
-          <div key={`fp-${pi}`} className="sq-page-single" ref={el => { if (el) pageRefs.current[pi] = el; }}>
+          <div key={`fp-${pi}`} className="sq-page-single">
             {page.map(p => (
               <FrontSticker key={p.id} p={p} group={group} company={company} groupColor={groupColor} groupLabel={groupLabel} photoDataUrls={photoDataUrls} compact={false} />
             ))}
@@ -624,7 +626,7 @@ export default function PrintLuggageSquare() {
 
         {/* ══ BACK ONLY: 2×2 grid full size ══ */}
         {view === "back" && pages.map((page, pi) => (
-          <div key={`bp-${pi}`} className="sq-page-single" ref={el => { if (el) pageRefs.current[pi] = el; }}>
+          <div key={`bp-${pi}`} className="sq-page-single">
             {page.map(p => (
               <BackSticker key={p.id} p={p} group={group} company={company} compact={false} />
             ))}

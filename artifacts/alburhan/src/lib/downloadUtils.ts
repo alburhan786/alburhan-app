@@ -27,7 +27,8 @@ const BASE_OPTS = {
   allowTaint: false,
   backgroundColor: "#ffffff",
   logging: false,
-  imageTimeout: 15000,
+  imageTimeout: 20000,
+  scale: 3,
 };
 
 // ─── Low-level helpers ───────────────────────────────────────────────────────
@@ -35,7 +36,7 @@ const BASE_OPTS = {
 /** Render element at given scale; returns null if canvas has zero dimensions. */
 async function renderCanvas(el: HTMLElement, scale: number): Promise<HTMLCanvasElement | null> {
   try {
-    const canvas = await html2canvas(el, { ...BASE_OPTS, scale });
+    const canvas = await html2canvas(el, { ...BASE_OPTS, scale, scrollX: 0, scrollY: 0 });
     if (!canvas || canvas.width === 0 || canvas.height === 0) return null;
     return canvas;
   } catch {
@@ -51,9 +52,9 @@ async function renderToBlob(
   el: HTMLElement,
   mime: "image/png" | "image/jpeg",
   quality: number,
-  scales = [6, 3, 2],
+  scales = [3, 2],
 ): Promise<{ blob: Blob; cssW: number; cssH: number } | null> {
-  for (const scale of scales) {
+  for (const scale of scales.length ? scales : [3, 2]) {
     const canvas = await renderCanvas(el, scale);
     if (!canvas) continue;
     try {

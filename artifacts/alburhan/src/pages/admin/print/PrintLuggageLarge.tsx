@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useRoute } from "wouter";
-import { downloadMultiPagePdf, fetchAsDataUrl } from "@/lib/downloadUtils";
+import { downloadMultiPagePdf, downloadPagesAsPng, downloadPagesAsJpg, fetchAsDataUrl } from "@/lib/downloadUtils";
 import { Barcode } from "@/components/print/Barcode";
 import { QRCodeCanvas } from "qrcode.react";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
@@ -61,14 +61,20 @@ export default function PrintLuggageLarge() {
   const [downloading, setDownloading] = useState<string | null>(null);
   const [photoDataUrls, setPhotoDataUrls] = useState<Record<string, string>>({});
   const [logoDataUrl, setLogoDataUrl] = useState<string>("");
-  const stickerRefs = useRef<HTMLDivElement[]>([]);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
-  const dl = async () => {
-    const pages = stickerRefs.current.filter(Boolean);
-    if (pages.length === 0) return;
-    setDownloading("pdf");
-    try { await downloadMultiPagePdf(pages, `luggage-large-${group?.groupName || "group"}`); }
-    finally { setDownloading(null); }
+  const dl = async (fmt: "pdf" | "jpg" | "png") => {
+    const pages = Array.from(containerRef.current?.querySelectorAll(".ll-sticker") ?? []) as HTMLElement[];
+    if (pages.length === 0) { alert("No stickers found — please wait for the page to load and try again."); return; }
+    setDownloading(fmt);
+    try {
+      const name = `luggage-large-${group?.groupName || "group"}`;
+      if (fmt === "pdf") await downloadMultiPagePdf(pages, name);
+      else if (fmt === "png") await downloadPagesAsPng(pages, name);
+      else await downloadPagesAsJpg(pages, name);
+    } catch (e) {
+      alert(`Download failed: ${e}`);
+    } finally { setDownloading(null); }
   };
 
   useEffect(() => {
@@ -127,18 +133,24 @@ export default function PrintLuggageLarge() {
           {COMPANIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
         <button onClick={() => window.print()} style={{ padding: "10px 24px", background: DARK, color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>🖨 Print</button>
-        <button onClick={dl} disabled={!!downloading} style={{ padding: "10px 20px", background: downloading === "pdf" ? "#6b7280" : "#1d4ed8", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>
+        <button onClick={() => dl("pdf")} disabled={!!downloading} style={{ padding: "10px 20px", background: downloading === "pdf" ? "#6b7280" : "#1d4ed8", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>
           {downloading === "pdf" ? "⏳..." : "⬇ PDF"}
+        </button>
+        <button onClick={() => dl("png")} disabled={!!downloading} style={{ padding: "10px 20px", background: downloading === "png" ? "#6b7280" : "#059669", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>
+          {downloading === "png" ? "⏳..." : "⬇ PNG"}
+        </button>
+        <button onClick={() => dl("jpg")} disabled={!!downloading} style={{ padding: "10px 20px", background: downloading === "jpg" ? "#6b7280" : "#7c3aed", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>
+          {downloading === "jpg" ? "⏳..." : "⬇ JPG"}
         </button>
         <button onClick={() => window.history.back()} style={{ padding: "10px 24px", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", background: "#fff" }}>Back</button>
       </div>
 
-      <div>
-      {pilgrims.map((p, idx) => {
+      <div ref={containerRef}>
+      {pilgrims.map((p) => {
         const serial = String(p.serialNumber).padStart(3, "0");
         const barcodeVal = p.passportNumber || `H${serial}`;
         return (
-        <div key={p.id} className="ll-sticker" ref={el => { if (el) stickerRefs.current[idx] = el; }}>
+        <div key={p.id} className="ll-sticker">
 
           {/* ── TOP HEADER: logos + service centre info ── */}
           <div style={{
