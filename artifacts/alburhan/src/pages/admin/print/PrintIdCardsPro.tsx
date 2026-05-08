@@ -560,7 +560,7 @@ export default function PrintIdCardsPro() {
     let el = document.getElementById(id) as HTMLStyleElement | null;
     if (!el) { el = document.createElement("style"); el.id = id; document.head.appendChild(el); }
     const landscape = printMode === "grid9" || printMode === "strip" || printMode === "sheets";
-    el.textContent = `@media print { @page { size: ${landscape ? "297mm 210mm" : "210mm 297mm"}; margin: ${printMode === "grid9" ? "0mm" : "8mm"}; } }`;
+    el.textContent = `@media print { @page { size: ${landscape ? "A4 landscape" : "A4 portrait"}; margin: ${printMode === "grid9" ? "0mm" : "8mm"}; } }`;
     return () => { document.getElementById(id)?.remove(); };
   }, [printMode]);
   // Refs set directly on each page div during render — avoids querySelectorAll timing issues
@@ -595,11 +595,11 @@ export default function PrintIdCardsPro() {
     if (!win) { alert("Popup blocked — please allow popups for this site and try again."); return; }
     win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
 <style>
-  @page { size: 297mm 210mm; margin: 0; }
+  @page { size: A4 landscape; margin: 0; }
   * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-  body { margin: 0; padding: 0; background: white; }
+  html, body { margin: 0; padding: 0; background: white; width: 297mm; }
   .pro-card {
-    width: 76.2mm; height: 101.6mm; border: 1px solid #ccc; border-radius: 3px;
+    width: 101.6mm; height: 76.2mm; border: 1px solid #ccc; border-radius: 3px;
     overflow: hidden; font-family: Arial, sans-serif; background: #fff;
     display: flex; flex-direction: column; flex-shrink: 0;
   }
