@@ -367,6 +367,177 @@ function CropMarkCard({ children }: { children: React.ReactNode }) {
   );
 }
 
+/* ── Portrait card for Grid9 mode (70mm × 99mm ≈ 2.76" × 3.9") ────────── */
+function FrontCardPortrait({ p, group, company, photoDataUrls }: CardProps) {
+  const serial = String(p.serialNumber).padStart(3, "0");
+  const barcodeVal = (p.barcodeId || p.passportNumber || `HAJ${serial}`)
+    .replace(/[^\x00-\x7F]/g, "")
+    .replace(/[^A-Za-z0-9\-. ]/g, "")
+    .trim();
+
+  return (
+    <div className="pro-card-portrait">
+
+      {/* ── Header ── */}
+      <div style={{
+        background: DARK, flexShrink: 0,
+        padding: "1.2mm 2mm 1mm", display: "flex", alignItems: "center", gap: "1.5mm",
+      }}>
+        <div style={{ fontSize: "18pt", lineHeight: 1, flexShrink: 0 }}>🇮🇳</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: "7pt", fontWeight: 900, color: "#fff", textTransform: "uppercase", letterSpacing: "0.4px", lineHeight: 1.15 }}>
+            AL BURHAN TOURS AND TRAVELS
+          </div>
+          <div style={{ fontSize: "6pt", fontWeight: 900, color: GOLD, letterSpacing: "1px", lineHeight: 1.2 }}>
+            HAJJ {group.year}
+          </div>
+        </div>
+        {company.logoUrl ? (
+          <div style={{
+            width: "10mm", height: "10mm", borderRadius: "50%",
+            background: "#fff", border: `2px solid ${GOLD}`,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            overflow: "hidden", flexShrink: 0,
+          }}>
+            <img src={company.logoUrl} alt="" style={{ width: "88%", height: "88%", objectFit: "contain" }} />
+          </div>
+        ) : (
+          <div style={{
+            width: "10mm", height: "10mm", borderRadius: "50%", background: GOLD,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            color: DARK, fontWeight: 900, fontSize: "6pt", flexShrink: 0,
+          }}>AB</div>
+        )}
+      </div>
+
+      {/* ── Gold strip: Serial + Maktab ── */}
+      <div style={{
+        background: GOLD, flexShrink: 0,
+        padding: "0.6mm 2mm", display: "flex", justifyContent: "space-between", alignItems: "center",
+      }}>
+        <span style={{ fontSize: "6.5pt", fontWeight: 900, color: DARK }}>Serial No: {serial}</span>
+        {group.maktabNumber && (
+          <span style={{ fontSize: "6.5pt", fontWeight: 900, color: DARK }}>Maktab: {group.maktabNumber}</span>
+        )}
+      </div>
+
+      {/* ── Body ── */}
+      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+
+        {/* Photo sidebar */}
+        <div style={{
+          width: "22mm", flexShrink: 0, background: DARK,
+          display: "flex", flexDirection: "column", alignItems: "center",
+          justifyContent: "flex-start", padding: "2mm 1.2mm 1mm",
+          borderRight: `2px solid ${GOLD}`,
+        }}>
+          <div style={{
+            padding: "1.5px",
+            background: `linear-gradient(135deg, ${GOLD} 0%, #E8D48B 50%, ${GOLD} 100%)`,
+            borderRadius: "3px", boxShadow: `0 0 4px ${GOLD}99`,
+          }}>
+            {p.photoUrl ? (
+              <img src={photoDataUrls[p.id] || `${API}${p.photoUrl}`} alt=""
+                style={{ width: "18mm", height: "24mm", objectFit: "cover", objectPosition: "top center", display: "block", borderRadius: "2px" }} />
+            ) : (
+              <div style={{
+                width: "18mm", height: "24mm", background: "#e0e8e4",
+                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                fontSize: "3pt", color: "#888", fontWeight: 700, borderRadius: "2px",
+              }}>
+                <div style={{ fontSize: "10pt", color: GOLD }}>👤</div>
+                <div>PHOTO</div>
+              </div>
+            )}
+          </div>
+
+          {/* QR below photo */}
+          <div style={{ marginTop: "2mm", background: "#fff", padding: "2px", borderRadius: "2px", border: `1.5px solid ${GOLD}` }}>
+            <QRCodeCanvas value={buildVerifyUrl(p.id)} size={44} level="M" fgColor="#000" bgColor="#fff" />
+          </div>
+          <div style={{ fontSize: "3pt", color: "rgba(255,255,255,0.6)", textTransform: "uppercase", marginTop: "0.5mm", textAlign: "center" }}>SCAN TO VERIFY</div>
+        </div>
+
+        {/* Info column */}
+        <div style={{ flex: 1, padding: "2mm 1.5mm 1mm 2mm", display: "flex", flexDirection: "column", gap: "1.2mm", overflow: "hidden" }}>
+
+          {/* Name */}
+          <div style={{
+            fontSize: "8pt", fontWeight: 900, color: DARK,
+            textTransform: "uppercase", lineHeight: 1.25, wordBreak: "break-word",
+            borderBottom: `1px solid ${GOLD}50`, paddingBottom: "1mm",
+          }}>
+            {p.salutation ? `${p.salutation} ` : ""}{p.fullName}
+          </div>
+
+          {/* Passport */}
+          {p.passportNumber && (
+            <div>
+              <div style={{ fontSize: "3pt", color: "#999", textTransform: "uppercase", lineHeight: 1 }}>Passport No.</div>
+              <div style={{ fontSize: "8pt", fontWeight: 900, color: DARK, letterSpacing: "0.8px", lineHeight: 1.15 }}>{p.passportNumber}</div>
+            </div>
+          )}
+
+          {/* Mobile India */}
+          {p.mobileIndia && (
+            <div>
+              <div style={{ fontSize: "3pt", color: "#999", textTransform: "uppercase", lineHeight: 1 }}>Mobile (India)</div>
+              <div style={{ fontSize: "7.5pt", fontWeight: 900, color: DARK, lineHeight: 1.15 }}>{p.mobileIndia}</div>
+            </div>
+          )}
+
+          {/* City / Bus / Room */}
+          {(p.city || p.busNumber || p.roomNumber) && (
+            <div style={{ display: "flex", gap: "2mm", flexWrap: "wrap" }}>
+              {p.city && <div><div style={{ fontSize: "3pt", color: "#999" }}>City</div><div style={{ fontSize: "6pt", fontWeight: 700, color: DARK }}>{p.city}</div></div>}
+              {p.busNumber && <div><div style={{ fontSize: "3pt", color: "#999" }}>Bus</div><div style={{ fontSize: "6pt", fontWeight: 700, color: DARK }}>{p.busNumber}</div></div>}
+              {p.roomNumber && <div><div style={{ fontSize: "3pt", color: "#999" }}>Room</div><div style={{ fontSize: "6pt", fontWeight: 700, color: DARK }}>{p.roomNumber}</div></div>}
+            </div>
+          )}
+
+          {/* Maktab / Service center */}
+          <div style={{ background: `${GOLD}22`, borderRadius: "2px", padding: "1mm 1.5mm", border: `1px solid ${GOLD}60` }}>
+            <div style={{ fontSize: "3pt", color: "#888", textTransform: "uppercase", lineHeight: 1 }}>Service Centre No.</div>
+            <div style={{ fontSize: "12pt", fontWeight: 900, color: DARK, lineHeight: 1.1 }}>{group.maktabNumber || "—"}</div>
+          </div>
+
+          {/* Company India phones */}
+          <div style={{ marginTop: "auto", borderTop: `1px solid ${GOLD}40`, paddingTop: "0.8mm" }}>
+            <div style={{ fontSize: "3pt", color: "#999", textTransform: "uppercase", lineHeight: 1 }}>Company (India)</div>
+            <div style={{ fontSize: "6pt", fontWeight: 900, color: DARK, lineHeight: 1.4 }}>
+              {INDIA_PHONES[0]} &nbsp;|&nbsp; {INDIA_PHONES[1]}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Barcode ── */}
+      <div style={{ flexShrink: 0, padding: "1mm 2mm 0.5mm", background: "#fff", borderTop: `2px solid ${GOLD}` }}>
+        <Barcode value={barcodeVal} format="CODE128" width={1.4} height={14} displayValue fontSize={5} />
+      </div>
+
+      {/* ── Footer ── */}
+      <div style={{ background: DARK, flexShrink: 0, padding: "1.2mm 2mm" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: "2mm", alignItems: "flex-start" }}>
+          <div>
+            <div style={{ fontSize: "3pt", fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", lineHeight: 1, marginBottom: "0.4mm" }}>
+              {p.salutation ? `${p.salutation} ` : ""}{p.fullName}
+            </div>
+            <div style={{ fontSize: "5pt", fontWeight: 900, color: "#fff", lineHeight: 1.35, letterSpacing: "0.2px" }}>
+              {SHORT_ADDRESS}
+            </div>
+          </div>
+          <div style={{ textAlign: "right", flexShrink: 0 }}>
+            <div style={{ fontSize: "3pt", fontWeight: 700, color: "#f87171", textTransform: "uppercase", lineHeight: 1, marginBottom: "0.4mm" }}>🆘 Emergency (Saudi)</div>
+            <div style={{ fontSize: "8pt", fontWeight: 900, color: "#fff", lineHeight: 1.25, letterSpacing: "0.5px" }}>{SAUDI_EMERGENCY[0]}</div>
+            <div style={{ fontSize: "8pt", fontWeight: 900, color: "#fff", lineHeight: 1.25, letterSpacing: "0.5px" }}>{SAUDI_EMERGENCY[1]}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 type PrintMode = "grid9" | "sidebyside" | "duplex" | "strip" | "sheets";
 
 export default function PrintIdCardsPro() {
@@ -756,9 +927,9 @@ export default function PrintIdCardsPro() {
           border-radius: 4px;
         }
 
-        /* ── Grid9: 3×3 = 9 front cards on A4 landscape ── */
+        /* ── Grid9: 9 portrait front cards per A4 portrait page (3×3, 70×99mm) ── */
         .grid9-page {
-          width: 277mm;
+          width: 210mm;
           margin: 0 auto;
           page-break-after: always;
           break-after: page;
@@ -769,11 +940,27 @@ export default function PrintIdCardsPro() {
         }
         .grid9-grid {
           display: grid;
-          grid-template-columns: repeat(3, 90mm);
-          grid-template-rows: repeat(3, 60mm);
+          grid-template-columns: repeat(3, 70mm);
+          grid-template-rows: repeat(3, 99mm);
           gap: 0;
-          width: 270mm;
-          margin: 0 auto;
+          width: 210mm;
+        }
+        .pro-card-portrait {
+          width: 70mm;
+          height: 99mm;
+          border: 0.3px solid #ccc;
+          overflow: hidden;
+          font-family: Arial, sans-serif;
+          background: #fff;
+          display: flex;
+          flex-direction: column;
+          flex-shrink: 0;
+          page-break-inside: avoid;
+          break-inside: avoid;
+          box-sizing: border-box;
+        }
+        @media print {
+          .pro-card-portrait { border-color: transparent; }
         }
 
         @media print {
@@ -809,7 +996,8 @@ export default function PrintIdCardsPro() {
           }
         }
       `}</style>
-      {(isStrip || isSheets || isGrid9) && <style>{`@media print { @page { size: A4 landscape; margin: ${isGrid9 ? "15mm 13.5mm" : "8mm"}; } }`}</style>}
+      {(isStrip || isSheets) && <style>{`@media print { @page { size: A4 landscape; margin: 8mm; } }`}</style>}
+      {isGrid9 && <style>{`@media print { @page { size: A4 portrait; margin: 0; } }`}</style>}
 
       {/* ── Toolbar ── */}
       <div className="no-print" style={{
@@ -820,7 +1008,7 @@ export default function PrintIdCardsPro() {
         <div>
           <div style={{ fontWeight: 800, fontSize: "15px", color: DARK }}>ID Card Print</div>
           <div style={{ fontSize: "12px", color: "#555" }}>
-            {isGrid9  ? "Grid 9 · 9 front cards per A4 landscape · 90×60mm · Cut & laminate"
+            {isGrid9  ? "Grid 9 · 9 portrait front cards per A4 · 70×99mm (≈3\"×4\") · Cut & laminate"
              : isSheets ? "Sheets · All fronts = Page 1 · All backs = Page 2 · A4 landscape"
              : isStrip ? "Strip 3 · 3 fronts on top · 3 backs on bottom · A4 landscape"
              : isSBS   ? "Side-by-side · Front | Back on same sheet · Cut & stack"
@@ -893,8 +1081,8 @@ export default function PrintIdCardsPro() {
       }}>
         {isGrid9 ? (
           <>
-            <span>✅ 9 FRONT cards per A4 landscape sheet · 90×60mm each · 3 columns × 3 rows</span>
-            <span>🖨 Printer → A4 Landscape · One-sided · Scale 100% · Margins None → ✂ Cut on crop lines → Laminate</span>
+            <span>✅ 9 FRONT cards per A4 portrait · 70×99mm each (≈ 2¾" × 3¾") · 3 cols × 3 rows · fills entire A4</span>
+            <span>🖨 Printer → A4 Portrait · One-sided · Scale 100% · Margins None → ✂ Cut at every 70mm (width) &amp; 99mm (height) → Laminate</span>
           </>
         ) : isSheets ? (
           <>
@@ -935,13 +1123,13 @@ export default function PrintIdCardsPro() {
               <div className="grid9-page" ref={el => { if (el) pageElsRef.current[pi] = el as HTMLElement; }}>
                 <div className="grid9-grid">
                   {cells.map((p, i) => (
-                    <div key={i} style={{ width: "90mm", height: "60mm", position: "relative" }}>
+                    <div key={i} style={{ width: "70mm", height: "99mm", position: "relative" }}>
                       {p ? (
                         <div ref={el => { if (el) frontCardRefs.current.set(p.id, el as HTMLElement); }}>
-                          <FrontCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} photoDataUrls={photoDataUrls} />
+                          <FrontCardPortrait p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} photoDataUrls={photoDataUrls} />
                         </div>
                       ) : (
-                        <div className="pro-card" style={{ background: "#f9fafb", border: "0.5px dashed #ccc" }} />
+                        <div className="pro-card-portrait" style={{ background: "#f9fafb", border: "0.5px dashed #ccc" }} />
                       )}
                     </div>
                   ))}
