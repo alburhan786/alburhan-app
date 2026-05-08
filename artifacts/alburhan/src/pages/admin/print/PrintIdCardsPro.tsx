@@ -553,11 +553,71 @@ export default function PrintIdCardsPro() {
   const [dlState, setDlState] = useState<string | null>(null);
   const [photoDataUrls, setPhotoDataUrls] = useState<Record<string, string>>({});
   const contentRef = useRef<HTMLDivElement>(null);
+
+  // Inject @page size into <head> — body-level <style> tags are ignored by Safari
+  useEffect(() => {
+    const id = "pro-id-page-size";
+    let el = document.getElementById(id) as HTMLStyleElement | null;
+    if (!el) { el = document.createElement("style"); el.id = id; document.head.appendChild(el); }
+    const landscape = printMode === "grid9" || printMode === "strip" || printMode === "sheets";
+    el.textContent = `@media print { @page { size: ${landscape ? "297mm 210mm" : "210mm 297mm"}; margin: ${printMode === "grid9" ? "0mm" : "8mm"}; } }`;
+    return () => { document.getElementById(id)?.remove(); };
+  }, [printMode]);
   // Refs set directly on each page div during render — avoids querySelectorAll timing issues
   const pageElsRef = useRef<HTMLElement[]>([]);
   // Per-pilgrim card element refs for SVG export
   const frontCardRefs = useRef<Map<string, HTMLElement>>(new Map());
   const backCardRefs = useRef<Map<string, HTMLElement>>(new Map());
+
+  // Grid9 dedicated print: opens a fresh popup window with guaranteed landscape @page
+  const printGrid9 = () => {
+    const pages = Array.from(contentRef.current?.querySelectorAll(".grid9-page") ?? []) as HTMLElement[];
+    if (pages.length === 0) { alert("Cards not loaded yet — please wait and try again."); return; }
+
+    // Convert canvas elements (QR, barcode) to <img> data URLs so they survive the copy
+    const clonePage = (src: HTMLElement) => {
+      const clone = src.cloneNode(true) as HTMLElement;
+      const srcCanvases = Array.from(src.querySelectorAll("canvas"));
+      const cloneCanvases = Array.from(clone.querySelectorAll("canvas"));
+      srcCanvases.forEach((canvas, i) => {
+        const img = document.createElement("img");
+        img.src = (canvas as HTMLCanvasElement).toDataURL("image/png");
+        img.style.width = canvas.style.width || canvas.offsetWidth + "px";
+        img.style.height = canvas.style.height || canvas.offsetHeight + "px";
+        img.style.display = "block";
+        cloneCanvases[i]?.parentNode?.replaceChild(img, cloneCanvases[i]);
+      });
+      return clone.outerHTML;
+    };
+
+    const pagesHtml = pages.map(clonePage).join("\n");
+    const win = window.open("", "_blank", "width=1,height=1");
+    if (!win) { alert("Popup blocked — please allow popups for this site and try again."); return; }
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>
+  @page { size: 297mm 210mm; margin: 0; }
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  body { margin: 0; padding: 0; background: white; }
+  .pro-card {
+    width: 90mm; height: 60mm; border: 1px solid #ccc; border-radius: 3px;
+    overflow: hidden; font-family: Arial, sans-serif; background: #fff;
+    display: flex; flex-direction: column; flex-shrink: 0;
+  }
+  .grid9-page {
+    width: 297mm; height: 210mm; display: flex; align-items: center;
+    justify-content: center; page-break-after: always; break-after: page;
+    page-break-inside: avoid; break-inside: avoid; overflow: hidden;
+  }
+  .grid9-page:last-child { page-break-after: auto; break-after: auto; }
+  .grid9-grid {
+    display: grid; grid-template-columns: repeat(3, 90mm);
+    grid-template-rows: repeat(3, 60mm); gap: 0;
+    width: 270mm; height: 180mm; flex-shrink: 0;
+  }
+</style></head><body>${pagesHtml}</body></html>`);
+    win.document.close();
+    setTimeout(() => { win.focus(); win.print(); }, 600);
+  };
 
   const dlCards = async (fmt: "pdf" | "jpg" | "png") => {
     const pageEls = pageElsRef.current.filter(Boolean);
@@ -989,7 +1049,6 @@ export default function PrintIdCardsPro() {
           }
         }
       `}</style>
-      <style>{`@media print { @page { size: ${(isGrid9 || isStrip || isSheets) ? "297mm 210mm" : "210mm 297mm"}; margin: ${isGrid9 ? "0" : "8mm"}; } }`}</style>
 
       {/* ── Toolbar ── */}
       <div className="no-print" style={{
@@ -1032,8 +1091,8 @@ export default function PrintIdCardsPro() {
         </label>
 
         <div style={{ marginLeft: "auto", display: "flex", gap: "8px" }}>
-          <button onClick={() => window.print()} style={{ padding: "10px 24px", background: DARK, color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "14px" }}>
-            🖨 Print
+          <button onClick={() => isGrid9 ? printGrid9() : window.print()} style={{ padding: "10px 24px", background: DARK, color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "14px" }}>
+            🖨 Print {isGrid9 ? "(Grid 9)" : ""}
           </button>
           <button onClick={() => dlCards("pdf")} disabled={!!dlState} style={{ padding: "10px 18px", background: dlState === "pdf" ? "#6b7280" : "#1d4ed8", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
             {dlState === "pdf" ? "⏳..." : "⬇ PDF"}
