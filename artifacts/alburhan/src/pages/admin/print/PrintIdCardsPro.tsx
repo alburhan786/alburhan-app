@@ -928,13 +928,19 @@ export default function PrintIdCardsPro() {
         }
 
         /* ── Grid9: 9 landscape cards per A4 landscape page (3×3, 90×60mm) ── */
-        /* 3 × 90mm = 270mm — fits A4 landscape usable 281mm width              */
-        /* 3 × 60mm = 180mm — fits A4 landscape usable 194mm height (8mm margin)*/
+        /* Each page-div is the full A4 landscape size: 297×210mm               */
+        /* This forces the browser to start a new print page after each one     */
         .grid9-page {
-          width: 270mm;
-          margin: 0 auto;
+          width: 297mm;
+          height: 210mm;
+          overflow: hidden;
+          display: flex;
+          align-items: center;
+          justify-content: center;
           page-break-after: always;
           break-after: page;
+          page-break-inside: avoid;
+          break-inside: avoid;
         }
         .grid9-page:last-child {
           page-break-after: auto;
@@ -946,12 +952,14 @@ export default function PrintIdCardsPro() {
           grid-template-rows: repeat(3, 60mm);
           gap: 0;
           width: 270mm;
+          height: 180mm;
+          flex-shrink: 0;
         }
 
         @media print {
           .strip-page    { box-shadow: none !important; }
           .sheets-page   { box-shadow: none !important; }
-          .grid9-page    { box-shadow: none !important; }
+          .grid9-page    { box-shadow: none !important; margin: 0 !important; }
           .h-cut-label   { background: white !important; }
           .h-cut-scissors{ background: white !important; }
           .sheets-header { display: none !important; }
@@ -981,7 +989,7 @@ export default function PrintIdCardsPro() {
           }
         }
       `}</style>
-      <style>{`@media print { @page { size: ${(isGrid9 || isStrip || isSheets) ? "A4 landscape" : "A4 portrait"}; margin: 8mm; } }`}</style>
+      <style>{`@media print { @page { size: ${(isGrid9 || isStrip || isSheets) ? "297mm 210mm" : "210mm 297mm"}; margin: ${isGrid9 ? "0" : "8mm"}; } }`}</style>
 
       {/* ── Toolbar ── */}
       <div className="no-print" style={{
