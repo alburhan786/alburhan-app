@@ -610,9 +610,9 @@ export default function PrintIdCardsPro() {
   }
   .grid9-page:last-child { page-break-after: auto; break-after: auto; }
   .grid9-grid {
-    display: grid; grid-template-columns: repeat(3, 76.2mm);
-    grid-template-rows: repeat(2, 101.6mm); gap: 0;
-    width: 228.6mm; height: 203.2mm; flex-shrink: 0;
+    display: grid; grid-template-columns: repeat(2, 101.6mm);
+    grid-template-rows: repeat(2, 76.2mm); gap: 0;
+    width: 203.2mm; height: 152.4mm; flex-shrink: 0;
   }
 </style></head><body>${pagesHtml}</body></html>`);
     win.document.close();
@@ -682,7 +682,7 @@ export default function PrintIdCardsPro() {
       "position:fixed",
       "top:-99999px",
       "left:-99999px",
-      "width:76.2mm",
+      "width:101.6mm",
       "background:#ffffff",
       "display:flex",
       "flex-direction:column",
@@ -770,7 +770,7 @@ export default function PrintIdCardsPro() {
   const isGrid9  = printMode === "grid9";
 
   // Grid9: 9 fronts per A4 landscape page (3×3)
-  const GRID9_PER_PAGE = 6;
+  const GRID9_PER_PAGE = 4;
   const grid9Pages: (Pilgrim | null)[][] = [];
   for (let i = 0; i < pilgrims.length; i += GRID9_PER_PAGE) {
     const chunk: (Pilgrim | null)[] = pilgrims.slice(i, i + GRID9_PER_PAGE);
@@ -801,8 +801,8 @@ export default function PrintIdCardsPro() {
         * { box-sizing: border-box; }
 
         .pro-card {
-          width: 76.2mm;
-          height: 101.6mm;
+          width: 101.6mm;
+          height: 76.2mm;
           border: 1px solid #ccc;
           border-radius: 3px;
           overflow: hidden;
@@ -852,7 +852,7 @@ export default function PrintIdCardsPro() {
         }
         .cut-line-inner {
           width: 1px;
-          height: 101.6mm;
+          height: 76.2mm;
           border-left: 1px dashed #333;
           position: relative;
         }
@@ -876,7 +876,7 @@ export default function PrintIdCardsPro() {
           align-items: center;
           justify-content: center;
           position: relative;
-          height: 101.6mm;
+          height: 76.2mm;
         }
         .v-cut-line-inner {
           height: 100%;
@@ -898,7 +898,7 @@ export default function PrintIdCardsPro() {
 
         /* Single-card pages for duplex mode */
         .duplex-page {
-          width: 76.2mm;
+          width: 101.6mm;
           margin: 0 auto;
           page-break-after: always;
           break-after: page;
@@ -987,7 +987,7 @@ export default function PrintIdCardsPro() {
           border-radius: 4px;
         }
 
-        /* ── Grid6: 6 portrait cards (3"×4") per A4 landscape page (3×2, 76.2×101.6mm) ── */
+        /* ── Grid4: 4 landscape cards (4"×3") per A4 landscape page (2×2, 101.6×76.2mm) ── */
         /* Each page-div is the full A4 landscape size: 297×210mm                           */
         /* This forces the browser to start a new print page after each one                  */
         .grid9-page {
@@ -1008,11 +1008,11 @@ export default function PrintIdCardsPro() {
         }
         .grid9-grid {
           display: grid;
-          grid-template-columns: repeat(3, 76.2mm);
-          grid-template-rows: repeat(2, 101.6mm);
+          grid-template-columns: repeat(2, 101.6mm);
+          grid-template-rows: repeat(2, 76.2mm);
           gap: 0;
-          width: 228.6mm;
-          height: 203.2mm;
+          width: 203.2mm;
+          height: 152.4mm;
           flex-shrink: 0;
         }
 
@@ -1059,7 +1059,7 @@ export default function PrintIdCardsPro() {
         <div>
           <div style={{ fontWeight: 800, fontSize: "15px", color: DARK }}>ID Card Print</div>
           <div style={{ fontSize: "12px", color: "#555" }}>
-            {isGrid9  ? "Grid 6 · 6 portrait cards (3\"×4\") per A4 landscape · 76.2×101.6mm · Cut & laminate"
+            {isGrid9  ? "Grid 4 · 4 landscape cards (4\"×3\") per A4 landscape · 101.6×76.2mm · Cut & laminate"
              : isSheets ? "Sheets · All fronts = Page 1 · All backs = Page 2 · A4 landscape"
              : isStrip ? "Strip 3 · 3 fronts on top · 3 backs on bottom · A4 landscape"
              : isSBS   ? "Side-by-side · Front | Back on same sheet · Cut & stack"
@@ -1132,8 +1132,8 @@ export default function PrintIdCardsPro() {
       }}>
         {isGrid9 ? (
           <>
-            <span>✅ 6 FRONT cards per A4 landscape · 3"×4" each (76.2mm wide × 101.6mm tall) · 3 cols × 2 rows</span>
-            <span>🖨 Printer → A4 Landscape · One-sided · Scale 100% · Margins None → ✂ Cut at every 76mm (width) &amp; 102mm (height) → Laminate</span>
+            <span>✅ 4 FRONT cards per A4 landscape · 4"×3" each (101.6mm wide × 76.2mm tall) · 2 cols × 2 rows</span>
+            <span>🖨 Printer → A4 Landscape · One-sided · Scale 100% · Margins None → ✂ Cut at every 102mm (width) &amp; 76mm (height) → Laminate</span>
           </>
         ) : isSheets ? (
           <>
@@ -1169,12 +1169,12 @@ export default function PrintIdCardsPro() {
           grid9Pages.map((cells, pi) => (
             <div key={pi}>
               <div className="no-print" style={{ fontSize: "11px", color: "#14532d", fontWeight: 700, marginBottom: "3mm" }}>
-                📄 Sheet {pi + 1} of {grid9Pages.length} — 6 FRONT cards (3"×4" · 76.2mm × 101.6mm)
+                📄 Sheet {pi + 1} of {grid9Pages.length} — 4 FRONT cards (4"×3" · 101.6mm × 76.2mm)
               </div>
               <div className="grid9-page" ref={el => { if (el) pageElsRef.current[pi] = el as HTMLElement; }}>
                 <div className="grid9-grid">
                   {cells.map((p, i) => (
-                    <div key={i} style={{ width: "76.2mm", height: "101.6mm", position: "relative" }}>
+                    <div key={i} style={{ width: "101.6mm", height: "76.2mm", position: "relative" }}>
                       {p ? (
                         <div ref={el => { if (el) frontCardRefs.current.set(p.id, el as HTMLElement); }}>
                           <FrontCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} photoDataUrls={photoDataUrls} />
