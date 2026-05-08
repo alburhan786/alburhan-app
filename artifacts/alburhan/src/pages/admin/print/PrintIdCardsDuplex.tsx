@@ -19,11 +19,11 @@ const SAUDI_EMERGENCY = ["0547090786", "0568780786"];
 const SHORT_ADDRESS   = "Shop No. 8, Khanka Masjid Complex, Shanwara Road, Burhanpur";
 
 /*
-  Card: 85 mm × 55 mm  LANDSCAPE (8.5 cm wide × 5.5 cm tall)
+  Card: 90 mm × 60 mm  LANDSCAPE (9 cm wide × 6 cm tall)
   A4 landscape page: 297 mm × 210 mm
   Grid: 3 cols × 3 rows = 9 cards per sheet
-    H margin: (297 − 3×85) / 2 = 21 mm each side
-    V margin: (210 − 3×55) / 2 = 22.5 mm each side
+    H margin: (297 − 3×90) / 2 = 13.5 mm each side
+    V margin: (210 − 3×60) / 2 = 15 mm each side
   Duplex long-edge: back page columns reversed per row
     Front: [A B C]   Back: [C B A]
 */
@@ -99,10 +99,10 @@ function FrontCard({ p, group, company, photoDataUrls, showFeedbackQr, bookingMa
 
         {/* Photo sidebar */}
         <div style={{
-          width: "19mm", flexShrink: 0,
+          width: "22mm", flexShrink: 0,
           background: `${DARK}10`,
           display: "flex", flexDirection: "column", alignItems: "center",
-          justifyContent: "flex-start", padding: "1.5mm 1mm 1mm",
+          justifyContent: "flex-start", padding: "2mm 1mm 1mm",
           borderRight: `2px solid ${GOLD}`,
         }}>
           <div style={{
@@ -115,20 +115,20 @@ function FrontCard({ p, group, company, photoDataUrls, showFeedbackQr, bookingMa
                 src={photoDataUrls[p.id] || `${API}${p.photoUrl}`}
                 alt=""
                 style={{
-                  width: "14mm", height: "17mm",
+                  width: "16mm", height: "20mm",
                   objectFit: "cover", objectPosition: "top center",
                   display: "block", borderRadius: "2px",
                   WebkitPrintColorAdjust: "exact", printColorAdjust: "exact",
                 } as React.CSSProperties}
               />
             ) : (
-              <div style={{ width: "14mm", height: "17mm", background: "#e0e8e4", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontSize: "2.5pt", color: "#888", fontWeight: 700, borderRadius: "2px" }}>
-                <div style={{ fontSize: "8pt", color: GOLD }}>👤</div>
+              <div style={{ width: "16mm", height: "20mm", background: "#e0e8e4", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontSize: "2.5pt", color: "#888", fontWeight: 700, borderRadius: "2px" }}>
+                <div style={{ fontSize: "9pt", color: GOLD }}>👤</div>
                 <div>PHOTO</div>
               </div>
             )}
           </div>
-          <div style={{ fontSize: "5pt", fontWeight: 900, color: DARK, marginTop: "0.8mm" }}>#{serial}</div>
+          <div style={{ fontSize: "5.5pt", fontWeight: 900, color: DARK, marginTop: "1mm" }}>#{serial}</div>
         </div>
 
         {/* Info center */}
@@ -163,7 +163,7 @@ function FrontCard({ p, group, company, photoDataUrls, showFeedbackQr, bookingMa
 
         {/* QR right */}
         <div style={{
-          width: "19mm", flexShrink: 0,
+          width: "22mm", flexShrink: 0,
           padding: "1mm 1mm 0.5mm",
           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
           borderLeft: `1px solid ${GOLD}50`,
@@ -173,7 +173,7 @@ function FrontCard({ p, group, company, photoDataUrls, showFeedbackQr, bookingMa
               value={showFeedbackQr && p.mobileIndia && bookingMap[p.mobileIndia]
                 ? `${PROD_DOMAIN}/feedback?booking_id=${bookingMap[p.mobileIndia]}`
                 : buildVerifyUrl(p.id)}
-              size={48} level="M" fgColor="#000" bgColor="#fff"
+              size={56} level="M" fgColor="#000" bgColor="#fff"
             />
           </div>
           <div style={{ fontSize: "2.5pt", color: "#888", textTransform: "uppercase", marginTop: "0.5mm", textAlign: "center" }}>
@@ -324,27 +324,27 @@ function BackCard({ p, group, company, showFeedbackQr, bookingMap }: {
 
 /* ─── SVG Crop-mark overlay ──────────────────────────────────────────────────
    Page:  297 mm × 210 mm  (A4 landscape)
-   Grid:  3 cols × 85 mm  +  3 rows × 55 mm
-   H margin (each side): (297 − 255) / 2 = 21 mm
-   V margin (each side): (210 − 165) / 2 = 22.5 mm
+   Grid:  3 cols × 90 mm  +  3 rows × 60 mm
+   H margin (each side): (297 − 270) / 2 = 13.5 mm
+   V margin (each side): (210 − 180) / 2 = 15 mm
 
-   Cut X positions: 21, 106, 191, 276 mm
-   Cut Y positions: 22.5, 77.5, 132.5, 187.5 mm
+   Cut X positions: 13.5, 103.5, 193.5, 283.5 mm
+   Cut Y positions: 15, 75, 135, 195 mm
 
-   For every cut-X → draw a vertical line in the TOP margin (0 → 20mm)
-                      and in the BOTTOM margin (190mm → 210mm)
-   For every cut-Y → draw a horizontal line in the LEFT margin (0 → 19mm)
-                      and in the RIGHT margin (278mm → 297mm)
-   2 mm gap between line end and card edge keeps the mark out of the bleed.
+   For every cut-X → vertical line in TOP margin (0 → 13mm)
+                      and BOTTOM margin (197mm → 210mm)
+   For every cut-Y → horizontal line in LEFT margin (0 → 11.5mm)
+                      and RIGHT margin (285.5mm → 297mm)
+   2 mm gap between line end and card edge.
 ──────────────────────────────────────────────────────────────────────────── */
 function CropOverlay() {
-  const cutX  = [21, 106, 191, 276];          // mm from left
-  const cutY  = [22.5, 77.5, 132.5, 187.5];  // mm from top
-  const gap   = 2;   // mm gap between mark and card edge
-  const vTop  = 22.5 - gap;   // 20.5 mm  — top of grid minus gap
-  const vBot  = 187.5 + gap;  // 189.5 mm — bottom of grid plus gap
-  const hLeft = 21 - gap;     // 19 mm
-  const hRight= 276 + gap;    // 278 mm
+  const cutX  = [13.5, 103.5, 193.5, 283.5]; // mm from left
+  const cutY  = [15, 75, 135, 195];           // mm from top
+  const gap   = 2;    // mm gap between mark and card edge
+  const vTop  = 15 - gap;    // 13 mm
+  const vBot  = 195 + gap;   // 197 mm
+  const hLeft = 13.5 - gap;  // 11.5 mm
+  const hRight= 283.5 + gap; // 285.5 mm
 
   const lp = (v: number) => `${v}mm`;
 
@@ -379,7 +379,7 @@ function CropOverlay() {
 
 function CardCell({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ width: "85mm", height: "55mm", flexShrink: 0, overflow: "hidden" }}>
+    <div style={{ width: "90mm", height: "60mm", flexShrink: 0, overflow: "hidden" }}>
       {children}
     </div>
   );
@@ -407,8 +407,8 @@ function A4Page({ children, label, pageRef }: {
       {/* Card grid — exactly centred by the flex parent (.a4l) */}
       <div style={{
         display: "grid",
-        gridTemplateColumns: `repeat(${COLS}, 85mm)`,
-        gridTemplateRows:    `repeat(${ROWS}, 55mm)`,
+        gridTemplateColumns: `repeat(${COLS}, 90mm)`,
+        gridTemplateRows:    `repeat(${ROWS}, 60mm)`,
         gap: "0",
       }}>
         {children}
@@ -509,9 +509,9 @@ export default function PrintIdCardsDuplex() {
         }
         * { box-sizing:border-box; }
 
-        /* Landscape card: 85mm × 55mm */
+        /* Landscape card: 90mm × 60mm  (9 cm × 6 cm) */
         .lcard {
-          width:85mm; height:55mm;
+          width:90mm; height:60mm;
           overflow:hidden; border-radius:3px;
           font-family:'Inter',Arial,sans-serif;
           background:#fff; position:relative; flex-shrink:0;
@@ -546,7 +546,7 @@ export default function PrintIdCardsDuplex() {
         gap: "10px", flexWrap: "wrap",
       }}>
         <div style={{ color: "#fff", fontWeight: 800, fontSize: "13px", fontFamily: "Arial,sans-serif" }}>
-          🖨️ Duplex ID Cards (85×55mm) &nbsp;—&nbsp;
+          🖨️ Duplex ID Cards (90×60mm) &nbsp;—&nbsp;
           <span style={{ color: GOLD }}>{group.groupName}</span>
           <span style={{ color: "#9ca3af", fontWeight: 400, marginLeft: "8px" }}>
             {pilgrims.length} pilgrims · {pages.length} sheet{pages.length !== 1 ? "s" : ""} ×2 pages · 9 per sheet
@@ -578,14 +578,14 @@ export default function PrintIdCardsDuplex() {
             <A4Page label={`FRONT — Sheet ${pi + 1} of ${pages.length}`} pageRef={el => { if (el) pageElsRef.current[pi * 2] = el!; }}>
               {frontCells.map((p, i) => (
                 <CardCell key={i}>
-                  {p ? <FrontCard {...cardProps(p)} /> : <div className="lcard" style={{ background: "#f9fafb", border: "0.5px dashed #ddd" }} />}
+                  {p ? <FrontCard {...cardProps(p)} /> : <div className="lcard" style={{ background: "#f9fafb", border: "0.5px dashed #ccc" }} />}
                 </CardCell>
               ))}
             </A4Page>
             <A4Page label={`BACK — Sheet ${pi + 1} · mirrored for long-edge duplex`} pageRef={el => { if (el) pageElsRef.current[pi * 2 + 1] = el!; }}>
               {backCells.map((p, i) => (
                 <CardCell key={i}>
-                  {p ? <BackCard {...cardProps(p)} /> : <div className="lcard" style={{ background: "#f9fafb", border: "0.5px dashed #ddd" }} />}
+                  {p ? <BackCard {...cardProps(p)} /> : <div className="lcard" style={{ background: "#f9fafb", border: "0.5px dashed #ccc" }} />}
                 </CardCell>
               ))}
             </A4Page>
