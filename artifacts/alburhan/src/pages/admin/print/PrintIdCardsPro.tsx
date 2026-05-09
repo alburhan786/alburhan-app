@@ -538,7 +538,7 @@ function FrontCardPortrait({ p, group, company, photoDataUrls }: CardProps) {
   );
 }
 
-type PrintMode = "grid9" | "sidebyside" | "duplex" | "strip" | "sheets";
+type PrintMode = "grid9" | "grid8" | "sidebyside" | "duplex" | "strip" | "sheets";
 
 export default function PrintIdCardsPro() {
   const [, params] = useRoute("/admin/groups/:groupId/print/id-cards-pro");
@@ -560,7 +560,8 @@ export default function PrintIdCardsPro() {
     let el = document.getElementById(id) as HTMLStyleElement | null;
     if (!el) { el = document.createElement("style"); el.id = id; document.head.appendChild(el); }
     const landscape = printMode === "grid9" || printMode === "strip" || printMode === "sheets";
-    el.textContent = `@media print { @page { size: ${landscape ? "A4 landscape" : "A4 portrait"}; margin: ${printMode === "grid9" ? "0mm" : "8mm"}; } }`;
+    const margins = (printMode === "grid9" || printMode === "grid8") ? "0mm" : "8mm";
+    el.textContent = `@media print { @page { size: ${landscape ? "A4 landscape" : "A4 portrait"}; margin: ${margins}; } }`;
     return () => { document.getElementById(id)?.remove(); };
   }, [printMode]);
   // Refs set directly on each page div during render — avoids querySelectorAll timing issues
@@ -614,6 +615,66 @@ export default function PrintIdCardsPro() {
     grid-template-rows: repeat(2, 76.2mm); gap: 0;
     width: 203.2mm; height: 152.4mm; flex-shrink: 0;
   }
+</style></head><body>${pagesHtml}</body></html>`);
+    win.document.close();
+    setTimeout(() => { win.focus(); win.print(); }, 600);
+  };
+
+  // Grid8 dedicated print: opens popup with A4 portrait @page, 8 cards (2×4, 100×68mm)
+  const printGrid8 = () => {
+    const pages = Array.from(contentRef.current?.querySelectorAll(".grid8-page") ?? []) as HTMLElement[];
+    if (pages.length === 0) { alert("Cards not loaded yet — please wait and try again."); return; }
+
+    const clonePage = (src: HTMLElement) => {
+      const clone = src.cloneNode(true) as HTMLElement;
+      const srcCanvases = Array.from(src.querySelectorAll("canvas"));
+      const cloneCanvases = Array.from(clone.querySelectorAll("canvas"));
+      srcCanvases.forEach((canvas, i) => {
+        const img = document.createElement("img");
+        img.src = (canvas as HTMLCanvasElement).toDataURL("image/png");
+        img.style.width = canvas.style.width || canvas.offsetWidth + "px";
+        img.style.height = canvas.style.height || canvas.offsetHeight + "px";
+        img.style.display = "block";
+        cloneCanvases[i]?.parentNode?.replaceChild(img, cloneCanvases[i]);
+      });
+      return clone.outerHTML;
+    };
+
+    const pagesHtml = pages.map(clonePage).join("\n");
+    const win = window.open("", "_blank", "width=1,height=1");
+    if (!win) { alert("Popup blocked — please allow popups for this site and try again."); return; }
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>
+  @page { size: A4 portrait; margin: 0; }
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  html, body { margin: 0; padding: 0; background: white; width: 210mm; }
+  .pro-card {
+    width: 100mm; height: 68mm; border: none;
+    overflow: hidden; font-family: Arial, sans-serif; background: #fff;
+    display: flex; flex-direction: column; flex-shrink: 0;
+  }
+  .grid8-page {
+    width: 210mm; height: 297mm; display: flex; align-items: center;
+    justify-content: center; page-break-after: always; break-after: page;
+    page-break-inside: avoid; break-inside: avoid; overflow: hidden;
+  }
+  .grid8-page:last-child { page-break-after: auto; break-after: auto; }
+  .grid8-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 100mm);
+    grid-template-rows: repeat(4, 68mm);
+    gap: 0; width: 200mm; height: 272mm; flex-shrink: 0;
+  }
+  .grid8-cell {
+    width: 100mm; height: 68mm; position: relative;
+    border: 0.4pt dashed #999; box-sizing: border-box;
+  }
+  .cut-corner { position: absolute; width: 3mm; height: 3mm; }
+  .cut-corner.tl { top: -1px; left: -1px; border-top: 1pt solid #333; border-left: 1pt solid #333; }
+  .cut-corner.tr { top: -1px; right: -1px; border-top: 1pt solid #333; border-right: 1pt solid #333; }
+  .cut-corner.bl { bottom: -1px; left: -1px; border-bottom: 1pt solid #333; border-left: 1pt solid #333; }
+  .cut-corner.br { bottom: -1px; right: -1px; border-bottom: 1pt solid #333; border-right: 1pt solid #333; }
+  @media print { .no-print { display: none !important; } }
 </style></head><body>${pagesHtml}</body></html>`);
     win.document.close();
     setTimeout(() => { win.focus(); win.print(); }, 600);
@@ -768,8 +829,18 @@ export default function PrintIdCardsPro() {
   const isStrip  = printMode === "strip";
   const isSheets = printMode === "sheets";
   const isGrid9  = printMode === "grid9";
+  const isGrid8  = printMode === "grid8";
 
-  // Grid9: 9 fronts per A4 landscape page (3×3)
+  // Grid8: 8 fronts per A4 portrait page (2×4, 100×68mm)
+  const GRID8_PER_PAGE = 8;
+  const grid8Pages: (Pilgrim | null)[][] = [];
+  for (let i = 0; i < pilgrims.length; i += GRID8_PER_PAGE) {
+    const chunk: (Pilgrim | null)[] = pilgrims.slice(i, i + GRID8_PER_PAGE);
+    while (chunk.length < GRID8_PER_PAGE) chunk.push(null);
+    grid8Pages.push(chunk);
+  }
+
+  // Grid9: 4 fronts per A4 landscape page (2×2)
   const GRID9_PER_PAGE = 4;
   const grid9Pages: (Pilgrim | null)[][] = [];
   for (let i = 0; i < pilgrims.length; i += GRID9_PER_PAGE) {
@@ -987,6 +1058,34 @@ export default function PrintIdCardsPro() {
           border-radius: 4px;
         }
 
+        /* ── Grid8: 8 landscape cards per A4 portrait page (2×4, 100×68mm) with cut guides ── */
+        .grid8-page {
+          width: 210mm; height: 297mm; display: flex; align-items: center;
+          justify-content: center; page-break-after: always; break-after: page;
+          page-break-inside: avoid; break-inside: avoid; overflow: hidden;
+          background: white;
+        }
+        .grid8-page:last-child { page-break-after: auto; break-after: auto; }
+        .grid8-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 100mm);
+          grid-template-rows: repeat(4, 68mm);
+          gap: 0; width: 200mm; height: 272mm; flex-shrink: 0;
+        }
+        .grid8-cell {
+          width: 100mm; height: 68mm; position: relative;
+          border: 0.4pt dashed #aaa; box-sizing: border-box;
+        }
+        .grid8-cell .pro-card { width: 100mm !important; height: 68mm !important; border: none !important; }
+        .cut-corner { position: absolute; width: 3mm; height: 3mm; z-index: 2; }
+        .cut-corner.tl { top: -1px; left: -1px; border-top: 0.8pt solid #555; border-left: 0.8pt solid #555; }
+        .cut-corner.tr { top: -1px; right: -1px; border-top: 0.8pt solid #555; border-right: 0.8pt solid #555; }
+        .cut-corner.bl { bottom: -1px; left: -1px; border-bottom: 0.8pt solid #555; border-left: 0.8pt solid #555; }
+        .cut-corner.br { bottom: -1px; right: -1px; border-bottom: 0.8pt solid #555; border-right: 0.8pt solid #555; }
+        @media print {
+          .grid8-page { box-shadow: none !important; }
+        }
+
         /* ── Grid4: 4 landscape cards (4"×3") per A4 landscape page (2×2, 101.6×76.2mm) ── */
         /* Each page-div is the full A4 landscape size: 297×210mm                           */
         /* This forces the browser to start a new print page after each one                  */
@@ -1059,7 +1158,8 @@ export default function PrintIdCardsPro() {
         <div>
           <div style={{ fontWeight: 800, fontSize: "15px", color: DARK }}>ID Card Print</div>
           <div style={{ fontSize: "12px", color: "#555" }}>
-            {isGrid9  ? "Grid 4 · 4 landscape cards (4\"×3\") per A4 landscape · 101.6×76.2mm · Cut & laminate"
+            {isGrid8  ? "Grid 8 · 8 cards per A4 portrait · 100×68mm · 2 cols × 4 rows · dashed cut guides"
+             : isGrid9  ? "Grid 4 · 4 landscape cards (4\"×3\") per A4 landscape · 101.6×76.2mm · Cut & laminate"
              : isSheets ? "Sheets · All fronts = Page 1 · All backs = Page 2 · A4 landscape"
              : isStrip ? "Strip 3 · 3 fronts on top · 3 backs on bottom · A4 landscape"
              : isSBS   ? "Side-by-side · Front | Back on same sheet · Cut & stack"
@@ -1068,14 +1168,14 @@ export default function PrintIdCardsPro() {
         </div>
         {/* Mode toggle */}
         <div style={{ display: "flex", gap: "4px", background: "#e5e7eb", borderRadius: "8px", padding: "3px" }}>
-          {(["grid9", "sheets", "strip", "sidebyside", "duplex"] as PrintMode[]).map(m => (
+          {(["grid8", "grid9", "sheets", "strip", "sidebyside", "duplex"] as PrintMode[]).map(m => (
             <button key={m} onClick={() => setPrintMode(m)} style={{
               padding: "6px 12px", border: "none", borderRadius: "6px", cursor: "pointer",
               fontSize: "12px", fontWeight: 700,
               background: printMode === m ? DARK : "transparent",
               color: printMode === m ? "#fff" : "#374151",
             }}>
-              {m === "grid9" ? "Grid 9" : m === "sheets" ? "Sheets" : m === "strip" ? "Strip 3" : m === "sidebyside" ? "Side-by-Side" : "Duplex"}
+              {m === "grid8" ? "✂ Grid 8" : m === "grid9" ? "Grid 4" : m === "sheets" ? "Sheets" : m === "strip" ? "Strip 3" : m === "sidebyside" ? "Side-by-Side" : "Duplex"}
             </button>
           ))}
         </div>
@@ -1091,8 +1191,8 @@ export default function PrintIdCardsPro() {
         </label>
 
         <div style={{ marginLeft: "auto", display: "flex", gap: "8px" }}>
-          <button onClick={() => isGrid9 ? printGrid9() : window.print()} style={{ padding: "10px 24px", background: DARK, color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "14px" }}>
-            🖨 Print {isGrid9 ? "(Grid 9)" : ""}
+          <button onClick={() => isGrid8 ? printGrid8() : isGrid9 ? printGrid9() : window.print()} style={{ padding: "10px 24px", background: DARK, color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "14px" }}>
+            🖨 Print {isGrid8 ? "(Grid 8 · A4 Portrait)" : isGrid9 ? "(Grid 4 · A4 Landscape)" : ""}
           </button>
           <button onClick={() => dlCards("pdf")} disabled={!!dlState} style={{ padding: "10px 18px", background: dlState === "pdf" ? "#6b7280" : "#1d4ed8", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
             {dlState === "pdf" ? "⏳..." : "⬇ PDF"}
@@ -1125,12 +1225,17 @@ export default function PrintIdCardsPro() {
       {/* ── Instruction bar ── */}
       <div className="no-print" style={{
         padding: "10px 20px", fontSize: "13px", fontWeight: 600,
-        background: isGrid9 ? "#f0fdf4" : isSheets ? "#f0f9ff" : isStrip ? "#fefce8" : isSBS ? "#f0fdf4" : "#eff6ff",
-        borderBottom: `2px solid ${isGrid9 ? "#86efac" : isSheets ? "#7dd3fc" : isStrip ? "#fde047" : isSBS ? "#86efac" : "#93c5fd"}`,
-        color: isGrid9 ? "#14532d" : isSheets ? "#0c4a6e" : isStrip ? "#854d0e" : isSBS ? "#15803d" : "#1d4ed8",
+        background: isGrid8 ? "#fdf4ff" : isGrid9 ? "#f0fdf4" : isSheets ? "#f0f9ff" : isStrip ? "#fefce8" : isSBS ? "#f0fdf4" : "#eff6ff",
+        borderBottom: `2px solid ${isGrid8 ? "#e879f9" : isGrid9 ? "#86efac" : isSheets ? "#7dd3fc" : isStrip ? "#fde047" : isSBS ? "#86efac" : "#93c5fd"}`,
+        color: isGrid8 ? "#701a75" : isGrid9 ? "#14532d" : isSheets ? "#0c4a6e" : isStrip ? "#854d0e" : isSBS ? "#15803d" : "#1d4ed8",
         display: "flex", gap: "20px", flexWrap: "wrap", alignItems: "center",
       }}>
-        {isGrid9 ? (
+        {isGrid8 ? (
+          <>
+            <span>✅ 8 FRONT cards per A4 portrait · 100×68mm · 2 cols × 4 rows · dashed cut lines printed on sheet</span>
+            <span>🖨 Printer → A4 Portrait · One-sided · Scale 100% · Margins None · Print Backgrounds ON → ✂ Cut along dashed lines → Laminate</span>
+          </>
+        ) : isGrid9 ? (
           <>
             <span>✅ 4 FRONT cards per A4 landscape · 4"×3" each (101.6mm wide × 76.2mm tall) · 2 cols × 2 rows</span>
             <span>🖨 Printer → A4 Landscape · One-sided · Scale 100% · Margins None → ✂ Cut at every 102mm (width) &amp; 76mm (height) → Laminate</span>
@@ -1164,8 +1269,36 @@ export default function PrintIdCardsPro() {
       {/* ── Content ── */}
       <div ref={contentRef} className="id-print-content" style={{ background: "#f5f5f0", padding: "8mm", display: "flex", flexDirection: "column", gap: "8mm" }}>
 
-        {isGrid9 ? (
-          /* ── GRID9 MODE: 9 landscape front cards per A4 landscape page (3×3), 86×54mm CR80 ── */
+        {isGrid8 ? (
+          /* ── GRID8 MODE: 8 front cards per A4 portrait page (2×4, 100×68mm) with cut guides ── */
+          grid8Pages.map((cells, pi) => (
+            <div key={pi}>
+              <div className="no-print" style={{ fontSize: "11px", color: "#701a75", fontWeight: 700, marginBottom: "3mm" }}>
+                ✂ Sheet {pi + 1} of {grid8Pages.length} — 8 FRONT cards (100mm × 68mm) · A4 Portrait · cut along dashed lines
+              </div>
+              <div className="grid8-page" ref={el => { if (el) pageElsRef.current[pi] = el as HTMLElement; }}>
+                <div className="grid8-grid">
+                  {cells.map((p, i) => (
+                    <div key={i} className="grid8-cell">
+                      <span className="cut-corner tl" />
+                      <span className="cut-corner tr" />
+                      <span className="cut-corner bl" />
+                      <span className="cut-corner br" />
+                      {p ? (
+                        <div ref={el => { if (el) frontCardRefs.current.set(p.id, el as HTMLElement); }}>
+                          <FrontCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} photoDataUrls={photoDataUrls} />
+                        </div>
+                      ) : (
+                        <div className="pro-card" style={{ background: "#f9fafb" }} />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))
+        ) : isGrid9 ? (
+          /* ── GRID9 MODE: 4 landscape front cards per A4 landscape page (2×2) ── */
           grid9Pages.map((cells, pi) => (
             <div key={pi}>
               <div className="no-print" style={{ fontSize: "11px", color: "#14532d", fontWeight: 700, marginBottom: "3mm" }}>
