@@ -70,7 +70,7 @@ function StaffCardFront({ s, groupName, photoDataUrls }: { s: StaffMember; group
   return (
     <div className="staff-card" style={{ background: "#fff", display: "flex", flexDirection: "column" }}>
 
-      {/* ── HEADER: logo LEFT + text RIGHT ~15mm ── */}
+      {/* ── HEADER: logo LEFT + text RIGHT ── */}
       <div style={{
         background: GREEN, display: "flex", alignItems: "center",
         padding: "1.8mm 2.5mm 1.5mm", gap: "2mm", flexShrink: 0,
@@ -97,18 +97,25 @@ function StaffCardFront({ s, groupName, photoDataUrls }: { s: StaffMember; group
           </div>
           <div style={{
             fontSize: "3pt", color: "rgba(255,255,255,0.75)",
-            letterSpacing: "0.6px", textTransform: "uppercase", marginBottom: "1mm",
+            letterSpacing: "0.6px", textTransform: "uppercase",
           }}>
             SERVING PILGRIMS WITH CARE
           </div>
-          {/* HAJJ 2026 gold pill */}
-          <div style={{
-            display: "inline-block",
-            background: GOLD, borderRadius: "20px", padding: "0.5mm 3mm",
-            fontSize: "5.5pt", fontWeight: 900, color: GREEN, letterSpacing: "1.5px",
-          }}>
-            HAJJ 2026
-          </div>
+        </div>
+      </div>
+
+      {/* ── HAJJ 2026 pill — full-width centered row ── */}
+      <div style={{
+        background: GREEN, display: "flex", alignItems: "center", justifyContent: "center",
+        padding: "1mm 2mm 1.8mm", flexShrink: 0,
+        borderBottom: `1.5px solid ${GOLD}44`,
+      }}>
+        <div style={{
+          background: GOLD, borderRadius: "20px", padding: "0.8mm 6mm",
+          fontSize: "5.5pt", fontWeight: 900, color: GREEN, letterSpacing: "2px",
+          boxShadow: "0 0 0 1px rgba(255,255,255,0.2)",
+        }}>
+          HAJJ 2026
         </div>
       </div>
 
@@ -205,14 +212,17 @@ function StaffCardFront({ s, groupName, photoDataUrls }: { s: StaffMember; group
         {s.staffId && (
           <div style={{
             display: "flex", alignItems: "center", justifyContent: "center",
-            background: GREEN, borderRadius: "5px", padding: "1mm 2mm", flexShrink: 0,
+            background: GREEN, borderRadius: "6px", padding: "1.5mm 2mm", flexShrink: 0,
+            border: `1px solid ${GOLD}88`,
+            boxShadow: `0 0 0 2px ${GREEN}33`,
+            margin: "0 0",
           }}>
-            <svg viewBox="0 0 16 12" width="9" height="7" style={{ marginRight: "1.5mm", flexShrink: 0 }}>
-              <rect x="0.5" y="0.5" width="15" height="11" rx="2" fill="none" stroke={GOLD} strokeWidth="1.2"/>
-              <line x1="4" y1="4" x2="12" y2="4" stroke={GOLD} strokeWidth="1.1"/>
-              <line x1="4" y1="7.5" x2="10" y2="7.5" stroke={GOLD} strokeWidth="1.1"/>
+            <svg viewBox="0 0 16 12" width="10" height="8" style={{ marginRight: "1.8mm", flexShrink: 0 }}>
+              <rect x="0.5" y="0.5" width="15" height="11" rx="2" fill="none" stroke={GOLD} strokeWidth="1.3"/>
+              <line x1="4" y1="4" x2="12" y2="4" stroke={GOLD} strokeWidth="1.2"/>
+              <line x1="4" y1="7.5" x2="10" y2="7.5" stroke={GOLD} strokeWidth="1.2"/>
             </svg>
-            <span style={{ fontSize: "6pt", fontWeight: 900, color: "#fff", letterSpacing: "0.5px" }}>
+            <span style={{ fontSize: "6.5pt", fontWeight: 900, color: "#fff", letterSpacing: "1px", textTransform: "uppercase" }}>
               ID NO. : {s.staffId}
             </span>
           </div>
