@@ -126,10 +126,10 @@ function StaffCardFront({ s, groupName, photoDataUrls }: { s: StaffMember; group
         </span>
       </div>
 
-      {/* ── MIDDLE: photo LEFT + Kaaba/HAJJ RIGHT ~30mm ── */}
+      {/* ── MIDDLE: photo LEFT + Kaaba/HAJJ RIGHT ~28mm ── */}
       <div style={{
         background: "#f0fdf4", display: "flex", alignItems: "stretch",
-        padding: "2mm 2mm 1.5mm", gap: "2mm", flexShrink: 0, height: "32mm",
+        padding: "1.5mm 2mm 1mm", gap: "2mm", flexShrink: 0, height: "28mm",
       }}>
         {/* Photo */}
         {s.photoUrl ? (
@@ -166,27 +166,27 @@ function StaffCardFront({ s, groupName, photoDataUrls }: { s: StaffMember; group
 
       {/* ── INFO (flex:1) ── */}
       <div style={{
-        background: "#fff", padding: "1.5mm 2.5mm 1mm",
-        flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: "0.9mm",
+        background: "#fff", padding: "1.2mm 2.5mm 1mm",
+        flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: "0.8mm",
+        overflow: "hidden",
       }}>
-        {/* Name */}
+        {/* Name — allow 2 lines so long names never get cut */}
         <div style={{
-          fontSize: "9.5pt", fontWeight: 900, color: "#111",
+          fontSize: "8.5pt", fontWeight: 900, color: "#111",
           textTransform: "uppercase", textAlign: "center",
-          lineHeight: 1.0, letterSpacing: "0.5px",
-          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+          lineHeight: 1.1, letterSpacing: "0.5px",
+          wordBreak: "break-word",
         }}>
           {s.fullName}
         </div>
 
         {/* Gold divider */}
-        <div style={{ height: "0.4mm", background: GOLD, borderRadius: "1px" }} />
+        <div style={{ height: "0.4mm", background: GOLD, borderRadius: "1px", flexShrink: 0 }} />
 
         {/* Role */}
         <div style={{
-          fontSize: "4.5pt", fontWeight: 700, color: "#444",
-          textAlign: "center", lineHeight: 1.3,
-          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+          fontSize: "5pt", fontWeight: 700, color: "#444",
+          textAlign: "center", lineHeight: 1.3, wordBreak: "break-word",
         }}>
           ROLE : <span style={{ color: GREEN, fontWeight: 900 }}>{roleLabel}</span>
         </div>
@@ -194,9 +194,8 @@ function StaffCardFront({ s, groupName, photoDataUrls }: { s: StaffMember; group
         {/* Designation */}
         {s.designation && (
           <div style={{
-            fontSize: "4.5pt", fontWeight: 700, color: "#444",
-            textAlign: "center", lineHeight: 1.3,
-            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+            fontSize: "5pt", fontWeight: 700, color: "#444",
+            textAlign: "center", lineHeight: 1.3, wordBreak: "break-word",
           }}>
             DESIGNATION : <span style={{ color: GREEN, fontWeight: 900 }}>{s.designation.toUpperCase()}</span>
           </div>
@@ -206,7 +205,7 @@ function StaffCardFront({ s, groupName, photoDataUrls }: { s: StaffMember; group
         {s.staffId && (
           <div style={{
             display: "flex", alignItems: "center", justifyContent: "center",
-            background: GREEN, borderRadius: "5px", padding: "1mm 2mm",
+            background: GREEN, borderRadius: "5px", padding: "1mm 2mm", flexShrink: 0,
           }}>
             <svg viewBox="0 0 16 12" width="9" height="7" style={{ marginRight: "1.5mm", flexShrink: 0 }}>
               <rect x="0.5" y="0.5" width="15" height="11" rx="2" fill="none" stroke={GOLD} strokeWidth="1.2"/>
@@ -222,8 +221,8 @@ function StaffCardFront({ s, groupName, photoDataUrls }: { s: StaffMember; group
         {/* Group */}
         {groupName && (
           <div style={{
-            fontSize: "4pt", color: "#555", textAlign: "center", lineHeight: 1.2,
-            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+            fontSize: "4.5pt", color: "#555", textAlign: "center", lineHeight: 1.2,
+            wordBreak: "break-word",
           }}>
             GROUP : <span style={{ fontWeight: 800, color: "#333" }}>{groupName}</span>
           </div>
@@ -232,21 +231,21 @@ function StaffCardFront({ s, groupName, photoDataUrls }: { s: StaffMember; group
 
       {/* ── FOOTER: personal mobile LEFT + website RIGHT ── */}
       <div style={{
-        background: GREEN, padding: "1.5mm 3mm", flexShrink: 0,
+        background: GREEN, padding: "1.8mm 3mm", flexShrink: 0,
         display: "flex", alignItems: "center", justifyContent: "space-between",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: "1.5mm" }}>
-          <svg viewBox="0 0 24 24" width="8" height="8" fill="none" stroke={GOLD} strokeWidth="2.5">
+          <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke={GOLD} strokeWidth="2.5">
             <path d="M22 16.92v3a2 2 0 0 1-2.18 2A19.79 19.79 0 0 1 3.08 5.18 2 2 0 0 1 5.07 3h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L9.09 10.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 23 18z" />
           </svg>
-          <span style={{ fontSize: "3.5pt", color: "#fff", fontWeight: 700 }}>{mobile}</span>
+          <span style={{ fontSize: "5.5pt", color: "#fff", fontWeight: 900, letterSpacing: "0.3px" }}>{mobile}</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "1.5mm" }}>
-          <svg viewBox="0 0 24 24" width="8" height="8" fill="none" stroke={GOLD} strokeWidth="2">
+          <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke={GOLD} strokeWidth="2">
             <circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" />
             <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
           </svg>
-          <span style={{ fontSize: "3.5pt", color: "#fff", fontWeight: 700 }}>{company.website}</span>
+          <span style={{ fontSize: "5pt", color: GOLD, fontWeight: 900, letterSpacing: "0.2px" }}>{company.website}</span>
         </div>
       </div>
     </div>
