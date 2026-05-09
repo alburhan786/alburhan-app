@@ -575,30 +575,27 @@ export default function PrintIdCardsPro() {
     const pages = Array.from(contentRef.current?.querySelectorAll(".grid9-page") ?? []) as HTMLElement[];
     if (pages.length === 0) { alert("Cards not loaded yet — please wait and try again."); return; }
 
-    // Convert canvas elements (QR, barcode) to <img> data URLs so they survive the copy
-    const clonePage = (src: HTMLElement) => {
+    // Convert every canvas (QR, barcode) → <img data-url> so they survive the copy
+    const clonePageEl = (src: HTMLElement): HTMLElement => {
       const clone = src.cloneNode(true) as HTMLElement;
-      const srcCanvases = Array.from(src.querySelectorAll("canvas"));
-      const cloneCanvases = Array.from(clone.querySelectorAll("canvas"));
+      const srcCanvases  = Array.from(src.querySelectorAll("canvas")) as HTMLCanvasElement[];
+      const cloneCanvases = Array.from(clone.querySelectorAll("canvas")) as HTMLCanvasElement[];
       srcCanvases.forEach((canvas, i) => {
         const img = document.createElement("img");
-        img.src = (canvas as HTMLCanvasElement).toDataURL("image/png");
-        img.style.width = canvas.style.width || canvas.offsetWidth + "px";
-        img.style.height = canvas.style.height || canvas.offsetHeight + "px";
-        img.style.display = "block";
+        img.src = canvas.toDataURL("image/png");
+        img.style.cssText = `width:${canvas.offsetWidth}px;height:${canvas.offsetHeight}px;display:block;`;
         cloneCanvases[i]?.parentNode?.replaceChild(img, cloneCanvases[i]);
       });
-      return clone.outerHTML;
+      return clone;
     };
 
-    const pagesHtml = pages.map(clonePage).join("\n");
-    const win = window.open("", "_blank", "width=1,height=1");
+    const win = window.open("", "_blank", "width=900,height=700");
     if (!win) { alert("Popup blocked — please allow popups for this site and try again."); return; }
-    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
-<style>
+
+    const css = `
   @page { size: A4 landscape; margin: 0; }
   * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-  html, body { margin: 0; padding: 0; background: white; width: 297mm; }
+  html, body { margin: 0; padding: 0; background: white; }
   .no-print { display: none !important; }
   .pro-card {
     width: 99mm; height: 70mm; border: none;
@@ -606,16 +603,17 @@ export default function PrintIdCardsPro() {
     display: flex; flex-direction: column; flex-shrink: 0;
   }
   .grid9-page {
-    width: 297mm; height: 210mm; display: flex; align-items: center;
-    justify-content: center; page-break-after: always; break-after: page;
-    page-break-inside: avoid; break-inside: avoid; overflow: hidden;
+    width: 297mm; height: 210mm;
+    display: grid;
+    grid-template-columns: repeat(3, 99mm);
+    grid-template-rows: repeat(3, 70mm);
+    gap: 0;
+    page-break-after: always; break-after: page;
+    page-break-inside: avoid; break-inside: avoid;
+    overflow: hidden;
   }
   .grid9-page:last-child { page-break-after: auto; break-after: auto; }
-  .grid9-grid {
-    display: grid; grid-template-columns: repeat(3, 99mm);
-    grid-template-rows: repeat(3, 70mm); gap: 0;
-    width: 297mm; height: 210mm; flex-shrink: 0;
-  }
+  .grid9-grid { display: contents; }
   .grid9-cell {
     width: 99mm; height: 70mm; position: relative;
     border: 0.4pt dashed #999; box-sizing: border-box;
@@ -626,9 +624,29 @@ export default function PrintIdCardsPro() {
   .cut-corner.tr { top:0; right:0; border-top:1pt solid #333; border-right:1pt solid #333; }
   .cut-corner.bl { bottom:0; left:0; border-bottom:1pt solid #333; border-left:1pt solid #333; }
   .cut-corner.br { bottom:0; right:0; border-bottom:1pt solid #333; border-right:1pt solid #333; }
-</style></head><body>${pagesHtml}</body></html>`);
+    `;
+
+    // Build popup document via DOM (avoids document.write truncation on large HTML)
+    win.document.open();
+    win.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><style>' + css + '</style></head><body></body></html>');
     win.document.close();
-    setTimeout(() => { win.focus(); win.print(); }, 600);
+
+    // Append all cloned pages into the popup body
+    pages.forEach(page => {
+      win.document.body.appendChild(clonePageEl(page));
+    });
+
+    // Wait for all images in the popup to fully load, then print
+    const imgs = Array.from(win.document.querySelectorAll("img")) as HTMLImageElement[];
+    const pending = imgs.filter(img => !img.complete);
+    if (pending.length === 0) {
+      setTimeout(() => { win.focus(); win.print(); }, 400);
+    } else {
+      let loaded = 0;
+      const onDone = () => { loaded++; if (loaded >= pending.length) { win.focus(); win.print(); } };
+      pending.forEach(img => { img.onload = onDone; img.onerror = onDone; });
+      setTimeout(() => { win.focus(); win.print(); }, 4000); // safety fallback
+    }
   };
 
   // Grid8 dedicated print: opens popup with A4 portrait @page, 8 cards (2×4, 100×68mm)
