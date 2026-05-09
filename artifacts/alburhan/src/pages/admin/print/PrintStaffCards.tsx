@@ -676,12 +676,21 @@ export default function PrintStaffCards() {
         </div>
       )}
 
-      {/* ── Hidden off-screen back cards — always rendered so refs are populated for hi-res download ── */}
-      <div style={{ position: "absolute", left: "-9999px", top: 0, pointerEvents: "none", opacity: 0, zIndex: -1 }} aria-hidden="true">
+      {/* ── Off-screen back + front cards for hi-res PNG download ── */}
+      {/* Must NOT use opacity:0 (html2canvas captures blank) — left:-9999px hides visually */}
+      <div style={{ position: "fixed", left: "-9999px", top: 0, pointerEvents: "none", zIndex: -1, display: "flex", flexDirection: "column", gap: "4mm" }} aria-hidden="true">
         {filtered.map(s => (
-          <div key={`hidden-b-${s.id}`} ref={el => { if (el) backCardRefs.current.set(s.id, el); }}
-            style={{ width: "54mm", height: "86mm", position: "absolute" }}>
+          <div key={`hidden-b-${s.id}`}
+            ref={el => { if (el) backCardRefs.current.set(s.id, el); }}
+            style={{ width: "54mm", height: "86mm", flexShrink: 0 }}>
             <StaffCardBack s={s} groupName={s.groupId ? groups[s.groupId] : undefined} />
+          </div>
+        ))}
+        {filtered.map(s => (
+          <div key={`hidden-f-${s.id}`}
+            ref={el => { if (el) frontCardRefs.current.set(s.id, el); }}
+            style={{ width: "54mm", height: "86mm", flexShrink: 0 }}>
+            <StaffCardFront s={s} groupName={s.groupId ? groups[s.groupId] : undefined} photoDataUrls={photoDataUrls} />
           </div>
         ))}
       </div>
