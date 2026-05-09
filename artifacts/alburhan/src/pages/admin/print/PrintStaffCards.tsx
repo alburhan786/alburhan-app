@@ -86,6 +86,7 @@ function StaffCardFront({ s, groupName, photoDataUrls }: { s: StaffMember; group
           <div style={{
             fontSize: "11pt", fontWeight: 900, color: "#fff",
             lineHeight: 1.0, letterSpacing: "0.6px", textTransform: "uppercase",
+            marginBottom: "1.2mm",
           }}>
             {company.nameShort}
           </div>
