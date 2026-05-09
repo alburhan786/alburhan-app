@@ -598,7 +598,7 @@ export default function PrintIdCardsPro() {
 <style>
   @page { size: A4 landscape; margin: 0; }
   * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-  html, body { margin: 0; padding: 0; background: white; width: 297mm; height: 210mm; }
+  html, body { margin: 0; padding: 0; background: white; width: 297mm; }
   .no-print { display: none !important; }
   .pro-card {
     width: 99mm; height: 70mm; border: none;
