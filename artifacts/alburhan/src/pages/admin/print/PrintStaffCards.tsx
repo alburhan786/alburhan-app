@@ -324,15 +324,15 @@ function StaffCardBack({ s, groupName }: { s: StaffMember; groupName?: string })
         </div>
       </div>
 
-      {/* ── QR LEFT + DETAILS RIGHT (side by side) ~32mm ── */}
+      {/* ── QR LEFT + DETAILS RIGHT (side by side) ── */}
       <div style={{
-        display: "flex", gap: "2.5mm", padding: "2mm 2.5mm 1.5mm",
+        display: "flex", gap: "2mm", padding: "2mm 2.5mm 1.5mm",
         flexShrink: 0, alignItems: "flex-start",
       }}>
         {/* QR column */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1mm", flexShrink: 0 }}>
-          <div style={{ border: `2.5px solid ${GREEN}`, borderRadius: "4px", padding: "2px", background: "#fff" }}>
-            <QRCodeCanvas value={verifyUrl} size={64} level="L" fgColor={GREEN} bgColor="#fff" />
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1mm", flexShrink: 0, width: "16mm" }}>
+          <div style={{ border: `2px solid ${GREEN}`, borderRadius: "4px", padding: "1.5px", background: "#fff" }}>
+            <QRCodeCanvas value={verifyUrl} size={52} level="L" fgColor={GREEN} bgColor="#fff" />
           </div>
           <div style={{
             background: GREEN, borderRadius: "12px", padding: "0.5mm 1.5mm",
@@ -346,19 +346,19 @@ function StaffCardBack({ s, groupName }: { s: StaffMember; groupName?: string })
         </div>
 
         {/* Details table */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "0.9mm" }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "1mm", minWidth: 0 }}>
           {rows.map(([label, value], i) => (
-            <div key={i} style={{ display: "flex", gap: "0.5mm", alignItems: "baseline" }}>
+            <div key={i} style={{ display: "flex", gap: "0.8mm", alignItems: "flex-start" }}>
               <span style={{
-                fontSize: "3pt", fontWeight: 900, color: GREEN,
-                minWidth: "15mm", flexShrink: 0, letterSpacing: "0.1px",
+                fontSize: "3.2pt", fontWeight: 900, color: GREEN,
+                width: "14mm", flexShrink: 0, letterSpacing: "0.1px", lineHeight: 1.3,
               }}>{label}</span>
-              <span style={{ fontSize: "3pt", color: "#888", flexShrink: 0 }}>:</span>
+              <span style={{ fontSize: "3.2pt", color: "#888", flexShrink: 0, lineHeight: 1.3 }}>:</span>
               <span style={{
-                fontSize: "3pt",
-                fontWeight: label === "ID NO." ? 900 : label === "NAME" ? 800 : 600,
+                fontSize: "3.2pt", lineHeight: 1.3,
+                fontWeight: label === "ID NO." ? 900 : label === "NAME" ? 800 : 700,
                 color: label === "BLOOD GROUP" ? "#b91c1c" : label === "ID NO." ? GREEN : "#111",
-                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1,
+                flex: 1, minWidth: 0, wordBreak: "break-word",
               }}>{value}</span>
             </div>
           ))}
