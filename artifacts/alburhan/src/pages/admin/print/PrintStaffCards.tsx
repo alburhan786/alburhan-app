@@ -401,33 +401,24 @@ function StaffCardBack({ s, groupName }: { s: StaffMember; groupName?: string })
         </div>
       </div>
 
-      {/* ── ADDRESS ROW (light green) ── */}
+      {/* ── FOOTER: mobile LEFT + website RIGHT on green bar ── */}
       <div style={{
-        background: "#f0fdf4", padding: "1mm 2.5mm", flexShrink: 0,
-        display: "flex", alignItems: "flex-start", gap: "2mm",
-        borderTop: `0.5px solid ${GREEN}33`,
+        background: GREEN, padding: "1.8mm 3mm", flexShrink: 0,
+        display: "flex", alignItems: "center", justifyContent: "space-between",
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "1mm", flexShrink: 0 }}>
-          <svg viewBox="0 0 24 24" width="7" height="7" fill="none" stroke={GREEN} strokeWidth="2.5">
+        <div style={{ display: "flex", alignItems: "center", gap: "1.5mm" }}>
+          <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke={GOLD} strokeWidth="2.5">
             <path d="M22 16.92v3a2 2 0 0 1-2.18 2A19.79 19.79 0 0 1 3.08 5.18 2 2 0 0 1 5.07 3h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L9.09 10.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 23 18z" />
           </svg>
-          <span style={{ fontSize: "2.8pt", fontWeight: 800, color: "#111", whiteSpace: "nowrap" }}>{company.mobile}</span>
+          <span style={{ fontSize: "5.5pt", color: "#fff", fontWeight: 900, letterSpacing: "0.3px" }}>{company.mobile}</span>
         </div>
-        <div style={{ display: "flex", alignItems: "flex-start", gap: "1mm", flex: 1, overflow: "hidden" }}>
-          <svg viewBox="0 0 24 24" width="7" height="7" fill="none" stroke={GREEN} strokeWidth="2.5" style={{ flexShrink: 0, marginTop: "0.2mm" }}>
-            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" />
+        <div style={{ display: "flex", alignItems: "center", gap: "1.5mm" }}>
+          <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke={GOLD} strokeWidth="2">
+            <circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" />
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
           </svg>
-          <span style={{ fontSize: "2.5pt", color: "#555", lineHeight: 1.4, overflow: "hidden" }}>
-            {company.address}
-          </span>
+          <span style={{ fontSize: "5pt", color: GOLD, fontWeight: 900, letterSpacing: "0.2px" }}>{company.website}</span>
         </div>
-      </div>
-
-      {/* ── FOOTER: gold bar ── */}
-      <div style={{ background: GOLD, padding: "1mm", textAlign: "center", flexShrink: 0 }}>
-        <span style={{ fontSize: "3.5pt", color: GREEN, fontWeight: 900, letterSpacing: "1.2px" }}>
-          ❖&nbsp; SERVING PILGRIMS WITH CARE &nbsp;❖
-        </span>
       </div>
     </div>
   );
