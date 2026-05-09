@@ -65,9 +65,9 @@ function SnowflakeSVG({ size = 120, color = GREEN, opacity = 0.07 }: { size?: nu
    compact = true  → 96 × 68 mm  (for "both" mode, 4 per page)
    compact = false → 96 × 128 mm (for front-only mode)
    ════════════════════════════════════════════════════ */
-function FrontSticker({ p, group, company, groupColor, groupLabel, photoDataUrls, compact }: {
+function FrontSticker({ p, group, company, groupColor, groupLabel, photoDataUrls, compact, logoDataUrl }: {
   p: Pilgrim; group: Group; company: ReturnType<typeof getCompanyById>;
-  groupColor: string; groupLabel: string; photoDataUrls: Record<string, string>; compact: boolean;
+  groupColor: string; groupLabel: string; photoDataUrls: Record<string, string>; compact: boolean; logoDataUrl?: string;
 }) {
   const sn = String(p.serialNumber).padStart(3, "0");
 
@@ -599,7 +599,7 @@ export default function PrintLuggageSquare() {
             </div>
             <div key={`fp-${pi}`} className="sq-page-single">
               {page.map(p => (
-                <FrontSticker key={`f-${p.id}`} p={p} group={group} company={company} groupColor={groupColor} groupLabel={groupLabel} photoDataUrls={photoDataUrls} compact={false} />
+                <FrontSticker key={`f-${p.id}`} p={p} group={group} company={company} groupColor={groupColor} groupLabel={groupLabel} photoDataUrls={photoDataUrls} compact={false} logoDataUrl={logoDataUrl} />
               ))}
             </div>
 
@@ -619,7 +619,7 @@ export default function PrintLuggageSquare() {
         {view === "front" && pages.map((page, pi) => (
           <div key={`fp-${pi}`} className="sq-page-single">
             {page.map(p => (
-              <FrontSticker key={p.id} p={p} group={group} company={company} groupColor={groupColor} groupLabel={groupLabel} photoDataUrls={photoDataUrls} compact={false} />
+              <FrontSticker key={p.id} p={p} group={group} company={company} groupColor={groupColor} groupLabel={groupLabel} photoDataUrls={photoDataUrls} compact={false} logoDataUrl={logoDataUrl} />
             ))}
           </div>
         ))}
