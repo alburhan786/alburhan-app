@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { QRCodeCanvas } from "qrcode.react";
-import { downloadAsPdf, downloadAsJpg, downloadAsPng, fetchAsDataUrl } from "@/lib/downloadUtils";
+import { downloadAsPdf, downloadAsJpg, downloadAsPng, fetchAsDataUrl, downloadPerPilgrimAsPng } from "@/lib/downloadUtils";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -434,7 +434,10 @@ export default function PrintStaffCards() {
   const [frontOnly,     setFrontOnly]      = useState(true);
   const [photoDataUrls, setPhotoDataUrls]  = useState<Record<string, string>>({});
   const contentRef = useRef<HTMLDivElement>(null);
+  const frontCardRefs = useRef<Map<string, HTMLElement>>(new Map());
+  const backCardRefs  = useRef<Map<string, HTMLElement>>(new Map());
   const [dlState, setDlState] = useState<string | null>(null);
+  const [dlProgress, setDlProgress] = useState<string>("");
 
   const dlCards = async (fmt: "pdf" | "jpg" | "png") => {
     if (!contentRef.current) return;
@@ -444,6 +447,33 @@ export default function PrintStaffCards() {
       else if (fmt === "png") await downloadAsPng(contentRef.current, "staff-cards");
       else await downloadAsJpg(contentRef.current, "staff-cards");
     } finally { setDlState(null); }
+  };
+
+  const dlHiRes = async (side: "front" | "back") => {
+    const refsMap = side === "front" ? frontCardRefs.current : backCardRefs.current;
+    const cards = filtered
+      .map(s => ({ slug: s.fullName.replace(/[^a-zA-Z0-9]/g, "_").replace(/_+/g, "_"), el: refsMap.get(s.id) }))
+      .filter((x): x is { slug: string; el: HTMLElement } => !!x.el);
+    if (cards.length === 0) { alert("No cards found — please wait for the page to load."); return; }
+    setDlState(`png-${side}`);
+    setDlProgress(`0/${cards.length}`);
+    try {
+      const html2canvas = (await import("html2canvas")).default;
+      const { saveAs } = await import("file-saver");
+      const scale = 560 / 96;
+      let done = 0;
+      for (const { slug, el } of cards) {
+        const canvas = await html2canvas(el, {
+          useCORS: true, allowTaint: false, backgroundColor: "#ffffff",
+          logging: false, imageTimeout: 20000, scale, scrollX: 0, scrollY: 0,
+        });
+        const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, "image/png", 1));
+        if (blob) saveAs(blob, `${slug}_${side}.png`);
+        done++;
+        setDlProgress(`${done}/${cards.length}`);
+        await new Promise(r => setTimeout(r, 200));
+      }
+    } finally { setDlState(null); setDlProgress(""); }
   };
 
   useEffect(() => {
@@ -568,7 +598,7 @@ export default function PrintStaffCards() {
 
         <span style={{ fontSize: "12px", color: "#666", marginLeft: "4px" }}>{filtered.length} card(s)</span>
 
-        <div style={{ marginLeft: "auto", display: "flex", gap: "8px" }}>
+        <div style={{ marginLeft: "auto", display: "flex", gap: "8px", flexWrap: "wrap" }}>
           <button onClick={() => window.print()} disabled={filtered.length === 0} style={{
             padding: "8px 20px", background: GREEN, color: "#fff",
             border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer",
@@ -577,11 +607,14 @@ export default function PrintStaffCards() {
           <button onClick={() => dlCards("pdf")} disabled={!!dlState || filtered.length === 0} style={{ padding: "8px 16px", background: dlState === "pdf" ? "#6b7280" : "#1d4ed8", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>
             {dlState === "pdf" ? "⏳..." : "⬇ PDF"}
           </button>
-          <button onClick={() => dlCards("png")} disabled={!!dlState || filtered.length === 0} style={{ padding: "8px 16px", background: dlState === "png" ? "#6b7280" : "#059669", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>
-            {dlState === "png" ? "⏳..." : "⬇ PNG"}
-          </button>
           <button onClick={() => dlCards("jpg")} disabled={!!dlState || filtered.length === 0} style={{ padding: "8px 16px", background: dlState === "jpg" ? "#6b7280" : "#7c3aed", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>
             {dlState === "jpg" ? "⏳..." : "⬇ JPG"}
+          </button>
+          <button onClick={() => dlHiRes("front")} disabled={!!dlState || filtered.length === 0} style={{ padding: "8px 14px", background: dlState === "png-front" ? "#6b7280" : "#0e7490", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "12px" }}>
+            {dlState === "png-front" ? `⏳ ${dlProgress}` : "⬇ PNG Fronts 560dpi"}
+          </button>
+          <button onClick={() => dlHiRes("back")} disabled={!!dlState || filtered.length === 0} style={{ padding: "8px 14px", background: dlState === "png-back" ? "#6b7280" : "#9333ea", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", fontSize: "12px" }}>
+            {dlState === "png-back" ? `⏳ ${dlProgress}` : "⬇ PNG Backs 560dpi"}
           </button>
           <button onClick={() => window.history.back()} style={{
             padding: "8px 20px", border: "1px solid #ccc",
@@ -607,7 +640,9 @@ export default function PrintStaffCards() {
                 </div>
                 <div className="cards-row">
                   {page.map(s => (
-                    <StaffCardFront key={`f-${s.id}`} s={s} groupName={s.groupId ? groups[s.groupId] : undefined} photoDataUrls={photoDataUrls} />
+                    <div key={`f-${s.id}`} ref={el => { if (el) frontCardRefs.current.set(s.id, el); }}>
+                      <StaffCardFront s={s} groupName={s.groupId ? groups[s.groupId] : undefined} photoDataUrls={photoDataUrls} />
+                    </div>
                   ))}
                 </div>
               </div>
@@ -619,7 +654,9 @@ export default function PrintStaffCards() {
                   </div>
                   <div className="cards-row">
                     {page.map(s => (
-                      <StaffCardBack key={`b-${s.id}`} s={s} groupName={s.groupId ? groups[s.groupId] : undefined} />
+                      <div key={`b-${s.id}`} ref={el => { if (el) backCardRefs.current.set(s.id, el); }}>
+                        <StaffCardBack s={s} groupName={s.groupId ? groups[s.groupId] : undefined} />
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -628,6 +665,16 @@ export default function PrintStaffCards() {
           ))}
         </div>
       )}
+
+      {/* ── Hidden off-screen back cards — always rendered so refs are populated for hi-res download ── */}
+      <div style={{ position: "absolute", left: "-9999px", top: 0, pointerEvents: "none", opacity: 0, zIndex: -1 }} aria-hidden="true">
+        {filtered.map(s => (
+          <div key={`hidden-b-${s.id}`} ref={el => { if (el) backCardRefs.current.set(s.id, el); }}
+            style={{ width: "54mm", height: "86mm", position: "absolute" }}>
+            <StaffCardBack s={s} groupName={s.groupId ? groups[s.groupId] : undefined} />
+          </div>
+        ))}
+      </div>
     </>
   );
 }
