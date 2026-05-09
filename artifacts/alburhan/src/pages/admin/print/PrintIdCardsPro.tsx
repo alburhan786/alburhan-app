@@ -598,7 +598,8 @@ export default function PrintIdCardsPro() {
 <style>
   @page { size: A4 landscape; margin: 0; }
   * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-  html, body { margin: 0; padding: 0; background: white; width: 297mm; }
+  html, body { margin: 0; padding: 0; background: white; width: 297mm; height: 210mm; }
+  .no-print { display: none !important; }
   .pro-card {
     width: 99mm; height: 70mm; border: none;
     overflow: hidden; font-family: Arial, sans-serif; background: #fff;
@@ -617,13 +618,14 @@ export default function PrintIdCardsPro() {
   }
   .grid9-cell {
     width: 99mm; height: 70mm; position: relative;
-    border: 0.4pt dashed #aaa; box-sizing: border-box;
+    border: 0.4pt dashed #999; box-sizing: border-box;
+    overflow: hidden;
   }
-  .cut-corner { position: absolute; width: 3mm; height: 3mm; }
-  .cut-corner.tl { top:-1px; left:-1px; border-top:0.8pt solid #555; border-left:0.8pt solid #555; }
-  .cut-corner.tr { top:-1px; right:-1px; border-top:0.8pt solid #555; border-right:0.8pt solid #555; }
-  .cut-corner.bl { bottom:-1px; left:-1px; border-bottom:0.8pt solid #555; border-left:0.8pt solid #555; }
-  .cut-corner.br { bottom:-1px; right:-1px; border-bottom:0.8pt solid #555; border-right:0.8pt solid #555; }
+  .cut-corner { position: absolute; width: 4mm; height: 4mm; z-index: 10; }
+  .cut-corner.tl { top:0; left:0; border-top:1pt solid #333; border-left:1pt solid #333; }
+  .cut-corner.tr { top:0; right:0; border-top:1pt solid #333; border-right:1pt solid #333; }
+  .cut-corner.bl { bottom:0; left:0; border-bottom:1pt solid #333; border-left:1pt solid #333; }
+  .cut-corner.br { bottom:0; right:0; border-bottom:1pt solid #333; border-right:1pt solid #333; }
 </style></head><body>${pagesHtml}</body></html>`);
     win.document.close();
     setTimeout(() => { win.focus(); win.print(); }, 600);
