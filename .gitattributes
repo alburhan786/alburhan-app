@@ -1,1 +1,2 @@
 artifacts/alburhan/public/frontend-dist.tar.gz filter=lfs diff=lfs merge=lfs -text
+frontend-dist.tar.gz filter=lfs diff=lfs merge=lfs -text
