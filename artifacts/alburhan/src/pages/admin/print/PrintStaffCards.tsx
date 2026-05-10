@@ -458,7 +458,7 @@ export default function PrintStaffCards() {
     const cards = filtered
       .map(s => ({ slug: s.fullName.replace(/[^a-zA-Z0-9]/g, "_").replace(/_+/g, "_"), el: refsMap.get(s.id) }))
       .filter((x): x is { slug: string; el: HTMLElement } => !!x.el);
-    if (cards.length === 0) { alert("No cards found — please wait for the page to load."); return; }
+    if (cards.length === 0) { alert("No cards visible yet — please wait a moment and try again."); return; }
     setDlState(`png-${side}`);
     setDlProgress(`0/${cards.length}`);
     try {
@@ -467,15 +467,28 @@ export default function PrintStaffCards() {
       const scale = 560 / 96;
       let done = 0;
       for (const { slug, el } of cards) {
+        const W = el.offsetWidth  || 204; // 54mm @ 96dpi
+        const H = el.offsetHeight || 326; // 86mm @ 96dpi
         const canvas = await html2canvas(el, {
           useCORS: true, allowTaint: false, backgroundColor: "#ffffff",
-          logging: false, imageTimeout: 20000, scale, scrollX: 0, scrollY: 0,
+          logging: false, imageTimeout: 30000, scale,
+          width: W, height: H,
+          windowWidth: W, windowHeight: H,
+          scrollX: 0, scrollY: 0,
+          onclone: (_doc: Document, cloned: HTMLElement) => {
+            // Force the cloned element to top-left so nothing is off-screen
+            cloned.style.position = "absolute";
+            cloned.style.left = "0";
+            cloned.style.top  = "0";
+            cloned.style.margin = "0";
+            cloned.style.opacity = "1";
+          },
         });
         const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, "image/png", 1));
         if (blob) saveAs(blob, `${slug}_${side}.png`);
         done++;
         setDlProgress(`${done}/${cards.length}`);
-        await new Promise(r => setTimeout(r, 200));
+        await new Promise(r => setTimeout(r, 300));
       }
     } finally { setDlState(null); setDlProgress(""); }
   };
@@ -626,6 +639,44 @@ export default function PrintStaffCards() {
           }}>← Back</button>
         </div>
       </div>
+
+      {/* ── Hi-Res PNG download bar ── */}
+      {filtered.length > 0 && (
+        <div className="no-print" style={{
+          background: "#0d1f17", padding: "10px 16px",
+          display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap",
+          borderBottom: `3px solid ${GOLD}`,
+        }}>
+          <span style={{ color: GOLD, fontWeight: 800, fontSize: "13px", letterSpacing: "0.5px" }}>
+            📥 Download Separately (560 DPI PNG)
+          </span>
+          <button
+            onClick={() => dlHiRes("front")}
+            disabled={!!dlState}
+            style={{
+              padding: "10px 24px", background: dlState === "png-front" ? "#6b7280" : "#0e7490",
+              color: "#fff", border: "none", borderRadius: "8px",
+              fontWeight: 800, fontSize: "13px", cursor: dlState ? "not-allowed" : "pointer",
+              letterSpacing: "0.3px",
+            }}>
+            {dlState === "png-front" ? `⏳ Saving front… ${dlProgress}` : "⬇ FRONT Cards — PNG"}
+          </button>
+          <button
+            onClick={() => dlHiRes("back")}
+            disabled={!!dlState}
+            style={{
+              padding: "10px 24px", background: dlState === "png-back" ? "#6b7280" : "#7e22ce",
+              color: "#fff", border: "none", borderRadius: "8px",
+              fontWeight: 800, fontSize: "13px", cursor: dlState ? "not-allowed" : "pointer",
+              letterSpacing: "0.3px",
+            }}>
+            {dlState === "png-back" ? `⏳ Saving back… ${dlProgress}` : "⬇ BACK Cards — PNG"}
+          </button>
+          <span style={{ fontSize: "11px", color: "#9ca3af" }}>
+            Each card saves as a separate file • {filtered.length} card{filtered.length !== 1 ? "s" : ""}
+          </span>
+        </div>
+      )}
 
       {filtered.length === 0 ? (
         <div className="no-print" style={{ padding: "60px", textAlign: "center", color: "#888" }}>
