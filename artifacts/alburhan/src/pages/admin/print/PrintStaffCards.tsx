@@ -136,10 +136,10 @@ function StaffCardFront({ s, groupName, photoDataUrls }: { s: StaffMember; group
         </span>
       </div>
 
-      {/* ── MIDDLE: photo LEFT + Kaaba/HAJJ RIGHT ~28mm ── */}
+      {/* ── MIDDLE: photo LEFT + Kaaba/HAJJ RIGHT ~25mm ── */}
       <div style={{
         background: "#f0fdf4", display: "flex", alignItems: "stretch",
-        padding: "1.5mm 2mm 1mm", gap: "2mm", flexShrink: 0, height: "28mm",
+        padding: "1.2mm 2mm 1mm", gap: "2mm", flexShrink: 0, height: "25mm",
       }}>
         {/* Photo */}
         {s.photoUrl ? (
@@ -176,23 +176,22 @@ function StaffCardFront({ s, groupName, photoDataUrls }: { s: StaffMember; group
 
       {/* ── INFO (flex:1) ── */}
       <div style={{
-        background: "#fff", padding: "1.2mm 2.5mm 1mm",
-        flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: "0.8mm",
-        overflow: "hidden",
+        background: "#fff", padding: "1.5mm 2.5mm 1mm",
+        flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-start", gap: "0.7mm",
       }}>
-        {/* Name — allow 2 lines so long names never get cut */}
+        {/* Name — wraps freely, never clipped */}
         <div style={{
-          fontSize: "8.5pt", fontWeight: 900, color: "#111",
+          fontSize: "8pt", fontWeight: 900, color: "#111",
           textTransform: "uppercase", textAlign: "center",
-          lineHeight: 1.1, letterSpacing: "0.5px",
+          lineHeight: 1.15, letterSpacing: "0.4px",
           wordBreak: "break-word",
-          marginBottom: "1.5mm",
+          marginBottom: "0.8mm",
         }}>
           {s.fullName}
         </div>
 
         {/* Gold divider */}
-        <div style={{ height: "0.5mm", background: GOLD, borderRadius: "1px", flexShrink: 0, marginBottom: "1.5mm" }} />
+        <div style={{ height: "0.5mm", background: GOLD, borderRadius: "1px", flexShrink: 0, marginBottom: "0.8mm" }} />
 
         {/* Role */}
         <div style={{
