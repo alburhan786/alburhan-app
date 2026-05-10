@@ -86,13 +86,14 @@ function StaffCardFront({ s, groupName, photoDataUrls }: { s: StaffMember; group
           <div style={{
             fontSize: "11pt", fontWeight: 900, color: "#fff",
             lineHeight: 1.0, letterSpacing: "0.6px", textTransform: "uppercase",
-            marginBottom: "1.2mm",
+            marginBottom: "1.8mm",
           }}>
             {company.nameShort}
           </div>
           <div style={{
             fontSize: "6.5pt", fontWeight: 800, color: GOLD,
             lineHeight: 1.1, letterSpacing: "0.8px",
+            marginBottom: "1.2mm",
           }}>
             TOURS &amp; TRAVELS
           </div>
@@ -105,16 +106,17 @@ function StaffCardFront({ s, groupName, photoDataUrls }: { s: StaffMember; group
         </div>
       </div>
 
-      {/* ── HAJJ 2026 pill — full-width centered row ── */}
+      {/* ── HAJJ 2026 — full-width centered box ── */}
       <div style={{
         background: GREEN, display: "flex", alignItems: "center", justifyContent: "center",
-        padding: "1mm 2mm 1.8mm", flexShrink: 0,
-        borderBottom: `1.5px solid ${GOLD}44`,
+        padding: "1.2mm 2mm 1.8mm", flexShrink: 0,
+        borderBottom: `1.5px solid ${GOLD}55`,
       }}>
         <div style={{
-          background: GOLD, borderRadius: "20px", padding: "0.8mm 6mm",
-          fontSize: "5.5pt", fontWeight: 900, color: GREEN, letterSpacing: "2px",
-          boxShadow: "0 0 0 1px rgba(255,255,255,0.2)",
+          background: GOLD, borderRadius: "4px", padding: "1mm 8mm",
+          fontSize: "6pt", fontWeight: 900, color: GREEN, letterSpacing: "2.5px",
+          border: `1px solid rgba(255,255,255,0.35)`,
+          boxShadow: `0 1px 4px rgba(0,0,0,0.25)`,
         }}>
           HAJJ 2026
         </div>
@@ -184,12 +186,13 @@ function StaffCardFront({ s, groupName, photoDataUrls }: { s: StaffMember; group
           textTransform: "uppercase", textAlign: "center",
           lineHeight: 1.1, letterSpacing: "0.5px",
           wordBreak: "break-word",
+          marginBottom: "1.5mm",
         }}>
           {s.fullName}
         </div>
 
         {/* Gold divider */}
-        <div style={{ height: "0.4mm", background: GOLD, borderRadius: "1px", flexShrink: 0 }} />
+        <div style={{ height: "0.5mm", background: GOLD, borderRadius: "1px", flexShrink: 0, marginBottom: "1.5mm" }} />
 
         {/* Role */}
         <div style={{
@@ -209,21 +212,21 @@ function StaffCardFront({ s, groupName, photoDataUrls }: { s: StaffMember; group
           </div>
         )}
 
-        {/* ID pill */}
+        {/* ID box — centered, full-width */}
         {s.staffId && (
           <div style={{
             display: "flex", alignItems: "center", justifyContent: "center",
-            background: GREEN, borderRadius: "6px", padding: "1.5mm 2mm", flexShrink: 0,
-            border: `1px solid ${GOLD}88`,
-            boxShadow: `0 0 0 2px ${GREEN}33`,
-            margin: "0 0",
+            background: GREEN, borderRadius: "5px", padding: "1.8mm 3mm", flexShrink: 0,
+            border: `1.5px solid ${GOLD}`,
+            margin: "0.5mm 0",
+            width: "100%", boxSizing: "border-box",
           }}>
-            <svg viewBox="0 0 16 12" width="10" height="8" style={{ marginRight: "1.8mm", flexShrink: 0 }}>
+            <svg viewBox="0 0 16 12" width="10" height="8" style={{ marginRight: "2mm", flexShrink: 0 }}>
               <rect x="0.5" y="0.5" width="15" height="11" rx="2" fill="none" stroke={GOLD} strokeWidth="1.3"/>
               <line x1="4" y1="4" x2="12" y2="4" stroke={GOLD} strokeWidth="1.2"/>
               <line x1="4" y1="7.5" x2="10" y2="7.5" stroke={GOLD} strokeWidth="1.2"/>
             </svg>
-            <span style={{ fontSize: "6.5pt", fontWeight: 900, color: "#fff", letterSpacing: "1px", textTransform: "uppercase" }}>
+            <span style={{ fontSize: "7pt", fontWeight: 900, color: "#fff", letterSpacing: "1.2px", textTransform: "uppercase" }}>
               ID NO. : {s.staffId}
             </span>
           </div>
