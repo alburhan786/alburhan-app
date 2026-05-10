@@ -43,6 +43,23 @@ router.get("/download-dist", (_req, res) => {
   }
 });
 
+// Temporary: serve backend API server update for VPS deployment
+router.get("/download-api-update", (_req, res) => {
+  const candidates = [
+    "/home/runner/workspace/api-server-update.tar.gz",
+    path.resolve(process.cwd(), "../../api-server-update.tar.gz"),
+    path.resolve(process.cwd(), "api-server-update.tar.gz"),
+  ];
+  const found = candidates.find(p => fs.existsSync(p));
+  if (found) {
+    res.setHeader("Content-Type", "application/gzip");
+    res.setHeader("Content-Disposition", 'attachment; filename="api-server-update.tar.gz"');
+    res.sendFile(found);
+  } else {
+    res.status(404).json({ error: "API update archive not found", tried: candidates });
+  }
+});
+
 router.use(healthRouter);
 router.use("/auth", authRouter);
 router.use("/packages", packagesRouter);
