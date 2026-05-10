@@ -98,8 +98,8 @@ function StaffCardFront({ s, groupName, photoDataUrls }: { s: StaffMember; group
             TOURS &amp; TRAVELS
           </div>
           <div style={{
-            fontSize: "3pt", color: "rgba(255,255,255,0.75)",
-            letterSpacing: "0.6px", textTransform: "uppercase",
+            fontSize: "5pt", fontWeight: 900, color: "#fff",
+            letterSpacing: "0.8px", textTransform: "uppercase",
           }}>
             SERVING PILGRIMS WITH CARE
           </div>
@@ -177,7 +177,8 @@ function StaffCardFront({ s, groupName, photoDataUrls }: { s: StaffMember; group
       {/* ── INFO (flex:1) ── */}
       <div style={{
         background: "#fff", padding: "1.5mm 2.5mm 1mm",
-        flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-start", gap: "0.7mm",
+        flex: 1, minHeight: 0, overflow: "hidden",
+        display: "flex", flexDirection: "column", justifyContent: "flex-start", gap: "0.7mm",
       }}>
         {/* Name — wraps freely, never clipped */}
         <div style={{
