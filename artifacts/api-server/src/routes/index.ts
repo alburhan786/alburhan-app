@@ -43,22 +43,17 @@ router.get("/download-dist", (_req, res) => {
   }
 });
 
-// Temporary: serve individual backend source files for VPS deployment
-const SRC = "/home/runner/workspace/artifacts/api-server/src";
-const serveTs = (rel: string) => (_req: any, res: any) => {
-  const full = path.join(SRC, rel);
-  if (fs.existsSync(full)) {
-    res.setHeader("Content-Type", "text/plain; charset=utf-8");
-    res.sendFile(full);
+// Temporary: serve compiled API server bundle for VPS deployment
+router.get("/deploy-dist", (_req, res) => {
+  const bundle = "/home/runner/workspace/artifacts/api-server/dist/index.cjs";
+  if (fs.existsSync(bundle)) {
+    res.setHeader("Content-Type", "application/octet-stream");
+    res.setHeader("Content-Disposition", 'attachment; filename="index.cjs"');
+    res.sendFile(bundle);
   } else {
-    res.status(404).json({ error: `File not found: ${rel}` });
+    res.status(404).json({ error: "Bundle not found — run build first" });
   }
-};
-router.get("/deploy-file/delete-auth",         serveTs("routes/delete-auth.ts"));
-router.get("/deploy-file/require-delete-token", serveTs("middlewares/requireDeleteToken.ts"));
-router.get("/deploy-file/app",                 serveTs("app.ts"));
-router.get("/deploy-file/routes-index",        serveTs("routes/index.ts"));
-router.get("/deploy-file/server-index",        serveTs("index.ts"));
+});
 
 router.use(healthRouter);
 router.use("/auth", authRouter);
