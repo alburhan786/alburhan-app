@@ -57,7 +57,7 @@ export function DeleteGuardProvider({ children }: { children: ReactNode }) {
       const data = await res.json();
       if (!res.ok) {
         if (data.locked) startLockout(data.secs ?? 30);
-        setError(data.error || "Authorization failed.");
+        setError(data.error || data.message || "Authorization failed.");
         return;
       }
       setOpen(false);

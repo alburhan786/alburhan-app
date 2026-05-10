@@ -384,7 +384,7 @@ export default function GroupsManager() {
                   </div>
                   <div className="flex items-center gap-1">
                     <Button variant="ghost" size="icon" onClick={() => openEdit(g)}><Edit size={16} /></Button>
-                    <Button variant="ghost" size="icon" className="text-red-600" onClick={() => handleDelete(g.id, g.name)}><Trash2 size={16} /></Button>
+                    <Button variant="ghost" size="icon" className="text-red-600" onClick={() => handleDelete(g.id, g.groupName)}><Trash2 size={16} /></Button>
                   </div>
                 </div>
                 <div className="space-y-1 text-sm text-muted-foreground mb-3">
