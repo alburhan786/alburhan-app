@@ -6,6 +6,7 @@ import session from "express-session";
 import path from "path";
 import fs from "fs";
 import router from "./routes/index.js";
+import { requireDeleteToken } from "./middlewares/requireDeleteToken.js";
 
 const app: Express = express();
 
@@ -57,6 +58,11 @@ app.use(session({
     sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
   },
 }));
+
+app.use("/api", (req, res, next) => {
+  if (req.method === "DELETE") return requireDeleteToken(req, res, next);
+  next();
+});
 
 app.use("/api", router);
 

@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useDeleteGuard } from "@/components/DeleteGuard";
 import { Plus, Edit, Trash2, Users, Eye, Printer, ChevronDown, Hash, Wand2, Save, ChevronUp, ChevronDown as ChevronDownIcon } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -92,6 +93,7 @@ export default function GroupsManager() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const { toast } = useToast();
+  const { requestDelete } = useDeleteGuard();
 
   // Serial number management state
   const [serialEdits, setSerialEdits] = useState<Record<string, number>>({});
@@ -191,13 +193,15 @@ export default function GroupsManager() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Delete this group and all its pilgrims?")) return;
-    try {
-      await fetch(`${API}/api/groups/${id}`, { method: "DELETE", credentials: "include" });
+  const handleDelete = (id: string, name: string) => {
+    requestDelete(`Group: ${name}`, async (token) => {
+      await fetch(`${API}/api/groups/${id}`, {
+        method: "DELETE", credentials: "include",
+        headers: { "X-Delete-Token": token },
+      });
       toast({ title: "Group deleted" });
       fetchGroups();
-    } catch { toast({ title: "Error", variant: "destructive" }); }
+    });
   };
 
   // Auto-number: assign serial numbers sequentially based on serialOrder
@@ -380,7 +384,7 @@ export default function GroupsManager() {
                   </div>
                   <div className="flex items-center gap-1">
                     <Button variant="ghost" size="icon" onClick={() => openEdit(g)}><Edit size={16} /></Button>
-                    <Button variant="ghost" size="icon" className="text-red-600" onClick={() => handleDelete(g.id)}><Trash2 size={16} /></Button>
+                    <Button variant="ghost" size="icon" className="text-red-600" onClick={() => handleDelete(g.id, g.name)}><Trash2 size={16} /></Button>
                   </div>
                 </div>
                 <div className="space-y-1 text-sm text-muted-foreground mb-3">

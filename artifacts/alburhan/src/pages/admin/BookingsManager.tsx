@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
-import { useListBookings, useApproveBooking, useRejectBooking, useListDocuments, useDeleteDocument } from "@workspace/api-client-react";
+import { useListBookings, useApproveBooking, useRejectBooking, useListDocuments } from "@workspace/api-client-react";
+import { useDeleteGuard } from "@/components/DeleteGuard";
 import type { Booking, Pilgrim } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -53,8 +54,8 @@ function AdminDocumentsSection({ bookingId }: { bookingId: string }) {
   const { data: docs, isLoading, refetch } = useListDocuments(bookingId, {
     query: { refetchOnMount: "always" },
   });
-  const deleteDoc = useDeleteDocument();
   const { toast } = useToast();
+  const { requestDelete } = useDeleteGuard();
   const queryClient = useQueryClient();
 
   const [uploading, setUploading] = useState(false);
@@ -62,15 +63,16 @@ function AdminDocumentsSection({ bookingId }: { bookingId: string }) {
   const [file, setFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const handleDelete = async (docId: string, fileName: string) => {
-    if (!confirm(`Delete "${fileName}"? This cannot be undone.`)) return;
-    try {
-      await deleteDoc.mutateAsync({ id: docId });
+  const handleDelete = (docId: string, fileName: string) => {
+    requestDelete(`Document: ${fileName}`, async (token) => {
+      const res = await fetch(`${BASE_API}/api/documents/${docId}`, {
+        method: "DELETE", credentials: "include",
+        headers: { "X-Delete-Token": token },
+      });
+      if (!res.ok) throw new Error("Could not delete document");
       queryClient.invalidateQueries({ queryKey: [`/api/documents/${bookingId}`] });
       toast({ title: "Document deleted" });
-    } catch {
-      toast({ title: "Error", description: "Could not delete document", variant: "destructive" });
-    }
+    });
   };
 
   const handleUpload = async () => {
@@ -236,6 +238,7 @@ function getBalanceColor(remaining: number, finalAmount: number): string {
 
 function AdminPaymentLedger({ booking }: { booking: BookingWithAmounts }) {
   const { toast } = useToast();
+  const { requestDelete } = useDeleteGuard();
   const queryClient = useQueryClient();
 
   const [entries, setEntries] = useState<PaymentEntry[]>([]);
@@ -321,12 +324,12 @@ function AdminPaymentLedger({ booking }: { booking: BookingWithAmounts }) {
     }
   };
 
-  const handleDelete = async (txnId: string) => {
-    if (!confirm("Delete this payment entry? The booking balance will be recalculated.")) return;
-    try {
+  const handleDelete = (txnId: string) => {
+    requestDelete("Payment entry (balance will be recalculated)", async (token) => {
       const res = await fetch(`${API}/api/admin/bookings/${booking.id}/payments/${txnId}`, {
         method: "DELETE",
         credentials: "include",
+        headers: { "X-Delete-Token": token },
       });
       const data = (await res.json()) as { message?: string; booking?: { paidAmount?: number } };
       if (!res.ok) throw new Error(data.message ?? "Failed to delete payment entry");
@@ -336,10 +339,7 @@ function AdminPaymentLedger({ booking }: { booking: BookingWithAmounts }) {
       toast({ title: "Payment entry deleted" });
       fetchEntries();
       queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to delete";
-      toast({ title: "Error", description: msg, variant: "destructive" });
-    }
+    });
   };
 
   const handleSendPaymentLink = async () => {

@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
-import { useListPackages, useCreatePackage, useUpdatePackage, useDeletePackage } from "@workspace/api-client-react";
+import { useListPackages, useCreatePackage, useUpdatePackage } from "@workspace/api-client-react";
+import { useDeleteGuard } from "@/components/DeleteGuard";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -28,9 +29,9 @@ export default function PackagesManager() {
   const { data: packages = [], isLoading } = useListPackages();
   const createMutation = useCreatePackage();
   const updateMutation = useUpdatePackage();
-  const deleteMutation = useDeletePackage();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { requestDelete } = useDeleteGuard();
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -169,15 +170,19 @@ export default function PackagesManager() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this package?")) return;
-    try {
-      await deleteMutation.mutateAsync({ id });
+  const handleDelete = (id: string, name?: string) => {
+    requestDelete(`Package${name ? `: ${name}` : ""}`, async (token) => {
+      const res = await fetch(`${BASE_API}/api/packages/${id}`, {
+        method: "DELETE", credentials: "include",
+        headers: { "X-Delete-Token": token },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Delete failed");
+      }
       toast({ title: "Package deleted" });
-      queryClient.invalidateQueries({ queryKey: ['/api/packages'] });
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    }
+      queryClient.invalidateQueries({ queryKey: ["/api/packages"] });
+    });
   };
 
   const loadGallery = async (pkgId: string) => {
@@ -212,18 +217,17 @@ export default function PackagesManager() {
     } finally { setGalleryUploading(false); }
   };
 
-  const deleteGalleryItem = async (mediaId: string) => {
+  const deleteGalleryItem = (mediaId: string) => {
     if (!mediaPkg) return;
-    try {
+    requestDelete("Package media item", async (token) => {
       const res = await fetch(`${BASE_API}/api/packages/${mediaPkg.id}/gallery/${mediaId}`, {
         method: "DELETE", credentials: "include",
+        headers: { "X-Delete-Token": token },
       });
       if (!res.ok) throw new Error("Delete failed");
       setGallery(prev => prev.filter(m => m.id !== mediaId));
       toast({ title: "Removed from gallery" });
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    }
+    });
   };
 
   const uploadMedia = async (file: File, type: "image" | "video") => {
@@ -1013,7 +1017,7 @@ export default function PackagesManager() {
                       <Images size={12} /> Media
                     </Button>
                     <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-700 hover:bg-red-50 px-2"
-                      onClick={() => handleDelete(pkg.id)}>
+                      onClick={() => handleDelete(pkg.id, pkg.name)}>
                       <Trash2 size={14} />
                     </Button>
                   </div>

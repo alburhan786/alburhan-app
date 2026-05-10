@@ -65,6 +65,7 @@ import ScanPilgrim from "@/pages/public/ScanPilgrim";
 import NotFound from "@/pages/not-found";
 import { useAuth } from "@/hooks/use-auth";
 import { MainLayout } from "@/components/layout/MainLayout";
+import { DeleteGuardProvider } from "@/components/DeleteGuard";
 
 const queryClient = new QueryClient();
 
@@ -169,10 +170,12 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
-        </WouterRouter>
-        <Toaster />
+        <DeleteGuardProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <Router />
+          </WouterRouter>
+          <Toaster />
+        </DeleteGuardProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );

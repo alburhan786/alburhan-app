@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Upload, Trash2, Eye, EyeOff, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useDeleteGuard } from "@/components/DeleteGuard";
 
 const API_BASE = import.meta.env.VITE_API_URL || "";
 
@@ -23,6 +24,7 @@ export default function GalleryManager() {
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const { requestDelete } = useDeleteGuard();
 
   const fetchImages = useCallback(async () => {
     try {
@@ -73,19 +75,16 @@ export default function GalleryManager() {
     }
   };
 
-  const deleteImage = async (id: string) => {
-    if (!confirm("Delete this image?")) return;
-    try {
+  const deleteImage = (id: string, title?: string | null) => {
+    requestDelete(`Image${title ? `: ${title}` : ""}`, async (token) => {
       const res = await fetch(`${API_BASE}/api/gallery/${id}`, {
-        method: "DELETE",
-        credentials: "include",
+        method: "DELETE", credentials: "include",
+        headers: { "X-Delete-Token": token },
       });
       if (!res.ok) throw new Error("Delete failed");
       toast({ title: "Image deleted" });
       fetchImages();
-    } catch {
-      toast({ title: "Failed to delete", variant: "destructive" });
-    }
+    });
   };
 
   return (
@@ -157,7 +156,7 @@ export default function GalleryManager() {
                     size="sm"
                     variant="outline"
                     className="rounded-lg text-xs text-red-600 hover:bg-red-50 hover:text-red-700"
-                    onClick={() => deleteImage(img.id)}
+                    onClick={() => deleteImage(img.id, img.title)}
                   >
                     <Trash2 className="w-3 h-3" />
                   </Button>

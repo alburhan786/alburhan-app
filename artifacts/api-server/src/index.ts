@@ -10,7 +10,24 @@ async function runMigrations() {
     await db.execute(sql`ALTER TABLE pilgrims ADD COLUMN IF NOT EXISTS barcode_id TEXT`);
     console.log("[Migration] barcode_id column ensured");
   } catch (err) {
-    console.error("[Migration] Failed:", err);
+    console.error("[Migration] barcode_id failed:", err);
+  }
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS delete_audit_log (
+        id SERIAL PRIMARY KEY,
+        action TEXT NOT NULL,
+        item_type TEXT NOT NULL,
+        item_id TEXT NOT NULL,
+        deleted_by TEXT NOT NULL,
+        ip_address TEXT NOT NULL,
+        success BOOLEAN NOT NULL DEFAULT false,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    console.log("[Migration] delete_audit_log table ensured");
+  } catch (err) {
+    console.error("[Migration] delete_audit_log failed:", err);
   }
 }
 

@@ -22,6 +22,7 @@ import feedbackRouter from "./feedback.js";
 import staffRouter from "./staff.js";
 import verifyRouter from "./verify.js";
 import scanRouter from "./scan.js";
+import deleteAuthRouter from "./delete-auth.js";
 
 const router: IRouter = Router();
 
@@ -62,6 +63,7 @@ router.use("/feedback", feedbackRouter);
 router.use("/staff", staffRouter);
 router.use("/verify", verifyRouter);
 router.use("/scan", scanRouter);
+router.use("/delete-auth", deleteAuthRouter);
 router.use(storageRouter);
 
 export default router;

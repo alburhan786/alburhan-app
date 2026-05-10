@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useDeleteGuard } from "@/components/DeleteGuard";
 import { Plus, Edit, Trash2, Printer, UserCheck, Upload, Camera } from "lucide-react";
 import { Link } from "wouter";
 import { COMPANIES } from "@/lib/companies";
@@ -87,6 +88,7 @@ export default function StaffManager() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadTargetId, setUploadTargetId] = useState<string | null>(null);
   const { toast } = useToast();
+  const { requestDelete } = useDeleteGuard();
 
   const fetchData = useCallback(async () => {
     try {
@@ -160,13 +162,15 @@ export default function StaffManager() {
     }
   };
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Delete ${name}? This cannot be undone.`)) return;
-    try {
-      await fetch(`${API}/api/staff/${id}`, { method: "DELETE", credentials: "include" });
+  const handleDelete = (id: string, name: string) => {
+    requestDelete(`Staff: ${name}`, async (token) => {
+      await fetch(`${API}/api/staff/${id}`, {
+        method: "DELETE", credentials: "include",
+        headers: { "X-Delete-Token": token },
+      });
       toast({ title: "Staff member deleted" });
       fetchData();
-    } catch { toast({ title: "Error deleting", variant: "destructive" }); }
+    });
   };
 
   const triggerPhotoUpload = (staffId: string) => {

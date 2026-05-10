@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useDeleteGuard } from "@/components/DeleteGuard";
 import { Plus, Edit, Trash2, ArrowLeft, Upload, Printer, CreditCard, Luggage, Heart,
   Building2, Bus, DoorOpen, FileDown, Hotel, BedDouble, Users, Wand2, X, AlertTriangle, Sticker, Layers } from "lucide-react";
 import { Link, useRoute } from "wouter";
@@ -134,6 +135,7 @@ export default function PilgrimManager() {
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const { toast } = useToast();
+  const { requestDelete } = useDeleteGuard();
 
   const [roomDialogOpen, setRoomDialogOpen] = useState(false);
   const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
@@ -258,13 +260,15 @@ export default function PilgrimManager() {
     } catch { toast({ title: "Error saving pilgrim", variant: "destructive" }); }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Delete this pilgrim?")) return;
-    try {
-      await fetch(`${API}/api/groups/${groupId}/pilgrims/${id}`, { method: "DELETE", credentials: "include" });
+  const handleDelete = (id: string, name?: string) => {
+    requestDelete(`Pilgrim${name ? `: ${name}` : ""}`, async (token) => {
+      await fetch(`${API}/api/groups/${groupId}/pilgrims/${id}`, {
+        method: "DELETE", credentials: "include",
+        headers: { "X-Delete-Token": token },
+      });
       toast({ title: "Pilgrim deleted" });
       fetchData();
-    } catch { toast({ title: "Error", variant: "destructive" }); }
+    });
   };
 
   const handlePhotoUpload = async (pilgrimId: string, file: File) => {
@@ -658,7 +662,7 @@ export default function PilgrimManager() {
                           <Printer size={14} />
                         </Button>
                         <Button variant="ghost" size="icon" onClick={() => openEdit(p)}><Edit size={14} /></Button>
-                        <Button variant="ghost" size="icon" className="text-red-600" onClick={() => handleDelete(p.id)}><Trash2 size={14} /></Button>
+                        <Button variant="ghost" size="icon" className="text-red-600" onClick={() => handleDelete(p.id, p.fullName)}><Trash2 size={14} /></Button>
                       </div>
                     </td>
                   </tr>
