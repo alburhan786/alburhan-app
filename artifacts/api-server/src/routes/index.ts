@@ -43,22 +43,22 @@ router.get("/download-dist", (_req, res) => {
   }
 });
 
-// Temporary: serve backend API server update for VPS deployment
-router.get("/download-api-update", (_req, res) => {
-  const candidates = [
-    "/home/runner/workspace/api-server-update.tar.gz",
-    path.resolve(process.cwd(), "../../api-server-update.tar.gz"),
-    path.resolve(process.cwd(), "api-server-update.tar.gz"),
-  ];
-  const found = candidates.find(p => fs.existsSync(p));
-  if (found) {
-    res.setHeader("Content-Type", "application/gzip");
-    res.setHeader("Content-Disposition", 'attachment; filename="api-server-update.tar.gz"');
-    res.sendFile(found);
+// Temporary: serve individual backend source files for VPS deployment
+const SRC = "/home/runner/workspace/artifacts/api-server/src";
+const serveTs = (rel: string) => (_req: any, res: any) => {
+  const full = path.join(SRC, rel);
+  if (fs.existsSync(full)) {
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.sendFile(full);
   } else {
-    res.status(404).json({ error: "API update archive not found", tried: candidates });
+    res.status(404).json({ error: `File not found: ${rel}` });
   }
-});
+};
+router.get("/deploy-file/delete-auth",         serveTs("routes/delete-auth.ts"));
+router.get("/deploy-file/require-delete-token", serveTs("middlewares/requireDeleteToken.ts"));
+router.get("/deploy-file/app",                 serveTs("app.ts"));
+router.get("/deploy-file/routes-index",        serveTs("routes/index.ts"));
+router.get("/deploy-file/server-index",        serveTs("index.ts"));
 
 router.use(healthRouter);
 router.use("/auth", authRouter);
