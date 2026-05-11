@@ -176,27 +176,27 @@ function StaffCardFront({ s, groupName, photoDataUrls }: { s: StaffMember; group
 
       {/* ── INFO (flex:1) ── */}
       <div style={{
-        background: "#fff", padding: "1.5mm 2.5mm 1mm",
+        background: "#fff", padding: "1mm 2.5mm 0.5mm",
         flex: 1, minHeight: 0, overflow: "hidden",
-        display: "flex", flexDirection: "column", justifyContent: "flex-start", gap: "0.7mm",
+        display: "flex", flexDirection: "column", justifyContent: "flex-start", gap: "0.4mm",
       }}>
-        {/* Name — wraps freely, never clipped */}
+        {/* Name */}
         <div style={{
-          fontSize: "8pt", fontWeight: 900, color: "#111",
+          fontSize: "7pt", fontWeight: 900, color: "#111",
           textTransform: "uppercase", textAlign: "center",
-          lineHeight: 1.15, letterSpacing: "0.4px",
+          lineHeight: 1.15, letterSpacing: "0.3px",
           wordBreak: "break-word",
-          marginBottom: "0.8mm",
+          marginBottom: "0.4mm",
         }}>
           {s.fullName}
         </div>
 
         {/* Gold divider */}
-        <div style={{ height: "0.5mm", background: GOLD, borderRadius: "1px", flexShrink: 0, marginBottom: "0.8mm" }} />
+        <div style={{ height: "0.5mm", background: GOLD, borderRadius: "1px", flexShrink: 0, marginBottom: "0.4mm" }} />
 
         {/* Role */}
         <div style={{
-          fontSize: "5pt", fontWeight: 700, color: "#444",
+          fontSize: "4.5pt", fontWeight: 700, color: "#444",
           textAlign: "center", lineHeight: 1.3, wordBreak: "break-word",
         }}>
           ROLE : <span style={{ color: GREEN, fontWeight: 900 }}>{roleLabel}</span>
@@ -205,38 +205,28 @@ function StaffCardFront({ s, groupName, photoDataUrls }: { s: StaffMember; group
         {/* Designation */}
         {s.designation && (
           <div style={{
-            fontSize: "5pt", fontWeight: 700, color: "#444",
+            fontSize: "4.5pt", fontWeight: 700, color: "#444",
             textAlign: "center", lineHeight: 1.3, wordBreak: "break-word",
           }}>
-            DESIGNATION : <span style={{ color: GREEN, fontWeight: 900 }}>{s.designation.toUpperCase()}</span>
+            DESIG : <span style={{ color: GREEN, fontWeight: 900 }}>{s.designation.toUpperCase()}</span>
           </div>
         )}
 
-        {/* ID box — stacked to prevent long IDs from cutting */}
+        {/* ID box — stacked, always fully visible */}
         {s.staffId && (
           <div style={{
             display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-            background: GREEN, borderRadius: "5px", padding: "1.5mm 2mm", flexShrink: 0,
+            background: GREEN, borderRadius: "5px", padding: "1mm 2mm", flexShrink: 0,
             border: `1.5px solid ${GOLD}`,
-            margin: "0.5mm 0",
+            margin: "0.4mm 0",
             width: "100%", boxSizing: "border-box",
           }}>
-            <span style={{ fontSize: "4pt", fontWeight: 700, color: GOLD, letterSpacing: "1px", textTransform: "uppercase", lineHeight: 1.2 }}>
+            <span style={{ fontSize: "3.5pt", fontWeight: 700, color: GOLD, letterSpacing: "1px", textTransform: "uppercase", lineHeight: 1.2 }}>
               ID NO.
             </span>
-            <span style={{ fontSize: "7pt", fontWeight: 900, color: "#fff", letterSpacing: "0.5px", textTransform: "uppercase", lineHeight: 1.3, textAlign: "center", wordBreak: "break-all" }}>
+            <span style={{ fontSize: "7pt", fontWeight: 900, color: "#fff", letterSpacing: "0.3px", textTransform: "uppercase", lineHeight: 1.25, textAlign: "center", wordBreak: "break-all" }}>
               {s.staffId}
             </span>
-          </div>
-        )}
-
-        {/* Group */}
-        {groupName && (
-          <div style={{
-            fontSize: "4.5pt", color: "#555", textAlign: "center", lineHeight: 1.2,
-            wordBreak: "break-word",
-          }}>
-            GROUP : <span style={{ fontWeight: 800, color: "#333" }}>{groupName}</span>
           </div>
         )}
       </div>
