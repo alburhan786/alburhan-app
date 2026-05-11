@@ -81,29 +81,28 @@ function FrontCard({ p, group, company, photoDataUrl }: { p:Pilgrim; group:Group
   return (
     <div className="id-card" style={{ width:"54mm", height:"85mm" }}>
       <WaveShapes />
-      {/* Main content — stops before footer */}
-      <div style={{ position:"relative", zIndex:1, display:"flex", flexDirection:"column", padding:"2mm 3mm 0", height:"52mm" }}>
+      {/* Main content — name ABOVE photo so it's never pushed out */}
+      <div style={{ position:"relative", zIndex:1, display:"flex", flexDirection:"column", padding:"2mm 3mm 0" }}>
         <LogoHeader company={company} />
 
-        {/* Photo — passport style, larger */}
-        <div style={{ display:"flex", justifyContent:"center", marginTop:"1.5mm", marginBottom:"1.5mm" }}>
+        {/* Name + year — above photo so long names never get hidden */}
+        <div style={{ textAlign:"center", margin:"1.5mm 0 1.5mm" }}>
+          <div style={{ fontSize:"7pt", fontWeight:900, color:DARK, textTransform:"uppercase", lineHeight:1.2, wordBreak:"break-word" }}>{p.fullName || "—"}</div>
+          <div style={{ fontSize:"4.5pt", color:GOLD, fontWeight:700, marginTop:"0.8mm", letterSpacing:"0.5px" }}>HAJJ {group.year}</div>
+        </div>
+
+        {/* Photo — passport style */}
+        <div style={{ display:"flex", justifyContent:"center", marginBottom:"1mm" }}>
           {photoSrc
-            ? <img src={photoSrc} alt="" style={{ width:"28mm", height:"32mm", objectFit:"cover", objectPosition:"top center", borderRadius:"4px", border:`3px solid ${GOLD}`, boxShadow:`0 0 0 1.5px ${DARK}`, WebkitPrintColorAdjust:"exact", printColorAdjust:"exact" } as React.CSSProperties} />
-            : <div style={{ width:"28mm", height:"32mm", background:"#f0f0f0", borderRadius:"4px", border:`3px solid ${GOLD}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"5pt", color:"#aaa", fontWeight:600 }}>PHOTO</div>
+            ? <img src={photoSrc} alt="" style={{ width:"28mm", height:"30mm", objectFit:"cover", objectPosition:"top center", borderRadius:"4px", border:`3px solid ${GOLD}`, boxShadow:`0 0 0 1.5px ${DARK}`, WebkitPrintColorAdjust:"exact", printColorAdjust:"exact" } as React.CSSProperties} />
+            : <div style={{ width:"28mm", height:"30mm", background:"#f0f0f0", borderRadius:"4px", border:`3px solid ${GOLD}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"5pt", color:"#aaa", fontWeight:600 }}>PHOTO</div>
           }
         </div>
 
-        {/* Name + year */}
-        <div style={{ textAlign:"center", marginBottom:"1.5mm" }}>
-          <div style={{ fontSize:"7.5pt", fontWeight:900, color:DARK, textTransform:"uppercase", lineHeight:1.2, wordBreak:"break-word" }}>{p.fullName || "—"}</div>
-          <div style={{ fontSize:"5pt", color:GOLD, fontWeight:700, marginTop:"0.5mm" }}>HAJJ {group.year}</div>
-        </div>
-
-        {/* Info rows */}
-        <div style={{ display:"flex", flexDirection:"column", gap:"1mm", fontSize:"5pt", paddingLeft:"1mm" }}>
-          <div><span style={{ color:"#888", fontSize:"4pt" }}>Serial: </span><span style={{ fontWeight:700, color:DARK }}>#{String(p.serialNumber).padStart(3,"0")}</span></div>
-          <div><span style={{ color:"#888", fontSize:"4pt" }}>Passport: </span><span style={{ fontWeight:600, fontFamily:"monospace" }}>{p.passportNumber||"—"}</span></div>
-          <div><span style={{ color:"#888", fontSize:"4pt" }}>Mobile: </span><span style={{ fontWeight:600 }}>{p.mobileIndia||"—"}</span></div>
+        {/* Serial + passport compact row */}
+        <div style={{ textAlign:"center", fontSize:"4pt", color:"#555", lineHeight:1.5 }}>
+          <span style={{ fontWeight:700, color:DARK }}>#{String(p.serialNumber).padStart(3,"0")}</span>
+          {p.passportNumber && <span style={{ marginLeft:"2mm", fontFamily:"monospace", color:"#666" }}>{p.passportNumber}</span>}
         </div>
       </div>
 
