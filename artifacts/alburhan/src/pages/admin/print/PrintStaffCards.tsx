@@ -212,22 +212,20 @@ function StaffCardFront({ s, groupName, photoDataUrls }: { s: StaffMember; group
           </div>
         )}
 
-        {/* ID box — centered, full-width */}
+        {/* ID box — stacked to prevent long IDs from cutting */}
         {s.staffId && (
           <div style={{
-            display: "flex", alignItems: "center", justifyContent: "center",
-            background: GREEN, borderRadius: "5px", padding: "1.8mm 3mm", flexShrink: 0,
+            display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+            background: GREEN, borderRadius: "5px", padding: "1.5mm 2mm", flexShrink: 0,
             border: `1.5px solid ${GOLD}`,
             margin: "0.5mm 0",
             width: "100%", boxSizing: "border-box",
           }}>
-            <svg viewBox="0 0 16 12" width="10" height="8" style={{ marginRight: "2mm", flexShrink: 0 }}>
-              <rect x="0.5" y="0.5" width="15" height="11" rx="2" fill="none" stroke={GOLD} strokeWidth="1.3"/>
-              <line x1="4" y1="4" x2="12" y2="4" stroke={GOLD} strokeWidth="1.2"/>
-              <line x1="4" y1="7.5" x2="10" y2="7.5" stroke={GOLD} strokeWidth="1.2"/>
-            </svg>
-            <span style={{ fontSize: "7pt", fontWeight: 900, color: "#fff", letterSpacing: "1.2px", textTransform: "uppercase" }}>
-              ID NO. : {s.staffId}
+            <span style={{ fontSize: "4pt", fontWeight: 700, color: GOLD, letterSpacing: "1px", textTransform: "uppercase", lineHeight: 1.2 }}>
+              ID NO.
+            </span>
+            <span style={{ fontSize: "7pt", fontWeight: 900, color: "#fff", letterSpacing: "0.5px", textTransform: "uppercase", lineHeight: 1.3, textAlign: "center", wordBreak: "break-all" }}>
+              {s.staffId}
             </span>
           </div>
         )}
@@ -312,19 +310,19 @@ function StaffCardBack({ s, groupName }: { s: StaffMember; groupName?: string })
         </div>
       </div>
 
-      {/* ── STAFF IDENTITY CARD pill banner ~7mm ── */}
+      {/* ── STAFF IDENTITY CARD full-width banner ── */}
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "center",
-        padding: "1.5mm 2mm", flexShrink: 0,
-        borderTop: `1px solid ${GOLD}44`, borderBottom: `1px solid ${GOLD}44`,
-        background: "#fff",
+        padding: "2mm 2.5mm", flexShrink: 0,
+        background: GOLD,
+        borderTop: `1px solid ${GOLD}`, borderBottom: `1px solid rgba(0,0,0,0.15)`,
       }}>
-        <div style={{
-          background: GREEN, borderRadius: "20px", padding: "0.8mm 5mm",
-          fontSize: "5pt", fontWeight: 900, color: "#fff", letterSpacing: "1.5px",
+        <span style={{
+          fontSize: "7pt", fontWeight: 900, color: GREEN,
+          letterSpacing: "2px", textTransform: "uppercase",
         }}>
           STAFF IDENTITY CARD
-        </div>
+        </span>
       </div>
 
       {/* ── QR LEFT + DETAILS RIGHT (side by side) ── */}
@@ -350,21 +348,26 @@ function StaffCardBack({ s, groupName }: { s: StaffMember; groupName?: string })
 
         {/* Details table */}
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "1mm", minWidth: 0 }}>
-          {rows.map(([label, value], i) => (
-            <div key={i} style={{ display: "flex", gap: "0.8mm", alignItems: "flex-start" }}>
-              <span style={{
-                fontSize: "3.2pt", fontWeight: 900, color: GREEN,
-                width: "14mm", flexShrink: 0, letterSpacing: "0.1px", lineHeight: 1.3,
-              }}>{label}</span>
-              <span style={{ fontSize: "3.2pt", color: "#888", flexShrink: 0, lineHeight: 1.3 }}>:</span>
-              <span style={{
-                fontSize: "3.2pt", lineHeight: 1.3,
-                fontWeight: label === "ID NO." ? 900 : label === "NAME" ? 800 : 700,
-                color: label === "BLOOD GROUP" ? "#b91c1c" : label === "ID NO." ? GREEN : "#111",
-                flex: 1, minWidth: 0, wordBreak: "break-word",
-              }}>{value}</span>
-            </div>
-          ))}
+          {rows.map(([label, value], i) => {
+            const isName = label === "NAME";
+            const isId   = label === "ID NO.";
+            const isBlood = label === "BLOOD GROUP";
+            return (
+              <div key={i} style={{ display: "flex", gap: "0.8mm", alignItems: "flex-start" }}>
+                <span style={{
+                  fontSize: isName ? "4pt" : "3.2pt", fontWeight: 900, color: GREEN,
+                  width: "14mm", flexShrink: 0, letterSpacing: "0.1px", lineHeight: 1.3,
+                }}>{label}</span>
+                <span style={{ fontSize: isName ? "4pt" : "3.2pt", color: "#888", flexShrink: 0, lineHeight: 1.3 }}>:</span>
+                <span style={{
+                  fontSize: isName ? "4.5pt" : "3.2pt", lineHeight: 1.3,
+                  fontWeight: isName || isId ? 900 : 700,
+                  color: isBlood ? "#b91c1c" : isId ? GREEN : "#111",
+                  flex: 1, minWidth: 0, wordBreak: "break-word",
+                }}>{value}</span>
+              </div>
+            );
+          })}
         </div>
       </div>
 
