@@ -418,7 +418,21 @@ export default function PrintIdCards() {
           display: grid;
           grid-template-columns: repeat(3, 54mm);
           grid-template-rows: repeat(3, 85mm);
-          gap: 0;
+          gap: 3mm;
+        }
+        /* Each cell shows a dashed cutting guide around the card */
+        .g9-cell {
+          position: relative;
+          width: 54mm;
+          height: 85mm;
+          border: 0.6px dashed rgba(160,160,160,0.7);
+          overflow: hidden;
+          box-sizing: border-box;
+        }
+        .g9-cell .id-card {
+          width: 100% !important;
+          height: 100% !important;
+          border: none !important;
         }
         .g9-label {
           position: absolute;
@@ -592,10 +606,13 @@ export default function PrintIdCards() {
                       FRONT — Sheet {pi + 1} of {g9Pages.length} &nbsp;({pg.length} cards)
                     </div>
                     <div className="g9-grid">
-                      {pad(pg).map((p, i) => p
-                        ? <FrontCard key={p.id} p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} photoDataUrls={photoDataUrls} />
-                        : <div key={`empty-${i}`} className="id-card" style={{ background: "#f9fafb", border: "0.5px dashed #ddd" }} />
-                      )}
+                      {pad(pg).map((p, i) => (
+                        <div key={p ? p.id : `ef-${i}`} className="g9-cell">
+                          {p
+                            ? <FrontCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} photoDataUrls={photoDataUrls} />
+                            : <div className="id-card" style={{ background: "#f9fafb" }} />}
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))}
@@ -606,10 +623,13 @@ export default function PrintIdCards() {
                       BACK — Sheet {pi + 1} of {g9Pages.length} &nbsp;(same position as front)
                     </div>
                     <div className="g9-grid">
-                      {pad(pg).map((p, i) => p
-                        ? <BackCard key={p.id} p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
-                        : <div key={`empty-${i}`} className="id-card" style={{ background: "#f9fafb", border: "0.5px dashed #ddd" }} />
-                      )}
+                      {pad(pg).map((p, i) => (
+                        <div key={p ? p.id : `eb-${i}`} className="g9-cell">
+                          {p
+                            ? <BackCard p={p} group={group} company={company} showFeedbackQr={showFeedbackQr} bookingMap={bookingMap} />
+                            : <div className="id-card" style={{ background: "#f9fafb" }} />}
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))}
