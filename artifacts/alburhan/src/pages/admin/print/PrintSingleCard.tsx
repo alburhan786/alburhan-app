@@ -37,7 +37,7 @@ function buildVerifyUrl(id: string) {
 function CardHeader({ company }: { company: CompanyInfo }) {
   return (
     <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"2.5mm 2.5mm 0", position:"relative", zIndex:1 }}>
-      <div style={{ fontSize:"16pt", lineHeight:1, flexShrink:0 }}>🇮🇳</div>
+      <div style={{ fontSize:"24pt", lineHeight:1, flexShrink:0 }}>🇮🇳</div>
       <div style={{ flex:1, textAlign:"center", padding:"0 1mm" }}>
         <div style={{ fontSize:"10pt", fontWeight:900, color:DARK, letterSpacing:"0.5px", lineHeight:1.1 }}>{company.nameShort}</div>
         <div style={{ fontSize:"4.5pt", fontWeight:700, color:GOLD, letterSpacing:"0.5px", lineHeight:1.3 }}>TOURS & TRAVELS</div>
@@ -128,8 +128,9 @@ function FrontCard({ p, group, company, photoDataUrl }: { p:Pilgrim; group:Group
             : <div style={{ fontSize:"4pt", color:"#999", textAlign:"center", padding:"2mm 0" }}>{group.groupName}</div>
           }
         </div>
-        <div style={{ background:DARK, color:GOLD, padding:"1.2mm 2mm", fontSize:"3.2pt", textAlign:"center", fontWeight:800, letterSpacing:"0.2px", lineHeight:1.5, WebkitPrintColorAdjust:"exact", printColorAdjust:"exact" } as React.CSSProperties}>
-          {company.name} | 🇮🇳 {company.phone} | ☎ {company.phoneSaudi}
+        <div style={{ background:DARK, padding:"1.5mm 2mm", textAlign:"center", lineHeight:1.6, WebkitPrintColorAdjust:"exact", printColorAdjust:"exact" } as React.CSSProperties}>
+          <div style={{ color:"#fff", fontSize:"4pt", fontWeight:900, letterSpacing:"0.3px" }}>{company.name}</div>
+          <div style={{ color:"#fff", fontSize:"4pt", fontWeight:800, marginTop:"0.3mm" }}>🇮🇳 {company.phone} | ☎ {company.phoneSaudi}</div>
         </div>
       </div>
     </div>
