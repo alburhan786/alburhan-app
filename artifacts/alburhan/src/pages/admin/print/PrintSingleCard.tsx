@@ -322,8 +322,10 @@ export default function PrintSingleCard() {
 
   /* Download one side as PDF or PNG */
   const dl = async (dlSide:"front"|"back", fmt:"pdf"|"png") => {
-    const el = dlSide === "front" ? frontRef.current : backRef.current;
-    if (!el || !pilgrim) return;
+    const pageEl = dlSide === "front" ? frontRef.current : backRef.current;
+    if (!pageEl || !pilgrim) return;
+    /* Capture only the .id-card element — excludes A4 white space, crop marks, cut guide */
+    const el = (pageEl.querySelector(".id-card") as HTMLElement) ?? pageEl;
     const key = `${dlSide}-${fmt}`;
     setDlState(key);
     const slug = pilgrim.fullName.replace(/[^a-z0-9]/gi,"-").toLowerCase();
