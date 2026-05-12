@@ -57,6 +57,7 @@ import StaffManager from "@/pages/admin/StaffManager";
 import PrintStaffCards from "@/pages/admin/print/PrintStaffCards";
 import PrintSprayLabel from "@/pages/admin/print/PrintSprayLabel";
 import PrintSingleCard from "@/pages/admin/print/PrintSingleCard";
+import PrintSheetCards from "@/pages/admin/print/PrintSheetCards";
 import PrintSingleCardPro from "@/pages/admin/print/PrintSingleCardPro";
 import PrintIdCardSVG from "@/pages/admin/print/PrintIdCardSVG";
 import StaffVerify from "@/pages/public/StaffVerify";
@@ -125,6 +126,7 @@ function Router() {
       <Route path="/admin/gallery" component={() => <AdminRoute component={GalleryManager} />} />
       <Route path="/admin/groups" component={() => <AdminRoute component={GroupsManager} />} />
       <Route path="/admin/groups/:groupId/pilgrims" component={() => <AdminRoute component={PilgrimManager} />} />
+      <Route path="/admin/groups/:groupId/print/id-card-sheet" component={() => <AdminRoute component={PrintSheetCards} />} />
       <Route path="/admin/groups/:groupId/print/id-cards" component={() => <AdminRoute component={PrintIdCards} />} />
       <Route path="/admin/groups/:groupId/print/id-cards-pro" component={() => <AdminRoute component={PrintIdCardsPro} />} />
       <Route path="/admin/groups/:groupId/print/id-cards-duplex" component={() => <AdminRoute component={PrintIdCardsDuplex} />} />
