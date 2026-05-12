@@ -110,22 +110,22 @@ function FrontCard({ p, group, company, photoDataUrl, barcodeDataUrl }: { p:Pilg
         <div style={{ flex:1, minWidth:0, display:"flex", flexDirection:"column", gap:"1.8mm" }}>
           <div style={{ display:"flex", alignItems:"flex-start", gap:"1.5mm" }}>
             <div style={dot} />
-            <div style={{ fontSize:"4.5pt", lineHeight:1.3, minWidth:0, overflow:"hidden" }}>
-              <span style={{ color:"#888" }}>Serial No. </span>
+            <div style={{ fontSize:"5.5pt", lineHeight:1.3, minWidth:0, overflow:"hidden" }}>
+              <span style={{ color:"#555" }}>Serial No. </span>
               <span style={{ fontWeight:800, color:DARK }}>#{String(p.serialNumber).padStart(3,"0")}</span>
             </div>
           </div>
           <div style={{ display:"flex", alignItems:"flex-start", gap:"1.5mm" }}>
             <div style={dot} />
-            <div style={{ fontSize:"4.5pt", lineHeight:1.3, minWidth:0, overflow:"hidden" }}>
-              <span style={{ color:"#888" }}>Passport No. </span>
+            <div style={{ fontSize:"5.5pt", lineHeight:1.3, minWidth:0, overflow:"hidden" }}>
+              <span style={{ color:"#555" }}>Passport No. </span>
               <span style={{ fontWeight:700, fontFamily:"monospace" }}>{p.passportNumber||"—"}</span>
             </div>
           </div>
           <div style={{ display:"flex", alignItems:"flex-start", gap:"1.5mm" }}>
             <div style={dot} />
-            <div style={{ fontSize:"4.5pt", lineHeight:1.3, minWidth:0, overflow:"hidden" }}>
-              <span style={{ color:"#888" }}>Mobile (India) </span>
+            <div style={{ fontSize:"5.5pt", lineHeight:1.3, minWidth:0, overflow:"hidden" }}>
+              <span style={{ color:"#555" }}>Mobile (India) </span>
               <span style={{ fontWeight:700 }}>{p.mobileIndia||"—"}</span>
             </div>
           </div>
@@ -328,7 +328,7 @@ export default function PrintSingleCard() {
        Temporarily hide crop marks + cut guide so only the pure card is captured. */
     const el = (pageEl.querySelector(".card-wrap") as HTMLElement) ?? pageEl;
     const toHide = Array.from(el.querySelectorAll(".crop-mark,.cut-guide")) as HTMLElement[];
-    toHide.forEach(e => { e.style.visibility = "hidden"; });
+    toHide.forEach(e => { e.style.display = "none"; });
     const key = `${dlSide}-${fmt}`;
     setDlState(key);
     const slug = pilgrim.fullName.replace(/[^a-z0-9]/gi,"-").toLowerCase();
@@ -357,7 +357,7 @@ export default function PrintSingleCard() {
         pdf.save(`id-card-${dlSide}-${slug}.pdf`);
       }
     } finally {
-      toHide.forEach(e => { e.style.visibility = ""; });
+      toHide.forEach(e => { e.style.display = ""; });
       setDlState(null);
     }
   };
