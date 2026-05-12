@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
 import { fetchAsDataUrl } from "@/lib/downloadUtils";
-import { QRCodeCanvas } from "qrcode.react";
+import { QRCodeCanvas, QRCodeSVG } from "qrcode.react";
 import { COMPANIES, getCompanyById, type CompanyInfo } from "@/lib/companies";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
