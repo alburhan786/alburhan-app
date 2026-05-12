@@ -53,9 +53,9 @@ function buildVerifyUrl(id: string) {
 /* ─── Shared header ─────────────────────────────────────────────────────────── */
 function CardHeader({ company }: { company: CompanyInfo }) {
   return (
-    <div style={{ padding:"2.5mm 2.5mm 0", position:"relative", zIndex:1 }}>
+    <div style={{ padding:"3mm 3mm 0", position:"relative", zIndex:1 }}>
       {/* Logo absolutely placed on the dark corner decoration */}
-      <div style={{ position:"absolute", top:"1.5mm", right:"1.5mm", width:"11mm", height:"11mm", borderRadius:"50%", background:"#fff", border:`1.5px solid ${GOLD}`, display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden", zIndex:2 }}>
+      <div style={{ position:"absolute", top:"3mm", right:"3mm", width:"11mm", height:"11mm", borderRadius:"50%", background:"#fff", border:`1.5px solid ${GOLD}`, display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden", zIndex:2 }}>
         {company.logoUrl
           ? <img src={company.logoUrl} alt="" style={{ width:"88%", height:"88%", objectFit:"contain" }} />
           : <span style={{ fontWeight:900, fontSize:"4pt", color:DARK }}>{company.nameShort.slice(0,1)}</span>
@@ -105,7 +105,7 @@ function FrontCard({ p, group, company, photoDataUrl, barcodeDataUrl }: { p:Pilg
       </div>
 
       {/* Info rows (left) + QR (right) */}
-      <div style={{ display:"flex", alignItems:"flex-start", padding:"0 2mm 0 3mm", gap:"1mm", position:"relative", zIndex:1, overflow:"hidden" }}>
+      <div style={{ display:"flex", alignItems:"flex-start", padding:"0 3mm", gap:"1mm", position:"relative", zIndex:1, overflow:"hidden" }}>
         {/* Info rows */}
         <div style={{ flex:1, minWidth:0, display:"flex", flexDirection:"column", gap:"1.8mm" }}>
           <div style={{ display:"flex", alignItems:"flex-start", gap:"1.5mm" }}>
@@ -139,13 +139,13 @@ function FrontCard({ p, group, company, photoDataUrl, barcodeDataUrl }: { p:Pilg
 
       {/* Barcode + footer — absolute bottom */}
       <div style={{ position:"absolute", bottom:0, left:0, right:0, zIndex:2 }}>
-        <div style={{ background:"#fff", padding:"1mm 2mm" }}>
+        <div style={{ background:"#fff", padding:"1mm 3mm" }}>
           {barcodeDataUrl
             ? <img src={barcodeDataUrl} alt="barcode" style={{ display:"block", width:"100%", height:"auto" }} />
             : <div style={{ fontSize:"4pt", color:"#999", textAlign:"center", padding:"2mm 0" }}>{group.groupName}</div>
           }
         </div>
-        <div style={{ background:DARK, padding:"1.5mm 2mm", textAlign:"center", lineHeight:1.6, WebkitPrintColorAdjust:"exact", printColorAdjust:"exact" } as React.CSSProperties}>
+        <div style={{ background:DARK, padding:"1.5mm 3mm", textAlign:"center", lineHeight:1.6, WebkitPrintColorAdjust:"exact", printColorAdjust:"exact" } as React.CSSProperties}>
           <div style={{ color:"#fff", fontSize:"4pt", fontWeight:900, letterSpacing:"0.3px" }}>{company.name}</div>
           <div style={{ color:"#fff", fontSize:"4pt", fontWeight:800, marginTop:"0.3mm" }}>🇮🇳 {company.phone} | ☎ {company.phoneSaudi}</div>
         </div>
@@ -169,7 +169,7 @@ function BackCard({ p, group, company }: { p:Pilgrim; group:Group; company:Compa
       <CardHeader company={company} />
 
       {/* Info rows */}
-      <div style={{ position:"relative", zIndex:1, display:"flex", flexDirection:"column", gap:"2mm", padding:"2mm 3mm 0", fontSize:"5pt", lineHeight:1.35 }}>
+      <div style={{ position:"relative", zIndex:1, display:"flex", flexDirection:"column", gap:"2mm", padding:"3mm 3mm 0", fontSize:"5pt", lineHeight:1.35 }}>
         <div style={{ display:"flex", alignItems:"flex-start", gap:"1.5mm" }}>
           <div style={dot} />
           <div><span style={{ color:"#888" }}>Passport No. </span><span style={{ fontFamily:"monospace", fontWeight:700 }}>{p.passportNumber||"—"}</span></div>
@@ -219,7 +219,7 @@ function BackCard({ p, group, company }: { p:Pilgrim; group:Group; company:Compa
           <div style={{ flex:1, textAlign:"center" }}><b style={{ color:DARK, textTransform:"uppercase" }}>{p.fullName}</b></div>
           <div style={{ flex:1, textAlign:"right" }}>Year: <b style={{ color:DARK }}>{group.year}</b></div>
         </div>
-        <div style={{ background:DARK, color:"#fff", padding:"1.5mm 2mm", fontSize:"3.2pt", fontWeight:900, textAlign:"center", lineHeight:1.6, WebkitPrintColorAdjust:"exact", printColorAdjust:"exact" } as React.CSSProperties}>
+        <div style={{ background:DARK, color:"#fff", padding:"1.5mm 3mm", fontSize:"3.2pt", fontWeight:900, textAlign:"center", lineHeight:1.6, WebkitPrintColorAdjust:"exact", printColorAdjust:"exact" } as React.CSSProperties}>
           <div>{company.address}</div>
           <div style={{ color:GOLD, marginTop:"0.3mm" }}>🇮🇳 {company.phone} | ☎ {company.phoneSaudi}</div>
         </div>
