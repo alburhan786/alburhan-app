@@ -1,28 +1,29 @@
 import { useEffect, useState, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
 import { fetchAsDataUrl } from "@/lib/downloadUtils";
-import { QRCodeSVG } from "qrcode.react";
+import { QRCodeCanvas } from "qrcode.react";
 import { COMPANIES, getCompanyById, type CompanyInfo } from "@/lib/companies";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { saveAs } from "file-saver";
 import JsBarcode from "jsbarcode";
 
-/* Generate barcode as PNG data URL synchronously — avoids useEffect timing gaps */
-function makeBarcodeDataUrl(value: string, height = 40): string {
+/* Generate barcode as PNG data URL — synchronous, no timing gap */
+function makeBarcodeDataUrl(value: string, height = 20): string {
   if (!value) return "";
   try {
     const safe = value.replace(/[^\x00-\x7F]/g, "");
     if (!safe) return "";
     const canvas = document.createElement("canvas");
     JsBarcode(canvas, safe, {
-      format: "CODE128", width: 1.5, height, fontSize: 0,
-      displayValue: false, margin: 4,
+      format: "CODE128", width: 1.2, height, fontSize: 0,
+      displayValue: false, margin: 3,
       background: "#ffffff", lineColor: "#000000",
     });
     return canvas.toDataURL("image/png");
   } catch { return ""; }
 }
+
 
 const API         = import.meta.env.VITE_API_URL || "";
 const BASE        = import.meta.env.BASE_URL.replace(/\/$/, "") || "";
@@ -73,7 +74,7 @@ function CardHeader({ company }: { company: CompanyInfo }) {
 }
 
 /* ─── Front card — 54 mm × 85 mm — matches reference design ────────────────── */
-function FrontCard({ p, group, company, photoDataUrl, barcodeDataUrl }: { p:Pilgrim; group:Group; company:CompanyInfo; photoDataUrl:string; barcodeDataUrl:string }) {
+function FrontCard({ p, group, company, photoDataUrl, barcodeDataUrl, qrDataUrl }: { p:Pilgrim; group:Group; company:CompanyInfo; photoDataUrl:string; barcodeDataUrl:string; qrDataUrl:string }) {
   const photoSrc = photoDataUrl || (p.photoUrl ? `${API}${p.photoUrl}` : "");
   const dot: React.CSSProperties = { width:"2.5mm", height:"2.5mm", minWidth:"2.5mm", borderRadius:"50%", background:GOLD, marginTop:"0.5mm" };
   return (
@@ -129,9 +130,9 @@ function FrontCard({ p, group, company, photoDataUrl, barcodeDataUrl }: { p:Pilg
             </div>
           </div>
         </div>
-        {/* QR code — right, fixed width so it never spills out */}
+        {/* QR code — right, fixed width, pre-rendered as PNG for reliable download */}
         <div style={{ width:"14mm", flexShrink:0, display:"flex", flexDirection:"column", alignItems:"center", gap:"0.5mm" }}>
-          <QRCodeSVG value={buildVerifyUrl(p.id)} size={48} level="M" fgColor="#000000" bgColor="#ffffff" style={{ display:"block", maxWidth:"100%" }} />
+          {qrDataUrl && <img src={qrDataUrl} alt="qr" style={{ display:"block", width:"100%", height:"auto" }} />}
           <div style={{ fontSize:"3pt", color:DARK, fontWeight:800, textTransform:"uppercase", letterSpacing:"0.3px" }}>SCAN</div>
         </div>
       </div>
@@ -267,6 +268,7 @@ export default function PrintSingleCard() {
   const [allPilgrims,    setAllPilgrims]    = useState<Pilgrim[]>([]);
   const [photoDataUrl,   setPhotoDataUrl]   = useState("");
   const [barcodeDataUrl, setBarcodeDataUrl] = useState("");
+  const [qrDataUrl,      setQrDataUrl]      = useState("");
   const [companyId,      setCompanyId]      = useState("alburhan");
   const [error,          setError]          = useState("");
   const [dlState,        setDlState]        = useState<string|null>(null);
@@ -274,6 +276,7 @@ export default function PrintSingleCard() {
 
   const frontRef = useRef<HTMLDivElement>(null);
   const backRef  = useRef<HTMLDivElement>(null);
+  const qrRef    = useRef<HTMLDivElement>(null);
   const company  = getCompanyById(companyId);
 
   // Auto-scroll to the correct card when side changes
@@ -287,10 +290,22 @@ export default function PrintSingleCard() {
   const frontUrl = (pid: string) => `${BASE}/admin/groups/${groupId}/print/id-card-front/${pid}`;
   const backUrl  = (pid: string) => `${BASE}/admin/groups/${groupId}/print/id-card-back/${pid}`;
 
+  /* Capture QR canvas data URL after pilgrim changes */
+  useEffect(() => {
+    if (!pilgrim) return;
+    setQrDataUrl("");
+    const timer = setTimeout(() => {
+      const canvas = qrRef.current?.querySelector("canvas");
+      if (canvas) setQrDataUrl(canvas.toDataURL("image/png"));
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [pilgrim?.id]);
+
   useEffect(() => {
     if (!groupId || !pilgrimId) return;
     setPhotoDataUrl("");
     setBarcodeDataUrl("");
+    setQrDataUrl("");
     Promise.all([
       fetch(`${API}/api/groups/${groupId}`,          { credentials:"include" }).then(r => r.json()),
       fetch(`${API}/api/groups/${groupId}/pilgrims`, { credentials:"include" }).then(r => r.json()),
@@ -467,12 +482,17 @@ export default function PrintSingleCard() {
         </div>
       </div>
 
+      {/* Hidden QRCodeCanvas — used to pre-render QR as PNG data URL for reliable download */}
+      <div ref={qrRef} style={{ position:"absolute", left:"-9999px", top:0, visibility:"hidden", pointerEvents:"none" }}>
+        <QRCodeCanvas value={buildVerifyUrl(pilgrim.id)} size={96} level="M" bgColor="#ffffff" fgColor="#000000" />
+      </div>
+
       {/* ── FRONT — A4 page ── */}
       <div ref={frontRef} className={`a4-page${printTarget==="back"?" hide-print":""}`}>
         <div className="card-wrap">
           <CropMarks />
           <div className="cut-guide" />
-          <FrontCard p={pilgrim} group={group} company={company} photoDataUrl={photoDataUrl} barcodeDataUrl={barcodeDataUrl} />
+          <FrontCard p={pilgrim} group={group} company={company} photoDataUrl={photoDataUrl} barcodeDataUrl={barcodeDataUrl} qrDataUrl={qrDataUrl} />
         </div>
         <div className="side-badge no-print" style={{ background:"#dbeafe", color:"#1e40af" }}>
           ▲ FRONT — {pilgrim.fullName} &nbsp;·&nbsp; 54 mm × 85 mm &nbsp;·&nbsp; 300 DPI ready
