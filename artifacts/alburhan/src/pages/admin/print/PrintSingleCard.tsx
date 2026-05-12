@@ -324,8 +324,11 @@ export default function PrintSingleCard() {
   const dl = async (dlSide:"front"|"back", fmt:"pdf"|"png") => {
     const pageEl = dlSide === "front" ? frontRef.current : backRef.current;
     if (!pageEl || !pilgrim) return;
-    /* Capture only the .id-card element — excludes A4 white space, crop marks, cut guide */
-    const el = (pageEl.querySelector(".id-card") as HTMLElement) ?? pageEl;
+    /* Capture .card-wrap — no overflow:hidden, no border-radius clipping.
+       Temporarily hide crop marks + cut guide so only the pure card is captured. */
+    const el = (pageEl.querySelector(".card-wrap") as HTMLElement) ?? pageEl;
+    const toHide = Array.from(el.querySelectorAll(".crop-mark,.cut-guide")) as HTMLElement[];
+    toHide.forEach(e => { e.style.visibility = "hidden"; });
     const key = `${dlSide}-${fmt}`;
     setDlState(key);
     const slug = pilgrim.fullName.replace(/[^a-z0-9]/gi,"-").toLowerCase();
@@ -353,7 +356,10 @@ export default function PrintSingleCard() {
         pdf.rect((210-cardW)/2-3,(297-cardH)/2-3,cardW+6,cardH+6);
         pdf.save(`id-card-${dlSide}-${slug}.pdf`);
       }
-    } finally { setDlState(null); }
+    } finally {
+      toHide.forEach(e => { e.style.visibility = ""; });
+      setDlState(null);
+    }
   };
 
   /* Print — hide one side via CSS class, then restore */
