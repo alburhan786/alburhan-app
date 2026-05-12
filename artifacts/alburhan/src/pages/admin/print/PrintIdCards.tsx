@@ -387,10 +387,14 @@ export default function PrintIdCards() {
         }
 
         /* ── Grid-9 mode: 3×3 portrait cards on A4 ── */
-        /* Card 54×85mm · 3 cols: 162mm · 3 rows: 255mm — fits A4 210×297mm */
+        /*
+          @page margin is 8mm → printable area = 194mm × 281mm
+          Grid content: 3×54mm=162mm wide, 3×85mm=255mm tall (gap:0)
+          Centred in 194×281mm → 16mm H margin, 13mm V margin — no clipping.
+        */
         .g9-page {
-          width: 210mm;
-          height: 297mm;
+          width: 194mm;
+          height: 281mm;
           background: #fff;
           display: flex;
           align-items: center;
@@ -398,6 +402,7 @@ export default function PrintIdCards() {
           position: relative;
           page-break-after: always;
           break-after: page;
+          overflow: hidden;
           flex-shrink: 0;
         }
         .g9-page:last-of-type { page-break-after: auto; break-after: auto; }
@@ -409,7 +414,7 @@ export default function PrintIdCards() {
         }
         .g9-label {
           position: absolute;
-          top: 7mm;
+          top: 4mm;
           left: 50%;
           transform: translateX(-50%);
           font-size: 9px;
@@ -422,7 +427,7 @@ export default function PrintIdCards() {
         }
         @media print {
           .g9-label { display: none !important; }
-          .g9-page { box-shadow: none !important; margin: 0 !important; }
+          .g9-page  { box-shadow: none !important; margin: 0 !important; }
         }
         @media screen {
           .g9-page {
