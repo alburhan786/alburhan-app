@@ -52,19 +52,21 @@ function buildVerifyUrl(id: string) {
 /* ─── Shared header ─────────────────────────────────────────────────────────── */
 function CardHeader({ company }: { company: CompanyInfo }) {
   return (
-    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"2.5mm 2.5mm 0", position:"relative", zIndex:1 }}>
-      <div style={{ fontSize:"24pt", lineHeight:1, flexShrink:0 }}>🇮🇳</div>
-      <div style={{ flex:1, textAlign:"center", padding:"0 1mm" }}>
-        <div style={{ fontSize:"10pt", fontWeight:900, color:DARK, letterSpacing:"0.5px", lineHeight:1.1 }}>{company.nameShort}</div>
-        <div style={{ fontSize:"4.5pt", fontWeight:700, color:GOLD, letterSpacing:"0.5px", lineHeight:1.3 }}>TOURS & TRAVELS</div>
-      </div>
-      <div style={{ flexShrink:0 }}>
+    <div style={{ padding:"2.5mm 2.5mm 0", position:"relative", zIndex:1 }}>
+      {/* Logo absolutely placed on the dark corner decoration */}
+      <div style={{ position:"absolute", top:"1.5mm", right:"1.5mm", width:"11mm", height:"11mm", borderRadius:"50%", background:"#fff", border:`1.5px solid ${GOLD}`, display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden", zIndex:2 }}>
         {company.logoUrl
-          ? <div style={{ width:"10mm", height:"10mm", borderRadius:"50%", background:"#fff", border:`1.5px solid ${GOLD}`, display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden" }}>
-              <img src={company.logoUrl} alt="" style={{ width:"90%", height:"90%", objectFit:"contain" }} />
-            </div>
-          : <div style={{ width:"10mm", height:"10mm", borderRadius:"50%", background:DARK, display:"flex", alignItems:"center", justifyContent:"center", color:GOLD, fontWeight:900, fontSize:"4pt" }}>{company.nameShort.slice(0,1)}</div>
+          ? <img src={company.logoUrl} alt="" style={{ width:"88%", height:"88%", objectFit:"contain" }} />
+          : <span style={{ fontWeight:900, fontSize:"4pt", color:DARK }}>{company.nameShort.slice(0,1)}</span>
         }
+      </div>
+      {/* Flag + name — padded right so text never enters the dark decoration zone */}
+      <div style={{ display:"flex", alignItems:"center", gap:"1.5mm", paddingRight:"13mm" }}>
+        <div style={{ fontSize:"24pt", lineHeight:1, flexShrink:0 }}>🇮🇳</div>
+        <div style={{ minWidth:0 }}>
+          <div style={{ fontSize:"9.5pt", fontWeight:900, color:DARK, letterSpacing:"0.3px", lineHeight:1.1, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{company.nameShort}</div>
+          <div style={{ fontSize:"4pt", fontWeight:700, color:GOLD, letterSpacing:"0.5px", lineHeight:1.3 }}>TOURS & TRAVELS</div>
+        </div>
       </div>
     </div>
   );
