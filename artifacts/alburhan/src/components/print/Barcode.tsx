@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import JsBarcode from "jsbarcode";
 
 interface BarcodeProps {
@@ -11,32 +11,34 @@ interface BarcodeProps {
 }
 
 export function Barcode({ value, width = 1, height = 25, fontSize = 8, displayValue = false, format = "CODE39" }: BarcodeProps) {
-  const svgRef = useRef<SVGSVGElement>(null);
+  const [dataUrl, setDataUrl] = useState<string>("");
 
   useEffect(() => {
-    if (svgRef.current && value) {
-      try {
-        const safeValue = format === "CODE128"
-          ? value.replace(/[^\x00-\x7F]/g, "")
-          : value.toUpperCase().replace(/[^A-Z0-9\-.\s$/+%]/g, "");
-        JsBarcode(svgRef.current, safeValue, {
-          format,
-          width,
-          height,
-          fontSize,
-          displayValue,
-          margin: 6,
-          marginLeft: 8,
-          marginRight: 8,
-          marginTop: 5,
-          marginBottom: 5,
-          background: "#ffffff",
-          lineColor: "#000000",
-        });
-      } catch {}
-    }
+    if (!value) return;
+    try {
+      const safeValue = format === "CODE128"
+        ? value.replace(/[^\x00-\x7F]/g, "")
+        : value.toUpperCase().replace(/[^A-Z0-9\-.\s$/+%]/g, "");
+
+      const canvas = document.createElement("canvas");
+      JsBarcode(canvas, safeValue, {
+        format,
+        width,
+        height,
+        fontSize,
+        displayValue,
+        margin: 6,
+        marginLeft: 8,
+        marginRight: 8,
+        marginTop: 5,
+        marginBottom: 5,
+        background: "#ffffff",
+        lineColor: "#000000",
+      });
+      setDataUrl(canvas.toDataURL("image/png"));
+    } catch {}
   }, [value, width, height, fontSize, displayValue, format]);
 
-  if (!value) return null;
-  return <svg ref={svgRef} style={{ display: "block", maxWidth: "100%" }} />;
+  if (!value || !dataUrl) return null;
+  return <img src={dataUrl} alt="barcode" style={{ display: "block", maxWidth: "100%", imageRendering: "crisp-edges" }} />;
 }
