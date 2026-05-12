@@ -81,8 +81,8 @@ function FrontCard({ p, group, company, photoDataUrl, barcodeDataUrl }: { p:Pilg
       {/* Decorations */}
       <div style={{ position:"absolute", top:0, right:0, width:"20mm", height:"22mm", background:DARK, borderRadius:"0 0 0 100%", zIndex:0 }} />
       <div style={{ position:"absolute", top:"6mm", right:0, width:"11mm", height:"12mm", background:"rgba(255,255,255,0.09)", borderRadius:"0 0 0 100%", zIndex:0 }} />
-      <div style={{ position:"absolute", bottom:"11mm", left:0, width:"15mm", height:"17mm", background:`linear-gradient(135deg,${GOLD},${GOLD_LIGHT})`, borderRadius:"0 100% 0 0", zIndex:0 }} />
-      <div style={{ position:"absolute", bottom:"15mm", left:0, width:"9mm", height:"10mm", background:"rgba(255,255,255,0.18)", borderRadius:"0 100% 0 0", zIndex:0 }} />
+      <div style={{ position:"absolute", bottom:"12.5mm", left:0, width:"9mm", height:"10mm", background:`linear-gradient(135deg,${GOLD},${GOLD_LIGHT})`, borderRadius:"0 100% 0 0", zIndex:0 }} />
+      <div style={{ position:"absolute", bottom:"15mm", left:0, width:"5mm", height:"6mm", background:"rgba(255,255,255,0.18)", borderRadius:"0 100% 0 0", zIndex:0 }} />
 
       {/* Header */}
       <CardHeader company={company} />
