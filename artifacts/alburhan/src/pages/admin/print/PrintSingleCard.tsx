@@ -102,36 +102,34 @@ function FrontCard({ p, group, company, photoDataUrl, barcodeDataUrl }: { p:Pilg
       </div>
 
       {/* Info rows (left) + QR (right) */}
-      <div style={{ display:"flex", alignItems:"flex-start", padding:"0 2.5mm", gap:"1.5mm", position:"relative", zIndex:1 }}>
+      <div style={{ display:"flex", alignItems:"flex-start", padding:"0 2mm 0 3mm", gap:"1mm", position:"relative", zIndex:1, overflow:"hidden" }}>
         {/* Info rows */}
-        <div style={{ flex:1, display:"flex", flexDirection:"column", gap:"1.8mm" }}>
+        <div style={{ flex:1, minWidth:0, display:"flex", flexDirection:"column", gap:"1.8mm" }}>
           <div style={{ display:"flex", alignItems:"flex-start", gap:"1.5mm" }}>
             <div style={dot} />
-            <div style={{ fontSize:"4.5pt", lineHeight:1.3 }}>
+            <div style={{ fontSize:"4.5pt", lineHeight:1.3, minWidth:0, overflow:"hidden" }}>
               <span style={{ color:"#888" }}>Serial No. </span>
               <span style={{ fontWeight:800, color:DARK }}>#{String(p.serialNumber).padStart(3,"0")}</span>
             </div>
           </div>
           <div style={{ display:"flex", alignItems:"flex-start", gap:"1.5mm" }}>
             <div style={dot} />
-            <div style={{ fontSize:"4.5pt", lineHeight:1.3 }}>
+            <div style={{ fontSize:"4.5pt", lineHeight:1.3, minWidth:0, overflow:"hidden" }}>
               <span style={{ color:"#888" }}>Passport No. </span>
               <span style={{ fontWeight:700, fontFamily:"monospace" }}>{p.passportNumber||"—"}</span>
             </div>
           </div>
           <div style={{ display:"flex", alignItems:"flex-start", gap:"1.5mm" }}>
             <div style={dot} />
-            <div style={{ fontSize:"4.5pt", lineHeight:1.3 }}>
+            <div style={{ fontSize:"4.5pt", lineHeight:1.3, minWidth:0, overflow:"hidden" }}>
               <span style={{ color:"#888" }}>Mobile (India) </span>
               <span style={{ fontWeight:700 }}>{p.mobileIndia||"—"}</span>
             </div>
           </div>
         </div>
-        {/* QR code — right */}
-        <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:"0.5mm", flexShrink:0 }}>
-          <div style={{ background:"#fff", padding:"2px", border:`1.5px solid ${DARK}`, borderRadius:"3px" }}>
-            <QRCodeSVG value={buildVerifyUrl(p.id)} size={54} level="M" fgColor="#000000" bgColor="#ffffff" />
-          </div>
+        {/* QR code — right, fixed width so it never spills out */}
+        <div style={{ width:"14mm", flexShrink:0, display:"flex", flexDirection:"column", alignItems:"center", gap:"0.5mm" }}>
+          <QRCodeSVG value={buildVerifyUrl(p.id)} size={48} level="M" fgColor="#000000" bgColor="#ffffff" style={{ display:"block", maxWidth:"100%" }} />
           <div style={{ fontSize:"3pt", color:DARK, fontWeight:800, textTransform:"uppercase", letterSpacing:"0.3px" }}>SCAN</div>
         </div>
       </div>
