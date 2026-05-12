@@ -324,11 +324,15 @@ export default function PrintSingleCard() {
   const dl = async (dlSide:"front"|"back", fmt:"pdf"|"png") => {
     const pageEl = dlSide === "front" ? frontRef.current : backRef.current;
     if (!pageEl || !pilgrim) return;
-    /* Capture .card-wrap — no overflow:hidden, no border-radius clipping.
-       Temporarily hide crop marks + cut guide so only the pure card is captured. */
-    const el = (pageEl.querySelector(".card-wrap") as HTMLElement) ?? pageEl;
-    const toHide = Array.from(el.querySelectorAll(".crop-mark,.cut-guide")) as HTMLElement[];
-    toHide.forEach(e => { e.style.display = "none"; });
+    /* Capture only .id-card — crop marks/cut-guide live in .card-wrap so they're never included.
+       Temporarily disable overflow:hidden and border-radius so no content is clipped at edges. */
+    const el = (pageEl.querySelector(".id-card") as HTMLElement) ?? pageEl;
+    const prevOverflow     = el.style.overflow;
+    const prevRadius       = el.style.borderRadius;
+    const prevBoxShadow    = el.style.boxShadow;
+    el.style.overflow      = "visible";
+    el.style.borderRadius  = "0";
+    el.style.boxShadow     = "none";
     const key = `${dlSide}-${fmt}`;
     setDlState(key);
     const slug = pilgrim.fullName.replace(/[^a-z0-9]/gi,"-").toLowerCase();
@@ -357,7 +361,9 @@ export default function PrintSingleCard() {
         pdf.save(`id-card-${dlSide}-${slug}.pdf`);
       }
     } finally {
-      toHide.forEach(e => { e.style.display = ""; });
+      el.style.overflow     = prevOverflow;
+      el.style.borderRadius = prevRadius;
+      el.style.boxShadow    = prevBoxShadow;
       setDlState(null);
     }
   };
