@@ -286,10 +286,16 @@ export default function PrintIdCards() {
     <>
       <style>{`
         @media print {
-          @page { size: A4 portrait; margin: 8mm; }
-          body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; margin: 0; }
-          .no-print { display: none !important; }
-          .cut-line { display: flex !important; }
+          @page { size: A4 portrait; margin: 0; }
+          html, body {
+            margin: 0 !important; padding: 0 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          .no-print  { display: none !important; }
+          .cut-line  { display: flex !important; }
+          /* grid9: wrapper must have no padding so g9-page starts at page top */
+          .grid9-wrap { padding: 0 !important; }
         }
         * { box-sizing: border-box; }
         .id-card {
@@ -388,13 +394,14 @@ export default function PrintIdCards() {
 
         /* ── Grid-9 mode: 3×3 portrait cards on A4 ── */
         /*
-          @page margin is 8mm → printable area = 194mm × 281mm
+          @page margin is 0 → printable area = full 210mm × 297mm
           Grid content: 3×54mm=162mm wide, 3×85mm=255mm tall (gap:0)
-          Centred in 194×281mm → 16mm H margin, 13mm V margin — no clipping.
+          Centred in 210×297mm → 24mm H margin, 21mm V margin — no clipping.
+          wrapper (.grid9-wrap) has padding:0 in print so g9-page starts at page top.
         */
         .g9-page {
-          width: 194mm;
-          height: 281mm;
+          width: 210mm;
+          height: 297mm;
           background: #fff;
           display: flex;
           align-items: center;
@@ -402,6 +409,7 @@ export default function PrintIdCards() {
           position: relative;
           page-break-after: always;
           break-after: page;
+          page-break-inside: avoid;
           overflow: hidden;
           flex-shrink: 0;
         }
@@ -507,7 +515,7 @@ export default function PrintIdCards() {
         )}
       </div>
 
-      <div ref={contentRef} style={{ padding: printMode === "direct" ? "0" : "6mm", fontFamily: "'Inter', Arial, sans-serif" }}>
+      <div ref={contentRef} className={printMode === "grid9" ? "grid9-wrap" : ""} style={{ padding: (printMode === "direct" || printMode === "grid9") ? "0" : "6mm", fontFamily: "'Inter', Arial, sans-serif" }}>
         {printMode === "direct" ? (
           /* ── DIRECT PRINT: one card per full A4 page, scaled to fill ── */
           pilgrims.flatMap(p => [
