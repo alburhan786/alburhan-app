@@ -74,7 +74,7 @@ function CardHeader({ company }: { company: CompanyInfo }) {
 }
 
 /* ─── Front card — 54 mm × 85 mm — matches reference design ────────────────── */
-function FrontCard({ p, group, company, photoDataUrl, barcodeDataUrl, qrDataUrl }: { p:Pilgrim; group:Group; company:CompanyInfo; photoDataUrl:string; barcodeDataUrl:string; qrDataUrl:string }) {
+function FrontCard({ p, group, company, photoDataUrl, barcodeDataUrl }: { p:Pilgrim; group:Group; company:CompanyInfo; photoDataUrl:string; barcodeDataUrl:string }) {
   const photoSrc = photoDataUrl || (p.photoUrl ? `${API}${p.photoUrl}` : "");
   const dot: React.CSSProperties = { width:"2.5mm", height:"2.5mm", minWidth:"2.5mm", borderRadius:"50%", background:GOLD, marginTop:"0.5mm" };
   return (
@@ -130,9 +130,9 @@ function FrontCard({ p, group, company, photoDataUrl, barcodeDataUrl, qrDataUrl 
             </div>
           </div>
         </div>
-        {/* QR code — right, fixed width, pre-rendered as PNG for reliable download */}
+        {/* QR code — right, fixed width */}
         <div style={{ width:"14mm", flexShrink:0, display:"flex", flexDirection:"column", alignItems:"center", gap:"0.5mm" }}>
-          {qrDataUrl && <img src={qrDataUrl} alt="qr" style={{ display:"block", width:"100%", height:"auto" }} />}
+          <QRCodeCanvas value={buildVerifyUrl(p.id)} size={48} level="M" bgColor="#ffffff" fgColor="#000000" style={{ display:"block" }} />
           <div style={{ fontSize:"3pt", color:DARK, fontWeight:800, textTransform:"uppercase", letterSpacing:"0.3px" }}>SCAN</div>
         </div>
       </div>
@@ -268,7 +268,6 @@ export default function PrintSingleCard() {
   const [allPilgrims,    setAllPilgrims]    = useState<Pilgrim[]>([]);
   const [photoDataUrl,   setPhotoDataUrl]   = useState("");
   const [barcodeDataUrl, setBarcodeDataUrl] = useState("");
-  const [qrDataUrl,      setQrDataUrl]      = useState("");
   const [companyId,      setCompanyId]      = useState("alburhan");
   const [error,          setError]          = useState("");
   const [dlState,        setDlState]        = useState<string|null>(null);
@@ -276,7 +275,6 @@ export default function PrintSingleCard() {
 
   const frontRef = useRef<HTMLDivElement>(null);
   const backRef  = useRef<HTMLDivElement>(null);
-  const qrRef    = useRef<HTMLDivElement>(null);
   const company  = getCompanyById(companyId);
 
   // Auto-scroll to the correct card when side changes
@@ -290,22 +288,10 @@ export default function PrintSingleCard() {
   const frontUrl = (pid: string) => `${BASE}/admin/groups/${groupId}/print/id-card-front/${pid}`;
   const backUrl  = (pid: string) => `${BASE}/admin/groups/${groupId}/print/id-card-back/${pid}`;
 
-  /* Capture QR canvas data URL after pilgrim changes */
-  useEffect(() => {
-    if (!pilgrim) return;
-    setQrDataUrl("");
-    const timer = setTimeout(() => {
-      const canvas = qrRef.current?.querySelector("canvas");
-      if (canvas) setQrDataUrl(canvas.toDataURL("image/png"));
-    }, 150);
-    return () => clearTimeout(timer);
-  }, [pilgrim?.id]);
-
   useEffect(() => {
     if (!groupId || !pilgrimId) return;
     setPhotoDataUrl("");
     setBarcodeDataUrl("");
-    setQrDataUrl("");
     Promise.all([
       fetch(`${API}/api/groups/${groupId}`,          { credentials:"include" }).then(r => r.json()),
       fetch(`${API}/api/groups/${groupId}/pilgrims`, { credentials:"include" }).then(r => r.json()),
@@ -482,17 +468,12 @@ export default function PrintSingleCard() {
         </div>
       </div>
 
-      {/* Hidden QRCodeCanvas — used to pre-render QR as PNG data URL for reliable download */}
-      <div ref={qrRef} style={{ position:"absolute", left:"-9999px", top:0, visibility:"hidden", pointerEvents:"none" }}>
-        <QRCodeCanvas value={buildVerifyUrl(pilgrim.id)} size={96} level="M" bgColor="#ffffff" fgColor="#000000" />
-      </div>
-
       {/* ── FRONT — A4 page ── */}
       <div ref={frontRef} className={`a4-page${printTarget==="back"?" hide-print":""}`}>
         <div className="card-wrap">
           <CropMarks />
           <div className="cut-guide" />
-          <FrontCard p={pilgrim} group={group} company={company} photoDataUrl={photoDataUrl} barcodeDataUrl={barcodeDataUrl} qrDataUrl={qrDataUrl} />
+          <FrontCard p={pilgrim} group={group} company={company} photoDataUrl={photoDataUrl} barcodeDataUrl={barcodeDataUrl} />
         </div>
         <div className="side-badge no-print" style={{ background:"#dbeafe", color:"#1e40af" }}>
           ▲ FRONT — {pilgrim.fullName} &nbsp;·&nbsp; 54 mm × 85 mm &nbsp;·&nbsp; 300 DPI ready
