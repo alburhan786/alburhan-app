@@ -74,28 +74,50 @@ export default function PrintZamzam() {
     <>
       <style>{`
         @media print {
-          @page { size: A4 portrait; margin: 5mm; }
-          body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; margin: 0; }
+          @page { size: A4 portrait; margin: 0; }
+          html, body {
+            margin: 0 !important; padding: 0 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
           .no-print { display: none !important; }
-          .zz-wrap { background: white !important; padding: 0 !important; }
+          .zz-wrap  { padding: 0 !important; background: white !important; }
+          .zz-page  { box-shadow: none !important; margin: 0 !important; }
         }
         * { box-sizing: border-box; }
+
+        /*
+          Full A4: 210mm × 297mm (@page margin 0).
+          2 stickers per page, each 200mm × 133mm.
+          Layout: 2×133 + gap(7mm) = 273mm content, centred → 12mm top/bottom safe margin.
+          Width: 200mm centred → 5mm each side safe margin.
+        */
         .zz-page {
           display: flex;
           flex-direction: column;
           gap: 7mm;
-          width: 200mm;
-          height: 280mm;
-          max-height: 280mm;
+          align-items: center;
+          justify-content: center;
+          width: 210mm;
+          height: 297mm;
           page-break-after: always;
-          break-after: page;
+          break-after: always;
+          page-break-inside: avoid;
           overflow: hidden;
+          flex-shrink: 0;
         }
         .zz-page:last-child { page-break-after: auto; break-after: auto; }
+        @media screen {
+          .zz-page {
+            box-shadow: 0 8px 40px rgba(0,0,0,0.45);
+            margin: 20px auto;
+          }
+          .zz-page:last-child { margin-bottom: 20px; }
+        }
+
         .zz-sticker {
           width: 200mm;
-          height: 136mm;
-          max-height: 136mm;
+          height: 133mm;
           flex-shrink: 0;
           display: flex;
           flex-direction: row;
@@ -135,7 +157,7 @@ export default function PrintZamzam() {
         }}>← Back</button>
       </div>
 
-      <div ref={contentRef} className="zz-wrap" style={{ background: "#f5f5f0", padding: "8mm" }}>
+      <div ref={contentRef} className="zz-wrap" style={{ background: "#4b5563" }}>
         {pages.map((page, pageIdx) => (
           <div key={pageIdx} className="zz-page">
             {page.map(p => {
