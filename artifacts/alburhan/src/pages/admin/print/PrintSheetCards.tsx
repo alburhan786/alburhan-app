@@ -232,10 +232,19 @@ export default function PrintSheetCards() {
       <style>{`
         @media print {
           @page { size: A4 portrait; margin: 0; }
-          body { margin:0; padding:0; background:#fff!important;
-                 -webkit-print-color-adjust:exact!important; print-color-adjust:exact!important; }
+          html, body {
+            margin:0!important; padding:0!important;
+            width:210mm!important; height:297mm!important;
+            background:#fff!important;
+            -webkit-print-color-adjust:exact!important;
+            print-color-adjust:exact!important;
+          }
           .no-print  { display:none!important; }
-          .sheet-pad { padding-top:0!important; }
+          .sheet-pad { padding-top:0!important; margin:0!important; }
+          .a4-sheet  {
+            margin:0!important; box-shadow:none!important;
+            page-break-after:always;
+          }
         }
         * { box-sizing:border-box; }
         .id-card {
@@ -285,15 +294,20 @@ export default function PrintSheetCards() {
 
       {/* ── A4 Sheet ── */}
       <div className="sheet-pad" style={{ paddingTop:"62px" }}>
-        <div style={{
+        {/*
+          Safe-margin layout — content is SMALLER than A4 so no printer can clip it.
+          Content width:  3×54 + 2×9  = 180mm  →  15mm safe margin each side  (total 210mm)
+          Content height: 3×85 + 2×8  = 271mm  →  13mm safe margin top+bottom  (total 297mm)
+          Cards are centered inside the 210×297 sheet via justifyContent/alignContent.
+        */}
+        <div className="a4-sheet" style={{
           width:"210mm", height:"297mm", background:"#fff",
           display:"grid",
-          /* 3 cols × 54mm + 2 gaps × 12mm + 2 padding × 12mm = 210mm */
           gridTemplateColumns:"repeat(3, 54mm)",
-          /* 3 rows × 85mm + 2 gaps × 10.5mm + 2 padding × 10.5mm = 297mm */
           gridTemplateRows:"repeat(3, 85mm)",
-          columnGap:"12mm", rowGap:"10.5mm",
-          padding:"10.5mm 12mm",
+          columnGap:"9mm", rowGap:"8mm",
+          justifyContent:"center", alignContent:"center",
+          overflow:"hidden",
           margin:"20px auto",
           boxShadow:"0 8px 48px rgba(0,0,0,0.5)",
         }}>
