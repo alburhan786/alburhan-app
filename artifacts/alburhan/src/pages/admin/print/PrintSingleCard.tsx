@@ -2,11 +2,27 @@ import { useEffect, useState, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
 import { fetchAsDataUrl } from "@/lib/downloadUtils";
 import { QRCodeSVG } from "qrcode.react";
-import { Barcode } from "@/components/print/Barcode";
 import { COMPANIES, getCompanyById, type CompanyInfo } from "@/lib/companies";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { saveAs } from "file-saver";
+import JsBarcode from "jsbarcode";
+
+/* Generate barcode as PNG data URL synchronously — avoids useEffect timing gaps */
+function makeBarcodeDataUrl(value: string, height = 40): string {
+  if (!value) return "";
+  try {
+    const safe = value.replace(/[^\x00-\x7F]/g, "");
+    if (!safe) return "";
+    const canvas = document.createElement("canvas");
+    JsBarcode(canvas, safe, {
+      format: "CODE128", width: 1.5, height, fontSize: 0,
+      displayValue: false, margin: 4,
+      background: "#ffffff", lineColor: "#000000",
+    });
+    return canvas.toDataURL("image/png");
+  } catch { return ""; }
+}
 
 const API         = import.meta.env.VITE_API_URL || "";
 const BASE        = import.meta.env.BASE_URL.replace(/\/$/, "") || "";
@@ -55,7 +71,7 @@ function CardHeader({ company }: { company: CompanyInfo }) {
 }
 
 /* ─── Front card — 54 mm × 85 mm — matches reference design ────────────────── */
-function FrontCard({ p, group, company, photoDataUrl }: { p:Pilgrim; group:Group; company:CompanyInfo; photoDataUrl:string }) {
+function FrontCard({ p, group, company, photoDataUrl, barcodeDataUrl }: { p:Pilgrim; group:Group; company:CompanyInfo; photoDataUrl:string; barcodeDataUrl:string }) {
   const photoSrc = photoDataUrl || (p.photoUrl ? `${API}${p.photoUrl}` : "");
   const dot: React.CSSProperties = { width:"2.5mm", height:"2.5mm", minWidth:"2.5mm", borderRadius:"50%", background:GOLD, marginTop:"0.5mm" };
   return (
@@ -122,9 +138,9 @@ function FrontCard({ p, group, company, photoDataUrl }: { p:Pilgrim; group:Group
 
       {/* Barcode + footer — absolute bottom */}
       <div style={{ position:"absolute", bottom:0, left:0, right:0, zIndex:2 }}>
-        <div style={{ background:"#fff", padding:"0.5mm 2mm 1mm" }}>
-          {(p.barcodeId||p.passportNumber)
-            ? <Barcode value={p.barcodeId||p.passportNumber!} format="CODE128" height={16} width={1.2} fontSize={5} />
+        <div style={{ background:"#fff", padding:"1mm 2mm" }}>
+          {barcodeDataUrl
+            ? <img src={barcodeDataUrl} alt="barcode" style={{ display:"block", width:"100%", height:"auto" }} />
             : <div style={{ fontSize:"4pt", color:"#999", textAlign:"center", padding:"2mm 0" }}>{group.groupName}</div>
           }
         </div>
@@ -246,14 +262,15 @@ export default function PrintSingleCard() {
 
   const [, navigate] = useLocation();
 
-  const [group,        setGroup]        = useState<Group   |null>(null);
-  const [pilgrim,      setPilgrim]      = useState<Pilgrim |null>(null);
-  const [allPilgrims,  setAllPilgrims]  = useState<Pilgrim[]>([]);
-  const [photoDataUrl, setPhotoDataUrl] = useState("");
-  const [companyId,    setCompanyId]    = useState("alburhan");
-  const [error,        setError]        = useState("");
-  const [dlState,      setDlState]      = useState<string|null>(null);
-  const [printTarget,  setPrintTarget]  = useState<"front"|"back"|null>(null);
+  const [group,          setGroup]          = useState<Group   |null>(null);
+  const [pilgrim,        setPilgrim]        = useState<Pilgrim |null>(null);
+  const [allPilgrims,    setAllPilgrims]    = useState<Pilgrim[]>([]);
+  const [photoDataUrl,   setPhotoDataUrl]   = useState("");
+  const [barcodeDataUrl, setBarcodeDataUrl] = useState("");
+  const [companyId,      setCompanyId]      = useState("alburhan");
+  const [error,          setError]          = useState("");
+  const [dlState,        setDlState]        = useState<string|null>(null);
+  const [printTarget,    setPrintTarget]    = useState<"front"|"back"|null>(null);
 
   const frontRef = useRef<HTMLDivElement>(null);
   const backRef  = useRef<HTMLDivElement>(null);
@@ -273,6 +290,7 @@ export default function PrintSingleCard() {
   useEffect(() => {
     if (!groupId || !pilgrimId) return;
     setPhotoDataUrl("");
+    setBarcodeDataUrl("");
     Promise.all([
       fetch(`${API}/api/groups/${groupId}`,          { credentials:"include" }).then(r => r.json()),
       fetch(`${API}/api/groups/${groupId}/pilgrims`, { credentials:"include" }).then(r => r.json()),
@@ -283,6 +301,9 @@ export default function PrintSingleCard() {
       const found = list.find(p => p.id === pilgrimId);
       if (found) {
         setPilgrim(found);
+        /* Compute barcode immediately — synchronous, no timing gap */
+        const barcodeVal = found.barcodeId || found.passportNumber || "";
+        setBarcodeDataUrl(makeBarcodeDataUrl(barcodeVal));
         if (found.photoUrl) {
           const d = await fetchAsDataUrl(`${API}${found.photoUrl}`);
           setPhotoDataUrl(d || "");
@@ -306,6 +327,8 @@ export default function PrintSingleCard() {
     setDlState(key);
     const slug = pilgrim.fullName.replace(/[^a-z0-9]/gi,"-").toLowerCase();
     try {
+      /* Wait for any async renders (photos, etc.) to settle */
+      await new Promise(r => setTimeout(r, 400));
       const canvas =
         await captureEl(el, PRINT_SCALE) ??
         await captureEl(el, 3)          ??
@@ -449,7 +472,7 @@ export default function PrintSingleCard() {
         <div className="card-wrap">
           <CropMarks />
           <div className="cut-guide" />
-          <FrontCard p={pilgrim} group={group} company={company} photoDataUrl={photoDataUrl} />
+          <FrontCard p={pilgrim} group={group} company={company} photoDataUrl={photoDataUrl} barcodeDataUrl={barcodeDataUrl} />
         </div>
         <div className="side-badge no-print" style={{ background:"#dbeafe", color:"#1e40af" }}>
           ▲ FRONT — {pilgrim.fullName} &nbsp;·&nbsp; 54 mm × 85 mm &nbsp;·&nbsp; 300 DPI ready
