@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
 import { fetchAsDataUrl } from "@/lib/downloadUtils";
-import { QRCodeCanvas } from "qrcode.react";
+import { QRCodeSVG } from "qrcode.react";
 import { Barcode } from "@/components/print/Barcode";
 import { COMPANIES, getCompanyById, type CompanyInfo } from "@/lib/companies";
 import html2canvas from "html2canvas";
@@ -114,7 +114,7 @@ function FrontCard({ p, group, company, photoDataUrl }: { p:Pilgrim; group:Group
         {/* QR code — right */}
         <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:"0.5mm", flexShrink:0 }}>
           <div style={{ background:"#fff", padding:"2px", border:`1.5px solid ${DARK}`, borderRadius:"3px" }}>
-            <QRCodeCanvas value={buildVerifyUrl(p.id)} size={44} level="M" fgColor="#000000" bgColor="#ffffff" />
+            <QRCodeSVG value={buildVerifyUrl(p.id)} size={54} level="M" fgColor="#000000" bgColor="#ffffff" />
           </div>
           <div style={{ fontSize:"3pt", color:DARK, fontWeight:800, textTransform:"uppercase", letterSpacing:"0.3px" }}>SCAN</div>
         </div>
@@ -188,7 +188,7 @@ function BackCard({ p, group, company }: { p:Pilgrim; group:Group; company:Compa
       <div style={{ position:"relative", zIndex:1, display:"flex", justifyContent:"center", marginTop:"2.5mm" }}>
         <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:"0.5mm" }}>
           <div style={{ background:"#fff", padding:"4px", borderRadius:"3px", border:`1.5px solid ${DARK}` }}>
-            <QRCodeCanvas value={buildVerifyUrl(p.id)} size={68} level="M" fgColor="#000000" bgColor="#ffffff" />
+            <QRCodeSVG value={buildVerifyUrl(p.id)} size={72} level="M" fgColor="#000000" bgColor="#ffffff" />
           </div>
           <div style={{ fontSize:"3pt", color:DARK, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.3px" }}>SCAN</div>
         </div>
