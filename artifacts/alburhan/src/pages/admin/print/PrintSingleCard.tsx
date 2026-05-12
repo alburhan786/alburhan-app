@@ -9,7 +9,7 @@ import { saveAs } from "file-saver";
 import JsBarcode from "jsbarcode";
 
 /* Generate barcode as PNG data URL — synchronous, no timing gap */
-function makeBarcodeDataUrl(value: string, height = 20): string {
+function makeBarcodeDataUrl(value: string, height = 13): string {
   if (!value) return "";
   try {
     const safe = value.replace(/[^\x00-\x7F]/g, "");
@@ -89,8 +89,8 @@ function FrontCard({ p, group, company, photoDataUrl, barcodeDataUrl }: { p:Pilg
       <CardHeader company={company} />
 
       {/* Circular photo */}
-      <div style={{ display:"flex", justifyContent:"center", marginTop:"2mm", position:"relative", zIndex:1 }}>
-        <div style={{ width:"28mm", height:"28mm", borderRadius:"50%", border:`2.5mm solid ${GOLD}`, overflow:"hidden", flexShrink:0, background:"#f0f0f0" }}>
+      <div style={{ display:"flex", justifyContent:"center", marginTop:"1.5mm", position:"relative", zIndex:1 }}>
+        <div style={{ width:"23mm", height:"23mm", borderRadius:"50%", border:`2mm solid ${GOLD}`, overflow:"hidden", flexShrink:0, background:"#f0f0f0" }}>
           {photoSrc
             ? <img src={photoSrc} alt="" style={{ width:"100%", height:"100%", objectFit:"cover", objectPosition:"top center", WebkitPrintColorAdjust:"exact", printColorAdjust:"exact", display:"block" } as React.CSSProperties} />
             : <div style={{ width:"100%", height:"100%", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"5pt", color:"#aaa", fontWeight:600 }}>PHOTO</div>
@@ -245,7 +245,13 @@ function CropMarks() {
 /* ─── Canvas capture helper ────────────────────────────────────────────────── */
 async function captureEl(el: HTMLElement, scale: number): Promise<HTMLCanvasElement|null> {
   try {
-    const c = await html2canvas(el, { useCORS:true, allowTaint:true, backgroundColor:"#ffffff", logging:false, imageTimeout:15000, scale });
+    const c = await html2canvas(el, {
+      useCORS: true, allowTaint: true, backgroundColor: "#ffffff",
+      logging: false, imageTimeout: 15000, scale,
+      /* Pin to exact element bounds — prevents scroll-offset drift */
+      width: el.offsetWidth, height: el.offsetHeight,
+      x: 0, y: 0, scrollX: 0, scrollY: 0,
+    });
     return c.width > 0 && c.height > 0 ? c : null;
   } catch { return null; }
 }
@@ -325,14 +331,8 @@ export default function PrintSingleCard() {
     const pageEl = dlSide === "front" ? frontRef.current : backRef.current;
     if (!pageEl || !pilgrim) return;
     /* Capture only .id-card — crop marks/cut-guide live in .card-wrap so they're never included.
-       Temporarily disable overflow:hidden and border-radius so no content is clipped at edges. */
+       Capture as-is: overflow:hidden keeps canvas to exact card bounds, scrollX/Y=0 prevents drift. */
     const el = (pageEl.querySelector(".id-card") as HTMLElement) ?? pageEl;
-    const prevOverflow     = el.style.overflow;
-    const prevRadius       = el.style.borderRadius;
-    const prevBoxShadow    = el.style.boxShadow;
-    el.style.overflow      = "visible";
-    el.style.borderRadius  = "0";
-    el.style.boxShadow     = "none";
     const key = `${dlSide}-${fmt}`;
     setDlState(key);
     const slug = pilgrim.fullName.replace(/[^a-z0-9]/gi,"-").toLowerCase();
@@ -361,9 +361,6 @@ export default function PrintSingleCard() {
         pdf.save(`id-card-${dlSide}-${slug}.pdf`);
       }
     } finally {
-      el.style.overflow     = prevOverflow;
-      el.style.borderRadius = prevRadius;
-      el.style.boxShadow    = prevBoxShadow;
       setDlState(null);
     }
   };
