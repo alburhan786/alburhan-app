@@ -146,8 +146,8 @@ function RoomSticker({ roomNumber, pilgrims, group, companyName, companyPhone, c
 
       </div>
 
-      {/* Hotel rows — light background so dates are clearly visible */}
-      {hasHotels && (
+      {/* Hotel rows hidden */}
+      {false && hasHotels && (
         <div style={{
           background: "#f0fdf4", borderBottom: `1.5px solid ${DARK_GREEN}30`,
           padding: "2mm 3.5mm 1mm",
