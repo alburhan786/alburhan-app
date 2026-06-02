@@ -124,9 +124,14 @@ router.put("/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) =
 
 router.delete("/:id", requireAdmin as any, async (req, res) => {
   const id = String(req.params.id);
-  await db.delete(pilgrimsTable).where(eq(pilgrimsTable.groupId, id));
-  await db.delete(hajjGroupsTable).where(eq(hajjGroupsTable.id, id));
-  res.json({ message: "Group and all pilgrims deleted" });
+  try {
+    await db.delete(pilgrimsTable).where(eq(pilgrimsTable.groupId, id));
+    await db.delete(hajjGroupsTable).where(eq(hajjGroupsTable.id, id));
+    res.json({ message: "Group and all pilgrims deleted" });
+  } catch (err: any) {
+    console.error("[groups] DELETE /:id DB error:", err);
+    res.status(500).json({ message: err?.message || "Failed to delete group" });
+  }
 });
 
 router.get("/:groupId/pilgrims", requireAdmin as any, async (req, res) => {
@@ -1328,11 +1333,16 @@ router.put("/:groupId/rooms/:roomId", requireAdmin as any, async (req: Authentic
 router.delete("/:groupId/rooms/:roomId", requireAdmin as any, async (req, res) => {
   const groupId = String(req.params.groupId);
   const roomId = String(req.params.roomId);
-  const scope = and(eq(hajjRoomsTable.id, roomId), eq(hajjRoomsTable.groupId, groupId));
-  const rooms = await db.select().from(hajjRoomsTable).where(scope).limit(1);
-  if (!rooms[0]) { res.status(404).json({ message: "Room not found" }); return; }
-  await db.delete(hajjRoomsTable).where(scope);
-  res.json({ message: "Room deleted" });
+  try {
+    const scope = and(eq(hajjRoomsTable.id, roomId), eq(hajjRoomsTable.groupId, groupId));
+    const rooms = await db.select().from(hajjRoomsTable).where(scope).limit(1);
+    if (!rooms[0]) { res.status(404).json({ message: "Room not found" }); return; }
+    await db.delete(hajjRoomsTable).where(scope);
+    res.json({ message: "Room deleted" });
+  } catch (err: any) {
+    console.error("[groups] DELETE /:groupId/rooms/:roomId DB error:", err);
+    res.status(500).json({ message: err?.message || "Failed to delete room" });
+  }
 });
 
 export default router;
