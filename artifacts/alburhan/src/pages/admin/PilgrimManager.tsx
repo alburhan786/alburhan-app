@@ -342,11 +342,17 @@ export default function PilgrimManager() {
       const res = await fetch(`${API}/api/groups/${groupId}/rooms/${id}`, {
         method: "DELETE", credentials: "include",
       });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) {
+        let msg = `HTTP ${res.status}`;
+        try { const d = await res.json(); msg = d.message || msg; } catch {}
+        throw new Error(msg);
+      }
       toast({ title: "Room deleted" });
       setDeleteConfirmRoomId(null);
       fetchData();
-    } catch { toast({ title: "Error deleting room", variant: "destructive" }); }
+    } catch (err: any) {
+      toast({ title: err?.message || "Error deleting room", variant: "destructive" });
+    }
   };
 
   const handleAutoAllocate = async () => {
