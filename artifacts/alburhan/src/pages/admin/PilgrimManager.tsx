@@ -339,8 +339,8 @@ export default function PilgrimManager() {
 
   const handleRoomDelete = async (id: string) => {
     try {
-      const res = await fetch(`${API}/api/groups/${groupId}/rooms/${id}`, {
-        method: "DELETE", credentials: "include",
+      const res = await fetch(`${API}/api/groups/${groupId}/rooms/${id}/delete`, {
+        method: "POST", credentials: "include",
       });
       if (!res.ok) {
         let msg = `HTTP ${res.status}`;

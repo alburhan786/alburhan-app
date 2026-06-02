@@ -1345,4 +1345,20 @@ router.delete("/:groupId/rooms/:roomId", requireAdmin as any, async (req, res) =
   }
 });
 
+// POST-based workaround for environments where Nginx blocks DELETE method
+router.post("/:groupId/rooms/:roomId/delete", requireAdmin as any, async (req, res) => {
+  const groupId = String(req.params.groupId);
+  const roomId = String(req.params.roomId);
+  try {
+    const scope = and(eq(hajjRoomsTable.id, roomId), eq(hajjRoomsTable.groupId, groupId));
+    const rooms = await db.select().from(hajjRoomsTable).where(scope).limit(1);
+    if (!rooms[0]) { res.status(404).json({ message: "Room not found" }); return; }
+    await db.delete(hajjRoomsTable).where(scope);
+    res.json({ message: "Room deleted" });
+  } catch (err: any) {
+    console.error("[groups] POST /:groupId/rooms/:roomId/delete DB error:", err);
+    res.status(500).json({ message: err?.message || "Failed to delete room" });
+  }
+});
+
 export default router;
