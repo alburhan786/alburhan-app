@@ -96,6 +96,7 @@ router.get("/family/:groupId/:familyId", async (req, res) => {
       passportNumber: p.passportNumber,
       gender: p.gender,
       relation: p.relation,
+      familyRelation: p.familyRelation,
       familyHead: p.familyHead,
       roomNumber: p.roomNumber,
       roomHotel: p.roomHotel,

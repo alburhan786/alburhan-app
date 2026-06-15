@@ -1375,6 +1375,111 @@ router.delete("/:groupId/rooms/:roomId", requireAdmin as any, async (req, res) =
 
 // ======================== FAMILY ENDPOINTS ========================
 
+// GET /:groupId/families/pdf — family list PDF download
+router.get("/:groupId/families/pdf", requireAdmin as any, async (req, res) => {
+  try {
+    const groupId = String(req.params.groupId);
+    const groups = await db.select().from(hajjGroupsTable).where(eq(hajjGroupsTable.id, groupId)).limit(1);
+    if (!groups[0]) { res.status(404).json({ message: "Group not found" }); return; }
+    const group = groups[0];
+
+    const pilgrims = await db.select().from(pilgrimsTable)
+      .where(eq(pilgrimsTable.groupId, groupId))
+      .orderBy(asc(pilgrimsTable.serialNumber));
+
+    const familyMap = new Map<string, typeof pilgrims>();
+    for (const p of pilgrims) {
+      if (!p.familyId) continue;
+      if (!familyMap.has(p.familyId)) familyMap.set(p.familyId, []);
+      familyMap.get(p.familyId)!.push(p);
+    }
+    const families = Array.from(familyMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([familyId, members]) => ({
+        familyId,
+        members,
+        head: members.find(m => m.familyHead) || members[0] || null,
+      }));
+
+    const doc = new PDFDocument({ size: "A4", layout: "portrait", margin: 0 });
+    const safeName = group.groupName.replace(/[^a-zA-Z0-9]/g, "-");
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="family-list-${safeName}-${group.year}.pdf"`);
+    doc.pipe(res);
+
+    const PAGE_W = doc.page.width;
+    const MARGIN = 28;
+    const USABLE_W = PAGE_W - MARGIN * 2;
+    const DARK_GREEN = "#0B3D2E";
+    const GOLD = "#C9A23F";
+    const LIGHT_ROW = "#f0f7f0";
+
+    // Header
+    doc.rect(MARGIN, MARGIN, USABLE_W, 44).fill(DARK_GREEN);
+    doc.image(LOGO_BUFFER, MARGIN + 4, MARGIN + 2, { width: 40, height: 40 });
+    doc.fill(GOLD).font("Helvetica-Bold").fontSize(14)
+      .text("AL BURHAN TOURS & TRAVELS", MARGIN + 46, MARGIN + 5, { width: USABLE_W - 46, align: "center", lineBreak: false });
+    doc.fill("white").font("Helvetica").fontSize(7.5)
+      .text("5/8 Khanka Masjid Complex, Shanwara Road, Burhanpur 450331 M.P. | Tel: +91 9893989786 | WhatsApp: +91 8989701701",
+        MARGIN + 46, MARGIN + 22, { width: USABLE_W - 46, align: "center", lineBreak: false });
+
+    let y = MARGIN + 48;
+    doc.fill(DARK_GREEN).font("Helvetica-Bold").fontSize(11)
+      .text(`FAMILY LIST — ${group.groupName.toUpperCase()} (${group.year})`, MARGIN, y + 4,
+        { width: USABLE_W, align: "center", lineBreak: false });
+    const meta = [`Total Families: ${families.length}`, `Total Pilgrims: ${pilgrims.length}`].join("   |   ");
+    doc.fill("#555").font("Helvetica").fontSize(7)
+      .text(meta, MARGIN, y + 18, { width: USABLE_W, align: "center", lineBreak: false });
+    y += 32;
+
+    // Table
+    const colW = [44, 120, 180, 36, 56, 80, 82];
+    const colLabels = ["Fam ID", "Head Name", "Members", "Cnt", "Room", "Hotel", "Mobile"];
+    const totalW = colW.reduce((a, b) => a + b, 0);
+    const tableX = MARGIN + (USABLE_W - totalW) / 2;
+
+    doc.rect(tableX, y, totalW, 17).fill(DARK_GREEN);
+    let cx = tableX;
+    colLabels.forEach((lbl, i) => {
+      doc.fill("white").font("Helvetica-Bold").fontSize(7.5)
+        .text(lbl, cx + 2, y + 5, { width: colW[i] - 4, lineBreak: false });
+      cx += colW[i];
+    });
+    y += 17;
+
+    for (let idx = 0; idx < families.length; idx++) {
+      const fam = families[idx];
+      const headName = [fam.head?.salutation, fam.head?.fullName].filter(Boolean).join(" ") || fam.familyId;
+      const memberNames = fam.members.map(m => m.fullName).join(", ");
+      const roomNos = [...new Set(fam.members.filter(m => m.roomNumber).map(m => m.roomNumber!))].join(", ") || "—";
+      const hotels = [...new Set(fam.members.filter(m => m.roomHotel).map(m => m.roomHotel!))].join(", ") || "—";
+      const mobile = fam.head?.mobileIndia || fam.head?.mobileSaudi || "—";
+      const rowData = [fam.familyId, headName, memberNames, String(fam.members.length), roomNos, hotels, mobile];
+
+      const ROW_H = 20;
+      if (y + ROW_H > doc.page.height - 28) {
+        doc.addPage();
+        y = MARGIN;
+      }
+      if (idx % 2 === 0) doc.rect(tableX, y, totalW, ROW_H).fill(LIGHT_ROW);
+      doc.moveTo(tableX, y + ROW_H).lineTo(tableX + totalW, y + ROW_H).strokeColor("#ddd").lineWidth(0.5).stroke();
+
+      cx = tableX;
+      rowData.forEach((val, i) => {
+        doc.fill("#111").font("Helvetica").fontSize(7)
+          .text(val, cx + 2, y + 6, { width: colW[i] - 4, lineBreak: false });
+        cx += colW[i];
+      });
+      y += ROW_H;
+    }
+
+    doc.end();
+  } catch (err: any) {
+    console.error("[groups] families/pdf error:", err);
+    if (!res.headersSent) res.status(500).json({ message: err?.message || "Failed to generate family list PDF" });
+  }
+});
+
 // GET /:groupId/families — list all families (admin)
 router.get("/:groupId/families", requireAdmin as any, async (req, res) => {
   const groupId = String(req.params.groupId);

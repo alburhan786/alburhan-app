@@ -167,6 +167,7 @@ export default function PilgrimManager() {
   const [families, setFamilies] = useState<FamilyGroup[]>([]);
   const [familyAllocating, setFamilyAllocating] = useState(false);
   const [expandedFamilies, setExpandedFamilies] = useState<Set<string>>(new Set());
+  const [downloadingFamilyPdf, setDownloadingFamilyPdf] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -509,6 +510,21 @@ export default function PilgrimManager() {
     finally { setFamilyAllocating(false); }
   };
 
+  const handleDownloadFamilyPdf = async () => {
+    setDownloadingFamilyPdf(true);
+    try {
+      const res = await fetch(`${API}/api/groups/${groupId}/families/pdf`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = `family-list-${group?.groupName || groupId}-${group?.year || ""}.pdf`;
+      a.click(); window.URL.revokeObjectURL(url);
+      toast({ title: "Family List PDF downloaded!" });
+    } catch { toast({ title: "Failed to download family list PDF", variant: "destructive" }); }
+    finally { setDownloadingFamilyPdf(false); }
+  };
+
   const handleAssignFamilyToRoom = async (familyId: string, roomId: string | null) => {
     try {
       const res = await fetch(`${API}/api/groups/${groupId}/families/${encodeURIComponent(familyId)}/assign-room`, {
@@ -791,11 +807,12 @@ export default function PilgrimManager() {
                             value={p.familyRelation || ""}
                             onChange={e => {
                               const val = e.target.value;
-                              fetch(`${API}/groups/${groupId}/pilgrims/${p.id}`, {
+                              fetch(`${API}/api/groups/${groupId}/pilgrims/${p.id}`, {
                                 method: "PUT",
-                                headers: { "Content-Type": "application/json", ...authHeader() },
+                                credentials: "include",
+                                headers: { "Content-Type": "application/json" },
                                 body: JSON.stringify({ familyRelation: val || null }),
-                              }).then(() => fetchPilgrims());
+                              }).then(() => fetchData());
                             }}
                             className="h-5 text-[10px] rounded border border-amber-200 bg-amber-50 text-amber-900 px-1 max-w-[72px]"
                           >
@@ -1099,6 +1116,14 @@ export default function PilgrimManager() {
             >
               <Wand2 size={16} /> {familyAllocating ? "Allocating..." : "Family Auto Allocate"}
             </Button>
+            <Button
+              onClick={handleDownloadFamilyPdf}
+              disabled={downloadingFamilyPdf || families.length === 0}
+              variant="outline"
+              className="gap-1.5 rounded-xl border-amber-300 text-amber-700 hover:bg-amber-50 disabled:opacity-60"
+            >
+              <FileDown size={16} /> {downloadingFamilyPdf ? "Generating..." : "Family List PDF"}
+            </Button>
             <Button onClick={fetchFamilies} variant="outline" className="gap-1.5 rounded-xl">
               Refresh
             </Button>
@@ -1165,6 +1190,9 @@ export default function PilgrimManager() {
                               {fam.head?.familyHead && <Star size={11} className="text-amber-500" fill="currentColor" />}
                             </div>
                             <div className="text-xs text-muted-foreground mt-0.5">{fam.members.length} member{fam.members.length !== 1 ? "s" : ""}</div>
+                            {fam.head?.mobileIndia && (
+                              <div className="text-[10px] text-muted-foreground">📞 {fam.head.mobileIndia}</div>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
@@ -1221,7 +1249,7 @@ export default function PilgrimManager() {
                                 <span className="font-medium truncate">{m.fullName}</span>
                                 {m.familyHead && <Star size={9} className="inline ml-1 text-amber-500" fill="currentColor" />}
                               </div>
-                              <span className="text-muted-foreground shrink-0">{m.relation || m.gender || ""}</span>
+                              <span className="text-muted-foreground shrink-0">{m.familyRelation || m.relation || m.gender || ""}</span>
                               {m.roomNumber && (
                                 <span className="bg-primary/10 text-primary font-semibold px-1.5 py-0.5 rounded text-[10px] shrink-0">Rm {m.roomNumber}</span>
                               )}
@@ -1233,8 +1261,9 @@ export default function PilgrimManager() {
                       {/* QR code */}
                       {isExpanded && (
                         <div className="mb-3 flex items-start gap-3 bg-white border rounded-lg p-3">
-                          <div className="bg-white p-1 border rounded">
+                          <div className="bg-white p-1 border rounded shrink-0">
                             <QRCodeCanvas
+                              id={`family-qr-${fam.familyId}`}
                               value={familyQrUrl}
                               size={72}
                               level="M"
@@ -1244,11 +1273,23 @@ export default function PilgrimManager() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-xs font-semibold text-gray-700 mb-0.5">Family Verify QR</p>
-                            <p className="text-[10px] text-muted-foreground break-all mb-2">{familyQrUrl}</p>
-                            <button
-                              onClick={() => window.open(familyQrUrl, "_blank")}
-                              className="text-[10px] text-primary underline"
-                            >Open page ↗</button>
+                            <p className="text-[10px] text-muted-foreground break-all mb-1">{familyQrUrl}</p>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => window.open(familyQrUrl, "_blank")}
+                                className="text-[10px] text-primary underline"
+                              >Open ↗</button>
+                              <button
+                                onClick={() => {
+                                  const canvas = document.getElementById(`family-qr-${fam.familyId}`) as HTMLCanvasElement;
+                                  if (!canvas) return;
+                                  const url = canvas.toDataURL("image/png");
+                                  const a = document.createElement("a");
+                                  a.href = url; a.download = `family-qr-${fam.familyId}.png`; a.click();
+                                }}
+                                className="text-[10px] text-emerald-700 underline"
+                              >Download QR ↓</button>
+                            </div>
                           </div>
                         </div>
                       )}
