@@ -695,6 +695,7 @@ export default function PilgrimManager() {
         const q = familySearch.toLowerCase();
         if (fam.familyId.toLowerCase().includes(q)) return true;
         if ((fam.head?.fullName || "").toLowerCase().includes(q)) return true;
+        if ((group?.flightNumber || "").toLowerCase().includes(q)) return true;
         return fam.members.some(m =>
           m.fullName.toLowerCase().includes(q) ||
           (m.passportNumber || "").toLowerCase().includes(q) ||
@@ -813,7 +814,7 @@ export default function PilgrimManager() {
           { label: "Grouped", value: pilgrims.filter(p => p.familyId).length, color: "text-blue-700 bg-blue-50 border-blue-200" },
           { label: "Ungrouped", value: pilgrims.filter(p => !p.familyId).length, color: "text-orange-700 bg-orange-50 border-orange-200" },
           { label: "Rooms Assigned", value: pilgrims.filter(p => p.roomId).length, color: "text-purple-700 bg-purple-50 border-purple-200" },
-          { label: "Flights Assigned", value: pilgrims.filter(p => p.busNumber).length, color: "text-teal-700 bg-teal-50 border-teal-200" },
+          { label: "Flights Assigned", value: group?.flightNumber ? pilgrims.length : 0, color: "text-teal-700 bg-teal-50 border-teal-200" },
         ].map(stat => (
           <div key={stat.label} className={`flex flex-col items-center px-3 py-1.5 rounded-lg border text-xs font-semibold ${stat.color}`}>
             <span className="text-lg font-black leading-tight">{stat.value}</span>

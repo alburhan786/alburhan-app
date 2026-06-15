@@ -1745,10 +1745,13 @@ router.post("/:groupId/families/auto-detect", requireAdmin as any, async (req, r
 });
 
 // POST /:groupId/families/auto-generate-ids — re-sequence family IDs to F001, F002...
+// Uses two-phase rename (oldId -> TEMP_N -> Fxxx) to avoid collision-merging when an oldId
+// matches a newId of another family still pending in the same pass.
 router.post("/:groupId/families/auto-generate-ids", requireAdmin as any, async (req, res) => {
   const groupId = String(req.params.groupId);
   try {
-    const pilgrims = await db.select().from(pilgrimsTable)
+    const pilgrims = await db.select({ id: pilgrimsTable.id, familyId: pilgrimsTable.familyId })
+      .from(pilgrimsTable)
       .where(eq(pilgrimsTable.groupId, groupId))
       .orderBy(asc(pilgrimsTable.serialNumber));
 
@@ -1760,11 +1763,23 @@ router.post("/:groupId/families/auto-generate-ids", requireAdmin as any, async (
       const newId = `F${String(idx + 1).padStart(3, "0")}`;
       if (oldId !== newId) mapping.push({ oldId, newId });
     });
+    if (mapping.length === 0) {
+      res.json({ updated: 0, families: [], totalFamilies: existingIds.length });
+      return;
+    }
 
-    for (const { oldId, newId } of mapping) {
+    // Phase 1: rename oldId -> temporary TEMP_<idx> (guarantees no collision with F001…)
+    for (let i = 0; i < mapping.length; i++) {
       await db.update(pilgrimsTable)
-        .set({ familyId: newId, updatedAt: new Date() })
-        .where(and(eq(pilgrimsTable.groupId, groupId), eq(pilgrimsTable.familyId, oldId)));
+        .set({ familyId: `TEMP_${i}`, updatedAt: new Date() })
+        .where(and(eq(pilgrimsTable.groupId, groupId), eq(pilgrimsTable.familyId, mapping[i].oldId)));
+    }
+
+    // Phase 2: rename TEMP_<idx> -> final newId
+    for (let i = 0; i < mapping.length; i++) {
+      await db.update(pilgrimsTable)
+        .set({ familyId: mapping[i].newId, updatedAt: new Date() })
+        .where(and(eq(pilgrimsTable.groupId, groupId), eq(pilgrimsTable.familyId, `TEMP_${i}`)));
     }
 
     res.json({ updated: mapping.length, families: mapping, totalFamilies: existingIds.length });
