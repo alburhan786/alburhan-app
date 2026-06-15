@@ -685,18 +685,33 @@ export default function PilgrimManager() {
     } catch { toast({ title: "Excel export failed", variant: "destructive" }); }
   };
 
-  const downloadFamilyReport = async (type: "pdf" | "flight-list" | "bus-list" | "hotel-list", label: string) => {
-    const epMap: Record<string, string> = { "pdf": "pdf", "flight-list": "flight-list/pdf", "bus-list": "bus-list/pdf", "hotel-list": "hotel-list/pdf" };
+  const downloadFamilyReport = async (type: "pdf" | "flight-list" | "bus-list" | "hotel-list" | "badges", label: string) => {
+    const epMap: Record<string, string> = { "pdf": "pdf", "flight-list": "flight-list/pdf", "bus-list": "bus-list/pdf", "hotel-list": "hotel-list/pdf", "badges": "badges/pdf" };
     try {
       const res = await fetch(`${API}/api/groups/${groupId}/families/${epMap[type]}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed");
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url; a.download = `family-${type}-${group?.groupName || groupId}-${group?.year || ""}.pdf`;
+      const ext = type === "badges" ? "pdf" : "pdf";
+      a.href = url; a.download = `family-${type}-${group?.groupName || groupId}-${group?.year || ""}.${ext}`;
       a.click(); window.URL.revokeObjectURL(url);
       toast({ title: `${label} downloaded!` });
     } catch { toast({ title: `Failed to download ${label}`, variant: "destructive" }); }
+  };
+
+  const downloadFamilyBadges = async (familyId: string) => {
+    try {
+      const res = await fetch(`${API}/api/groups/${groupId}/families/${encodeURIComponent(familyId)}/badges/pdf`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `badges-${familyId}-${(group?.groupName ?? groupId).replace(/[^a-zA-Z0-9]+/g, "-")}-${group?.year || ""}.pdf`;
+      a.click(); window.URL.revokeObjectURL(url);
+      toast({ title: `Badges PDF for ${familyId} downloaded!` });
+    } catch { toast({ title: "Badges download failed", variant: "destructive" }); }
   };
 
   const handleWhatsAppShare = async () => {
@@ -1340,11 +1355,13 @@ export default function PilgrimManager() {
                     { key: "flight-list", label: "Flight List PDF" },
                     { key: "bus-list", label: "Bus List PDF" },
                     { key: "hotel-list", label: "Hotel List PDF" },
+                    { key: "badges", label: "Family Badges PDF" },
                   ] as const).map(item => (
                     <button key={item.key}
                       onClick={() => { downloadFamilyReport(item.key, item.label); setReportsOpen(false); }}
                       className="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-muted text-left">
-                      <FileDown size={13} className="text-emerald-600" /> {item.label}
+                      <FileDown size={13} className={item.key === "badges" ? "text-amber-600" : "text-emerald-600"} />
+                      {item.label}
                     </button>
                   ))}
                 </div>
@@ -1612,6 +1629,13 @@ export default function PilgrimManager() {
                           </div>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
+                          <Button
+                            variant="ghost" size="icon" className="h-7 w-7 text-amber-600 hover:bg-amber-50"
+                            title={`Print Badges — ${fam.familyId}`}
+                            onClick={() => downloadFamilyBadges(fam.familyId)}
+                          >
+                            <Printer size={13} />
+                          </Button>
                           {fam.head?.mobileIndia && (
                             <Button
                               variant="ghost" size="icon" className="h-7 w-7 text-green-600 hover:bg-green-50"

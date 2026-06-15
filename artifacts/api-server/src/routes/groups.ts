@@ -2053,6 +2053,173 @@ router.get("/:groupId/families/hotel-list/pdf", requireAdmin as any, async (req,
   }
 });
 
+// Helper: draw a single family luggage-tag badge at (bx, by, bw, bh)
+function drawFamilyBadge(doc: any, p: any, group: any, bx: number, by: number, bw: number, bh: number) {
+  const DARK = "#0B3D2E";
+  const GOLD = "#C9A23F";
+  const HOTEL_L: Record<string, string> = { makkah: "Makkah", madinah: "Madinah", aziziah: "Aziziah" };
+
+  // Background + border
+  doc.rect(bx + 1, by + 1, bw - 2, bh - 2).fill("#FFFEF8");
+  doc.rect(bx, by, bw, bh).strokeColor(GOLD).lineWidth(1).stroke();
+
+  // Header bar
+  const HDR_H = 26;
+  doc.rect(bx, by, bw, HDR_H).fill(DARK);
+  try { doc.image(LOGO_BUFFER, bx + 4, by + 7, { width: 12, height: 12 }); } catch {}
+  doc.fill(GOLD).font("Helvetica-Bold").fontSize(12)
+    .text(p.familyId || "—", bx + 18, by + 7, { width: 56, lineBreak: false });
+  const role = p.familyHead ? "HEAD" : (p.familyRelation || p.relation || "Member").toUpperCase().slice(0, 12);
+  doc.fill("#C9A23F").font("Helvetica").fontSize(7)
+    .text(role, bx + 78, by + 10, { lineBreak: false });
+  doc.fill("white").font("Helvetica").fontSize(6.5)
+    .text(`${group.groupName}  ${group.year}`, bx + bw - 130, by + 9, { width: 126, align: "right", lineBreak: false });
+
+  // Photo box
+  const PHOTO_SZ = 54;
+  const PX = bx + 7;
+  const PY = by + HDR_H + 8;
+  doc.rect(PX, PY, PHOTO_SZ, PHOTO_SZ).fill("#E8E8E8").strokeColor(GOLD).lineWidth(0.8).stroke();
+  const glyph = p.gender?.toLowerCase() === "female" ? "F" : "M";
+  doc.fill("#AAA").font("Helvetica-Bold").fontSize(18)
+    .text(glyph, PX, PY + 14, { width: PHOTO_SZ, align: "center", lineBreak: false });
+  // Serial under photo
+  doc.fill(DARK).font("Helvetica-Bold").fontSize(8)
+    .text(`#${String(p.serialNumber).padStart(3, "0")}`, PX, PY + PHOTO_SZ + 4, { width: PHOTO_SZ, align: "center", lineBreak: false });
+
+  // Content area
+  const CX = PX + PHOTO_SZ + 8;
+  const CW = bx + bw - CX - 7;
+  let cy = PY;
+
+  // Name
+  const name = [p.salutation, p.fullName].filter(Boolean).join(" ");
+  doc.fill(DARK).font("Helvetica-Bold").fontSize(9)
+    .text(name, CX, cy, { width: CW, lineBreak: false });
+  cy += 13;
+
+  // Role pill
+  const pillW = Math.min(CW, 70);
+  const pillBg = p.familyHead ? GOLD : "#D4EDDA";
+  const pillFg = p.familyHead ? DARK : "#155724";
+  doc.rect(CX, cy, pillW, 11).fill(pillBg);
+  doc.fill(pillFg).font("Helvetica-Bold").fontSize(6.5)
+    .text((p.familyHead ? "★ HEAD" : (p.familyRelation || p.relation || "MEMBER")).toUpperCase(), CX + 2, cy + 2, { width: pillW - 4, align: "center", lineBreak: false });
+  cy += 14;
+
+  // Passport
+  if (p.passportNumber) {
+    doc.fill("#555").font("Helvetica").fontSize(7.5)
+      .text("Passport  ", CX, cy, { continued: true, lineBreak: false });
+    doc.fill(DARK).font("Helvetica-Bold").text(p.passportNumber, { lineBreak: false });
+    cy += 11;
+  }
+
+  // Room + Hotel
+  if (p.roomNumber) {
+    const hotel = p.roomHotel ? (HOTEL_L[p.roomHotel] || p.roomHotel) : "";
+    doc.fill("#555").font("Helvetica").fontSize(7.5)
+      .text("Room  ", CX, cy, { continued: true, lineBreak: false });
+    doc.fill(DARK).font("Helvetica-Bold").text(`${p.roomNumber}${hotel ? `  (${hotel})` : ""}`, { lineBreak: false });
+    cy += 11;
+  }
+
+  // Bus
+  if (p.busNumber) {
+    doc.fill("#555").font("Helvetica").fontSize(7.5)
+      .text("Bus  ", CX, cy, { continued: true, lineBreak: false });
+    doc.fill(DARK).font("Helvetica-Bold").text(p.busNumber, { lineBreak: false });
+    cy += 11;
+  }
+
+  // Flight
+  if (group.flightNumber) {
+    doc.fill("#555").font("Helvetica").fontSize(7.5)
+      .text("Flight  ", CX, cy, { continued: true, lineBreak: false });
+    doc.fill(DARK).font("Helvetica-Bold").text(group.flightNumber, { lineBreak: false });
+    cy += 11;
+  }
+
+  // Mobile
+  if (p.mobileIndia) {
+    doc.fill("#666").font("Helvetica").fontSize(7)
+      .text(`Mob: ${p.mobileIndia}`, CX, cy, { width: CW, lineBreak: false });
+  }
+
+  // Footer bar
+  const FY = by + bh - 15;
+  doc.rect(bx, FY, bw, 15).fill(GOLD + "44");
+  doc.moveTo(bx, FY).lineTo(bx + bw, FY).strokeColor(GOLD).lineWidth(0.5).stroke();
+  doc.fill(DARK).font("Helvetica-Bold").fontSize(6.5)
+    .text("AL BURHAN TOURS & TRAVELS  |  HAJJ " + group.year, bx + 4, FY + 4, { width: bw - 8, align: "center", lineBreak: false });
+}
+
+// Helper: layout a list of pilgrims as 2-col x 3-row badges on A4 pages
+function layoutBadgeGrid(doc: any, pilgrims: any[], group: any) {
+  const COLS = 2, ROWS = 3, MARGIN = 18, GAP = 8;
+  const BW = (doc.page.width - MARGIN * 2 - GAP * (COLS - 1)) / COLS;
+  const BH = (doc.page.height - MARGIN * 2 - GAP * (ROWS - 1)) / ROWS;
+  pilgrims.forEach((p, idx) => {
+    if (idx > 0 && idx % (COLS * ROWS) === 0) doc.addPage();
+    const pos = idx % (COLS * ROWS);
+    const col = pos % COLS;
+    const row = Math.floor(pos / COLS);
+    const bx = MARGIN + col * (BW + GAP);
+    const by = MARGIN + row * (BH + GAP);
+    drawFamilyBadge(doc, p, group, bx, by, BW, BH);
+  });
+}
+
+// GET /:groupId/families/badges/pdf — family ID badges for all grouped pilgrims
+router.get("/:groupId/families/badges/pdf", requireAdmin as any, async (req, res) => {
+  try {
+    const groupId = String(req.params.groupId);
+    const groups = await db.select().from(hajjGroupsTable).where(eq(hajjGroupsTable.id, groupId)).limit(1);
+    if (!groups[0]) { res.status(404).json({ message: "Group not found" }); return; }
+    const group = groups[0];
+    const allPilgrims = await db.select().from(pilgrimsTable)
+      .where(eq(pilgrimsTable.groupId, groupId))
+      .orderBy(asc(pilgrimsTable.familyId), asc(pilgrimsTable.serialNumber));
+    const pilgrims = allPilgrims.filter(p => p.familyId);
+    if (!pilgrims.length) { res.status(404).json({ message: "No grouped pilgrims found" }); return; }
+    const doc = new PDFDocument({ size: "A4", layout: "portrait", margin: 0 });
+    const safeName = group.groupName.replace(/[^a-zA-Z0-9]/g, "-");
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="family-badges-all-${safeName}-${group.year}.pdf"`);
+    doc.pipe(res);
+    layoutBadgeGrid(doc, pilgrims, group);
+    doc.end();
+  } catch (err: any) {
+    console.error("[groups] families/badges/pdf error:", err);
+    if (!res.headersSent) res.status(500).json({ message: err?.message || "Failed" });
+  }
+});
+
+// GET /:groupId/families/:familyId/badges/pdf — badges for a single family
+router.get("/:groupId/families/:familyId/badges/pdf", requireAdmin as any, async (req, res) => {
+  try {
+    const groupId = String(req.params.groupId);
+    const familyId = decodeURIComponent(String(req.params.familyId));
+    const groups = await db.select().from(hajjGroupsTable).where(eq(hajjGroupsTable.id, groupId)).limit(1);
+    if (!groups[0]) { res.status(404).json({ message: "Group not found" }); return; }
+    const group = groups[0];
+    const pilgrims = await db.select().from(pilgrimsTable)
+      .where(and(eq(pilgrimsTable.groupId, groupId), eq(pilgrimsTable.familyId, familyId)))
+      .orderBy(desc(pilgrimsTable.familyHead), asc(pilgrimsTable.serialNumber));
+    if (!pilgrims.length) { res.status(404).json({ message: "Family not found" }); return; }
+    const doc = new PDFDocument({ size: "A4", layout: "portrait", margin: 0 });
+    const safeName = `${familyId}-${group.groupName.replace(/[^a-zA-Z0-9]/g, "-")}`;
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="family-badges-${safeName}-${group.year}.pdf"`);
+    doc.pipe(res);
+    layoutBadgeGrid(doc, pilgrims, group);
+    doc.end();
+  } catch (err: any) {
+    console.error("[groups] families/:familyId/badges/pdf error:", err);
+    if (!res.headersSent) res.status(500).json({ message: err?.message || "Failed" });
+  }
+});
+
 // POST /:groupId/families/:familyId/whatsapp — send WhatsApp to family head
 router.post("/:groupId/families/:familyId/whatsapp", requireAdmin as any, async (req, res) => {
   const groupId = String(req.params.groupId);
