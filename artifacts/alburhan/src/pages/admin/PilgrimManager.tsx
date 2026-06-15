@@ -7,7 +7,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useDeleteGuard } from "@/components/DeleteGuard";
 import { Plus, Edit, Trash2, ArrowLeft, Upload, Printer, CreditCard, Luggage, Heart,
-  Building2, Bus, DoorOpen, FileDown, Hotel, BedDouble, Users, Wand2, X, AlertTriangle, Sticker, Layers, UserCheck, QrCode, Star } from "lucide-react";
+  Building2, Bus, DoorOpen, FileDown, Hotel, BedDouble, Users, Wand2, X, AlertTriangle, Sticker, Layers, UserCheck, QrCode, Star,
+  Search, LayoutGrid, List, GitBranch, ChevronDown, Share2, RefreshCw, Zap } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
 import { Link, useRoute } from "wouter";
 import { BulkImportModal } from "./BulkImportModal";
@@ -79,6 +80,15 @@ interface FamilyGroup {
   roomNumber?: string | null;
   roomHotel?: string | null;
   roomId?: string | null;
+}
+
+interface DetectionSuggestion {
+  id: number;
+  pilgrimIds: string[];
+  memberNames: string[];
+  reason: string;
+  suggestedFamilyId: string;
+  existingFamilyId?: string;
 }
 
 interface Group {
@@ -168,6 +178,16 @@ export default function PilgrimManager() {
   const [familyAllocating, setFamilyAllocating] = useState(false);
   const [expandedFamilies, setExpandedFamilies] = useState<Set<string>>(new Set());
   const [downloadingFamilyPdf, setDownloadingFamilyPdf] = useState(false);
+  const [familyView, setFamilyView] = useState<"card" | "table" | "tree">("card");
+  const [familySearch, setFamilySearch] = useState("");
+  const [autoDetecting, setAutoDetecting] = useState(false);
+  const [detectDialogOpen, setDetectDialogOpen] = useState(false);
+  const [suggestions, setSuggestions] = useState<DetectionSuggestion[]>([]);
+  const [acceptedSuggestions, setAcceptedSuggestions] = useState<Set<number>>(new Set());
+  const [suggestionFamilyIds, setSuggestionFamilyIds] = useState<Record<number, string>>({});
+  const [applyingSuggestions, setApplyingSuggestions] = useState(false);
+  const [resequencing, setResequencing] = useState(false);
+  const [reportsOpen, setReportsOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -540,6 +560,118 @@ export default function PilgrimManager() {
     } catch { toast({ title: "Failed to assign family to room", variant: "destructive" }); }
   };
 
+  const handleAutoDetect = async () => {
+    setAutoDetecting(true);
+    try {
+      const res = await fetch(`${API}/api/groups/${groupId}/families/auto-detect`, { method: "POST", credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      const data = await res.json();
+      if (data.suggestions.length === 0) {
+        toast({ title: "No family groups detected", description: "Try assigning families manually in the Pilgrims tab." });
+        return;
+      }
+      setSuggestions(data.suggestions);
+      setAcceptedSuggestions(new Set(data.suggestions.map((s: DetectionSuggestion) => s.id)));
+      setSuggestionFamilyIds(Object.fromEntries(data.suggestions.map((s: DetectionSuggestion) => [s.id, s.suggestedFamilyId])));
+      setDetectDialogOpen(true);
+    } catch { toast({ title: "Auto-detect failed", variant: "destructive" }); }
+    finally { setAutoDetecting(false); }
+  };
+
+  const handleApplySuggestions = async () => {
+    const accepted = suggestions.filter(s => acceptedSuggestions.has(s.id)).map(s => ({
+      pilgrimIds: s.pilgrimIds,
+      familyId: suggestionFamilyIds[s.id] || s.suggestedFamilyId,
+      familyHeadId: s.pilgrimIds[0],
+    }));
+    if (accepted.length === 0) { toast({ title: "No suggestions selected", variant: "destructive" }); return; }
+    setApplyingSuggestions(true);
+    try {
+      const res = await fetch(`${API}/api/groups/${groupId}/families/apply-suggestions`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ suggestions: accepted }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      const data = await res.json();
+      toast({ title: `Applied ${data.applied} family group${data.applied !== 1 ? "s" : ""}!` });
+      setDetectDialogOpen(false);
+      await fetchData();
+      await fetchFamilies();
+    } catch { toast({ title: "Failed to apply suggestions", variant: "destructive" }); }
+    finally { setApplyingSuggestions(false); }
+  };
+
+  const handleResequenceIds = async () => {
+    setResequencing(true);
+    try {
+      const res = await fetch(`${API}/api/groups/${groupId}/families/auto-generate-ids`, { method: "POST", credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      const data = await res.json();
+      toast({ title: "IDs re-sequenced!", description: `${data.updated} famil${data.updated !== 1 ? "ies" : "y"} renamed to F001, F002… format` });
+      await fetchData();
+      await fetchFamilies();
+    } catch { toast({ title: "Re-sequence failed", variant: "destructive" }); }
+    finally { setResequencing(false); }
+  };
+
+  const exportFamiliesExcel = () => {
+    const headers = ["Family ID", "Family Head", "Full Name", "Relation", "Gender", "Passport No", "Mobile India", "Room No", "Bus No", "Hotel"];
+    const rows: string[][] = [];
+    const sorted = [...families].sort((a, b) => a.familyId.localeCompare(b.familyId));
+    for (const fam of sorted) {
+      for (const m of fam.members) {
+        rows.push([
+          fam.familyId,
+          m.familyHead ? "Yes" : "No",
+          m.fullName || "",
+          m.familyRelation || m.relation || "",
+          m.gender || "",
+          m.passportNumber || "",
+          m.mobileIndia || "",
+          m.roomNumber || "",
+          m.busNumber || "",
+          m.roomHotel ? (HOTEL_LABELS[m.roomHotel] || m.roomHotel) : "",
+        ]);
+      }
+    }
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    ws["!cols"] = headers.map((_, i) => ({ wch: i === 2 ? 28 : 16 }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Families");
+    const safeName = (group?.groupName ?? groupId).replace(/[^a-zA-Z0-9\u0600-\u06FF]+/g, "-");
+    XLSX.writeFile(wb, `family-list-${safeName}-${group?.year || ""}.xlsx`);
+  };
+
+  const downloadFamilyReport = async (type: "pdf" | "flight-list" | "bus-list" | "hotel-list", label: string) => {
+    const epMap: Record<string, string> = { "pdf": "pdf", "flight-list": "flight-list/pdf", "bus-list": "bus-list/pdf", "hotel-list": "hotel-list/pdf" };
+    try {
+      const res = await fetch(`${API}/api/groups/${groupId}/families/${epMap[type]}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = `family-${type}-${group?.groupName || groupId}-${group?.year || ""}.pdf`;
+      a.click(); window.URL.revokeObjectURL(url);
+      toast({ title: `${label} downloaded!` });
+    } catch { toast({ title: `Failed to download ${label}`, variant: "destructive" }); }
+  };
+
+  const handleWhatsAppShare = async () => {
+    try {
+      const res = await fetch(`${API}/api/groups/${groupId}/families/pdf`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = `family-list-${group?.groupName || groupId}-${group?.year || ""}.pdf`;
+      a.click(); window.URL.revokeObjectURL(url);
+      const text = encodeURIComponent(`Al Burhan Tours & Travels — Family List for ${group?.groupName || ""} (${group?.year || ""}). PDF downloaded — please share.`);
+      setTimeout(() => window.open(`https://wa.me/?text=${text}`, "_blank"), 500);
+      toast({ title: "PDF downloaded — share it via WhatsApp" });
+    } catch { toast({ title: "Failed", variant: "destructive" }); }
+  };
+
   const f = (key: string, val: string) => setForm(prev => ({ ...prev, [key]: val }));
   const rf = (key: string, val: string) => setRoomForm(prev => ({ ...prev, [key]: val }));
   const brf = (key: string, val: string) => setBulkRoomForm(prev => ({ ...prev, [key]: val }));
@@ -571,6 +703,19 @@ export default function PilgrimManager() {
   };
 
   const unassignedPilgrims = pilgrims.filter(p => !p.roomNumber);
+  const filteredFamilies = familySearch.trim()
+    ? families.filter(fam => {
+        const q = familySearch.toLowerCase();
+        if (fam.familyId.toLowerCase().includes(q)) return true;
+        if ((fam.head?.fullName || "").toLowerCase().includes(q)) return true;
+        return fam.members.some(m =>
+          m.fullName.toLowerCase().includes(q) ||
+          (m.passportNumber || "").toLowerCase().includes(q) ||
+          (m.roomNumber || "").toLowerCase().includes(q) ||
+          (m.busNumber || "").toLowerCase().includes(q)
+        );
+      })
+    : families;
   const pilgrimsInRoom = (room: HajjRoom) =>
     pilgrims.filter(p => p.roomNumber === room.roomNumber && p.roomHotel === room.hotel);
   const numericRoom = (rn: string) => { const n = parseInt(rn, 10); return isNaN(n) ? Infinity : n; };
@@ -671,6 +816,23 @@ export default function PilgrimManager() {
             )}
           </div>
         </div>
+      </div>
+
+      {/* Stats row */}
+      <div className="flex flex-wrap gap-2 mb-4 p-3 bg-gradient-to-r from-[#0d5040]/5 to-[#C9A84C]/5 rounded-xl border border-[#0d5040]/10">
+        {[
+          { label: "Families", value: new Set(pilgrims.filter(p => p.familyId).map(p => p.familyId!)).size, color: "text-amber-700 bg-amber-50 border-amber-200" },
+          { label: "Pilgrims", value: pilgrims.length, color: "text-emerald-700 bg-emerald-50 border-emerald-200" },
+          { label: "Grouped", value: pilgrims.filter(p => p.familyId).length, color: "text-blue-700 bg-blue-50 border-blue-200" },
+          { label: "Ungrouped", value: pilgrims.filter(p => !p.familyId).length, color: "text-orange-700 bg-orange-50 border-orange-200" },
+          { label: "Rooms Assigned", value: pilgrims.filter(p => p.roomId).length, color: "text-purple-700 bg-purple-50 border-purple-200" },
+          { label: "Bus Assigned", value: pilgrims.filter(p => p.busNumber).length, color: "text-teal-700 bg-teal-50 border-teal-200" },
+        ].map(stat => (
+          <div key={stat.label} className={`flex flex-col items-center px-3 py-1.5 rounded-lg border text-xs font-semibold ${stat.color}`}>
+            <span className="text-lg font-black leading-tight">{stat.value}</span>
+            <span className="text-[10px] font-medium opacity-80">{stat.label}</span>
+          </div>
+        ))}
       </div>
 
       {/* Tab bar */}
@@ -1109,25 +1271,77 @@ export default function PilgrimManager() {
         <div className="space-y-6">
           {/* Action bar */}
           <div className="flex flex-wrap gap-2 items-center">
-            <Button
-              onClick={handleFamilyAutoAllocate}
-              disabled={familyAllocating || families.length === 0 || rooms.length === 0}
-              className="gap-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white disabled:opacity-60"
-            >
-              <Wand2 size={16} /> {familyAllocating ? "Allocating..." : "Family Auto Allocate"}
+            <Button onClick={handleAutoDetect} disabled={autoDetecting || pilgrims.length === 0}
+              className="gap-1.5 rounded-xl bg-[#0d5040] hover:bg-[#0d5040]/90 text-white disabled:opacity-60">
+              <Zap size={15} /> {autoDetecting ? "Detecting..." : "Auto-detect Families"}
             </Button>
-            <Button
-              onClick={handleDownloadFamilyPdf}
-              disabled={downloadingFamilyPdf || families.length === 0}
-              variant="outline"
-              className="gap-1.5 rounded-xl border-amber-300 text-amber-700 hover:bg-amber-50 disabled:opacity-60"
-            >
-              <FileDown size={16} /> {downloadingFamilyPdf ? "Generating..." : "Family List PDF"}
+            <Button onClick={handleResequenceIds} disabled={resequencing || families.length === 0} variant="outline"
+              className="gap-1.5 rounded-xl border-[#0d5040] text-[#0d5040] hover:bg-[#0d5040]/10 disabled:opacity-60">
+              <RefreshCw size={14} /> {resequencing ? "Re-sequencing..." : "Re-sequence IDs"}
             </Button>
-            <Button onClick={fetchFamilies} variant="outline" className="gap-1.5 rounded-xl">
-              Refresh
+            <Button onClick={handleFamilyAutoAllocate} disabled={familyAllocating || families.length === 0 || rooms.length === 0}
+              className="gap-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white disabled:opacity-60">
+              <Wand2 size={15} /> {familyAllocating ? "Allocating..." : "Family Auto Allocate"}
             </Button>
-            <div className="flex items-center gap-2 ml-2 text-sm text-muted-foreground">
+            <div className="relative">
+              <Button variant="outline" disabled={families.length === 0}
+                className="gap-1.5 rounded-xl border-emerald-300 text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
+                onClick={() => setReportsOpen(o => !o)}>
+                <FileDown size={14} /> Reports <ChevronDown size={12} />
+              </Button>
+              {reportsOpen && (
+                <div className="absolute left-0 top-full mt-1 bg-white border rounded-xl shadow-lg py-1 z-50 min-w-[190px]"
+                  onMouseLeave={() => setReportsOpen(false)}>
+                  {([
+                    { key: "pdf", label: "Family List PDF" },
+                    { key: "flight-list", label: "Flight List PDF" },
+                    { key: "bus-list", label: "Bus List PDF" },
+                    { key: "hotel-list", label: "Hotel List PDF" },
+                  ] as const).map(item => (
+                    <button key={item.key}
+                      onClick={() => { downloadFamilyReport(item.key, item.label); setReportsOpen(false); }}
+                      className="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-muted text-left">
+                      <FileDown size={13} className="text-emerald-600" /> {item.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <Button onClick={exportFamiliesExcel} disabled={families.length === 0} variant="outline"
+              className="gap-1.5 rounded-xl border-teal-300 text-teal-700 hover:bg-teal-50 disabled:opacity-60">
+              <FileDown size={14} /> Export Excel
+            </Button>
+            <Button onClick={handleWhatsAppShare} disabled={families.length === 0} variant="outline"
+              className="gap-1.5 rounded-xl border-green-400 text-green-700 hover:bg-green-50 disabled:opacity-60">
+              <Share2 size={14} /> Share PDF
+            </Button>
+            <Button onClick={fetchFamilies} variant="outline" className="gap-1.5 rounded-xl">Refresh</Button>
+          </div>
+
+          {/* Search + view toggle */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 min-w-[200px] max-w-sm">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+              <input value={familySearch} onChange={e => setFamilySearch(e.target.value)}
+                placeholder="Search family ID, name, passport, room…"
+                className="w-full pl-8 pr-3 h-9 text-sm rounded-lg border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30" />
+            </div>
+            <div className="flex border rounded-lg overflow-hidden shrink-0">
+              {([
+                { v: "card" as const, Icon: LayoutGrid, label: "Card" },
+                { v: "table" as const, Icon: List, label: "Table" },
+                { v: "tree" as const, Icon: GitBranch, label: "Tree" },
+              ]).map(({ v, Icon, label }) => (
+                <button key={v} title={`${label} view`} onClick={() => setFamilyView(v)}
+                  className={`flex items-center gap-1 px-3 py-1.5 text-xs font-semibold transition-colors ${familyView === v ? "bg-primary text-white" : "text-muted-foreground hover:bg-muted"}`}>
+                  <Icon size={13} /> {label}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              {filteredFamilies.length !== families.length && (
+                <span className="text-xs text-muted-foreground">{filteredFamilies.length} of</span>
+              )}
               <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-semibold text-xs">{families.length} families</span>
               <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full font-semibold text-xs">
                 {pilgrims.filter(p => !p.familyId).length} ungrouped
@@ -1136,7 +1350,7 @@ export default function PilgrimManager() {
           </div>
 
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm text-blue-800">
-            <strong>Tip:</strong> In the <em>Pilgrims</em> tab, click "<span className="font-mono font-bold">+Fam</span>" in the Family column to assign a Family ID (e.g. F01, F02). Click ⭐ to mark the family head. Then use <em>Family Auto Allocate</em> to keep families together.
+            <strong>Tip:</strong> Use <strong>Auto-detect</strong> to automatically group pilgrims by shared mobile number or surname+city. Or click "<span className="font-mono font-bold">+Fam</span>" in the Pilgrims tab to assign manually. Click ⭐ to mark the family head.
           </div>
 
           {/* Ungrouped pilgrims */}
@@ -1156,16 +1370,118 @@ export default function PilgrimManager() {
             </Card>
           )}
 
-          {/* Family cards */}
+          {/* Family content - view-based */}
           {families.length === 0 ? (
             <Card className="p-12 text-center border-dashed border-2">
               <UserCheck className="w-12 h-12 mx-auto text-muted-foreground/40 mb-4" />
               <h3 className="text-lg font-semibold mb-2">No families yet</h3>
-              <p className="text-muted-foreground text-sm">Go to the Pilgrims tab, click "+Fam" to assign a Family ID to each pilgrim.</p>
+              <p className="text-muted-foreground text-sm">Click <strong>Auto-detect Families</strong> above, or go to the Pilgrims tab and click "+Fam" to assign families manually.</p>
             </Card>
+          ) : filteredFamilies.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground">
+              <Search className="w-8 h-8 mx-auto mb-2 opacity-30" />
+              <p className="text-sm">No families match "<strong>{familySearch}</strong>"</p>
+              <button onClick={() => setFamilySearch("")} className="text-xs text-primary underline mt-1">Clear search</button>
+            </div>
+          ) : familyView === "table" ? (
+            <Card className="border-none shadow-sm rounded-2xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-muted text-muted-foreground uppercase text-xs font-semibold">
+                    <tr>
+                      <th className="px-4 py-3">Family ID</th>
+                      <th className="px-4 py-3">Head</th>
+                      <th className="px-4 py-3">Members</th>
+                      <th className="px-4 py-3">Room</th>
+                      <th className="px-4 py-3">Hotel</th>
+                      <th className="px-4 py-3">Bus</th>
+                      <th className="px-4 py-3">Mobile</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {filteredFamilies.map(fam => {
+                      const headName = fam.head ? [fam.head.salutation, fam.head.fullName].filter(Boolean).join(" ") : fam.familyId;
+                      const roomInfo = fam.roomId ? rooms.find(r => r.id === fam.roomId) : null;
+                      const memberRoomIds = [...new Set(fam.members.filter(m => m.roomId).map(m => m.roomId!))];
+                      const busNos = [...new Set(fam.members.filter(m => m.busNumber).map(m => m.busNumber!))];
+                      return (
+                        <tr key={fam.familyId} className="hover:bg-muted/30">
+                          <td className="px-4 py-2.5">
+                            <span className="bg-amber-500 text-white font-black text-xs px-2 py-1 rounded-lg">{fam.familyId}</span>
+                          </td>
+                          <td className="px-4 py-2.5 font-medium text-sm">{headName}</td>
+                          <td className="px-4 py-2.5 text-xs text-muted-foreground">{fam.members.length} member{fam.members.length !== 1 ? "s" : ""}</td>
+                          <td className="px-4 py-2.5 text-xs font-semibold text-primary">
+                            {roomInfo ? `Rm ${roomInfo.roomNumber}` : memberRoomIds.length > 0 ? `${memberRoomIds.length} rooms` : "—"}
+                          </td>
+                          <td className="px-4 py-2.5">
+                            {fam.head?.roomHotel ? (
+                              <span className={`text-xs px-1.5 py-0.5 rounded font-semibold ${HOTEL_COLORS[fam.head.roomHotel] || "bg-gray-100"}`}>
+                                {HOTEL_LABELS[fam.head.roomHotel] || fam.head.roomHotel}
+                              </span>
+                            ) : <span className="text-muted-foreground">—</span>}
+                          </td>
+                          <td className="px-4 py-2.5 text-xs">{busNos.join(", ") || "—"}</td>
+                          <td className="px-4 py-2.5 text-xs">{fam.head?.mobileIndia || "—"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          ) : familyView === "tree" ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredFamilies.map(fam => {
+                const headMember = fam.members.find(m => m.familyHead) || fam.members[0];
+                return (
+                  <Card key={fam.familyId} className="rounded-xl border-2 border-[#0d5040]/20 overflow-hidden">
+                    <div className="bg-[#0d5040] px-4 py-2 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-white font-black text-sm">{fam.familyId}</span>
+                        <span className="text-[#C9A84C] text-xs font-semibold">{fam.members.length} member{fam.members.length !== 1 ? "s" : ""}</span>
+                      </div>
+                      {fam.head?.mobileIndia && (
+                        <span className="text-white/70 text-[10px]">📞 {fam.head.mobileIndia}</span>
+                      )}
+                    </div>
+                    <div className="p-3 space-y-1">
+                      {fam.members.map(m => {
+                        const isHead = m.familyHead || m.id === headMember?.id;
+                        return (
+                          <div key={m.id}
+                            className={`flex items-center gap-2 py-1.5 px-2 rounded-lg text-xs ${isHead ? "bg-amber-50 border border-amber-200" : "bg-white/50"}`}
+                            style={{ marginLeft: isHead ? 0 : 12 }}>
+                            <div className="w-6 h-6 rounded-full bg-muted overflow-hidden shrink-0">
+                              {m.photoUrl
+                                ? <img src={`${API}${m.photoUrl}`} alt="" className="w-full h-full object-cover" />
+                                : <div className="w-full h-full flex items-center justify-center text-[10px]">{m.gender?.toLowerCase() === "female" ? "👩" : "👨"}</div>}
+                            </div>
+                            {isHead && <Star size={10} className="text-amber-500 shrink-0" fill="currentColor" />}
+                            <span className={`font-medium truncate ${isHead ? "text-amber-900" : "text-gray-700"}`}>{m.fullName}</span>
+                            {m.familyRelation && (
+                              <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full text-[9px] font-semibold shrink-0">{m.familyRelation}</span>
+                            )}
+                            {m.roomNumber && (
+                              <span className="ml-auto bg-primary/10 text-primary font-semibold px-1.5 py-0.5 rounded text-[9px] shrink-0">Rm {m.roomNumber}</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {(fam.head?.roomNumber || fam.head?.busNumber) && (
+                      <div className="px-3 pb-2 flex gap-2">
+                        {fam.head.roomNumber && <span className="text-[10px] bg-primary/10 text-primary font-semibold px-2 py-0.5 rounded">🏨 Rm {fam.head.roomNumber}</span>}
+                        {fam.head.busNumber && <span className="text-[10px] bg-blue-100 text-blue-700 font-semibold px-2 py-0.5 rounded">🚌 Bus {fam.head.busNumber}</span>}
+                      </div>
+                    )}
+                  </Card>
+                );
+              })}
+            </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {families.map(fam => {
+              {filteredFamilies.map(fam => {
                 const isExpanded = expandedFamilies.has(fam.familyId);
                 const headName = fam.head ? [fam.head.salutation, fam.head.fullName].filter(Boolean).join(" ") : fam.familyId;
                 const roomInfo = fam.roomId ? rooms.find(r => r.id === fam.roomId) : null;
@@ -1541,6 +1857,78 @@ export default function PilgrimManager() {
           </div>
         </DialogContent>
       </Dialog>
+      {/* ===== Auto-detect Dialog ===== */}
+      <Dialog open={detectDialogOpen} onOpenChange={setDetectDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-xl flex items-center gap-2">
+              <Zap size={18} className="text-[#0d5040]" /> Auto-detected Family Groups
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground -mt-1">
+            Found <strong>{suggestions.length}</strong> suggestion{suggestions.length !== 1 ? "s" : ""} covering{" "}
+            <strong>{[...new Set(suggestions.flatMap(s => s.pilgrimIds))].length}</strong> pilgrims.
+            Review and toggle which ones to apply.
+          </p>
+          <div className="flex items-center gap-2 py-1">
+            <button onClick={() => setAcceptedSuggestions(new Set(suggestions.map(s => s.id)))}
+              className="text-xs text-primary underline">Select All</button>
+            <span className="text-muted-foreground">·</span>
+            <button onClick={() => setAcceptedSuggestions(new Set())}
+              className="text-xs text-muted-foreground underline">Deselect All</button>
+            <span className="ml-auto text-xs text-muted-foreground">
+              {acceptedSuggestions.size} of {suggestions.length} selected
+            </span>
+          </div>
+          <div className="space-y-3 mt-1">
+            {suggestions.map(s => {
+              const accepted = acceptedSuggestions.has(s.id);
+              return (
+                <div key={s.id}
+                  className={`border rounded-xl p-3 transition-all ${accepted ? "border-[#0d5040]/40 bg-[#0d5040]/5" : "border-gray-200 bg-gray-50 opacity-60"}`}>
+                  <div className="flex items-start gap-3">
+                    <input type="checkbox" checked={accepted} onChange={e => {
+                      const next = new Set(acceptedSuggestions);
+                      e.target.checked ? next.add(s.id) : next.delete(s.id);
+                      setAcceptedSuggestions(next);
+                    }} className="mt-1 w-4 h-4 accent-[#0d5040] shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <input
+                          value={suggestionFamilyIds[s.id] || s.suggestedFamilyId}
+                          onChange={e => setSuggestionFamilyIds(prev => ({ ...prev, [s.id]: e.target.value }))}
+                          className="font-mono font-black text-sm text-[#0d5040] bg-amber-100 border border-amber-300 rounded px-2 py-0.5 w-20"
+                          title="Edit family ID"
+                        />
+                        <span className="text-xs text-muted-foreground">{s.reason}</span>
+                        {s.existingFamilyId && (
+                          <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-semibold shrink-0">existing</span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {s.memberNames.map((name, i) => (
+                          <span key={i} className="text-xs bg-white border border-gray-200 text-gray-700 px-2 py-0.5 rounded-full">
+                            {i === 0 && <Star size={8} className="inline mr-0.5 text-amber-500 mb-0.5" fill="currentColor" />}
+                            {name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex gap-2 mt-2 pt-2 border-t">
+            <Button variant="outline" onClick={() => setDetectDialogOpen(false)} className="flex-1">Cancel</Button>
+            <Button onClick={handleApplySuggestions} disabled={applyingSuggestions || acceptedSuggestions.size === 0}
+              className="flex-1 bg-[#0d5040] hover:bg-[#0d5040]/90 text-white gap-1.5">
+              <Zap size={14} /> {applyingSuggestions ? "Applying..." : `Apply ${acceptedSuggestions.size} Group${acceptedSuggestions.size !== 1 ? "s" : ""}`}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <BulkImportModal
         groupId={groupId}
         open={bulkImportOpen}

@@ -1650,6 +1650,370 @@ router.post("/:groupId/families/:familyId/assign-room", requireAdmin as any, asy
   }
 });
 
+// POST /:groupId/families/auto-detect — analyze pilgrims and suggest family groups
+router.post("/:groupId/families/auto-detect", requireAdmin as any, async (req, res) => {
+  const groupId = String(req.params.groupId);
+  try {
+    const pilgrims = await db.select().from(pilgrimsTable)
+      .where(eq(pilgrimsTable.groupId, groupId))
+      .orderBy(asc(pilgrimsTable.serialNumber));
+
+    const suggestions: { id: number; pilgrimIds: string[]; memberNames: string[]; reason: string; suggestedFamilyId: string; existingFamilyId?: string }[] = [];
+    const assignedIds = new Set<string>();
+    let nextSuggId = 1;
+
+    // 1. Strong match: same mobileIndia (non-empty)
+    const mobileMap = new Map<string, typeof pilgrims>();
+    for (const p of pilgrims) {
+      if (!p.mobileIndia?.trim()) continue;
+      const key = p.mobileIndia.trim();
+      if (!mobileMap.has(key)) mobileMap.set(key, []);
+      mobileMap.get(key)!.push(p);
+    }
+    for (const [, group] of mobileMap) {
+      if (group.length < 2) continue;
+      const ids = group.map(p => p.id);
+      if (ids.every(id => assignedIds.has(id))) continue;
+      const existingFamilyIds = [...new Set(group.filter(p => p.familyId).map(p => p.familyId!))];
+      suggestions.push({
+        id: nextSuggId++,
+        pilgrimIds: ids,
+        memberNames: group.map(p => p.fullName),
+        reason: `Same mobile number (${group[0].mobileIndia})`,
+        suggestedFamilyId: existingFamilyIds[0] || `F${String(nextSuggId).padStart(3, "0")}`,
+        existingFamilyId: existingFamilyIds[0],
+      });
+      ids.forEach(id => assignedIds.add(id));
+    }
+
+    // 2. Medium match: same city + same last-name word
+    const surnameMap = new Map<string, typeof pilgrims>();
+    for (const p of pilgrims) {
+      if (assignedIds.has(p.id)) continue;
+      const parts = p.fullName.trim().split(/\s+/);
+      const surname = parts[parts.length - 1].toLowerCase();
+      const city = (p.city || "").trim().toLowerCase();
+      if (!surname || !city) continue;
+      const key = `${city}::${surname}`;
+      if (!surnameMap.has(key)) surnameMap.set(key, []);
+      surnameMap.get(key)!.push(p);
+    }
+    for (const [, group] of surnameMap) {
+      if (group.length < 2) continue;
+      const ids = group.map(p => p.id);
+      const existingFamilyIds = [...new Set(group.filter(p => p.familyId).map(p => p.familyId!))];
+      const parts = group[0].fullName.trim().split(/\s+/);
+      const surname = parts[parts.length - 1];
+      suggestions.push({
+        id: nextSuggId++,
+        pilgrimIds: ids,
+        memberNames: group.map(p => p.fullName),
+        reason: `Same surname "${surname}" and city "${group[0].city}"`,
+        suggestedFamilyId: existingFamilyIds[0] || `F${String(nextSuggId).padStart(3, "0")}`,
+        existingFamilyId: existingFamilyIds[0],
+      });
+      ids.forEach(id => assignedIds.add(id));
+    }
+
+    res.json({ suggestions, total: pilgrims.length, matched: assignedIds.size });
+  } catch (err: any) {
+    res.status(500).json({ message: err?.message || "Auto-detect failed" });
+  }
+});
+
+// POST /:groupId/families/auto-generate-ids — re-sequence family IDs to F001, F002...
+router.post("/:groupId/families/auto-generate-ids", requireAdmin as any, async (req, res) => {
+  const groupId = String(req.params.groupId);
+  try {
+    const pilgrims = await db.select().from(pilgrimsTable)
+      .where(eq(pilgrimsTable.groupId, groupId))
+      .orderBy(asc(pilgrimsTable.serialNumber));
+
+    const existingIds = [...new Set(pilgrims.filter(p => p.familyId).map(p => p.familyId!))].sort();
+    if (existingIds.length === 0) { res.json({ updated: 0, families: [] }); return; }
+
+    const mapping: { oldId: string; newId: string }[] = [];
+    existingIds.forEach((oldId, idx) => {
+      const newId = `F${String(idx + 1).padStart(3, "0")}`;
+      if (oldId !== newId) mapping.push({ oldId, newId });
+    });
+
+    for (const { oldId, newId } of mapping) {
+      await db.update(pilgrimsTable)
+        .set({ familyId: newId, updatedAt: new Date() })
+        .where(and(eq(pilgrimsTable.groupId, groupId), eq(pilgrimsTable.familyId, oldId)));
+    }
+
+    res.json({ updated: mapping.length, families: mapping, totalFamilies: existingIds.length });
+  } catch (err: any) {
+    res.status(500).json({ message: err?.message || "Failed to re-sequence family IDs" });
+  }
+});
+
+// POST /:groupId/families/apply-suggestions — save accepted suggestions
+router.post("/:groupId/families/apply-suggestions", requireAdmin as any, async (req, res) => {
+  const groupId = String(req.params.groupId);
+  const { suggestions } = req.body as { suggestions: { pilgrimIds: string[]; familyId: string; familyHeadId?: string }[] };
+  if (!Array.isArray(suggestions) || suggestions.length === 0) {
+    res.status(400).json({ message: "No suggestions provided" }); return;
+  }
+  try {
+    let applied = 0;
+    for (const sugg of suggestions) {
+      const { pilgrimIds, familyId, familyHeadId } = sugg;
+      if (!pilgrimIds?.length || !familyId) continue;
+      for (const pid of pilgrimIds) {
+        const isHead = pid === familyHeadId;
+        await db.update(pilgrimsTable)
+          .set({ familyId, familyHead: isHead, updatedAt: new Date() })
+          .where(and(eq(pilgrimsTable.id, pid), eq(pilgrimsTable.groupId, groupId)));
+      }
+      applied++;
+    }
+    res.json({ applied });
+  } catch (err: any) {
+    res.status(500).json({ message: err?.message || "Failed to apply suggestions" });
+  }
+});
+
+// Helper: shared PDF header for family reports
+function drawFamilyPdfHeader(doc: PDFKit.PDFDocument, group: any, title: string, subtitle: string) {
+  const PAGE_W = doc.page.width;
+  const MARGIN = 28;
+  const USABLE_W = PAGE_W - MARGIN * 2;
+  const DARK_GREEN = "#0B3D2E";
+  const GOLD = "#C9A23F";
+
+  doc.rect(MARGIN, MARGIN, USABLE_W, 44).fill(DARK_GREEN);
+  doc.image(LOGO_BUFFER, MARGIN + 4, MARGIN + 2, { width: 40, height: 40 });
+  doc.fill(GOLD).font("Helvetica-Bold").fontSize(14)
+    .text("AL BURHAN TOURS & TRAVELS", MARGIN + 46, MARGIN + 5, { width: USABLE_W - 46, align: "center", lineBreak: false });
+  doc.fill("white").font("Helvetica").fontSize(7.5)
+    .text("5/8 Khanka Masjid Complex, Shanwara Road, Burhanpur 450331 M.P. | Tel: +91 9893989786 | WhatsApp: +91 8989701701",
+      MARGIN + 46, MARGIN + 22, { width: USABLE_W - 46, align: "center", lineBreak: false });
+
+  let y = MARGIN + 48;
+  doc.fill(DARK_GREEN).font("Helvetica-Bold").fontSize(11)
+    .text(`${title} — ${group.groupName.toUpperCase()} (${group.year})`, MARGIN, y + 4, { width: USABLE_W, align: "center", lineBreak: false });
+  doc.fill("#555").font("Helvetica").fontSize(7)
+    .text(subtitle, MARGIN, y + 18, { width: USABLE_W, align: "center", lineBreak: false });
+  return y + 32;
+}
+
+// Helper: draw family block in a sectioned PDF
+function drawFamilyBlock(doc: PDFKit.PDFDocument, fam: any, y: number, MARGIN: number, USABLE_W: number) {
+  const DARK_GREEN = "#0B3D2E";
+  const GOLD = "#C9A23F";
+  const PAGE_H = doc.page.height;
+  const headName = [fam.head?.salutation, fam.head?.fullName].filter(Boolean).join(" ") || fam.familyId;
+  const memberList = fam.members.map((m: any) => `${m.fullName}${m.familyRelation ? ` (${m.familyRelation})` : ""}`).join("  •  ");
+  const blockH = 36;
+  if (y + blockH > PAGE_H - 28) { doc.addPage(); y = MARGIN; }
+  doc.rect(MARGIN, y, USABLE_W, 16).fill(GOLD + "22");
+  doc.fill(DARK_GREEN).font("Helvetica-Bold").fontSize(7.5)
+    .text(`${fam.familyId}  —  ${headName}  (${fam.members.length} members)`, MARGIN + 4, y + 4, { width: USABLE_W - 8, lineBreak: false });
+  y += 16;
+  doc.fill("#333").font("Helvetica").fontSize(7)
+    .text(memberList || "—", MARGIN + 4, y + 3, { width: USABLE_W - 8, lineBreak: false });
+  const mobile = fam.head?.mobileIndia || fam.head?.mobileSaudi || "";
+  if (mobile) doc.fill("#666").font("Helvetica").fontSize(6.5)
+    .text(`📞 ${mobile}`, MARGIN + 4, y + 12, { lineBreak: false });
+  const room = fam.head?.roomNumber ? `Room ${fam.head.roomNumber}${fam.head.roomHotel ? ` · ${fam.head.roomHotel}` : ""}` : "";
+  if (room) doc.fill("#666").font("Helvetica").fontSize(6.5)
+    .text(room, MARGIN + USABLE_W - 80, y + 12, { width: 76, align: "right", lineBreak: false });
+  y += 22;
+  doc.moveTo(MARGIN, y).lineTo(MARGIN + USABLE_W, y).strokeColor("#ddd").lineWidth(0.4).stroke();
+  y += 2;
+  return y;
+}
+
+// GET /:groupId/families/flight-list/pdf — families grouped by flight info
+router.get("/:groupId/families/flight-list/pdf", requireAdmin as any, async (req, res) => {
+  try {
+    const groupId = String(req.params.groupId);
+    const groups = await db.select().from(hajjGroupsTable).where(eq(hajjGroupsTable.id, groupId)).limit(1);
+    if (!groups[0]) { res.status(404).json({ message: "Group not found" }); return; }
+    const group = groups[0];
+    const pilgrims = await db.select().from(pilgrimsTable).where(eq(pilgrimsTable.groupId, groupId)).orderBy(asc(pilgrimsTable.serialNumber));
+
+    const familyMap = new Map<string, typeof pilgrims>();
+    for (const p of pilgrims) {
+      if (!p.familyId) continue;
+      if (!familyMap.has(p.familyId)) familyMap.set(p.familyId, []);
+      familyMap.get(p.familyId)!.push(p);
+    }
+    const families = Array.from(familyMap.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([familyId, members]) => ({
+      familyId, members, head: members.find(m => m.familyHead) || members[0] || null,
+    }));
+
+    const doc = new PDFDocument({ size: "A4", layout: "portrait", margin: 0 });
+    const safeName = group.groupName.replace(/[^a-zA-Z0-9]/g, "-");
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="family-flight-list-${safeName}-${group.year}.pdf"`);
+    doc.pipe(res);
+
+    const MARGIN = 28;
+    const USABLE_W = doc.page.width - MARGIN * 2;
+    const DARK_GREEN = "#0B3D2E";
+    const GOLD = "#C9A23F";
+    const flightLabel = group.flightNumber ? `Flight: ${group.flightNumber}` : "Flight details not set";
+    const subtitle = `${flightLabel}  |  Departure: ${group.departureDate || "—"}  |  Total Families: ${families.length}  |  Total Pilgrims: ${pilgrims.length}`;
+
+    let y = drawFamilyPdfHeader(doc, group, "FAMILY WISE FLIGHT LIST", subtitle);
+
+    // Section header
+    doc.rect(MARGIN, y, USABLE_W, 18).fill(DARK_GREEN);
+    doc.fill(GOLD).font("Helvetica-Bold").fontSize(9)
+      .text(`✈  ${flightLabel}`, MARGIN + 6, y + 5, { width: USABLE_W - 8, lineBreak: false });
+    y += 18;
+
+    for (const fam of families) {
+      y = drawFamilyBlock(doc, fam, y, MARGIN, USABLE_W);
+    }
+    doc.end();
+  } catch (err: any) {
+    console.error("[groups] families/flight-list/pdf error:", err);
+    if (!res.headersSent) res.status(500).json({ message: err?.message || "Failed" });
+  }
+});
+
+// GET /:groupId/families/bus-list/pdf — families grouped by bus number
+router.get("/:groupId/families/bus-list/pdf", requireAdmin as any, async (req, res) => {
+  try {
+    const groupId = String(req.params.groupId);
+    const groups = await db.select().from(hajjGroupsTable).where(eq(hajjGroupsTable.id, groupId)).limit(1);
+    if (!groups[0]) { res.status(404).json({ message: "Group not found" }); return; }
+    const group = groups[0];
+    const pilgrims = await db.select().from(pilgrimsTable).where(eq(pilgrimsTable.groupId, groupId)).orderBy(asc(pilgrimsTable.serialNumber));
+
+    const familyMap = new Map<string, typeof pilgrims>();
+    for (const p of pilgrims) {
+      if (!p.familyId) continue;
+      if (!familyMap.has(p.familyId)) familyMap.set(p.familyId, []);
+      familyMap.get(p.familyId)!.push(p);
+    }
+    const families = Array.from(familyMap.entries()).map(([familyId, members]) => {
+      const head = members.find(m => m.familyHead) || members[0];
+      const busNums = members.filter(m => m.busNumber).map(m => m.busNumber!);
+      const busNumber = head?.busNumber || (busNums.length > 0 ? busNums[0] : null) || null;
+      return { familyId, members, head: head || null, busNumber };
+    });
+
+    const busGroups = new Map<string, typeof families>();
+    for (const fam of families) {
+      const key = fam.busNumber || "Unassigned";
+      if (!busGroups.has(key)) busGroups.set(key, []);
+      busGroups.get(key)!.push(fam);
+    }
+    const sortedBusKeys = [...busGroups.keys()].sort((a, b) => {
+      if (a === "Unassigned") return 1;
+      if (b === "Unassigned") return -1;
+      return a.localeCompare(b, undefined, { numeric: true });
+    });
+
+    const doc = new PDFDocument({ size: "A4", layout: "portrait", margin: 0 });
+    const safeName = group.groupName.replace(/[^a-zA-Z0-9]/g, "-");
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="family-bus-list-${safeName}-${group.year}.pdf"`);
+    doc.pipe(res);
+
+    const MARGIN = 28;
+    const USABLE_W = doc.page.width - MARGIN * 2;
+    const DARK_GREEN = "#0B3D2E";
+    const GOLD = "#C9A23F";
+    const subtitle = `Total Families: ${families.length}  |  Total Pilgrims: ${pilgrims.length}  |  Buses: ${sortedBusKeys.filter(k => k !== "Unassigned").length}`;
+    let y = drawFamilyPdfHeader(doc, group, "FAMILY WISE BUS LIST", subtitle);
+
+    for (const busKey of sortedBusKeys) {
+      const busGroup = busGroups.get(busKey)!;
+      if (y + 22 > doc.page.height - 28) { doc.addPage(); y = MARGIN; }
+      doc.rect(MARGIN, y, USABLE_W, 18).fill(DARK_GREEN);
+      doc.fill(GOLD).font("Helvetica-Bold").fontSize(9)
+        .text(`🚌  Bus ${busKey}  (${busGroup.length} famil${busGroup.length === 1 ? "y" : "ies"})`, MARGIN + 6, y + 5, { width: USABLE_W - 8, lineBreak: false });
+      y += 18;
+      for (const fam of busGroup) {
+        y = drawFamilyBlock(doc, fam, y, MARGIN, USABLE_W);
+      }
+      y += 4;
+    }
+    doc.end();
+  } catch (err: any) {
+    console.error("[groups] families/bus-list/pdf error:", err);
+    if (!res.headersSent) res.status(500).json({ message: err?.message || "Failed" });
+  }
+});
+
+// GET /:groupId/families/hotel-list/pdf — families grouped by hotel
+router.get("/:groupId/families/hotel-list/pdf", requireAdmin as any, async (req, res) => {
+  try {
+    const groupId = String(req.params.groupId);
+    const groups = await db.select().from(hajjGroupsTable).where(eq(hajjGroupsTable.id, groupId)).limit(1);
+    if (!groups[0]) { res.status(404).json({ message: "Group not found" }); return; }
+    const group = groups[0];
+    const pilgrims = await db.select().from(pilgrimsTable).where(eq(pilgrimsTable.groupId, groupId)).orderBy(asc(pilgrimsTable.serialNumber));
+
+    const familyMap = new Map<string, typeof pilgrims>();
+    for (const p of pilgrims) {
+      if (!p.familyId) continue;
+      if (!familyMap.has(p.familyId)) familyMap.set(p.familyId, []);
+      familyMap.get(p.familyId)!.push(p);
+    }
+    const HOTEL_LABELS_PDF: Record<string, string> = { makkah: "Makkah Hotel", madinah: "Madinah Hotel", aziziah: "Aziziah Hotel" };
+    const HOTEL_ORDER_PDF = ["makkah", "madinah", "aziziah"];
+
+    const families = Array.from(familyMap.entries()).map(([familyId, members]) => {
+      const head = members.find(m => m.familyHead) || members[0];
+      const hotels = members.filter(m => m.roomHotel).map(m => m.roomHotel!);
+      const hotelKey = head?.roomHotel || (hotels.length > 0 ? hotels[0] : null) || "unassigned";
+      return { familyId, members, head: head || null, hotelKey };
+    });
+
+    const hotelGroups = new Map<string, typeof families>();
+    for (const fam of families) {
+      if (!hotelGroups.has(fam.hotelKey)) hotelGroups.set(fam.hotelKey, []);
+      hotelGroups.get(fam.hotelKey)!.push(fam);
+    }
+    const sortedHotelKeys = [...hotelGroups.keys()].sort((a, b) => {
+      const ia = HOTEL_ORDER_PDF.indexOf(a), ib = HOTEL_ORDER_PDF.indexOf(b);
+      if (ia !== -1 && ib !== -1) return ia - ib;
+      if (ia !== -1) return -1;
+      if (ib !== -1) return 1;
+      return a.localeCompare(b);
+    });
+
+    const doc = new PDFDocument({ size: "A4", layout: "portrait", margin: 0 });
+    const safeName = group.groupName.replace(/[^a-zA-Z0-9]/g, "-");
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="family-hotel-list-${safeName}-${group.year}.pdf"`);
+    doc.pipe(res);
+
+    const MARGIN = 28;
+    const USABLE_W = doc.page.width - MARGIN * 2;
+    const DARK_GREEN = "#0B3D2E";
+    const GOLD = "#C9A23F";
+    const subtitle = `Total Families: ${families.length}  |  Total Pilgrims: ${pilgrims.length}  |  Hotels: ${sortedHotelKeys.filter(k => k !== "unassigned").length}`;
+    let y = drawFamilyPdfHeader(doc, group, "HOTEL WISE FAMILY LIST", subtitle);
+
+    for (const hotelKey of sortedHotelKeys) {
+      const hotelGroup = hotelGroups.get(hotelKey)!;
+      const hotelLabel = HOTEL_LABELS_PDF[hotelKey] || hotelKey.charAt(0).toUpperCase() + hotelKey.slice(1);
+      if (y + 22 > doc.page.height - 28) { doc.addPage(); y = MARGIN; }
+      doc.rect(MARGIN, y, USABLE_W, 18).fill(DARK_GREEN);
+      doc.fill(GOLD).font("Helvetica-Bold").fontSize(9)
+        .text(`🏨  ${hotelLabel}  (${hotelGroup.length} famil${hotelGroup.length === 1 ? "y" : "ies"})`, MARGIN + 6, y + 5, { width: USABLE_W - 8, lineBreak: false });
+      y += 18;
+      for (const fam of hotelGroup) {
+        y = drawFamilyBlock(doc, fam, y, MARGIN, USABLE_W);
+      }
+      y += 4;
+    }
+    doc.end();
+  } catch (err: any) {
+    console.error("[groups] families/hotel-list/pdf error:", err);
+    if (!res.headersSent) res.status(500).json({ message: err?.message || "Failed" });
+  }
+});
+
 // POST-based workaround for environments where Nginx blocks DELETE method
 router.post("/:groupId/rooms/:roomId/delete", requireAdmin as any, async (req, res) => {
   const groupId = String(req.params.groupId);
