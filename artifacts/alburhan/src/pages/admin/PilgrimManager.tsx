@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useDeleteGuard } from "@/components/DeleteGuard";
 import { Plus, Edit, Trash2, ArrowLeft, Upload, Printer, CreditCard, Luggage, Heart,
   Building2, Bus, DoorOpen, FileDown, Hotel, BedDouble, Users, Wand2, X, AlertTriangle, Sticker, Layers, UserCheck, QrCode, Star,
-  Search, LayoutGrid, List, GitBranch, ChevronDown, Share2, RefreshCw, Zap } from "lucide-react";
+  Search, LayoutGrid, List, GitBranch, ChevronDown, Share2, RefreshCw, Zap, MessageCircle } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
 import { Link, useRoute } from "wouter";
 import { BulkImportModal } from "./BulkImportModal";
@@ -188,6 +188,9 @@ export default function PilgrimManager() {
   const [applyingSuggestions, setApplyingSuggestions] = useState(false);
   const [resequencing, setResequencing] = useState(false);
   const [reportsOpen, setReportsOpen] = useState(false);
+  const [waFamily, setWaFamily] = useState<FamilyGroup | null>(null);
+  const [waMessage, setWaMessage] = useState("");
+  const [waSending, setWaSending] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -613,6 +616,58 @@ export default function PilgrimManager() {
       await fetchFamilies();
     } catch { toast({ title: "Re-sequence failed", variant: "destructive" }); }
     finally { setResequencing(false); }
+  };
+
+  const openFamilyWA = (fam: FamilyGroup) => {
+    const head = fam.head;
+    const memberLines = fam.members.map(m =>
+      `  • ${m.fullName}${m.familyRelation ? ` (${m.familyRelation})` : ""}${m.roomNumber ? ` — Rm ${m.roomNumber}` : ""}`
+    ).join("\n");
+    const lines = [
+      "🕌 *Al Burhan Tours & Travels*",
+      "",
+      `Assalamu Alaikum, *${head?.fullName || "Pilgrim"}*! 🌙`,
+      "",
+      "Here are your family travel details:",
+      "",
+      `📋 *Family ID:* ${fam.familyId}`,
+      `👨‍👩‍👧‍👦 *Members (${fam.members.length}):*`,
+      memberLines,
+      "",
+      head?.roomNumber ? `🏨 *Room:* ${head.roomNumber}${head.roomHotel ? ` — ${HOTEL_LABELS[head.roomHotel] || head.roomHotel}` : ""}` : null,
+      group?.flightNumber ? `✈️ *Flight:* ${group.flightNumber}` : null,
+      head?.busNumber ? `🚌 *Bus:* ${head.busNumber}` : null,
+      "",
+      "May Allah accept your Hajj and grant you a blessed journey. 🤲",
+      "",
+      "— Al Burhan Tours & Travels",
+    ].filter(l => l !== null).join("\n");
+    setWaFamily(fam);
+    setWaMessage(lines);
+  };
+
+  const sendFamilyWA = async () => {
+    if (!waFamily) return;
+    setWaSending(true);
+    try {
+      const res = await fetch(`${API}/api/groups/${groupId}/families/${encodeURIComponent(waFamily.familyId)}/whatsapp`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: waMessage }),
+      });
+      const data = await res.json();
+      if (data.sent) {
+        toast({ title: `WhatsApp sent to ${waFamily.head?.fullName || waFamily.familyId}` });
+        setWaFamily(null);
+      } else if (data.waLink) {
+        window.open(data.waLink, "_blank");
+        toast({ title: "Opened WhatsApp — tap Send to deliver the message" });
+        setWaFamily(null);
+      } else {
+        toast({ title: data.message || "Could not send", variant: "destructive" });
+      }
+    } catch { toast({ title: "WhatsApp failed", variant: "destructive" }); }
+    finally { setWaSending(false); }
   };
 
   const exportFamiliesExcel = async () => {
@@ -1475,9 +1530,20 @@ export default function PilgrimManager() {
                         <span className="text-white font-black text-sm">{fam.familyId}</span>
                         <span className="text-[#C9A84C] text-xs font-semibold">{fam.members.length} member{fam.members.length !== 1 ? "s" : ""}</span>
                       </div>
-                      {fam.head?.mobileIndia && (
-                        <span className="text-white/70 text-[10px]">📞 {fam.head.mobileIndia}</span>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {fam.head?.mobileIndia && (
+                          <span className="text-white/70 text-[10px]">📞 {fam.head.mobileIndia}</span>
+                        )}
+                        {fam.head?.mobileIndia && (
+                          <button
+                            onClick={() => openFamilyWA(fam)}
+                            className="text-green-300 hover:text-green-100 transition-colors"
+                            title="Send WhatsApp"
+                          >
+                            <MessageCircle size={13} />
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <div className="p-3 space-y-1">
                       {fam.members.map(m => {
@@ -1546,6 +1612,15 @@ export default function PilgrimManager() {
                           </div>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
+                          {fam.head?.mobileIndia && (
+                            <Button
+                              variant="ghost" size="icon" className="h-7 w-7 text-green-600 hover:bg-green-50"
+                              title={`WhatsApp ${fam.head.fullName}`}
+                              onClick={() => openFamilyWA(fam)}
+                            >
+                              <MessageCircle size={13} />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost" size="icon" className="h-7 w-7"
                             title="View Family QR Page"
@@ -1668,6 +1743,55 @@ export default function PilgrimManager() {
           )}
         </div>
       )}
+
+      {/* ===== Family WhatsApp Compose Dialog ===== */}
+      <Dialog open={!!waFamily} onOpenChange={open => !open && setWaFamily(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <MessageCircle size={16} className="text-green-600" />
+              WhatsApp — {waFamily?.familyId}
+              {waFamily?.head?.fullName ? ` · ${waFamily.head.fullName}` : ""}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 pt-1">
+            <div className="flex items-center gap-2 text-xs bg-green-50 border border-green-200 px-3 py-2 rounded-lg">
+              <MessageCircle size={12} className="text-green-600 shrink-0" />
+              <span className="text-green-800">Sending to: <strong>{waFamily?.head?.mobileIndia || "—"}</strong></span>
+            </div>
+            <textarea
+              value={waMessage}
+              onChange={e => setWaMessage(e.target.value)}
+              rows={13}
+              className="w-full border rounded-lg p-3 text-xs font-mono resize-none focus:outline-none focus:ring-2 focus:ring-green-400/50 bg-white"
+            />
+            <div className="flex gap-2 justify-between">
+              <button
+                onClick={() => {
+                  const phone = (waFamily?.head?.mobileIndia || "").replace(/\D/g, "");
+                  const full = phone.length === 10 ? `91${phone}` : phone;
+                  window.open(`https://wa.me/${full}?text=${encodeURIComponent(waMessage)}`, "_blank");
+                }}
+                className="text-xs text-green-700 underline px-2 py-1 rounded hover:bg-green-50"
+              >
+                Open in WhatsApp ↗
+              </button>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setWaFamily(null)}>Cancel</Button>
+                <Button
+                  size="sm"
+                  className="bg-green-600 hover:bg-green-700 text-white gap-1.5"
+                  onClick={sendFamilyWA}
+                  disabled={waSending || !waFamily?.head?.mobileIndia}
+                >
+                  <MessageCircle size={13} />
+                  {waSending ? "Sending…" : "Send via BotBee"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* ===== Pilgrim Dialog ===== */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

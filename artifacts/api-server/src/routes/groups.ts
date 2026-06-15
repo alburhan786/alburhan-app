@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db, hajjGroupsTable, pilgrimsTable, hajjRoomsTable } from "@workspace/db";
 import { eq, and, ne, desc, asc, count, max } from "drizzle-orm";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
+import { sendWhatsApp } from "../lib/notifications.js";
 import multer from "multer";
 import { uploadToGCS, deleteFromGCS } from "../lib/gcsUpload.js";
 import { objectStorageClient } from "../lib/objectStorage.js";
@@ -2048,6 +2049,62 @@ router.get("/:groupId/families/hotel-list/pdf", requireAdmin as any, async (req,
     doc.end();
   } catch (err: any) {
     console.error("[groups] families/hotel-list/pdf error:", err);
+    if (!res.headersSent) res.status(500).json({ message: err?.message || "Failed" });
+  }
+});
+
+// POST /:groupId/families/:familyId/whatsapp — send WhatsApp to family head
+router.post("/:groupId/families/:familyId/whatsapp", requireAdmin as any, async (req, res) => {
+  const groupId = String(req.params.groupId);
+  const familyId = decodeURIComponent(String(req.params.familyId));
+  const { message: customMessage } = req.body || {};
+  try {
+    const groups = await db.select().from(hajjGroupsTable).where(eq(hajjGroupsTable.id, groupId)).limit(1);
+    if (!groups[0]) { res.status(404).json({ message: "Group not found" }); return; }
+    const group = groups[0];
+
+    const members = await db.select().from(pilgrimsTable)
+      .where(and(eq(pilgrimsTable.groupId, groupId), eq(pilgrimsTable.familyId, familyId)))
+      .orderBy(desc(pilgrimsTable.familyHead), asc(pilgrimsTable.serialNumber));
+    if (!members.length) { res.status(404).json({ message: "Family not found" }); return; }
+
+    const head = members.find(m => m.familyHead) || members[0];
+    const mobile = head.mobileIndia || "";
+    if (!mobile) { res.status(400).json({ message: "Family head has no mobile number" }); return; }
+
+    // Build message if not provided
+    const HOTEL_LABELS: Record<string, string> = { makkah: "Makkah", madinah: "Madinah", aziziah: "Aziziah" };
+    const memberLines = members.map(m =>
+      `  • ${m.fullName}${m.familyRelation ? ` (${m.familyRelation})` : ""}${m.roomNumber ? ` — Rm ${m.roomNumber}` : ""}`
+    ).join("\n");
+    const message = customMessage || [
+      "🕌 *Al Burhan Tours & Travels*",
+      "",
+      `Assalamu Alaikum, *${head.fullName}*! 🌙`,
+      "",
+      "Here are your family travel details:",
+      "",
+      `📋 *Family ID:* ${familyId}`,
+      `👨‍👩‍👧‍👦 *Members (${members.length}):*`,
+      memberLines,
+      "",
+      head.roomNumber ? `🏨 *Room:* ${head.roomNumber}${head.roomHotel ? ` — ${HOTEL_LABELS[head.roomHotel] || head.roomHotel}` : ""}` : null,
+      group.flightNumber ? `✈️ *Flight:* ${group.flightNumber}` : null,
+      head.busNumber ? `🚌 *Bus:* ${head.busNumber}` : null,
+      "",
+      "May Allah accept your Hajj and grant you a blessed journey. 🤲",
+      "",
+      "— Al Burhan Tours & Travels",
+    ].filter(Boolean).join("\n");
+
+    const cleanPhone = mobile.replace(/\D/g, "");
+    const fullPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+    const waLink = `https://wa.me/${fullPhone}?text=${encodeURIComponent(message)}`;
+
+    const sent = await sendWhatsApp(mobile, message);
+    res.json({ sent, waLink, mobile });
+  } catch (err: any) {
+    console.error("[groups] family whatsapp error:", err);
     if (!res.headersSent) res.status(500).json({ message: err?.message || "Failed" });
   }
 });
