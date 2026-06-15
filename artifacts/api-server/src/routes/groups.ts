@@ -1572,23 +1572,36 @@ router.post("/:groupId/families/auto-allocate", requireAdmin as any, async (req,
         }
         assignedCount += neededBeds;
       } else {
-        // Large family — fill available rooms one at a time (overflow into adjacent rooms of same type)
+        // Large family — overflow into adjacent rooms of same type (room-number proximity ordering)
         let remaining = [...family];
+        let lastRoomNum: string | null = null;
         while (remaining.length > 0) {
-          let bestSplit: typeof rooms[0] | null = null;
-          let bestSplitAvail = -1;
-          for (const room of rooms) {
-            const occupied = roomBeds.get(room.id) || 0;
-            const avail = room.totalBeds - occupied;
-            if (avail > 0 && preferredTypes.includes(room.roomType || "")) {
-              if (avail > bestSplitAvail) { bestSplitAvail = avail; bestSplit = room; }
-            }
+          const candidates = rooms.filter(r => {
+            const avail = r.totalBeds - (roomBeds.get(r.id) || 0);
+            return avail > 0 && preferredTypes.includes(r.roomType || "");
+          });
+          if (candidates.length === 0) { unassignedCount += remaining.length; break; }
+          // First overflow: pick largest available; subsequent: pick nearest by room number
+          if (lastRoomNum !== null) {
+            const lastN = parseInt(lastRoomNum, 10) || 0;
+            candidates.sort((a, b) => {
+              const dA = Math.abs((parseInt(a.roomNumber, 10) || 0) - lastN);
+              const dB = Math.abs((parseInt(b.roomNumber, 10) || 0) - lastN);
+              if (dA !== dB) return dA - dB;
+              return (b.totalBeds - (roomBeds.get(b.id) || 0)) - (a.totalBeds - (roomBeds.get(a.id) || 0));
+            });
+          } else {
+            candidates.sort((a, b) =>
+              (b.totalBeds - (roomBeds.get(b.id) || 0)) - (a.totalBeds - (roomBeds.get(a.id) || 0))
+            );
           }
-          if (!bestSplit) { unassignedCount += remaining.length; break; }
-          const toPlace = remaining.splice(0, bestSplitAvail);
+          const bestSplit = candidates[0];
+          const avail = bestSplit.totalBeds - (roomBeds.get(bestSplit.id) || 0);
+          const toPlace = remaining.splice(0, avail);
           roomBeds.set(bestSplit.id, (roomBeds.get(bestSplit.id) || 0) + toPlace.length);
+          lastRoomNum = bestSplit.roomNumber;
           for (const p of toPlace) {
-            assignments.push({ pilgrimId: p.id, roomNumber: bestSplit!.roomNumber, roomHotel: bestSplit!.hotel, roomId: bestSplit!.id });
+            assignments.push({ pilgrimId: p.id, roomNumber: bestSplit.roomNumber, roomHotel: bestSplit.hotel, roomId: bestSplit.id });
           }
           assignedCount += toPlace.length;
         }

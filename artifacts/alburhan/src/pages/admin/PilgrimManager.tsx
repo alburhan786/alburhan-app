@@ -811,7 +811,7 @@ export default function PilgrimManager() {
                                 method: "PUT",
                                 credentials: "include",
                                 headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ familyRelation: val || null }),
+                                body: JSON.stringify({ ...p, familyRelation: val || null }),
                               }).then(() => fetchData());
                             }}
                             className="h-5 text-[10px] rounded border border-amber-200 bg-amber-50 text-amber-900 px-1 max-w-[72px]"
