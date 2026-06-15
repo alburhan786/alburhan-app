@@ -7,7 +7,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useDeleteGuard } from "@/components/DeleteGuard";
 import { Plus, Edit, Trash2, ArrowLeft, Upload, Printer, CreditCard, Luggage, Heart,
-  Building2, Bus, DoorOpen, FileDown, Hotel, BedDouble, Users, Wand2, X, AlertTriangle, Sticker, Layers } from "lucide-react";
+  Building2, Bus, DoorOpen, FileDown, Hotel, BedDouble, Users, Wand2, X, AlertTriangle, Sticker, Layers, UserCheck, QrCode, Star } from "lucide-react";
+import { QRCodeCanvas } from "qrcode.react";
 import { Link, useRoute } from "wouter";
 import { BulkImportModal } from "./BulkImportModal";
 import * as XLSX from "xlsx";
@@ -66,6 +67,17 @@ interface Pilgrim {
   passportIssueDate?: string;
   passportExpiryDate?: string;
   passportPlaceOfIssue?: string;
+  familyId?: string;
+  familyHead?: boolean;
+}
+
+interface FamilyGroup {
+  familyId: string;
+  members: Pilgrim[];
+  head: Pilgrim | null;
+  roomNumber?: string | null;
+  roomHotel?: string | null;
+  roomId?: string | null;
 }
 
 interface Group {
@@ -123,7 +135,7 @@ export default function PilgrimManager() {
   const [, params] = useRoute("/admin/groups/:groupId/pilgrims");
   const groupId = params?.groupId || "";
 
-  const [activeTab, setActiveTab] = useState<"pilgrims" | "rooms">("pilgrims");
+  const [activeTab, setActiveTab] = useState<"pilgrims" | "rooms" | "families">("pilgrims");
   const [group, setGroup] = useState<Group | null>(null);
   const [pilgrims, setPilgrims] = useState<Pilgrim[]>([]);
   const [rooms, setRooms] = useState<HajjRoom[]>([]);
@@ -150,6 +162,10 @@ export default function PilgrimManager() {
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
   const [editingSerial, setEditingSerial] = useState<{ id: string; value: string } | null>(null);
   const [generatingBarcodes, setGeneratingBarcodes] = useState(false);
+  const [editingFamilyId, setEditingFamilyId] = useState<{ id: string; value: string } | null>(null);
+  const [families, setFamilies] = useState<FamilyGroup[]>([]);
+  const [familyAllocating, setFamilyAllocating] = useState(false);
+  const [expandedFamilies, setExpandedFamilies] = useState<Set<string>>(new Set());
 
   const fetchData = useCallback(async () => {
     try {
@@ -164,7 +180,15 @@ export default function PilgrimManager() {
     } catch {} finally { setLoading(false); }
   }, [groupId]);
 
+  const fetchFamilies = useCallback(async () => {
+    try {
+      const res = await fetch(`${API}/api/groups/${groupId}/families`, { credentials: "include" });
+      if (res.ok) setFamilies(await res.json());
+    } catch {}
+  }, [groupId]);
+
   useEffect(() => { if (groupId) fetchData(); }, [groupId, fetchData]);
+  useEffect(() => { if (groupId && activeTab === "families") fetchFamilies(); }, [groupId, activeTab, fetchFamilies]);
 
   const generateBarcodes = async () => {
     setGeneratingBarcodes(true);
@@ -438,6 +462,67 @@ export default function PilgrimManager() {
     finally { setDownloadingBulkStickers(false); }
   };
 
+  const handleFamilyIdUpdate = async (p: Pilgrim, newVal: string) => {
+    const newFamilyId = newVal.trim().toUpperCase() || null;
+    if ((newFamilyId || null) === (p.familyId || null)) { setEditingFamilyId(null); return; }
+    try {
+      await fetch(`${API}/api/groups/${groupId}/pilgrims/${p.id}`, {
+        method: "PUT", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...p, familyId: newFamilyId, serialNumber: p.serialNumber }),
+      });
+      await fetchData();
+      if (activeTab === "families") await fetchFamilies();
+    } catch { toast({ title: "Failed to update family ID", variant: "destructive" }); }
+    setEditingFamilyId(null);
+  };
+
+  const handleToggleFamilyHead = async (p: Pilgrim) => {
+    try {
+      await fetch(`${API}/api/groups/${groupId}/pilgrims/${p.id}`, {
+        method: "PUT", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...p, familyHead: !p.familyHead, serialNumber: p.serialNumber }),
+      });
+      toast({ title: p.familyHead ? "Removed as family head" : "Set as family head" });
+      await fetchData();
+      if (activeTab === "families") await fetchFamilies();
+    } catch { toast({ title: "Failed to update", variant: "destructive" }); }
+  };
+
+  const handleFamilyAutoAllocate = async () => {
+    setFamilyAllocating(true);
+    try {
+      const res = await fetch(`${API}/api/groups/${groupId}/families/auto-allocate`, {
+        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+      });
+      if (!res.ok) throw new Error("Failed");
+      const data = await res.json();
+      toast({
+        title: "Family-wise rooms allocated!",
+        description: `${data.assigned} pilgrims assigned · ${data.unassigned} unassigned`,
+      });
+      await fetchData();
+      await fetchFamilies();
+    } catch { toast({ title: "Family auto-allocation failed", variant: "destructive" }); }
+    finally { setFamilyAllocating(false); }
+  };
+
+  const handleAssignFamilyToRoom = async (familyId: string, roomId: string | null) => {
+    try {
+      const res = await fetch(`${API}/api/groups/${groupId}/families/${encodeURIComponent(familyId)}/assign-room`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomId }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      const targetRoom = roomId ? rooms.find(r => r.id === roomId) : null;
+      toast({ title: targetRoom ? `Family ${familyId} → Room ${targetRoom.roomNumber}` : `Family ${familyId} room cleared` });
+      await fetchData();
+      await fetchFamilies();
+    } catch { toast({ title: "Failed to assign family to room", variant: "destructive" }); }
+  };
+
   const f = (key: string, val: string) => setForm(prev => ({ ...prev, [key]: val }));
   const rf = (key: string, val: string) => setRoomForm(prev => ({ ...prev, [key]: val }));
   const brf = (key: string, val: string) => setBulkRoomForm(prev => ({ ...prev, [key]: val }));
@@ -585,6 +670,12 @@ export default function PilgrimManager() {
         >
           <Hotel size={15} /> Room Management ({rooms.length})
         </button>
+        <button
+          onClick={() => setActiveTab("families")}
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px ${activeTab === "families" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+        >
+          <UserCheck size={15} /> Families ({families.length})
+        </button>
       </div>
 
       <input ref={fileRef} type="file" accept="image/*" className="hidden"
@@ -606,6 +697,7 @@ export default function PilgrimManager() {
                   <th className="px-4 py-3">Room</th>
                   <th className="px-4 py-3">Bus</th>
                   <th className="px-4 py-3">Relation</th>
+                  <th className="px-4 py-3">Family</th>
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
@@ -657,6 +749,42 @@ export default function PilgrimManager() {
                     </td>
                     <td className="px-4 py-3">{p.busNumber || "—"}</td>
                     <td className="px-4 py-3 text-xs">{p.relation || "—"}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1">
+                        {editingFamilyId?.id === p.id ? (
+                          <input
+                            autoFocus
+                            type="text"
+                            placeholder="e.g. F01"
+                            value={editingFamilyId.value}
+                            onChange={e => setEditingFamilyId({ id: p.id, value: e.target.value })}
+                            onBlur={() => handleFamilyIdUpdate(p, editingFamilyId.value)}
+                            onKeyDown={e => {
+                              if (e.key === "Enter") handleFamilyIdUpdate(p, editingFamilyId.value);
+                              if (e.key === "Escape") setEditingFamilyId(null);
+                            }}
+                            className="w-16 h-6 text-center font-mono font-bold border-2 border-amber-400 rounded focus:outline-none text-xs"
+                          />
+                        ) : (
+                          <span
+                            title="Click to set family ID"
+                            onClick={() => setEditingFamilyId({ id: p.id, value: p.familyId || "" })}
+                            className={`font-mono font-semibold cursor-pointer px-1.5 py-0.5 rounded transition-colors text-xs ${p.familyId ? "bg-amber-100 text-amber-800 hover:bg-amber-200" : "text-muted-foreground/40 hover:bg-muted"}`}
+                          >
+                            {p.familyId || "+Fam"}
+                          </span>
+                        )}
+                        {p.familyId && (
+                          <button
+                            title={p.familyHead ? "Remove as head" : "Set as family head"}
+                            onClick={() => handleToggleFamilyHead(p)}
+                            className={`text-xs transition-colors ${p.familyHead ? "text-amber-500" : "text-muted-foreground/30 hover:text-amber-400"}`}
+                          >
+                            <Star size={11} fill={p.familyHead ? "currentColor" : "none"} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-1">
                         <Button
@@ -804,6 +932,18 @@ export default function PilgrimManager() {
                           </div>
                         </div>
 
+                        {/* Family chips for this room */}
+                        {(() => {
+                          const famIds = [...new Set(roomPilgrims.filter(p => p.familyId).map(p => p.familyId!))];
+                          return famIds.length > 0 ? (
+                            <div className="flex flex-wrap gap-1 mb-2">
+                              {famIds.map(fid => (
+                                <span key={fid} className="text-[10px] bg-amber-100 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded-full font-bold">👨‍👩‍👧 {fid}</span>
+                              ))}
+                            </div>
+                          ) : null;
+                        })()}
+
                         {/* Pilgrim chips */}
                         {roomPilgrims.length === 0 ? (
                           <p className="text-xs text-muted-foreground italic">No pilgrims assigned</p>
@@ -905,6 +1045,174 @@ export default function PilgrimManager() {
                 </div>
               </Card>
             </>
+          )}
+        </div>
+      )}
+
+      {/* ============ FAMILIES TAB ============ */}
+      {activeTab === "families" && (
+        <div className="space-y-6">
+          {/* Action bar */}
+          <div className="flex flex-wrap gap-2 items-center">
+            <Button
+              onClick={handleFamilyAutoAllocate}
+              disabled={familyAllocating || families.length === 0 || rooms.length === 0}
+              className="gap-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white disabled:opacity-60"
+            >
+              <Wand2 size={16} /> {familyAllocating ? "Allocating..." : "Family Auto Allocate"}
+            </Button>
+            <Button onClick={fetchFamilies} variant="outline" className="gap-1.5 rounded-xl">
+              Refresh
+            </Button>
+            <div className="flex items-center gap-2 ml-2 text-sm text-muted-foreground">
+              <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-semibold text-xs">{families.length} families</span>
+              <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full font-semibold text-xs">
+                {pilgrims.filter(p => !p.familyId).length} ungrouped
+              </span>
+            </div>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm text-blue-800">
+            <strong>Tip:</strong> In the <em>Pilgrims</em> tab, click "<span className="font-mono font-bold">+Fam</span>" in the Family column to assign a Family ID (e.g. F01, F02). Click ⭐ to mark the family head. Then use <em>Family Auto Allocate</em> to keep families together.
+          </div>
+
+          {/* Ungrouped pilgrims */}
+          {pilgrims.filter(p => !p.familyId).length > 0 && (
+            <Card className="rounded-xl border-dashed border-2 border-gray-300">
+              <div className="px-5 py-3 border-b bg-muted/20 flex items-center gap-2">
+                <Users size={15} className="text-muted-foreground" />
+                <span className="font-semibold text-sm text-muted-foreground">Ungrouped Pilgrims ({pilgrims.filter(p => !p.familyId).length})</span>
+              </div>
+              <div className="p-4 flex flex-wrap gap-1.5">
+                {pilgrims.filter(p => !p.familyId).sort((a, b) => a.serialNumber - b.serialNumber).map(p => (
+                  <span key={p.id} className="text-xs bg-gray-100 border border-gray-200 text-gray-700 px-2 py-1 rounded-full">
+                    {p.serialNumber}. {p.fullName.split(" ")[0]}
+                  </span>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {/* Family cards */}
+          {families.length === 0 ? (
+            <Card className="p-12 text-center border-dashed border-2">
+              <UserCheck className="w-12 h-12 mx-auto text-muted-foreground/40 mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No families yet</h3>
+              <p className="text-muted-foreground text-sm">Go to the Pilgrims tab, click "+Fam" to assign a Family ID to each pilgrim.</p>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {families.map(fam => {
+                const isExpanded = expandedFamilies.has(fam.familyId);
+                const headName = fam.head ? [fam.head.salutation, fam.head.fullName].filter(Boolean).join(" ") : fam.familyId;
+                const roomInfo = fam.roomId ? rooms.find(r => r.id === fam.roomId) : null;
+                const memberRoomIds = [...new Set(fam.members.map(m => m.roomId || ""))].filter(Boolean);
+                const allSameRoom = memberRoomIds.length === 1 && !!fam.roomId;
+                const hasRoom = memberRoomIds.length > 0;
+                const familyQrUrl = `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/verify/family/${groupId}/${encodeURIComponent(fam.familyId)}`;
+
+                return (
+                  <Card key={fam.familyId} className="rounded-xl border-2 border-amber-200 bg-amber-50/30 overflow-hidden">
+                    <div className="p-4">
+                      {/* Header */}
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="bg-amber-500 text-white rounded-xl px-3 py-1.5 text-center min-w-[52px]">
+                            <div className="text-[9px] font-bold uppercase tracking-wide opacity-80">Family</div>
+                            <div className="text-base font-black leading-tight">{fam.familyId}</div>
+                          </div>
+                          <div>
+                            <div className="font-bold text-sm flex items-center gap-1">
+                              {headName}
+                              {fam.head?.familyHead && <Star size={11} className="text-amber-500" fill="currentColor" />}
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-0.5">{fam.members.length} member{fam.members.length !== 1 ? "s" : ""}</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Button
+                            variant="ghost" size="icon" className="h-7 w-7"
+                            title="View Family QR Page"
+                            onClick={() => window.open(familyQrUrl, "_blank")}
+                          >
+                            <QrCode size={13} />
+                          </Button>
+                          <button
+                            onClick={() => setExpandedFamilies(prev => {
+                              const next = new Set(prev);
+                              isExpanded ? next.delete(fam.familyId) : next.add(fam.familyId);
+                              return next;
+                            })}
+                            className="text-xs text-muted-foreground px-2 py-1 rounded hover:bg-muted"
+                          >
+                            {isExpanded ? "▲ Hide" : "▼ Show"}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Room status */}
+                      <div className="mb-3">
+                        {allSameRoom && roomInfo ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${HOTEL_COLORS[roomInfo.hotel] || "bg-gray-100"}`}>
+                              {HOTEL_LABELS[roomInfo.hotel] || roomInfo.hotel}
+                            </span>
+                            <span className="text-xs font-bold text-primary">Room {roomInfo.roomNumber}</span>
+                            <span className={`text-xs px-1.5 py-0.5 rounded-full ${ROOM_TYPE_COLORS[roomInfo.roomType] || "bg-gray-100"}`}>
+                              {ROOM_TYPE_LABELS[roomInfo.roomType] || roomInfo.roomType}
+                            </span>
+                          </div>
+                        ) : hasRoom ? (
+                          <span className="text-xs text-amber-700 font-medium bg-amber-100 px-2 py-0.5 rounded-full">Mixed rooms ({memberRoomIds.length})</span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground italic">No room assigned</span>
+                        )}
+                      </div>
+
+                      {/* Member list (expandable) */}
+                      {isExpanded && (
+                        <div className="mb-3 bg-white rounded-lg border p-2 space-y-1">
+                          {fam.members.map(m => (
+                            <div key={m.id} className="flex items-center gap-2 text-xs py-1 border-b last:border-0">
+                              <div className="w-6 h-6 rounded-full bg-muted overflow-hidden shrink-0">
+                                {m.photoUrl
+                                  ? <img src={`${API}${m.photoUrl}`} alt="" className="w-full h-full object-cover" />
+                                  : <div className="w-full h-full flex items-center justify-center text-[10px]">{m.gender?.toLowerCase() === "female" ? "👩" : "👨"}</div>}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <span className="font-medium truncate">{m.fullName}</span>
+                                {m.familyHead && <Star size={9} className="inline ml-1 text-amber-500" fill="currentColor" />}
+                              </div>
+                              <span className="text-muted-foreground shrink-0">{m.relation || m.gender || ""}</span>
+                              {m.roomNumber && (
+                                <span className="bg-primary/10 text-primary font-semibold px-1.5 py-0.5 rounded text-[10px] shrink-0">Rm {m.roomNumber}</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Assign Room dropdown */}
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs text-muted-foreground shrink-0">Assign all to:</label>
+                        <select
+                          value={fam.roomId || ""}
+                          onChange={e => handleAssignFamilyToRoom(fam.familyId, e.target.value || null)}
+                          className="flex-1 h-8 px-2 rounded border bg-background text-xs"
+                        >
+                          <option value="">— Unassigned —</option>
+                          {sortedRooms.map(r => (
+                            <option key={r.id} value={r.id}>
+                              Rm {r.roomNumber} · {HOTEL_LABELS[r.hotel] || r.hotel} ({ROOM_TYPE_LABELS[r.roomType] || r.roomType}) [{r.totalBeds - r.occupiedBeds} free]
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
           )}
         </div>
       )}

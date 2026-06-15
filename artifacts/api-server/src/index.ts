@@ -13,6 +13,18 @@ async function runMigrations() {
     console.error("[Migration] barcode_id failed:", err);
   }
   try {
+    await db.execute(sql`ALTER TABLE pilgrims ADD COLUMN IF NOT EXISTS family_id TEXT`);
+    console.log("[Migration] family_id column ensured");
+  } catch (err) {
+    console.error("[Migration] family_id failed:", err);
+  }
+  try {
+    await db.execute(sql`ALTER TABLE pilgrims ADD COLUMN IF NOT EXISTS family_head BOOLEAN DEFAULT false`);
+    console.log("[Migration] family_head column ensured");
+  } catch (err) {
+    console.error("[Migration] family_head failed:", err);
+  }
+  try {
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS delete_audit_log (
         id SERIAL PRIMARY KEY,

@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, integer, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, integer, jsonb, boolean } from "drizzle-orm/pg-core";
 
 export const hajjGroupsTable = pgTable("hajj_groups", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -53,6 +53,8 @@ export const pilgrimsTable = pgTable("pilgrims", {
   coverNumber: text("cover_number"),
   medicalCondition: text("medical_condition"),
   barcodeId: text("barcode_id"),
+  familyId: text("family_id"),
+  familyHead: boolean("family_head").default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

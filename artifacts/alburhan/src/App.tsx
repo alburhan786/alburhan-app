@@ -62,6 +62,7 @@ import PrintSingleCardPro from "@/pages/admin/print/PrintSingleCardPro";
 import PrintIdCardSVG from "@/pages/admin/print/PrintIdCardSVG";
 import StaffVerify from "@/pages/public/StaffVerify";
 import VerifyPilgrim from "@/pages/public/VerifyPilgrim";
+import VerifyFamily from "@/pages/public/VerifyFamily";
 import ScanPilgrim from "@/pages/public/ScanPilgrim";
 import NotFound from "@/pages/not-found";
 import { useAuth } from "@/hooks/use-auth";
@@ -111,6 +112,7 @@ function Router() {
       <Route path="/pay/:bookingNumber" component={PaymentPage} />
       <Route path="/feedback" component={FeedbackPage} />
       <Route path="/verify-staff" component={StaffVerify} />
+      <Route path="/verify/family/:groupId/:familyId" component={VerifyFamily} />
       <Route path="/verify/:id" component={VerifyPilgrim} />
       <Route path="/scan/:barcodeId" component={ScanPilgrim} />
 

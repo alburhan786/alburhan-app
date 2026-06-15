@@ -147,7 +147,8 @@ router.post("/:groupId/pilgrims", requireAdmin as any, async (req: Authenticated
   const { fullName, passportNumber, visaNumber, dateOfBirth, gender, bloodGroup,
     photoUrl, mobileIndia, mobileSaudi, address, city, state, roomNumber, roomType, roomHotel, roomId,
     busNumber, seatNumber, relation, coverNumber, medicalCondition,
-    salutation, passportIssueDate, passportExpiryDate, passportPlaceOfIssue } = req.body;
+    salutation, passportIssueDate, passportExpiryDate, passportPlaceOfIssue,
+    familyId, familyHead } = req.body;
 
   if (!fullName) { res.status(400).json({ message: "fullName is required" }); return; }
 
@@ -169,6 +170,8 @@ router.post("/:groupId/pilgrims", requireAdmin as any, async (req: Authenticated
     passportIssueDate: passportIssueDate || null,
     passportExpiryDate: passportExpiryDate || null,
     passportPlaceOfIssue: passportPlaceOfIssue || null,
+    familyId: familyId || null,
+    familyHead: familyHead === true || familyHead === "true" ? true : false,
   }).returning();
   res.status(201).json(fmtPilgrim(pilgrim));
 });
@@ -179,7 +182,8 @@ router.put("/:groupId/pilgrims/:pilgrimId", requireAdmin as any, async (req: Aut
   const { fullName, passportNumber, visaNumber, dateOfBirth, gender, bloodGroup,
     photoUrl, mobileIndia, mobileSaudi, address, city, state, roomNumber, roomType, roomHotel, roomId,
     busNumber, seatNumber, relation, coverNumber, medicalCondition, serialNumber,
-    salutation, passportIssueDate, passportExpiryDate, passportPlaceOfIssue } = req.body;
+    salutation, passportIssueDate, passportExpiryDate, passportPlaceOfIssue,
+    familyId, familyHead } = req.body;
 
   const scope = and(eq(pilgrimsTable.id, pilgrimId), eq(pilgrimsTable.groupId, groupId));
 
@@ -193,6 +197,8 @@ router.put("/:groupId/pilgrims/:pilgrimId", requireAdmin as any, async (req: Aut
     passportIssueDate: passportIssueDate || null,
     passportExpiryDate: passportExpiryDate || null,
     passportPlaceOfIssue: passportPlaceOfIssue || null,
+    familyId: familyId !== undefined ? (familyId || null) : undefined,
+    familyHead: familyHead !== undefined ? (familyHead === true || familyHead === "true") : undefined,
     updatedAt: new Date(),
   }).where(scope).returning();
 
@@ -1342,6 +1348,146 @@ router.delete("/:groupId/rooms/:roomId", requireAdmin as any, async (req, res) =
   } catch (err: any) {
     console.error("[groups] DELETE /:groupId/rooms/:roomId DB error:", err);
     res.status(500).json({ message: err?.message || "Failed to delete room" });
+  }
+});
+
+// ======================== FAMILY ENDPOINTS ========================
+
+// GET /:groupId/families — list all families (admin)
+router.get("/:groupId/families", requireAdmin as any, async (req, res) => {
+  const groupId = String(req.params.groupId);
+  try {
+    const pilgrims = await db.select().from(pilgrimsTable)
+      .where(eq(pilgrimsTable.groupId, groupId))
+      .orderBy(asc(pilgrimsTable.serialNumber));
+
+    const familyMap = new Map<string, typeof pilgrims>();
+    for (const p of pilgrims) {
+      if (!p.familyId) continue;
+      if (!familyMap.has(p.familyId)) familyMap.set(p.familyId, []);
+      familyMap.get(p.familyId)!.push(p);
+    }
+
+    const families = Array.from(familyMap.entries()).map(([familyId, members]) => {
+      const head = members.find(m => m.familyHead) || members[0];
+      return {
+        familyId,
+        members: members.map(fmtPilgrim),
+        head: head ? fmtPilgrim(head) : null,
+        roomNumber: head?.roomNumber || null,
+        roomHotel: head?.roomHotel || null,
+        roomId: head?.roomId || null,
+      };
+    });
+
+    families.sort((a, b) => a.familyId.localeCompare(b.familyId));
+    res.json(families);
+  } catch (err: any) {
+    res.status(500).json({ message: err?.message || "Failed to fetch families" });
+  }
+});
+
+// POST /:groupId/families/auto-allocate — family-aware room auto-allocation
+router.post("/:groupId/families/auto-allocate", requireAdmin as any, async (req, res) => {
+  const groupId = String(req.params.groupId);
+  try {
+    const rooms = await db.select().from(hajjRoomsTable)
+      .where(eq(hajjRoomsTable.groupId, groupId))
+      .orderBy(asc(hajjRoomsTable.hotel), asc(hajjRoomsTable.roomNumber));
+
+    const pilgrims = await db.select().from(pilgrimsTable)
+      .where(eq(pilgrimsTable.groupId, groupId))
+      .orderBy(asc(pilgrimsTable.serialNumber));
+
+    // Group by familyId; pilgrims without one get their own solo group
+    const familyMap = new Map<string, typeof pilgrims>();
+    for (const p of pilgrims) {
+      const key = p.familyId ? `fam_${p.familyId}` : `solo_${p.id}`;
+      if (!familyMap.has(key)) familyMap.set(key, []);
+      familyMap.get(key)!.push(p);
+    }
+
+    const sortedFamilies = Array.from(familyMap.values()).sort((a, b) => b.length - a.length);
+    const roomBeds = new Map<string, number>();
+    for (const room of rooms) roomBeds.set(room.id, 0);
+
+    type Assignment = { pilgrimId: string; roomNumber: string; roomHotel: string; roomId: string };
+    const assignments: Assignment[] = [];
+    let assignedCount = 0;
+    let unassignedCount = 0;
+
+    for (const family of sortedFamilies) {
+      const females = family.filter(p => p.gender?.toLowerCase() === "female");
+      const males = family.filter(p => p.gender?.toLowerCase() === "male");
+      const isMixed = females.length > 0 && males.length > 0;
+      const allFemale = females.length === family.length;
+      const neededBeds = family.length;
+
+      let preferredTypes: string[];
+      if (isMixed) preferredTypes = ["family"];
+      else if (allFemale) preferredTypes = ["ladies", "family"];
+      else preferredTypes = ["gents", "family"];
+
+      let bestRoom: typeof rooms[0] | null = null;
+      let bestAvail = Infinity;
+      for (const room of rooms) {
+        const occupied = roomBeds.get(room.id) || 0;
+        const avail = room.totalBeds - occupied;
+        if (avail >= neededBeds && preferredTypes.includes(room.roomType || "")) {
+          if (avail < bestAvail) { bestAvail = avail; bestRoom = room; }
+        }
+      }
+
+      if (bestRoom) {
+        roomBeds.set(bestRoom.id, (roomBeds.get(bestRoom.id) || 0) + neededBeds);
+        for (const p of family) {
+          assignments.push({ pilgrimId: p.id, roomNumber: bestRoom!.roomNumber, roomHotel: bestRoom!.hotel, roomId: bestRoom!.id });
+        }
+        assignedCount += neededBeds;
+      } else {
+        unassignedCount += neededBeds;
+      }
+    }
+
+    await db.transaction(async (tx) => {
+      await tx.update(pilgrimsTable)
+        .set({ roomNumber: null, roomHotel: null, roomId: null, updatedAt: new Date() })
+        .where(eq(pilgrimsTable.groupId, groupId));
+      for (const a of assignments) {
+        await tx.update(pilgrimsTable)
+          .set({ roomNumber: a.roomNumber, roomHotel: a.roomHotel, roomId: a.roomId, updatedAt: new Date() })
+          .where(eq(pilgrimsTable.id, a.pilgrimId));
+      }
+    });
+
+    res.json({ assigned: assignedCount, unassigned: unassignedCount });
+  } catch (err: any) {
+    console.error("[groups] family auto-allocate error:", err);
+    res.status(500).json({ message: err?.message || "Failed to auto-allocate rooms by family" });
+  }
+});
+
+// POST /:groupId/families/:familyId/assign-room — assign all family members to a room
+router.post("/:groupId/families/:familyId/assign-room", requireAdmin as any, async (req, res) => {
+  const groupId = String(req.params.groupId);
+  const familyId = decodeURIComponent(String(req.params.familyId));
+  const { roomId } = req.body;
+  try {
+    let roomNumber: string | null = null;
+    let roomHotel: string | null = null;
+    if (roomId) {
+      const roomRows = await db.select().from(hajjRoomsTable)
+        .where(and(eq(hajjRoomsTable.id, roomId), eq(hajjRoomsTable.groupId, groupId))).limit(1);
+      if (!roomRows[0]) { res.status(404).json({ message: "Room not found" }); return; }
+      roomNumber = roomRows[0].roomNumber;
+      roomHotel = roomRows[0].hotel;
+    }
+    await db.update(pilgrimsTable)
+      .set({ roomNumber, roomHotel, roomId: roomId || null, updatedAt: new Date() })
+      .where(and(eq(pilgrimsTable.groupId, groupId), eq(pilgrimsTable.familyId, familyId)));
+    res.json({ message: "Family assigned to room" });
+  } catch (err: any) {
+    res.status(500).json({ message: err?.message || "Failed to assign family to room" });
   }
 });
 
