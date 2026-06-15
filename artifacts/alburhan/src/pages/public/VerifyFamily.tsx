@@ -80,7 +80,7 @@ export default function VerifyFamily() {
 
   useEffect(() => {
     if (!groupId || !familyId) { setStatus("not_found"); return; }
-    fetch(`${apiBase()}/groups/${groupId}/families/${encodeURIComponent(familyId)}/public`)
+    fetch(`${apiBase()}/verify/family/${groupId}/${encodeURIComponent(familyId)}`)
       .then(r => r.ok ? r.json() : Promise.reject(r.status))
       .then(d => { setData(d); setStatus("found"); })
       .catch(code => setStatus(code === 404 ? "not_found" : "error"));

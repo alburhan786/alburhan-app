@@ -54,6 +54,7 @@ export const pilgrimsTable = pgTable("pilgrims", {
   medicalCondition: text("medical_condition"),
   barcodeId: text("barcode_id"),
   familyId: text("family_id"),
+  familyRelation: text("family_relation"),
   familyHead: boolean("family_head").default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

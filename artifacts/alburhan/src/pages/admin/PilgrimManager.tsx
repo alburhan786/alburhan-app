@@ -68,6 +68,7 @@ interface Pilgrim {
   passportExpiryDate?: string;
   passportPlaceOfIssue?: string;
   familyId?: string;
+  familyRelation?: string;
   familyHead?: boolean;
 }
 
@@ -750,38 +751,59 @@ export default function PilgrimManager() {
                     <td className="px-4 py-3">{p.busNumber || "—"}</td>
                     <td className="px-4 py-3 text-xs">{p.relation || "—"}</td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-1">
-                        {editingFamilyId?.id === p.id ? (
-                          <input
-                            autoFocus
-                            type="text"
-                            placeholder="e.g. F01"
-                            value={editingFamilyId.value}
-                            onChange={e => setEditingFamilyId({ id: p.id, value: e.target.value })}
-                            onBlur={() => handleFamilyIdUpdate(p, editingFamilyId.value)}
-                            onKeyDown={e => {
-                              if (e.key === "Enter") handleFamilyIdUpdate(p, editingFamilyId.value);
-                              if (e.key === "Escape") setEditingFamilyId(null);
-                            }}
-                            className="w-16 h-6 text-center font-mono font-bold border-2 border-amber-400 rounded focus:outline-none text-xs"
-                          />
-                        ) : (
-                          <span
-                            title="Click to set family ID"
-                            onClick={() => setEditingFamilyId({ id: p.id, value: p.familyId || "" })}
-                            className={`font-mono font-semibold cursor-pointer px-1.5 py-0.5 rounded transition-colors text-xs ${p.familyId ? "bg-amber-100 text-amber-800 hover:bg-amber-200" : "text-muted-foreground/40 hover:bg-muted"}`}
-                          >
-                            {p.familyId || "+Fam"}
-                          </span>
-                        )}
+                      <div className="flex flex-col gap-0.5">
+                        <div className="flex items-center gap-1">
+                          {editingFamilyId?.id === p.id ? (
+                            <input
+                              autoFocus
+                              type="text"
+                              placeholder="e.g. F01"
+                              value={editingFamilyId.value}
+                              onChange={e => setEditingFamilyId({ id: p.id, value: e.target.value })}
+                              onBlur={() => handleFamilyIdUpdate(p, editingFamilyId.value)}
+                              onKeyDown={e => {
+                                if (e.key === "Enter") handleFamilyIdUpdate(p, editingFamilyId.value);
+                                if (e.key === "Escape") setEditingFamilyId(null);
+                              }}
+                              className="w-16 h-6 text-center font-mono font-bold border-2 border-amber-400 rounded focus:outline-none text-xs"
+                            />
+                          ) : (
+                            <span
+                              title="Click to set family ID"
+                              onClick={() => setEditingFamilyId({ id: p.id, value: p.familyId || "" })}
+                              className={`font-mono font-semibold cursor-pointer px-1.5 py-0.5 rounded transition-colors text-xs ${p.familyId ? "bg-amber-100 text-amber-800 hover:bg-amber-200" : "text-muted-foreground/40 hover:bg-muted"}`}
+                            >
+                              {p.familyId || "+Fam"}
+                            </span>
+                          )}
+                          {p.familyId && (
+                            <button
+                              title={p.familyHead ? "Remove as head" : "Set as family head"}
+                              onClick={() => handleToggleFamilyHead(p)}
+                              className={`text-xs transition-colors ${p.familyHead ? "text-amber-500" : "text-muted-foreground/30 hover:text-amber-400"}`}
+                            >
+                              <Star size={11} fill={p.familyHead ? "currentColor" : "none"} />
+                            </button>
+                          )}
+                        </div>
                         {p.familyId && (
-                          <button
-                            title={p.familyHead ? "Remove as head" : "Set as family head"}
-                            onClick={() => handleToggleFamilyHead(p)}
-                            className={`text-xs transition-colors ${p.familyHead ? "text-amber-500" : "text-muted-foreground/30 hover:text-amber-400"}`}
+                          <select
+                            value={p.familyRelation || ""}
+                            onChange={e => {
+                              const val = e.target.value;
+                              fetch(`${API}/groups/${groupId}/pilgrims/${p.id}`, {
+                                method: "PUT",
+                                headers: { "Content-Type": "application/json", ...authHeader() },
+                                body: JSON.stringify({ familyRelation: val || null }),
+                              }).then(() => fetchPilgrims());
+                            }}
+                            className="h-5 text-[10px] rounded border border-amber-200 bg-amber-50 text-amber-900 px-1 max-w-[72px]"
                           >
-                            <Star size={11} fill={p.familyHead ? "currentColor" : "none"} />
-                          </button>
+                            <option value="">Relation</option>
+                            {["Husband","Wife","Son","Daughter","Father","Mother","Other"].map(r => (
+                              <option key={r} value={r}>{r}</option>
+                            ))}
+                          </select>
                         )}
                       </div>
                     </td>
@@ -819,13 +841,24 @@ export default function PilgrimManager() {
             <Button onClick={() => setBulkRoomDialogOpen(true)} variant="outline" className="gap-1.5 rounded-xl border-primary text-primary hover:bg-primary/10">
               <Layers size={16} /> Bulk Add Rooms
             </Button>
-            <Button
-              onClick={handleAutoAllocate}
-              disabled={autoAllocating || rooms.length === 0}
-              className="gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-60"
-            >
-              <Wand2 size={16} /> {autoAllocating ? "Allocating..." : "Auto Allocate Rooms"}
-            </Button>
+            <div className="flex gap-1 rounded-xl border border-emerald-600 overflow-hidden">
+              <Button
+                onClick={handleAutoAllocate}
+                disabled={autoAllocating || familyAllocating || rooms.length === 0}
+                className="gap-1.5 rounded-none rounded-l-xl bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-60"
+                title="Allocate rooms by gender"
+              >
+                <Wand2 size={16} /> {autoAllocating ? "Allocating..." : "By Gender"}
+              </Button>
+              <Button
+                onClick={handleFamilyAutoAllocate}
+                disabled={autoAllocating || familyAllocating || rooms.length === 0}
+                className="gap-1.5 rounded-none rounded-r-xl bg-amber-600 hover:bg-amber-700 text-white disabled:opacity-60"
+                title="Allocate rooms keeping families together"
+              >
+                <Wand2 size={16} /> {familyAllocating ? "Allocating..." : "By Family"}
+              </Button>
+            </div>
             <Button
               onClick={handleDownloadRoomPdf}
               disabled={downloadingRoomPdf || rooms.length === 0}
@@ -932,16 +965,21 @@ export default function PilgrimManager() {
                           </div>
                         </div>
 
-                        {/* Family chips for this room */}
+                        {/* Family label for this room */}
                         {(() => {
+                          if (roomPilgrims.length === 0) return null;
                           const famIds = [...new Set(roomPilgrims.filter(p => p.familyId).map(p => p.familyId!))];
-                          return famIds.length > 0 ? (
-                            <div className="flex flex-wrap gap-1 mb-2">
-                              {famIds.map(fid => (
-                                <span key={fid} className="text-[10px] bg-amber-100 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded-full font-bold">👨‍👩‍👧 {fid}</span>
-                              ))}
+                          if (famIds.length === 0) return null;
+                          if (famIds.length === 1) return (
+                            <div className="mb-2">
+                              <span className="text-[10px] bg-amber-100 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded-full font-bold">👨‍👩‍👧 Family: {famIds[0]}</span>
                             </div>
-                          ) : null;
+                          );
+                          return (
+                            <div className="mb-2">
+                              <span className="text-[10px] bg-gray-100 text-gray-600 border border-gray-200 px-1.5 py-0.5 rounded-full font-semibold">Mixed ({famIds.length} families)</span>
+                            </div>
+                          );
                         })()}
 
                         {/* Pilgrim chips */}
@@ -1189,6 +1227,29 @@ export default function PilgrimManager() {
                               )}
                             </div>
                           ))}
+                        </div>
+                      )}
+
+                      {/* QR code */}
+                      {isExpanded && (
+                        <div className="mb-3 flex items-start gap-3 bg-white border rounded-lg p-3">
+                          <div className="bg-white p-1 border rounded">
+                            <QRCodeCanvas
+                              value={familyQrUrl}
+                              size={72}
+                              level="M"
+                              fgColor="#0d5040"
+                              bgColor="#ffffff"
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold text-gray-700 mb-0.5">Family Verify QR</p>
+                            <p className="text-[10px] text-muted-foreground break-all mb-2">{familyQrUrl}</p>
+                            <button
+                              onClick={() => window.open(familyQrUrl, "_blank")}
+                              className="text-[10px] text-primary underline"
+                            >Open page ↗</button>
+                          </div>
                         </div>
                       )}
 

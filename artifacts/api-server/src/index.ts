@@ -19,6 +19,12 @@ async function runMigrations() {
     console.error("[Migration] family_id failed:", err);
   }
   try {
+    await db.execute(sql`ALTER TABLE pilgrims ADD COLUMN IF NOT EXISTS family_relation TEXT`);
+    console.log("[Migration] family_relation column ensured");
+  } catch (err) {
+    console.error("[Migration] family_relation failed:", err);
+  }
+  try {
     await db.execute(sql`ALTER TABLE pilgrims ADD COLUMN IF NOT EXISTS family_head BOOLEAN DEFAULT false`);
     console.log("[Migration] family_head column ensured");
   } catch (err) {

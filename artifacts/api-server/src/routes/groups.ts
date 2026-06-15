@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, hajjGroupsTable, pilgrimsTable, hajjRoomsTable } from "@workspace/db";
-import { eq, and, desc, asc, count, max } from "drizzle-orm";
+import { eq, and, ne, desc, asc, count, max } from "drizzle-orm";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import multer from "multer";
 import { uploadToGCS, deleteFromGCS } from "../lib/gcsUpload.js";
@@ -148,7 +148,7 @@ router.post("/:groupId/pilgrims", requireAdmin as any, async (req: Authenticated
     photoUrl, mobileIndia, mobileSaudi, address, city, state, roomNumber, roomType, roomHotel, roomId,
     busNumber, seatNumber, relation, coverNumber, medicalCondition,
     salutation, passportIssueDate, passportExpiryDate, passportPlaceOfIssue,
-    familyId, familyHead } = req.body;
+    familyId, familyRelation, familyHead } = req.body;
 
   if (!fullName) { res.status(400).json({ message: "fullName is required" }); return; }
 
@@ -171,6 +171,7 @@ router.post("/:groupId/pilgrims", requireAdmin as any, async (req: Authenticated
     passportExpiryDate: passportExpiryDate || null,
     passportPlaceOfIssue: passportPlaceOfIssue || null,
     familyId: familyId || null,
+    familyRelation: familyRelation || null,
     familyHead: familyHead === true || familyHead === "true" ? true : false,
   }).returning();
   res.status(201).json(fmtPilgrim(pilgrim));
@@ -183,9 +184,29 @@ router.put("/:groupId/pilgrims/:pilgrimId", requireAdmin as any, async (req: Aut
     photoUrl, mobileIndia, mobileSaudi, address, city, state, roomNumber, roomType, roomHotel, roomId,
     busNumber, seatNumber, relation, coverNumber, medicalCondition, serialNumber,
     salutation, passportIssueDate, passportExpiryDate, passportPlaceOfIssue,
-    familyId, familyHead } = req.body;
+    familyId, familyRelation, familyHead } = req.body;
 
   const scope = and(eq(pilgrimsTable.id, pilgrimId), eq(pilgrimsTable.groupId, groupId));
+
+  // Enforce single family_head: if setting head=true, clear it from others in same family
+  const isSettingHead = familyHead === true || familyHead === "true";
+  if (isSettingHead) {
+    const resolvedFamilyId = familyId !== undefined ? (familyId || null) : null;
+    // Fetch current pilgrim to get existing familyId if not provided
+    const [existingRow] = await db.select({ familyId: pilgrimsTable.familyId })
+      .from(pilgrimsTable).where(scope).limit(1);
+    const activeFamilyId = familyId !== undefined ? (familyId || null) : existingRow?.familyId || null;
+    if (activeFamilyId) {
+      await db.update(pilgrimsTable)
+        .set({ familyHead: false, updatedAt: new Date() })
+        .where(and(
+          eq(pilgrimsTable.groupId, groupId),
+          eq(pilgrimsTable.familyId, activeFamilyId),
+          ne(pilgrimsTable.id, pilgrimId)
+        ));
+    }
+    void resolvedFamilyId;
+  }
 
   const [updated] = await db.update(pilgrimsTable).set({
     fullName, passportNumber, visaNumber, dateOfBirth, gender, bloodGroup,
@@ -198,6 +219,7 @@ router.put("/:groupId/pilgrims/:pilgrimId", requireAdmin as any, async (req: Aut
     passportExpiryDate: passportExpiryDate || null,
     passportPlaceOfIssue: passportPlaceOfIssue || null,
     familyId: familyId !== undefined ? (familyId || null) : undefined,
+    familyRelation: familyRelation !== undefined ? (familyRelation || null) : undefined,
     familyHead: familyHead !== undefined ? (familyHead === true || familyHead === "true") : undefined,
     updatedAt: new Date(),
   }).where(scope).returning();
@@ -1445,7 +1467,26 @@ router.post("/:groupId/families/auto-allocate", requireAdmin as any, async (req,
         }
         assignedCount += neededBeds;
       } else {
-        unassignedCount += neededBeds;
+        // Large family — fill available rooms one at a time (overflow into adjacent rooms of same type)
+        let remaining = [...family];
+        while (remaining.length > 0) {
+          let bestSplit: typeof rooms[0] | null = null;
+          let bestSplitAvail = -1;
+          for (const room of rooms) {
+            const occupied = roomBeds.get(room.id) || 0;
+            const avail = room.totalBeds - occupied;
+            if (avail > 0 && preferredTypes.includes(room.roomType || "")) {
+              if (avail > bestSplitAvail) { bestSplitAvail = avail; bestSplit = room; }
+            }
+          }
+          if (!bestSplit) { unassignedCount += remaining.length; break; }
+          const toPlace = remaining.splice(0, bestSplitAvail);
+          roomBeds.set(bestSplit.id, (roomBeds.get(bestSplit.id) || 0) + toPlace.length);
+          for (const p of toPlace) {
+            assignments.push({ pilgrimId: p.id, roomNumber: bestSplit!.roomNumber, roomHotel: bestSplit!.hotel, roomId: bestSplit!.id });
+          }
+          assignedCount += toPlace.length;
+        }
       }
     }
 
