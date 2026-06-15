@@ -35,7 +35,8 @@
     "nodemailer": "^8.0.2",
     "pdfkit": "^0.18.0",
     "qrcode": "^1.5.4",
-    "razorpay": "^2.9.6"
+    "razorpay": "^2.9.6",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/compression": "^1.8.1",

@@ -9,6 +9,7 @@ import PDFDocument from "pdfkit";
 import QRCode from "qrcode";
 import fs from "fs";
 import path from "path";
+import * as XLSX from "xlsx";
 import { LOGO_BASE64 } from "../lib/logoData.js";
 const LOGO_BUFFER = Buffer.from(LOGO_BASE64, "base64");
 
@@ -1686,17 +1687,39 @@ router.post("/:groupId/families/auto-detect", requireAdmin as any, async (req, r
       ids.forEach(id => assignedIds.add(id));
     }
 
-    // 2. Medium match: same city + same last-name word
+    // 2. Medium match: same non-empty address (exact)
+    const addressMap = new Map<string, typeof pilgrims>();
+    for (const p of pilgrims) {
+      if (assignedIds.has(p.id)) continue;
+      const addr = (p.address || "").trim().toLowerCase();
+      if (!addr || addr.length < 6) continue;
+      if (!addressMap.has(addr)) addressMap.set(addr, []);
+      addressMap.get(addr)!.push(p);
+    }
+    for (const [, group] of addressMap) {
+      if (group.length < 2) continue;
+      const ids = group.map(p => p.id);
+      const existingFamilyIds = [...new Set(group.filter(p => p.familyId).map(p => p.familyId!))];
+      suggestions.push({
+        id: nextSuggId++,
+        pilgrimIds: ids,
+        memberNames: group.map(p => p.fullName),
+        reason: `Same address/city (medium match)`,
+        suggestedFamilyId: existingFamilyIds[0] || `F${String(nextSuggId).padStart(3, "0")}`,
+        existingFamilyId: existingFamilyIds[0],
+      });
+      ids.forEach(id => assignedIds.add(id));
+    }
+
+    // 3. Suggestion: same surname (last word of fullName)
     const surnameMap = new Map<string, typeof pilgrims>();
     for (const p of pilgrims) {
       if (assignedIds.has(p.id)) continue;
       const parts = p.fullName.trim().split(/\s+/);
       const surname = parts[parts.length - 1].toLowerCase();
-      const city = (p.city || "").trim().toLowerCase();
-      if (!surname || !city) continue;
-      const key = `${city}::${surname}`;
-      if (!surnameMap.has(key)) surnameMap.set(key, []);
-      surnameMap.get(key)!.push(p);
+      if (!surname || surname.length < 3) continue;
+      if (!surnameMap.has(surname)) surnameMap.set(surname, []);
+      surnameMap.get(surname)!.push(p);
     }
     for (const [, group] of surnameMap) {
       if (group.length < 2) continue;
@@ -1708,7 +1731,7 @@ router.post("/:groupId/families/auto-detect", requireAdmin as any, async (req, r
         id: nextSuggId++,
         pilgrimIds: ids,
         memberNames: group.map(p => p.fullName),
-        reason: `Same surname "${surname}" and city "${group[0].city}"`,
+        reason: `Same surname "${surname}" (suggestion — review carefully)`,
         suggestedFamilyId: existingFamilyIds[0] || `F${String(nextSuggId).padStart(3, "0")}`,
         existingFamilyId: existingFamilyIds[0],
       });
@@ -2010,6 +2033,60 @@ router.get("/:groupId/families/hotel-list/pdf", requireAdmin as any, async (req,
     doc.end();
   } catch (err: any) {
     console.error("[groups] families/hotel-list/pdf error:", err);
+    if (!res.headersSent) res.status(500).json({ message: err?.message || "Failed" });
+  }
+});
+
+// GET /:groupId/families/export.xlsx — Excel export with one row per pilgrim grouped by family
+router.get("/:groupId/families/export.xlsx", requireAdmin as any, async (req, res) => {
+  try {
+    const groupId = String(req.params.groupId);
+    const groups = await db.select().from(hajjGroupsTable).where(eq(hajjGroupsTable.id, groupId)).limit(1);
+    if (!groups[0]) { res.status(404).json({ message: "Group not found" }); return; }
+    const group = groups[0];
+    const pilgrims = await db.select().from(pilgrimsTable)
+      .where(eq(pilgrimsTable.groupId, groupId))
+      .orderBy(asc(pilgrimsTable.familyId), asc(pilgrimsTable.serialNumber));
+
+    const HOTEL_LABELS: Record<string, string> = { makkah: "Makkah", madinah: "Madinah", aziziah: "Aziziah" };
+    const flightNo = group.flightNumber || "";
+
+    const headers = ["Family ID", "Family Head", "Full Name", "Relation", "Gender", "Passport No", "Mobile India", "Room No", "Flight No", "Bus No", "Hotel"];
+    const rows: (string | number)[][] = pilgrims.map(p => [
+      p.familyId || "",
+      p.familyHead ? "Yes" : "No",
+      p.fullName || "",
+      p.familyRelation || p.relation || "",
+      p.gender || "",
+      p.passportNumber || "",
+      p.mobileIndia || "",
+      p.roomNumber || "",
+      flightNo,
+      p.busNumber || "",
+      p.roomHotel ? (HOTEL_LABELS[p.roomHotel] || p.roomHotel) : "",
+    ]);
+
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    ws["!cols"] = headers.map((_, i) => ({ wch: i === 2 ? 30 : i === 0 ? 10 : 16 }));
+
+    // Style header row
+    const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
+    for (let c = range.s.c; c <= range.e.c; c++) {
+      const cellRef = XLSX.utils.encode_cell({ r: 0, c });
+      if (!ws[cellRef]) continue;
+      ws[cellRef].s = { font: { bold: true }, fill: { fgColor: { rgb: "0B3D2E" } }, fontColor: { rgb: "FFFFFF" } };
+    }
+
+    const wb = XLSX.utils.book_new();
+    const safeName = group.groupName.replace(/[^a-zA-Z0-9]/g, "-");
+    XLSX.utils.book_append_sheet(wb, ws, "Families");
+    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="family-list-${safeName}-${group.year}.xlsx"`);
+    res.send(buf);
+  } catch (err: any) {
+    console.error("[groups] families/export.xlsx error:", err);
     if (!res.headersSent) res.status(500).json({ message: err?.message || "Failed" });
   }
 });

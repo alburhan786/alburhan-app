@@ -615,32 +615,19 @@ export default function PilgrimManager() {
     finally { setResequencing(false); }
   };
 
-  const exportFamiliesExcel = () => {
-    const headers = ["Family ID", "Family Head", "Full Name", "Relation", "Gender", "Passport No", "Mobile India", "Room No", "Bus No", "Hotel"];
-    const rows: string[][] = [];
-    const sorted = [...families].sort((a, b) => a.familyId.localeCompare(b.familyId));
-    for (const fam of sorted) {
-      for (const m of fam.members) {
-        rows.push([
-          fam.familyId,
-          m.familyHead ? "Yes" : "No",
-          m.fullName || "",
-          m.familyRelation || m.relation || "",
-          m.gender || "",
-          m.passportNumber || "",
-          m.mobileIndia || "",
-          m.roomNumber || "",
-          m.busNumber || "",
-          m.roomHotel ? (HOTEL_LABELS[m.roomHotel] || m.roomHotel) : "",
-        ]);
-      }
-    }
-    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-    ws["!cols"] = headers.map((_, i) => ({ wch: i === 2 ? 28 : 16 }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Families");
-    const safeName = (group?.groupName ?? groupId).replace(/[^a-zA-Z0-9\u0600-\u06FF]+/g, "-");
-    XLSX.writeFile(wb, `family-list-${safeName}-${group?.year || ""}.xlsx`);
+  const exportFamiliesExcel = async () => {
+    try {
+      const res = await fetch(`${API}/api/groups/${groupId}/families/export.xlsx`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `family-list-${(group?.groupName ?? groupId).replace(/[^a-zA-Z0-9]+/g, "-")}-${group?.year || ""}.xlsx`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      toast({ title: "Excel file downloaded!" });
+    } catch { toast({ title: "Excel export failed", variant: "destructive" }); }
   };
 
   const downloadFamilyReport = async (type: "pdf" | "flight-list" | "bus-list" | "hotel-list", label: string) => {
@@ -826,7 +813,7 @@ export default function PilgrimManager() {
           { label: "Grouped", value: pilgrims.filter(p => p.familyId).length, color: "text-blue-700 bg-blue-50 border-blue-200" },
           { label: "Ungrouped", value: pilgrims.filter(p => !p.familyId).length, color: "text-orange-700 bg-orange-50 border-orange-200" },
           { label: "Rooms Assigned", value: pilgrims.filter(p => p.roomId).length, color: "text-purple-700 bg-purple-50 border-purple-200" },
-          { label: "Bus Assigned", value: pilgrims.filter(p => p.busNumber).length, color: "text-teal-700 bg-teal-50 border-teal-200" },
+          { label: "Flights Assigned", value: pilgrims.filter(p => p.busNumber).length, color: "text-teal-700 bg-teal-50 border-teal-200" },
         ].map(stat => (
           <div key={stat.label} className={`flex flex-col items-center px-3 py-1.5 rounded-lg border text-xs font-semibold ${stat.color}`}>
             <span className="text-lg font-black leading-tight">{stat.value}</span>
@@ -1384,52 +1371,98 @@ export default function PilgrimManager() {
               <button onClick={() => setFamilySearch("")} className="text-xs text-primary underline mt-1">Clear search</button>
             </div>
           ) : familyView === "table" ? (
-            <Card className="border-none shadow-sm rounded-2xl overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left">
-                  <thead className="bg-muted text-muted-foreground uppercase text-xs font-semibold">
-                    <tr>
-                      <th className="px-4 py-3">Family ID</th>
-                      <th className="px-4 py-3">Head</th>
-                      <th className="px-4 py-3">Members</th>
-                      <th className="px-4 py-3">Room</th>
-                      <th className="px-4 py-3">Hotel</th>
-                      <th className="px-4 py-3">Bus</th>
-                      <th className="px-4 py-3">Mobile</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {filteredFamilies.map(fam => {
-                      const headName = fam.head ? [fam.head.salutation, fam.head.fullName].filter(Boolean).join(" ") : fam.familyId;
-                      const roomInfo = fam.roomId ? rooms.find(r => r.id === fam.roomId) : null;
-                      const memberRoomIds = [...new Set(fam.members.filter(m => m.roomId).map(m => m.roomId!))];
-                      const busNos = [...new Set(fam.members.filter(m => m.busNumber).map(m => m.busNumber!))];
-                      return (
-                        <tr key={fam.familyId} className="hover:bg-muted/30">
-                          <td className="px-4 py-2.5">
-                            <span className="bg-amber-500 text-white font-black text-xs px-2 py-1 rounded-lg">{fam.familyId}</span>
-                          </td>
-                          <td className="px-4 py-2.5 font-medium text-sm">{headName}</td>
-                          <td className="px-4 py-2.5 text-xs text-muted-foreground">{fam.members.length} member{fam.members.length !== 1 ? "s" : ""}</td>
-                          <td className="px-4 py-2.5 text-xs font-semibold text-primary">
-                            {roomInfo ? `Rm ${roomInfo.roomNumber}` : memberRoomIds.length > 0 ? `${memberRoomIds.length} rooms` : "—"}
-                          </td>
-                          <td className="px-4 py-2.5">
-                            {fam.head?.roomHotel ? (
-                              <span className={`text-xs px-1.5 py-0.5 rounded font-semibold ${HOTEL_COLORS[fam.head.roomHotel] || "bg-gray-100"}`}>
-                                {HOTEL_LABELS[fam.head.roomHotel] || fam.head.roomHotel}
-                              </span>
-                            ) : <span className="text-muted-foreground">—</span>}
-                          </td>
-                          <td className="px-4 py-2.5 text-xs">{busNos.join(", ") || "—"}</td>
-                          <td className="px-4 py-2.5 text-xs">{fam.head?.mobileIndia || "—"}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
+            <div className="space-y-3">
+              <Card className="border-none shadow-sm rounded-2xl overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-muted text-muted-foreground uppercase text-xs font-semibold">
+                      <tr>
+                        <th className="px-4 py-3">Family ID</th>
+                        <th className="px-4 py-3">Head</th>
+                        <th className="px-4 py-3">Members</th>
+                        <th className="px-4 py-3">Room</th>
+                        <th className="px-4 py-3">Hotel</th>
+                        <th className="px-4 py-3">Flight</th>
+                        <th className="px-4 py-3">Bus</th>
+                        <th className="px-4 py-3">Mobile</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {filteredFamilies.map(fam => {
+                        const headName = fam.head ? [fam.head.salutation, fam.head.fullName].filter(Boolean).join(" ") : fam.familyId;
+                        const roomInfo = fam.roomId ? rooms.find(r => r.id === fam.roomId) : null;
+                        const memberRoomIds = [...new Set(fam.members.filter(m => m.roomId).map(m => m.roomId!))];
+                        const busNos = [...new Set(fam.members.filter(m => m.busNumber).map(m => m.busNumber!))];
+                        return (
+                          <tr key={fam.familyId} className="hover:bg-muted/30">
+                            <td className="px-4 py-2.5">
+                              <span className="bg-amber-500 text-white font-black text-xs px-2 py-1 rounded-lg">{fam.familyId}</span>
+                            </td>
+                            <td className="px-4 py-2.5 font-medium text-sm">{headName}</td>
+                            <td className="px-4 py-2.5 text-xs text-muted-foreground">{fam.members.length} member{fam.members.length !== 1 ? "s" : ""}</td>
+                            <td className="px-4 py-2.5 text-xs font-semibold text-primary">
+                              {roomInfo ? `Rm ${roomInfo.roomNumber}` : memberRoomIds.length > 0 ? `${memberRoomIds.length} rooms` : "—"}
+                            </td>
+                            <td className="px-4 py-2.5">
+                              {fam.head?.roomHotel ? (
+                                <span className={`text-xs px-1.5 py-0.5 rounded font-semibold ${HOTEL_COLORS[fam.head.roomHotel] || "bg-gray-100"}`}>
+                                  {HOTEL_LABELS[fam.head.roomHotel] || fam.head.roomHotel}
+                                </span>
+                              ) : <span className="text-muted-foreground">—</span>}
+                            </td>
+                            <td className="px-4 py-2.5 text-xs">{group?.flightNumber || "—"}</td>
+                            <td className="px-4 py-2.5 text-xs">{busNos.join(", ") || "—"}</td>
+                            <td className="px-4 py-2.5 text-xs">{fam.head?.mobileIndia || "—"}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+              {/* Ungrouped quick-assign section */}
+              {pilgrims.filter(p => !p.familyId).length > 0 && (
+                <Card className="rounded-xl border-dashed border-2 border-orange-200 bg-orange-50/30">
+                  <div className="px-4 py-2 border-b bg-orange-100/40 flex items-center gap-2">
+                    <AlertTriangle size={13} className="text-orange-600" />
+                    <span className="text-xs font-semibold text-orange-800">Ungrouped Pilgrims — Quick Assign</span>
+                  </div>
+                  <div className="divide-y">
+                    {pilgrims.filter(p => !p.familyId).sort((a, b) => a.serialNumber - b.serialNumber).map(p => (
+                      <div key={p.id} className="flex items-center gap-3 px-4 py-2">
+                        <span className="text-xs font-medium text-gray-700 flex-1 min-w-0 truncate">
+                          {p.serialNumber}. {p.fullName}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground shrink-0">{p.gender || ""}</span>
+                        <select
+                          defaultValue=""
+                          onChange={async e => {
+                            if (!e.target.value) return;
+                            try {
+                              await fetch(`${API}/api/groups/${groupId}/pilgrims/${p.id}`, {
+                                method: "POST", credentials: "include",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ familyId: e.target.value }),
+                              });
+                              toast({ title: `${p.fullName.split(" ")[0]} assigned to ${e.target.value}` });
+                              await fetchData(); await fetchFamilies();
+                            } catch { toast({ title: "Assignment failed", variant: "destructive" }); }
+                          }}
+                          className="h-7 text-xs rounded border bg-background px-1 shrink-0 max-w-[140px]"
+                        >
+                          <option value="">Assign to family…</option>
+                          {families.map(f => (
+                            <option key={f.familyId} value={f.familyId}>
+                              {f.familyId} — {f.head?.fullName?.split(" ")[0] || "?"}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+            </div>
           ) : familyView === "tree" ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {filteredFamilies.map(fam => {
