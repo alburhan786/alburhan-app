@@ -1,0 +1,180 @@
+Build a Family-Wise Pilgrim Management System for Al Burhan Tours & Travels.
+
+OBJECTIVE:
+Automatically group all pilgrims by family and manage room allocation, flights, buses, attendance, documents, and reports family-wise.
+
+FAMILY MANAGEMENT
+
+* Auto Generate Family ID (F001, F002, F003)
+* Family Head Name
+* Family Mobile Number
+* Family Address
+* Total Family Members
+* Family QR Code
+* Family Status
+
+PILGRIM MANAGEMENT
+
+Fields:
+
+* Haji ID
+* Full Name
+* Photo
+* Gender
+* Age
+* Relationship (Head, Wife, Son, Daughter, Father, Mother)
+* Passport Number
+* Visa Number
+* Mobile Number
+* Family ID
+* Room Number
+* Flight Number
+* Bus Number
+* QR Code
+
+AUTO FAMILY GROUPING
+
+Automatically group pilgrims into the same family when:
+
+* Same Mobile Number
+* Same Address
+* Same Guardian
+* Same Family Name
+
+Allow manual merge and split families.
+
+FAMILY-WISE LIST PAGE
+
+Display:
+
+Family ID: F001
+Family Head: Mohammed Altaf Khan
+Mobile: +91XXXXXXXXXX
+
+Members:
+
+1. Mohammed Altaf Khan (Head)
+2. Nahid Parveen (Wife)
+3. Ahmed Altaf (Son)
+4. Fatima Altaf (Daughter)
+
+Total Members: 4
+
+Hotel: Azka Safa Hotel
+Room: 1512
+Flight: QP905
+Bus: Bus-01
+
+FAMILY-WISE ROOM ALLOCATION
+
+Rules:
+
+* Family of 2 → Same Room
+* Family of 3 → Triple Room
+* Family of 4 → Quad Room
+* Family of 5 → Quint Room
+* Family of 6+ → Adjacent Rooms
+
+Room Table:
+
+Room No | Family Head | Members | Total Pax | Room Type
+1512 | Mohammed Altaf Khan | 4 | 4 | QUAD
+1513 | Ahmed Khan | 5 | 5 | QUINT
+
+FAMILY-WISE FLIGHT LIST
+
+Flight No | Family Head | Members | Total Pax
+
+FAMILY-WISE BUS LIST
+
+Bus No | Family Head | Members | Total Pax
+
+HOTEL MANAGEMENT
+
+* Hotel Name
+* Room Number
+* Room Type
+* Floor Number
+* Occupied Beds
+* Vacant Beds
+
+QR ATTENDANCE
+
+* Generate QR for every pilgrim
+* Scan by mobile camera
+* Bus Boarding Attendance
+* Airport Attendance
+* Ziyarat Attendance
+* Present / Missing Status
+* Family Attendance Tracking
+
+SEARCH & FILTERS
+
+Search by:
+
+* Family Head Name
+* Family ID
+* Passport Number
+* Room Number
+* Flight Number
+* Mobile Number
+
+REPORTS
+
+Generate:
+
+* Family Wise Pilgrim List
+* Family Wise Room Allocation
+* Family Wise Flight Manifest
+* Family Wise Bus Manifest
+* Missing Family Members Report
+* Hotel Wise Family List
+
+EXPORT
+
+* Excel Export
+* PDF Export
+* Print Report
+* WhatsApp Share PDF
+
+DASHBOARD
+
+Cards:
+
+* Total Families
+* Total Pilgrims
+* Total Rooms
+* Total Flights
+* Total Buses
+* Present Pilgrims
+* Missing Pilgrims
+
+UI DESIGN
+
+* Premium Hajj ERP Design
+* Green + Gold + White Theme
+* Mobile Responsive
+* Admin Dashboard
+* Family Card View
+* Family Tree View
+* Table View
+* Dark Mode
+
+TECH STACK
+
+* React + TypeScript
+* Firebase Authentication
+* Firestore Database
+* QR Code Generator
+* Camera Scanner
+* Excel Import/Export
+* PDF Generator
+* Push Notifications
+
+COMPANY BRANDING
+
+Al Burhan Tours & Travels
+Website: alburhantravels.com
+
+IMPORTANT:
+Every pilgrim must belong to a family. All lists, room allocations, flights, buses, attendance, exports, and reports must support Family-Wise View and Family-Wise Management.
