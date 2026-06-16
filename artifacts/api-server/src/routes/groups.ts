@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, hajjGroupsTable, pilgrimsTable, hajjRoomsTable } from "@workspace/db";
-import { eq, and, ne, desc, asc, count, max } from "drizzle-orm";
+import { eq, and, ne, desc, asc, count, max, inArray } from "drizzle-orm";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendWhatsApp } from "../lib/notifications.js";
 import multer from "multer";
@@ -1513,6 +1513,110 @@ router.get("/:groupId/families", requireAdmin as any, async (req, res) => {
     res.json(families);
   } catch (err: any) {
     res.status(500).json({ message: err?.message || "Failed to fetch families" });
+  }
+});
+
+// POST /:groupId/families/merge — move all members of sourceFamily into targetFamily
+router.post("/:groupId/families/merge", requireAdmin as any, async (req, res) => {
+  const groupId = String(req.params.groupId);
+  const { sourceFamily, targetFamily } = req.body;
+  if (!sourceFamily || !targetFamily) {
+    res.status(400).json({ message: "sourceFamily and targetFamily required" }); return;
+  }
+  if (sourceFamily === targetFamily) {
+    res.status(400).json({ message: "Source and target cannot be the same family" }); return;
+  }
+  try {
+    const sourceMembers = await db.select().from(pilgrimsTable)
+      .where(and(eq(pilgrimsTable.groupId, groupId), eq(pilgrimsTable.familyId, sourceFamily)));
+    if (sourceMembers.length === 0) {
+      res.status(404).json({ message: "Source family not found or has no members" }); return;
+    }
+    const targetMembers = await db.select().from(pilgrimsTable)
+      .where(and(eq(pilgrimsTable.groupId, groupId), eq(pilgrimsTable.familyId, targetFamily)));
+    if (targetMembers.length === 0) {
+      res.status(404).json({ message: "Target family not found or has no members" }); return;
+    }
+
+    // Move source members into target family; clear their head status
+    await db.update(pilgrimsTable)
+      .set({ familyId: targetFamily, familyHead: false, updatedAt: new Date() })
+      .where(and(eq(pilgrimsTable.groupId, groupId), eq(pilgrimsTable.familyId, sourceFamily)));
+
+    // Ensure target family still has a head
+    const targetHasHead = targetMembers.some(m => m.familyHead);
+    if (!targetHasHead) {
+      const firstTarget = [...targetMembers].sort((a, b) => a.serialNumber - b.serialNumber)[0];
+      if (firstTarget) {
+        await db.update(pilgrimsTable)
+          .set({ familyHead: true, updatedAt: new Date() })
+          .where(eq(pilgrimsTable.id, firstTarget.id));
+      }
+    }
+
+    res.json({ success: true, moved: sourceMembers.length, newTotal: targetMembers.length + sourceMembers.length, sourceFamily, targetFamily });
+  } catch (err: any) {
+    res.status(500).json({ message: err?.message || "Merge failed" });
+  }
+});
+
+// POST /:groupId/families/:familyId/split — split selected members into a new auto-generated family
+router.post("/:groupId/families/:familyId/split", requireAdmin as any, async (req, res) => {
+  const groupId = String(req.params.groupId);
+  const familyId = String(req.params.familyId);
+  const { pilgrimIds } = req.body;
+  if (!Array.isArray(pilgrimIds) || pilgrimIds.length === 0) {
+    res.status(400).json({ message: "pilgrimIds array required" }); return;
+  }
+  try {
+    const familyMembers = await db.select().from(pilgrimsTable)
+      .where(and(eq(pilgrimsTable.groupId, groupId), eq(pilgrimsTable.familyId, familyId)));
+    if (familyMembers.length === 0) {
+      res.status(404).json({ message: "Family not found or has no members" }); return;
+    }
+    if (pilgrimIds.length >= familyMembers.length) {
+      res.status(400).json({ message: "Cannot split all members — at least one must remain" }); return;
+    }
+    const memberIdSet = new Set(familyMembers.map(m => m.id));
+    for (const pid of pilgrimIds) {
+      if (!memberIdSet.has(pid)) {
+        res.status(400).json({ message: `Pilgrim ${pid} does not belong to family ${familyId}` }); return;
+      }
+    }
+
+    // Generate next available F-number family ID
+    const allIds = await db.select({ familyId: pilgrimsTable.familyId })
+      .from(pilgrimsTable).where(eq(pilgrimsTable.groupId, groupId));
+    const existingIds = new Set(allIds.map(p => p.familyId).filter(Boolean));
+    let num = 1;
+    while (existingIds.has(`F${String(num).padStart(3, "0")}`)) num++;
+    const newFamilyId = `F${String(num).padStart(3, "0")}`;
+
+    // Move split members to new family (clear head first)
+    await db.update(pilgrimsTable)
+      .set({ familyId: newFamilyId, familyHead: false, updatedAt: new Date() })
+      .where(and(eq(pilgrimsTable.groupId, groupId), inArray(pilgrimsTable.id, pilgrimIds)));
+
+    // First pilgrim in the split list becomes head of new family
+    await db.update(pilgrimsTable)
+      .set({ familyHead: true, updatedAt: new Date() })
+      .where(eq(pilgrimsTable.id, pilgrimIds[0]));
+
+    // If original family head was split out, promote first remaining member
+    const originalHead = familyMembers.find(m => m.familyHead);
+    if (originalHead && pilgrimIds.includes(originalHead.id)) {
+      const remaining = familyMembers.filter(m => !pilgrimIds.includes(m.id))
+        .sort((a, b) => a.serialNumber - b.serialNumber);
+      if (remaining.length > 0) {
+        await db.update(pilgrimsTable)
+          .set({ familyHead: true, updatedAt: new Date() })
+          .where(eq(pilgrimsTable.id, remaining[0].id));
+      }
+    }
+
+    res.json({ success: true, newFamilyId, splitCount: pilgrimIds.length });
+  } catch (err: any) {
+    res.status(500).json({ message: err?.message || "Split failed" });
   }
 });
 

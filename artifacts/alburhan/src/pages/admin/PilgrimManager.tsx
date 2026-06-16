@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useDeleteGuard } from "@/components/DeleteGuard";
 import { Plus, Edit, Trash2, ArrowLeft, Upload, Printer, CreditCard, Luggage, Heart,
   Building2, Bus, DoorOpen, FileDown, Hotel, BedDouble, Users, Wand2, X, AlertTriangle, Sticker, Layers, UserCheck, QrCode, Star,
-  Search, LayoutGrid, List, GitBranch, ChevronDown, Share2, RefreshCw, Zap, MessageCircle } from "lucide-react";
+  Search, LayoutGrid, List, GitBranch, ChevronDown, Share2, RefreshCw, Zap, MessageCircle, GitMerge, Scissors } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
 import { Link, useRoute } from "wouter";
 import { BulkImportModal } from "./BulkImportModal";
@@ -191,6 +191,14 @@ export default function PilgrimManager() {
   const [waFamily, setWaFamily] = useState<FamilyGroup | null>(null);
   const [waMessage, setWaMessage] = useState("");
   const [waSending, setWaSending] = useState(false);
+
+  const [mergeSourceFam, setMergeSourceFam] = useState<FamilyGroup | null>(null);
+  const [mergeTargetId, setMergeTargetId] = useState("");
+  const [mergePending, setMergePending] = useState(false);
+
+  const [splitFam, setSplitFam] = useState<FamilyGroup | null>(null);
+  const [splitSelectedIds, setSplitSelectedIds] = useState<string[]>([]);
+  const [splitPending, setSplitPending] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -561,6 +569,50 @@ export default function PilgrimManager() {
       await fetchData();
       await fetchFamilies();
     } catch { toast({ title: "Failed to assign family to room", variant: "destructive" }); }
+  };
+
+  const doMerge = async () => {
+    if (!mergeSourceFam || !mergeTargetId) return;
+    setMergePending(true);
+    try {
+      const res = await fetch(`${API}/api/groups/${groupId}/families/merge`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sourceFamily: mergeSourceFam.familyId, targetFamily: mergeTargetId }),
+      });
+      const data = await res.json();
+      if (!res.ok) { toast({ title: data.message || "Merge failed", variant: "destructive" }); return; }
+      const targetFam = families.find(f => f.familyId === mergeTargetId);
+      toast({ title: `${mergeSourceFam.familyId} merged into ${mergeTargetId} — ${data.newTotal} members` });
+      setMergeSourceFam(null);
+      setMergeTargetId("");
+      await fetchFamilies();
+    } catch { toast({ title: "Merge failed", variant: "destructive" }); }
+    finally { setMergePending(false); }
+  };
+
+  const openSplitModal = (fam: FamilyGroup) => {
+    setSplitFam(fam);
+    setSplitSelectedIds([]);
+  };
+
+  const doSplit = async () => {
+    if (!splitFam || splitSelectedIds.length === 0) return;
+    setSplitPending(true);
+    try {
+      const res = await fetch(`${API}/api/groups/${groupId}/families/${encodeURIComponent(splitFam.familyId)}/split`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pilgrimIds: splitSelectedIds }),
+      });
+      const data = await res.json();
+      if (!res.ok) { toast({ title: data.message || "Split failed", variant: "destructive" }); return; }
+      toast({ title: `${data.splitCount} member${data.splitCount !== 1 ? "s" : ""} split into new family ${data.newFamilyId}` });
+      setSplitFam(null);
+      setSplitSelectedIds([]);
+      await fetchFamilies();
+    } catch { toast({ title: "Split failed", variant: "destructive" }); }
+    finally { setSplitPending(false); }
   };
 
   const handleAutoDetect = async () => {
@@ -1635,6 +1687,22 @@ export default function PilgrimManager() {
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
                           <Button
+                            variant="ghost" size="icon" className="h-7 w-7 text-violet-600 hover:bg-violet-50"
+                            title={`Merge ${fam.familyId} into another family`}
+                            onClick={() => { setMergeSourceFam(fam); setMergeTargetId(""); }}
+                          >
+                            <GitMerge size={13} />
+                          </Button>
+                          {fam.members.length >= 2 && (
+                            <Button
+                              variant="ghost" size="icon" className="h-7 w-7 text-orange-600 hover:bg-orange-50"
+                              title={`Split members out of ${fam.familyId}`}
+                              onClick={() => openSplitModal(fam)}
+                            >
+                              <Scissors size={13} />
+                            </Button>
+                          )}
+                          <Button
                             variant="ghost" size="icon" className="h-7 w-7 text-amber-600 hover:bg-amber-50"
                             title={`Print Badges — ${fam.familyId}`}
                             onClick={() => downloadFamilyBadges(fam.familyId)}
@@ -1772,6 +1840,123 @@ export default function PilgrimManager() {
           )}
         </div>
       )}
+
+      {/* ===== Family Merge Dialog ===== */}
+      <Dialog open={!!mergeSourceFam} onOpenChange={open => !open && setMergeSourceFam(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <GitMerge size={16} className="text-violet-600" />
+              Merge Family {mergeSourceFam?.familyId}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-1">
+            <p className="text-xs text-muted-foreground">
+              All {mergeSourceFam?.members.length} members of <strong>{mergeSourceFam?.familyId}</strong> will be moved into the target family. <strong>{mergeSourceFam?.familyId}</strong> will cease to exist.
+            </p>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-gray-700">Merge into:</label>
+              <select
+                value={mergeTargetId}
+                onChange={e => setMergeTargetId(e.target.value)}
+                className="w-full h-9 px-3 text-sm rounded-lg border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                <option value="">— Select target family —</option>
+                {families.filter(f => f.familyId !== mergeSourceFam?.familyId).map(f => (
+                  <option key={f.familyId} value={f.familyId}>
+                    {f.familyId} — {f.head?.fullName?.split(" ")[0] || "?"} ({f.members.length} members)
+                  </option>
+                ))}
+              </select>
+            </div>
+            {mergeTargetId && mergeSourceFam && (
+              <div className="bg-violet-50 border border-violet-200 rounded-lg px-3 py-2 text-xs text-violet-800">
+                <strong>Preview:</strong> Merge {mergeSourceFam.familyId} ({mergeSourceFam.members.length} members) into {mergeTargetId} ({families.find(f => f.familyId === mergeTargetId)?.members.length ?? "?"} members)
+                {" → "}{mergeTargetId} ({(mergeSourceFam.members.length) + (families.find(f => f.familyId === mergeTargetId)?.members.length ?? 0)} members)
+              </div>
+            )}
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" size="sm" onClick={() => setMergeSourceFam(null)}>Cancel</Button>
+              <Button
+                size="sm"
+                className="bg-violet-600 hover:bg-violet-700 text-white gap-1.5"
+                onClick={doMerge}
+                disabled={!mergeTargetId || mergePending}
+              >
+                <GitMerge size={13} />
+                {mergePending ? "Merging…" : "Confirm Merge"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ===== Family Split Dialog ===== */}
+      <Dialog open={!!splitFam} onOpenChange={open => !open && setSplitFam(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Scissors size={16} className="text-orange-600" />
+              Split Family {splitFam?.familyId}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-1">
+            <p className="text-xs text-muted-foreground">
+              Select members to split out into a new auto-generated family. At least one member must remain in <strong>{splitFam?.familyId}</strong>.
+            </p>
+            <div className="border rounded-lg divide-y max-h-60 overflow-y-auto">
+              {splitFam?.members.map(m => {
+                const isHead = !!m.familyHead;
+                const checked = splitSelectedIds.includes(m.id);
+                return (
+                  <label
+                    key={m.id}
+                    className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-muted/40 ${isHead ? "bg-amber-50" : ""}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={e => {
+                        setSplitSelectedIds(prev =>
+                          e.target.checked ? [...prev, m.id] : prev.filter(id => id !== m.id)
+                        );
+                      }}
+                      className="rounded"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm font-medium truncate">{m.fullName}</span>
+                      {isHead && <Star size={10} className="inline ml-1 text-amber-500" fill="currentColor" />}
+                      {m.familyRelation && <span className="ml-1.5 text-[10px] text-muted-foreground">{m.familyRelation}</span>}
+                    </div>
+                    <span className="text-[10px] text-muted-foreground shrink-0">{m.gender || ""}</span>
+                  </label>
+                );
+              })}
+            </div>
+            {splitSelectedIds.length > 0 && splitFam && (
+              <div className="bg-orange-50 border border-orange-200 rounded-lg px-3 py-2 text-xs text-orange-800">
+                <strong>Preview:</strong> {splitSelectedIds.length} member{splitSelectedIds.length !== 1 ? "s" : ""} will move to a new auto-generated family.{" "}
+                {splitFam.members.length - splitSelectedIds.length} remain in {splitFam.familyId}.
+                {splitSelectedIds.length >= splitFam.members.length && (
+                  <span className="block mt-1 font-semibold text-red-700">⚠ At least one member must stay — deselect one.</span>
+                )}
+              </div>
+            )}
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" size="sm" onClick={() => setSplitFam(null)}>Cancel</Button>
+              <Button
+                size="sm"
+                className="bg-orange-600 hover:bg-orange-700 text-white gap-1.5"
+                onClick={doSplit}
+                disabled={splitSelectedIds.length === 0 || splitSelectedIds.length >= (splitFam?.members.length ?? 0) || splitPending}
+              >
+                <Scissors size={13} />
+                {splitPending ? "Splitting…" : "Split into New Family"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* ===== Family WhatsApp Compose Dialog ===== */}
       <Dialog open={!!waFamily} onOpenChange={open => !open && setWaFamily(null)}>
