@@ -174,11 +174,14 @@ function FrontSVG({ data, assets, svgRef }: { data: CardData; assets: Assets; sv
 
       {/* ── FOOTER ── */}
       <rect y="49" width="85" height="5" fill={DARK} />
-      <text x="4" y="50.8" fontFamily="Arial, sans-serif" fontSize="1.5" fontWeight="bold" fill="rgba(255,255,255,0.55)" letterSpacing="0.2">{data.name}</text>
-      <text x="4" y="52.8" fontFamily="Arial, sans-serif" fontSize="1.8" fontWeight="bold" fill="#f87171" letterSpacing="0.2">🆘 {data.emergency1}</text>
-      <text x="4" y="54.5" fontFamily="Arial, sans-serif" fontSize="1.8" fontWeight="bold" fill="#f87171">{data.emergency2}</text>
-      <text x="81" y="52" fontFamily="Arial, sans-serif" fontSize="1.5" fontWeight="bold" fill={GOLD} textAnchor="end">MOBILE</text>
-      <text x="81" y="54.2" fontFamily="Arial, sans-serif" fontSize="2.2" fontWeight="bold" fill="#ffffff" textAnchor="end">{data.mobile}</text>
+      {/* Emergency — red highlighted box */}
+      <rect x="0.5" y="49.3" width="51" height="4.4" rx="0.8" fill="#c0000c" stroke="#ff4444" strokeWidth="0.2" />
+      <text x="2.5" y="50.8" fontFamily="Arial, sans-serif" fontSize="1.6" fontWeight="bold" fill="#ffd0d0" letterSpacing="0.3">🆘 EMERGENCY (SAUDI)</text>
+      <text x="2.5" y="52.6" fontFamily="Arial, sans-serif" fontSize="2.2" fontWeight="bold" fill="#ffffff" letterSpacing="0.3">{data.emergency1}</text>
+      <text x="2.5" y="54.1" fontFamily="Arial, sans-serif" fontSize="2.2" fontWeight="bold" fill="#ffffff" letterSpacing="0.3">{data.emergency2}</text>
+      {/* Mobile */}
+      <text x="84" y="51.4" fontFamily="Arial, sans-serif" fontSize="1.5" fontWeight="bold" fill={GOLD} textAnchor="end">MOBILE</text>
+      <text x="84" y="53.5" fontFamily="Arial, sans-serif" fontSize="2.3" fontWeight="bold" fill="#ffffff" textAnchor="end">{data.mobile}</text>
     </svg>
   );
 }

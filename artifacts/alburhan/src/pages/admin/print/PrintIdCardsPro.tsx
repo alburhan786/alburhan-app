@@ -192,24 +192,29 @@ function FrontCard({ p, group, company, photoDataUrls }: CardProps) {
         <Barcode value={barcodeVal} format={barcodeFormat} width={1.5} height={14} displayValue fontSize={5} />
       </div>
 
-      {/* ── Footer — Mobile + Emergency numbers BIG BOLD WHITE SQUARE ── */}
-      <div style={{ background: DARK, flexShrink: 0, padding: "1mm 2.5mm" } as React.CSSProperties}>
-        {/* Row 1: label + mobile */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.8mm" }}>
-          <div style={{ fontSize: "3pt", fontWeight: 700, color: "rgba(255,255,255,0.55)", textTransform: "uppercase", letterSpacing: "0.3px" }}>
-            {p.salutation ? `${p.salutation} ` : ""}{p.fullName}
-          </div>
-          <div style={{ fontSize: "3pt", fontWeight: 700, color: "rgba(255,255,255,0.55)", textTransform: "uppercase" }}>Mobile No.</div>
-        </div>
-        {/* Row 2: emergency | mobile */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "2mm" }}>
-          <div>
-            <div style={{ fontSize: "3.5pt", fontWeight: 900, color: "#ff2020", textTransform: "uppercase", letterSpacing: "0.5px", lineHeight: 1, marginBottom: "0.4mm" }}>🆘 EMERGENCY (SAUDI)</div>
+      {/* ── Footer — Emergency (red box) + Pilgrim Mobile ── */}
+      <div style={{ background: DARK, flexShrink: 0, padding: "1mm 1.5mm" } as React.CSSProperties}>
+        <div style={{ display: "flex", alignItems: "stretch", justifyContent: "space-between", gap: "1.5mm" }}>
+
+          {/* Emergency — red highlighted box */}
+          <div style={{
+            background: "#c0000c", borderRadius: "2px", padding: "0.8mm 1.5mm",
+            display: "flex", flexDirection: "column", justifyContent: "center", flex: 1,
+            border: "1px solid #ff4444",
+          }}>
+            <div style={{ fontSize: "4pt", fontWeight: 900, color: "#ffd0d0", textTransform: "uppercase", letterSpacing: "0.6px", lineHeight: 1, marginBottom: "0.5mm" }}>
+              🆘 EMERGENCY (SAUDI)
+            </div>
             <div style={{ fontSize: "9pt", fontWeight: 900, color: "#fff", lineHeight: 1.2, letterSpacing: "0.5px" }}>{SAUDI_EMERGENCY[0]}</div>
             <div style={{ fontSize: "9pt", fontWeight: 900, color: "#fff", lineHeight: 1.2, letterSpacing: "0.5px" }}>{SAUDI_EMERGENCY[1]}</div>
           </div>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: "3pt", fontWeight: 700, color: GOLD, textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1 }}>Pilgrim Mobile</div>
+
+          {/* Pilgrim mobile */}
+          <div style={{ textAlign: "right", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+            <div style={{ fontSize: "2.8pt", fontWeight: 700, color: "rgba(255,255,255,0.55)", textTransform: "uppercase", lineHeight: 1 }}>
+              {p.salutation ? `${p.salutation} ` : ""}{p.fullName}
+            </div>
+            <div style={{ fontSize: "2.8pt", fontWeight: 700, color: GOLD, textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1, marginTop: "0.4mm" }}>Mobile No.</div>
             <div style={{ fontSize: "9pt", fontWeight: 900, color: "#fff", lineHeight: 1.25, letterSpacing: "0.5px" }}>
               {p.mobileIndia || "—"}
             </div>
@@ -516,21 +521,31 @@ function FrontCardPortrait({ p, group, company, photoDataUrls }: CardProps) {
         <Barcode value={barcodeVal} format="CODE128" width={1.4} height={14} displayValue fontSize={5} />
       </div>
 
-      {/* ── Footer ── */}
-      <div style={{ background: DARK, flexShrink: 0, padding: "1.2mm 2mm" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: "2mm", alignItems: "flex-start" }}>
-          <div>
-            <div style={{ fontSize: "3pt", fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", lineHeight: 1, marginBottom: "0.4mm" }}>
+      {/* ── Footer — Emergency (red box) + Address ── */}
+      <div style={{ background: DARK, flexShrink: 0, padding: "1mm 1.5mm" }}>
+        <div style={{ display: "flex", alignItems: "stretch", gap: "1.5mm" }}>
+
+          {/* Emergency — red highlighted box */}
+          <div style={{
+            background: "#c0000c", borderRadius: "2px", padding: "0.8mm 1.5mm",
+            display: "flex", flexDirection: "column", justifyContent: "center",
+            border: "1px solid #ff4444", flexShrink: 0,
+          }}>
+            <div style={{ fontSize: "3.5pt", fontWeight: 900, color: "#ffd0d0", textTransform: "uppercase", letterSpacing: "0.5px", lineHeight: 1, marginBottom: "0.5mm" }}>
+              🆘 EMERGENCY (SAUDI)
+            </div>
+            <div style={{ fontSize: "8pt", fontWeight: 900, color: "#fff", lineHeight: 1.2, letterSpacing: "0.5px" }}>{SAUDI_EMERGENCY[0]}</div>
+            <div style={{ fontSize: "8pt", fontWeight: 900, color: "#fff", lineHeight: 1.2, letterSpacing: "0.5px" }}>{SAUDI_EMERGENCY[1]}</div>
+          </div>
+
+          {/* Address */}
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+            <div style={{ fontSize: "2.8pt", fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", lineHeight: 1, marginBottom: "0.4mm" }}>
               {p.salutation ? `${p.salutation} ` : ""}{p.fullName}
             </div>
-            <div style={{ fontSize: "5pt", fontWeight: 900, color: "#fff", lineHeight: 1.35, letterSpacing: "0.2px" }}>
+            <div style={{ fontSize: "4.5pt", fontWeight: 900, color: "#fff", lineHeight: 1.35, letterSpacing: "0.2px" }}>
               {SHORT_ADDRESS}
             </div>
-          </div>
-          <div style={{ textAlign: "right", flexShrink: 0 }}>
-            <div style={{ fontSize: "3pt", fontWeight: 700, color: "#f87171", textTransform: "uppercase", lineHeight: 1, marginBottom: "0.4mm" }}>🆘 Emergency (Saudi)</div>
-            <div style={{ fontSize: "8pt", fontWeight: 900, color: "#fff", lineHeight: 1.25, letterSpacing: "0.5px" }}>{SAUDI_EMERGENCY[0]}</div>
-            <div style={{ fontSize: "8pt", fontWeight: 900, color: "#fff", lineHeight: 1.25, letterSpacing: "0.5px" }}>{SAUDI_EMERGENCY[1]}</div>
           </div>
         </div>
       </div>
