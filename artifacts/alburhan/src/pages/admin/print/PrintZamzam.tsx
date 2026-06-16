@@ -216,10 +216,10 @@ export default function PrintZamzam() {
                     <div style={{ textAlign: "center" }}>
                       <div style={{ fontSize: "6pt", color: "#999", textTransform: "uppercase", letterSpacing: "1.5px", fontWeight: 700 }}>SERIAL NO.</div>
                       <div style={{
-                        fontSize: "52pt", fontWeight: 900, color: DARK_GREEN,
-                        lineHeight: 1, letterSpacing: "-1px",
+                        fontSize: "72pt", fontWeight: 900, color: DARK_GREEN,
+                        lineHeight: 1, letterSpacing: "-2px",
                         fontFamily: "'Arial Black', Arial, sans-serif",
-                        WebkitTextStroke: "3px white", paintOrder: "stroke fill",
+                        WebkitTextStroke: "4px white", paintOrder: "stroke fill",
                       }}>
                         #{serial}
                       </div>
@@ -319,7 +319,7 @@ export default function PrintZamzam() {
                           {barcodeVal}
                         </div>
                       </div>
-                      <QRCodeCanvas value={buildVerifyUrl(p.id)} size={130} level="M" fgColor={DARK_GREEN} />
+                      <QRCodeCanvas value={buildVerifyUrl(p.id)} size={140} level="M" fgColor={DARK_GREEN} />
                     </div>
                   </div>
 
