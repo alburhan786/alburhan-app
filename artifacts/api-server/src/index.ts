@@ -63,10 +63,10 @@ async function runMigrations() {
   }
   try {
     await db.execute(sql`ALTER TABLE attendance_events ADD COLUMN IF NOT EXISTS scan_token TEXT`);
-    await db.execute(sql`
-      UPDATE attendance_events SET scan_token = gen_random_uuid()::text WHERE scan_token IS NULL
-    `);
-    console.log("[Migration] attendance_events.scan_token ensured");
+    await db.execute(sql`UPDATE attendance_events SET scan_token = gen_random_uuid()::text WHERE scan_token IS NULL`);
+    await db.execute(sql`ALTER TABLE attendance_events ADD COLUMN IF NOT EXISTS scan_token_expires_at TIMESTAMPTZ`);
+    await db.execute(sql`UPDATE attendance_events SET scan_token_expires_at = NOW() + INTERVAL '24 hours' WHERE scan_token_expires_at IS NULL`);
+    console.log("[Migration] attendance_events.scan_token + expires_at ensured");
   } catch (err) {
     console.error("[Migration] attendance_events.scan_token failed:", err);
   }

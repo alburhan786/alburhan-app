@@ -46,16 +46,36 @@ export default function AttendanceManager() {
   const [groupName, setGroupName] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
+  const [refreshingId, setRefreshingId] = useState<string | null>(null);
+
   const copyScannerLink = (ev: any) => {
     const base = window.location.origin + (import.meta.env.BASE_URL || "").replace(/\/$/, "");
     const url = `${base}/attendance-scan/${groupId}/${ev.id}?token=${ev.scanToken}`;
     navigator.clipboard.writeText(url).then(() => {
       setCopiedId(ev.id);
-      toast({ title: "Scanner link copied!", description: "Share this link with field staff" });
+      toast({ title: "Scanner link copied!", description: "Share this link with field staff — expires in 24 h" });
       setTimeout(() => setCopiedId(null), 2000);
     }).catch(() => {
       toast({ title: "Copy failed", description: url, variant: "destructive" });
     });
+  };
+
+  const refreshToken = async (ev: any) => {
+    if (!confirm("Generate a new scanner link? The old link will stop working immediately.")) return;
+    setRefreshingId(ev.id);
+    try {
+      const res = await fetch(`${API}/api/groups/${groupId}/attendance/events/${ev.id}/refresh-token`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await res.json();
+      setEvents((prev) => prev.map((e) => e.id === ev.id ? { ...e, scanToken: data.scanToken, scanTokenExpiresAt: data.scanTokenExpiresAt } : e));
+      toast({ title: "New scanner link generated", description: "Old link is now invalid" });
+    } catch {
+      toast({ title: "Failed to refresh token", variant: "destructive" });
+    } finally {
+      setRefreshingId(null);
+    }
   };
 
   const fetchEvents = useCallback(async () => {
@@ -220,15 +240,32 @@ export default function AttendanceManager() {
                     </Button>
                   </Link>
                 </div>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="w-full mt-1.5 gap-1.5 text-xs text-muted-foreground hover:text-[#0d5040]"
-                  onClick={() => copyScannerLink(ev)}
-                >
-                  {copiedId === ev.id ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
-                  {copiedId === ev.id ? "Link Copied!" : "Copy Field Staff Scanner Link"}
-                </Button>
+                <div className="flex gap-1.5 mt-1.5">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="flex-1 gap-1.5 text-xs text-muted-foreground hover:text-[#0d5040]"
+                    onClick={() => copyScannerLink(ev)}
+                  >
+                    {copiedId === ev.id ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+                    {copiedId === ev.id ? "Copied!" : "Copy Staff Link"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="gap-1.5 text-xs text-muted-foreground hover:text-amber-600"
+                    onClick={() => refreshToken(ev)}
+                    disabled={refreshingId === ev.id}
+                    title="Generate a new scanner link (old link stops working)"
+                  >
+                    <Share2 size={12} /> {refreshingId === ev.id ? "…" : "New Link"}
+                  </Button>
+                </div>
+                {ev.scanTokenExpiresAt && (
+                  <p className="text-center text-[10px] text-muted-foreground mt-0.5">
+                    Link expires {new Date(ev.scanTokenExpiresAt) < new Date() ? <span className="text-red-500 font-medium">— expired</span> : new Date(ev.scanTokenExpiresAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                  </p>
+                )}
               </div>
             );
           })}

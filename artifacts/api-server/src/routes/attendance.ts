@@ -26,24 +26,42 @@ async function getEventForGroup(eventId: string, groupId: string) {
   return event || null;
 }
 
+function isAdminSession(req: Request): Promise<boolean> {
+  return new Promise(async (resolve) => {
+    try {
+      const sessionUserId = (req as any).session?.userId;
+      if (!sessionUserId) { resolve(false); return; }
+      const { db: _db, usersTable } = await import("@workspace/db");
+      const { eq: _eq } = await import("drizzle-orm");
+      const [user] = await _db.select().from(usersTable).where(_eq(usersTable.id, sessionUserId));
+      resolve(user?.role === "admin");
+    } catch { resolve(false); }
+  });
+}
+
 async function requireAdminOrToken(req: Request, res: Response, next: NextFunction) {
+  if (await isAdminSession(req)) { next(); return; }
+
   const { eventId, groupId } = req.params;
-  const { token } = req.query;
+  const token = String(req.query.token || "");
 
-  const sessionUserId = (req as any).session?.userId;
-  if (sessionUserId) {
-    const { db: _db, usersTable } = await import("@workspace/db");
-    const { eq: _eq } = await import("drizzle-orm");
-    const [user] = await _db.select().from(usersTable).where(_eq(usersTable.id, sessionUserId));
-    if (user?.role === "admin") { next(); return; }
+  if (!token || !eventId || !groupId) {
+    res.status(401).json({ error: "Unauthorized. Provide admin session or valid scanner token." });
+    return;
   }
 
-  if (token && eventId && groupId) {
-    const event = await getEventForGroup(eventId, groupId);
-    if (event && event.scanToken && event.scanToken === String(token)) { next(); return; }
+  const event = await getEventForGroup(eventId, groupId);
+  if (!event || !event.scanToken || event.scanToken !== token) {
+    res.status(401).json({ error: "Invalid scanner token." });
+    return;
   }
 
-  res.status(401).json({ error: "Unauthorized. Provide admin session or valid scanner token." });
+  if (event.scanTokenExpiresAt && event.scanTokenExpiresAt < new Date()) {
+    res.status(401).json({ error: "Scanner link has expired. Ask admin to regenerate the link." });
+    return;
+  }
+
+  next();
 }
 
 router.get("/:groupId/attendance/events", requireAdmin, async (req, res) => {
@@ -86,6 +104,15 @@ router.post("/:groupId/attendance/events", requireAdmin, async (req, res) => {
   res.json(event);
 });
 
+router.delete("/:groupId/attendance/events/:eventId", requireAdmin, async (req, res) => {
+  const { groupId, eventId } = req.params;
+  const event = await getEventForGroup(eventId, groupId);
+  if (!event) { res.status(404).json({ error: "Event not found in this group" }); return; }
+  await db.delete(attendanceLogsTable).where(eq(attendanceLogsTable.eventId, eventId));
+  await db.delete(attendanceEventsTable).where(eq(attendanceEventsTable.id, eventId));
+  res.json({ success: true });
+});
+
 router.post("/:groupId/attendance/events/:eventId/delete", requireAdmin, async (req, res) => {
   const { groupId, eventId } = req.params;
   const event = await getEventForGroup(eventId, groupId);
@@ -93,6 +120,20 @@ router.post("/:groupId/attendance/events/:eventId/delete", requireAdmin, async (
   await db.delete(attendanceLogsTable).where(eq(attendanceLogsTable.eventId, eventId));
   await db.delete(attendanceEventsTable).where(eq(attendanceEventsTable.id, eventId));
   res.json({ success: true });
+});
+
+router.post("/:groupId/attendance/events/:eventId/refresh-token", requireAdmin, async (req, res) => {
+  const { groupId, eventId } = req.params;
+  const event = await getEventForGroup(eventId, groupId);
+  if (!event) { res.status(404).json({ error: "Event not found in this group" }); return; }
+  const newToken = crypto.randomUUID();
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const [updated] = await db
+    .update(attendanceEventsTable)
+    .set({ scanToken: newToken, scanTokenExpiresAt: expiresAt })
+    .where(eq(attendanceEventsTable.id, eventId))
+    .returning();
+  res.json({ scanToken: updated.scanToken, scanTokenExpiresAt: updated.scanTokenExpiresAt });
 });
 
 router.get("/:groupId/attendance/events/:eventId/info", requireAdminOrToken, async (req, res) => {
@@ -192,6 +233,37 @@ router.post("/:groupId/attendance/events/:eventId/mark-all-present", requireAdmi
   res.json({ success: true, count: pilgrims.length });
 });
 
+router.post("/:groupId/attendance/events/:eventId/mark-pilgrim", requireAdmin, async (req, res) => {
+  const { groupId, eventId } = req.params;
+  const { pilgrimId, status } = req.body;
+  if (!pilgrimId || !["present", "absent"].includes(status)) {
+    res.status(400).json({ error: "pilgrimId and status (present|absent) required" }); return;
+  }
+  const event = await getEventForGroup(eventId, groupId);
+  if (!event) { res.status(404).json({ error: "Event not found in this group" }); return; }
+
+  const [pilgrim] = await db
+    .select()
+    .from(pilgrimsTable)
+    .where(and(eq(pilgrimsTable.id, pilgrimId), eq(pilgrimsTable.groupId, groupId)));
+  if (!pilgrim) { res.status(404).json({ error: "Pilgrim not found in this group" }); return; }
+
+  const existing = await db
+    .select()
+    .from(attendanceLogsTable)
+    .where(and(eq(attendanceLogsTable.eventId, eventId), eq(attendanceLogsTable.pilgrimId, pilgrimId)));
+
+  if (existing.length > 0) {
+    await db
+      .update(attendanceLogsTable)
+      .set({ status, scannedAt: new Date() })
+      .where(and(eq(attendanceLogsTable.eventId, eventId), eq(attendanceLogsTable.pilgrimId, pilgrimId)));
+  } else {
+    await db.insert(attendanceLogsTable).values({ eventId, pilgrimId, groupId, status });
+  }
+  res.json({ success: true, status });
+});
+
 router.get("/:groupId/attendance/events/:eventId/summary", requireAdmin, async (req, res) => {
   const { groupId, eventId } = req.params;
   const event = await getEventForGroup(eventId, groupId);
@@ -277,7 +349,7 @@ router.get("/:groupId/attendance/events/:eventId/export", requireAdmin, async (r
         "Total Members": "",
         "Present": "",
         "Missing": "",
-        "Status": log?.status === "present" ? "Present ✓" : "Missing ✗",
+        "Status": log?.status === "present" ? "Present ✓" : log?.status === "absent" ? "Absent ✗" : "Missing ✗",
       });
     }
   }

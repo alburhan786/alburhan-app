@@ -6,6 +6,7 @@ export const attendanceEventsTable = pgTable("attendance_events", {
   name: text("name").notNull(),
   type: text("type").notNull().default("other"),
   scanToken: text("scan_token").$defaultFn(() => crypto.randomUUID()),
+  scanTokenExpiresAt: timestamp("scan_token_expires_at").$defaultFn(() => new Date(Date.now() + 24 * 60 * 60 * 1000)),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
