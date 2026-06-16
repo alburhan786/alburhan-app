@@ -37,6 +37,7 @@ async function runMigrations() {
         group_id TEXT NOT NULL,
         name TEXT NOT NULL,
         type TEXT NOT NULL DEFAULT 'other',
+        scan_token TEXT,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
@@ -59,6 +60,15 @@ async function runMigrations() {
     console.log("[Migration] attendance_logs table ensured");
   } catch (err) {
     console.error("[Migration] attendance_logs failed:", err);
+  }
+  try {
+    await db.execute(sql`ALTER TABLE attendance_events ADD COLUMN IF NOT EXISTS scan_token TEXT`);
+    await db.execute(sql`
+      UPDATE attendance_events SET scan_token = gen_random_uuid()::text WHERE scan_token IS NULL
+    `);
+    console.log("[Migration] attendance_events.scan_token ensured");
+  } catch (err) {
+    console.error("[Migration] attendance_events.scan_token failed:", err);
   }
   try {
     await db.execute(sql`

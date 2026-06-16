@@ -63,6 +63,7 @@ import PrintIdCardSVG from "@/pages/admin/print/PrintIdCardSVG";
 import AttendanceManager from "@/pages/admin/AttendanceManager";
 import AttendanceScanner from "@/pages/admin/AttendanceScanner";
 import AttendanceReport from "@/pages/admin/AttendanceReport";
+import AttendanceScanPublic from "@/pages/public/AttendanceScanPublic";
 import StaffVerify from "@/pages/public/StaffVerify";
 import VerifyPilgrim from "@/pages/public/VerifyPilgrim";
 import VerifyFamily from "@/pages/public/VerifyFamily";
@@ -118,6 +119,7 @@ function Router() {
       <Route path="/verify/family/:groupId/:familyId" component={VerifyFamily} />
       <Route path="/verify/:id" component={VerifyPilgrim} />
       <Route path="/scan/:barcodeId" component={ScanPilgrim} />
+      <Route path="/attendance-scan/:groupId/:eventId" component={AttendanceScanPublic} />
 
       {/* Customer Routes */}
       <Route path="/customer/dashboard" component={() => <CustomerRoute component={CustomerDashboard} />} />

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Trash2, QrCode, BarChart2, Bus, Plane, MapPin, MoreHorizontal } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, QrCode, BarChart2, Bus, Plane, MapPin, MoreHorizontal, Share2, Copy, Check } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -44,6 +44,19 @@ export default function AttendanceManager() {
   const [newType, setNewType] = useState("bus");
   const [showCreate, setShowCreate] = useState(false);
   const [groupName, setGroupName] = useState("");
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const copyScannerLink = (ev: any) => {
+    const base = window.location.origin + (import.meta.env.BASE_URL || "").replace(/\/$/, "");
+    const url = `${base}/attendance-scan/${groupId}/${ev.id}?token=${ev.scanToken}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedId(ev.id);
+      toast({ title: "Scanner link copied!", description: "Share this link with field staff" });
+      setTimeout(() => setCopiedId(null), 2000);
+    }).catch(() => {
+      toast({ title: "Copy failed", description: url, variant: "destructive" });
+    });
+  };
 
   const fetchEvents = useCallback(async () => {
     setLoading(true);
@@ -207,6 +220,15 @@ export default function AttendanceManager() {
                     </Button>
                   </Link>
                 </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="w-full mt-1.5 gap-1.5 text-xs text-muted-foreground hover:text-[#0d5040]"
+                  onClick={() => copyScannerLink(ev)}
+                >
+                  {copiedId === ev.id ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+                  {copiedId === ev.id ? "Link Copied!" : "Copy Field Staff Scanner Link"}
+                </Button>
               </div>
             );
           })}

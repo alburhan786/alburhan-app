@@ -5,6 +5,7 @@ export const attendanceEventsTable = pgTable("attendance_events", {
   groupId: text("group_id").notNull(),
   name: text("name").notNull(),
   type: text("type").notNull().default("other"),
+  scanToken: text("scan_token").$defaultFn(() => crypto.randomUUID()),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

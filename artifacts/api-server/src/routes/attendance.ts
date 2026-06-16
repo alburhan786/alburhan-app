@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Request, type Response, type NextFunction } from "express";
 import { db, attendanceEventsTable, attendanceLogsTable, pilgrimsTable } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
@@ -11,13 +11,39 @@ function parsePilgrimId(qrText: string): string | null {
     const url = new URL(qrText);
     const parts = url.pathname.split("/");
     const verifyIdx = parts.findIndex((p) => p === "verify");
-    if (verifyIdx >= 0 && parts[verifyIdx + 1]) {
-      return parts[verifyIdx + 1];
-    }
+    if (verifyIdx >= 0 && parts[verifyIdx + 1]) return parts[verifyIdx + 1];
   } catch {
-    if (qrText && !qrText.includes(" ") && qrText.length > 10) return qrText;
+    if (qrText && !qrText.includes(" ") && qrText.length > 8) return qrText;
   }
   return null;
+}
+
+async function getEventForGroup(eventId: string, groupId: string) {
+  const [event] = await db
+    .select()
+    .from(attendanceEventsTable)
+    .where(and(eq(attendanceEventsTable.id, eventId), eq(attendanceEventsTable.groupId, groupId)));
+  return event || null;
+}
+
+async function requireAdminOrToken(req: Request, res: Response, next: NextFunction) {
+  const { eventId, groupId } = req.params;
+  const { token } = req.query;
+
+  const sessionUserId = (req as any).session?.userId;
+  if (sessionUserId) {
+    const { db: _db, usersTable } = await import("@workspace/db");
+    const { eq: _eq } = await import("drizzle-orm");
+    const [user] = await _db.select().from(usersTable).where(_eq(usersTable.id, sessionUserId));
+    if (user?.role === "admin") { next(); return; }
+  }
+
+  if (token && eventId && groupId) {
+    const event = await getEventForGroup(eventId, groupId);
+    if (event && event.scanToken && event.scanToken === String(token)) { next(); return; }
+  }
+
+  res.status(401).json({ error: "Unauthorized. Provide admin session or valid scanner token." });
 }
 
 router.get("/:groupId/attendance/events", requireAdmin, async (req, res) => {
@@ -61,20 +87,41 @@ router.post("/:groupId/attendance/events", requireAdmin, async (req, res) => {
 });
 
 router.post("/:groupId/attendance/events/:eventId/delete", requireAdmin, async (req, res) => {
-  const { eventId } = req.params;
+  const { groupId, eventId } = req.params;
+  const event = await getEventForGroup(eventId, groupId);
+  if (!event) { res.status(404).json({ error: "Event not found in this group" }); return; }
   await db.delete(attendanceLogsTable).where(eq(attendanceLogsTable.eventId, eventId));
   await db.delete(attendanceEventsTable).where(eq(attendanceEventsTable.id, eventId));
   res.json({ success: true });
 });
 
-router.post("/:groupId/attendance/events/:eventId/scan", requireAdmin, async (req, res) => {
+router.get("/:groupId/attendance/events/:eventId/info", requireAdminOrToken, async (req, res) => {
+  const { groupId, eventId } = req.params;
+  const event = await getEventForGroup(eventId, groupId);
+  if (!event) { res.status(404).json({ error: "Event not found" }); return; }
+
+  const pilgrimCount = await db
+    .select()
+    .from(pilgrimsTable)
+    .where(eq(pilgrimsTable.groupId, groupId));
+  const logs = await db
+    .select()
+    .from(attendanceLogsTable)
+    .where(eq(attendanceLogsTable.eventId, eventId));
+  const presentCount = logs.filter((l) => l.status === "present").length;
+
+  res.json({ id: event.id, name: event.name, type: event.type, groupId: event.groupId, presentCount, totalCount: pilgrimCount.length });
+});
+
+router.post("/:groupId/attendance/events/:eventId/scan", requireAdminOrToken, async (req, res) => {
   const { groupId, eventId } = req.params;
   const { pilgrimId: rawId, qrText, status = "present" } = req.body;
 
+  const event = await getEventForGroup(eventId, groupId);
+  if (!event) { res.status(404).json({ error: "Event not found in this group" }); return; }
+
   let pilgrimId = rawId;
-  if (!pilgrimId && qrText) {
-    pilgrimId = parsePilgrimId(qrText);
-  }
+  if (!pilgrimId && qrText) pilgrimId = parsePilgrimId(qrText);
   if (!pilgrimId) { res.status(400).json({ error: "pilgrimId or qrText required" }); return; }
 
   const [pilgrim] = await db
@@ -111,7 +158,7 @@ router.post("/:groupId/attendance/events/:eventId/scan", requireAdmin, async (re
 
   res.json({
     success: true,
-    pilgrim: { id: pilgrim.id, fullName: pilgrim.fullName, familyId: pilgrim.familyId, serialNumber: pilgrim.serialNumber, photoUrl: pilgrim.photoUrl },
+    pilgrim: { id: pilgrim.id, fullName: pilgrim.fullName, familyId: (pilgrim as any).familyId, serialNumber: pilgrim.serialNumber, photoUrl: pilgrim.photoUrl },
     status,
     presentCount,
     totalCount: totalPilgrims.length,
@@ -120,6 +167,9 @@ router.post("/:groupId/attendance/events/:eventId/scan", requireAdmin, async (re
 
 router.post("/:groupId/attendance/events/:eventId/mark-all-present", requireAdmin, async (req, res) => {
   const { groupId, eventId } = req.params;
+  const event = await getEventForGroup(eventId, groupId);
+  if (!event) { res.status(404).json({ error: "Event not found in this group" }); return; }
+
   const pilgrims = await db
     .select()
     .from(pilgrimsTable)
@@ -144,6 +194,9 @@ router.post("/:groupId/attendance/events/:eventId/mark-all-present", requireAdmi
 
 router.get("/:groupId/attendance/events/:eventId/summary", requireAdmin, async (req, res) => {
   const { groupId, eventId } = req.params;
+  const event = await getEventForGroup(eventId, groupId);
+  if (!event) { res.status(404).json({ error: "Event not found in this group" }); return; }
+
   const pilgrims = await db
     .select()
     .from(pilgrimsTable)
@@ -157,7 +210,7 @@ router.get("/:groupId/attendance/events/:eventId/summary", requireAdmin, async (
 
   const families = new Map<string, { familyId: string; members: any[] }>();
   for (const p of pilgrims) {
-    const fid = p.familyId || `solo_${p.id}`;
+    const fid = (p as any).familyId || `solo_${p.id}`;
     if (!families.has(fid)) families.set(fid, { familyId: fid, members: [] });
     families.get(fid)!.members.push({ ...p, attendanceStatus: logMap.get(p.id) || "missing" });
   }
@@ -184,10 +237,8 @@ router.get("/:groupId/attendance/events/:eventId/summary", requireAdmin, async (
 
 router.get("/:groupId/attendance/events/:eventId/export", requireAdmin, async (req, res) => {
   const { groupId, eventId } = req.params;
-  const [event] = await db
-    .select()
-    .from(attendanceEventsTable)
-    .where(eq(attendanceEventsTable.id, eventId));
+  const event = await getEventForGroup(eventId, groupId);
+  if (!event) { res.status(404).json({ error: "Event not found in this group" }); return; }
 
   const pilgrims = await db
     .select()
@@ -199,10 +250,9 @@ router.get("/:groupId/attendance/events/:eventId/export", requireAdmin, async (r
     .where(eq(attendanceLogsTable.eventId, eventId));
 
   const logMap = new Map(logs.map((l) => [l.pilgrimId, l]));
-
   const families = new Map<string, any[]>();
   for (const p of pilgrims) {
-    const fid = p.familyId || `solo_${p.id}`;
+    const fid = (p as any).familyId || `solo_${p.id}`;
     if (!families.has(fid)) families.set(fid, []);
     families.get(fid)!.push(p);
   }
@@ -238,7 +288,7 @@ router.get("/:groupId/attendance/events/:eventId/export", requireAdmin, async (r
   XLSX.utils.book_append_sheet(wb, ws, "Attendance");
 
   const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
-  const safeEvent = (event?.name || "attendance").replace(/[^a-z0-9]/gi, "_");
+  const safeEvent = event.name.replace(/[^a-z0-9]/gi, "_");
   res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   res.setHeader("Content-Disposition", `attachment; filename="${safeEvent}.xlsx"`);
   res.send(buf);
