@@ -200,6 +200,16 @@ export default function PilgrimManager() {
   const [splitSelectedIds, setSplitSelectedIds] = useState<string[]>([]);
   const [splitPending, setSplitPending] = useState(false);
 
+  const [roomNumAllocOpen, setRoomNumAllocOpen] = useState(false);
+  const [roomNumAllocStart, setRoomNumAllocStart] = useState("1501");
+  const [roomNumAllocPrefix, setRoomNumAllocPrefix] = useState("");
+  const [roomNumAllocForce, setRoomNumAllocForce] = useState(false);
+  const [roomNumAllocating, setRoomNumAllocating] = useState(false);
+
+  const [roomSummaryOpen, setRoomSummaryOpen] = useState(false);
+  const [roomSummaryData, setRoomSummaryData] = useState<any[]>([]);
+  const [roomSummaryLoading, setRoomSummaryLoading] = useState(false);
+
   const fetchData = useCallback(async () => {
     try {
       const [gRes, pRes, rRes] = await Promise.all([
@@ -613,6 +623,62 @@ export default function PilgrimManager() {
       await fetchFamilies();
     } catch { toast({ title: "Split failed", variant: "destructive" }); }
     finally { setSplitPending(false); }
+  };
+
+  const handleAutoAllocateRooms = async () => {
+    const start = parseInt(roomNumAllocStart, 10);
+    if (!start || isNaN(start)) { toast({ title: "Enter a valid starting room number", variant: "destructive" }); return; }
+    setRoomNumAllocating(true);
+    try {
+      const res = await fetch(`${API}/api/groups/${groupId}/families/auto-allocate-rooms`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ startRoom: start, prefix: roomNumAllocPrefix.trim(), force: roomNumAllocForce }),
+      });
+      const data = await res.json();
+      if (!res.ok) { toast({ title: data.message || "Allocation failed", variant: "destructive" }); return; }
+      toast({
+        title: `Rooms allocated!`,
+        description: `${data.assigned} pilgrims assigned · ${data.skipped} skipped · Next room: ${data.nextRoom}`,
+      });
+      setRoomNumAllocOpen(false);
+      await fetchData();
+      await fetchFamilies();
+    } catch { toast({ title: "Room allocation failed", variant: "destructive" }); }
+    finally { setRoomNumAllocating(false); }
+  };
+
+  const fetchRoomSummary = async () => {
+    setRoomSummaryLoading(true);
+    try {
+      const res = await fetch(`${API}/api/groups/${groupId}/families/room-summary`, { credentials: "include" });
+      const data = await res.json();
+      setRoomSummaryData(data);
+      setRoomSummaryOpen(true);
+    } catch { toast({ title: "Failed to load room summary", variant: "destructive" }); }
+    finally { setRoomSummaryLoading(false); }
+  };
+
+  const exportRoomSummaryExcel = () => {
+    if (!roomSummaryData.length) { toast({ title: "No room data to export" }); return; }
+    const rows: any[] = [];
+    for (const row of roomSummaryData) {
+      for (const fam of row.families) {
+        rows.push({
+          "Room No": row.roomNumber,
+          "Room Type": row.roomType,
+          "Family ID": fam.familyId,
+          "Family Head": fam.headName,
+          "Members": fam.memberCount,
+          "Total in Room": row.totalMembers,
+        });
+      }
+    }
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws["!cols"] = [{ wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 28 }, { wch: 10 }, { wch: 14 }];
+    XLSX.utils.book_append_sheet(wb, ws, "Room Summary");
+    XLSX.writeFile(wb, `room-summary-${group?.groupName || groupId}.xlsx`);
   };
 
   const handleAutoDetect = async () => {
@@ -1398,6 +1464,10 @@ export default function PilgrimManager() {
               className="gap-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white disabled:opacity-60">
               <Wand2 size={15} /> {familyAllocating ? "Allocating..." : "Family Auto Allocate"}
             </Button>
+            <Button onClick={() => setRoomNumAllocOpen(true)} disabled={families.length === 0} variant="outline"
+              className="gap-1.5 rounded-xl border-blue-300 text-blue-700 hover:bg-blue-50 disabled:opacity-60">
+              <BedDouble size={14} /> Assign Room Numbers
+            </Button>
             <div className="relative">
               <Button variant="outline" disabled={families.length === 0}
                 className="gap-1.5 rounded-xl border-emerald-300 text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
@@ -1421,6 +1491,13 @@ export default function PilgrimManager() {
                       {item.label}
                     </button>
                   ))}
+                  <button
+                    onClick={() => { fetchRoomSummary(); setReportsOpen(false); }}
+                    disabled={roomSummaryLoading}
+                    className="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-muted text-left border-t mt-1 pt-2">
+                    <BedDouble size={13} className="text-blue-600" />
+                    {roomSummaryLoading ? "Loading…" : "Room Summary"}
+                  </button>
                 </div>
               )}
             </div>
@@ -1840,6 +1917,146 @@ export default function PilgrimManager() {
           )}
         </div>
       )}
+
+      {/* ===== Auto-Allocate Room Numbers Dialog ===== */}
+      <Dialog open={roomNumAllocOpen} onOpenChange={setRoomNumAllocOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <BedDouble size={16} className="text-blue-600" />
+              Assign Room Numbers by Family Size
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-1">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-800 space-y-0.5">
+              <p className="font-semibold">Rules applied:</p>
+              <p>2 members → Double · 3 → Triple · 4 → Quad · 5 → Quint · 6+ → Multi (split into blocks)</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-gray-700">Starting Room No.</label>
+                <Input
+                  type="number"
+                  value={roomNumAllocStart}
+                  onChange={e => setRoomNumAllocStart(e.target.value)}
+                  placeholder="e.g. 1501"
+                  className="h-9 text-sm"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-gray-700">Prefix <span className="text-muted-foreground font-normal">(optional)</span></label>
+                <Input
+                  value={roomNumAllocPrefix}
+                  onChange={e => setRoomNumAllocPrefix(e.target.value)}
+                  placeholder="e.g. Makkah-A"
+                  className="h-9 text-sm"
+                />
+              </div>
+            </div>
+            {roomNumAllocPrefix && roomNumAllocStart && (
+              <p className="text-xs text-muted-foreground">First room will be: <strong>{roomNumAllocPrefix}-{roomNumAllocStart}</strong></p>
+            )}
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="roomAllocForce"
+                checked={roomNumAllocForce}
+                onChange={e => setRoomNumAllocForce(e.target.checked)}
+                className="rounded"
+              />
+              <label htmlFor="roomAllocForce" className="text-xs text-gray-700 cursor-pointer">
+                Override existing room assignments
+              </label>
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
+              <strong>Preview:</strong> {families.length} families will be processed · rooms starting from {roomNumAllocPrefix ? `${roomNumAllocPrefix}-` : ""}{roomNumAllocStart || "?"}
+              {!roomNumAllocForce && <span> · Already-assigned families will be skipped</span>}
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" size="sm" onClick={() => setRoomNumAllocOpen(false)}>Cancel</Button>
+              <Button
+                size="sm"
+                className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5"
+                onClick={handleAutoAllocateRooms}
+                disabled={!roomNumAllocStart || roomNumAllocating}
+              >
+                <BedDouble size={13} />
+                {roomNumAllocating ? "Allocating…" : "Allocate"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ===== Room Summary Modal ===== */}
+      <Dialog open={roomSummaryOpen} onOpenChange={setRoomSummaryOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between gap-2 text-base">
+              <span className="flex items-center gap-2">
+                <BedDouble size={16} className="text-blue-600" />
+                Room Summary — {group?.groupName || "Group"}
+              </span>
+              <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={exportRoomSummaryExcel}>
+                <FileDown size={12} /> Export Excel
+              </Button>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="overflow-auto flex-1 mt-2">
+            {roomSummaryData.length === 0 ? (
+              <p className="text-center text-muted-foreground text-sm py-8">No room assignments found. Use "Assign Room Numbers" to allocate rooms.</p>
+            ) : (
+              <table className="w-full text-sm text-left border-collapse">
+                <thead className="bg-[#0d5040] text-white text-xs uppercase sticky top-0">
+                  <tr>
+                    <th className="px-3 py-2.5 rounded-tl-lg">Room No.</th>
+                    <th className="px-3 py-2.5">Family Head</th>
+                    <th className="px-3 py-2.5 text-center">Members</th>
+                    <th className="px-3 py-2.5 rounded-tr-lg">Room Type</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {roomSummaryData.map((row: any) =>
+                    row.families.map((fam: any, fi: number) => (
+                      <tr key={`${row.roomNumber}-${fam.familyId}`} className="hover:bg-muted/30">
+                        {fi === 0 ? (
+                          <td rowSpan={row.families.length} className="px-3 py-2 font-black text-primary border-r">
+                            {row.roomNumber}
+                          </td>
+                        ) : null}
+                        <td className="px-3 py-2">
+                          <div className="font-medium">{fam.headName}</div>
+                          <div className="text-[10px] text-muted-foreground">{fam.familyId}</div>
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <span className="bg-amber-100 text-amber-800 font-semibold px-2 py-0.5 rounded-full text-xs">{fam.memberCount}</span>
+                        </td>
+                        {fi === 0 ? (
+                          <td rowSpan={row.families.length} className="px-3 py-2 border-l">
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
+                              row.roomType === "Double" ? "bg-blue-100 text-blue-800" :
+                              row.roomType === "Triple" ? "bg-purple-100 text-purple-800" :
+                              row.roomType === "Quad" ? "bg-green-100 text-green-800" :
+                              row.roomType === "Quint" ? "bg-amber-100 text-amber-800" :
+                              row.roomType === "Multi" ? "bg-red-100 text-red-800" :
+                              "bg-gray-100 text-gray-700"
+                            }`}>{row.roomType}</span>
+                            <div className="text-[10px] text-muted-foreground mt-0.5">{row.totalMembers} total</div>
+                          </td>
+                        ) : null}
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            )}
+          </div>
+          <div className="pt-2 border-t flex justify-between items-center">
+            <p className="text-xs text-muted-foreground">{roomSummaryData.length} rooms · {roomSummaryData.reduce((s: number, r: any) => s + r.totalMembers, 0)} pilgrims assigned</p>
+            <Button size="sm" variant="outline" onClick={() => setRoomSummaryOpen(false)}>Close</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* ===== Family Merge Dialog ===== */}
       <Dialog open={!!mergeSourceFam} onOpenChange={open => !open && setMergeSourceFam(null)}>

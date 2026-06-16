@@ -1620,6 +1620,107 @@ router.post("/:groupId/families/:familyId/split", requireAdmin as any, async (re
   }
 });
 
+// POST /:groupId/families/auto-allocate-rooms — sequential room-number assignment based on family size rules
+router.post("/:groupId/families/auto-allocate-rooms", requireAdmin as any, async (req, res) => {
+  const groupId = String(req.params.groupId);
+  const startRoom = parseInt(String(req.body.startRoom ?? 1501), 10);
+  const prefix = String(req.body.prefix || "");
+  const force = req.body.force === true || req.body.force === "true";
+
+  const ROOM_TYPE_LABEL: Record<number, string> = { 1: "Single", 2: "Double", 3: "Triple", 4: "Quad", 5: "Quint" };
+
+  try {
+    const pilgrims = await db.select().from(pilgrimsTable)
+      .where(eq(pilgrimsTable.groupId, groupId))
+      .orderBy(asc(pilgrimsTable.serialNumber));
+
+    const familyMap = new Map<string, typeof pilgrims>();
+    for (const p of pilgrims) {
+      if (!p.familyId) continue;
+      if (!familyMap.has(p.familyId)) familyMap.set(p.familyId, []);
+      familyMap.get(p.familyId)!.push(p);
+    }
+
+    const sortedFamilies = Array.from(familyMap.entries()).sort(([a], [b]) => a.localeCompare(b));
+    let currentRoom = startRoom;
+    const results: { familyId: string; head: string; size: number; rooms: string[]; roomType: string }[] = [];
+    let assignedCount = 0;
+    let skippedCount = 0;
+
+    for (const [familyId, members] of sortedFamilies) {
+      const head = members.find(m => m.familyHead) || members[0];
+      if (!force && head?.roomNumber) {
+        results.push({ familyId, head: head.fullName, size: members.length, rooms: [head.roomNumber], roomType: "existing" });
+        skippedCount += members.length;
+        continue;
+      }
+
+      const size = members.length;
+      const roomsNeeded = size <= 5 ? 1 : Math.ceil(size / 5);
+      const roomType = ROOM_TYPE_LABEL[size] || (size >= 6 ? "Multi" : "Single");
+
+      const assignedRooms: string[] = [];
+      for (let i = 0; i < roomsNeeded; i++) {
+        assignedRooms.push(prefix ? `${prefix}-${currentRoom}` : String(currentRoom));
+        currentRoom++;
+      }
+
+      const primaryRoom = assignedRooms[0];
+      for (const m of members) {
+        await db.update(pilgrimsTable)
+          .set({ roomNumber: primaryRoom, updatedAt: new Date() })
+          .where(eq(pilgrimsTable.id, m.id));
+      }
+
+      results.push({ familyId, head: head?.fullName || familyId, size, rooms: assignedRooms, roomType });
+      assignedCount += size;
+    }
+
+    res.json({ assigned: assignedCount, skipped: skippedCount, families: results, nextRoom: currentRoom });
+  } catch (err: any) {
+    res.status(500).json({ message: err?.message || "Auto-allocation failed" });
+  }
+});
+
+// GET /:groupId/families/room-summary — room allocation summary table
+router.get("/:groupId/families/room-summary", requireAdmin as any, async (req, res) => {
+  const groupId = String(req.params.groupId);
+  const ROOM_TYPE_LABEL: Record<number, string> = { 1: "Single", 2: "Double", 3: "Triple", 4: "Quad", 5: "Quint" };
+
+  try {
+    const pilgrims = await db.select().from(pilgrimsTable)
+      .where(eq(pilgrimsTable.groupId, groupId))
+      .orderBy(asc(pilgrimsTable.serialNumber));
+
+    const familyMap = new Map<string, typeof pilgrims>();
+    for (const p of pilgrims) {
+      if (!p.familyId) continue;
+      if (!familyMap.has(p.familyId)) familyMap.set(p.familyId, []);
+      familyMap.get(p.familyId)!.push(p);
+    }
+
+    const roomMap = new Map<string, { familyId: string; headName: string; memberCount: number }[]>();
+    for (const [familyId, members] of familyMap.entries()) {
+      const head = members.find(m => m.familyHead) || members[0];
+      const roomNumber = head?.roomNumber || members.find(m => m.roomNumber)?.roomNumber;
+      if (!roomNumber) continue;
+      if (!roomMap.has(roomNumber)) roomMap.set(roomNumber, []);
+      roomMap.get(roomNumber)!.push({ familyId, headName: head?.fullName || familyId, memberCount: members.length });
+    }
+
+    const rows = Array.from(roomMap.entries())
+      .sort(([a], [b]) => (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0) || a.localeCompare(b))
+      .map(([roomNumber, families]) => {
+        const total = families.reduce((s, f) => s + f.memberCount, 0);
+        return { roomNumber, families, totalMembers: total, roomType: ROOM_TYPE_LABEL[total] || (total >= 6 ? "Multi" : "Single") };
+      });
+
+    res.json(rows);
+  } catch (err: any) {
+    res.status(500).json({ message: err?.message || "Failed to fetch room summary" });
+  }
+});
+
 // POST /:groupId/families/auto-allocate — family-aware room auto-allocation
 router.post("/:groupId/families/auto-allocate", requireAdmin as any, async (req, res) => {
   const groupId = String(req.params.groupId);
