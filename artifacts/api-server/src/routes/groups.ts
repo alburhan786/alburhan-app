@@ -1737,6 +1737,276 @@ router.get("/:groupId/families/room-summary", requireAdmin as any, async (req, r
   }
 });
 
+// GET /:groupId/families/room-summary/pdf — printable room allocation sheet for hotel staff
+router.get("/:groupId/families/room-summary/pdf", requireAdmin as any, async (req, res) => {
+  try {
+    const groupId = String(req.params.groupId);
+    const groups = await db.select().from(hajjGroupsTable).where(eq(hajjGroupsTable.id, groupId)).limit(1);
+    if (!groups[0]) { res.status(404).json({ message: "Group not found" }); return; }
+    const group = groups[0];
+
+    const pilgrims = await db.select().from(pilgrimsTable)
+      .where(eq(pilgrimsTable.groupId, groupId))
+      .orderBy(asc(pilgrimsTable.serialNumber));
+
+    // Build room-family map (same logic as room-summary GET)
+    const familyMap = new Map<string, typeof pilgrims>();
+    for (const p of pilgrims) {
+      if (!p.familyId) continue;
+      if (!familyMap.has(p.familyId)) familyMap.set(p.familyId, []);
+      familyMap.get(p.familyId)!.push(p);
+    }
+
+    const ROOM_TYPE_LABEL: Record<number, string> = { 1: "Single", 2: "Double", 3: "Triple", 4: "Quad", 5: "Quint" };
+    const roomMap = new Map<string, { familyId: string; headName: string; memberCount: number; roomHotel: string | null; roomNotes: string | null }[]>();
+
+    for (const [familyId, members] of familyMap.entries()) {
+      const head = members.find(m => m.familyHead) || members[0];
+      const roomNumber = head?.roomNumber || members.find(m => m.roomNumber)?.roomNumber;
+      if (!roomNumber) continue;
+      const roomHotel = head?.roomHotel || members.find(m => m.roomHotel)?.roomHotel || null;
+      const roomNotes = head?.roomNotes || members.find(m => m.roomNotes)?.roomNotes || null;
+      if (!roomMap.has(roomNumber)) roomMap.set(roomNumber, []);
+      roomMap.get(roomNumber)!.push({ familyId, headName: head?.fullName || familyId, memberCount: members.length, roomHotel, roomNotes });
+    }
+
+    const rows = Array.from(roomMap.entries())
+      .sort(([a], [b]) => (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0) || a.localeCompare(b))
+      .map(([roomNumber, families]) => {
+        const total = families.reduce((s, f) => s + f.memberCount, 0);
+        const roomNotes = families.find(f => f.roomNotes)?.roomNotes || null;
+        const roomHotel = families.find(f => f.roomHotel)?.roomHotel || "";
+        return { roomNumber, families, totalMembers: total, roomType: ROOM_TYPE_LABEL[total] || (total >= 6 ? "Multi" : "Single"), roomNotes, roomHotel };
+      });
+
+    const doc = new PDFDocument({ size: "A4", layout: "portrait", margin: 0 });
+    const safeName = group.groupName.replace(/[^a-zA-Z0-9]/g, "-");
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="room-allocation-${safeName}-${group.year}.pdf"`);
+    doc.pipe(res);
+
+    const PAGE_W = doc.page.width;
+    const PAGE_H = doc.page.height;
+    const MARGIN = 28;
+    const USABLE_W = PAGE_W - MARGIN * 2;
+    const DARK_GREEN = "#0B3D2E";
+    const GOLD = "#C9A23F";
+    const LIGHT_ROW = "#f5f7f5";
+    const generatedOn = new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+
+    // Column layout: Sr | Room No. | Room Block | Hotel | Family Head | Members | Type
+    const colWidths = [24, 58, 72, 60, 200, 52, 50];
+    const COL_LABELS = ["Sr.", "Room No.", "Block/Range", "Hotel", "Family Head", "Members", "Type"];
+    const totalTableW = colWidths.reduce((a, b) => a + b, 0);
+    const tableX = MARGIN + (USABLE_W - totalTableW) / 2;
+    const ROW_H = 18;
+    const HEADER_H = 18;
+
+    let pageNum = 1;
+    let rowSerial = 0;
+
+    function drawPageHeader(yStart: number) {
+      doc.rect(MARGIN, yStart, PAGE_W - MARGIN * 2, 44).fill(DARK_GREEN);
+      doc.image(LOGO_BUFFER, MARGIN + 4, yStart + 2, { width: 40, height: 40 });
+      doc.fill(GOLD).font("Helvetica-Bold").fontSize(13)
+        .text("AL BURHAN TOURS & TRAVELS", MARGIN + 46, yStart + 6, { width: PAGE_W - MARGIN * 2 - 46, align: "center", lineBreak: false });
+      doc.fill("white").font("Helvetica").fontSize(7)
+        .text("5/8 Khanka Masjid Complex, Shanwara Road, Burhanpur 450331 M.P. | Tel: +91 9893989786 | WhatsApp: +91 8989701701",
+          MARGIN + 46, yStart + 22, { width: PAGE_W - MARGIN * 2 - 46, align: "center", lineBreak: false });
+      return yStart + 46;
+    }
+
+    function drawSubheader(yStart: number) {
+      doc.rect(MARGIN, yStart, PAGE_W - MARGIN * 2, 28).fill("#e8f0ec");
+      doc.fill(DARK_GREEN).font("Helvetica-Bold").fontSize(10)
+        .text(`ROOM ALLOCATION SHEET — ${group.groupName.toUpperCase()} (${group.year})`,
+          MARGIN, yStart + 5, { width: PAGE_W - MARGIN * 2, align: "center", lineBreak: false });
+      const parts = [
+        `Total Rooms: ${rows.length}`,
+        `Total Pilgrims: ${pilgrims.length}`,
+        `Generated: ${generatedOn}`,
+      ].join("   |   ");
+      doc.fill("#555").font("Helvetica").fontSize(7)
+        .text(parts, MARGIN, yStart + 18, { width: PAGE_W - MARGIN * 2, align: "center", lineBreak: false });
+      return yStart + 30;
+    }
+
+    function drawTableHeader(yStart: number) {
+      doc.rect(tableX, yStart, totalTableW, HEADER_H).fill("#1a5c44");
+      let cx = tableX;
+      COL_LABELS.forEach((label, i) => {
+        doc.fill("white").font("Helvetica-Bold").fontSize(6.5)
+          .text(label, cx + 2, yStart + 5, { width: colWidths[i] - 4, align: i >= 4 ? "left" : "center", lineBreak: false });
+        cx += colWidths[i];
+      });
+      return yStart + HEADER_H;
+    }
+
+    function drawPageFooter() {
+      doc.fill("#888").font("Helvetica").fontSize(6.5)
+        .text(`Page ${pageNum}  |  Al Burhan Tours & Travels — Confidential`,
+          MARGIN, PAGE_H - 18, { width: PAGE_W - MARGIN * 2, align: "center", lineBreak: false });
+    }
+
+    // Start first page
+    let y = drawPageHeader(MARGIN);
+    y = drawSubheader(y + 4);
+    y += 6;
+    y = drawTableHeader(y);
+
+    let familySerial = 0;
+
+    for (const row of rows) {
+      for (let fi = 0; fi < row.families.length; fi++) {
+        const fam = row.families[fi];
+        familySerial++;
+
+        // Check page break
+        if (y + ROW_H > PAGE_H - 24) {
+          drawPageFooter();
+          doc.addPage();
+          pageNum++;
+          y = drawPageHeader(MARGIN);
+          y += 4;
+          y = drawTableHeader(y);
+        }
+
+        const fillColor = familySerial % 2 === 0 ? LIGHT_ROW : "white";
+        doc.rect(tableX, y, totalTableW, ROW_H).fill(fillColor);
+
+        // Left border accent for first family in room
+        if (fi === 0) {
+          doc.rect(tableX, y, 3, ROW_H * row.families.length > PAGE_H - 24 - y ? ROW_H : ROW_H * row.families.length).fill(DARK_GREEN);
+        }
+
+        const textY = y + 5;
+        let cx = tableX;
+
+        // Sr.
+        doc.fill("#555").font("Helvetica").fontSize(6.5)
+          .text(String(familySerial), cx + 2, textY, { width: colWidths[0] - 4, align: "center", lineBreak: false });
+        cx += colWidths[0];
+
+        // Room No. (only on first family of room)
+        if (fi === 0) {
+          doc.fill(DARK_GREEN).font("Helvetica-Bold").fontSize(8)
+            .text(row.roomNumber, cx + 2, textY, { width: colWidths[1] - 4, align: "center", lineBreak: false });
+        }
+        cx += colWidths[1];
+
+        // Block/Range (roomNotes for multi-room, dash otherwise)
+        if (fi === 0) {
+          doc.fill(row.roomNotes ? "#8B3A00" : "#aaa").font("Helvetica").fontSize(6.5)
+            .text(row.roomNotes || "—", cx + 2, textY, { width: colWidths[2] - 4, align: "center", lineBreak: false });
+        }
+        cx += colWidths[2];
+
+        // Hotel
+        if (fi === 0) {
+          const hotelLabel = row.roomHotel === "makkah" ? "Makkah" : row.roomHotel === "madinah" ? "Madinah" : row.roomHotel === "aziziah" ? "Aziziah" : row.roomHotel || "—";
+          doc.fill("#333").font("Helvetica").fontSize(6.5)
+            .text(hotelLabel, cx + 2, textY, { width: colWidths[3] - 4, align: "center", lineBreak: false });
+        }
+        cx += colWidths[3];
+
+        // Family Head
+        doc.fill("#1a1a1a").font("Helvetica").fontSize(7)
+          .text(fam.headName, cx + 3, textY, { width: colWidths[4] - 6, align: "left", lineBreak: false });
+        cx += colWidths[4];
+
+        // Members count
+        doc.fill(DARK_GREEN).font("Helvetica-Bold").fontSize(7.5)
+          .text(String(fam.memberCount), cx + 2, textY, { width: colWidths[5] - 4, align: "center", lineBreak: false });
+        cx += colWidths[5];
+
+        // Room Type (only on first family)
+        if (fi === 0) {
+          doc.fill("#555").font("Helvetica").fontSize(6.5)
+            .text(row.roomType, cx + 2, textY, { width: colWidths[6] - 4, align: "center", lineBreak: false });
+        }
+
+        // Row bottom border
+        doc.moveTo(tableX, y + ROW_H).lineTo(tableX + totalTableW, y + ROW_H)
+          .strokeColor("#ddd").lineWidth(0.3).stroke();
+
+        y += ROW_H;
+      }
+
+      // Gap between rooms (light separator)
+      doc.moveTo(tableX, y).lineTo(tableX + totalTableW, y)
+        .strokeColor(DARK_GREEN).lineWidth(0.5).stroke();
+    }
+
+    // Summary footer row
+    if (y + 20 > PAGE_H - 24) {
+      drawPageFooter();
+      doc.addPage();
+      pageNum++;
+      y = drawPageHeader(MARGIN);
+      y += 8;
+    }
+    doc.rect(tableX, y + 4, totalTableW, 16).fill("#e8f0ec");
+    doc.fill(DARK_GREEN).font("Helvetica-Bold").fontSize(7.5)
+      .text(`Total: ${rows.length} rooms · ${pilgrims.filter(p => p.roomNumber).length} pilgrims assigned`,
+        tableX + 4, y + 8, { width: totalTableW - 8, align: "right", lineBreak: false });
+
+    drawPageFooter();
+    doc.end();
+  } catch (err: any) {
+    console.error("[groups] families/room-summary/pdf error:", err);
+    if (!res.headersSent) res.status(500).json({ message: err?.message || "Failed to generate PDF" });
+  }
+});
+
+// POST /:groupId/families/:familyId/change-room-number — reassign one family to a new room
+router.post("/:groupId/families/:familyId/change-room-number", requireAdmin as any, async (req, res) => {
+  const groupId = String(req.params.groupId);
+  const familyId = String(req.params.familyId);
+  const newRoomNumber = String(req.body.newRoomNumber || "").trim();
+  if (!newRoomNumber) { res.status(400).json({ message: "newRoomNumber is required" }); return; }
+  try {
+    const members = await db.select().from(pilgrimsTable)
+      .where(and(eq(pilgrimsTable.groupId, groupId), eq(pilgrimsTable.familyId, familyId)));
+    if (!members.length) { res.status(404).json({ message: "Family not found" }); return; }
+    await db.update(pilgrimsTable)
+      .set({ roomNumber: newRoomNumber, updatedAt: new Date() })
+      .where(and(eq(pilgrimsTable.groupId, groupId), eq(pilgrimsTable.familyId, familyId)));
+    res.json({ updated: members.length, familyId, newRoomNumber });
+  } catch (err: any) {
+    res.status(500).json({ message: err?.message || "Failed to update room number" });
+  }
+});
+
+// POST /:groupId/families/swap-rooms — swap room numbers between two families
+router.post("/:groupId/families/swap-rooms", requireAdmin as any, async (req, res) => {
+  const groupId = String(req.params.groupId);
+  const familyAId = String(req.body.familyAId || "").trim();
+  const familyBId = String(req.body.familyBId || "").trim();
+  if (!familyAId || !familyBId || familyAId === familyBId) {
+    res.status(400).json({ message: "Two distinct familyAId and familyBId are required" }); return;
+  }
+  try {
+    const allMembers = await db.select().from(pilgrimsTable)
+      .where(and(eq(pilgrimsTable.groupId, groupId),
+        sql`${pilgrimsTable.familyId} IN (${familyAId}, ${familyBId})`));
+    const membersA = allMembers.filter(m => m.familyId === familyAId);
+    const membersB = allMembers.filter(m => m.familyId === familyBId);
+    if (!membersA.length || !membersB.length) { res.status(404).json({ message: "One or both families not found" }); return; }
+    const roomA = membersA.find(m => m.roomNumber)?.roomNumber || null;
+    const roomB = membersB.find(m => m.roomNumber)?.roomNumber || null;
+    // Swap: A gets B's room, B gets A's room
+    await db.update(pilgrimsTable)
+      .set({ roomNumber: roomB, updatedAt: new Date() })
+      .where(and(eq(pilgrimsTable.groupId, groupId), eq(pilgrimsTable.familyId, familyAId)));
+    await db.update(pilgrimsTable)
+      .set({ roomNumber: roomA, updatedAt: new Date() })
+      .where(and(eq(pilgrimsTable.groupId, groupId), eq(pilgrimsTable.familyId, familyBId)));
+    res.json({ swapped: true, familyAId, roomAFrom: roomA, roomATo: roomB, familyBId, roomBFrom: roomB, roomBTo: roomA });
+  } catch (err: any) {
+    res.status(500).json({ message: err?.message || "Failed to swap rooms" });
+  }
+});
+
 // POST /:groupId/families/auto-allocate — family-aware room auto-allocation
 router.post("/:groupId/families/auto-allocate", requireAdmin as any, async (req, res) => {
   const groupId = String(req.params.groupId);

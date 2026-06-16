@@ -8,7 +8,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useDeleteGuard } from "@/components/DeleteGuard";
 import { Plus, Edit, Trash2, ArrowLeft, Upload, Printer, CreditCard, Luggage, Heart,
   Building2, Bus, DoorOpen, FileDown, Hotel, BedDouble, Users, Wand2, X, AlertTriangle, Sticker, Layers, UserCheck, QrCode, Star,
-  Search, LayoutGrid, List, GitBranch, ChevronDown, Share2, RefreshCw, Zap, MessageCircle, GitMerge, Scissors } from "lucide-react";
+  Search, LayoutGrid, List, GitBranch, ChevronDown, Share2, RefreshCw, Zap, MessageCircle, GitMerge, Scissors,
+  Pencil, ArrowLeftRight, Check } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
 import { Link, useRoute } from "wouter";
 import { BulkImportModal } from "./BulkImportModal";
@@ -210,6 +211,9 @@ export default function PilgrimManager() {
   const [roomSummaryOpen, setRoomSummaryOpen] = useState(false);
   const [roomSummaryData, setRoomSummaryData] = useState<any[]>([]);
   const [roomSummaryLoading, setRoomSummaryLoading] = useState(false);
+  const [editingRoom, setEditingRoom] = useState<{ familyId: string; value: string } | null>(null);
+  const [swapSelectA, setSwapSelectA] = useState<string | null>(null);
+  const [swapPending, setSwapPending] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -638,6 +642,11 @@ export default function PilgrimManager() {
       });
       const data = await res.json();
       if (!res.ok) { toast({ title: data.message || "Allocation failed", variant: "destructive" }); return; }
+      // Persist last-used values for this group
+      const k = `roomAlloc:${groupId}`;
+      localStorage.setItem(`${k}:start`, String(data.nextRoom ?? start));
+      localStorage.setItem(`${k}:prefix`, roomNumAllocPrefix.trim());
+      localStorage.setItem(`${k}:hotel`, roomNumAllocHotel);
       toast({
         title: `Rooms allocated!`,
         description: `${data.assigned} pilgrims assigned · ${data.skipped} skipped · Next room: ${data.nextRoom}`,
@@ -653,11 +662,50 @@ export default function PilgrimManager() {
     setRoomSummaryLoading(true);
     try {
       const res = await fetch(`${API}/api/groups/${groupId}/families/room-summary`, { credentials: "include" });
+      if (!res.ok) { toast({ title: "Failed to load room summary", variant: "destructive" }); return; }
       const data = await res.json();
+      if (!Array.isArray(data)) { toast({ title: "Unexpected response from server", variant: "destructive" }); return; }
       setRoomSummaryData(data);
       setRoomSummaryOpen(true);
     } catch { toast({ title: "Failed to load room summary", variant: "destructive" }); }
     finally { setRoomSummaryLoading(false); }
+  };
+
+  const handleChangeRoomNumber = async (familyId: string, newRoomNumber: string) => {
+    if (!newRoomNumber.trim()) return;
+    try {
+      const res = await fetch(`${API}/api/groups/${groupId}/families/${familyId}/change-room-number`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newRoomNumber: newRoomNumber.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) { toast({ title: data.message || "Failed to update room", variant: "destructive" }); return; }
+      toast({ title: `Room updated to ${newRoomNumber}` });
+      setEditingRoom(null);
+      // Refresh summary in place
+      const summaryRes = await fetch(`${API}/api/groups/${groupId}/families/room-summary`, { credentials: "include" });
+      if (summaryRes.ok) { const d = await summaryRes.json(); if (Array.isArray(d)) setRoomSummaryData(d); }
+    } catch { toast({ title: "Failed to update room number", variant: "destructive" }); }
+  };
+
+  const handleSwapRooms = async (familyBId: string) => {
+    if (!swapSelectA || swapSelectA === familyBId) { setSwapSelectA(null); return; }
+    setSwapPending(true);
+    try {
+      const res = await fetch(`${API}/api/groups/${groupId}/families/swap-rooms`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ familyAId: swapSelectA, familyBId }),
+      });
+      const data = await res.json();
+      if (!res.ok) { toast({ title: data.message || "Swap failed", variant: "destructive" }); return; }
+      toast({ title: `Rooms swapped!`, description: `${data.roomAFrom} ↔ ${data.roomBFrom}` });
+      setSwapSelectA(null);
+      const summaryRes = await fetch(`${API}/api/groups/${groupId}/families/room-summary`, { credentials: "include" });
+      if (summaryRes.ok) { const d = await summaryRes.json(); if (Array.isArray(d)) setRoomSummaryData(d); }
+    } catch { toast({ title: "Swap failed", variant: "destructive" }); }
+    finally { setSwapPending(false); }
   };
 
   const exportRoomSummaryExcel = () => {
@@ -1465,7 +1513,13 @@ export default function PilgrimManager() {
               className="gap-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white disabled:opacity-60">
               <Wand2 size={15} /> {familyAllocating ? "Allocating..." : "Family Auto Allocate"}
             </Button>
-            <Button onClick={() => setRoomNumAllocOpen(true)} disabled={families.length === 0} variant="outline"
+            <Button onClick={() => {
+              const k = `roomAlloc:${groupId}`;
+              setRoomNumAllocStart(localStorage.getItem(`${k}:start`) || "1501");
+              setRoomNumAllocPrefix(localStorage.getItem(`${k}:prefix`) || "");
+              setRoomNumAllocHotel(localStorage.getItem(`${k}:hotel`) || "makkah");
+              setRoomNumAllocOpen(true);
+            }} disabled={families.length === 0} variant="outline"
               className="gap-1.5 rounded-xl border-blue-300 text-blue-700 hover:bg-blue-50 disabled:opacity-60">
               <BedDouble size={14} /> Assign Room Numbers
             </Button>
@@ -2026,58 +2080,134 @@ export default function PilgrimManager() {
                 <BedDouble size={16} className="text-blue-600" />
                 Room Summary — {group?.groupName || "Group"}
               </span>
-              <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={exportRoomSummaryExcel}>
-                <FileDown size={12} /> Export Excel
-              </Button>
+              <div className="flex gap-1.5">
+                <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={exportRoomSummaryExcel}>
+                  <FileDown size={12} /> Excel
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 text-xs text-red-700 border-red-200 hover:bg-red-50"
+                  onClick={() => {
+                    const url = `${API}/api/groups/${groupId}/families/room-summary/pdf`;
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = "";
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                  }}
+                >
+                  <FileDown size={12} /> PDF
+                </Button>
+              </div>
             </DialogTitle>
           </DialogHeader>
           <div className="overflow-auto flex-1 mt-2">
             {roomSummaryData.length === 0 ? (
               <p className="text-center text-muted-foreground text-sm py-8">No room assignments found. Use "Assign Room Numbers" to allocate rooms.</p>
             ) : (
+              <>
+              {swapSelectA && (
+                <div className="mb-2 px-3 py-1.5 bg-amber-50 border border-amber-300 rounded-lg text-xs text-amber-800 flex items-center justify-between">
+                  <span><ArrowLeftRight size={11} className="inline mr-1" />Swap mode: now click another family's <ArrowLeftRight size={11} className="inline mx-0.5" /> to complete the swap</span>
+                  <button className="text-amber-600 hover:text-amber-900 font-semibold" onClick={() => setSwapSelectA(null)}>Cancel</button>
+                </div>
+              )}
               <table className="w-full text-sm text-left border-collapse">
                 <thead className="bg-[#0d5040] text-white text-xs uppercase sticky top-0">
                   <tr>
                     <th className="px-3 py-2.5 rounded-tl-lg">Room No.</th>
                     <th className="px-3 py-2.5">Family Head</th>
                     <th className="px-3 py-2.5 text-center">Members</th>
-                    <th className="px-3 py-2.5 rounded-tr-lg">Room Type</th>
+                    <th className="px-3 py-2.5">Room Type</th>
+                    <th className="px-3 py-2.5 rounded-tr-lg text-center">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {roomSummaryData.map((row: any) =>
-                    row.families.map((fam: any, fi: number) => (
-                      <tr key={`${row.roomNumber}-${fam.familyId}`} className="hover:bg-muted/30">
-                        {fi === 0 ? (
-                          <td rowSpan={row.families.length} className="px-3 py-2 font-black text-primary border-r">
-                            {row.roomNumber}
+                    row.families.map((fam: any, fi: number) => {
+                      const isSwapSelected = swapSelectA === fam.familyId;
+                      const isEditing = editingRoom?.familyId === fam.familyId;
+                      return (
+                        <tr key={`${row.roomNumber}-${fam.familyId}`}
+                          className={`hover:bg-muted/30 transition-colors ${isSwapSelected ? "bg-amber-50 ring-1 ring-inset ring-amber-300" : ""}`}>
+                          {fi === 0 ? (
+                            <td rowSpan={row.families.length} className="px-3 py-2 border-r align-top pt-3">
+                              {isEditing ? (
+                                <div className="flex flex-col gap-1">
+                                  <input
+                                    autoFocus
+                                    className="w-20 border rounded px-1.5 py-0.5 text-xs font-mono"
+                                    value={editingRoom.value}
+                                    onChange={e => setEditingRoom({ familyId: fam.familyId, value: e.target.value })}
+                                    onKeyDown={e => {
+                                      if (e.key === "Enter") handleChangeRoomNumber(fam.familyId, editingRoom.value);
+                                      if (e.key === "Escape") setEditingRoom(null);
+                                    }}
+                                  />
+                                  <div className="flex gap-1">
+                                    <button onClick={() => handleChangeRoomNumber(fam.familyId, editingRoom.value)}
+                                      className="text-green-600 hover:text-green-800"><Check size={12} /></button>
+                                    <button onClick={() => setEditingRoom(null)}
+                                      className="text-red-400 hover:text-red-700"><X size={12} /></button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className="font-black text-primary">{row.roomNumber}</span>
+                              )}
+                            </td>
+                          ) : null}
+                          <td className="px-3 py-2">
+                            <div className="font-medium">{fam.headName}</div>
+                            <div className="text-[10px] text-muted-foreground">{fam.familyId}</div>
                           </td>
-                        ) : null}
-                        <td className="px-3 py-2">
-                          <div className="font-medium">{fam.headName}</div>
-                          <div className="text-[10px] text-muted-foreground">{fam.familyId}</div>
-                        </td>
-                        <td className="px-3 py-2 text-center">
-                          <span className="bg-amber-100 text-amber-800 font-semibold px-2 py-0.5 rounded-full text-xs">{fam.memberCount}</span>
-                        </td>
-                        {fi === 0 ? (
-                          <td rowSpan={row.families.length} className="px-3 py-2 border-l">
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
-                              row.roomType === "Double" ? "bg-blue-100 text-blue-800" :
-                              row.roomType === "Triple" ? "bg-purple-100 text-purple-800" :
-                              row.roomType === "Quad" ? "bg-green-100 text-green-800" :
-                              row.roomType === "Quint" ? "bg-amber-100 text-amber-800" :
-                              row.roomType === "Multi" ? "bg-red-100 text-red-800" :
-                              "bg-gray-100 text-gray-700"
-                            }`}>{row.roomType}</span>
-                            <div className="text-[10px] text-muted-foreground mt-0.5">{row.totalMembers} total</div>
+                          <td className="px-3 py-2 text-center">
+                            <span className="bg-amber-100 text-amber-800 font-semibold px-2 py-0.5 rounded-full text-xs">{fam.memberCount}</span>
                           </td>
-                        ) : null}
-                      </tr>
-                    ))
+                          {fi === 0 ? (
+                            <td rowSpan={row.families.length} className="px-3 py-2 border-l align-top pt-3">
+                              <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
+                                row.roomType === "Double" ? "bg-blue-100 text-blue-800" :
+                                row.roomType === "Triple" ? "bg-purple-100 text-purple-800" :
+                                row.roomType === "Quad" ? "bg-green-100 text-green-800" :
+                                row.roomType === "Quint" ? "bg-amber-100 text-amber-800" :
+                                row.roomType === "Multi" ? "bg-red-100 text-red-800" :
+                                "bg-gray-100 text-gray-700"
+                              }`}>{row.roomType}</span>
+                              <div className="text-[10px] text-muted-foreground mt-0.5">{row.totalMembers} total</div>
+                            </td>
+                          ) : null}
+                          <td className="px-3 py-2 text-center">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                title="Edit room number"
+                                className="p-1 rounded hover:bg-blue-50 text-blue-500 hover:text-blue-700 transition-colors"
+                                onClick={() => setEditingRoom(isEditing ? null : { familyId: fam.familyId, value: row.roomNumber })}
+                              ><Pencil size={12} /></button>
+                              <button
+                                title={swapSelectA ? (isSwapSelected ? "Cancel swap" : "Swap with this family") : "Select to swap"}
+                                disabled={swapPending}
+                                className={`p-1 rounded transition-colors ${
+                                  isSwapSelected ? "bg-amber-100 text-amber-700" :
+                                  swapSelectA ? "text-amber-600 hover:bg-amber-50 animate-pulse" :
+                                  "hover:bg-amber-50 text-gray-400 hover:text-amber-600"
+                                }`}
+                                onClick={() => {
+                                  if (!swapSelectA) { setSwapSelectA(fam.familyId); }
+                                  else if (isSwapSelected) { setSwapSelectA(null); }
+                                  else { handleSwapRooms(fam.familyId); }
+                                }}
+                              ><ArrowLeftRight size={12} /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
+              </>
             )}
           </div>
           <div className="pt-2 border-t flex justify-between items-center">
