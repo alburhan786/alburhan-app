@@ -14,6 +14,7 @@ interface Group {
   id: string; groupName: string; year: number;
   startingSerialNumber?: number;
   hotels?: {
+    aziziah?: { name?: string; address?: string; checkIn?: string; checkOut?: string };
     makkah?: { name?: string; address?: string; checkIn?: string; checkOut?: string };
     madinah?: { name?: string; address?: string; checkIn?: string; checkOut?: string };
   };
@@ -77,8 +78,13 @@ export default function PrintHotelList() {
           <PrintHeader title="Hotel Room List" subtitle={`${group.groupName} (${group.year})`} company={company} />
 
           {/* Hotel summary bar */}
-          {(group.hotels?.makkah?.name || group.hotels?.madinah?.name) && (
+          {(group.hotels?.aziziah?.name || group.hotels?.makkah?.name || group.hotels?.madinah?.name) && (
             <div style={{ display: "flex", gap: "6mm", justifyContent: "flex-end", fontSize: "8pt", color: "#333", lineHeight: 1.7, marginTop: "-3mm", marginBottom: "4mm" }}>
+              {group.hotels?.aziziah?.name && (
+                <div>Makkah 1: <b style={{ color: "#0d5040" }}>{group.hotels.aziziah.name}</b>
+                  {group.hotels.aziziah.checkIn && <span style={{ color: "#888" }}> (Check-in: {group.hotels.aziziah.checkIn})</span>}
+                </div>
+              )}
               {group.hotels?.makkah?.name && (
                 <div>Makkah 2: <b style={{ color: "#0d5040" }}>{group.hotels.makkah.name}</b>
                   {group.hotels.makkah.checkIn && <span style={{ color: "#888" }}> (Check-in: {group.hotels.makkah.checkIn})</span>}
@@ -101,6 +107,9 @@ export default function PrintHotelList() {
                 <th style={thStyle}>Passport</th>
                 <th style={{ ...thStyle, textAlign: "center" }}>Room No.</th>
                 <th style={{ ...thStyle, textAlign: "center" }}>Bus No.</th>
+                <th style={thStyle}>Makkah 1 Hotel</th>
+                <th style={thStyle}>Makkah 1 Check-in</th>
+                <th style={thStyle}>Makkah 1 Check-out</th>
                 <th style={thStyle}>Makkah 2 Hotel</th>
                 <th style={thStyle}>Makkah 2 Check-in</th>
                 <th style={thStyle}>Makkah 2 Check-out</th>
@@ -124,6 +133,9 @@ export default function PrintHotelList() {
                   <td style={{ ...tdStyle, fontFamily: "monospace", fontSize: "7.5pt" }}>{p.passportNumber || "—"}</td>
                   <td style={{ ...tdStyle, fontWeight: 700, textAlign: "center", color: "#0d5040", fontSize: "10pt" }}>{p.roomNumber || "—"}</td>
                   <td style={{ ...tdStyle, textAlign: "center", fontWeight: 700, color: "#1a2744" }}>{p.busNumber || "—"}</td>
+                  <td style={tdStyle}>{group.hotels?.aziziah?.name || "—"}</td>
+                  <td style={{ ...tdStyle, color: "#C9A23F", fontWeight: 600 }}>{group.hotels?.aziziah?.checkIn || "—"}</td>
+                  <td style={tdStyle}>{group.hotels?.aziziah?.checkOut || "—"}</td>
                   <td style={tdStyle}>{group.hotels?.makkah?.name || "—"}</td>
                   <td style={{ ...tdStyle, color: "#C9A23F", fontWeight: 600 }}>{group.hotels?.makkah?.checkIn || "—"}</td>
                   <td style={tdStyle}>{group.hotels?.makkah?.checkOut || "—"}</td>

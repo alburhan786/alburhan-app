@@ -151,7 +151,7 @@ function BackCard({ p, group, company, showFeedbackQr, bookingMap }: {
           <div style={{ display: "flex", alignItems: "flex-start", gap: "1.5mm" }}>
             <div style={dot} />
             <div>
-              <span style={{ color: "#888", fontSize: "4.5pt" }}>Makkah Hotel: </span>
+              <span style={{ color: "#888", fontSize: "4.5pt" }}>Makkah 2 Hotel: </span>
               <span style={{ fontWeight: 600 }}>{group.hotels?.makkah?.name || "—"}</span>
               {group.hotels?.makkah?.nameAr && <div style={{ fontSize: "4.5pt", direction: "rtl", textAlign: "right" }}>{group.hotels.makkah.nameAr}</div>}
             </div>
