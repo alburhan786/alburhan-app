@@ -1653,8 +1653,8 @@ router.post("/:groupId/families/auto-allocate-rooms", requireAdmin as any, async
 
     for (const [familyId, members] of sortedFamilies) {
       const head = members.find(m => m.familyHead) || members[0];
-      const alreadyAssigned = members.every(m => m.roomNumber);
-      if (!force && alreadyAssigned) {
+      // Non-destructive: skip if ANY member already has a room assigned
+      if (!force && members.some(m => m.roomNumber)) {
         results.push({ familyId, head: head?.fullName || familyId, size: members.length, rooms: [head?.roomNumber || ""], roomType: "existing", roomRange: null });
         skippedCount += members.length;
         continue;
@@ -1670,12 +1670,16 @@ router.post("/:groupId/families/auto-allocate-rooms", requireAdmin as any, async
         currentRoom++;
       }
 
+      // Store first room in roomNumber; for 6+ (multi-room) persist range in roomNotes field
       const primaryRoom = assignedRooms[0];
-      // For multi-room families, store the range in roomNumber (e.g. "1512-1513") so it is persisted and visible everywhere
-      const roomNumberToStore = assignedRooms.length > 1 ? assignedRooms.join("–") : primaryRoom;
-      const roomRange = assignedRooms.length > 1 ? roomNumberToStore : null;
+      const roomRange = assignedRooms.length > 1 ? assignedRooms.join("–") : null;
 
-      const updates: Record<string, any> = { roomNumber: roomNumberToStore, updatedAt: new Date() };
+      const updates: Record<string, any> = {
+        roomNumber: primaryRoom,
+        roomType,
+        ...(roomRange ? { roomNotes: roomRange } : { roomNotes: null }),
+        updatedAt: new Date(),
+      };
       if (hotel) updates.roomHotel = hotel;
 
       for (const m of members) {
@@ -1709,20 +1713,22 @@ router.get("/:groupId/families/room-summary", requireAdmin as any, async (req, r
       familyMap.get(p.familyId)!.push(p);
     }
 
-    const roomMap = new Map<string, { familyId: string; headName: string; memberCount: number }[]>();
+    const roomMap = new Map<string, { familyId: string; headName: string; memberCount: number; roomNotes: string | null }[]>();
     for (const [familyId, members] of familyMap.entries()) {
       const head = members.find(m => m.familyHead) || members[0];
       const roomNumber = head?.roomNumber || members.find(m => m.roomNumber)?.roomNumber;
       if (!roomNumber) continue;
+      const roomNotes = (head as any)?.roomNotes || members.find(m => (m as any).roomNotes)?.roomNotes || null;
       if (!roomMap.has(roomNumber)) roomMap.set(roomNumber, []);
-      roomMap.get(roomNumber)!.push({ familyId, headName: head?.fullName || familyId, memberCount: members.length });
+      roomMap.get(roomNumber)!.push({ familyId, headName: head?.fullName || familyId, memberCount: members.length, roomNotes });
     }
 
     const rows = Array.from(roomMap.entries())
       .sort(([a], [b]) => (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0) || a.localeCompare(b))
       .map(([roomNumber, families]) => {
         const total = families.reduce((s, f) => s + f.memberCount, 0);
-        return { roomNumber, families, totalMembers: total, roomType: ROOM_TYPE_LABEL[total] || (total >= 6 ? "Multi" : "Single") };
+        const roomNotes = families.find(f => f.roomNotes)?.roomNotes || null;
+        return { roomNumber, families, totalMembers: total, roomType: ROOM_TYPE_LABEL[total] || (total >= 6 ? "Multi" : "Single"), roomNotes };
       });
 
     res.json(rows);

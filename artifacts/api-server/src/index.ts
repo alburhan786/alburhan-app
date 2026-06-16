@@ -31,6 +31,12 @@ async function runMigrations() {
     console.error("[Migration] family_head failed:", err);
   }
   try {
+    await db.execute(sql`ALTER TABLE pilgrims ADD COLUMN IF NOT EXISTS room_notes TEXT`);
+    console.log("[Migration] room_notes column ensured");
+  } catch (err) {
+    console.error("[Migration] room_notes failed:", err);
+  }
+  try {
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS attendance_events (
         id TEXT PRIMARY KEY,
