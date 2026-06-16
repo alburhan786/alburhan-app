@@ -35,3 +35,9 @@ id = "7N7yxQd0-q8dCOURZRJDg"
 uri = "file://alburhan_data_export.tar.gz"
 type = "unspecified"
 title = "Database Export (alburhan_data_export.tar.gz)"
+
+[[outputs]]
+id = "IeMeybH_1-q_CWJCfwqZz"
+uri = "file://alburhan-deploy.zip"
+type = "unspecified"
+title = "alburhan-deploy.zip — VPS Deployment Package"
