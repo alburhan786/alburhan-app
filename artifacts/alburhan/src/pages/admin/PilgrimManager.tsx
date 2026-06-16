@@ -203,6 +203,7 @@ export default function PilgrimManager() {
   const [roomNumAllocOpen, setRoomNumAllocOpen] = useState(false);
   const [roomNumAllocStart, setRoomNumAllocStart] = useState("1501");
   const [roomNumAllocPrefix, setRoomNumAllocPrefix] = useState("");
+  const [roomNumAllocHotel, setRoomNumAllocHotel] = useState("makkah");
   const [roomNumAllocForce, setRoomNumAllocForce] = useState(false);
   const [roomNumAllocating, setRoomNumAllocating] = useState(false);
 
@@ -633,7 +634,7 @@ export default function PilgrimManager() {
       const res = await fetch(`${API}/api/groups/${groupId}/families/auto-allocate-rooms`, {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ startRoom: start, prefix: roomNumAllocPrefix.trim(), force: roomNumAllocForce }),
+        body: JSON.stringify({ startRoom: start, prefix: roomNumAllocPrefix.trim(), hotel: roomNumAllocHotel, force: roomNumAllocForce }),
       });
       const data = await res.json();
       if (!res.ok) { toast({ title: data.message || "Allocation failed", variant: "destructive" }); return; }
@@ -1930,7 +1931,7 @@ export default function PilgrimManager() {
           <div className="space-y-4 pt-1">
             <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-800 space-y-0.5">
               <p className="font-semibold">Rules applied:</p>
-              <p>2 members → Double · 3 → Triple · 4 → Quad · 5 → Quint · 6+ → Multi (split into blocks)</p>
+              <p>2 members → Double · 3 → Triple · 4 → Quad · 5 → Quint · 6+ → Multi (adjacent blocks of 5)</p>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
@@ -1953,6 +1954,18 @@ export default function PilgrimManager() {
                 />
               </div>
             </div>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-gray-700">Hotel</label>
+              <select
+                value={roomNumAllocHotel}
+                onChange={e => setRoomNumAllocHotel(e.target.value)}
+                className="w-full h-9 px-3 text-sm rounded-lg border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                <option value="makkah">Makkah</option>
+                <option value="madinah">Madinah</option>
+                <option value="aziziah">Aziziah</option>
+              </select>
+            </div>
             {roomNumAllocPrefix && roomNumAllocStart && (
               <p className="text-xs text-muted-foreground">First room will be: <strong>{roomNumAllocPrefix}-{roomNumAllocStart}</strong></p>
             )}
@@ -1968,10 +1981,26 @@ export default function PilgrimManager() {
                 Override existing room assignments
               </label>
             </div>
-            <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
-              <strong>Preview:</strong> {families.length} families will be processed · rooms starting from {roomNumAllocPrefix ? `${roomNumAllocPrefix}-` : ""}{roomNumAllocStart || "?"}
-              {!roomNumAllocForce && <span> · Already-assigned families will be skipped</span>}
-            </div>
+            {(() => {
+              const toProcess = roomNumAllocForce
+                ? families
+                : families.filter(f => !f.members.every((m: any) => m.roomNumber));
+              const roomsNeeded = toProcess.reduce((total, f) => {
+                const sz = f.members.length;
+                return total + (sz <= 5 ? 1 : Math.ceil(sz / 5));
+              }, 0);
+              const startNum = parseInt(roomNumAllocStart, 10) || 0;
+              const endNum = startNum ? startNum + roomsNeeded - 1 : 0;
+              return (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
+                  <strong>Preview:</strong> {toProcess.length} families → <strong>{roomsNeeded} rooms needed</strong>
+                  {startNum > 0 && <span> · rooms {startNum}–{endNum}</span>}
+                  {!roomNumAllocForce && families.length > toProcess.length && (
+                    <span> · {families.length - toProcess.length} already-assigned families skipped</span>
+                  )}
+                </div>
+              );
+            })()}
             <div className="flex gap-2 justify-end">
               <Button variant="outline" size="sm" onClick={() => setRoomNumAllocOpen(false)}>Cancel</Button>
               <Button

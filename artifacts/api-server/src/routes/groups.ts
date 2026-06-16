@@ -1623,8 +1623,12 @@ router.post("/:groupId/families/:familyId/split", requireAdmin as any, async (re
 // POST /:groupId/families/auto-allocate-rooms — sequential room-number assignment based on family size rules
 router.post("/:groupId/families/auto-allocate-rooms", requireAdmin as any, async (req, res) => {
   const groupId = String(req.params.groupId);
-  const startRoom = parseInt(String(req.body.startRoom ?? 1501), 10);
+  const startRoom = parseInt(String(req.body.startRoom ?? ""), 10);
+  if (!startRoom || isNaN(startRoom) || startRoom <= 0) {
+    res.status(400).json({ message: "startRoom must be a valid positive number" }); return;
+  }
   const prefix = String(req.body.prefix || "");
+  const hotel = String(req.body.hotel || ""); // e.g. "makkah", "madinah", "aziziah"
   const force = req.body.force === true || req.body.force === "true";
 
   const ROOM_TYPE_LABEL: Record<number, string> = { 1: "Single", 2: "Double", 3: "Triple", 4: "Quad", 5: "Quint" };
@@ -1643,14 +1647,15 @@ router.post("/:groupId/families/auto-allocate-rooms", requireAdmin as any, async
 
     const sortedFamilies = Array.from(familyMap.entries()).sort(([a], [b]) => a.localeCompare(b));
     let currentRoom = startRoom;
-    const results: { familyId: string; head: string; size: number; rooms: string[]; roomType: string }[] = [];
+    const results: { familyId: string; head: string; size: number; rooms: string[]; roomType: string; roomRange: string | null }[] = [];
     let assignedCount = 0;
     let skippedCount = 0;
 
     for (const [familyId, members] of sortedFamilies) {
       const head = members.find(m => m.familyHead) || members[0];
-      if (!force && head?.roomNumber) {
-        results.push({ familyId, head: head.fullName, size: members.length, rooms: [head.roomNumber], roomType: "existing" });
+      const alreadyAssigned = members.every(m => m.roomNumber);
+      if (!force && alreadyAssigned) {
+        results.push({ familyId, head: head?.fullName || familyId, size: members.length, rooms: [head?.roomNumber || ""], roomType: "existing", roomRange: null });
         skippedCount += members.length;
         continue;
       }
@@ -1666,13 +1671,18 @@ router.post("/:groupId/families/auto-allocate-rooms", requireAdmin as any, async
       }
 
       const primaryRoom = assignedRooms[0];
+      // For multi-room families, store the range in roomNumber (e.g. "1512-1513") so it is persisted and visible everywhere
+      const roomNumberToStore = assignedRooms.length > 1 ? assignedRooms.join("–") : primaryRoom;
+      const roomRange = assignedRooms.length > 1 ? roomNumberToStore : null;
+
+      const updates: Record<string, any> = { roomNumber: roomNumberToStore, updatedAt: new Date() };
+      if (hotel) updates.roomHotel = hotel;
+
       for (const m of members) {
-        await db.update(pilgrimsTable)
-          .set({ roomNumber: primaryRoom, updatedAt: new Date() })
-          .where(eq(pilgrimsTable.id, m.id));
+        await db.update(pilgrimsTable).set(updates).where(eq(pilgrimsTable.id, m.id));
       }
 
-      results.push({ familyId, head: head?.fullName || familyId, size, rooms: assignedRooms, roomType });
+      results.push({ familyId, head: head?.fullName || familyId, size, rooms: assignedRooms, roomType, roomRange });
       assignedCount += size;
     }
 
