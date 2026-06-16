@@ -32,6 +32,36 @@ async function runMigrations() {
   }
   try {
     await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS attendance_events (
+        id TEXT PRIMARY KEY,
+        group_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL DEFAULT 'other',
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    console.log("[Migration] attendance_events table ensured");
+  } catch (err) {
+    console.error("[Migration] attendance_events failed:", err);
+  }
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS attendance_logs (
+        id TEXT PRIMARY KEY,
+        event_id TEXT NOT NULL,
+        pilgrim_id TEXT NOT NULL,
+        group_id TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'present',
+        scanned_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        scanned_by TEXT
+      )
+    `);
+    console.log("[Migration] attendance_logs table ensured");
+  } catch (err) {
+    console.error("[Migration] attendance_logs failed:", err);
+  }
+  try {
+    await db.execute(sql`
       CREATE TABLE IF NOT EXISTS delete_audit_log (
         id SERIAL PRIMARY KEY,
         action TEXT NOT NULL,

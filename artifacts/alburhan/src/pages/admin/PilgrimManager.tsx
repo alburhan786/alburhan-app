@@ -913,6 +913,11 @@ export default function PilgrimManager() {
         >
           <UserCheck size={15} /> Families ({families.length})
         </button>
+        <Link href={`/admin/groups/${groupId}/attendance`}>
+          <span className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 border-transparent text-muted-foreground hover:text-foreground transition-colors -mb-px cursor-pointer">
+            <QrCode size={15} /> Attendance
+          </span>
+        </Link>
       </div>
 
       <input ref={fileRef} type="file" accept="image/*" className="hidden"

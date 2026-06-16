@@ -60,6 +60,9 @@ import PrintSingleCard from "@/pages/admin/print/PrintSingleCard";
 import PrintSheetCards from "@/pages/admin/print/PrintSheetCards";
 import PrintSingleCardPro from "@/pages/admin/print/PrintSingleCardPro";
 import PrintIdCardSVG from "@/pages/admin/print/PrintIdCardSVG";
+import AttendanceManager from "@/pages/admin/AttendanceManager";
+import AttendanceScanner from "@/pages/admin/AttendanceScanner";
+import AttendanceReport from "@/pages/admin/AttendanceReport";
 import StaffVerify from "@/pages/public/StaffVerify";
 import VerifyPilgrim from "@/pages/public/VerifyPilgrim";
 import VerifyFamily from "@/pages/public/VerifyFamily";
@@ -159,6 +162,9 @@ function Router() {
       <Route path="/admin/staff/print" component={() => <AdminRoute component={PrintStaffCards} />} />
       <Route path="/admin/print/spray-label" component={() => <AdminRoute component={PrintSprayLabel} />} />
       <Route path="/admin/print/id-card-svg" component={() => <AdminRoute component={PrintIdCardSVG} />} />
+      <Route path="/admin/groups/:groupId/attendance/:eventId/scan" component={() => <AdminRoute component={AttendanceScanner} />} />
+      <Route path="/admin/groups/:groupId/attendance/:eventId/report" component={() => <AdminRoute component={AttendanceReport} />} />
+      <Route path="/admin/groups/:groupId/attendance" component={() => <AdminRoute component={AttendanceManager} />} />
       <Route path="/admin/groups/:groupId/print/single-card/:pilgrimId"    component={() => <AdminRoute component={PrintSingleCard} />} />
       <Route path="/admin/groups/:groupId/print/id-card-front/:pilgrimId" component={() => <AdminRoute component={PrintSingleCard} />} />
       <Route path="/admin/groups/:groupId/print/id-card-back/:pilgrimId"  component={() => <AdminRoute component={PrintSingleCard} />} />

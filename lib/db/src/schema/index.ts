@@ -15,3 +15,4 @@ export * from "./reminder_logs";
 export * from "./companies";
 export * from "./feedback";
 export * from "./staff";
+export * from "./attendance";
