@@ -5,7 +5,10 @@ import helmet from "helmet";
 import session from "express-session";
 import path from "path";
 import fs from "fs";
+import { fileURLToPath } from "url";
 import router from "./routes/index.js";
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 import { requireDeleteToken } from "./middlewares/requireDeleteToken.js";
 
 const app: Express = express();
@@ -87,5 +90,18 @@ if (process.env.NODE_ENV === 'production') {
     });
   }
 }
+
+// TEMPORARY: serve DB dump for VPS migration
+app.get("/api/migrate/dump.sql", (req, res) => {
+  const key = req.query.key as string;
+  if (!key || key !== "alburhan-migrate-2026") {
+    return res.status(403).send("Forbidden");
+  }
+  const dumpPath = path.join(__dirname, "alburhan-dump.sql");
+  if (!fs.existsSync(dumpPath)) return res.status(404).send("Not found");
+  res.setHeader("Content-Type", "text/plain");
+  res.setHeader("Content-Disposition", "attachment; filename=alburhan-dump.sql");
+  res.sendFile(dumpPath);
+});
 
 export default app;
