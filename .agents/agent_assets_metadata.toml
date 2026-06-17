@@ -41,3 +41,9 @@ id = "IeMeybH_1-q_CWJCfwqZz"
 uri = "file://alburhan-deploy.zip"
 type = "unspecified"
 title = "alburhan-deploy.zip — VPS Deployment Package"
+
+[[outputs]]
+id = "OzkMZo1lBhUf_VnMoA6d6"
+uri = "file://alburhan-dump.zip"
+type = "unspecified"
+title = "alburhan-dump.zip — Database Dump (extract to get alburhan-dump.sql)"
