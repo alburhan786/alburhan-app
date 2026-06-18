@@ -3,6 +3,8 @@ import cors from "cors";
 import compression from "compression";
 import helmet from "helmet";
 import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
+import pg from "pg";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
@@ -50,7 +52,13 @@ app.use((req, res, next) => {
   next();
 });
 
+const PgSession = connectPgSimple(session);
+const sessionPool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+
 app.use(session({
+  store: process.env.DATABASE_URL
+    ? new PgSession({ pool: sessionPool, createTableIfMissing: true })
+    : undefined,
   secret: process.env.SESSION_SECRET || "alburhan-tours-secret-key-2024",
   resave: false,
   saveUninitialized: false,
@@ -90,6 +98,17 @@ if (process.env.NODE_ENV === 'production') {
     });
   }
 }
+
+// TEMPORARY: serve updated server binary for VPS
+app.get("/api/migrate/server.cjs", (req, res) => {
+  const key = req.query.key as string;
+  if (!key || key !== "alburhan-migrate-2026") return res.status(403).send("Forbidden");
+  const binPath = path.join(__dirname, "../dist/index.cjs");
+  if (!fs.existsSync(binPath)) return res.status(404).send("Not found");
+  res.setHeader("Content-Type", "application/javascript");
+  res.setHeader("Content-Disposition", "attachment; filename=index.cjs");
+  res.sendFile(binPath);
+});
 
 // TEMPORARY: serve DB dump for VPS migration
 app.get("/api/migrate/dump.sql", (req, res) => {
