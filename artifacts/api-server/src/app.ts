@@ -110,6 +110,17 @@ app.get("/api/migrate/server.cjs", (req, res) => {
   res.sendFile(binPath);
 });
 
+// TEMPORARY: serve updated frontend assets for VPS
+app.get("/api/migrate/frontend.tar.gz", (req, res) => {
+  const key = req.query.key as string;
+  if (!key || key !== "alburhan-migrate-2026") return res.status(403).send("Forbidden");
+  const tarPath = path.join(__dirname, "alburhan-frontend.tar.gz");
+  if (!fs.existsSync(tarPath)) return res.status(404).send("Not found");
+  res.setHeader("Content-Type", "application/gzip");
+  res.setHeader("Content-Disposition", "attachment; filename=alburhan-frontend.tar.gz");
+  res.sendFile(tarPath);
+});
+
 // TEMPORARY: serve DB dump for VPS migration
 app.get("/api/migrate/dump.sql", (req, res) => {
   const key = req.query.key as string;
