@@ -13,6 +13,7 @@ import { Plus, Edit, Trash2, ArrowLeft, Upload, Printer, CreditCard, Luggage, He
 import { QRCodeCanvas } from "qrcode.react";
 import { Link, useRoute } from "wouter";
 import { BulkImportModal } from "./BulkImportModal";
+import QuickAddModal from "./QuickAddModal";
 import * as XLSX from "xlsx";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -172,6 +173,7 @@ export default function PilgrimManager() {
   const [bulkRoomForm, setBulkRoomForm] = useState({ hotel: "makkah", roomType: "gents", totalBeds: "4", floor: "", fromRoom: "", toRoom: "" });
   const [bulkAdding, setBulkAdding] = useState(false);
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [editingSerial, setEditingSerial] = useState<{ id: string; value: string } | null>(null);
   const [generatingBarcodes, setGeneratingBarcodes] = useState(false);
   const [editingFamilyId, setEditingFamilyId] = useState<{ id: string; value: string } | null>(null);
@@ -1025,6 +1027,9 @@ export default function PilgrimManager() {
                 </Button>
                 <Button variant="outline" onClick={exportToExcel} disabled={pilgrims.length === 0} className="gap-1.5 rounded-xl border-emerald-300 text-emerald-700 hover:bg-emerald-50">
                   <FileDown size={15} /> Export Excel
+                </Button>
+                <Button variant="outline" onClick={() => setQuickAddOpen(true)} className="gap-1.5 rounded-xl border-amber-300 text-amber-700 hover:bg-amber-50">
+                  <Zap size={15} /> Quick Add
                 </Button>
                 <Button variant="outline" onClick={() => setBulkImportOpen(true)} className="gap-1.5 rounded-xl border-blue-300 text-blue-700 hover:bg-blue-50">
                   <Upload size={15} /> Bulk Import
@@ -2683,6 +2688,13 @@ export default function PilgrimManager() {
         onClose={() => setBulkImportOpen(false)}
         onImported={fetchData}
         existingPassports={pilgrims.map(p => p.passportNumber).filter(Boolean) as string[]}
+      />
+
+      <QuickAddModal
+        open={quickAddOpen}
+        onClose={() => setQuickAddOpen(false)}
+        groupId={groupId}
+        onImported={fetchData}
       />
     </AdminLayout>
   );
