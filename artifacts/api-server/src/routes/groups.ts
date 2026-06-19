@@ -372,6 +372,9 @@ router.post("/:groupId/pilgrims/bulk", requireAdmin as any, async (req: Authenti
     passportIssueDate: r.passportIssueDate ? String(r.passportIssueDate).trim() : null,
     passportExpiryDate: r.passportExpiryDate ? String(r.passportExpiryDate).trim() : null,
     passportPlaceOfIssue: r.passportPlaceOfIssue ? String(r.passportPlaceOfIssue).trim() : null,
+    familyId: r.familyId ? String(r.familyId).trim() : null,
+    familyHead: r.familyHead ? String(r.familyHead).trim().toLowerCase() === "yes" : false,
+    familyRelation: r.familyRelation ? String(r.familyRelation).trim() : null,
   }));
 
   try {

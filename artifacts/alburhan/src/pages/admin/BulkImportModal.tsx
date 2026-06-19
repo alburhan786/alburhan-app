@@ -13,6 +13,7 @@ const TEMPLATE_COLUMNS = [
   "Visa Number", "Blood Group", "Mobile India", "Mobile Saudi",
   "City", "State", "Address", "Bus Number", "Seat Number", "Cover Number",
   "Relation", "Medical Condition",
+  "Family ID", "Family Head (Yes/No)", "Family Relation",
 ];
 
 const COLUMN_MAP: Record<string, string> = {
@@ -42,6 +43,10 @@ const COLUMN_MAP: Record<string, string> = {
   "cover no": "coverNumber",
   "relation": "relation",
   "medical condition": "medicalCondition",
+  "family id": "familyId",
+  "family head (yes/no)": "familyHead",
+  "family head": "familyHead",
+  "family relation": "familyRelation",
 };
 
 interface ParsedRow {
@@ -275,7 +280,8 @@ export function BulkImportModal({ groupId, open, onClose, onImported, existingPa
                             <th className="text-left px-3 py-2 font-semibold">Passport</th>
                             <th className="text-left px-3 py-2 font-semibold">Gender</th>
                             <th className="text-left px-3 py-2 font-semibold">Mobile India</th>
-                            <th className="text-left px-3 py-2 font-semibold">City</th>
+                            <th className="text-left px-3 py-2 font-semibold">Family ID</th>
+                            <th className="text-left px-3 py-2 font-semibold">Head</th>
                             <th className="text-left px-3 py-2 font-semibold w-28">Status</th>
                           </tr>
                         </thead>
@@ -287,7 +293,8 @@ export function BulkImportModal({ groupId, open, onClose, onImported, existingPa
                               <td className="px-3 py-1.5 font-mono">{row.data.passportNumber || "—"}</td>
                               <td className="px-3 py-1.5">{row.data.gender || "—"}</td>
                               <td className="px-3 py-1.5">{row.data.mobileIndia || "—"}</td>
-                              <td className="px-3 py-1.5">{row.data.city || "—"}</td>
+                              <td className="px-3 py-1.5 font-mono text-amber-700">{row.data.familyId || "—"}</td>
+                              <td className="px-3 py-1.5">{row.data.familyHead?.toLowerCase() === "yes" ? <CheckCircle2 size={12} className="text-emerald-600" /> : "—"}</td>
                               <td className="px-3 py-1.5">
                                 {row.error
                                   ? <span className="flex items-center gap-1 text-red-600"><AlertCircle size={11} /> {row.error}</span>
