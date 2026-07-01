@@ -14,8 +14,12 @@ const MASHARIQ_AR = "شركة مشارق الماسية";
 
 // Company India phones (shown big on front)
 const INDIA_PHONES = ["9893989786", "9893225590"];
-// Emergency Saudi phones (shown in front footer white)
+// Emergency Saudi contacts (name + number)
 const SAUDI_EMERGENCY = ["0547090786", "0568780786"];
+const EMERGENCY_CONTACTS = [
+  { name: "Mohammed Altaf", number: SAUDI_EMERGENCY[0] },
+  { name: "Mohammed Wasim", number: SAUDI_EMERGENCY[1] },
+];
 
 interface Pilgrim {
   id: string; serialNumber: number; fullName: string; passportNumber?: string;
@@ -165,8 +169,26 @@ function FrontCard({ p, group, company, photoDataUrls }: CardProps) {
             <div style={{ fontSize: "9pt", fontWeight: 900, color: DARK, lineHeight: 1.1 }}>{group.maktabNumber || "—"}</div>
           </div>
 
+          {/* Emergency contacts — prominent section */}
+          <div style={{
+            marginTop: "auto",
+            background: "#fff0f0", borderRadius: "2px",
+            border: `1px solid #e8a0a0`,
+            padding: "0.8mm 1mm",
+          }}>
+            <div style={{ fontSize: "3pt", fontWeight: 900, color: "#b91c1c", textTransform: "uppercase", letterSpacing: "0.4px", lineHeight: 1, marginBottom: "0.6mm" }}>
+              🆘 Emergency (Saudi)
+            </div>
+            {EMERGENCY_CONTACTS.map((c, i) => (
+              <div key={i} style={{ marginBottom: i < EMERGENCY_CONTACTS.length - 1 ? "0.5mm" : 0 }}>
+                <div style={{ fontSize: "6pt", fontWeight: 900, color: DARK, lineHeight: 1.1 }}>{c.name}</div>
+                <div style={{ fontSize: "6.5pt", fontWeight: 900, color: "#b91c1c", lineHeight: 1.1, letterSpacing: "0.3px" }}>{c.number}</div>
+              </div>
+            ))}
+          </div>
+
           {/* Company India phones — big bold */}
-          <div style={{ marginTop: "auto", borderTop: `1px solid ${GOLD}40`, paddingTop: "0.5mm" }}>
+          <div style={{ borderTop: `1px solid ${GOLD}40`, paddingTop: "0.5mm" }}>
             <div style={{ fontSize: "2.5pt", color: "#999", textTransform: "uppercase", lineHeight: 1 }}>Company (India)</div>
             <div style={{ fontSize: "5pt", fontWeight: 900, color: DARK, lineHeight: 1.3 }}>
               {INDIA_PHONES[0]} &nbsp;|&nbsp; {INDIA_PHONES[1]}
