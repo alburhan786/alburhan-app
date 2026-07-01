@@ -167,7 +167,7 @@ export default function PackageDetail() {
   const { data: pkg, isLoading } = useGetPackage(id);
   const createBooking = useCreateBooking();
   const { toast } = useToast();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const { initiatePayment, isInitializing: isPaymentLoading } = usePayment();
   const [, setLocation] = useLocation();
   const [isOpen, setIsOpen] = useState(false);
@@ -221,7 +221,8 @@ export default function PackageDetail() {
         title: "Login Required",
         description: "Please login first to book this package.",
       });
-      setLocation("/login");
+      const currentPath = `/packages/${id}`;
+      setLocation(`/login?returnUrl=${encodeURIComponent(currentPath)}`);
       return;
     }
     setIsOpen(true);
@@ -340,6 +341,16 @@ export default function PackageDetail() {
       return (
         <button disabled className="w-full py-4 bg-amber-500 text-white font-bold rounded-xl text-base shadow-lg opacity-80 cursor-not-allowed">
           Booking Under Review
+        </button>
+      );
+    }
+    if (isAuthLoading) {
+      return (
+        <button
+          disabled
+          className="w-full py-4 bg-primary/60 text-white font-bold rounded-xl text-base shadow-lg cursor-not-allowed"
+        >
+          Loading...
         </button>
       );
     }

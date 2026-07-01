@@ -37,9 +37,13 @@ export default function Login() {
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [, setLocation] = useLocation();
 
+  const searchParams = new URLSearchParams(window.location.search);
+  const rawReturnUrl = searchParams.get("returnUrl");
+  const returnUrl = rawReturnUrl && rawReturnUrl.startsWith("/") && !rawReturnUrl.startsWith("//") ? rawReturnUrl : null;
+
   useEffect(() => {
     if (isAuthenticated) {
-      setLocation(isAdmin ? "/admin/dashboard" : "/customer/dashboard");
+      setLocation(isAdmin ? "/admin/dashboard" : (returnUrl || "/customer/dashboard"));
     }
   }, [isAuthenticated, isAdmin, setLocation]);
 
@@ -79,7 +83,7 @@ export default function Login() {
           title: "Welcome back!",
           description: `Assalamu Alaikum${result.user?.name ? `, ${result.user.name}` : ""}! You have logged in.`,
         });
-        setLocation(result.user?.role === "admin" ? "/admin/dashboard" : "/customer/dashboard");
+        setLocation(result.user?.role === "admin" ? "/admin/dashboard" : (returnUrl || "/customer/dashboard"));
       }
     } catch (err: any) {
       toast({
@@ -98,9 +102,9 @@ export default function Login() {
     setIsUpdating(true);
     try {
       await updateProfile({ name: name.trim(), email: email.trim() || undefined });
-      setLocation("/customer/dashboard");
+      setLocation(returnUrl || "/customer/dashboard");
     } catch {
-      setLocation("/customer/dashboard");
+      setLocation(returnUrl || "/customer/dashboard");
     } finally {
       setIsUpdating(false);
     }
@@ -237,7 +241,7 @@ export default function Login() {
                     {isUpdating ? "Saving..." : "Start My Journey →"}
                   </Button>
                   <div className="text-center">
-                    <button type="button" onClick={() => setLocation("/customer/dashboard")} className="text-sm text-muted-foreground hover:text-primary underline underline-offset-4">
+                    <button type="button" onClick={() => setLocation(returnUrl || "/customer/dashboard")} className="text-sm text-muted-foreground hover:text-primary underline underline-offset-4">
                       Skip for now
                     </button>
                   </div>

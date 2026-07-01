@@ -34,7 +34,10 @@ export function useAuth() {
         if (data.user.role === 'admin') {
           setLocation("/admin/dashboard");
         } else {
-          setLocation("/customer/dashboard");
+          const params = new URLSearchParams(window.location.search);
+          const rawReturn = params.get("returnUrl");
+          const returnUrl = rawReturn && rawReturn.startsWith("/") && !rawReturn.startsWith("//") ? rawReturn : null;
+          setLocation(returnUrl || "/customer/dashboard");
         }
       },
       onError: (error: any) => {
