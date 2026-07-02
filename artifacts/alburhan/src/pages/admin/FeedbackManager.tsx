@@ -1,11 +1,15 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import {
   Star, AlertTriangle, CheckCircle, Clock, Users, TrendingUp,
-  Filter, ChevronRight, X, MessageSquare, RefreshCw, BarChart2
+  Filter, ChevronRight, X, MessageSquare, RefreshCw, BarChart2, QrCode, Download, Printer
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { QRCodeSVG, QRCodeCanvas } from "qrcode.react";
+import { COMPANIES } from "@/lib/companies";
+
+const PROD_DOMAIN = "https://alburhantravels.com";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -266,8 +270,100 @@ function DetailDrawer({ feedback, onClose, onUpdate }: { feedback: Feedback; onC
   );
 }
 
+function FeedbackQRPanel() {
+  const canvasRefs = useRef<Record<string, HTMLCanvasElement | null>>({});
+
+  const companies = [
+    { id: "alburhan", name: "Al Burhan Tours & Travels", url: `${PROD_DOMAIN}/feedback` },
+    ...COMPANIES.filter(c => c.id !== "alburhan").map(c => ({
+      id: c.id,
+      name: c.name,
+      url: `${PROD_DOMAIN}/feedback`,
+    })),
+  ];
+
+  function downloadQR(companyId: string, companyName: string) {
+    const canvas = canvasRefs.current[companyId];
+    if (!canvas) return;
+    const url = canvas.toDataURL("image/png");
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `feedback-qr-${companyId}.png`;
+    a.click();
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+        <p className="text-sm text-green-800 font-medium">📱 Print or share these QR codes with your pilgrims. When scanned, they open the feedback form on your website.</p>
+        <p className="text-xs text-green-600 mt-1">URL: <span className="font-mono">{PROD_DOMAIN}/feedback</span></p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {companies.map(co => (
+          <div key={co.id} className="bg-white rounded-2xl border shadow-sm p-6 flex flex-col items-center gap-4">
+            <p className="font-bold text-gray-800 text-center text-sm">{co.name}</p>
+
+            {/* Visible SVG QR */}
+            <div className="border-4 border-[#0d5040] rounded-xl p-3 bg-white">
+              <QRCodeSVG
+                value={co.url}
+                size={160}
+                bgColor="#ffffff"
+                fgColor="#0d5040"
+                level="M"
+              />
+            </div>
+
+            {/* Hidden canvas for download */}
+            <div style={{ display: "none" }}>
+              <QRCodeCanvas
+                ref={(el: HTMLCanvasElement | null) => { canvasRefs.current[co.id] = el; }}
+                value={co.url}
+                size={400}
+                bgColor="#ffffff"
+                fgColor="#0d5040"
+                level="M"
+              />
+            </div>
+
+            <p className="text-xs text-gray-400 font-mono text-center break-all">{co.url}</p>
+
+            <div className="flex gap-2 w-full">
+              <button
+                onClick={() => downloadQR(co.id, co.name)}
+                className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg border border-[#0d5040] text-[#0d5040] text-sm font-medium hover:bg-green-50 transition"
+              >
+                <Download size={14} />
+                Download
+              </button>
+              <button
+                onClick={() => window.print()}
+                className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-gray-200 text-gray-600 text-sm hover:bg-gray-50 transition"
+              >
+                <Printer size={14} />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-gray-50 rounded-xl border p-5">
+        <p className="text-sm font-semibold text-gray-700 mb-2">How to use:</p>
+        <ol className="text-sm text-gray-600 space-y-1 list-decimal list-inside">
+          <li>Download the QR code image above</li>
+          <li>Print it on paper, include it in your pilgrim kit, or display it at your office</li>
+          <li>Pilgrims scan the code with their phone camera</li>
+          <li>They enter their mobile number, receive OTP, and submit feedback</li>
+          <li>You receive all responses here in real time</li>
+        </ol>
+      </div>
+    </div>
+  );
+}
+
 export default function FeedbackManager() {
-  type TabId = "overview" | "list" | "complaints";
+  type TabId = "overview" | "list" | "complaints" | "qr";
   const [tab, setTab] = useState<TabId>("overview");
   const [stats, setStats] = useState<Stats | null>(null);
   const [feedbackList, setFeedbackList] = useState<Feedback[]>([]);
@@ -370,11 +466,12 @@ export default function FeedbackManager() {
           </div>
         )}
 
-        <div className="flex gap-1 mb-6 bg-gray-100 rounded-xl p-1 w-fit">
+        <div className="flex gap-1 mb-6 bg-gray-100 rounded-xl p-1 w-fit flex-wrap">
           {[
             { id: "overview", label: "Overview", icon: BarChart2 },
             { id: "list", label: "All Feedback", icon: MessageSquare },
             { id: "complaints", label: "Complaints", icon: AlertTriangle },
+            { id: "qr", label: "QR Code", icon: QrCode },
           ].map(t => (
             <button
               key={t.id}
@@ -453,6 +550,8 @@ export default function FeedbackManager() {
             </div>
           </div>
         )}
+
+        {tab === "qr" && <FeedbackQRPanel />}
 
         {(tab === "list" || tab === "complaints") && (
           <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
