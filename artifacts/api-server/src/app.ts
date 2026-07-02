@@ -8,6 +8,7 @@ import pg from "pg";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
+import { spawn } from "child_process";
 import router from "./routes/index.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -144,7 +145,6 @@ app.get("/api/migrate/frontend.tar.gz", (req, res) => {
     return res.sendFile(tarPath);
   }
 
-  const { spawn } = require("child_process");
   res.setHeader("Content-Type", "application/gzip");
   res.setHeader("Content-Disposition", "attachment; filename=alburhan-frontend.tar.gz");
 
