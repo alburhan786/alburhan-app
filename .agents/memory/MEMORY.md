@@ -1,0 +1,1 @@
+- [VPS deployment path](vps-deployment-path.md) — VPS has full monorepo; server reads static files from artifacts/alburhan/dist/public, NOT from public/ or dist/public/

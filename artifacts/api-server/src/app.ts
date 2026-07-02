@@ -148,9 +148,10 @@ app.get("/api/migrate/frontend.tar.gz", (req, res) => {
   res.setHeader("Content-Type", "application/gzip");
   res.setHeader("Content-Disposition", "attachment; filename=alburhan-frontend.tar.gz");
 
-  // tar -czf - -C <parent> public/  →  streams the archive
-  const parentDir = path.dirname(distDir);
-  const tar = spawn("tar", ["-czf", "-", "-C", parentDir, "public"]);
+  // tar -czf - with path artifacts/alburhan/dist/public so it extracts to the right place on VPS
+  // The VPS has the full monorepo at /var/www/alburhan/ so it reads from artifacts/alburhan/dist/public
+  const workspaceRoot = path.resolve(distDir, "../../../..");  // dist/public → dist → alburhan → artifacts → workspace
+  const tar = spawn("tar", ["-czf", "-", "-C", workspaceRoot, "artifacts/alburhan/dist/public"]);
   tar.stdout.pipe(res);
   tar.stderr.on("data", (d: Buffer) => console.error("[tar]", d.toString()));
   tar.on("close", (code: number) => { if (code !== 0) console.error("[tar] exited", code); });
