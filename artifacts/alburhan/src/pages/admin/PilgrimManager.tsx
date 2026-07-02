@@ -121,7 +121,7 @@ interface HajjRoom {
 const emptyPilgrim = {
   fullName: "", passportNumber: "", visaNumber: "", dateOfBirth: "", gender: "",
   bloodGroup: "", mobileIndia: "", mobileSaudi: "", address: "", city: "",
-  state: "", roomNumber: "", roomType: "", busNumber: "", seatNumber: "",
+  state: "", roomNumber: "", roomType: "", roomHotel: "", busNumber: "", seatNumber: "",
   relation: "", coverNumber: "", medicalCondition: "",
   salutation: "", passportIssueDate: "", passportExpiryDate: "", passportPlaceOfIssue: "",
   serialNumber: "",
@@ -201,7 +201,7 @@ export default function PilgrimManager() {
   const [waMessage, setWaMessage] = useState("");
   const [waSending, setWaSending] = useState(false);
   const [syncPromptData, setSyncPromptData] = useState<{
-    familyId: string; familySize: number; roomNumber: string; busNumber: string; roomHotel: string;
+    familyId: string; familySize: number; roomNumber: string; busNumber: string; roomHotel: string; flightNumber?: string;
   } | null>(null);
   const [syncingFamily, setSyncingFamily] = useState(false);
 
@@ -290,7 +290,7 @@ export default function PilgrimManager() {
       dateOfBirth: p.dateOfBirth || "", gender: p.gender || "", bloodGroup: p.bloodGroup || "",
       mobileIndia: p.mobileIndia || "", mobileSaudi: p.mobileSaudi || "", address: p.address || "",
       city: p.city || "", state: p.state || "", roomNumber: p.roomNumber || "",
-      roomType: p.roomType || "", busNumber: p.busNumber || "", seatNumber: p.seatNumber || "",
+      roomType: p.roomType || "", roomHotel: p.roomHotel || "", busNumber: p.busNumber || "", seatNumber: p.seatNumber || "",
       relation: p.relation || "", coverNumber: p.coverNumber || "",
       medicalCondition: p.medicalCondition || "",
       salutation: p.salutation || "",
@@ -353,7 +353,7 @@ export default function PilgrimManager() {
           // Use pilgrims state (always loaded) rather than families state (only loaded when Families tab is active)
           const nonHeadCount = pilgrims.filter(p => p.familyId === fId && !p.familyHead).length;
           if (nonHeadCount > 0) {
-            setSyncPromptData({ familyId: fId, familySize: nonHeadCount, roomNumber: form.roomNumber, busNumber: form.busNumber, roomHotel: form.roomHotel || "" });
+            setSyncPromptData({ familyId: fId, familySize: nonHeadCount, roomNumber: form.roomNumber, busNumber: form.busNumber, roomHotel: form.roomHotel || "", flightNumber: group?.flightNumber || "" });
           }
         }
       }
@@ -1958,6 +1958,10 @@ export default function PilgrimManager() {
                         ) : (
                           <span className="text-xs text-muted-foreground italic">· No bus</span>
                         )}
+                        {group?.flightNumber && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 font-semibold">✈️ {group.flightNumber}</span>
+                        )}
+                        <span className="text-xs text-muted-foreground">· {group?.groupName} {group?.year}</span>
                       </div>
 
                       {/* Member list (expandable) */}
@@ -2504,8 +2508,8 @@ export default function PilgrimManager() {
           </DialogHeader>
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              You changed the room/bus for the family head of <strong>Family {syncPromptData?.familyId}</strong>. 
-              Apply the same room, hotel and bus to all <strong>{syncPromptData?.familySize}</strong> other family members?
+              You changed the room/hotel/bus for the family head of <strong>Family {syncPromptData?.familyId}</strong>. 
+              Apply the same room, hotel, bus and flight context to all <strong>{syncPromptData?.familySize}</strong> other family members?
             </p>
             {syncPromptData && (
               <div className="bg-muted rounded-lg p-3 text-sm space-y-1">
@@ -2515,6 +2519,9 @@ export default function PilgrimManager() {
                 {syncPromptData.busNumber
                   ? <div>🚌 Bus: <strong>{syncPromptData.busNumber}</strong></div>
                   : <div className="text-muted-foreground">🚌 Bus: <em>will be cleared</em></div>}
+                {syncPromptData.flightNumber && (
+                  <div className="text-muted-foreground">✈️ Flight: <strong>{syncPromptData.flightNumber}</strong> <span className="text-xs">(group-wide, shown for reference)</span></div>
+                )}
               </div>
             )}
             <div className="flex gap-2 pt-1">
