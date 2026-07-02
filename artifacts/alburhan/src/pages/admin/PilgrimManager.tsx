@@ -81,6 +81,8 @@ interface FamilyGroup {
   roomNumber?: string | null;
   roomHotel?: string | null;
   roomId?: string | null;
+  busNumber?: string | null;
+  memberAttendance?: Record<string, { attended: number; total: number }>;
 }
 
 interface DetectionSuggestion {
@@ -348,8 +350,8 @@ export default function PilgrimManager() {
         const busChanged = form.busNumber !== (originalPilgrim.busNumber || "");
         const hotelChanged = (form.roomHotel || "") !== (originalPilgrim.roomHotel || "");
         if (roomChanged || busChanged || hotelChanged) {
-          const fam = families.find(f => f.familyId === fId);
-          const nonHeadCount = fam ? fam.members.filter(m => !m.familyHead).length : 0;
+          // Use pilgrims state (always loaded) rather than families state (only loaded when Families tab is active)
+          const nonHeadCount = pilgrims.filter(p => p.familyId === fId && !p.familyHead).length;
           if (nonHeadCount > 0) {
             setSyncPromptData({ familyId: fId, familySize: nonHeadCount, roomNumber: form.roomNumber, busNumber: form.busNumber, roomHotel: form.roomHotel || "" });
           }
@@ -1934,10 +1936,10 @@ export default function PilgrimManager() {
                         </div>
                       </div>
 
-                      {/* Room status */}
-                      <div className="mb-3">
+                      {/* Room + Bus status (collapsed summary) */}
+                      <div className="mb-3 flex flex-wrap items-center gap-1.5">
                         {allSameRoom && roomInfo ? (
-                          <div className="flex items-center gap-1.5">
+                          <>
                             <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${HOTEL_COLORS[roomInfo.hotel] || "bg-gray-100"}`}>
                               {HOTEL_LABELS[roomInfo.hotel] || roomInfo.hotel}
                             </span>
@@ -1945,11 +1947,16 @@ export default function PilgrimManager() {
                             <span className={`text-xs px-1.5 py-0.5 rounded-full ${ROOM_TYPE_COLORS[roomInfo.roomType] || "bg-gray-100"}`}>
                               {ROOM_TYPE_LABELS[roomInfo.roomType] || roomInfo.roomType}
                             </span>
-                          </div>
+                          </>
                         ) : hasRoom ? (
                           <span className="text-xs text-amber-700 font-medium bg-amber-100 px-2 py-0.5 rounded-full">Mixed rooms ({memberRoomIds.length})</span>
                         ) : (
-                          <span className="text-xs text-muted-foreground italic">No room assigned</span>
+                          <span className="text-xs text-muted-foreground italic">No room</span>
+                        )}
+                        {fam.busNumber ? (
+                          <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-blue-100 text-blue-800">🚌 Bus {fam.busNumber}</span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground italic">· No bus</span>
                         )}
                       </div>
 
@@ -1976,6 +1983,16 @@ export default function PilgrimManager() {
                                   {m.mobileIndia && <span className="text-[10px] text-gray-500">📞 {m.mobileIndia}</span>}
                                   {m.roomNumber && <span className="text-[10px] font-semibold text-primary">🏨 Rm {m.roomNumber}</span>}
                                   {m.busNumber && <span className="text-[10px] font-semibold text-blue-600">🚌 Bus {m.busNumber}</span>}
+                                  {(() => {
+                                    const att = fam.memberAttendance?.[m.id];
+                                    if (!att || att.total === 0) return null;
+                                    const pct = Math.round((att.attended / att.total) * 100);
+                                    return (
+                                      <span className={`text-[10px] font-semibold px-1 py-0.5 rounded ${att.attended === att.total ? "text-emerald-700 bg-emerald-50" : att.attended === 0 ? "text-red-600 bg-red-50" : "text-amber-700 bg-amber-50"}`}>
+                                        ✓ {att.attended}/{att.total} ({pct}%)
+                                      </span>
+                                    );
+                                  })()}
                                 </div>
                               </div>
                               {!m.familyHead && (

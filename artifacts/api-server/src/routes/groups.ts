@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, hajjGroupsTable, pilgrimsTable, hajjRoomsTable } from "@workspace/db";
+import { db, hajjGroupsTable, pilgrimsTable, hajjRoomsTable, attendanceLogsTable, attendanceEventsTable } from "@workspace/db";
 import { eq, and, ne, desc, asc, count, max, inArray } from "drizzle-orm";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendWhatsApp } from "../lib/notifications.js";
@@ -1517,6 +1517,23 @@ router.get("/:groupId/families", requireAdmin as any, async (req, res) => {
       .where(eq(pilgrimsTable.groupId, groupId))
       .orderBy(asc(pilgrimsTable.serialNumber));
 
+    // Get all attendance events for this group
+    const events = await db.select().from(attendanceEventsTable)
+      .where(eq(attendanceEventsTable.groupId, groupId));
+    const totalEvents = events.length;
+
+    // Get attendance counts per pilgrim (how many events each attended)
+    const attendanceCounts: Record<string, number> = {};
+    if (totalEvents > 0) {
+      const logs = await db.select().from(attendanceLogsTable)
+        .where(eq(attendanceLogsTable.groupId, groupId));
+      for (const log of logs) {
+        if (log.status === "present") {
+          attendanceCounts[log.pilgrimId] = (attendanceCounts[log.pilgrimId] || 0) + 1;
+        }
+      }
+    }
+
     const familyMap = new Map<string, typeof pilgrims>();
     for (const p of pilgrims) {
       if (!p.familyId) continue;
@@ -1526,6 +1543,10 @@ router.get("/:groupId/families", requireAdmin as any, async (req, res) => {
 
     const families = Array.from(familyMap.entries()).map(([familyId, members]) => {
       const head = members.find(m => m.familyHead) || members[0];
+      const memberAttendance: Record<string, { attended: number; total: number }> = {};
+      for (const m of members) {
+        memberAttendance[m.id] = { attended: attendanceCounts[m.id] || 0, total: totalEvents };
+      }
       return {
         familyId,
         members: members.map(fmtPilgrim),
@@ -1533,6 +1554,8 @@ router.get("/:groupId/families", requireAdmin as any, async (req, res) => {
         roomNumber: head?.roomNumber || null,
         roomHotel: head?.roomHotel || null,
         roomId: head?.roomId || null,
+        busNumber: head?.busNumber || null,
+        memberAttendance,
       };
     });
 
