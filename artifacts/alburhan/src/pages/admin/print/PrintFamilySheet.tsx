@@ -172,7 +172,7 @@ export default function PrintFamilySheet() {
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11.5px" }}>
           <thead>
             <tr style={{ background: DARK, color: "#fff" }}>
-              {["S.No", "Name", "Passport", "Relation", "Room", "Bus", "Mobile (India)"].map(h => (
+              {["S.No", "Name", "Passport", "Relation", "Hotel", "Room", "Bus", "Mobile (India)"].map(h => (
                 <th key={h} style={{ padding: "8px 10px", textAlign: "left", fontWeight: 700, whiteSpace: "nowrap" }}>{h}</th>
               ))}
             </tr>
@@ -180,7 +180,6 @@ export default function PrintFamilySheet() {
           <tbody>
             {family.members.map((m, idx) => {
               const name = [m.salutation, m.fullName].filter(Boolean).join(" ");
-              const hotelInitial = m.roomHotel ? (HOTEL_LABELS[m.roomHotel]?.[0] || m.roomHotel[0]) : "";
               return (
                 <tr key={m.id} style={{ background: idx % 2 === 0 ? "#f9f9f9" : "#fff", borderBottom: "1px solid #e8e8e8" }}>
                   <td style={{ padding: "7px 10px", color: "#555", verticalAlign: "middle" }}>
@@ -193,9 +192,10 @@ export default function PrintFamilySheet() {
                   <td style={{ padding: "7px 10px", fontFamily: "monospace", fontSize: "10.5px", verticalAlign: "middle" }}>{m.passportNumber || "—"}</td>
                   <td style={{ padding: "7px 10px", verticalAlign: "middle" }}>{m.familyRelation || m.relation || "—"}</td>
                   <td style={{ padding: "7px 10px", verticalAlign: "middle" }}>
-                    {m.roomNumber
-                      ? <span style={{ fontWeight: 600 }}>{m.roomNumber}{hotelInitial ? ` (${hotelInitial})` : ""}</span>
-                      : "—"}
+                    {m.roomHotel ? <span style={{ fontWeight: 600 }}>{HOTEL_LABELS[m.roomHotel] || m.roomHotel}</span> : "—"}
+                  </td>
+                  <td style={{ padding: "7px 10px", verticalAlign: "middle" }}>
+                    {m.roomNumber ? <span style={{ fontWeight: 600 }}>{m.roomNumber}</span> : "—"}
                   </td>
                   <td style={{ padding: "7px 10px", verticalAlign: "middle" }}>{m.busNumber || "—"}</td>
                   <td style={{ padding: "7px 10px", verticalAlign: "middle" }}>{m.mobileIndia || "—"}</td>

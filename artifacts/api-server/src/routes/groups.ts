@@ -104,7 +104,12 @@ router.get("/:id", requireAdmin as any, async (req, res) => {
   const id = String(req.params.id);
   const groups = await db.select().from(hajjGroupsTable).where(eq(hajjGroupsTable.id, id)).limit(1);
   if (!groups[0]) { res.status(404).json({ message: "Group not found" }); return; }
-  res.json(fmtGroup(groups[0]));
+  // Include live family count from pilgrims table
+  const familyRows = await db.selectDistinct({ familyId: pilgrimsTable.familyId })
+    .from(pilgrimsTable)
+    .where(and(eq(pilgrimsTable.groupId, id), ne(pilgrimsTable.familyId, null as any)));
+  const familyCount = familyRows.length;
+  res.json({ ...fmtGroup(groups[0]), familyCount });
 });
 
 router.put("/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
@@ -135,6 +140,20 @@ router.delete("/:id", requireAdmin as any, async (req, res) => {
     res.status(500).json({ message: err?.message || "Failed to delete group" });
   }
 });
+
+// Helper: ensure exactly one family head exists (auto-promote lowest serial if none set)
+async function ensureFamilyHead(groupId: string, familyId: string) {
+  const members = await db.select().from(pilgrimsTable)
+    .where(and(eq(pilgrimsTable.groupId, groupId), eq(pilgrimsTable.familyId, familyId)))
+    .orderBy(asc(pilgrimsTable.serialNumber));
+  if (members.length === 0) return;
+  const hasHead = members.some(m => m.familyHead);
+  if (!hasHead) {
+    await db.update(pilgrimsTable)
+      .set({ familyHead: true, updatedAt: new Date() })
+      .where(eq(pilgrimsTable.id, members[0].id));
+  }
+}
 
 router.get("/:groupId/pilgrims", requireAdmin as any, async (req, res) => {
   const groupId = String(req.params.groupId);
@@ -176,6 +195,12 @@ router.post("/:groupId/pilgrims", requireAdmin as any, async (req: Authenticated
     familyRelation: familyRelation || null,
     familyHead: familyHead === true || familyHead === "true" ? true : false,
   }).returning();
+
+  // Auto-assign head: if family has no head after insert, promote the first member
+  if (pilgrim.familyId) {
+    await ensureFamilyHead(groupId, pilgrim.familyId);
+  }
+
   res.status(201).json(fmtPilgrim(pilgrim));
 });
 
@@ -227,6 +252,13 @@ router.put("/:groupId/pilgrims/:pilgrimId", requireAdmin as any, async (req: Aut
   }).where(scope).returning();
 
   if (!updated) { res.status(404).json({ message: "Pilgrim not found in this group" }); return; }
+
+  // Auto-assign head: if family has no head after update, promote the first member
+  const updatedFamilyId = updated.familyId;
+  if (updatedFamilyId) {
+    await ensureFamilyHead(groupId, updatedFamilyId);
+  }
+
   res.json(fmtPilgrim(updated));
 });
 
