@@ -1543,32 +1543,49 @@ router.get("/:groupId/families", requireAdmin as any, async (req, res) => {
   }
 });
 
-// POST /:groupId/families/:familyId/sync-logistics — copy head's room/bus to all non-head members
+// POST /:groupId/families/:familyId/sync-logistics — copy head's room/bus/hotel to all non-head members
 router.post("/:groupId/families/:familyId/sync-logistics", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   const groupId = String(req.params.groupId);
   const familyId = String(req.params.familyId);
-  const { roomNumber, busNumber } = req.body;
   try {
     const members = await db.select().from(pilgrimsTable)
       .where(and(eq(pilgrimsTable.groupId, groupId), eq(pilgrimsTable.familyId, familyId)));
     if (members.length === 0) { res.status(404).json({ message: "Family not found" }); return; }
 
-    const updates: Record<string, any> = { updatedAt: new Date() };
-    if (roomNumber !== undefined) updates.roomNumber = roomNumber || null;
-    if (busNumber !== undefined) updates.busNumber = busNumber || null;
+    // Always derive logistics from the family head in the DB — never trust client body alone
+    const head = members.find(m => m.familyHead);
+    if (!head) {
+      res.status(400).json({ message: "No family head set — mark a member as head first" });
+      return;
+    }
 
     const nonHeads = members.filter(m => !m.familyHead);
     if (nonHeads.length === 0) { res.json({ updated: 0 }); return; }
 
+    // Sync all logistics fields from head to every non-head member
     await db.update(pilgrimsTable)
-      .set(updates)
+      .set({
+        roomNumber: head.roomNumber ?? null,
+        roomId: head.roomId ?? null,
+        roomHotel: head.roomHotel ?? null,
+        roomType: head.roomType ?? null,
+        busNumber: head.busNumber ?? null,
+        updatedAt: new Date(),
+      })
       .where(and(
         eq(pilgrimsTable.groupId, groupId),
         eq(pilgrimsTable.familyId, familyId),
         eq(pilgrimsTable.familyHead, false),
       ));
 
-    res.json({ updated: nonHeads.length });
+    res.json({
+      updated: nonHeads.length,
+      synced: {
+        roomNumber: head.roomNumber,
+        busNumber: head.busNumber,
+        roomHotel: head.roomHotel,
+      },
+    });
   } catch (err: any) {
     res.status(500).json({ message: err?.message || "Failed to sync logistics" });
   }

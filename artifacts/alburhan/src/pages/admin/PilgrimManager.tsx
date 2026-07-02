@@ -199,7 +199,7 @@ export default function PilgrimManager() {
   const [waMessage, setWaMessage] = useState("");
   const [waSending, setWaSending] = useState(false);
   const [syncPromptData, setSyncPromptData] = useState<{
-    familyId: string; familySize: number; roomNumber: string; busNumber: string;
+    familyId: string; familySize: number; roomNumber: string; busNumber: string; roomHotel: string;
   } | null>(null);
   const [syncingFamily, setSyncingFamily] = useState(false);
 
@@ -346,11 +346,12 @@ export default function PilgrimManager() {
         const fId = originalPilgrim.familyId;
         const roomChanged = form.roomNumber !== (originalPilgrim.roomNumber || "");
         const busChanged = form.busNumber !== (originalPilgrim.busNumber || "");
-        if (roomChanged || busChanged) {
+        const hotelChanged = (form.roomHotel || "") !== (originalPilgrim.roomHotel || "");
+        if (roomChanged || busChanged || hotelChanged) {
           const fam = families.find(f => f.familyId === fId);
           const nonHeadCount = fam ? fam.members.filter(m => !m.familyHead).length : 0;
           if (nonHeadCount > 0) {
-            setSyncPromptData({ familyId: fId, familySize: nonHeadCount, roomNumber: form.roomNumber, busNumber: form.busNumber });
+            setSyncPromptData({ familyId: fId, familySize: nonHeadCount, roomNumber: form.roomNumber, busNumber: form.busNumber, roomHotel: form.roomHotel || "" });
           }
         }
       }
@@ -2487,12 +2488,16 @@ export default function PilgrimManager() {
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
               You changed the room/bus for the family head of <strong>Family {syncPromptData?.familyId}</strong>. 
-              Apply the same room/bus to all <strong>{syncPromptData?.familySize}</strong> other family members?
+              Apply the same room, hotel and bus to all <strong>{syncPromptData?.familySize}</strong> other family members?
             </p>
             {syncPromptData && (
               <div className="bg-muted rounded-lg p-3 text-sm space-y-1">
-                {syncPromptData.roomNumber && <div>🏨 Room: <strong>{syncPromptData.roomNumber}</strong></div>}
-                {syncPromptData.busNumber && <div>🚌 Bus: <strong>{syncPromptData.busNumber}</strong></div>}
+                {syncPromptData.roomNumber
+                  ? <div>🏨 Room: <strong>{syncPromptData.roomNumber}</strong>{syncPromptData.roomHotel ? ` — ${HOTEL_LABELS[syncPromptData.roomHotel] || syncPromptData.roomHotel}` : ""}</div>
+                  : <div className="text-muted-foreground">🏨 Room: <em>will be cleared</em></div>}
+                {syncPromptData.busNumber
+                  ? <div>🚌 Bus: <strong>{syncPromptData.busNumber}</strong></div>
+                  : <div className="text-muted-foreground">🚌 Bus: <em>will be cleared</em></div>}
               </div>
             )}
             <div className="flex gap-2 pt-1">
@@ -2510,6 +2515,11 @@ export default function PilgrimManager() {
                     const res = await fetch(`${API}/api/groups/${groupId}/families/${encodeURIComponent(syncPromptData.familyId)}/sync-logistics`, {
                       method: "POST", credentials: "include",
                       headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        roomNumber: syncPromptData.roomNumber,
+                        busNumber: syncPromptData.busNumber,
+                        roomHotel: syncPromptData.roomHotel,
+                      }),
                     });
                     if (!res.ok) throw new Error("Failed");
                     const data = await res.json();
