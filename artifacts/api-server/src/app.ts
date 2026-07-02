@@ -121,15 +121,40 @@ app.get("/api/migrate/vps-update.sql", (req, res) => {
   res.sendFile(sqlPath);
 });
 
-// TEMPORARY: serve updated frontend assets for VPS
+// TEMPORARY: serve updated frontend assets for VPS — dynamically tarred from live dist
 app.get("/api/migrate/frontend.tar.gz", (req, res) => {
   const key = req.query.key as string;
   if (!key || key !== "alburhan-migrate-2026") return res.status(403).send("Forbidden");
-  const tarPath = path.join(__dirname, "alburhan-frontend.tar.gz");
-  if (!fs.existsSync(tarPath)) return res.status(404).send("Not found");
+
+  // Find the dist/public folder (works both on Replit dev and VPS)
+  const candidates = [
+    path.resolve(process.cwd(), "artifacts/alburhan/dist/public"),
+    path.resolve(process.cwd(), "../alburhan/dist/public"),
+    path.join(__dirname, "../../alburhan/dist/public"),
+    path.join(__dirname, "../../../artifacts/alburhan/dist/public"),
+  ];
+  const distDir = candidates.find(d => fs.existsSync(d));
+
+  if (!distDir) {
+    // fallback: try the pre-built static file
+    const tarPath = path.join(__dirname, "alburhan-frontend.tar.gz");
+    if (!fs.existsSync(tarPath)) return res.status(404).send("Frontend dist not found");
+    res.setHeader("Content-Type", "application/gzip");
+    res.setHeader("Content-Disposition", "attachment; filename=alburhan-frontend.tar.gz");
+    return res.sendFile(tarPath);
+  }
+
+  const { spawn } = require("child_process");
   res.setHeader("Content-Type", "application/gzip");
   res.setHeader("Content-Disposition", "attachment; filename=alburhan-frontend.tar.gz");
-  res.sendFile(tarPath);
+
+  // tar -czf - -C <parent> public/  →  streams the archive
+  const parentDir = path.dirname(distDir);
+  const tar = spawn("tar", ["-czf", "-", "-C", parentDir, "public"]);
+  tar.stdout.pipe(res);
+  tar.stderr.on("data", (d: Buffer) => console.error("[tar]", d.toString()));
+  tar.on("close", (code: number) => { if (code !== 0) console.error("[tar] exited", code); });
+  req.on("close", () => tar.kill());
 });
 
 // TEMPORARY: serve DB dump for VPS migration
