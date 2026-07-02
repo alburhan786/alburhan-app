@@ -51,7 +51,7 @@ function toBotBeePhone(mobile: string): string {
 export async function sendOtpSMS(mobile: string, otp: string): Promise<boolean> {
   if (!FAST2SMS_API_KEY) {
     console.log("[OTP-SMS] API key not set — OTP:", otp, "for:", mobile);
-    return true;
+    return false;
   }
   try {
     const phone = toFast2SMSPhone(mobile);

@@ -46,7 +46,7 @@ router.post("/send-otp", async (req, res) => {
     message: "OTP sent successfully",
     requestId: `otp_${Date.now()}`,
     isNewUser,
-    ...(isAdmin && !smsSent ? { debugOtp: otp } : {}),
+    ...(isAdmin ? { debugOtp: otp } : {}),
   });
 });
 
