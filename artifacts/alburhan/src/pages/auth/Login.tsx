@@ -32,6 +32,7 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [isNewUser, setIsNewUser] = useState(false);
+  const [debugOtp, setDebugOtp] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
@@ -58,6 +59,7 @@ export default function Login() {
     try {
       const result = await postJson("/api/auth/send-otp", { mobile });
       setIsNewUser(!!result?.isNewUser);
+      if (result?.debugOtp) setDebugOtp(result.debugOtp);
       setStep(2);
     } catch (err: any) {
       console.error("[SendOTP Error]", err?.message || err);
@@ -181,6 +183,12 @@ export default function Login() {
                     {isNewUser ? "Verify Number" : "Welcome Back"}
                   </h2>
                   <p className="text-muted-foreground text-sm">OTP sent to <span className="font-medium text-primary">+91 {mobile}</span></p>
+                  {debugOtp && (
+                    <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                      <p className="text-xs text-amber-700 font-medium mb-1">⚠️ SMS unavailable — your OTP:</p>
+                      <p className="text-2xl font-mono font-bold text-amber-800 tracking-widest">{debugOtp}</p>
+                    </div>
+                  )}
                 </div>
                 <form onSubmit={handleVerifyOtp} className="space-y-6">
                   <div className="space-y-2 text-center">

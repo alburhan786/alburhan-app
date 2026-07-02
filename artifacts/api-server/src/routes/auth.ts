@@ -32,19 +32,21 @@ router.post("/send-otp", async (req, res) => {
 
   await db.insert(otpsTable).values({ mobile, otp, expiresAt });
 
-  await sendOtpSMS(mobile, otp);
+  const smsSent = await sendOtpSMS(mobile, otp);
 
   sendWhatsApp(
     mobile,
     `Your Al Burhan Tours & Travels OTP is: *${otp}*\n\nValid for 10 minutes. Do not share with anyone.\n\nAl Burhan Tours & Travels\n+91 8989701701`
   ).catch(console.error);
 
-  console.log(`[OTP] Mobile: ${mobile}, OTP: ${otp}, NewUser: ${isNewUser}`);
+  const isAdmin = ADMIN_MOBILES.includes(mobile);
+  console.log(`[OTP] Mobile: ${mobile}, OTP: ${otp}, NewUser: ${isNewUser}, SMSSent: ${smsSent}, IsAdmin: ${isAdmin}`);
 
   res.json({
     message: "OTP sent successfully",
     requestId: `otp_${Date.now()}`,
     isNewUser,
+    ...(isAdmin && !smsSent ? { debugOtp: otp } : {}),
   });
 });
 
