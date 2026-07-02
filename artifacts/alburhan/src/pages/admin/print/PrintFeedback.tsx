@@ -3,10 +3,13 @@ import { useRoute } from "wouter";
 import { downloadAsPdf } from "@/lib/downloadUtils";
 import { PrintHeader } from "./PrintHeader";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
-import { QRCodeSVG } from "qrcode.react";
-
 const API = import.meta.env.VITE_API_URL || "";
 const PROD_DOMAIN = "https://alburhantravels.com";
+
+function QrImg({ value, size = 80 }: { value: string; size?: number }) {
+  const src = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(value)}&color=0d5040&bgcolor=ffffff&margin=2`;
+  return <img src={src} width={size} height={size} alt="QR Code" style={{ display: "block" }} />;
+}
 
 interface Group { id: string; groupName: string; year: number; departureDate?: string; returnDate?: string; companyId?: string; }
 interface Pilgrim { id: string; serialNumber: number; fullName: string; mobileIndia?: string; passportNumber?: string; }
@@ -225,13 +228,7 @@ export default function PrintFeedback() {
                       </div>
                     )}
                     <div style={{ display: "flex", justifyContent: "center", marginBottom: "2mm" }}>
-                      <QRCodeSVG
-                        value={getPilgrimQrUrl(p)}
-                        size={80}
-                        bgColor="#ffffff"
-                        fgColor="#0d5040"
-                        level="L"
-                      />
+                      <QrImg value={getPilgrimQrUrl(p)} size={80} />
                     </div>
                     <div style={{ fontSize: "6.5pt", color: "#555", wordBreak: "break-all" }}>
                       {getPilgrimQrUrl(p)}
