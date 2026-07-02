@@ -1,1 +1,2 @@
 - [VPS deployment path](vps-deployment-path.md) — VPS has full monorepo; server reads static files from artifacts/alburhan/dist/public, NOT from public/ or dist/public/
+- [Family management schema](family-schema.md) — familyId/familyHead/familyRelation fields on pilgrims, use QrImg (img.qrserver.com) NOT QRCodeCanvas for print-safe QR codes.

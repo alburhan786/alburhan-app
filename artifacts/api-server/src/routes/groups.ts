@@ -1485,6 +1485,30 @@ router.get("/:groupId/families/pdf", requireAdmin as any, async (req, res) => {
   }
 });
 
+// GET /:groupId/families/statistics — aggregate stats for the families dashboard
+router.get("/:groupId/families/statistics", requireAdmin as any, async (req, res) => {
+  const groupId = String(req.params.groupId);
+  try {
+    const pilgrims = await db.select().from(pilgrimsTable).where(eq(pilgrimsTable.groupId, groupId));
+    const familyMap = new Map<string, typeof pilgrims>();
+    for (const p of pilgrims) {
+      if (!p.familyId) continue;
+      if (!familyMap.has(p.familyId)) familyMap.set(p.familyId, []);
+      familyMap.get(p.familyId)!.push(p);
+    }
+    const families = Array.from(familyMap.values());
+    const totalFamilies = families.length;
+    const totalInFamilies = families.reduce((s, f) => s + f.length, 0);
+    const avgSize = totalFamilies > 0 ? parseFloat((totalInFamilies / totalFamilies).toFixed(1)) : 0;
+    const largestFamily = families.reduce((max, f) => Math.max(max, f.length), 0);
+    const withoutRoom = families.filter(f => !f.some(m => m.roomNumber)).length;
+    const withoutBus = families.filter(f => !f.some(m => m.busNumber)).length;
+    res.json({ totalFamilies, totalPilgrims: totalInFamilies, avgSize, largestFamily, withoutRoom, withoutBus });
+  } catch (err: any) {
+    res.status(500).json({ message: err?.message || "Failed to fetch family statistics" });
+  }
+});
+
 // GET /:groupId/families — list all families (admin)
 router.get("/:groupId/families", requireAdmin as any, async (req, res) => {
   const groupId = String(req.params.groupId);
@@ -1516,6 +1540,37 @@ router.get("/:groupId/families", requireAdmin as any, async (req, res) => {
     res.json(families);
   } catch (err: any) {
     res.status(500).json({ message: err?.message || "Failed to fetch families" });
+  }
+});
+
+// POST /:groupId/families/:familyId/sync-logistics — copy head's room/bus to all non-head members
+router.post("/:groupId/families/:familyId/sync-logistics", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  const groupId = String(req.params.groupId);
+  const familyId = String(req.params.familyId);
+  const { roomNumber, busNumber } = req.body;
+  try {
+    const members = await db.select().from(pilgrimsTable)
+      .where(and(eq(pilgrimsTable.groupId, groupId), eq(pilgrimsTable.familyId, familyId)));
+    if (members.length === 0) { res.status(404).json({ message: "Family not found" }); return; }
+
+    const updates: Record<string, any> = { updatedAt: new Date() };
+    if (roomNumber !== undefined) updates.roomNumber = roomNumber || null;
+    if (busNumber !== undefined) updates.busNumber = busNumber || null;
+
+    const nonHeads = members.filter(m => !m.familyHead);
+    if (nonHeads.length === 0) { res.json({ updated: 0 }); return; }
+
+    await db.update(pilgrimsTable)
+      .set(updates)
+      .where(and(
+        eq(pilgrimsTable.groupId, groupId),
+        eq(pilgrimsTable.familyId, familyId),
+        eq(pilgrimsTable.familyHead, false),
+      ));
+
+    res.json({ updated: nonHeads.length });
+  } catch (err: any) {
+    res.status(500).json({ message: err?.message || "Failed to sync logistics" });
   }
 });
 

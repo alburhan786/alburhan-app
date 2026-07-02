@@ -31,6 +31,7 @@ export default function AttendanceScanner() {
   const [totalCount, setTotalCount] = useState(0);
   const [lastScan, setLastScan] = useState<{
     name: string; familyId: string | null; serialNumber: number; status: string; photoUrl: string | null;
+    familyMembers?: { id: string; fullName: string; serialNumber: number; familyRelation: string | null; familyHead: boolean | null; attendanceStatus: string | null }[];
   } | null>(null);
   const [scanStatus, setScanStatus] = useState<"idle" | "success" | "error" | "duplicate">("idle");
   const [scanning, setScanning] = useState(false);
@@ -92,6 +93,7 @@ export default function AttendanceScanner() {
           serialNumber: data.pilgrim.serialNumber,
           status: data.status,
           photoUrl: data.pilgrim.photoUrl,
+          familyMembers: data.familyMembers || [],
         });
         setPresentCount(data.presentCount);
         setTotalCount(data.totalCount);
@@ -209,12 +211,12 @@ export default function AttendanceScanner() {
 
         {/* Last Scan Result */}
         {lastScan && (
-          <div className={`border rounded-xl p-4 bg-white shadow-sm transition-all ${scanStatus === "success" ? "border-emerald-300" : "border-gray-200"}`}>
-            <div className="flex items-center gap-3">
+          <div className={`border rounded-xl bg-white shadow-sm transition-all overflow-hidden ${scanStatus === "success" ? "border-emerald-300" : "border-gray-200"}`}>
+            <div className="flex items-center gap-3 p-4">
               {lastScan.photoUrl ? (
-                <img src={`${API}${lastScan.photoUrl}`} alt={lastScan.name} className="w-12 h-12 rounded-full object-cover border-2 border-emerald-200" />
+                <img src={`${API}${lastScan.photoUrl}`} alt={lastScan.name} className="w-12 h-12 rounded-full object-cover border-2 border-emerald-200 shrink-0" />
               ) : (
-                <div className="w-12 h-12 rounded-full bg-[#0d5040]/10 flex items-center justify-center text-[#0d5040] font-bold text-lg">
+                <div className="w-12 h-12 rounded-full bg-[#0d5040]/10 flex items-center justify-center text-[#0d5040] font-bold text-lg shrink-0">
                   {lastScan.name.charAt(0)}
                 </div>
               )}
@@ -228,6 +230,33 @@ export default function AttendanceScanner() {
                 {lastScan.status === "present" ? "✓ Present" : "✗ Absent"}
               </Badge>
             </div>
+
+            {/* Family Members Rollup */}
+            {lastScan.familyId && lastScan.familyMembers && lastScan.familyMembers.length > 1 && (
+              <div className="border-t bg-[#0d5040]/5 px-3 py-2">
+                <p className="text-[10px] font-bold text-[#0d5040] uppercase tracking-wide mb-1.5">
+                  👨‍👩‍👧‍👦 Family {lastScan.familyId} — {lastScan.familyMembers.length} members
+                </p>
+                <div className="space-y-1">
+                  {lastScan.familyMembers.map(m => {
+                    const isScanned = m.id === lastScan.familyMembers?.find(fm => fm.fullName === lastScan.name && fm.serialNumber === lastScan.serialNumber)?.id;
+                    const status = m.attendanceStatus;
+                    return (
+                      <div key={m.id} className={`flex items-center justify-between text-xs py-0.5 px-1.5 rounded ${isScanned ? "bg-emerald-100 font-semibold" : ""}`}>
+                        <span className="truncate flex-1">
+                          {m.familyHead && <span className="text-[#C9A23F] mr-1">★</span>}
+                          {m.fullName}
+                          {m.familyRelation && <span className="text-muted-foreground ml-1 font-normal">· {m.familyRelation}</span>}
+                        </span>
+                        <span className={`shrink-0 ml-2 font-semibold ${status === "present" ? "text-emerald-600" : status === "absent" ? "text-red-500" : "text-gray-400"}`}>
+                          {status === "present" ? "✓" : status === "absent" ? "✗" : "—"}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

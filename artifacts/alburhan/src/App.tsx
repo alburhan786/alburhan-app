@@ -61,6 +61,7 @@ import PrintSheetCards from "@/pages/admin/print/PrintSheetCards";
 import PrintSingleCardPro from "@/pages/admin/print/PrintSingleCardPro";
 import PrintIdCardSVG from "@/pages/admin/print/PrintIdCardSVG";
 import AttendanceManager from "@/pages/admin/AttendanceManager";
+import PrintFamilySheet from "@/pages/admin/print/PrintFamilySheet";
 import AttendanceScanner from "@/pages/admin/AttendanceScanner";
 import AttendanceReport from "@/pages/admin/AttendanceReport";
 import AttendanceScanPublic from "@/pages/public/AttendanceScanPublic";
@@ -149,6 +150,7 @@ function Router() {
       <Route path="/admin/groups/:groupId/print/contract" component={() => <AdminRoute component={PrintContract} />} />
       <Route path="/admin/groups/:groupId/print/room-stickers" component={() => <AdminRoute component={PrintRoomStickers} />} />
       <Route path="/admin/groups/:groupId/print/haji-list" component={() => <AdminRoute component={PrintHajiList} />} />
+      <Route path="/admin/groups/:groupId/families/:familyId/print" component={() => <AdminRoute component={PrintFamilySheet} />} />
       <Route path="/admin/offline-bookings" component={() => <AdminRoute component={OfflineBookingManager} />} />
       <Route path="/admin/qr-tracker" component={() => <AdminRoute component={QRTracker} />} />
       <Route path="/admin/reports" component={() => <AdminRoute component={ReportsManager} />} />

@@ -3,14 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useDeleteGuard } from "@/components/DeleteGuard";
 import { Plus, Edit, Trash2, ArrowLeft, Upload, Printer, CreditCard, Luggage, Heart,
   Building2, Bus, DoorOpen, FileDown, Hotel, BedDouble, Users, Wand2, X, AlertTriangle, Sticker, Layers, UserCheck, QrCode, Star,
   Search, LayoutGrid, List, GitBranch, ChevronDown, Share2, RefreshCw, Zap, MessageCircle, GitMerge, Scissors,
   Pencil, ArrowLeftRight, Check } from "lucide-react";
-import { QRCodeCanvas } from "qrcode.react";
 import { Link, useRoute } from "wouter";
 import { BulkImportModal } from "./BulkImportModal";
 import QuickAddModal from "./QuickAddModal";
@@ -144,6 +143,11 @@ const ROOM_TYPE_COLORS: Record<string, string> = {
 };
 const HOTEL_ORDER = ["makkah", "madinah", "aziziah"];
 
+function QrImg({ value, size = 72 }: { value: string; size?: number }) {
+  const src = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(value)}&color=0d5040&bgcolor=ffffff`;
+  return <img src={src} alt="QR" width={size} height={size} style={{ display: "block" }} />;
+}
+
 export default function PilgrimManager() {
   const [, params] = useRoute("/admin/groups/:groupId/pilgrims");
   const groupId = params?.groupId || "";
@@ -194,6 +198,10 @@ export default function PilgrimManager() {
   const [waFamily, setWaFamily] = useState<FamilyGroup | null>(null);
   const [waMessage, setWaMessage] = useState("");
   const [waSending, setWaSending] = useState(false);
+  const [syncPromptData, setSyncPromptData] = useState<{
+    familyId: string; familySize: number; roomNumber: string; busNumber: string;
+  } | null>(null);
+  const [syncingFamily, setSyncingFamily] = useState(false);
 
   const [mergeSourceFam, setMergeSourceFam] = useState<FamilyGroup | null>(null);
   const [mergeTargetId, setMergeTargetId] = useState("");
@@ -319,6 +327,7 @@ export default function PilgrimManager() {
 
   const handleSave = async () => {
     if (!form.fullName) { toast({ title: "Name is required", variant: "destructive" }); return; }
+    const originalPilgrim = editingId ? pilgrims.find(p => p.id === editingId) : null;
     try {
       const url = editingId
         ? `${API}/api/groups/${groupId}/pilgrims/${editingId}`
@@ -331,6 +340,20 @@ export default function PilgrimManager() {
       toast({ title: editingId ? "Pilgrim updated" : "Pilgrim added" });
       setDialogOpen(false);
       fetchData();
+      if (activeTab === "families") fetchFamilies();
+
+      if (editingId && originalPilgrim?.familyHead && originalPilgrim?.familyId) {
+        const fId = originalPilgrim.familyId;
+        const roomChanged = form.roomNumber !== (originalPilgrim.roomNumber || "");
+        const busChanged = form.busNumber !== (originalPilgrim.busNumber || "");
+        if (roomChanged || busChanged) {
+          const fam = families.find(f => f.familyId === fId);
+          const nonHeadCount = fam ? fam.members.filter(m => !m.familyHead).length : 0;
+          if (nonHeadCount > 0) {
+            setSyncPromptData({ familyId: fId, familySize: nonHeadCount, roomNumber: form.roomNumber, busNumber: form.busNumber });
+          }
+        }
+      }
     } catch { toast({ title: "Error saving pilgrim", variant: "destructive" }); }
   };
 
@@ -929,6 +952,15 @@ export default function PilgrimManager() {
   };
 
   const unassignedPilgrims = pilgrims.filter(p => !p.roomNumber);
+  const familyStats = useMemo(() => {
+    const totalFamilies = families.length;
+    const totalInFamilies = families.reduce((s, f) => s + f.members.length, 0);
+    const avgSize = totalFamilies > 0 ? (totalInFamilies / totalFamilies).toFixed(1) : "0";
+    const largestFamily = families.reduce((max, f) => Math.max(max, f.members.length), 0);
+    const withoutRoom = families.filter(f => !f.members.some(m => m.roomNumber)).length;
+    const withoutBus = families.filter(f => !f.members.some(m => m.busNumber)).length;
+    return { totalFamilies, totalInFamilies, avgSize, largestFamily, withoutRoom, withoutBus };
+  }, [families]);
   const filteredFamilies = familySearch.trim()
     ? families.filter(fam => {
         const q = familySearch.toLowerCase();
@@ -1083,7 +1115,7 @@ export default function PilgrimManager() {
           onClick={() => setActiveTab("families")}
           className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px ${activeTab === "families" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
         >
-          <UserCheck size={15} /> Families ({families.length})
+          <UserCheck size={15} /> Families ({new Set(pilgrims.filter(p => p.familyId).map(p => p.familyId!)).size})
         </button>
         <Link href={`/admin/groups/${groupId}/attendance`}>
           <span className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 border-transparent text-muted-foreground hover:text-foreground transition-colors -mb-px cursor-pointer">
@@ -1603,6 +1635,25 @@ export default function PilgrimManager() {
             </div>
           </div>
 
+          {/* Statistics bar */}
+          {families.length > 0 && (
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+              {[
+                { label: "Total Families", value: familyStats.totalFamilies, color: "text-amber-700 bg-amber-50 border-amber-200" },
+                { label: "Total Pilgrims", value: familyStats.totalInFamilies, color: "text-emerald-700 bg-emerald-50 border-emerald-200" },
+                { label: "Avg Size", value: familyStats.avgSize, color: "text-blue-700 bg-blue-50 border-blue-200" },
+                { label: "Largest", value: familyStats.largestFamily, color: "text-purple-700 bg-purple-50 border-purple-200" },
+                { label: "No Room", value: familyStats.withoutRoom, color: familyStats.withoutRoom > 0 ? "text-orange-700 bg-orange-50 border-orange-200" : "text-gray-400 bg-gray-50 border-gray-100" },
+                { label: "No Bus", value: familyStats.withoutBus, color: familyStats.withoutBus > 0 ? "text-red-700 bg-red-50 border-red-200" : "text-gray-400 bg-gray-50 border-gray-100" },
+              ].map(stat => (
+                <div key={stat.label} className={`flex flex-col items-center py-2 px-2 rounded-xl border text-center ${stat.color}`}>
+                  <span className="text-xl font-black leading-tight">{stat.value}</span>
+                  <span className="text-[9px] font-medium leading-tight mt-0.5 opacity-80">{stat.label}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm text-blue-800">
             <strong>Tip:</strong> Use <strong>Auto-detect</strong> to automatically group pilgrims by shared mobile number or surname+city. Or click "<span className="font-mono font-bold">+Fam</span>" in the Pilgrims tab to assign manually. Click ⭐ to mark the family head.
           </div>
@@ -1846,6 +1897,13 @@ export default function PilgrimManager() {
                           >
                             <Printer size={13} />
                           </Button>
+                          <Button
+                            variant="ghost" size="icon" className="h-7 w-7 text-[#0d5040] hover:bg-[#0d5040]/10"
+                            title={`Print Family Sheet — ${fam.familyId}`}
+                            onClick={() => window.open(`/admin/groups/${groupId}/families/${encodeURIComponent(fam.familyId)}/print`, "_blank")}
+                          >
+                            <FileDown size={13} />
+                          </Button>
                           {fam.head?.mobileIndia && (
                             <Button
                               variant="ghost" size="icon" className="h-7 w-7 text-green-600 hover:bg-green-50"
@@ -1896,21 +1954,48 @@ export default function PilgrimManager() {
 
                       {/* Member list (expandable) */}
                       {isExpanded && (
-                        <div className="mb-3 bg-white rounded-lg border p-2 space-y-1">
+                        <div className="mb-3 bg-white rounded-lg border overflow-hidden">
                           {fam.members.map(m => (
-                            <div key={m.id} className="flex items-center gap-2 text-xs py-1 border-b last:border-0">
-                              <div className="w-6 h-6 rounded-full bg-muted overflow-hidden shrink-0">
+                            <div key={m.id} className={`flex items-start gap-2 text-xs py-2 px-3 border-b last:border-0 ${m.familyHead ? "bg-amber-50" : ""}`}>
+                              <div className="w-8 h-8 rounded-full bg-muted overflow-hidden shrink-0 mt-0.5">
                                 {m.photoUrl
                                   ? <img src={`${API}${m.photoUrl}`} alt="" className="w-full h-full object-cover" />
-                                  : <div className="w-full h-full flex items-center justify-center text-[10px]">{m.gender?.toLowerCase() === "female" ? "👩" : "👨"}</div>}
+                                  : <div className="w-full h-full flex items-center justify-center text-[11px]">{m.gender?.toLowerCase() === "female" ? "👩" : "👨"}</div>}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <span className="font-medium truncate">{m.fullName}</span>
-                                {m.familyHead && <Star size={9} className="inline ml-1 text-amber-500" fill="currentColor" />}
+                                <div className="flex items-center gap-1 flex-wrap">
+                                  <span className="font-semibold text-gray-800">{m.fullName}</span>
+                                  {m.familyHead && <span className="text-[9px] bg-amber-400 text-white rounded px-1.5 py-0.5 font-bold">HEAD</span>}
+                                  {(m.familyRelation || m.relation) && (
+                                    <span className="text-[10px] text-muted-foreground">· {m.familyRelation || m.relation}</span>
+                                  )}
+                                </div>
+                                <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+                                  {m.passportNumber && <span className="font-mono text-[10px] text-gray-500">{m.passportNumber}</span>}
+                                  {m.mobileIndia && <span className="text-[10px] text-gray-500">📞 {m.mobileIndia}</span>}
+                                  {m.roomNumber && <span className="text-[10px] font-semibold text-primary">🏨 Rm {m.roomNumber}</span>}
+                                  {m.busNumber && <span className="text-[10px] font-semibold text-blue-600">🚌 Bus {m.busNumber}</span>}
+                                </div>
                               </div>
-                              <span className="text-muted-foreground shrink-0">{m.familyRelation || m.relation || m.gender || ""}</span>
-                              {m.roomNumber && (
-                                <span className="bg-primary/10 text-primary font-semibold px-1.5 py-0.5 rounded text-[10px] shrink-0">Rm {m.roomNumber}</span>
+                              {!m.familyHead && (
+                                <button
+                                  title="Set as family head"
+                                  onClick={async () => {
+                                    try {
+                                      await fetch(`${API}/api/groups/${groupId}/pilgrims/${m.id}`, {
+                                        method: "PUT", credentials: "include",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({ ...m, familyHead: true, serialNumber: m.serialNumber }),
+                                      });
+                                      toast({ title: `${m.fullName.split(" ")[0]} set as family head` });
+                                      await fetchData();
+                                      await fetchFamilies();
+                                    } catch { toast({ title: "Failed to update", variant: "destructive" }); }
+                                  }}
+                                  className="shrink-0 mt-1 text-muted-foreground/30 hover:text-amber-500 transition-colors"
+                                >
+                                  <Star size={11} />
+                                </button>
                               )}
                             </div>
                           ))}
@@ -1921,33 +2006,36 @@ export default function PilgrimManager() {
                       {isExpanded && (
                         <div className="mb-3 flex items-start gap-3 bg-white border rounded-lg p-3">
                           <div className="bg-white p-1 border rounded shrink-0">
-                            <QRCodeCanvas
-                              id={`family-qr-${fam.familyId}`}
-                              value={familyQrUrl}
-                              size={72}
-                              level="M"
-                              fgColor="#0d5040"
-                              bgColor="#ffffff"
-                            />
+                            <QrImg value={familyQrUrl} size={72} />
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-xs font-semibold text-gray-700 mb-0.5">Family Verify QR</p>
                             <p className="text-[10px] text-muted-foreground break-all mb-1">{familyQrUrl}</p>
-                            <div className="flex gap-2">
+                            <div className="flex flex-wrap gap-2">
                               <button
                                 onClick={() => window.open(familyQrUrl, "_blank")}
                                 className="text-[10px] text-primary underline"
                               >Open ↗</button>
                               <button
                                 onClick={() => {
-                                  const canvas = document.getElementById(`family-qr-${fam.familyId}`) as HTMLCanvasElement;
-                                  if (!canvas) return;
-                                  const url = canvas.toDataURL("image/png");
-                                  const a = document.createElement("a");
-                                  a.href = url; a.download = `family-qr-${fam.familyId}.png`; a.click();
+                                  const img = new Image();
+                                  img.crossOrigin = "anonymous";
+                                  img.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(familyQrUrl)}&color=0d5040&bgcolor=ffffff`;
+                                  img.onload = () => {
+                                    const canvas = document.createElement("canvas");
+                                    canvas.width = 200; canvas.height = 200;
+                                    canvas.getContext("2d")?.drawImage(img, 0, 0);
+                                    const a = document.createElement("a");
+                                    a.href = canvas.toDataURL("image/png");
+                                    a.download = `family-qr-${fam.familyId}.png`; a.click();
+                                  };
                                 }}
                                 className="text-[10px] text-emerald-700 underline"
                               >Download QR ↓</button>
+                              <button
+                                onClick={() => window.open(`/admin/groups/${groupId}/families/${encodeURIComponent(fam.familyId)}/print`, "_blank")}
+                                className="text-[10px] text-[#0d5040] underline"
+                              >Print Sheet ↗</button>
                             </div>
                           </div>
                         </div>
@@ -2383,6 +2471,57 @@ export default function PilgrimManager() {
                   {waSending ? "Sending…" : "Send via BotBee"}
                 </Button>
               </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ===== Sync Logistics Dialog ===== */}
+      <Dialog open={!!syncPromptData} onOpenChange={open => !open && setSyncPromptData(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-[#0d5040]">
+              <RefreshCw size={16} /> Sync Family Logistics?
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              You changed the room/bus for the family head of <strong>Family {syncPromptData?.familyId}</strong>. 
+              Apply the same room/bus to all <strong>{syncPromptData?.familySize}</strong> other family members?
+            </p>
+            {syncPromptData && (
+              <div className="bg-muted rounded-lg p-3 text-sm space-y-1">
+                {syncPromptData.roomNumber && <div>🏨 Room: <strong>{syncPromptData.roomNumber}</strong></div>}
+                {syncPromptData.busNumber && <div>🚌 Bus: <strong>{syncPromptData.busNumber}</strong></div>}
+              </div>
+            )}
+            <div className="flex gap-2 pt-1">
+              <Button variant="outline" size="sm" className="flex-1" onClick={() => setSyncPromptData(null)}>
+                No, skip
+              </Button>
+              <Button
+                size="sm"
+                className="flex-1 bg-[#0d5040] hover:bg-[#0d5040]/90 text-white gap-1.5"
+                disabled={syncingFamily}
+                onClick={async () => {
+                  if (!syncPromptData) return;
+                  setSyncingFamily(true);
+                  try {
+                    const res = await fetch(`${API}/api/groups/${groupId}/families/${encodeURIComponent(syncPromptData.familyId)}/sync-logistics`, {
+                      method: "POST", credentials: "include",
+                      headers: { "Content-Type": "application/json" },
+                    });
+                    if (!res.ok) throw new Error("Failed");
+                    const data = await res.json();
+                    toast({ title: `Synced ${data.updated ?? syncPromptData.familySize} family members ✓` });
+                    fetchData(); fetchFamilies();
+                  } catch { toast({ title: "Sync failed", variant: "destructive" }); }
+                  finally { setSyncingFamily(false); setSyncPromptData(null); }
+                }}
+              >
+                <RefreshCw size={13} />
+                {syncingFamily ? "Syncing…" : "Yes, sync all"}
+              </Button>
             </div>
           </div>
         </DialogContent>

@@ -1,6 +1,6 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { db, attendanceEventsTable, attendanceLogsTable, pilgrimsTable } from "@workspace/db";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import * as XLSX from "xlsx";
 
@@ -197,12 +197,44 @@ router.post("/:groupId/attendance/events/:eventId/scan", requireAdminOrToken, as
     .from(pilgrimsTable)
     .where(eq(pilgrimsTable.groupId, groupId));
 
+  // Fetch family members with their attendance status if pilgrim has a family
+  let familyMembers: {
+    id: string; fullName: string; serialNumber: number;
+    familyRelation: string | null; familyHead: boolean | null;
+    attendanceStatus: string | null;
+  }[] = [];
+
+  const familyId = (pilgrim as any).familyId as string | null;
+  if (familyId) {
+    const siblings = await db.select().from(pilgrimsTable)
+      .where(and(eq(pilgrimsTable.groupId, groupId), eq(pilgrimsTable.familyId as any, familyId)));
+
+    if (siblings.length > 0) {
+      const siblingIds = siblings.map(s => s.id);
+      const siblingLogs = await db.select().from(attendanceLogsTable)
+        .where(and(eq(attendanceLogsTable.eventId, eventId), inArray(attendanceLogsTable.pilgrimId, siblingIds)));
+      const logMap = new Map(siblingLogs.map(l => [l.pilgrimId, l.status]));
+
+      familyMembers = siblings
+        .sort((a, b) => (a.serialNumber ?? 0) - (b.serialNumber ?? 0))
+        .map(s => ({
+          id: s.id,
+          fullName: s.fullName,
+          serialNumber: s.serialNumber ?? 0,
+          familyRelation: (s as any).familyRelation ?? null,
+          familyHead: (s as any).familyHead ?? false,
+          attendanceStatus: logMap.get(s.id) ?? null,
+        }));
+    }
+  }
+
   res.json({
     success: true,
-    pilgrim: { id: pilgrim.id, fullName: pilgrim.fullName, familyId: (pilgrim as any).familyId, serialNumber: pilgrim.serialNumber, photoUrl: pilgrim.photoUrl },
+    pilgrim: { id: pilgrim.id, fullName: pilgrim.fullName, familyId, serialNumber: pilgrim.serialNumber, photoUrl: pilgrim.photoUrl },
     status,
     presentCount,
     totalCount: totalPilgrims.length,
+    familyMembers,
   });
 });
 
