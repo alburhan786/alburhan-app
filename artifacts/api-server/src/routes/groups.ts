@@ -215,14 +215,16 @@ router.put("/:groupId/pilgrims/:pilgrimId", requireAdmin as any, async (req: Aut
 
   const scope = and(eq(pilgrimsTable.id, pilgrimId), eq(pilgrimsTable.groupId, groupId));
 
+  // Fetch current state before update — needed for head-orphan protection on familyId change
+  const [existingRow] = await db.select({ familyId: pilgrimsTable.familyId, familyHead: pilgrimsTable.familyHead })
+    .from(pilgrimsTable).where(scope).limit(1);
+  const oldFamilyId = existingRow?.familyId || null;
+  const wasHead = existingRow?.familyHead === true;
+
   // Enforce single family_head: if setting head=true, clear it from others in same family
   const isSettingHead = familyHead === true || familyHead === "true";
   if (isSettingHead) {
-    const resolvedFamilyId = familyId !== undefined ? (familyId || null) : null;
-    // Fetch current pilgrim to get existing familyId if not provided
-    const [existingRow] = await db.select({ familyId: pilgrimsTable.familyId })
-      .from(pilgrimsTable).where(scope).limit(1);
-    const activeFamilyId = familyId !== undefined ? (familyId || null) : existingRow?.familyId || null;
+    const activeFamilyId = familyId !== undefined ? (familyId || null) : oldFamilyId;
     if (activeFamilyId) {
       await db.update(pilgrimsTable)
         .set({ familyHead: false, updatedAt: new Date() })
@@ -232,7 +234,6 @@ router.put("/:groupId/pilgrims/:pilgrimId", requireAdmin as any, async (req: Aut
           ne(pilgrimsTable.id, pilgrimId)
         ));
     }
-    void resolvedFamilyId;
   }
 
   const [updated] = await db.update(pilgrimsTable).set({
@@ -253,10 +254,16 @@ router.put("/:groupId/pilgrims/:pilgrimId", requireAdmin as any, async (req: Aut
 
   if (!updated) { res.status(404).json({ message: "Pilgrim not found in this group" }); return; }
 
-  // Auto-assign head: if family has no head after update, promote the first member
   const updatedFamilyId = updated.familyId;
+
+  // Auto-assign head in new family if needed
   if (updatedFamilyId) {
     await ensureFamilyHead(groupId, updatedFamilyId);
+  }
+
+  // If this pilgrim was the head and moved to a different family, ensure old family also gets a head
+  if (wasHead && oldFamilyId && oldFamilyId !== updatedFamilyId) {
+    await ensureFamilyHead(groupId, oldFamilyId);
   }
 
   res.json(fmtPilgrim(updated));

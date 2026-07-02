@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useDeleteGuard } from "@/components/DeleteGuard";
-import { Plus, Edit, Trash2, Users, Eye, Printer, ChevronDown, Hash, Wand2, Save, ChevronUp, ChevronDown as ChevronDownIcon } from "lucide-react";
+import { Plus, Edit, Trash2, Users, Eye, Printer, ChevronDown, Hash, Wand2, Save, ChevronUp, ChevronDown as ChevronDownIcon, UserCheck } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 
@@ -24,6 +24,7 @@ interface HajjGroup {
   hotels?: any;
   notes?: string;
   pilgrimCount: number;
+  familyCount?: number;
 }
 
 const emptyForm = {
@@ -405,8 +406,13 @@ export default function GroupsManager() {
                     <Users size={18} />
                     <span>{g.pilgrimCount} Pilgrims</span>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     <PrintDropdown groupId={g.id} />
+                    <Link href={`/admin/groups/${g.id}/pilgrims?tab=families`}>
+                      <Button size="sm" variant="outline" className="rounded-lg gap-1 border-amber-300 text-amber-700 hover:bg-amber-50">
+                        <UserCheck size={14} /> Families{g.familyCount ? ` (${g.familyCount})` : ""}
+                      </Button>
+                    </Link>
                     <Link href={`/admin/groups/${g.id}/pilgrims`}>
                       <Button size="sm" variant="outline" className="rounded-lg gap-1">
                         <Eye size={14} /> Manage

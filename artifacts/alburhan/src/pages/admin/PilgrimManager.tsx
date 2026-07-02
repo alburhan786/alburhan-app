@@ -154,7 +154,14 @@ export default function PilgrimManager() {
   const [, params] = useRoute("/admin/groups/:groupId/pilgrims");
   const groupId = params?.groupId || "";
 
-  const [activeTab, setActiveTab] = useState<"pilgrims" | "rooms" | "families">("pilgrims");
+  const initialTab = (): "pilgrims" | "rooms" | "families" => {
+    try {
+      const p = new URLSearchParams(window.location.search).get("tab");
+      if (p === "families" || p === "rooms") return p;
+    } catch {}
+    return "pilgrims";
+  };
+  const [activeTab, setActiveTab] = useState<"pilgrims" | "rooms" | "families">(initialTab);
   const [group, setGroup] = useState<Group | null>(null);
   const [pilgrims, setPilgrims] = useState<Pilgrim[]>([]);
   const [rooms, setRooms] = useState<HajjRoom[]>([]);
