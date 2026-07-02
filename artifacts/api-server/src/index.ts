@@ -1,3 +1,11 @@
+process.on("uncaughtException", (err) => {
+  console.error("[UNCAUGHT EXCEPTION] Server will NOT exit:", err);
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("[UNHANDLED REJECTION] Server will NOT exit:", reason);
+});
+
 import app from "./app";
 import { db, usersTable } from "@workspace/db";
 import { inArray, sql } from "drizzle-orm";
@@ -93,24 +101,49 @@ async function runMigrations() {
   } catch (err) {
     console.error("[Migration] delete_audit_log failed:", err);
   }
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS reminder_logs (
+        id SERIAL PRIMARY KEY,
+        booking_id TEXT NOT NULL,
+        channel TEXT NOT NULL DEFAULT 'whatsapp',
+        status TEXT NOT NULL DEFAULT 'sent',
+        triggered_by TEXT NOT NULL DEFAULT 'cron',
+        notes TEXT,
+        sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    console.log("[Migration] reminder_logs table ensured");
+  } catch (err) {
+    console.error("[Migration] reminder_logs failed:", err);
+  }
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS pilgrims_families (
+        id TEXT PRIMARY KEY,
+        group_id TEXT NOT NULL,
+        family_name TEXT,
+        head_pilgrim_id TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    console.log("[Migration] pilgrims_families table ensured");
+  } catch (err) {
+    console.error("[Migration] pilgrims_families failed:", err);
+  }
 }
 
 const rawPort = process.env["PORT"];
-
-if (!rawPort) {
-  throw new Error(
-    "PORT environment variable is required but was not provided.",
-  );
-}
-
-const port = Number(rawPort);
+const port = rawPort ? Number(rawPort) : 8080;
 
 if (Number.isNaN(port) || port <= 0) {
-  throw new Error(`Invalid PORT value: "${rawPort}"`);
+  console.error(`[Startup] Invalid PORT value "${rawPort}", defaulting to 8080`);
 }
 
-app.listen(port, async () => {
-  console.log(`Server listening on port ${port}`);
+const finalPort = Number.isNaN(port) || port <= 0 ? 8080 : port;
+
+app.listen(finalPort, async () => {
+  console.log(`Server listening on port ${finalPort}`);
 
   await runMigrations();
 
