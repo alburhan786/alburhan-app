@@ -775,7 +775,7 @@ router.delete("/:id", requireAdmin as any, async (req: AuthenticatedRequest, res
 
     const deletedBy = req.user?.name || req.user?.mobile || "admin";
     const { rows: updatedRows } = await pool.query(
-      `UPDATE bookings SET deleted_at = NOW(), deleted_by = $1, is_deleted = true, updated_at = NOW() WHERE id = $2 RETURNING *`,
+      `UPDATE bookings SET deleted_at = NOW(), deleted_by = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
       [deletedBy, bookingId]
     );
     const updated = updatedRows[0];
@@ -800,7 +800,7 @@ router.post("/:id/restore", requireAdmin as any, async (req: AuthenticatedReques
 
     const restoredBy = req.user?.name || req.user?.mobile || "admin";
     const { rows: updatedRows } = await pool.query(
-      `UPDATE bookings SET deleted_at = NULL, deleted_by = NULL, is_deleted = false, updated_at = NOW() WHERE id = $1 RETURNING *`,
+      `UPDATE bookings SET deleted_at = NULL, deleted_by = NULL, updated_at = NOW() WHERE id = $1 RETURNING *`,
       [bookingId]
     );
     const [updated] = updatedRows;

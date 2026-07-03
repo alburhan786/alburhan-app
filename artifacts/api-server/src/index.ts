@@ -7,7 +7,7 @@ process.on("unhandledRejection", (reason) => {
 });
 
 import app from "./app";
-import { db, usersTable } from "@workspace/db";
+import { db, pool, usersTable } from "@workspace/db";
 import { inArray, sql } from "drizzle-orm";
 import { ADMIN_MOBILES } from "./routes/auth.js";
 import { startPaymentReminderCron } from "./jobs/paymentReminder.js";
@@ -263,8 +263,8 @@ async function runMigrations() {
   try {
     await db.execute(sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ`);
     await db.execute(sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS deleted_by TEXT`);
-    await db.execute(sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT false`);
-    await db.execute(sql`UPDATE bookings SET is_deleted = true WHERE deleted_at IS NOT NULL AND is_deleted = false`);
+    await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT false`);
+    await pool.query(`UPDATE bookings SET is_deleted = true WHERE deleted_at IS NOT NULL AND is_deleted = false`);
     console.log("[Migration] bookings soft-delete columns ensured");
   } catch (err) {
     console.error("[Migration] bookings soft-delete columns failed:", err);
