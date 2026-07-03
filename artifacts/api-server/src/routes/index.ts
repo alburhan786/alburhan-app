@@ -60,6 +60,7 @@ router.get("/deploy-dist", (_req, res) => {
 
 router.use(healthRouter);
 router.use("/auth", authRouter);
+router.use(authRouter);
 router.use("/packages", packagesRouter);
 router.use("/packages", packageMediaRouter);
 router.use("/bookings", bookingsRouter);
