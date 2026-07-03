@@ -1521,8 +1521,8 @@ export default function BookingsManager() {
 
   const handleSoftDelete = async (bookingId: string) => {
     try {
-      const res = await fetch(`${API}/api/bookings/${bookingId}`, { method: "DELETE", credentials: "include" });
-      if (!res.ok) { const d = await res.json(); throw new Error(d.message || "Failed to delete"); }
+      const res = await fetch(`${API}/api/bookings/${bookingId}/trash`, { method: "POST", credentials: "include" });
+      if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.message || d.error || "Failed to delete"); }
       toast({ title: "Booking moved to Trash" });
       queryClient.invalidateQueries({ queryKey: ['/api/bookings'] });
       setSoftDeleteTarget(null);

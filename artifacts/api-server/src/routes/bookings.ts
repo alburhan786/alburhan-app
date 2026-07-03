@@ -794,29 +794,73 @@ router.delete("/:id/permanent", requireAdmin as any, async (req: AuthenticatedRe
   }
 });
 
-router.delete("/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
-  const bookingId = req.params.id;
+async function softDeleteBooking(bookingId: string, req: AuthenticatedRequest, res: any) {
+  console.log(`[soft-delete] START bookingId=${bookingId}`);
   try {
-    const { rows: existingRows } = await pool.query(`SELECT * FROM bookings WHERE id = $1 LIMIT 1`, [bookingId]);
+    console.log(`[soft-delete] Checking if booking exists...`);
+    const { rows: existingRows } = await pool.query(
+      `SELECT id, booking_number, status, deleted_at FROM bookings WHERE id = $1 LIMIT 1`,
+      [bookingId]
+    );
+    console.log(`[soft-delete] Query returned ${existingRows.length} row(s)`);
+
     const existing = existingRows[0];
-    if (!existing) { res.status(404).json({ message: "Booking not found" }); return; }
-    if (existing.deleted_at) { res.status(400).json({ message: "Booking is already in trash" }); return; }
+    if (!existing) {
+      console.log(`[soft-delete] Booking ${bookingId} NOT FOUND in database`);
+      res.status(404).json({ message: `Booking not found: ${bookingId}` });
+      return;
+    }
+    console.log(`[soft-delete] Found booking ${existing.booking_number}, deleted_at=${existing.deleted_at}`);
+
+    if (existing.deleted_at) {
+      res.status(400).json({ message: "Booking is already in trash" });
+      return;
+    }
 
     const deletedBy = req.user?.name || req.user?.mobile || "admin";
+    console.log(`[soft-delete] Running UPDATE for bookingId=${bookingId} deletedBy=${deletedBy}`);
+
     const { rows: updatedRows } = await pool.query(
       `UPDATE bookings SET deleted_at = NOW(), deleted_by = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
       [deletedBy, bookingId]
     );
-    const updated = updatedRows[0];
+    console.log(`[soft-delete] UPDATE returned ${updatedRows.length} row(s)`);
 
-    await writeAuditLog(bookingId, deletedBy, "soft_delete", [
-      { fieldName: "status", oldValue: existing.status, newValue: "deleted" },
-    ]);
+    if (!updatedRows[0]) {
+      console.error(`[soft-delete] UPDATE returned 0 rows for bookingId=${bookingId}`);
+      res.status(500).json({ message: "Update succeeded but returned no data — check database constraints" });
+      return;
+    }
+
+    const updated = updatedRows[0];
+    console.log(`[soft-delete] SUCCESS booking=${updated.booking_number} deleted_at=${updated.deleted_at}`);
+
+    try {
+      await writeAuditLog(bookingId, deletedBy, "soft_delete", [
+        { fieldName: "status", oldValue: existing.status, newValue: "deleted" },
+      ]);
+    } catch (auditErr: any) {
+      console.warn(`[soft-delete] Audit log failed (non-fatal):`, auditErr?.message);
+    }
+
     res.json({ message: "Booking moved to trash", booking: formatBooking(updated) });
   } catch (err: any) {
-    console.error("[bookings] DELETE /:id error:", err);
-    res.status(500).json({ message: err?.message || "Failed to delete booking" });
+    const pgCode = err?.code || "unknown";
+    const pgDetail = err?.detail || "";
+    const pgMessage = err?.message || "Unknown error";
+    console.error(`[soft-delete] ERROR bookingId=${bookingId} pgCode=${pgCode} pgDetail=${pgDetail}`, err);
+    res.status(500).json({
+      message: `Database error (${pgCode}): ${pgMessage}${pgDetail ? " — " + pgDetail : ""}`,
+    });
   }
+}
+
+router.post("/:id/trash", requireAdmin as any, (req: AuthenticatedRequest, res) => {
+  softDeleteBooking(req.params.id, req, res);
+});
+
+router.delete("/:id", requireAdmin as any, (req: AuthenticatedRequest, res) => {
+  softDeleteBooking(req.params.id, req, res);
 });
 
 router.post("/:id/restore", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
