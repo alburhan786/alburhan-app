@@ -1,2 +1,4 @@
 - [VPS deployment path](vps-deployment-path.md) — VPS has full monorepo; server reads static files from artifacts/alburhan/dist/public, NOT from public/ or dist/public/
 - [Family management schema](family-schema.md) — familyId/familyHead/familyRelation fields on pilgrims, use QrImg (img.qrserver.com) NOT QRCodeCanvas for print-safe QR codes.
+- [VPS drizzle db.execute quirk](vps-drizzle-pool-query.md) — drizzle db.execute() returns non-iterable QueryResult in bundled CJS; always use pool.query() for raw SQL on VPS
+- [VPS session fix](vps-session-fix.md) — connect-pg-simple createTableIfMissing reads table.sql from disk (not bundled); use createTableIfMissing:false + manual CREATE TABLE migration run before app.listen
