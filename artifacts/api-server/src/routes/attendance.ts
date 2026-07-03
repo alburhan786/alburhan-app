@@ -188,6 +188,8 @@ router.post("/:groupId/attendance/events/:eventId/scan", requireAdminOrToken, as
     .from(attendanceLogsTable)
     .where(and(eq(attendanceLogsTable.eventId, eventId), eq(attendanceLogsTable.pilgrimId, pilgrimId)));
 
+  const alreadyPresent = existing.length > 0 && existing[0].status === "present" && status === "present";
+
   if (existing.length > 0) {
     await db
       .update(attendanceLogsTable)
@@ -241,7 +243,18 @@ router.post("/:groupId/attendance/events/:eventId/scan", requireAdminOrToken, as
 
   res.json({
     success: true,
-    pilgrim: { id: pilgrim.id, fullName: pilgrim.fullName, familyId, serialNumber: pilgrim.serialNumber, photoUrl: pilgrim.photoUrl },
+    alreadyPresent,
+    pilgrim: {
+      id: pilgrim.id,
+      fullName: pilgrim.fullName,
+      familyId: familyId ?? null,
+      serialNumber: pilgrim.serialNumber,
+      photoUrl: pilgrim.photoUrl ?? null,
+      passportNumber: pilgrim.passportNumber ?? null,
+      roomNumber: pilgrim.roomNumber ?? null,
+      roomHotel: pilgrim.roomHotel ?? null,
+      busNumber: pilgrim.busNumber ?? null,
+    },
     status,
     presentCount,
     totalCount: totalPilgrims.length,
