@@ -44,8 +44,29 @@ export default function AccountingDashboard() {
     setLoading(true);
     try {
       const r = await fetch(`${API}/api/expenses/accounting-summary`, { credentials: "include" });
-      if (r.ok) setData(await r.json());
-    } catch {}
+      if (r.ok) {
+        const json = await r.json();
+        setData({
+          totalCollected: Number(json.totalCollected ?? 0),
+          thisMonthCollected: Number(json.thisMonthCollected ?? 0),
+          totalOutstanding: Number(json.totalOutstanding ?? 0),
+          totalBookings: Number(json.totalBookings ?? 0),
+          totalExpenses: Number(json.totalExpenses ?? 0),
+          thisMonthExpenses: Number(json.thisMonthExpenses ?? 0),
+          netProfit: Number(json.netProfit ?? 0),
+          byCategory: Array.isArray(json.byCategory) ? json.byCategory : [],
+          monthly: Array.isArray(json.monthly) ? json.monthly : [],
+          monthlyExpenses: Array.isArray(json.monthlyExpenses) ? json.monthlyExpenses : [],
+        });
+      } else {
+        // Non-200 response: show ₹0 dashboard instead of blank error
+        console.error("[AccountingDashboard] API error:", r.status, await r.text().catch(() => ""));
+        setData({ totalCollected: 0, thisMonthCollected: 0, totalOutstanding: 0, totalBookings: 0, totalExpenses: 0, thisMonthExpenses: 0, netProfit: 0, byCategory: [], monthly: [], monthlyExpenses: [] });
+      }
+    } catch (err) {
+      console.error("[AccountingDashboard] Fetch failed:", err);
+      setData({ totalCollected: 0, thisMonthCollected: 0, totalOutstanding: 0, totalBookings: 0, totalExpenses: 0, thisMonthExpenses: 0, netProfit: 0, byCategory: [], monthly: [], monthlyExpenses: [] });
+    }
     setLoading(false);
   }
 

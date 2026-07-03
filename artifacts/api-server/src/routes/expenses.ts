@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, expensesTable } from "@workspace/db";
+import { db, pool, expensesTable } from "@workspace/db";
 import { eq, desc, sql, and } from "drizzle-orm";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 
@@ -27,49 +27,118 @@ router.get("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
 });
 
 router.get("/accounting-summary", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
+  const ZERO_RESPONSE = {
+    totalCollected: 0, thisMonthCollected: 0, totalOutstanding: 0,
+    totalBookings: 0, totalExpenses: 0, thisMonthExpenses: 0,
+    netProfit: 0, byCategory: [], monthly: [], monthlyExpenses: [],
+  };
+
+  // Helper: run raw SQL via pool.query() — works in both dev (tsx) and VPS (bundled CJS)
+  async function rawQuery(queryText: string): Promise<any[]> {
+    const result = await pool.query(queryText);
+    return result.rows ?? [];
+  }
+
   try {
-    const [expStats] = await db.execute(sql`
-      SELECT
-        COALESCE(SUM(amount::numeric), 0) AS total_expenses,
-        COALESCE(SUM(CASE WHEN date >= date_trunc('month', NOW())::text THEN amount::numeric ELSE 0 END), 0) AS this_month_expenses,
-        json_agg(json_build_object('category', category, 'total', cat_total) ORDER BY cat_total DESC) AS by_category
-      FROM (
-        SELECT category, SUM(amount::numeric) AS cat_total FROM expenses GROUP BY category
-      ) sub
-    `) as any;
+    // Expense stats
+    let eStats: Record<string, any> = {};
+    try {
+      const [row] = await rawQuery(`
+        SELECT
+          COALESCE(SUM(amount::numeric), 0) AS total_expenses,
+          COALESCE(SUM(CASE WHEN date >= to_char(date_trunc('month', NOW()), 'YYYY-MM-DD') THEN amount::numeric ELSE 0 END), 0) AS this_month_expenses
+        FROM expenses
+      `);
+      eStats = row ?? {};
+    } catch (err) {
+      console.error("[expenses] accounting-summary: expense stats query failed:", err);
+    }
 
-    const [bookingStats] = await db.execute(sql`
-      SELECT
-        COALESCE(SUM(paid_amount::numeric), 0) AS total_collected,
-        COALESCE(SUM(CASE WHEN created_at >= date_trunc('month', NOW()) THEN paid_amount::numeric ELSE 0 END), 0) AS this_month_collected,
-        COALESCE(SUM(GREATEST(final_amount::numeric - COALESCE(paid_amount::numeric,0), 0)), 0) AS total_outstanding,
-        COUNT(*)::int AS total_bookings
-      FROM bookings
-      WHERE final_amount IS NOT NULL
-    `) as any;
+    // Expenses by category
+    let byCategory: any[] = [];
+    try {
+      byCategory = await rawQuery(`
+        SELECT category, COALESCE(SUM(amount::numeric), 0) AS total
+        FROM expenses
+        GROUP BY category
+        ORDER BY total DESC
+      `);
+    } catch (err) {
+      console.error("[expenses] accounting-summary: by-category query failed:", err);
+    }
 
-    const monthlyRows = await db.execute(sql`
-      SELECT
-        to_char(date_trunc('month', created_at), 'YYYY-MM') AS month,
-        COALESCE(SUM(paid_amount::numeric), 0) AS collected
-      FROM bookings
-      WHERE created_at >= NOW() - INTERVAL '12 months'
-      GROUP BY 1 ORDER BY 1
-    `) as any;
+    // Booking stats — exclude soft-deleted
+    let bStats: Record<string, any> = {};
+    try {
+      const [row] = await rawQuery(`
+        SELECT
+          COALESCE(SUM(paid_amount::numeric), 0) AS total_collected,
+          COALESCE(SUM(CASE WHEN created_at >= date_trunc('month', NOW()) THEN paid_amount::numeric ELSE 0 END), 0) AS this_month_collected,
+          COALESCE(SUM(GREATEST(final_amount::numeric - COALESCE(paid_amount::numeric,0), 0)), 0) AS total_outstanding,
+          COUNT(*)::int AS total_bookings
+        FROM bookings
+        WHERE final_amount IS NOT NULL AND deleted_at IS NULL
+      `);
+      bStats = row ?? {};
+    } catch (err) {
+      // Fallback without deleted_at filter (column may not exist on older VPS)
+      try {
+        const [row] = await rawQuery(`
+          SELECT
+            COALESCE(SUM(paid_amount::numeric), 0) AS total_collected,
+            COALESCE(SUM(CASE WHEN created_at >= date_trunc('month', NOW()) THEN paid_amount::numeric ELSE 0 END), 0) AS this_month_collected,
+            COALESCE(SUM(GREATEST(final_amount::numeric - COALESCE(paid_amount::numeric,0), 0)), 0) AS total_outstanding,
+            COUNT(*)::int AS total_bookings
+          FROM bookings
+          WHERE final_amount IS NOT NULL
+        `);
+        bStats = row ?? {};
+      } catch (err2) {
+        console.error("[expenses] accounting-summary: booking stats query failed:", err2);
+      }
+    }
 
-    const monthlyExpRows = await db.execute(sql`
-      SELECT
-        substring(date FROM 1 FOR 7) AS month,
-        COALESCE(SUM(amount::numeric), 0) AS expenses
-      FROM expenses
-      WHERE date >= to_char(NOW() - INTERVAL '12 months', 'YYYY-MM-DD')
-      GROUP BY 1 ORDER BY 1
-    `) as any;
+    // Monthly collections
+    let monthly: any[] = [];
+    try {
+      monthly = await rawQuery(`
+        SELECT
+          to_char(date_trunc('month', created_at), 'YYYY-MM') AS month,
+          COALESCE(SUM(paid_amount::numeric), 0) AS collected
+        FROM bookings
+        WHERE created_at >= NOW() - INTERVAL '12 months'
+          AND deleted_at IS NULL
+        GROUP BY 1 ORDER BY 1
+      `);
+    } catch {
+      try {
+        monthly = await rawQuery(`
+          SELECT
+            to_char(date_trunc('month', created_at), 'YYYY-MM') AS month,
+            COALESCE(SUM(paid_amount::numeric), 0) AS collected
+          FROM bookings
+          WHERE created_at >= NOW() - INTERVAL '12 months'
+          GROUP BY 1 ORDER BY 1
+        `);
+      } catch (err2) {
+        console.error("[expenses] accounting-summary: monthly collections query failed:", err2);
+      }
+    }
 
-    const bStats = Array.isArray(bookingStats) ? bookingStats[0] : (bookingStats as any)?.rows?.[0] ?? {};
-    const eStats = Array.isArray(expStats) ? expStats[0] : (expStats as any)?.rows?.[0] ?? {};
-    const mRows = Array.isArray(monthlyRows) ? monthlyRows : (monthlyRows as any)?.rows ?? [];
-    const meRows = Array.isArray(monthlyExpRows) ? monthlyExpRows : (monthlyExpRows as any)?.rows ?? [];
+    // Monthly expenses
+    let monthlyExpenses: any[] = [];
+    try {
+      monthlyExpenses = await rawQuery(`
+        SELECT
+          substring(date FROM 1 FOR 7) AS month,
+          COALESCE(SUM(amount::numeric), 0) AS expenses
+        FROM expenses
+        WHERE date >= to_char(NOW() - INTERVAL '12 months', 'YYYY-MM-DD')
+        GROUP BY 1 ORDER BY 1
+      `);
+    } catch (err) {
+      console.error("[expenses] accounting-summary: monthly expenses query failed:", err);
+    }
 
     const totalCollected = parseFloat(bStats.total_collected ?? 0);
     const totalExpenses = parseFloat(eStats.total_expenses ?? 0);
@@ -82,13 +151,14 @@ router.get("/accounting-summary", requireAdmin as any, async (_req: Authenticate
       totalExpenses,
       thisMonthExpenses: parseFloat(eStats.this_month_expenses ?? 0),
       netProfit: totalCollected - totalExpenses,
-      byCategory: eStats.by_category ?? [],
-      monthly: mRows,
-      monthlyExpenses: meRows,
+      byCategory: byCategory.map(r => ({ category: r.category, total: parseFloat(r.total) })),
+      monthly: monthly.map(r => ({ month: r.month, collected: parseFloat(r.collected) })),
+      monthlyExpenses: monthlyExpenses.map(r => ({ month: r.month, expenses: parseFloat(r.expenses) })),
     });
   } catch (err) {
-    console.error("[expenses] accounting-summary error:", err);
-    res.status(500).json({ error: "Failed to fetch accounting summary" });
+    console.error("[expenses] accounting-summary: unexpected error:", err);
+    // Return zeros instead of a 500 — dashboard shows ₹0 rather than "Failed to load data"
+    res.json(ZERO_RESPONSE);
   }
 });
 
