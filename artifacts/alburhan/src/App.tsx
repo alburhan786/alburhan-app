@@ -158,6 +158,7 @@ function Router() {
       <Route path="/admin/qr-tracker" component={() => <AdminRoute component={QRTracker} />} />
       <Route path="/admin/reports" component={() => <AdminRoute component={ReportsManager} />} />
       <Route path="/admin/payment-analytics" component={() => <AdminRoute component={PaymentAnalytics} />} />
+      <Route path="/admin/payments" component={() => <AdminRoute component={PaymentAnalytics} />} />
       <Route path="/admin/print-center" component={() => <AdminRoute component={PrintCenter} />} />
       <Route path="/admin/customers" component={() => <AdminRoute component={CustomerManager} />} />
       <Route path="/admin/requests" component={() => <AdminRoute component={RequestsManager} />} />

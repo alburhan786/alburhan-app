@@ -1,0 +1,228 @@
+Upgrade Payment Management Module – Al Burhan Tours & Travels ERP
+
+Upgrade the existing Payment Analytics page into a complete enterprise-grade Payment Management System without deleting or breaking any existing features, bookings, database records, or integrations.
+
+Core Requirements
+
+1. Payment Management
+
+Implement full payment management with:
+
+* Add Payment
+* Edit Payment
+* Soft Delete Payment
+* Restore Deleted Payment
+* View Payment Details
+* Print Receipt
+* Download PDF Receipt
+* Email Receipt
+* WhatsApp Receipt
+
+Never permanently delete payment records.
+
+⸻
+
+2. Payment Actions
+
+Add an Actions column in the payment table with:
+
+* ✏️ Edit
+* 🗑️ Soft Delete
+* 👁️ View
+* 📄 Print Receipt
+* 📥 Download PDF
+* 📧 Email Receipt
+* 📱 WhatsApp Receipt
+* 📜 Payment History
+
+⸻
+
+3. Edit Payment
+
+Allow editing:
+
+* Payment Amount
+* Payment Date
+* Payment Mode
+* Transaction ID
+* Bank Name
+* Cheque Number
+* UPI Reference
+* Notes
+* Received By
+
+Automatically update:
+
+* Total Paid
+* Remaining Balance
+* Booking Status
+* Invoice Status
+
+⸻
+
+4. Soft Delete
+
+Never permanently remove payment records.
+
+When deleting:
+
+* Confirmation popup
+* Require Super Admin permission
+* Ask for deletion reason
+* Mark payment as Deleted
+* Save Deleted By
+* Save Deleted Date
+* Save Deletion Reason
+* Allow Restore
+
+⸻
+
+5. Payment History
+
+Maintain complete audit logs:
+
+* Original Amount
+* Edited Amount
+* Previous Balance
+* New Balance
+* Modified By
+* Date & Time
+* Action Type
+* Reason for Change
+
+⸻
+
+6. Booking Integration
+
+Each booking must display:
+
+* Package Cost
+* GST
+* Discount
+* Total Amount
+* Advance Paid
+* Total Paid
+* Remaining Balance
+* Outstanding Amount
+* Refund Amount
+* Complete Payment Timeline
+
+Whenever a payment is added, edited, deleted, or restored, automatically recalculate booking balances.
+
+⸻
+
+7. Reports
+
+Create reports for:
+
+* Daily Collection
+* Monthly Collection
+* Hajj Group Collection
+* Umrah Group Collection
+* Pending Payments
+* Outstanding Balances
+* Refund Report
+* Cash Book
+* Bank Book
+* Customer Ledger
+* Profit & Loss
+
+Export reports to:
+
+* PDF
+* Excel
+* CSV
+
+⸻
+
+8. Search & Filters
+
+Search by:
+
+* Booking Number
+* Pilgrim Name
+* Passport Number
+* Mobile Number
+* Group
+* Package
+* Payment Status
+* Payment Method
+* Date Range
+
+⸻
+
+9. Dashboard
+
+Display cards showing:
+
+* Total Collection
+* Today’s Collection
+* Pending Amount
+* Overdue Amount
+* Total Paid
+* Total Refunds
+* Paid Bookings
+* Partial Payments
+* Unpaid Bookings
+
+⸻
+
+10. Security & Permissions
+
+Super Admin
+
+* Full Access
+
+Manager
+
+* Add/Edit/View Payments
+
+Accountant
+
+* Add/Edit/Print Receipts
+
+Staff
+
+* View Only
+
+Every action must be logged with:
+
+* User Name
+* User Role
+* Date & Time
+* IP Address (if available)
+
+⸻
+
+11. Database Safety
+
+* Do not delete existing booking or payment data.
+* Use database transactions for all updates.
+* Maintain referential integrity.
+* Keep all existing ERP features working.
+* Ensure compatibility with existing records.
+
+⸻
+
+12. Final Verification
+
+Before deployment:
+
+* Test Add Payment
+* Test Edit Payment
+* Test Soft Delete
+* Test Restore
+* Test Receipt Printing
+* Test PDF Generation
+* Test WhatsApp Receipt
+* Test Booking Balance Recalculation
+* Test Reports
+* Test Search & Filters
+
+Provide a final report listing:
+
+* Files modified
+* Database changes
+* New APIs added
+* Bugs fixed
+* Confirmation that all existing ERP modules continue to function correctly without data loss.

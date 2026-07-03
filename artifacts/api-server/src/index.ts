@@ -270,6 +270,42 @@ async function runMigrations() {
     console.error("[Migration] bookings soft-delete columns failed:", err);
   }
   try {
+    await pool.query(`ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS bank_name TEXT`);
+    await pool.query(`ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS received_by TEXT`);
+    await pool.query(`ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS edited_at TIMESTAMPTZ`);
+    await pool.query(`ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS edited_by TEXT`);
+    await pool.query(`ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ`);
+    await pool.query(`ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS deleted_by TEXT`);
+    await pool.query(`ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS deletion_reason TEXT`);
+    await pool.query(`ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT false`);
+    console.log("[Migration] payment_transactions soft-delete + extra columns ensured");
+  } catch (err) {
+    console.error("[Migration] payment_transactions columns failed:", err);
+  }
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS payment_audit_logs (
+        id TEXT PRIMARY KEY,
+        transaction_id TEXT NOT NULL,
+        booking_id TEXT NOT NULL,
+        action TEXT NOT NULL,
+        old_amount NUMERIC(12,2),
+        new_amount NUMERIC(12,2),
+        old_mode TEXT,
+        new_mode TEXT,
+        old_date TEXT,
+        new_date TEXT,
+        changed_by TEXT,
+        changed_by_name TEXT,
+        change_reason TEXT,
+        changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    console.log("[Migration] payment_audit_logs table ensured");
+  } catch (err) {
+    console.error("[Migration] payment_audit_logs failed:", err);
+  }
+  try {
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS booking_audit_logs (
         id TEXT PRIMARY KEY,
