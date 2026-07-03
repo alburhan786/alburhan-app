@@ -145,6 +145,19 @@ const ROOM_TYPE_COLORS: Record<string, string> = {
 };
 const HOTEL_ORDER = ["makkah", "madinah", "aziziah"];
 
+const FAMILY_PALETTE = [
+  { bg: "bg-blue-50", header: "bg-blue-100" },
+  { bg: "bg-emerald-50", header: "bg-emerald-100" },
+  { bg: "bg-purple-50", header: "bg-purple-100" },
+  { bg: "bg-amber-50", header: "bg-amber-100" },
+  { bg: "bg-rose-50", header: "bg-rose-100" },
+  { bg: "bg-cyan-50", header: "bg-cyan-100" },
+  { bg: "bg-orange-50", header: "bg-orange-100" },
+  { bg: "bg-teal-50", header: "bg-teal-100" },
+  { bg: "bg-indigo-50", header: "bg-indigo-100" },
+  { bg: "bg-pink-50", header: "bg-pink-100" },
+];
+
 function QrImg({ value, size = 72 }: { value: string; size?: number }) {
   const src = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(value)}&color=0d5040&bgcolor=ffffff`;
   return <img src={src} alt="QR" width={size} height={size} style={{ display: "block" }} />;
@@ -234,6 +247,10 @@ export default function PilgrimManager() {
   const [swapSelectA, setSwapSelectA] = useState<string | null>(null);
   const [swapPending, setSwapPending] = useState(false);
   const [highlightedFamilyId, setHighlightedFamilyId] = useState<string | null>(null);
+  const [pilgrimSearch, setPilgrimSearch] = useState("");
+  const [groupByFamily, setGroupByFamily] = useState(false);
+  const [pilgrimSortBy, setPilgrimSortBy] = useState<"serial" | "family" | "room" | "bus" | "hotel">("serial");
+  const [collapsedFamilies, setCollapsedFamilies] = useState<Set<string>>(new Set());
 
   const fetchData = useCallback(async () => {
     try {
@@ -277,17 +294,44 @@ export default function PilgrimManager() {
   };
 
   const exportToExcel = () => {
-    const headers = EXPORT_COLUMNS.map(c => c.label);
-    const rows = pilgrims
-      .slice()
-      .sort((a, b) => (a.serialNumber ?? 0) - (b.serialNumber ?? 0))
-      .map(p => EXPORT_COLUMNS.map(c => (p as any)[c.key] ?? ""));
-    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-    ws["!cols"] = EXPORT_COLUMNS.map((_, i) => ({ wch: i === 0 ? 10 : 22 }));
+    const safeName = (group?.groupName ?? groupId).replace(/[^a-zA-Z0-9\u0600-\u06FF]+/g, "-");
+    const headers = ["Family ID", "Family Head", "Family Relation", ...EXPORT_COLUMNS.map(c => c.label)];
+    const aoa: (string | number)[][] = [headers];
+
+    if (groupByFamily && familyGroupsForDisplay) {
+      familyGroupsForDisplay.families.forEach(([familyId, members]) => {
+        const head = members.find(m => m.familyHead) || members[0];
+        members.forEach(p => {
+          aoa.push([
+            familyId,
+            head?.fullName ?? "",
+            p.familyRelation ?? "",
+            ...EXPORT_COLUMNS.map(c => (p as any)[c.key] ?? ""),
+          ]);
+        });
+        aoa.push(Array(headers.length).fill(""));
+      });
+      if (familyGroupsForDisplay.ungrouped.length > 0) {
+        familyGroupsForDisplay.ungrouped.forEach(p => {
+          aoa.push(["—", "—", "—", ...EXPORT_COLUMNS.map(c => (p as any)[c.key] ?? "")]);
+        });
+      }
+    } else {
+      sortedPilgrims.forEach(p => {
+        aoa.push([
+          p.familyId ?? "—",
+          p.familyHead ? p.fullName : "",
+          p.familyRelation ?? "",
+          ...EXPORT_COLUMNS.map(c => (p as any)[c.key] ?? ""),
+        ]);
+      });
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws["!cols"] = headers.map((_, i) => ({ wch: i < 3 ? 16 : i === 3 ? 10 : 22 }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Pilgrims");
-    const safeName = (group?.groupName ?? groupId).replace(/[^a-zA-Z0-9\u0600-\u06FF]+/g, "-");
-    XLSX.writeFile(wb, `pilgrims-${safeName}.xlsx`);
+    XLSX.writeFile(wb, `pilgrims-${groupByFamily ? "by-family-" : ""}${safeName}.xlsx`);
   };
 
   const openCreate = () => { setEditingId(null); setForm(emptyPilgrim); setDialogOpen(true); };
@@ -1021,6 +1065,210 @@ export default function PilgrimManager() {
     return "border-emerald-300 bg-emerald-50";
   };
 
+  const filteredPilgrimsBase = useMemo(() => {
+    if (!pilgrimSearch.trim()) return pilgrims;
+    const q = pilgrimSearch.toLowerCase();
+    const matchingFamilyIds = new Set<string>();
+    for (const p of pilgrims) {
+      const ok = p.fullName.toLowerCase().includes(q)
+        || (p.passportNumber || "").toLowerCase().includes(q)
+        || (p.familyId || "").toLowerCase().includes(q)
+        || (p.roomNumber || "").toLowerCase().includes(q)
+        || (p.busNumber || "").toLowerCase().includes(q)
+        || (p.familyRelation || "").toLowerCase().includes(q)
+        || (p.mobileIndia || "").toLowerCase().includes(q);
+      if (ok && p.familyId) matchingFamilyIds.add(p.familyId);
+    }
+    return pilgrims.filter(p => {
+      if (p.familyId && matchingFamilyIds.has(p.familyId)) return true;
+      return p.fullName.toLowerCase().includes(q)
+        || (p.passportNumber || "").toLowerCase().includes(q)
+        || (p.familyId || "").toLowerCase().includes(q)
+        || (p.roomNumber || "").toLowerCase().includes(q)
+        || (p.busNumber || "").toLowerCase().includes(q)
+        || (p.mobileIndia || "").toLowerCase().includes(q);
+    });
+  }, [pilgrimSearch, pilgrims]);
+
+  const sortedPilgrims = useMemo(() => {
+    const arr = [...filteredPilgrimsBase];
+    switch (pilgrimSortBy) {
+      case "family":
+        return arr.sort((a, b) => {
+          const fa = a.familyId || "\uffff", fb = b.familyId || "\uffff";
+          if (fa !== fb) return fa.localeCompare(fb);
+          if (a.familyHead && !b.familyHead) return -1;
+          if (!a.familyHead && b.familyHead) return 1;
+          return (a.serialNumber || 0) - (b.serialNumber || 0);
+        });
+      case "room":
+        return arr.sort((a, b) => {
+          if (!a.roomNumber && b.roomNumber) return 1;
+          if (a.roomNumber && !b.roomNumber) return -1;
+          if (!a.roomNumber && !b.roomNumber) return (a.serialNumber||0)-(b.serialNumber||0);
+          return compareRoomNumbers(a.roomNumber!, b.roomNumber!);
+        });
+      case "bus":
+        return arr.sort((a, b) => (a.busNumber || "\uffff").localeCompare(b.busNumber || "\uffff"));
+      case "hotel":
+        return arr.sort((a, b) => {
+          const ha = HOTEL_ORDER.indexOf(a.roomHotel || ""), hb = HOTEL_ORDER.indexOf(b.roomHotel || "");
+          return (ha === -1 ? 99 : ha) - (hb === -1 ? 99 : hb);
+        });
+      default:
+        return arr.sort((a, b) => (a.serialNumber || 0) - (b.serialNumber || 0));
+    }
+  }, [filteredPilgrimsBase, pilgrimSortBy]);
+
+  const familyGroupsForDisplay = useMemo(() => {
+    if (!groupByFamily) return null;
+    const map = new Map<string, Pilgrim[]>();
+    const ungrouped: Pilgrim[] = [];
+    for (const p of sortedPilgrims) {
+      if (p.familyId) {
+        if (!map.has(p.familyId)) map.set(p.familyId, []);
+        map.get(p.familyId)!.push(p);
+      } else {
+        ungrouped.push(p);
+      }
+    }
+    const families = [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+    return { families, ungrouped };
+  }, [groupByFamily, sortedPilgrims]);
+
+  const renderPilgrimRow = (p: Pilgrim, rowClass: string) => (
+    <tr key={p.id} className={rowClass}>
+      <td className="px-4 py-3">
+        {editingSerial?.id === p.id ? (
+          <input autoFocus type="number" min="1"
+            value={editingSerial.value}
+            onChange={e => setEditingSerial({ id: p.id, value: e.target.value })}
+            onBlur={() => handleSerialUpdate(p, editingSerial.value)}
+            onKeyDown={e => {
+              if (e.key === "Enter") handleSerialUpdate(p, editingSerial.value);
+              if (e.key === "Escape") setEditingSerial(null);
+            }}
+            className="w-14 h-7 text-center font-mono font-bold text-primary border-2 border-primary rounded focus:outline-none text-sm"
+          />
+        ) : (
+          <span title="Click to edit serial number"
+            onClick={() => setEditingSerial({ id: p.id, value: String(p.serialNumber) })}
+            className="font-mono font-bold text-primary cursor-pointer hover:bg-primary/10 px-1.5 py-0.5 rounded transition-colors">
+            {p.serialNumber}
+          </span>
+        )}
+      </td>
+      <td className="px-4 py-3">
+        <div className="w-10 h-10 rounded-lg bg-muted overflow-hidden cursor-pointer"
+          onClick={() => { setUploadingId(p.id); fileRef.current?.click(); }}>
+          {p.photoUrl
+            ? <img src={`${API}${p.photoUrl}`} alt="" className="w-full h-full object-cover" />
+            : <div className="w-full h-full flex items-center justify-center text-muted-foreground/40"><Upload size={14} /></div>}
+        </div>
+      </td>
+      <td className="px-4 py-3 text-xs text-muted-foreground">{p.salutation || "—"}</td>
+      <td className="px-4 py-3 font-medium">{p.fullName}</td>
+      <td className="px-4 py-3 font-mono text-xs">{p.passportNumber || "—"}</td>
+      <td className="px-4 py-3 text-xs">{p.mobileIndia || "—"}</td>
+      <td className="px-4 py-3 text-xs">
+        {p.roomNumber
+          ? <span className="font-semibold">{p.roomNumber}{p.roomHotel ? ` · ${HOTEL_LABELS[p.roomHotel] || p.roomHotel}` : ""}</span>
+          : "—"}
+      </td>
+      <td className="px-4 py-3">{p.busNumber || "—"}</td>
+      <td className="px-4 py-3 text-xs">{p.relation || "—"}</td>
+      <td
+        className={`px-3 py-3 sticky right-[112px] z-10 border-l-2 border-gray-200 ${p.familyId && p.familyId === highlightedFamilyId ? "bg-blue-50" : "bg-white"}`}
+        style={{minWidth:140}}
+      >
+        {editingFamilyId?.id === p.id ? (
+          <input autoFocus type="text" placeholder="e.g. F01"
+            value={editingFamilyId.value}
+            onChange={e => setEditingFamilyId({ id: p.id, value: e.target.value })}
+            onBlur={() => handleFamilyIdUpdate(p, editingFamilyId.value)}
+            onKeyDown={e => {
+              if (e.key === "Enter") handleFamilyIdUpdate(p, editingFamilyId.value);
+              if (e.key === "Escape") setEditingFamilyId(null);
+            }}
+            className="w-24 h-7 text-center font-mono font-bold border-2 border-blue-400 rounded-lg focus:outline-none text-xs"
+          />
+        ) : p.familyId ? (() => {
+          const count = familyCountMap[p.familyId] ?? 1;
+          const isHead = p.familyHead;
+          const isMissingData = !p.passportNumber;
+          const badgeCls = isHead
+            ? "bg-orange-500 hover:bg-orange-600 ring-orange-300"
+            : isMissingData
+            ? "bg-red-500 hover:bg-red-600 ring-red-300"
+            : p.passportNumber
+            ? "bg-green-600 hover:bg-green-700 ring-green-300"
+            : "bg-blue-600 hover:bg-blue-700 ring-blue-300";
+          return (
+            <div className="flex flex-col gap-1">
+              <button
+                title={`Click to highlight family ${p.familyId}. Double-click to edit.`}
+                onClick={() => setHighlightedFamilyId(prev => prev === p.familyId ? null : p.familyId!)}
+                onDoubleClick={() => setEditingFamilyId({ id: p.id, value: p.familyId || "" })}
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-white font-bold text-xs cursor-pointer transition-all ring-2 ring-offset-1 select-none ${badgeCls}`}
+              >
+                <span>{isHead ? "👑" : "👨‍👩‍👧"}</span>
+                <span className="font-mono">{p.familyId}</span>
+                <span className="opacity-80">({count})</span>
+              </button>
+              <div className="flex items-center gap-1">
+                <select
+                  value={p.familyRelation || ""}
+                  onChange={e => {
+                    const val = e.target.value;
+                    fetch(`${API}/api/groups/${groupId}/pilgrims/${p.id}`, {
+                      method: "PUT", credentials: "include",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ ...p, familyRelation: val || null }),
+                    }).then(() => fetchData());
+                  }}
+                  className="h-5 text-[10px] rounded border border-gray-200 bg-gray-50 text-gray-700 px-1 max-w-[72px]"
+                >
+                  <option value="">Relation</option>
+                  {["Self","Husband","Wife","Son","Daughter","Father","Mother","Brother","Sister","Nephew","Niece","Father in Law","Mother in Law","Bhabhi","Uncle","Aunty","Other"].map(r => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
+                <button
+                  title={isHead ? "Remove as family head" : "Set as family head"}
+                  onClick={() => handleToggleFamilyHead(p)}
+                  className={`transition-colors ${isHead ? "text-orange-500" : "text-muted-foreground/30 hover:text-orange-400"}`}
+                >
+                  <Star size={11} fill={isHead ? "currentColor" : "none"} />
+                </button>
+              </div>
+            </div>
+          );
+        })() : (
+          <button
+            title="Click to set family ID"
+            onClick={() => setEditingFamilyId({ id: p.id, value: "" })}
+            className="text-xs text-muted-foreground/40 hover:text-blue-500 hover:bg-blue-50 px-2 py-1 rounded-full transition-colors font-medium border border-dashed border-gray-200 hover:border-blue-300"
+          >
+            + Family
+          </button>
+        )}
+      </td>
+      <td className={`px-3 py-3 text-right sticky right-0 z-10 ${p.familyId && p.familyId === highlightedFamilyId ? "bg-blue-50" : "bg-white"}`} style={{width:112}}>
+        <div className="flex items-center justify-end gap-1">
+          <Button variant="ghost" size="icon"
+            title={`Print ID card for ${p.fullName}`}
+            onClick={() => window.open(`/admin/groups/${groupId}/print/single-card/${p.id}`, "_blank")}
+            className="text-emerald-700 hover:bg-emerald-50"
+          >
+            <Printer size={14} />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => openEdit(p)}><Edit size={14} /></Button>
+          <Button variant="ghost" size="icon" className="text-red-600" onClick={() => handleDelete(p.id, p.fullName)}><Trash2 size={14} /></Button>
+        </div>
+      </td>
+    </tr>
+  );
+
   if (loading) return <AdminLayout><div className="py-12 text-center text-muted-foreground animate-pulse">Loading...</div></AdminLayout>;
 
   return (
@@ -1148,172 +1396,175 @@ export default function PilgrimManager() {
 
       {/* ============ PILGRIMS TAB ============ */}
       {activeTab === "pilgrims" && (
-        <Card className="border-none shadow-sm rounded-2xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-muted text-muted-foreground uppercase text-xs font-semibold">
-                <tr>
-                  <th className="px-4 py-3">#</th>
-                  <th className="px-4 py-3">Photo</th>
-                  <th className="px-4 py-3">Title</th>
-                  <th className="px-4 py-3">Name</th>
-                  <th className="px-4 py-3">Passport</th>
-                  <th className="px-4 py-3">Mobile</th>
-                  <th className="px-4 py-3">Room</th>
-                  <th className="px-4 py-3">Bus</th>
-                  <th className="px-4 py-3">Relation</th>
-                  <th className="px-3 py-3 sticky right-[112px] z-20 bg-muted border-l-2 border-gray-200" style={{minWidth:140}}>Family</th>
-                  <th className="px-3 py-3 text-right sticky right-0 z-20 bg-muted" style={{width:112}}>Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {pilgrims.length === 0 ? (
-                  <tr><td colSpan={10} className="text-center py-8 text-muted-foreground">No pilgrims yet. Click "Add Pilgrim" to start.</td></tr>
-                ) : pilgrims.map(p => (
-                  <tr key={p.id} className={`transition-colors ${p.familyId && p.familyId === highlightedFamilyId ? "bg-blue-50" : "hover:bg-muted/30"}`}>
-                    <td className="px-4 py-3">
-                      {editingSerial?.id === p.id ? (
-                        <input
-                          autoFocus
-                          type="number" min="1"
-                          value={editingSerial.value}
-                          onChange={e => setEditingSerial({ id: p.id, value: e.target.value })}
-                          onBlur={() => handleSerialUpdate(p, editingSerial.value)}
-                          onKeyDown={e => {
-                            if (e.key === "Enter") handleSerialUpdate(p, editingSerial.value);
-                            if (e.key === "Escape") setEditingSerial(null);
-                          }}
-                          className="w-14 h-7 text-center font-mono font-bold text-primary border-2 border-primary rounded focus:outline-none text-sm"
-                        />
-                      ) : (
-                        <span
-                          title="Click to edit serial number"
-                          onClick={() => setEditingSerial({ id: p.id, value: String(p.serialNumber) })}
-                          className="font-mono font-bold text-primary cursor-pointer hover:bg-primary/10 px-1.5 py-0.5 rounded transition-colors"
-                        >
-                          {p.serialNumber}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="w-10 h-10 rounded-lg bg-muted overflow-hidden cursor-pointer"
-                        onClick={() => { setUploadingId(p.id); fileRef.current?.click(); }}>
-                        {p.photoUrl
-                          ? <img src={`${API}${p.photoUrl}`} alt="" className="w-full h-full object-cover" />
-                          : <div className="w-full h-full flex items-center justify-center text-muted-foreground/40"><Upload size={14} /></div>}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">{p.salutation || "—"}</td>
-                    <td className="px-4 py-3 font-medium">{p.fullName}</td>
-                    <td className="px-4 py-3 font-mono text-xs">{p.passportNumber || "—"}</td>
-                    <td className="px-4 py-3 text-xs">{p.mobileIndia || "—"}</td>
-                    <td className="px-4 py-3 text-xs">
-                      {p.roomNumber
-                        ? <span className="font-semibold">{p.roomNumber}{p.roomHotel ? ` · ${HOTEL_LABELS[p.roomHotel] || p.roomHotel}` : ""}</span>
-                        : "—"}
-                    </td>
-                    <td className="px-4 py-3">{p.busNumber || "—"}</td>
-                    <td className="px-4 py-3 text-xs">{p.relation || "—"}</td>
-                    {/* Family column — sticky right, colored badges */}
-                    <td
-                      className={`px-3 py-3 sticky right-[112px] z-10 border-l-2 border-gray-200 ${p.familyId && p.familyId === highlightedFamilyId ? "bg-blue-50" : "bg-white"}`}
-                      style={{minWidth:140}}
-                    >
-                      {editingFamilyId?.id === p.id ? (
-                        <input
-                          autoFocus
-                          type="text"
-                          placeholder="e.g. F01"
-                          value={editingFamilyId.value}
-                          onChange={e => setEditingFamilyId({ id: p.id, value: e.target.value })}
-                          onBlur={() => handleFamilyIdUpdate(p, editingFamilyId.value)}
-                          onKeyDown={e => {
-                            if (e.key === "Enter") handleFamilyIdUpdate(p, editingFamilyId.value);
-                            if (e.key === "Escape") setEditingFamilyId(null);
-                          }}
-                          className="w-24 h-7 text-center font-mono font-bold border-2 border-blue-400 rounded-lg focus:outline-none text-xs"
-                        />
-                      ) : p.familyId ? (() => {
-                        const count = familyCountMap[p.familyId] ?? 1;
-                        const isHead = p.familyHead;
-                        const isMissingData = !p.passportNumber;
-                        const badgeCls = isHead
-                          ? "bg-orange-500 hover:bg-orange-600 ring-orange-300"
-                          : isMissingData
-                          ? "bg-red-500 hover:bg-red-600 ring-red-300"
-                          : p.passportNumber
-                          ? "bg-green-600 hover:bg-green-700 ring-green-300"
-                          : "bg-blue-600 hover:bg-blue-700 ring-blue-300";
-                        return (
-                          <div className="flex flex-col gap-1">
-                            <button
-                              title={`Click to highlight family ${p.familyId}. Double-click to edit.`}
-                              onClick={() => setHighlightedFamilyId(prev => prev === p.familyId ? null : p.familyId!)}
-                              onDoubleClick={() => setEditingFamilyId({ id: p.id, value: p.familyId || "" })}
-                              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-white font-bold text-xs cursor-pointer transition-all ring-2 ring-offset-1 select-none ${badgeCls}`}
-                            >
-                              <span>{isHead ? "👑" : "👨‍👩‍👧"}</span>
-                              <span className="font-mono">{p.familyId}</span>
-                              <span className="opacity-80">({count})</span>
-                            </button>
-                            <div className="flex items-center gap-1">
-                              <select
-                                value={p.familyRelation || ""}
-                                onChange={e => {
-                                  const val = e.target.value;
-                                  fetch(`${API}/api/groups/${groupId}/pilgrims/${p.id}`, {
-                                    method: "PUT", credentials: "include",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({ ...p, familyRelation: val || null }),
-                                  }).then(() => fetchData());
-                                }}
-                                className="h-5 text-[10px] rounded border border-gray-200 bg-gray-50 text-gray-700 px-1 max-w-[72px]"
-                              >
-                                <option value="">Relation</option>
-                                {["Self","Husband","Wife","Son","Daughter","Father","Mother","Brother","Sister","Nephew","Niece","Father in Law","Mother in Law","Bhabhi","Uncle","Aunty","Other"].map(r => (
-                                  <option key={r} value={r}>{r}</option>
-                                ))}
-                              </select>
-                              <button
-                                title={isHead ? "Remove as family head" : "Set as family head"}
-                                onClick={() => handleToggleFamilyHead(p)}
-                                className={`transition-colors ${isHead ? "text-orange-500" : "text-muted-foreground/30 hover:text-orange-400"}`}
-                              >
-                                <Star size={11} fill={isHead ? "currentColor" : "none"} />
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })() : (
-                        <button
-                          title="Click to set family ID"
-                          onClick={() => setEditingFamilyId({ id: p.id, value: "" })}
-                          className="text-xs text-muted-foreground/40 hover:text-blue-500 hover:bg-blue-50 px-2 py-1 rounded-full transition-colors font-medium border border-dashed border-gray-200 hover:border-blue-300"
-                        >
-                          + Family
-                        </button>
-                      )}
-                    </td>
-                    <td className={`px-3 py-3 text-right sticky right-0 z-10 ${p.familyId && p.familyId === highlightedFamilyId ? "bg-blue-50" : "bg-white"}`} style={{width:112}}>
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          variant="ghost" size="icon"
-                          title={`Print ID card for ${p.fullName}`}
-                          onClick={() => window.open(`/admin/groups/${groupId}/print/single-card/${p.id}`, "_blank")}
-                          className="text-emerald-700 hover:bg-emerald-50"
-                        >
-                          <Printer size={14} />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => openEdit(p)}><Edit size={14} /></Button>
-                        <Button variant="ghost" size="icon" className="text-red-600" onClick={() => handleDelete(p.id, p.fullName)}><Trash2 size={14} /></Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <div className="space-y-3">
+          {/* Search + Sort + Group by Family toolbar */}
+          <div className="flex flex-wrap gap-2 items-center">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+              <input
+                value={pilgrimSearch}
+                onChange={e => setPilgrimSearch(e.target.value)}
+                placeholder="Search name, passport, family ID, room, bus…"
+                className="w-full pl-8 pr-8 h-9 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-primary bg-white"
+              />
+              {pilgrimSearch && (
+                <button onClick={() => setPilgrimSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700">
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+            <select
+              value={pilgrimSortBy}
+              onChange={e => setPilgrimSortBy(e.target.value as typeof pilgrimSortBy)}
+              className="h-9 px-3 rounded-xl border border-gray-200 text-sm bg-white focus:outline-none focus:border-primary"
+            >
+              <option value="serial">Sort: Serial #</option>
+              <option value="family">Sort: Family ID</option>
+              <option value="room">Sort: Room No.</option>
+              <option value="bus">Sort: Bus</option>
+              <option value="hotel">Sort: Hotel</option>
+            </select>
+            <button
+              onClick={() => { const next = !groupByFamily; setGroupByFamily(next); if (next && pilgrimSortBy === "serial") setPilgrimSortBy("family"); }}
+              className={`flex items-center gap-2 h-9 px-4 rounded-xl border text-sm font-semibold transition-colors ${
+                groupByFamily ? "bg-[#0d5040] text-white border-[#0d5040]" : "bg-white text-gray-600 border-gray-200 hover:border-[#0d5040] hover:text-[#0d5040]"
+              }`}
+            >
+              <GitBranch size={14} />
+              {groupByFamily ? "Family View ON" : "Group by Family"}
+            </button>
+            {groupByFamily && (
+              <>
+                <button onClick={() => setCollapsedFamilies(new Set())} className="h-9 px-3 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 whitespace-nowrap">Expand All</button>
+                <button
+                  onClick={() => { if (familyGroupsForDisplay) setCollapsedFamilies(new Set(familyGroupsForDisplay.families.map(([fid]) => fid))); }}
+                  className="h-9 px-3 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 whitespace-nowrap"
+                >Collapse All</button>
+              </>
+            )}
           </div>
-        </Card>
+
+          {pilgrimSearch.trim() && (
+            <p className="text-xs text-muted-foreground px-1">
+              <span className="font-semibold text-foreground">{sortedPilgrims.length}</span> pilgrim{sortedPilgrims.length !== 1 ? "s" : ""} found
+              {groupByFamily && familyGroupsForDisplay
+                ? ` across ${familyGroupsForDisplay.families.length} famil${familyGroupsForDisplay.families.length !== 1 ? "ies" : "y"}`
+                : ""}
+              {" · "}
+              <button onClick={() => setPilgrimSearch("")} className="text-primary underline">Clear</button>
+            </p>
+          )}
+
+          <Card className="border-none shadow-sm rounded-2xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-muted text-muted-foreground uppercase text-xs font-semibold">
+                  <tr>
+                    <th className="px-4 py-3">#</th>
+                    <th className="px-4 py-3">Photo</th>
+                    <th className="px-4 py-3">Title</th>
+                    <th className="px-4 py-3">Name</th>
+                    <th className="px-4 py-3">Passport</th>
+                    <th className="px-4 py-3">Mobile</th>
+                    <th className="px-4 py-3">Room</th>
+                    <th className="px-4 py-3">Bus</th>
+                    <th className="px-4 py-3">Relation</th>
+                    <th className="px-3 py-3 sticky right-[112px] z-20 bg-muted border-l-2 border-gray-200" style={{minWidth:140}}>Family</th>
+                    <th className="px-3 py-3 text-right sticky right-0 z-20 bg-muted" style={{width:112}}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {groupByFamily && familyGroupsForDisplay ? (
+                    (() => {
+                      if (familyGroupsForDisplay.families.length === 0 && familyGroupsForDisplay.ungrouped.length === 0)
+                        return <tr><td colSpan={11} className="text-center py-8 text-muted-foreground">{pilgrimSearch ? `No pilgrims match "${pilgrimSearch}"` : "No pilgrims with a Family ID yet."}</td></tr>;
+                      const rows: JSX.Element[] = [];
+                      familyGroupsForDisplay.families.forEach(([familyId, members], fi) => {
+                        const head = members.find(m => m.familyHead) || members[0];
+                        const isCollapsed = collapsedFamilies.has(familyId);
+                        const pal = FAMILY_PALETTE[fi % FAMILY_PALETTE.length];
+                        if (fi > 0) rows.push(
+                          <tr key={`sp-${familyId}`}><td colSpan={11} style={{height:22,padding:0,background:"#f8fafc",borderTop:"2px solid #e2e8f0"}} /></tr>
+                        );
+                        rows.push(
+                          <tr key={`hdr-${familyId}`} className={pal.header}>
+                            <td colSpan={11} className="px-3 py-2.5 border-b border-gray-200">
+                              <div className="flex items-center gap-3 flex-wrap">
+                                <button
+                                  onClick={() => setCollapsedFamilies(prev => { const s = new Set(prev); s.has(familyId) ? s.delete(familyId) : s.add(familyId); return s; })}
+                                  className="flex items-center gap-2 flex-1 min-w-0 text-left"
+                                >
+                                  <ChevronDown size={15} className={`shrink-0 text-gray-500 transition-transform duration-200 ${isCollapsed ? "-rotate-90" : ""}`} />
+                                  <span className="font-bold text-sm text-gray-800">
+                                    👨‍👩‍👧‍👦 Family:&nbsp;<span className="font-mono text-[#0d5040]">{familyId}</span>
+                                  </span>
+                                  <span className="shrink-0 px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#0d5040]/10 text-[#0d5040]">
+                                    {members.length} member{members.length !== 1 ? "s" : ""}
+                                  </span>
+                                  {head && (
+                                    <span className="text-xs text-gray-600 truncate">
+                                      Head: <span className="font-semibold">{head.fullName}</span>
+                                    </span>
+                                  )}
+                                </button>
+                                <div className="flex items-center gap-3 text-xs text-gray-600 shrink-0 flex-wrap">
+                                  {head?.roomNumber && (
+                                    <span className="flex items-center gap-1">
+                                      <BedDouble size={11} />
+                                      <span className="font-semibold">{head.roomNumber}</span>
+                                      {head.roomHotel && (
+                                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${HOTEL_COLORS[head.roomHotel] || "bg-gray-100"}`}>
+                                          {HOTEL_LABELS[head.roomHotel] || head.roomHotel}
+                                        </span>
+                                      )}
+                                    </span>
+                                  )}
+                                  {head?.busNumber && (
+                                    <span className="flex items-center gap-1">
+                                      <Bus size={11} />
+                                      <span className="font-semibold">{head.busNumber}</span>
+                                    </span>
+                                  )}
+                                  {group?.flightNumber && (
+                                    <span className="text-sky-600 font-semibold">✈ {group.flightNumber}</span>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                        if (!isCollapsed) {
+                          members.forEach((p, mi) => rows.push(renderPilgrimRow(p, `${mi % 2 === 0 ? pal.bg : "bg-white"} hover:brightness-95 transition-colors`)));
+                        }
+                      });
+                      if (familyGroupsForDisplay.ungrouped.length > 0) {
+                        if (familyGroupsForDisplay.families.length > 0)
+                          rows.push(<tr key="sp-ungrouped"><td colSpan={11} style={{height:22,padding:0,background:"#f8fafc",borderTop:"2px solid #e2e8f0"}} /></tr>);
+                        rows.push(
+                          <tr key="hdr-ungrouped" className="bg-gray-100">
+                            <td colSpan={11} className="px-4 py-2.5 border-b border-gray-200">
+                              <span className="text-sm font-bold text-gray-500">⚪ Ungrouped Pilgrims ({familyGroupsForDisplay.ungrouped.length})</span>
+                            </td>
+                          </tr>
+                        );
+                        familyGroupsForDisplay.ungrouped.forEach(p => rows.push(renderPilgrimRow(p, "hover:bg-muted/30 transition-colors")));
+                      }
+                      return rows;
+                    })()
+                  ) : sortedPilgrims.length === 0 ? (
+                    <tr><td colSpan={11} className="text-center py-8 text-muted-foreground">
+                      {pilgrimSearch ? `No pilgrims match "${pilgrimSearch}"` : 'No pilgrims yet. Click "Add Pilgrim" to start.'}
+                    </td></tr>
+                  ) : (
+                    sortedPilgrims.map(p =>
+                      renderPilgrimRow(p, `transition-colors ${p.familyId && p.familyId === highlightedFamilyId ? "bg-blue-50" : "hover:bg-muted/30"}`)
+                    )
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
       )}
 
       {/* ============ ROOMS TAB ============ */}
