@@ -8,37 +8,47 @@ const router = Router();
 
 router.get("/stats", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
   try {
-    const [totalBookings] = await db.select({ count: count() }).from(bookingsTable);
-    const [pendingBookings] = await db.select({ count: count() }).from(bookingsTable).where(eq(bookingsTable.status, "pending"));
-    const [approvedBookings] = await db.select({ count: count() }).from(bookingsTable).where(eq(bookingsTable.status, "approved"));
-    const [confirmedBookings] = await db.select({ count: count() }).from(bookingsTable).where(eq(bookingsTable.status, "confirmed"));
-    const [rejectedBookings] = await db.select({ count: count() }).from(bookingsTable).where(eq(bookingsTable.status, "rejected"));
-    const [revenue] = await db.select({ total: sum(bookingsTable.finalAmount) }).from(bookingsTable).where(eq(bookingsTable.status, "confirmed"));
-    const [totalCustomers] = await db.select({ count: count() }).from(usersTable).where(eq(usersTable.role, "customer"));
-    const [totalPackages] = await db.select({ count: count() }).from(packagesTable);
+    // Use raw SQL to avoid pgEnum type mismatch on VPS (booking_status enum may not exist)
+    const [counts] = await db.execute(sql`
+      SELECT
+        COUNT(*)::int AS total,
+        COUNT(*) FILTER (WHERE status::text = 'pending')::int AS pending,
+        COUNT(*) FILTER (WHERE status::text = 'approved')::int AS approved,
+        COUNT(*) FILTER (WHERE status::text = 'confirmed')::int AS confirmed,
+        COUNT(*) FILTER (WHERE status::text = 'rejected')::int AS rejected,
+        COALESCE(SUM(CASE WHEN status::text = 'confirmed' THEN final_amount::numeric ELSE 0 END), 0)::float AS revenue
+      FROM bookings
+    `) as any;
 
-    const recentBookings = await db
-      .select()
-      .from(bookingsTable)
-      .orderBy(desc(bookingsTable.createdAt))
-      .limit(5);
+    const [custRow] = await db.execute(sql`SELECT COUNT(*)::int AS total FROM users WHERE role = 'customer'`) as any;
+    const [pkgRow] = await db.execute(sql`SELECT COUNT(*)::int AS total FROM packages`) as any;
+
+    const recentRows = await db.execute(sql`
+      SELECT id, booking_number, customer_name, customer_mobile, status::text AS status,
+             total_amount, gst_amount, final_amount, created_at, updated_at
+      FROM bookings ORDER BY created_at DESC LIMIT 5
+    `) as any;
 
     res.json({
-      totalBookings: Number(totalBookings.count),
-      pendingBookings: Number(pendingBookings.count),
-      approvedBookings: Number(approvedBookings.count),
-      confirmedBookings: Number(confirmedBookings.count),
-      rejectedBookings: Number(rejectedBookings.count),
-      totalRevenue: Number(revenue.total ?? 0),
-      totalCustomers: Number(totalCustomers.count),
-      totalPackages: Number(totalPackages.count),
-      recentBookings: recentBookings.map(b => ({
-        ...b,
-        totalAmount: b.totalAmount ? Number(b.totalAmount) : null,
-        gstAmount: b.gstAmount ? Number(b.gstAmount) : null,
-        finalAmount: b.finalAmount ? Number(b.finalAmount) : null,
-        createdAt: b.createdAt?.toISOString?.(),
-        updatedAt: b.updatedAt?.toISOString?.(),
+      totalBookings: Number(counts?.total ?? 0),
+      pendingBookings: Number(counts?.pending ?? 0),
+      approvedBookings: Number(counts?.approved ?? 0),
+      confirmedBookings: Number(counts?.confirmed ?? 0),
+      rejectedBookings: Number(counts?.rejected ?? 0),
+      totalRevenue: Number(counts?.revenue ?? 0),
+      totalCustomers: Number(custRow?.total ?? 0),
+      totalPackages: Number(pkgRow?.total ?? 0),
+      recentBookings: (Array.isArray(recentRows) ? recentRows : []).map((b: any) => ({
+        id: b.id,
+        bookingNumber: b.booking_number,
+        customerName: b.customer_name,
+        customerMobile: b.customer_mobile,
+        status: b.status,
+        totalAmount: b.total_amount ? Number(b.total_amount) : null,
+        gstAmount: b.gst_amount ? Number(b.gst_amount) : null,
+        finalAmount: b.final_amount ? Number(b.final_amount) : null,
+        createdAt: b.created_at,
+        updatedAt: b.updated_at,
       })),
     });
   } catch (err: any) {
