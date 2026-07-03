@@ -31,6 +31,7 @@ import busesRouter from "./buses.js";
 import medicalRouter from "./medical.js";
 import visaRouter from "./visa.js";
 import aiRouter from "./ai.js";
+import systemHealthRouter from "./system-health.js";
 
 const router: IRouter = Router();
 
@@ -93,6 +94,7 @@ router.use("/buses", busesRouter);
 router.use("/medical", medicalRouter);
 router.use("/visa", visaRouter);
 router.use("/ai", aiRouter);
+router.use("/admin", systemHealthRouter);
 router.use(storageRouter);
 
 export default router;

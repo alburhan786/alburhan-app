@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db, usersTable, otpsTable } from "@workspace/db";
-import { eq, and, gt } from "drizzle-orm";
+import { pool } from "@workspace/db";
+import { eq, and, gt, lt, count, sql } from "drizzle-orm";
 import {
   SendOtpBody,
   VerifyOtpBody,
@@ -12,6 +13,17 @@ export const ADMIN_MOBILES = ["9893989786", "9893225590", "8989701701", "9999999
 
 const router = Router();
 
+// Rate limit: max 5 OTP requests per phone per 30 minutes
+async function checkOtpRateLimit(mobile: string): Promise<boolean> {
+  const cutoff = new Date(Date.now() - 30 * 60 * 1000);
+  const result = await pool.query(
+    `SELECT COUNT(*) as cnt FROM otps WHERE mobile=$1 AND created_at > $2`,
+    [mobile, cutoff]
+  );
+  const cnt = parseInt(result.rows[0]?.cnt || "0", 10);
+  return cnt < 5;
+}
+
 router.post("/send-otp", async (req, res) => {
   const parsed = SendOtpBody.safeParse(req.body);
   if (!parsed.success) {
@@ -20,33 +32,58 @@ router.post("/send-otp", async (req, res) => {
   }
   const { mobile } = parsed.data;
 
-  const existing = await db.select().from(usersTable).where(eq(usersTable.mobile, mobile)).limit(1);
+  // Validate mobile: must be 10 digits
+  const cleanMobile = mobile.replace(/\D/g, "");
+  if (cleanMobile.length !== 10) {
+    res.status(400).json({ message: "Please enter a valid 10-digit mobile number" });
+    return;
+  }
+
+  // Rate limiting
+  const withinLimit = await checkOtpRateLimit(cleanMobile);
+  if (!withinLimit) {
+    res.status(429).json({ message: "Too many OTP requests. Please wait 30 minutes before trying again." });
+    return;
+  }
+
+  const existing = await db.select().from(usersTable).where(eq(usersTable.mobile, cleanMobile)).limit(1);
   const isNewUser = !existing[0];
 
   if (isNewUser) {
-    await db.insert(usersTable).values({ mobile, role: ADMIN_MOBILES.includes(mobile) ? "admin" : "customer" });
+    await db.insert(usersTable).values({ mobile: cleanMobile, role: ADMIN_MOBILES.includes(cleanMobile) ? "admin" : "customer" });
   }
 
   const otp = generateOtp();
-  const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+  const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
-  await db.insert(otpsTable).values({ mobile, otp, expiresAt });
+  await db.insert(otpsTable).values({ mobile: cleanMobile, otp, expiresAt });
 
-  const smsSent = await sendOtpSMS(mobile, otp);
+  const smsResult = await sendOtpSMS(cleanMobile, otp);
 
+  // Send WhatsApp as backup (don't await)
   sendWhatsApp(
-    mobile,
-    `Your Al Burhan Tours & Travels OTP is: *${otp}*\n\nValid for 10 minutes. Do not share with anyone.\n\nAl Burhan Tours & Travels\n+91 8989701701`
-  ).catch(console.error);
+    cleanMobile,
+    `Your Al Burhan Tours & Travels OTP is: *${otp}*\n\nValid for 5 minutes. Do not share with anyone.\n\nAl Burhan Tours & Travels\n+91 8989701701`
+  ).catch(() => {});
 
-  const isAdmin = ADMIN_MOBILES.includes(mobile);
-  console.log(`[OTP] Mobile: ${mobile}, OTP: ${otp}, NewUser: ${isNewUser}, SMSSent: ${smsSent}, IsAdmin: ${isAdmin}`);
+  const isAdmin = ADMIN_MOBILES.includes(cleanMobile);
+
+  console.log(`[OTP] Mobile: ${cleanMobile}, OTP: ${otp}, NewUser: ${isNewUser}, SMSSent: ${smsResult.sent}, IsAdmin: ${isAdmin}${smsResult.error ? `, Error: ${smsResult.error}` : ""}`);
 
   res.json({
-    message: "OTP sent successfully",
+    message: smsResult.sent
+      ? "OTP sent to your mobile number"
+      : "OTP generated (SMS delivery issue — check WhatsApp or contact support)",
     requestId: `otp_${Date.now()}`,
     isNewUser,
-    ...(isAdmin ? { debugOtp: otp } : {}),
+    smsSent: smsResult.sent,
+    // Admin-only debug info
+    ...(isAdmin ? {
+      debugOtp: otp,
+      smsStatus: smsResult.sent ? "delivered" : "failed",
+      smsError: smsResult.error,
+      smsProviderResponse: smsResult.providerResponse,
+    } : {}),
   });
 });
 
@@ -57,14 +94,47 @@ router.post("/verify-otp", async (req, res) => {
     return;
   }
   const { mobile, otp } = parsed.data;
-
+  const cleanMobile = mobile.replace(/\D/g, "");
   const now = new Date();
+
+  // Check for too many recent failed attempts (last 5 OTPs for this mobile)
+  const recentAttempts = await pool.query(
+    `SELECT attempts FROM otps WHERE mobile=$1 AND used=false AND expires_at > $2 ORDER BY created_at DESC LIMIT 1`,
+    [cleanMobile, now]
+  );
+  const currentAttempts = parseInt(recentAttempts.rows[0]?.attempts || "0", 10);
+  if (currentAttempts >= 5) {
+    res.status(429).json({ message: "Too many failed attempts. Please request a new OTP." });
+    return;
+  }
+
+  // Check if OTP is expired (but exists and unused)
+  const expiredCheck = await pool.query(
+    `SELECT id FROM otps WHERE mobile=$1 AND otp=$2 AND used=false AND expires_at <= $3 ORDER BY created_at DESC LIMIT 1`,
+    [cleanMobile, otp, now]
+  );
+  if (expiredCheck.rows[0]) {
+    res.status(401).json({ message: "OTP has expired. Please request a new OTP." });
+    return;
+  }
+
+  // Check if OTP was already used
+  const usedCheck = await pool.query(
+    `SELECT id FROM otps WHERE mobile=$1 AND otp=$2 AND used=true ORDER BY created_at DESC LIMIT 1`,
+    [cleanMobile, otp]
+  );
+  if (usedCheck.rows[0]) {
+    res.status(401).json({ message: "This OTP has already been used. Please request a new OTP." });
+    return;
+  }
+
+  // Find valid OTP
   const otpRecords = await db
     .select()
     .from(otpsTable)
     .where(
       and(
-        eq(otpsTable.mobile, mobile),
+        eq(otpsTable.mobile, cleanMobile),
         eq(otpsTable.otp, otp),
         eq(otpsTable.used, false),
         gt(otpsTable.expiresAt, now)
@@ -73,35 +143,43 @@ router.post("/verify-otp", async (req, res) => {
     .limit(1);
 
   if (!otpRecords[0]) {
-    res.status(401).json({ message: "Invalid or expired OTP" });
+    // Increment attempt counter on the most recent OTP
+    await pool.query(
+      `UPDATE otps SET attempts = COALESCE(attempts, 0) + 1 WHERE mobile=$1 AND used=false AND expires_at > $2`,
+      [cleanMobile, now]
+    );
+    res.status(401).json({ message: "Invalid OTP. Please check and try again." });
     return;
   }
 
+  // Mark OTP as used
   await db.update(otpsTable).set({ used: true }).where(eq(otpsTable.id, otpRecords[0].id));
 
-  const users = await db.select().from(usersTable).where(eq(usersTable.mobile, mobile)).limit(1);
+  const users = await db.select().from(usersTable).where(eq(usersTable.mobile, cleanMobile)).limit(1);
   const user = users[0];
 
   if (!user) {
-    res.status(401).json({ message: "User not found" });
+    res.status(401).json({ message: "User not found. Please contact support." });
     return;
   }
 
   const isNewUser = !user.name;
-
   (req.session as any).userId = user.id;
 
+  // Send welcome WhatsApp (don't await)
   if (isNewUser) {
     sendWhatsApp(
-      mobile,
+      cleanMobile,
       `Assalamu Alaikum! Welcome to Al Burhan Tours & Travels.\n\nWe are delighted to have you with us. With 35+ years of experience, we are here to guide you on your sacred journey.\n\nFor assistance, call us:\n+91 8989701701\n+91 9893989786\n\nJazak Allah Khair!`
-    ).catch(console.error);
+    ).catch(() => {});
   } else {
     sendWhatsApp(
-      mobile,
+      cleanMobile,
       `Assalamu Alaikum ${user.name || ""},\n\nWelcome back to Al Burhan Tours & Travels! You have logged in successfully.\n\nFor assistance: +91 8989701701\n\nJazak Allah Khair!`
-    ).catch(console.error);
+    ).catch(() => {});
   }
+
+  console.log(`[OTP-VERIFY] Mobile: ${cleanMobile}, Success, NewUser: ${isNewUser}`);
 
   res.json({
     message: isNewUser ? "Registration successful" : "Login successful",

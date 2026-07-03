@@ -1,0 +1,289 @@
+The OTP login system is not working. Users are not receiving OTPs even after multiple attempts.
+
+This is a HIGH PRIORITY production issue.
+
+Please perform a complete end-to-end audit and fix the entire OTP authentication flow.
+
+## 1. Debug Everything
+
+Check:
+
+- Frontend
+- Backend API
+- Database
+- SMS Provider
+- Environment Variables
+- Rate Limiter
+- Authentication Middleware
+- Production Deployment
+- Hostinger Deployment
+- Replit Secrets
+
+Do not assume anything.
+Find the exact root cause.
+
+------------------------------------------------
+
+## 2. Verify Environment Variables
+
+Check that these secrets exist:
+
+FAST2SMS_API_KEY
+
+or
+
+MSG91_AUTH_KEY
+
+or
+
+TWILIO_ACCOUNT_SID
+TWILIO_AUTH_TOKEN
+TWILIO_PHONE_NUMBER
+
+or whichever SMS provider is configured.
+
+If any variable is missing,
+show a clear admin error instead of silently failing.
+
+------------------------------------------------
+
+## 3. OTP Generation
+
+Generate
+
+6 digit random OTP
+
+Store in database
+
+Expiry = 5 minutes
+
+Maximum attempts = 5
+
+Hash OTP before saving.
+
+------------------------------------------------
+
+## 4. SMS Sending
+
+Log every request.
+
+Log response from SMS provider.
+
+If provider returns error
+
+Display:
+
+"OTP could not be sent. Please try again."
+
+instead of generic failure.
+
+------------------------------------------------
+
+## 5. Verify Phone Number
+
+Automatically convert
+
+9893989786
+
+to
+
++919893989786
+
+Remove spaces
+
+Remove hyphens
+
+Reject invalid numbers.
+
+------------------------------------------------
+
+## 6. Add Resend OTP
+
+Button disabled for
+
+30 seconds
+
+After timer
+
+Enable
+
+Resend OTP
+
+Maximum
+
+5 resends.
+
+------------------------------------------------
+
+## 7. Add Admin Debug Panel
+
+Visible only for Admin.
+
+Show
+
+Generated OTP
+
+SMS Provider Status
+
+API Response
+
+Delivery Status
+
+Phone Number
+
+Expiry Time
+
+Errors
+
+This panel must never be visible to customers.
+
+------------------------------------------------
+
+## 8. Database
+
+Check
+
+otp table
+
+otp_logs
+
+users
+
+sessions
+
+Ensure OTP is saved correctly.
+
+------------------------------------------------
+
+## 9. Error Handling
+
+Instead of
+
+"Failed"
+
+show proper messages
+
+OTP Expired
+
+Invalid OTP
+
+OTP Already Used
+
+SMS Failed
+
+Server Error
+
+Too Many Attempts
+
+------------------------------------------------
+
+## 10. Logging
+
+Create logs for
+
+OTP Created
+
+OTP Sent
+
+OTP Delivered
+
+OTP Failed
+
+OTP Verified
+
+OTP Expired
+
+OTP Resent
+
+------------------------------------------------
+
+## 11. Security
+
+OTP expires after
+
+5 minutes
+
+Delete OTP after successful login
+
+Prevent brute force attacks
+
+Limit
+
+5 attempts
+
+------------------------------------------------
+
+## 12. Production Testing
+
+Test on
+
+Desktop
+
+Android
+
+iPhone
+
+Chrome
+
+Safari
+
+Edge
+
+Firefox
+
+------------------------------------------------
+
+## 13. Health Check
+
+Create
+
+/admin/system-health
+
+Show
+
+Database ✅
+
+SMS Provider ✅
+
+OTP Service ✅
+
+API ✅
+
+Environment Variables ✅
+
+Server Time ✅
+
+------------------------------------------------
+
+## 14. Final Testing
+
+Run complete end-to-end test
+
+User enters phone
+
+↓
+
+OTP generated
+
+↓
+
+SMS sent
+
+↓
+
+SMS received
+
+↓
+
+OTP verified
+
+↓
+
+Login successful
+
+No errors should remain.
+
+If anything fails,
+identify the exact reason and automatically fix it.
+
+Do not stop until OTP login works successfully in production.

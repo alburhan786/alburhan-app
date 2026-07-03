@@ -441,6 +441,12 @@ async function runMigrations() {
   } catch (err) {
     console.error("[Migration] visa tracking columns failed:", err);
   }
+  try {
+    await pool.query(`ALTER TABLE otps ADD COLUMN IF NOT EXISTS attempts INTEGER NOT NULL DEFAULT 0`);
+    console.log("[Migration] otps.attempts column ensured");
+  } catch (err) {
+    console.error("[Migration] otps.attempts failed:", err);
+  }
 }
 
 const rawPort = process.env["PORT"];

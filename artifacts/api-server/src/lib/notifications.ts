@@ -20,7 +20,10 @@ async function withRetry<T>(
   throw lastErr;
 }
 
-const FAST2SMS_API_KEY = process.env.FAST2SMS_API_KEY;
+// Read at call time (NOT module load time) so pm2 --update-env works correctly
+function getFast2SMSKey(): string | undefined {
+  return process.env.FAST2SMS_API_KEY || process.env.FAST2SMS_XXL_API_KEY;
+}
 const FAST2SMS_SENDER_ID = "ALBURH";
 const FAST2SMS_OTP_DLT_TEMPLATE_ID = "164844";
 const FAST2SMS_NOTIFY_DLT_TEMPLATE_ID = "211277";
@@ -48,20 +51,26 @@ function toBotBeePhone(mobile: string): string {
   return clean;
 }
 
-export async function sendOtpSMS(mobile: string, otp: string): Promise<boolean> {
-  if (!FAST2SMS_API_KEY) {
-    console.log("[OTP-SMS] API key not set — OTP:", otp, "for:", mobile);
-    return false;
+export async function sendOtpSMS(mobile: string, otp: string): Promise<{ sent: boolean; providerResponse?: any; error?: string }> {
+  const apiKey = getFast2SMSKey();
+  if (!apiKey || apiKey === "your_key_here" || apiKey === "your-fast2sms-key-here") {
+    console.error("[OTP-SMS] FAST2SMS API key not set or is placeholder. OTP:", otp, "for:", mobile);
+    return { sent: false, error: "SMS provider API key not configured" };
   }
   try {
     const phone = toFast2SMSPhone(mobile);
-    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${FAST2SMS_API_KEY}&route=dlt&sender_id=${FAST2SMS_SENDER_ID}&message=${FAST2SMS_OTP_DLT_TEMPLATE_ID}&variables_values=${otp}|&numbers=${phone}&flash=0`;
-    const response = await withRetry(() => axios.get(url), 3, 1000);
-    console.log("[OTP-SMS] Sent to", mobile, response.data);
-    return true;
+    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=dlt&sender_id=${FAST2SMS_SENDER_ID}&message=${FAST2SMS_OTP_DLT_TEMPLATE_ID}&variables_values=${otp}|&numbers=${phone}&flash=0`;
+    console.log(`[OTP-SMS] Sending to ${phone} via Fast2SMS (key: ${apiKey.slice(0, 6)}...)`);
+    const response = await withRetry(() => axios.get(url), 2, 1000);
+    console.log("[OTP-SMS] Provider response:", JSON.stringify(response.data));
+    if (response.data?.return === false) {
+      return { sent: false, providerResponse: response.data, error: response.data?.message || "Provider rejected request" };
+    }
+    return { sent: true, providerResponse: response.data };
   } catch (err: any) {
-    console.error("[OTP-SMS] Error after retries:", err?.response?.data || err.message);
-    return false;
+    const errData = err?.response?.data || err.message;
+    console.error("[OTP-SMS] Error:", JSON.stringify(errData));
+    return { sent: false, error: String(errData) };
   }
 }
 
@@ -71,14 +80,15 @@ export async function sendDLTSMS(
   var2: string,
   var3: string
 ): Promise<boolean> {
-  if (!FAST2SMS_API_KEY) {
+  const apiKey = getFast2SMSKey();
+  if (!apiKey || apiKey === "your_key_here") {
     console.log("[SMS-DLT] API key not set — vars:", var1, var2, var3, "for:", mobile);
     return false;
   }
   try {
     const phone = toFast2SMSPhone(mobile);
     const variables = encodeURIComponent(`${var1}|${var2}|${var3}|`);
-    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${FAST2SMS_API_KEY}&route=dlt&sender_id=${FAST2SMS_SENDER_ID}&message=${FAST2SMS_NOTIFY_DLT_TEMPLATE_ID}&variables_values=${variables}&numbers=${phone}&flash=0`;
+    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=dlt&sender_id=${FAST2SMS_SENDER_ID}&message=${FAST2SMS_NOTIFY_DLT_TEMPLATE_ID}&variables_values=${variables}&numbers=${phone}&flash=0`;
     const response = await withRetry(() => axios.get(url));
     console.log("[SMS-DLT] Sent to", mobile, response.data);
     return true;
