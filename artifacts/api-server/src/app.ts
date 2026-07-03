@@ -12,7 +12,6 @@ import { spawn } from "child_process";
 import router from "./routes/index.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-import { requireDeleteToken } from "./middlewares/requireDeleteToken.js";
 
 const app: Express = express();
 
@@ -70,11 +69,6 @@ app.use(session({
     sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
   },
 }));
-
-app.use("/api", (req, res, next) => {
-  if (req.method === "DELETE") return requireDeleteToken(req, res, next);
-  next();
-});
 
 app.use("/api", router);
 

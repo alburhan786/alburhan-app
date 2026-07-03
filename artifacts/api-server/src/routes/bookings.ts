@@ -54,13 +54,42 @@ function generateInvoiceNumber(): string {
 }
 
 function formatBooking(b: any) {
+  const isCamel = b.bookingNumber !== undefined;
+  const get = (camel: string, snake: string) => isCamel ? b[camel] : b[snake];
   return {
-    ...b,
-    totalAmount: b.totalAmount ? Number(b.totalAmount) : null,
-    gstAmount: b.gstAmount ? Number(b.gstAmount) : null,
-    finalAmount: b.finalAmount ? Number(b.finalAmount) : null,
-    createdAt: b.createdAt?.toISOString?.() ?? b.createdAt,
-    updatedAt: b.updatedAt?.toISOString?.() ?? b.updatedAt,
+    id: get("id", "id"),
+    bookingNumber: get("bookingNumber", "booking_number"),
+    packageId: get("packageId", "package_id"),
+    packageName: get("packageName", "package_name"),
+    customerId: get("customerId", "customer_id"),
+    customerName: get("customerName", "customer_name"),
+    customerMobile: get("customerMobile", "customer_mobile"),
+    customerEmail: get("customerEmail", "customer_email"),
+    numberOfPilgrims: get("numberOfPilgrims", "number_of_pilgrims"),
+    pilgrims: get("pilgrims", "pilgrims"),
+    preferredDepartureDate: get("preferredDepartureDate", "preferred_departure_date"),
+    status: get("status", "status"),
+    roomType: get("roomType", "room_type"),
+    groupId: get("groupId", "group_id"),
+    invoiceNumber: get("invoiceNumber", "invoice_number"),
+    rejectionReason: get("rejectionReason", "rejection_reason"),
+    notes: get("notes", "notes"),
+    isOffline: get("isOffline", "is_offline"),
+    isDeleted: get("isDeleted", "is_deleted"),
+    deletedAt: get("deletedAt", "deleted_at"),
+    deletedBy: get("deletedBy", "deleted_by"),
+    travellerDetailsStatus: get("travellerDetailsStatus", "traveller_details_status"),
+    paymentId: get("paymentId", "payment_id"),
+    razorpayOrderId: get("razorpayOrderId", "razorpay_order_id"),
+    razorpayPaymentId: get("razorpayPaymentId", "razorpay_payment_id"),
+    totalAmount: (() => { const v = get("totalAmount","total_amount"); return v ? Number(v) : null; })(),
+    gstAmount: (() => { const v = get("gstAmount","gst_amount"); return v ? Number(v) : null; })(),
+    finalAmount: (() => { const v = get("finalAmount","final_amount"); return v ? Number(v) : null; })(),
+    advanceAmount: (() => { const v = get("advanceAmount","advance_amount"); return v ? Number(v) : null; })(),
+    paidAmount: (() => { const v = get("paidAmount","paid_amount"); return v ? Number(v) : null; })(),
+    onlinePaidAmount: (() => { const v = get("onlinePaidAmount","online_paid_amount"); return v ? Number(v) : null; })(),
+    createdAt: (() => { const v = get("createdAt","created_at"); return v?.toISOString?.() ?? v; })(),
+    updatedAt: (() => { const v = get("updatedAt","updated_at"); return v?.toISOString?.() ?? v; })(),
   };
 }
 
