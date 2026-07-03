@@ -24,6 +24,8 @@ import verifyRouter from "./verify.js";
 import scanRouter from "./scan.js";
 import deleteAuthRouter from "./delete-auth.js";
 import attendanceRouter from "./attendance.js";
+import expensesRouter from "./expenses.js";
+import flightsRouter from "./flights.js";
 
 const router: IRouter = Router();
 
@@ -78,6 +80,8 @@ router.use("/verify", verifyRouter);
 router.use("/scan", scanRouter);
 router.use("/delete-auth", deleteAuthRouter);
 router.use("/groups", attendanceRouter);
+router.use("/expenses", expensesRouter);
+router.use("/flights", flightsRouter);
 router.use(storageRouter);
 
 export default router;

@@ -208,6 +208,58 @@ async function runMigrations() {
   } catch (err) {
     console.error("[Migration] pilgrims room/bus columns failed:", err);
   }
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS expenses (
+        id TEXT PRIMARY KEY,
+        group_id TEXT,
+        category TEXT NOT NULL,
+        vendor TEXT,
+        description TEXT NOT NULL,
+        amount NUMERIC(12,2) NOT NULL,
+        date TEXT NOT NULL,
+        paid_by TEXT,
+        payment_method TEXT DEFAULT 'cash',
+        invoice_number TEXT,
+        attachment_url TEXT,
+        notes TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    console.log("[Migration] expenses table ensured");
+  } catch (err) {
+    console.error("[Migration] expenses table failed:", err);
+  }
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS group_flights (
+        id TEXT PRIMARY KEY,
+        group_id TEXT NOT NULL,
+        flight_type TEXT NOT NULL DEFAULT 'outbound',
+        airline TEXT,
+        flight_number TEXT,
+        pnr TEXT,
+        departure_airport TEXT,
+        arrival_airport TEXT,
+        departure_date TEXT,
+        departure_time TEXT,
+        arrival_date TEXT,
+        arrival_time TEXT,
+        baggage_allowance TEXT,
+        meal_type TEXT,
+        status TEXT DEFAULT 'scheduled',
+        notes TEXT,
+        pilgrims_assigned JSONB DEFAULT '[]',
+        ticket_numbers JSONB DEFAULT '{}',
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    console.log("[Migration] group_flights table ensured");
+  } catch (err) {
+    console.error("[Migration] group_flights table failed:", err);
+  }
 }
 
 const rawPort = process.env["PORT"];

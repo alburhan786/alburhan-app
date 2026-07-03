@@ -64,6 +64,9 @@ import AttendanceManager from "@/pages/admin/AttendanceManager";
 import PrintFamilySheet from "@/pages/admin/print/PrintFamilySheet";
 import AttendanceScanner from "@/pages/admin/AttendanceScanner";
 import AttendanceReport from "@/pages/admin/AttendanceReport";
+import ExpenseManager from "@/pages/admin/ExpenseManager";
+import AccountingDashboard from "@/pages/admin/AccountingDashboard";
+import FlightManager from "@/pages/admin/FlightManager";
 import AttendanceScanPublic from "@/pages/public/AttendanceScanPublic";
 import StaffVerify from "@/pages/public/StaffVerify";
 import VerifyPilgrim from "@/pages/public/VerifyPilgrim";
@@ -169,6 +172,10 @@ function Router() {
       <Route path="/admin/groups/:groupId/attendance/:eventId/scan" component={() => <AdminRoute component={AttendanceScanner} />} />
       <Route path="/admin/groups/:groupId/attendance/:eventId/report" component={() => <AdminRoute component={AttendanceReport} />} />
       <Route path="/admin/groups/:groupId/attendance" component={() => <AdminRoute component={AttendanceManager} />} />
+      <Route path="/admin/expenses" component={() => <AdminRoute component={ExpenseManager} />} />
+      <Route path="/admin/accounting" component={() => <AdminRoute component={AccountingDashboard} />} />
+      <Route path="/admin/flights" component={() => <AdminRoute component={FlightManager} />} />
+      <Route path="/admin/groups/:groupId/flights" component={() => <AdminRoute component={FlightManager} />} />
       <Route path="/admin/groups/:groupId/print/single-card/:pilgrimId"    component={() => <AdminRoute component={PrintSingleCard} />} />
       <Route path="/admin/groups/:groupId/print/id-card-front/:pilgrimId" component={() => <AdminRoute component={PrintSingleCard} />} />
       <Route path="/admin/groups/:groupId/print/id-card-back/:pilgrimId"  component={() => <AdminRoute component={PrintSingleCard} />} />

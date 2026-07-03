@@ -4,7 +4,8 @@ import { useAuth } from "@/hooks/use-auth";
 import {
   LayoutDashboard, PackageSearch, Users, BookOpen, MessageSquare, LogOut,
   ImageIcon, UsersRound, Receipt, ClipboardPlus, ScanLine, BarChart2,
-  Printer, Menu, Megaphone, ShieldCheck, Inbox, PieChart, Star, BadgeCheck, Droplets
+  Printer, Menu, Megaphone, ShieldCheck, Inbox, PieChart, Star, BadgeCheck, Droplets,
+  TrendingDown, Calculator, Plane
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -37,12 +38,15 @@ function buildMenu(openComplaints: number): MenuSection[] {
         { icon: ClipboardPlus, label: "Offline Booking", href: "/admin/offline-bookings" },
         { icon: Receipt, label: "Invoices", href: "/admin/invoices" },
         { icon: PieChart, label: "Payment Analytics", href: "/admin/payment-analytics" },
+        { icon: TrendingDown, label: "Expenses", href: "/admin/expenses" },
+        { icon: Calculator, label: "Accounting", href: "/admin/accounting" },
       ],
     },
     {
       section: "Pilgrims & Groups",
       items: [
         { icon: UsersRound, label: "Hajj Groups", href: "/admin/groups" },
+        { icon: Plane, label: "Flights", href: "/admin/flights" },
         { icon: BadgeCheck, label: "Staff ID Cards", href: "/admin/staff" },
         { icon: ScanLine, label: "QR Tracker", href: "/admin/qr-tracker" },
         { icon: Printer, label: "Print Center", href: "/admin/print-center" },

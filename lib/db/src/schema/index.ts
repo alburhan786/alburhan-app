@@ -16,3 +16,5 @@ export * from "./companies";
 export * from "./feedback";
 export * from "./staff";
 export * from "./attendance";
+export * from "./expenses";
+export * from "./flights";
