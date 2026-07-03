@@ -131,6 +131,23 @@ async function runMigrations() {
   } catch (err) {
     console.error("[Migration] pilgrims_families failed:", err);
   }
+  try {
+    await db.execute(sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS total_amount NUMERIC(12,2)`);
+    await db.execute(sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS gst_amount NUMERIC(12,2)`);
+    await db.execute(sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS final_amount NUMERIC(12,2)`);
+    console.log("[Migration] bookings amount columns ensured");
+  } catch (err) {
+    console.error("[Migration] bookings amount columns failed:", err);
+  }
+  try {
+    await db.execute(sql`ALTER TABLE pilgrims ADD COLUMN IF NOT EXISTS room_id TEXT`);
+    await db.execute(sql`ALTER TABLE pilgrims ADD COLUMN IF NOT EXISTS room_hotel TEXT`);
+    await db.execute(sql`ALTER TABLE pilgrims ADD COLUMN IF NOT EXISTS room_number TEXT`);
+    await db.execute(sql`ALTER TABLE pilgrims ADD COLUMN IF NOT EXISTS bus_number TEXT`);
+    console.log("[Migration] pilgrims room/bus columns ensured");
+  } catch (err) {
+    console.error("[Migration] pilgrims room/bus columns failed:", err);
+  }
 }
 
 const rawPort = process.env["PORT"];
