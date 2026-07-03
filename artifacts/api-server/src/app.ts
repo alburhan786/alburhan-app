@@ -158,6 +158,28 @@ app.get("/api/migrate/frontend.tar.gz", (req, res) => {
   req.on("close", () => tar.kill());
 });
 
+// DIAGNOSTIC: test DB tables/columns on VPS (key-protected, no login needed)
+app.get("/api/migrate/db-check", async (req, res) => {
+  const key = req.query.key as string;
+  if (!key || key !== "alburhan-migrate-2026") return res.status(403).send("Forbidden");
+  const { db: diagDb } = await import("@workspace/db");
+  const { sql: diagSql } = await import("drizzle-orm");
+  const checks: Record<string, string> = {};
+  const tables = ["bookings", "users", "packages", "hajj_groups", "pilgrims", "hajj_rooms", "attendance_events", "attendance_logs"];
+  for (const t of tables) {
+    try {
+      const r = await diagDb.execute(diagSql.raw(`SELECT COUNT(*) FROM ${t}`)) as any;
+      checks[t] = `OK (${r[0]?.count ?? r?.rows?.[0]?.count ?? "?"} rows)`;
+    } catch (e: any) { checks[t] = `ERROR: ${e.message}`; }
+  }
+  // Test stats query specifically
+  try {
+    await diagDb.execute(diagSql.raw(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE status::text='pending')::int AS pending, COALESCE(SUM(CASE WHEN status::text='confirmed' THEN final_amount::numeric ELSE 0 END),0)::float AS revenue FROM bookings`));
+    checks["stats_query"] = "OK";
+  } catch (e: any) { checks["stats_query"] = `ERROR: ${e.message}`; }
+  res.json(checks);
+});
+
 // TEMPORARY: serve DB dump for VPS migration
 app.get("/api/migrate/dump.sql", (req, res) => {
   const key = req.query.key as string;
