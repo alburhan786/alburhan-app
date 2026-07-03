@@ -65,14 +65,19 @@ function fmtPilgrim(p: any) {
 }
 
 router.get("/", requireAdmin as any, async (_req, res) => {
-  const groups = await db.select().from(hajjGroupsTable).orderBy(desc(hajjGroupsTable.createdAt));
-  const pilgrimCounts = await db
-    .select({ groupId: pilgrimsTable.groupId, count: count() })
-    .from(pilgrimsTable)
-    .groupBy(pilgrimsTable.groupId);
+  try {
+    const groups = await db.select().from(hajjGroupsTable).orderBy(desc(hajjGroupsTable.createdAt));
+    const pilgrimCounts = await db
+      .select({ groupId: pilgrimsTable.groupId, count: count() })
+      .from(pilgrimsTable)
+      .groupBy(pilgrimsTable.groupId);
 
-  const countMap = Object.fromEntries(pilgrimCounts.map(pc => [pc.groupId, Number(pc.count)]));
-  res.json(groups.map(g => ({ ...fmtGroup(g), pilgrimCount: countMap[g.id] || 0 })));
+    const countMap = Object.fromEntries(pilgrimCounts.map(pc => [pc.groupId, Number(pc.count)]));
+    res.json(groups.map(g => ({ ...fmtGroup(g), pilgrimCount: countMap[g.id] || 0 })));
+  } catch (err: any) {
+    console.error("[Groups] List failed:", err?.message);
+    res.status(500).json({ message: err?.message || "Failed to load groups" });
+  }
 });
 
 router.post("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
