@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, hajjGroupsTable, pilgrimsTable, hajjRoomsTable, attendanceLogsTable, attendanceEventsTable } from "@workspace/db";
-import { eq, and, ne, desc, asc, count, max, inArray } from "drizzle-orm";
+import { eq, and, ne, desc, asc, count, max, inArray, sql } from "drizzle-orm";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendWhatsApp } from "../lib/notifications.js";
 import multer from "multer";
@@ -67,23 +67,26 @@ function fmtPilgrim(p: any) {
 router.get("/", requireAdmin as any, async (_req, res) => {
   try {
     // Raw SQL to avoid Drizzle schema mismatch on VPS (missing columns crash ORM selects)
-    const groups = await db.execute(sql`
+    // db.execute() with node-postgres returns { rows: [...] }, so we normalise both shapes
+    const rawGroups = await db.execute(sql`
       SELECT id, group_name, year, company_id, departure_date, return_date,
              flight_number, maktab_number, COALESCE(starting_serial_number, 1) AS starting_serial_number,
              COALESCE(hotels, '{}') AS hotels, notes, created_at, updated_at
       FROM hajj_groups ORDER BY created_at DESC
-    `) as any[];
+    `);
+    const groups: any[] = (rawGroups as any)?.rows ?? (Array.isArray(rawGroups) ? rawGroups : []);
 
-    const counts = await db.execute(sql`
+    const rawCounts = await db.execute(sql`
       SELECT group_id, COUNT(*)::int AS cnt FROM pilgrims GROUP BY group_id
-    `) as any[];
+    `);
+    const countRows: any[] = (rawCounts as any)?.rows ?? (Array.isArray(rawCounts) ? rawCounts : []);
 
     const countMap: Record<string, number> = {};
-    for (const r of (Array.isArray(counts) ? counts : [])) {
+    for (const r of countRows) {
       countMap[r.group_id] = Number(r.cnt);
     }
 
-    const groupList = (Array.isArray(groups) ? groups : []).map((g: any) => ({
+    const groupList = groups.map((g: any) => ({
       id: g.id,
       groupName: g.group_name,
       year: g.year,

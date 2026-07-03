@@ -9,7 +9,8 @@ const router = Router();
 router.get("/stats", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
   try {
     // Use raw SQL to avoid pgEnum type mismatch on VPS (booking_status enum may not exist)
-    const [counts] = await db.execute(sql`
+    // db.execute() with node-postgres returns { rows: [...] }
+    const countsResult = await db.execute(sql`
       SELECT
         COUNT(*)::int AS total,
         COUNT(*) FILTER (WHERE status::text = 'pending')::int AS pending,
@@ -19,12 +20,16 @@ router.get("/stats", requireAdmin as any, async (_req: AuthenticatedRequest, res
         COALESCE(SUM(CASE WHEN status::text = 'confirmed'
           THEN NULLIF(TRIM(final_amount::text), '')::numeric ELSE 0 END), 0)::float AS revenue
       FROM bookings
-    `) as any;
+    `);
+    const counts = (countsResult as any)?.rows?.[0] ?? (Array.isArray(countsResult) ? (countsResult as any[])[0] : countsResult);
 
-    const [custRow] = await db.execute(sql`SELECT COUNT(*)::int AS total FROM users WHERE role = 'customer'`) as any;
-    const [pkgRow] = await db.execute(sql`SELECT COUNT(*)::int AS total FROM packages`) as any;
+    const custResult = await db.execute(sql`SELECT COUNT(*)::int AS total FROM users WHERE role = 'customer'`);
+    const custRow = (custResult as any)?.rows?.[0] ?? (Array.isArray(custResult) ? (custResult as any[])[0] : custResult);
 
-    const recentRows = await db.execute(sql`
+    const pkgResult = await db.execute(sql`SELECT COUNT(*)::int AS total FROM packages`);
+    const pkgRow = (pkgResult as any)?.rows?.[0] ?? (Array.isArray(pkgResult) ? (pkgResult as any[])[0] : pkgResult);
+
+    const recentResult = await db.execute(sql`
       SELECT id,
              COALESCE(booking_number, '') AS booking_number,
              COALESCE(customer_name, '') AS customer_name,
@@ -35,7 +40,8 @@ router.get("/stats", requireAdmin as any, async (_req: AuthenticatedRequest, res
              NULLIF(TRIM(final_amount::text), '') AS final_amount,
              created_at, updated_at
       FROM bookings ORDER BY created_at DESC LIMIT 5
-    `) as any;
+    `);
+    const recentRows: any[] = (recentResult as any)?.rows ?? (Array.isArray(recentResult) ? recentResult : []);
 
     res.json({
       totalBookings: Number(counts?.total ?? 0),
