@@ -1,6 +1,6 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { db, attendanceEventsTable, attendanceLogsTable, pilgrimsTable } from "@workspace/db";
-import { eq, and, desc, inArray } from "drizzle-orm";
+import { eq, and, desc, inArray, or } from "drizzle-orm";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import * as XLSX from "xlsx";
 
@@ -161,16 +161,27 @@ router.post("/:groupId/attendance/events/:eventId/scan", requireAdminOrToken, as
   const event = await getEventForGroup(eventId, groupId);
   if (!event) { res.status(404).json({ error: "Event not found in this group" }); return; }
 
-  let pilgrimId = rawId;
-  if (!pilgrimId && qrText) pilgrimId = parsePilgrimId(qrText);
-  if (!pilgrimId) { res.status(400).json({ error: "pilgrimId or qrText required" }); return; }
+  let scannedValue = rawId;
+  if (!scannedValue && qrText) scannedValue = parsePilgrimId(qrText);
+  if (!scannedValue) { res.status(400).json({ error: "pilgrimId or qrText required" }); return; }
 
+  // Look up by UUID first, then fall back to barcodeId (e.g. ABT-HJ26-0001)
   const [pilgrim] = await db
     .select()
     .from(pilgrimsTable)
-    .where(and(eq(pilgrimsTable.id, pilgrimId), eq(pilgrimsTable.groupId, groupId)));
+    .where(and(
+      eq(pilgrimsTable.groupId, groupId),
+      or(
+        eq(pilgrimsTable.id, scannedValue),
+        eq(pilgrimsTable.barcodeId, scannedValue.toUpperCase())
+      )
+    ))
+    .limit(1);
 
   if (!pilgrim) { res.status(404).json({ error: "Pilgrim not found in this group" }); return; }
+
+  // Always use the real UUID for attendance logs
+  const pilgrimId = pilgrim.id;
 
   const existing = await db
     .select()
