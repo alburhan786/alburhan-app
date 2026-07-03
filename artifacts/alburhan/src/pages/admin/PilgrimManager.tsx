@@ -1270,7 +1270,7 @@ export default function PilgrimManager() {
                                 className="h-5 text-[10px] rounded border border-gray-200 bg-gray-50 text-gray-700 px-1 max-w-[72px]"
                               >
                                 <option value="">Relation</option>
-                                {["Husband","Wife","Son","Daughter","Father","Mother","Other"].map(r => (
+                                {["Self","Husband","Wife","Son","Daughter","Father","Mother","Brother","Sister","Nephew","Niece","Father in Law","Mother in Law","Bhabhi","Uncle","Aunty","Other"].map(r => (
                                   <option key={r} value={r}>{r}</option>
                                 ))}
                               </select>
@@ -2658,7 +2658,7 @@ export default function PilgrimManager() {
               <div className="space-y-1"><label className="text-sm font-medium">Relation</label>
                 <select value={form.relation} onChange={e => f("relation", e.target.value)} className="w-full h-10 px-3 rounded-md border bg-background text-sm">
                   <option value="">Select</option>
-                  {["Self","Wife","Husband","Mother","Father","Son","Daughter","Brother","Sister","Other"].map(r => <option key={r} value={r}>{r}</option>)}
+                  {["Self","Husband","Wife","Son","Daughter","Father","Mother","Brother","Sister","Nephew","Niece","Father in Law","Mother in Law","Bhabhi","Uncle","Aunty","Other"].map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
               </div>
               <div className="space-y-1"><label className="text-sm font-medium">Cover Number (HGO ID)</label><Input value={form.coverNumber} onChange={e => f("coverNumber", e.target.value)} /></div>
