@@ -1,5 +1,5 @@
 #!/bin/bash
-# VPS build script — bypasses pnpm workspace filter issues
+# VPS build + deploy script — works around pnpm filter issues
 set -e
 
 ROOT="/var/www/alburhan"
@@ -8,18 +8,9 @@ DIST_DIR="$API_DIR/dist"
 
 echo "==> Building api-server for VPS..."
 
-# Ensure esbuild is available (approve it if needed)
-cd "$ROOT"
-if [ ! -f "$ROOT/node_modules/esbuild/bin/esbuild" ] && [ ! -f "$ROOT/node_modules/.bin/esbuild" ]; then
-  echo "==> Running pnpm approve-builds for esbuild..."
-  echo "esbuild" | pnpm approve-builds 2>/dev/null || true
-  pnpm install --no-frozen-lockfile 2>/dev/null || true
-fi
-
 # Build using Node.js directly with esbuild (no pnpm filter needed)
 node --input-type=module << 'SCRIPT'
 import { createRequire } from 'module';
-import { fileURLToPath } from 'url';
 import path from 'path';
 import { readFileSync, rmSync } from 'fs';
 
@@ -45,6 +36,7 @@ const allowlist = [
   'connect-pg-simple',
   'cors',
   'date-fns',
+  'dotenv',
   'drizzle-orm',
   'drizzle-zod',
   'express',
@@ -104,7 +96,12 @@ await build({
 console.log('✅ api-server built successfully!');
 SCRIPT
 
-echo "==> Restarting pm2..."
-pm2 restart api-server
+echo "==> Restarting pm2 with updated env..."
+# Export .env vars so PM2 picks them up
+set -a
+source "$ROOT/.env" 2>/dev/null || true
+set +a
+
+pm2 restart api-server --update-env
 
 echo "✅ Done! Server is live."

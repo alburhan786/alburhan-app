@@ -1,3 +1,8 @@
+// Load .env file before anything else (needed for VPS where PM2 doesn't auto-load .env)
+import { config as dotenvConfig } from "dotenv";
+dotenvConfig({ path: "/var/www/alburhan/.env" });
+dotenvConfig(); // also try local .env as fallback
+
 process.on("uncaughtException", (err) => {
   console.error("[UNCAUGHT EXCEPTION] Server will NOT exit:", err);
 });
