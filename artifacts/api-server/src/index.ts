@@ -263,6 +263,8 @@ async function runMigrations() {
   try {
     await db.execute(sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ`);
     await db.execute(sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS deleted_by TEXT`);
+    await db.execute(sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT false`);
+    await db.execute(sql`UPDATE bookings SET is_deleted = true WHERE deleted_at IS NOT NULL AND is_deleted = false`);
     console.log("[Migration] bookings soft-delete columns ensured");
   } catch (err) {
     console.error("[Migration] bookings soft-delete columns failed:", err);

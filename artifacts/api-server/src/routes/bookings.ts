@@ -1,5 +1,5 @@
 import { Router, type Request } from "express";
-import { db, bookingsTable, packagesTable, usersTable, hajjGroupsTable, customerProfilesTable, paymentTransactionsTable } from "@workspace/db";
+import { db, pool, bookingsTable, packagesTable, usersTable, hajjGroupsTable, customerProfilesTable, paymentTransactionsTable } from "@workspace/db";
 import { eq, and, desc, count, sql, isNull, or, ilike } from "drizzle-orm";
 import multer from "multer";
 import { uploadToGCS } from "../lib/gcsUpload.js";
@@ -768,15 +768,17 @@ router.delete("/:id/permanent", requireAdmin as any, async (req: AuthenticatedRe
 router.delete("/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   const bookingId = req.params.id;
   try {
-    const [existing] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
+    const { rows: existingRows } = await pool.query(`SELECT * FROM bookings WHERE id = $1 LIMIT 1`, [bookingId]);
+    const existing = existingRows[0];
     if (!existing) { res.status(404).json({ message: "Booking not found" }); return; }
-    if (existing.deletedAt) { res.status(400).json({ message: "Booking is already in trash" }); return; }
+    if (existing.deleted_at) { res.status(400).json({ message: "Booking is already in trash" }); return; }
 
     const deletedBy = req.user?.name || req.user?.mobile || "admin";
-    const [updated] = await db.update(bookingsTable)
-      .set({ deletedAt: new Date(), deletedBy, updatedAt: new Date() })
-      .where(eq(bookingsTable.id, bookingId))
-      .returning();
+    const { rows: updatedRows } = await pool.query(
+      `UPDATE bookings SET deleted_at = NOW(), deleted_by = $1, is_deleted = true, updated_at = NOW() WHERE id = $2 RETURNING *`,
+      [deletedBy, bookingId]
+    );
+    const updated = updatedRows[0];
 
     await writeAuditLog(bookingId, deletedBy, "soft_delete", [
       { fieldName: "status", oldValue: existing.status, newValue: "deleted" },
@@ -791,15 +793,17 @@ router.delete("/:id", requireAdmin as any, async (req: AuthenticatedRequest, res
 router.post("/:id/restore", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   const bookingId = req.params.id;
   try {
-    const [existing] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
+    const { rows: existingRows } = await pool.query(`SELECT * FROM bookings WHERE id = $1 LIMIT 1`, [bookingId]);
+    const existing = existingRows[0];
     if (!existing) { res.status(404).json({ message: "Booking not found" }); return; }
-    if (!existing.deletedAt) { res.status(400).json({ message: "Booking is not in trash" }); return; }
+    if (!existing.deleted_at) { res.status(400).json({ message: "Booking is not in trash" }); return; }
 
     const restoredBy = req.user?.name || req.user?.mobile || "admin";
-    const [updated] = await db.update(bookingsTable)
-      .set({ deletedAt: null, deletedBy: null, updatedAt: new Date() })
-      .where(eq(bookingsTable.id, bookingId))
-      .returning();
+    const { rows: updatedRows } = await pool.query(
+      `UPDATE bookings SET deleted_at = NULL, deleted_by = NULL, is_deleted = false, updated_at = NOW() WHERE id = $1 RETURNING *`,
+      [bookingId]
+    );
+    const [updated] = updatedRows;
 
     await writeAuditLog(bookingId, restoredBy, "restore", [
       { fieldName: "status", oldValue: "deleted", newValue: existing.status },
