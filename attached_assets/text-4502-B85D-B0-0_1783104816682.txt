@@ -1,0 +1,35 @@
+Fix the Add Flight module.
+
+Current error:
+Failed to save
+{"error":"groupId required"}
+
+Requirements:
+
+1. Every flight must be linked to a Hajj Group.
+2. If the user opens Add Flight from a group, automatically pass the groupId.
+3. If no group is selected, show a dropdown:
+   - Select Group
+   - Hajj 2027
+   - Ramadan Umrah
+   - Iraq Ziyarat
+   - Syria Tour
+4. Do not allow saving without a valid groupId.
+5. Show a friendly message:
+   "Please select a Hajj Group before adding a flight."
+   instead of the raw JSON error.
+6. Save the flight with:
+   - groupId
+   - airline
+   - flight number
+   - PNR
+   - departure airport
+   - arrival airport
+   - departure date/time
+   - arrival date/time
+   - baggage
+   - meal
+   - status
+   - notes
+7. After saving, automatically display the flight under the selected group's Flights tab.
+8. Keep existing data intact and fix only the Add Flight workflow.

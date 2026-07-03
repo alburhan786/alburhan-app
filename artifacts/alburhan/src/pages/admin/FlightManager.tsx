@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plus, Plane, Pencil, Trash2, ChevronDown, ChevronRight, ArrowRight } from "lucide-react";
+import { Plus, Plane, Pencil, Trash2, ChevronDown, ChevronRight, ArrowRight, Users } from "lucide-react";
 import { useParams } from "wouter";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -48,6 +48,13 @@ interface Flight {
   createdAt: string;
 }
 
+interface Group {
+  id: string;
+  name: string;
+  type?: string | null;
+  year?: string | null;
+}
+
 const EMPTY_FORM = {
   flightType: "outbound", airline: "", flightNumber: "", pnr: "",
   departureAirport: "", arrivalAirport: "", departureDate: "", departureTime: "",
@@ -60,34 +67,58 @@ const statusMap = Object.fromEntries(STATUSES.map(s => [s.value, s]));
 
 export default function FlightManager() {
   const params = useParams<{ groupId?: string }>();
-  const groupId = params?.groupId;
+  const urlGroupId = params?.groupId;
   const { toast } = useToast();
+
   const [flights, setFlights] = useState<Flight[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeType, setActiveType] = useState("outbound");
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [formGroupId, setFormGroupId] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [groupNameMap, setGroupNameMap] = useState<Record<string, string>>({});
+
+  async function loadGroups() {
+    try {
+      const r = await fetch(`${API}/api/groups`, { credentials: "include" });
+      if (r.ok) {
+        const data = await r.json();
+        const list: Group[] = Array.isArray(data) ? data : (data.groups || []);
+        setGroups(list);
+        const map: Record<string, string> = {};
+        list.forEach(g => { map[g.id] = g.name; });
+        setGroupNameMap(map);
+      }
+    } catch {}
+  }
 
   async function load() {
     setLoading(true);
     try {
-      const url = groupId ? `${API}/api/flights?groupId=${groupId}` : `${API}/api/flights`;
+      const url = urlGroupId
+        ? `${API}/api/flights?groupId=${urlGroupId}`
+        : `${API}/api/flights`;
       const r = await fetch(url, { credentials: "include" });
       if (r.ok) setFlights(await r.json());
     } catch {}
     setLoading(false);
   }
 
-  useEffect(() => { load(); }, [groupId]);
+  useEffect(() => {
+    loadGroups();
+    load();
+  }, [urlGroupId]);
 
   const shown = flights.filter(f => f.flightType === activeType);
 
   function openAdd() {
     setEditId(null);
     setForm({ ...EMPTY_FORM, flightType: activeType });
+    setFormGroupId(urlGroupId || "");
     setShowModal(true);
   }
 
@@ -109,17 +140,35 @@ export default function FlightManager() {
       status: f.status || "scheduled",
       notes: f.notes || "",
     });
+    setFormGroupId(f.groupId || urlGroupId || "");
     setShowModal(true);
   }
 
   async function save() {
+    const effectiveGroupId = urlGroupId || formGroupId;
+    if (!effectiveGroupId) {
+      toast({
+        title: "Group required",
+        description: "Please select a Hajj Group before adding a flight.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setSaving(true);
     try {
-      const body = { ...form, groupId };
+      const body = { ...form, groupId: effectiveGroupId };
       const url = editId ? `${API}/api/flights/${editId}` : `${API}/api/flights`;
       const method = editId ? "PUT" : "POST";
-      const r = await fetch(url, { method, credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      if (!r.ok) throw new Error(await r.text());
+      const r = await fetch(url, {
+        method, credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        throw new Error(err.error || err.message || "Failed to save flight");
+      }
       toast({ title: editId ? "Flight updated" : "Flight added" });
       setShowModal(false);
       await load();
@@ -137,8 +186,14 @@ export default function FlightManager() {
   }
 
   function toggleExpand(id: string) {
-    setExpanded(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+    setExpanded(prev => {
+      const n = new Set(prev);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
   }
+
+  const currentGroupName = urlGroupId ? (groupNameMap[urlGroupId] || urlGroupId) : null;
 
   return (
     <AdminLayout>
@@ -147,7 +202,13 @@ export default function FlightManager() {
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-bold text-[#0d5040]">Flight Management</h1>
-            <p className="text-sm text-muted-foreground">{groupId ? `Group: ${groupId}` : "All groups"}</p>
+            <p className="text-sm text-muted-foreground">
+              {currentGroupName ? (
+                <span className="flex items-center gap-1.5">
+                  <Users size={13} /> Group: <strong>{currentGroupName}</strong>
+                </span>
+              ) : "All groups"}
+            </p>
           </div>
           <Button size="sm" className="bg-[#0d5040] hover:bg-[#0a3d30]" onClick={openAdd}>
             <Plus size={14} className="mr-1.5" />Add Flight
@@ -175,8 +236,10 @@ export default function FlightManager() {
         ) : shown.length === 0 ? (
           <div className="py-16 text-center bg-white rounded-xl border">
             <Plane size={32} className="mx-auto text-muted-foreground/30 mb-2" />
-            <p className="text-muted-foreground text-sm">No {FLIGHT_TYPES.find(t=>t.value===activeType)?.label.split("(")[0]} flights yet</p>
-            <Button size="sm" className="mt-3 bg-[#0d5040]" onClick={openAdd}><Plus size={13} className="mr-1" />Add Flight</Button>
+            <p className="text-muted-foreground text-sm">No {FLIGHT_TYPES.find(t => t.value === activeType)?.label.split("(")[0]} flights yet</p>
+            <Button size="sm" className="mt-3 bg-[#0d5040]" onClick={openAdd}>
+              <Plus size={13} className="mr-1" />Add Flight
+            </Button>
           </div>
         ) : (
           <div className="space-y-3">
@@ -187,28 +250,29 @@ export default function FlightManager() {
               return (
                 <div key={f.id} className="bg-white rounded-xl border overflow-hidden">
                   <div className="p-4 flex items-start gap-4">
-                    {/* Airline badge */}
                     <div className="shrink-0 w-12 h-12 bg-[#0d5040]/10 rounded-xl flex items-center justify-center">
                       <Plane size={22} className="text-[#0d5040]" />
                     </div>
 
-                    {/* Flight info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-bold text-base">{f.airline || "—"}</span>
                         {f.flightNumber && <span className="text-sm text-muted-foreground">· {f.flightNumber}</span>}
                         {f.pnr && <Badge variant="outline" className="text-[10px] font-mono">PNR: {f.pnr}</Badge>}
                         <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${st?.color || "bg-gray-100"}`}>{st?.label || f.status}</span>
+                        {!urlGroupId && groupNameMap[f.groupId] && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#0d5040]/10 text-[#0d5040] font-medium flex items-center gap-1">
+                            <Users size={9} /> {groupNameMap[f.groupId]}
+                          </span>
+                        )}
                       </div>
 
-                      {/* Route */}
                       <div className="flex items-center gap-2 mt-1.5 text-sm">
                         <span className="font-mono font-bold">{f.departureAirport || "—"}</span>
                         <ArrowRight size={14} className="text-muted-foreground" />
                         <span className="font-mono font-bold">{f.arrivalAirport || "—"}</span>
                       </div>
 
-                      {/* Dates */}
                       <div className="flex gap-4 mt-1 text-xs text-muted-foreground flex-wrap">
                         {f.departureDate && <span>Dep: <strong>{f.departureDate}</strong>{f.departureTime && ` ${f.departureTime}`}</span>}
                         {f.arrivalDate && <span>Arr: <strong>{f.arrivalDate}</strong>{f.arrivalTime && ` ${f.arrivalTime}`}</span>}
@@ -216,13 +280,11 @@ export default function FlightManager() {
                         {f.mealType && <span>🍽️ {f.mealType}</span>}
                       </div>
 
-                      {/* Pilgrim count */}
                       {(f.pilgrimsAssigned?.length ?? 0) > 0 && (
                         <p className="text-xs text-muted-foreground mt-1">👥 {f.pilgrimsAssigned!.length} pilgrims assigned</p>
                       )}
                     </div>
 
-                    {/* Actions */}
                     <div className="flex items-center gap-1 shrink-0">
                       <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => toggleExpand(f.id)}>
                         {isExp ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
@@ -236,7 +298,6 @@ export default function FlightManager() {
                     </div>
                   </div>
 
-                  {/* Expanded details */}
                   {isExp && (
                     <div className="border-t bg-muted/30 px-4 py-3 text-xs grid grid-cols-2 md:grid-cols-4 gap-3">
                       <div><span className="text-muted-foreground">Flight Type</span><p className="font-medium mt-0.5">{typ?.label.split("(")[0]}</p></div>
@@ -260,6 +321,46 @@ export default function FlightManager() {
             <DialogTitle>{editId ? "Edit Flight" : "Add Flight"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 mt-2">
+
+            {/* Group selector — shown when NOT launched from a specific group */}
+            {!urlGroupId && (
+              <div>
+                <label className="text-xs font-semibold text-[#0d5040] uppercase tracking-wide">
+                  Hajj Group <span className="text-red-500">*</span>
+                </label>
+                {groups.length === 0 ? (
+                  <p className="mt-1 text-sm text-muted-foreground italic">Loading groups…</p>
+                ) : (
+                  <select
+                    value={formGroupId}
+                    onChange={e => setFormGroupId(e.target.value)}
+                    className={`mt-1 w-full h-9 px-2 rounded border text-sm bg-background ${!formGroupId ? "border-red-300" : "border-input"}`}
+                  >
+                    <option value="">— Select Hajj Group —</option>
+                    {groups.map(g => (
+                      <option key={g.id} value={g.id}>
+                        {g.name}{g.year ? ` (${g.year})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {!formGroupId && (
+                  <p className="mt-1 text-xs text-amber-600 flex items-center gap-1">
+                    ⚠ Please select a Hajj Group before adding a flight.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Group label when launched from a group page */}
+            {urlGroupId && currentGroupName && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#0d5040]/5 border border-[#0d5040]/20 text-sm">
+                <Users size={14} className="text-[#0d5040]" />
+                <span className="text-muted-foreground">Group:</span>
+                <span className="font-semibold text-[#0d5040]">{currentGroupName}</span>
+              </div>
+            )}
+
             <div>
               <label className="text-xs font-medium">Flight Type</label>
               <select value={form.flightType} onChange={e => setForm(f => ({...f, flightType: e.target.value}))} className="mt-1 w-full h-9 px-2 rounded border text-sm bg-background">
@@ -334,7 +435,12 @@ export default function FlightManager() {
             </div>
             <div className="flex gap-2 pt-1">
               <Button variant="outline" className="flex-1" onClick={() => setShowModal(false)}>Cancel</Button>
-              <Button className="flex-1 bg-[#0d5040] hover:bg-[#0a3d30]" onClick={save} disabled={saving}>
+              <Button
+                className="flex-1 bg-[#0d5040] hover:bg-[#0a3d30]"
+                onClick={save}
+                disabled={saving || (!urlGroupId && !formGroupId)}
+                title={!urlGroupId && !formGroupId ? "Select a group first" : undefined}
+              >
                 {saving ? "Saving…" : editId ? "Update" : "Add Flight"}
               </Button>
             </div>
