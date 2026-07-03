@@ -16,7 +16,8 @@ router.get("/stats", requireAdmin as any, async (_req: AuthenticatedRequest, res
         COUNT(*) FILTER (WHERE status::text = 'approved')::int AS approved,
         COUNT(*) FILTER (WHERE status::text = 'confirmed')::int AS confirmed,
         COUNT(*) FILTER (WHERE status::text = 'rejected')::int AS rejected,
-        COALESCE(SUM(CASE WHEN status::text = 'confirmed' THEN final_amount::numeric ELSE 0 END), 0)::float AS revenue
+        COALESCE(SUM(CASE WHEN status::text = 'confirmed'
+          THEN NULLIF(TRIM(final_amount::text), '')::numeric ELSE 0 END), 0)::float AS revenue
       FROM bookings
     `) as any;
 
@@ -24,8 +25,15 @@ router.get("/stats", requireAdmin as any, async (_req: AuthenticatedRequest, res
     const [pkgRow] = await db.execute(sql`SELECT COUNT(*)::int AS total FROM packages`) as any;
 
     const recentRows = await db.execute(sql`
-      SELECT id, booking_number, customer_name, customer_mobile, status::text AS status,
-             total_amount, gst_amount, final_amount, created_at, updated_at
+      SELECT id,
+             COALESCE(booking_number, '') AS booking_number,
+             COALESCE(customer_name, '') AS customer_name,
+             COALESCE(customer_mobile, '') AS customer_mobile,
+             status::text AS status,
+             NULLIF(TRIM(total_amount::text), '') AS total_amount,
+             NULLIF(TRIM(gst_amount::text), '') AS gst_amount,
+             NULLIF(TRIM(final_amount::text), '') AS final_amount,
+             created_at, updated_at
       FROM bookings ORDER BY created_at DESC LIMIT 5
     `) as any;
 
