@@ -1,0 +1,437 @@
+Upgrade the existing Al Burhan Tours & Travels ERP into a complete Hajj & Umrah Management System.
+
+IMPORTANT:
+- Do NOT break any existing functionality.
+- Do NOT delete existing data.
+- Preserve the current UI theme (Dark Green, Gold, White).
+- Keep PostgreSQL as the database.
+- Add new modules gradually with proper database migrations.
+
+==================================================
+PHASE 1 – FIX EXISTING ISSUES
+==================================================
+
+Fix all existing bugs:
+
+1. Booking "Move to Trash" is failing.
+   - Implement Soft Delete.
+   - Add Trash module.
+   - Restore Booking.
+   - Permanent Delete (Super Admin only).
+
+2. Accounting Dashboard
+   - Fix "Failed to load data".
+   - Show zero values when no data exists.
+
+3. Flight Module
+   - Fix "groupId required".
+   - Allow creating flights without errors.
+   - Assign flights to Hajj Groups.
+
+4. Add proper error logging.
+5. Never display raw JSON errors to users.
+
+==================================================
+PHASE 2 – COMPLETE PAYMENT MANAGEMENT
+==================================================
+
+Create a professional accounting module.
+
+Each pilgrim must have:
+
+• Package Price
+• Discount
+• Extra Charges
+• Advance
+• Installments
+• Paid Amount
+• Balance
+• Refund
+• Payment History
+
+Payment Methods
+
+Cash
+UPI
+Bank
+Cheque
+Online
+Razorpay
+
+Generate
+
+Receipt
+Invoice
+Balance Statement
+
+Automatic calculations
+
+Today's Collection
+
+Monthly Collection
+
+Outstanding
+
+Profit
+
+Loss
+
+==================================================
+PHASE 3 – FAMILY ACCOUNTING
+==================================================
+
+Create Family Ledger.
+
+Example
+
+F001
+
+Mohammed Altaf
+Nahid Parveen
+Mohammed Asif
+
+Package Total
+
+₹18,50,000
+
+Paid
+
+₹15,00,000
+
+Balance
+
+₹3,50,000
+
+One payment can be distributed across family members.
+
+==================================================
+PHASE 4 – OPERATION DASHBOARD
+==================================================
+
+Create a Live Hajj Operations Dashboard.
+
+Cards
+
+Total Pilgrims
+
+Families
+
+Hotels
+
+Rooms
+
+Flights
+
+Buses
+
+Present
+
+Missing
+
+Medical Cases
+
+Pending Payments
+
+Pending Visas
+
+Pending Tickets
+
+Today's Departure
+
+Today's Arrival
+
+==================================================
+PHASE 5 – HOTEL MANAGEMENT
+==================================================
+
+Hotel
+
+Floor
+
+Room
+
+Capacity
+
+Occupancy
+
+Family Wise Allocation
+
+Room Shift
+
+Check In
+
+Check Out
+
+Print Room List
+
+==================================================
+PHASE 6 – BUS MANAGEMENT
+==================================================
+
+Bus
+
+Driver
+
+Guide
+
+Seat Numbers
+
+Attendance
+
+Occupancy
+
+Print Bus List
+
+==================================================
+PHASE 7 – FLIGHT MANAGEMENT
+==================================================
+
+Airline
+
+PNR
+
+Flight
+
+Departure
+
+Arrival
+
+Meal
+
+Baggage
+
+Seat
+
+Status
+
+Assign entire Hajj Group to one flight.
+
+==================================================
+PHASE 8 – DOCUMENT CENTER
+==================================================
+
+Store
+
+Passport
+
+Visa
+
+PAN
+
+Aadhaar
+
+Photo
+
+Insurance
+
+Vaccination
+
+Ticket
+
+Generate PDF.
+
+==================================================
+PHASE 9 – WHATSAPP AUTOMATION
+==================================================
+
+Templates
+
+Booking Confirmation
+
+Payment Reminder
+
+Balance Reminder
+
+Visa Ready
+
+Flight Reminder
+
+Room Allocation
+
+Bus Allocation
+
+Departure Reminder
+
+Return Reminder
+
+Thank You Message
+
+Feedback Request
+
+==================================================
+PHASE 10 – QR ATTENDANCE
+==================================================
+
+Android Camera
+
+RugGear Scanner
+
+QR
+
+Barcode
+
+Attendance Events
+
+Airport
+
+Hotel
+
+Bus
+
+Ziyarat
+
+Mina
+
+Arafat
+
+Muzdalifah
+
+Return
+
+Live Counter
+
+Present
+
+Missing
+
+Offline Sync
+
+==================================================
+PHASE 11 – REPORTS
+==================================================
+
+Pilgrim Report
+
+Family Report
+
+Hotel Report
+
+Room Report
+
+Bus Report
+
+Flight Report
+
+Outstanding Report
+
+Collection Report
+
+Expense Report
+
+Profit & Loss
+
+Export
+
+Excel
+
+PDF
+
+==================================================
+PHASE 12 – CUSTOMER PORTAL
+==================================================
+
+Pilgrim Login
+
+Booking Status
+
+Invoice
+
+Receipt
+
+Flight
+
+Hotel
+
+Room
+
+Bus
+
+Visa
+
+Ticket
+
+Payment
+
+Notifications
+
+QR ID Card
+
+==================================================
+PHASE 13 – STAFF PANEL
+==================================================
+
+Staff Roles
+
+Admin
+
+Accountant
+
+Operations
+
+Munazzam
+
+Reception
+
+Scanner Staff
+
+Permissions for every module.
+
+==================================================
+PHASE 14 – SECURITY
+==================================================
+
+Daily Backup
+
+Audit Log
+
+Role Permissions
+
+Soft Delete
+
+Restore
+
+Activity Log
+
+==================================================
+PHASE 15 – AI FEATURES
+==================================================
+
+AI WhatsApp Writer
+
+AI Report Summary
+
+AI OCR Passport
+
+AI OCR Visa
+
+AI Document Verification
+
+==================================================
+FINAL REQUIREMENT
+==================================================
+
+The ERP should be able to manage:
+
+10,000+ Pilgrims
+
+5,000+ Families
+
+100+ Hajj Groups
+
+50+ Hotels
+
+100+ Buses
+
+Multiple Flights
+
+Fast Search
+
+Professional Reports
+
+No duplicate records
+
+Responsive UI
+
+Enterprise-level performance.
+
+Complete each phase one by one and test before moving to the next phase.

@@ -5,7 +5,7 @@ import {
   LayoutDashboard, PackageSearch, Users, BookOpen, MessageSquare, LogOut,
   ImageIcon, UsersRound, Receipt, ClipboardPlus, ScanLine, BarChart2,
   Printer, Menu, Megaphone, ShieldCheck, Inbox, PieChart, Star, BadgeCheck, Droplets,
-  TrendingDown, Calculator, Plane
+  TrendingDown, Calculator, Plane, Activity, Home, CreditCard, Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -29,6 +29,7 @@ function buildMenu(openComplaints: number): MenuSection[] {
       section: "Overview",
       items: [
         { icon: LayoutDashboard, label: "Dashboard", href: "/admin/dashboard" },
+        { icon: Activity, label: "Operations", href: "/admin/operations" },
       ],
     },
     {
@@ -37,9 +38,11 @@ function buildMenu(openComplaints: number): MenuSection[] {
         { icon: BookOpen, label: "Bookings", href: "/admin/bookings" },
         { icon: ClipboardPlus, label: "Offline Booking", href: "/admin/offline-bookings" },
         { icon: Receipt, label: "Invoices", href: "/admin/invoices" },
-        { icon: PieChart, label: "Payment Analytics", href: "/admin/payment-analytics" },
+        { icon: CreditCard, label: "Payment Management", href: "/admin/payments" },
         { icon: TrendingDown, label: "Expenses", href: "/admin/expenses" },
         { icon: Calculator, label: "Accounting", href: "/admin/accounting" },
+        { icon: Home, label: "Family Ledger", href: "/admin/family-ledger" },
+        { icon: Trash2, label: "Trash", href: "/admin/bookings?tab=trash" },
       ],
     },
     {

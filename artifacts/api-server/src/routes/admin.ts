@@ -375,4 +375,151 @@ router.patch("/requests/:id/assign-group", requireAdmin as any, async (req: Auth
   }
 });
 
+// ── Operations Dashboard ──────────────────────────────────────────────────────
+router.get("/operations", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
+  try {
+    const [pilgrims, families, flights, groups, bookings, attendance] = await Promise.all([
+      pool.query(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE family_id IS NOT NULL)::int AS in_family FROM pilgrims`),
+      pool.query(`SELECT COUNT(DISTINCT family_id)::int AS total FROM pilgrims WHERE family_id IS NOT NULL`),
+      pool.query(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE departure_date = to_char(NOW(),'YYYY-MM-DD'))::int AS today_dep FROM group_flights`),
+      pool.query(`SELECT COUNT(*)::int AS total FROM hajj_groups`),
+      pool.query(`
+        SELECT
+          COUNT(*)::int AS total,
+          COUNT(*) FILTER (WHERE status='pending')::int AS pending_count,
+          COUNT(*) FILTER (WHERE status='partially_paid')::int AS partial_count,
+          COUNT(*) FILTER (WHERE status='confirmed')::int AS confirmed_count,
+          COALESCE(SUM(GREATEST(final_amount::numeric - COALESCE(paid_amount::numeric,0),0)) FILTER (WHERE status IN ('approved','partially_paid')), 0)::numeric AS pending_balance
+        FROM bookings WHERE is_deleted = false OR is_deleted IS NULL
+      `).catch(() => pool.query(`
+        SELECT
+          COUNT(*)::int AS total,
+          COUNT(*) FILTER (WHERE status='pending')::int AS pending_count,
+          COUNT(*) FILTER (WHERE status='partially_paid')::int AS partial_count,
+          COUNT(*) FILTER (WHERE status='confirmed')::int AS confirmed_count,
+          COALESCE(SUM(GREATEST(final_amount::numeric - COALESCE(paid_amount::numeric,0),0)) FILTER (WHERE status IN ('approved','partially_paid')), 0)::numeric AS pending_balance
+        FROM bookings WHERE final_amount IS NOT NULL
+      `)),
+      pool.query(`
+        SELECT COUNT(*)::int AS total_logs,
+          COUNT(*) FILTER (WHERE status='present')::int AS present,
+          COUNT(*) FILTER (WHERE status='absent')::int AS absent
+        FROM attendance_logs
+      `).catch(() => ({ rows: [{ total_logs: 0, present: 0, absent: 0 }] })),
+    ]);
+
+    const p = pilgrims.rows[0] || {};
+    const f = families.rows[0] || {};
+    const fl = flights.rows[0] || {};
+    const g = groups.rows[0] || {};
+    const b = bookings.rows[0] || {};
+    const a = attendance.rows[0] || {};
+
+    res.json({
+      totalPilgrims: p.total ?? 0,
+      pilgrimsInFamily: p.in_family ?? 0,
+      totalFamilies: f.total ?? 0,
+      totalGroups: g.total ?? 0,
+      totalFlights: fl.total ?? 0,
+      todayDepartures: fl.today_dep ?? 0,
+      totalBookings: b.total ?? 0,
+      pendingBookings: b.pending_count ?? 0,
+      partialBookings: b.partial_count ?? 0,
+      confirmedBookings: b.confirmed_count ?? 0,
+      pendingBalance: parseFloat(b.pending_balance ?? 0),
+      attendancePresent: a.present ?? 0,
+      attendanceAbsent: a.absent ?? 0,
+    });
+  } catch (err: any) {
+    console.error("[admin] GET /operations error:", err);
+    res.status(500).json({ message: err?.message || "Failed to load operations data" });
+  }
+});
+
+// ── Family Ledger ─────────────────────────────────────────────────────────────
+router.get("/family-ledger", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { groupId, search } = req.query as Record<string, string>;
+
+    const families = await pool.query(`
+      SELECT
+        p.family_id,
+        p.group_id,
+        hg.group_name,
+        COUNT(*)::int AS member_count,
+        MAX(CASE WHEN p.family_head = true THEN p.full_name END) AS head_name,
+        array_agg(p.full_name ORDER BY p.family_head DESC NULLS LAST, p.full_name) AS member_names,
+        array_agg(COALESCE(p.mobile_india,'') ORDER BY p.family_head DESC NULLS LAST) AS member_mobiles
+      FROM pilgrims p
+      LEFT JOIN hajj_groups hg ON hg.id = p.group_id
+      WHERE p.family_id IS NOT NULL
+        ${groupId ? "AND p.group_id = $1" : ""}
+      GROUP BY p.family_id, p.group_id, hg.group_name
+      ORDER BY hg.group_name, head_name
+      ${groupId ? "" : "LIMIT 500"}
+    `, groupId ? [groupId] : []);
+
+    if (families.rows.length === 0) return res.json([]);
+
+    // For each family, find associated bookings by mobile number
+    const allMobiles = families.rows.flatMap((f: Record<string, string[]>) => f.member_mobiles.filter(Boolean));
+    let bookingMap: Record<string, { finalAmount: number; paidAmount: number; status: string }> = {};
+
+    if (allMobiles.length > 0) {
+      const placeholders = allMobiles.map((_: string, i: number) => `$${i + 1}`).join(",");
+      const bRes = await pool.query(
+        `SELECT customer_mobile, SUM(COALESCE(final_amount::numeric,0)) AS total_amount,
+          SUM(COALESCE(paid_amount::numeric,0)) AS total_paid
+         FROM bookings
+         WHERE customer_mobile IN (${placeholders})
+           AND (is_deleted = false OR is_deleted IS NULL)
+         GROUP BY customer_mobile`,
+        allMobiles
+      ).catch(() => ({ rows: [] as Record<string, string>[] }));
+
+      for (const row of bRes.rows as Record<string, string>[]) {
+        bookingMap[row["customer_mobile"] as string] = {
+          finalAmount: parseFloat(row["total_amount"] as string ?? "0"),
+          paidAmount: parseFloat(row["total_paid"] as string ?? "0"),
+          status: "",
+        };
+      }
+    }
+
+    const result = families.rows.map((f: Record<string, unknown>) => {
+      const mobiles = (f["member_mobiles"] as string[]).filter(Boolean);
+      let totalAmount = 0, totalPaid = 0;
+      for (const m of mobiles) {
+        const bk = bookingMap[m];
+        if (bk) { totalAmount += bk.finalAmount; totalPaid += bk.paidAmount; }
+      }
+      const headName = f["head_name"] as string || (f["member_names"] as string[])[0] || "Unknown";
+      return {
+        familyId: f["family_id"],
+        groupId: f["group_id"],
+        groupName: f["group_name"] || "—",
+        headName,
+        memberCount: f["member_count"],
+        memberNames: f["member_names"],
+        totalAmount,
+        totalPaid,
+        balance: totalAmount - totalPaid,
+      };
+    }).filter((f: Record<string, unknown>) => {
+      if (!search) return true;
+      const s = (search as string).toLowerCase();
+      return (
+        ((f["headName"] as string) || "").toLowerCase().includes(s) ||
+        ((f["familyId"] as string) || "").toLowerCase().includes(s) ||
+        ((f["groupName"] as string) || "").toLowerCase().includes(s)
+      );
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    console.error("[admin] GET /family-ledger error:", err);
+    res.status(500).json({ message: err?.message || "Failed to load family ledger" });
+  }
+});
+
 export default router;
