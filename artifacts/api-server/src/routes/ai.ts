@@ -6,10 +6,24 @@ import { pool } from "@workspace/db";
 const router = Router();
 
 function getClient() {
-  const baseURL = process.env["AI_INTEGRATIONS_ANTHROPIC_BASE_URL"];
-  const apiKey = process.env["AI_INTEGRATIONS_ANTHROPIC_API_KEY"] || "dummy-key";
-  if (!baseURL) throw new Error("AI_INTEGRATIONS_ANTHROPIC_BASE_URL not set");
-  return new Anthropic({ apiKey, baseURL });
+  // Support both Replit-proxied mode and direct Anthropic API key (for VPS)
+  const replitBaseURL = process.env["AI_INTEGRATIONS_ANTHROPIC_BASE_URL"];
+  const replitApiKey = process.env["AI_INTEGRATIONS_ANTHROPIC_API_KEY"];
+  const directApiKey = process.env["ANTHROPIC_API_KEY"];
+
+  if (replitBaseURL && replitApiKey && !replitBaseURL.includes("localhost")) {
+    // Replit proxy (non-local)
+    return new Anthropic({ apiKey: replitApiKey, baseURL: replitBaseURL });
+  }
+  if (directApiKey) {
+    // Direct Anthropic API key (VPS or any environment)
+    return new Anthropic({ apiKey: directApiKey });
+  }
+  if (replitBaseURL && replitApiKey) {
+    // Replit local proxy (dev mode)
+    return new Anthropic({ apiKey: replitApiKey, baseURL: replitBaseURL });
+  }
+  throw new Error("No AI API key configured. Set ANTHROPIC_API_KEY in your .env file.");
 }
 
 // POST /api/ai/whatsapp-writer
