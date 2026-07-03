@@ -322,6 +322,120 @@ async function runMigrations() {
   } catch (err) {
     console.error("[Migration] booking_audit_logs failed:", err);
   }
+  // Phase 5: Hotel Management
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS hotels (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        city TEXT NOT NULL,
+        address TEXT,
+        stars INTEGER,
+        group_id TEXT,
+        check_in_date TEXT,
+        check_out_date TEXT,
+        total_rooms INTEGER,
+        contact_phone TEXT,
+        notes TEXT,
+        is_deleted BOOLEAN NOT NULL DEFAULT false,
+        deleted_at TIMESTAMPTZ,
+        deleted_by TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS hotel_rooms (
+        id TEXT PRIMARY KEY,
+        hotel_id TEXT NOT NULL,
+        room_number TEXT NOT NULL,
+        floor TEXT,
+        capacity INTEGER NOT NULL DEFAULT 2,
+        bed_type TEXT DEFAULT 'Double',
+        notes TEXT,
+        is_deleted BOOLEAN NOT NULL DEFAULT false,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS pilgrim_room_assignments (
+        id TEXT PRIMARY KEY,
+        hotel_id TEXT NOT NULL,
+        room_id TEXT NOT NULL,
+        pilgrim_id TEXT NOT NULL,
+        assigned_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE(pilgrim_id, hotel_id)
+      )
+    `);
+    console.log("[Migration] hotels, hotel_rooms, pilgrim_room_assignments tables ensured");
+  } catch (err) {
+    console.error("[Migration] hotels tables failed:", err);
+  }
+  // Phase 6: Bus Management
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS buses (
+        id TEXT PRIMARY KEY,
+        bus_number TEXT NOT NULL,
+        group_id TEXT NOT NULL,
+        capacity INTEGER NOT NULL DEFAULT 45,
+        vehicle_type TEXT DEFAULT 'Coach',
+        driver_name TEXT,
+        driver_mobile TEXT,
+        route_description TEXT,
+        notes TEXT,
+        is_deleted BOOLEAN NOT NULL DEFAULT false,
+        deleted_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS pilgrim_bus_assignments (
+        id TEXT PRIMARY KEY,
+        bus_id TEXT NOT NULL,
+        pilgrim_id TEXT NOT NULL,
+        seat_number TEXT,
+        assigned_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE(bus_id, pilgrim_id)
+      )
+    `);
+    console.log("[Migration] buses, pilgrim_bus_assignments tables ensured");
+  } catch (err) {
+    console.error("[Migration] buses tables failed:", err);
+  }
+  // Phase 7: Medical Module
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS medical_cases (
+        id TEXT PRIMARY KEY,
+        pilgrim_id TEXT NOT NULL,
+        group_id TEXT,
+        case_type TEXT NOT NULL DEFAULT 'general',
+        description TEXT,
+        severity TEXT NOT NULL DEFAULT 'low',
+        status TEXT NOT NULL DEFAULT 'open',
+        handled_by TEXT,
+        notes TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        resolved_at TIMESTAMPTZ,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    console.log("[Migration] medical_cases table ensured");
+  } catch (err) {
+    console.error("[Migration] medical_cases table failed:", err);
+  }
+  // Phase 8: Visa Tracking columns on pilgrims
+  try {
+    await pool.query(`ALTER TABLE pilgrims ADD COLUMN IF NOT EXISTS visa_status TEXT`);
+    await pool.query(`ALTER TABLE pilgrims ADD COLUMN IF NOT EXISTS visa_type TEXT`);
+    await pool.query(`ALTER TABLE pilgrims ADD COLUMN IF NOT EXISTS visa_applied_date TEXT`);
+    await pool.query(`ALTER TABLE pilgrims ADD COLUMN IF NOT EXISTS visa_received_date TEXT`);
+    console.log("[Migration] visa tracking columns ensured");
+  } catch (err) {
+    console.error("[Migration] visa tracking columns failed:", err);
+  }
 }
 
 const rawPort = process.env["PORT"];

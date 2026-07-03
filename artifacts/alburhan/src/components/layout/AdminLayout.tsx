@@ -5,7 +5,8 @@ import {
   LayoutDashboard, PackageSearch, Users, BookOpen, MessageSquare, LogOut,
   ImageIcon, UsersRound, Receipt, ClipboardPlus, ScanLine, BarChart2,
   Printer, Menu, Megaphone, ShieldCheck, Inbox, PieChart, Star, BadgeCheck, Droplets,
-  TrendingDown, Calculator, Plane, Activity, Home, CreditCard, Trash2
+  TrendingDown, Calculator, Plane, Activity, Home, CreditCard, Trash2,
+  Building2, Bus, Heart, FileCheck, Sparkles
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -50,6 +51,10 @@ function buildMenu(openComplaints: number): MenuSection[] {
       items: [
         { icon: UsersRound, label: "Hajj Groups", href: "/admin/groups" },
         { icon: Plane, label: "Flights", href: "/admin/flights" },
+        { icon: Building2, label: "Hotels", href: "/admin/hotels" },
+        { icon: Bus, label: "Buses", href: "/admin/buses" },
+        { icon: Heart, label: "Medical", href: "/admin/medical" },
+        { icon: FileCheck, label: "Visa Tracker", href: "/admin/visa" },
         { icon: BadgeCheck, label: "Staff ID Cards", href: "/admin/staff" },
         { icon: ScanLine, label: "QR Tracker", href: "/admin/qr-tracker" },
         { icon: Printer, label: "Print Center", href: "/admin/print-center" },
@@ -73,6 +78,12 @@ function buildMenu(openComplaints: number): MenuSection[] {
         { icon: MessageSquare, label: "Inquiries", href: "/admin/inquiries" },
         { icon: Megaphone, label: "Broadcast Messages", href: "/admin/broadcast" },
         { icon: BarChart2, label: "Reports", href: "/admin/reports" },
+      ],
+    },
+    {
+      section: "AI Tools",
+      items: [
+        { icon: Sparkles, label: "AI Assistant", href: "/admin/ai" },
       ],
     },
   ];

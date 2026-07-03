@@ -26,6 +26,11 @@ import deleteAuthRouter from "./delete-auth.js";
 import attendanceRouter from "./attendance.js";
 import expensesRouter from "./expenses.js";
 import flightsRouter from "./flights.js";
+import hotelsRouter from "./hotels.js";
+import busesRouter from "./buses.js";
+import medicalRouter from "./medical.js";
+import visaRouter from "./visa.js";
+import aiRouter from "./ai.js";
 
 const router: IRouter = Router();
 
@@ -83,6 +88,11 @@ router.use("/delete-auth", deleteAuthRouter);
 router.use("/groups", attendanceRouter);
 router.use("/expenses", expensesRouter);
 router.use("/flights", flightsRouter);
+router.use("/hotels", hotelsRouter);
+router.use("/buses", busesRouter);
+router.use("/medical", medicalRouter);
+router.use("/visa", visaRouter);
+router.use("/ai", aiRouter);
 router.use(storageRouter);
 
 export default router;
