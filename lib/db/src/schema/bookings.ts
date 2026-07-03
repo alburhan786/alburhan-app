@@ -33,6 +33,8 @@ export const bookingsTable = pgTable("bookings", {
   travellerDetailsStatus: text("traveller_details_status").notNull().default("not_submitted"),
   notes: text("notes"),
   isOffline: boolean("is_offline").notNull().default(false),
+  deletedAt: timestamp("deleted_at"),
+  deletedBy: text("deleted_by"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

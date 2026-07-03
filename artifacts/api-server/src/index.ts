@@ -260,6 +260,30 @@ async function runMigrations() {
   } catch (err) {
     console.error("[Migration] group_flights table failed:", err);
   }
+  try {
+    await db.execute(sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ`);
+    await db.execute(sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS deleted_by TEXT`);
+    console.log("[Migration] bookings soft-delete columns ensured");
+  } catch (err) {
+    console.error("[Migration] bookings soft-delete columns failed:", err);
+  }
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS booking_audit_logs (
+        id TEXT PRIMARY KEY,
+        booking_id TEXT NOT NULL,
+        changed_by TEXT NOT NULL,
+        changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        action TEXT NOT NULL,
+        field_name TEXT,
+        old_value TEXT,
+        new_value TEXT
+      )
+    `);
+    console.log("[Migration] booking_audit_logs table ensured");
+  } catch (err) {
+    console.error("[Migration] booking_audit_logs failed:", err);
+  }
 }
 
 const rawPort = process.env["PORT"];

@@ -1,6 +1,6 @@
 import { Router, type Request } from "express";
 import { db, bookingsTable, packagesTable, usersTable, hajjGroupsTable, customerProfilesTable, paymentTransactionsTable } from "@workspace/db";
-import { eq, and, desc, count, sql } from "drizzle-orm";
+import { eq, and, desc, count, sql, isNull, or, ilike } from "drizzle-orm";
 import multer from "multer";
 import { uploadToGCS } from "../lib/gcsUpload.js";
 import { upsertPilgrimFromProfile } from "../lib/pilgrimUtils.js";
@@ -25,6 +25,7 @@ import {
   CreateOfflineBookingBody,
 } from "@workspace/api-zod";
 import { requireAuth, requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
+import { validateDeleteToken } from "./delete-auth.js";
 import {
   sendBookingApprovalNotification,
   sendBookingRejectionNotification,
@@ -143,15 +144,36 @@ router.post("/offline", requireAdmin as any, async (req: AuthenticatedRequest, r
   }
 });
 
+router.get("/trash", requireAdmin as any, async (_req, res) => {
+  try {
+    const rows = await db
+      .select({ booking: bookingsTable, package: packagesTable })
+      .from(bookingsTable)
+      .leftJoin(packagesTable, eq(bookingsTable.packageId, packagesTable.id))
+      .where(sql`${bookingsTable.deletedAt} IS NOT NULL`)
+      .orderBy(desc(bookingsTable.deletedAt));
+    res.json({
+      bookings: rows.map(({ booking, package: pkg }) => ({
+        ...formatBooking(booking),
+        deletedAt: booking.deletedAt?.toISOString?.() ?? null,
+        deletedBy: booking.deletedBy,
+        packageDetails: pkg ? { duration: pkg.duration, includes: pkg.includes } : null,
+      })),
+    });
+  } catch (err: any) {
+    res.status(500).json({ message: err?.message || "Failed to load trash" });
+  }
+});
+
 router.get("/", requireAuth as any, async (req: AuthenticatedRequest, res) => {
   const parsed = ListBookingsQueryParams.safeParse(req.query);
   const query = parsed.success ? parsed.data : {};
   const page = Number(query.page ?? 1);
-  const limit = Number(query.limit ?? 20);
+  const limit = Number(query.limit ?? 200);
   const offset = (page - 1) * limit;
 
-  const conditions: ReturnType<typeof eq>[] = [];
-  if (query.status) conditions.push(eq(bookingsTable.status, query.status));
+  const conditions: any[] = [isNull(bookingsTable.deletedAt)];
+  if (query.status) conditions.push(eq(bookingsTable.status, query.status as any));
   if (req.user?.role !== "admin") {
     conditions.push(eq(bookingsTable.customerMobile, req.user!.mobile));
   }
@@ -163,7 +185,7 @@ router.get("/", requireAuth as any, async (req: AuthenticatedRequest, res) => {
     })
     .from(bookingsTable)
     .leftJoin(packagesTable, eq(bookingsTable.packageId, packagesTable.id))
-    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .where(and(...conditions))
     .orderBy(desc(bookingsTable.createdAt))
     .limit(limit)
     .offset(offset);
@@ -171,7 +193,7 @@ router.get("/", requireAuth as any, async (req: AuthenticatedRequest, res) => {
   const [{ count: totalCount }] = await db
     .select({ count: count() })
     .from(bookingsTable)
-    .where(conditions.length > 0 ? and(...conditions) : undefined);
+    .where(and(...conditions));
 
   res.json({
     bookings: rows.map(({ booking, package: pkg }) => ({
@@ -663,6 +685,184 @@ router.get("/by-number/:bookingNumber/payment-page", async (req, res) => {
   } catch (err: any) {
     console.error("[payment-page]", err?.message);
     res.status(500).json({ message: "Failed to load payment page data" });
+  }
+});
+
+async function writeAuditLog(bookingId: string, changedBy: string, action: string, logs: Array<{ fieldName: string; oldValue: string; newValue: string }>) {
+  for (const log of logs) {
+    try {
+      await db.execute(sql`
+        INSERT INTO booking_audit_logs (id, booking_id, changed_by, action, field_name, old_value, new_value)
+        VALUES (${crypto.randomUUID()}, ${bookingId}, ${changedBy}, ${action}, ${log.fieldName}, ${log.oldValue}, ${log.newValue})
+      `);
+    } catch (err) {
+      console.error("[audit] Failed to write audit log:", err);
+    }
+  }
+}
+
+router.patch("/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  const bookingId = req.params.id;
+  try {
+    const [existing] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
+    if (!existing) { res.status(404).json({ message: "Booking not found" }); return; }
+    if (existing.deletedAt) { res.status(400).json({ message: "Cannot edit a deleted booking. Restore it first." }); return; }
+
+    const editableFields = [
+      "customerName", "customerMobile", "customerEmail", "packageName",
+      "numberOfPilgrims", "preferredDepartureDate", "roomType", "status",
+      "totalAmount", "gstAmount", "finalAmount", "advanceAmount", "paidAmount",
+      "notes", "groupId", "invoiceNumber", "rejectionReason",
+    ];
+
+    const updates: Record<string, any> = {};
+    const auditLogs: Array<{ fieldName: string; oldValue: string; newValue: string }> = [];
+
+    for (const field of editableFields) {
+      if (req.body[field] !== undefined) {
+        const oldVal = (existing as any)[field];
+        const newVal = req.body[field] === "" ? null : req.body[field];
+        if (String(oldVal ?? "") !== String(newVal ?? "")) {
+          updates[field] = newVal;
+          auditLogs.push({ fieldName: field, oldValue: String(oldVal ?? ""), newValue: String(newVal ?? "") });
+        }
+      }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      res.json(formatBooking(existing));
+      return;
+    }
+
+    updates.updatedAt = new Date();
+    const [updated] = await db.update(bookingsTable).set(updates).where(eq(bookingsTable.id, bookingId)).returning();
+    const changedBy = req.user?.name || req.user?.mobile || "admin";
+    await writeAuditLog(bookingId, changedBy, "edit", auditLogs);
+    res.json(formatBooking(updated));
+  } catch (err: any) {
+    console.error("[bookings] PATCH /:id error:", err);
+    res.status(500).json({ message: err?.message || "Failed to update booking" });
+  }
+});
+
+router.delete("/:id/permanent", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  const bookingId = req.params.id;
+  const token = req.headers["x-delete-token"] as string;
+  if (!token) { res.status(403).json({ message: "Delete token required" }); return; }
+  const adminName = validateDeleteToken(token);
+  if (!adminName) { res.status(403).json({ message: "Invalid or expired delete token" }); return; }
+
+  try {
+    const [existing] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
+    if (!existing) { res.status(404).json({ message: "Booking not found" }); return; }
+
+    await db.execute(sql`DELETE FROM booking_audit_logs WHERE booking_id = ${bookingId}`);
+    await db.delete(bookingsTable).where(eq(bookingsTable.id, bookingId));
+    res.json({ message: "Booking permanently deleted", deletedBy: adminName });
+  } catch (err: any) {
+    console.error("[bookings] DELETE /:id/permanent error:", err);
+    res.status(500).json({ message: err?.message || "Failed to permanently delete booking" });
+  }
+});
+
+router.delete("/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  const bookingId = req.params.id;
+  try {
+    const [existing] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
+    if (!existing) { res.status(404).json({ message: "Booking not found" }); return; }
+    if (existing.deletedAt) { res.status(400).json({ message: "Booking is already in trash" }); return; }
+
+    const deletedBy = req.user?.name || req.user?.mobile || "admin";
+    const [updated] = await db.update(bookingsTable)
+      .set({ deletedAt: new Date(), deletedBy, updatedAt: new Date() })
+      .where(eq(bookingsTable.id, bookingId))
+      .returning();
+
+    await writeAuditLog(bookingId, deletedBy, "soft_delete", [
+      { fieldName: "status", oldValue: existing.status, newValue: "deleted" },
+    ]);
+    res.json({ message: "Booking moved to trash", booking: formatBooking(updated) });
+  } catch (err: any) {
+    console.error("[bookings] DELETE /:id error:", err);
+    res.status(500).json({ message: err?.message || "Failed to delete booking" });
+  }
+});
+
+router.post("/:id/restore", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  const bookingId = req.params.id;
+  try {
+    const [existing] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
+    if (!existing) { res.status(404).json({ message: "Booking not found" }); return; }
+    if (!existing.deletedAt) { res.status(400).json({ message: "Booking is not in trash" }); return; }
+
+    const restoredBy = req.user?.name || req.user?.mobile || "admin";
+    const [updated] = await db.update(bookingsTable)
+      .set({ deletedAt: null, deletedBy: null, updatedAt: new Date() })
+      .where(eq(bookingsTable.id, bookingId))
+      .returning();
+
+    await writeAuditLog(bookingId, restoredBy, "restore", [
+      { fieldName: "status", oldValue: "deleted", newValue: existing.status },
+    ]);
+    res.json({ message: "Booking restored", booking: formatBooking(updated) });
+  } catch (err: any) {
+    console.error("[bookings] POST /:id/restore error:", err);
+    res.status(500).json({ message: err?.message || "Failed to restore booking" });
+  }
+});
+
+router.post("/:id/duplicate", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  const bookingId = req.params.id;
+  try {
+    const [existing] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
+    if (!existing) { res.status(404).json({ message: "Booking not found" }); return; }
+
+    const newBookingNumber = generateBookingNumber();
+    const [duplicate] = await db.insert(bookingsTable).values({
+      bookingNumber: newBookingNumber,
+      packageId: existing.packageId,
+      packageName: existing.packageName,
+      customerId: existing.customerId,
+      customerName: existing.customerName,
+      customerMobile: existing.customerMobile,
+      customerEmail: existing.customerEmail,
+      numberOfPilgrims: existing.numberOfPilgrims,
+      pilgrims: existing.pilgrims ?? [],
+      preferredDepartureDate: existing.preferredDepartureDate,
+      roomType: existing.roomType,
+      status: "pending",
+      totalAmount: existing.totalAmount,
+      gstAmount: existing.gstAmount,
+      finalAmount: existing.finalAmount,
+      notes: existing.notes ? `[Duplicate of ${existing.bookingNumber}] ${existing.notes}` : `[Duplicate of ${existing.bookingNumber}]`,
+      isOffline: true,
+    }).returning();
+
+    const duplicatedBy = req.user?.name || req.user?.mobile || "admin";
+    await writeAuditLog(duplicate.id, duplicatedBy, "create", [
+      { fieldName: "source", oldValue: "", newValue: `Duplicated from ${existing.bookingNumber}` },
+    ]);
+    res.status(201).json({ message: "Booking duplicated", ...formatBooking(duplicate) });
+  } catch (err: any) {
+    console.error("[bookings] POST /:id/duplicate error:", err);
+    res.status(500).json({ message: err?.message || "Failed to duplicate booking" });
+  }
+});
+
+router.get("/:id/audit-log", requireAdmin as any, async (req, res) => {
+  const bookingId = req.params.id;
+  try {
+    const rows = await db.execute(sql`
+      SELECT id, booking_id, changed_by, changed_at, action, field_name, old_value, new_value
+      FROM booking_audit_logs
+      WHERE booking_id = ${bookingId}
+      ORDER BY changed_at DESC
+      LIMIT 200
+    `);
+    const logs = (rows as any).rows ?? rows;
+    res.json(Array.isArray(logs) ? logs : []);
+  } catch (err: any) {
+    res.status(500).json({ message: err?.message || "Failed to load audit log" });
   }
 });
 

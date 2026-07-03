@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
-import { CheckCircle, XCircle, Eye, ExternalLink, Plus, Trash2, FileText, Download, ImageIcon, RefreshCw, Upload, Wallet, ClipboardList, User, Link2, Send, Bell } from "lucide-react";
+import { CheckCircle, XCircle, Eye, ExternalLink, Plus, Trash2, FileText, Download, ImageIcon, RefreshCw, Upload, Wallet, ClipboardList, User, Link2, Send, Bell, Pencil, Copy, History, RotateCcw, AlertTriangle, Search } from "lucide-react";
 
 const DOC_TYPE_LABELS: Record<string, string> = {
   passport: "Passport",
@@ -1193,6 +1193,256 @@ function OfflineBookingForm({ open, onClose, onSuccess }: { open: boolean; onClo
   );
 }
 
+const EDITABLE_STATUS_OPTIONS = [
+  { value: "pending", label: "Pending" },
+  { value: "approved", label: "Approved" },
+  { value: "confirmed", label: "Confirmed" },
+  { value: "rejected", label: "Rejected" },
+  { value: "cancelled", label: "Cancelled" },
+  { value: "partially_paid", label: "Partially Paid" },
+];
+
+function EditBookingModal({ booking, open, onClose, onSaved }: {
+  booking: any | null; open: boolean; onClose: () => void; onSaved: () => void;
+}) {
+  const { toast } = useToast();
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (booking) {
+      setForm({
+        customerName: booking.customerName || "",
+        customerMobile: booking.customerMobile || "",
+        customerEmail: booking.customerEmail || "",
+        packageName: booking.packageName || "",
+        numberOfPilgrims: String(booking.numberOfPilgrims ?? 1),
+        roomType: booking.roomType || "",
+        preferredDepartureDate: booking.preferredDepartureDate || "",
+        status: booking.status || "pending",
+        totalAmount: booking.totalAmount != null ? String(Number(booking.totalAmount)) : "",
+        gstAmount: booking.gstAmount != null ? String(Number(booking.gstAmount)) : "",
+        finalAmount: booking.finalAmount != null ? String(Number(booking.finalAmount)) : "",
+        advanceAmount: booking.advanceAmount != null ? String(Number(booking.advanceAmount)) : "",
+        paidAmount: booking.paidAmount != null ? String(Number(booking.paidAmount)) : "",
+        invoiceNumber: booking.invoiceNumber || "",
+        rejectionReason: booking.rejectionReason || "",
+        notes: booking.notes || "",
+      });
+    }
+  }, [booking?.id, open]);
+
+  const setField = (key: string, val: string) => setForm(f => ({ ...f, [key]: val }));
+
+  const handleSave = async () => {
+    if (!booking) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`${API}/api/bookings/${booking.id}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.message || "Failed to save"); }
+      toast({ title: "Booking updated!" });
+      onSaved();
+      onClose();
+    } catch (err: any) {
+      toast({ title: "Save failed", description: err.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!booking) return null;
+
+  const inp = "w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#0A3D2A]";
+  const lbl = "block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1";
+
+  return (
+    <Dialog open={open} onOpenChange={v => !v && onClose()}>
+      <DialogContent className="max-w-3xl max-h-[88vh] overflow-y-auto p-0">
+        <div style={{ background: "#0A3D2A" }} className="px-6 py-4 flex items-center gap-3">
+          <Pencil className="text-white/70 w-5 h-5" />
+          <div>
+            <h2 className="text-white font-bold text-lg">Edit Booking</h2>
+            <p className="text-white/60 text-xs">{booking.bookingNumber} · {booking.customerName}</p>
+          </div>
+        </div>
+        <div className="p-6 space-y-6">
+          <div>
+            <div className="text-sm font-bold text-[#0A3D2A] uppercase tracking-wide border-b border-[#0A3D2A]/20 pb-1 mb-3">Customer Details</div>
+            <div className="grid grid-cols-2 gap-4">
+              <div><label className={lbl}>Customer Name *</label><input className={inp} value={form.customerName} onChange={e => setField("customerName", e.target.value)} /></div>
+              <div><label className={lbl}>Mobile *</label><input className={inp} value={form.customerMobile} onChange={e => setField("customerMobile", e.target.value)} /></div>
+              <div><label className={lbl}>Email</label><input className={inp} type="email" value={form.customerEmail} onChange={e => setField("customerEmail", e.target.value)} /></div>
+            </div>
+          </div>
+          <div>
+            <div className="text-sm font-bold text-[#0A3D2A] uppercase tracking-wide border-b border-[#0A3D2A]/20 pb-1 mb-3">Package & Trip</div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2"><label className={lbl}>Package Name</label><input className={inp} value={form.packageName} onChange={e => setField("packageName", e.target.value)} /></div>
+              <div><label className={lbl}>No. of Pilgrims</label><input className={inp} type="number" min="1" value={form.numberOfPilgrims} onChange={e => setField("numberOfPilgrims", e.target.value)} /></div>
+              <div><label className={lbl}>Room Type</label>
+                <select className={inp} value={form.roomType} onChange={e => setField("roomType", e.target.value)}>
+                  <option value="">— Select —</option>
+                  {["sharing", "double", "triple", "quad"].map(r => <option key={r} value={r} className="capitalize">{r.charAt(0).toUpperCase() + r.slice(1)}</option>)}
+                </select>
+              </div>
+              <div><label className={lbl}>Departure Date</label><input className={inp} type="date" value={form.preferredDepartureDate} onChange={e => setField("preferredDepartureDate", e.target.value)} /></div>
+              <div><label className={lbl}>Status</label>
+                <select className={inp} value={form.status} onChange={e => setField("status", e.target.value)}>
+                  {EDITABLE_STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </div>
+              {form.status === "rejected" && (
+                <div className="col-span-2"><label className={lbl}>Rejection Reason</label><input className={inp} value={form.rejectionReason} onChange={e => setField("rejectionReason", e.target.value)} /></div>
+              )}
+              <div><label className={lbl}>Invoice Number</label><input className={`${inp} font-mono uppercase`} value={form.invoiceNumber} onChange={e => setField("invoiceNumber", e.target.value.toUpperCase())} /></div>
+            </div>
+          </div>
+          <div>
+            <div className="text-sm font-bold text-[#0A3D2A] uppercase tracking-wide border-b border-[#0A3D2A]/20 pb-1 mb-3">Amounts (₹)</div>
+            <div className="grid grid-cols-3 gap-4">
+              <div><label className={lbl}>Base Amount</label><input className={`${inp} font-mono`} type="number" min="0" step="0.01" value={form.totalAmount} onChange={e => setField("totalAmount", e.target.value)} /></div>
+              <div><label className={lbl}>GST Amount</label><input className={`${inp} font-mono`} type="number" min="0" step="0.01" value={form.gstAmount} onChange={e => setField("gstAmount", e.target.value)} /></div>
+              <div><label className={lbl}>Final Amount</label><input className={`${inp} font-mono`} type="number" min="0" step="0.01" value={form.finalAmount} onChange={e => setField("finalAmount", e.target.value)} /></div>
+              <div><label className={lbl}>Advance Paid</label><input className={`${inp} font-mono`} type="number" min="0" step="0.01" value={form.advanceAmount} onChange={e => setField("advanceAmount", e.target.value)} /></div>
+              <div><label className={lbl}>Total Paid</label><input className={`${inp} font-mono`} type="number" min="0" step="0.01" value={form.paidAmount} onChange={e => setField("paidAmount", e.target.value)} /></div>
+            </div>
+          </div>
+          <div>
+            <div className="text-sm font-bold text-[#0A3D2A] uppercase tracking-wide border-b border-[#0A3D2A]/20 pb-1 mb-3">Notes</div>
+            <textarea className={`${inp} resize-none`} rows={3} value={form.notes} onChange={e => setField("notes", e.target.value)} placeholder="Additional notes..." />
+          </div>
+          <div className="flex gap-3 pt-2 border-t">
+            <button type="button" onClick={onClose} className="flex-1 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50">Cancel</button>
+            <button type="button" onClick={handleSave} disabled={saving} className="flex-1 py-2 rounded-lg bg-[#0A3D2A] text-white text-sm font-bold hover:bg-[#0d5038] disabled:opacity-60">
+              {saving ? "Saving…" : "Save Changes"}
+            </button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function AuditLogModal({ bookingId, bookingNumber, open, onClose }: {
+  bookingId: string | null; bookingNumber: string; open: boolean; onClose: () => void;
+}) {
+  const [logs, setLogs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (!open || !bookingId) return;
+    setLoading(true);
+    fetch(`${API}/api/bookings/${bookingId}/audit-log`, { credentials: "include" })
+      .then(r => r.json())
+      .then(data => setLogs(Array.isArray(data) ? data : []))
+      .catch(() => toast({ title: "Failed to load audit log", variant: "destructive" }))
+      .finally(() => setLoading(false));
+  }, [open, bookingId]);
+
+  const actionLabel = (action: string) => {
+    if (action === "edit") return { label: "Edited", color: "bg-blue-100 text-blue-800" };
+    if (action === "soft_delete") return { label: "Deleted", color: "bg-red-100 text-red-800" };
+    if (action === "restore") return { label: "Restored", color: "bg-emerald-100 text-emerald-800" };
+    if (action === "create") return { label: "Created", color: "bg-purple-100 text-purple-800" };
+    return { label: action, color: "bg-gray-100 text-gray-800" };
+  };
+
+  const fieldLabel = (f: string) => f.replace(/([A-Z])/g, " $1").replace(/^./, s => s.toUpperCase());
+
+  return (
+    <Dialog open={open} onOpenChange={v => !v && onClose()}>
+      <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <History size={18} className="text-[#0A3D2A]" />
+            Audit Log — {bookingNumber}
+          </DialogTitle>
+        </DialogHeader>
+        {loading ? (
+          <p className="text-sm text-muted-foreground py-6 text-center">Loading audit log…</p>
+        ) : logs.length === 0 ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground py-8 justify-center">
+            <History size={16} />No audit records found.
+          </div>
+        ) : (
+          <div className="border rounded-lg overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-muted text-xs text-muted-foreground uppercase">
+                <tr>
+                  <th className="px-3 py-2 text-left">Date & Time</th>
+                  <th className="px-3 py-2 text-left">User</th>
+                  <th className="px-3 py-2 text-left">Action</th>
+                  <th className="px-3 py-2 text-left">Field</th>
+                  <th className="px-3 py-2 text-left">Old Value</th>
+                  <th className="px-3 py-2 text-left">New Value</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {logs.map((log: any, i: number) => {
+                  const { label, color } = actionLabel(log.action);
+                  return (
+                    <tr key={log.id ?? i} className="hover:bg-muted/20">
+                      <td className="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">
+                        {log.changed_at ? new Date(log.changed_at).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}
+                      </td>
+                      <td className="px-3 py-2 text-xs font-medium">{log.changed_by || "—"}</td>
+                      <td className="px-3 py-2">
+                        <Badge className={`text-[10px] px-2 py-0.5 border-0 font-semibold ${color}`}>{label}</Badge>
+                      </td>
+                      <td className="px-3 py-2 text-xs">{log.field_name ? fieldLabel(log.field_name) : "—"}</td>
+                      <td className="px-3 py-2 text-xs text-red-600 max-w-[120px] truncate" title={log.old_value}>{log.old_value || "—"}</td>
+                      <td className="px-3 py-2 text-xs text-emerald-700 max-w-[120px] truncate" title={log.new_value}>{log.new_value || "—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ConfirmDeleteDialog({ booking, open, onClose, onConfirm }: {
+  booking: any | null; open: boolean; onClose: () => void; onConfirm: () => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={v => !v && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-red-600">
+            <AlertTriangle size={18} /> Move to Trash
+          </DialogTitle>
+        </DialogHeader>
+        <div className="py-2 space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Are you sure you want to move this booking to Trash?
+          </p>
+          {booking && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm space-y-1">
+              <p><span className="text-muted-foreground">Booking:</span> <span className="font-mono font-bold">{booking.bookingNumber}</span></p>
+              <p><span className="text-muted-foreground">Customer:</span> <span className="font-semibold">{booking.customerName}</span></p>
+              <p><span className="text-muted-foreground">Status:</span> <span className="capitalize">{booking.status}</span></p>
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground">Payments, invoices, and pilgrim records will NOT be deleted. You can restore this booking anytime.</p>
+        </div>
+        <div className="flex gap-3 pt-2">
+          <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50">Cancel</button>
+          <button onClick={onConfirm} className="flex-1 py-2 rounded-lg bg-red-600 text-white text-sm font-bold hover:bg-red-700">Move to Trash</button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function BookingsManager() {
   const { data, isLoading, refetch } = useListBookings();
   const bookings = data?.bookings || [];
@@ -1200,10 +1450,35 @@ export default function BookingsManager() {
   const rejectMutation = useRejectBooking();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { requestDelete } = useDeleteGuard();
   const [detailBooking, setDetailBooking] = useState<Booking | null>(null);
   const [showOfflineForm, setShowOfflineForm] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
   const [autoFillingCardId, setAutoFillingCardId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [editBooking, setEditBooking] = useState<any | null>(null);
+  const [auditBooking, setAuditBooking] = useState<any | null>(null);
+  const [softDeleteTarget, setSoftDeleteTarget] = useState<any | null>(null);
+  const [trashBookings, setTrashBookings] = useState<any[]>([]);
+  const [trashLoading, setTrashLoading] = useState(false);
+
+  const fetchTrash = async () => {
+    setTrashLoading(true);
+    try {
+      const res = await fetch(`${API}/api/bookings/trash`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load trash");
+      const data = await res.json();
+      setTrashBookings(data.bookings || []);
+    } catch (err: any) {
+      toast({ title: "Error loading trash", description: err.message, variant: "destructive" });
+    } finally {
+      setTrashLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (statusFilter === "trash") fetchTrash();
+  }, [statusFilter]);
 
   const handleApprove = async (id: string) => {
     try {
@@ -1211,8 +1486,7 @@ export default function BookingsManager() {
       toast({ title: "Booking Approved" });
       queryClient.invalidateQueries({ queryKey: ['/api/bookings'] });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to approve booking";
-      toast({ title: "Error", description: message, variant: "destructive" });
+      toast({ title: "Error", description: err instanceof Error ? err.message : "Failed to approve", variant: "destructive" });
     }
   };
 
@@ -1224,8 +1498,7 @@ export default function BookingsManager() {
       toast({ title: "Booking Rejected" });
       queryClient.invalidateQueries({ queryKey: ['/api/bookings'] });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to reject booking";
-      toast({ title: "Error", description: message, variant: "destructive" });
+      toast({ title: "Error", description: err instanceof Error ? err.message : "Failed to reject", variant: "destructive" });
     }
   };
 
@@ -1233,18 +1506,63 @@ export default function BookingsManager() {
     setAutoFillingCardId(bookingId);
     try {
       const res = await fetch(`${API}/api/admin/bookings/${bookingId}/auto-fill-pilgrim`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
+        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Auto-fill failed");
-      toast({ title: "Pilgrim auto-filled!", description: data.message || "Pilgrim record populated from customer's travel details." });
+      toast({ title: "Pilgrim auto-filled!", description: data.message });
       queryClient.invalidateQueries({ queryKey: ['/api/bookings'] });
     } catch (err: unknown) {
       toast({ title: "Error", description: err instanceof Error ? err.message : "Auto-fill failed", variant: "destructive" });
     } finally {
       setAutoFillingCardId(null);
+    }
+  };
+
+  const handleSoftDelete = async (bookingId: string) => {
+    try {
+      const res = await fetch(`${API}/api/bookings/${bookingId}`, { method: "DELETE", credentials: "include" });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.message || "Failed to delete"); }
+      toast({ title: "Booking moved to Trash" });
+      queryClient.invalidateQueries({ queryKey: ['/api/bookings'] });
+      setSoftDeleteTarget(null);
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleRestore = async (bookingId: string) => {
+    try {
+      const res = await fetch(`${API}/api/bookings/${bookingId}/restore`, { method: "POST", credentials: "include" });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.message || "Failed to restore"); }
+      toast({ title: "Booking restored!" });
+      fetchTrash();
+      queryClient.invalidateQueries({ queryKey: ['/api/bookings'] });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handlePermanentDelete = (booking: any) => {
+    requestDelete(`Booking #${booking.bookingNumber} (${booking.customerName})`, async (token) => {
+      const res = await fetch(`${API}/api/bookings/${booking.id}/permanent`, {
+        method: "DELETE", credentials: "include", headers: { "X-Delete-Token": token },
+      });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.message || "Failed to permanently delete"); }
+      toast({ title: "Booking permanently deleted" });
+      fetchTrash();
+    });
+  };
+
+  const handleDuplicate = async (bookingId: string) => {
+    try {
+      const res = await fetch(`${API}/api/bookings/${bookingId}/duplicate`, { method: "POST", credentials: "include" });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.message || "Failed to duplicate"); }
+      const data = await res.json();
+      toast({ title: "Booking duplicated!", description: `New booking: ${data.bookingNumber}` });
+      queryClient.invalidateQueries({ queryKey: ['/api/bookings'] });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     }
   };
 
@@ -1264,12 +1582,34 @@ export default function BookingsManager() {
     return status;
   };
 
-  const filtered = statusFilter === "all" ? bookings : bookings.filter(b => b.status === statusFilter);
+  const matchesSearch = (b: any) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    if (b.bookingNumber?.toLowerCase().includes(q)) return true;
+    if (b.customerName?.toLowerCase().includes(q)) return true;
+    if (b.customerMobile?.includes(q.replace(/\D/g, ''))) return true;
+    if (b.notes?.toLowerCase().includes(q)) return true;
+    const pilgrims = Array.isArray(b.pilgrims) ? b.pilgrims : [];
+    if (pilgrims.some((p: any) => p.passportNumber?.toLowerCase().includes(q) || p.name?.toLowerCase().includes(q))) return true;
+    return false;
+  };
 
-  const counts = bookings.reduce((acc: Record<string, number>, b) => {
+  const filtered = (statusFilter === "all" ? bookings : bookings.filter((b: any) => b.status === statusFilter)).filter(matchesSearch);
+  const counts = bookings.reduce((acc: Record<string, number>, b: any) => {
     acc[b.status] = (acc[b.status] || 0) + 1;
     return acc;
   }, {});
+
+  const statusTabs = [
+    { label: "All", value: "all", count: bookings.length, color: "bg-gray-50 border-gray-200" },
+    { label: "Pending", value: "pending", count: counts.pending || 0, color: "bg-amber-50 border-amber-200" },
+    { label: "Approved", value: "approved", count: counts.approved || 0, color: "bg-blue-50 border-blue-200" },
+    { label: "Part. Paid", value: "partially_paid", count: counts.partially_paid || 0, color: "bg-orange-50 border-orange-200" },
+    { label: "Confirmed", value: "confirmed", count: counts.confirmed || 0, color: "bg-emerald-50 border-emerald-200" },
+    { label: "Cancelled", value: "cancelled", count: counts.cancelled || 0, color: "bg-gray-50 border-gray-200" },
+    { label: "Rejected", value: "rejected", count: counts.rejected || 0, color: "bg-red-50 border-red-200" },
+    { label: "🗑 Trash", value: "trash", count: 0, color: "bg-red-50 border-red-300" },
+  ];
 
   return (
     <AdminLayout>
@@ -1283,115 +1623,241 @@ export default function BookingsManager() {
         </Button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-6 gap-4 mb-6">
-        {[
-          { label: "All", value: bookings.length, key: "all", color: "bg-gray-50 border-gray-200" },
-          { label: "Pending", value: counts.pending || 0, key: "pending", color: "bg-amber-50 border-amber-200" },
-          { label: "Approved", value: counts.approved || 0, key: "approved", color: "bg-blue-50 border-blue-200" },
-          { label: "Part. Paid", value: counts.partially_paid || 0, key: "partially_paid", color: "bg-orange-50 border-orange-200" },
-          { label: "Confirmed", value: counts.confirmed || 0, key: "confirmed", color: "bg-emerald-50 border-emerald-200" },
-          { label: "Rejected", value: counts.rejected || 0, key: "rejected", color: "bg-red-50 border-red-200" },
-        ].map(s => (
-          <button key={s.key} onClick={() => setStatusFilter(s.key)} className={`p-4 rounded-xl border-2 text-left transition hover:shadow-md ${s.color} ${statusFilter === s.key ? "shadow-md ring-2 ring-[#0A3D2A]" : ""}`}>
-            <div className="text-2xl font-bold text-foreground">{s.value}</div>
-            <div className="text-xs text-muted-foreground font-semibold uppercase mt-1">{s.label}</div>
+      {/* Status Tabs */}
+      <div className="grid grid-cols-8 gap-2 mb-4">
+        {statusTabs.map(s => (
+          <button key={s.value} onClick={() => setStatusFilter(s.value)}
+            className={`p-3 rounded-xl border-2 text-left transition hover:shadow-md ${s.color} ${statusFilter === s.value ? "shadow-md ring-2 ring-[#0A3D2A]" : ""}`}>
+            <div className="text-xl font-bold text-foreground">{s.value === "trash" ? "—" : s.count}</div>
+            <div className="text-[10px] text-muted-foreground font-semibold uppercase mt-0.5 leading-tight">{s.label}</div>
           </button>
         ))}
       </div>
 
-      <Card className="border-none shadow-sm rounded-2xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-muted text-muted-foreground uppercase text-xs font-semibold">
-              <tr>
-                <th className="px-6 py-4">Booking ID / Date</th>
-                <th className="px-6 py-4">Customer Info</th>
-                <th className="px-6 py-4">Package</th>
-                <th className="px-6 py-4">Amount</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {isLoading ? (
-                <tr><td colSpan={6} className="text-center py-8">Loading...</td></tr>
-              ) : filtered.length === 0 ? (
-                <tr><td colSpan={6} className="text-center py-12 text-muted-foreground">No bookings found.</td></tr>
-              ) : filtered.map(booking => (
-                <tr key={booking.id} className="hover:bg-muted/30 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="font-mono font-bold text-primary">{booking.bookingNumber}</div>
-                    <div className="text-xs text-muted-foreground mt-1">{formatDate(booking.createdAt)}</div>
-                    {booking.isOffline && <span className="text-[9px] font-semibold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full">OFFLINE</span>}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="font-bold">{booking.customerName}</div>
-                    <div className="text-xs text-muted-foreground">{booking.customerMobile}</div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="font-medium text-foreground">{booking.packageName || "—"}</div>
-                    <div className="text-xs text-muted-foreground">{booking.numberOfPilgrims} Pilgrim(s)</div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="font-mono font-semibold text-[#0A3D2A]">{booking.finalAmount ? formatCurrency(booking.finalAmount) : "—"}</div>
-                    {(booking as any).advanceAmount && (
-                      <div className="text-xs text-emerald-600">Adv: ₹{Number((booking as any).advanceAmount).toLocaleString("en-IN")}</div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex flex-col gap-1.5">
-                      <Badge variant="outline" className={`px-2.5 py-1 uppercase tracking-wider text-[10px] font-bold border-0 ${getStatusColor(booking.status)}`}>
-                        {getStatusLabel(booking.status)}
-                      </Badge>
-                      {booking.travellerDetailsStatus === "submitted" ? (
-                        <Badge className="bg-indigo-100 text-indigo-800 border-0 text-[9px] px-1.5 py-0.5 font-semibold w-fit">
-                          <User size={9} className="mr-0.5" /> Details Submitted
-                        </Badge>
-                      ) : (["approved", "confirmed", "partially_paid"].includes(booking.status)) ? (
-                        <Badge className="bg-amber-100 text-amber-700 border-0 text-[9px] px-1.5 py-0.5 font-semibold w-fit animate-pulse">
-                          <ClipboardList size={9} className="mr-0.5" /> Details Pending
-                        </Badge>
-                      ) : null}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary" onClick={() => setDetailBooking(booking)} title="View Details">
-                        <Eye size={18} />
-                      </Button>
-                      {booking.travellerDetailsStatus === "submitted" && booking.groupId && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-indigo-600 hover:bg-indigo-50"
-                          title="Auto-fill Pilgrim from submitted details"
-                          disabled={autoFillingCardId === booking.id}
-                          onClick={() => handleAutoFillFromCard(booking.id)}
-                        >
-                          <User size={18} className={autoFillingCardId === booking.id ? "animate-pulse" : ""} />
-                        </Button>
-                      )}
-                      {booking.status === 'pending' && (
-                        <>
-                          <Button variant="ghost" size="icon" className="text-emerald-600 hover:bg-emerald-50" onClick={() => handleApprove(booking.id)} title="Approve">
-                            <CheckCircle size={18} />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="text-red-600 hover:bg-red-50" onClick={() => handleReject(booking.id)} title="Reject">
-                            <XCircle size={18} />
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* Search Bar */}
+      {statusFilter !== "trash" && (
+        <div className="mb-4 relative">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Search by Booking ID, Name, Mobile, Passport, Family ID…"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#0A3D2A] bg-white shadow-sm"
+          />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs font-semibold">
+              Clear
+            </button>
+          )}
         </div>
-      </Card>
+      )}
 
+      {/* TRASH VIEW */}
+      {statusFilter === "trash" && (
+        <Card className="border-none shadow-sm rounded-2xl overflow-hidden">
+          <div className="px-6 py-4 bg-red-50 border-b border-red-200 flex items-center gap-2">
+            <Trash2 size={16} className="text-red-600" />
+            <h2 className="font-semibold text-red-800 text-sm">Deleted Bookings — Trash</h2>
+            <span className="text-xs text-red-500 ml-auto">Payments, invoices & pilgrims are preserved</span>
+            <Button size="sm" variant="outline" className="h-7 text-xs ml-2" onClick={fetchTrash}>
+              <RefreshCw size={12} className={trashLoading ? "animate-spin" : ""} />
+            </Button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-muted text-muted-foreground uppercase text-xs font-semibold">
+                <tr>
+                  <th className="px-5 py-3">Booking</th>
+                  <th className="px-5 py-3">Customer</th>
+                  <th className="px-5 py-3">Package / Amount</th>
+                  <th className="px-5 py-3">Deleted By / When</th>
+                  <th className="px-5 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {trashLoading ? (
+                  <tr><td colSpan={5} className="text-center py-8 text-muted-foreground">Loading trash…</td></tr>
+                ) : trashBookings.length === 0 ? (
+                  <tr><td colSpan={5} className="text-center py-12 text-muted-foreground">Trash is empty.</td></tr>
+                ) : trashBookings.map((b: any) => (
+                  <tr key={b.id} className="hover:bg-red-50/30 transition-colors bg-red-50/10">
+                    <td className="px-5 py-3">
+                      <div className="font-mono font-bold text-red-700 line-through opacity-70">{b.bookingNumber}</div>
+                      <div className="text-[10px] text-muted-foreground">{formatDate(b.createdAt)}</div>
+                    </td>
+                    <td className="px-5 py-3">
+                      <div className="font-semibold text-gray-600">{b.customerName}</div>
+                      <div className="text-xs text-muted-foreground">{b.customerMobile}</div>
+                    </td>
+                    <td className="px-5 py-3">
+                      <div className="text-sm text-gray-600">{b.packageName || "—"}</div>
+                      <div className="font-mono text-xs text-[#0A3D2A]">{b.finalAmount ? formatCurrency(b.finalAmount) : "—"}</div>
+                    </td>
+                    <td className="px-5 py-3">
+                      <div className="text-xs font-medium">{b.deletedBy || "—"}</div>
+                      <div className="text-[10px] text-muted-foreground">
+                        {b.deletedAt ? new Date(b.deletedAt).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}
+                      </div>
+                    </td>
+                    <td className="px-5 py-3 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <Button variant="ghost" size="sm" className="h-7 text-xs text-emerald-700 hover:bg-emerald-50 gap-1" onClick={() => handleRestore(b.id)}>
+                          <RotateCcw size={12} /> Restore
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs text-red-600 hover:bg-red-50 gap-1" onClick={() => handlePermanentDelete(b)}>
+                          <Trash2 size={12} /> Permanent Delete
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+
+      {/* MAIN BOOKINGS TABLE */}
+      {statusFilter !== "trash" && (
+        <Card className="border-none shadow-sm rounded-2xl overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-muted text-muted-foreground uppercase text-xs font-semibold">
+                <tr>
+                  <th className="px-5 py-4">Booking ID / Date</th>
+                  <th className="px-5 py-4">Customer Info</th>
+                  <th className="px-5 py-4">Package</th>
+                  <th className="px-5 py-4">Amount</th>
+                  <th className="px-5 py-4">Status</th>
+                  <th className="px-5 py-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {isLoading ? (
+                  <tr><td colSpan={6} className="text-center py-8">Loading...</td></tr>
+                ) : filtered.length === 0 ? (
+                  <tr><td colSpan={6} className="text-center py-12 text-muted-foreground">
+                    {searchQuery ? `No bookings match "${searchQuery}"` : "No bookings found."}
+                  </td></tr>
+                ) : filtered.map((booking: any) => (
+                  <tr key={booking.id} className="hover:bg-muted/30 transition-colors">
+                    <td className="px-5 py-4">
+                      <div className="font-mono font-bold text-primary text-sm">{booking.bookingNumber}</div>
+                      <div className="text-xs text-muted-foreground mt-1">{formatDate(booking.createdAt)}</div>
+                      {booking.isOffline && <span className="text-[9px] font-semibold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full">OFFLINE</span>}
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="font-bold">{booking.customerName}</div>
+                      <div className="text-xs text-muted-foreground">{booking.customerMobile}</div>
+                      {booking.customerEmail && <div className="text-[10px] text-muted-foreground truncate max-w-[140px]">{booking.customerEmail}</div>}
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="font-medium text-foreground">{booking.packageName || "—"}</div>
+                      <div className="text-xs text-muted-foreground">{booking.numberOfPilgrims} Pilgrim(s)</div>
+                      {booking.roomType && <div className="text-[10px] text-muted-foreground capitalize">{booking.roomType}</div>}
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="font-mono font-semibold text-[#0A3D2A]">{booking.finalAmount ? formatCurrency(booking.finalAmount) : "—"}</div>
+                      {booking.advanceAmount && (
+                        <div className="text-xs text-emerald-600">Adv: ₹{Number(booking.advanceAmount).toLocaleString("en-IN")}</div>
+                      )}
+                      {booking.paidAmount && booking.finalAmount && Number(booking.paidAmount) < Number(booking.finalAmount) && (
+                        <div className="text-[10px] text-red-500">Due: ₹{(Number(booking.finalAmount) - Number(booking.paidAmount)).toLocaleString("en-IN")}</div>
+                      )}
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="flex flex-col gap-1.5">
+                        <Badge variant="outline" className={`px-2.5 py-1 uppercase tracking-wider text-[10px] font-bold border-0 ${getStatusColor(booking.status)}`}>
+                          {getStatusLabel(booking.status)}
+                        </Badge>
+                        {booking.travellerDetailsStatus === "submitted" ? (
+                          <Badge className="bg-indigo-100 text-indigo-800 border-0 text-[9px] px-1.5 py-0.5 font-semibold w-fit">
+                            <User size={9} className="mr-0.5" /> Details Submitted
+                          </Badge>
+                        ) : (["approved", "confirmed", "partially_paid"].includes(booking.status)) ? (
+                          <Badge className="bg-amber-100 text-amber-700 border-0 text-[9px] px-1.5 py-0.5 font-semibold w-fit animate-pulse">
+                            <ClipboardList size={9} className="mr-0.5" /> Details Pending
+                          </Badge>
+                        ) : null}
+                      </div>
+                    </td>
+                    <td className="px-5 py-4 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        {/* View */}
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-blue-50" onClick={() => setDetailBooking(booking)} title="View Details">
+                          <Eye size={15} />
+                        </Button>
+                        {/* Edit */}
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-amber-600 hover:bg-amber-50" onClick={() => setEditBooking(booking)} title="Edit Booking">
+                          <Pencil size={15} />
+                        </Button>
+                        {/* Duplicate */}
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-indigo-600 hover:bg-indigo-50" onClick={() => handleDuplicate(booking.id)} title="Duplicate Booking">
+                          <Copy size={15} />
+                        </Button>
+                        {/* Audit Log */}
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-500 hover:bg-gray-100" onClick={() => setAuditBooking(booking)} title="View Audit Log">
+                          <History size={15} />
+                        </Button>
+                        {/* Auto-fill Pilgrim */}
+                        {booking.travellerDetailsStatus === "submitted" && booking.groupId && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-indigo-600 hover:bg-indigo-50" title="Auto-fill Pilgrim"
+                            disabled={autoFillingCardId === booking.id} onClick={() => handleAutoFillFromCard(booking.id)}>
+                            <User size={15} className={autoFillingCardId === booking.id ? "animate-pulse" : ""} />
+                          </Button>
+                        )}
+                        {/* Approve / Reject (pending only) */}
+                        {booking.status === 'pending' && (
+                          <>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-600 hover:bg-emerald-50" onClick={() => handleApprove(booking.id)} title="Approve">
+                              <CheckCircle size={15} />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50" onClick={() => handleReject(booking.id)} title="Reject">
+                              <XCircle size={15} />
+                            </Button>
+                          </>
+                        )}
+                        {/* Soft Delete */}
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50" onClick={() => setSoftDeleteTarget(booking)} title="Move to Trash">
+                          <Trash2 size={15} />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {filtered.length > 0 && (
+            <div className="px-5 py-3 border-t bg-muted/30 text-xs text-muted-foreground">
+              Showing {filtered.length} booking{filtered.length !== 1 ? "s" : ""}
+              {searchQuery && ` matching "${searchQuery}"`}
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* Modals */}
       <BookingDetailModal booking={detailBooking} open={!!detailBooking} onClose={() => setDetailBooking(null)} />
+      <EditBookingModal
+        booking={editBooking}
+        open={!!editBooking}
+        onClose={() => setEditBooking(null)}
+        onSaved={() => { queryClient.invalidateQueries({ queryKey: ['/api/bookings'] }); refetch(); }}
+      />
+      <AuditLogModal
+        bookingId={auditBooking?.id ?? null}
+        bookingNumber={auditBooking?.bookingNumber ?? ""}
+        open={!!auditBooking}
+        onClose={() => setAuditBooking(null)}
+      />
+      <ConfirmDeleteDialog
+        booking={softDeleteTarget}
+        open={!!softDeleteTarget}
+        onClose={() => setSoftDeleteTarget(null)}
+        onConfirm={() => softDeleteTarget && handleSoftDelete(softDeleteTarget.id)}
+      />
       <OfflineBookingForm
         open={showOfflineForm}
         onClose={() => setShowOfflineForm(false)}
