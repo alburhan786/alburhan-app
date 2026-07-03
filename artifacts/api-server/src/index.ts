@@ -14,6 +14,21 @@ import { startPaymentReminderCron } from "./jobs/paymentReminder.js";
 import { startFeedbackReminderCron } from "./jobs/feedbackReminder.js";
 
 async function runMigrations() {
+  // Session table — must exist BEFORE connect-pg-simple initializes
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "session" (
+        "sid" varchar NOT NULL COLLATE "default",
+        "sess" json NOT NULL,
+        "expire" timestamp(6) NOT NULL,
+        CONSTRAINT "session_pkey" PRIMARY KEY ("sid") NOT DEFERRABLE INITIALLY IMMEDIATE
+      ) WITH (OIDS=FALSE)
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire")`);
+    console.log("[Migration] session table ensured");
+  } catch (err) {
+    console.error("[Migration] session table failed:", err);
+  }
   try {
     await db.execute(sql`ALTER TABLE pilgrims ADD COLUMN IF NOT EXISTS barcode_id TEXT`);
     console.log("[Migration] barcode_id column ensured");
@@ -180,27 +195,30 @@ async function runMigrations() {
 
 const rawPort = process.env["PORT"];
 const port = rawPort ? Number(rawPort) : 8080;
-
-if (Number.isNaN(port) || port <= 0) {
-  console.error(`[Startup] Invalid PORT value "${rawPort}", defaulting to 8080`);
-}
-
 const finalPort = Number.isNaN(port) || port <= 0 ? 8080 : port;
 
-app.listen(finalPort, async () => {
-  console.log(`Server listening on port ${finalPort}`);
-
+// Run migrations FIRST, then start server — ensures session table exists before any request
+async function start() {
+  console.log("[Startup] Running migrations...");
   await runMigrations();
 
   try {
     await db.update(usersTable)
       .set({ role: "admin" })
       .where(inArray(usersTable.mobile, ADMIN_MOBILES));
-    console.log("[Startup] Admin roles synced for ADMIN_MOBILES");
+    console.log("[Startup] Admin roles synced");
   } catch (err) {
     console.error("[Startup] Failed to sync admin roles:", err);
   }
 
-  startPaymentReminderCron();
-  startFeedbackReminderCron();
+  app.listen(finalPort, () => {
+    console.log(`Server listening on port ${finalPort}`);
+    startPaymentReminderCron();
+    startFeedbackReminderCron();
+  });
+}
+
+start().catch(err => {
+  console.error("[Startup] Fatal error:", err);
+  process.exit(1);
 });

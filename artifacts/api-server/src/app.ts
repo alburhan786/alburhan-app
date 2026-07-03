@@ -58,7 +58,7 @@ const sessionPool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 
 app.use(session({
   store: process.env.DATABASE_URL
-    ? new PgSession({ pool: sessionPool, createTableIfMissing: true })
+    ? new PgSession({ pool: sessionPool, createTableIfMissing: false })
     : undefined,
   secret: process.env.SESSION_SECRET || "alburhan-tours-secret-key-2024",
   resave: false,
