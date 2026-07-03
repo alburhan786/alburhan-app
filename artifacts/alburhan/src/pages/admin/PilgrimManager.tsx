@@ -233,6 +233,7 @@ export default function PilgrimManager() {
   const [editingRoom, setEditingRoom] = useState<{ familyId: string; value: string } | null>(null);
   const [swapSelectA, setSwapSelectA] = useState<string | null>(null);
   const [swapPending, setSwapPending] = useState(false);
+  const [highlightedFamilyId, setHighlightedFamilyId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -962,6 +963,14 @@ export default function PilgrimManager() {
   };
 
   const unassignedPilgrims = pilgrims.filter(p => !p.roomNumber);
+  const familyCountMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const pg of pilgrims) {
+      if (pg.familyId) map[pg.familyId] = (map[pg.familyId] || 0) + 1;
+    }
+    return map;
+  }, [pilgrims]);
+
   const familyStats = useMemo(() => {
     const totalFamilies = families.length;
     const totalInFamilies = families.reduce((s, f) => s + f.members.length, 0);
@@ -1153,15 +1162,15 @@ export default function PilgrimManager() {
                   <th className="px-4 py-3">Room</th>
                   <th className="px-4 py-3">Bus</th>
                   <th className="px-4 py-3">Relation</th>
-                  <th className="px-4 py-3">Family</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
+                  <th className="px-3 py-3 sticky right-[112px] z-20 bg-muted border-l-2 border-gray-200" style={{minWidth:140}}>Family</th>
+                  <th className="px-3 py-3 text-right sticky right-0 z-20 bg-muted" style={{width:112}}>Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {pilgrims.length === 0 ? (
                   <tr><td colSpan={10} className="text-center py-8 text-muted-foreground">No pilgrims yet. Click "Add Pilgrim" to start.</td></tr>
                 ) : pilgrims.map(p => (
-                  <tr key={p.id} className="hover:bg-muted/30">
+                  <tr key={p.id} className={`transition-colors ${p.familyId && p.familyId === highlightedFamilyId ? "bg-blue-50" : "hover:bg-muted/30"}`}>
                     <td className="px-4 py-3">
                       {editingSerial?.id === p.id ? (
                         <input
@@ -1205,65 +1214,87 @@ export default function PilgrimManager() {
                     </td>
                     <td className="px-4 py-3">{p.busNumber || "—"}</td>
                     <td className="px-4 py-3 text-xs">{p.relation || "—"}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-col gap-0.5">
-                        <div className="flex items-center gap-1">
-                          {editingFamilyId?.id === p.id ? (
-                            <input
-                              autoFocus
-                              type="text"
-                              placeholder="e.g. F01"
-                              value={editingFamilyId.value}
-                              onChange={e => setEditingFamilyId({ id: p.id, value: e.target.value })}
-                              onBlur={() => handleFamilyIdUpdate(p, editingFamilyId.value)}
-                              onKeyDown={e => {
-                                if (e.key === "Enter") handleFamilyIdUpdate(p, editingFamilyId.value);
-                                if (e.key === "Escape") setEditingFamilyId(null);
-                              }}
-                              className="w-16 h-6 text-center font-mono font-bold border-2 border-amber-400 rounded focus:outline-none text-xs"
-                            />
-                          ) : (
-                            <span
-                              title="Click to set family ID"
-                              onClick={() => setEditingFamilyId({ id: p.id, value: p.familyId || "" })}
-                              className={`font-mono font-semibold cursor-pointer px-1.5 py-0.5 rounded transition-colors text-xs ${p.familyId ? "bg-amber-100 text-amber-800 hover:bg-amber-200" : "text-muted-foreground/40 hover:bg-muted"}`}
-                            >
-                              {p.familyId || "+Fam"}
-                            </span>
-                          )}
-                          {p.familyId && (
+                    {/* Family column — sticky right, colored badges */}
+                    <td
+                      className={`px-3 py-3 sticky right-[112px] z-10 border-l-2 border-gray-200 ${p.familyId && p.familyId === highlightedFamilyId ? "bg-blue-50" : "bg-white"}`}
+                      style={{minWidth:140}}
+                    >
+                      {editingFamilyId?.id === p.id ? (
+                        <input
+                          autoFocus
+                          type="text"
+                          placeholder="e.g. F01"
+                          value={editingFamilyId.value}
+                          onChange={e => setEditingFamilyId({ id: p.id, value: e.target.value })}
+                          onBlur={() => handleFamilyIdUpdate(p, editingFamilyId.value)}
+                          onKeyDown={e => {
+                            if (e.key === "Enter") handleFamilyIdUpdate(p, editingFamilyId.value);
+                            if (e.key === "Escape") setEditingFamilyId(null);
+                          }}
+                          className="w-24 h-7 text-center font-mono font-bold border-2 border-blue-400 rounded-lg focus:outline-none text-xs"
+                        />
+                      ) : p.familyId ? (() => {
+                        const count = familyCountMap[p.familyId] ?? 1;
+                        const isHead = p.familyHead;
+                        const isMissingData = !p.passportNumber;
+                        const badgeCls = isHead
+                          ? "bg-orange-500 hover:bg-orange-600 ring-orange-300"
+                          : isMissingData
+                          ? "bg-red-500 hover:bg-red-600 ring-red-300"
+                          : p.passportNumber
+                          ? "bg-green-600 hover:bg-green-700 ring-green-300"
+                          : "bg-blue-600 hover:bg-blue-700 ring-blue-300";
+                        return (
+                          <div className="flex flex-col gap-1">
                             <button
-                              title={p.familyHead ? "Remove as head" : "Set as family head"}
-                              onClick={() => handleToggleFamilyHead(p)}
-                              className={`text-xs transition-colors ${p.familyHead ? "text-amber-500" : "text-muted-foreground/30 hover:text-amber-400"}`}
+                              title={`Click to highlight family ${p.familyId}. Double-click to edit.`}
+                              onClick={() => setHighlightedFamilyId(prev => prev === p.familyId ? null : p.familyId!)}
+                              onDoubleClick={() => setEditingFamilyId({ id: p.id, value: p.familyId || "" })}
+                              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-white font-bold text-xs cursor-pointer transition-all ring-2 ring-offset-1 select-none ${badgeCls}`}
                             >
-                              <Star size={11} fill={p.familyHead ? "currentColor" : "none"} />
+                              <span>{isHead ? "👑" : "👨‍👩‍👧"}</span>
+                              <span className="font-mono">{p.familyId}</span>
+                              <span className="opacity-80">({count})</span>
                             </button>
-                          )}
-                        </div>
-                        {p.familyId && (
-                          <select
-                            value={p.familyRelation || ""}
-                            onChange={e => {
-                              const val = e.target.value;
-                              fetch(`${API}/api/groups/${groupId}/pilgrims/${p.id}`, {
-                                method: "PUT",
-                                credentials: "include",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ ...p, familyRelation: val || null }),
-                              }).then(() => fetchData());
-                            }}
-                            className="h-5 text-[10px] rounded border border-amber-200 bg-amber-50 text-amber-900 px-1 max-w-[72px]"
-                          >
-                            <option value="">Relation</option>
-                            {["Husband","Wife","Son","Daughter","Father","Mother","Other"].map(r => (
-                              <option key={r} value={r}>{r}</option>
-                            ))}
-                          </select>
-                        )}
-                      </div>
+                            <div className="flex items-center gap-1">
+                              <select
+                                value={p.familyRelation || ""}
+                                onChange={e => {
+                                  const val = e.target.value;
+                                  fetch(`${API}/api/groups/${groupId}/pilgrims/${p.id}`, {
+                                    method: "PUT", credentials: "include",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ ...p, familyRelation: val || null }),
+                                  }).then(() => fetchData());
+                                }}
+                                className="h-5 text-[10px] rounded border border-gray-200 bg-gray-50 text-gray-700 px-1 max-w-[72px]"
+                              >
+                                <option value="">Relation</option>
+                                {["Husband","Wife","Son","Daughter","Father","Mother","Other"].map(r => (
+                                  <option key={r} value={r}>{r}</option>
+                                ))}
+                              </select>
+                              <button
+                                title={isHead ? "Remove as family head" : "Set as family head"}
+                                onClick={() => handleToggleFamilyHead(p)}
+                                className={`transition-colors ${isHead ? "text-orange-500" : "text-muted-foreground/30 hover:text-orange-400"}`}
+                              >
+                                <Star size={11} fill={isHead ? "currentColor" : "none"} />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })() : (
+                        <button
+                          title="Click to set family ID"
+                          onClick={() => setEditingFamilyId({ id: p.id, value: "" })}
+                          className="text-xs text-muted-foreground/40 hover:text-blue-500 hover:bg-blue-50 px-2 py-1 rounded-full transition-colors font-medium border border-dashed border-gray-200 hover:border-blue-300"
+                        >
+                          + Family
+                        </button>
+                      )}
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className={`px-3 py-3 text-right sticky right-0 z-10 ${p.familyId && p.familyId === highlightedFamilyId ? "bg-blue-50" : "bg-white"}`} style={{width:112}}>
                       <div className="flex items-center justify-end gap-1">
                         <Button
                           variant="ghost" size="icon"
