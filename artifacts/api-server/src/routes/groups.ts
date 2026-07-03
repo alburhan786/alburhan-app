@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, hajjGroupsTable, pilgrimsTable, hajjRoomsTable, attendanceLogsTable, attendanceEventsTable } from "@workspace/db";
+import { db, pool, hajjGroupsTable, pilgrimsTable, hajjRoomsTable, attendanceLogsTable, attendanceEventsTable } from "@workspace/db";
 import { eq, and, ne, desc, asc, count, max, inArray, sql } from "drizzle-orm";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendWhatsApp } from "../lib/notifications.js";
@@ -66,20 +66,18 @@ function fmtPilgrim(p: any) {
 
 router.get("/", requireAdmin as any, async (_req, res) => {
   try {
-    // Raw SQL to avoid Drizzle schema mismatch on VPS (missing columns crash ORM selects)
-    // db.execute() with node-postgres returns { rows: [...] }, so we normalise both shapes
-    const rawGroups = await db.execute(sql`
-      SELECT id, group_name, year, company_id, departure_date, return_date,
-             flight_number, maktab_number, COALESCE(starting_serial_number, 1) AS starting_serial_number,
-             COALESCE(hotels, '{}') AS hotels, notes, created_at, updated_at
-      FROM hajj_groups ORDER BY created_at DESC
-    `);
-    const groups: any[] = (rawGroups as any)?.rows ?? (Array.isArray(rawGroups) ? rawGroups : []);
-
-    const rawCounts = await db.execute(sql`
-      SELECT group_id, COUNT(*)::int AS cnt FROM pilgrims GROUP BY group_id
-    `);
-    const countRows: any[] = (rawCounts as any)?.rows ?? (Array.isArray(rawCounts) ? rawCounts : []);
+    // pool.query() directly — avoids drizzle wrapper bundling quirks on VPS
+    const [groupsRes, countsRes] = await Promise.all([
+      pool.query(`
+        SELECT id, group_name, year, company_id, departure_date, return_date,
+               flight_number, maktab_number, COALESCE(starting_serial_number, 1) AS starting_serial_number,
+               COALESCE(hotels, '{}') AS hotels, notes, created_at, updated_at
+        FROM hajj_groups ORDER BY created_at DESC
+      `),
+      pool.query(`SELECT group_id, COUNT(*)::int AS cnt FROM pilgrims GROUP BY group_id`),
+    ]);
+    const groups: any[] = groupsRes.rows;
+    const countRows: any[] = countsRes.rows;
 
     const countMap: Record<string, number> = {};
     for (const r of countRows) {

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, bookingsTable, usersTable, packagesTable, inquiriesTable, packageRequestsTable, hajjGroupsTable, customerProfilesTable, pilgrimsTable } from "@workspace/db";
+import { db, pool, bookingsTable, usersTable, packagesTable, inquiriesTable, packageRequestsTable, hajjGroupsTable, customerProfilesTable, pilgrimsTable } from "@workspace/db";
 import { eq, count, sum, desc, and, sql, max } from "drizzle-orm";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendWhatsApp, sendDLTSMS } from "../lib/notifications.js";
@@ -8,9 +8,8 @@ const router = Router();
 
 router.get("/stats", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
   try {
-    // Use raw SQL to avoid pgEnum type mismatch on VPS (booking_status enum may not exist)
-    // db.execute() with node-postgres returns { rows: [...] }
-    const countsResult = await db.execute(sql`
+    // Use pool.query() directly — bypasses drizzle wrapper to avoid bundling quirks
+    const countsRes = await pool.query(`
       SELECT
         COUNT(*)::int AS total,
         COUNT(*) FILTER (WHERE status::text = 'pending')::int AS pending,
@@ -21,27 +20,27 @@ router.get("/stats", requireAdmin as any, async (_req: AuthenticatedRequest, res
           THEN NULLIF(TRIM(final_amount::text), '')::numeric ELSE 0 END), 0)::float AS revenue
       FROM bookings
     `);
-    const counts = (countsResult as any)?.rows?.[0] ?? (Array.isArray(countsResult) ? (countsResult as any[])[0] : countsResult);
+    const counts = countsRes.rows[0] ?? {};
 
-    const custResult = await db.execute(sql`SELECT COUNT(*)::int AS total FROM users WHERE role = 'customer'`);
-    const custRow = (custResult as any)?.rows?.[0] ?? (Array.isArray(custResult) ? (custResult as any[])[0] : custResult);
-
-    const pkgResult = await db.execute(sql`SELECT COUNT(*)::int AS total FROM packages`);
-    const pkgRow = (pkgResult as any)?.rows?.[0] ?? (Array.isArray(pkgResult) ? (pkgResult as any[])[0] : pkgResult);
-
-    const recentResult = await db.execute(sql`
-      SELECT id,
-             COALESCE(booking_number, '') AS booking_number,
-             COALESCE(customer_name, '') AS customer_name,
-             COALESCE(customer_mobile, '') AS customer_mobile,
-             status::text AS status,
-             NULLIF(TRIM(total_amount::text), '') AS total_amount,
-             NULLIF(TRIM(gst_amount::text), '') AS gst_amount,
-             NULLIF(TRIM(final_amount::text), '') AS final_amount,
-             created_at, updated_at
-      FROM bookings ORDER BY created_at DESC LIMIT 5
-    `);
-    const recentRows: any[] = (recentResult as any)?.rows ?? (Array.isArray(recentResult) ? recentResult : []);
+    const [custRes, pkgRes, recentRes] = await Promise.all([
+      pool.query(`SELECT COUNT(*)::int AS total FROM users WHERE role = 'customer'`),
+      pool.query(`SELECT COUNT(*)::int AS total FROM packages`),
+      pool.query(`
+        SELECT id,
+               COALESCE(booking_number, '') AS booking_number,
+               COALESCE(customer_name, '') AS customer_name,
+               COALESCE(customer_mobile, '') AS customer_mobile,
+               status::text AS status,
+               NULLIF(TRIM(total_amount::text), '') AS total_amount,
+               NULLIF(TRIM(gst_amount::text), '') AS gst_amount,
+               NULLIF(TRIM(final_amount::text), '') AS final_amount,
+               created_at, updated_at
+        FROM bookings ORDER BY created_at DESC LIMIT 5
+      `),
+    ]);
+    const custRow = custRes.rows[0] ?? {};
+    const pkgRow = pkgRes.rows[0] ?? {};
+    const recentRows: any[] = recentRes.rows;
 
     res.json({
       totalBookings: Number(counts?.total ?? 0),
