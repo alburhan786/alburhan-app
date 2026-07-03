@@ -1,0 +1,543 @@
+Build a complete Travel ERP for Al Burhan Tours & Travels.
+
+Goal:
+Create a modern, fast, secure Hajj & Umrah Management System that manages the entire pilgrim journey from enquiry to return.
+
+=========================================
+1. BOOKING MANAGEMENT
+=========================================
+
+Booking Status Flow:
+Enquiry
+→ Quotation
+→ Pending
+→ Approved
+→ Payment Pending
+→ Partially Paid
+→ Fully Paid
+→ Visa Processing
+→ Ticket Issued
+→ Confirmed
+→ Travel Started
+→ Completed
+→ Cancelled
+
+Features:
+- Add Booking
+- Edit Booking
+- Delete Booking (Admin only)
+- Duplicate Booking
+- Booking Timeline
+- Booking Notes
+- Upload Documents
+- Print Booking Form
+- Search & Filters
+- Audit Log (track every change)
+
+=========================================
+2. PILGRIM MANAGEMENT
+=========================================
+
+Store:
+
+Photo
+Passport
+Visa
+Aadhaar
+PAN
+Blood Group
+Emergency Contact
+Medical Notes
+Relation
+Family ID
+Room
+Bus
+Flight
+Hotel
+Package
+
+Generate:
+- QR Code
+- Barcode
+- ID Card
+
+=========================================
+3. FAMILY MANAGEMENT
+=========================================
+
+Auto Family IDs
+
+Example:
+
+F001
+Head: Mohammed Altaf
+Members: 4
+
+Show:
+Head
+Wife
+Son
+Daughter
+
+Group families together.
+
+Clicking one member should show the entire family.
+
+=========================================
+4. PAYMENT MANAGEMENT
+=========================================
+
+Every pilgrim must have a financial ledger.
+
+Package Price
+
+Discount
+
+Extra Charges
+
+Paid Amount
+
+Balance Amount
+
+Refund
+
+Due Date
+
+Payment Status
+
+Payment History
+
+Support:
+
+Cash
+UPI
+Bank Transfer
+Cheque
+Razorpay
+Stripe
+
+Generate:
+
+Receipt
+
+Invoice
+
+Balance Statement
+
+Refund Receipt
+
+Automatically calculate:
+
+Total Paid
+
+Outstanding Balance
+
+Profit
+
+Loss
+
+=========================================
+5. FAMILY PAYMENT
+=========================================
+
+Allow one payment for the whole family.
+
+Example:
+
+Family F001
+
+Package Total
+
+₹19,50,000
+
+Paid
+
+₹15,00,000
+
+Balance
+
+₹4,50,000
+
+Distribute payments among family members.
+
+=========================================
+6. EXPENSE MANAGEMENT
+=========================================
+
+Expense Categories
+
+Flights
+
+Hotels
+
+Visa
+
+Saudi Transport
+
+Food
+
+Laundry
+
+Zam Zam
+
+Staff Salary
+
+Marketing
+
+Office
+
+Miscellaneous
+
+Every expense should contain
+
+Vendor
+
+Invoice
+
+Amount
+
+Date
+
+Paid By
+
+Attachment
+
+=========================================
+7. ACCOUNTING
+=========================================
+
+Dashboard
+
+Today's Collection
+
+Monthly Collection
+
+Pending Amount
+
+Expenses
+
+Net Profit
+
+Cash Balance
+
+Bank Balance
+
+Outstanding Amount
+
+Export Excel
+
+Export PDF
+
+=========================================
+8. ROOM MANAGEMENT
+=========================================
+
+Assign Rooms
+
+Auto Capacity Check
+
+Family Preference
+
+Room List
+
+Room Occupancy
+
+Print Room List
+
+=========================================
+9. BUS MANAGEMENT
+=========================================
+
+Assign Bus
+
+Seat Number
+
+Driver
+
+Munazzam
+
+Attendance
+
+Bus Occupancy
+
+Print Bus List
+
+=========================================
+10. FLIGHT MANAGEMENT
+=========================================
+
+Airline
+
+PNR
+
+Ticket Number
+
+Departure
+
+Arrival
+
+Seat
+
+Baggage
+
+Meal
+
+Flight Status
+
+=========================================
+11. HOTEL MANAGEMENT
+=========================================
+
+Hotel
+
+Room
+
+Check In
+
+Check Out
+
+Map
+
+Walking Distance
+
+=========================================
+12. QR ATTENDANCE
+=========================================
+
+Scan using
+
+Android Camera
+
+RugGear Scanner
+
+QR
+
+Barcode
+
+Attendance Events
+
+Airport
+
+Hotel
+
+Bus
+
+Ziyarat
+
+Mina
+
+Arafat
+
+Muzdalifah
+
+Return
+
+Live Dashboard
+
+Present
+
+Missing
+
+Late
+
+Duplicate Scan Warning
+
+Offline Sync
+
+=========================================
+13. DOCUMENT MANAGEMENT
+=========================================
+
+Passport
+
+Visa
+
+Ticket
+
+Insurance
+
+Vaccination
+
+PDF
+
+Photos
+
+Bulk Upload
+
+=========================================
+14. WHATSAPP
+=========================================
+
+Templates
+
+Departure
+
+Arrival
+
+Payment Reminder
+
+Balance Reminder
+
+Flight Reminder
+
+Hotel Reminder
+
+Room Allocation
+
+Bus Allocation
+
+Generate QR
+
+Send Invoice
+
+Send Receipt
+
+=========================================
+15. REPORTS
+=========================================
+
+Pilgrim Report
+
+Family Report
+
+Room Report
+
+Bus Report
+
+Flight Report
+
+Hotel Report
+
+Outstanding Report
+
+Payment Report
+
+Expense Report
+
+Profit & Loss
+
+GST Report
+
+Attendance Report
+
+Export PDF
+
+Export Excel
+
+=========================================
+16. USER ROLES
+=========================================
+
+Super Admin
+
+Accountant
+
+Booking Staff
+
+Operations
+
+Munazzam
+
+Scanner Staff
+
+Reception
+
+Each role has permissions.
+
+=========================================
+17. DASHBOARD
+=========================================
+
+Cards
+
+Bookings
+
+Pilgrims
+
+Families
+
+Payments
+
+Expenses
+
+Outstanding
+
+Profit
+
+Today's Collection
+
+Upcoming Flights
+
+Upcoming Departures
+
+Attendance
+
+=========================================
+18. UI
+=========================================
+
+Premium Airline Style
+
+Dark Green
+
+Gold
+
+White
+
+Responsive
+
+Fast
+
+Professional
+
+Large Buttons
+
+Modern Cards
+
+Data Tables
+
+Sticky Headers
+
+Dark Mode
+
+=========================================
+19. SECURITY
+=========================================
+
+Role Based Access
+
+Daily Backup
+
+Activity Log
+
+Soft Delete
+
+Restore Deleted Records
+
+=========================================
+20. FUTURE MODULES
+=========================================
+
+Hajj
+
+Umrah
+
+Ramadan Umrah
+
+Iraq Ziyarat
+
+Syria Tour
+
+Jordan Tour
+
+Baitul Muqaddas
+
+Domestic Tours
+
+Keep the database normalized and scalable.
+
+Do not break any existing functionality.
+
+Add these modules one by one while keeping existing data intact.
+
+The ERP should be able to manage 10,000+ pilgrims with fast search, filtering, and reporting.
