@@ -73,7 +73,7 @@ import HotelManager from "@/pages/admin/HotelManager";
 import BusManager from "@/pages/admin/BusManager";
 import MedicalManager from "@/pages/admin/MedicalManager";
 import VisaTracker from "@/pages/admin/VisaTracker";
-import AIAssistant from "@/pages/admin/AIAssistant";
+import AdminAIAssistant from "@/pages/admin/AIAssistant";
 import AttendanceScanPublic from "@/pages/public/AttendanceScanPublic";
 import StaffVerify from "@/pages/public/StaffVerify";
 import VerifyPilgrim from "@/pages/public/VerifyPilgrim";
@@ -186,7 +186,7 @@ function Router() {
       <Route path="/admin/buses" component={() => <AdminRoute component={BusManager} />} />
       <Route path="/admin/medical" component={() => <AdminRoute component={MedicalManager} />} />
       <Route path="/admin/visa" component={() => <AdminRoute component={VisaTracker} />} />
-      <Route path="/admin/ai" component={() => <AdminRoute component={AIAssistant} />} />
+      <Route path="/admin/ai" component={() => <AdminRoute component={AdminAIAssistant} />} />
       <Route path="/admin/expenses" component={() => <AdminRoute component={ExpenseManager} />} />
       <Route path="/admin/accounting" component={() => <AdminRoute component={AccountingDashboard} />} />
       <Route path="/admin/flights" component={() => <AdminRoute component={FlightManager} />} />
