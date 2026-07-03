@@ -66,14 +66,41 @@ function fmtPilgrim(p: any) {
 
 router.get("/", requireAdmin as any, async (_req, res) => {
   try {
-    const groups = await db.select().from(hajjGroupsTable).orderBy(desc(hajjGroupsTable.createdAt));
-    const pilgrimCounts = await db
-      .select({ groupId: pilgrimsTable.groupId, count: count() })
-      .from(pilgrimsTable)
-      .groupBy(pilgrimsTable.groupId);
+    // Raw SQL to avoid Drizzle schema mismatch on VPS (missing columns crash ORM selects)
+    const groups = await db.execute(sql`
+      SELECT id, group_name, year, company_id, departure_date, return_date,
+             flight_number, maktab_number, COALESCE(starting_serial_number, 1) AS starting_serial_number,
+             COALESCE(hotels, '{}') AS hotels, notes, created_at, updated_at
+      FROM hajj_groups ORDER BY created_at DESC
+    `) as any[];
 
-    const countMap = Object.fromEntries(pilgrimCounts.map(pc => [pc.groupId, Number(pc.count)]));
-    res.json(groups.map(g => ({ ...fmtGroup(g), pilgrimCount: countMap[g.id] || 0 })));
+    const counts = await db.execute(sql`
+      SELECT group_id, COUNT(*)::int AS cnt FROM pilgrims GROUP BY group_id
+    `) as any[];
+
+    const countMap: Record<string, number> = {};
+    for (const r of (Array.isArray(counts) ? counts : [])) {
+      countMap[r.group_id] = Number(r.cnt);
+    }
+
+    const groupList = (Array.isArray(groups) ? groups : []).map((g: any) => ({
+      id: g.id,
+      groupName: g.group_name,
+      year: g.year,
+      companyId: g.company_id,
+      departureDate: g.departure_date,
+      returnDate: g.return_date,
+      flightNumber: g.flight_number,
+      maktabNumber: g.maktab_number,
+      startingSerialNumber: g.starting_serial_number ?? 1,
+      hotels: g.hotels ?? {},
+      notes: g.notes,
+      createdAt: g.created_at,
+      updatedAt: g.updated_at,
+      pilgrimCount: countMap[g.id] || 0,
+    }));
+
+    res.json(groupList);
   } catch (err: any) {
     console.error("[Groups] List failed:", err?.message);
     res.status(500).json({ message: err?.message || "Failed to load groups" });
