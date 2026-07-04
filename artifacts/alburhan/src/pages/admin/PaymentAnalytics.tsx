@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { usePermissions } from "@/hooks/use-permissions";
 import {
   IndianRupee, TrendingUp, Clock, AlertTriangle,
   ChevronUp, ChevronDown, Bell, BellOff, Play,
@@ -96,10 +97,13 @@ type DrawerProps = {
 
 function PaymentDrawer({ booking, onClose, onRefreshAnalytics }: DrawerProps) {
   const qc = useQueryClient();
+  const { can } = usePermissions();
+  const canDelete = can("payments", "delete");
   const [includeDeleted, setIncludeDeleted] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [editTxn, setEditTxn] = useState<PaymentTxn | null>(null);
   const [deleteTxn, setDeleteTxn] = useState<PaymentTxn | null>(null);
+  const [reverseTxn, setReverseTxn] = useState<PaymentTxn | null>(null);
   const [historyTxn, setHistoryTxn] = useState<PaymentTxn | null>(null);
   const [receiptTxn, setReceiptTxn] = useState<PaymentTxn | null>(null);
   const [loading, setLoading] = useState(false);
@@ -225,8 +229,10 @@ function PaymentDrawer({ booking, onClose, onRefreshAnalytics }: DrawerProps) {
                   key={txn.id}
                   txn={txn}
                   loading={loading}
+                  canDelete={canDelete}
                   onEdit={() => setEditTxn(txn)}
                   onDelete={() => setDeleteTxn(txn)}
+                  onReverse={() => setReverseTxn(txn)}
                   onRestore={() => doRestore(txn)}
                   onHistory={() => setHistoryTxn(txn)}
                   onReceipt={() => setReceiptTxn(txn)}
@@ -266,6 +272,18 @@ function PaymentDrawer({ booking, onClose, onRefreshAnalytics }: DrawerProps) {
           onClose={() => setDeleteTxn(null)}
           onSuccess={(msg) => { showToast("ok", msg); refresh(); setDeleteTxn(null); }}
           onError={(msg) => showToast("err", msg)}
+          onRequestReverse={() => { setDeleteTxn(null); setReverseTxn(deleteTxn); }}
+        />
+      )}
+
+      {/* Reverse Payment */}
+      {reverseTxn && (
+        <ReverseDialog
+          txn={reverseTxn}
+          booking={booking}
+          onClose={() => setReverseTxn(null)}
+          onSuccess={(msg) => { showToast("ok", msg); refresh(); setReverseTxn(null); }}
+          onError={(msg) => showToast("err", msg)}
         />
       )}
 
@@ -282,9 +300,9 @@ function PaymentDrawer({ booking, onClose, onRefreshAnalytics }: DrawerProps) {
   );
 }
 
-function TxnRow({ txn, loading, onEdit, onDelete, onRestore, onHistory, onReceipt }: {
-  txn: PaymentTxn; loading: boolean;
-  onEdit: () => void; onDelete: () => void; onRestore: () => void;
+function TxnRow({ txn, loading, canDelete, onEdit, onDelete, onReverse, onRestore, onHistory, onReceipt }: {
+  txn: PaymentTxn; loading: boolean; canDelete: boolean;
+  onEdit: () => void; onDelete: () => void; onReverse: () => void; onRestore: () => void;
   onHistory: () => void; onReceipt: () => void;
 }) {
   return (
@@ -294,7 +312,8 @@ function TxnRow({ txn, loading, onEdit, onDelete, onRestore, onHistory, onReceip
           <span className="font-mono font-bold text-gray-900 text-sm">{fmt(txn.amount)}</span>
           <span className="text-xs bg-gray-100 text-gray-600 rounded px-1.5 py-0.5 font-medium">{MODE_LABELS[txn.paymentMode] ?? txn.paymentMode}</span>
           {txn.isDeleted && <span className="text-xs bg-red-100 text-red-700 rounded px-1.5 py-0.5 font-medium">Deleted</span>}
-          {txn.editedAt && !txn.isDeleted && <span className="text-xs bg-blue-50 text-blue-500 rounded px-1.5 py-0.5">Edited</span>}
+          {txn.notes?.startsWith("Reversal:") && !txn.isDeleted && <span className="text-xs bg-orange-50 text-orange-600 rounded px-1.5 py-0.5 font-medium">Reversal</span>}
+          {txn.editedAt && !txn.isDeleted && !txn.notes?.startsWith("Reversal:") && <span className="text-xs bg-blue-50 text-blue-500 rounded px-1.5 py-0.5">Edited</span>}
         </div>
         <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-2 flex-wrap">
           <span>{new Date(txn.paymentDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span>
@@ -320,9 +339,16 @@ function TxnRow({ txn, loading, onEdit, onDelete, onRestore, onHistory, onReceip
             <button title="Edit" onClick={onEdit} className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors">
               <Edit2 size={14} />
             </button>
-            <button title="Soft Delete" onClick={onDelete} className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 transition-colors">
-              <Trash2 size={14} />
-            </button>
+            {canDelete && (
+              <>
+                <button title="Reverse Payment" onClick={onReverse} className="p-1.5 rounded-lg text-orange-500 hover:bg-orange-50 transition-colors">
+                  <RotateCcw size={14} />
+                </button>
+                <button title="Delete Payment" onClick={onDelete} className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 transition-colors">
+                  <Trash2 size={14} />
+                </button>
+              </>
+            )}
           </>
         )}
         <button title="Payment History" onClick={onHistory} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 transition-colors">
@@ -452,12 +478,14 @@ function PaymentFormFields({ form, setForm }: { form: FormState; setForm: React.
 }
 
 // ---------- Delete Dialog ----------
-function DeleteDialog({ txn, booking, onClose, onSuccess, onError }: {
+function DeleteDialog({ txn, booking, onClose, onSuccess, onError, onRequestReverse }: {
   txn: PaymentTxn; booking: BookingRow; onClose: () => void;
   onSuccess: (msg: string) => void; onError: (msg: string) => void;
+  onRequestReverse: () => void;
 }) {
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
+  const [journalLinked, setJournalLinked] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -468,28 +496,95 @@ function DeleteDialog({ txn, booking, onClose, onSuccess, onError }: {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reason }),
       });
-      const d = await r.json() as { message?: string };
-      if (!r.ok) throw new Error(d.message ?? "Failed");
-      onSuccess("Payment moved to trash");
+      const d = await r.json() as { message?: string; code?: string };
+      if (!r.ok) {
+        if (d.code === "JOURNAL_LINKED") { setJournalLinked(true); return; }
+        throw new Error(d.message ?? "Failed");
+      }
+      onSuccess("Payment deleted successfully.");
     } catch (e) { onError((e as Error).message); }
     finally { setSaving(false); }
   };
 
+  if (journalLinked) {
+    return (
+      <Dialog title="Cannot Delete Payment" onClose={onClose}>
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+          <p className="text-amber-800 text-sm font-semibold mb-1">Linked to Accounting Records</p>
+          <p className="text-amber-700 text-sm">This payment is linked to accounting records. Please reverse or cancel the payment instead.</p>
+          <p className="text-amber-600 text-xs mt-2">A reversal creates a negative transaction that preserves the full audit trail.</p>
+        </div>
+        <div className="flex gap-2 justify-end pt-2">
+          <button type="button" onClick={onClose} className="px-4 py-2 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors font-medium">Cancel</button>
+          <button type="button" onClick={onRequestReverse} className="px-4 py-2 text-sm bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium flex items-center gap-1.5">
+            <RotateCcw size={13} /> Reverse Payment
+          </button>
+        </div>
+      </Dialog>
+    );
+  }
+
   return (
-    <Dialog title="Move Payment to Trash" onClose={onClose}>
+    <Dialog title="Delete Payment" onClose={onClose}>
       <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
-        <p className="text-red-700 text-sm font-medium">This payment will be soft-deleted.</p>
+        <p className="text-red-700 text-sm font-semibold">Are you sure you want to delete this payment? This action cannot be undone.</p>
         <p className="text-red-600 text-xs mt-1">Amount: <strong>{fmt(txn.amount)}</strong> — {MODE_LABELS[txn.paymentMode]} on {new Date(txn.paymentDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
-        <p className="text-red-500 text-xs mt-0.5">Booking balance will be recalculated. You can restore this record anytime.</p>
+        <p className="text-red-500 text-xs mt-0.5">Booking balance and ledgers will be recalculated automatically.</p>
       </div>
       <form onSubmit={submit} className="space-y-4">
-        <Field label="Reason for deletion">
+        <Field label="Reason for deletion (optional)">
           <textarea value={reason} onChange={e => setReason(e.target.value)} className="input-std resize-none" rows={2} placeholder="Duplicate entry, data correction…" />
         </Field>
         <div className="flex gap-2 justify-end pt-2">
           <button type="button" onClick={onClose} className="px-4 py-2 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors font-medium">Cancel</button>
           <button type="submit" disabled={saving} className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors font-medium flex items-center gap-1.5">
-            {saving && <Loader2 size={13} className="animate-spin" />} Move to Trash
+            {saving && <Loader2 size={13} className="animate-spin" />} Delete Payment
+          </button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
+// ---------- Reverse Dialog ----------
+function ReverseDialog({ txn, booking, onClose, onSuccess, onError }: {
+  txn: PaymentTxn; booking: BookingRow; onClose: () => void;
+  onSuccess: (msg: string) => void; onError: (msg: string) => void;
+}) {
+  const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const r = await fetch(`${API}/api/admin/bookings/${booking.id}/payments/${txn.id}/reverse`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      });
+      const d = await r.json() as { message?: string };
+      if (!r.ok) throw new Error(d.message ?? "Failed");
+      onSuccess("Payment reversed successfully.");
+    } catch (e) { onError((e as Error).message); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <Dialog title="Reverse Payment" onClose={onClose}>
+      <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4">
+        <p className="text-orange-800 text-sm font-semibold">A reversal entry will be created</p>
+        <p className="text-orange-700 text-xs mt-1">Amount: <strong>{fmt(txn.amount)}</strong> — {MODE_LABELS[txn.paymentMode]} on {new Date(txn.paymentDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
+        <p className="text-orange-600 text-xs mt-0.5">A negative transaction of <strong>{fmt(txn.amount)}</strong> will be added, cancelling this payment while preserving the audit trail.</p>
+      </div>
+      <form onSubmit={submit} className="space-y-4">
+        <Field label="Reason for reversal (optional)">
+          <textarea value={reason} onChange={e => setReason(e.target.value)} className="input-std resize-none" rows={2} placeholder="Entered in error, customer refund…" />
+        </Field>
+        <div className="flex gap-2 justify-end pt-2">
+          <button type="button" onClick={onClose} className="px-4 py-2 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors font-medium">Cancel</button>
+          <button type="submit" disabled={saving} className="px-4 py-2 text-sm bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 transition-colors font-medium flex items-center gap-1.5">
+            {saving && <Loader2 size={13} className="animate-spin" />} Confirm Reversal
           </button>
         </div>
       </form>

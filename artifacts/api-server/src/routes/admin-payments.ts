@@ -315,8 +315,8 @@ router.patch("/:id/payments/:txnId", requireAdmin as RequestHandler, async (req:
   }
 });
 
-// DELETE /:id/payments/:txnId — soft delete
-router.delete("/:id/payments/:txnId", requireAdmin as RequestHandler, async (req: AuthenticatedRequest, res) => {
+// DELETE /:id/payments/:txnId — soft delete (super_admin / accounts_admin only)
+router.delete("/:id/payments/:txnId", requireAdmin as RequestHandler, requirePermission("payments", "delete") as any, async (req: AuthenticatedRequest, res) => {
   try {
     const { id: bookingId, txnId } = req.params as Record<string, string>;
     const { reason } = req.body as { reason?: string };
@@ -326,6 +326,20 @@ router.delete("/:id/payments/:txnId", requireAdmin as RequestHandler, async (req
       const entry = rowRes.rows[0];
       if (!entry || entry.booking_id !== bookingId) throw Object.assign(new Error("Payment not found"), { statusCode: 404 });
       if (entry.is_deleted) throw Object.assign(new Error("Payment already deleted"), { statusCode: 422 });
+
+      // Block direct deletion if payment has an accounting journal entry
+      const journalCheck = await pool.query(
+        `SELECT COUNT(*) FROM journal_entries WHERE source='payment' AND source_id=$1`,
+        [txnId]
+      );
+      if (Number(journalCheck.rows[0]?.count ?? 0) > 0) {
+        throw Object.assign(
+          new Error("This payment is linked to accounting records. Please reverse or cancel the payment instead."),
+          { statusCode: 409, code: "JOURNAL_LINKED" }
+        );
+      }
+
+      const [booking] = await tx.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
 
       await pool.query(
         `UPDATE payment_transactions SET is_deleted=true, deleted_at=NOW(), deleted_by=$1, deletion_reason=$2 WHERE id=$3`,
@@ -339,22 +353,72 @@ router.delete("/:id/payments/:txnId", requireAdmin as RequestHandler, async (req
         oldAmount: Number(entry.amount), oldMode: entry.payment_mode, oldDate: entry.payment_date,
         changedBy: req.user?.id, changedByName: req.user?.name, changeReason: reason ?? null,
       });
-      auditLog({ req, action: "deleted", entityTable: "payments", entityId: txnId, oldValue: { bookingId, amount: entry.amount, paymentMode: entry.payment_mode, paymentDate: entry.payment_date } }).catch(() => {});
+      auditLog({ req, action: "deleted", entityTable: "payments", entityId: txnId, oldValue: { bookingId, customerName: booking?.customerName ?? null, amount: entry.amount, paymentMode: entry.payment_mode, paymentDate: entry.payment_date, deletedBy: req.user?.name, reason: reason ?? null } }).catch(() => {});
 
       return { updated };
     });
 
-    // Void journal entry for deleted payment (fire-and-forget, non-fatal)
     voidJournalEntry("payment", txnId).catch(() => {});
 
     return res.json({
-      message: "Payment soft-deleted",
+      message: "Payment deleted successfully.",
+      booking: { paidAmount: result.updated?.totalPaid, status: result.updated?.newStatus },
+    });
+  } catch (err) {
+    const e = err as { statusCode?: number; code?: string; message?: string };
+    if (e.statusCode) return res.status(e.statusCode).json({ message: e.message, code: e.code });
+    console.error("[admin-payments] DELETE error:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// POST /:id/payments/:txnId/reverse — create a negative reversal transaction (preserves audit trail)
+router.post("/:id/payments/:txnId/reverse", requireAdmin as RequestHandler, requirePermission("payments", "delete") as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { id: bookingId, txnId } = req.params as Record<string, string>;
+    const { reason } = req.body as { reason?: string };
+
+    const result = await db.transaction(async (tx) => {
+      const rowRes = await pool.query(`SELECT * FROM payment_transactions WHERE id = $1`, [txnId]);
+      const entry = rowRes.rows[0];
+      if (!entry || entry.booking_id !== bookingId) throw Object.assign(new Error("Payment not found"), { statusCode: 404 });
+      if (entry.is_deleted) throw Object.assign(new Error("Cannot reverse a deleted payment"), { statusCode: 422 });
+
+      const [booking] = await tx.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
+      if (!booking) throw Object.assign(new Error("Booking not found"), { statusCode: 404 });
+
+      const reversalId = crypto.randomUUID();
+      const today = new Date().toISOString().split("T")[0];
+      const notes = reason ? `Reversal: ${reason}` : `Reversal of payment recorded on ${String(entry.payment_date)}`;
+      await pool.query(
+        `INSERT INTO payment_transactions (id, booking_id, amount, payment_date, payment_mode, reference_number, notes, recorded_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [reversalId, bookingId, String(-Number(entry.amount)), today, entry.payment_mode, entry.reference_number ?? null, notes, req.user?.id ?? null]
+      );
+
+      const updated = await recalculateBookingPayment(tx, bookingId);
+
+      await writeAuditLog({
+        transactionId: txnId, bookingId, action: "reversed",
+        oldAmount: Number(entry.amount), oldMode: entry.payment_mode, oldDate: entry.payment_date,
+        changedBy: req.user?.id, changedByName: req.user?.name, changeReason: reason ?? null,
+      });
+      auditLog({ req, action: "reversed", entityTable: "payments", entityId: txnId, oldValue: { bookingId, customerName: booking.customerName, amount: entry.amount, paymentMode: entry.payment_mode, reversalId, reason: reason ?? null } }).catch(() => {});
+
+      return { reversalId, updated };
+    });
+
+    voidJournalEntry("payment", txnId).catch(() => {});
+
+    return res.status(201).json({
+      message: "Payment reversed successfully.",
+      reversalId: result.reversalId,
       booking: { paidAmount: result.updated?.totalPaid, status: result.updated?.newStatus },
     });
   } catch (err) {
     const statusCode = (err as { statusCode?: number }).statusCode;
     if (statusCode) return res.status(statusCode).json({ message: (err as Error).message });
-    console.error("[admin-payments] DELETE error:", err);
+    console.error("[admin-payments] REVERSE error:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
 });

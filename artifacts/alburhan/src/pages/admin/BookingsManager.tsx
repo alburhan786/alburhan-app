@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { usePermissions } from "@/hooks/use-permissions";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { CheckCircle, XCircle, Eye, ExternalLink, Plus, Trash2, FileText, Download, ImageIcon, RefreshCw, Upload, Wallet, ClipboardList, User, Link2, Send, Bell, Pencil, Copy, History, RotateCcw, AlertTriangle, Search } from "lucide-react";
@@ -240,6 +241,7 @@ function getBalanceColor(remaining: number, finalAmount: number): string {
 function AdminPaymentLedger({ booking }: { booking: BookingWithAmounts }) {
   const { toast } = useToast();
   const { requestDelete } = useDeleteGuard();
+  const { can } = usePermissions();
   const queryClient = useQueryClient();
 
   const [entries, setEntries] = useState<PaymentEntry[]>([]);
@@ -457,9 +459,11 @@ function AdminPaymentLedger({ booking }: { booking: BookingWithAmounts }) {
                     {entry.notes && <span className="italic">{entry.notes}</span>}
                   </td>
                   <td className="px-3 py-2 text-right">
-                    <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:bg-red-50" onClick={() => handleDelete(entry.id)}>
-                      <Trash2 size={12} />
-                    </Button>
+                    {can("payments", "delete") && (
+                      <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:bg-red-50" onClick={() => handleDelete(entry.id)}>
+                        <Trash2 size={12} />
+                      </Button>
+                    )}
                   </td>
                 </tr>
               ))}
