@@ -1117,18 +1117,18 @@ export default function AccountingDashboard() {
 
   return (
     <AdminLayout>
-      <div className="max-w-7xl mx-auto px-6 py-5 space-y-6">
+      <div className="max-w-7xl mx-auto px-6 py-6 space-y-0">
         {/* Page header */}
-        <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-[#0B3D2E]">Accounting</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">Chart of Accounts · Double-Entry Journals · Cash Books · P&L · Balance Sheet</p>
+            <h1 className="text-[32px] font-bold text-[#0B3D2E] leading-tight tracking-tight">Accounting</h1>
+            <p className="text-base font-medium text-muted-foreground mt-1">Chart of Accounts · Double-Entry Journals · Cash Books · P&L · Balance Sheet</p>
           </div>
           {fys.length > 0 && (
-            <div className="flex items-center gap-3 bg-white border rounded-xl px-4 py-2.5 shadow-sm">
+            <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-xl px-4 py-2.5 shadow-sm">
               <span className="text-xs text-muted-foreground font-semibold whitespace-nowrap">Financial Year:</span>
               <select value={activeFyId} onChange={e => handleFyChange(e.target.value)}
-                className="h-8 px-2 rounded-lg border text-sm bg-background font-medium focus:outline-none focus:ring-2 focus:ring-[#0F5132]/30">
+                className="h-9 px-2 rounded-lg border text-sm bg-background font-semibold focus:outline-none focus:ring-2 focus:ring-[#0F5132]/30 text-[#0B3D2E]">
                 {fys.map((fy: any) => (
                   <option key={fy.id} value={fy.id}>{fy.name}{fy.is_active ? " ●" : ""}</option>
                 ))}
@@ -1138,19 +1138,31 @@ export default function AccountingDashboard() {
           )}
         </div>
 
-        {/* Tabs navigation */}
-        <div className="bg-white border rounded-2xl p-2 flex gap-1 overflow-x-auto shadow-sm">
-          {TABS.map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)}
-              className={`px-4 py-2 text-xs font-medium rounded-xl transition-all whitespace-nowrap ${
-                tab === t.id
-                  ? "bg-[#0F5132] text-white font-bold shadow-sm"
-                  : "text-muted-foreground hover:bg-[#0F5132]/8 hover:text-[#0F5132]"
-              }`}>
-              {t.label}
-            </button>
-          ))}
+        {/* Premium Tab Navigation */}
+        <div className="mb-6">
+          <div
+            className="flex gap-1 overflow-x-auto"
+            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+          >
+            {TABS.map(t => (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={`px-4 py-3 text-[15px] font-semibold rounded-[10px] transition-all duration-200 whitespace-nowrap flex-shrink-0 ${
+                  tab === t.id
+                    ? "bg-[#0F5132] text-white shadow-md"
+                    : "text-gray-500 hover:bg-[#0F5132]/10 hover:text-[#0F5132]"
+                }`}
+                style={{ letterSpacing: "0.01em" }}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <div className="h-[2px] bg-[#E5E7EB] w-full mt-2 rounded-full" />
         </div>
+
+        <div className="space-y-5">
         {tab === "overview" && <Overview />}
         {tab === "accounts" && <ChartOfAccounts />}
         {tab === "fy" && <FYManager activeFyId={activeFyId} />}
@@ -1166,6 +1178,7 @@ export default function AccountingDashboard() {
         {tab === "trial" && <TrialBalance key={fyKey} defaultFrom={fyFrom} defaultTo={fyTo} />}
         {tab === "recon" && <BankRecon key={fyKey} defaultFrom={fyFrom} defaultTo={fyTo} />}
         {tab === "cashflow" && <CashFlow key={fyKey} defaultFrom={fyFrom} defaultTo={fyTo} />}
+        </div>
       </div>
     </AdminLayout>
   );
