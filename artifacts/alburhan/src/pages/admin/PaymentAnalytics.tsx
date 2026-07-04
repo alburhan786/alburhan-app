@@ -207,7 +207,10 @@ function PaymentDrawer({ booking, onClose, onRefreshAnalytics }: DrawerProps) {
               {deletedTxns.length > 0 && <span className="ml-1 bg-red-100 text-red-700 rounded-full px-1.5 text-xs font-bold">{deletedTxns.length}</span>}
             </button>
           </div>
-          <p className="text-xs text-gray-400">Manual ledger: <span className="font-mono font-semibold text-emerald-600">{fmt(manualTotal)}</span></p>
+          <div className="flex items-center gap-2">
+            <p className="text-xs text-gray-400">Manual ledger: <span className="font-mono font-semibold text-emerald-600">{fmt(manualTotal)}</span></p>
+            {canDelete && <DeleteBookingButton booking={booking} onClose={onClose} onRefreshAnalytics={onRefreshAnalytics} showToast={showToast} />}
+          </div>
         </div>
 
         {/* Transaction list */}
@@ -474,6 +477,54 @@ function PaymentFormFields({ form, setForm }: { form: FormState; setForm: React.
         <textarea value={form.notes} onChange={set("notes")} className="input-std resize-none" rows={2} placeholder="Optional notes…" />
       </Field>
     </>
+  );
+}
+
+// ---------- Delete Booking Button ----------
+function DeleteBookingButton({ booking, onClose, onRefreshAnalytics, showToast }: {
+  booking: BookingRow; onClose: () => void;
+  onRefreshAnalytics: () => void; showToast: (t: "ok" | "err", m: string) => void;
+}) {
+  const [confirm, setConfirm] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const doDelete = async () => {
+    setSaving(true);
+    try {
+      const r = await fetch(`${API}/api/admin/bookings/${booking.id}`, {
+        method: "DELETE", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+      const d = await r.json() as { ok?: boolean; message?: string; error?: string };
+      if (!r.ok) throw new Error(d.error ?? d.message ?? "Failed to delete booking");
+      showToast("ok", "Booking deleted successfully.");
+      onRefreshAnalytics();
+      onClose();
+    } catch (e) {
+      showToast("err", (e as Error).message);
+      setConfirm(false);
+    } finally { setSaving(false); }
+  };
+
+  if (confirm) {
+    return (
+      <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-1.5">
+        <span className="text-xs text-red-700 font-medium">Delete this booking?</span>
+        <button onClick={doDelete} disabled={saving} className="text-xs bg-red-600 text-white rounded px-2 py-0.5 hover:bg-red-700 disabled:opacity-50 font-medium flex items-center gap-1">
+          {saving && <Loader2 size={11} className="animate-spin" />} Yes, Delete
+        </button>
+        <button onClick={() => setConfirm(false)} className="text-xs text-gray-500 hover:text-gray-700 font-medium">Cancel</button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => setConfirm(true)}
+      className="flex items-center gap-1.5 text-xs border border-red-200 text-red-600 rounded-lg px-3 py-1.5 hover:bg-red-50 transition-colors font-medium"
+    >
+      <Trash2 size={12} /> Delete Booking
+    </button>
   );
 }
 

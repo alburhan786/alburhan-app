@@ -523,6 +523,48 @@ router.get("/family-ledger", requireAdmin as any, async (req: AuthenticatedReque
   }
 });
 
+// DELETE /bookings/:id — soft-delete a booking and its payments (super_admin only)
+router.delete("/bookings/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  if (req.user?.role !== "admin") return res.status(403).json({ error: "Admin only" });
+  const adminRole = req.user?.adminRole;
+  if (adminRole !== "super_admin" && adminRole !== "accounts") return res.status(403).json({ error: "Only super_admin or accounts role can delete bookings" });
+  const bookingId = req.params["id"] as string;
+  try {
+    const bRes = await pool.query(`SELECT id, booking_number, deleted_at FROM bookings WHERE id=$1 LIMIT 1`, [bookingId]);
+    const booking = bRes.rows[0];
+    if (!booking) return res.status(404).json({ error: "Booking not found" });
+    if (booking.deleted_at) return res.status(422).json({ error: "Booking already deleted" });
+
+    // Soft-delete all payments first
+    await pool.query(
+      `UPDATE payment_transactions SET is_deleted=true, deleted_at=NOW(), deletion_reason='Booking deleted'
+       WHERE booking_id=$1 AND is_deleted=false`,
+      [bookingId]
+    );
+    // Void journal entries for all payments of this booking
+    await pool.query(
+      `DELETE FROM journal_entry_lines WHERE journal_entry_id IN
+       (SELECT je.id FROM journal_entries je
+        JOIN payment_transactions pt ON pt.id=je.source_id
+        WHERE je.source='payment' AND pt.booking_id=$1)`,
+      [bookingId]
+    );
+    await pool.query(
+      `DELETE FROM journal_entries WHERE source='payment' AND source_id IN
+       (SELECT id FROM payment_transactions WHERE booking_id=$1)`,
+      [bookingId]
+    );
+    // Soft-delete the booking
+    await pool.query(`UPDATE bookings SET deleted_at=NOW() WHERE id=$1`, [bookingId]);
+
+    console.log(`[DELETE booking] bookingId=${bookingId} bookingNumber=${booking.booking_number} deletedBy=${req.user?.id}`);
+    return res.json({ ok: true, message: "Booking deleted successfully." });
+  } catch (e: any) {
+    console.error("[DELETE booking] error:", e);
+    return res.status(500).json({ error: e.message ?? "Failed to delete booking" });
+  }
+});
+
 // One-time: delete test bookings + payments (browser-callable, requires admin login)
 router.get("/clear-test-bookings", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   if (req.user?.role !== "super_admin") return res.status(403).json({ error: "Super admin only" });
