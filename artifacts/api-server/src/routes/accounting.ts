@@ -338,8 +338,8 @@ router.get("/journal", requireAdmin as any, async (req: AuthenticatedRequest, re
         MAX(CASE WHEN jel.credit > 0 THEN a.name END) AS account_cr,
         MAX(CASE WHEN jel.debit > 0 THEN a.code END) AS code_dr,
         MAX(CASE WHEN jel.credit > 0 THEN a.code END) AS code_cr,
-        SUM(jel.debit)::numeric / 2 AS debit,
-        SUM(jel.credit)::numeric / 2 AS credit,
+        SUM(jel.debit)::numeric AS debit,
+        SUM(jel.credit)::numeric AS credit,
         '' AS party
       FROM journal_entries je
       JOIN journal_entry_lines jel ON jel.journal_entry_id=je.id

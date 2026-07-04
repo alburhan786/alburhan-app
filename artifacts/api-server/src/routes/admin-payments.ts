@@ -3,7 +3,7 @@ import { db, pool, bookingsTable, paymentTransactionsTable, customerProfilesTabl
 import { eq, sum, count, asc, and, isNull, or } from "drizzle-orm";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import { upsertPilgrimFromProfile } from "../lib/pilgrimUtils.js";
-import { postPaymentJournal } from "../lib/journalHelper.js";
+import { postPaymentJournal, voidJournalEntry } from "../lib/journalHelper.js";
 
 type BookingStatus = "pending" | "approved" | "rejected" | "confirmed" | "cancelled" | "partially_paid";
 type PaymentMode = "cash" | "neft" | "upi" | "cheque" | "online";
@@ -288,6 +288,16 @@ router.patch("/:id/payments/:txnId", requireAdmin as RequestHandler, async (req:
       return { entry: updated2.rows[0], updated };
     });
 
+    // Sync journal: void old entry + re-post with new values (fire-and-forget, non-fatal)
+    voidJournalEntry("payment", result.entry.id).then(() =>
+      postPaymentJournal({
+        txnId: result.entry.id,
+        amount: Number(result.entry.amount),
+        mode: String(result.entry.payment_mode),
+        date: String(result.entry.payment_date).slice(0, 10),
+      })
+    ).catch(() => {});
+
     return res.json({
       entry: { ...result.entry, amount: Number(result.entry.amount) },
       booking: { paidAmount: result.updated?.totalPaid, status: result.updated?.newStatus },
@@ -327,6 +337,9 @@ router.delete("/:id/payments/:txnId", requireAdmin as RequestHandler, async (req
 
       return { updated };
     });
+
+    // Void journal entry for deleted payment (fire-and-forget, non-fatal)
+    voidJournalEntry("payment", txnId).catch(() => {});
 
     return res.json({
       message: "Payment soft-deleted",
@@ -371,6 +384,9 @@ router.post("/:id/payments/:txnId/restore", requireAdmin as RequestHandler, asyn
 
       return { updated };
     });
+
+    // Re-post journal entry for restored payment (fire-and-forget, non-fatal)
+    postPaymentJournal({ txnId }).catch(() => {});
 
     return res.json({
       message: "Payment restored",

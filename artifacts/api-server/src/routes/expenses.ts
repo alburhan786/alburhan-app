@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db, pool, expensesTable } from "@workspace/db";
 import { eq, desc, sql, and } from "drizzle-orm";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
-import { postExpenseJournal } from "../lib/journalHelper.js";
+import { postExpenseJournal, voidJournalEntry } from "../lib/journalHelper.js";
 
 const router = Router();
 
@@ -208,6 +208,20 @@ router.put("/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) =
       .where(eq(expensesTable.id, req.params.id))
       .returning();
     if (!row) return res.status(404).json({ error: "Not found" });
+
+    // Sync journal: void old entry + re-post with new values (fire-and-forget, non-fatal)
+    voidJournalEntry("expense", row.id).then(() =>
+      postExpenseJournal({
+        expId: row.id,
+        amount: Number(row.amount),
+        category: String(row.category),
+        paymentMethod: String(row.paymentMethod || "cash"),
+        date: String(row.date),
+        description: String(row.description),
+        invoiceNumber: row.invoiceNumber ?? null,
+      })
+    ).catch(() => {});
+
     res.json(row);
   } catch (err) {
     console.error("[expenses] PUT", err);
@@ -217,7 +231,10 @@ router.put("/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) =
 
 router.delete("/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
-    await db.delete(expensesTable).where(eq(expensesTable.id, req.params.id));
+    const expId = req.params.id as string;
+    await db.delete(expensesTable).where(eq(expensesTable.id, expId));
+    // Void journal entry for deleted expense (fire-and-forget, non-fatal)
+    voidJournalEntry("expense", expId).catch(() => {});
     res.json({ ok: true });
   } catch (err) {
     console.error("[expenses] DELETE", err);

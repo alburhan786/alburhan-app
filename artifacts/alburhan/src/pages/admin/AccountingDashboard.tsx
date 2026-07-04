@@ -923,8 +923,41 @@ function BalanceSheet({ defaultTo }: { defaultTo?: string }) {
       <div className="flex gap-2 flex-wrap items-center"><span className="text-sm text-muted-foreground">As of:</span><Input type="date" value={asOf} onChange={e => setAsOf(e.target.value)} className="h-8 text-sm w-40" /><Button size="sm" onClick={load} disabled={loading}><RefreshCw size={14} className={`mr-1 ${loading ? "animate-spin" : ""}`} />Load</Button></div>
       {loading ? <Spin /> : err ? <Err msg={err} /> : !data ? null : (
         <div className="grid md:grid-cols-2 gap-4 max-w-3xl">
-          <div className="bg-white border rounded-xl overflow-hidden"><div className="bg-green-600 text-white px-4 py-2.5 font-semibold text-sm">Assets</div><div className="px-4 py-3 space-y-2 text-sm">{[["Cash in Hand", data.assets?.cash], ["Bank Balance", data.assets?.bank], ["Accounts Receivable", data.assets?.accountsReceivable]].map(([l, v]) => <div key={l as string} className="flex justify-between text-muted-foreground"><span>{l}</span><span>{fmt(Number(v))}</span></div>)}<div className="border-t pt-2 flex justify-between font-bold"><span>Total Assets</span><span>{fmt(data.assets?.total || 0)}</span></div></div></div>
-          <div className="bg-white border rounded-xl overflow-hidden"><div className="bg-red-600 text-white px-4 py-2.5 font-semibold text-sm">Liabilities & Equity</div><div className="px-4 py-3 space-y-2 text-sm"><div className="flex justify-between text-muted-foreground"><span>Expenses Paid</span><span>{fmt(data.liabilities?.expensesPaid || 0)}</span></div><div className="border-t pt-2 flex justify-between"><span>Total Liabilities</span><span>{fmt(data.liabilities?.total || 0)}</span></div><div className="border-t pt-2"><div className={`flex justify-between font-bold ${data.equity >= 0 ? "text-green-600" : "text-red-600"}`}><span>Equity (Net Worth)</span><span>{fmt(data.equity || 0)}</span></div></div><div className="border-t pt-2 flex justify-between font-bold"><span>Total L + E</span><span>{fmt((data.liabilities?.total || 0) + (data.equity || 0))}</span></div></div></div>
+          <div className="bg-white border rounded-xl overflow-hidden">
+            <div className="bg-green-600 text-white px-4 py-2.5 font-semibold text-sm">Assets</div>
+            <div className="px-4 py-3 space-y-2 text-sm">
+              {[["Cash in Hand", data.assets?.cash], ["Bank Balance", data.assets?.bank], ["Accounts Receivable", data.assets?.accountsReceivable]].map(([l, v]) =>
+                <div key={l as string} className="flex justify-between text-muted-foreground"><span>{l}</span><span>{fmt(Number(v))}</span></div>
+              )}
+              {(data.assets?.items || []).filter((i: any) => !["1001","1002","1003"].includes(i.code)).map((i: any) =>
+                <div key={i.name} className="flex justify-between text-muted-foreground"><span>{i.name}</span><span>{fmt(Number(i.balance))}</span></div>
+              )}
+              <div className="border-t pt-2 flex justify-between font-bold"><span>Total Assets</span><span>{fmt(data.assets?.total || 0)}</span></div>
+            </div>
+          </div>
+          <div className="bg-white border rounded-xl overflow-hidden">
+            <div className="bg-red-600 text-white px-4 py-2.5 font-semibold text-sm">Liabilities & Equity</div>
+            <div className="px-4 py-3 space-y-2 text-sm">
+              {(data.liabilities?.items || []).map((i: any) =>
+                <div key={i.name} className="flex justify-between text-muted-foreground"><span>{i.name}</span><span>{fmt(Number(i.balance))}</span></div>
+              )}
+              {!data.liabilities?.items?.length && <div className="flex justify-between text-muted-foreground"><span>Liabilities</span><span>—</span></div>}
+              <div className="border-t pt-2 flex justify-between font-semibold"><span>Total Liabilities</span><span>{fmt(data.liabilities?.total || 0)}</span></div>
+              <div className="border-t pt-2 space-y-1">
+                {(data.equity?.items || []).map((i: any) =>
+                  <div key={i.name} className="flex justify-between text-muted-foreground"><span>{i.name}</span><span>{fmt(Number(i.balance))}</span></div>
+                )}
+                <div className="flex justify-between text-muted-foreground"><span>Retained Earnings (Net Income)</span><span className={(data.equity?.netIncome || 0) >= 0 ? "text-green-600" : "text-red-600"}>{fmt(data.equity?.netIncome || 0)}</span></div>
+                <div className={`flex justify-between font-bold ${(data.equity?.total || 0) >= 0 ? "text-green-600" : "text-red-600"}`}>
+                  <span>Total Equity</span><span>{fmt(data.equity?.total || 0)}</span>
+                </div>
+              </div>
+              <div className="border-t pt-2 flex justify-between font-bold">
+                <span>Total L + E</span>
+                <span>{fmt((data.liabilities?.total || 0) + (data.equity?.total || 0))}</span>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

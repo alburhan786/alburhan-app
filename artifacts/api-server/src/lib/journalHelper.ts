@@ -22,12 +22,24 @@ async function nextNum(source: string, prefix: string): Promise<string> {
 }
 
 /**
- * Auto-post a double-entry journal entry when a payment is recorded.
- * Dr: Cash (1001) or Bank (1002) — Cr: Sales Revenue (4001)
- * Non-fatal: errors are logged but never propagated.
+ * Void (delete) the journal entry for a given source + source_id.
+ * Non-fatal — used before re-posting on edit/delete/restore.
  */
+export async function voidJournalEntry(source: string, sourceId: string): Promise<void> {
+  try {
+    await pool.query(
+      `DELETE FROM journal_entry_lines WHERE journal_entry_id IN
+       (SELECT id FROM journal_entries WHERE source=$1 AND source_id=$2)`,
+      [source, sourceId]
+    );
+    await pool.query(`DELETE FROM journal_entries WHERE source=$1 AND source_id=$2`, [source, sourceId]);
+  } catch (err) {
+    console.error("[journalHelper] voidJournalEntry (non-fatal):", err);
+  }
+}
+
 export async function postPaymentJournal(params: {
-  txnId: string; amount: number; mode: string; date: string; bookingNumber: string;
+  txnId: string; amount: number; mode: string; date: string; bookingNumber?: string;
 }): Promise<void> {
   try {
     const dup = await pool.query(
@@ -35,6 +47,17 @@ export async function postPaymentJournal(params: {
       [params.txnId]
     );
     if (dup.rows.length) return;
+
+    // Resolve booking_number for narration/reference
+    let bookingNum = params.bookingNumber;
+    if (!bookingNum) {
+      const bRes = await pool.query(
+        `SELECT b.booking_number FROM payment_transactions pt
+         JOIN bookings b ON b.id=pt.booking_id WHERE pt.id=$1`,
+        [params.txnId]
+      );
+      bookingNum = bRes.rows[0]?.booking_number ?? params.txnId;
+    }
 
     const isCash = params.mode === "cash";
     const drId = await acctId(isCash ? "1001" : "1002");
@@ -45,7 +68,7 @@ export async function postPaymentJournal(params: {
     const { rows: [entry] } = await pool.query(
       `INSERT INTO journal_entries (id, entry_number, date, narration, reference, source, source_id)
        VALUES (gen_random_uuid()::text,$1,$2,$3,$4,'payment',$5) RETURNING id`,
-      [num, params.date, `Customer receipt — ${params.bookingNumber}`, params.bookingNumber, params.txnId]
+      [num, params.date, `Customer receipt — ${bookingNum}`, bookingNum, params.txnId]
     );
     await pool.query(
       `INSERT INTO journal_entry_lines (id, journal_entry_id, account_id, debit, credit)
