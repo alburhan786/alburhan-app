@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { db, staffTable } from "@workspace/db";
 import { eq, desc, like } from "drizzle-orm";
-import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
+import { requireAdmin, requirePermission, type AuthenticatedRequest } from "../lib/auth.js";
+import { auditLog } from "../lib/audit.js";
 import multer from "multer";
 import { uploadToGCS, deleteFromGCS } from "../lib/gcsUpload.js";
 
@@ -16,6 +17,7 @@ const upload = multer({
 });
 
 const router = Router();
+router.use(requirePermission("staff", "view") as any);
 
 async function generateStaffId(companyId: string): Promise<string> {
   const prefix = companyId === "horizon" ? "HZN" : "ABT";

@@ -25,6 +25,7 @@ import {
   CreateOfflineBookingBody,
 } from "@workspace/api-zod";
 import { requireAuth, requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
+import { auditLog } from "../lib/audit.js";
 import { validateDeleteToken } from "./delete-auth.js";
 import {
   sendBookingApprovalNotification,
@@ -291,6 +292,8 @@ router.post("/", requireAuth as any, async (req: AuthenticatedRequest, res) => {
     packageName: booking.packageName ?? pkg?.name ?? "Travel Package",
     numberOfPilgrims: booking.numberOfPilgrims,
   }).catch(console.error);
+
+  auditLog({ req, action: "created", entityTable: "bookings", entityId: booking.id, newValue: { bookingNumber: booking.bookingNumber, customerName: booking.customerName, status: booking.status } }).catch(() => {});
 
   res.status(201).json(formatBooking(booking));
 });

@@ -14,6 +14,8 @@ export interface AuthenticatedRequest extends Request {
 }
 
 export async function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  // Idempotent — skip DB lookup if already resolved (e.g. when used as router.use + per-route middleware)
+  if (req.user) { next(); return; }
   const userId = (req.session as any)?.userId;
   if (!userId) {
     res.status(401).json({ message: "Unauthorized. Please login first." });
@@ -30,7 +32,8 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
       id: u.id,
       mobile: u.mobile,
       role: u.role,
-      adminRole: (u.admin_role || "super_admin") as AdminRole,
+      // Default to 'read_only' (least-privilege) when admin_role is missing
+      adminRole: (u.admin_role || "read_only") as AdminRole,
       name: u.name,
       email: u.email,
     };

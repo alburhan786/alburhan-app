@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { db, pool, hajjGroupsTable, pilgrimsTable, hajjRoomsTable, attendanceLogsTable, attendanceEventsTable } from "@workspace/db";
 import { eq, and, ne, desc, asc, count, max, inArray, sql } from "drizzle-orm";
-import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
+import { requireAdmin, requirePermission, type AuthenticatedRequest } from "../lib/auth.js";
+import { auditLog } from "../lib/audit.js";
 import { sendWhatsApp } from "../lib/notifications.js";
 import multer from "multer";
 import { uploadToGCS, deleteFromGCS } from "../lib/gcsUpload.js";
@@ -126,6 +127,7 @@ router.post("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => 
       hotels: hotels || {},
       notes: notes || null,
     }).returning();
+    auditLog({ req, action: "created", entityTable: "groups", entityId: group.id, newValue: { groupName: group.groupName, year: group.year } }).catch(() => {});
     res.status(201).json(fmtGroup(group));
   } catch (err: any) {
     console.error("[groups] POST / DB error:", err);
@@ -162,11 +164,13 @@ router.put("/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) =
   }
 });
 
-router.delete("/:id", requireAdmin as any, async (req, res) => {
+router.delete("/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   const id = String(req.params.id);
   try {
+    const [snap] = await db.select({ id: hajjGroupsTable.id, groupName: hajjGroupsTable.groupName, year: hajjGroupsTable.year }).from(hajjGroupsTable).where(eq(hajjGroupsTable.id, id)).limit(1);
     await db.delete(pilgrimsTable).where(eq(pilgrimsTable.groupId, id));
     await db.delete(hajjGroupsTable).where(eq(hajjGroupsTable.id, id));
+    auditLog({ req, action: "deleted", entityTable: "groups", entityId: id, oldValue: snap || null }).catch(() => {});
     res.json({ message: "Group and all pilgrims deleted" });
   } catch (err: any) {
     console.error("[groups] DELETE /:id DB error:", err);

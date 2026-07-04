@@ -1,8 +1,9 @@
 import { Router } from "express";
 import { pool } from "@workspace/db";
-import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
+import { requireAdmin, requirePermission, type AuthenticatedRequest } from "../lib/auth.js";
 
 const router = Router();
+router.use(requirePermission("accounting", "view") as any);
 
 async function q(text: string, params?: any[]): Promise<any[]> {
   return (await pool.query(text, params)).rows ?? [];

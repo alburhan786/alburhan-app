@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useEffect, useState, useMemo } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -10,6 +10,7 @@ import {
   Scale, Users2, Package, ClipboardList, KeyRound
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { usePermissions } from "@/hooks/use-permissions";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -108,6 +109,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
   const { logout, user } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openComplaints, setOpenComplaints] = useState(0);
+  const { can, isAdminLevel } = usePermissions();
 
   useEffect(() => {
     fetch(`${API}/api/feedback/admin/stats`, { credentials: "include" })
@@ -116,7 +118,14 @@ export function AdminLayout({ children }: { children: ReactNode }) {
       .catch(() => {});
   }, []);
 
-  const MENU = buildMenu(openComplaints);
+  const MENU = useMemo(() => {
+    const base = buildMenu(openComplaints);
+    // System section only visible to admin-level roles (super_admin, admin)
+    if (!isAdminLevel) {
+      return base.filter(s => s.section !== "System");
+    }
+    return base;
+  }, [openComplaints, isAdminLevel]);
   const isActive = (href: string) => location === href || location.startsWith(href + "/");
 
   const SidebarContent = () => (

@@ -2,6 +2,7 @@ import { Router, type RequestHandler } from "express";
 import { db, pool, bookingsTable, paymentTransactionsTable, customerProfilesTable } from "@workspace/db";
 import { eq, sum, count, asc, and, isNull, or } from "drizzle-orm";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
+import { auditLog } from "../lib/audit.js";
 import { upsertPilgrimFromProfile } from "../lib/pilgrimUtils.js";
 import { postPaymentJournal, voidJournalEntry } from "../lib/journalHelper.js";
 
@@ -216,6 +217,7 @@ router.post("/:id/payments", requireAdmin as RequestHandler, async (req: Authent
         newAmount: Number(amount), newMode: String(paymentMode), newDate: String(paymentDate),
         changedBy: req.user?.id, changedByName: req.user?.name,
       });
+      auditLog({ req, action: "created", entityTable: "payments", entityId: txnId, newValue: { bookingId, amount, paymentMode, paymentDate } }).catch(() => {});
 
       return { entry, updated };
     });
@@ -334,6 +336,7 @@ router.delete("/:id/payments/:txnId", requireAdmin as RequestHandler, async (req
         oldAmount: Number(entry.amount), oldMode: entry.payment_mode, oldDate: entry.payment_date,
         changedBy: req.user?.id, changedByName: req.user?.name, changeReason: reason ?? null,
       });
+      auditLog({ req, action: "deleted", entityTable: "payments", entityId: txnId, oldValue: { bookingId, amount: entry.amount, paymentMode: entry.payment_mode, paymentDate: entry.payment_date } }).catch(() => {});
 
       return { updated };
     });

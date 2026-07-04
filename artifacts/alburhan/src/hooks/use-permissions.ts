@@ -116,7 +116,8 @@ async function fetchMe(): Promise<{ adminRole: AdminRole; name?: string }> {
     })
     .catch(() => {
       _fetching = null;
-      return { adminRole: "super_admin" as AdminRole };
+      // Default to 'read_only' on network failure — least privilege
+      return { adminRole: "read_only" as AdminRole };
     });
   return _fetching;
 }
@@ -126,7 +127,7 @@ export function invalidatePermissionsCache() {
 }
 
 export function usePermissions() {
-  const [adminRole, setAdminRole] = useState<AdminRole>("super_admin");
+  const [adminRole, setAdminRole] = useState<AdminRole>("read_only");
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
