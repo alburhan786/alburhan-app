@@ -901,11 +901,9 @@ export default function PaymentAnalytics() {
         {data && (
           <>
             {/* KPI Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <KpiCard label={`Today's Collection (${todayDate})`} value={fmt(data.todayCollection)} icon={IndianRupee} iconBg="bg-emerald-50" iconColor="text-emerald-600" sub="Manual + online payments today" />
               <KpiCard label="Monthly Revenue" value={fmt(data.monthlyRevenue)} icon={TrendingUp} iconBg="bg-blue-50" iconColor="text-blue-600" sub={today} />
-              <KpiCard label="Total Pending" value={fmt(data.totalPending)} icon={Clock} iconBg="bg-amber-50" iconColor="text-amber-600" sub="Outstanding across all open bookings" />
-              <KpiCard label="Overdue (>30 days)" value={fmt(data.totalOverdue)} icon={AlertTriangle} iconBg="bg-red-50" iconColor="text-red-600" sub={`${data.overdueCount} booking${data.overdueCount !== 1 ? "s" : ""} overdue`} />
             </div>
 
             {/* Status Breakdown */}
