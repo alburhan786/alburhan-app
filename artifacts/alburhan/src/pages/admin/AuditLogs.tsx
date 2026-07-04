@@ -10,6 +10,9 @@ import * as XLSX from "xlsx";
 
 const API = import.meta.env.VITE_API_URL || "";
 
+// Entities for which the backend /restore endpoint is implemented
+const RESTORABLE_ENTITIES = ["expenses"];
+
 const ACTION_COLORS: Record<string, string> = {
   created: "bg-green-100 text-green-800",
   updated: "bg-blue-100 text-blue-800",
@@ -235,7 +238,7 @@ export default function AuditLogs() {
                                 <Eye size={11} className="mr-1" />View
                               </Button>
                             )}
-                            {log.action === "deleted" && log.old_value && (
+                            {log.action === "deleted" && log.old_value && RESTORABLE_ENTITIES.includes(log.entity_table) && (
                               <Button size="sm" variant="ghost"
                                 className="h-7 text-xs text-purple-700 hover:bg-purple-50"
                                 disabled={restoring === log.id}

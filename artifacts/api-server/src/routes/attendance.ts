@@ -70,8 +70,13 @@ async function requireAdminOrToken(req: Request, res: Response, next: NextFuncti
   next();
 }
 
-router.get("/:groupId/attendance/events", requireAdmin, async (req, res) => {
+router.get("/:groupId/attendance/events", requireAdmin, async (req: AuthenticatedRequest, res) => {
   const { groupId } = req.params;
+  // Guide role: only allow access to assigned groups
+  if (req.user?.adminRole === "guide" && !req.user.assignedGroupIds.includes(groupId)) {
+    res.status(403).json({ message: "Access restricted to your assigned groups only." });
+    return;
+  }
   const events = await db
     .select()
     .from(attendanceEventsTable)

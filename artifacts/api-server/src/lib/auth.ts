@@ -10,6 +10,7 @@ export interface AuthenticatedRequest extends Request {
     adminRole: AdminRole;
     name?: string | null;
     email?: string | null;
+    assignedGroupIds: string[];
   };
 }
 
@@ -36,6 +37,7 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
       adminRole: (u.admin_role || "read_only") as AdminRole,
       name: u.name,
       email: u.email,
+      assignedGroupIds: Array.isArray(u.assigned_group_ids) ? u.assigned_group_ids : [],
     };
     next();
   } catch (err) {

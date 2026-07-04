@@ -23,7 +23,7 @@ router.get(
   async (_req, res) => {
     try {
       const r = await pool.query(
-        `SELECT id, mobile, name, email, role, admin_role, created_at, updated_at
+        `SELECT id, mobile, name, email, role, admin_role, assigned_group_ids, created_at, updated_at
          FROM users WHERE role='admin' ORDER BY created_at DESC`
       );
       res.json(r.rows);
@@ -72,6 +72,33 @@ router.put(
     } catch (err) {
       console.error("[admin-users] PUT /:id/role:", err);
       res.status(500).json({ error: "Failed to update role" });
+    }
+  }
+);
+
+router.put(
+  "/:id/assigned-groups",
+  requirePermission("users", "edit") as any,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { assigned_group_ids } = req.body;
+      if (!Array.isArray(assigned_group_ids)) {
+        return res.status(400).json({ error: "assigned_group_ids must be an array" });
+      }
+      const existing = await pool.query(
+        `SELECT id, admin_role FROM users WHERE id=$1 AND role='admin'`,
+        [req.params.id]
+      );
+      if (!existing.rows[0]) return res.status(404).json({ error: "Admin user not found" });
+
+      await pool.query(
+        `UPDATE users SET assigned_group_ids=$1, updated_at=NOW() WHERE id=$2`,
+        [assigned_group_ids, req.params.id]
+      );
+      res.json({ success: true, id: req.params.id, assigned_group_ids });
+    } catch (err) {
+      console.error("[admin-users] PUT /:id/assigned-groups:", err);
+      res.status(500).json({ error: "Failed to update assigned groups" });
     }
   }
 );

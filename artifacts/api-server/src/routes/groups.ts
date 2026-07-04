@@ -66,7 +66,7 @@ function fmtPilgrim(p: any) {
   return { ...p, createdAt: p.createdAt?.toISOString?.(), updatedAt: p.updatedAt?.toISOString?.() };
 }
 
-router.get("/", requireAdmin as any, async (_req, res) => {
+router.get("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
     // pool.query() directly — avoids drizzle wrapper bundling quirks on VPS
     const [groupsRes, countsRes] = await Promise.all([
@@ -103,6 +103,11 @@ router.get("/", requireAdmin as any, async (_req, res) => {
       pilgrimCount: countMap[g.id] || 0,
     }));
 
+    // Guide role: restrict to assigned groups only
+    if (req.user?.adminRole === "guide") {
+      const allowed = req.user.assignedGroupIds;
+      return res.json(groupList.filter((g: any) => allowed.includes(g.id)));
+    }
     res.json(groupList);
   } catch (err: any) {
     console.error("[Groups] List failed:", err?.message);
@@ -195,8 +200,13 @@ async function ensureFamilyHead(groupId: string, familyId: string) {
   }
 }
 
-router.get("/:groupId/pilgrims", requireAdmin as any, async (req, res) => {
+router.get("/:groupId/pilgrims", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   const groupId = String(req.params.groupId);
+  // Guide role: only allow access to assigned groups
+  if (req.user?.adminRole === "guide" && !req.user.assignedGroupIds.includes(groupId)) {
+    res.status(403).json({ message: "Access restricted to your assigned groups only." });
+    return;
+  }
   const pilgrims = await db.select().from(pilgrimsTable)
     .where(eq(pilgrimsTable.groupId, groupId))
     .orderBy(asc(pilgrimsTable.serialNumber));

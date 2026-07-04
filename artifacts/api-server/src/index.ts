@@ -730,6 +730,13 @@ async function runMigrations() {
   } catch (err) {
     console.error("[Migration] users.admin_role failed:", err);
   }
+  // ── Guide group assignment column ──────────────────────────────────────────
+  try {
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS assigned_group_ids TEXT[] NOT NULL DEFAULT '{}'`);
+    console.log("[Migration] users.assigned_group_ids column ensured");
+  } catch (err) {
+    console.error("[Migration] users.assigned_group_ids failed:", err);
+  }
   // ── Unified Audit Logs table ───────────────────────────────────────────────
   try {
     await pool.query(`
