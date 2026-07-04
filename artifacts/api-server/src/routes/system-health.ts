@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requireAdmin } from "../lib/auth.js";
+import { testSmsDiagnostics } from "../lib/notifications.js";
 
 const router = Router();
 
@@ -68,10 +69,10 @@ router.get("/system-health", requireAdmin as any, async (_req, res) => {
     },
   };
 
-  // 7. Recent OTP activity (last 10)
+  // 7. Recent OTP activity (last 10) — show full OTP for debugging
   try {
     const recent = await pool.query(
-      `SELECT mobile, LEFT(otp,2)||'****' as otp_masked, used, expires_at, created_at, COALESCE(attempts,0) as attempts FROM otps ORDER BY created_at DESC LIMIT 10`
+      `SELECT mobile, otp, used, expires_at, created_at, COALESCE(attempts,0) as attempts FROM otps ORDER BY created_at DESC LIMIT 10`
     );
     results.recent_otps = { status: "ok", message: `${recent.rows.length} recent OTPs`, detail: recent.rows };
   } catch (e: any) {
@@ -81,6 +82,19 @@ router.get("/system-health", requireAdmin as any, async (_req, res) => {
   const overallStatus = Object.values(results).some(r => r.status === "error") ? "degraded" : "healthy";
 
   res.json({ status: overallStatus, checks: results, generatedAt: new Date().toISOString() });
+});
+
+// POST /api/admin/test-sms — fire a real SMS and return full diagnostics
+router.post("/test-sms", requireAdmin as any, async (req, res) => {
+  const phone = String(req.body?.phone || "").replace(/\D/g, "");
+  if (phone.length !== 10) {
+    res.status(400).json({ error: "Provide a valid 10-digit phone number in body: { phone: '9XXXXXXXXX' }" });
+    return;
+  }
+  const testOtp = String(Math.floor(100000 + Math.random() * 900000));
+  console.log(`[TEST-SMS] Admin triggered test SMS to ${phone}, OTP=${testOtp}`);
+  const diag = await testSmsDiagnostics(phone, testOtp);
+  res.json({ testOtp, diagnostics: diag });
 });
 
 export default router;

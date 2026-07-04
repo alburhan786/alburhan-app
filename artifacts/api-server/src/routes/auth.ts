@@ -68,21 +68,23 @@ router.post("/send-otp", async (req, res) => {
 
   const isAdmin = ADMIN_MOBILES.includes(cleanMobile);
 
-  console.log(`[OTP] Mobile: ${cleanMobile}, OTP: ${otp}, NewUser: ${isNewUser}, SMSSent: ${smsResult.sent}, IsAdmin: ${isAdmin}${smsResult.error ? `, Error: ${smsResult.error}` : ""}`);
+  console.log(`[OTP] Mobile: ${cleanMobile}, OTP: ${otp}, NewUser: ${isNewUser}, SMSSent: ${smsResult.sent}, Route: ${smsResult.route || "n/a"}, IsAdmin: ${isAdmin}${smsResult.error ? `, Error: ${smsResult.error}` : ""}`);
 
   res.json({
     message: smsResult.sent
-      ? "OTP sent to your mobile number"
+      ? `OTP sent to your mobile number (via ${smsResult.route || "SMS"})`
       : "OTP generated (SMS delivery issue — check WhatsApp or contact support)",
     requestId: `otp_${Date.now()}`,
     isNewUser,
     smsSent: smsResult.sent,
-    // Admin-only debug info
+    smsRoute: smsResult.route,
+    // Admin phones always get the OTP + full diagnostics in response
     ...(isAdmin ? {
       debugOtp: otp,
       smsStatus: smsResult.sent ? "delivered" : "failed",
       smsError: smsResult.error,
       smsProviderResponse: smsResult.providerResponse,
+      smsUrlUsed: smsResult.urlUsed,
     } : {}),
   });
 });
