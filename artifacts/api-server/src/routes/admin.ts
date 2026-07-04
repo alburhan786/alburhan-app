@@ -523,4 +523,27 @@ router.get("/family-ledger", requireAdmin as any, async (req: AuthenticatedReque
   }
 });
 
+// One-time: delete test bookings + payments (browser-callable, requires admin login)
+router.get("/clear-test-bookings", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  if (req.user?.role !== "super_admin") return res.status(403).json({ error: "Super admin only" });
+  const nums = [
+    'ABT26033710','ABT26034356','ABT26038022','ABT26033123','ABT26031895',
+    'ABT26036960','ABT26035537','ABT26046308','ABT26046094','ABT26049541','ABT26047687'
+  ];
+  try {
+    const p = await pool.query(
+      `UPDATE payment_transactions SET is_deleted=true, deleted_at=NOW(), deletion_reason='Test data cleared'
+       WHERE booking_id IN (SELECT id FROM bookings WHERE booking_number = ANY($1)) AND is_deleted=false`,
+      [nums]
+    );
+    const b = await pool.query(
+      `UPDATE bookings SET deleted_at=NOW() WHERE booking_number = ANY($1) AND deleted_at IS NULL`,
+      [nums]
+    );
+    res.json({ ok: true, bookings_deleted: b.rowCount, payments_deleted: p.rowCount, message: "Test bookings cleared. Refresh the Payment Management page." });
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
 export default router;
