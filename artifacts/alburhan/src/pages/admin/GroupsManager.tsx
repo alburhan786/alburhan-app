@@ -1,4 +1,5 @@
 import { AdminLayout } from "@/components/layout/AdminLayout";
+import { PermissionGuard } from "@/components/PermissionGuard";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -266,9 +267,11 @@ export default function GroupsManager() {
           <Button variant="outline" onClick={() => setShowSerialManager(v => !v)} className="rounded-xl gap-2 border-amber-400 text-amber-700 hover:bg-amber-50">
             <Hash size={16} /> Serial Numbers
           </Button>
-          <Button onClick={openCreate} className="bg-primary text-white gap-2 rounded-xl">
-            <Plus size={18} /> Create Group
-          </Button>
+          <PermissionGuard module="groups" action="create" asDisabled>
+            <Button onClick={openCreate} className="bg-primary text-white gap-2 rounded-xl">
+              <Plus size={18} /> Create Group
+            </Button>
+          </PermissionGuard>
         </div>
       </div>
 

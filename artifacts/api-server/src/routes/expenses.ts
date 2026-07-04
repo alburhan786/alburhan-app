@@ -232,6 +232,7 @@ router.put("/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) =
       .where(eq(expensesTable.id, req.params.id))
       .returning();
     if (!row) return res.status(404).json({ error: "Not found" });
+    auditLog({ req, action: "updated", entityTable: "expenses", entityId: row.id, newValue: { category: row.category, amount: row.amount, description: row.description } }).catch(() => {});
 
     // Sync journal: void old entry + re-post with new values (fire-and-forget, non-fatal)
     voidJournalEntry("expense", row.id).then(() =>

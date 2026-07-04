@@ -1,8 +1,9 @@
 import { Router } from "express";
 import { pool } from "@workspace/db";
-import { requireAdmin } from "../lib/auth.js";
+import { requireAdmin, requireModuleAccess } from "../lib/auth.js";
 
 const router = Router();
+router.use(requireModuleAccess("pilgrims") as any);
 
 const VISA_STATUSES = ["not_applied", "applied", "in_process", "received", "rejected"];
 

@@ -1,9 +1,10 @@
 import { Router } from "express";
 import { pool } from "@workspace/db";
-import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
+import { requireAdmin, requireModuleAccess, type AuthenticatedRequest } from "../lib/auth.js";
 import { randomUUID } from "crypto";
 
 const router = Router();
+router.use(requireModuleAccess("pilgrims") as any);
 
 // GET all medical cases
 router.get("/cases", requireAdmin as any, async (req, res) => {

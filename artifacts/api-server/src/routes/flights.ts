@@ -1,9 +1,10 @@
 import { Router } from "express";
 import { db, groupFlightsTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
-import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
+import { requireAdmin, requireModuleAccess, type AuthenticatedRequest } from "../lib/auth.js";
 
 const router = Router();
+router.use(requireModuleAccess("groups") as any);
 
 router.get("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
+import { PermissionGuard } from "@/components/PermissionGuard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -230,7 +231,9 @@ export default function ExpenseManager() {
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={load} disabled={loading}><RefreshCw size={14} className={`mr-1.5 ${loading ? "animate-spin" : ""}`} />Refresh</Button>
             <Button variant="outline" size="sm" onClick={exportExcel} disabled={!filtered.length}><Download size={14} className="mr-1.5" />Export Excel</Button>
-            <Button size="sm" className="bg-[#0d5040] hover:bg-[#0a3d30]" onClick={openAdd}><Plus size={14} className="mr-1.5" />Add Expense</Button>
+            <PermissionGuard module="expenses" action="create" asDisabled>
+              <Button size="sm" className="bg-[#0d5040] hover:bg-[#0a3d30]" onClick={openAdd}><Plus size={14} className="mr-1.5" />Add Expense</Button>
+            </PermissionGuard>
           </div>
         </div>
 

@@ -1,10 +1,11 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { db, attendanceEventsTable, attendanceLogsTable, pilgrimsTable } from "@workspace/db";
 import { eq, and, desc, inArray, or } from "drizzle-orm";
-import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
+import { requireAdmin, requireModuleAccess, type AuthenticatedRequest } from "../lib/auth.js";
 import * as XLSX from "xlsx";
 
 const router = Router();
+router.use(requireModuleAccess("groups") as any);
 
 function parsePilgrimId(qrText: string): string | null {
   try {
