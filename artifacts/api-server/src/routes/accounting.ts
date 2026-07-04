@@ -365,7 +365,7 @@ router.get("/payment-entries", requireAdmin as any, async (req: AuthenticatedReq
     const dateTo = to || new Date().toISOString().slice(0, 10);
     const rows = await q(`
       SELECT pt.id, pt.payment_date::text AS date, b.booking_number,
-        COALESCE(u.name,u.mobile) AS customer_name, u.mobile, COALESCE(hg.name,'') AS group_name,
+        COALESCE(u.name,u.mobile) AS customer_name, u.mobile, COALESCE(hg.group_name,'') AS group_name,
         pt.payment_mode AS mode, COALESCE(pt.reference_number,'') AS reference,
         COALESCE(pt.bank_name,'') AS bank_name, COALESCE(pt.received_by,'') AS received_by,
         pt.amount::numeric AS amount, pt.is_reconciled, pt.created_at
@@ -388,7 +388,7 @@ router.get("/outstanding", requireAdmin as any, async (req: AuthenticatedRequest
     const { search } = req.query as Record<string, string>;
     const rows = await q(`
       SELECT b.id AS booking_id, b.booking_number,
-        COALESCE(u.name,u.mobile) AS customer_name, u.mobile, COALESCE(hg.name,'') AS group_name,
+        COALESCE(u.name,u.mobile) AS customer_name, u.mobile, COALESCE(hg.group_name,'') AS group_name,
         b.final_amount::numeric AS total_amount, COALESCE(b.paid_amount::numeric,0) AS paid_amount,
         GREATEST(b.final_amount::numeric - COALESCE(b.paid_amount::numeric,0),0) AS outstanding,
         b.status, b.created_at
@@ -411,7 +411,7 @@ router.get("/ledger", requireAdmin as any, async (req: AuthenticatedRequest, res
     const { search } = req.query as Record<string, string>;
     const rows = await q(`
       SELECT b.id AS booking_id, b.booking_number,
-        COALESCE(u.name,u.mobile) AS customer_name, u.mobile, COALESCE(hg.name,'') AS group_name,
+        COALESCE(u.name,u.mobile) AS customer_name, u.mobile, COALESCE(hg.group_name,'') AS group_name,
         b.final_amount::numeric AS debit, COALESCE(b.paid_amount::numeric,0) AS credit,
         GREATEST(b.final_amount::numeric - COALESCE(b.paid_amount::numeric,0),0) AS balance,
         b.status, b.created_at
