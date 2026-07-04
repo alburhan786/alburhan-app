@@ -1,11 +1,12 @@
 import { Router } from "express";
 import { SendNotificationBody } from "@workspace/api-zod";
-import { requireAdmin, requireAuth, type AuthenticatedRequest } from "../lib/auth.js";
+import { requireAdmin, requireAuth, requireModuleAccess, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendWhatsApp, sendEmail } from "../lib/notifications.js";
 import { db, customerNotificationsTable } from "@workspace/db";
 import { eq, and, desc, count } from "drizzle-orm";
 
 const router = Router();
+router.use(requireModuleAccess("customers") as any);
 
 router.post("/send", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   const parsed = SendNotificationBody.safeParse(req.body);

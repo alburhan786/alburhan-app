@@ -1,11 +1,12 @@
 import { Router } from "express";
 import { db, broadcastsTable, customerNotificationsTable, bookingsTable, usersTable } from "@workspace/db";
 import { eq, desc, ilike, or } from "drizzle-orm";
-import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
+import { requireAdmin, requireModuleAccess, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendWhatsApp, sendRCS, type RcsRichData } from "../lib/notifications.js";
 import axios from "axios";
 
 const router = Router();
+router.use(requireModuleAccess("customers") as any);
 
 const FAST2SMS_API_KEY = process.env.FAST2SMS_API_KEY;
 

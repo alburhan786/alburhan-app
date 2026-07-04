@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, galleryImagesTable } from "@workspace/db";
 import { eq, desc, asc } from "drizzle-orm";
-import { requireAuth, requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
+import { requireAuth, requireAdmin, requireModuleAccess, type AuthenticatedRequest } from "../lib/auth.js";
 import multer from "multer";
 import { uploadToGCS, deleteFromGCS } from "../lib/gcsUpload.js";
 
@@ -19,6 +19,7 @@ const upload = multer({
 });
 
 const router = Router();
+router.use(requireModuleAccess("settings") as any);
 
 router.get(
   "/",

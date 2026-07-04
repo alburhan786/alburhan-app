@@ -1,10 +1,11 @@
 import { Router } from "express";
 import { db, pool, bookingsTable, usersTable, packagesTable, inquiriesTable, packageRequestsTable, hajjGroupsTable, customerProfilesTable, pilgrimsTable } from "@workspace/db";
 import { eq, count, sum, desc, and, sql, max } from "drizzle-orm";
-import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
+import { requireAdmin, requireModuleAccess, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendWhatsApp, sendDLTSMS } from "../lib/notifications.js";
 
 const router = Router();
+router.use(requireModuleAccess("reports") as any);
 
 router.get("/stats", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
   try {

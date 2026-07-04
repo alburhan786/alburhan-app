@@ -2,9 +2,10 @@ import { Router } from "express";
 import { db, packagesTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { CreatePackageBody, ListPackagesQueryParams } from "@workspace/api-zod";
-import { requireAdmin } from "../lib/auth.js";
+import { requireAdmin, requireModuleAccess } from "../lib/auth.js";
 
 const router = Router();
+router.use(requireModuleAccess("bookings") as any);
 
 router.get("/", async (req, res) => {
   const parsed = ListPackagesQueryParams.safeParse(req.query);
