@@ -195,6 +195,57 @@ router.get("/trash", requireAdmin as any, requirePermission("bookings", "view") 
   }
 });
 
+// POST /bulk-trash — soft-delete multiple bookings at once
+router.post("/bulk-trash", requireAdmin as any, requirePermission("bookings", "delete") as any, async (req: AuthenticatedRequest, res) => {
+  const { ids } = req.body as { ids?: string[] };
+  if (!ids || !Array.isArray(ids) || ids.length === 0) {
+    res.status(400).json({ message: "No booking IDs provided" }); return;
+  }
+  const deletedBy = req.user?.name || req.user?.mobile || "admin";
+  const results: { id: string; bookingNumber: string; success: boolean; error?: string }[] = [];
+  let successCount = 0;
+
+  for (const id of ids) {
+    try {
+      const existingRows = await pool.query(
+        `SELECT id, booking_number, deleted_at FROM bookings WHERE id=$1 LIMIT 1`, [id]
+      );
+      const existing = existingRows.rows[0];
+      if (!existing) { results.push({ id, bookingNumber: "?", success: false, error: "Booking not found" }); continue; }
+      if (existing.deleted_at) { results.push({ id, bookingNumber: existing.booking_number, success: false, error: "Already in trash" }); continue; }
+
+      await pool.query(
+        `UPDATE bookings SET deleted_at=NOW(), deleted_by=$1, updated_at=NOW() WHERE id=$2`,
+        [deletedBy, id]
+      );
+      await pool.query(
+        `UPDATE payment_transactions SET is_deleted=true, deleted_at=NOW(), deleted_by=$1, deletion_reason='Booking bulk-deleted'
+         WHERE booking_id=$2 AND (is_deleted=false OR is_deleted IS NULL)`,
+        [req.user?.id ?? deletedBy, id]
+      );
+
+      try {
+        await writeAuditLog(id, deletedBy, "soft_delete", [
+          { fieldName: "deleted_at", oldValue: "", newValue: new Date().toISOString() },
+        ]);
+      } catch { /* audit non-fatal */ }
+
+      results.push({ id, bookingNumber: existing.booking_number, success: true });
+      successCount++;
+    } catch (err: any) {
+      results.push({ id, bookingNumber: "?", success: false, error: err.message });
+    }
+  }
+
+  const failCount = ids.length - successCount;
+  const failed = results.filter(r => !r.success);
+  const message = failCount === 0
+    ? `${successCount} booking${successCount !== 1 ? "s" : ""} moved to trash successfully.`
+    : `${successCount} succeeded, ${failCount} failed: ${failed.map(f => `${f.bookingNumber} (${f.error})`).join(", ")}`;
+
+  res.json({ message, successCount, failCount, results });
+});
+
 router.get("/", requireAuth as any, async (req: AuthenticatedRequest, res) => {
   const parsed = ListBookingsQueryParams.safeParse(req.query);
   const query = parsed.success ? parsed.data : {};

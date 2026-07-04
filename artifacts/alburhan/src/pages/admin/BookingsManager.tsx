@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/use-permissions";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
-import { CheckCircle, XCircle, Eye, ExternalLink, Plus, Trash2, FileText, Download, ImageIcon, RefreshCw, Upload, Wallet, ClipboardList, User, Link2, Send, Bell, Pencil, Copy, History, RotateCcw, AlertTriangle, Search } from "lucide-react";
+import { CheckCircle, XCircle, Eye, ExternalLink, Plus, Trash2, FileText, Download, ImageIcon, RefreshCw, Upload, Wallet, ClipboardList, User, Link2, Send, Bell, Pencil, Copy, History, RotateCcw, AlertTriangle, Search, Loader2 } from "lucide-react";
 
 const DOC_TYPE_LABELS: Record<string, string> = {
   passport: "Passport",
@@ -1415,6 +1415,56 @@ function AuditLogModal({ bookingId, bookingNumber, open, onClose }: {
   );
 }
 
+function BulkDeleteConfirmDialog({ count, open, deleting, onClose, onConfirm }: {
+  count: number; open: boolean; deleting: boolean; onClose: () => void; onConfirm: () => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={v => !v && !deleting && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-red-600">
+            <AlertTriangle size={18} /> Delete Selected Bookings
+          </DialogTitle>
+        </DialogHeader>
+        <div className="py-2 space-y-3">
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm font-semibold text-amber-900">
+            ⚠️ You are about to delete <span className="font-bold text-red-700">{count} booking{count !== 1 ? "s" : ""}</span>.
+          </div>
+          <p className="text-sm text-muted-foreground font-medium">This will:</p>
+          <ul className="text-sm text-muted-foreground space-y-1.5 pl-2">
+            {[
+              "Move bookings to Trash (Soft Delete)",
+              "Keep audit logs",
+              "Remove them from the active bookings list",
+              "Update dashboard statistics",
+              "Update payment analytics",
+              "Update customer and hajji records",
+            ].map(item => (
+              <li key={item} className="flex items-start gap-2">
+                <span className="text-red-500 mt-0.5">•</span> {item}
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-muted-foreground bg-gray-50 rounded-lg px-3 py-2 border">
+            You can restore bookings from the 🗑 Trash tab at any time.
+          </p>
+        </div>
+        <div className="flex gap-3 pt-2">
+          <button onClick={onClose} disabled={deleting}
+            className="flex-1 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50">
+            Cancel
+          </button>
+          <button onClick={onConfirm} disabled={deleting}
+            className="flex-1 py-2 rounded-lg bg-red-600 text-white text-sm font-bold hover:bg-red-700 disabled:opacity-60 flex items-center justify-center gap-2">
+            {deleting && <Loader2 size={14} className="animate-spin" />}
+            Move to Trash
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function ConfirmDeleteDialog({ booking, open, onClose, onConfirm }: {
   booking: any | null; open: boolean; onClose: () => void; onConfirm: () => void;
 }) {
@@ -1466,6 +1516,9 @@ export default function BookingsManager() {
   const [softDeleteTarget, setSoftDeleteTarget] = useState<any | null>(null);
   const [trashBookings, setTrashBookings] = useState<any[]>([]);
   const [trashLoading, setTrashLoading] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showBulkConfirm, setShowBulkConfirm] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const fetchTrash = async () => {
     setTrashLoading(true);
@@ -1559,6 +1612,48 @@ export default function BookingsManager() {
     });
   };
 
+  const allSelected = filtered.length > 0 && filtered.every((b: any) => selectedIds.has(b.id));
+  const someSelected = !allSelected && filtered.some((b: any) => selectedIds.has(b.id));
+
+  const handleToggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filtered.map((b: any) => b.id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    setBulkDeleting(true);
+    try {
+      const ids = Array.from(selectedIds);
+      const res = await fetch(`${API}/api/bookings/bulk-trash`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      const d = await res.json() as { message?: string; successCount?: number; failCount?: number };
+      if (!res.ok) throw new Error(d.message || "Bulk delete failed");
+      toast({ title: "Bulk Delete Complete", description: d.message });
+      setSelectedIds(new Set());
+      setShowBulkConfirm(false);
+      queryClient.invalidateQueries({ queryKey: ['/api/bookings'] });
+      refetch();
+    } catch (err: any) {
+      toast({ title: "Bulk Delete Error", description: err.message, variant: "destructive" });
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
   const handleDuplicate = async (bookingId: string) => {
     try {
       const res = await fetch(`${API}/api/bookings/${bookingId}/duplicate`, { method: "POST", credentials: "include" });
@@ -1623,9 +1718,19 @@ export default function BookingsManager() {
           <h1 className="text-3xl font-serif font-bold text-foreground">Bookings Management</h1>
           <p className="text-muted-foreground mt-1">Review, process, and create offline booking requests.</p>
         </div>
-        <Button onClick={() => setShowOfflineForm(true)} className="bg-[#0A3D2A] hover:bg-[#0d5038] text-white font-semibold flex items-center gap-2 shadow-md">
-          <Plus size={16} /> New Offline Booking
-        </Button>
+        <div className="flex items-center gap-2">
+          {selectedIds.size > 0 && statusFilter !== "trash" && (
+            <button
+              onClick={() => setShowBulkConfirm(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-sm font-bold rounded-xl hover:bg-red-700 shadow-md transition-colors"
+            >
+              <Trash2 size={15} /> Bulk Delete ({selectedIds.size})
+            </button>
+          )}
+          <Button onClick={() => setShowOfflineForm(true)} className="bg-[#0A3D2A] hover:bg-[#0d5038] text-white font-semibold flex items-center gap-2 shadow-md">
+            <Plus size={16} /> New Offline Booking
+          </Button>
+        </div>
       </div>
 
       {/* Status Tabs */}
@@ -1730,6 +1835,16 @@ export default function BookingsManager() {
             <table className="w-full text-sm text-left">
               <thead className="bg-muted text-muted-foreground uppercase text-xs font-semibold">
                 <tr>
+                  <th className="px-4 py-4 w-10">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      ref={el => { if (el) el.indeterminate = someSelected; }}
+                      onChange={handleSelectAll}
+                      className="w-4 h-4 accent-[#0A3D2A] cursor-pointer"
+                      title="Select All"
+                    />
+                  </th>
                   <th className="px-5 py-4">Booking ID / Date</th>
                   <th className="px-5 py-4">Customer Info</th>
                   <th className="px-5 py-4">Package</th>
@@ -1740,13 +1855,21 @@ export default function BookingsManager() {
               </thead>
               <tbody className="divide-y divide-border">
                 {isLoading ? (
-                  <tr><td colSpan={6} className="text-center py-8">Loading...</td></tr>
+                  <tr><td colSpan={7} className="text-center py-8">Loading...</td></tr>
                 ) : filtered.length === 0 ? (
-                  <tr><td colSpan={6} className="text-center py-12 text-muted-foreground">
+                  <tr><td colSpan={7} className="text-center py-12 text-muted-foreground">
                     {searchQuery ? `No bookings match "${searchQuery}"` : "No bookings found."}
                   </td></tr>
                 ) : filtered.map((booking: any) => (
-                  <tr key={booking.id} className="hover:bg-muted/30 transition-colors">
+                  <tr key={booking.id} className={`hover:bg-muted/30 transition-colors ${selectedIds.has(booking.id) ? "bg-red-50/40" : ""}`}>
+                    <td className="px-4 py-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(booking.id)}
+                        onChange={() => handleToggleSelect(booking.id)}
+                        className="w-4 h-4 accent-[#0A3D2A] cursor-pointer"
+                      />
+                    </td>
                     <td className="px-5 py-4">
                       <div className="font-mono font-bold text-primary text-sm">{booking.bookingNumber}</div>
                       <div className="text-xs text-muted-foreground mt-1">{formatDate(booking.createdAt)}</div>
@@ -1871,6 +1994,13 @@ export default function BookingsManager() {
         open={showOfflineForm}
         onClose={() => setShowOfflineForm(false)}
         onSuccess={() => { queryClient.invalidateQueries({ queryKey: ['/api/bookings'] }); refetch(); }}
+      />
+      <BulkDeleteConfirmDialog
+        count={selectedIds.size}
+        open={showBulkConfirm}
+        deleting={bulkDeleting}
+        onClose={() => setShowBulkConfirm(false)}
+        onConfirm={handleBulkDelete}
       />
     </AdminLayout>
   );
