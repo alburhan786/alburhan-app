@@ -187,4 +187,24 @@ app.get("/api/migrate/dump.sql", (req, res) => {
   res.sendFile(dumpPath);
 });
 
+// TEMPORARY: soft-delete test bookings by booking numbers
+app.get("/api/migrate/delete-bookings", async (req, res) => {
+  const key = req.query.key as string;
+  if (!key || key !== "alburhan-migrate-2026") return res.status(403).send("Forbidden");
+  const { pool } = await import("@workspace/db");
+  const nums = [
+    'ABT26033710','ABT26034356','ABT26038022','ABT26033123','ABT26031895',
+    'ABT26036960','ABT26035537','ABT26046308','ABT26046094','ABT26049541','ABT26047687'
+  ];
+  try {
+    const r = await pool.query(
+      `UPDATE bookings SET deleted_at = NOW() WHERE booking_number = ANY($1) AND deleted_at IS NULL`,
+      [nums]
+    );
+    res.json({ ok: true, updated: r.rowCount, bookings: nums });
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
 export default app;
