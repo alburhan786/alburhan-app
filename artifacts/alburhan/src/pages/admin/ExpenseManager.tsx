@@ -54,6 +54,7 @@ const EMPTY_FORM = {
   groupId: "", packageId: "", category: "misc", vendor: "", vendorId: "", description: "",
   amount: "", date: new Date().toISOString().slice(0, 10),
   paidBy: "", paymentMethod: "cash", invoiceNumber: "", notes: "", status: "approved",
+  gst_percent: "", cgst_amount: "", sgst_amount: "", igst_amount: "", hsn_sac: "",
 };
 
 function fmt(n: number) { return "₹" + n.toLocaleString("en-IN", { maximumFractionDigits: 0 }); }
@@ -141,6 +142,9 @@ export default function ExpenseManager() {
       description: e.description, amount: e.amount, date: e.date,
       paidBy: e.paidBy || "", paymentMethod: e.paymentMethod || "cash",
       invoiceNumber: e.invoiceNumber || "", notes: e.notes || "", status: e.status || "approved",
+      gst_percent: (e as any).gst_percent || "", cgst_amount: (e as any).cgst_amount || "",
+      sgst_amount: (e as any).sgst_amount || "", igst_amount: (e as any).igst_amount || "",
+      hsn_sac: (e as any).hsn_sac || "",
     });
     setShowModal(true);
   }
@@ -460,6 +464,44 @@ export default function ExpenseManager() {
             <div>
               <label className="text-xs font-medium">Invoice Number</label>
               <Input value={form.invoiceNumber} onChange={e => setForm(f => ({ ...f, invoiceNumber: e.target.value }))} placeholder="INV-001" className="mt-1" />
+            </div>
+            {/* GST Details (optional) */}
+            <div className="border rounded-lg p-3 space-y-2 bg-muted/20">
+              <p className="text-xs font-semibold text-muted-foreground">GST Details (optional)</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs font-medium">HSN/SAC Code</label>
+                  <Input value={form.hsn_sac} onChange={e => setForm(f => ({ ...f, hsn_sac: e.target.value }))} placeholder="e.g. 9985" className="mt-1 h-8 text-sm" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium">GST %</label>
+                  <Input type="number" value={form.gst_percent} onChange={e => {
+                    const pct = parseFloat(e.target.value) || 0;
+                    const base = parseFloat(form.amount || "0");
+                    const totalGst = base * pct / 100;
+                    setForm(f => ({
+                      ...f, gst_percent: e.target.value,
+                      cgst_amount: (totalGst / 2).toFixed(2),
+                      sgst_amount: (totalGst / 2).toFixed(2),
+                      igst_amount: "0",
+                    }));
+                  }} placeholder="e.g. 18" className="mt-1 h-8 text-sm" />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="text-xs font-medium">CGST (₹)</label>
+                  <Input type="number" value={form.cgst_amount} onChange={e => setForm(f => ({ ...f, cgst_amount: e.target.value }))} placeholder="0.00" className="mt-1 h-8 text-sm" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium">SGST (₹)</label>
+                  <Input type="number" value={form.sgst_amount} onChange={e => setForm(f => ({ ...f, sgst_amount: e.target.value }))} placeholder="0.00" className="mt-1 h-8 text-sm" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium">IGST (₹)</label>
+                  <Input type="number" value={form.igst_amount} onChange={e => setForm(f => ({ ...f, igst_amount: e.target.value }))} placeholder="0.00" className="mt-1 h-8 text-sm" />
+                </div>
+              </div>
             </div>
             <div>
               <label className="text-xs font-medium">Notes</label>

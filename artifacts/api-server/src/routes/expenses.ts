@@ -165,7 +165,8 @@ router.get("/accounting-summary", requireAdmin as any, async (_req: Authenticate
 
 router.post("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
-    const { groupId, category, vendor, vendorId, description, amount, date, paidBy, paymentMethod, invoiceNumber, notes } = req.body;
+    const { groupId, category, vendor, vendorId, description, amount, date, paidBy, paymentMethod, invoiceNumber, notes,
+      gst_percent, cgst_amount, sgst_amount, igst_amount, hsn_sac } = req.body;
     if (!category || !description || !amount || !date) {
       return res.status(400).json({ error: "category, description, amount, date required" });
     }
@@ -181,6 +182,11 @@ router.post("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => 
       paymentMethod: paymentMethod || "cash",
       invoiceNumber,
       notes,
+      gstPercent: gst_percent ? String(gst_percent) : null,
+      cgstAmount: cgst_amount ? String(cgst_amount) : null,
+      sgstAmount: sgst_amount ? String(sgst_amount) : null,
+      igstAmount: igst_amount ? String(igst_amount) : null,
+      hsnSac: hsn_sac || null,
     }).returning();
 
     // Auto-post double-entry journal (fire-and-forget, non-fatal)
@@ -203,9 +209,21 @@ router.post("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => 
 
 router.put("/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
-    const { category, vendor, vendorId, description, amount, date, paidBy, paymentMethod, invoiceNumber, notes, groupId } = req.body;
+    const { category, vendor, vendorId, description, amount, date, paidBy, paymentMethod, invoiceNumber, notes, groupId,
+      gst_percent, cgst_amount, sgst_amount, igst_amount, hsn_sac, status, rejectedReason } = req.body;
     const [row] = await db.update(expensesTable)
-      .set({ category, vendor, vendorId: vendorId || null, description, amount: String(amount), date, paidBy, paymentMethod, invoiceNumber, notes, groupId: groupId || null, updatedAt: new Date() })
+      .set({
+        category, vendor, vendorId: vendorId || null, description,
+        amount: amount !== undefined ? String(amount) : undefined,
+        date, paidBy, paymentMethod, invoiceNumber, notes,
+        groupId: groupId || null,
+        gstPercent: gst_percent !== undefined ? (gst_percent ? String(gst_percent) : null) : undefined,
+        cgstAmount: cgst_amount !== undefined ? (cgst_amount ? String(cgst_amount) : null) : undefined,
+        sgstAmount: sgst_amount !== undefined ? (sgst_amount ? String(sgst_amount) : null) : undefined,
+        igstAmount: igst_amount !== undefined ? (igst_amount ? String(igst_amount) : null) : undefined,
+        hsnSac: hsn_sac !== undefined ? (hsn_sac || null) : undefined,
+        updatedAt: new Date(),
+      })
       .where(eq(expensesTable.id, req.params.id))
       .returning();
     if (!row) return res.status(404).json({ error: "Not found" });

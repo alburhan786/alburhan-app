@@ -14,6 +14,11 @@ export const expensesTable = pgTable("expenses", {
   invoiceNumber: text("invoice_number"),
   attachmentUrl: text("attachment_url"),
   notes: text("notes"),
+  gstPercent: numeric("gst_percent", { precision: 5, scale: 2 }),
+  cgstAmount: numeric("cgst_amount", { precision: 12, scale: 2 }),
+  sgstAmount: numeric("sgst_amount", { precision: 12, scale: 2 }),
+  igstAmount: numeric("igst_amount", { precision: 12, scale: 2 }),
+  hsnSac: text("hsn_sac"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

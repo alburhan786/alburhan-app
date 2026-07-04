@@ -77,6 +77,9 @@ import AdminAIAssistant from "@/pages/admin/AIAssistant";
 import CustomerLedger from "@/pages/admin/CustomerLedger";
 import HajjiLedger from "@/pages/admin/HajjiLedger";
 import VendorManager from "@/pages/admin/VendorManager";
+import GSTReports from "@/pages/admin/GSTReports";
+import PayrollManager from "@/pages/admin/PayrollManager";
+import AssetManager from "@/pages/admin/AssetManager";
 import AttendanceScanPublic from "@/pages/public/AttendanceScanPublic";
 import StaffVerify from "@/pages/public/StaffVerify";
 import VerifyPilgrim from "@/pages/public/VerifyPilgrim";
@@ -195,6 +198,9 @@ function Router() {
       <Route path="/admin/customer-ledger" component={() => <AdminRoute component={CustomerLedger} />} />
       <Route path="/admin/hajji-ledger" component={() => <AdminRoute component={HajjiLedger} />} />
       <Route path="/admin/vendors" component={() => <AdminRoute component={VendorManager} />} />
+      <Route path="/admin/gst-reports" component={() => <AdminRoute component={GSTReports} />} />
+      <Route path="/admin/payroll" component={() => <AdminRoute component={PayrollManager} />} />
+      <Route path="/admin/assets" component={() => <AdminRoute component={AssetManager} />} />
       <Route path="/admin/flights" component={() => <AdminRoute component={FlightManager} />} />
       <Route path="/admin/groups/:groupId/flights" component={() => <AdminRoute component={FlightManager} />} />
       <Route path="/admin/groups/:groupId/print/single-card/:pilgrimId"    component={() => <AdminRoute component={PrintSingleCard} />} />

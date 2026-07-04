@@ -642,6 +642,109 @@ async function runMigrations() {
   } catch (err) {
     console.error("[Migration] account_opening_balances failed:", err);
   }
+  // ── GST fields on expenses ─────────────────────────────────────────────────
+  try {
+    await pool.query(`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS gst_percent NUMERIC(5,2)`);
+    await pool.query(`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS cgst_amount NUMERIC(12,2)`);
+    await pool.query(`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS sgst_amount NUMERIC(12,2)`);
+    await pool.query(`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS igst_amount NUMERIC(12,2)`);
+    await pool.query(`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS hsn_sac TEXT`);
+    console.log("[Migration] expenses GST columns ensured");
+  } catch (err) {
+    console.error("[Migration] expenses GST columns failed:", err);
+  }
+  // ── GST fields on bookings ─────────────────────────────────────────────────
+  try {
+    await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS gst_rate NUMERIC(5,2)`);
+    await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS taxable_amount NUMERIC(14,2)`);
+    console.log("[Migration] bookings GST columns ensured");
+  } catch (err) {
+    console.error("[Migration] bookings GST columns failed:", err);
+  }
+  // ── Employees table ────────────────────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS employees (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        designation TEXT,
+        department TEXT,
+        mobile TEXT,
+        email TEXT,
+        bank_account TEXT,
+        ifsc TEXT,
+        pan TEXT,
+        pf_number TEXT,
+        esi_number TEXT,
+        joining_date TEXT,
+        basic_salary NUMERIC(12,2) NOT NULL DEFAULT 0,
+        hra NUMERIC(12,2) NOT NULL DEFAULT 0,
+        allowances JSONB NOT NULL DEFAULT '{}',
+        total_salary NUMERIC(12,2) NOT NULL DEFAULT 0,
+        notes TEXT,
+        is_active BOOLEAN NOT NULL DEFAULT true,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    console.log("[Migration] employees table ensured");
+  } catch (err) {
+    console.error("[Migration] employees table failed:", err);
+  }
+  // ── Payroll runs table ─────────────────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS payroll_runs (
+        id TEXT PRIMARY KEY,
+        employee_id TEXT NOT NULL REFERENCES employees(id),
+        month TEXT NOT NULL,
+        present_days NUMERIC(5,2) NOT NULL DEFAULT 26,
+        working_days NUMERIC(5,2) NOT NULL DEFAULT 26,
+        gross_salary NUMERIC(12,2) NOT NULL DEFAULT 0,
+        basic_salary NUMERIC(12,2) NOT NULL DEFAULT 0,
+        hra NUMERIC(12,2) NOT NULL DEFAULT 0,
+        allowances JSONB NOT NULL DEFAULT '{}',
+        pf_deduction NUMERIC(12,2) NOT NULL DEFAULT 0,
+        esi_deduction NUMERIC(12,2) NOT NULL DEFAULT 0,
+        tds_deduction NUMERIC(12,2) NOT NULL DEFAULT 0,
+        advance_deduction NUMERIC(12,2) NOT NULL DEFAULT 0,
+        other_deductions NUMERIC(12,2) NOT NULL DEFAULT 0,
+        total_deductions NUMERIC(12,2) NOT NULL DEFAULT 0,
+        net_salary NUMERIC(12,2) NOT NULL DEFAULT 0,
+        notes TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE(employee_id, month)
+      )
+    `);
+    console.log("[Migration] payroll_runs table ensured");
+  } catch (err) {
+    console.error("[Migration] payroll_runs table failed:", err);
+  }
+  // ── Assets table ───────────────────────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS assets (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        category TEXT NOT NULL DEFAULT 'other',
+        purchase_date TEXT NOT NULL,
+        purchase_price NUMERIC(14,2) NOT NULL DEFAULT 0,
+        vendor TEXT,
+        serial_number TEXT,
+        warranty_date TEXT,
+        depreciation_rate NUMERIC(6,4) NOT NULL DEFAULT 0.15,
+        location TEXT,
+        notes TEXT,
+        is_active BOOLEAN NOT NULL DEFAULT true,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    console.log("[Migration] assets table ensured");
+  } catch (err) {
+    console.error("[Migration] assets table failed:", err);
+  }
 }
 
 const rawPort = process.env["PORT"];

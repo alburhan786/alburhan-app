@@ -34,6 +34,9 @@ import aiRouter from "./ai.js";
 import systemHealthRouter from "./system-health.js";
 import accountingRouter from "./accounting.js";
 import vendorsRouter from "./vendors.js";
+import gstRouter from "./gst.js";
+import payrollRouter from "./payroll.js";
+import assetsRouter from "./assets.js";
 
 const router: IRouter = Router();
 
@@ -101,6 +104,9 @@ router.use("/ai", aiRouter);
 router.use("/admin", systemHealthRouter);
 router.use("/accounting", accountingRouter);
 router.use("/vendors", vendorsRouter);
+router.use("/gst", gstRouter);
+router.use("/payroll", payrollRouter);
+router.use("/assets", assetsRouter);
 router.use(storageRouter);
 
 export default router;
