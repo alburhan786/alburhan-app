@@ -1,7 +1,58 @@
 // Load .env file before anything else (needed for VPS where PM2 doesn't auto-load .env)
 import { config as dotenvConfig } from "dotenv";
-dotenvConfig({ path: "/var/www/alburhan/.env" });
-dotenvConfig(); // also try local .env as fallback
+import fs from "fs";
+
+// Try multiple candidate paths — first one that exists wins
+const ENV_CANDIDATES = [
+  "/var/www/alburhan/.env",
+  "/var/www/alburhan/api-server/.env",
+  "/var/www/alburhan/artifacts/api-server/.env",
+  process.cwd() + "/.env",
+  process.cwd() + "/../../.env",
+];
+
+let loadedEnvPath: string | null = null;
+for (const p of ENV_CANDIDATES) {
+  if (fs.existsSync(p)) {
+    const result = dotenvConfig({ path: p });
+    if (!result.error) {
+      loadedEnvPath = p;
+      break;
+    }
+  }
+}
+// Always also try CWD fallback
+dotenvConfig();
+
+// ── Startup diagnostic: print immediately so it appears in pm2 logs ──────────
+console.log("=".repeat(60));
+console.log("[STARTUP] Al Burhan API Server starting");
+console.log("[STARTUP] Node:", process.version, "| PID:", process.pid);
+console.log("[STARTUP] CWD:", process.cwd());
+console.log("[STARTUP] .env searched:", ENV_CANDIDATES.join(", "));
+console.log("[STARTUP] .env loaded from:", loadedEnvPath || "NONE FOUND — env must come from PM2/system");
+console.log("[STARTUP] ENV CHECK:");
+const _envKeys = [
+  "FAST2SMS_API_KEY",
+  "FAST2SMS_XXL_API_KEY",
+  "DATABASE_URL",
+  "SESSION_SECRET",
+  "BOTBEE_API_KEY",
+  "BOTBEE_PHONE_NUMBER_ID",
+  "NODE_ENV",
+];
+for (const k of _envKeys) {
+  const v = process.env[k];
+  if (!v) {
+    console.log(`[STARTUP]   ❌ ${k} = NOT SET`);
+  } else {
+    const masked = k.includes("SECRET") || k.includes("KEY") || k.includes("URL") || k.includes("DATABASE")
+      ? `${v.slice(0, 6)}...${v.slice(-4)} (len=${v.length})`
+      : v;
+    console.log(`[STARTUP]   ✅ ${k} = ${masked}`);
+  }
+}
+console.log("=".repeat(60));
 
 process.on("uncaughtException", (err) => {
   console.error("[UNCAUGHT EXCEPTION] Server will NOT exit:", err);

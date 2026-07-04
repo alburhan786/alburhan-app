@@ -42,6 +42,59 @@ import adminUsersRouter from "./users-admin.js";
 
 const router: IRouter = Router();
 
+// ── Public env diagnostic (no auth) — safe to expose: values are masked ──────
+router.get("/diag", (_req, res) => {
+  const fast2smsKey = process.env.FAST2SMS_API_KEY || process.env.FAST2SMS_XXL_API_KEY;
+  const mask = (v: string | undefined, label: string) =>
+    v ? `${v.slice(0, 6)}...${v.slice(-4)} (len=${v.length})` : `❌ ${label} NOT SET`;
+
+  // Which .env files exist on disk?
+  const envCandidates = [
+    "/var/www/alburhan/.env",
+    "/var/www/alburhan/api-server/.env",
+    "/var/www/alburhan/artifacts/api-server/.env",
+    process.cwd() + "/.env",
+  ];
+  const envFilesFound = envCandidates.map(p => ({ path: p, exists: fs.existsSync(p) }));
+
+  // If a .env file exists, read its keys (not values) so we can see what's in it
+  const foundEnvFile = envFilesFound.find(e => e.exists);
+  let envFileKeys: string[] = [];
+  if (foundEnvFile) {
+    try {
+      const content = fs.readFileSync(foundEnvFile.path, "utf8");
+      envFileKeys = content
+        .split("\n")
+        .map(l => l.trim())
+        .filter(l => l && !l.startsWith("#") && l.includes("="))
+        .map(l => l.split("=")[0].trim());
+    } catch { /* ignore */ }
+  }
+
+  res.json({
+    server: "Al Burhan Tours API",
+    time: new Date().toISOString(),
+    node: process.version,
+    cwd: process.cwd(),
+    pid: process.pid,
+    env: {
+      NODE_ENV: process.env.NODE_ENV || "NOT SET",
+      FAST2SMS_API_KEY: mask(process.env.FAST2SMS_API_KEY, "FAST2SMS_API_KEY"),
+      FAST2SMS_XXL_API_KEY: mask(process.env.FAST2SMS_XXL_API_KEY, "FAST2SMS_XXL_API_KEY"),
+      DATABASE_URL: process.env.DATABASE_URL ? `set (len=${process.env.DATABASE_URL.length})` : "❌ NOT SET",
+      SESSION_SECRET: process.env.SESSION_SECRET ? `set (len=${process.env.SESSION_SECRET.length})` : "❌ NOT SET",
+      BOTBEE_API_KEY: process.env.BOTBEE_API_KEY ? "set" : "not set",
+      BOTBEE_PHONE_NUMBER_ID: process.env.BOTBEE_PHONE_NUMBER_ID ? "set" : "not set",
+    },
+    fast2smsReady: !!fast2smsKey && fast2smsKey !== "your_key_here",
+    envFilesOnDisk: envFilesFound,
+    envFileKeys: foundEnvFile
+      ? { path: foundEnvFile.path, keys: envFileKeys, hasFast2smsKey: envFileKeys.some(k => k.includes("FAST2SMS")) }
+      : null,
+    allFast2smsEnvKeys: Object.keys(process.env).filter(k => k.includes("FAST2SMS")),
+  });
+});
+
 // Temporary: serve pre-built frontend dist for VPS deployment
 router.get("/download-dist", (_req, res) => {
   const candidates = [
