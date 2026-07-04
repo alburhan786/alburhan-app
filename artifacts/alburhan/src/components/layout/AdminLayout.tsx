@@ -7,7 +7,7 @@ import {
   Printer, Menu, Megaphone, ShieldCheck, Inbox, PieChart, Star, BadgeCheck, Droplets,
   TrendingDown, Calculator, Plane, Activity, Home, CreditCard, Trash2,
   Building2, Bus, Heart, FileCheck, Sparkles, UserCheck, BookMarked, Truck,
-  Scale, Users2, Package, ClipboardList, KeyRound
+  Scale, Users2, Package, ClipboardList, KeyRound, HeartPulse
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePermissions, type Module, type Action } from "@/hooks/use-permissions";
@@ -101,6 +101,7 @@ function buildMenu(openComplaints: number): MenuSection[] {
       items: [
         { icon: KeyRound, label: "User Roles", href: "/admin/user-roles", require: ["users", "view"] },
         { icon: ClipboardList, label: "Audit Logs", href: "/admin/audit-logs", require: ["audit_logs", "view"] },
+        { icon: HeartPulse, label: "System Health", href: "/admin/system-health", require: ["users", "view"] },
       ],
     },
   ];

@@ -7,7 +7,7 @@ import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { AlertTriangle, RefreshCw, CheckCircle } from "lucide-react";
+import { AlertTriangle, RefreshCw, CheckCircle, MessageCircle, Phone } from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_URL || "";
 const RESEND_COOLDOWN = 30;
@@ -38,6 +38,8 @@ export default function Login() {
   const [debugOtp, setDebugOtp] = useState<string | null>(null);
   const [smsSent, setSmsSent] = useState<boolean | null>(null);
   const [smsError, setSmsError] = useState<string | null>(null);
+  const [whatsappSent, setWhatsappSent] = useState<boolean>(false);
+  const [smsFailReason, setSmsFailReason] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
@@ -76,11 +78,15 @@ export default function Login() {
     setIsSendingOtp(true);
     setSmsSent(null);
     setSmsError(null);
+    setWhatsappSent(false);
+    setSmsFailReason(null);
     try {
       const result = await postJson("/api/auth/send-otp", { mobile: mobileNum });
       setIsNewUser(!!result?.isNewUser);
-      setSmsSent(result?.smsSent !== false);
+      setSmsSent(result?.smsSent === true);
+      setWhatsappSent(result?.whatsappSent === true);
       if (result?.smsError) setSmsError(result.smsError);
+      if (result?.smsFailReason) setSmsFailReason(result.smsFailReason);
       if (result?.debugOtp) setDebugOtp(result.debugOtp);
       startCooldown();
       return true;
@@ -221,13 +227,45 @@ export default function Login() {
                   {smsSent === true && (
                     <div className="mt-2 flex items-center justify-center gap-1.5 text-green-600 text-xs">
                       <CheckCircle className="w-3.5 h-3.5" />
-                      <span>SMS sent successfully</span>
+                      <span>OTP sent via SMS</span>
                     </div>
                   )}
-                  {smsSent === false && !debugOtp && (
-                    <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-xl flex items-start gap-2">
-                      <AlertTriangle className="w-4 h-4 text-orange-500 mt-0.5 shrink-0" />
-                      <p className="text-xs text-orange-700 text-left">SMS could not be delivered. Check WhatsApp or contact <strong>+91 8989701701</strong> for your OTP.</p>
+
+                  {/* SMS failed — WhatsApp delivered */}
+                  {smsSent === false && whatsappSent && !debugOtp && (
+                    <div className="mt-3 space-y-2">
+                      <div className="p-3 bg-green-50 border border-green-200 rounded-xl flex items-start gap-2">
+                        <MessageCircle className="w-4 h-4 text-green-600 mt-0.5 shrink-0" />
+                        <div className="text-left">
+                          <p className="text-xs font-semibold text-green-800">OTP sent to your WhatsApp</p>
+                          <p className="text-xs text-green-700 mt-0.5">Open WhatsApp and check for a message from Al Burhan Tours with your OTP code.</p>
+                        </div>
+                      </div>
+                      {smsFailReason && (
+                        <details className="text-left">
+                          <summary className="text-[10px] text-muted-foreground cursor-pointer hover:text-foreground">SMS delivery details</summary>
+                          <p className="text-[10px] text-red-600 mt-1 bg-red-50 rounded p-2 font-mono break-all">{smsFailReason}</p>
+                        </details>
+                      )}
+                    </div>
+                  )}
+
+                  {/* SMS failed — no WhatsApp either */}
+                  {smsSent === false && !whatsappSent && !debugOtp && (
+                    <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-xl space-y-2">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="w-4 h-4 text-orange-500 mt-0.5 shrink-0" />
+                        <p className="text-xs text-orange-700 text-left font-medium">SMS delivery failed. Please try resending or contact support.</p>
+                      </div>
+                      <a href="tel:+918989701701" className="flex items-center gap-1.5 text-xs text-orange-700 font-semibold hover:text-orange-900">
+                        <Phone className="w-3.5 h-3.5" /> +91 8989701701
+                      </a>
+                      {smsFailReason && (
+                        <details className="text-left">
+                          <summary className="text-[10px] text-muted-foreground cursor-pointer">Show error details</summary>
+                          <p className="text-[10px] text-red-600 mt-1 font-mono break-all">{smsFailReason}</p>
+                        </details>
+                      )}
                     </div>
                   )}
 
@@ -236,7 +274,7 @@ export default function Login() {
                     <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
                       <p className="text-xs text-amber-700 font-medium mb-1">⚠️ Admin debug — your OTP:</p>
                       <p className="text-2xl font-mono font-bold text-amber-800 tracking-widest">{debugOtp}</p>
-                      {smsError && <p className="text-xs text-red-600 mt-1">SMS error: {smsError}</p>}
+                      {smsError && <p className="text-xs text-red-600 mt-1 font-mono break-all">SMS: {smsError}</p>}
                     </div>
                   )}
                 </div>

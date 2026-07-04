@@ -68,17 +68,28 @@ router.post("/send-otp", async (req, res) => {
 
   const isAdmin = ADMIN_MOBILES.includes(cleanMobile);
 
-  console.log(`[OTP] Mobile: ${cleanMobile}, OTP: ${otp}, NewUser: ${isNewUser}, SMSSent: ${smsResult.sent}, Route: ${smsResult.route || "n/a"}, IsAdmin: ${isAdmin}${smsResult.error ? `, Error: ${smsResult.error}` : ""}`);
+  const waSent = !!(process.env.BOTBEE_API_KEY && process.env.BOTBEE_PHONE_NUMBER_ID);
+  console.log(`[OTP] Mobile: ${cleanMobile}, OTP: ${otp}, NewUser: ${isNewUser}, SMSSent: ${smsResult.sent}, Route: ${smsResult.route || "n/a"}, WhatsApp: ${waSent}, IsAdmin: ${isAdmin}${smsResult.error ? `, Error: ${smsResult.error}` : ""}`);
+
+  // Sanitize error — strip any key-like tokens before sending to client
+  const sanitizedError = smsResult.error
+    ? smsResult.error.replace(/authorization=[^&]+/gi, "authorization=***").slice(0, 300)
+    : undefined;
 
   res.json({
     message: smsResult.sent
       ? `OTP sent to your mobile number (via ${smsResult.route || "SMS"})`
-      : "OTP generated (SMS delivery issue — check WhatsApp or contact support)",
+      : waSent
+        ? "OTP sent via WhatsApp. Please check your WhatsApp messages."
+        : "OTP generated. SMS delivery failed — please contact support at +91 8989701701",
     requestId: `otp_${Date.now()}`,
     isNewUser,
     smsSent: smsResult.sent,
     smsRoute: smsResult.route,
-    // Admin phones always get the OTP + full diagnostics in response
+    whatsappSent: waSent,
+    // All users get a safe reason (no secrets)
+    smsFailReason: smsResult.sent ? undefined : sanitizedError,
+    // Admin phones get full debug info including the OTP
     ...(isAdmin ? {
       debugOtp: otp,
       smsStatus: smsResult.sent ? "delivered" : "failed",

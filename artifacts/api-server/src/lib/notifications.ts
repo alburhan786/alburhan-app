@@ -62,7 +62,7 @@ export interface SmsResult {
   urlUsed?: string;
 }
 
-// Try DLT route first, fall back to quick route if DLT fails
+// Try OTP route → DLT route → Quick route (3 attempts)
 export async function sendOtpSMS(mobile: string, otp: string): Promise<SmsResult> {
   const apiKey = getFast2SMSKey();
 
@@ -74,55 +74,75 @@ export async function sendOtpSMS(mobile: string, otp: string): Promise<SmsResult
 
   const phone = toFast2SMSPhone(mobile);
   const maskedKey = `${apiKey.slice(0, 8)}...${apiKey.slice(-4)}`;
+  const errors: string[] = [];
 
-  // ── Attempt 1: DLT route ──────────────────────────────────────────────────
+  // ── Attempt 1: OTP route (Fast2SMS built-in pre-approved template) ─────────
+  try {
+    const otpUrl = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&variables_values=${encodeURIComponent(otp)}&route=otp&numbers=${phone}&flash=0`;
+    const maskedOtpUrl = otpUrl.replace(apiKey, maskedKey);
+    console.log(`[OTP-SMS][OTP-Route] Requesting: ${maskedOtpUrl}`);
+    const otpResp = await axios.get(otpUrl, { timeout: 10000 });
+    console.log(`[OTP-SMS][OTP-Route] Response: ${JSON.stringify(otpResp.data)}`);
+    if (otpResp.data?.return === true) {
+      console.log(`[OTP-SMS][OTP-Route] ✅ SMS sent to ${phone}`);
+      return { sent: true, providerResponse: otpResp.data, route: "otp", urlUsed: maskedOtpUrl };
+    }
+    const otpErr = Array.isArray(otpResp.data?.message) ? otpResp.data.message.join("; ") : (otpResp.data?.message || JSON.stringify(otpResp.data));
+    console.warn(`[OTP-SMS][OTP-Route] ❌ Rejected: ${otpErr}`);
+    errors.push(`OTP-route: ${otpErr}`);
+  } catch (err: any) {
+    const e = err?.response?.data?.message || err?.message || String(err);
+    console.error(`[OTP-SMS][OTP-Route] Network error: ${e}`);
+    errors.push(`OTP-route: ${e}`);
+  }
+
+  // ── Attempt 2: DLT route (custom registered template) ────────────────────
   try {
     const variables = encodeURIComponent(`${otp}|`);
     const dltUrl = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=dlt&sender_id=${FAST2SMS_SENDER_ID}&message=${FAST2SMS_OTP_DLT_TEMPLATE_ID}&variables_values=${variables}&numbers=${phone}&flash=0`;
     const maskedDltUrl = dltUrl.replace(apiKey, maskedKey);
     console.log(`[OTP-SMS][DLT] Requesting: ${maskedDltUrl}`);
-
-    const response = await axios.get(dltUrl, { timeout: 10000 });
-    console.log(`[OTP-SMS][DLT] Response status: ${response.status}`);
-    console.log(`[OTP-SMS][DLT] Response body: ${JSON.stringify(response.data)}`);
-
-    if (response.data?.return === true) {
+    const dltResp = await axios.get(dltUrl, { timeout: 10000 });
+    console.log(`[OTP-SMS][DLT] Response: ${JSON.stringify(dltResp.data)}`);
+    if (dltResp.data?.return === true) {
       console.log(`[OTP-SMS][DLT] ✅ SMS sent to ${phone}`);
-      return { sent: true, providerResponse: response.data, route: "dlt", urlUsed: maskedDltUrl };
+      return { sent: true, providerResponse: dltResp.data, route: "dlt", urlUsed: maskedDltUrl };
     }
+    const dltErr = Array.isArray(dltResp.data?.message) ? dltResp.data.message.join("; ") : (dltResp.data?.message || JSON.stringify(dltResp.data));
+    console.warn(`[OTP-SMS][DLT] ❌ Rejected: ${dltErr}`);
+    errors.push(`DLT: ${dltErr}`);
+  } catch (err: any) {
+    const e = err?.response?.data?.message || err?.message || String(err);
+    console.error(`[OTP-SMS][DLT] Network error: ${e}`);
+    errors.push(`DLT: ${e}`);
+  }
 
-    const dltError = response.data?.message || JSON.stringify(response.data);
-    console.warn(`[OTP-SMS][DLT] ❌ Provider rejected: ${dltError} — trying quick route fallback`);
-
-    // ── Attempt 2: Quick route fallback ──────────────────────────────────────
-    const quickMsg = encodeURIComponent(`Your Al Burhan Tours OTP is ${otp}. Valid for 5 minutes. Do not share.`);
+  // ── Attempt 3: Quick route fallback ──────────────────────────────────────
+  try {
+    const quickMsg = encodeURIComponent(`Your Al Burhan Tours OTP is ${otp}. Valid 5 mins. Do not share.`);
     const quickUrl = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=q&message=${quickMsg}&numbers=${phone}&flash=0`;
     const maskedQuickUrl = quickUrl.replace(apiKey, maskedKey);
     console.log(`[OTP-SMS][Quick] Requesting: ${maskedQuickUrl}`);
-
     const qResp = await axios.get(quickUrl, { timeout: 10000 });
-    console.log(`[OTP-SMS][Quick] Response status: ${qResp.status}`);
-    console.log(`[OTP-SMS][Quick] Response body: ${JSON.stringify(qResp.data)}`);
-
+    console.log(`[OTP-SMS][Quick] Response: ${JSON.stringify(qResp.data)}`);
     if (qResp.data?.return === true) {
-      console.log(`[OTP-SMS][Quick] ✅ Fallback SMS sent to ${phone}`);
+      console.log(`[OTP-SMS][Quick] ✅ SMS sent to ${phone}`);
       return { sent: true, providerResponse: qResp.data, route: "quick", urlUsed: maskedQuickUrl };
     }
-
-    const quickError = qResp.data?.message || JSON.stringify(qResp.data);
-    console.error(`[OTP-SMS][Quick] ❌ Also rejected: ${quickError}`);
+    const quickErr = Array.isArray(qResp.data?.message) ? qResp.data.message.join("; ") : (qResp.data?.message || JSON.stringify(qResp.data));
+    console.error(`[OTP-SMS][Quick] ❌ Also rejected: ${quickErr}`);
+    errors.push(`Quick: ${quickErr}`);
     return {
       sent: false,
-      route: "both_failed",
-      providerResponse: { dlt: response.data, quick: qResp.data },
-      error: `DLT: ${dltError} | Quick: ${quickError}`,
-      urlUsed: maskedDltUrl,
+      route: "all_failed",
+      providerResponse: qResp.data,
+      error: errors.join(" | "),
     };
-
   } catch (err: any) {
-    const errData = err?.response?.data || err?.message || String(err);
-    console.error(`[OTP-SMS] Network/parse error: ${JSON.stringify(errData)}`);
-    return { sent: false, error: String(errData) };
+    const e = err?.response?.data?.message || err?.message || String(err);
+    console.error(`[OTP-SMS][Quick] Network error: ${e}`);
+    errors.push(`Quick: ${e}`);
+    return { sent: false, error: errors.join(" | ") };
   }
 }
 
@@ -139,13 +159,23 @@ export async function testSmsDiagnostics(phone: string, otp: string): Promise<Re
     envKeysFound: envKeys,
     phone: cleanPhone,
     otp,
+    otp_route: null,
     dlt: null,
     quick: null,
   };
 
   if (!apiKey) return diag;
 
-  // DLT
+  // OTP route (Fast2SMS built-in template)
+  try {
+    const otpUrl = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&variables_values=${encodeURIComponent(otp)}&route=otp&numbers=${cleanPhone}&flash=0`;
+    const r = await axios.get(otpUrl, { timeout: 10000 });
+    diag.otp_route = { status: r.status, body: r.data };
+  } catch (e: any) {
+    diag.otp_route = { error: e?.response?.data || e?.message };
+  }
+
+  // DLT (custom registered template)
   try {
     const variables = encodeURIComponent(`${otp}|`);
     const dltUrl = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=dlt&sender_id=${FAST2SMS_SENDER_ID}&message=${FAST2SMS_OTP_DLT_TEMPLATE_ID}&variables_values=${variables}&numbers=${cleanPhone}&flash=0`;
@@ -155,7 +185,7 @@ export async function testSmsDiagnostics(phone: string, otp: string): Promise<Re
     diag.dlt = { error: e?.response?.data || e?.message };
   }
 
-  // Quick
+  // Quick route
   try {
     const quickMsg = encodeURIComponent(`Test OTP: ${otp}. Al Burhan Tours.`);
     const quickUrl = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=q&message=${quickMsg}&numbers=${cleanPhone}&flash=0`;
