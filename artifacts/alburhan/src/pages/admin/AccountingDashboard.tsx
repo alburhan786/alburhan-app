@@ -7,7 +7,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useToast } from "@/hooks/use-toast";
 import {
   Download, TrendingUp, TrendingDown, Wallet, AlertCircle,
-  RefreshCw, Plus, Pencil, Trash2, CheckCircle2, XCircle, ChevronRight
+  RefreshCw, Plus, Pencil, Trash2, CheckCircle2, XCircle, ChevronRight,
+  Banknote, Building2, FileText, BarChart3,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 
@@ -54,10 +55,10 @@ const TABS = [
 
 function DR({ from, to, onFrom, onTo }: { from: string; to: string; onFrom: (v: string) => void; onTo: (v: string) => void }) {
   return (
-    <div className="flex gap-2 items-center flex-wrap">
-      <Input type="date" value={from} onChange={e => onFrom(e.target.value)} className="h-8 text-sm w-36" />
-      <span className="text-[11px] text-muted-foreground">to</span>
-      <Input type="date" value={to} onChange={e => onTo(e.target.value)} className="h-8 text-sm w-36" />
+    <div className="flex gap-3 items-center flex-wrap">
+      <Input type="date" value={from} onChange={e => onFrom(e.target.value)} className="h-11 text-sm w-[170px] rounded-xl" />
+      <span className="text-xs text-muted-foreground font-medium">to</span>
+      <Input type="date" value={to} onChange={e => onTo(e.target.value)} className="h-11 text-sm w-[170px] rounded-xl" />
     </div>
   );
 }
@@ -67,6 +68,7 @@ function Err({ msg }: { msg: string }) { return <div className="py-12 text-cente
 // ── OVERVIEW ─────────────────────────────────────────────────────────────────
 function Overview() {
   const [data, setData] = useState<any>(null);
+  const [bs, setBs] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const load = useCallback(async () => {
@@ -79,22 +81,30 @@ function Overview() {
     setLoading(false);
   }, []);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    fetch(`${API}/api/accounting/balance-sheet?asOf=${today}`, { credentials: "include" })
+      .then(r => r.json()).then(setBs).catch(() => {});
+  }, []);
 
   const allMonths = data ? [...new Set([...(data.monthly || []).map((m: any) => m.month), ...(data.monthlyExpenses || []).map((m: any) => m.month)])].sort().slice(-12) : [];
   const maxM = data ? Math.max(...(data.monthly || []).map((m: any) => Number(m.collected) || 0), ...(data.monthlyExpenses || []).map((m: any) => Number(m.expenses) || 0), 1) : 1;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <div className="flex justify-end gap-2">
         <Button variant="outline" size="sm" onClick={load} disabled={loading}><RefreshCw size={14} className={`mr-1.5 ${loading ? "animate-spin" : ""}`} />Refresh</Button>
       </div>
       {loading ? <Spin /> : err ? <Err msg={err} /> : data && (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <KpiCard icon={<TrendingUp size={16} className="text-green-600" />} bg="bg-green-100" label="Total Revenue" value={fmt(data.totalCollected)} sub={`This month: ${fmt(data.thisMonthCollected)}`} />
-            <KpiCard icon={<TrendingDown size={16} className="text-red-600" />} bg="bg-red-100" label="Total Expenses" value={fmt(data.totalExpenses)} sub={`This month: ${fmt(data.thisMonthExpenses)}`} vc="text-red-600" />
-            <KpiCard icon={<Wallet size={16} className={data.netProfit >= 0 ? "text-emerald-600" : "text-red-600"} />} bg={data.netProfit >= 0 ? "bg-emerald-100" : "bg-red-100"} label="Net Profit / Loss" value={(data.netProfit >= 0 ? "" : "-") + fmt(data.netProfit)} vc={data.netProfit >= 0 ? "text-emerald-600" : "text-red-600"} sub={data.netProfit >= 0 ? "Profitable" : "Loss making"} />
-            <KpiCard icon={<AlertCircle size={16} className="text-amber-600" />} bg="bg-amber-100" label="Outstanding" value={fmt(data.totalOutstanding)} sub={`${data.totalBookings} bookings`} vc="text-amber-600" />
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+            <KpiCard icon={<Banknote size={16} className="text-emerald-600" />} bg="bg-emerald-50" label="Cash in Hand" value={bs?.assets?.cash != null ? fmt(Number(bs.assets.cash)) : "—"} vc="text-emerald-700" />
+            <KpiCard icon={<Building2 size={16} className="text-blue-600" />} bg="bg-blue-50" label="Bank Balance" value={bs?.assets?.bank != null ? fmt(Number(bs.assets.bank)) : "—"} vc="text-blue-700" />
+            <KpiCard icon={<TrendingUp size={16} className="text-green-600" />} bg="bg-green-100" label="Revenue" value={fmt(data.totalCollected)} sub={`This month: ${fmt(data.thisMonthCollected)}`} />
+            <KpiCard icon={<TrendingDown size={16} className="text-red-600" />} bg="bg-red-100" label="Expenses" value={fmt(data.totalExpenses)} sub={`This month: ${fmt(data.thisMonthExpenses)}`} vc="text-red-600" />
+            <KpiCard icon={<BarChart3 size={16} className={data.netProfit >= 0 ? "text-emerald-600" : "text-red-600"} />} bg={data.netProfit >= 0 ? "bg-emerald-100" : "bg-red-100"} label="Net Profit" value={(data.netProfit >= 0 ? "" : "-") + fmt(Math.abs(data.netProfit))} vc={data.netProfit >= 0 ? "text-emerald-600" : "text-red-600"} sub={data.netProfit >= 0 ? "Profitable" : "Loss making"} />
+            <KpiCard icon={<AlertCircle size={16} className="text-amber-600" />} bg="bg-amber-100" label="Outstanding Receivables" value={fmt(data.totalOutstanding)} sub={`${data.totalBookings} bookings`} vc="text-amber-600" />
+            <KpiCard icon={<FileText size={16} className="text-orange-600" />} bg="bg-orange-100" label="Outstanding Payables" value={bs?.liabilities?.total != null ? fmt(Number(bs.liabilities.total)) : "—"} vc="text-orange-600" />
           </div>
           {allMonths.length > 0 && (
             <div className="bg-white rounded-xl border p-5">
@@ -149,10 +159,10 @@ function Overview() {
 
 function KpiCard({ icon, bg, label, value, sub, vc = "text-gray-800" }: any) {
   return (
-    <div className="bg-white rounded-xl border p-5">
-      <div className="flex items-center gap-2 mb-2">
-        <div className={`w-8 h-8 ${bg} rounded-lg flex items-center justify-center`}>{icon}</div>
-        <span className="text-xs text-muted-foreground font-medium">{label}</span>
+    <div className="bg-white rounded-2xl border shadow-sm p-5 hover:shadow-md transition-shadow">
+      <div className="flex items-center gap-2.5 mb-3">
+        <div className={`w-9 h-9 ${bg} rounded-xl flex items-center justify-center shadow-sm`}>{icon}</div>
+        <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wide leading-tight">{label}</span>
       </div>
       <p className={`text-2xl font-bold ${vc}`}>{value}</p>
       {sub && <p className="text-[10px] text-muted-foreground mt-1">{sub}</p>}
@@ -217,15 +227,20 @@ function ChartOfAccounts() {
   const filtered = filterType === "all" ? accounts : accounts.filter(a => a.type === filterType);
 
   return (
-    <div className="space-y-4">
-      <div className="flex gap-2 flex-wrap items-center">
-        <select value={filterType} onChange={e => setFilterType(e.target.value)} className="h-8 px-2 rounded border text-sm bg-background">
-          <option value="all">All Types</option>
-          {["asset", "liability", "equity", "income", "expense"].map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
-        </select>
-        <Button size="sm" variant="outline" onClick={load} disabled={loading}><RefreshCw size={14} className={`mr-1 ${loading ? "animate-spin" : ""}`} />Refresh</Button>
-        <Button size="sm" variant="outline" onClick={exportExcel} disabled={!accounts.length}><Download size={14} className="mr-1" />Excel</Button>
-        <Button size="sm" className="bg-[#0d5040] hover:bg-[#0a3d30] ml-auto" onClick={openAdd}><Plus size={14} className="mr-1" />Add Account</Button>
+    <div className="space-y-5">
+      <div className="bg-white rounded-2xl border shadow-sm p-4">
+        <div className="flex flex-wrap items-center gap-4">
+          <select value={filterType} onChange={e => setFilterType(e.target.value)}
+            className="h-11 px-3 rounded-xl border text-sm bg-white font-medium w-44 focus:outline-none focus:ring-2 focus:ring-[#0F5132]/30">
+            <option value="all">All Types</option>
+            {["asset", "liability", "equity", "income", "expense"].map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
+          </select>
+          <div className="flex items-center gap-3">
+            <Button className="h-11 px-5 rounded-xl text-sm font-medium" variant="outline" onClick={load} disabled={loading}><RefreshCw size={15} className={`mr-2 ${loading ? "animate-spin" : ""}`} />Refresh</Button>
+            <Button className="h-11 px-5 rounded-xl text-sm font-medium" variant="outline" onClick={exportExcel} disabled={!accounts.length}><Download size={15} className="mr-2" />Export Excel</Button>
+            <Button className="h-11 px-5 rounded-xl text-sm font-medium bg-[#0B3D2E] hover:bg-[#0a3d30] ml-2" onClick={openAdd}><Plus size={15} className="mr-2" />Add Account</Button>
+          </div>
+        </div>
       </div>
 
       {/* Summary cards */}
@@ -528,18 +543,27 @@ function GeneralLedger({ defaultFrom, defaultTo }: { defaultFrom?: string; defau
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex gap-2 flex-wrap items-center">
-        <select value={selAccount} onChange={e => setSelAccount(e.target.value)} className="h-8 px-2 rounded border text-sm bg-background min-w-[220px]">
-          <option value="">Select Account…</option>
-          {accounts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
-        </select>
-        <DR from={from} to={to} onFrom={setFrom} onTo={setTo} />
-        <Button size="sm" onClick={load} disabled={loading || !selAccount}><RefreshCw size={14} className={`mr-1 ${loading ? "animate-spin" : ""}`} />Load</Button>
-        <Button size="sm" variant="outline" onClick={sync} disabled={syncing} title="Auto-create journal entries from payments and expenses">
-          <RefreshCw size={14} className={`mr-1 ${syncing ? "animate-spin" : ""}`} />{syncing ? "Syncing…" : "Sync Journal"}
-        </Button>
-        <Button size="sm" variant="outline" onClick={exportExcel} disabled={!data?.lines?.length}><Download size={14} className="mr-1" />Excel</Button>
+    <div className="space-y-5">
+      <div className="bg-white rounded-2xl border shadow-sm p-5 mb-2">
+        <div className="flex flex-wrap items-center gap-6">
+          <select value={selAccount} onChange={e => setSelAccount(e.target.value)}
+            className="h-11 px-3 rounded-xl border text-sm bg-white w-80 font-medium focus:outline-none focus:ring-2 focus:ring-[#0F5132]/30">
+            <option value="">Select Account…</option>
+            {accounts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
+          </select>
+          <DR from={from} to={to} onFrom={setFrom} onTo={setTo} />
+          <div className="flex items-center gap-3 flex-wrap">
+            <Button className="h-11 px-5 rounded-xl text-sm font-medium" onClick={load} disabled={loading || !selAccount}>
+              <RefreshCw size={15} className={`mr-2 ${loading ? "animate-spin" : ""}`} />Load
+            </Button>
+            <Button className="h-11 px-5 rounded-xl text-sm font-medium" variant="outline" onClick={sync} disabled={syncing} title="Auto-create journal entries from payments and expenses">
+              <RefreshCw size={15} className={`mr-2 ${syncing ? "animate-spin" : ""}`} />{syncing ? "Syncing…" : "Sync Journal"}
+            </Button>
+            <Button className="h-11 px-5 rounded-xl text-sm font-medium" variant="outline" onClick={exportExcel} disabled={!data?.lines?.length}>
+              <Download size={15} className="mr-2" />Export Excel
+            </Button>
+          </div>
+        </div>
       </div>
 
       {!selAccount ? (
@@ -646,16 +670,20 @@ function BankRecon({ defaultFrom, defaultTo }: { defaultFrom?: string; defaultTo
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex gap-2 flex-wrap items-center">
-        <DR from={from} to={to} onFrom={setFrom} onTo={setTo} />
-        <select value={status} onChange={e => setStatus(e.target.value)} className="h-8 px-2 rounded border text-sm bg-background">
-          <option value="all">All</option>
-          <option value="unreconciled">Unreconciled</option>
-          <option value="reconciled">Reconciled</option>
-        </select>
-        <Button size="sm" onClick={load} disabled={loading}><RefreshCw size={14} className={`mr-1 ${loading ? "animate-spin" : ""}`} />Load</Button>
-        {selected.size > 0 && <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={bulkReconcile}><CheckCircle2 size={14} className="mr-1" />Reconcile {selected.size} selected</Button>}
+    <div className="space-y-5">
+      <div className="bg-white rounded-2xl border shadow-sm p-4">
+        <div className="flex flex-wrap items-center gap-6">
+          <DR from={from} to={to} onFrom={setFrom} onTo={setTo} />
+          <select value={status} onChange={e => setStatus(e.target.value)} className="h-11 px-3 rounded-xl border text-sm bg-white font-medium w-44 focus:outline-none focus:ring-2 focus:ring-[#0F5132]/30">
+            <option value="all">All</option>
+            <option value="unreconciled">Unreconciled</option>
+            <option value="reconciled">Reconciled</option>
+          </select>
+          <div className="flex items-center gap-3">
+            <Button className="h-11 px-5 rounded-xl text-sm font-medium" onClick={load} disabled={loading}><RefreshCw size={15} className={`mr-2 ${loading ? "animate-spin" : ""}`} />Load</Button>
+            {selected.size > 0 && <Button className="h-11 px-5 rounded-xl text-sm font-medium bg-green-600 hover:bg-green-700" onClick={bulkReconcile}><CheckCircle2 size={15} className="mr-2" />Reconcile {selected.size} selected</Button>}
+          </div>
+        </div>
       </div>
 
       {data?.summary && (
@@ -773,11 +801,15 @@ function CashFlow({ defaultFrom, defaultTo }: { defaultFrom?: string; defaultTo?
   }
 
   return (
-    <div className="space-y-4 max-w-2xl">
-      <div className="flex gap-2 flex-wrap items-center">
-        <DR from={from} to={to} onFrom={setFrom} onTo={setTo} />
-        <Button size="sm" onClick={load} disabled={loading}><RefreshCw size={14} className={`mr-1 ${loading ? "animate-spin" : ""}`} />Load</Button>
-        <Button size="sm" variant="outline" onClick={exportExcel} disabled={!data}><Download size={14} className="mr-1" />Excel</Button>
+    <div className="space-y-5 max-w-3xl">
+      <div className="bg-white rounded-2xl border shadow-sm p-4">
+        <div className="flex flex-wrap items-center gap-6">
+          <DR from={from} to={to} onFrom={setFrom} onTo={setTo} />
+          <div className="flex items-center gap-3">
+            <Button className="h-11 px-5 rounded-xl text-sm font-medium" onClick={load} disabled={loading}><RefreshCw size={15} className={`mr-2 ${loading ? "animate-spin" : ""}`} />Load</Button>
+            <Button className="h-11 px-5 rounded-xl text-sm font-medium" variant="outline" onClick={exportExcel} disabled={!data}><Download size={15} className="mr-2" />Export Excel</Button>
+          </div>
+        </div>
       </div>
       {loading ? <Spin /> : err ? <Err msg={err} /> : !data ? null : (
         <div className="space-y-3">
@@ -820,8 +852,16 @@ function BookView({ endpoint, title, defaultFrom, defaultTo }: { endpoint: strin
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, title); XLSX.writeFile(wb, `${endpoint}-${from}-${to}.xlsx`);
   }
   return (
-    <div className="space-y-4">
-      <div className="flex gap-2 flex-wrap items-center"><DR from={from} to={to} onFrom={setFrom} onTo={setTo} /><Button size="sm" onClick={load} disabled={loading}><RefreshCw size={14} className={`mr-1 ${loading ? "animate-spin" : ""}`} />Load</Button><Button size="sm" variant="outline" onClick={exp} disabled={!data?.rows?.length}><Download size={14} className="mr-1" />Excel</Button></div>
+    <div className="space-y-5">
+      <div className="bg-white rounded-2xl border shadow-sm p-4">
+        <div className="flex flex-wrap items-center gap-6">
+          <DR from={from} to={to} onFrom={setFrom} onTo={setTo} />
+          <div className="flex items-center gap-3">
+            <Button className="h-11 px-5 rounded-xl text-sm font-medium" onClick={load} disabled={loading}><RefreshCw size={15} className={`mr-2 ${loading ? "animate-spin" : ""}`} />Load</Button>
+            <Button className="h-11 px-5 rounded-xl text-sm font-medium" variant="outline" onClick={exp} disabled={!data?.rows?.length}><Download size={15} className="mr-2" />Export Excel</Button>
+          </div>
+        </div>
+      </div>
       {data?.summary && <div className="grid grid-cols-3 gap-3">{[["Total In", data.summary.totalIn, "text-green-600"], ["Total Out", data.summary.totalOut, "text-red-600"], ["Net Balance", data.summary.netBalance, data.summary.netBalance >= 0 ? "text-emerald-600" : "text-red-600"]].map(([l, v, c]) => <div key={l as string} className="bg-white border rounded-xl p-4"><p className="text-xs text-muted-foreground">{l}</p><p className={`text-xl font-bold mt-1 ${c}`}>{fmt(Number(v))}</p></div>)}</div>}
       {loading ? <Spin /> : err ? <Err msg={err} /> : !data?.rows?.length ? <div className="py-12 text-center text-muted-foreground text-sm">No transactions in this period</div> : (
         <div className="bg-white rounded-xl border overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-muted/50 text-xs text-muted-foreground uppercase"><tr><th className="px-4 py-2.5 text-left">Date</th><th className="px-4 py-2.5 text-left">Type</th><th className="px-4 py-2.5 text-left">Party</th><th className="px-4 py-2.5 text-left">Narration</th><th className="px-4 py-2.5 text-left">Ref</th><th className="px-4 py-2.5 text-left">Mode</th><th className="px-4 py-2.5 text-right">In</th><th className="px-4 py-2.5 text-right">Out</th><th className="px-4 py-2.5 text-right">Balance</th></tr></thead><tbody className="divide-y">{(data?.rows || []).map((r: any, i: number) => (<tr key={i} className={`hover:bg-muted/20 ${r.type === "payment" ? "bg-red-50/30" : ""}`}><td className="px-4 py-2 text-xs whitespace-nowrap">{fmtDate(r.date)}</td><td className="px-4 py-2"><Badge variant={r.type === "receipt" ? "default" : "secondary"} className="text-[10px] capitalize">{r.type}</Badge></td><td className="px-4 py-2 text-xs">{r.party}</td><td className="px-4 py-2 text-xs max-w-[180px] truncate">{r.narration}</td><td className="px-4 py-2 text-xs text-muted-foreground">{r.reference || "—"}</td><td className="px-4 py-2 text-xs capitalize">{r.mode}</td><td className="px-4 py-2 text-right text-green-600 font-semibold text-xs">{r.cash_in || r.bank_in ? fmt(Number(r.cash_in || r.bank_in)) : "—"}</td><td className="px-4 py-2 text-right text-red-600 font-semibold text-xs">{r.expense ? fmt(Number(r.expense)) : "—"}</td><td className={`px-4 py-2 text-right font-bold text-xs ${Number(r.running_balance || 0) >= 0 ? "text-gray-700" : "text-red-600"}`}>{fmt(Number(r.running_balance || 0))}</td></tr>))}</tbody></table></div></div>
@@ -839,8 +879,16 @@ function Ledger() {
   const totals = { debit: filtered.reduce((s, r) => s + Number(r.debit || 0), 0), credit: filtered.reduce((s, r) => s + Number(r.credit || 0), 0), balance: filtered.reduce((s, r) => s + Number(r.balance || 0), 0) };
   function exp() { const ws = XLSX.utils.json_to_sheet(rows.map(r => ({ "Booking #": r.booking_number, Customer: r.customer_name, Mobile: r.mobile, Group: r.group_name || "", "Total (Dr)": r.debit, "Paid (Cr)": r.credit, Balance: r.balance, Status: r.status }))); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Ledger"); XLSX.writeFile(wb, `ledger-${new Date().toISOString().slice(0, 10)}.xlsx`); }
   return (
-    <div className="space-y-4">
-      <div className="flex gap-2 flex-wrap"><Input placeholder="Search customer, mobile, booking…" value={search} onChange={e => setSearch(e.target.value)} className="h-8 text-sm flex-1 min-w-[200px]" /><Button size="sm" variant="outline" onClick={load} disabled={loading}><RefreshCw size={14} className={`mr-1 ${loading ? "animate-spin" : ""}`} />Load</Button><Button size="sm" variant="outline" onClick={exp} disabled={!rows.length}><Download size={14} className="mr-1" />Excel</Button></div>
+    <div className="space-y-5">
+      <div className="bg-white rounded-2xl border shadow-sm p-4">
+        <div className="flex flex-wrap items-center gap-4">
+          <Input placeholder="Search customer, mobile, booking…" value={search} onChange={e => setSearch(e.target.value)} className="h-11 text-sm flex-1 min-w-[220px] rounded-xl" />
+          <div className="flex items-center gap-3">
+            <Button className="h-11 px-5 rounded-xl text-sm font-medium" variant="outline" onClick={load} disabled={loading}><RefreshCw size={15} className={`mr-2 ${loading ? "animate-spin" : ""}`} />Refresh</Button>
+            <Button className="h-11 px-5 rounded-xl text-sm font-medium" variant="outline" onClick={exp} disabled={!rows.length}><Download size={15} className="mr-2" />Export Excel</Button>
+          </div>
+        </div>
+      </div>
       {loading ? <Spin /> : err ? <Err msg={err} /> : (
         <div className="bg-white rounded-xl border overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-muted/50 text-xs text-muted-foreground uppercase"><tr><th className="px-4 py-2.5 text-left">Booking #</th><th className="px-4 py-2.5 text-left">Customer</th><th className="px-4 py-2.5 text-left">Mobile</th><th className="px-4 py-2.5 text-left">Group</th><th className="px-4 py-2.5 text-right">Debit</th><th className="px-4 py-2.5 text-right">Credit</th><th className="px-4 py-2.5 text-right">Balance</th><th className="px-4 py-2.5 text-left">Status</th></tr></thead><tbody className="divide-y">{filtered.map(r => (<tr key={r.booking_id} className="hover:bg-muted/20"><td className="px-4 py-2.5 font-mono text-xs">{r.booking_number}</td><td className="px-4 py-2.5 font-medium">{r.customer_name}</td><td className="px-4 py-2.5 text-xs text-muted-foreground">{r.mobile}</td><td className="px-4 py-2.5 text-xs">{r.group_name || "—"}</td><td className="px-4 py-2.5 text-right font-semibold">{fmt(Number(r.debit))}</td><td className="px-4 py-2.5 text-right text-green-600 font-semibold">{fmt(Number(r.credit))}</td><td className={`px-4 py-2.5 text-right font-bold ${Number(r.balance) > 0 ? "text-amber-600" : "text-green-600"}`}>{fmt(Number(r.balance))}</td><td className="px-4 py-2.5"><Badge variant="secondary" className="text-[10px]">{r.status}</Badge></td></tr>))}</tbody><tfoot className="bg-muted/30 border-t font-semibold"><tr><td colSpan={4} className="px-4 py-2.5 text-xs text-muted-foreground">TOTAL ({filtered.length})</td><td className="px-4 py-2.5 text-right">{fmt(totals.debit)}</td><td className="px-4 py-2.5 text-right text-green-600">{fmt(totals.credit)}</td><td className="px-4 py-2.5 text-right text-amber-600">{fmt(totals.balance)}</td><td /></tr></tfoot></table></div></div>
       )}
@@ -855,8 +903,16 @@ function Journal({ defaultFrom, defaultTo }: { defaultFrom?: string; defaultTo?:
   useEffect(() => { load(); }, [load]);
   function exp() { const ws = XLSX.utils.json_to_sheet(rows.map(r => ({ Date: r.date, Ref: r.reference, Party: r.party, "Account Dr": r.account_dr, "Account Cr": r.account_cr, Debit: r.debit, Credit: r.credit, Narration: r.narration }))); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Journal"); XLSX.writeFile(wb, `journal-${from}-${to}.xlsx`); }
   return (
-    <div className="space-y-4">
-      <div className="flex gap-2 flex-wrap items-center"><DR from={from} to={to} onFrom={setFrom} onTo={setTo} /><Button size="sm" onClick={load} disabled={loading}><RefreshCw size={14} className={`mr-1 ${loading ? "animate-spin" : ""}`} />Load</Button><Button size="sm" variant="outline" onClick={exp} disabled={!rows.length}><Download size={14} className="mr-1" />Excel</Button></div>
+    <div className="space-y-5">
+      <div className="bg-white rounded-2xl border shadow-sm p-4">
+        <div className="flex flex-wrap items-center gap-6">
+          <DR from={from} to={to} onFrom={setFrom} onTo={setTo} />
+          <div className="flex items-center gap-3">
+            <Button className="h-11 px-5 rounded-xl text-sm font-medium" onClick={load} disabled={loading}><RefreshCw size={15} className={`mr-2 ${loading ? "animate-spin" : ""}`} />Load</Button>
+            <Button className="h-11 px-5 rounded-xl text-sm font-medium" variant="outline" onClick={exp} disabled={!rows.length}><Download size={15} className="mr-2" />Export Excel</Button>
+          </div>
+        </div>
+      </div>
       {loading ? <Spin /> : err ? <Err msg={err} /> : rows.length === 0 ? <div className="py-12 text-center text-muted-foreground text-sm">No journal entries</div> : (
         <div className="bg-white rounded-xl border overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-muted/50 text-xs text-muted-foreground uppercase"><tr><th className="px-4 py-2.5 text-left">Date</th><th className="px-4 py-2.5 text-left">Ref</th><th className="px-4 py-2.5 text-left">Party</th><th className="px-4 py-2.5 text-left">Dr Account</th><th className="px-4 py-2.5 text-left">Cr Account</th><th className="px-4 py-2.5 text-right">Debit</th><th className="px-4 py-2.5 text-right">Credit</th><th className="px-4 py-2.5 text-left">Narration</th></tr></thead><tbody className="divide-y">{rows.map((r, i) => (<tr key={i} className="hover:bg-muted/20"><td className="px-4 py-2 text-xs whitespace-nowrap">{fmtDate(r.date)}</td><td className="px-4 py-2 text-xs font-mono">{r.reference}</td><td className="px-4 py-2 text-xs">{r.party}</td><td className="px-4 py-2 text-xs capitalize">{r.account_dr}</td><td className="px-4 py-2 text-xs">{r.account_cr}</td><td className="px-4 py-2 text-right font-semibold text-xs">{fmt(Number(r.debit))}</td><td className="px-4 py-2 text-right text-green-600 font-semibold text-xs">{fmt(Number(r.credit))}</td><td className="px-4 py-2 text-xs max-w-[180px] truncate">{r.narration}</td></tr>))}</tbody><tfoot className="bg-muted/30 border-t font-semibold"><tr><td colSpan={5} className="px-4 py-2.5 text-xs text-muted-foreground">TOTAL ({rows.length})</td><td className="px-4 py-2.5 text-right">{fmt(rows.reduce((s, r) => s + Number(r.debit || 0), 0))}</td><td className="px-4 py-2.5 text-right text-green-600">{fmt(rows.reduce((s, r) => s + Number(r.credit || 0), 0))}</td><td /></tr></tfoot></table></div></div>
       )}
@@ -871,8 +927,19 @@ function PaymentEntries({ defaultFrom, defaultTo }: { defaultFrom?: string; defa
   useEffect(() => { load(); }, [load]);
   function exp() { if (!data?.rows) return; const ws = XLSX.utils.json_to_sheet(data.rows.map((r: any) => ({ Date: r.date, "Booking #": r.booking_number, Customer: r.customer_name, Mobile: r.mobile, Group: r.group_name || "", Mode: r.mode, Reference: r.reference, Bank: r.bank_name, "Received By": r.received_by, "Amount (₹)": r.amount, Reconciled: r.is_reconciled ? "Yes" : "No" }))); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Payments"); XLSX.writeFile(wb, `payments-${from}-${to}.xlsx`); }
   return (
-    <div className="space-y-4">
-      <div className="flex gap-2 flex-wrap items-center"><DR from={from} to={to} onFrom={setFrom} onTo={setTo} /><select value={mode} onChange={e => setMode(e.target.value)} className="h-8 px-2 rounded border text-sm bg-background">{["all", "cash", "upi", "neft", "cheque", "online", "card"].map(m => <option key={m} value={m}>{m === "all" ? "All Modes" : m.toUpperCase()}</option>)}</select><Button size="sm" onClick={load} disabled={loading}><RefreshCw size={14} className={`mr-1 ${loading ? "animate-spin" : ""}`} />Load</Button><Button size="sm" variant="outline" onClick={exp} disabled={!data?.rows?.length}><Download size={14} className="mr-1" />Excel</Button></div>
+    <div className="space-y-5">
+      <div className="bg-white rounded-2xl border shadow-sm p-4">
+        <div className="flex flex-wrap items-center gap-6">
+          <DR from={from} to={to} onFrom={setFrom} onTo={setTo} />
+          <select value={mode} onChange={e => setMode(e.target.value)} className="h-11 px-3 rounded-xl border text-sm bg-white font-medium w-44 focus:outline-none focus:ring-2 focus:ring-[#0F5132]/30">
+            {["all", "cash", "upi", "neft", "cheque", "online", "card"].map(m => <option key={m} value={m}>{m === "all" ? "All Modes" : m.toUpperCase()}</option>)}
+          </select>
+          <div className="flex items-center gap-3">
+            <Button className="h-11 px-5 rounded-xl text-sm font-medium" onClick={load} disabled={loading}><RefreshCw size={15} className={`mr-2 ${loading ? "animate-spin" : ""}`} />Load</Button>
+            <Button className="h-11 px-5 rounded-xl text-sm font-medium" variant="outline" onClick={exp} disabled={!data?.rows?.length}><Download size={15} className="mr-2" />Export Excel</Button>
+          </div>
+        </div>
+      </div>
       {data && <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 flex gap-6"><div><p className="text-xs text-muted-foreground">Total Collected</p><p className="text-xl font-bold text-emerald-600">{fmt(data.total || 0)}</p></div><div><p className="text-xs text-muted-foreground">Entries</p><p className="text-xl font-bold">{data.rows?.length || 0}</p></div></div>}
       {loading ? <Spin /> : err ? <Err msg={err} /> : !data?.rows?.length ? <div className="py-12 text-center text-muted-foreground text-sm">No payments in this period</div> : (
         <div className="bg-white rounded-xl border overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-muted/50 text-xs text-muted-foreground uppercase"><tr><th className="px-4 py-2.5 text-left">Date</th><th className="px-4 py-2.5 text-left">Booking #</th><th className="px-4 py-2.5 text-left">Customer</th><th className="px-4 py-2.5 text-left">Mode</th><th className="px-4 py-2.5 text-left">Reference</th><th className="px-4 py-2.5 text-left">Bank</th><th className="px-4 py-2.5 text-right">Amount</th><th className="px-4 py-2.5 text-left">Recon</th></tr></thead><tbody className="divide-y">{data.rows.map((r: any) => (<tr key={r.id} className="hover:bg-muted/20"><td className="px-4 py-2 text-xs whitespace-nowrap">{fmtDate(r.date)}</td><td className="px-4 py-2 font-mono text-xs">{r.booking_number}</td><td className="px-4 py-2 text-xs font-medium">{r.customer_name}</td><td className="px-4 py-2"><Badge variant="outline" className="text-[10px] uppercase">{r.mode}</Badge></td><td className="px-4 py-2 text-xs text-muted-foreground">{r.reference || "—"}</td><td className="px-4 py-2 text-xs">{r.bank_name || "—"}</td><td className="px-4 py-2 text-right font-bold text-green-600">{fmt(Number(r.amount))}</td><td className="px-4 py-2">{r.is_reconciled ? <CheckCircle2 size={14} className="text-green-500" /> : <XCircle size={14} className="text-amber-400" />}</td></tr>))}</tbody><tfoot className="bg-muted/30 border-t"><tr><td colSpan={6} className="px-4 py-2.5 text-xs font-semibold text-muted-foreground">TOTAL ({data.rows.length})</td><td className="px-4 py-2.5 text-right font-bold text-green-600">{fmt(data.total || 0)}</td><td /></tr></tfoot></table></div></div>
@@ -888,8 +955,16 @@ function Outstanding() {
   function exp() { if (!data?.rows) return; const ws = XLSX.utils.json_to_sheet(data.rows.map((r: any) => ({ "Booking #": r.booking_number, Customer: r.customer_name, Mobile: r.mobile, Group: r.group_name || "", Total: r.total_amount, Paid: r.paid_amount, Outstanding: r.outstanding }))); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Outstanding"); XLSX.writeFile(wb, `outstanding-${new Date().toISOString().slice(0, 10)}.xlsx`); }
   const filtered = data?.rows ? (search ? data.rows.filter((r: any) => `${r.customer_name} ${r.mobile}`.toLowerCase().includes(search.toLowerCase())) : data.rows) : [];
   return (
-    <div className="space-y-4">
-      <div className="flex gap-2 flex-wrap"><Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search customer…" className="h-8 text-sm flex-1 min-w-[180px]" /><Button size="sm" variant="outline" onClick={load} disabled={loading}><RefreshCw size={14} className={`mr-1 ${loading ? "animate-spin" : ""}`} />Refresh</Button><Button size="sm" variant="outline" onClick={exp} disabled={!data?.rows?.length}><Download size={14} className="mr-1" />Excel</Button></div>
+    <div className="space-y-5">
+      <div className="bg-white rounded-2xl border shadow-sm p-4">
+        <div className="flex flex-wrap items-center gap-4">
+          <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search customer…" className="h-11 text-sm flex-1 min-w-[220px] rounded-xl" />
+          <div className="flex items-center gap-3">
+            <Button className="h-11 px-5 rounded-xl text-sm font-medium" variant="outline" onClick={load} disabled={loading}><RefreshCw size={15} className={`mr-2 ${loading ? "animate-spin" : ""}`} />Refresh</Button>
+            <Button className="h-11 px-5 rounded-xl text-sm font-medium" variant="outline" onClick={exp} disabled={!data?.rows?.length}><Download size={15} className="mr-2" />Export Excel</Button>
+          </div>
+        </div>
+      </div>
       {data && <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex gap-6"><div><p className="text-xs text-muted-foreground">Total Outstanding</p><p className="text-xl font-bold text-amber-600">{fmt(data.total || 0)}</p></div><div><p className="text-xs text-muted-foreground">Customers</p><p className="text-xl font-bold">{data.count || 0}</p></div></div>}
       {loading ? <Spin /> : err ? <Err msg={err} /> : filtered.length === 0 ? <div className="py-12 text-center text-green-600 text-sm font-medium">🎉 No outstanding balances!</div> : (
         <div className="bg-white rounded-xl border overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-muted/50 text-xs text-muted-foreground uppercase"><tr><th className="px-4 py-2.5 text-left">Booking #</th><th className="px-4 py-2.5 text-left">Customer</th><th className="px-4 py-2.5 text-left">Mobile</th><th className="px-4 py-2.5 text-left">Group</th><th className="px-4 py-2.5 text-right">Total</th><th className="px-4 py-2.5 text-right">Paid</th><th className="px-4 py-2.5 text-right">Outstanding</th></tr></thead><tbody className="divide-y">{filtered.map((r: any) => (<tr key={r.booking_id} className="hover:bg-muted/20"><td className="px-4 py-2 font-mono text-xs">{r.booking_number}</td><td className="px-4 py-2 font-medium text-xs">{r.customer_name}</td><td className="px-4 py-2 text-xs text-muted-foreground">{r.mobile}</td><td className="px-4 py-2 text-xs">{r.group_name || "—"}</td><td className="px-4 py-2 text-right text-xs">{fmt(Number(r.total_amount))}</td><td className="px-4 py-2 text-right text-green-600 text-xs">{fmt(Number(r.paid_amount))}</td><td className="px-4 py-2 text-right font-bold text-amber-600">{fmt(Number(r.outstanding))}</td></tr>))}</tbody><tfoot className="bg-muted/30 border-t"><tr><td colSpan={6} className="px-4 py-2.5 text-xs font-semibold text-muted-foreground">TOTAL ({filtered.length})</td><td className="px-4 py-2.5 text-right font-bold text-amber-600">{fmt(filtered.reduce((s: number, r: any) => s + Number(r.outstanding || 0), 0))}</td></tr></tfoot></table></div></div>
@@ -905,8 +980,16 @@ function ProfitLoss({ defaultFrom, defaultTo }: { defaultFrom?: string; defaultT
   useEffect(() => { load(); }, [load]);
   function exp() { if (!data) return; const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["P&L", `${data.period?.from} to ${data.period?.to}`], [], ["INCOME"], ["Sales Revenue", data.revenue?.total], [], ["EXPENSES"], ...(data.expenses?.byCategory || []).map((c: any) => [CAT_LABELS[c.category] || c.category, c.total]), ["Total Expenses", data.expenses?.total], [], ["NET PROFIT/(LOSS)", data.netProfit]]), "P&L"); XLSX.writeFile(wb, `pl-${from}-${to}.xlsx`); }
   return (
-    <div className="space-y-4">
-      <div className="flex gap-2 flex-wrap items-center"><DR from={from} to={to} onFrom={setFrom} onTo={setTo} /><Button size="sm" onClick={load} disabled={loading}><RefreshCw size={14} className={`mr-1 ${loading ? "animate-spin" : ""}`} />Load</Button><Button size="sm" variant="outline" onClick={exp} disabled={!data}><Download size={14} className="mr-1" />Excel</Button></div>
+    <div className="space-y-5">
+      <div className="bg-white rounded-2xl border shadow-sm p-4">
+        <div className="flex flex-wrap items-center gap-6">
+          <DR from={from} to={to} onFrom={setFrom} onTo={setTo} />
+          <div className="flex items-center gap-3">
+            <Button className="h-11 px-5 rounded-xl text-sm font-medium" onClick={load} disabled={loading}><RefreshCw size={15} className={`mr-2 ${loading ? "animate-spin" : ""}`} />Load</Button>
+            <Button className="h-11 px-5 rounded-xl text-sm font-medium" variant="outline" onClick={exp} disabled={!data}><Download size={15} className="mr-2" />Export Excel</Button>
+          </div>
+        </div>
+      </div>
       {loading ? <Spin /> : err ? <Err msg={err} /> : !data ? null : (
         <div className="max-w-2xl"><div className="bg-white border rounded-xl overflow-hidden"><div className="bg-[#0d5040] text-white px-5 py-3 font-semibold text-sm">Profit & Loss Statement — {data.period?.from} to {data.period?.to}</div><div className="px-5 py-4 space-y-4"><div><p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Income</p><div className="flex justify-between py-1.5 border-b text-sm"><span>Sales Revenue ({data.revenue?.bookingCount} payments)</span><span className="font-semibold text-green-600">{fmt(data.revenue?.total || 0)}</span></div><div className="flex justify-between py-1.5 font-bold"><span>Total Income</span><span className="text-green-600">{fmt(data.revenue?.total || 0)}</span></div></div><div><p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Expenditure</p>{(data.expenses?.byCategory || []).map((c: any) => (<div key={c.category} className="flex justify-between py-1 border-b last:border-0 text-sm"><span className="text-muted-foreground">{CAT_LABELS[c.category] || c.category}</span><span className="text-red-600">{fmt(Number(c.total))}</span></div>))}<div className="flex justify-between py-1.5 font-bold border-t mt-1"><span>Total Expenditure</span><span className="text-red-600">{fmt(data.expenses?.total || 0)}</span></div></div><div className={`flex justify-between py-3 px-4 rounded-lg font-bold text-lg ${data.netProfit >= 0 ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}><span>Net {data.netProfit >= 0 ? "Profit" : "Loss"}</span><span>{data.netProfit >= 0 ? "" : "-"}{fmt(Math.abs(data.netProfit || 0))}</span></div></div></div></div>
       )}
@@ -919,8 +1002,16 @@ function BalanceSheet({ defaultTo }: { defaultTo?: string }) {
   const load = useCallback(async () => { setLoading(true); setErr(""); try { const r = await fetch(`${API}/api/accounting/balance-sheet?asOf=${asOf}`, { credentials: "include" }); if (!r.ok) setErr(`Error ${r.status}`); else setData(await r.json()); } catch (e: any) { setErr(e.message); } setLoading(false); }, [asOf]);
   useEffect(() => { load(); }, [load]);
   return (
-    <div className="space-y-4">
-      <div className="flex gap-2 flex-wrap items-center"><span className="text-sm text-muted-foreground">As of:</span><Input type="date" value={asOf} onChange={e => setAsOf(e.target.value)} className="h-8 text-sm w-40" /><Button size="sm" onClick={load} disabled={loading}><RefreshCw size={14} className={`mr-1 ${loading ? "animate-spin" : ""}`} />Load</Button></div>
+    <div className="space-y-5">
+      <div className="bg-white rounded-2xl border shadow-sm p-4">
+        <div className="flex flex-wrap items-center gap-6">
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-muted-foreground font-medium">As of:</span>
+            <Input type="date" value={asOf} onChange={e => setAsOf(e.target.value)} className="h-11 text-sm w-[170px] rounded-xl" />
+          </div>
+          <Button className="h-11 px-5 rounded-xl text-sm font-medium" onClick={load} disabled={loading}><RefreshCw size={15} className={`mr-2 ${loading ? "animate-spin" : ""}`} />Load</Button>
+        </div>
+      </div>
       {loading ? <Spin /> : err ? <Err msg={err} /> : !data ? null : (
         <div className="grid md:grid-cols-2 gap-4 max-w-3xl">
           <div className="bg-white border rounded-xl overflow-hidden">
@@ -971,8 +1062,16 @@ function TrialBalance({ defaultFrom, defaultTo }: { defaultFrom?: string; defaul
   useEffect(() => { load(); }, [load]);
   function exp() { if (!data) return; const ws = XLSX.utils.json_to_sheet((data.entries || []).map((e: any) => ({ Account: e.account, "Debit (Dr)": e.debit || 0, "Credit (Cr)": e.credit || 0 }))); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Trial Balance"); XLSX.writeFile(wb, `trial-balance-${from}-${to}.xlsx`); }
   return (
-    <div className="space-y-4">
-      <div className="flex gap-2 flex-wrap items-center"><DR from={from} to={to} onFrom={setFrom} onTo={setTo} /><Button size="sm" onClick={load} disabled={loading}><RefreshCw size={14} className={`mr-1 ${loading ? "animate-spin" : ""}`} />Load</Button><Button size="sm" variant="outline" onClick={exp} disabled={!data}><Download size={14} className="mr-1" />Excel</Button></div>
+    <div className="space-y-5">
+      <div className="bg-white rounded-2xl border shadow-sm p-4">
+        <div className="flex flex-wrap items-center gap-6">
+          <DR from={from} to={to} onFrom={setFrom} onTo={setTo} />
+          <div className="flex items-center gap-3">
+            <Button className="h-11 px-5 rounded-xl text-sm font-medium" onClick={load} disabled={loading}><RefreshCw size={15} className={`mr-2 ${loading ? "animate-spin" : ""}`} />Load</Button>
+            <Button className="h-11 px-5 rounded-xl text-sm font-medium" variant="outline" onClick={exp} disabled={!data}><Download size={15} className="mr-2" />Export Excel</Button>
+          </div>
+        </div>
+      </div>
       {loading ? <Spin /> : err ? <Err msg={err} /> : !data ? null : (
         <div className="max-w-2xl space-y-3">
           {data.totals?.balanced ? <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2.5 text-green-700 text-sm font-medium">✅ Trial Balance is balanced</div> : <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 text-amber-700 text-sm font-medium">⚠️ Imbalance: Dr {fmt(data.totals?.debit)} ≠ Cr {fmt(data.totals?.credit)}</div>}
@@ -1018,30 +1117,36 @@ export default function AccountingDashboard() {
 
   return (
     <AdminLayout>
-      <div className="max-w-7xl mx-auto space-y-4">
+      <div className="max-w-7xl mx-auto px-6 py-5 space-y-6">
+        {/* Page header */}
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="text-2xl font-bold text-[#0d5040]">Accounting</h1>
-            <p className="text-sm text-muted-foreground">Chart of Accounts, Double-Entry Journals, Cash Books, P&L, Balance Sheet</p>
+            <h1 className="text-2xl font-bold text-[#0B3D2E]">Accounting</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">Chart of Accounts · Double-Entry Journals · Cash Books · P&L · Balance Sheet</p>
           </div>
           {fys.length > 0 && (
-            <div className="flex items-center gap-2 bg-white border rounded-lg px-3 py-2 shadow-sm">
-              <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">Financial Year:</span>
+            <div className="flex items-center gap-3 bg-white border rounded-xl px-4 py-2.5 shadow-sm">
+              <span className="text-xs text-muted-foreground font-semibold whitespace-nowrap">Financial Year:</span>
               <select value={activeFyId} onChange={e => handleFyChange(e.target.value)}
-                className="h-7 px-2 rounded border text-sm bg-background">
+                className="h-8 px-2 rounded-lg border text-sm bg-background font-medium focus:outline-none focus:ring-2 focus:ring-[#0F5132]/30">
                 {fys.map((fy: any) => (
                   <option key={fy.id} value={fy.id}>{fy.name}{fy.is_active ? " ●" : ""}</option>
                 ))}
               </select>
-              {fyFrom && <span className="text-[11px] text-muted-foreground hidden sm:inline">{fyFrom} → {fyTo}</span>}
+              {fyFrom && <span className="text-[11px] text-muted-foreground hidden sm:inline font-medium">{fyFrom} → {fyTo}</span>}
             </div>
           )}
         </div>
-        {/* Scrollable tabs */}
-        <div className="bg-white border rounded-xl p-1 flex gap-0.5 overflow-x-auto">
+
+        {/* Tabs navigation */}
+        <div className="bg-white border rounded-2xl p-2 flex gap-1 overflow-x-auto shadow-sm">
           {TABS.map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all whitespace-nowrap ${tab === t.id ? "bg-[#0d5040] text-white" : "text-muted-foreground hover:bg-muted/50"}`}>
+              className={`px-4 py-2 text-xs font-medium rounded-xl transition-all whitespace-nowrap ${
+                tab === t.id
+                  ? "bg-[#0F5132] text-white font-bold shadow-sm"
+                  : "text-muted-foreground hover:bg-[#0F5132]/8 hover:text-[#0F5132]"
+              }`}>
               {t.label}
             </button>
           ))}
