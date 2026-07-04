@@ -94,7 +94,7 @@ function formatBooking(b: any) {
   };
 }
 
-router.get("/offline", requireAdmin as any, (_req, res) => {
+router.get("/offline", requireAdmin as any, requirePermission("bookings", "view") as any, (_req, res) => {
   res.json({ message: "Use POST /bookings/offline to create offline bookings" });
 });
 
@@ -174,7 +174,7 @@ router.post("/offline", requireAdmin as any, requirePermission("bookings", "crea
   }
 });
 
-router.get("/trash", requireAdmin as any, async (_req, res) => {
+router.get("/trash", requireAdmin as any, requirePermission("bookings", "view") as any, async (_req, res) => {
   try {
     const rows = await db
       .select({ booking: bookingsTable, package: packagesTable })
@@ -848,6 +848,7 @@ async function softDeleteBooking(bookingId: string, req: AuthenticatedRequest, r
     } catch (auditErr: any) {
       console.warn(`[soft-delete] Audit log failed (non-fatal):`, auditErr?.message);
     }
+    auditLog({ req, action: "deleted", entityTable: "bookings", entityId: bookingId, oldValue: { bookingNumber: existing.booking_number, status: existing.status }, newValue: { deletedBy } }).catch(() => {});
 
     res.json({ message: "Booking moved to trash", booking: formatBooking(updated) });
   } catch (err: any) {
@@ -869,7 +870,7 @@ router.delete("/:id", requireAdmin as any, requirePermission("bookings", "delete
   softDeleteBooking(req.params.id, req, res);
 });
 
-router.post("/:id/restore", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+router.post("/:id/restore", requireAdmin as any, requirePermission("bookings", "edit") as any, async (req: AuthenticatedRequest, res) => {
   const bookingId = req.params.id;
   try {
     const { rows: existingRows } = await pool.query(`SELECT * FROM bookings WHERE id = $1 LIMIT 1`, [bookingId]);
@@ -895,7 +896,7 @@ router.post("/:id/restore", requireAdmin as any, async (req: AuthenticatedReques
   }
 });
 
-router.post("/:id/duplicate", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+router.post("/:id/duplicate", requireAdmin as any, requirePermission("bookings", "create") as any, async (req: AuthenticatedRequest, res) => {
   const bookingId = req.params.id;
   try {
     const [existing] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
