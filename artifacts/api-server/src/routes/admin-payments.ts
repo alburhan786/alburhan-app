@@ -1,6 +1,6 @@
 import { Router, type RequestHandler } from "express";
 import { db, pool, bookingsTable, paymentTransactionsTable, customerProfilesTable } from "@workspace/db";
-import { eq, sum, count, asc, and, isNull, or } from "drizzle-orm";
+import { eq, count, and } from "drizzle-orm";
 import { requireAdmin, requireModuleAccess, requirePermission, type AuthenticatedRequest } from "../lib/auth.js";
 import { auditLog } from "../lib/audit.js";
 import { upsertPilgrimFromProfile } from "../lib/pilgrimUtils.js";
@@ -21,27 +21,29 @@ function generateInvoiceNumber(): string {
   return `INV${Date.now().toString().slice(-8)}`;
 }
 
-async function recalculateBookingPayment(tx: DbOrTx, bookingId: string) {
-  const [booking] = await tx.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
+async function recalculateBookingPayment(_tx: DbOrTx, bookingId: string) {
+  // Use pool.query throughout — avoids VPS drizzle bundling quirks with db.execute()
+  const bookingRes = await pool.query(
+    `SELECT id, status, final_amount, paid_amount, online_paid_amount, invoice_number FROM bookings WHERE id=$1 LIMIT 1`,
+    [bookingId]
+  );
+  const booking = bookingRes.rows[0];
   if (!booking) return;
 
-  const [result] = await tx
-    .select({ total: sum(paymentTransactionsTable.amount) })
-    .from(paymentTransactionsTable)
-    .where(
-      and(
-        eq(paymentTransactionsTable.bookingId, bookingId),
-        or(eq(paymentTransactionsTable.isDeleted, false), isNull(paymentTransactionsTable.deletedAt))
-      )
-    );
-
-  const ledgerSum = Number(result?.total ?? 0);
-  const onlinePaidAmount = Number(booking.onlinePaidAmount ?? 0);
+  // Sum only non-deleted transactions for this booking
+  const sumRes = await pool.query(
+    `SELECT COALESCE(SUM(amount::numeric), 0) AS total
+     FROM payment_transactions
+     WHERE booking_id=$1 AND is_deleted=false`,
+    [bookingId]
+  );
+  const ledgerSum = Number(sumRes.rows[0]?.total ?? 0);
+  const onlinePaidAmount = Number(booking.online_paid_amount ?? 0);
   const totalPaid = onlinePaidAmount + ledgerSum;
-  const finalAmount = Number(booking.finalAmount ?? 0);
+  const finalAmount = Number(booking.final_amount ?? 0);
 
   let newStatus: BookingStatus = booking.status as BookingStatus;
-  let invoiceNumber = booking.invoiceNumber;
+  let invoiceNumber: string | null = booking.invoice_number ?? null;
 
   if (PAYABLE_STATUSES.includes(newStatus)) {
     if (totalPaid === 0) {
@@ -54,16 +56,10 @@ async function recalculateBookingPayment(tx: DbOrTx, bookingId: string) {
     }
   }
 
-  await tx
-    .update(bookingsTable)
-    .set({
-      paidAmount: String(totalPaid),
-      onlinePaidAmount: String(onlinePaidAmount),
-      status: newStatus,
-      invoiceNumber: invoiceNumber ?? undefined,
-      updatedAt: new Date(),
-    })
-    .where(eq(bookingsTable.id, bookingId));
+  await pool.query(
+    `UPDATE bookings SET paid_amount=$1, online_paid_amount=$2, status=$3, invoice_number=$4, updated_at=NOW() WHERE id=$5`,
+    [String(totalPaid), String(onlinePaidAmount), newStatus, invoiceNumber, bookingId]
+  );
 
   return { totalPaid, ledgerSum, onlinePaidAmount, newStatus, invoiceNumber };
 }
@@ -315,50 +311,64 @@ router.patch("/:id/payments/:txnId", requireAdmin as RequestHandler, async (req:
   }
 });
 
-// DELETE /:id/payments/:txnId — soft delete (super_admin / accounts_admin only)
+// DELETE /:id/payments/:txnId — soft delete with journal void (super_admin / accounts_admin only)
 router.delete("/:id/payments/:txnId", requireAdmin as RequestHandler, requirePermission("payments", "delete") as any, async (req: AuthenticatedRequest, res) => {
   try {
     const { id: bookingId, txnId } = req.params as Record<string, string>;
     const { reason } = req.body as { reason?: string };
 
+    console.log(`[DELETE payment] START — txnId=${txnId} bookingId=${bookingId} user=${req.user?.id ?? "unknown"}`);
+
     const result = await db.transaction(async (tx) => {
+      // 1. Fetch and validate payment
       const rowRes = await pool.query(`SELECT * FROM payment_transactions WHERE id = $1`, [txnId]);
       const entry = rowRes.rows[0];
+      console.log(`[DELETE payment] entry found: ${entry ? `amount=${entry.amount} mode=${entry.payment_mode} is_deleted=${entry.is_deleted}` : "NOT FOUND"}`);
+
       if (!entry || entry.booking_id !== bookingId) throw Object.assign(new Error("Payment not found"), { statusCode: 404 });
       if (entry.is_deleted) throw Object.assign(new Error("Payment already deleted"), { statusCode: 422 });
 
-      // Block direct deletion if payment has an accounting journal entry
-      const journalCheck = await pool.query(
-        `SELECT COUNT(*) FROM journal_entries WHERE source='payment' AND source_id=$1`,
-        [txnId]
-      );
-      if (Number(journalCheck.rows[0]?.count ?? 0) > 0) {
-        throw Object.assign(
-          new Error("This payment is linked to accounting records. Please reverse or cancel the payment instead."),
-          { statusCode: 409, code: "JOURNAL_LINKED" }
-        );
-      }
-
       const [booking] = await tx.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
 
-      await pool.query(
+      // 2. Void linked journal entries FIRST (always — don't block deletion because of accounting)
+      const jlRes = await pool.query(
+        `DELETE FROM journal_entry_lines WHERE journal_entry_id IN
+         (SELECT id FROM journal_entries WHERE source='payment' AND source_id=$1)`,
+        [txnId]
+      );
+      const jeRes = await pool.query(
+        `DELETE FROM journal_entries WHERE source='payment' AND source_id=$1`,
+        [txnId]
+      );
+      console.log(`[DELETE payment] journal voided — entries=${jeRes.rowCount} lines=${jlRes.rowCount}`);
+
+      // 3. Soft-delete the payment transaction
+      const delRes = await pool.query(
         `UPDATE payment_transactions SET is_deleted=true, deleted_at=NOW(), deleted_by=$1, deletion_reason=$2 WHERE id=$3`,
         [req.user?.id ?? null, reason ?? null, txnId]
       );
+      console.log(`[DELETE payment] payment soft-deleted — rows affected=${delRes.rowCount}`);
 
+      // 4. Recalculate booking totals (paid amount, status, balance)
       const updated = await recalculateBookingPayment(tx, bookingId);
+      console.log(`[DELETE payment] booking recalculated — totalPaid=${updated?.totalPaid} status=${updated?.newStatus}`);
 
+      // 5. Audit log
       await writeAuditLog({
         transactionId: txnId, bookingId, action: "deleted",
         oldAmount: Number(entry.amount), oldMode: entry.payment_mode, oldDate: entry.payment_date,
         changedBy: req.user?.id, changedByName: req.user?.name, changeReason: reason ?? null,
       });
-      auditLog({ req, action: "deleted", entityTable: "payments", entityId: txnId, oldValue: { bookingId, customerName: booking?.customerName ?? null, amount: entry.amount, paymentMode: entry.payment_mode, paymentDate: entry.payment_date, deletedBy: req.user?.name, reason: reason ?? null } }).catch(() => {});
+      auditLog({ req, action: "deleted", entityTable: "payments", entityId: txnId, oldValue: {
+        bookingId, customerName: booking?.customerName ?? null,
+        amount: entry.amount, paymentMode: entry.payment_mode, paymentDate: entry.payment_date,
+        deletedBy: req.user?.name, reason: reason ?? null,
+      }}).catch(() => {});
 
-      return { updated };
+      return { updated, entry };
     });
 
-    voidJournalEntry("payment", txnId).catch(() => {});
+    console.log(`[DELETE payment] SUCCESS — txnId=${txnId} finalPaid=${result.updated?.totalPaid} status=${result.updated?.newStatus}`);
 
     return res.json({
       message: "Payment deleted successfully.",
@@ -366,9 +376,9 @@ router.delete("/:id/payments/:txnId", requireAdmin as RequestHandler, requirePer
     });
   } catch (err) {
     const e = err as { statusCode?: number; code?: string; message?: string };
+    console.error(`[DELETE payment] ERROR — txnId=${req.params["txnId"]}:`, err);
     if (e.statusCode) return res.status(e.statusCode).json({ message: e.message, code: e.code });
-    console.error("[admin-payments] DELETE error:", err);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: `Delete failed: ${(err as Error).message ?? "Unknown error"}` });
   }
 });
 
