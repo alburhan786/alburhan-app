@@ -13,6 +13,7 @@ const allowlist = [
   "@google/generative-ai",
   "axios",
   "dotenv",
+  "helmet",
   "connect-pg-simple",
   "cors",
   "date-fns",
