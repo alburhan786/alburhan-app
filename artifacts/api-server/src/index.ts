@@ -874,6 +874,23 @@ async function start() {
     console.log(`Server listening on port ${finalPort}`);
     startPaymentReminderCron();
     startFeedbackReminderCron();
+    const scheduleAuditRetention = () => {
+      const now = new Date();
+      const nextRun = new Date(now);
+      nextRun.setUTCHours(18, 30, 0, 0); // 00:00 IST = 18:30 UTC
+      if (nextRun <= now) nextRun.setUTCDate(nextRun.getUTCDate() + 1);
+      setTimeout(async () => {
+        try {
+          const result = await pool.query(`DELETE FROM audit_logs WHERE created_at < NOW() - INTERVAL '12 months'`);
+          console.log(`[AuditRetention] Purged ${result.rowCount} entries older than 12 months`);
+        } catch (err) {
+          console.error("[AuditRetention] Purge failed:", err);
+        }
+        scheduleAuditRetention();
+      }, nextRun.getTime() - now.getTime());
+    };
+    scheduleAuditRetention();
+    console.log("[AuditRetention] Scheduled: daily purge of audit_logs older than 12 months");
   });
 }
 

@@ -1,14 +1,22 @@
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useDeleteGuard } from "@/components/DeleteGuard";
-import { Plus, Edit, Trash2, Printer, UserCheck, Upload, Camera } from "lucide-react";
+import { Plus, Edit, Trash2, Printer, UserCheck, Upload, Camera, RefreshCw, ShieldCheck, Info, Users } from "lucide-react";
 import { Link } from "wouter";
 import { COMPANIES } from "@/lib/companies";
+import { PermissionGuard } from "@/components/PermissionGuard";
+import {
+  usePermissions,
+  ROLE_LABELS as ADMIN_ROLE_LABELS,
+  ROLE_COLORS,
+  type AdminRole,
+} from "@/hooks/use-permissions";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -67,15 +75,33 @@ const emptyForm = {
   notes: "",
 };
 
-const ROLE_LABELS: Record<string, string> = {
+const STAFF_ROLE_LABELS: Record<string, string> = {
   airport_staff:  "Airport Staff",
   catering_staff: "Catering Staff",
   office_staff:   "Office Staff",
 };
 
+const ALL_ADMIN_ROLES: AdminRole[] = [
+  "super_admin", "admin", "accounts", "manager",
+  "sales", "operations", "guide", "staff", "read_only",
+];
+
+const ROLE_DESCRIPTIONS: Record<AdminRole, string> = {
+  super_admin: "Full access including user management and audit logs",
+  admin: "Full operational access; cannot manage user roles",
+  accounts: "Full access to Finance, Expenses, GST, Payroll, Assets",
+  manager: "Manage groups, pilgrims, customers; view financial data",
+  sales: "Create/manage bookings and payments; manage customers",
+  operations: "Manage groups, flights, hotels, buses, pilgrims",
+  guide: "Read-only access to group pilgrim list",
+  staff: "View groups and pilgrims only",
+  read_only: "View and export any data; no create/edit/delete",
+};
+
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
 export default function StaffManager() {
+  const [activeTab, setActiveTab] = useState<"staff" | "roles">("staff");
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [groups, setGroups] = useState<HajjGroup[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,8 +113,16 @@ export default function StaffManager() {
   const [search, setSearch] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadTargetId, setUploadTargetId] = useState<string | null>(null);
+
+  // Admin roles tab state
+  const [adminUsers, setAdminUsers] = useState<any[]>([]);
+  const [rolesLoading, setRolesLoading] = useState(false);
+  const [savingRole, setSavingRole] = useState<string | null>(null);
+  const [showMatrix, setShowMatrix] = useState(false);
+
   const { toast } = useToast();
   const { requestDelete } = useDeleteGuard();
+  const { adminRole: myRole, isAdminLevel } = usePermissions();
 
   const fetchData = useCallback(async () => {
     try {
@@ -101,7 +135,19 @@ export default function StaffManager() {
     } catch {} finally { setLoading(false); }
   }, []);
 
+  const fetchAdminUsers = useCallback(async () => {
+    setRolesLoading(true);
+    try {
+      const r = await fetch(`${API}/api/admin-users`, { credentials: "include" });
+      if (r.ok) setAdminUsers(await r.json());
+    } catch (e: any) {
+      toast({ title: "Failed to load admin users", description: e.message, variant: "destructive" });
+    }
+    setRolesLoading(false);
+  }, [toast]);
+
   useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { if (activeTab === "roles") fetchAdminUsers(); }, [activeTab, fetchAdminUsers]);
 
   const f = (key: keyof typeof emptyForm, val: string) => setForm(prev => ({ ...prev, [key]: val }));
 
@@ -202,6 +248,26 @@ export default function StaffManager() {
     }
   };
 
+  const changeAdminRole = async (userId: string, newRole: AdminRole) => {
+    setSavingRole(userId);
+    try {
+      const r = await fetch(`${API}/api/admin-users/${userId}/role`, {
+        method: "PUT", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ admin_role: newRole }),
+      });
+      if (!r.ok) {
+        const err = await r.json();
+        throw new Error(err.error || "Failed to update role");
+      }
+      toast({ title: `Role updated to ${ADMIN_ROLE_LABELS[newRole]}` });
+      await fetchAdminUsers();
+    } catch (e: any) {
+      toast({ title: "Role update failed", description: e.message, variant: "destructive" });
+    }
+    setSavingRole(null);
+  };
+
   const filtered = staff.filter(s => {
     if (filter !== "all" && s.role !== filter) return false;
     if (search.trim()) {
@@ -216,130 +282,331 @@ export default function StaffManager() {
     return true;
   });
 
+  const canEditRoles = myRole === "super_admin";
+
   return (
     <AdminLayout>
       <input type="file" accept="image/*" ref={fileInputRef} onChange={handlePhotoChange} className="hidden" />
 
-      <div className="flex justify-between items-center mb-8 flex-wrap gap-4">
+      <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
         <div>
-          <h1 className="text-3xl font-serif font-bold">Staff ID Cards</h1>
-          <p className="text-muted-foreground mt-1">Manage Airport & Catering Staff identification cards.</p>
+          <h1 className="text-3xl font-serif font-bold">Staff & Access</h1>
+          <p className="text-muted-foreground mt-1">Manage staff ID cards and admin user roles.</p>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          <Link href="/admin/staff/print">
-            <Button variant="outline" className="gap-2 rounded-xl border-green-400 text-green-700 hover:bg-green-50">
-              <Printer size={16} /> Print All Cards
-            </Button>
-          </Link>
-          <Button onClick={openCreate} className="bg-primary text-white gap-2 rounded-xl">
-            <Plus size={18} /> Add Staff
-          </Button>
-        </div>
+        {activeTab === "staff" && (
+          <div className="flex gap-2 flex-wrap">
+            <Link href="/admin/staff/print">
+              <Button variant="outline" className="gap-2 rounded-xl border-green-400 text-green-700 hover:bg-green-50">
+                <Printer size={16} /> Print All Cards
+              </Button>
+            </Link>
+            <PermissionGuard module="staff" action="create">
+              <Button onClick={openCreate} className="bg-primary text-white gap-2 rounded-xl">
+                <Plus size={18} /> Add Staff
+              </Button>
+            </PermissionGuard>
+          </div>
+        )}
       </div>
 
-      {/* Filter tabs + search */}
-      <div className="flex flex-wrap gap-2 mb-6 items-center">
-        {(["all", "airport_staff", "catering_staff", "office_staff"] as const).map(r => (
-          <button
-            key={r}
-            onClick={() => setFilter(r)}
-            className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${
-              filter === r
-                ? "bg-primary text-white"
-                : "bg-muted text-muted-foreground hover:bg-muted/80"
-            }`}
-          >
-            {r === "all" ? `All (${staff.length})` : `${ROLE_LABELS[r]} (${staff.filter(s => s.role === r).length})`}
-          </button>
-        ))}
-        <div className="ml-auto">
-          <Input
-            placeholder="Search by name, ID, mobile..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="h-8 w-56 rounded-full text-sm"
-          />
-        </div>
+      {/* Tab switcher */}
+      <div className="flex gap-1 mb-6 border-b">
+        <button
+          onClick={() => setActiveTab("staff")}
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === "staff"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <UserCheck size={15} /> Staff ID Cards ({staff.length})
+        </button>
+        <button
+          onClick={() => setActiveTab("roles")}
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === "roles"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <ShieldCheck size={15} /> Admin User Roles ({adminUsers.length})
+        </button>
       </div>
 
-      {loading ? (
-        <div className="py-12 text-center text-muted-foreground animate-pulse">Loading...</div>
-      ) : filtered.length === 0 ? (
-        <Card className="p-12 text-center border-dashed border-2">
-          <UserCheck className="w-12 h-12 mx-auto text-muted-foreground/40 mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No staff members yet</h3>
-          <p className="text-muted-foreground text-sm mb-4">Add your first staff member to generate ID cards.</p>
-          <Button onClick={openCreate} variant="outline" className="rounded-xl"><Plus className="w-4 h-4 mr-2" /> Add First Staff</Button>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filtered.map(s => {
-            const group = groups.find(g => g.id === s.groupId);
-            return (
-              <Card key={s.id} className="p-4 rounded-2xl border-none shadow-sm hover:shadow-md transition-shadow">
-                <div className="flex items-start gap-3">
-                  {/* Photo */}
-                  <div className="relative shrink-0">
-                    {s.photoUrl ? (
-                      <img
-                        src={`${API}${s.photoUrl}`}
-                        alt={s.fullName}
-                        className="w-14 h-14 rounded-lg object-cover border-2 border-primary/20"
-                      />
-                    ) : (
-                      <div className="w-14 h-14 rounded-lg bg-muted border-2 border-dashed border-muted-foreground/30 flex items-center justify-center text-muted-foreground/50">
-                        <Camera size={20} />
-                      </div>
-                    )}
-                    <button
-                      onClick={() => triggerPhotoUpload(s.id)}
-                      disabled={photoUploading === s.id}
-                      className="absolute -bottom-1 -right-1 w-5 h-5 bg-primary rounded-full flex items-center justify-center text-white hover:bg-primary/80 transition-colors"
-                      title="Upload photo"
-                    >
-                      {photoUploading === s.id ? <span className="text-[6px]">...</span> : <Upload size={10} />}
-                    </button>
-                  </div>
+      {/* ── Staff Tab ── */}
+      {activeTab === "staff" && (
+        <>
+          <div className="flex flex-wrap gap-2 mb-6 items-center">
+            {(["all", "airport_staff", "catering_staff", "office_staff"] as const).map(r => (
+              <button
+                key={r}
+                onClick={() => setFilter(r)}
+                className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${
+                  filter === r
+                    ? "bg-primary text-white"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                }`}
+              >
+                {r === "all" ? `All (${staff.length})` : `${STAFF_ROLE_LABELS[r]} (${staff.filter(s => s.role === r).length})`}
+              </button>
+            ))}
+            <div className="ml-auto">
+              <Input
+                placeholder="Search by name, ID, mobile..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="h-8 w-56 rounded-full text-sm"
+              />
+            </div>
+          </div>
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-1">
-                      <div className="min-w-0">
-                        <h3 className="font-bold text-sm truncate">{s.fullName}</h3>
-                        {s.fatherName && <p className="text-xs text-muted-foreground truncate">S/o {s.fatherName}</p>}
-                        <p className="text-xs text-muted-foreground truncate">{s.designation || "—"}</p>
+          {loading ? (
+            <div className="py-12 text-center text-muted-foreground animate-pulse">Loading...</div>
+          ) : filtered.length === 0 ? (
+            <Card className="p-12 text-center border-dashed border-2">
+              <UserCheck className="w-12 h-12 mx-auto text-muted-foreground/40 mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No staff members yet</h3>
+              <p className="text-muted-foreground text-sm mb-4">Add your first staff member to generate ID cards.</p>
+              <PermissionGuard module="staff" action="create">
+                <Button onClick={openCreate} variant="outline" className="rounded-xl"><Plus className="w-4 h-4 mr-2" /> Add First Staff</Button>
+              </PermissionGuard>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {filtered.map(s => {
+                const group = groups.find(g => g.id === s.groupId);
+                return (
+                  <Card key={s.id} className="p-4 rounded-2xl border-none shadow-sm hover:shadow-md transition-shadow">
+                    <div className="flex items-start gap-3">
+                      <div className="relative shrink-0">
+                        {s.photoUrl ? (
+                          <img
+                            src={`${API}${s.photoUrl}`}
+                            alt={s.fullName}
+                            className="w-14 h-14 rounded-lg object-cover border-2 border-primary/20"
+                          />
+                        ) : (
+                          <div className="w-14 h-14 rounded-lg bg-muted border-2 border-dashed border-muted-foreground/30 flex items-center justify-center text-muted-foreground/50">
+                            <Camera size={20} />
+                          </div>
+                        )}
+                        <button
+                          onClick={() => triggerPhotoUpload(s.id)}
+                          disabled={photoUploading === s.id}
+                          className="absolute -bottom-1 -right-1 w-5 h-5 bg-primary rounded-full flex items-center justify-center text-white hover:bg-primary/80 transition-colors"
+                          title="Upload photo"
+                        >
+                          {photoUploading === s.id ? <span className="text-[6px]">...</span> : <Upload size={10} />}
+                        </button>
                       </div>
-                      <div className="flex gap-0.5 shrink-0">
-                        <Button variant="ghost" size="icon" className="w-7 h-7" onClick={() => openEdit(s)}><Edit size={13} /></Button>
-                        <Button variant="ghost" size="icon" className="w-7 h-7 text-red-600" onClick={() => handleDelete(s.id, s.fullName)}><Trash2 size={13} /></Button>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-1">
+                          <div className="min-w-0">
+                            <h3 className="font-bold text-sm truncate">{s.fullName}</h3>
+                            {s.fatherName && <p className="text-xs text-muted-foreground truncate">S/o {s.fatherName}</p>}
+                            <p className="text-xs text-muted-foreground truncate">{s.designation || "—"}</p>
+                          </div>
+                          <div className="flex gap-0.5 shrink-0">
+                            <PermissionGuard module="staff" action="edit" asDisabled>
+                              <Button variant="ghost" size="icon" className="w-7 h-7" onClick={() => openEdit(s)}><Edit size={13} /></Button>
+                            </PermissionGuard>
+                            <PermissionGuard module="staff" action="delete" asDisabled>
+                              <Button variant="ghost" size="icon" className="w-7 h-7 text-red-600" onClick={() => handleDelete(s.id, s.fullName)}><Trash2 size={13} /></Button>
+                            </PermissionGuard>
+                          </div>
+                        </div>
+
+                        <div className="mt-1 space-y-0.5">
+                          <span className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                            s.role === "catering_staff" ? "bg-orange-100 text-orange-700" : "bg-blue-100 text-blue-700"
+                          }`}>
+                            {STAFF_ROLE_LABELS[s.role] || s.role}
+                          </span>
+                          {s.staffId && <p className="text-[10px] font-mono text-muted-foreground">{s.staffId}</p>}
+                          {group && <p className="text-[10px] text-muted-foreground">{group.groupName}</p>}
+                        </div>
+
+                        <div className="mt-2 flex items-center justify-between">
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                            s.status === "active" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                          }`}>
+                            {s.status === "active" ? "Active" : "Inactive"}
+                          </span>
+                          {s.validUpto && <span className="text-[10px] text-muted-foreground">Valid: {s.validUpto}</span>}
+                        </div>
                       </div>
                     </div>
-
-                    <div className="mt-1 space-y-0.5">
-                      <span className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                        s.role === "catering_staff" ? "bg-orange-100 text-orange-700" : "bg-blue-100 text-blue-700"
-                      }`}>
-                        {ROLE_LABELS[s.role] || s.role}
-                      </span>
-                      {s.staffId && <p className="text-[10px] font-mono text-muted-foreground">{s.staffId}</p>}
-                      {group && <p className="text-[10px] text-muted-foreground">{group.groupName}</p>}
+                    <div className="mt-3 pt-2 border-t text-[10px] text-muted-foreground">
+                      {COMPANIES.find(c => c.id === s.companyId)?.nameShort || s.companyId}
                     </div>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
 
-                    <div className="mt-2 flex items-center justify-between">
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                        s.status === "active" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-                      }`}>
-                        {s.status === "active" ? "Active" : "Inactive"}
-                      </span>
-                      {s.validUpto && <span className="text-[10px] text-muted-foreground">Valid: {s.validUpto}</span>}
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-3 pt-2 border-t text-[10px] text-muted-foreground">
-                  {COMPANIES.find(c => c.id === s.companyId)?.nameShort || s.companyId}
-                </div>
-              </Card>
-            );
-          })}
+      {/* ── Admin Roles Tab ── */}
+      {activeTab === "roles" && (
+        <div className="space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm text-muted-foreground">Assign roles to admin users who log into this panel.</p>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setShowMatrix(m => !m)}>
+                <Info size={14} className="mr-1.5" />{showMatrix ? "Hide" : "Show"} Permissions Matrix
+              </Button>
+              <Button variant="outline" size="sm" onClick={fetchAdminUsers} disabled={rolesLoading}>
+                <RefreshCw size={14} className={`mr-1.5 ${rolesLoading ? "animate-spin" : ""}`} />Refresh
+              </Button>
+            </div>
+          </div>
+
+          {/* My Role Banner */}
+          <div className="bg-white rounded-xl border p-4 flex items-center gap-3">
+            <ShieldCheck size={20} className="text-[#0d5040] shrink-0" />
+            <div>
+              <p className="text-sm font-medium">
+                Your role: <Badge className={`ml-1 text-xs border-0 ${ROLE_COLORS[myRole]}`}>{ADMIN_ROLE_LABELS[myRole]}</Badge>
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">{ROLE_DESCRIPTIONS[myRole]}</p>
+            </div>
+          </div>
+
+          {/* Permissions Matrix */}
+          {showMatrix && (
+            <div className="bg-white rounded-xl border overflow-hidden">
+              <div className="px-4 py-3 border-b bg-muted/30">
+                <p className="text-sm font-semibold">Permissions Matrix</p>
+                <p className="text-xs text-muted-foreground">What each role can do per module</p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-semibold">Module</th>
+                      {ALL_ADMIN_ROLES.map(r => (
+                        <th key={r} className="px-2 py-2 text-center font-semibold whitespace-nowrap">
+                          <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] ${ROLE_COLORS[r]}`}>
+                            {ADMIN_ROLE_LABELS[r]}
+                          </span>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {[
+                      ["Bookings",    { super_admin: "All", admin: "All", accounts: "View", manager: "Edit", sales: "Edit", operations: "View", guide: "—", staff: "—", read_only: "View" }],
+                      ["Payments",    { super_admin: "All", admin: "All", accounts: "All", manager: "View", sales: "Create", operations: "View", guide: "—", staff: "—", read_only: "View" }],
+                      ["Expenses",    { super_admin: "All", admin: "All", accounts: "All", manager: "View", sales: "—", operations: "View", guide: "—", staff: "—", read_only: "View" }],
+                      ["Accounting",  { super_admin: "All", admin: "All", accounts: "All", manager: "View", sales: "—", operations: "—", guide: "—", staff: "—", read_only: "View" }],
+                      ["Payroll",     { super_admin: "All", admin: "All", accounts: "All", manager: "—", sales: "—", operations: "—", guide: "—", staff: "—", read_only: "—" }],
+                      ["Groups",      { super_admin: "All", admin: "All", accounts: "View", manager: "All", sales: "View", operations: "All", guide: "View", staff: "View", read_only: "View" }],
+                      ["Pilgrims",    { super_admin: "All", admin: "All", accounts: "View", manager: "All", sales: "View", operations: "All", guide: "View", staff: "View", read_only: "View" }],
+                      ["Audit Logs",  { super_admin: "All", admin: "All", accounts: "View", manager: "—", sales: "—", operations: "—", guide: "—", staff: "—", read_only: "—" }],
+                      ["User Roles",  { super_admin: "All", admin: "View", accounts: "—", manager: "—", sales: "—", operations: "—", guide: "—", staff: "—", read_only: "—" }],
+                    ].map(([mod, perms]) => (
+                      <tr key={mod as string} className="hover:bg-muted/10">
+                        <td className="px-3 py-1.5 font-medium">{mod as string}</td>
+                        {ALL_ADMIN_ROLES.map(r => {
+                          const val = (perms as any)[r] || "—";
+                          return (
+                            <td key={r} className={`px-2 py-1.5 text-center ${val === "All" ? "text-green-700 font-bold" : val === "—" ? "text-red-400" : "text-blue-600"}`}>
+                              {val}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Role Reference Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {ALL_ADMIN_ROLES.map(role => (
+              <div key={role} className="bg-white rounded-lg border p-3">
+                <Badge className={`text-[10px] border-0 mb-1 ${ROLE_COLORS[role]}`}>{ADMIN_ROLE_LABELS[role]}</Badge>
+                <p className="text-xs text-muted-foreground">{ROLE_DESCRIPTIONS[role]}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Admin Users Table */}
+          <div className="bg-white rounded-xl border overflow-hidden">
+            <div className="px-4 py-3 border-b bg-muted/30 flex items-center gap-2">
+              <Users size={15} className="text-muted-foreground" />
+              <p className="text-sm font-semibold">Admin Users ({adminUsers.length})</p>
+              {!canEditRoles && (
+                <p className="text-xs text-muted-foreground ml-2">
+                  Only Super Admins can change roles.
+                </p>
+              )}
+            </div>
+            {rolesLoading ? (
+              <div className="py-12 text-center text-muted-foreground text-sm">Loading…</div>
+            ) : adminUsers.length === 0 ? (
+              <div className="py-12 text-center text-muted-foreground text-sm">No admin users found</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50 text-xs text-muted-foreground uppercase tracking-wider">
+                    <tr>
+                      <th className="px-4 py-2.5 text-left">Name / Mobile</th>
+                      <th className="px-4 py-2.5 text-left">Email</th>
+                      <th className="px-4 py-2.5 text-left">Current Role</th>
+                      {canEditRoles && <th className="px-4 py-2.5 text-left">Change Role</th>}
+                      <th className="px-4 py-2.5 text-left">Joined</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {adminUsers.map(u => {
+                      const role = (u.admin_role || "read_only") as AdminRole;
+                      return (
+                        <tr key={u.id} className="hover:bg-muted/20">
+                          <td className="px-4 py-3">
+                            <p className="font-medium">{u.name || "—"}</p>
+                            <p className="text-xs text-muted-foreground font-mono">{u.mobile}</p>
+                          </td>
+                          <td className="px-4 py-3 text-xs text-muted-foreground">{u.email || "—"}</td>
+                          <td className="px-4 py-3">
+                            <Badge className={`text-[11px] border-0 ${ROLE_COLORS[role]}`}>
+                              {ADMIN_ROLE_LABELS[role] || role}
+                            </Badge>
+                          </td>
+                          {canEditRoles && (
+                            <td className="px-4 py-3">
+                              <select
+                                value={role}
+                                disabled={savingRole === u.id}
+                                onChange={e => changeAdminRole(u.id, e.target.value as AdminRole)}
+                                className="h-8 px-2 rounded border text-sm bg-background disabled:opacity-50 cursor-pointer"
+                              >
+                                {ALL_ADMIN_ROLES.map(r => (
+                                  <option key={r} value={r}>{ADMIN_ROLE_LABELS[r]}</option>
+                                ))}
+                              </select>
+                              {savingRole === u.id && (
+                                <span className="ml-2 text-xs text-muted-foreground">Saving…</span>
+                              )}
+                            </td>
+                          )}
+                          <td className="px-4 py-3 text-xs text-muted-foreground">
+                            {u.created_at ? new Date(u.created_at).toLocaleDateString("en-IN") : "—"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -359,7 +626,6 @@ export default function StaffManager() {
           </DialogHeader>
           <div className="space-y-6 mt-4">
 
-            {/* Basic Info */}
             <div>
               <h3 className="text-sm font-bold uppercase tracking-wider mb-3 text-muted-foreground">Basic Info</h3>
               <div className="grid grid-cols-2 gap-4">
@@ -414,7 +680,6 @@ export default function StaffManager() {
               </div>
             </div>
 
-            {/* Contact */}
             <div>
               <h3 className="text-sm font-bold uppercase tracking-wider mb-3 text-muted-foreground">Contact & Identity</h3>
               <div className="grid grid-cols-2 gap-4">
@@ -450,7 +715,6 @@ export default function StaffManager() {
               </div>
             </div>
 
-            {/* Employment */}
             <div>
               <h3 className="text-sm font-bold uppercase tracking-wider mb-3 text-muted-foreground">Employment</h3>
               <div className="grid grid-cols-2 gap-4">
