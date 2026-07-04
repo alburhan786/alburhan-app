@@ -721,6 +721,64 @@ async function runMigrations() {
   } catch (err) {
     console.error("[Migration] payroll_runs table failed:", err);
   }
+  // ── Salary components (structured salary breakdown per employee) ───────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS salary_components (
+        id TEXT PRIMARY KEY,
+        employee_id TEXT NOT NULL REFERENCES employees(id),
+        name TEXT NOT NULL,
+        type TEXT NOT NULL DEFAULT 'earning',
+        calculation TEXT NOT NULL DEFAULT 'fixed',
+        value NUMERIC(12,2) NOT NULL DEFAULT 0,
+        basis TEXT,
+        is_active BOOLEAN NOT NULL DEFAULT true,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS sc_employee_idx ON salary_components(employee_id)`);
+    console.log("[Migration] salary_components table ensured");
+  } catch (err) {
+    console.error("[Migration] salary_components table failed:", err);
+  }
+  // ── Payroll entries (line items per payroll run) ────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS payroll_entries (
+        id TEXT PRIMARY KEY,
+        payroll_run_id TEXT NOT NULL REFERENCES payroll_runs(id) ON DELETE CASCADE,
+        employee_id TEXT NOT NULL,
+        month TEXT NOT NULL,
+        component_name TEXT NOT NULL,
+        component_type TEXT NOT NULL DEFAULT 'earning',
+        amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS pe_run_idx ON payroll_entries(payroll_run_id)`);
+    console.log("[Migration] payroll_entries table ensured");
+  } catch (err) {
+    console.error("[Migration] payroll_entries table failed:", err);
+  }
+  // ── Employee advances ──────────────────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS employee_advances (
+        id TEXT PRIMARY KEY,
+        employee_id TEXT NOT NULL REFERENCES employees(id),
+        amount NUMERIC(12,2) NOT NULL,
+        date TEXT NOT NULL,
+        reason TEXT,
+        status TEXT NOT NULL DEFAULT 'pending',
+        payroll_run_id TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS ea_employee_idx ON employee_advances(employee_id)`);
+    console.log("[Migration] employee_advances table ensured");
+  } catch (err) {
+    console.error("[Migration] employee_advances table failed:", err);
+  }
   // ── Assets table ───────────────────────────────────────────────────────────
   try {
     await pool.query(`

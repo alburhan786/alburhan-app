@@ -5,7 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2, RefreshCw, Search, Package } from "lucide-react";
+import { Plus, Pencil, Trash2, RefreshCw, Search, Package, Printer } from "lucide-react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+
+const COMPANY = "Al Burhan Tours & Travels";
+const COMPANY_ADDRESS = "Contact: +91 98939 89786 | alburhantravels.com";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -111,6 +116,83 @@ export default function AssetManager() {
     setSaving(false);
   }
 
+  function printAssetRegister() {
+    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    const W = doc.internal.pageSize.getWidth();
+    let y = 12;
+    doc.setFontSize(14); doc.setFont("helvetica", "bold");
+    doc.text(COMPANY, W / 2, y, { align: "center" }); y += 6;
+    doc.setFontSize(9); doc.setFont("helvetica", "normal");
+    doc.text(COMPANY_ADDRESS, W / 2, y, { align: "center" }); y += 5;
+    doc.setFontSize(11); doc.setFont("helvetica", "bold");
+    doc.text("ASSET REGISTER", W / 2, y, { align: "center" }); y += 4;
+    doc.setFontSize(8); doc.setFont("helvetica", "normal");
+    doc.text(`Generated: ${new Date().toLocaleDateString("en-IN")} | Total Assets: ${filtered.length}`, W / 2, y, { align: "center" });
+    y += 4;
+
+    (autoTable as any)(doc, {
+      startY: y,
+      head: [[
+        "Asset Name", "Category", "Purchased", "Vendor", "Location",
+        "Age (yrs)", "Cost (₹)", "Depr. Rate", "Book Value (₹)", "Warranty"
+      ]],
+      body: filtered.map(a => {
+        const cat = catMap[a.category];
+        return [
+          a.name + (a.serial_number ? `\n${a.serial_number}` : ""),
+          (cat?.icon || "") + " " + (cat?.label || a.category),
+          a.purchase_date,
+          a.vendor || "—",
+          a.location || "—",
+          String(a.age_years) + "y",
+          "₹" + a.purchase_price.toLocaleString("en-IN", { maximumFractionDigits: 0 }),
+          Math.round(a.depreciation_rate * 100) + "%",
+          "₹" + a.book_value.toLocaleString("en-IN", { maximumFractionDigits: 0 }),
+          a.warranty_date ? (a.warranty_expired ? "Expired" : "Valid till " + a.warranty_date) : "—",
+        ];
+      }),
+      foot: [[
+        `TOTAL (${filtered.length})`, "", "", "", "", "",
+        "₹" + totalCost.toLocaleString("en-IN", { maximumFractionDigits: 0 }),
+        "",
+        "₹" + totalBook.toLocaleString("en-IN", { maximumFractionDigits: 0 }),
+        "",
+      ]],
+      styles: { fontSize: 7, cellPadding: 1.5 },
+      headStyles: { fillColor: [13, 80, 64] },
+      footStyles: { fillColor: [240, 240, 240], fontStyle: "bold" },
+      columnStyles: {
+        6: { halign: "right" }, 7: { halign: "right" }, 8: { halign: "right" },
+      },
+      margin: { left: 8, right: 8 },
+    });
+
+    // Summary by category at the end
+    const finalY = (doc as any).lastAutoTable.finalY + 6;
+    if (finalY < doc.internal.pageSize.getHeight() - 30) {
+      doc.setFontSize(9); doc.setFont("helvetica", "bold");
+      doc.text("Summary by Category", 8, finalY);
+      (autoTable as any)(doc, {
+        startY: finalY + 3,
+        head: [["Category", "Count", "Total Cost (₹)", "Total Book Value (₹)", "Depreciation (₹)"]],
+        body: CATEGORIES.filter(c => catTotals[c.value]).map(c => [
+          (c.icon || "") + " " + c.label,
+          String(catTotals[c.value].count),
+          "₹" + catTotals[c.value].cost.toLocaleString("en-IN", { maximumFractionDigits: 0 }),
+          "₹" + catTotals[c.value].book.toLocaleString("en-IN", { maximumFractionDigits: 0 }),
+          "₹" + (catTotals[c.value].cost - catTotals[c.value].book).toLocaleString("en-IN", { maximumFractionDigits: 0 }),
+        ]),
+        styles: { fontSize: 7 },
+        headStyles: { fillColor: [13, 80, 64] },
+        columnStyles: { 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" } },
+        margin: { left: 8, right: 8 },
+        tableWidth: 120,
+      });
+    }
+
+    doc.save(`asset-register-${new Date().toISOString().slice(0, 10)}.pdf`);
+  }
+
   async function remove(id: string, name: string) {
     if (!confirm(`Delete asset "${name}"?`)) return;
     const r = await fetch(`${API}/api/assets/${id}`, { method: "DELETE", credentials: "include" });
@@ -182,6 +264,9 @@ export default function AssetManager() {
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={load} disabled={loading}>
               <RefreshCw size={14} className={`mr-1.5 ${loading ? "animate-spin" : ""}`} />Refresh
+            </Button>
+            <Button variant="outline" size="sm" onClick={printAssetRegister} disabled={!filtered.length}>
+              <Printer size={14} className="mr-1.5" />Print Register
             </Button>
             <Button size="sm" className="bg-[#0d5040] hover:bg-[#0a3d30]" onClick={openAdd}>
               <Plus size={14} className="mr-1.5" />Add Asset

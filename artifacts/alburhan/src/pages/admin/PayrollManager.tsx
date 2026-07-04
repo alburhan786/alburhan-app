@@ -18,7 +18,7 @@ function fmt(n: number) {
   return "₹" + (n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2, minimumFractionDigits: 2 });
 }
 
-const TABS = ["employees", "payroll", "register"] as const;
+const TABS = ["employees", "payroll", "advances", "register"] as const;
 type Tab = typeof TABS[number];
 
 const DEPARTMENTS = ["Management", "Operations", "Sales", "Finance", "IT", "Admin", "Field Staff", "Other"];
@@ -37,6 +37,10 @@ const EMPTY_RUN = {
   advance_deduction: "0", tds_deduction: "0", other_deductions: "0", notes: "",
 };
 
+const EMPTY_ADVANCE = {
+  employee_id: "", amount: "", date: new Date().toISOString().slice(0, 10), reason: "",
+};
+
 export default function PayrollManager() {
   const { toast } = useToast();
   const [tab, setTab] = useState<Tab>("employees");
@@ -45,9 +49,12 @@ export default function PayrollManager() {
   const [loading, setLoading] = useState(false);
   const [showEmpModal, setShowEmpModal] = useState(false);
   const [showRunModal, setShowRunModal] = useState(false);
+  const [showAdvanceModal, setShowAdvanceModal] = useState(false);
   const [editEmpId, setEditEmpId] = useState<string | null>(null);
   const [empForm, setEmpForm] = useState(EMPTY_EMP);
   const [runForm, setRunForm] = useState(EMPTY_RUN);
+  const [advanceForm, setAdvanceForm] = useState(EMPTY_ADVANCE);
+  const [advances, setAdvances] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
   const [regMonth, setRegMonth] = useState(new Date().toISOString().slice(0, 7));
 
@@ -73,13 +80,25 @@ export default function PayrollManager() {
     setLoading(false);
   }, [regMonth, toast]);
 
+  const loadAdvances = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await fetch(`${API}/api/payroll/advances`, { credentials: "include" });
+      if (r.ok) setAdvances(await r.json());
+    } catch (e: any) {
+      toast({ title: "Failed to load advances", description: e.message, variant: "destructive" });
+    }
+    setLoading(false);
+  }, [toast]);
+
   useEffect(() => {
     loadEmployees();
   }, [loadEmployees]);
 
   useEffect(() => {
     if (tab === "register") loadRegister();
-  }, [tab, loadRegister]);
+    if (tab === "advances") loadAdvances();
+  }, [tab, loadRegister, loadAdvances]);
 
   function openAddEmp() { setEditEmpId(null); setEmpForm(EMPTY_EMP); setShowEmpModal(true); }
   function openEditEmp(emp: any) {
@@ -243,9 +262,43 @@ export default function PayrollManager() {
     }
   }
 
+  async function saveAdvance() {
+    if (!advanceForm.employee_id || !advanceForm.amount || !advanceForm.date) {
+      toast({ title: "Employee, amount and date are required", variant: "destructive" }); return;
+    }
+    setSaving(true);
+    try {
+      const r = await fetch(`${API}/api/payroll/advances`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(advanceForm),
+      });
+      if (!r.ok) throw new Error(await r.text());
+      toast({ title: "Advance recorded — will auto-deduct in next payroll run" });
+      setShowAdvanceModal(false);
+      setAdvanceForm(EMPTY_ADVANCE);
+      await loadAdvances();
+    } catch (e: any) {
+      toast({ title: "Failed to record advance", description: e.message, variant: "destructive" });
+    }
+    setSaving(false);
+  }
+
+  async function cancelAdvance(id: string) {
+    if (!confirm("Cancel this advance?")) return;
+    const r = await fetch(`${API}/api/payroll/advances/${id}`, {
+      method: "PUT", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "cancelled" }),
+    });
+    if (r.ok) { toast({ title: "Advance cancelled" }); await loadAdvances(); }
+    else toast({ title: "Failed to cancel advance", variant: "destructive" });
+  }
+
   const tabLabels: Record<Tab, string> = {
     employees: "Employees",
     payroll: "Run Payroll",
+    advances: "Advances",
     register: "Salary Register",
   };
 
@@ -301,6 +354,12 @@ export default function PayrollManager() {
                 </Button>
               </>
             )}
+            {tab === "advances" && (
+              <Button size="sm" className="bg-[#0d5040] hover:bg-[#0a3d30]"
+                onClick={() => { setAdvanceForm(EMPTY_ADVANCE); setShowAdvanceModal(true); }}>
+                <Plus size={14} className="mr-1.5" />Record Advance
+              </Button>
+            )}
           </div>
         </div>
 
@@ -333,6 +392,79 @@ export default function PayrollManager() {
               <p className="text-xs text-muted-foreground">Departments</p>
               <p className="text-2xl font-bold text-gray-800 mt-1">{new Set(employees.map(e => e.department).filter(Boolean)).size}</p>
             </div>
+          </div>
+        )}
+
+        {/* ADVANCES TAB */}
+        {tab === "advances" && (
+          <div className="bg-white rounded-xl border overflow-hidden">
+            {loading ? (
+              <div className="py-16 text-center text-muted-foreground">Loading…</div>
+            ) : advances.length === 0 ? (
+              <div className="py-16 text-center">
+                <FileText size={32} className="mx-auto text-muted-foreground/30 mb-2" />
+                <p className="text-muted-foreground text-sm">No salary advances recorded yet</p>
+                <Button size="sm" className="mt-3 bg-[#0d5040]"
+                  onClick={() => { setAdvanceForm(EMPTY_ADVANCE); setShowAdvanceModal(true); }}>
+                  <Plus size={13} className="mr-1" />Record First Advance
+                </Button>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50 text-xs text-muted-foreground uppercase tracking-wider">
+                    <tr>
+                      <th className="px-4 py-2.5 text-left">Employee</th>
+                      <th className="px-4 py-2.5 text-left">Date</th>
+                      <th className="px-4 py-2.5 text-right">Amount</th>
+                      <th className="px-4 py-2.5 text-left">Reason</th>
+                      <th className="px-4 py-2.5 text-left">Status</th>
+                      <th className="px-4 py-2.5 text-left">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {advances.map(adv => (
+                      <tr key={adv.id} className="hover:bg-muted/20">
+                        <td className="px-4 py-2.5 font-medium">{adv.employee_name}</td>
+                        <td className="px-4 py-2.5 text-xs text-muted-foreground">{adv.date}</td>
+                        <td className="px-4 py-2.5 text-right font-semibold">{fmt(parseFloat(adv.amount))}</td>
+                        <td className="px-4 py-2.5 text-xs text-muted-foreground">{adv.reason || "—"}</td>
+                        <td className="px-4 py-2.5">
+                          {adv.status === "pending" && (
+                            <Badge className="text-[10px] bg-yellow-100 text-yellow-800 border-0">Pending — Auto-deduct</Badge>
+                          )}
+                          {adv.status === "deducted" && (
+                            <Badge className="text-[10px] bg-green-100 text-green-800 border-0">Deducted</Badge>
+                          )}
+                          {adv.status === "cancelled" && (
+                            <Badge className="text-[10px] bg-gray-100 text-gray-500 border-0">Cancelled</Badge>
+                          )}
+                        </td>
+                        <td className="px-4 py-2.5">
+                          {adv.status === "pending" && (
+                            <Button size="sm" variant="ghost" className="h-7 text-xs text-red-600 hover:bg-red-50"
+                              onClick={() => cancelAdvance(adv.id)}>
+                              Cancel
+                            </Button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="bg-muted/30 border-t font-semibold text-xs">
+                    <tr>
+                      <td colSpan={2} className="px-4 py-2.5">
+                        Pending: {advances.filter(a => a.status === "pending").length} | Total Pending:
+                      </td>
+                      <td className="px-4 py-2.5 text-right text-yellow-700">
+                        {fmt(advances.filter(a => a.status === "pending").reduce((s, a) => s + parseFloat(a.amount || 0), 0))}
+                      </td>
+                      <td colSpan={3} />
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
           </div>
         )}
 
@@ -538,6 +670,53 @@ export default function PayrollManager() {
           </div>
         )}
       </div>
+
+      {/* Record Advance Modal */}
+      <Dialog open={showAdvanceModal} onOpenChange={setShowAdvanceModal}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Record Salary Advance</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 mt-2">
+            <div>
+              <label className="text-xs font-medium">Employee *</label>
+              <select value={advanceForm.employee_id}
+                onChange={e => setAdvanceForm(f => ({ ...f, employee_id: e.target.value }))}
+                className="mt-1 w-full h-9 px-2 rounded border text-sm bg-background">
+                <option value="">— Select Employee —</option>
+                {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name} ({emp.department || "—"})</option>)}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium">Amount (₹) *</label>
+                <Input type="number" min="0" value={advanceForm.amount}
+                  onChange={e => setAdvanceForm(f => ({ ...f, amount: e.target.value }))} className="mt-1" />
+              </div>
+              <div>
+                <label className="text-xs font-medium">Date *</label>
+                <Input type="date" value={advanceForm.date}
+                  onChange={e => setAdvanceForm(f => ({ ...f, date: e.target.value }))} className="mt-1" />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-medium">Reason</label>
+              <Input value={advanceForm.reason}
+                onChange={e => setAdvanceForm(f => ({ ...f, reason: e.target.value }))}
+                placeholder="e.g. Medical emergency" className="mt-1" />
+            </div>
+            <p className="text-xs text-muted-foreground bg-yellow-50 border border-yellow-200 rounded p-2">
+              This advance will be automatically deducted from the employee's next payroll run.
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" size="sm" onClick={() => setShowAdvanceModal(false)}>Cancel</Button>
+              <Button size="sm" className="bg-[#0d5040]" onClick={saveAdvance} disabled={saving}>
+                {saving ? "Saving…" : "Record Advance"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Add/Edit Employee Modal */}
       <Dialog open={showEmpModal} onOpenChange={setShowEmpModal}>

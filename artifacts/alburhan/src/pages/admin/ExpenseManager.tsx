@@ -142,9 +142,11 @@ export default function ExpenseManager() {
       description: e.description, amount: e.amount, date: e.date,
       paidBy: e.paidBy || "", paymentMethod: e.paymentMethod || "cash",
       invoiceNumber: e.invoiceNumber || "", notes: e.notes || "", status: e.status || "approved",
-      gst_percent: (e as any).gst_percent || "", cgst_amount: (e as any).cgst_amount || "",
-      sgst_amount: (e as any).sgst_amount || "", igst_amount: (e as any).igst_amount || "",
-      hsn_sac: (e as any).hsn_sac || "",
+      gst_percent: String((e as any).gstPercent ?? (e as any).gst_percent ?? ""),
+      cgst_amount: String((e as any).cgstAmount ?? (e as any).cgst_amount ?? ""),
+      sgst_amount: String((e as any).sgstAmount ?? (e as any).sgst_amount ?? ""),
+      igst_amount: String((e as any).igstAmount ?? (e as any).igst_amount ?? ""),
+      hsn_sac: (e as any).hsnSac || (e as any).hsn_sac || "",
     });
     setShowModal(true);
   }

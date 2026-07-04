@@ -90,12 +90,75 @@ router.delete("/employees/:id", requireAdmin as any, async (req: AuthenticatedRe
   }
 });
 
+// ── Advance Management ────────────────────────────────────────────────────────
+router.get("/advances/:employeeId", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const rows = await q(
+      `SELECT ea.*, e.name AS employee_name
+       FROM employee_advances ea
+       JOIN employees e ON e.id=ea.employee_id
+       WHERE ea.employee_id=$1 ORDER BY ea.created_at DESC`,
+      [req.params.employeeId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("[payroll] GET /advances/:id:", err);
+    res.status(500).json({ error: "Failed to fetch advances" });
+  }
+});
+
+router.get("/advances", requireAdmin as any, async (_req, res) => {
+  try {
+    const rows = await q(
+      `SELECT ea.*, e.name AS employee_name, e.department
+       FROM employee_advances ea
+       JOIN employees e ON e.id=ea.employee_id
+       ORDER BY ea.created_at DESC LIMIT 100`
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("[payroll] GET /advances:", err);
+    res.status(500).json({ error: "Failed to fetch advances" });
+  }
+});
+
+router.post("/advances", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { employee_id, amount, date, reason } = req.body;
+    if (!employee_id || !amount || !date) return res.status(400).json({ error: "employee_id, amount, date required" });
+    const row = await q1(
+      `INSERT INTO employee_advances (id,employee_id,amount,date,reason)
+       VALUES (gen_random_uuid()::text,$1,$2,$3,$4) RETURNING *`,
+      [employee_id, String(amount), date, reason||null]
+    );
+    res.json(row);
+  } catch (err) {
+    console.error("[payroll] POST /advances:", err);
+    res.status(500).json({ error: "Failed to record advance" });
+  }
+});
+
+router.put("/advances/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { status } = req.body;
+    const row = await q1(
+      `UPDATE employee_advances SET status=$1 WHERE id=$2 RETURNING *`,
+      [status, req.params.id]
+    );
+    if (!row) return res.status(404).json({ error: "Advance not found" });
+    res.json(row);
+  } catch (err) {
+    console.error("[payroll] PUT /advances/:id:", err);
+    res.status(500).json({ error: "Failed to update advance" });
+  }
+});
+
 // ── Process Monthly Payroll ───────────────────────────────────────────────────
 router.post("/run", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
     const {
       employee_id, month, present_days, working_days,
-      advance_deduction, tds_deduction, other_deductions, notes
+      tds_deduction, other_deductions, notes
     } = req.body;
     if (!employee_id || !month) return res.status(400).json({ error: "employee_id and month required" });
 
@@ -109,7 +172,7 @@ router.post("/run", requireAdmin as any, async (req: AuthenticatedRequest, res) 
     const basic = parseFloat(emp.basic_salary || 0) * ratio;
     const hra = parseFloat(emp.hra || 0) * ratio;
     const allowances = emp.allowances || {};
-    const allowTotal = Object.values(allowances).reduce((s: number, v: any) => s + parseFloat(v || 0), 0) * ratio;
+    const allowTotal = Object.values(allowances as Record<string, any>).reduce((s: number, v: any) => s + parseFloat(v || 0), 0) * ratio;
     const gross = basic + hra + allowTotal;
 
     // PF: 12% of basic (mandatory if basic ≤ 15000 under EPFO)
@@ -117,16 +180,26 @@ router.post("/run", requireAdmin as any, async (req: AuthenticatedRequest, res) 
     // ESI: 0.75% of gross if gross ≤ 21000/month
     const esiDeduction = gross <= 21000 ? gross * 0.0075 : 0;
     const tds = parseFloat(tds_deduction || 0);
-    const advance = parseFloat(advance_deduction || 0);
     const other = parseFloat(other_deductions || 0);
+
+    // Auto-fetch pending advances for this employee and sum them
+    const pendingAdvances = await q(
+      `SELECT * FROM employee_advances WHERE employee_id=$1 AND status='pending' ORDER BY date`,
+      [employee_id]
+    );
+    const autoAdvance = pendingAdvances.reduce((s, a) => s + parseFloat(a.amount || 0), 0);
+    // Allow manual override: if body has advance_deduction, use that; otherwise use auto-sum
+    const manualAdvance = req.body.advance_deduction !== undefined ? parseFloat(req.body.advance_deduction) : null;
+    const advance = manualAdvance !== null ? manualAdvance : autoAdvance;
 
     const totalDeductions = pfDeduction + esiDeduction + tds + advance + other;
     const netSalary = Math.max(0, gross - totalDeductions);
 
     // Check if payroll already run for this employee + month
     const existing = await q1(`SELECT id FROM payroll_runs WHERE employee_id=$1 AND month=$2`, [employee_id, month]);
+    let runId: string;
+
     if (existing) {
-      // Update existing run
       const row = await q1(
         `UPDATE payroll_runs SET
           present_days=$1, working_days=$2, gross_salary=$3, basic_salary=$4, hra=$5,
@@ -137,7 +210,19 @@ router.post("/run", requireAdmin as any, async (req: AuthenticatedRequest, res) 
         [pd, wd, gross, basic, hra, JSON.stringify(allowances), pfDeduction, esiDeduction,
          tds, advance, other, totalDeductions, netSalary, notes||null, existing.id]
       );
-      return res.json({ ...row, employee: emp });
+      runId = existing.id;
+      // Delete old entries for re-run
+      await pool.query(`DELETE FROM payroll_entries WHERE payroll_run_id=$1`, [runId]);
+      // Mark advances as deducted
+      if (pendingAdvances.length > 0) {
+        await pool.query(
+          `UPDATE employee_advances SET status='deducted', payroll_run_id=$1 WHERE employee_id=$2 AND status='pending'`,
+          [runId, employee_id]
+        );
+      }
+      // Create fresh payroll entries
+      await insertPayrollEntries(runId, employee_id, month, { basic, hra, allowances, allowTotal, gross, pfDeduction, esiDeduction, tds, advance, other });
+      return res.json({ ...row, employee: emp, advance_auto_detected: autoAdvance, pending_advances_count: pendingAdvances.length });
     }
 
     const row = await q1(
@@ -148,12 +233,54 @@ router.post("/run", requireAdmin as any, async (req: AuthenticatedRequest, res) 
       [employee_id, month, pd, wd, gross, basic, hra, JSON.stringify(allowances),
        pfDeduction, esiDeduction, tds, advance, other, totalDeductions, netSalary, notes||null]
     );
-    res.json({ ...row, employee: emp });
+    runId = row.id;
+
+    // Mark advances as deducted
+    if (pendingAdvances.length > 0) {
+      await pool.query(
+        `UPDATE employee_advances SET status='deducted', payroll_run_id=$1 WHERE employee_id=$2 AND status='pending'`,
+        [runId, employee_id]
+      );
+    }
+
+    // Create payroll_entries line items
+    await insertPayrollEntries(runId, employee_id, month, { basic, hra, allowances, allowTotal, gross, pfDeduction, esiDeduction, tds, advance, other });
+
+    res.json({ ...row, employee: emp, advance_auto_detected: autoAdvance, pending_advances_count: pendingAdvances.length });
   } catch (err) {
     console.error("[payroll] POST /run:", err);
     res.status(500).json({ error: "Failed to process payroll" });
   }
 });
+
+async function insertPayrollEntries(
+  runId: string, employeeId: string, month: string,
+  { basic, hra, allowances, allowTotal, gross, pfDeduction, esiDeduction, tds, advance, other }:
+  { basic: number; hra: number; allowances: Record<string, any>; allowTotal: number; gross: number;
+    pfDeduction: number; esiDeduction: number; tds: number; advance: number; other: number }
+) {
+  const entries: Array<[string, string, string, string, string, number]> = [
+    [runId, employeeId, month, "Basic Salary", "earning", basic],
+    [runId, employeeId, month, "HRA", "earning", hra],
+  ];
+  Object.entries(allowances).forEach(([k, v]) => {
+    const amt = parseFloat(String(v || 0));
+    if (amt > 0) entries.push([runId, employeeId, month, k.charAt(0).toUpperCase() + k.slice(1) + " Allowance", "earning", amt]);
+  });
+  entries.push([runId, employeeId, month, "PF Deduction", "deduction", pfDeduction]);
+  if (esiDeduction > 0) entries.push([runId, employeeId, month, "ESI Deduction", "deduction", esiDeduction]);
+  if (tds > 0) entries.push([runId, employeeId, month, "TDS", "deduction", tds]);
+  if (advance > 0) entries.push([runId, employeeId, month, "Advance Recovery", "deduction", advance]);
+  if (other > 0) entries.push([runId, employeeId, month, "Other Deductions", "deduction", other]);
+
+  for (const [rid, eid, m, name, type, amount] of entries) {
+    await pool.query(
+      `INSERT INTO payroll_entries (id,payroll_run_id,employee_id,month,component_name,component_type,amount)
+       VALUES (gen_random_uuid()::text,$1,$2,$3,$4,$5,$6)`,
+      [rid, eid, m, name, type, amount]
+    );
+  }
+}
 
 // ── Payroll Register ──────────────────────────────────────────────────────────
 router.get("/register", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
