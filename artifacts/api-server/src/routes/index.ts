@@ -38,7 +38,9 @@ const router: IRouter = Router();
 // Temporary: serve pre-built frontend dist for VPS deployment
 router.get("/download-dist", (_req, res) => {
   const candidates = [
+    "/home/runner/workspace/artifacts/alburhan/dist/public/frontend-dist.tar.gz",
     "/home/runner/workspace/frontend-dist.tar.gz",
+    path.resolve(process.cwd(), "../../artifacts/alburhan/dist/public/frontend-dist.tar.gz"),
     path.resolve(process.cwd(), "../../frontend-dist.tar.gz"),
     path.resolve(process.cwd(), "frontend-dist.tar.gz"),
   ];
