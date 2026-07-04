@@ -140,36 +140,11 @@ export async function sendOtpSMS(mobile: string, otp: string): Promise<SmsResult
   const attempts: SmsRouteAttempt[] = [];
   const errors: string[] = [];
 
-  // ── Route 1: OTP route (Fast2SMS built-in pre-approved template) ──────────
-  {
-    const t0 = Date.now();
-    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&variables_values=${encodeURIComponent(otp)}&route=otp&numbers=${phone}&flash=0`;
-    const maskedUrl = url.replace(apiKey, apiKeyMasked);
-    console.log(`[OTP-SMS][otp-route] → ${maskedUrl}`);
-    try {
-      const r = await axios.get(url, { timeout: 12000 });
-      const durationMs = Date.now() - t0;
-      const { code, message } = extractF2sError(r.data);
-      const success = r.data?.return === true;
-      console.log(`[OTP-SMS][otp-route] ← HTTP ${r.status} | return=${r.data?.return} | ${message} (${durationMs}ms)`);
-      attempts.push({ route: "otp", requestUrl: maskedUrl, httpStatus: r.status, responseBody: r.data, success, errorCode: code, errorMessage: success ? undefined : message, durationMs });
-      if (success) {
-        const log: SmsAttemptLog = { id, ts: new Date().toISOString(), mobileMasked: maskMobile(mobile), otp, finalSuccess: true, finalRoute: "otp", attempts, totalDurationMs: Date.now() - overallStart, apiKeyPresent, apiKeyMasked };
-        pushSmsLog(log);
-        return { sent: true, providerResponse: r.data, route: "otp", urlUsed: maskedUrl, logId: id };
-      }
-      errors.push(`otp-route: ${message}`);
-    } catch (err: any) {
-      const durationMs = Date.now() - t0;
-      const errBody = err?.response?.data;
-      const errMsg = errBody ? extractF2sError(errBody).message : (err?.message || String(err));
-      console.error(`[OTP-SMS][otp-route] ✗ ${errMsg} (${durationMs}ms)`);
-      attempts.push({ route: "otp", requestUrl: maskedUrl, httpStatus: err?.response?.status, responseBody: errBody, success: false, errorMessage: errMsg, durationMs });
-      errors.push(`otp-route: ${errMsg}`);
-    }
-  }
+  // NOTE: Fast2SMS route=otp requires website verification (status_code 996).
+  // That step has not been completed on this account, so we skip it entirely
+  // and go straight to DLT (registered template) → Quick fallback.
 
-  // ── Route 2: DLT route (custom registered template) ───────────────────────
+  // ── Route 1: DLT route (registered Sender ID + Template) ─────────────────
   {
     const t0 = Date.now();
     const variables = encodeURIComponent(`${otp}|`);
@@ -252,15 +227,8 @@ export async function testSmsDiagnostics(phone: string, otp: string): Promise<Re
 
   if (!apiKey) return diag;
 
-  // OTP route
-  try {
-    const t0 = Date.now();
-    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&variables_values=${encodeURIComponent(otp)}&route=otp&numbers=${cleanPhone}&flash=0`;
-    const r = await axios.get(url, { timeout: 12000 });
-    diag.otp_route = { status: r.status, body: r.data, durationMs: Date.now() - t0 };
-  } catch (e: any) {
-    diag.otp_route = { error: e?.response?.data || e?.message };
-  }
+  // OTP route — SKIPPED: requires website verification (status_code 996 on this account)
+  diag.otp_route = { skipped: true, reason: "route=otp requires Fast2SMS website verification (status_code 996). Use DLT or Quick instead." };
 
   // DLT route
   try {
