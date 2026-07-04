@@ -37,6 +37,8 @@ import vendorsRouter from "./vendors.js";
 import gstRouter from "./gst.js";
 import payrollRouter from "./payroll.js";
 import assetsRouter from "./assets.js";
+import auditRouter from "./audit.js";
+import adminUsersRouter from "./users-admin.js";
 
 const router: IRouter = Router();
 
@@ -107,6 +109,8 @@ router.use("/vendors", vendorsRouter);
 router.use("/gst", gstRouter);
 router.use("/payroll", payrollRouter);
 router.use("/assets", assetsRouter);
+router.use("/audit-logs", auditRouter);
+router.use("/admin-users", adminUsersRouter);
 router.use(storageRouter);
 
 export default router;

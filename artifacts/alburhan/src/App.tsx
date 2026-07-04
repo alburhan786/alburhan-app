@@ -80,6 +80,8 @@ import VendorManager from "@/pages/admin/VendorManager";
 import GSTReports from "@/pages/admin/GSTReports";
 import PayrollManager from "@/pages/admin/PayrollManager";
 import AssetManager from "@/pages/admin/AssetManager";
+import AuditLogs from "@/pages/admin/AuditLogs";
+import UserRolesManager from "@/pages/admin/UserRolesManager";
 import AttendanceScanPublic from "@/pages/public/AttendanceScanPublic";
 import StaffVerify from "@/pages/public/StaffVerify";
 import VerifyPilgrim from "@/pages/public/VerifyPilgrim";
@@ -201,6 +203,8 @@ function Router() {
       <Route path="/admin/gst-reports" component={() => <AdminRoute component={GSTReports} />} />
       <Route path="/admin/payroll" component={() => <AdminRoute component={PayrollManager} />} />
       <Route path="/admin/assets" component={() => <AdminRoute component={AssetManager} />} />
+      <Route path="/admin/audit-logs" component={() => <AdminRoute component={AuditLogs} />} />
+      <Route path="/admin/user-roles" component={() => <AdminRoute component={UserRolesManager} />} />
       <Route path="/admin/flights" component={() => <AdminRoute component={FlightManager} />} />
       <Route path="/admin/groups/:groupId/flights" component={() => <AdminRoute component={FlightManager} />} />
       <Route path="/admin/groups/:groupId/print/single-card/:pilgrimId"    component={() => <AdminRoute component={PrintSingleCard} />} />

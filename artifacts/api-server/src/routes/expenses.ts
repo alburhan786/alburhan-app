@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db, pool, expensesTable } from "@workspace/db";
 import { eq, desc, sql, and } from "drizzle-orm";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
+import { auditLog } from "../lib/audit.js";
 import { postExpenseJournal, voidJournalEntry } from "../lib/journalHelper.js";
 
 const router = Router();
@@ -189,6 +190,9 @@ router.post("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => 
       hsnSac: hsn_sac || null,
     }).returning();
 
+    // Audit log
+    auditLog({ req, action: "created", entityTable: "expenses", entityId: row.id, newValue: row }).catch(() => {});
+
     // Auto-post double-entry journal (fire-and-forget, non-fatal)
     postExpenseJournal({
       expId: row.id,
@@ -251,7 +255,11 @@ router.put("/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) =
 router.delete("/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
     const expId = req.params.id as string;
+    // Snapshot before delete for audit/restore
+    const [snap] = await db.select().from(expensesTable).where(eq(expensesTable.id, expId)).limit(1);
     await db.delete(expensesTable).where(eq(expensesTable.id, expId));
+    // Audit log
+    auditLog({ req, action: "deleted", entityTable: "expenses", entityId: expId, oldValue: snap || null }).catch(() => {});
     // Void journal entry for deleted expense (fire-and-forget, non-fatal)
     voidJournalEntry("expense", expId).catch(() => {});
     res.json({ ok: true });

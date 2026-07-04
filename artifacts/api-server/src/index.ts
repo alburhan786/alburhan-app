@@ -721,6 +721,36 @@ async function runMigrations() {
   } catch (err) {
     console.error("[Migration] payroll_runs table failed:", err);
   }
+  // ── Admin role column on users ─────────────────────────────────────────────
+  try {
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS admin_role TEXT NOT NULL DEFAULT 'super_admin'`);
+    console.log("[Migration] users.admin_role column ensured");
+  } catch (err) {
+    console.error("[Migration] users.admin_role failed:", err);
+  }
+  // ── Unified Audit Logs table ───────────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS audit_logs (
+        id TEXT PRIMARY KEY,
+        actor_id TEXT,
+        actor_name TEXT,
+        action TEXT NOT NULL,
+        entity_table TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        old_value JSONB,
+        new_value JSONB,
+        ip TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS al_entity_idx ON audit_logs(entity_table, entity_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS al_actor_idx ON audit_logs(actor_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS al_created_idx ON audit_logs(created_at)`);
+    console.log("[Migration] audit_logs table ensured");
+  } catch (err) {
+    console.error("[Migration] audit_logs table failed:", err);
+  }
   // ── Salary components (structured salary breakdown per employee) ───────────
   try {
     await pool.query(`

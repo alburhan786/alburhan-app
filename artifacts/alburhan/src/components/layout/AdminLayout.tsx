@@ -7,7 +7,7 @@ import {
   Printer, Menu, Megaphone, ShieldCheck, Inbox, PieChart, Star, BadgeCheck, Droplets,
   TrendingDown, Calculator, Plane, Activity, Home, CreditCard, Trash2,
   Building2, Bus, Heart, FileCheck, Sparkles, UserCheck, BookMarked, Truck,
-  Scale, Users2, Package
+  Scale, Users2, Package, ClipboardList, KeyRound
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -91,6 +91,13 @@ function buildMenu(openComplaints: number): MenuSection[] {
       section: "AI Tools",
       items: [
         { icon: Sparkles, label: "AI Assistant", href: "/admin/ai" },
+      ],
+    },
+    {
+      section: "System",
+      items: [
+        { icon: KeyRound, label: "User Roles", href: "/admin/user-roles" },
+        { icon: ClipboardList, label: "Audit Logs", href: "/admin/audit-logs" },
       ],
     },
   ];
