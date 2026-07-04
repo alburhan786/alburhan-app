@@ -165,7 +165,7 @@ router.get("/accounting-summary", requireAdmin as any, async (_req: Authenticate
 
 router.post("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
-    const { groupId, category, vendor, description, amount, date, paidBy, paymentMethod, invoiceNumber, notes } = req.body;
+    const { groupId, category, vendor, vendorId, description, amount, date, paidBy, paymentMethod, invoiceNumber, notes } = req.body;
     if (!category || !description || !amount || !date) {
       return res.status(400).json({ error: "category, description, amount, date required" });
     }
@@ -173,6 +173,7 @@ router.post("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => 
       groupId: groupId || null,
       category,
       vendor,
+      vendorId: vendorId || null,
       description,
       amount: String(amount),
       date,
@@ -202,9 +203,9 @@ router.post("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => 
 
 router.put("/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
-    const { category, vendor, description, amount, date, paidBy, paymentMethod, invoiceNumber, notes, groupId } = req.body;
+    const { category, vendor, vendorId, description, amount, date, paidBy, paymentMethod, invoiceNumber, notes, groupId } = req.body;
     const [row] = await db.update(expensesTable)
-      .set({ category, vendor, description, amount: String(amount), date, paidBy, paymentMethod, invoiceNumber, notes, groupId: groupId || null, updatedAt: new Date() })
+      .set({ category, vendor, vendorId: vendorId || null, description, amount: String(amount), date, paidBy, paymentMethod, invoiceNumber, notes, groupId: groupId || null, updatedAt: new Date() })
       .where(eq(expensesTable.id, req.params.id))
       .returning();
     if (!row) return res.status(404).json({ error: "Not found" });

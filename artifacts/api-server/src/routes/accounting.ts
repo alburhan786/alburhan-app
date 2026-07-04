@@ -757,61 +757,105 @@ router.get("/customer-ledger/search", requireAdmin as any, async (req: Authentic
   }
 });
 
+async function buildCustomerLedger(mobile: string, from?: string, to?: string) {
+  const customer = await q1(
+    `SELECT id, mobile, name, email FROM users WHERE mobile=$1 LIMIT 1`, [mobile]
+  );
+  if (!customer) return null;
+
+  let bSql = `SELECT b.id, b.booking_number, b.package_name, b.group_id,
+                b.status, b.final_amount, b.total_amount, b.gst_amount,
+                b.paid_amount, b.advance_amount,
+                b.invoice_number, b.created_at, b.notes, b.preferred_departure_date,
+                b.number_of_pilgrims, b.room_type,
+                g.name AS group_name
+             FROM bookings b
+             LEFT JOIN hajj_groups g ON g.id=b.group_id
+             WHERE b.customer_mobile=$1 AND (b.is_deleted IS NULL OR b.is_deleted=false)`;
+  const bParams: any[] = [mobile];
+  if (from) { bParams.push(from); bSql += ` AND DATE(b.created_at)>=$${bParams.length}`; }
+  if (to)   { bParams.push(to);   bSql += ` AND DATE(b.created_at)<=$${bParams.length}`; }
+  bSql += ` ORDER BY b.created_at DESC`;
+
+  const bookings = await q(bSql, bParams);
+  const bookingIds = bookings.map((b: any) => b.id);
+  let payments: any[] = [];
+  if (bookingIds.length > 0) {
+    payments = await q(
+      `SELECT pt.booking_id, pt.id, pt.amount, pt.mode, pt.payment_date,
+              pt.received_by, pt.bank_name, pt.notes
+       FROM payment_transactions pt
+       WHERE pt.booking_id=ANY($1::text[]) AND (pt.is_deleted IS NULL OR pt.is_deleted=false)
+       ORDER BY pt.payment_date ASC`,
+      [bookingIds]
+    );
+  }
+
+  const paymentsByBooking: Record<string, any[]> = {};
+  for (const p of payments) {
+    if (!paymentsByBooking[p.booking_id]) paymentsByBooking[p.booking_id] = [];
+    paymentsByBooking[p.booking_id].push(p);
+  }
+
+  const enriched = bookings.map((b: any) => {
+    const finalAmt = Number(b.final_amount || 0);
+    const totalAmt = Number(b.total_amount || finalAmt);
+    const gstAmt = Number(b.gst_amount || 0);
+    const paidAmt = Number(b.paid_amount || 0);
+    const advanceAmt = Number(b.advance_amount || 0);
+    const discount = Math.max(0, totalAmt - gstAmt - finalAmt);
+    const bkPayments = paymentsByBooking[b.id] || [];
+    const refundAmt = bkPayments
+      .filter((p: any) => p.mode === "refund" || Number(p.amount) < 0)
+      .reduce((s: number, p: any) => s + Math.abs(Number(p.amount)), 0);
+    return {
+      ...b,
+      total_amount: totalAmt,
+      gst_amount: gstAmt,
+      final_amount: finalAmt,
+      paid_amount: paidAmt,
+      advance_amount: advanceAmt,
+      discount_amount: discount,
+      refund_amount: refundAmt,
+      balance: Math.max(0, finalAmt - paidAmt),
+      payments: bkPayments,
+    };
+  });
+
+  const totalBilled = enriched.reduce((s: number, b: any) => s + b.final_amount, 0);
+  const totalPaid = enriched.reduce((s: number, b: any) => s + b.paid_amount, 0);
+  const totalDiscount = enriched.reduce((s: number, b: any) => s + b.discount_amount, 0);
+  const totalRefund = enriched.reduce((s: number, b: any) => s + b.refund_amount, 0);
+  const totalBalance = enriched.reduce((s: number, b: any) => s + b.balance, 0);
+
+  return {
+    customer,
+    bookings: enriched,
+    summary: { totalBilled, totalPaid, totalDiscount, totalRefund, totalBalance },
+  };
+}
+
+router.get("/customer-ledger/user/:userId", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { userId } = req.params;
+    const { from, to } = req.query as Record<string, string>;
+    const user = await q1(`SELECT mobile FROM users WHERE id=$1 LIMIT 1`, [userId]);
+    if (!user) return res.status(404).json({ error: "Customer not found" });
+    const result = await buildCustomerLedger(user.mobile, from, to);
+    if (!result) return res.status(404).json({ error: "Customer not found" });
+    res.json(result);
+  } catch (err) {
+    console.error("[accounting] customer-ledger/user/:userId:", err);
+    res.status(500).json({ error: "Failed to fetch customer ledger" });
+  }
+});
+
 router.get("/customer-ledger/:mobile", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
-    const { mobile } = req.params;
     const { from, to } = req.query as Record<string, string>;
-
-    const customer = await q1(`SELECT id, mobile, name, email FROM users WHERE mobile=$1 LIMIT 1`, [mobile]);
-    if (!customer) return res.status(404).json({ error: "Customer not found" });
-
-    let bSql = `SELECT b.id, b.booking_number, b.package_name, b.group_id,
-                  b.status, b.final_amount, b.paid_amount, b.advance_amount,
-                  b.invoice_number, b.created_at, b.notes, b.preferred_departure_date,
-                  b.number_of_pilgrims, b.room_type,
-                  g.name AS group_name
-               FROM bookings b
-               LEFT JOIN hajj_groups g ON g.id=b.group_id
-               WHERE b.customer_mobile=$1 AND (b.is_deleted IS NULL OR b.is_deleted=false)`;
-    const bParams: any[] = [mobile];
-    if (from) { bParams.push(from); bSql += ` AND DATE(b.created_at)>=$${bParams.length}`; }
-    if (to)   { bParams.push(to);   bSql += ` AND DATE(b.created_at)<=$${bParams.length}`; }
-    bSql += ` ORDER BY b.created_at DESC`;
-
-    const bookings = await q(bSql, bParams);
-
-    const bookingIds = bookings.map((b: any) => b.id);
-    let payments: any[] = [];
-    if (bookingIds.length > 0) {
-      payments = await q(
-        `SELECT pt.booking_id, pt.id, pt.amount, pt.mode, pt.payment_date,
-                pt.received_by, pt.bank_name, pt.notes, pt.is_deleted
-         FROM payment_transactions pt
-         WHERE pt.booking_id=ANY($1::text[]) AND (pt.is_deleted IS NULL OR pt.is_deleted=false)
-         ORDER BY pt.payment_date ASC`,
-        [bookingIds]
-      );
-    }
-
-    const paymentsByBooking: Record<string, any[]> = {};
-    for (const p of payments) {
-      if (!paymentsByBooking[p.booking_id]) paymentsByBooking[p.booking_id] = [];
-      paymentsByBooking[p.booking_id].push(p);
-    }
-
-    const enriched = bookings.map((b: any) => ({
-      ...b,
-      final_amount: Number(b.final_amount || 0),
-      paid_amount: Number(b.paid_amount || 0),
-      balance: Math.max(0, Number(b.final_amount || 0) - Number(b.paid_amount || 0)),
-      payments: paymentsByBooking[b.id] || [],
-    }));
-
-    const totalBilled = enriched.reduce((s: number, b: any) => s + b.final_amount, 0);
-    const totalPaid = enriched.reduce((s: number, b: any) => s + b.paid_amount, 0);
-    const totalBalance = enriched.reduce((s: number, b: any) => s + b.balance, 0);
-
-    res.json({ customer, bookings: enriched, summary: { totalBilled, totalPaid, totalBalance } });
+    const result = await buildCustomerLedger(req.params.mobile, from, to);
+    if (!result) return res.status(404).json({ error: "Customer not found" });
+    res.json(result);
   } catch (err) {
     console.error("[accounting] customer-ledger/:mobile:", err);
     res.status(500).json({ error: "Failed to fetch customer ledger" });
@@ -826,11 +870,16 @@ router.get("/hajji-ledger/search", requireAdmin as any, async (req: Authenticate
     if (!query || query.trim().length < 2) return res.json([]);
     const term = `%${query.trim()}%`;
     const rows = await q(
-      `SELECT b.id, b.booking_number, b.customer_name, b.customer_mobile,
+      `SELECT DISTINCT b.id, b.booking_number, b.customer_name, b.customer_mobile,
               b.package_name, b.status, b.final_amount, b.paid_amount, b.created_at
        FROM bookings b
+       LEFT JOIN pilgrims p ON p.booking_id = b.id
        WHERE (b.is_deleted IS NULL OR b.is_deleted=false)
-         AND (b.booking_number ILIKE $1 OR b.customer_name ILIKE $1 OR b.customer_mobile ILIKE $1)
+         AND (b.booking_number ILIKE $1
+              OR b.customer_name ILIKE $1
+              OR b.customer_mobile ILIKE $1
+              OR p.passport_number ILIKE $1
+              OR p.name ILIKE $1)
        ORDER BY b.created_at DESC
        LIMIT 20`,
       [term]

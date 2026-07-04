@@ -5,6 +5,7 @@ export const expensesTable = pgTable("expenses", {
   groupId: text("group_id"),
   category: text("category").notNull(),
   vendor: text("vendor"),
+  vendorId: text("vendor_id"),
   description: text("description").notNull(),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
   date: text("date").notNull(),

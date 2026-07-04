@@ -87,7 +87,15 @@ router.get("/:id/ledger", requireAdmin as any, async (req: AuthenticatedRequest,
     const expenses = await q(sql, params);
     const totalAmount = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
 
-    res.json({ vendor, expenses, totalAmount });
+    // Add running balance to each expense row
+    let running = 0;
+    const expensesWithBalance = expenses.map((e: any) => {
+      running += Number(e.amount || 0);
+      return { ...e, running_balance: running };
+    });
+
+    // Outstanding = total expenses recorded (no "paid" concept for vendors yet, all expenses are liabilities)
+    res.json({ vendor, expenses: expensesWithBalance, totalAmount, outstandingAmount: totalAmount });
   } catch (err) {
     console.error("[vendors] GET /:id/ledger", err);
     res.status(500).json({ error: "Failed to fetch vendor ledger" });
