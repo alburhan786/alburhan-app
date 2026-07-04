@@ -24,7 +24,7 @@ import {
   RejectBookingBody,
   CreateOfflineBookingBody,
 } from "@workspace/api-zod";
-import { requireAuth, requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
+import { requireAuth, requireAdmin, requirePermission, type AuthenticatedRequest } from "../lib/auth.js";
 import { auditLog } from "../lib/audit.js";
 import { validateDeleteToken } from "./delete-auth.js";
 import {
@@ -98,7 +98,7 @@ router.get("/offline", requireAdmin as any, (_req, res) => {
   res.json({ message: "Use POST /bookings/offline to create offline bookings" });
 });
 
-router.post("/offline", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+router.post("/offline", requireAdmin as any, requirePermission("bookings", "create") as any, async (req: AuthenticatedRequest, res) => {
   const parsed = CreateOfflineBookingBody.safeParse(req.body);
   if (!parsed.success) {
     console.error("[bookings] POST /offline Zod error:", parsed.error.message);
@@ -311,7 +311,7 @@ router.get("/:id", requireAuth as any, async (req: AuthenticatedRequest, res) =>
   res.json(formatBooking(bookings[0]));
 });
 
-router.post("/:id/approve", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+router.post("/:id/approve", requireAdmin as any, requirePermission("bookings", "approve") as any, async (req: AuthenticatedRequest, res) => {
   const bookings = await db.select().from(bookingsTable).where(eq(bookingsTable.id, req.params.id)).limit(1);
   if (!bookings[0]) {
     res.status(404).json({ message: "Booking not found" });
@@ -333,7 +333,7 @@ router.post("/:id/approve", requireAdmin as any, async (req: AuthenticatedReques
   res.json(formatBooking(updated));
 });
 
-router.post("/:id/reject", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+router.post("/:id/reject", requireAdmin as any, requirePermission("bookings", "edit") as any, async (req: AuthenticatedRequest, res) => {
   const parsed = RejectBookingBody.safeParse(req.body);
   const reason = parsed.success ? parsed.data.reason : undefined;
 
@@ -733,7 +733,7 @@ async function writeAuditLog(bookingId: string, changedBy: string, action: strin
   }
 }
 
-router.patch("/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+router.patch("/:id", requireAdmin as any, requirePermission("bookings", "edit") as any, async (req: AuthenticatedRequest, res) => {
   const bookingId = req.params.id;
   try {
     const [existing] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
@@ -777,7 +777,7 @@ router.patch("/:id", requireAdmin as any, async (req: AuthenticatedRequest, res)
   }
 });
 
-router.delete("/:id/permanent", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+router.delete("/:id/permanent", requireAdmin as any, requirePermission("bookings", "delete") as any, async (req: AuthenticatedRequest, res) => {
   const bookingId = req.params.id;
   const token = req.headers["x-delete-token"] as string;
   if (!token) { res.status(403).json({ message: "Delete token required" }); return; }
@@ -858,11 +858,11 @@ async function softDeleteBooking(bookingId: string, req: AuthenticatedRequest, r
   }
 }
 
-router.post("/:id/trash", requireAdmin as any, (req: AuthenticatedRequest, res) => {
+router.post("/:id/trash", requireAdmin as any, requirePermission("bookings", "delete") as any, (req: AuthenticatedRequest, res) => {
   softDeleteBooking(req.params.id, req, res);
 });
 
-router.delete("/:id", requireAdmin as any, (req: AuthenticatedRequest, res) => {
+router.delete("/:id", requireAdmin as any, requirePermission("bookings", "delete") as any, (req: AuthenticatedRequest, res) => {
   softDeleteBooking(req.params.id, req, res);
 });
 

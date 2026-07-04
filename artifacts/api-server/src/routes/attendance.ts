@@ -5,7 +5,11 @@ import { requireAdmin, requireModuleAccess, type AuthenticatedRequest } from "..
 import * as XLSX from "xlsx";
 
 const router = Router();
-router.use(requireModuleAccess("groups") as any);
+// Exempt token-based scan endpoints (requireAdminOrToken) from admin-session-only RBAC
+router.use((req: any, res: any, next: any) => {
+  if (/\/attendance\/events\/[^/]+\/(info|scan)$/.test(req.path)) return next();
+  return (requireModuleAccess("groups") as any)(req, res, next);
+});
 
 function parsePilgrimId(qrText: string): string | null {
   try {

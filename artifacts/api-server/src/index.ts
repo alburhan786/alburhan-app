@@ -723,7 +723,9 @@ async function runMigrations() {
   }
   // ── Admin role column on users ─────────────────────────────────────────────
   try {
-    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS admin_role TEXT NOT NULL DEFAULT 'super_admin'`);
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS admin_role TEXT NOT NULL DEFAULT 'read_only'`);
+    // Ensure default is least-privilege for all existing + new installations
+    await pool.query(`ALTER TABLE users ALTER COLUMN admin_role SET DEFAULT 'read_only'`);
     console.log("[Migration] users.admin_role column ensured");
   } catch (err) {
     console.error("[Migration] users.admin_role failed:", err);
@@ -848,6 +850,11 @@ async function start() {
     await db.update(usersTable)
       .set({ role: "admin" })
       .where(inArray(usersTable.mobile, ADMIN_MOBILES));
+    // Controlled backfill: explicitly assign super_admin to known admin accounts
+    await pool.query(
+      `UPDATE users SET admin_role = 'super_admin' WHERE mobile = ANY($1) AND admin_role = 'read_only'`,
+      [ADMIN_MOBILES]
+    );
     console.log("[Startup] Admin roles synced");
   } catch (err) {
     console.error("[Startup] Failed to sync admin roles:", err);
