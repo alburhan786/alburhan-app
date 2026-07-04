@@ -10,7 +10,7 @@ import {
   Scale, Users2, Package, ClipboardList, KeyRound
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { usePermissions } from "@/hooks/use-permissions";
+import { usePermissions, type Module, type Action } from "@/hooks/use-permissions";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -19,6 +19,7 @@ interface MenuItem {
   label: string;
   href: string;
   badge?: number;
+  require?: [Module, Action];
 }
 
 interface MenuSection {
@@ -32,60 +33,60 @@ function buildMenu(openComplaints: number): MenuSection[] {
       section: "Overview",
       items: [
         { icon: LayoutDashboard, label: "Dashboard", href: "/admin/dashboard" },
-        { icon: Activity, label: "Operations", href: "/admin/operations" },
+        { icon: Activity, label: "Operations", href: "/admin/operations", require: ["bookings", "view"] },
       ],
     },
     {
       section: "Bookings & Finance",
       items: [
-        { icon: BookOpen, label: "Bookings", href: "/admin/bookings" },
-        { icon: ClipboardPlus, label: "Offline Booking", href: "/admin/offline-bookings" },
-        { icon: Receipt, label: "Invoices", href: "/admin/invoices" },
-        { icon: CreditCard, label: "Payment Management", href: "/admin/payments" },
-        { icon: TrendingDown, label: "Expenses", href: "/admin/expenses" },
-        { icon: Calculator, label: "Accounting", href: "/admin/accounting" },
-        { icon: Home, label: "Family Ledger", href: "/admin/family-ledger" },
-        { icon: UserCheck, label: "Customer Ledger", href: "/admin/customer-ledger" },
-        { icon: BookMarked, label: "Hajji Ledger", href: "/admin/hajji-ledger" },
-        { icon: Truck, label: "Vendors", href: "/admin/vendors" },
-        { icon: Scale, label: "GST Reports", href: "/admin/gst-reports" },
-        { icon: Users2, label: "Payroll", href: "/admin/payroll" },
-        { icon: Package, label: "Assets", href: "/admin/assets" },
-        { icon: Trash2, label: "Trash", href: "/admin/bookings?tab=trash" },
+        { icon: BookOpen, label: "Bookings", href: "/admin/bookings", require: ["bookings", "view"] },
+        { icon: ClipboardPlus, label: "Offline Booking", href: "/admin/offline-bookings", require: ["bookings", "create"] },
+        { icon: Receipt, label: "Invoices", href: "/admin/invoices", require: ["bookings", "view"] },
+        { icon: CreditCard, label: "Payment Management", href: "/admin/payments", require: ["payments", "view"] },
+        { icon: TrendingDown, label: "Expenses", href: "/admin/expenses", require: ["expenses", "view"] },
+        { icon: Calculator, label: "Accounting", href: "/admin/accounting", require: ["accounting", "view"] },
+        { icon: Home, label: "Family Ledger", href: "/admin/family-ledger", require: ["accounting", "view"] },
+        { icon: UserCheck, label: "Customer Ledger", href: "/admin/customer-ledger", require: ["customers", "view"] },
+        { icon: BookMarked, label: "Hajji Ledger", href: "/admin/hajji-ledger", require: ["groups", "view"] },
+        { icon: Truck, label: "Vendors", href: "/admin/vendors", require: ["accounting", "view"] },
+        { icon: Scale, label: "GST Reports", href: "/admin/gst-reports", require: ["gst", "view"] },
+        { icon: Users2, label: "Payroll", href: "/admin/payroll", require: ["payroll", "view"] },
+        { icon: Package, label: "Assets", href: "/admin/assets", require: ["assets", "view"] },
+        { icon: Trash2, label: "Trash", href: "/admin/bookings?tab=trash", require: ["bookings", "delete"] },
       ],
     },
     {
       section: "Pilgrims & Groups",
       items: [
-        { icon: UsersRound, label: "Hajj Groups", href: "/admin/groups" },
-        { icon: Plane, label: "Flights", href: "/admin/flights" },
-        { icon: Building2, label: "Hotels", href: "/admin/hotels" },
-        { icon: Bus, label: "Buses", href: "/admin/buses" },
-        { icon: Heart, label: "Medical", href: "/admin/medical" },
-        { icon: FileCheck, label: "Visa Tracker", href: "/admin/visa" },
-        { icon: BadgeCheck, label: "Staff ID Cards", href: "/admin/staff" },
-        { icon: ScanLine, label: "QR Tracker", href: "/admin/qr-tracker" },
-        { icon: Printer, label: "Print Center", href: "/admin/print-center" },
-        { icon: Droplets, label: "Spray Label", href: "/admin/print/spray-label" },
+        { icon: UsersRound, label: "Hajj Groups", href: "/admin/groups", require: ["groups", "view"] },
+        { icon: Plane, label: "Flights", href: "/admin/flights", require: ["groups", "view"] },
+        { icon: Building2, label: "Hotels", href: "/admin/hotels", require: ["groups", "view"] },
+        { icon: Bus, label: "Buses", href: "/admin/buses", require: ["groups", "view"] },
+        { icon: Heart, label: "Medical", href: "/admin/medical", require: ["pilgrims", "view"] },
+        { icon: FileCheck, label: "Visa Tracker", href: "/admin/visa", require: ["pilgrims", "view"] },
+        { icon: BadgeCheck, label: "Staff ID Cards", href: "/admin/staff", require: ["staff", "view"] },
+        { icon: ScanLine, label: "QR Tracker", href: "/admin/qr-tracker", require: ["groups", "view"] },
+        { icon: Printer, label: "Print Center", href: "/admin/print-center", require: ["groups", "export"] },
+        { icon: Droplets, label: "Spray Label", href: "/admin/print/spray-label", require: ["groups", "view"] },
       ],
     },
     {
       section: "Packages & Content",
       items: [
-        { icon: PackageSearch, label: "Packages", href: "/admin/packages" },
-        { icon: ImageIcon, label: "Gallery", href: "/admin/gallery" },
+        { icon: PackageSearch, label: "Packages", href: "/admin/packages", require: ["bookings", "view"] },
+        { icon: ImageIcon, label: "Gallery", href: "/admin/gallery", require: ["settings", "view"] },
       ],
     },
     {
       section: "Customers & Reports",
       items: [
-        { icon: Users, label: "Customers", href: "/admin/customers" },
-        { icon: ShieldCheck, label: "KYC Management", href: "/admin/kyc" },
-        { icon: Star, label: "Feedback", href: "/admin/feedback", badge: openComplaints },
-        { icon: Inbox, label: "Package Requests", href: "/admin/requests" },
-        { icon: MessageSquare, label: "Inquiries", href: "/admin/inquiries" },
-        { icon: Megaphone, label: "Broadcast Messages", href: "/admin/broadcast" },
-        { icon: BarChart2, label: "Reports", href: "/admin/reports" },
+        { icon: Users, label: "Customers", href: "/admin/customers", require: ["customers", "view"] },
+        { icon: ShieldCheck, label: "KYC Management", href: "/admin/kyc", require: ["customers", "view"] },
+        { icon: Star, label: "Feedback", href: "/admin/feedback", badge: openComplaints, require: ["customers", "view"] },
+        { icon: Inbox, label: "Package Requests", href: "/admin/requests", require: ["customers", "view"] },
+        { icon: MessageSquare, label: "Inquiries", href: "/admin/inquiries", require: ["customers", "view"] },
+        { icon: Megaphone, label: "Broadcast Messages", href: "/admin/broadcast", require: ["customers", "edit"] },
+        { icon: BarChart2, label: "Reports", href: "/admin/reports", require: ["reports", "view"] },
       ],
     },
     {
@@ -97,8 +98,8 @@ function buildMenu(openComplaints: number): MenuSection[] {
     {
       section: "System",
       items: [
-        { icon: KeyRound, label: "User Roles", href: "/admin/user-roles" },
-        { icon: ClipboardList, label: "Audit Logs", href: "/admin/audit-logs" },
+        { icon: KeyRound, label: "User Roles", href: "/admin/user-roles", require: ["users", "view"] },
+        { icon: ClipboardList, label: "Audit Logs", href: "/admin/audit-logs", require: ["audit_logs", "view"] },
       ],
     },
   ];
@@ -109,7 +110,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
   const { logout, user } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openComplaints, setOpenComplaints] = useState(0);
-  const { can, isAdminLevel } = usePermissions();
+  const { can, roleLabel, roleColor } = usePermissions();
 
   useEffect(() => {
     fetch(`${API}/api/feedback/admin/stats`, { credentials: "include" })
@@ -119,13 +120,15 @@ export function AdminLayout({ children }: { children: ReactNode }) {
   }, []);
 
   const MENU = useMemo(() => {
-    const base = buildMenu(openComplaints);
-    // System section only visible to admin-level roles (super_admin, admin)
-    if (!isAdminLevel) {
-      return base.filter(s => s.section !== "System");
-    }
-    return base;
-  }, [openComplaints, isAdminLevel]);
+    const raw = buildMenu(openComplaints);
+    return raw
+      .map(section => ({
+        ...section,
+        items: section.items.filter(item => !item.require || can(item.require[0], item.require[1])),
+      }))
+      .filter(section => section.items.length > 0);
+  }, [openComplaints, can]);
+
   const isActive = (href: string) => location === href || location.startsWith(href + "/");
 
   const SidebarContent = () => (
@@ -170,7 +173,9 @@ export function AdminLayout({ children }: { children: ReactNode }) {
           </div>
           <div className="flex flex-col min-w-0">
             <span className="text-sm font-medium text-white truncate">{user?.name || "Administrator"}</span>
-            <span className="text-[11px] text-primary-foreground/50 truncate">{user?.mobile}</span>
+            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full self-start mt-0.5 ${roleColor || "bg-slate-100 text-slate-600"}`}>
+              {roleLabel}
+            </span>
           </div>
         </div>
         <Button

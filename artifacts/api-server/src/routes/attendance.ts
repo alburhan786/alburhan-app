@@ -1,7 +1,7 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { db, attendanceEventsTable, attendanceLogsTable, pilgrimsTable } from "@workspace/db";
 import { eq, and, desc, inArray, or } from "drizzle-orm";
-import { requireAdmin, requireModuleAccess, type AuthenticatedRequest } from "../lib/auth.js";
+import { requireAdmin, requireModuleAccess, requirePermission, type AuthenticatedRequest } from "../lib/auth.js";
 import * as XLSX from "xlsx";
 
 const router = Router();
@@ -374,7 +374,7 @@ router.get("/:groupId/attendance/events/:eventId/summary", requireAdmin, async (
   res.json({ rows, presentCount, totalCount: pilgrims.length, missingCount: pilgrims.length - presentCount });
 });
 
-router.get("/:groupId/attendance/events/:eventId/export", requireAdmin, async (req, res) => {
+router.get("/:groupId/attendance/events/:eventId/export", requireAdmin, requirePermission("groups", "export") as any, async (req: AuthenticatedRequest, res) => {
   const { groupId, eventId } = req.params;
   const event = await getEventForGroup(eventId, groupId);
   if (!event) { res.status(404).json({ error: "Event not found in this group" }); return; }

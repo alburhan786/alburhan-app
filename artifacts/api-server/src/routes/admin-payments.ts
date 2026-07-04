@@ -301,6 +301,8 @@ router.patch("/:id/payments/:txnId", requireAdmin as RequestHandler, async (req:
       })
     ).catch(() => {});
 
+    const { id: bookingId2, txnId: txnId2 } = req.params as Record<string, string>;
+    auditLog({ req, action: "updated", entityTable: "payments", entityId: txnId2, newValue: { bookingId: bookingId2, amount, paymentMode, paymentDate } }).catch(() => {});
     return res.json({
       entry: { ...result.entry, amount: Number(result.entry.amount) },
       booking: { paidAmount: result.updated?.totalPaid, status: result.updated?.newStatus },

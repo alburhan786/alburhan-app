@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, pool, hajjGroupsTable, pilgrimsTable, hajjRoomsTable, attendanceLogsTable, attendanceEventsTable } from "@workspace/db";
 import { eq, and, ne, desc, asc, count, max, inArray, sql } from "drizzle-orm";
-import { requireAdmin, requireModuleAccess, type AuthenticatedRequest } from "../lib/auth.js";
+import { requireAdmin, requireModuleAccess, requirePermission, type AuthenticatedRequest } from "../lib/auth.js";
 import { auditLog } from "../lib/audit.js";
 import { sendWhatsApp } from "../lib/notifications.js";
 import multer from "multer";
@@ -27,6 +27,13 @@ const upload = multer({
 
 const router = Router();
 router.use(requireModuleAccess("groups") as any);
+// Enforce export permission on PDF/XLSX download routes (GET mapped to "view" by default, not "export")
+router.use((req: any, res: any, next: any) => {
+  if (req.method === "GET" && /\/pdf$|\.xlsx$|\.pdf$/.test(req.path)) {
+    return (requirePermission("groups", "export") as any)(req, res, next);
+  }
+  next();
+});
 
 const UPLOADS_DIR = process.env.UPLOADS_DIR ||
   path.resolve(process.cwd(), process.env.NODE_ENV === "production" ? "uploads" : "../../uploads");
