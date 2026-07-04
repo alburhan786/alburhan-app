@@ -330,6 +330,7 @@ router.post("/:id/approve", requireAdmin as any, requirePermission("bookings", "
     bookingNumber: updated.bookingNumber,
   }).catch(console.error);
 
+  auditLog({ req, action: "approved", entityTable: "bookings", entityId: updated.id, newValue: { bookingNumber: updated.bookingNumber, status: "approved" } }).catch(() => {});
   res.json(formatBooking(updated));
 });
 
@@ -356,6 +357,7 @@ router.post("/:id/reject", requireAdmin as any, requirePermission("bookings", "e
     reason,
   }).catch(console.error);
 
+  auditLog({ req, action: "rejected", entityTable: "bookings", entityId: updated.id, newValue: { bookingNumber: updated.bookingNumber, status: "rejected", reason } }).catch(() => {});
   res.json(formatBooking(updated));
 });
 
@@ -770,6 +772,7 @@ router.patch("/:id", requireAdmin as any, requirePermission("bookings", "edit") 
     const [updated] = await db.update(bookingsTable).set(updates).where(eq(bookingsTable.id, bookingId)).returning();
     const changedBy = req.user?.name || req.user?.mobile || "admin";
     await writeAuditLog(bookingId, changedBy, "edit", auditLogs);
+    auditLog({ req, action: "updated", entityTable: "bookings", entityId: bookingId, newValue: updates }).catch(() => {});
     res.json(formatBooking(updated));
   } catch (err: any) {
     console.error("[bookings] PATCH /:id error:", err);
@@ -884,6 +887,7 @@ router.post("/:id/restore", requireAdmin as any, async (req: AuthenticatedReques
     await writeAuditLog(bookingId, restoredBy, "restore", [
       { fieldName: "status", oldValue: "deleted", newValue: existing.status },
     ]);
+    auditLog({ req, action: "restored", entityTable: "bookings", entityId: bookingId, newValue: { bookingNumber: existing.booking_number, restoredBy } }).catch(() => {});
     res.json({ message: "Booking restored", booking: formatBooking(updated) });
   } catch (err: any) {
     console.error("[bookings] POST /:id/restore error:", err);

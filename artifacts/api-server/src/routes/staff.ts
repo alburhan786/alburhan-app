@@ -128,6 +128,7 @@ router.post("/", requireAdmin, async (req: AuthenticatedRequest, res) => {
       status: status || "active",
     }).returning();
 
+    auditLog({ req, action: "created", entityTable: "staff", entityId: inserted[0].id, newValue: { staffId: inserted[0].staffId, fullName: inserted[0].fullName, role: inserted[0].role } }).catch(() => {});
     res.status(201).json(inserted[0]);
   } catch (err) {
     console.error("[staff] POST /", err);
@@ -166,6 +167,7 @@ router.put("/:id", requireAdmin, async (req: AuthenticatedRequest, res) => {
     }).where(eq(staffTable.id, req.params.id)).returning();
 
     if (!updated.length) { res.status(404).json({ error: "Not found" }); return; }
+    auditLog({ req, action: "updated", entityTable: "staff", entityId: req.params.id, newValue: { fullName: updated[0].fullName, role: updated[0].role, status: updated[0].status } }).catch(() => {});
     res.json(updated[0]);
   } catch (err) {
     console.error("[staff] PUT /:id", err);
@@ -180,6 +182,7 @@ router.delete("/:id", requireAdmin, async (req: AuthenticatedRequest, res) => {
       await deleteFromGCS(results[0].photoUrl).catch(() => {});
     }
     await db.delete(staffTable).where(eq(staffTable.id, req.params.id));
+    auditLog({ req, action: "deleted", entityTable: "staff", entityId: req.params.id, oldValue: results[0] ? { staffId: results[0].staffId, fullName: results[0].fullName } : null }).catch(() => {});
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: "Failed to delete staff member" });

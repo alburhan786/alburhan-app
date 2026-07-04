@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db, groupFlightsTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { requireAdmin, requireModuleAccess, type AuthenticatedRequest } from "../lib/auth.js";
+import { auditLog } from "../lib/audit.js";
 
 const router = Router();
 router.use(requireModuleAccess("groups") as any);
@@ -35,6 +36,7 @@ router.post("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => 
       pilgrimsAssigned: pilgrimsAssigned ?? [],
       ticketNumbers: ticketNumbers ?? {},
     }).returning();
+    auditLog({ req, action: "created", entityTable: "flights", entityId: row.id, newValue: { groupId: row.groupId, flightNumber: row.flightNumber, flightType: row.flightType } }).catch(() => {});
     res.json(row);
   } catch (err) {
     console.error("[flights] POST /", err);
@@ -50,6 +52,7 @@ router.put("/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) =
       .where(eq(groupFlightsTable.id, req.params.id))
       .returning();
     if (!row) return res.status(404).json({ error: "Not found" });
+    auditLog({ req, action: "updated", entityTable: "flights", entityId: req.params.id, newValue: { flightNumber: row.flightNumber, status: row.status } }).catch(() => {});
     res.json(row);
   } catch (err) {
     console.error("[flights] PUT", err);
@@ -60,6 +63,7 @@ router.put("/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) =
 router.delete("/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
     await db.delete(groupFlightsTable).where(eq(groupFlightsTable.id, req.params.id));
+    auditLog({ req, action: "deleted", entityTable: "flights", entityId: req.params.id }).catch(() => {});
     res.json({ ok: true });
   } catch (err) {
     console.error("[flights] DELETE", err);
