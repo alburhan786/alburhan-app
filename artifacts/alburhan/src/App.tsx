@@ -49,6 +49,7 @@ import ReportsManager from "@/pages/admin/ReportsManager";
 import PaymentAnalytics from "@/pages/admin/PaymentAnalytics";
 import PaymentTrash from "@/pages/admin/PaymentTrash";
 import SystemHealth from "@/pages/admin/SystemHealth";
+import OTPDebug from "@/pages/admin/OTPDebug";
 import PrintCenter from "@/pages/admin/PrintCenter";
 import BroadcastManager from "@/pages/admin/BroadcastManager";
 import KYCManager from "@/pages/admin/KYCManager";
@@ -208,6 +209,7 @@ function Router() {
       <Route path="/admin/assets" component={() => <AdminRoute component={AssetManager} />} />
       <Route path="/admin/audit-logs" component={() => <AdminRoute component={AuditLogs} />} />
       <Route path="/admin/system-health" component={() => <AdminRoute component={SystemHealth} />} />
+      <Route path="/admin/otp-debug" component={() => <AdminRoute component={OTPDebug} />} />
       <Route path="/admin/user-roles" component={() => <AdminRoute component={UserRolesManager} />} />
       <Route path="/admin/flights" component={() => <AdminRoute component={FlightManager} />} />
       <Route path="/admin/groups/:groupId/flights" component={() => <AdminRoute component={FlightManager} />} />

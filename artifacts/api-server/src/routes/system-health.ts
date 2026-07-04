@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requireAdmin } from "../lib/auth.js";
-import { testSmsDiagnostics } from "../lib/notifications.js";
+import { testSmsDiagnostics, getSmsAttemptLog } from "../lib/notifications.js";
 
 const router = Router();
 
@@ -48,7 +48,6 @@ router.get("/system-health", requireAdmin as any, async (_req, res) => {
     BOTBEE_API_KEY: !!process.env.BOTBEE_API_KEY,
     DATABASE_URL: !!process.env.DATABASE_URL,
     SESSION_SECRET: !!process.env.SESSION_SECRET,
-    ANTHROPIC_API_KEY: !!process.env.ANTHROPIC_API_KEY || !!process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
   };
   const missingEnv = Object.entries(envCheck).filter(([, v]) => !v).map(([k]) => k);
   results.env_vars = {
@@ -69,7 +68,7 @@ router.get("/system-health", requireAdmin as any, async (_req, res) => {
     },
   };
 
-  // 7. Recent OTP activity (last 10) — show full OTP for debugging
+  // 7. Recent OTP activity (last 10) — show full OTP for admin debugging
   try {
     const recent = await pool.query(
       `SELECT mobile, otp, used, expires_at, created_at, COALESCE(attempts,0) as attempts FROM otps ORDER BY created_at DESC LIMIT 10`
@@ -80,8 +79,13 @@ router.get("/system-health", requireAdmin as any, async (_req, res) => {
   }
 
   const overallStatus = Object.values(results).some(r => r.status === "error") ? "degraded" : "healthy";
-
   res.json({ status: overallStatus, checks: results, generatedAt: new Date().toISOString() });
+});
+
+// GET /api/admin/otp-debug — return in-memory SMS attempt log
+router.get("/otp-debug", requireAdmin as any, async (_req, res) => {
+  const log = getSmsAttemptLog();
+  res.json({ count: log.length, entries: log });
 });
 
 // POST /api/admin/test-sms — fire a real SMS and return full diagnostics

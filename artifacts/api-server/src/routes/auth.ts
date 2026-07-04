@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, usersTable, otpsTable } from "@workspace/db";
 import { pool } from "@workspace/db";
-import { eq, and, gt, lt, count, sql } from "drizzle-orm";
+import { eq, and, gt } from "drizzle-orm";
 import {
   SendOtpBody,
   VerifyOtpBody,
@@ -32,14 +32,12 @@ router.post("/send-otp", async (req, res) => {
   }
   const { mobile } = parsed.data;
 
-  // Validate mobile: must be 10 digits
   const cleanMobile = mobile.replace(/\D/g, "");
   if (cleanMobile.length !== 10) {
     res.status(400).json({ message: "Please enter a valid 10-digit mobile number" });
     return;
   }
 
-  // Rate limiting
   const withinLimit = await checkOtpRateLimit(cleanMobile);
   if (!withinLimit) {
     res.status(429).json({ message: "Too many OTP requests. Please wait 30 minutes before trying again." });
@@ -54,27 +52,40 @@ router.post("/send-otp", async (req, res) => {
   }
 
   const otp = generateOtp();
-  const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+  const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
   await db.insert(otpsTable).values({ mobile: cleanMobile, otp, expiresAt });
 
+  // Send SMS (all 3 routes tried automatically)
   const smsResult = await sendOtpSMS(cleanMobile, otp);
 
-  // Send WhatsApp as backup (don't await)
-  sendWhatsApp(
-    cleanMobile,
-    `Your Al Burhan Tours & Travels OTP is: *${otp}*\n\nValid for 5 minutes. Do not share with anyone.\n\nAl Burhan Tours & Travels\n+91 8989701701`
-  ).catch(() => {});
+  // Send WhatsApp as backup — await with timeout so we know actual result
+  let waSent = false;
+  try {
+    const waPromise = sendWhatsApp(
+      cleanMobile,
+      `Your Al Burhan Tours & Travels OTP is: *${otp}*\n\nValid for 5 minutes. Do not share with anyone.\n\nAl Burhan Tours & Travels\n+91 8989701701`
+    );
+    // Give WhatsApp 8 seconds max — don't block OTP response indefinitely
+    waSent = await Promise.race([
+      waPromise,
+      new Promise<boolean>(r => setTimeout(() => r(false), 8000)),
+    ]);
+  } catch {
+    waSent = false;
+  }
 
   const isAdmin = ADMIN_MOBILES.includes(cleanMobile);
 
-  const waSent = !!(process.env.BOTBEE_API_KEY && process.env.BOTBEE_PHONE_NUMBER_ID);
-  console.log(`[OTP] Mobile: ${cleanMobile}, OTP: ${otp}, NewUser: ${isNewUser}, SMSSent: ${smsResult.sent}, Route: ${smsResult.route || "n/a"}, WhatsApp: ${waSent}, IsAdmin: ${isAdmin}${smsResult.error ? `, Error: ${smsResult.error}` : ""}`);
-
-  // Sanitize error — strip any key-like tokens before sending to client
+  // Sanitize error: strip API keys before sending to client
   const sanitizedError = smsResult.error
-    ? smsResult.error.replace(/authorization=[^&]+/gi, "authorization=***").slice(0, 300)
+    ? smsResult.error.replace(/authorization=[^&\s]+/gi, "authorization=***").slice(0, 400)
     : undefined;
+
+  console.log(
+    `[OTP] mobile=${cleanMobile} otp=${otp} newUser=${isNewUser} smsSent=${smsResult.sent} route=${smsResult.route || "n/a"} waSent=${waSent} isAdmin=${isAdmin}` +
+    (smsResult.error ? ` error=${smsResult.error}` : "")
+  );
 
   res.json({
     message: smsResult.sent
@@ -87,15 +98,16 @@ router.post("/send-otp", async (req, res) => {
     smsSent: smsResult.sent,
     smsRoute: smsResult.route,
     whatsappSent: waSent,
-    // All users get a safe reason (no secrets)
-    smsFailReason: smsResult.sent ? undefined : sanitizedError,
-    // Admin phones get full debug info including the OTP
+    // Safe reason visible to all users (no secrets)
+    smsFailReason: !smsResult.sent ? sanitizedError : undefined,
+    // Admin phones: full debug including OTP and raw provider response
     ...(isAdmin ? {
       debugOtp: otp,
       smsStatus: smsResult.sent ? "delivered" : "failed",
       smsError: smsResult.error,
       smsProviderResponse: smsResult.providerResponse,
       smsUrlUsed: smsResult.urlUsed,
+      smsLogId: smsResult.logId,
     } : {}),
   });
 });
@@ -110,7 +122,7 @@ router.post("/verify-otp", async (req, res) => {
   const cleanMobile = mobile.replace(/\D/g, "");
   const now = new Date();
 
-  // Check for too many recent failed attempts (last 5 OTPs for this mobile)
+  // Check for too many recent failed attempts
   const recentAttempts = await pool.query(
     `SELECT attempts FROM otps WHERE mobile=$1 AND used=false AND expires_at > $2 ORDER BY created_at DESC LIMIT 1`,
     [cleanMobile, now]
@@ -121,7 +133,7 @@ router.post("/verify-otp", async (req, res) => {
     return;
   }
 
-  // Check if OTP is expired (but exists and unused)
+  // Check if OTP is expired
   const expiredCheck = await pool.query(
     `SELECT id FROM otps WHERE mobile=$1 AND otp=$2 AND used=false AND expires_at <= $3 ORDER BY created_at DESC LIMIT 1`,
     [cleanMobile, otp, now]
@@ -156,7 +168,6 @@ router.post("/verify-otp", async (req, res) => {
     .limit(1);
 
   if (!otpRecords[0]) {
-    // Increment attempt counter on the most recent OTP
     await pool.query(
       `UPDATE otps SET attempts = COALESCE(attempts, 0) + 1 WHERE mobile=$1 AND used=false AND expires_at > $2`,
       [cleanMobile, now]
@@ -165,7 +176,6 @@ router.post("/verify-otp", async (req, res) => {
     return;
   }
 
-  // Mark OTP as used
   await db.update(otpsTable).set({ used: true }).where(eq(otpsTable.id, otpRecords[0].id));
 
   const users = await db.select().from(usersTable).where(eq(usersTable.mobile, cleanMobile)).limit(1);
@@ -179,7 +189,6 @@ router.post("/verify-otp", async (req, res) => {
   const isNewUser = !user.name;
   (req.session as any).userId = user.id;
 
-  // Send welcome WhatsApp (don't await)
   if (isNewUser) {
     sendWhatsApp(
       cleanMobile,

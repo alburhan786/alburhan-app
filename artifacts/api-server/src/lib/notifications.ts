@@ -31,13 +31,9 @@ const FAST2SMS_SENDER_ID = "ALBURH";
 const FAST2SMS_OTP_DLT_TEMPLATE_ID = "164844";
 const FAST2SMS_NOTIFY_DLT_TEMPLATE_ID = "211277";
 
-const BOTBEE_API_KEY = process.env.BOTBEE_API_KEY;
-const BOTBEE_PHONE_NUMBER_ID = process.env.BOTBEE_PHONE_NUMBER_ID;
-const BOTBEE_BUSINESS_ID = process.env.BOTBEE_BUSINESS_ID;
 const BOTBEE_BASE_URL = "https://app.botbee.io/api/v1/whatsapp";
 
 const LEMIN_API_URL = process.env.LEMIN_API_URL || "https://rcs.leminai.com/api/send";
-const LEMIN_API_KEY = process.env.LEMIN_API_KEY;
 const LEMIN_USER_ID = process.env.LEMIN_USER_ID || "0x89mqd53ph";
 const LEMIN_TEMPLATE_ID = process.env.LEMIN_TEMPLATE_ID || "1473";
 
@@ -54,99 +50,189 @@ function toBotBeePhone(mobile: string): string {
   return clean;
 }
 
+// ── In-memory SMS attempt log (last 50 entries) ─────────────────────────────
+
+export interface SmsRouteAttempt {
+  route: string;
+  requestUrl: string;
+  httpStatus?: number;
+  responseBody?: any;
+  success: boolean;
+  errorCode?: string;
+  errorMessage?: string;
+  durationMs: number;
+}
+
+export interface SmsAttemptLog {
+  id: string;
+  ts: string;
+  mobileMasked: string;
+  otp: string;
+  finalSuccess: boolean;
+  finalRoute?: string;
+  attempts: SmsRouteAttempt[];
+  totalDurationMs: number;
+  apiKeyPresent: boolean;
+  apiKeyMasked: string;
+}
+
+const SMS_LOG: SmsAttemptLog[] = [];
+let _logId = 0;
+
+function pushSmsLog(entry: SmsAttemptLog) {
+  SMS_LOG.unshift(entry);
+  if (SMS_LOG.length > 50) SMS_LOG.pop();
+}
+
+export function getSmsAttemptLog(): SmsAttemptLog[] {
+  return SMS_LOG;
+}
+
+function maskMobile(mobile: string): string {
+  if (mobile.length >= 4) return `*****${mobile.slice(-4)}`;
+  return "****";
+}
+
+function extractF2sError(data: any): { code?: string; message: string } {
+  if (!data) return { message: "No response body" };
+  const msgs: string[] = Array.isArray(data.message)
+    ? data.message
+    : data.message
+      ? [String(data.message)]
+      : [];
+  const code = data.status_code ? String(data.status_code) : data.code ? String(data.code) : undefined;
+  return { code, message: msgs.join("; ") || JSON.stringify(data) };
+}
+
+// ── Main OTP SMS sender ──────────────────────────────────────────────────────
+
 export interface SmsResult {
   sent: boolean;
   providerResponse?: any;
   error?: string;
   route?: string;
   urlUsed?: string;
+  logId?: string;
 }
 
-// Try OTP route → DLT route → Quick route (3 attempts)
 export async function sendOtpSMS(mobile: string, otp: string): Promise<SmsResult> {
   const apiKey = getFast2SMSKey();
+  const id = `sms_${++_logId}`;
+  const overallStart = Date.now();
+
+  const apiKeyPresent = !!apiKey;
+  const apiKeyMasked = apiKey ? `${apiKey.slice(0, 8)}...${apiKey.slice(-4)}` : "NOT_FOUND";
 
   if (!apiKey) {
     const envKeys = Object.keys(process.env).filter(k => k.includes("FAST2SMS")).join(", ");
-    console.error(`[OTP-SMS] No valid Fast2SMS key found. Env keys with FAST2SMS: [${envKeys}]`);
-    return { sent: false, error: "SMS provider API key not configured" };
+    const msg = `FAST2SMS_API_KEY not set. Env keys found: [${envKeys || "none"}]`;
+    console.error(`[OTP-SMS] ❌ ${msg}`);
+    const logEntry: SmsAttemptLog = {
+      id, ts: new Date().toISOString(), mobileMasked: maskMobile(mobile), otp,
+      finalSuccess: false, attempts: [], totalDurationMs: 0,
+      apiKeyPresent: false, apiKeyMasked: "NOT_FOUND",
+    };
+    pushSmsLog(logEntry);
+    return { sent: false, error: msg, logId: id };
   }
 
   const phone = toFast2SMSPhone(mobile);
-  const maskedKey = `${apiKey.slice(0, 8)}...${apiKey.slice(-4)}`;
+  const attempts: SmsRouteAttempt[] = [];
   const errors: string[] = [];
 
-  // ── Attempt 1: OTP route (Fast2SMS built-in pre-approved template) ─────────
-  try {
-    const otpUrl = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&variables_values=${encodeURIComponent(otp)}&route=otp&numbers=${phone}&flash=0`;
-    const maskedOtpUrl = otpUrl.replace(apiKey, maskedKey);
-    console.log(`[OTP-SMS][OTP-Route] Requesting: ${maskedOtpUrl}`);
-    const otpResp = await axios.get(otpUrl, { timeout: 10000 });
-    console.log(`[OTP-SMS][OTP-Route] Response: ${JSON.stringify(otpResp.data)}`);
-    if (otpResp.data?.return === true) {
-      console.log(`[OTP-SMS][OTP-Route] ✅ SMS sent to ${phone}`);
-      return { sent: true, providerResponse: otpResp.data, route: "otp", urlUsed: maskedOtpUrl };
+  // ── Route 1: OTP route (Fast2SMS built-in pre-approved template) ──────────
+  {
+    const t0 = Date.now();
+    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&variables_values=${encodeURIComponent(otp)}&route=otp&numbers=${phone}&flash=0`;
+    const maskedUrl = url.replace(apiKey, apiKeyMasked);
+    console.log(`[OTP-SMS][otp-route] → ${maskedUrl}`);
+    try {
+      const r = await axios.get(url, { timeout: 12000 });
+      const durationMs = Date.now() - t0;
+      const { code, message } = extractF2sError(r.data);
+      const success = r.data?.return === true;
+      console.log(`[OTP-SMS][otp-route] ← HTTP ${r.status} | return=${r.data?.return} | ${message} (${durationMs}ms)`);
+      attempts.push({ route: "otp", requestUrl: maskedUrl, httpStatus: r.status, responseBody: r.data, success, errorCode: code, errorMessage: success ? undefined : message, durationMs });
+      if (success) {
+        const log: SmsAttemptLog = { id, ts: new Date().toISOString(), mobileMasked: maskMobile(mobile), otp, finalSuccess: true, finalRoute: "otp", attempts, totalDurationMs: Date.now() - overallStart, apiKeyPresent, apiKeyMasked };
+        pushSmsLog(log);
+        return { sent: true, providerResponse: r.data, route: "otp", urlUsed: maskedUrl, logId: id };
+      }
+      errors.push(`otp-route: ${message}`);
+    } catch (err: any) {
+      const durationMs = Date.now() - t0;
+      const errBody = err?.response?.data;
+      const errMsg = errBody ? extractF2sError(errBody).message : (err?.message || String(err));
+      console.error(`[OTP-SMS][otp-route] ✗ ${errMsg} (${durationMs}ms)`);
+      attempts.push({ route: "otp", requestUrl: maskedUrl, httpStatus: err?.response?.status, responseBody: errBody, success: false, errorMessage: errMsg, durationMs });
+      errors.push(`otp-route: ${errMsg}`);
     }
-    const otpErr = Array.isArray(otpResp.data?.message) ? otpResp.data.message.join("; ") : (otpResp.data?.message || JSON.stringify(otpResp.data));
-    console.warn(`[OTP-SMS][OTP-Route] ❌ Rejected: ${otpErr}`);
-    errors.push(`OTP-route: ${otpErr}`);
-  } catch (err: any) {
-    const e = err?.response?.data?.message || err?.message || String(err);
-    console.error(`[OTP-SMS][OTP-Route] Network error: ${e}`);
-    errors.push(`OTP-route: ${e}`);
   }
 
-  // ── Attempt 2: DLT route (custom registered template) ────────────────────
-  try {
+  // ── Route 2: DLT route (custom registered template) ───────────────────────
+  {
+    const t0 = Date.now();
     const variables = encodeURIComponent(`${otp}|`);
-    const dltUrl = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=dlt&sender_id=${FAST2SMS_SENDER_ID}&message=${FAST2SMS_OTP_DLT_TEMPLATE_ID}&variables_values=${variables}&numbers=${phone}&flash=0`;
-    const maskedDltUrl = dltUrl.replace(apiKey, maskedKey);
-    console.log(`[OTP-SMS][DLT] Requesting: ${maskedDltUrl}`);
-    const dltResp = await axios.get(dltUrl, { timeout: 10000 });
-    console.log(`[OTP-SMS][DLT] Response: ${JSON.stringify(dltResp.data)}`);
-    if (dltResp.data?.return === true) {
-      console.log(`[OTP-SMS][DLT] ✅ SMS sent to ${phone}`);
-      return { sent: true, providerResponse: dltResp.data, route: "dlt", urlUsed: maskedDltUrl };
+    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=dlt&sender_id=${FAST2SMS_SENDER_ID}&message=${FAST2SMS_OTP_DLT_TEMPLATE_ID}&variables_values=${variables}&numbers=${phone}&flash=0`;
+    const maskedUrl = url.replace(apiKey, apiKeyMasked);
+    console.log(`[OTP-SMS][dlt] → ${maskedUrl}`);
+    try {
+      const r = await axios.get(url, { timeout: 12000 });
+      const durationMs = Date.now() - t0;
+      const { code, message } = extractF2sError(r.data);
+      const success = r.data?.return === true;
+      console.log(`[OTP-SMS][dlt] ← HTTP ${r.status} | return=${r.data?.return} | ${message} (${durationMs}ms)`);
+      attempts.push({ route: "dlt", requestUrl: maskedUrl, httpStatus: r.status, responseBody: r.data, success, errorCode: code, errorMessage: success ? undefined : message, durationMs });
+      if (success) {
+        const log: SmsAttemptLog = { id, ts: new Date().toISOString(), mobileMasked: maskMobile(mobile), otp, finalSuccess: true, finalRoute: "dlt", attempts, totalDurationMs: Date.now() - overallStart, apiKeyPresent, apiKeyMasked };
+        pushSmsLog(log);
+        return { sent: true, providerResponse: r.data, route: "dlt", urlUsed: maskedUrl, logId: id };
+      }
+      errors.push(`dlt: ${message}`);
+    } catch (err: any) {
+      const durationMs = Date.now() - t0;
+      const errBody = err?.response?.data;
+      const errMsg = errBody ? extractF2sError(errBody).message : (err?.message || String(err));
+      console.error(`[OTP-SMS][dlt] ✗ ${errMsg} (${durationMs}ms)`);
+      attempts.push({ route: "dlt", requestUrl: maskedUrl, httpStatus: err?.response?.status, responseBody: errBody, success: false, errorMessage: errMsg, durationMs });
+      errors.push(`dlt: ${errMsg}`);
     }
-    const dltErr = Array.isArray(dltResp.data?.message) ? dltResp.data.message.join("; ") : (dltResp.data?.message || JSON.stringify(dltResp.data));
-    console.warn(`[OTP-SMS][DLT] ❌ Rejected: ${dltErr}`);
-    errors.push(`DLT: ${dltErr}`);
-  } catch (err: any) {
-    const e = err?.response?.data?.message || err?.message || String(err);
-    console.error(`[OTP-SMS][DLT] Network error: ${e}`);
-    errors.push(`DLT: ${e}`);
   }
 
-  // ── Attempt 3: Quick route fallback ──────────────────────────────────────
-  try {
-    const quickMsg = encodeURIComponent(`Your Al Burhan Tours OTP is ${otp}. Valid 5 mins. Do not share.`);
-    const quickUrl = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=q&message=${quickMsg}&numbers=${phone}&flash=0`;
-    const maskedQuickUrl = quickUrl.replace(apiKey, maskedKey);
-    console.log(`[OTP-SMS][Quick] Requesting: ${maskedQuickUrl}`);
-    const qResp = await axios.get(quickUrl, { timeout: 10000 });
-    console.log(`[OTP-SMS][Quick] Response: ${JSON.stringify(qResp.data)}`);
-    if (qResp.data?.return === true) {
-      console.log(`[OTP-SMS][Quick] ✅ SMS sent to ${phone}`);
-      return { sent: true, providerResponse: qResp.data, route: "quick", urlUsed: maskedQuickUrl };
+  // ── Route 3: Quick route fallback ─────────────────────────────────────────
+  {
+    const t0 = Date.now();
+    const msg = encodeURIComponent(`Your Al Burhan Tours OTP is ${otp}. Valid 5 mins. Do not share.`);
+    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=q&message=${msg}&numbers=${phone}&flash=0`;
+    const maskedUrl = url.replace(apiKey, apiKeyMasked);
+    console.log(`[OTP-SMS][quick] → ${maskedUrl}`);
+    try {
+      const r = await axios.get(url, { timeout: 12000 });
+      const durationMs = Date.now() - t0;
+      const { code, message } = extractF2sError(r.data);
+      const success = r.data?.return === true;
+      console.log(`[OTP-SMS][quick] ← HTTP ${r.status} | return=${r.data?.return} | ${message} (${durationMs}ms)`);
+      attempts.push({ route: "quick", requestUrl: maskedUrl, httpStatus: r.status, responseBody: r.data, success, errorCode: code, errorMessage: success ? undefined : message, durationMs });
+      const log: SmsAttemptLog = { id, ts: new Date().toISOString(), mobileMasked: maskMobile(mobile), otp, finalSuccess: success, finalRoute: success ? "quick" : undefined, attempts, totalDurationMs: Date.now() - overallStart, apiKeyPresent, apiKeyMasked };
+      pushSmsLog(log);
+      if (success) return { sent: true, providerResponse: r.data, route: "quick", urlUsed: maskedUrl, logId: id };
+      errors.push(`quick: ${message}`);
+      return { sent: false, route: "all_failed", providerResponse: r.data, error: errors.join(" | "), logId: id };
+    } catch (err: any) {
+      const durationMs = Date.now() - t0;
+      const errBody = err?.response?.data;
+      const errMsg = errBody ? extractF2sError(errBody).message : (err?.message || String(err));
+      console.error(`[OTP-SMS][quick] ✗ ${errMsg} (${durationMs}ms)`);
+      attempts.push({ route: "quick", requestUrl: maskedUrl, httpStatus: err?.response?.status, responseBody: errBody, success: false, errorMessage: errMsg, durationMs });
+      errors.push(`quick: ${errMsg}`);
+      const log: SmsAttemptLog = { id, ts: new Date().toISOString(), mobileMasked: maskMobile(mobile), otp, finalSuccess: false, attempts, totalDurationMs: Date.now() - overallStart, apiKeyPresent, apiKeyMasked };
+      pushSmsLog(log);
+      return { sent: false, error: errors.join(" | "), logId: id };
     }
-    const quickErr = Array.isArray(qResp.data?.message) ? qResp.data.message.join("; ") : (qResp.data?.message || JSON.stringify(qResp.data));
-    console.error(`[OTP-SMS][Quick] ❌ Also rejected: ${quickErr}`);
-    errors.push(`Quick: ${quickErr}`);
-    return {
-      sent: false,
-      route: "all_failed",
-      providerResponse: qResp.data,
-      error: errors.join(" | "),
-    };
-  } catch (err: any) {
-    const e = err?.response?.data?.message || err?.message || String(err);
-    console.error(`[OTP-SMS][Quick] Network error: ${e}`);
-    errors.push(`Quick: ${e}`);
-    return { sent: false, error: errors.join(" | ") };
   }
 }
 
-// Admin-only: fire a real SMS to a test number and return full diagnostics
+// ── Admin diagnostics: fire all 3 routes against a test number ──────────────
 export async function testSmsDiagnostics(phone: string, otp: string): Promise<Record<string, any>> {
   const apiKey = getFast2SMSKey();
   const envKeys = Object.keys(process.env).filter(k => k.includes("FAST2SMS"));
@@ -166,31 +252,34 @@ export async function testSmsDiagnostics(phone: string, otp: string): Promise<Re
 
   if (!apiKey) return diag;
 
-  // OTP route (Fast2SMS built-in template)
+  // OTP route
   try {
-    const otpUrl = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&variables_values=${encodeURIComponent(otp)}&route=otp&numbers=${cleanPhone}&flash=0`;
-    const r = await axios.get(otpUrl, { timeout: 10000 });
-    diag.otp_route = { status: r.status, body: r.data };
+    const t0 = Date.now();
+    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&variables_values=${encodeURIComponent(otp)}&route=otp&numbers=${cleanPhone}&flash=0`;
+    const r = await axios.get(url, { timeout: 12000 });
+    diag.otp_route = { status: r.status, body: r.data, durationMs: Date.now() - t0 };
   } catch (e: any) {
     diag.otp_route = { error: e?.response?.data || e?.message };
   }
 
-  // DLT (custom registered template)
+  // DLT route
   try {
+    const t0 = Date.now();
     const variables = encodeURIComponent(`${otp}|`);
-    const dltUrl = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=dlt&sender_id=${FAST2SMS_SENDER_ID}&message=${FAST2SMS_OTP_DLT_TEMPLATE_ID}&variables_values=${variables}&numbers=${cleanPhone}&flash=0`;
-    const r = await axios.get(dltUrl, { timeout: 10000 });
-    diag.dlt = { status: r.status, body: r.data };
+    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=dlt&sender_id=${FAST2SMS_SENDER_ID}&message=${FAST2SMS_OTP_DLT_TEMPLATE_ID}&variables_values=${variables}&numbers=${cleanPhone}&flash=0`;
+    const r = await axios.get(url, { timeout: 12000 });
+    diag.dlt = { status: r.status, body: r.data, durationMs: Date.now() - t0 };
   } catch (e: any) {
     diag.dlt = { error: e?.response?.data || e?.message };
   }
 
   // Quick route
   try {
-    const quickMsg = encodeURIComponent(`Test OTP: ${otp}. Al Burhan Tours.`);
-    const quickUrl = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=q&message=${quickMsg}&numbers=${cleanPhone}&flash=0`;
-    const r = await axios.get(quickUrl, { timeout: 10000 });
-    diag.quick = { status: r.status, body: r.data };
+    const t0 = Date.now();
+    const msg = encodeURIComponent(`Test OTP: ${otp}. Al Burhan Tours.`);
+    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=q&message=${msg}&numbers=${cleanPhone}&flash=0`;
+    const r = await axios.get(url, { timeout: 12000 });
+    diag.quick = { status: r.status, body: r.data, durationMs: Date.now() - t0 };
   } catch (e: any) {
     diag.quick = { error: e?.response?.data || e?.message };
   }
@@ -224,6 +313,8 @@ export async function sendDLTSMS(
 }
 
 export async function sendWhatsApp(mobile: string, message: string): Promise<boolean> {
+  const BOTBEE_API_KEY = process.env.BOTBEE_API_KEY;
+  const BOTBEE_PHONE_NUMBER_ID = process.env.BOTBEE_PHONE_NUMBER_ID;
   if (!BOTBEE_API_KEY || !BOTBEE_PHONE_NUMBER_ID) {
     console.log("[WhatsApp] API not configured, skipping:", mobile);
     return false;
@@ -240,7 +331,7 @@ export async function sendWhatsApp(mobile: string, message: string): Promise<boo
       axios.post(
         `${BOTBEE_BASE_URL}/send`,
         params.toString(),
-        { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+        { headers: { "Content-Type": "application/x-www-form-urlencoded" }, timeout: 10000 }
       )
     );
     const result = response.data;
@@ -268,6 +359,7 @@ export async function sendRCS(
   messageText: string,
   richData?: RcsRichData
 ): Promise<boolean> {
+  const LEMIN_API_KEY = process.env.LEMIN_API_KEY;
   if (!LEMIN_API_KEY) {
     console.log("[RCS] LEMIN_API_KEY not set — skipping RCS for:", mobile);
     return false;
@@ -294,9 +386,6 @@ export async function sendRCS(
         agent: richData.agent || "jio",
         active: "true",
       };
-      console.log("[RCS] Sending rich RCS to", mobile, "url:", richData.url, "agent:", richData.agent);
-    } else {
-      console.log("[RCS] Sending plain text RCS to", mobile);
     }
 
     const response = await withRetry(() =>
@@ -326,6 +415,9 @@ export async function sendWhatsAppTemplate(
   templateName: string,
   components: object[]
 ): Promise<boolean> {
+  const BOTBEE_API_KEY = process.env.BOTBEE_API_KEY;
+  const BOTBEE_PHONE_NUMBER_ID = process.env.BOTBEE_PHONE_NUMBER_ID;
+  const BOTBEE_BUSINESS_ID = process.env.BOTBEE_BUSINESS_ID;
   if (!BOTBEE_API_KEY || !BOTBEE_PHONE_NUMBER_ID) {
     console.log("[WhatsApp-Template] API not configured, skipping:", mobile);
     return false;
