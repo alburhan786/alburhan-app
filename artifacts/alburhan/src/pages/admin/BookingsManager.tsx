@@ -1612,9 +1612,6 @@ export default function BookingsManager() {
     });
   };
 
-  const allSelected = filtered.length > 0 && filtered.every((b: any) => selectedIds.has(b.id));
-  const someSelected = !allSelected && filtered.some((b: any) => selectedIds.has(b.id));
-
   const handleToggleSelect = (id: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -1695,6 +1692,8 @@ export default function BookingsManager() {
   };
 
   const filtered = (statusFilter === "all" ? bookings : bookings.filter((b: any) => b.status === statusFilter)).filter(matchesSearch);
+  const allSelected = filtered.length > 0 && filtered.every((b: any) => selectedIds.has(b.id));
+  const someSelected = !allSelected && filtered.some((b: any) => selectedIds.has(b.id));
   const counts = bookings.reduce((acc: Record<string, number>, b: any) => {
     acc[b.status] = (acc[b.status] || 0) + 1;
     return acc;
