@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, staffTable } from "@workspace/db";
 import { eq, desc, like } from "drizzle-orm";
-import { requireAdmin, requirePermission, type AuthenticatedRequest } from "../lib/auth.js";
+import { requireAdmin, requireModuleAccess, type AuthenticatedRequest } from "../lib/auth.js";
 import { auditLog } from "../lib/audit.js";
 import multer from "multer";
 import { uploadToGCS, deleteFromGCS } from "../lib/gcsUpload.js";
@@ -17,7 +17,11 @@ const upload = multer({
 });
 
 const router = Router();
-router.use(requirePermission("staff", "view") as any);
+// Public endpoint GET /verify (staff ID card lookup) is exempt from RBAC
+router.use((req: any, res: any, next: any) => {
+  if (req.method === "GET" && req.path === "/verify") return next();
+  return (requireModuleAccess("staff") as any)(req, res, next);
+});
 
 async function generateStaffId(companyId: string): Promise<string> {
   const prefix = companyId === "horizon" ? "HZN" : "ABT";

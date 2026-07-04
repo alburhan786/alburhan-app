@@ -1,11 +1,12 @@
 import { Router } from "express";
 import { db, pool, expensesTable } from "@workspace/db";
 import { eq, desc, sql, and } from "drizzle-orm";
-import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
+import { requireAdmin, requireModuleAccess, type AuthenticatedRequest } from "../lib/auth.js";
 import { auditLog } from "../lib/audit.js";
 import { postExpenseJournal, voidJournalEntry } from "../lib/journalHelper.js";
 
 const router = Router();
+router.use(requireModuleAccess("expenses") as any);
 
 const CATEGORIES = ["flights","hotels","visa","transport","food","laundry","zamzam","salary","marketing","office","misc"];
 

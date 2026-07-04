@@ -73,6 +73,30 @@ export function requirePermission(module: Module, action: Action) {
   };
 }
 
+/** Maps HTTP method → RBAC Action, then enforces permission. Use as router.use() for full module protection. */
+export function requireModuleAccess(module: Module) {
+  const METHOD_ACTION: Record<string, Action> = {
+    GET: "view", POST: "create", PUT: "edit", PATCH: "edit", DELETE: "delete",
+  };
+  return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    await requireAuth(req, res, async () => {
+      if (req.user?.role !== "admin") {
+        res.status(403).json({ message: "Admin access required." });
+        return;
+      }
+      const action: Action = METHOD_ACTION[req.method] ?? "view";
+      const adminRole = req.user!.adminRole;
+      if (!hasPermission(adminRole, module, action)) {
+        res.status(403).json({
+          message: `Permission denied: role '${adminRole}' cannot ${action} ${module}`,
+        });
+        return;
+      }
+      next();
+    });
+  };
+}
+
 export function generateOtp(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
