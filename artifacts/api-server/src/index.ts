@@ -456,6 +456,142 @@ async function runMigrations() {
   } catch (err) {
     console.error("[Migration] expenses approval columns failed:", err);
   }
+  // ── Chart of Accounts ──────────────────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS accounts (
+        id TEXT PRIMARY KEY,
+        code TEXT NOT NULL,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL,
+        sub_type TEXT,
+        parent_id TEXT,
+        opening_balance NUMERIC(14,2) NOT NULL DEFAULT 0,
+        is_active BOOLEAN NOT NULL DEFAULT true,
+        is_system BOOLEAN NOT NULL DEFAULT false,
+        description TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS accounts_code_idx ON accounts(code)`);
+    console.log("[Migration] accounts table ensured");
+  } catch (err) {
+    console.error("[Migration] accounts table failed:", err);
+  }
+  // Seed default Chart of Accounts (only if empty)
+  try {
+    const existing = await pool.query(`SELECT COUNT(*) FROM accounts`);
+    if (parseInt(existing.rows[0].count) === 0) {
+      const seedAccounts = [
+        ["1001","Cash in Hand","asset","current_asset",true],
+        ["1002","Bank Account","asset","current_asset",true],
+        ["1003","Accounts Receivable (Debtors)","asset","current_asset",true],
+        ["1004","Advance to Suppliers","asset","current_asset",false],
+        ["1005","Fixed Assets","asset","fixed_asset",false],
+        ["2001","Accounts Payable (Creditors)","liability","current_liability",true],
+        ["2002","GST Payable","liability","current_liability",false],
+        ["2003","Advance from Customers","liability","current_liability",false],
+        ["3001","Owner Capital","equity","capital",true],
+        ["3002","Retained Earnings","equity","retained_earnings",true],
+        ["4001","Hajj Package Revenue","income","sales",true],
+        ["4002","Umrah Package Revenue","income","sales",true],
+        ["4003","Ziyarat Package Revenue","income","sales",false],
+        ["4004","Tour Package Revenue","income","sales",false],
+        ["4005","Other Income","income","other_income",false],
+        ["5001","Flight Expenses","expense","operating",true],
+        ["5002","Hotel Expenses","expense","operating",true],
+        ["5003","Visa Expenses","expense","operating",true],
+        ["5004","Transport Expenses","expense","operating",true],
+        ["5005","Food Expenses","expense","operating",false],
+        ["5006","Laundry Expenses","expense","operating",false],
+        ["5007","Zam Zam Expenses","expense","operating",false],
+        ["5008","Staff Salary","expense","payroll",true],
+        ["5009","Marketing Expenses","expense","operating",false],
+        ["5010","Office Expenses","expense","operating",false],
+        ["5011","Miscellaneous Expenses","expense","operating",false],
+        ["5012","Bank Charges","expense","finance",false],
+      ];
+      for (const [code, name, type, sub_type, is_system] of seedAccounts) {
+        await pool.query(
+          `INSERT INTO accounts (id, code, name, type, sub_type, is_system, opening_balance) VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, 0) ON CONFLICT (code) DO NOTHING`,
+          [code, name, type, sub_type, is_system]
+        );
+      }
+      console.log("[Migration] accounts seeded with default chart of accounts");
+    }
+  } catch (err) {
+    console.error("[Migration] accounts seed failed:", err);
+  }
+  // ── Financial Years ────────────────────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS financial_years (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        start_date TEXT NOT NULL,
+        end_date TEXT NOT NULL,
+        is_active BOOLEAN NOT NULL DEFAULT false,
+        is_closed BOOLEAN NOT NULL DEFAULT false,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    // Seed current FY if none exist
+    const fyCount = await pool.query(`SELECT COUNT(*) FROM financial_years`);
+    if (parseInt(fyCount.rows[0].count) === 0) {
+      const now = new Date();
+      const fyYear = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+      await pool.query(
+        `INSERT INTO financial_years (id, name, start_date, end_date, is_active) VALUES (gen_random_uuid()::text, $1, $2, $3, true)`,
+        [`FY ${fyYear}-${(fyYear+1).toString().slice(2)}`, `${fyYear}-04-01`, `${fyYear+1}-03-31`]
+      );
+    }
+    console.log("[Migration] financial_years table ensured");
+  } catch (err) {
+    console.error("[Migration] financial_years failed:", err);
+  }
+  // ── Journal Entries ────────────────────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS journal_entries (
+        id TEXT PRIMARY KEY,
+        entry_number TEXT NOT NULL,
+        date TEXT NOT NULL,
+        narration TEXT NOT NULL,
+        reference TEXT,
+        source TEXT NOT NULL DEFAULT 'manual',
+        source_id TEXT,
+        financial_year_id TEXT,
+        created_by TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS journal_entry_lines (
+        id TEXT PRIMARY KEY,
+        journal_entry_id TEXT NOT NULL,
+        account_id TEXT NOT NULL,
+        debit NUMERIC(14,2) NOT NULL DEFAULT 0,
+        credit NUMERIC(14,2) NOT NULL DEFAULT 0,
+        narration TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS jel_entry_idx ON journal_entry_lines(journal_entry_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS jel_account_idx ON journal_entry_lines(account_id)`);
+    console.log("[Migration] journal_entries + journal_entry_lines tables ensured");
+  } catch (err) {
+    console.error("[Migration] journal_entries failed:", err);
+  }
+  // ── Bank Reconciliation columns on payment_transactions ──────────────────
+  try {
+    await pool.query(`ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS is_reconciled BOOLEAN NOT NULL DEFAULT false`);
+    await pool.query(`ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS reconciled_date TEXT`);
+    await pool.query(`ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS reconciled_by TEXT`);
+    console.log("[Migration] payment_transactions reconciliation columns ensured");
+  } catch (err) {
+    console.error("[Migration] payment_transactions reconciliation columns failed:", err);
+  }
 }
 
 const rawPort = process.env["PORT"];
