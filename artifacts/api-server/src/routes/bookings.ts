@@ -32,9 +32,16 @@ import {
   sendBookingRejectionNotification,
   sendBookingSubmissionNotification,
   sendPaymentConfirmationNotification,
+  sendAdminNewBookingEmail,
   sendWhatsApp,
   sendDLTSMS,
 } from "../lib/notifications.js";
+import {
+  notifyNewBooking,
+  notifyBookingApproved,
+  notifyBookingRejected,
+  notifyBookingCancelled,
+} from "../lib/adminNotifications.js";
 
 const router = Router();
 
@@ -166,6 +173,30 @@ router.post("/offline", requireAdmin as any, requirePermission("bookings", "crea
         bookingNumber: booking.bookingNumber,
       }).catch(console.error);
     }
+
+    notifyNewBooking({
+      bookingId: booking.id,
+      bookingNumber: booking.bookingNumber,
+      customerName: booking.customerName,
+      customerMobile: booking.customerMobile,
+      customerEmail: booking.customerEmail,
+      packageName: booking.packageName ?? null,
+      finalAmount: booking.finalAmount ? Number(booking.finalAmount) : null,
+      numberOfPilgrims: booking.numberOfPilgrims,
+      isOffline: true,
+    });
+
+    sendAdminNewBookingEmail({
+      bookingId: booking.id,
+      bookingNumber: booking.bookingNumber,
+      customerName: booking.customerName,
+      customerMobile: booking.customerMobile,
+      customerEmail: booking.customerEmail,
+      packageName: booking.packageName ?? null,
+      finalAmount: booking.finalAmount ? Number(booking.finalAmount) : null,
+      numberOfPilgrims: booking.numberOfPilgrims,
+      isOffline: true,
+    }).catch(console.error);
 
     res.status(201).json(formatBooking(booking));
   } catch (err: any) {
@@ -344,6 +375,30 @@ router.post("/", requireAuth as any, async (req: AuthenticatedRequest, res) => {
     numberOfPilgrims: booking.numberOfPilgrims,
   }).catch(console.error);
 
+  notifyNewBooking({
+    bookingId: booking.id,
+    bookingNumber: booking.bookingNumber,
+    customerName: booking.customerName,
+    customerMobile: booking.customerMobile,
+    customerEmail: booking.customerEmail,
+    packageName: booking.packageName ?? pkg?.name ?? null,
+    finalAmount: booking.finalAmount ? Number(booking.finalAmount) : null,
+    numberOfPilgrims: booking.numberOfPilgrims,
+    isOffline: false,
+  });
+
+  sendAdminNewBookingEmail({
+    bookingId: booking.id,
+    bookingNumber: booking.bookingNumber,
+    customerName: booking.customerName,
+    customerMobile: booking.customerMobile,
+    customerEmail: booking.customerEmail,
+    packageName: booking.packageName ?? pkg?.name ?? "Travel Package",
+    finalAmount: booking.finalAmount ? Number(booking.finalAmount) : null,
+    numberOfPilgrims: booking.numberOfPilgrims,
+    isOffline: false,
+  }).catch(console.error);
+
   auditLog({ req, action: "created", entityTable: "bookings", entityId: booking.id, newValue: { bookingNumber: booking.bookingNumber, customerName: booking.customerName, status: booking.status } }).catch(() => {});
 
   res.status(201).json(formatBooking(booking));
@@ -381,6 +436,13 @@ router.post("/:id/approve", requireAdmin as any, requirePermission("bookings", "
     bookingNumber: updated.bookingNumber,
   }).catch(console.error);
 
+  notifyBookingApproved({
+    bookingId: updated.id,
+    bookingNumber: updated.bookingNumber,
+    customerName: updated.customerName,
+    customerMobile: updated.customerMobile,
+  });
+
   auditLog({ req, action: "approved", entityTable: "bookings", entityId: updated.id, newValue: { bookingNumber: updated.bookingNumber, status: "approved" } }).catch(() => {});
   res.json(formatBooking(updated));
 });
@@ -407,6 +469,14 @@ router.post("/:id/reject", requireAdmin as any, requirePermission("bookings", "e
     bookingNumber: updated.bookingNumber,
     reason,
   }).catch(console.error);
+
+  notifyBookingRejected({
+    bookingId: updated.id,
+    bookingNumber: updated.bookingNumber,
+    customerName: updated.customerName,
+    customerMobile: updated.customerMobile,
+    reason,
+  });
 
   auditLog({ req, action: "rejected", entityTable: "bookings", entityId: updated.id, newValue: { bookingNumber: updated.bookingNumber, status: "rejected", reason } }).catch(() => {});
   res.json(formatBooking(updated));

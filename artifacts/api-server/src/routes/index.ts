@@ -39,6 +39,7 @@ import payrollRouter from "./payroll.js";
 import assetsRouter from "./assets.js";
 import auditRouter from "./audit.js";
 import adminUsersRouter from "./users-admin.js";
+import adminNotificationsRouter from "./admin-notifications.js";
 
 const router: IRouter = Router();
 
@@ -164,6 +165,7 @@ router.use("/payroll", payrollRouter);
 router.use("/assets", assetsRouter);
 router.use("/audit-logs", auditRouter);
 router.use("/admin-users", adminUsersRouter);
+router.use("/admin-notifications", adminNotificationsRouter);
 router.use(storageRouter);
 
 export default router;

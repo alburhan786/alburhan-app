@@ -378,6 +378,24 @@ async function runMigrations() {
   } catch (err) {
     console.error("[Migration] booking_audit_logs failed:", err);
   }
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS admin_notifications (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        body JSONB NOT NULL DEFAULT '{}',
+        booking_id TEXT,
+        is_read BOOLEAN NOT NULL DEFAULT false,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS admin_notif_created_idx ON admin_notifications(created_at DESC)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS admin_notif_unread_idx ON admin_notifications(is_read) WHERE is_read = false`);
+    console.log("[Migration] admin_notifications table ensured");
+  } catch (err) {
+    console.error("[Migration] admin_notifications failed:", err);
+  }
   // Phase 5: Hotel Management
   try {
     await pool.query(`

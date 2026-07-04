@@ -562,6 +562,88 @@ export async function sendCustomerDocumentUploadNotification(opts: {
   ]);
 }
 
+const ADMIN_NOTIFICATION_EMAILS = [
+  "admin@alburhantravels.com",
+  "altaf@alburhantravels.com",
+];
+
+export async function sendAdminNewBookingEmail(opts: {
+  bookingId: string;
+  bookingNumber: string;
+  customerName: string;
+  customerMobile: string;
+  customerEmail?: string | null;
+  packageName?: string | null;
+  finalAmount?: number | null;
+  numberOfPilgrims: number;
+  isOffline: boolean;
+}): Promise<void> {
+  const transport = getEmailTransport();
+  if (!transport) {
+    console.log("[AdminEmail] SMTP not configured — skipping admin booking email");
+    return;
+  }
+  const from = process.env.SMTP_USER || "info@alburhantravels.com";
+  const subject = opts.isOffline
+    ? `[Al Burhan] New Offline Booking — ${opts.customerName}`
+    : `[Al Burhan] New Booking Request — ${opts.customerName}`;
+  const dashLink = `https://alburhantravels.in/admin/bookings`;
+  const amountLine = opts.finalAmount
+    ? `₹${Number(opts.finalAmount).toLocaleString("en-IN")}`
+    : "To be calculated";
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:20px;color:#222">
+  <div style="background:#1a3c5e;padding:20px 28px;border-radius:10px 10px 0 0">
+    <h2 style="color:#fff;margin:0;font-size:18px">
+      ${opts.isOffline ? "📋 New Offline Booking" : "📬 New Booking Request"}
+    </h2>
+    <p style="color:#a8c4e0;margin:4px 0 0">Al Burhan Tours &amp; Travels — Admin Alert</p>
+  </div>
+  <div style="background:#f8fafc;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 10px 10px;padding:24px">
+    <table style="width:100%;border-collapse:collapse">
+      <tr><td style="padding:8px 0;border-bottom:1px solid #eee;color:#555;width:40%"><strong>Customer Name</strong></td><td style="padding:8px 0;border-bottom:1px solid #eee">${opts.customerName}</td></tr>
+      <tr><td style="padding:8px 0;border-bottom:1px solid #eee;color:#555"><strong>Mobile</strong></td><td style="padding:8px 0;border-bottom:1px solid #eee">${opts.customerMobile}</td></tr>
+      ${opts.customerEmail ? `<tr><td style="padding:8px 0;border-bottom:1px solid #eee;color:#555"><strong>Email</strong></td><td style="padding:8px 0;border-bottom:1px solid #eee">${opts.customerEmail}</td></tr>` : ""}
+      <tr><td style="padding:8px 0;border-bottom:1px solid #eee;color:#555"><strong>Booking ID</strong></td><td style="padding:8px 0;border-bottom:1px solid #eee;font-family:monospace">${opts.bookingNumber}</td></tr>
+      <tr><td style="padding:8px 0;border-bottom:1px solid #eee;color:#555"><strong>Package</strong></td><td style="padding:8px 0;border-bottom:1px solid #eee">${opts.packageName ?? "—"}</td></tr>
+      <tr><td style="padding:8px 0;border-bottom:1px solid #eee;color:#555"><strong>Pilgrims</strong></td><td style="padding:8px 0;border-bottom:1px solid #eee">${opts.numberOfPilgrims}</td></tr>
+      <tr><td style="padding:8px 0;border-bottom:1px solid #eee;color:#555"><strong>Total Amount</strong></td><td style="padding:8px 0;border-bottom:1px solid #eee;font-weight:bold;color:#1a3c5e">${amountLine}</td></tr>
+      <tr><td style="padding:8px 0;color:#555"><strong>Date &amp; Time</strong></td><td style="padding:8px 0">${new Date().toLocaleString("en-IN", { dateStyle: "long", timeStyle: "short" })}</td></tr>
+    </table>
+    <div style="margin-top:24px;text-align:center">
+      <a href="${dashLink}" style="background:#1a3c5e;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block">
+        View Booking in Dashboard →
+      </a>
+    </div>
+  </div>
+  <p style="color:#aaa;font-size:11px;text-align:center;margin-top:16px">Al Burhan Tours &amp; Travels · admin@alburhantravels.com</p>
+</body>
+</html>`;
+
+  const results = await Promise.allSettled(
+    ADMIN_NOTIFICATION_EMAILS.map((to) =>
+      transport!.sendMail({
+        from: `Al Burhan Tours & Travels <${from}>`,
+        to,
+        subject,
+        html,
+        text: `New Booking: ${opts.customerName}\nMobile: ${opts.customerMobile}\nBooking: ${opts.bookingNumber}\nPackage: ${opts.packageName ?? "—"}\nPilgrims: ${opts.numberOfPilgrims}\nAmount: ${amountLine}\n\nView: ${dashLink}`,
+      }),
+    ),
+  );
+  results.forEach((r, i) => {
+    if (r.status === "fulfilled") {
+      console.log(`[AdminEmail] Sent admin booking alert to ${ADMIN_NOTIFICATION_EMAILS[i]}`);
+    } else {
+      console.error(`[AdminEmail] Failed to ${ADMIN_NOTIFICATION_EMAILS[i]}:`, (r as PromiseRejectedResult).reason?.message);
+    }
+  });
+}
+
 export async function sendAdminDocumentReadyNotification(opts: {
   mobile: string;
   email?: string | null;
