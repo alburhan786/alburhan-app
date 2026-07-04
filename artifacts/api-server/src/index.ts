@@ -592,6 +592,24 @@ async function runMigrations() {
   } catch (err) {
     console.error("[Migration] payment_transactions reconciliation columns failed:", err);
   }
+  // ── Per-account per-FY opening balances ───────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS account_opening_balances (
+        id TEXT PRIMARY KEY,
+        account_id TEXT NOT NULL,
+        financial_year_id TEXT NOT NULL,
+        opening_balance NUMERIC(14,2) NOT NULL DEFAULT 0,
+        notes TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE(account_id, financial_year_id)
+      )
+    `);
+    console.log("[Migration] account_opening_balances table ensured");
+  } catch (err) {
+    console.error("[Migration] account_opening_balances failed:", err);
+  }
 }
 
 const rawPort = process.env["PORT"];
@@ -611,6 +629,16 @@ async function start() {
   } catch (err) {
     console.error("[Startup] Failed to sync admin roles:", err);
   }
+
+  // Auto-sync journal entries for historical data (non-blocking)
+  import("./lib/journalHelper.js").then(({ syncAllJournalEntries }) => {
+    syncAllJournalEntries().then(({ payments, expenses }) => {
+      if (payments + expenses > 0)
+        console.log(`[Startup] Journal sync: ${payments} payment entries + ${expenses} expense entries created`);
+      else
+        console.log("[Startup] Journal sync: all entries already up to date");
+    }).catch(err => console.error("[Startup] Journal sync failed (non-fatal):", err));
+  }).catch(() => {});
 
   app.listen(finalPort, () => {
     console.log(`Server listening on port ${finalPort}`);

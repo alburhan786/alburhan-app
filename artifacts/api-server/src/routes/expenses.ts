@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db, pool, expensesTable } from "@workspace/db";
 import { eq, desc, sql, and } from "drizzle-orm";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
+import { postExpenseJournal } from "../lib/journalHelper.js";
 
 const router = Router();
 
@@ -180,6 +181,18 @@ router.post("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => 
       invoiceNumber,
       notes,
     }).returning();
+
+    // Auto-post double-entry journal (fire-and-forget, non-fatal)
+    postExpenseJournal({
+      expId: row.id,
+      amount: Number(amount),
+      category: String(category),
+      paymentMethod: String(paymentMethod || "cash"),
+      date: String(date),
+      description: String(description),
+      invoiceNumber: invoiceNumber ? String(invoiceNumber) : null,
+    }).catch(() => {});
+
     res.json(row);
   } catch (err) {
     console.error("[expenses] POST /", err);

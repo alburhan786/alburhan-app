@@ -306,12 +306,93 @@ function ChartOfAccounts() {
   );
 }
 
+// ── OPENING BALANCES EDITOR ──────────────────────────────────────────────
+function OpeningBalancesEditor({ fyId }: { fyId: string }) {
+  const { toast } = useToast();
+  const [rows, setRows] = useState<any[]>([]);
+  const [edits, setEdits] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    if (!fyId) return;
+    setLoading(true);
+    try {
+      const r = await fetch(`${API}/api/accounting/opening-balances?fy_id=${fyId}`, { credentials: "include" });
+      if (r.ok) { const d = await r.json(); setRows(d.rows || []); setEdits({}); }
+    } catch { }
+    setLoading(false);
+  }, [fyId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function save() {
+    setSaving(true);
+    const balances = rows.map(r => ({
+      account_id: r.account_id,
+      opening_balance: Number(edits[r.account_id] ?? r.opening_balance) || 0,
+    }));
+    try {
+      const r = await fetch(`${API}/api/accounting/opening-balances/bulk-save`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fy_id: fyId, balances }),
+      });
+      if (r.ok) { toast({ title: "Opening balances saved" }); load(); }
+      else toast({ title: "Save failed", variant: "destructive" });
+    } catch { toast({ title: "Save failed", variant: "destructive" }); }
+    setSaving(false);
+  }
+
+  if (loading) return <Spin />;
+  if (!rows.length) return <div className="py-6 text-center text-muted-foreground text-sm">No accounts found</div>;
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-muted-foreground">Set per-account opening balances for this financial year. Leave at 0 to use the default from Chart of Accounts.</p>
+      <div className="bg-white rounded-xl border overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50 text-xs text-muted-foreground uppercase">
+              <tr>
+                <th className="px-4 py-2.5 text-left">Code</th>
+                <th className="px-4 py-2.5 text-left">Account</th>
+                <th className="px-4 py-2.5 text-left">Type</th>
+                <th className="px-4 py-2.5 text-right">Opening Balance (₹)</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {rows.map(row => (
+                <tr key={row.account_id} className="hover:bg-muted/20">
+                  <td className="px-4 py-2 font-mono text-xs font-semibold">{row.code}</td>
+                  <td className="px-4 py-2 text-xs">{row.name}</td>
+                  <td className="px-4 py-2"><span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${ACCT_TYPE_COLORS[row.type] || ""}`}>{row.type}</span></td>
+                  <td className="px-4 py-2 text-right">
+                    <Input type="number" className="h-7 text-xs text-right w-32 ml-auto"
+                      value={edits[row.account_id] ?? String(row.opening_balance)}
+                      onChange={e => setEdits(prev => ({ ...prev, [row.account_id]: e.target.value }))} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div className="flex justify-end">
+        <Button className="bg-[#0d5040]" size="sm" onClick={save} disabled={saving}>{saving ? "Saving…" : "Save Opening Balances"}</Button>
+      </div>
+    </div>
+  );
+}
+
 // ── FINANCIAL YEAR MANAGER ────────────────────────────────────────────────
-function FYManager() {
+function FYManager({ activeFyId }: { activeFyId?: string }) {
   const { toast } = useToast();
   const [fys, setFys] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [showOB, setShowOB] = useState(false);
+  const [obFyId, setObFyId] = useState<string>("");
   const [form, setForm] = useState({ name: "", start_date: "", end_date: "" });
 
   const load = useCallback(async () => {
@@ -341,7 +422,7 @@ function FYManager() {
   return (
     <div className="space-y-4 max-w-2xl">
       <div className="flex justify-between items-center">
-        <p className="text-sm text-muted-foreground">Manage your financial years. Only one can be active at a time.</p>
+        <p className="text-sm text-muted-foreground">Manage financial years and set opening balances per account.</p>
         <Button size="sm" className="bg-[#0d5040]" onClick={() => setShowModal(true)}><Plus size={14} className="mr-1" />New Year</Button>
       </div>
       {loading ? <Spin /> : (
@@ -355,6 +436,7 @@ function FYManager() {
               <div className="flex items-center gap-2">
                 {fy.is_active && <Badge className="bg-green-100 text-green-700 border-0">Active</Badge>}
                 {fy.is_closed && <Badge className="bg-gray-100 text-gray-500 border-0">Closed</Badge>}
+                <Button size="sm" variant="outline" className="text-xs" onClick={() => { setObFyId(fy.id); setShowOB(true); }}>Opening Balances</Button>
                 {!fy.is_active && !fy.is_closed && <Button size="sm" variant="outline" onClick={() => activate(fy.id)}>Set Active</Button>}
                 {fy.is_active && !fy.is_closed && <Button size="sm" variant="outline" className="text-red-600" onClick={() => closeFY(fy.id, fy.name)}>Close Year</Button>}
               </div>
@@ -362,6 +444,17 @@ function FYManager() {
           ))}
         </div>
       )}
+
+      {showOB && obFyId && (
+        <div className="mt-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold">Opening Balances — {fys.find(f => f.id === obFyId)?.name}</h3>
+            <Button size="sm" variant="ghost" className="text-xs h-6" onClick={() => setShowOB(false)}>✕ Close</Button>
+          </div>
+          <OpeningBalancesEditor fyId={obFyId} />
+        </div>
+      )}
+
       <Dialog open={showModal} onOpenChange={setShowModal}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>New Financial Year</DialogTitle></DialogHeader>
@@ -383,14 +476,14 @@ function FYManager() {
 }
 
 // ── GENERAL LEDGER (per account) ──────────────────────────────────────────
-function GeneralLedger() {
+function GeneralLedger({ defaultFrom, defaultTo }: { defaultFrom?: string; defaultTo?: string }) {
   const [accounts, setAccounts] = useState<any[]>([]);
   const [selAccount, setSelAccount] = useState("");
   const [data, setData] = useState<any>(null);
   const today = new Date().toISOString().slice(0, 10);
   const fyStart = (new Date().getMonth() >= 3 ? new Date().getFullYear() : new Date().getFullYear() - 1) + "-04-01";
-  const [from, setFrom] = useState(fyStart);
-  const [to, setTo] = useState(today);
+  const [from, setFrom] = useState(defaultFrom || fyStart);
+  const [to, setTo] = useState(defaultTo || today);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [syncing, setSyncing] = useState(false);
@@ -510,12 +603,12 @@ function GeneralLedger() {
 }
 
 // ── BANK RECONCILIATION ───────────────────────────────────────────────────
-function BankRecon() {
+function BankRecon({ defaultFrom, defaultTo }: { defaultFrom?: string; defaultTo?: string }) {
   const { toast } = useToast();
   const today = new Date().toISOString().slice(0, 10);
   const d30 = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
-  const [from, setFrom] = useState(d30);
-  const [to, setTo] = useState(today);
+  const [from, setFrom] = useState(defaultFrom || d30);
+  const [to, setTo] = useState(defaultTo || today);
   const [status, setStatus] = useState("all");
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -626,10 +719,10 @@ function BankRecon() {
 }
 
 // ── CASH FLOW ─────────────────────────────────────────────────────────────
-function CashFlow() {
+function CashFlow({ defaultFrom, defaultTo }: { defaultFrom?: string; defaultTo?: string }) {
   const fyYear = new Date().getMonth() >= 3 ? new Date().getFullYear() : new Date().getFullYear() - 1;
-  const [from, setFrom] = useState(`${fyYear}-04-01`);
-  const [to, setTo] = useState(new Date().toISOString().slice(0, 10));
+  const [from, setFrom] = useState(defaultFrom || `${fyYear}-04-01`);
+  const [to, setTo] = useState(defaultTo || new Date().toISOString().slice(0, 10));
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
@@ -711,10 +804,10 @@ function CashFlow() {
 }
 
 // ── SHARED / SIMPLE VIEWS ─────────────────────────────────────────────────
-function BookView({ endpoint, title }: { endpoint: string; title: string }) {
+function BookView({ endpoint, title, defaultFrom, defaultTo }: { endpoint: string; title: string; defaultFrom?: string; defaultTo?: string }) {
   const today = new Date().toISOString().slice(0, 10);
   const d90 = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
-  const [from, setFrom] = useState(d90); const [to, setTo] = useState(today);
+  const [from, setFrom] = useState(defaultFrom || d90); const [to, setTo] = useState(defaultTo || today);
   const [data, setData] = useState<any>(null); const [loading, setLoading] = useState(false); const [err, setErr] = useState("");
   const load = useCallback(async () => {
     setLoading(true); setErr("");
@@ -755,9 +848,9 @@ function Ledger() {
   );
 }
 
-function Journal() {
+function Journal({ defaultFrom, defaultTo }: { defaultFrom?: string; defaultTo?: string }) {
   const today = new Date().toISOString().slice(0, 10); const d30 = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
-  const [from, setFrom] = useState(d30); const [to, setTo] = useState(today); const [rows, setRows] = useState<any[]>([]); const [loading, setLoading] = useState(false); const [err, setErr] = useState("");
+  const [from, setFrom] = useState(defaultFrom || d30); const [to, setTo] = useState(defaultTo || today); const [rows, setRows] = useState<any[]>([]); const [loading, setLoading] = useState(false); const [err, setErr] = useState("");
   const load = useCallback(async () => { setLoading(true); setErr(""); try { const r = await fetch(`${API}/api/accounting/journal?from=${from}&to=${to}`, { credentials: "include" }); if (!r.ok) setErr(`Error ${r.status}`); else setRows(await r.json()); } catch (e: any) { setErr(e.message); } setLoading(false); }, [from, to]);
   useEffect(() => { load(); }, [load]);
   function exp() { const ws = XLSX.utils.json_to_sheet(rows.map(r => ({ Date: r.date, Ref: r.reference, Party: r.party, "Account Dr": r.account_dr, "Account Cr": r.account_cr, Debit: r.debit, Credit: r.credit, Narration: r.narration }))); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Journal"); XLSX.writeFile(wb, `journal-${from}-${to}.xlsx`); }
@@ -771,9 +864,9 @@ function Journal() {
   );
 }
 
-function PaymentEntries() {
+function PaymentEntries({ defaultFrom, defaultTo }: { defaultFrom?: string; defaultTo?: string }) {
   const today = new Date().toISOString().slice(0, 10); const d30 = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
-  const [from, setFrom] = useState(d30); const [to, setTo] = useState(today); const [mode, setMode] = useState("all"); const [data, setData] = useState<any>(null); const [loading, setLoading] = useState(false); const [err, setErr] = useState("");
+  const [from, setFrom] = useState(defaultFrom || d30); const [to, setTo] = useState(defaultTo || today); const [mode, setMode] = useState("all"); const [data, setData] = useState<any>(null); const [loading, setLoading] = useState(false); const [err, setErr] = useState("");
   const load = useCallback(async () => { setLoading(true); setErr(""); try { const r = await fetch(`${API}/api/accounting/payment-entries?from=${from}&to=${to}&mode=${mode}`, { credentials: "include" }); if (!r.ok) setErr(`Error ${r.status}`); else setData(await r.json()); } catch (e: any) { setErr(e.message); } setLoading(false); }, [from, to, mode]);
   useEffect(() => { load(); }, [load]);
   function exp() { if (!data?.rows) return; const ws = XLSX.utils.json_to_sheet(data.rows.map((r: any) => ({ Date: r.date, "Booking #": r.booking_number, Customer: r.customer_name, Mobile: r.mobile, Group: r.group_name || "", Mode: r.mode, Reference: r.reference, Bank: r.bank_name, "Received By": r.received_by, "Amount (₹)": r.amount, Reconciled: r.is_reconciled ? "Yes" : "No" }))); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Payments"); XLSX.writeFile(wb, `payments-${from}-${to}.xlsx`); }
@@ -805,9 +898,9 @@ function Outstanding() {
   );
 }
 
-function ProfitLoss() {
+function ProfitLoss({ defaultFrom, defaultTo }: { defaultFrom?: string; defaultTo?: string }) {
   const fyYear = new Date().getMonth() >= 3 ? new Date().getFullYear() : new Date().getFullYear() - 1;
-  const [from, setFrom] = useState(`${fyYear}-04-01`); const [to, setTo] = useState(new Date().toISOString().slice(0, 10)); const [data, setData] = useState<any>(null); const [loading, setLoading] = useState(false); const [err, setErr] = useState("");
+  const [from, setFrom] = useState(defaultFrom || `${fyYear}-04-01`); const [to, setTo] = useState(defaultTo || new Date().toISOString().slice(0, 10)); const [data, setData] = useState<any>(null); const [loading, setLoading] = useState(false); const [err, setErr] = useState("");
   const load = useCallback(async () => { setLoading(true); setErr(""); try { const r = await fetch(`${API}/api/accounting/pl?from=${from}&to=${to}`, { credentials: "include" }); if (!r.ok) setErr(`Error ${r.status}`); else setData(await r.json()); } catch (e: any) { setErr(e.message); } setLoading(false); }, [from, to]);
   useEffect(() => { load(); }, [load]);
   function exp() { if (!data) return; const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["P&L", `${data.period?.from} to ${data.period?.to}`], [], ["INCOME"], ["Sales Revenue", data.revenue?.total], [], ["EXPENSES"], ...(data.expenses?.byCategory || []).map((c: any) => [CAT_LABELS[c.category] || c.category, c.total]), ["Total Expenses", data.expenses?.total], [], ["NET PROFIT/(LOSS)", data.netProfit]]), "P&L"); XLSX.writeFile(wb, `pl-${from}-${to}.xlsx`); }
@@ -821,8 +914,8 @@ function ProfitLoss() {
   );
 }
 
-function BalanceSheet() {
-  const [asOf, setAsOf] = useState(new Date().toISOString().slice(0, 10)); const [data, setData] = useState<any>(null); const [loading, setLoading] = useState(false); const [err, setErr] = useState("");
+function BalanceSheet({ defaultTo }: { defaultTo?: string }) {
+  const [asOf, setAsOf] = useState(defaultTo || new Date().toISOString().slice(0, 10)); const [data, setData] = useState<any>(null); const [loading, setLoading] = useState(false); const [err, setErr] = useState("");
   const load = useCallback(async () => { setLoading(true); setErr(""); try { const r = await fetch(`${API}/api/accounting/balance-sheet?asOf=${asOf}`, { credentials: "include" }); if (!r.ok) setErr(`Error ${r.status}`); else setData(await r.json()); } catch (e: any) { setErr(e.message); } setLoading(false); }, [asOf]);
   useEffect(() => { load(); }, [load]);
   return (
@@ -838,9 +931,9 @@ function BalanceSheet() {
   );
 }
 
-function TrialBalance() {
+function TrialBalance({ defaultFrom, defaultTo }: { defaultFrom?: string; defaultTo?: string }) {
   const fyYear = new Date().getMonth() >= 3 ? new Date().getFullYear() : new Date().getFullYear() - 1;
-  const [from, setFrom] = useState(`${fyYear}-04-01`); const [to, setTo] = useState(new Date().toISOString().slice(0, 10)); const [data, setData] = useState<any>(null); const [loading, setLoading] = useState(false); const [err, setErr] = useState("");
+  const [from, setFrom] = useState(defaultFrom || `${fyYear}-04-01`); const [to, setTo] = useState(defaultTo || new Date().toISOString().slice(0, 10)); const [data, setData] = useState<any>(null); const [loading, setLoading] = useState(false); const [err, setErr] = useState("");
   const load = useCallback(async () => { setLoading(true); setErr(""); try { const r = await fetch(`${API}/api/accounting/trial-balance?from=${from}&to=${to}`, { credentials: "include" }); if (!r.ok) setErr(`Error ${r.status}`); else setData(await r.json()); } catch (e: any) { setErr(e.message); } setLoading(false); }, [from, to]);
   useEffect(() => { load(); }, [load]);
   function exp() { if (!data) return; const ws = XLSX.utils.json_to_sheet((data.entries || []).map((e: any) => ({ Account: e.account, "Debit (Dr)": e.debit || 0, "Credit (Cr)": e.credit || 0 }))); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Trial Balance"); XLSX.writeFile(wb, `trial-balance-${from}-${to}.xlsx`); }
@@ -860,12 +953,56 @@ function TrialBalance() {
 // ── MAIN ──────────────────────────────────────────────────────────────────
 export default function AccountingDashboard() {
   const [tab, setTab] = useState("overview");
+  const [fys, setFys] = useState<any[]>([]);
+  const [activeFyId, setActiveFyId] = useState("");
+  const [fyFrom, setFyFrom] = useState("");
+  const [fyTo, setFyTo] = useState("");
+
+  useEffect(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    fetch(`${API}/api/accounting/financial-years`, { credentials: "include" })
+      .then(r => r.json()).then((years: any[]) => {
+        setFys(years);
+        const active = years.find((y: any) => y.is_active) || years[0];
+        if (active) {
+          setActiveFyId(active.id);
+          setFyFrom(active.start_date);
+          setFyTo(active.end_date > today ? today : active.end_date);
+        }
+      }).catch(() => {});
+  }, []);
+
+  function handleFyChange(fyId: string) {
+    const today = new Date().toISOString().slice(0, 10);
+    const fy = fys.find((y: any) => y.id === fyId);
+    if (!fy) return;
+    setActiveFyId(fyId);
+    setFyFrom(fy.start_date);
+    setFyTo(fy.end_date > today ? today : fy.end_date);
+  }
+
+  const fyKey = `${fyFrom}-${fyTo}`;
+
   return (
     <AdminLayout>
       <div className="max-w-7xl mx-auto space-y-4">
-        <div>
-          <h1 className="text-2xl font-bold text-[#0d5040]">Accounting</h1>
-          <p className="text-sm text-muted-foreground">Chart of Accounts, Double-Entry Journals, Cash Books, P&L, Balance Sheet</p>
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-2xl font-bold text-[#0d5040]">Accounting</h1>
+            <p className="text-sm text-muted-foreground">Chart of Accounts, Double-Entry Journals, Cash Books, P&L, Balance Sheet</p>
+          </div>
+          {fys.length > 0 && (
+            <div className="flex items-center gap-2 bg-white border rounded-lg px-3 py-2 shadow-sm">
+              <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">Financial Year:</span>
+              <select value={activeFyId} onChange={e => handleFyChange(e.target.value)}
+                className="h-7 px-2 rounded border text-sm bg-background">
+                {fys.map((fy: any) => (
+                  <option key={fy.id} value={fy.id}>{fy.name}{fy.is_active ? " ●" : ""}</option>
+                ))}
+              </select>
+              {fyFrom && <span className="text-[11px] text-muted-foreground hidden sm:inline">{fyFrom} → {fyTo}</span>}
+            </div>
+          )}
         </div>
         {/* Scrollable tabs */}
         <div className="bg-white border rounded-xl p-1 flex gap-0.5 overflow-x-auto">
@@ -878,19 +1015,19 @@ export default function AccountingDashboard() {
         </div>
         {tab === "overview" && <Overview />}
         {tab === "accounts" && <ChartOfAccounts />}
-        {tab === "fy" && <FYManager />}
-        {tab === "gen-ledger" && <GeneralLedger />}
+        {tab === "fy" && <FYManager activeFyId={activeFyId} />}
+        {tab === "gen-ledger" && <GeneralLedger key={fyKey} defaultFrom={fyFrom} defaultTo={fyTo} />}
         {tab === "ledger" && <Ledger />}
-        {tab === "cashbook" && <BookView endpoint="cashbook" title="Cash Book" />}
-        {tab === "bankbook" && <BookView endpoint="bankbook" title="Bank Book" />}
-        {tab === "journal" && <Journal />}
-        {tab === "payments" && <PaymentEntries />}
+        {tab === "cashbook" && <BookView key={fyKey} endpoint="cashbook" title="Cash Book" defaultFrom={fyFrom} defaultTo={fyTo} />}
+        {tab === "bankbook" && <BookView key={fyKey} endpoint="bankbook" title="Bank Book" defaultFrom={fyFrom} defaultTo={fyTo} />}
+        {tab === "journal" && <Journal key={fyKey} defaultFrom={fyFrom} defaultTo={fyTo} />}
+        {tab === "payments" && <PaymentEntries key={fyKey} defaultFrom={fyFrom} defaultTo={fyTo} />}
         {tab === "outstanding" && <Outstanding />}
-        {tab === "pl" && <ProfitLoss />}
-        {tab === "balance" && <BalanceSheet />}
-        {tab === "trial" && <TrialBalance />}
-        {tab === "recon" && <BankRecon />}
-        {tab === "cashflow" && <CashFlow />}
+        {tab === "pl" && <ProfitLoss key={fyKey} defaultFrom={fyFrom} defaultTo={fyTo} />}
+        {tab === "balance" && <BalanceSheet key={fyKey} defaultTo={fyTo} />}
+        {tab === "trial" && <TrialBalance key={fyKey} defaultFrom={fyFrom} defaultTo={fyTo} />}
+        {tab === "recon" && <BankRecon key={fyKey} defaultFrom={fyFrom} defaultTo={fyTo} />}
+        {tab === "cashflow" && <CashFlow key={fyKey} defaultFrom={fyFrom} defaultTo={fyTo} />}
       </div>
     </AdminLayout>
   );

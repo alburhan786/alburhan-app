@@ -3,6 +3,7 @@ import { db, pool, bookingsTable, paymentTransactionsTable, customerProfilesTabl
 import { eq, sum, count, asc, and, isNull, or } from "drizzle-orm";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import { upsertPilgrimFromProfile } from "../lib/pilgrimUtils.js";
+import { postPaymentJournal } from "../lib/journalHelper.js";
 
 type BookingStatus = "pending" | "approved" | "rejected" | "confirmed" | "cancelled" | "partially_paid";
 type PaymentMode = "cash" | "neft" | "upi" | "cheque" | "online";
@@ -218,6 +219,15 @@ router.post("/:id/payments", requireAdmin as RequestHandler, async (req: Authent
 
       return { entry, updated };
     });
+
+    // Auto-post double-entry journal (fire-and-forget, non-fatal)
+    postPaymentJournal({
+      txnId: result.entry.id,
+      amount: Number(result.entry.amount),
+      mode: String(paymentMode),
+      date: String(paymentDate),
+      bookingNumber: bookingId,
+    }).catch(() => {});
 
     return res.status(201).json({
       entry: { ...result.entry, amount: Number(result.entry.amount) },
