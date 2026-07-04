@@ -1,7 +1,7 @@
 import { Router, type RequestHandler } from "express";
 import { db, pool, bookingsTable, paymentTransactionsTable, customerProfilesTable } from "@workspace/db";
 import { eq, sum, count, asc, and, isNull, or } from "drizzle-orm";
-import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
+import { requireAdmin, requireModuleAccess, requirePermission, type AuthenticatedRequest } from "../lib/auth.js";
 import { auditLog } from "../lib/audit.js";
 import { upsertPilgrimFromProfile } from "../lib/pilgrimUtils.js";
 import { postPaymentJournal, voidJournalEntry } from "../lib/journalHelper.js";
@@ -15,6 +15,7 @@ const VALID_MODES: PaymentMode[] = ["cash", "neft", "upi", "cheque", "online"];
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 const router = Router();
+router.use(requireModuleAccess("payments") as any);
 
 function generateInvoiceNumber(): string {
   return `INV${Date.now().toString().slice(-8)}`;

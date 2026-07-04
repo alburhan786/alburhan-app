@@ -158,6 +158,7 @@ router.put("/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) =
       hotels: hotels || {}, notes, updatedAt: new Date(),
     }).where(eq(hajjGroupsTable.id, id)).returning();
     if (!updated) { res.status(404).json({ message: "Group not found" }); return; }
+    auditLog({ req, action: "updated", entityTable: "groups", entityId: id, newValue: { groupName: updated.groupName, year: updated.year, departureDate: updated.departureDate } }).catch(() => {});
     res.json(fmtGroup(updated));
   } catch (err: any) {
     console.error("[groups] PUT /:id DB error:", err);

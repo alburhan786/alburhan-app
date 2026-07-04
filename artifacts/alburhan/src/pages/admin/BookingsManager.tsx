@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
+import { PermissionGuard } from "@/components/PermissionGuard";
 import { useListBookings, useApproveBooking, useRejectBooking, useListDocuments } from "@workspace/api-client-react";
 import { useDeleteGuard } from "@/components/DeleteGuard";
 import type { Booking, Pilgrim } from "@workspace/api-client-react";
@@ -1810,12 +1811,16 @@ export default function BookingsManager() {
                         {/* Approve / Reject (pending only) */}
                         {booking.status === 'pending' && (
                           <>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-600 hover:bg-emerald-50" onClick={() => handleApprove(booking.id)} title="Approve">
-                              <CheckCircle size={15} />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50" onClick={() => handleReject(booking.id)} title="Reject">
-                              <XCircle size={15} />
-                            </Button>
+                            <PermissionGuard module="bookings" action="approve" asDisabled>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-600 hover:bg-emerald-50" onClick={() => handleApprove(booking.id)} title="Approve">
+                                <CheckCircle size={15} />
+                              </Button>
+                            </PermissionGuard>
+                            <PermissionGuard module="bookings" action="edit" asDisabled>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50" onClick={() => handleReject(booking.id)} title="Reject">
+                                <XCircle size={15} />
+                              </Button>
+                            </PermissionGuard>
                           </>
                         )}
                         {/* Soft Delete */}
