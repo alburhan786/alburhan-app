@@ -365,11 +365,14 @@ router.get("/payment-entries", requireAdmin as any, async (req: AuthenticatedReq
     const dateTo = to || new Date().toISOString().slice(0, 10);
     const rows = await q(`
       SELECT pt.id, pt.payment_date::text AS date, b.booking_number,
-        COALESCE(u.name,u.mobile) AS customer_name, u.mobile, b.group_name,
+        COALESCE(u.name,u.mobile) AS customer_name, u.mobile, COALESCE(hg.name,'') AS group_name,
         pt.payment_mode AS mode, COALESCE(pt.reference_number,'') AS reference,
         COALESCE(pt.bank_name,'') AS bank_name, COALESCE(pt.received_by,'') AS received_by,
         pt.amount::numeric AS amount, pt.is_reconciled, pt.created_at
-      FROM payment_transactions pt JOIN bookings b ON b.id=pt.booking_id JOIN users u ON u.id=b.user_id
+      FROM payment_transactions pt
+        JOIN bookings b ON b.id=pt.booking_id
+        JOIN users u ON u.id=b.user_id
+        LEFT JOIN hajj_groups hg ON hg.id=b.group_id
       WHERE pt.is_deleted=false AND pt.payment_date::text BETWEEN $1 AND $2
         ${mode && mode !== "all" ? "AND pt.payment_mode=$3" : ""}
       ORDER BY pt.payment_date DESC, pt.created_at DESC
@@ -385,11 +388,13 @@ router.get("/outstanding", requireAdmin as any, async (req: AuthenticatedRequest
     const { search } = req.query as Record<string, string>;
     const rows = await q(`
       SELECT b.id AS booking_id, b.booking_number,
-        COALESCE(u.name,u.mobile) AS customer_name, u.mobile, b.group_name,
+        COALESCE(u.name,u.mobile) AS customer_name, u.mobile, COALESCE(hg.name,'') AS group_name,
         b.final_amount::numeric AS total_amount, COALESCE(b.paid_amount::numeric,0) AS paid_amount,
         GREATEST(b.final_amount::numeric - COALESCE(b.paid_amount::numeric,0),0) AS outstanding,
         b.status, b.created_at
-      FROM bookings b JOIN users u ON u.id=b.user_id
+      FROM bookings b
+        JOIN users u ON u.id=b.user_id
+        LEFT JOIN hajj_groups hg ON hg.id=b.group_id
       WHERE b.deleted_at IS NULL AND b.final_amount IS NOT NULL
         AND b.final_amount::numeric > COALESCE(b.paid_amount::numeric,0)
         ${search ? `AND (u.name ILIKE '%'||$1||'%' OR u.mobile ILIKE '%'||$1||'%')` : ""}
@@ -406,11 +411,13 @@ router.get("/ledger", requireAdmin as any, async (req: AuthenticatedRequest, res
     const { search } = req.query as Record<string, string>;
     const rows = await q(`
       SELECT b.id AS booking_id, b.booking_number,
-        COALESCE(u.name,u.mobile) AS customer_name, u.mobile, b.group_name,
+        COALESCE(u.name,u.mobile) AS customer_name, u.mobile, COALESCE(hg.name,'') AS group_name,
         b.final_amount::numeric AS debit, COALESCE(b.paid_amount::numeric,0) AS credit,
         GREATEST(b.final_amount::numeric - COALESCE(b.paid_amount::numeric,0),0) AS balance,
         b.status, b.created_at
-      FROM bookings b JOIN users u ON u.id=b.user_id
+      FROM bookings b
+        JOIN users u ON u.id=b.user_id
+        LEFT JOIN hajj_groups hg ON hg.id=b.group_id
       WHERE b.deleted_at IS NULL AND b.final_amount IS NOT NULL
         ${search ? `AND (u.name ILIKE '%'||$1||'%' OR u.mobile ILIKE '%'||$1||'%' OR b.booking_number ILIKE '%'||$1||'%')` : ""}
       ORDER BY b.created_at DESC LIMIT 500
