@@ -480,6 +480,105 @@ router.post("/:id/payments/:txnId/restore", requireAdmin as RequestHandler, asyn
   }
 });
 
+// ──────────────────────────────────────────────────────
+// PAYMENT TRASH routes (no booking-id prefix)
+// ──────────────────────────────────────────────────────
+
+// GET /payment-trash — list all soft-deleted payments
+router.get("/payment-trash", requireAdmin as RequestHandler, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { search = "", mode = "", from = "", to = "", page = "1", limit = "50" } = req.query as Record<string, string>;
+    const conds: string[] = ["pt.is_deleted = true"];
+    const params: unknown[] = [];
+    let pi = 1;
+    if (search) { params.push(`%${search}%`); conds.push(`(b.booking_number ILIKE $${pi} OR b.customer_name ILIKE $${pi} OR b.customer_mobile ILIKE $${pi} OR pt.id::text ILIKE $${pi})`); pi++; }
+    if (mode)   { params.push(mode);           conds.push(`pt.payment_mode = $${pi++}`); }
+    if (from)   { params.push(from);           conds.push(`pt.payment_date >= $${pi++}`); }
+    if (to)     { params.push(to);             conds.push(`pt.payment_date <= $${pi++}`); }
+    const where = conds.join(" AND ");
+    const pageNum = Math.max(1, parseInt(page)), lim = Math.min(200, Math.max(1, parseInt(limit)));
+    const countRes = await pool.query(`SELECT COUNT(*) FROM payment_transactions pt JOIN bookings b ON b.id=pt.booking_id WHERE ${where}`, params);
+    const total = parseInt(countRes.rows[0].count);
+    params.push(lim, (pageNum - 1) * lim);
+    const rows = await pool.query(
+      `SELECT pt.id, pt.booking_id, pt.amount, pt.payment_date, pt.payment_mode, pt.reference_number,
+              pt.bank_name, pt.notes, pt.recorded_by, pt.deleted_at, pt.deleted_by, pt.deletion_reason,
+              pt.created_at, b.booking_number, b.customer_name, b.customer_mobile,
+              del.name AS deleted_by_name
+       FROM payment_transactions pt
+       JOIN bookings b ON b.id=pt.booking_id
+       LEFT JOIN users del ON del.id=pt.deleted_by
+       WHERE ${where} ORDER BY pt.deleted_at DESC LIMIT $${pi} OFFSET $${pi+1}`,
+      params
+    );
+    return res.json({
+      entries: rows.rows.map((r: Record<string,unknown>) => ({
+        id: r["id"], bookingId: r["booking_id"], bookingNumber: r["booking_number"],
+        customerName: r["customer_name"], customerMobile: r["customer_mobile"],
+        amount: Number(r["amount"]), paymentDate: r["payment_date"], paymentMode: r["payment_mode"],
+        referenceNumber: r["reference_number"], bankName: r["bank_name"], notes: r["notes"],
+        deletedAt: r["deleted_at"], deletedByName: r["deleted_by_name"],
+        deletionReason: r["deletion_reason"], createdAt: r["created_at"],
+      })),
+      total, page: pageNum, limit: lim,
+    });
+  } catch (err) {
+    console.error("[payment-trash] GET error:", err);
+    return res.status(500).json({ message: `Failed: ${(err as Error).message}` });
+  }
+});
+
+// POST /payment-trash/:txnId/restore — restore soft-deleted payment
+router.post("/payment-trash/:txnId/restore", requireAdmin as RequestHandler, requirePermission("payments", "delete") as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { txnId } = req.params as Record<string, string>;
+    const rowRes = await pool.query(`SELECT * FROM payment_transactions WHERE id=$1`, [txnId]);
+    const entry = rowRes.rows[0];
+    if (!entry) return res.status(404).json({ message: "Payment not found" });
+    if (!entry.is_deleted) return res.status(422).json({ message: "Payment is not in trash" });
+
+    await pool.query(
+      `UPDATE payment_transactions SET is_deleted=false, deleted_at=NULL, deleted_by=NULL, deletion_reason=NULL WHERE id=$1`,
+      [txnId]
+    );
+    const updated = await recalculateBookingPayment(null as any, entry.booking_id);
+    postPaymentJournal({ txnId, amount: Number(entry.amount), mode: entry.payment_mode, date: String(entry.payment_date).slice(0,10) }).catch(() => {});
+    await writeAuditLog({ transactionId: txnId, bookingId: entry.booking_id, action: "restored",
+      newAmount: Number(entry.amount), newMode: entry.payment_mode, newDate: entry.payment_date,
+      changedBy: req.user?.id, changedByName: req.user?.name });
+    auditLog({ req, action: "restored", entityTable: "payments", entityId: txnId,
+      newValue: { bookingId: entry.booking_id, amount: entry.amount, restoredBy: req.user?.name } }).catch(() => {});
+    console.log(`[payment-trash] RESTORE txnId=${txnId} bookingId=${entry.booking_id} totalPaid=${updated?.totalPaid}`);
+    return res.json({ message: "Payment restored successfully.", booking: { paidAmount: updated?.totalPaid, status: updated?.newStatus } });
+  } catch (err) {
+    console.error("[payment-trash] RESTORE error:", err);
+    return res.status(500).json({ message: `Restore failed: ${(err as Error).message}` });
+  }
+});
+
+// DELETE /payment-trash/:txnId/permanent — hard-delete (irreversible)
+router.delete("/payment-trash/:txnId/permanent", requireAdmin as RequestHandler, requirePermission("payments", "delete") as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { txnId } = req.params as Record<string, string>;
+    const rowRes = await pool.query(`SELECT * FROM payment_transactions WHERE id=$1`, [txnId]);
+    const entry = rowRes.rows[0];
+    if (!entry) return res.status(404).json({ message: "Payment not found" });
+    if (!entry.is_deleted) return res.status(422).json({ message: "Payment must be moved to trash before permanent deletion" });
+
+    await pool.query(`DELETE FROM payment_audit_logs WHERE transaction_id=$1`, [txnId]);
+    await pool.query(`DELETE FROM journal_entry_lines WHERE journal_entry_id IN (SELECT id FROM journal_entries WHERE source='payment' AND source_id=$1)`, [txnId]);
+    await pool.query(`DELETE FROM journal_entries WHERE source='payment' AND source_id=$1`, [txnId]);
+    await pool.query(`DELETE FROM payment_transactions WHERE id=$1`, [txnId]);
+    auditLog({ req, action: "deleted", entityTable: "payments", entityId: txnId,
+      oldValue: { bookingId: entry.booking_id, amount: entry.amount, permanentDelete: true, deletedBy: req.user?.name } }).catch(() => {});
+    console.log(`[payment-trash] PERMANENT DELETE txnId=${txnId}`);
+    return res.json({ message: "Payment permanently deleted." });
+  } catch (err) {
+    console.error("[payment-trash] PERMANENT DELETE error:", err);
+    return res.status(500).json({ message: `Permanent delete failed: ${(err as Error).message}` });
+  }
+});
+
 // POST /:id/auto-fill-pilgrim
 router.post("/:id/auto-fill-pilgrim", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   const bookingId = req.params.id as string;

@@ -805,6 +805,139 @@ function DialogFooter({ onCancel, saving, label }: { onCancel: () => void; savin
   );
 }
 
+// ---------- Quick Trash Button (main table) ----------
+function QuickTrashButton({ booking, onRefreshAnalytics }: { booking: BookingRow; onRefreshAnalytics: () => void }) {
+  const [fetchingPayments, setFetchingPayments] = useState(false);
+  const [confirmPayment, setConfirmPayment] = useState<PaymentTxn | null>(null);
+  const [multiplePayments, setMultiplePayments] = useState(false);
+  const [reason, setReason] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [localToast, setLocalToast] = useState<{ type: "ok"|"err"; msg: string } | null>(null);
+
+  const showLocalToast = (type: "ok"|"err", msg: string) => {
+    setLocalToast({ type, msg });
+    setTimeout(() => setLocalToast(null), 3500);
+  };
+
+  const handleClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setFetchingPayments(true);
+    try {
+      const r = await fetch(`${API}/api/admin/bookings/${booking.id}/payments?includeDeleted=0`, { credentials: "include" });
+      const txns = await r.json() as PaymentTxn[];
+      const active = txns.filter((t: PaymentTxn) => !t.isDeleted);
+      if (active.length === 0) {
+        showLocalToast("err", "No payments to delete for this booking.");
+        return;
+      }
+      if (active.length === 1) {
+        setConfirmPayment(active[0]);
+      } else {
+        setMultiplePayments(true);
+      }
+    } catch { showLocalToast("err", "Failed to load payments."); }
+    finally { setFetchingPayments(false); }
+  };
+
+  const doDelete = async () => {
+    if (!confirmPayment) return;
+    setDeleting(true);
+    try {
+      const r = await fetch(`${API}/api/admin/bookings/${booking.id}/payments/${confirmPayment.id}`, {
+        method: "DELETE", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      });
+      const d = await r.json() as { message?: string; code?: string };
+      if (!r.ok) throw new Error(d.message ?? "Failed");
+      showLocalToast("ok", "✓ Payment moved to trash successfully.");
+      setConfirmPayment(null);
+      setReason("");
+      onRefreshAnalytics();
+    } catch (e) { showLocalToast("err", (e as Error).message); }
+    finally { setDeleting(false); }
+  };
+
+  return (
+    <>
+      {localToast && (
+        <div className={`fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium shadow-lg ${localToast.type === "ok" ? "bg-emerald-600 text-white" : "bg-red-600 text-white"}`}>
+          {localToast.type === "ok" ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
+          {localToast.msg}
+        </div>
+      )}
+      <button
+        onClick={handleClick}
+        disabled={fetchingPayments}
+        className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors disabled:opacity-50"
+        title="Delete Payment"
+      >
+        {fetchingPayments ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+      </button>
+
+      {/* Single payment confirmation */}
+      {confirmPayment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-gray-900 text-lg">Delete Payment</h3>
+              <button onClick={() => { setConfirmPayment(null); setReason(""); }} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-4 mb-4 space-y-2 text-sm">
+              {[
+                ["Payment ID", <span className="font-mono text-xs">{confirmPayment.id.slice(0,16)}…</span>],
+                ["Booking ID", <span className="font-mono font-bold text-[#0B3D2E]">{booking.bookingNumber}</span>],
+                ["Customer", <span className="font-medium">{booking.customerName}</span>],
+                ["Amount", <span className="font-mono font-bold text-gray-900">{fmt(confirmPayment.amount)}</span>],
+                ["Date", <span>{new Date(confirmPayment.paymentDate).toLocaleDateString("en-IN", { day:"numeric", month:"short", year:"numeric" })}</span>],
+                ["Mode", <span>{MODE_LABELS[confirmPayment.paymentMode] ?? confirmPayment.paymentMode}</span>],
+              ].map(([label, val]) => (
+                <div key={String(label)} className="flex justify-between items-center">
+                  <span className="text-gray-500">{label}</span>
+                  <span>{val}</span>
+                </div>
+              ))}
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4">
+              <p className="text-amber-800 text-xs font-semibold mb-1.5">⚠️ Are you sure you want to delete this payment?</p>
+              <ul className="text-amber-700 text-xs space-y-0.5">
+                {["Remove the payment record","Update Paid Amount","Update Remaining Balance","Update Booking Status","Reverse Accounting Journal Entries","Update Cash Book & Bank Book","Update Dashboard totals"].map(item => (
+                  <li key={item} className="flex items-center gap-1.5">• {item}</li>
+                ))}
+              </ul>
+            </div>
+            <div className="mb-4">
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">Reason (optional)</label>
+              <textarea value={reason} onChange={e => setReason(e.target.value)}
+                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-200 resize-none"
+                rows={2} placeholder="Duplicate entry, data correction…" />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => { setConfirmPayment(null); setReason(""); }} className="px-4 py-2 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 font-medium">Cancel</button>
+              <button onClick={doDelete} disabled={deleting} className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 font-medium flex items-center gap-1.5">
+                {deleting && <Loader2 size={13} className="animate-spin" />} Delete Payment
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Multiple payments — redirect to manage */}
+      {multiplePayments && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4">
+            <h3 className="font-bold text-gray-900 mb-2">Multiple Payments Found</h3>
+            <p className="text-sm text-gray-600 mb-4">This booking has multiple payment records. Please click <strong>Manage</strong> to select and delete a specific payment.</p>
+            <div className="flex justify-end">
+              <button onClick={() => setMultiplePayments(false)} className="px-4 py-2 text-sm bg-[#0B3D2E] text-white rounded-lg hover:bg-[#0a3327] font-medium">OK, Got It</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 // ---------- Main Page ----------
 export default function PaymentAnalytics() {
   const [filter, setFilter] = useState<FilterTab>("all");
@@ -814,6 +947,8 @@ export default function PaymentAnalytics() {
   const [remindersEnabled, setRemindersEnabledState] = useState<boolean | null>(null);
   const [reminderActionLoading, setReminderActionLoading] = useState(false);
   const [activeBooking, setActiveBooking] = useState<BookingRow | null>(null);
+  const { can } = usePermissions();
+  const canDelete = can("payments", "delete");
   const qc = useQueryClient();
 
   useEffect(() => {
@@ -1065,12 +1200,15 @@ export default function PaymentAnalytics() {
                               ) : "—"}
                             </td>
                             <td className="px-4 py-3 text-right">
-                              <button
-                                onClick={e => { e.stopPropagation(); setActiveBooking(b); }}
-                                className="inline-flex items-center gap-1 text-xs text-[#0B3D2E] font-semibold hover:underline"
-                              >
-                                <Eye size={13} /> Manage <ChevronRight size={11} />
-                              </button>
+                              <div className="flex items-center justify-end gap-2">
+                                {canDelete && <QuickTrashButton booking={b} onRefreshAnalytics={refreshAnalytics} />}
+                                <button
+                                  onClick={e => { e.stopPropagation(); setActiveBooking(b); }}
+                                  className="inline-flex items-center gap-1 text-xs text-[#0B3D2E] font-semibold hover:underline"
+                                >
+                                  <Eye size={13} /> Manage <ChevronRight size={11} />
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         );

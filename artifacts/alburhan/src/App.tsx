@@ -47,6 +47,7 @@ import OfflineBookingManager from "@/pages/admin/OfflineBookingManager";
 import QRTracker from "@/pages/admin/QRTracker";
 import ReportsManager from "@/pages/admin/ReportsManager";
 import PaymentAnalytics from "@/pages/admin/PaymentAnalytics";
+import PaymentTrash from "@/pages/admin/PaymentTrash";
 import PrintCenter from "@/pages/admin/PrintCenter";
 import BroadcastManager from "@/pages/admin/BroadcastManager";
 import KYCManager from "@/pages/admin/KYCManager";
@@ -174,6 +175,7 @@ function Router() {
       <Route path="/admin/reports" component={() => <AdminRoute component={ReportsManager} />} />
       <Route path="/admin/payment-analytics" component={() => <AdminRoute component={PaymentAnalytics} />} />
       <Route path="/admin/payments" component={() => <AdminRoute component={PaymentAnalytics} />} />
+      <Route path="/admin/payment-trash" component={() => <AdminRoute component={PaymentTrash} />} />
       <Route path="/admin/print-center" component={() => <AdminRoute component={PrintCenter} />} />
       <Route path="/admin/customers" component={() => <AdminRoute component={CustomerManager} />} />
       <Route path="/admin/requests" component={() => <AdminRoute component={RequestsManager} />} />

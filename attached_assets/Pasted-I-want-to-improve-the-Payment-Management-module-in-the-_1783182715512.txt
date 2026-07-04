@@ -1,0 +1,87 @@
+I want to improve the Payment Management module in the Al Burhan Tours & Travels ERP.
+
+Please add a complete Trash/Delete system for payments.
+
+Requirements:
+
+1. Add a red Trash icon (🗑️) in the Payments column beside every "Manage" button.
+
+2. When the Trash icon is clicked, show a confirmation popup:
+
+----------------------------------------
+Delete Payment
+----------------------------------------
+Payment ID:
+Booking ID:
+Customer Name:
+Amount:
+Date:
+Mode:
+
+⚠️ Are you sure you want to delete this payment?
+
+This will:
+• Remove the payment record.
+• Update Paid Amount.
+• Update Remaining Balance.
+• Update Booking Status.
+• Update Customer Ledger.
+• Update Hajji Ledger.
+• Update Family Ledger.
+• Reverse Accounting Journal Entries.
+• Update Cash Book.
+• Update Bank Book.
+• Update Dashboard totals.
+
+Buttons:
+[Cancel]
+[Delete Payment]
+----------------------------------------
+
+3. Use Soft Delete instead of permanent delete.
+   - Move deleted payments to Payment Trash.
+   - Save deleted_at, deleted_by and reason.
+
+4. Create a new sidebar menu:
+Finance
+   → Payment Management
+   → Payment Trash
+
+5. Payment Trash page must display:
+- Payment ID
+- Booking ID
+- Customer Name
+- Amount
+- Payment Mode
+- Deleted By
+- Deleted Date
+- Delete Reason
+
+Actions:
+• Restore
+• Permanently Delete
+
+6. Restore should:
+- Restore payment
+- Restore ledger entries
+- Restore booking balance
+- Restore dashboard totals
+
+7. Permanent Delete should permanently remove the payment from the database after confirmation.
+
+8. Add search, filters and export to Excel/PDF in Payment Trash.
+
+9. Add Audit Log:
+- Who deleted
+- Who restored
+- Date & Time
+- IP Address (if available)
+
+10. Show success messages:
+✓ Payment moved to Trash successfully.
+✓ Payment restored successfully.
+✓ Payment permanently deleted successfully.
+
+11. Fix all backend APIs and database logic so Delete, Restore and Permanent Delete work correctly without errors.
+
+12. Test everything end-to-end on the live ERP before marking the task complete.
