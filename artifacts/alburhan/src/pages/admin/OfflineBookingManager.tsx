@@ -8,8 +8,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import {
   Plus, Trash2, CheckCircle2, ClipboardList, User, Wallet, Users,
-  Phone, MapPin, CreditCard, Hash, FileText, Eye, X
+  Phone, MapPin, CreditCard, Hash, FileText, Eye, X, Tag
 } from "lucide-react";
+
+const DISCOUNT_TYPES = ["Early Booking", "Family", "Group", "Loyalty", "Promo Code", "Manual"];
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -70,6 +72,10 @@ export default function OfflineBookingManager() {
     packageName: "",
     totalAmount: "",
     advanceAmount: "",
+    discountType: "",
+    discountAmount: "",
+    discountPercentage: "",
+    discountReason: "",
     roomType: "",
     paymentStatus: "pending" as "pending" | "paid",
     notes: "",
@@ -79,7 +85,11 @@ export default function OfflineBookingManager() {
   const setField = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
   const totalAmt = parseFloat(form.totalAmount) || 0;
   const advAmt = parseFloat(form.advanceAmount) || 0;
-  const balAmt = totalAmt > 0 ? Math.max(0, totalAmt - advAmt) : 0;
+  const discPct = parseFloat(form.discountPercentage) || 0;
+  const discFlat = parseFloat(form.discountAmount) || 0;
+  const discAmt = discPct > 0 ? Math.round((totalAmt * discPct / 100) * 100) / 100 : discFlat;
+  const finalAmt = totalAmt > 0 ? Math.max(0, totalAmt - discAmt) : 0;
+  const balAmt = finalAmt > 0 ? Math.max(0, finalAmt - advAmt) : 0;
 
   const addPilgrim = () => setPilgrims(p => [...p, { ...EMPTY_PILGRIM }]);
   const removePilgrim = (i: number) => setPilgrims(p => p.filter((_, idx) => idx !== i));
@@ -89,6 +99,7 @@ export default function OfflineBookingManager() {
   const resetForm = () => {
     setForm({ agentName: "", customerName: "", customerMobile: "", customerEmail: "",
       customerAddress: "", packageName: "", totalAmount: "", advanceAmount: "",
+      discountType: "", discountAmount: "", discountPercentage: "", discountReason: "",
       roomType: "", paymentStatus: "pending", notes: "" });
     setPilgrims([{ ...EMPTY_PILGRIM }]);
     setBookingType("Offline");
@@ -144,6 +155,12 @@ export default function OfflineBookingManager() {
 
     if (totalAmt > 0) {
       payload.totalAmount = totalAmt;
+    }
+    if (discAmt > 0) {
+      if (discPct > 0) payload.discountPercentage = discPct;
+      else payload.discountAmount = discAmt;
+      if (form.discountType) payload.discountType = form.discountType;
+      if (form.discountReason) payload.discountReason = form.discountReason;
     }
 
     try {
@@ -304,13 +321,53 @@ export default function OfflineBookingManager() {
                       <input className={inputCls} type="number" min="0" placeholder="0" value={form.advanceAmount} onChange={e => setField("advanceAmount", e.target.value)} />
                     </div>
 
+                    {/* Discount Section */}
+                    <div className="col-span-2 border border-orange-200 bg-orange-50/40 rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Tag size={13} className="text-orange-600" />
+                        <span className="text-[11px] font-bold text-orange-700 uppercase tracking-widest">Discount (Optional)</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className={labelCls}>Discount Type</label>
+                          <select className={inputCls} value={form.discountType} onChange={e => setField("discountType", e.target.value)}>
+                            <option value="">— No Discount —</option>
+                            {DISCOUNT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className={labelCls}>Discount % (or flat ₹ below)</label>
+                          <input className={inputCls} type="number" min="0" max="100" step="0.01" placeholder="e.g. 10"
+                            value={form.discountPercentage}
+                            onChange={e => { setField("discountPercentage", e.target.value); if (e.target.value) setField("discountAmount", ""); }} />
+                        </div>
+                        <div>
+                          <label className={labelCls}>Flat Discount Amount (₹)</label>
+                          <input className={inputCls} type="number" min="0" step="0.01" placeholder="e.g. 5000"
+                            value={form.discountAmount}
+                            onChange={e => { setField("discountAmount", e.target.value); if (e.target.value) setField("discountPercentage", ""); }} />
+                        </div>
+                        <div>
+                          <label className={labelCls}>Discount Reason</label>
+                          <input className={inputCls} type="text" placeholder="e.g. Early bird offer"
+                            value={form.discountReason} onChange={e => setField("discountReason", e.target.value)} />
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Amount Summary */}
                     {totalAmt > 0 && (
-                      <div className="col-span-2 grid grid-cols-3 gap-3">
+                      <div className={`col-span-2 grid gap-3 ${discAmt > 0 ? "grid-cols-4" : "grid-cols-3"}`}>
                         <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 text-center">
                           <p className="text-[10px] text-gray-500 uppercase tracking-wide mb-1">Total Amount</p>
                           <p className="font-mono font-bold text-gray-800 text-base">₹{totalAmt.toLocaleString("en-IN")}</p>
                         </div>
+                        {discAmt > 0 && (
+                          <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 text-center">
+                            <p className="text-[10px] text-orange-600 uppercase tracking-wide mb-1">Discount</p>
+                            <p className="font-mono font-bold text-orange-600 text-base">-₹{discAmt.toLocaleString("en-IN")}</p>
+                          </div>
+                        )}
                         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center">
                           <p className="text-[10px] text-emerald-600 uppercase tracking-wide mb-1">Advance Paid</p>
                           <p className="font-mono font-bold text-emerald-700 text-base">₹{advAmt.toLocaleString("en-IN")}</p>

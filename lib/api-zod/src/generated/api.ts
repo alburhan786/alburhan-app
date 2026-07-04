@@ -380,6 +380,10 @@ export const ListBookingsResponse = zod.object({
       totalAmount: zod.number().optional(),
       gstAmount: zod.number().optional(),
       finalAmount: zod.number().optional(),
+      discountType: zod.string().optional(),
+      discountAmount: zod.number().optional(),
+      discountPercentage: zod.number().optional(),
+      discountReason: zod.string().optional(),
       paymentId: zod.string().optional(),
       razorpayOrderId: zod.string().optional(),
       razorpayPaymentId: zod.string().optional(),
@@ -460,6 +464,10 @@ export const GetBookingResponse = zod.object({
   totalAmount: zod.number().optional(),
   gstAmount: zod.number().optional(),
   finalAmount: zod.number().optional(),
+  discountType: zod.string().optional(),
+  discountAmount: zod.number().optional(),
+  discountPercentage: zod.number().optional(),
+  discountReason: zod.string().optional(),
   paymentId: zod.string().optional(),
   razorpayOrderId: zod.string().optional(),
   razorpayPaymentId: zod.string().optional(),
@@ -491,6 +499,10 @@ export const ApproveBookingResponse = zod.object({
   customerMobile: zod.string(),
   customerEmail: zod.string().optional(),
   numberOfPilgrims: zod.number(),
+  discountType: zod.string().optional(),
+  discountAmount: zod.number().optional(),
+  discountPercentage: zod.number().optional(),
+  discountReason: zod.string().optional(),
   pilgrims: zod
     .array(
       zod.object({
@@ -568,6 +580,10 @@ export const RejectBookingResponse = zod.object({
   totalAmount: zod.number().optional(),
   gstAmount: zod.number().optional(),
   finalAmount: zod.number().optional(),
+  discountType: zod.string().optional(),
+  discountAmount: zod.number().optional(),
+  discountPercentage: zod.number().optional(),
+  discountReason: zod.string().optional(),
   paymentId: zod.string().optional(),
   razorpayOrderId: zod.string().optional(),
   razorpayPaymentId: zod.string().optional(),
@@ -640,6 +656,10 @@ export const GetInvoiceResponse = zod.object({
   bankBranch: zod.string().optional(),
   bankAccount: zod.string().optional(),
   bankIfsc: zod.string().optional(),
+  discountType: zod.string().optional(),
+  discountAmount: zod.number().optional(),
+  discountPercentage: zod.number().optional(),
+  discountReason: zod.string().optional(),
 });
 
 /**
@@ -677,10 +697,15 @@ export const CreateOfflineBookingBody = zod.object({
   preferredDepartureDate: zod.string().optional(),
   roomType: zod.enum(["sharing", "double", "triple", "quad"]).optional(),
   advanceAmount: zod.number().optional(),
+  totalAmount: zod.number().optional(),
   notes: zod.string().optional(),
   paymentStatus: zod.enum(["pending", "paid"]).optional(),
   paymentAmount: zod.number().optional(),
   paymentMethod: zod.string().optional(),
+  discountType: zod.string().optional(),
+  discountAmount: zod.number().optional(),
+  discountPercentage: zod.number().optional(),
+  discountReason: zod.string().optional(),
 });
 
 /**

@@ -93,6 +93,10 @@ function formatBooking(b: any) {
     totalAmount: (() => { const v = get("totalAmount","total_amount"); return v ? Number(v) : null; })(),
     gstAmount: (() => { const v = get("gstAmount","gst_amount"); return v ? Number(v) : null; })(),
     finalAmount: (() => { const v = get("finalAmount","final_amount"); return v ? Number(v) : null; })(),
+    discountType: get("discountType", "discount_type"),
+    discountAmount: (() => { const v = get("discountAmount","discount_amount"); return v != null && v !== "" ? Number(v) : null; })(),
+    discountPercentage: (() => { const v = get("discountPercentage","discount_percentage"); return v != null && v !== "" ? Number(v) : null; })(),
+    discountReason: get("discountReason", "discount_reason"),
     advanceAmount: (() => { const v = get("advanceAmount","advance_amount"); return v ? Number(v) : null; })(),
     paidAmount: (() => { const v = get("paidAmount","paid_amount"); return v ? Number(v) : null; })(),
     onlinePaidAmount: (() => { const v = get("onlinePaidAmount","online_paid_amount"); return v ? Number(v) : null; })(),
@@ -116,9 +120,9 @@ router.post("/offline", requireAdmin as any, requirePermission("bookings", "crea
 
   try {
     let packageData = null;
-    let totalAmount = null;
-    let gstAmount = null;
-    let finalAmount = null;
+    let totalAmount: number | null = null;
+    let gstAmount: number | null = null;
+    let finalAmount: number | null = null;
 
     if (data.packageId) {
       const pkgs = await db.select().from(packagesTable).where(eq(packagesTable.id, data.packageId)).limit(1);
@@ -130,6 +134,25 @@ router.post("/offline", requireAdmin as any, requirePermission("bookings", "crea
         gstAmount = gst;
         finalAmount = price + gst;
       }
+    } else if (data.totalAmount) {
+      totalAmount = data.totalAmount;
+      gstAmount = 0;
+      finalAmount = data.totalAmount;
+    }
+
+    // Resolve discount
+    const baseForDiscount = (totalAmount ?? 0) + (gstAmount ?? 0);
+    let resolvedDiscountAmount: number = 0;
+    let resolvedDiscountPercentage: number = 0;
+    if (data.discountPercentage && data.discountPercentage > 0 && baseForDiscount > 0) {
+      resolvedDiscountPercentage = data.discountPercentage;
+      resolvedDiscountAmount = Math.round((baseForDiscount * data.discountPercentage / 100) * 100) / 100;
+    } else if (data.discountAmount && data.discountAmount > 0) {
+      resolvedDiscountAmount = data.discountAmount;
+      resolvedDiscountPercentage = baseForDiscount > 0 ? Math.round((data.discountAmount / baseForDiscount) * 10000) / 100 : 0;
+    }
+    if (finalAmount != null && resolvedDiscountAmount > 0) {
+      finalAmount = Math.max(0, finalAmount - resolvedDiscountAmount);
     }
 
     const bookingNumber = generateBookingNumber();
@@ -148,9 +171,13 @@ router.post("/offline", requireAdmin as any, requirePermission("bookings", "crea
       roomType: data.roomType ?? null,
       advanceAmount: data.advanceAmount ? String(data.advanceAmount) : null,
       status: isPaid ? "confirmed" : "approved",
-      totalAmount: totalAmount ? String(totalAmount) : null,
-      gstAmount: gstAmount ? String(gstAmount) : null,
-      finalAmount: finalAmount ? String(finalAmount) : null,
+      totalAmount: totalAmount != null ? String(totalAmount) : null,
+      gstAmount: gstAmount != null ? String(gstAmount) : null,
+      finalAmount: finalAmount != null ? String(finalAmount) : null,
+      discountType: data.discountType ?? null,
+      discountAmount: resolvedDiscountAmount > 0 ? String(resolvedDiscountAmount) : null,
+      discountPercentage: resolvedDiscountPercentage > 0 ? String(resolvedDiscountPercentage) : null,
+      discountReason: data.discountReason ?? null,
       notes: data.notes ?? null,
       isOffline: true,
       invoiceNumber: isPaid ? generateInvoiceNumber() : null,
@@ -868,6 +895,7 @@ router.patch("/:id", requireAdmin as any, requirePermission("bookings", "edit") 
       "numberOfPilgrims", "preferredDepartureDate", "roomType", "status",
       "totalAmount", "gstAmount", "finalAmount", "advanceAmount", "paidAmount",
       "notes", "groupId", "invoiceNumber", "rejectionReason",
+      "discountType", "discountAmount", "discountPercentage", "discountReason",
     ];
 
     const updates: Record<string, any> = {};

@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { useGetAdminStats, getBookingsReport, getPaymentsReport, getCustomersReport } from "@workspace/api-client-react";
-import { FileText, Download, Printer, TrendingUp, Users, IndianRupee, Package, CheckCircle, Clock, XCircle, BarChart2 } from "lucide-react";
+import { FileText, Download, Printer, TrendingUp, Users, IndianRupee, Package, CheckCircle, Clock, XCircle, BarChart2, Tag } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
 
-type ReportType = "bookings" | "payments" | "customers";
+type ReportType = "bookings" | "payments" | "customers" | "discounts";
 
 function downloadCSV(data: Record<string, unknown>[], filename: string) {
   if (!data.length) return;
@@ -59,6 +59,7 @@ const REPORT_TYPES: { key: ReportType; label: string; desc: string; icon: React.
   { key: "bookings", label: "Bookings Report", desc: "All bookings with status, package, and amount", icon: <Package size={18} /> },
   { key: "payments", label: "Payments Report", desc: "Revenue and payment transaction details", icon: <IndianRupee size={18} /> },
   { key: "customers", label: "Customer List", desc: "All registered customers with contact info", icon: <Users size={18} /> },
+  { key: "discounts", label: "Discount Report", desc: "Bookings with discounts — type, amount, and reason", icon: <Tag size={18} /> },
 ];
 
 export default function ReportsManager() {
@@ -71,9 +72,18 @@ export default function ReportsManager() {
   const [previewData, setPreviewData] = useState<Record<string, unknown>[] | null>(null);
   const [previewTitle, setPreviewTitle] = useState("");
 
+  const API = import.meta.env.VITE_API_URL || "";
   const fetchData = async () => {
     if (reportType === "payments") return (await getPaymentsReport()) as unknown as Record<string, unknown>[];
     if (reportType === "customers") return (await getCustomersReport()) as unknown as Record<string, unknown>[];
+    if (reportType === "discounts") {
+      const params = new URLSearchParams();
+      if (dateFrom) params.set("from", dateFrom);
+      if (dateTo) params.set("to", dateTo);
+      const res = await fetch(`${API}/api/admin/reports/discounts?${params}`, { credentials: "include" });
+      const json = await res.json();
+      return json.rows as Record<string, unknown>[];
+    }
     const params: Record<string, string> = {};
     if (dateFrom) params.from = dateFrom;
     if (dateTo) params.to = dateTo;

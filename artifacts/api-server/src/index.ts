@@ -237,6 +237,10 @@ async function runMigrations() {
     await db.execute(sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS customer_email TEXT`);
     await db.execute(sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS pilgrims JSONB DEFAULT '[]'`);
     await db.execute(sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS preferred_departure_date TEXT`);
+    await db.execute(sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS discount_type TEXT`);
+    await db.execute(sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS discount_amount NUMERIC(12,2) DEFAULT 0`);
+    await db.execute(sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS discount_percentage NUMERIC(5,2) DEFAULT 0`);
+    await db.execute(sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS discount_reason TEXT`);
     console.log("[Migration] bookings columns ensured");
   } catch (err) {
     console.error("[Migration] bookings columns failed:", err);

@@ -87,6 +87,7 @@ export default function AdminDashboard() {
     { label: "Pending Approval", value: stats.pendingBookings, icon: Clock, bg: "bg-amber-100", color: "text-amber-600", sub: "Awaiting action" },
     { label: "Total Customers", value: stats.totalCustomers, icon: Users, bg: "bg-purple-100", color: "text-purple-600", sub: "Registered users" },
     { label: "Rejected", value: stats.rejectedBookings ?? 0, icon: XCircle, bg: "bg-red-100", color: "text-red-500", sub: "Declined bookings" },
+    { label: "Total Discount", value: formatCurrency((stats as any).totalDiscount ?? 0), icon: IndianRupee, bg: "bg-orange-100", color: "text-orange-600", sub: `${(stats as any).discountedBookings ?? 0} bookings` },
   ];
 
   return (

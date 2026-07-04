@@ -103,6 +103,10 @@ function InvoiceContent({ invoice }: { invoice: InvoiceType }) {
   const gstAmount = invoice.gstAmount ?? 0;
   const cgstAmount = gstAmount / 2;
   const sgstAmount = gstAmount / 2;
+  const grossTotal = totalAmount + gstAmount;
+  const discountAmount = (invoice as any).discountAmount ?? 0;
+  const discountType = (invoice as any).discountType ?? "";
+  const discountPercentage = (invoice as any).discountPercentage ?? 0;
   const finalAmount = invoice.finalAmount ?? 0;
   const advanceAmount = invoice.advanceAmount ?? 0;
   const balance = finalAmount - advanceAmount;
@@ -307,6 +311,20 @@ function InvoiceContent({ invoice }: { invoice: InvoiceType }) {
                   <td className="py-1">SGST @{sgstRate}%</td>
                   <td className="py-1 text-right">{"\u20B9"} {formatINR(sgstAmount)}</td>
                 </tr>
+                {discountAmount > 0 && (
+                  <tr style={{ borderTop: `1px dashed ${DARK_GREEN}` }}>
+                    <td className="py-1 font-semibold">GROSS TOTAL</td>
+                    <td className="py-1 text-right font-semibold">{"\u20B9"} {formatINR(grossTotal)}</td>
+                  </tr>
+                )}
+                {discountAmount > 0 && (
+                  <tr>
+                    <td className="py-1" style={{ color: "#b45309" }}>
+                      Discount{discountType ? ` (${discountType})` : ""}{discountPercentage > 0 ? ` @${discountPercentage}%` : ""}
+                    </td>
+                    <td className="py-1 text-right font-semibold" style={{ color: "#b45309" }}>- {"\u20B9"} {formatINR(discountAmount)}</td>
+                  </tr>
+                )}
                 <tr style={{ borderTop: `2px solid ${DARK_GREEN}` }}>
                   <td className="py-1 font-bold" style={{ color: DARK_GREEN }}>TOTAL AMOUNT</td>
                   <td className="py-1 text-right font-bold" style={{ color: DARK_GREEN }}>{"\u20B9"} {formatINR(finalAmount)}</td>

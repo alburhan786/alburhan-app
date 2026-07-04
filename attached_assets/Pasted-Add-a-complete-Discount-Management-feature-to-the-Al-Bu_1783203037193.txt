@@ -1,0 +1,93 @@
+Add a complete Discount Management feature to the Al Burhan Tours & Travels booking system.
+
+Requirements:
+
+1. Database Changes
+   - Add new fields:
+     - discountType (Early Booking, Family, Group, Loyalty, Promo Code, Manual)
+     - discountAmount
+     - discountPercentage
+     - discountReason
+     - finalAmount
+
+2. Booking Form
+   - Add a "Discount" section.
+   - Allow admin to:
+     - Select Discount Type
+     - Enter Discount Amount (₹)
+     - OR Discount Percentage (%)
+     - Enter Discount Reason
+   - Automatically calculate:
+     Package Amount
+     - Discount
+     = Final Payable Amount
+
+3. Booking Management Page
+   - Add new columns:
+     - Discount Type
+     - Discount
+     - Final Amount
+   - Display:
+     Package Price | Discount | Final Amount
+
+4. Customer Booking Details
+   Show:
+   Package Price
+   Discount
+   Final Payable Amount
+
+5. Invoice
+   Include:
+   Package Price
+   Discount Type
+   Discount Amount
+   Final Amount Payable
+
+6. Payment Management
+   Calculate Remaining Balance using Final Amount after Discount.
+
+7. Reports
+   Add:
+   - Total Discounts Given
+   - Discount Report
+   - Discount by Package
+   - Discount by Customer
+   - Discount by Date
+
+8. Filters
+   Allow filtering bookings by:
+   - Discount Type
+   - Discount Amount
+   - No Discount
+
+9. Admin Dashboard
+   Add widgets:
+   - Total Discount Given
+   - Customers with Discount
+   - Average Discount
+   - Discount Revenue Impact
+
+10. Export
+   Include all discount fields in Excel, PDF and CSV exports.
+
+11. Existing bookings
+   Automatically set:
+   Discount = ₹0
+   Final Amount = Package Amount
+
+12. UI
+   Display:
+   - Discount in green
+   - Original Price (optional struck-through)
+   - Final Amount in bold
+   - Show "No Discount" if none is applied.
+
+13. Test the complete flow:
+   - Create a booking with a discount.
+   - Verify calculations.
+   - Verify invoice.
+   - Verify payment balance.
+   - Verify reports.
+   - Verify exports.
+
+Do not stop until the entire Discount Management feature is fully implemented, tested, and working throughout the application.

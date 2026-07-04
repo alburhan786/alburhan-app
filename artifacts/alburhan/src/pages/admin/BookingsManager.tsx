@@ -776,6 +776,11 @@ function BookingDetailModal({ booking, open, onClose }: { booking: Booking | nul
               <div className="space-y-1.5 text-sm">
                 {booking.totalAmount && <p><span className="text-muted-foreground">Total:</span> <span className="font-mono font-bold text-[#0B3D2E]">{formatCurrency(booking.totalAmount)}</span></p>}
                 {booking.gstAmount && <p><span className="text-muted-foreground">GST:</span> <span className="font-mono">{formatCurrency(booking.gstAmount)}</span></p>}
+                {(booking as any).discountAmount && Number((booking as any).discountAmount) > 0 && (
+                  <p><span className="text-muted-foreground">Discount{(booking as any).discountType ? ` (${(booking as any).discountType})` : ""}:</span>{" "}
+                    <span className="font-mono font-bold text-orange-600">-₹{Number((booking as any).discountAmount).toLocaleString("en-IN")}{(booking as any).discountPercentage ? ` (${Number((booking as any).discountPercentage)}%)` : ""}</span>
+                  </p>
+                )}
                 {booking.finalAmount && <p><span className="text-muted-foreground">Final:</span> <span className="font-mono font-bold text-[#0B3D2E]">{formatCurrency(booking.finalAmount)}</span></p>}
                 {(booking as any).advanceAmount && <p><span className="text-muted-foreground">Advance:</span> <span className="font-mono text-emerald-700">₹{Number((booking as any).advanceAmount).toLocaleString("en-IN")}</span></p>}
                 {(booking as any).paidAmount && <p><span className="text-muted-foreground">Paid Online:</span> <span className="font-mono font-bold text-orange-700">₹{Number((booking as any).paidAmount).toLocaleString("en-IN")}</span></p>}

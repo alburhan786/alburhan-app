@@ -18,7 +18,9 @@ router.get("/stats", requireAdmin as any, async (_req: AuthenticatedRequest, res
         COUNT(*) FILTER (WHERE status::text = 'confirmed')::int AS confirmed,
         COUNT(*) FILTER (WHERE status::text = 'rejected')::int AS rejected,
         COALESCE(SUM(CASE WHEN status::text = 'confirmed'
-          THEN NULLIF(TRIM(final_amount::text), '')::numeric ELSE 0 END), 0)::float AS revenue
+          THEN NULLIF(TRIM(final_amount::text), '')::numeric ELSE 0 END), 0)::float AS revenue,
+        COALESCE(SUM(NULLIF(TRIM(discount_amount::text), '')::numeric), 0)::float AS total_discount,
+        COUNT(*) FILTER (WHERE discount_amount IS NOT NULL AND NULLIF(TRIM(discount_amount::text),'')::numeric > 0)::int AS discounted_bookings
       FROM bookings
     `);
     const counts = countsRes.rows[0] ?? {};
@@ -50,6 +52,8 @@ router.get("/stats", requireAdmin as any, async (_req: AuthenticatedRequest, res
       confirmedBookings: Number(counts?.confirmed ?? 0),
       rejectedBookings: Number(counts?.rejected ?? 0),
       totalRevenue: Number(counts?.revenue ?? 0),
+      totalDiscount: Number(counts?.total_discount ?? 0),
+      discountedBookings: Number(counts?.discounted_bookings ?? 0),
       totalCustomers: Number(custRow?.total ?? 0),
       totalPackages: Number(pkgRow?.total ?? 0),
       recentBookings: (Array.isArray(recentRows) ? recentRows : []).map((b: any) => ({
@@ -143,13 +147,77 @@ router.get("/reports/bookings", requireAdmin as any, async (req: AuthenticatedRe
     .orderBy(desc(bookingsTable.createdAt));
 
   res.json(bookings.map(b => ({
-    ...b,
-    totalAmount: b.totalAmount ? Number(b.totalAmount) : null,
-    gstAmount: b.gstAmount ? Number(b.gstAmount) : null,
-    finalAmount: b.finalAmount ? Number(b.finalAmount) : null,
-    createdAt: b.createdAt?.toISOString?.(),
-    updatedAt: b.updatedAt?.toISOString?.(),
+    "Booking #": b.bookingNumber,
+    "Customer Name": b.customerName,
+    "Mobile": b.customerMobile,
+    "Package": b.packageName ?? "",
+    "Status": b.status,
+    "Pilgrims": b.numberOfPilgrims,
+    "Total Amount": b.totalAmount ? Number(b.totalAmount) : 0,
+    "GST": b.gstAmount ? Number(b.gstAmount) : 0,
+    "Discount Type": b.discountType ?? "No Discount",
+    "Discount Amount": b.discountAmount ? Number(b.discountAmount) : 0,
+    "Discount %": b.discountPercentage ? Number(b.discountPercentage) : 0,
+    "Discount Reason": b.discountReason ?? "",
+    "Final Amount": b.finalAmount ? Number(b.finalAmount) : 0,
+    "Offline": b.isOffline ? "Yes" : "No",
+    "Created At": b.createdAt?.toISOString?.(),
   })));
+});
+
+router.get("/reports/discounts", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  const { from, to, discountType } = req.query;
+  try {
+    let whereClause = `WHERE discount_amount IS NOT NULL AND NULLIF(TRIM(discount_amount::text),'')::numeric > 0`;
+    const params: any[] = [];
+    let idx = 1;
+    if (from) { whereClause += ` AND created_at >= $${idx++}`; params.push(new Date(from as string)); }
+    if (to) { whereClause += ` AND created_at <= $${idx++}`; params.push(new Date(to as string)); }
+    if (discountType) { whereClause += ` AND discount_type = $${idx++}`; params.push(discountType); }
+
+    const result = await pool.query(`
+      SELECT
+        booking_number, customer_name, customer_mobile, package_name,
+        status::text AS status, number_of_pilgrims,
+        NULLIF(TRIM(total_amount::text),'')::numeric AS total_amount,
+        NULLIF(TRIM(gst_amount::text),'')::numeric AS gst_amount,
+        NULLIF(TRIM(final_amount::text),'')::numeric AS final_amount,
+        discount_type, NULLIF(TRIM(discount_amount::text),'')::numeric AS discount_amount,
+        NULLIF(TRIM(discount_percentage::text),'')::numeric AS discount_percentage,
+        discount_reason, created_at
+      FROM bookings
+      ${whereClause}
+      ORDER BY created_at DESC
+    `, params);
+
+    const rows = result.rows;
+    const totalDiscount = rows.reduce((s: number, r: any) => s + Number(r.discount_amount ?? 0), 0);
+
+    res.json({
+      rows: rows.map((r: any) => ({
+        "Booking #": r.booking_number,
+        "Customer": r.customer_name,
+        "Mobile": r.customer_mobile,
+        "Package": r.package_name ?? "",
+        "Status": r.status,
+        "Discount Type": r.discount_type,
+        "Discount Amount": Number(r.discount_amount ?? 0),
+        "Discount %": Number(r.discount_percentage ?? 0),
+        "Discount Reason": r.discount_reason ?? "",
+        "Original Amount": Number(r.total_amount ?? 0) + Number(r.gst_amount ?? 0),
+        "Final Amount": Number(r.final_amount ?? 0),
+        "Date": new Date(r.created_at).toLocaleDateString("en-IN"),
+      })),
+      summary: {
+        totalDiscounts: totalDiscount,
+        count: rows.length,
+        averageDiscount: rows.length > 0 ? Math.round(totalDiscount / rows.length) : 0,
+      },
+    });
+  } catch (err: any) {
+    console.error("[reports/discounts] Error:", err);
+    res.status(500).json({ message: err?.message || "Failed to load discount report" });
+  }
 });
 
 router.get("/reports/customers", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
