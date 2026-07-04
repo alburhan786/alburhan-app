@@ -6,8 +6,9 @@ import * as XLSX from "xlsx";
 
 const router = Router();
 // Exempt token-based scan endpoints (requireAdminOrToken) from admin-session-only RBAC
+// req.path inside this router is relative (e.g. /:groupId/attendance/events/:eventId/info)
 router.use((req: any, res: any, next: any) => {
-  if (/\/attendance\/events\/[^/]+\/(info|scan)$/.test(req.path)) return next();
+  if (/\/events\/[^/]+\/(info|scan)$/.test(req.path)) return next();
   return (requireModuleAccess("groups") as any)(req, res, next);
 });
 

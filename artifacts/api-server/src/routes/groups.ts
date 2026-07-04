@@ -241,6 +241,7 @@ router.post("/:groupId/pilgrims", requireAdmin as any, async (req: Authenticated
     await ensureFamilyHead(groupId, pilgrim.familyId);
   }
 
+  auditLog({ req, action: "created", entityTable: "pilgrims", entityId: pilgrim.id, newValue: { groupId, fullName: pilgrim.fullName, passportNumber: pilgrim.passportNumber } }).catch(() => {});
   res.status(201).json(fmtPilgrim(pilgrim));
 });
 
@@ -293,6 +294,7 @@ router.put("/:groupId/pilgrims/:pilgrimId", requireAdmin as any, async (req: Aut
   }).where(scope).returning();
 
   if (!updated) { res.status(404).json({ message: "Pilgrim not found in this group" }); return; }
+  auditLog({ req, action: "updated", entityTable: "pilgrims", entityId: pilgrimId, newValue: { fullName: updated.fullName, passportNumber: updated.passportNumber, roomNumber: updated.roomNumber } }).catch(() => {});
 
   const updatedFamilyId = updated.familyId;
 
@@ -351,6 +353,7 @@ router.delete("/:groupId/pilgrims/:pilgrimId", requireAdmin as any, async (req, 
     await deleteFromGCS(pilgrims[0].photoUrl);
   }
   await db.delete(pilgrimsTable).where(scope);
+  auditLog({ req, action: "deleted", entityTable: "pilgrims", entityId: pilgrimId, oldValue: { groupId, fullName: pilgrims[0].fullName, passportNumber: pilgrims[0].passportNumber } }).catch(() => {});
   res.json({ message: "Pilgrim deleted" });
 });
 
