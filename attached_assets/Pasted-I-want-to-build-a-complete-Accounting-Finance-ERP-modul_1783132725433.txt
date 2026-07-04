@@ -1,0 +1,559 @@
+I want to build a complete Accounting & Finance ERP module for Al Burhan Tours & Travels.
+
+This is a production system for Hajj, Umrah, Ziyarat, and Tour management.
+
+The Accounting module should work like Tally, Zoho Books, and Busy Accounting, but integrated with our travel ERP.
+
+==========================
+1. COMPLETE ACCOUNTING
+==========================
+
+Create a full double-entry accounting system.
+
+Modules:
+
+• Chart of Accounts
+• Journal Entries
+• General Ledger
+• Customer Ledger
+• Vendor Ledger
+• Trial Balance
+• Profit & Loss
+• Balance Sheet
+• Cash Flow Statement
+• Bank Reconciliation
+• Opening Balance
+• Financial Year Closing
+• Multi-Year Accounting
+
+==========================
+2. EXPENSE MANAGEMENT
+==========================
+
+Create a complete Expense Management module.
+
+Features:
+
+• Add Expense
+• Edit Expense
+• Delete Expense
+• Expense Categories
+• Expense Approval
+• Attach Bills/Invoices
+• Vendor Name
+• Payment Mode
+• Expense Date
+• Notes
+• GST Fields
+• Search & Filters
+• Export Excel
+• Export PDF
+
+Expense Categories:
+
+• Hotel
+• Flight
+• Visa
+• Transport
+• Food
+• Laundry
+• Staff Salary
+• Office Rent
+• Electricity
+• Internet
+• Marketing
+• Printing
+• Ziyarat
+• Miscellaneous
+
+==========================
+3. CUSTOMER LEDGER
+==========================
+
+Every customer should have a ledger.
+
+Display:
+
+Customer Name
+
+Booking ID
+
+Package
+
+Invoice Amount
+
+Advance Received
+
+Payment History
+
+Refund
+
+Discount
+
+Outstanding Balance
+
+Ledger Statement
+
+Export PDF
+
+Export Excel
+
+==========================
+4. INDIVIDUAL HAJJI PAYMENT LEDGER
+==========================
+
+Each Hajji must have an individual payment history.
+
+Show:
+
+Passport No
+
+Booking ID
+
+Package
+
+Total Package Cost
+
+Advance
+
+Installments
+
+Cash Payments
+
+Bank Payments
+
+UPI
+
+Card
+
+Cheque
+
+Balance Amount
+
+Payment Timeline
+
+Print Statement
+
+==========================
+5. VENDOR MANAGEMENT
+==========================
+
+Create Vendor Master.
+
+Store:
+
+Vendor Name
+
+GST Number
+
+PAN
+
+Bank Details
+
+Contact
+
+Email
+
+Category
+
+Outstanding
+
+Payments
+
+Vendor Ledger
+
+==========================
+6. BANK & CASH BOOK
+==========================
+
+Separate Cash Book and Bank Book.
+
+Features:
+
+Cash Receipts
+
+Cash Payments
+
+Bank Deposits
+
+Withdrawals
+
+Transfer
+
+Opening Balance
+
+Closing Balance
+
+Daily Cash Report
+
+Daily Bank Report
+
+==========================
+7. PROFIT & LOSS
+==========================
+
+Generate automatic Profit & Loss.
+
+Filter:
+
+Daily
+
+Monthly
+
+Quarterly
+
+Yearly
+
+Package Wise
+
+Group Wise
+
+==========================
+8. BALANCE SHEET
+==========================
+
+Generate automatic Balance Sheet.
+
+Assets
+
+Liabilities
+
+Capital
+
+Current Assets
+
+Current Liabilities
+
+Cash
+
+Bank
+
+Receivables
+
+Payables
+
+==========================
+9. GST REPORTS
+==========================
+
+GST Ready.
+
+Fields:
+
+GST %
+
+CGST
+
+SGST
+
+IGST
+
+HSN/SAC
+
+GST Summary
+
+GST Sales Register
+
+GST Purchase Register
+
+GST Export
+
+==========================
+10. PAYROLL
+==========================
+
+Create Payroll Module.
+
+Employee Profile
+
+Attendance
+
+Salary
+
+Bonus
+
+Advance
+
+Deductions
+
+PF
+
+ESI
+
+Payslip
+
+Salary Register
+
+==========================
+11. ASSET MANAGEMENT
+==========================
+
+Office Assets.
+
+Laptop
+
+Printer
+
+Scanner
+
+Furniture
+
+Vehicles
+
+Mobile
+
+Depreciation
+
+Purchase Date
+
+Warranty
+
+Asset Register
+
+==========================
+12. DOCUMENT MANAGEMENT
+==========================
+
+Store:
+
+Passport
+
+Visa
+
+Aadhaar
+
+PAN
+
+Photo
+
+Air Ticket
+
+Hotel Voucher
+
+Invoice
+
+Receipt
+
+Medical
+
+Vaccination
+
+Download
+
+Preview
+
+==========================
+13. AUDIT LOGS
+==========================
+
+Track every action.
+
+Who created
+
+Who edited
+
+Who deleted
+
+Date
+
+Time
+
+IP Address
+
+Old Value
+
+New Value
+
+Restore Deleted Records
+
+==========================
+14. DAILY BACKUP
+==========================
+
+Automatic Backup.
+
+Daily
+
+Weekly
+
+Monthly
+
+Restore Backup
+
+Download Backup
+
+Backup Logs
+
+==========================
+15. USER ROLES & PERMISSIONS
+==========================
+
+Roles:
+
+Super Admin
+
+Admin
+
+Accounts
+
+Manager
+
+Sales
+
+Operations
+
+Guide
+
+Staff
+
+Read Only
+
+Permissions:
+
+View
+
+Create
+
+Edit
+
+Delete
+
+Approve
+
+Export
+
+==========================
+16. DASHBOARD
+==========================
+
+Finance Dashboard showing:
+
+Today's Collection
+
+Today's Expenses
+
+Cash Balance
+
+Bank Balance
+
+Outstanding Payments
+
+Receivables
+
+Payables
+
+Monthly Revenue
+
+Monthly Profit
+
+Expense Chart
+
+Package Revenue
+
+Group Revenue
+
+==========================
+17. REPORTS
+==========================
+
+Generate reports for:
+
+Revenue
+
+Expenses
+
+Profit
+
+Balance
+
+Customer Ledger
+
+Vendor Ledger
+
+Cash Book
+
+Bank Book
+
+GST
+
+Payroll
+
+Assets
+
+Audit Logs
+
+==========================
+18. EXPORT
+==========================
+
+Every page must support:
+
+PDF
+
+Excel
+
+CSV
+
+Print
+
+==========================
+19. SEARCH
+==========================
+
+Global Search.
+
+Search by:
+
+Customer
+
+Passport
+
+Booking ID
+
+Invoice
+
+Vendor
+
+Receipt
+
+Expense
+
+Payment
+
+==========================
+20. PERFORMANCE
+==========================
+
+Optimize database.
+
+Pagination
+
+Filters
+
+Sorting
+
+Fast Search
+
+Caching
+
+==========================
+21. TESTING
+==========================
+
+Test all modules.
+
+Fix database migrations.
+
+Fix API routes.
+
+Fix permissions.
+
+Fix production deployment.
+
+No console errors.
+
+No API errors.
+
+No blank pages.
+
+Deploy only after every Accounting and Finance module is fully functional on the live production website.
