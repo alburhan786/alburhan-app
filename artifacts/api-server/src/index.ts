@@ -447,6 +447,15 @@ async function runMigrations() {
   } catch (err) {
     console.error("[Migration] otps.attempts failed:", err);
   }
+  try {
+    await pool.query(`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'approved'`);
+    await pool.query(`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS approved_by TEXT`);
+    await pool.query(`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS rejected_reason TEXT`);
+    await pool.query(`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS package_id TEXT`);
+    console.log("[Migration] expenses approval columns ensured");
+  } catch (err) {
+    console.error("[Migration] expenses approval columns failed:", err);
+  }
 }
 
 const rawPort = process.env["PORT"];
