@@ -66,6 +66,30 @@ async function buildAll() {
       !(pkg.dependencies?.[dep]?.startsWith("workspace:")),
   );
 
+  // Inject messaging secrets from Replit build environment into the bundle.
+  // This means the VPS does NOT need these in its .env file — they are baked
+  // in at build time. DATABASE_URL, SESSION_SECRET etc. are intentionally
+  // excluded because those are VPS-specific and must stay in the VPS .env.
+  const messagingDefines: Record<string, string> = {};
+  const injectKeys = [
+    "FAST2SMS_API_KEY",
+    "FAST2SMS_XXL_API_KEY",
+    "BOTBEE_API_KEY",
+    "BOTBEE_PHONE_NUMBER_ID",
+    "BOTBEE_BUSINESS_ID",
+    "RAZORPAY_KEY_ID",
+    "RAZORPAY_SECRET",
+  ];
+  for (const key of injectKeys) {
+    const val = process.env[key];
+    if (val && val !== "your_actual_key_here" && val !== "your_key_here") {
+      messagingDefines[`process.env.${key}`] = JSON.stringify(val);
+      console.log(`  ✅ Injecting ${key} (len=${val.length}) into bundle`);
+    } else {
+      console.log(`  ⚠️  ${key} not set in build env — VPS must supply via .env`);
+    }
+  }
+
   await esbuild({
     entryPoints: [path.resolve(__dirname, "src/index.ts")],
     platform: "node",
@@ -75,6 +99,7 @@ async function buildAll() {
     define: {
       "process.env.NODE_ENV": '"production"',
       "import.meta.url": "__importMetaUrl",
+      ...messagingDefines,
     },
     banner: {
       js: `var __importMetaUrl = require("url").pathToFileURL(__filename).href;`,
