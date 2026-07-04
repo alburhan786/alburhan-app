@@ -19,7 +19,6 @@ const upload = multer({
 });
 
 const router = Router();
-router.use(requireModuleAccess("settings") as any);
 
 router.get(
   "/",
@@ -55,6 +54,7 @@ router.get("/active", async (_req, res) => {
 
 router.post(
   "/upload",
+  requireModuleAccess("settings") as any,
   requireAuth as any,
   requireAdmin as any,
   upload.single("file"),
@@ -85,6 +85,7 @@ router.post(
 
 router.patch(
   "/:id/toggle",
+  requireModuleAccess("settings") as any,
   requireAuth as any,
   requireAdmin as any,
   async (req: AuthenticatedRequest, res) => {
@@ -109,6 +110,7 @@ router.patch(
 
 router.delete(
   "/:id",
+  requireModuleAccess("settings") as any,
   requireAuth as any,
   requireAdmin as any,
   async (req: AuthenticatedRequest, res) => {

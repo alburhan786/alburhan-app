@@ -6,9 +6,8 @@ import { db, customerNotificationsTable } from "@workspace/db";
 import { eq, and, desc, count } from "drizzle-orm";
 
 const router = Router();
-router.use(requireModuleAccess("customers") as any);
 
-router.post("/send", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+router.post("/send", requireModuleAccess("customers") as any, requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   const parsed = SendNotificationBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ message: "Invalid request" });

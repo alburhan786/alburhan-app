@@ -5,7 +5,6 @@ import { CreatePackageBody, ListPackagesQueryParams } from "@workspace/api-zod";
 import { requireAdmin, requireModuleAccess } from "../lib/auth.js";
 
 const router = Router();
-router.use(requireModuleAccess("bookings") as any);
 
 router.get("/", async (req, res) => {
   const parsed = ListPackagesQueryParams.safeParse(req.query);
@@ -33,7 +32,7 @@ router.get("/:id", async (req, res) => {
   res.json(formatPackage(pkgs[0]));
 });
 
-router.post("/", requireAdmin as any, async (req, res) => {
+router.post("/", requireModuleAccess("bookings") as any, requireAdmin as any, async (req, res) => {
   const parsed = CreatePackageBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ message: "Invalid package data", error: parsed.error.message });
@@ -59,7 +58,7 @@ router.post("/", requireAdmin as any, async (req, res) => {
   res.status(201).json(formatPackage(pkg));
 });
 
-router.put("/:id", requireAdmin as any, async (req, res) => {
+router.put("/:id", requireModuleAccess("bookings") as any, requireAdmin as any, async (req, res) => {
   const parsed = CreatePackageBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ message: "Invalid package data" });
@@ -90,7 +89,7 @@ router.put("/:id", requireAdmin as any, async (req, res) => {
   res.json(formatPackage(pkg));
 });
 
-router.delete("/:id", requireAdmin as any, async (req, res) => {
+router.delete("/:id", requireModuleAccess("bookings") as any, requireAdmin as any, async (req, res) => {
   await db.delete(packagesTable).where(eq(packagesTable.id, req.params.id));
   res.json({ message: "Package deleted" });
 });
