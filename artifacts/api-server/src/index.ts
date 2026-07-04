@@ -592,6 +592,38 @@ async function runMigrations() {
   } catch (err) {
     console.error("[Migration] payment_transactions reconciliation columns failed:", err);
   }
+  // ── Vendors ────────────────────────────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS vendors (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        category TEXT NOT NULL DEFAULT 'other',
+        gst_number TEXT,
+        pan TEXT,
+        bank_account TEXT,
+        ifsc TEXT,
+        contact TEXT,
+        email TEXT,
+        address TEXT,
+        notes TEXT,
+        is_active BOOLEAN NOT NULL DEFAULT true,
+        is_deleted BOOLEAN NOT NULL DEFAULT false,
+        deleted_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    console.log("[Migration] vendors table ensured");
+  } catch (err) {
+    console.error("[Migration] vendors table failed:", err);
+  }
+  try {
+    await pool.query(`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS vendor_id TEXT`);
+    console.log("[Migration] expenses.vendor_id column ensured");
+  } catch (err) {
+    console.error("[Migration] expenses.vendor_id failed:", err);
+  }
   // ── Per-account per-FY opening balances ───────────────────────────────────
   try {
     await pool.query(`

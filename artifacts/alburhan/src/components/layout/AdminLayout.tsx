@@ -6,7 +6,7 @@ import {
   ImageIcon, UsersRound, Receipt, ClipboardPlus, ScanLine, BarChart2,
   Printer, Menu, Megaphone, ShieldCheck, Inbox, PieChart, Star, BadgeCheck, Droplets,
   TrendingDown, Calculator, Plane, Activity, Home, CreditCard, Trash2,
-  Building2, Bus, Heart, FileCheck, Sparkles
+  Building2, Bus, Heart, FileCheck, Sparkles, UserCheck, BookMarked, Truck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -43,6 +43,9 @@ function buildMenu(openComplaints: number): MenuSection[] {
         { icon: TrendingDown, label: "Expenses", href: "/admin/expenses" },
         { icon: Calculator, label: "Accounting", href: "/admin/accounting" },
         { icon: Home, label: "Family Ledger", href: "/admin/family-ledger" },
+        { icon: UserCheck, label: "Customer Ledger", href: "/admin/customer-ledger" },
+        { icon: BookMarked, label: "Hajji Ledger", href: "/admin/hajji-ledger" },
+        { icon: Truck, label: "Vendors", href: "/admin/vendors" },
         { icon: Trash2, label: "Trash", href: "/admin/bookings?tab=trash" },
       ],
     },

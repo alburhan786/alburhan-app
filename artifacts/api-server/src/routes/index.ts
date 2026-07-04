@@ -33,6 +33,7 @@ import visaRouter from "./visa.js";
 import aiRouter from "./ai.js";
 import systemHealthRouter from "./system-health.js";
 import accountingRouter from "./accounting.js";
+import vendorsRouter from "./vendors.js";
 
 const router: IRouter = Router();
 
@@ -99,6 +100,7 @@ router.use("/visa", visaRouter);
 router.use("/ai", aiRouter);
 router.use("/admin", systemHealthRouter);
 router.use("/accounting", accountingRouter);
+router.use("/vendors", vendorsRouter);
 router.use(storageRouter);
 
 export default router;

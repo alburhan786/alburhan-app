@@ -730,4 +730,184 @@ router.get("/cash-flow", requireAdmin as any, async (req: AuthenticatedRequest, 
   }
 });
 
+// ── CUSTOMER LEDGER ──────────────────────────────────────────────────────────
+
+router.get("/customer-ledger/search", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { q: query } = req.query as Record<string, string>;
+    if (!query || query.trim().length < 2) return res.json([]);
+    const term = `%${query.trim()}%`;
+    const rows = await q(
+      `SELECT u.id, u.mobile, u.name, u.email,
+        COUNT(b.id)::int AS booking_count,
+        COALESCE(SUM(b.final_amount::numeric),0)::numeric AS total_billed,
+        COALESCE(SUM(b.paid_amount::numeric),0)::numeric AS total_paid
+       FROM users u
+       LEFT JOIN bookings b ON b.customer_mobile=u.mobile AND (b.is_deleted IS NULL OR b.is_deleted=false)
+       WHERE u.role='customer' AND (u.mobile ILIKE $1 OR u.name ILIKE $1)
+       GROUP BY u.id, u.mobile, u.name, u.email
+       ORDER BY u.name
+       LIMIT 20`,
+      [term]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("[accounting] customer-ledger/search:", err);
+    res.status(500).json({ error: "Search failed" });
+  }
+});
+
+router.get("/customer-ledger/:mobile", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { mobile } = req.params;
+    const { from, to } = req.query as Record<string, string>;
+
+    const customer = await q1(`SELECT id, mobile, name, email FROM users WHERE mobile=$1 LIMIT 1`, [mobile]);
+    if (!customer) return res.status(404).json({ error: "Customer not found" });
+
+    let bSql = `SELECT b.id, b.booking_number, b.package_name, b.group_id,
+                  b.status, b.final_amount, b.paid_amount, b.advance_amount,
+                  b.invoice_number, b.created_at, b.notes, b.preferred_departure_date,
+                  b.number_of_pilgrims, b.room_type,
+                  g.name AS group_name
+               FROM bookings b
+               LEFT JOIN hajj_groups g ON g.id=b.group_id
+               WHERE b.customer_mobile=$1 AND (b.is_deleted IS NULL OR b.is_deleted=false)`;
+    const bParams: any[] = [mobile];
+    if (from) { bParams.push(from); bSql += ` AND DATE(b.created_at)>=$${bParams.length}`; }
+    if (to)   { bParams.push(to);   bSql += ` AND DATE(b.created_at)<=$${bParams.length}`; }
+    bSql += ` ORDER BY b.created_at DESC`;
+
+    const bookings = await q(bSql, bParams);
+
+    const bookingIds = bookings.map((b: any) => b.id);
+    let payments: any[] = [];
+    if (bookingIds.length > 0) {
+      payments = await q(
+        `SELECT pt.booking_id, pt.id, pt.amount, pt.mode, pt.payment_date,
+                pt.received_by, pt.bank_name, pt.notes, pt.is_deleted
+         FROM payment_transactions pt
+         WHERE pt.booking_id=ANY($1::text[]) AND (pt.is_deleted IS NULL OR pt.is_deleted=false)
+         ORDER BY pt.payment_date ASC`,
+        [bookingIds]
+      );
+    }
+
+    const paymentsByBooking: Record<string, any[]> = {};
+    for (const p of payments) {
+      if (!paymentsByBooking[p.booking_id]) paymentsByBooking[p.booking_id] = [];
+      paymentsByBooking[p.booking_id].push(p);
+    }
+
+    const enriched = bookings.map((b: any) => ({
+      ...b,
+      final_amount: Number(b.final_amount || 0),
+      paid_amount: Number(b.paid_amount || 0),
+      balance: Math.max(0, Number(b.final_amount || 0) - Number(b.paid_amount || 0)),
+      payments: paymentsByBooking[b.id] || [],
+    }));
+
+    const totalBilled = enriched.reduce((s: number, b: any) => s + b.final_amount, 0);
+    const totalPaid = enriched.reduce((s: number, b: any) => s + b.paid_amount, 0);
+    const totalBalance = enriched.reduce((s: number, b: any) => s + b.balance, 0);
+
+    res.json({ customer, bookings: enriched, summary: { totalBilled, totalPaid, totalBalance } });
+  } catch (err) {
+    console.error("[accounting] customer-ledger/:mobile:", err);
+    res.status(500).json({ error: "Failed to fetch customer ledger" });
+  }
+});
+
+// ── HAJJI PAYMENT LEDGER ─────────────────────────────────────────────────────
+
+router.get("/hajji-ledger/search", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { q: query } = req.query as Record<string, string>;
+    if (!query || query.trim().length < 2) return res.json([]);
+    const term = `%${query.trim()}%`;
+    const rows = await q(
+      `SELECT b.id, b.booking_number, b.customer_name, b.customer_mobile,
+              b.package_name, b.status, b.final_amount, b.paid_amount, b.created_at
+       FROM bookings b
+       WHERE (b.is_deleted IS NULL OR b.is_deleted=false)
+         AND (b.booking_number ILIKE $1 OR b.customer_name ILIKE $1 OR b.customer_mobile ILIKE $1)
+       ORDER BY b.created_at DESC
+       LIMIT 20`,
+      [term]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("[accounting] hajji-ledger/search:", err);
+    res.status(500).json({ error: "Search failed" });
+  }
+});
+
+router.get("/hajji-ledger/:bookingId", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { bookingId } = req.params;
+
+    const booking = await q1(
+      `SELECT b.*, g.name AS group_name
+       FROM bookings b
+       LEFT JOIN hajj_groups g ON g.id=b.group_id
+       WHERE b.id=$1 AND (b.is_deleted IS NULL OR b.is_deleted=false)`,
+      [bookingId]
+    );
+    if (!booking) return res.status(404).json({ error: "Booking not found" });
+
+    const payments = await q(
+      `SELECT pt.id, pt.amount, pt.mode, pt.payment_date, pt.received_by,
+              pt.bank_name, pt.notes, pt.invoice_number, pt.is_deleted
+       FROM payment_transactions pt
+       WHERE pt.booking_id=$1 AND (pt.is_deleted IS NULL OR pt.is_deleted=false)
+       ORDER BY pt.payment_date ASC, pt.created_at ASC`,
+      [bookingId]
+    );
+
+    const pilgrims = await q(
+      `SELECT id, name, mobile, passport_number, barcode_id
+       FROM pilgrims WHERE booking_id=$1 ORDER BY name`,
+      [bookingId]
+    );
+
+    const finalAmount = Number(booking.final_amount || 0);
+    const paidAmount = Number(booking.paid_amount || 0);
+    const balance = Math.max(0, finalAmount - paidAmount);
+
+    // Build running balance statement
+    let running = 0;
+    const statement = payments.map((p: any) => {
+      running += Number(p.amount || 0);
+      return {
+        ...p,
+        amount: Number(p.amount),
+        running_balance: running,
+        balance_remaining: Math.max(0, finalAmount - running),
+      };
+    });
+
+    const modeBreakdown: Record<string, number> = {};
+    for (const p of payments) {
+      const mode = p.mode || "cash";
+      modeBreakdown[mode] = (modeBreakdown[mode] || 0) + Number(p.amount || 0);
+    }
+
+    res.json({
+      booking: { ...booking, final_amount: finalAmount, paid_amount: paidAmount, balance },
+      statement,
+      pilgrims,
+      summary: {
+        totalInstallments: payments.length,
+        totalPaid: paidAmount,
+        totalBilled: finalAmount,
+        balance,
+        modeBreakdown,
+      },
+    });
+  } catch (err) {
+    console.error("[accounting] hajji-ledger/:bookingId:", err);
+    res.status(500).json({ error: "Failed to fetch hajji ledger" });
+  }
+});
+
 export default router;
