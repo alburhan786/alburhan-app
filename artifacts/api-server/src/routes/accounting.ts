@@ -891,6 +891,30 @@ router.get("/hajji-ledger/search", requireAdmin as any, async (req: Authenticate
   }
 });
 
+router.get("/hajji-ledger/passport/:passportNumber", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { passportNumber } = req.params;
+    const pilgrim = await q1(
+      `SELECT booking_id FROM pilgrims WHERE LOWER(passport_number)=LOWER($1) LIMIT 1`,
+      [passportNumber.trim()]
+    );
+    if (!pilgrim) return res.status(404).json({ error: "No booking found for this passport number" });
+    // Delegate to same query as bookingId endpoint
+    const booking = await q1(
+      `SELECT b.*, g.name AS group_name
+       FROM bookings b
+       LEFT JOIN hajj_groups g ON g.id=b.group_id
+       WHERE b.id=$1 AND (b.is_deleted IS NULL OR b.is_deleted=false)`,
+      [pilgrim.booking_id]
+    );
+    if (!booking) return res.status(404).json({ error: "Booking not found" });
+    return res.redirect(307, `/api/accounting/hajji-ledger/${pilgrim.booking_id}`);
+  } catch (err) {
+    console.error("[accounting] hajji-ledger/passport:", err);
+    res.status(500).json({ error: "Failed to look up by passport" });
+  }
+});
+
 router.get("/hajji-ledger/:bookingId", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
     const { bookingId } = req.params;

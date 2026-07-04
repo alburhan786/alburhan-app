@@ -82,19 +82,19 @@ router.get("/:id/ledger", requireAdmin as any, async (req: AuthenticatedRequest,
     const params: any[] = [req.params.id];
     if (from) { params.push(from); sql += ` AND e.date>=$${params.length}`; }
     if (to)   { params.push(to);   sql += ` AND e.date<=$${params.length}`; }
-    sql += ` ORDER BY e.date DESC, e.created_at DESC`;
+    sql += ` ORDER BY e.date ASC, e.created_at ASC`;
 
     const expenses = await q(sql, params);
-    const totalAmount = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
+    const totalAmount = expenses.reduce((s: number, e: any) => s + Number(e.amount || 0), 0);
 
-    // Add running balance to each expense row
+    // Compute running balance in chronological (ASC) order, then reverse for display (newest first)
     let running = 0;
-    const expensesWithBalance = expenses.map((e: any) => {
+    const expensesAsc = expenses.map((e: any) => {
       running += Number(e.amount || 0);
       return { ...e, running_balance: running };
     });
+    const expensesWithBalance = [...expensesAsc].reverse();
 
-    // Outstanding = total expenses recorded (no "paid" concept for vendors yet, all expenses are liabilities)
     res.json({ vendor, expenses: expensesWithBalance, totalAmount, outstandingAmount: totalAmount });
   } catch (err) {
     console.error("[vendors] GET /:id/ledger", err);

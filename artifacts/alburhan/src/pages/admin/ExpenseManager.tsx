@@ -51,7 +51,7 @@ interface Expense {
 interface Group { id: string; name: string; }
 
 const EMPTY_FORM = {
-  groupId: "", packageId: "", category: "misc", vendor: "", description: "",
+  groupId: "", packageId: "", category: "misc", vendor: "", vendorId: "", description: "",
   amount: "", date: new Date().toISOString().slice(0, 10),
   paidBy: "", paymentMethod: "cash", invoiceNumber: "", notes: "", status: "approved",
 };
@@ -68,6 +68,7 @@ export default function ExpenseManager() {
   const { toast } = useToast();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
+  const [vendorsList, setVendorsList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [catFilter, setCatFilter] = useState("all");
@@ -84,9 +85,10 @@ export default function ExpenseManager() {
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try {
-      const [expR, grpR] = await Promise.all([
+      const [expR, grpR, venR] = await Promise.all([
         fetch(`${API}/api/expenses`, { credentials: "include" }),
         fetch(`${API}/api/groups`, { credentials: "include" }),
+        fetch(`${API}/api/vendors`, { credentials: "include" }),
       ]);
       if (expR.ok) setExpenses(await expR.json());
       else setError(`API error ${expR.status}: ${await expR.text().catch(() => "")}`);
@@ -94,6 +96,7 @@ export default function ExpenseManager() {
         const grps = await grpR.json();
         setGroups(Array.isArray(grps) ? grps : grps.groups || []);
       }
+      if (venR.ok) setVendorsList(await venR.json());
     } catch (e: any) {
       setError(e.message);
     }
@@ -130,11 +133,12 @@ export default function ExpenseManager() {
   const grandTotal = expenses.reduce((s, e) => s + parseFloat(e.amount || "0"), 0);
 
   function openAdd() { setEditId(null); setForm(EMPTY_FORM); setShowModal(true); }
-  function openEdit(e: Expense) {
+  function openEdit(e: Expense & { vendorId?: string }) {
     setEditId(e.id);
     setForm({
       groupId: e.groupId || "", packageId: e.packageId || "", category: e.category,
-      vendor: e.vendor || "", description: e.description, amount: e.amount, date: e.date,
+      vendor: e.vendor || "", vendorId: (e as any).vendorId || "",
+      description: e.description, amount: e.amount, date: e.date,
       paidBy: e.paidBy || "", paymentMethod: e.paymentMethod || "cash",
       invoiceNumber: e.invoiceNumber || "", notes: e.notes || "", status: e.status || "approved",
     });
@@ -413,7 +417,23 @@ export default function ExpenseManager() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-medium">Vendor</label>
-                <Input value={form.vendor} onChange={e => setForm(f => ({ ...f, vendor: e.target.value }))} placeholder="Vendor name" className="mt-1" />
+                {vendorsList.length > 0 ? (
+                  <select
+                    value={form.vendorId}
+                    onChange={e => {
+                      const v = vendorsList.find(v => v.id === e.target.value);
+                      setForm(f => ({ ...f, vendorId: e.target.value, vendor: v ? v.name : f.vendor }));
+                    }}
+                    className="mt-1 w-full h-9 px-2 rounded border text-sm bg-background"
+                  >
+                    <option value="">— Select vendor —</option>
+                    {vendorsList.map((v: any) => (
+                      <option key={v.id} value={v.id}>{v.name} ({v.category})</option>
+                    ))}
+                  </select>
+                ) : (
+                  <Input value={form.vendor} onChange={e => setForm(f => ({ ...f, vendor: e.target.value }))} placeholder="Vendor name" className="mt-1" />
+                )}
               </div>
               <div>
                 <label className="text-xs font-medium">Paid By</label>
