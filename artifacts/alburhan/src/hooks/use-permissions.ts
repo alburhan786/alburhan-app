@@ -107,7 +107,7 @@ async function fetchMe(): Promise<{ adminRole: AdminRole; name?: string }> {
     .then(r => r.ok ? r.json() : null)
     .then(data => {
       const result = {
-        adminRole: (data?.adminRole ?? "super_admin") as AdminRole,
+        adminRole: (data?.adminRole ?? "read_only") as AdminRole,
         name: data?.name,
       };
       _cached = result;

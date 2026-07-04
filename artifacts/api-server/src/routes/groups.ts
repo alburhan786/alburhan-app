@@ -152,13 +152,14 @@ router.put("/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) =
   const id = String(req.params.id);
   const { groupName, year, departureDate, returnDate, flightNumber, maktabNumber, hotels, notes, startingSerialNumber } = req.body;
   try {
+    const [before] = await db.select().from(hajjGroupsTable).where(eq(hajjGroupsTable.id, id)).limit(1);
     const [updated] = await db.update(hajjGroupsTable).set({
       groupName, year: Number(year), departureDate, returnDate, flightNumber, maktabNumber,
       startingSerialNumber: startingSerialNumber ? Number(startingSerialNumber) : 1,
       hotels: hotels || {}, notes, updatedAt: new Date(),
     }).where(eq(hajjGroupsTable.id, id)).returning();
     if (!updated) { res.status(404).json({ message: "Group not found" }); return; }
-    auditLog({ req, action: "updated", entityTable: "groups", entityId: id, newValue: { groupName: updated.groupName, year: updated.year, departureDate: updated.departureDate } }).catch(() => {});
+    auditLog({ req, action: "updated", entityTable: "groups", entityId: id, oldValue: before ? { groupName: before.groupName, year: before.year, departureDate: before.departureDate } : null, newValue: { groupName: updated.groupName, year: updated.year, departureDate: updated.departureDate } }).catch(() => {});
     res.json(fmtGroup(updated));
   } catch (err: any) {
     console.error("[groups] PUT /:id DB error:", err);

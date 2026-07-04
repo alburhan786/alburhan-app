@@ -11,7 +11,7 @@ export async function auditLog({
   newValue,
 }: {
   req: Request | AuthenticatedRequest;
-  action: "created" | "updated" | "deleted" | "restored";
+  action: "created" | "updated" | "deleted" | "restored" | "approved" | "rejected";
   entityTable: string;
   entityId: string;
   oldValue?: object | null;

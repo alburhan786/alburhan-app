@@ -46,13 +46,14 @@ router.post("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => 
 
 router.put("/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
+    const [existing] = await db.select().from(groupFlightsTable).where(eq(groupFlightsTable.id, req.params.id)).limit(1);
     const { flightType, airline, flightNumber, pnr, departureAirport, arrivalAirport, departureDate, departureTime, arrivalDate, arrivalTime, baggageAllowance, mealType, status, notes, pilgrimsAssigned, ticketNumbers } = req.body;
     const [row] = await db.update(groupFlightsTable)
       .set({ flightType, airline, flightNumber, pnr, departureAirport, arrivalAirport, departureDate, departureTime, arrivalDate, arrivalTime, baggageAllowance, mealType, status, notes, pilgrimsAssigned: pilgrimsAssigned ?? [], ticketNumbers: ticketNumbers ?? {}, updatedAt: new Date() })
       .where(eq(groupFlightsTable.id, req.params.id))
       .returning();
     if (!row) return res.status(404).json({ error: "Not found" });
-    auditLog({ req, action: "updated", entityTable: "flights", entityId: req.params.id, newValue: { flightNumber: row.flightNumber, status: row.status } }).catch(() => {});
+    auditLog({ req, action: "updated", entityTable: "flights", entityId: req.params.id, oldValue: existing ? { flightNumber: existing.flightNumber, status: existing.status, airline: existing.airline } : null, newValue: { flightNumber: row.flightNumber, status: row.status, airline: row.airline } }).catch(() => {});
     res.json(row);
   } catch (err) {
     console.error("[flights] PUT", err);

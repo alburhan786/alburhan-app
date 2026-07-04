@@ -138,6 +138,7 @@ router.post("/", requireAdmin, async (req: AuthenticatedRequest, res) => {
 
 router.put("/:id", requireAdmin, async (req: AuthenticatedRequest, res) => {
   try {
+    const [existing] = await db.select().from(staffTable).where(eq(staffTable.id, req.params.id)).limit(1);
     const { fullName, fatherName, designation, department, role, companyId, employeeCode,
       mobileIndia, bloodGroup, dateOfBirth, address, aadhaarLast4, emergencyContact,
       emergencyMobile, joiningDate, validUpto, notes, status, staffId, groupId } = req.body;
@@ -167,7 +168,7 @@ router.put("/:id", requireAdmin, async (req: AuthenticatedRequest, res) => {
     }).where(eq(staffTable.id, req.params.id)).returning();
 
     if (!updated.length) { res.status(404).json({ error: "Not found" }); return; }
-    auditLog({ req, action: "updated", entityTable: "staff", entityId: req.params.id, newValue: { fullName: updated[0].fullName, role: updated[0].role, status: updated[0].status } }).catch(() => {});
+    auditLog({ req, action: "updated", entityTable: "staff", entityId: req.params.id, oldValue: existing ? { fullName: existing.fullName, role: existing.role, status: existing.status } : null, newValue: { fullName: updated[0].fullName, role: updated[0].role, status: updated[0].status } }).catch(() => {});
     res.json(updated[0]);
   } catch (err) {
     console.error("[staff] PUT /:id", err);
