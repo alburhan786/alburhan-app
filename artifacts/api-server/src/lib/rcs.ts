@@ -19,7 +19,6 @@ interface RCSConfig {
   apiKey: string;
   apiUrl: string;
   userId: string;
-  agentId: string;
   brandName: string;
   templateId: string;
   booking_created_tid?: string;
@@ -39,9 +38,9 @@ function getConfig(): RCSConfig {
   return {
     enabled: db.enabled !== false,
     apiKey: db.apiKey || process.env.LEMIN_API_KEY || "",
-    apiUrl: db.apiUrl || "https://rcs.leminai.com/api/send",
-    userId: db.extra?.user_id || process.env.LEMIN_USER_ID || "",
-    agentId: db.extra?.agent_id || "",
+    apiUrl: db.apiUrl || "https://rcs.leminai.com/api/send/template",
+    // apiKey IS the Developer API Key (user_id); fall back to legacy extra.user_id
+    userId: db.apiKey || db.extra?.user_id || process.env.LEMIN_USER_ID || "",
     brandName: db.extra?.brand_name || "Al Burhan Tours & Travels",
     templateId: db.extra?.template_id || "1473",
     booking_created_tid: db.extra?.booking_created_tid,
@@ -82,7 +81,7 @@ async function logRCS(opts: {
         provider_name, api_endpoint, http_status, request_payload,
         provider_response, error_code, sent_at, retry_count, booking_id, customer_id)
        VALUES (gen_random_uuid(),'rcs_event','rcs',$1,$2,$3,
-        'LeminAI','https://rcs.leminai.com/api/send',$4,$5,$6,$7,NOW(),0,$8,$9)`,
+        'LeminAI','https://rcs.leminai.com/api/send/template',$4,$5,$6,$7,NOW(),0,$8,$9)`,
       [
         opts.mobile,
         `RCS tpl:${opts.templateId} vars:${JSON.stringify(opts.variables)}`,
@@ -129,7 +128,7 @@ async function sendRCSWithRetry(opts: {
     if (attempt > 0) await sleep(1500 * attempt);
     try {
       const resp = await axios.post(endpoint, reqPayload, {
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${cfg.apiKey}` },
+        headers: { "Content-Type": "application/json" },
         timeout: 12000,
       });
       const ok = resp.status >= 200 && resp.status < 300;

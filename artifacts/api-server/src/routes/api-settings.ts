@@ -180,11 +180,10 @@ router.post("/:provider/test", requireAdmin as any, requireSuperAdmin, async (re
         break;
       }
       case "lemin": {
-        if (!apiKey) { result = { ok: false, message: "API key not set" }; break; }
-        const resp = await axios.get("https://rcs.leminai.com/api/status", {
-          headers: { Authorization: `Bearer ${apiKey}` }, timeout: 8000,
-        }).catch(e => e.response || { data: { error: e.message }, status: 0 });
-        result = { ok: resp.status === 200, httpStatus: resp.status, response: resp.data };
+        // The Developer API Key is stored in apiKey field (user_id)
+        const userId = apiKey || extra.user_id;
+        if (!userId) { result = { ok: false, message: "Developer API Key (User ID) not configured" }; break; }
+        result = { ok: true, message: `Developer API Key configured (${String(userId).slice(0, 6)}...)` };
         break;
       }
       case "smtp": {
@@ -359,15 +358,25 @@ router.post("/:provider/send-test", requireAdmin as any, requireSuperAdmin, asyn
       }
       case "lemin": {
         if (!mobile) return res.json({ ok: false, message: "Provide a mobile number" });
-        if (!apiKey) return res.json({ ok: false, message: "API key not configured" });
+        const userId = apiKey || extra.user_id;
+        if (!userId) return res.json({ ok: false, message: "Developer API Key not configured" });
         channel = "rcs";
         recipient = mobile;
         const phone = mobile.replace(/\D/g, "").slice(-10);
-        const endpoint = apiUrl || "https://rcs.leminai.com/api/send";
-        const reqPayload = { type: "single", dial_code: "+91", template: extra.template_id || "1473", phone, user_id: extra.user_id || "", variables: { name: "Test", message: "Al Burhan ERP RCS test from Test API" } };
+        const endpoint = apiUrl || "https://rcs.leminai.com/api/send/template";
+        const reqPayload = {
+          type: "single",
+          dial_code: "+91",
+          template: extra.template_id || "1473",
+          phone,
+          user_id: userId,
+        };
         let httpStatus = 0; let respData: any = {};
         try {
-          const resp = await axios.post(endpoint, reqPayload, { headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` }, timeout: 10000 });
+          const resp = await axios.post(endpoint, reqPayload, {
+            headers: { "Content-Type": "application/json" },
+            timeout: 10000,
+          });
           httpStatus = resp.status; respData = resp.data;
           result = { ok: httpStatus === 200, provider: "Lemin AI", endpoint, httpStatus, requestPayload: reqPayload, responsePayload: respData };
         } catch (e: any) {
@@ -401,6 +410,28 @@ router.post("/:provider/send-test", requireAdmin as any, requireSuperAdmin, asyn
     ).catch(e => console.error("[send-test] log failed:", e.message));
 
     res.json({ ...result, logged: true });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, message: err.message });
+  }
+});
+
+// POST /api/api-settings/lemin/set-webhook — register webhook URL with Lemin AI
+router.post("/lemin/set-webhook", requireAdmin as any, requireSuperAdmin, async (req, res) => {
+  try {
+    const row = await pool.query(`SELECT api_key, api_url, extra_fields FROM api_settings WHERE provider='lemin' LIMIT 1`);
+    const r = row.rows[0];
+    if (!r) return res.json({ ok: false, message: "Lemin AI not configured — save settings first" });
+    const userId = r.api_key || r.extra_fields?.user_id || "";
+    if (!userId) return res.json({ ok: false, message: "Developer API Key not set — save settings first" });
+    const webhookUrl = req.body?.url || "https://alburhantravels.com/api/webhook/rcs";
+    const payload = { url: webhookUrl, agent: "jio", active: true, user_id: userId };
+    const resp = await axios.post("https://rcs.leminai.com/api/webhook/set", payload, {
+      headers: { "Content-Type": "application/json" },
+      timeout: 10000,
+    }).catch((e: any) => e?.response || { data: { error: e.message }, status: 0 });
+    const ok = resp.status >= 200 && resp.status < 300;
+    console.log(`[Lemin] Webhook set result: status=${resp.status} ok=${ok}`, resp.data);
+    res.json({ ok, httpStatus: resp.status, requestPayload: payload, responsePayload: resp.data });
   } catch (err: any) {
     res.status(500).json({ ok: false, message: err.message });
   }

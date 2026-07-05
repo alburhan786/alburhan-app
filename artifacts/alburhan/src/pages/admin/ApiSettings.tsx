@@ -90,24 +90,22 @@ const PROVIDERS: ProviderDef[] = [
     color: "text-purple-600",
     description: "Jio RCS rich messaging via Lemin AI. Sends template-based rich messages with interactive content.",
     apiUrlLabel: "API Endpoint",
-    apiUrlPlaceholder: "https://rcs.leminai.com/api/send",
-    apiKeyLabel: "Bearer Token",
-    apiKeyPlaceholder: "Enter Lemin API bearer token",
+    apiUrlPlaceholder: "https://rcs.leminai.com/api/send/template",
+    apiKeyLabel: "User ID (Developer API Key)",
+    apiKeyPlaceholder: "Enter your Lemin AI Developer API Key",
     extraFields: [
-      { key: "agent_id",   label: "Agent ID",     placeholder: "agent_abc123",               isExtra: true },
-      { key: "brand_name", label: "Brand Name",   placeholder: "Al Burhan Tours & Travels",  isExtra: true },
-      { key: "user_id",    label: "User ID",      placeholder: "0x89mqd53ph",                isExtra: true },
-      { key: "template_id",label: "Default Template ID", placeholder: "1473",               isExtra: true },
-      { key: "booking_created_tid",    label: "Booking Created Template ID",      placeholder: "use default", isExtra: true },
-      { key: "booking_confirmed_tid",  label: "Booking Confirmed Template ID",    placeholder: "use default", isExtra: true },
-      { key: "payment_received_tid",   label: "Payment Received Template ID",     placeholder: "use default", isExtra: true },
-      { key: "pending_payment_tid",    label: "Pending Payment Template ID",      placeholder: "use default", isExtra: true },
-      { key: "invoice_created_tid",    label: "Invoice Created Template ID",      placeholder: "use default", isExtra: true },
-      { key: "ticket_issued_tid",      label: "Ticket Issued Template ID",        placeholder: "use default", isExtra: true },
-      { key: "visa_issued_tid",        label: "Visa Issued Template ID",          placeholder: "use default", isExtra: true },
-      { key: "departure_reminder_tid", label: "Departure Reminder Template ID",   placeholder: "use default", isExtra: true },
-      { key: "arrival_reminder_tid",   label: "Arrival Reminder Template ID",     placeholder: "use default", isExtra: true },
-      { key: "eid_greeting_tid",       label: "Eid Greeting Template ID",         placeholder: "use default", isExtra: true },
+      { key: "brand_name",             label: "Brand Name",                       placeholder: "Al Burhan Tours & Travels",  isExtra: true },
+      { key: "template_id",            label: "Default Template ID",              placeholder: "1473",                       isExtra: true },
+      { key: "booking_created_tid",    label: "Booking Created Template ID",      placeholder: "use default",                isExtra: true },
+      { key: "booking_confirmed_tid",  label: "Booking Confirmed Template ID",    placeholder: "use default",                isExtra: true },
+      { key: "payment_received_tid",   label: "Payment Received Template ID",     placeholder: "use default",                isExtra: true },
+      { key: "pending_payment_tid",    label: "Pending Payment Template ID",      placeholder: "use default",                isExtra: true },
+      { key: "invoice_created_tid",    label: "Invoice Created Template ID",      placeholder: "use default",                isExtra: true },
+      { key: "ticket_issued_tid",      label: "Ticket Issued Template ID",        placeholder: "use default",                isExtra: true },
+      { key: "visa_issued_tid",        label: "Visa Issued Template ID",          placeholder: "use default",                isExtra: true },
+      { key: "departure_reminder_tid", label: "Departure Reminder Template ID",   placeholder: "use default",                isExtra: true },
+      { key: "arrival_reminder_tid",   label: "Arrival Reminder Template ID",     placeholder: "use default",                isExtra: true },
+      { key: "eid_greeting_tid",       label: "Eid Greeting Template ID",         placeholder: "use default",                isExtra: true },
     ],
     testMessageFields: [
       { key: "mobile", label: "Test Mobile Number", placeholder: "10-digit number", type: "text" },
@@ -214,6 +212,8 @@ export default function ApiSettings() {
   const [testAllInputs, setTestAllInputs] = useState({ mobile: "", email: "" });
   const [testAllLoading, setTestAllLoading] = useState(false);
   const [testAllResults, setTestAllResults] = useState<Array<{ channel: string; ok: boolean; provider: string; httpStatus?: number; errorMessage?: string; responsePayload?: unknown }> | null>(null);
+  const [settingWebhook, setSettingWebhook] = useState(false);
+  const [webhookResult, setWebhookResult] = useState<{ ok: boolean; message?: string; httpStatus?: number; responsePayload?: unknown } | null>(null);
 
   useEffect(() => {
     if (!isSuperAdmin) return;
@@ -358,6 +358,31 @@ export default function ApiSettings() {
       if (pid !== "botbee") toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
       setSendingTest(p => ({ ...p, [pid]: false }));
+    }
+  }
+
+  async function setLeminWebhook() {
+    setSettingWebhook(true);
+    setWebhookResult(null);
+    try {
+      const res = await fetch(`${API}/api/api-settings/lemin/set-webhook`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ url: "https://alburhantravels.com/api/webhook/rcs" }),
+      });
+      const data = await res.json();
+      setWebhookResult(data);
+      toast({
+        title: data.ok ? "Webhook Registered" : "Webhook Failed",
+        description: data.ok ? "Lemin AI webhook URL registered for Jio RCS." : (data.message || "Registration failed"),
+        variant: data.ok ? "default" : "destructive",
+      });
+    } catch (err: any) {
+      setWebhookResult({ ok: false, message: err.message });
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setSettingWebhook(false);
     }
   }
 
@@ -555,6 +580,26 @@ export default function ApiSettings() {
                         {testR.ok ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
                         {testR.message || (testR.ok ? "Connected" : "Failed")}
                       </span>
+                    )}
+
+                    {/* Lemin — Set Webhook button */}
+                    {provider.id === "lemin" && (
+                      <>
+                        <button
+                          onClick={setLeminWebhook}
+                          disabled={settingWebhook}
+                          className="flex items-center gap-1.5 bg-purple-100 hover:bg-purple-200 text-purple-800 text-xs font-semibold px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+                        >
+                          {settingWebhook ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+                          Set Webhook
+                        </button>
+                        {webhookResult && (
+                          <span className={`flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-lg ${webhookResult.ok ? "bg-purple-100 text-purple-700" : "bg-red-100 text-red-700"}`}>
+                            {webhookResult.ok ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+                            {webhookResult.ok ? "Webhook registered" : (webhookResult.message || "Failed")}
+                          </span>
+                        )}
+                      </>
                     )}
                   </div>
 

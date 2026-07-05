@@ -371,19 +371,19 @@ export async function sendRCS(
   richData?: RcsRichData
 ): Promise<SendResult> {
   const leminCfg = getCachedConfig("lemin");
-  const endpoint = leminCfg.apiUrl || process.env.LEMIN_API_URL || "https://rcs.leminai.com/api/send";
+  const endpoint = leminCfg.apiUrl || process.env.LEMIN_API_URL || "https://rcs.leminai.com/api/send/template";
   if (leminCfg.enabled === false) {
     return { ok: false, provider: "Lemin AI", endpoint, errorMessage: "RCS disabled in API Settings" };
   }
-  const LEMIN_API_KEY = leminCfg.apiKey || process.env.LEMIN_API_KEY;
-  const lemin_user_id = leminCfg.extra.user_id || process.env.LEMIN_USER_ID || "0x89mqd53ph";
+  // apiKey IS the Developer API Key (user_id); fall back to legacy extra.user_id
+  const lemin_user_id = leminCfg.apiKey || leminCfg.extra.user_id || process.env.LEMIN_USER_ID || "";
   const lemin_template_id = leminCfg.extra.template_id || process.env.LEMIN_TEMPLATE_ID || "1473";
-  if (!LEMIN_API_KEY) {
-    return { ok: false, provider: "Lemin AI", endpoint, errorMessage: "LEMIN_API_KEY not configured" };
+  if (!lemin_user_id) {
+    return { ok: false, provider: "Lemin AI", endpoint, errorMessage: "Lemin Developer API Key (user_id) not configured" };
   }
   try {
     const clean = mobile.replace(/\D/g, "");
-    const phone = clean.startsWith("91") ? clean.slice(2) : clean;
+    const phone = clean.startsWith("91") && clean.length === 12 ? clean.slice(2) : clean;
     const payload: Record<string, unknown> = {
       type: "single", dial_code: "+91", template: lemin_template_id,
       phone, user_id: lemin_user_id,
@@ -394,7 +394,7 @@ export async function sendRCS(
     }
     const response = await withRetry(() =>
       axios.post(endpoint, payload, {
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${LEMIN_API_KEY}` },
+        headers: { "Content-Type": "application/json" },
         timeout: 10000,
       })
     );
