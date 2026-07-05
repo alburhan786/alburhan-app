@@ -45,7 +45,7 @@ const PROVIDERS: ProviderDef[] = [
     apiKeyLabel: "API Token",
     apiKeyPlaceholder: "Enter BotBee API token",
     extraFields: [
-      { key: "phone_number_id", label: "Phone Number ID", placeholder: "e.g. 109876543210", isExtra: true },
+      { key: "phone_number_id", label: "Phone Number ID", placeholder: "965912196611113", isExtra: true },
       { key: "business_id", label: "Business Account ID", placeholder: "e.g. 987654321", isExtra: true },
       { key: "instance_id", label: "Instance ID", placeholder: "e.g. instance_12345", isExtra: true },
       { key: "webhook_url", label: "Webhook URL (optional)", placeholder: "https://yourdomain.com/webhook/botbee", isExtra: true },
@@ -189,6 +189,7 @@ export default function ApiSettings() {
   const [testing, setTesting] = useState<Record<string, boolean>>({});
   const [sendingTest, setSendingTest] = useState<Record<string, boolean>>({});
   const [testResults, setTestResults] = useState<Record<string, TestResult | null>>({});
+  const [sendTestResults, setSendTestResults] = useState<Record<string, any>>({});
   const [testMsgInputs, setTestMsgInputs] = useState<Record<string, Record<string, string>>>({});
 
   // Super admin check
@@ -305,6 +306,7 @@ export default function ApiSettings() {
   async function sendTestMessage(pid: string) {
     const inputs = testMsgInputs[pid] || {};
     setSendingTest(p => ({ ...p, [pid]: true }));
+    setSendTestResults(p => ({ ...p, [pid]: null }));
     try {
       const res = await fetch(`${API}/api/api-settings/${pid}/send-test`, {
         method: "POST",
@@ -313,13 +315,17 @@ export default function ApiSettings() {
         body: JSON.stringify(inputs),
       });
       const data = await res.json();
-      if (data.ok) {
-        toast({ title: "Test Message Sent", description: data.message || "Message delivered successfully" });
-      } else {
-        toast({ title: "Send Failed", description: data.message || "Test message failed", variant: "destructive" });
+      setSendTestResults(p => ({ ...p, [pid]: data }));
+      if (pid !== "botbee") {
+        if (data.ok) {
+          toast({ title: "Test Message Sent", description: data.message || "Message delivered successfully" });
+        } else {
+          toast({ title: "Send Failed", description: data.message || data.errorMessage || "Test message failed", variant: "destructive" });
+        }
       }
     } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      setSendTestResults(p => ({ ...p, [pid]: { ok: false, errorMessage: err.message } }));
+      if (pid !== "botbee") toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
       setSendingTest(p => ({ ...p, [pid]: false }));
     }
@@ -501,11 +507,16 @@ export default function ApiSettings() {
 
                   {/* Test Message Section */}
                   {def.testMessageFields && def.testMessageFields.length > 0 && (
-                    <div className="bg-gray-50 rounded-lg p-3 space-y-2">
+                    <div className={`rounded-lg p-3 space-y-2 ${provider.id === "botbee" ? "bg-green-50 border border-green-100" : "bg-gray-50"}`}>
                       <p className="text-xs font-semibold text-gray-600 flex items-center gap-1.5">
                         <Send className="w-3.5 h-3.5" />
-                        Send Test Message
+                        {provider.id === "botbee" ? "Test WhatsApp" : "Send Test Message"}
                       </p>
+                      {provider.id === "botbee" && (
+                        <p className="text-xs text-gray-500">
+                          Sends: <span className="font-medium text-gray-700">"✅ WhatsApp Integration Successful. Al Burhan Tours & Travels Notification System is Connected."</span>
+                        </p>
+                      )}
                       <div className="flex flex-wrap gap-2 items-end">
                         {def.testMessageFields.map(field => (
                           <div key={field.key} className="flex-1 min-w-[160px]">
@@ -525,12 +536,59 @@ export default function ApiSettings() {
                         <button
                           onClick={() => sendTestMessage(provider.id)}
                           disabled={sendingTest[provider.id]}
-                          className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors disabled:opacity-50 shrink-0"
+                          className={`flex items-center gap-1.5 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors disabled:opacity-50 shrink-0 ${provider.id === "botbee" ? "bg-[#25D366] hover:bg-[#1ebe5d]" : "bg-green-600 hover:bg-green-700"}`}
                         >
                           {sendingTest[provider.id] ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                          Send
+                          {provider.id === "botbee" ? "Send Test WhatsApp" : "Send"}
                         </button>
                       </div>
+
+                      {/* BotBee rich result panel */}
+                      {provider.id === "botbee" && sendTestResults["botbee"] && (() => {
+                        const r = sendTestResults["botbee"];
+                        return (
+                          <div className={`mt-3 rounded-lg border-2 overflow-hidden ${r.ok ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}`}>
+                            {/* Status row */}
+                            <div className="flex items-center gap-3 px-3 py-2 border-b border-inherit">
+                              <span className="text-base">{r.ok ? "✅" : "❌"}</span>
+                              <div className="flex-1">
+                                <span className={`font-bold text-sm ${r.ok ? "text-green-800" : "text-red-800"}`}>
+                                  {r.ok ? "Delivered" : "Failed"}
+                                </span>
+                                {r.httpStatus && (
+                                  <span className={`ml-2 text-xs font-bold px-1.5 py-0.5 rounded ${r.httpStatus < 300 ? "bg-green-200 text-green-800" : "bg-red-200 text-red-800"}`}>
+                                    HTTP {r.httpStatus}
+                                  </span>
+                                )}
+                              </div>
+                              {r.logged && (
+                                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-medium">📋 Logged</span>
+                              )}
+                            </div>
+                            {/* Message ID */}
+                            {r.messageId && (
+                              <div className="flex items-center gap-2 px-3 py-2 border-b border-inherit bg-white/60">
+                                <span className="text-xs font-semibold text-gray-500 shrink-0">Message ID:</span>
+                                <code className="text-xs font-mono text-green-700 font-bold break-all">{r.messageId}</code>
+                              </div>
+                            )}
+                            {/* Error message */}
+                            {r.errorMessage && (
+                              <div className="px-3 py-2 border-b border-inherit bg-white/60">
+                                <span className="text-xs font-semibold text-red-600">Error: </span>
+                                <span className="text-xs text-red-700">{r.errorMessage}</span>
+                              </div>
+                            )}
+                            {/* API Response */}
+                            <div className="px-3 py-2">
+                              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">API Response</p>
+                              <pre className="bg-gray-900 text-green-300 text-[10px] font-mono rounded-lg p-2.5 overflow-auto max-h-36 whitespace-pre-wrap break-all">
+                                {JSON.stringify(r.responsePayload ?? r, null, 2)}
+                              </pre>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>

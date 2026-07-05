@@ -13,6 +13,7 @@ export interface BotBeeResult {
   responsePayload?: unknown;
   errorCode?: string;
   errorMessage?: string;
+  messageId?: string;
 }
 
 function getCredentials() {
@@ -294,6 +295,38 @@ export async function sendButtons(
   opts?: { eventType?: string; bookingId?: string; customerId?: string }
 ): Promise<BotBeeResult> {
   return sendInteractiveButtons(to, body, buttons, opts);
+}
+
+export async function uploadMedia(
+  fileBuffer: Buffer, mimeType: string, fileName: string
+): Promise<{ ok: boolean; mediaId?: string; errorMessage?: string; responsePayload?: unknown }> {
+  const { apiToken, phone_number_id, enabled, baseUrl } = getCredentials();
+  const endpoint = `${baseUrl}/whatsapp/upload/media`;
+  if (!enabled) return { ok: false, errorMessage: "WhatsApp disabled in API Settings" };
+  if (!apiToken || !phone_number_id) return { ok: false, errorMessage: "BotBee credentials not configured" };
+
+  try {
+    const FormData = (await import("form-data")).default;
+    const form = new FormData();
+    form.append("apiToken", apiToken);
+    form.append("phone_number_id", phone_number_id);
+    form.append("file", fileBuffer, { filename: fileName, contentType: mimeType });
+
+    const response = await withRetry(() =>
+      axios.post(endpoint, form, { headers: form.getHeaders(), timeout: 30000 })
+    );
+    const data = response.data;
+    const mediaId = data?.media_id || data?.id || data?.data?.id;
+    if (!mediaId) {
+      return { ok: false, errorMessage: data?.message || "No media ID in response", responsePayload: data };
+    }
+    console.log("[BotBee] uploadMedia success, mediaId:", mediaId);
+    return { ok: true, mediaId, responsePayload: data };
+  } catch (err: any) {
+    const resp = err?.response;
+    console.error("[BotBee] uploadMedia error:", resp?.data || err.message);
+    return { ok: false, errorMessage: resp?.data?.message || err.message, responsePayload: resp?.data };
+  }
 }
 
 // ── Fallback + send-with-fallback ─────────────────────────────────────────────

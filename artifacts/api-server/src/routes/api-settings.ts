@@ -255,6 +255,7 @@ router.post("/:provider/send-test", requireAdmin as any, requireSuperAdmin, asyn
       errorCode?: string;
       errorMessage?: string;
       message?: string;
+      messageId?: string;
     }
 
     let result: TestResult = { ok: false, provider, endpoint: "" };
@@ -272,7 +273,7 @@ router.post("/:provider/send-test", requireAdmin as any, requireSuperAdmin, asyn
         const phoneNumberId = extra.phone_number_id || process.env.BOTBEE_PHONE_NUMBER_ID || "";
         const baseUrl = apiUrl || "https://app.botbee.io/api/v1/whatsapp";
         const endpoint = `${baseUrl}/send`;
-        const testMsg = "✅ Al Burhan ERP — WhatsApp test message sent successfully from Test API.";
+        const testMsg = "✅ WhatsApp Integration Successful.\nAl Burhan Tours & Travels Notification System is Connected.";
         const reqPayload = { phone_number_id: phoneNumberId, phone_number: phoneWithCC, message: testMsg };
         const params = new URLSearchParams({ apiToken: apiKey, phone_number_id: phoneNumberId, phone_number: phoneWithCC, message: testMsg });
         let httpStatus = 0; let respData: any = {};
@@ -280,7 +281,8 @@ router.post("/:provider/send-test", requireAdmin as any, requireSuperAdmin, asyn
           const resp = await axios.post(endpoint, params.toString(), { headers: { "Content-Type": "application/x-www-form-urlencoded" }, timeout: 10000 });
           httpStatus = resp.status; respData = resp.data;
           const ok = !(respData?.status === "0" || respData?.status === 0);
-          result = { ok, provider: "BotBee", endpoint, httpStatus, requestPayload: reqPayload, responsePayload: respData, errorMessage: ok ? undefined : (respData?.message || "Message delivery failed") };
+          const messageId = respData?.message_id || respData?.messageId || respData?.id || respData?.data?.id || undefined;
+          result = { ok, provider: "BotBee", endpoint, httpStatus, requestPayload: reqPayload, responsePayload: respData, messageId, errorMessage: ok ? undefined : (respData?.message || "Message delivery failed") };
         } catch (e: any) {
           const er = e?.response; httpStatus = er?.status || 0; respData = er?.data || { error: e.message };
           result = { ok: false, provider: "BotBee", endpoint, httpStatus, requestPayload: reqPayload, responsePayload: respData, errorCode: String(respData?.code || ""), errorMessage: respData?.message || respData?.error || e.message };
