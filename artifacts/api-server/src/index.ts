@@ -1370,6 +1370,126 @@ async function runMigrations() {
     await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS request_payload JSONB`);
     await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS error_code TEXT`);
   } catch (err) { console.error("[Migration] api_settings table failed:", err); }
+  // ── wa_templates table ─────────────────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS wa_templates (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name TEXT NOT NULL UNIQUE,
+        display_name TEXT NOT NULL,
+        category TEXT NOT NULL DEFAULT 'UTILITY',
+        language TEXT NOT NULL DEFAULT 'en',
+        status TEXT NOT NULL DEFAULT 'local',
+        header_type TEXT NOT NULL DEFAULT 'none',
+        header_text TEXT,
+        body_text TEXT NOT NULL,
+        footer_text TEXT,
+        buttons JSONB NOT NULL DEFAULT '[]',
+        variables JSONB NOT NULL DEFAULT '[]',
+        event_type TEXT,
+        meta_template_name TEXT,
+        enabled BOOLEAN NOT NULL DEFAULT true,
+        is_builtin BOOLEAN NOT NULL DEFAULT false,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    console.log("[Migration] wa_templates table ensured");
+
+    // Seed 16 built-in templates
+    const BUILTIN_TEMPLATES = [
+      {
+        name: "booking_submitted", display_name: "Booking Submitted", category: "UTILITY", event_type: "new_booking",
+        body_text: "Assalamu Alaikum {{customer_name}},\n\nJazak Allah Khair for choosing Al Burhan Tours & Travels! 🕌\n\nYour booking has been received.\n\n📋 Booking ID: {{booking_id}}\n📦 Package: {{package_name}}\n\nOur team will review and confirm shortly.\n\nFor queries: +91 9893225590\n\nWarm Regards,\nAl Burhan Tours & Travels",
+        variables: ["customer_name","booking_id","package_name"], footer_text: "Al Burhan Tours & Travels",
+      },
+      {
+        name: "booking_approved", display_name: "Booking Approved", category: "UTILITY", event_type: "booking_approved",
+        body_text: "Assalamu Alaikum {{customer_name}},\n\nAlhamdulillah! ✅ Your booking is APPROVED.\n\n📋 Booking ID: {{booking_id}}\n📦 Package: {{package_name}}\n💰 Amount: ₹{{amount}}\n\nPlease complete your payment to confirm your seat.\n\nCall us: +91 9893225590\n\nJazak Allah Khair!\nAl Burhan Tours & Travels",
+        variables: ["customer_name","booking_id","package_name","amount"], footer_text: "Al Burhan Tours & Travels",
+      },
+      {
+        name: "payment_received", display_name: "Payment Received", category: "UTILITY", event_type: "payment_received",
+        body_text: "Assalamu Alaikum {{customer_name}},\n\n💰 Payment Received Successfully!\n\n📋 Booking ID: {{booking_id}}\n🧾 Invoice No: {{invoice_number}}\n💵 Amount: ₹{{amount}}\n\nJazak Allah Khair for your payment.\n\nAl Burhan Tours & Travels\n+91 9893225590",
+        variables: ["customer_name","booking_id","invoice_number","amount"], footer_text: "Al Burhan Tours & Travels",
+      },
+      {
+        name: "pending_payment_reminder", display_name: "Pending Payment Reminder", category: "UTILITY", event_type: "payment_due",
+        body_text: "Assalamu Alaikum {{customer_name}},\n\n⚠️ Friendly Reminder — Payment Pending\n\n📋 Booking ID: {{booking_id}}\n📦 Package: {{package_name}}\n💰 Outstanding: ₹{{amount}}\n\nPlease complete payment to secure your seat.\n\nContact: +91 9893225590\n\nJazak Allah Khair!\nAl Burhan Tours & Travels",
+        variables: ["customer_name","booking_id","package_name","amount"], footer_text: "Al Burhan Tours & Travels",
+      },
+      {
+        name: "invoice_generated", display_name: "Invoice Generated", category: "UTILITY", event_type: "invoice_generated",
+        body_text: "Assalamu Alaikum {{customer_name}},\n\n📄 Your Invoice is Ready!\n\n🧾 Invoice No: {{invoice_number}}\n📋 Booking ID: {{booking_id}}\n💰 Total: ₹{{amount}}\n\nPlease visit our office or contact us to collect your invoice.\n\nAl Burhan Tours & Travels\n+91 9893225590",
+        variables: ["customer_name","invoice_number","booking_id","amount"], footer_text: "Al Burhan Tours & Travels",
+      },
+      {
+        name: "ticket_issued", display_name: "Ticket Issued", category: "UTILITY", event_type: "ticket_issued",
+        body_text: "Assalamu Alaikum {{customer_name}},\n\n✈️ Your Flight Ticket has been Issued!\n\n📋 Booking ID: {{booking_id}}\n🎫 Ticket No: {{ticket_number}}\n✈️ Flight: {{flight_number}}\n📅 Departure: {{departure_date}} at {{departure_time}}\n\nPlease check-in 3 hours before departure.\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 9893225590",
+        variables: ["customer_name","booking_id","ticket_number","flight_number","departure_date","departure_time"], footer_text: "Al Burhan Tours & Travels",
+      },
+      {
+        name: "visa_issued", display_name: "Visa Issued", category: "UTILITY", event_type: "visa_ready",
+        body_text: "Assalamu Alaikum {{customer_name}},\n\nAlhamdulillah! 🕌 Your Visa is APPROVED!\n\n📋 Booking ID: {{booking_id}}\n🛂 Visa No: {{visa_number}}\n📦 Package: {{package_name}}\n\nPlease visit our office to collect your documents.\n\nAl Burhan Tours & Travels\n+91 9893225590",
+        variables: ["customer_name","booking_id","visa_number","package_name"], footer_text: "Al Burhan Tours & Travels",
+      },
+      {
+        name: "hotel_confirmation", display_name: "Hotel Confirmation", category: "UTILITY", event_type: "hotel_assigned",
+        body_text: "Assalamu Alaikum {{customer_name}},\n\n🏨 Hotel Confirmation\n\n📋 Booking ID: {{booking_id}}\n🏨 Hotel: {{hotel_name}}\n🛏️ Room: {{room_number}}\n\nYour accommodation has been confirmed. Please carry this message as reference.\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 9893225590",
+        variables: ["customer_name","booking_id","hotel_name","room_number"], footer_text: "Al Burhan Tours & Travels",
+      },
+      {
+        name: "flight_details", display_name: "Flight Details", category: "UTILITY", event_type: "ticket_issued",
+        body_text: "Assalamu Alaikum {{customer_name}},\n\n✈️ Flight Details — {{booking_id}}\n\n🛫 Flight: {{flight_number}}\n📅 Date: {{departure_date}}\n⏰ Time: {{departure_time}}\n🏨 Hotel: {{hotel_name}}\n\nHave a blessed journey!\n\nAl Burhan Tours & Travels\n+91 9893225590",
+        variables: ["customer_name","booking_id","flight_number","departure_date","departure_time","hotel_name"], footer_text: "Al Burhan Tours & Travels",
+      },
+      {
+        name: "departure_reminder", display_name: "Departure Reminder", category: "UTILITY", event_type: "departure_reminder",
+        body_text: "Assalamu Alaikum {{customer_name}},\n\n🕌 Departure Reminder!\n\nYour journey begins tomorrow, Insha'Allah.\n\n📋 Booking: {{booking_id}}\n✈️ Flight: {{flight_number}}\n📅 Date: {{departure_date}}\n⏰ Time: {{departure_time}}\n\nPlease report 3 hours before departure.\n\nMay Allah accept your Hajj/Umrah. Ameen!\nAl Burhan Tours & Travels",
+        variables: ["customer_name","booking_id","flight_number","departure_date","departure_time"], footer_text: "Al Burhan Tours & Travels",
+      },
+      {
+        name: "arrival_welcome", display_name: "Arrival Welcome", category: "MARKETING", event_type: "custom_admin",
+        body_text: "Assalamu Alaikum {{customer_name}},\n\n🌙 Welcome to the Holy Land!\n\nAlhamdulillah, you have arrived safely.\n\n📋 Booking: {{booking_id}}\n🏨 Hotel: {{hotel_name}}\n🛏️ Room: {{room_number}}\n\nFor any assistance, contact your group leader or call +91 9893225590.\n\nMay Allah bless your journey!\nAl Burhan Tours & Travels",
+        variables: ["customer_name","booking_id","hotel_name","room_number"], footer_text: "Al Burhan Tours & Travels",
+      },
+      {
+        name: "refund", display_name: "Refund Processed", category: "UTILITY", event_type: "custom_admin",
+        body_text: "Assalamu Alaikum {{customer_name}},\n\n💸 Refund Processed\n\n📋 Booking ID: {{booking_id}}\n💰 Refund Amount: ₹{{amount}}\n🧾 Reference: {{invoice_number}}\n\nYour refund has been processed and will reflect within 5-7 business days.\n\nFor queries: +91 9893225590\n\nJazak Allah Khair!\nAl Burhan Tours & Travels",
+        variables: ["customer_name","booking_id","amount","invoice_number"], footer_text: "Al Burhan Tours & Travels",
+      },
+      {
+        name: "cancellation", display_name: "Cancellation Notice", category: "UTILITY", event_type: "booking_cancelled",
+        body_text: "Assalamu Alaikum {{customer_name}},\n\n❌ Booking Cancelled\n\n📋 Booking ID: {{booking_id}}\n📦 Package: {{package_name}}\n\nYour booking has been cancelled as per your request. Our team will process any applicable refund.\n\nFor queries: +91 9893225590\n\nJazak Allah Khair!\nAl Burhan Tours & Travels",
+        variables: ["customer_name","booking_id","package_name"], footer_text: "Al Burhan Tours & Travels",
+      },
+      {
+        name: "eid_greeting", display_name: "Eid Greeting", category: "MARKETING", event_type: "custom_admin",
+        body_text: "Assalamu Alaikum {{customer_name}},\n\n🌙✨ Eid Mubarak! ✨🌙\n\nWishing you and your family a blessed Eid filled with joy, peace, and prosperity.\n\nMay Allah accept your prayers and grant you His blessings.\n\nTaqabbalallahu Minna Wa Minkum!\n\nWarm Regards,\nAl Burhan Tours & Travels\n+91 9893225590",
+        variables: ["customer_name"], footer_text: "Al Burhan Tours & Travels",
+      },
+      {
+        name: "hajj_promotion", display_name: "Hajj Promotion", category: "MARKETING", event_type: "custom_admin",
+        body_text: "Assalamu Alaikum {{customer_name}},\n\n🕌 Hajj 2025 — Limited Seats Available!\n\nAl Burhan Tours & Travels is pleased to announce our Hajj packages.\n\n📦 Package: {{package_name}}\n💰 Starting from: ₹{{amount}}\n\nEarly registration ensures your seat. Book now!\n\nContact: +91 9893225590\nVisit: alburhantravels.com\n\nJazak Allah Khair!\nAl Burhan Tours & Travels",
+        variables: ["customer_name","package_name","amount"], footer_text: "Al Burhan Tours & Travels",
+      },
+      {
+        name: "umrah_promotion", display_name: "Umrah Promotion", category: "MARKETING", event_type: "custom_admin",
+        body_text: "Assalamu Alaikum {{customer_name}},\n\n🌙 Umrah Packages — Al Burhan Tours & Travels\n\nFulfill your spiritual journey with our blessed Umrah packages.\n\n📦 Package: {{package_name}}\n💰 Starting from: ₹{{amount}}\n\nIncludes: Visa, Flights, Hotel & Ziyarat\n\nBook Now: +91 9893225590\nVisit: alburhantravels.com\n\nMay Allah accept your Umrah. Ameen!\nAl Burhan Tours & Travels",
+        variables: ["customer_name","package_name","amount"], footer_text: "Al Burhan Tours & Travels",
+      },
+    ];
+
+    for (const t of BUILTIN_TEMPLATES) {
+      await pool.query(`
+        INSERT INTO wa_templates (name, display_name, category, language, status, header_type, body_text, footer_text, variables, event_type, enabled, is_builtin)
+        VALUES ($1,$2,$3,'en','local','none',$4,$5,$6::jsonb,$7,true,true)
+        ON CONFLICT (name) DO NOTHING
+      `, [t.name, t.display_name, t.category, t.body_text, t.footer_text || null, JSON.stringify(t.variables), t.event_type || null]);
+    }
+    console.log("[Migration] wa_templates built-in templates seeded");
+  } catch (err) { console.error("[Migration] wa_templates failed:", err); }
+
   // ── Seed default workflow rules ────────────────────────────────────────────
   try {
     for (const rule of DEFAULT_RULES) {
