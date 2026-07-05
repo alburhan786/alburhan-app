@@ -329,6 +329,59 @@ export async function uploadMedia(
   }
 }
 
+// ── Template management ───────────────────────────────────────────────────────
+
+export interface WaTemplate {
+  name: string;
+  status: string;
+  category: string;
+  language: string;
+  id?: string;
+  components: Array<{
+    type: "HEADER" | "BODY" | "FOOTER" | "BUTTONS";
+    format?: string;
+    text?: string;
+    example?: Record<string, unknown>;
+    buttons?: Array<{ type: string; text: string; url?: string; phone_number?: string }>;
+  }>;
+}
+
+export async function fetchTemplates(): Promise<{ ok: boolean; templates?: WaTemplate[]; errorMessage?: string; responsePayload?: unknown }> {
+  const { apiToken, phone_number_id, enabled, baseUrl } = getCredentials();
+  const bbCfg = getCachedConfig("botbee");
+  const business_id = bbCfg.extra?.business_id || process.env.BOTBEE_BUSINESS_ID || "";
+
+  if (!enabled) return { ok: false, errorMessage: "WhatsApp disabled in API Settings" };
+  if (!apiToken || !phone_number_id) return { ok: false, errorMessage: "BotBee credentials not configured" };
+
+  const endpoint = `${baseUrl}/whatsapp/templates`;
+  try {
+    const params = new URLSearchParams({ apiToken, phone_number_id });
+    if (business_id) params.set("business_id", business_id);
+    const response = await axios.get(`${endpoint}?${params}`, { timeout: 15000 });
+    const data = response.data;
+
+    // BotBee may wrap in data/templates/result
+    const raw: WaTemplate[] = data?.templates || data?.data?.templates || data?.data || data?.result || (Array.isArray(data) ? data : []);
+    if (!Array.isArray(raw)) return { ok: false, errorMessage: "Unexpected response format", responsePayload: data };
+
+    const templates = raw.map((t: any) => ({
+      name: t.name,
+      status: (t.status || "UNKNOWN").toUpperCase(),
+      category: t.category || "UTILITY",
+      language: t.language || (t.language_code) || "en",
+      id: t.id || t.template_id,
+      components: Array.isArray(t.components) ? t.components : [],
+    }));
+
+    return { ok: true, templates };
+  } catch (err: any) {
+    const resp = err?.response;
+    console.error("[BotBee] fetchTemplates error:", resp?.data || err.message);
+    return { ok: false, errorMessage: resp?.data?.message || err.message, responsePayload: resp?.data };
+  }
+}
+
 // ── Fallback + send-with-fallback ─────────────────────────────────────────────
 
 async function smsFallback(to: string, bookingId?: string, customerId?: string) {

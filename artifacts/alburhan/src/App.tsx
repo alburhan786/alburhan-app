@@ -89,6 +89,7 @@ import BillingSettings from "@/pages/admin/BillingSettings";
 import NotificationCenter from "@/pages/admin/NotificationCenter";
 import NotificationLogs from "@/pages/admin/NotificationLogs";
 import CommunicationCenter from "@/pages/admin/CommunicationCenter";
+import WhatsAppTemplateManager from "@/pages/admin/WhatsAppTemplateManager";
 import WorkflowCenter from "@/pages/admin/WorkflowCenter";
 import ZiyaratManager from "@/pages/admin/ZiyaratManager";
 import LuggageManager from "@/pages/admin/LuggageManager";
@@ -227,6 +228,7 @@ function Router() {
       <Route path="/admin/billing-settings" component={() => <AdminRoute component={BillingSettings} />} />
       <Route path="/admin/api-settings" component={() => <AdminRoute component={ApiSettings} />} />
       <Route path="/admin/communication-center" component={() => <AdminRoute component={CommunicationCenter} />} />
+      <Route path="/admin/whatsapp-templates" component={() => <AdminRoute component={WhatsAppTemplateManager} />} />
       <Route path="/admin/workflow-center" component={() => <AdminRoute component={WorkflowCenter} />} />
       <Route path="/admin/ziyarat" component={() => <AdminRoute component={ZiyaratManager} />} />
       <Route path="/admin/luggage" component={() => <AdminRoute component={LuggageManager} />} />
