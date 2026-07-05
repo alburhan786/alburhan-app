@@ -47,3 +47,9 @@ id = "OzkMZo1lBhUf_VnMoA6d6"
 uri = "file://alburhan-dump.zip"
 type = "unspecified"
 title = "alburhan-dump.zip — Database Dump (extract to get alburhan-dump.sql)"
+
+[[outputs]]
+id = "-Vg8GL7OcPxevzFQYgyWZ"
+uri = "file://artifacts/alburhan/dist/public/frontend-dist.tar.gz"
+type = "unspecified"
+title = "Frontend Build (frontend-dist.tar.gz)"
