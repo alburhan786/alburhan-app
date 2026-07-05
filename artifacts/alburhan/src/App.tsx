@@ -94,6 +94,7 @@ import LuggageManager from "@/pages/admin/LuggageManager";
 import AllocationsManager from "@/pages/admin/AllocationsManager";
 import AutomationCenter from "@/pages/admin/AutomationCenter";
 import LoyaltyManager from "@/pages/admin/LoyaltyManager";
+import ApiSettings from "@/pages/admin/ApiSettings";
 import AttendanceScanPublic from "@/pages/public/AttendanceScanPublic";
 import StaffVerify from "@/pages/public/StaffVerify";
 import VerifyPilgrim from "@/pages/public/VerifyPilgrim";
@@ -222,6 +223,7 @@ function Router() {
       <Route path="/admin/user-roles" component={() => <AdminRoute component={UserRolesManager} />} />
       <Route path="/admin/notifications" component={() => <AdminRoute component={NotificationCenter} />} />
       <Route path="/admin/billing-settings" component={() => <AdminRoute component={BillingSettings} />} />
+      <Route path="/admin/api-settings" component={() => <AdminRoute component={ApiSettings} />} />
       <Route path="/admin/communication-center" component={() => <AdminRoute component={CommunicationCenter} />} />
       <Route path="/admin/workflow-center" component={() => <AdminRoute component={WorkflowCenter} />} />
       <Route path="/admin/ziyarat" component={() => <AdminRoute component={ZiyaratManager} />} />

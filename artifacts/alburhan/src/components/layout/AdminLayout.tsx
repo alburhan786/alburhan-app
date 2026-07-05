@@ -126,6 +126,7 @@ function buildMenu(openComplaints: number): MenuSection[] {
       section: "System",
       items: [
         { icon: Settings2, label: "Billing Settings", href: "/admin/billing-settings", require: ["settings", "view"] },
+        { icon: KeyRound, label: "API Settings", href: "/admin/api-settings", require: ["settings", "view"] },
         { icon: KeyRound, label: "User Roles", href: "/admin/user-roles", require: ["users", "view"] },
         { icon: ClipboardList, label: "Audit Logs", href: "/admin/audit-logs", require: ["audit_logs", "view"] },
         { icon: HeartPulse, label: "System Health", href: "/admin/system-health", require: ["users", "view"] },

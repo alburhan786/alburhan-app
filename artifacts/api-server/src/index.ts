@@ -1347,6 +1347,22 @@ async function runMigrations() {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_loyalty_transactions_customer ON loyalty_transactions(customer_id)`);
     console.log("[Migration] loyalty tables ensured");
   } catch (err) { console.error("[Migration] loyalty tables failed:", err); }
+  // ── api_settings table ─────────────────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS api_settings (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        provider TEXT NOT NULL UNIQUE,
+        enabled BOOLEAN NOT NULL DEFAULT true,
+        api_url TEXT,
+        api_key_encrypted TEXT,
+        extra_fields_encrypted TEXT,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_by TEXT
+      )
+    `);
+    console.log("[Migration] api_settings table ensured");
+  } catch (err) { console.error("[Migration] api_settings table failed:", err); }
   // ── Seed default workflow rules ────────────────────────────────────────────
   try {
     for (const rule of DEFAULT_RULES) {
@@ -1369,6 +1385,10 @@ const finalPort = Number.isNaN(port) || port <= 0 ? 8080 : port;
 async function start() {
   console.log("[Startup] Running migrations...");
   await runMigrations();
+
+  // Init API Settings provider (loads encrypted credentials from DB into memory cache)
+  const { initApiSettingsProvider } = await import("./lib/apiSettingsProvider.js");
+  await initApiSettingsProvider();
 
   try {
     await db.update(usersTable)

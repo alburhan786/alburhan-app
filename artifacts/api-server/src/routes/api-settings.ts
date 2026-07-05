@@ -1,0 +1,317 @@
+import { Router } from "express";
+import { pool } from "@workspace/db";
+import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
+import { encrypt, decrypt, maskKey } from "../lib/encryption.js";
+import { invalidateCache } from "../lib/apiSettingsProvider.js";
+import { auditLog } from "../lib/audit.js";
+import axios from "axios";
+import nodemailer from "nodemailer";
+
+const router = Router();
+
+// Super Admin only guard
+function requireSuperAdmin(req: any, res: any, next: any) {
+  if (req.user?.adminRole !== "super_admin") {
+    return res.status(403).json({ message: "Super Admin access required" });
+  }
+  next();
+}
+
+const PROVIDERS = ["botbee", "fast2sms", "lemin", "smtp", "firebase", "razorpay"] as const;
+type Provider = typeof PROVIDERS[number];
+
+// GET /api/api-settings — all providers with masked keys
+router.get("/", requireAdmin as any, requireSuperAdmin, async (_req, res) => {
+  try {
+    const result = await pool.query(`SELECT * FROM api_settings ORDER BY provider`);
+    const rows = result.rows.map(row => ({
+      id: row.id,
+      provider: row.provider,
+      enabled: row.enabled,
+      api_url: row.api_url,
+      api_key_masked: row.api_key_encrypted ? maskKey(decrypt(row.api_key_encrypted)) : null,
+      extra_fields: (() => {
+        if (!row.extra_fields_encrypted) return {};
+        try {
+          const raw = JSON.parse(decrypt(row.extra_fields_encrypted));
+          // Mask sensitive extra fields
+          const masked: Record<string, string> = {};
+          for (const [k, v] of Object.entries(raw)) {
+            const sensitive = ["key_secret", "password", "pass", "secret"].some(s => k.includes(s));
+            masked[k] = sensitive ? maskKey(String(v)) : String(v ?? "");
+          }
+          return masked;
+        } catch { return {}; }
+      })(),
+      updated_at: row.updated_at,
+      updated_by: row.updated_by,
+    }));
+    res.json(rows);
+  } catch (err: any) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// GET /api/api-settings/:provider — single provider (for edit form, also masked)
+router.get("/:provider", requireAdmin as any, requireSuperAdmin, async (req, res) => {
+  try {
+    const r = await pool.query(`SELECT * FROM api_settings WHERE provider=$1`, [req.params.provider]);
+    if (!r.rows[0]) return res.status(404).json({ message: "Not found" });
+    const row = r.rows[0];
+    const decrypted = row.extra_fields_encrypted ? (() => {
+      try { return JSON.parse(decrypt(row.extra_fields_encrypted)); } catch { return {}; }
+    })() : {};
+    // Mask sensitive extra fields for display
+    const displayExtra: Record<string, string> = {};
+    for (const [k, v] of Object.entries(decrypted)) {
+      const sensitive = ["key_secret", "password", "pass", "secret"].some(s => k.includes(s));
+      displayExtra[k] = sensitive ? maskKey(String(v ?? "")) : String(v ?? "");
+    }
+    res.json({
+      provider: row.provider,
+      enabled: row.enabled,
+      api_url: row.api_url,
+      api_key_masked: row.api_key_encrypted ? maskKey(decrypt(row.api_key_encrypted)) : null,
+      extra_fields: displayExtra,
+      updated_at: row.updated_at,
+      updated_by: row.updated_by,
+    });
+  } catch (err: any) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// PUT /api/api-settings/:provider — save credentials (Super Admin only)
+router.put("/:provider", requireAdmin as any, requireSuperAdmin, async (req: AuthenticatedRequest, res) => {
+  const provider = req.params.provider as Provider;
+  if (!PROVIDERS.includes(provider)) return res.status(400).json({ message: "Invalid provider" });
+
+  try {
+    const { enabled, api_url, api_key, extra_fields } = req.body;
+
+    // Fetch existing record to preserve encrypted values if not changed
+    const existing = await pool.query(`SELECT * FROM api_settings WHERE provider=$1`, [provider]);
+    const existingRow = existing.rows[0];
+
+    // Encrypt API key — if new value provided and not masked placeholder, use it; else keep existing
+    let apiKeyEncrypted = existingRow?.api_key_encrypted ?? null;
+    if (api_key !== undefined && api_key !== null && !api_key.startsWith("****")) {
+      apiKeyEncrypted = api_key ? encrypt(api_key) : null;
+    }
+
+    // Handle extra fields — only update fields that aren't masked placeholders
+    let extraEncrypted = existingRow?.extra_fields_encrypted ?? null;
+    if (extra_fields && Object.keys(extra_fields).length > 0) {
+      let existingExtra: Record<string, string> = {};
+      if (existingRow?.extra_fields_encrypted) {
+        try { existingExtra = JSON.parse(decrypt(existingRow.extra_fields_encrypted)); } catch {}
+      }
+      const merged = { ...existingExtra };
+      for (const [k, v] of Object.entries(extra_fields as Record<string, string>)) {
+        if (v !== undefined && v !== null && !String(v).startsWith("****")) {
+          merged[k] = String(v);
+        }
+      }
+      extraEncrypted = encrypt(JSON.stringify(merged));
+    }
+
+    await pool.query(`
+      INSERT INTO api_settings (provider, enabled, api_url, api_key_encrypted, extra_fields_encrypted, updated_at, updated_by)
+      VALUES ($1, $2, $3, $4, $5, NOW(), $6)
+      ON CONFLICT (provider) DO UPDATE SET
+        enabled = EXCLUDED.enabled,
+        api_url = EXCLUDED.api_url,
+        api_key_encrypted = EXCLUDED.api_key_encrypted,
+        extra_fields_encrypted = EXCLUDED.extra_fields_encrypted,
+        updated_at = NOW(),
+        updated_by = EXCLUDED.updated_by
+    `, [provider, enabled ?? true, api_url || null, apiKeyEncrypted, extraEncrypted, (req.user as any)?.name || (req.user as any)?.mobile || "admin"]);
+
+    // Audit log
+    auditLog({
+      req,
+      action: "updated",
+      entityTable: "api_settings",
+      entityId: provider,
+      newValue: { provider, enabled, api_url, has_api_key: !!apiKeyEncrypted },
+    }).catch(() => {});
+
+    // Invalidate cache so next notification uses new settings
+    invalidateCache();
+
+    res.json({ ok: true, message: `${provider} settings saved` });
+  } catch (err: any) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// POST /api/api-settings/:provider/test — test connection
+router.post("/:provider/test", requireAdmin as any, requireSuperAdmin, async (req, res) => {
+  const provider = req.params.provider;
+  try {
+    const r = await pool.query(`SELECT * FROM api_settings WHERE provider=$1`, [provider]);
+    const row = r.rows[0];
+    const apiKey = row?.api_key_encrypted ? decrypt(row.api_key_encrypted) : "";
+    const apiUrl = row?.api_url || "";
+    let extra: Record<string, string> = {};
+    if (row?.extra_fields_encrypted) {
+      try { extra = JSON.parse(decrypt(row.extra_fields_encrypted)); } catch {}
+    }
+
+    switch (provider) {
+      case "botbee": {
+        if (!apiKey) return res.json({ ok: false, message: "API key not set" });
+        const phoneNumberId = extra.phone_number_id || process.env.BOTBEE_PHONE_NUMBER_ID || "";
+        const baseUrl = apiUrl || "https://app.botbee.io/api/v1/whatsapp";
+        const params = new URLSearchParams({ apiToken: apiKey, phone_number_id: phoneNumberId });
+        const resp = await axios.get(`${baseUrl}/status?${params}`, { timeout: 8000 }).catch(e => e.response || { data: { error: e.message }, status: 0 });
+        return res.json({ ok: resp.status >= 200 && resp.status < 300, status: resp.status, response: resp.data });
+      }
+      case "fast2sms": {
+        if (!apiKey) return res.json({ ok: false, message: "API key not set" });
+        const resp = await axios.get(`https://www.fast2sms.com/dev/wallet?authorization=${apiKey}`, { timeout: 8000 }).catch(e => e.response || { data: { error: e.message }, status: 0 });
+        const ok = resp.data?.return === true;
+        return res.json({ ok, message: ok ? `Wallet balance: ₹${resp.data?.wallet || "?"}` : "Invalid API key", response: resp.data });
+      }
+      case "lemin": {
+        if (!apiKey) return res.json({ ok: false, message: "API key not set" });
+        const resp = await axios.get("https://rcs.leminai.com/api/status", {
+          headers: { Authorization: `Bearer ${apiKey}` }, timeout: 8000,
+        }).catch(e => e.response || { data: { error: e.message }, status: 0 });
+        return res.json({ ok: resp.status === 200, status: resp.status, response: resp.data });
+      }
+      case "smtp": {
+        const smtpHost = apiUrl || extra.host || process.env.SMTP_HOST || "smtp.gmail.com";
+        const smtpUser = extra.user || process.env.SMTP_USER || "";
+        const smtpPass = apiKey || process.env.SMTP_PASS || "";
+        if (!smtpUser || !smtpPass) return res.json({ ok: false, message: "SMTP user/password not configured" });
+        const transport = nodemailer.createTransport({
+          host: smtpHost,
+          port: Number(extra.port || 587),
+          secure: Number(extra.port || 587) === 465,
+          auth: { user: smtpUser, pass: smtpPass },
+        });
+        const verified = await transport.verify().then(() => true).catch((e: any) => String(e.message));
+        return res.json({ ok: verified === true, message: verified === true ? "SMTP connected" : verified });
+      }
+      case "firebase": {
+        if (!apiKey) return res.json({ ok: false, message: "Firebase Server Key not set" });
+        return res.json({ ok: true, message: "Firebase credentials present (test message via Send Test)" });
+      }
+      case "razorpay": {
+        if (!apiKey) return res.json({ ok: false, message: "Razorpay Key ID not set" });
+        const keySecret = extra.key_secret || process.env.RAZORPAY_SECRET || "";
+        if (!keySecret) return res.json({ ok: false, message: "Razorpay Key Secret not set" });
+        const resp = await axios.get("https://api.razorpay.com/v1/payments?count=1", {
+          auth: { username: apiKey, password: keySecret }, timeout: 8000,
+        }).catch(e => e.response || { data: { error: e.message }, status: 0 });
+        return res.json({ ok: resp.status === 200, status: resp.status, message: resp.status === 200 ? "Razorpay connected" : "Invalid credentials" });
+      }
+      default:
+        return res.json({ ok: false, message: "Unknown provider" });
+    }
+  } catch (err: any) {
+    res.status(500).json({ ok: false, message: err.message });
+  }
+});
+
+// POST /api/api-settings/:provider/send-test — send actual test message
+router.post("/:provider/send-test", requireAdmin as any, requireSuperAdmin, async (req, res) => {
+  const provider = req.params.provider;
+  const { mobile, email } = req.body;
+
+  try {
+    const r = await pool.query(`SELECT * FROM api_settings WHERE provider=$1`, [provider]);
+    const row = r.rows[0];
+    const apiKey = row?.api_key_encrypted ? decrypt(row.api_key_encrypted) : "";
+    const apiUrl = row?.api_url || "";
+    let extra: Record<string, string> = {};
+    if (row?.extra_fields_encrypted) {
+      try { extra = JSON.parse(decrypt(row.extra_fields_encrypted)); } catch {}
+    }
+
+    switch (provider) {
+      case "botbee": {
+        if (!mobile) return res.json({ ok: false, message: "Provide a mobile number" });
+        if (!apiKey) return res.json({ ok: false, message: "API key not configured" });
+        const phone = mobile.replace(/\D/g, "");
+        const phoneWithCC = phone.length === 10 ? `91${phone}` : phone;
+        const phoneNumberId = extra.phone_number_id || process.env.BOTBEE_PHONE_NUMBER_ID || "";
+        const baseUrl = apiUrl || "https://app.botbee.io/api/v1/whatsapp";
+        const params = new URLSearchParams({
+          apiToken: apiKey, phone_number_id: phoneNumberId,
+          phone_number: phoneWithCC, message: "✅ Al Burhan ERP — WhatsApp test message sent successfully from API Settings.",
+        });
+        const resp = await axios.post(`${baseUrl}/send`, params.toString(), {
+          headers: { "Content-Type": "application/x-www-form-urlencoded" }, timeout: 10000,
+        }).catch(e => e.response || { data: { error: e.message }, status: 0 });
+        return res.json({ ok: resp.status >= 200 && resp.status < 300, response: resp.data });
+      }
+      case "fast2sms": {
+        if (!mobile) return res.json({ ok: false, message: "Provide a mobile number" });
+        if (!apiKey) return res.json({ ok: false, message: "API key not configured" });
+        const phone = mobile.replace(/\D/g, "").slice(-10);
+        const msg = encodeURIComponent("Al Burhan ERP test SMS from API Settings.");
+        const resp = await axios.get(
+          `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=q&message=${msg}&numbers=${phone}&flash=0`,
+          { timeout: 10000 }
+        ).catch(e => e.response || { data: { error: e.message }, status: 0 });
+        return res.json({ ok: resp.data?.return === true, response: resp.data });
+      }
+      case "smtp": {
+        const toEmail = email || req.body.to;
+        if (!toEmail) return res.json({ ok: false, message: "Provide an email address" });
+        const smtpHost = apiUrl || extra.host || process.env.SMTP_HOST || "smtp.gmail.com";
+        const smtpUser = extra.user || process.env.SMTP_USER || "";
+        const smtpPass = apiKey || process.env.SMTP_PASS || "";
+        if (!smtpUser || !smtpPass) return res.json({ ok: false, message: "SMTP not fully configured" });
+        const transport = nodemailer.createTransport({
+          host: smtpHost, port: Number(extra.port || 587),
+          secure: Number(extra.port || 587) === 465,
+          auth: { user: smtpUser, pass: smtpPass },
+        });
+        await transport.sendMail({
+          from: `Al Burhan Tours & Travels <${smtpUser}>`,
+          to: toEmail, subject: "✅ Al Burhan ERP — SMTP Test",
+          text: "This is a test email from Al Burhan ERP API Settings. Your SMTP is configured correctly.",
+        });
+        return res.json({ ok: true, message: `Test email sent to ${toEmail}` });
+      }
+      case "firebase": {
+        if (!apiKey) return res.json({ ok: false, message: "Firebase Server Key not configured" });
+        const testToken = req.body.device_token;
+        if (!testToken) return res.json({ ok: false, message: "Provide a device FCM token" });
+        const resp = await axios.post("https://fcm.googleapis.com/fcm/send", {
+          to: testToken,
+          notification: { title: "Al Burhan ERP", body: "✅ Firebase Push test from API Settings" },
+        }, {
+          headers: { Authorization: `key=${apiKey}`, "Content-Type": "application/json" },
+          timeout: 10000,
+        }).catch(e => e.response || { data: { error: e.message }, status: 0 });
+        return res.json({ ok: resp.status === 200, response: resp.data });
+      }
+      case "lemin": {
+        if (!mobile) return res.json({ ok: false, message: "Provide a mobile number" });
+        if (!apiKey) return res.json({ ok: false, message: "API key not configured" });
+        const phone = mobile.replace(/\D/g, "").slice(-10);
+        const endpoint = apiUrl || "https://rcs.leminai.com/api/send";
+        const resp = await axios.post(endpoint, {
+          type: "single", dial_code: "+91",
+          template: extra.template_id || "1473",
+          phone, user_id: extra.user_id || "",
+          variables: { name: "Test", message: "Al Burhan ERP RCS test from API Settings" },
+        }, {
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+          timeout: 10000,
+        }).catch(e => e.response || { data: { error: e.message }, status: 0 });
+        return res.json({ ok: resp.status === 200, response: resp.data });
+      }
+      default:
+        return res.json({ ok: false, message: "No test message available for this provider" });
+    }
+  } catch (err: any) {
+    res.status(500).json({ ok: false, message: err.message });
+  }
+});
+
+export default router;

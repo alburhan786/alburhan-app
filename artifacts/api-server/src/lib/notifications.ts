@@ -1,5 +1,6 @@
 import axios from "axios";
 import nodemailer from "nodemailer";
+import { getCachedConfig } from "./apiSettingsProvider.js";
 
 async function withRetry<T>(
   fn: () => Promise<T>,
@@ -20,22 +21,26 @@ async function withRetry<T>(
   throw lastErr;
 }
 
-// Read at call time (NOT module load time) so pm2 --update-env works correctly
+// Read at call time — DB settings take priority, fall back to process.env
 function getFast2SMSKey(): string | undefined {
+  const dbCfg = getCachedConfig("fast2sms");
+  if (dbCfg.enabled === false) return undefined;
+  if (dbCfg.apiKey) return dbCfg.apiKey;
   const k = process.env.FAST2SMS_API_KEY || process.env.FAST2SMS_XXL_API_KEY;
   if (!k || k === "your_key_here" || k === "your-fast2sms-key-here") return undefined;
   return k;
 }
 
-const FAST2SMS_SENDER_ID = "ALBURH";
-const FAST2SMS_OTP_DLT_TEMPLATE_ID = "164844";
-const FAST2SMS_NOTIFY_DLT_TEMPLATE_ID = "211277";
+function getFast2SMSExtra() {
+  const dbCfg = getCachedConfig("fast2sms");
+  return {
+    sender_id: dbCfg.extra.sender_id || "ALBURH",
+    otp_template_id: dbCfg.extra.otp_template_id || "164844",
+    notify_template_id: dbCfg.extra.notify_template_id || "211277",
+  };
+}
 
 const BOTBEE_BASE_URL = "https://app.botbee.io/api/v1/whatsapp";
-
-const LEMIN_API_URL = process.env.LEMIN_API_URL || "https://rcs.leminai.com/api/send";
-const LEMIN_USER_ID = process.env.LEMIN_USER_ID || "0x89mqd53ph";
-const LEMIN_TEMPLATE_ID = process.env.LEMIN_TEMPLATE_ID || "1473";
 
 function toFast2SMSPhone(mobile: string): string {
   const clean = mobile.replace(/\D/g, "");
@@ -144,11 +149,12 @@ export async function sendOtpSMS(mobile: string, otp: string): Promise<SmsResult
   // That step has not been completed on this account, so we skip it entirely
   // and go straight to DLT (registered template) → Quick fallback.
 
+  const f2sExtra = getFast2SMSExtra();
   // ── Route 1: DLT route (registered Sender ID + Template) ─────────────────
   {
     const t0 = Date.now();
     const variables = encodeURIComponent(`${otp}|`);
-    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=dlt&sender_id=${FAST2SMS_SENDER_ID}&message=${FAST2SMS_OTP_DLT_TEMPLATE_ID}&variables_values=${variables}&numbers=${phone}&flash=0`;
+    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=dlt&sender_id=${f2sExtra.sender_id}&message=${f2sExtra.otp_template_id}&variables_values=${variables}&numbers=${phone}&flash=0`;
     const maskedUrl = url.replace(apiKey, apiKeyMasked);
     console.log(`[OTP-SMS][dlt] → ${maskedUrl}`);
     try {
@@ -233,8 +239,9 @@ export async function testSmsDiagnostics(phone: string, otp: string): Promise<Re
   // DLT route
   try {
     const t0 = Date.now();
+    const diagExtra = getFast2SMSExtra();
     const variables = encodeURIComponent(`${otp}|`);
-    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=dlt&sender_id=${FAST2SMS_SENDER_ID}&message=${FAST2SMS_OTP_DLT_TEMPLATE_ID}&variables_values=${variables}&numbers=${cleanPhone}&flash=0`;
+    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=dlt&sender_id=${diagExtra.sender_id}&message=${diagExtra.otp_template_id}&variables_values=${variables}&numbers=${cleanPhone}&flash=0`;
     const r = await axios.get(url, { timeout: 12000 });
     diag.dlt = { status: r.status, body: r.data, durationMs: Date.now() - t0 };
   } catch (e: any) {
@@ -268,8 +275,9 @@ export async function sendDLTSMS(
   }
   try {
     const phone = toFast2SMSPhone(mobile);
+    const f2sExtra = getFast2SMSExtra();
     const variables = encodeURIComponent(`${var1}|${var2}|${var3}|`);
-    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=dlt&sender_id=${FAST2SMS_SENDER_ID}&message=${FAST2SMS_NOTIFY_DLT_TEMPLATE_ID}&variables_values=${variables}&numbers=${phone}&flash=0`;
+    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=dlt&sender_id=${f2sExtra.sender_id}&message=${f2sExtra.notify_template_id}&variables_values=${variables}&numbers=${phone}&flash=0`;
     const response = await withRetry(() => axios.get(url));
     console.log("[SMS-DLT] Sent to", mobile, response.data);
     return true;
@@ -281,8 +289,11 @@ export async function sendDLTSMS(
 }
 
 export async function sendWhatsApp(mobile: string, message: string): Promise<boolean> {
-  const BOTBEE_API_KEY = process.env.BOTBEE_API_KEY;
-  const BOTBEE_PHONE_NUMBER_ID = process.env.BOTBEE_PHONE_NUMBER_ID;
+  const bbCfg = getCachedConfig("botbee");
+  if (bbCfg.enabled === false) { console.log("[WhatsApp] disabled in API Settings"); return false; }
+  const BOTBEE_API_KEY = bbCfg.apiKey || process.env.BOTBEE_API_KEY;
+  const BOTBEE_PHONE_NUMBER_ID = bbCfg.extra.phone_number_id || process.env.BOTBEE_PHONE_NUMBER_ID;
+  const bbBaseUrl = bbCfg.apiUrl || BOTBEE_BASE_URL;
   if (!BOTBEE_API_KEY || !BOTBEE_PHONE_NUMBER_ID) {
     console.log("[WhatsApp] API not configured, skipping:", mobile);
     return false;
@@ -297,7 +308,7 @@ export async function sendWhatsApp(mobile: string, message: string): Promise<boo
     });
     const response = await withRetry(() =>
       axios.post(
-        `${BOTBEE_BASE_URL}/send`,
+        `${bbBaseUrl}/send`,
         params.toString(),
         { headers: { "Content-Type": "application/x-www-form-urlencoded" }, timeout: 10000 }
       )
@@ -327,7 +338,12 @@ export async function sendRCS(
   messageText: string,
   richData?: RcsRichData
 ): Promise<boolean> {
-  const LEMIN_API_KEY = process.env.LEMIN_API_KEY;
+  const leminCfg = getCachedConfig("lemin");
+  if (leminCfg.enabled === false) { console.log("[RCS] disabled in API Settings"); return false; }
+  const LEMIN_API_KEY = leminCfg.apiKey || process.env.LEMIN_API_KEY;
+  const lemin_api_url = leminCfg.apiUrl || process.env.LEMIN_API_URL || "https://rcs.leminai.com/api/send";
+  const lemin_user_id = leminCfg.extra.user_id || process.env.LEMIN_USER_ID || "0x89mqd53ph";
+  const lemin_template_id = leminCfg.extra.template_id || process.env.LEMIN_TEMPLATE_ID || "1473";
   if (!LEMIN_API_KEY) {
     console.log("[RCS] LEMIN_API_KEY not set — skipping RCS for:", mobile);
     return false;
@@ -339,9 +355,9 @@ export async function sendRCS(
     const payload: Record<string, unknown> = {
       type: "single",
       dial_code: "+91",
-      template: LEMIN_TEMPLATE_ID,
+      template: lemin_template_id,
       phone,
-      user_id: LEMIN_USER_ID,
+      user_id: lemin_user_id,
       variables: {
         name: customerName || "Pilgrim",
         message: messageText,
@@ -357,7 +373,7 @@ export async function sendRCS(
     }
 
     const response = await withRetry(() =>
-      axios.post(LEMIN_API_URL, payload, {
+      axios.post(lemin_api_url, payload, {
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${LEMIN_API_KEY}`,
@@ -383,9 +399,12 @@ export async function sendWhatsAppTemplate(
   templateName: string,
   components: object[]
 ): Promise<boolean> {
-  const BOTBEE_API_KEY = process.env.BOTBEE_API_KEY;
-  const BOTBEE_PHONE_NUMBER_ID = process.env.BOTBEE_PHONE_NUMBER_ID;
-  const BOTBEE_BUSINESS_ID = process.env.BOTBEE_BUSINESS_ID;
+  const bbCfg2 = getCachedConfig("botbee");
+  if (bbCfg2.enabled === false) { console.log("[WhatsApp-Template] disabled in API Settings"); return false; }
+  const BOTBEE_API_KEY = bbCfg2.apiKey || process.env.BOTBEE_API_KEY;
+  const BOTBEE_PHONE_NUMBER_ID = bbCfg2.extra.phone_number_id || process.env.BOTBEE_PHONE_NUMBER_ID;
+  const BOTBEE_BUSINESS_ID = bbCfg2.extra.business_id || process.env.BOTBEE_BUSINESS_ID;
+  const bbBaseUrl2 = bbCfg2.apiUrl || BOTBEE_BASE_URL;
   if (!BOTBEE_API_KEY || !BOTBEE_PHONE_NUMBER_ID) {
     console.log("[WhatsApp-Template] API not configured, skipping:", mobile);
     return false;
@@ -407,7 +426,7 @@ export async function sendWhatsAppTemplate(
     }
     const response = await withRetry(() =>
       axios.post(
-        `${BOTBEE_BASE_URL}/send-template`,
+        `${bbBaseUrl2}/send-template`,
         payload,
         { headers: { "Content-Type": "application/json" } }
       )
@@ -421,10 +440,12 @@ export async function sendWhatsAppTemplate(
 }
 
 function getEmailTransport() {
-  const host = process.env.SMTP_HOST || "smtp.gmail.com";
-  const port = Number(process.env.SMTP_PORT || 587);
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
+  const smtpCfg = getCachedConfig("smtp");
+  if (smtpCfg.enabled === false) return null;
+  const host = smtpCfg.apiUrl || process.env.SMTP_HOST || "smtp.gmail.com";
+  const port = Number(smtpCfg.extra.port || process.env.SMTP_PORT || 587);
+  const user = smtpCfg.extra.user || process.env.SMTP_USER;
+  const pass = smtpCfg.apiKey || process.env.SMTP_PASS;
   if (!user || !pass) return null;
   return nodemailer.createTransport({
     host,
@@ -438,11 +459,12 @@ export async function sendEmail(to: string, subject: string, body: string): Prom
   if (!to) return false;
   const transport = getEmailTransport();
   if (!transport) {
-    console.log("[Email] SMTP not configured (set SMTP_USER + SMTP_PASS). Skipping email to:", to);
+    console.log("[Email] SMTP not configured. Skipping email to:", to);
     return false;
   }
   try {
-    const from = process.env.SMTP_USER || "info@alburhantravels.com";
+    const smtpCfg = getCachedConfig("smtp");
+    const from = smtpCfg.extra.from_email || smtpCfg.extra.user || process.env.SMTP_USER || "info@alburhantravels.com";
     await withRetry(() =>
       transport!.sendMail({
         from: `Al Burhan Tours & Travels <${from}>`,
