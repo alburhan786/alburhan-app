@@ -418,10 +418,15 @@ router.post("/:provider/send-test", requireAdmin as any, requireSuperAdmin, asyn
 // POST /api/api-settings/lemin/set-webhook — register webhook URL with Lemin AI
 router.post("/lemin/set-webhook", requireAdmin as any, requireSuperAdmin, async (req, res) => {
   try {
-    const row = await pool.query(`SELECT api_key, api_url, extra_fields FROM api_settings WHERE provider='lemin' LIMIT 1`);
+    const row = await pool.query(`SELECT api_key_encrypted, api_url, extra_fields_encrypted FROM api_settings WHERE provider='lemin' LIMIT 1`);
     const r = row.rows[0];
     if (!r) return res.json({ ok: false, message: "Lemin AI not configured — save settings first" });
-    const userId = r.api_key || r.extra_fields?.user_id || "";
+    const decryptedKey = r.api_key_encrypted ? decrypt(r.api_key_encrypted) : "";
+    let extraFields: Record<string, string> = {};
+    if (r.extra_fields_encrypted) {
+      try { extraFields = JSON.parse(decrypt(r.extra_fields_encrypted)); } catch {}
+    }
+    const userId = decryptedKey || extraFields.user_id || "";
     if (!userId) return res.json({ ok: false, message: "Developer API Key not set — save settings first" });
     const webhookUrl = req.body?.url || "https://alburhantravels.com/api/webhook/rcs";
     const payload = { url: webhookUrl, agent: "jio", active: true, user_id: userId };
