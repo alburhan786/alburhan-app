@@ -5,6 +5,7 @@ function apiUrl(path: string) { return `${API}${path}`; }
 
 const TABS = [
   { id: "dashboard", label: "📊 Dashboard" },
+  { id: "test-center", label: "🧪 Test Center" },
   { id: "queue", label: "📋 Delivery Logs" },
   { id: "failed", label: "❌ Failed" },
   { id: "campaigns", label: "📢 Campaigns" },
@@ -80,6 +81,77 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+// ── Provider Status Cards ──────────────────────────────────────────────────────
+const PROVIDER_META: Record<string, { label: string; icon: string; channel: string }> = {
+  botbee:   { label: "WhatsApp (BotBee)",  icon: "💬", channel: "whatsapp" },
+  fast2sms: { label: "SMS (Fast2SMS)",      icon: "📱", channel: "sms" },
+  lemin:    { label: "RCS (Lemin AI)",      icon: "🔵", channel: "rcs" },
+  smtp:     { label: "Email (SMTP)",        icon: "📧", channel: "email" },
+  firebase: { label: "Push (Firebase)",     icon: "🔔", channel: "push" },
+  razorpay: { label: "Razorpay Payments",   icon: "💳", channel: "" },
+};
+
+function ProviderStatusRow() {
+  const [providers, setProviders] = useState<any[]>([]);
+  const [testing, setTesting] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch(apiUrl("/api/api-settings"), { credentials: "include" });
+      if (res.ok) setProviders(await res.json());
+    } catch {}
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const runTest = async (provider: string) => {
+    setTesting(provider);
+    try {
+      const res = await fetch(apiUrl(`/api/api-settings/${provider}/test`), { method: "POST", credentials: "include" });
+      const d = await res.json();
+      setProviders(prev => prev.map(p => p.provider === provider ? { ...p, status: d.ok ? "connected" : "failed", last_tested: new Date().toISOString(), _testMsg: d.message } : p));
+    } catch { setProviders(prev => prev.map(p => p.provider === provider ? { ...p, status: "failed" } : p)); }
+    setTesting(null);
+  };
+
+  const STATUS_COLOR: Record<string, string> = { connected: "#22c55e", failed: "#ef4444", unknown: "#9ca3af" };
+
+  return (
+    <div style={{ marginBottom: 28 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <h3 style={{ fontWeight: 700, color: "#111827", margin: 0 }}>🔌 Provider Connectivity</h3>
+        <button onClick={load} style={{ background: "none", border: "1px solid #d1d5db", borderRadius: 6, padding: "4px 12px", cursor: "pointer", fontSize: 12, color: "#374151" }}>↻ Refresh</button>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 12 }}>
+        {Object.entries(PROVIDER_META).map(([id, meta]) => {
+          const p = providers.find(x => x.provider === id);
+          const status: string = p?.status || "unknown";
+          const color = STATUS_COLOR[status] || "#9ca3af";
+          const lastTested = p?.last_tested ? new Date(p.last_tested).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" }) : null;
+          return (
+            <div key={id} style={{ background: "#fff", border: `1px solid ${color}44`, borderRadius: 10, padding: 14, display: "flex", flexDirection: "column", gap: 6, boxShadow: "0 1px 3px #0001" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div>
+                  <div style={{ fontSize: 20 }}>{meta.icon}</div>
+                  <div style={{ fontWeight: 700, fontSize: 12, color: "#374151", marginTop: 2 }}>{meta.label}</div>
+                </div>
+                <span style={{ background: color + "22", color, border: `1px solid ${color}55`, borderRadius: 12, padding: "2px 10px", fontSize: 10, fontWeight: 700, whiteSpace: "nowrap" }}>
+                  {status === "connected" ? "✅ Connected" : status === "failed" ? "❌ Failed" : "— Unknown"}
+                </span>
+              </div>
+              {lastTested && <div style={{ fontSize: 10, color: "#9ca3af" }}>Tested: {lastTested}</div>}
+              <button onClick={() => runTest(id)} disabled={testing === id}
+                style={{ background: testing === id ? "#f3f4f6" : "#f8fafc", border: "1px solid #e5e7eb", borderRadius: 6, padding: "4px 0", cursor: "pointer", fontSize: 11, color: "#374151", fontWeight: 600 }}>
+                {testing === id ? "Testing…" : "Test Now"}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 function Dashboard() {
   const { data, loading, reload } = useApi<any>("/api/notification-center/stats");
@@ -95,6 +167,7 @@ function Dashboard() {
   ];
   return (
     <div>
+      <ProviderStatusRow />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 16, marginBottom: 28 }}>
         {cards.map(c => (
           <div key={c.label} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: "20px 18px", boxShadow: "0 1px 4px #0001" }}>
@@ -743,6 +816,114 @@ function ChannelTab({ channel }: { channel: string }) {
   );
 }
 
+// ── Test Center ───────────────────────────────────────────────────────────────
+const TEST_PROVIDERS = [
+  { id: "botbee",   label: "💬 WhatsApp",      channel: "whatsapp", needsMobile: true,  needsEmail: false },
+  { id: "fast2sms", label: "📱 SMS",            channel: "sms",      needsMobile: true,  needsEmail: false },
+  { id: "lemin",    label: "🔵 RCS",            channel: "rcs",      needsMobile: true,  needsEmail: false },
+  { id: "smtp",     label: "📧 Email",          channel: "email",    needsMobile: false, needsEmail: true  },
+  { id: "firebase", label: "🔔 Push (FCM)",     channel: "push",     needsMobile: false, needsEmail: false },
+];
+
+function TestCenter() {
+  const [mobile, setMobile] = useState("");
+  const [email, setEmail] = useState("");
+  const [results, setResults] = useState<Record<string, any>>({});
+  const [sending, setSending] = useState<Record<string, boolean>>({});
+
+  const send = async (providerId: string) => {
+    setSending(p => ({ ...p, [providerId]: true }));
+    setResults(p => ({ ...p, [providerId]: null }));
+    try {
+      const body: any = {};
+      if (mobile) body.mobile = mobile;
+      if (email) body.email = email;
+      const res = await fetch(apiUrl(`/api/api-settings/${providerId}/send-test`), {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      setResults(p => ({ ...p, [providerId]: data }));
+    } catch (e: any) {
+      setResults(p => ({ ...p, [providerId]: { ok: false, message: e.message } }));
+    }
+    setSending(p => ({ ...p, [providerId]: false }));
+  };
+
+  return (
+    <div style={{ maxWidth: 700 }}>
+      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 24, marginBottom: 28, boxShadow: "0 1px 4px #0001" }}>
+        <h3 style={{ fontWeight: 800, fontSize: 16, marginBottom: 4, color: "#111827" }}>🧪 Send Test Message</h3>
+        <p style={{ color: "#6b7280", fontSize: 13, marginBottom: 20, marginTop: 0 }}>
+          Test each channel individually without creating a booking. Credentials are loaded from <strong>API Settings</strong>.
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 20 }}>
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Mobile Number</label>
+            <input
+              value={mobile} onChange={e => setMobile(e.target.value)}
+              placeholder="91XXXXXXXXXX (WhatsApp / SMS / RCS)"
+              style={{ width: "100%", border: "1px solid #d1d5db", borderRadius: 7, padding: "9px 12px", fontSize: 13, boxSizing: "border-box" }}
+            />
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Email Address</label>
+            <input
+              type="email" value={email} onChange={e => setEmail(e.target.value)}
+              placeholder="test@example.com"
+              style={{ width: "100%", border: "1px solid #d1d5db", borderRadius: 7, padding: "9px 12px", fontSize: 13, boxSizing: "border-box" }}
+            />
+          </div>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {TEST_PROVIDERS.map(p => {
+            const res = results[p.id];
+            const busy = sending[p.id];
+            const disabled = busy || (p.needsMobile && !mobile.trim()) || (p.needsEmail && !email.trim());
+            return (
+              <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", background: "#f8fafc", borderRadius: 8, border: "1px solid #e5e7eb" }}>
+                <button
+                  onClick={() => send(p.id)} disabled={disabled}
+                  style={{ background: disabled ? "#e5e7eb" : "#2563eb", color: disabled ? "#9ca3af" : "#fff", border: "none", borderRadius: 7, padding: "9px 20px", cursor: disabled ? "not-allowed" : "pointer", fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", minWidth: 140, transition: "background .2s" }}
+                >
+                  {busy ? "Sending…" : `Send ${p.label}`}
+                </button>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  {p.needsMobile && !mobile.trim() && !res && (
+                    <span style={{ color: "#9ca3af", fontSize: 12 }}>Enter mobile number above to enable</span>
+                  )}
+                  {p.needsEmail && !email.trim() && !res && (
+                    <span style={{ color: "#9ca3af", fontSize: 12 }}>Enter email address above to enable</span>
+                  )}
+                  {res && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                      <span style={{
+                        background: res.ok ? "#dcfce7" : "#fef2f2",
+                        color: res.ok ? "#166534" : "#991b1b",
+                        border: `1px solid ${res.ok ? "#bbf7d0" : "#fecaca"}`,
+                        borderRadius: 6, padding: "3px 10px", fontSize: 12, fontWeight: 700,
+                      }}>
+                        {res.ok ? "✅ Sent" : "❌ Failed"}
+                      </span>
+                      {res.message && <span style={{ fontSize: 12, color: "#374151" }}>{res.message}</span>}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{ marginTop: 18, background: "#fefce8", border: "1px solid #fde68a", borderRadius: 8, padding: "10px 14px", fontSize: 12, color: "#92400e" }}>
+          ⚠️ Test messages are sent to real recipients and use your live API credentials. Ensure credentials are saved in <strong>Settings → API Settings</strong> before testing.
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Root ──────────────────────────────────────────────────────────────────────
 export default function CommunicationCenter() {
   const [tab, setTab] = useState("dashboard");
@@ -767,6 +948,7 @@ export default function CommunicationCenter() {
 
       <div style={{ padding: "28px 32px", maxWidth: 1400, margin: "0 auto" }}>
         {tab === "dashboard" && <Dashboard />}
+        {tab === "test-center" && <TestCenter />}
         {tab === "queue" && <DeliveryLogs />}
         {tab === "failed" && <DeliveryLogs filterStatus="failed" />}
         {tab === "campaigns" && <CampaignManager />}

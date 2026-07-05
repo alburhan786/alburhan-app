@@ -45,6 +45,8 @@ router.get("/", requireAdmin as any, requireSuperAdmin, async (_req, res) => {
       })(),
       updated_at: row.updated_at,
       updated_by: row.updated_by,
+      status: row.status || "unknown",
+      last_tested: row.last_tested || null,
     }));
     res.json(rows);
   } catch (err: any) {
@@ -145,7 +147,7 @@ router.put("/:provider", requireAdmin as any, requireSuperAdmin, async (req: Aut
   }
 });
 
-// POST /api/api-settings/:provider/test — test connection
+// POST /api/api-settings/:provider/test — test connection (saves result to DB)
 router.post("/:provider/test", requireAdmin as any, requireSuperAdmin, async (req, res) => {
   const provider = req.params.provider;
   try {
@@ -158,58 +160,71 @@ router.post("/:provider/test", requireAdmin as any, requireSuperAdmin, async (re
       try { extra = JSON.parse(decrypt(row.extra_fields_encrypted)); } catch {}
     }
 
+    let result: { ok: boolean; message?: string; httpStatus?: number; response?: any } = { ok: false, message: "Unknown provider" };
+
     switch (provider) {
       case "botbee": {
-        if (!apiKey) return res.json({ ok: false, message: "API key not set" });
+        if (!apiKey) { result = { ok: false, message: "API key not set" }; break; }
         const phoneNumberId = extra.phone_number_id || process.env.BOTBEE_PHONE_NUMBER_ID || "";
         const baseUrl = apiUrl || "https://app.botbee.io/api/v1/whatsapp";
         const params = new URLSearchParams({ apiToken: apiKey, phone_number_id: phoneNumberId });
         const resp = await axios.get(`${baseUrl}/status?${params}`, { timeout: 8000 }).catch(e => e.response || { data: { error: e.message }, status: 0 });
-        return res.json({ ok: resp.status >= 200 && resp.status < 300, status: resp.status, response: resp.data });
+        result = { ok: resp.status >= 200 && resp.status < 300, httpStatus: resp.status, response: resp.data };
+        break;
       }
       case "fast2sms": {
-        if (!apiKey) return res.json({ ok: false, message: "API key not set" });
+        if (!apiKey) { result = { ok: false, message: "API key not set" }; break; }
         const resp = await axios.get(`https://www.fast2sms.com/dev/wallet?authorization=${apiKey}`, { timeout: 8000 }).catch(e => e.response || { data: { error: e.message }, status: 0 });
         const ok = resp.data?.return === true;
-        return res.json({ ok, message: ok ? `Wallet balance: ₹${resp.data?.wallet || "?"}` : "Invalid API key", response: resp.data });
+        result = { ok, message: ok ? `Wallet balance: ₹${resp.data?.wallet || "?"}` : "Invalid API key", response: resp.data };
+        break;
       }
       case "lemin": {
-        if (!apiKey) return res.json({ ok: false, message: "API key not set" });
+        if (!apiKey) { result = { ok: false, message: "API key not set" }; break; }
         const resp = await axios.get("https://rcs.leminai.com/api/status", {
           headers: { Authorization: `Bearer ${apiKey}` }, timeout: 8000,
         }).catch(e => e.response || { data: { error: e.message }, status: 0 });
-        return res.json({ ok: resp.status === 200, status: resp.status, response: resp.data });
+        result = { ok: resp.status === 200, httpStatus: resp.status, response: resp.data };
+        break;
       }
       case "smtp": {
         const smtpHost = apiUrl || extra.host || process.env.SMTP_HOST || "smtp.gmail.com";
         const smtpUser = extra.user || process.env.SMTP_USER || "";
         const smtpPass = apiKey || process.env.SMTP_PASS || "";
-        if (!smtpUser || !smtpPass) return res.json({ ok: false, message: "SMTP user/password not configured" });
+        if (!smtpUser || !smtpPass) { result = { ok: false, message: "SMTP user/password not configured" }; break; }
         const transport = nodemailer.createTransport({
-          host: smtpHost,
-          port: Number(extra.port || 587),
+          host: smtpHost, port: Number(extra.port || 587),
           secure: Number(extra.port || 587) === 465,
           auth: { user: smtpUser, pass: smtpPass },
         });
         const verified = await transport.verify().then(() => true).catch((e: any) => String(e.message));
-        return res.json({ ok: verified === true, message: verified === true ? "SMTP connected" : verified });
+        result = { ok: verified === true, message: verified === true ? "SMTP connected" : String(verified) };
+        break;
       }
       case "firebase": {
-        if (!apiKey) return res.json({ ok: false, message: "Firebase Server Key not set" });
-        return res.json({ ok: true, message: "Firebase credentials present (test message via Send Test)" });
+        if (!apiKey) { result = { ok: false, message: "Firebase Server Key not set" }; break; }
+        result = { ok: true, message: "Firebase credentials present — use Send Test to verify delivery" };
+        break;
       }
       case "razorpay": {
-        if (!apiKey) return res.json({ ok: false, message: "Razorpay Key ID not set" });
+        if (!apiKey) { result = { ok: false, message: "Razorpay Key ID not set" }; break; }
         const keySecret = extra.key_secret || process.env.RAZORPAY_SECRET || "";
-        if (!keySecret) return res.json({ ok: false, message: "Razorpay Key Secret not set" });
+        if (!keySecret) { result = { ok: false, message: "Razorpay Key Secret not set" }; break; }
         const resp = await axios.get("https://api.razorpay.com/v1/payments?count=1", {
           auth: { username: apiKey, password: keySecret }, timeout: 8000,
         }).catch(e => e.response || { data: { error: e.message }, status: 0 });
-        return res.json({ ok: resp.status === 200, status: resp.status, message: resp.status === 200 ? "Razorpay connected" : "Invalid credentials" });
+        result = { ok: resp.status === 200, httpStatus: resp.status, message: resp.status === 200 ? "Razorpay connected" : "Invalid credentials" };
+        break;
       }
-      default:
-        return res.json({ ok: false, message: "Unknown provider" });
     }
+
+    // Persist test result so dashboard can show last known status
+    await pool.query(
+      `UPDATE api_settings SET status=$1, last_tested=NOW() WHERE provider=$2`,
+      [result.ok ? "connected" : "failed", provider]
+    ).catch(() => {});
+
+    res.json(result);
   } catch (err: any) {
     res.status(500).json({ ok: false, message: err.message });
   }

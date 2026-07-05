@@ -47,6 +47,8 @@ const PROVIDERS: ProviderDef[] = [
     extraFields: [
       { key: "phone_number_id", label: "Phone Number ID", placeholder: "e.g. 109876543210", isExtra: true },
       { key: "business_id", label: "Business Account ID", placeholder: "e.g. 987654321", isExtra: true },
+      { key: "instance_id", label: "Instance ID", placeholder: "e.g. instance_12345", isExtra: true },
+      { key: "webhook_url", label: "Webhook URL (optional)", placeholder: "https://yourdomain.com/webhook/botbee", isExtra: true },
     ],
     testMessageFields: [
       { key: "mobile", label: "Test Mobile Number", placeholder: "91XXXXXXXXXX", type: "text" },
@@ -82,6 +84,8 @@ const PROVIDERS: ProviderDef[] = [
     apiKeyLabel: "Bearer Token",
     apiKeyPlaceholder: "Enter Lemin API bearer token",
     extraFields: [
+      { key: "agent_id", label: "Agent ID", placeholder: "e.g. agent_abc123", isExtra: true },
+      { key: "brand_name", label: "Brand Name", placeholder: "e.g. Al Burhan Tours & Travels", isExtra: true },
       { key: "user_id", label: "User ID", placeholder: "0x89mqd53ph", isExtra: true },
       { key: "template_id", label: "Template ID", placeholder: "1473", isExtra: true },
     ],
@@ -139,6 +143,7 @@ const PROVIDERS: ProviderDef[] = [
     apiKeyPlaceholder: "rzp_live_XXXXXXXXXXXX",
     extraFields: [
       { key: "key_secret", label: "Key Secret", placeholder: "Enter Razorpay Key Secret", type: "password", isExtra: true },
+      { key: "webhook_secret", label: "Webhook Secret", placeholder: "Enter Razorpay Webhook Secret", type: "password", isExtra: true },
     ],
   },
 ];

@@ -1362,6 +1362,8 @@ async function runMigrations() {
       )
     `);
     console.log("[Migration] api_settings table ensured");
+    await pool.query(`ALTER TABLE api_settings ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'unknown'`);
+    await pool.query(`ALTER TABLE api_settings ADD COLUMN IF NOT EXISTS last_tested TIMESTAMPTZ`);
   } catch (err) { console.error("[Migration] api_settings table failed:", err); }
   // ── Seed default workflow rules ────────────────────────────────────────────
   try {

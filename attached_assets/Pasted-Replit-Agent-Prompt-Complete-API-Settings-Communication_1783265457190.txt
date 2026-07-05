@@ -1,0 +1,241 @@
+Replit Agent Prompt – Complete API Settings & Communication Center Integration
+
+I want to complete the API integration for my Al Burhan Tours & Travels ERP Communication Center.
+
+Objective
+
+Build a secure API Settings module where I can configure all third-party providers directly from the Admin Panel without editing .env files manually.
+
+⸻
+
+Create a new menu
+
+Admin → Settings → API Settings
+
+Only Super Admin can access this page.
+
+⸻
+
+Supported Providers
+
+1. BotBee WhatsApp
+
+Fields:
+
+* Provider Name
+* Base URL
+* API Key
+* Business Phone Number
+* Instance ID (if applicable)
+* Webhook URL (optional)
+
+Buttons:
+
+* Save
+* Test Connection
+* Send Test WhatsApp
+
+When “Test Connection” is clicked:
+
+* Validate API credentials
+* Display Connected / Failed
+* Show provider response
+
+When “Send Test WhatsApp” is clicked:
+
+Ask for a mobile number and send a real WhatsApp message.
+
+⸻
+
+2. Fast2SMS
+
+Fields:
+
+* API Key
+* Sender ID
+* Route
+* DLT Template ID (optional)
+
+Buttons:
+
+* Save
+* Test Connection
+* Send Test SMS
+
+The test should send a real SMS and display the provider response.
+
+⸻
+
+3. Lemin AI RCS
+
+Fields:
+
+* API URL
+* API Key
+* Agent ID
+* Brand Name
+
+Buttons:
+
+* Save
+* Test Connection
+* Send Test RCS
+
+Display Connected/Disconnected with API response.
+
+⸻
+
+4. Email (SMTP)
+
+Fields:
+
+* SMTP Host
+* SMTP Port
+* Username
+* Password
+* From Name
+* From Email
+
+Buttons:
+
+* Save
+* Test Connection
+* Send Test Email
+
+⸻
+
+5. Razorpay
+
+Fields:
+
+* Key ID
+* Secret
+* Webhook Secret
+
+Buttons:
+
+* Save
+* Test Connection
+
+⸻
+
+Security
+
+* Encrypt all API keys before storing in the database.
+* Never expose secrets in the frontend.
+* Show only the last 4 characters of each key (e.g. ********ABCD).
+* Add a Show/Hide toggle while editing.
+* Log all changes with admin name, date, time, and IP.
+* Allow only Super Admin to edit.
+
+⸻
+
+Database
+
+Create an api_settings table with:
+
+* provider_name
+* api_key (encrypted)
+* api_secret (encrypted)
+* base_url
+* configuration_json
+* status
+* last_tested
+* created_at
+* updated_at
+
+⸻
+
+Communication Center Integration
+
+The Communication Center must automatically use these saved credentials.
+
+When a booking event occurs, use the configured provider automatically.
+
+Events include:
+
+* New Booking
+* Booking Approved
+* Payment Received
+* Partial Payment
+* Balance Reminder
+* Invoice Generated
+* Passport Uploaded
+* Visa Issued
+* Ticket Issued
+* Room Allocation
+* Departure Reminder
+* Arrival Confirmation
+* Welcome Message
+* Package Update
+* Cancellation
+* Refund
+* Admin Notification
+
+⸻
+
+Dashboard
+
+Display live status cards:
+
+* WhatsApp Connected
+* SMS Connected
+* RCS Connected
+* Email Connected
+* Razorpay Connected
+
+Display:
+
+* Messages Sent Today
+* Delivered
+* Failed
+* Pending
+* Delivery Rate
+
+⸻
+
+Delivery Logs
+
+Maintain complete logs showing:
+
+* Date & Time
+* Customer Name
+* Booking ID
+* Channel (WhatsApp/SMS/RCS/Email)
+* Template Used
+* Status
+* Provider Response
+* Retry Option
+
+⸻
+
+Testing
+
+Create a “Send Test Message” page where I can enter:
+
+* Mobile Number
+* Email Address
+
+and test:
+
+* WhatsApp
+* SMS
+* RCS
+* Email
+
+without creating a booking.
+
+⸻
+
+Deployment
+
+After implementation:
+
+* Run all database migrations.
+* Preserve existing booking data.
+* Preserve invoices.
+* Preserve customers.
+* Preserve payment history.
+* Do not overwrite production data.
+* Restart services automatically after deployment.
+* Verify that Communication Center is fully operational and all providers can be tested from the Admin Panel.
