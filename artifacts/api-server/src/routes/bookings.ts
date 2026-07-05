@@ -42,7 +42,7 @@ import {
   notifyBookingRejected,
   notifyBookingCancelled,
 } from "../lib/adminNotifications.js";
-import { trackNotification } from "../lib/notificationEngine.js";
+import { trackNotification, fireNotificationEvent } from "../lib/notificationEngine.js";
 import { triggerWorkflow } from "../lib/workflowEngine.js";
 
 const router = Router();
@@ -630,8 +630,21 @@ router.post("/:id/send-invoice", requireAdmin as any, async (req: AuthenticatedR
     sendDLTSMS(b.customerMobile, b.customerName, b.bookingNumber, b.invoiceNumber || ""),
   ]);
 
-  const whatsappOk = results[0].status === "fulfilled" && (results[0] as PromiseFulfilledResult<boolean>).value;
-  const smsOk = results[1].status === "fulfilled" && (results[1] as PromiseFulfilledResult<boolean>).value;
+  const whatsappResult = results[0].status === "fulfilled" ? (results[0] as any).value : null;
+  const whatsappOk = whatsappResult?.ok === true;
+  const smsOk = results[1].status === "fulfilled";
+
+  fireNotificationEvent("invoice_generated", {
+    customerName: b.customerName,
+    customerMobile: b.customerMobile,
+    customerEmail: b.customerEmail ?? undefined,
+    customerId: b.customerId ?? undefined,
+    bookingId: b.id,
+    bookingNumber: b.bookingNumber,
+    packageName: b.packageName ?? undefined,
+    invoiceNumber: b.invoiceNumber ?? undefined,
+    amount: b.finalAmount ? Number(b.finalAmount) : undefined,
+  }).catch(() => {});
 
   res.json({ message: "Invoice notification sent", whatsapp: whatsappOk, sms: smsOk });
 });

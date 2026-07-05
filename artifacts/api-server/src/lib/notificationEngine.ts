@@ -10,13 +10,13 @@ export type EventType =
   // Bookings
   | "new_booking" | "booking_approved" | "booking_cancelled" | "booking_rejected" | "booking_completed"
   // Payments
-  | "payment_received" | "payment_due" | "payment_failed" | "balance_reminder"
+  | "payment_received" | "partial_payment" | "payment_due" | "payment_failed" | "balance_reminder" | "refund"
   // Invoices
   | "invoice_generated" | "receipt_generated" | "invoice_paid" | "invoice_cancelled"
   // Pilgrims & Documents
   | "passport_uploaded" | "passport_expiry" | "visa_approved" | "visa_rejected" | "visa_ready"
   // Flights
-  | "flight_assigned" | "flight_changed" | "flight_cancelled"
+  | "ticket_issued" | "flight_assigned" | "flight_changed" | "flight_cancelled"
   // Hotels
   | "hotel_assigned" | "room_assigned" | "room_changed"
   // Transport
@@ -66,9 +66,11 @@ export const EVENT_LABELS: Record<EventType, string> = {
   booking_rejected: "Booking Rejected",
   booking_completed: "Booking Completed",
   payment_received: "Payment Received",
+  partial_payment: "Partial Payment",
   payment_due: "Payment Due",
   payment_failed: "Payment Failed",
   balance_reminder: "Balance Reminder",
+  refund: "Refund Processed",
   invoice_generated: "Invoice Generated",
   receipt_generated: "Receipt Generated",
   invoice_paid: "Invoice Paid",
@@ -77,17 +79,18 @@ export const EVENT_LABELS: Record<EventType, string> = {
   passport_expiry: "Passport Expiry",
   visa_approved: "Visa Approved",
   visa_rejected: "Visa Rejected",
-  visa_ready: "Visa Ready",
+  visa_ready: "Visa Issued",
+  ticket_issued: "Ticket Issued",
   flight_assigned: "Flight Assigned",
   flight_changed: "Flight Changed",
   flight_cancelled: "Flight Cancelled",
-  hotel_assigned: "Hotel Assigned",
-  room_assigned: "Room Assigned",
+  hotel_assigned: "Hotel Confirmation",
+  room_assigned: "Room Allocation",
   room_changed: "Room Changed",
   bus_assigned: "Bus Assigned",
   seat_changed: "Seat Changed",
   departure_reminder: "Departure Reminder",
-  arrival_reminder: "Arrival Reminder",
+  arrival_reminder: "Arrival Welcome",
   return_reminder: "Return Reminder",
   airport_checkin: "Airport Check-In",
   missing_pilgrim: "Missing Pilgrim Alert",
@@ -97,10 +100,10 @@ export const EVENT_LABELS: Record<EventType, string> = {
 
 export const EVENT_GROUPS: Record<string, EventType[]> = {
   "Bookings": ["new_booking","booking_approved","booking_cancelled","booking_rejected","booking_completed"],
-  "Payments": ["payment_received","payment_due","payment_failed","balance_reminder"],
+  "Payments": ["payment_received","partial_payment","payment_due","payment_failed","balance_reminder","refund"],
   "Invoices": ["invoice_generated","receipt_generated","invoice_paid","invoice_cancelled"],
   "Pilgrims & Documents": ["passport_uploaded","passport_expiry","visa_approved","visa_rejected","visa_ready"],
-  "Flights": ["flight_assigned","flight_changed","flight_cancelled"],
+  "Flights": ["ticket_issued","flight_assigned","flight_changed","flight_cancelled"],
   "Hotels": ["hotel_assigned","room_assigned","room_changed"],
   "Transport": ["bus_assigned","seat_changed"],
   "Travel": ["departure_reminder","arrival_reminder","return_reminder"],
@@ -136,6 +139,10 @@ export function buildDefaultMessage(eventType: EventType, ctx: NotificationConte
       return `Assalamu Alaikum ${name},\n\nAlhamdulillah! Your journey ${booking} (${pkg}) is complete. May Allah accept your Ibadah.\n\nWe hope to serve you again.\nAl Burhan Tours & Travels\n+91 9893225590`;
     case "payment_received":
       return `Assalamu Alaikum ${name},\n\nPayment of ₹${formatINR(ctx.amount || 0)} received for booking ${booking}.\n\nBalance: ₹${formatINR(ctx.balanceAmount || 0)}\n\nView invoice: ${invUrl}\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
+    case "partial_payment":
+      return `Assalamu Alaikum ${name},\n\nPartial payment of ₹${formatINR(ctx.paidAmount || ctx.amount || 0)} received for booking ${booking} (${pkg}).\n\n💰 Remaining Balance: ₹${formatINR(ctx.balanceAmount || 0)}\n\nPay remaining: ${invUrl}\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 9893225590`;
+    case "refund":
+      return `Assalamu Alaikum ${name},\n\nYour refund of ₹${formatINR(ctx.amount || 0)} for booking ${booking} has been processed.\n\nIt will reflect in your account within 5-7 business days.\n\nFor queries: +91 9893225590\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
     case "payment_due":
     case "balance_reminder":
       return `Assalamu Alaikum ${name},\n\nReminder: Outstanding balance of ₹${formatINR(ctx.balanceAmount || 0)} is due for your booking ${booking} (${pkg}).\n\nPay now: ${invUrl}\n\nQueries: +91 9893225590\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
@@ -153,9 +160,11 @@ export function buildDefaultMessage(eventType: EventType, ctx: NotificationConte
       return `Assalamu Alaikum ${name},\n\nYour passport document has been uploaded for booking ${booking}. Our team will verify it shortly.\n\nFor queries: +91 9893225590\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
     case "passport_expiry":
       return `Assalamu Alaikum ${name},\n\nIMPORTANT: Your passport is expiring soon. Please renew it at least 6 months before travel.\n\nFor assistance: +91 9893225590\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
+    case "ticket_issued":
+      return `Assalamu Alaikum ${name},\n\n✈️ Your flight ticket for booking ${booking} has been issued!\n\nAirline: ${ctx.airline || "TBA"}\nFlight No: ${ctx.flightNumber || "TBA"}\nDeparture: ${ctx.departureDate || "TBA"}\n\nPlease check-in 3 hours before departure.\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 9893225590`;
     case "visa_approved":
     case "visa_ready":
-      return `Assalamu Alaikum ${name},\n\nAlhamdulillah! Your visa for booking ${booking} (${pkg}) is APPROVED${ctx.visaNumber ? ` — Visa No: ${ctx.visaNumber}` : ""}.\n\nPlease visit our office to collect your documents.\n\nPhone: +91 9893225590\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
+      return `Assalamu Alaikum ${name},\n\nAlhamdulillah! 🕌 Your Visa for booking ${booking} (${pkg}) has been ISSUED${ctx.visaNumber ? `.\nVisa No: ${ctx.visaNumber}` : ""}.\n\nPlease visit our office to collect your documents.\n\nPhone: +91 9893225590\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
     case "visa_rejected":
       return `Assalamu Alaikum ${name},\n\nWe regret to inform that your visa application for booking ${booking} has been rejected${ctx.reason ? `: ${ctx.reason}` : ""}.\n\nPlease contact us immediately.\nPhone: +91 9893225590\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
     case "flight_assigned":
@@ -202,16 +211,22 @@ function buildEmailSubject(eventType: EventType, ctx: NotificationContext): stri
     booking_rejected: `Booking Rejected ${booking} – Al Burhan`,
     booking_completed: `Journey Complete ${booking} – Al Burhan`,
     payment_received: `Payment Received – Booking ${booking}`,
+    partial_payment: `Partial Payment Received – Booking ${booking}`,
     payment_due: `Payment Reminder – Booking ${booking}`,
     payment_failed: `Payment Failed – Booking ${booking}`,
     balance_reminder: `Outstanding Balance – Booking ${booking}`,
+    refund: `Refund Processed – Booking ${booking}`,
     invoice_generated: `Invoice Ready – Booking ${booking}`,
     visa_approved: `Visa Approved – Booking ${booking}`,
     visa_rejected: `Visa Rejected – Booking ${booking}`,
+    visa_ready: `Visa Issued – Booking ${booking}`,
+    ticket_issued: `Flight Ticket Issued – Booking ${booking}`,
     flight_assigned: `Flight Details – Booking ${booking}`,
+    hotel_assigned: `Hotel Confirmation – Booking ${booking}`,
     room_assigned: `Room Assignment – Booking ${booking}`,
     bus_assigned: `Transport Details – Booking ${booking}`,
     departure_reminder: `Departure Reminder – ${ctx.packageName || "Your Journey"}`,
+    arrival_reminder: `Arrival Welcome – ${ctx.packageName || "Your Journey"}`,
     medical_emergency: `Medical Alert – ${ctx.customerName}`,
     feedback_request: `Share Your Experience – Al Burhan`,
   };

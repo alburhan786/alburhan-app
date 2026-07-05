@@ -49,6 +49,7 @@ import luggageRouter from "./luggage.js";
 import allocationsRouter from "./allocations.js";
 import loyaltyRouter from "./loyalty.js";
 import apiSettingsRouter from "./api-settings.js";
+import whatsappRouter from "./whatsapp.js";
 
 const router: IRouter = Router();
 
@@ -185,6 +186,7 @@ router.use("/luggage", luggageRouter);
 router.use("/allocations", allocationsRouter);
 router.use("/loyalty", loyaltyRouter);
 router.use("/api-settings", apiSettingsRouter);
+router.use("/whatsapp", whatsappRouter);
 router.use(storageRouter);
 
 export default router;

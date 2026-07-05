@@ -25,10 +25,10 @@ const CH_COLORS: Record<string, string> = {
 
 const EVENT_GROUPS: Record<string, string[]> = {
   "Bookings": ["new_booking","booking_approved","booking_cancelled","booking_rejected","booking_completed"],
-  "Payments": ["payment_received","payment_due","payment_failed","balance_reminder"],
+  "Payments": ["payment_received","partial_payment","payment_due","payment_failed","balance_reminder","refund"],
   "Invoices": ["invoice_generated","receipt_generated","invoice_paid","invoice_cancelled"],
   "Pilgrims & Documents": ["passport_uploaded","passport_expiry","visa_approved","visa_rejected","visa_ready"],
-  "Flights": ["flight_assigned","flight_changed","flight_cancelled"],
+  "Flights": ["ticket_issued","flight_assigned","flight_changed","flight_cancelled"],
   "Hotels": ["hotel_assigned","room_assigned","room_changed"],
   "Transport": ["bus_assigned","seat_changed"],
   "Travel": ["departure_reminder","arrival_reminder","return_reminder"],
@@ -39,15 +39,18 @@ const EVENT_GROUPS: Record<string, string[]> = {
 const EVENT_LABELS: Record<string, string> = {
   new_booking:"New Booking", booking_approved:"Booking Approved", booking_cancelled:"Booking Cancelled",
   booking_rejected:"Booking Rejected", booking_completed:"Booking Completed",
-  payment_received:"Payment Received", payment_due:"Payment Due", payment_failed:"Payment Failed",
-  balance_reminder:"Balance Reminder", invoice_generated:"Invoice Generated",
+  payment_received:"Payment Received", partial_payment:"Partial Payment",
+  payment_due:"Payment Due", payment_failed:"Payment Failed",
+  balance_reminder:"Balance Reminder", refund:"Refund Processed",
+  invoice_generated:"Invoice Generated",
   receipt_generated:"Receipt Generated", invoice_paid:"Invoice Paid", invoice_cancelled:"Invoice Cancelled",
   passport_uploaded:"Passport Uploaded", passport_expiry:"Passport Expiry",
-  visa_approved:"Visa Approved", visa_rejected:"Visa Rejected", visa_ready:"Visa Ready",
+  visa_approved:"Visa Approved", visa_rejected:"Visa Rejected", visa_ready:"Visa Issued",
+  ticket_issued:"Ticket Issued",
   flight_assigned:"Flight Assigned", flight_changed:"Flight Changed", flight_cancelled:"Flight Cancelled",
-  hotel_assigned:"Hotel Assigned", room_assigned:"Room Assigned", room_changed:"Room Changed",
+  hotel_assigned:"Hotel Confirmation", room_assigned:"Room Allocation", room_changed:"Room Changed",
   bus_assigned:"Bus Assigned", seat_changed:"Seat Changed",
-  departure_reminder:"Departure Reminder", arrival_reminder:"Arrival Reminder", return_reminder:"Return Reminder",
+  departure_reminder:"Departure Reminder", arrival_reminder:"Arrival Welcome", return_reminder:"Return Reminder",
   airport_checkin:"Airport Check-In", missing_pilgrim:"Missing Pilgrim", medical_emergency:"Medical Emergency",
   feedback_request:"Feedback Request",
 };
@@ -852,6 +855,242 @@ function ScheduledMessages() {
   );
 }
 
+// ── WhatsApp Tab ──────────────────────────────────────────────────────────────
+function WhatsAppTab() {
+  const [mobile, setMobile] = useState("");
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const [testResult, setTestResult] = useState<any>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [statusData, setStatusData] = useState<any>(null);
+
+  const { data, loading } = useApi<any>(
+    `/api/notification-center/logs?channel=whatsapp&limit=20`,
+    [refreshKey]
+  );
+
+  const logs = data?.logs || [];
+  const sent = logs.filter((l: any) => l.status === "sent").length;
+  const failed = logs.filter((l: any) => l.status === "failed").length;
+  const rate = (sent + failed) > 0 ? Math.round(sent / (sent + failed) * 100) : 0;
+
+  useEffect(() => {
+    fetch(apiUrl("/api/whatsapp/status"), { credentials: "include" })
+      .then(r => r.json()).then(setStatusData).catch(() => {});
+  }, []);
+
+  const sendTest = async () => {
+    if (!mobile.trim()) return;
+    setSending(true);
+    setTestResult(null);
+    try {
+      const res = await fetch(apiUrl("/api/whatsapp/test"), {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mobile: mobile.trim(), message: message.trim() || undefined }),
+      });
+      const d = await res.json();
+      setTestResult(d);
+      setRefreshKey(k => k + 1);
+    } catch (e: any) {
+      setTestResult({ ok: false, errorMessage: e.message });
+    }
+    setSending(false);
+  };
+
+  const configured = statusData?.configured !== false;
+
+  return (
+    <div style={{ maxWidth: 960 }}>
+      {/* Provider card */}
+      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 22, marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "flex-start", boxShadow: "0 1px 3px #0001" }}>
+        <div>
+          <h2 style={{ fontWeight: 800, fontSize: 20, color: "#25D366", margin: "0 0 6px" }}>💬 WhatsApp</h2>
+          <p style={{ color: "#374151", fontWeight: 600, margin: "0 0 4px" }}>Provider: BotBee WhatsApp Business API</p>
+          <p style={{ color: "#6b7280", fontSize: 13, margin: 0, maxWidth: 500 }}>
+            Sends messages via BotBee's WhatsApp Business API using BOTBEE_API_KEY + BOTBEE_PHONE_NUMBER_ID.
+            Supports text, templates, interactive buttons, and file delivery.
+          </p>
+          {statusData?.phoneNumberId && (
+            <p style={{ color: "#9ca3af", fontSize: 12, margin: "6px 0 0" }}>Phone Number ID: {statusData.phoneNumberId}</p>
+          )}
+        </div>
+        <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 20 }}>
+          <span style={{ display: "inline-block", background: configured ? "#dcfce7" : "#fef3c7", color: configured ? "#166534" : "#92400e", borderRadius: 20, padding: "5px 14px", fontSize: 12, fontWeight: 700, marginBottom: 14 }}>
+            {configured ? "✅ Configured" : "⚠️ Needs Setup"}
+          </span>
+          <div style={{ display: "flex", gap: 20, fontSize: 13 }}>
+            <div style={{ textAlign: "center" }}><div style={{ fontWeight: 800, color: "#22c55e", fontSize: 26 }}>{sent}</div><div style={{ color: "#6b7280", fontSize: 11 }}>Sent</div></div>
+            <div style={{ textAlign: "center" }}><div style={{ fontWeight: 800, color: "#ef4444", fontSize: 26 }}>{failed}</div><div style={{ color: "#6b7280", fontSize: 11 }}>Failed</div></div>
+            <div style={{ textAlign: "center" }}><div style={{ fontWeight: 800, color: "#25D366", fontSize: 26 }}>{rate}%</div><div style={{ color: "#6b7280", fontSize: 11 }}>Rate</div></div>
+          </div>
+        </div>
+      </div>
+
+      {/* Test Send section */}
+      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 22, marginBottom: 20, boxShadow: "0 1px 3px #0001" }}>
+        <h3 style={{ fontWeight: 800, fontSize: 15, color: "#111827", margin: "0 0 4px" }}>📲 Send Test WhatsApp</h3>
+        <p style={{ color: "#6b7280", fontSize: 13, margin: "0 0 18px" }}>
+          Send a live test message via BotBee. Every test is logged in Delivery Logs with the full provider response.
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Mobile Number *</label>
+            <input
+              value={mobile} onChange={e => setMobile(e.target.value)}
+              placeholder="91XXXXXXXXXX or 10-digit"
+              style={{ width: "100%", border: "1px solid #d1d5db", borderRadius: 7, padding: "9px 12px", fontSize: 13, boxSizing: "border-box" }}
+              onKeyDown={e => e.key === "Enter" && sendTest()}
+            />
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Custom Message <span style={{ color: "#9ca3af", fontWeight: 400 }}>(optional)</span></label>
+            <input
+              value={message} onChange={e => setMessage(e.target.value)}
+              placeholder="Leave blank for default test message"
+              style={{ width: "100%", border: "1px solid #d1d5db", borderRadius: 7, padding: "9px 12px", fontSize: 13, boxSizing: "border-box" }}
+            />
+          </div>
+        </div>
+        <button
+          onClick={sendTest}
+          disabled={sending || !mobile.trim()}
+          style={{
+            background: sending || !mobile.trim() ? "#d1fae5" : "#25D366",
+            color: "#fff", border: "none", borderRadius: 8,
+            padding: "10px 28px", cursor: sending || !mobile.trim() ? "not-allowed" : "pointer",
+            fontWeight: 700, fontSize: 14, display: "flex", alignItems: "center", gap: 8,
+          }}
+        >
+          {sending ? (
+            <><span style={{ display: "inline-block", width: 14, height: 14, border: "2px solid #fff", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />Sending…</>
+          ) : "💬 Send Test"}
+        </button>
+
+        {testResult && (
+          <div style={{
+            marginTop: 16, borderRadius: 10,
+            border: `2px solid ${testResult.ok ? "#bbf7d0" : "#fecaca"}`,
+            background: testResult.ok ? "#f0fdf4" : "#fef2f2",
+            overflow: "hidden",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 18px", borderBottom: `1px solid ${testResult.ok ? "#bbf7d0" : "#fecaca"}` }}>
+              <span style={{ fontSize: 22 }}>{testResult.ok ? "✅" : "❌"}</span>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 15, color: testResult.ok ? "#166534" : "#991b1b" }}>
+                  {testResult.ok ? "Delivered Successfully" : "Delivery Failed"}
+                </div>
+                {testResult.httpStatus && (
+                  <span style={{ fontSize: 11, background: testResult.httpStatus < 300 ? "#dcfce7" : "#fee2e2", color: testResult.httpStatus < 300 ? "#166534" : "#991b1b", borderRadius: 4, padding: "1px 7px", fontWeight: 700 }}>
+                    HTTP {testResult.httpStatus}
+                  </span>
+                )}
+              </div>
+              <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
+                {testResult.logged && <span style={{ fontSize: 11, background: "#dbeafe", color: "#1d4ed8", borderRadius: 4, padding: "2px 8px", fontWeight: 600 }}>📋 Logged</span>}
+                <span style={{ fontSize: 12, color: "#6b7280" }}>via {testResult.provider || "BotBee"}</span>
+              </div>
+            </div>
+            {testResult.errorMessage && (
+              <div style={{ padding: "10px 18px", background: "#fef2f2", borderBottom: "1px solid #fecaca" }}>
+                <span style={{ fontSize: 12, color: "#991b1b", fontWeight: 600 }}>Error: </span>
+                <span style={{ fontSize: 12, color: "#991b1b" }}>{testResult.errorMessage}</span>
+              </div>
+            )}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0 }}>
+              <div style={{ padding: "12px 18px", borderRight: "1px solid #e5e7eb" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 6 }}>Request Payload</div>
+                <pre style={{ background: "#1e293b", color: "#e2e8f0", borderRadius: 6, padding: "10px 12px", fontSize: 10, margin: 0, overflow: "auto", maxHeight: 180, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+                  {JSON.stringify(testResult.requestPayload || {}, null, 2)}
+                </pre>
+              </div>
+              <div style={{ padding: "12px 18px" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 6 }}>Provider Response</div>
+                <pre style={{ background: "#1e293b", color: "#e2e8f0", borderRadius: 6, padding: "10px 12px", fontSize: 10, margin: 0, overflow: "auto", maxHeight: 180, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+                  {JSON.stringify(testResult.responsePayload || testResult, null, 2)}
+                </pre>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Auto-trigger events info */}
+      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 20, marginBottom: 20 }}>
+        <h3 style={{ fontWeight: 700, fontSize: 14, margin: "0 0 12px", color: "#374151" }}>⚡ Auto-Triggered Events</h3>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+          {[
+            ["Booking Submitted","new_booking","#dbeafe","#1d4ed8"],
+            ["Booking Approved","booking_approved","#dcfce7","#166534"],
+            ["Payment Received","payment_received","#dcfce7","#166534"],
+            ["Partial Payment","partial_payment","#fef3c7","#92400e"],
+            ["Balance Reminder","balance_reminder","#fef3c7","#92400e"],
+            ["Invoice Generated","invoice_generated","#f3f4f6","#374151"],
+            ["Ticket Issued","ticket_issued","#ede9fe","#5b21b6"],
+            ["Visa Issued","visa_ready","#dcfce7","#166534"],
+            ["Hotel Confirmation","hotel_assigned","#dbeafe","#1d4ed8"],
+            ["Room Allocation","room_assigned","#dbeafe","#1d4ed8"],
+            ["Departure Reminder","departure_reminder","#fef3c7","#92400e"],
+            ["Arrival Welcome","arrival_reminder","#dcfce7","#166534"],
+            ["Feedback Request","feedback_request","#f3f4f6","#374151"],
+            ["Cancellation","booking_cancelled","#fee2e2","#991b1b"],
+            ["Refund","refund","#fee2e2","#991b1b"],
+          ].map(([label, , bg, color]) => (
+            <div key={label} style={{ background: bg, color, borderRadius: 6, padding: "5px 10px", fontSize: 12, fontWeight: 600 }}>
+              💬 {label}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Recent messages */}
+      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ padding: "16px 20px", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h3 style={{ fontWeight: 700, fontSize: 14, margin: 0 }}>Recent WhatsApp Messages</h3>
+          <button onClick={() => setRefreshKey(k => k + 1)} style={{ background: "none", border: "1px solid #d1d5db", borderRadius: 6, padding: "4px 12px", cursor: "pointer", fontSize: 12, color: "#374151" }}>
+            ↺ Refresh
+          </button>
+        </div>
+        {loading ? (
+          <div style={{ padding: 32, textAlign: "center", color: "#9ca3af" }}>Loading…</div>
+        ) : (
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+            <thead>
+              <tr style={{ background: "#f8fafc" }}>
+                {["Time","Recipient","Event","Status","Provider"].map(h => (
+                  <th key={h} style={{ padding: "8px 12px", textAlign: "left", fontWeight: 600, color: "#374151", borderBottom: "1px solid #e5e7eb" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {logs.length === 0 ? (
+                <tr><td colSpan={5} style={{ textAlign: "center", padding: 32, color: "#9ca3af" }}>No WhatsApp messages yet</td></tr>
+              ) : logs.map((log: any) => (
+                <tr key={log.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                  <td style={{ padding: "8px 12px", color: "#6b7280", whiteSpace: "nowrap" }}>
+                    {new Date(log.created_at).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" })}
+                  </td>
+                  <td style={{ padding: "8px 12px", fontWeight: 600 }}>{log.recipient}</td>
+                  <td style={{ padding: "8px 12px", color: "#374151" }}>{EVENT_LABELS[log.event_type] || log.event_type}</td>
+                  <td style={{ padding: "8px 12px" }}><StatusBadge status={log.status} /></td>
+                  <td style={{ padding: "8px 12px", color: "#6b7280", fontSize: 11 }}>
+                    {log.provider_name || "BotBee"}
+                    {log.http_status && (
+                      <span style={{ marginLeft: 4, background: log.http_status < 300 ? "#dcfce7" : "#fef2f2", color: log.http_status < 300 ? "#166534" : "#991b1b", borderRadius: 3, padding: "1px 5px", fontSize: 10, fontWeight: 700 }}>
+                        {log.http_status}
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Channel Info Tab ──────────────────────────────────────────────────────────
 function ChannelTab({ channel }: { channel: string }) {
   const INFO: Record<string, { provider: string; configured: boolean; desc: string }> = {
@@ -1110,7 +1349,7 @@ export default function CommunicationCenter() {
         {tab === "scheduled" && <ScheduledMessages />}
         {tab === "automation" && <AutomationRules />}
         {tab === "templates" && <Templates />}
-        {tab === "whatsapp" && <ChannelTab channel="whatsapp" />}
+        {tab === "whatsapp" && <WhatsAppTab />}
         {tab === "sms" && <ChannelTab channel="sms" />}
         {tab === "rcs" && <ChannelTab channel="rcs" />}
         {tab === "email" && <ChannelTab channel="email" />}
