@@ -2,15 +2,18 @@ import { pool } from "@workspace/db";
 import { fireNotificationEvent, type NotificationContext } from "./notificationEngine.js";
 
 export type WorkflowTrigger =
-  | "new_booking" | "booking_approved" | "booking_rejected"
+  | "new_booking" | "booking_approved" | "booking_rejected" | "booking_completed"
   | "payment_received"
   | "payment_reminder_30" | "payment_reminder_15" | "payment_reminder_7"
   | "payment_reminder_3" | "payment_reminder_1"
-  | "passport_uploaded"
+  | "balance_reminder_30" | "balance_reminder_15" | "balance_reminder_7"
+  | "balance_reminder_3" | "balance_reminder_1" | "balance_overdue"
+  | "passport_uploaded" | "document_reminder"
   | "visa_approved" | "visa_rejected"
   | "flight_assigned" | "hotel_assigned" | "bus_assigned"
+  | "ziyarat_reminder"
   | "departure_reminder_7d" | "departure_reminder_3d" | "departure_reminder_1d"
-  | "departure_reminder_12h" | "departure_reminder_6h"
+  | "departure_reminder_12h" | "departure_reminder_6h" | "departure_reminder_2h"
   | "return_reminder" | "feedback_request"
   | "document_expiry_90" | "document_expiry_60"
   | "document_expiry_30" | "document_expiry_7"
@@ -44,23 +47,33 @@ const TRIGGER_TO_EVENT: Record<string, string> = {
   new_booking: "new_booking",
   booking_approved: "booking_approved",
   booking_rejected: "booking_cancelled",
+  booking_completed: "booking_completed",
   payment_received: "payment_received",
   payment_reminder_30: "payment_reminder",
   payment_reminder_15: "payment_reminder",
   payment_reminder_7: "payment_reminder",
   payment_reminder_3: "payment_reminder",
   payment_reminder_1: "payment_reminder",
+  balance_reminder_30: "balance_reminder",
+  balance_reminder_15: "balance_reminder",
+  balance_reminder_7: "balance_reminder",
+  balance_reminder_3: "balance_reminder",
+  balance_reminder_1: "balance_reminder",
+  balance_overdue: "payment_due",
   passport_uploaded: "document_uploaded",
+  document_reminder: "document_uploaded",
   visa_approved: "visa_approved",
   visa_rejected: "visa_rejected",
   flight_assigned: "flight_assigned",
   hotel_assigned: "room_assigned",
   bus_assigned: "bus_assigned",
+  ziyarat_reminder: "departure_reminder",
   departure_reminder_7d: "departure_reminder",
   departure_reminder_3d: "departure_reminder",
   departure_reminder_1d: "departure_reminder",
   departure_reminder_12h: "departure_reminder",
   departure_reminder_6h: "departure_reminder",
+  departure_reminder_2h: "departure_reminder",
   return_reminder: "return_flight",
   feedback_request: "feedback_request",
   document_expiry_90: "document_expiry",
@@ -73,6 +86,7 @@ const TRIGGER_TO_EVENT: Record<string, string> = {
 const ADMIN_EVENT_TRIGGERS = new Set([
   "new_booking", "payment_received", "medical_emergency",
   "visa_approved", "visa_rejected", "booking_approved", "booking_rejected",
+  "booking_completed", "balance_overdue",
 ]);
 
 const TIMELINE_LABELS: Record<string, { icon: string; title: string }> = {
@@ -317,6 +331,7 @@ export function startDepartureReminderCron() {
     { trigger: "departure_reminder_1d", hoursAhead: 24 },
     { trigger: "departure_reminder_12h", hoursAhead: 12 },
     { trigger: "departure_reminder_6h", hoursAhead: 6 },
+    { trigger: "departure_reminder_2h", hoursAhead: 2 },
   ];
 
   const run = async () => {
@@ -479,4 +494,180 @@ export function startReturnAndFeedbackCron() {
   };
   scheduleMorning();
   console.log("[ReturnFeedback] Cron scheduled: daily at 10:00 IST");
+}
+
+// ── Balance Reminder Cron ──────────────────────────────────────────────────
+export function startBalanceReminderCron() {
+  const TRIGGERS: Array<{ trigger: WorkflowTrigger; daysAhead: number; overdue?: boolean }> = [
+    { trigger: "balance_reminder_30", daysAhead: 30 },
+    { trigger: "balance_reminder_15", daysAhead: 15 },
+    { trigger: "balance_reminder_7", daysAhead: 7 },
+    { trigger: "balance_reminder_3", daysAhead: 3 },
+    { trigger: "balance_reminder_1", daysAhead: 1 },
+    { trigger: "balance_overdue", daysAhead: -7, overdue: true },
+  ];
+
+  const run = async () => {
+    for (const { trigger, daysAhead, overdue } of TRIGGERS) {
+      const enabled = await getRuleEnabled(trigger).catch(() => false);
+      if (!enabled) continue;
+      try {
+        let query: string;
+        if (overdue) {
+          // Fire every 7 days for overdue bookings
+          query = `
+            SELECT b.id as booking_id, b.booking_number, b.customer_name, b.customer_mobile, b.customer_email,
+                   b.final_amount::numeric as amount,
+                   GREATEST(b.final_amount::numeric - COALESCE(b.paid_amount::numeric,0),0) as balance,
+                   b.package_name
+            FROM bookings b
+            WHERE b.status IN ('approved','partially_paid')
+              AND b.due_date IS NOT NULL
+              AND b.due_date::date < CURRENT_DATE
+              AND GREATEST(b.final_amount::numeric - COALESCE(b.paid_amount::numeric,0),0) > 0
+              AND EXTRACT(epoch FROM (CURRENT_DATE - b.due_date::date)) / 86400 > 0
+              AND MOD(EXTRACT(epoch FROM (CURRENT_DATE - b.due_date::date))::int / 86400, 7) = 0
+            LIMIT 50
+          `;
+        } else {
+          query = `
+            SELECT b.id as booking_id, b.booking_number, b.customer_name, b.customer_mobile, b.customer_email,
+                   b.final_amount::numeric as amount,
+                   GREATEST(b.final_amount::numeric - COALESCE(b.paid_amount::numeric,0),0) as balance,
+                   b.package_name
+            FROM bookings b
+            WHERE b.status IN ('approved','partially_paid')
+              AND b.due_date IS NOT NULL
+              AND b.due_date::date = (CURRENT_DATE + interval '${daysAhead} days')::date
+              AND GREATEST(b.final_amount::numeric - COALESCE(b.paid_amount::numeric,0),0) > 0
+            LIMIT 50
+          `;
+        }
+        const res = await pool.query(query);
+        for (const row of res.rows) {
+          await triggerWorkflow(trigger, {
+            bookingId: row.booking_id,
+            bookingNumber: row.booking_number,
+            customerName: row.customer_name,
+            customerMobile: row.customer_mobile,
+            customerEmail: row.customer_email,
+            packageName: row.package_name,
+            amount: parseFloat(row.amount ?? 0),
+            balance: parseFloat(row.balance ?? 0),
+          });
+        }
+      } catch {}
+    }
+  };
+
+  const scheduleDaily = () => {
+    const now = new Date();
+    const next = new Date(now);
+    next.setUTCHours(3, 0, 0, 0); // 08:30 IST
+    if (next <= now) next.setUTCDate(next.getUTCDate() + 1);
+    setTimeout(() => { run().catch(() => {}); scheduleDaily(); }, next.getTime() - now.getTime());
+  };
+  scheduleDaily();
+  console.log("[BalanceReminder] Cron scheduled: daily at 08:30 IST");
+}
+
+// ── Document Reminder Cron ──────────────────────────────────────────────────
+export function startDocumentReminderCron() {
+  const run = async () => {
+    const enabled = await getRuleEnabled("document_reminder").catch(() => false);
+    if (!enabled) return;
+    try {
+      const res = await pool.query(`
+        SELECT p.id as pilgrim_id, p.full_name, p.mobile_india,
+               b.id as booking_id, b.booking_number, b.customer_name, b.customer_mobile,
+               p.passport_number, p.photo_url, p.visa_number
+        FROM pilgrims p
+        JOIN bookings b ON b.id = (
+          SELECT bk.id FROM bookings bk WHERE bk.id = p.booking_id LIMIT 1
+        )
+        WHERE b.status IN ('approved','partially_paid')
+          AND (p.passport_number IS NULL OR p.passport_number = ''
+               OR p.photo_url IS NULL OR p.photo_url = '')
+        LIMIT 100
+      `);
+      for (const row of res.rows) {
+        const missing: string[] = [];
+        if (!row.passport_number) missing.push("Passport");
+        if (!row.photo_url) missing.push("Photo");
+        await triggerWorkflow("document_reminder", {
+          bookingId: row.booking_id,
+          bookingNumber: row.booking_number,
+          customerName: row.customer_name || row.full_name,
+          customerMobile: row.customer_mobile || row.mobile_india,
+          pilgramName: row.full_name,
+          documentType: missing.join(", "),
+        });
+      }
+    } catch {}
+  };
+
+  // Run every 3 days: check if it should run based on day number
+  const schedule = () => {
+    const MS_3_DAYS = 3 * 24 * 60 * 60 * 1000;
+    setTimeout(() => { run().catch(() => {}); schedule(); }, MS_3_DAYS);
+  };
+  run().catch(() => {});
+  schedule();
+  console.log("[DocumentReminder] Cron scheduled: every 3 days");
+}
+
+// ── Ziyarat Reminder Cron ────────────────────────────────────────────────────
+export function startZiyaratReminderCron() {
+  const run = async () => {
+    const enabled = await getRuleEnabled("ziyarat_reminder").catch(() => false);
+    if (!enabled) return;
+    try {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowStr = tomorrow.toISOString().slice(0, 10);
+
+      const res = await pool.query(`
+        SELECT z.name, z.location, z.departure_time, z.guide_name, z.bus_id,
+               b.bus_number,
+               za.pilgrim_id, p.full_name, p.mobile_india,
+               bk.id as booking_id, bk.booking_number, bk.customer_name
+        FROM ziyarat_schedules z
+        LEFT JOIN buses b ON z.bus_id = b.id
+        LEFT JOIN ziyarat_attendance za ON za.schedule_id = z.id
+        LEFT JOIN pilgrims p ON za.pilgrim_id = p.id
+        LEFT JOIN bookings bk ON bk.id = (
+          SELECT bk2.id FROM bookings bk2 WHERE bk2.id = p.booking_id LIMIT 1
+        )
+        WHERE z.schedule_date = $1
+          AND z.status = 'scheduled'
+          AND p.mobile_india IS NOT NULL
+        LIMIT 100
+      `, [tomorrowStr]);
+
+      for (const row of res.rows) {
+        await triggerWorkflow("ziyarat_reminder", {
+          bookingId: row.booking_id,
+          bookingNumber: row.booking_number,
+          customerName: row.customer_name || row.full_name,
+          customerMobile: row.mobile_india,
+          pilgramName: row.full_name,
+          packageName: row.name,
+          hotelName: row.location,
+          busNumber: row.bus_number || undefined,
+          departureDate: tomorrowStr,
+          flightNumber: row.departure_time ? `at ${row.departure_time}` : undefined,
+        });
+      }
+    } catch {}
+  };
+
+  const scheduleEvening = () => {
+    const now = new Date();
+    const next = new Date(now);
+    next.setUTCHours(15, 0, 0, 0); // 20:30 IST
+    if (next <= now) next.setUTCDate(next.getUTCDate() + 1);
+    setTimeout(() => { run().catch(() => {}); scheduleEvening(); }, next.getTime() - now.getTime());
+  };
+  scheduleEvening();
+  console.log("[ZiyaratReminder] Cron scheduled: daily at 20:30 IST");
 }

@@ -3,3 +3,5 @@
 - [VPS drizzle db.execute quirk](vps-drizzle-pool-query.md) — drizzle db.execute() returns non-iterable QueryResult in bundled CJS; always use pool.query() for raw SQL on VPS
 - [VPS session fix](vps-session-fix.md) — connect-pg-simple createTableIfMissing reads table.sql from disk (not bundled); use createTableIfMissing:false + manual CREATE TABLE migration run before app.listen
 - [Admin page API pattern](admin-api-pattern.md) — admin pages use `const API = import.meta.env.VITE_API_URL || ""` for fetch; no @/lib/api module exists
+- [Automation engine triggers](automation-engine.md) — workflowEngine.ts is the master trigger hub; routes must call triggerWorkflow() (not just fireNotificationEvent) to get logs + timeline
+- [Frontend JSX convention](frontend-jsx.md) — project uses React (className=, not class=); preact/hooks imports will break Vite build

@@ -3,6 +3,7 @@ import { pool } from "@workspace/db";
 import { requireAdmin, requireModuleAccess, type AuthenticatedRequest } from "../lib/auth.js";
 import { randomUUID } from "crypto";
 import { fireNotificationEvent } from "../lib/notificationEngine.js";
+import { triggerWorkflow } from "../lib/workflowEngine.js";
 
 const router = Router();
 router.use(requireModuleAccess("groups") as any);
@@ -173,10 +174,15 @@ router.post("/:hotelId/rooms/:roomId/assign", requireAdmin as any, async (req, r
     );
     res.json({ message: "Assigned" });
     Promise.all([
-      pool.query(`SELECT full_name, mobile_india FROM pilgrims WHERE id=$1`, [pilgrimId]),
+      pool.query(`SELECT id, full_name, mobile_india, booking_id FROM pilgrims WHERE id=$1`, [pilgrimId]),
       pool.query(`SELECT h.name as hotel_name, r.room_number FROM hotels h JOIN hotel_rooms r ON r.id=$1 AND r.hotel_id=$2`, [req.params.roomId, req.params.hotelId]),
     ]).then(([pRes, hRes]) => {
-      if (pRes.rows[0]) fireNotificationEvent("room_assigned", { customerName: pRes.rows[0].full_name, customerMobile: pRes.rows[0].mobile_india, hotelName: hRes.rows[0]?.hotel_name, roomNumber: hRes.rows[0]?.room_number }).catch(() => {});
+      if (!pRes.rows[0]) return;
+      const p = pRes.rows[0];
+      const hotelName = hRes.rows[0]?.hotel_name;
+      const roomNumber = hRes.rows[0]?.room_number;
+      fireNotificationEvent("room_assigned", { customerName: p.full_name, customerMobile: p.mobile_india, hotelName, roomNumber }).catch(() => {});
+      triggerWorkflow("hotel_assigned", { customerName: p.full_name, customerMobile: p.mobile_india, pilgramName: p.full_name, bookingId: p.booking_id, hotelName, roomNumber }).catch(() => {});
     }).catch(() => {});
   } catch (err: any) {
     res.status(500).json({ error: err.message });

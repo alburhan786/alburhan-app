@@ -2,6 +2,7 @@ import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requireAdmin, requireModuleAccess } from "../lib/auth.js";
 import { fireNotificationEvent } from "../lib/notificationEngine.js";
+import { triggerWorkflow } from "../lib/workflowEngine.js";
 
 const router = Router();
 router.use(requireModuleAccess("pilgrims") as any);
@@ -75,11 +76,21 @@ router.put("/:pilgrimId", requireAdmin as any, async (req, res) => {
     );
     res.json({ message: "Visa updated" });
     if (visaStatus === "received" || visaStatus === "approved") {
-      pool.query(`SELECT full_name, mobile_india FROM pilgrims WHERE id=$1`, [req.params.pilgrimId])
-        .then(r => { if (r.rows[0]) fireNotificationEvent("visa_approved", { customerName: r.rows[0].full_name, customerMobile: r.rows[0].mobile_india, visaNumber: visaNumber || undefined }).catch(() => {}); }).catch(() => {});
+      pool.query(`SELECT full_name, mobile_india, booking_id FROM pilgrims WHERE id=$1`, [req.params.pilgrimId])
+        .then(r => {
+          if (!r.rows[0]) return;
+          const p = r.rows[0];
+          fireNotificationEvent("visa_approved", { customerName: p.full_name, customerMobile: p.mobile_india, visaNumber: visaNumber || undefined }).catch(() => {});
+          triggerWorkflow("visa_approved", { customerName: p.full_name, customerMobile: p.mobile_india, pilgramName: p.full_name, bookingId: p.booking_id, visaStatus: "approved" }).catch(() => {});
+        }).catch(() => {});
     } else if (visaStatus === "rejected") {
-      pool.query(`SELECT full_name, mobile_india FROM pilgrims WHERE id=$1`, [req.params.pilgrimId])
-        .then(r => { if (r.rows[0]) fireNotificationEvent("visa_rejected", { customerName: r.rows[0].full_name, customerMobile: r.rows[0].mobile_india }).catch(() => {}); }).catch(() => {});
+      pool.query(`SELECT full_name, mobile_india, booking_id FROM pilgrims WHERE id=$1`, [req.params.pilgrimId])
+        .then(r => {
+          if (!r.rows[0]) return;
+          const p = r.rows[0];
+          fireNotificationEvent("visa_rejected", { customerName: p.full_name, customerMobile: p.mobile_india }).catch(() => {});
+          triggerWorkflow("visa_rejected", { customerName: p.full_name, customerMobile: p.mobile_india, pilgramName: p.full_name, bookingId: p.booking_id, visaStatus: "rejected" }).catch(() => {});
+        }).catch(() => {});
     }
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -102,8 +113,13 @@ router.post("/bulk-update", requireAdmin as any, async (req, res) => {
     );
     res.json({ message: `Updated ${pilgrimIds.length} pilgrims`, count: pilgrimIds.length });
     if (visaStatus === "received" || visaStatus === "approved") {
-      pool.query(`SELECT full_name, mobile_india FROM pilgrims WHERE id=ANY($1)`, [pilgrimIds])
-        .then(r => { for (const p of r.rows) fireNotificationEvent("visa_approved", { customerName: p.full_name, customerMobile: p.mobile_india }).catch(() => {}); }).catch(() => {});
+      pool.query(`SELECT id, full_name, mobile_india, booking_id FROM pilgrims WHERE id=ANY($1)`, [pilgrimIds])
+        .then(r => {
+          for (const p of r.rows) {
+            fireNotificationEvent("visa_approved", { customerName: p.full_name, customerMobile: p.mobile_india }).catch(() => {});
+            triggerWorkflow("visa_approved", { customerName: p.full_name, customerMobile: p.mobile_india, pilgramName: p.full_name, bookingId: p.booking_id, visaStatus: "approved" }).catch(() => {});
+          }
+        }).catch(() => {});
     }
   } catch (err: any) {
     res.status(500).json({ error: err.message });

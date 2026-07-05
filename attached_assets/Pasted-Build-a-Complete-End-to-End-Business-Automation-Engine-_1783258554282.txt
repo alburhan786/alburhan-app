@@ -1,0 +1,535 @@
+Build a Complete End-to-End Business Automation Engine for Al Burhan Tours & Travels ERP.
+
+IMPORTANT
+
+This is the core automation engine.
+
+Every customer action and every staff action should automatically trigger workflows.
+
+No manual sending should be required.
+
+Use the existing Notification Engine, Workflow Engine, Accounting, Booking and Customer modules.
+
+=========================================
+STEP 1
+CUSTOMER ENQUIRY
+=========================================
+
+Customer submits enquiry
+
+Automatically
+
+Create Lead
+
+Assign Sales Executive
+
+Send WhatsApp
+
+Send SMS
+
+Send Email
+
+Create Follow-up
+
+Notify Admin
+
+=========================================
+STEP 2
+BOOKING REQUEST
+=========================================
+
+Customer books package
+
+Automatically
+
+Generate Booking ID
+
+Generate Family ID
+
+Create Customer
+
+Create Pilgrim
+
+Reserve Seat
+
+Notify Admin
+
+Popup
+
+Browser Notification
+
+WhatsApp
+
+Email
+
+SMS
+
+=========================================
+STEP 3
+ADMIN APPROVES BOOKING
+=========================================
+
+Automatically
+
+Generate Invoice
+
+Generate Proforma Invoice
+
+Generate Payment Schedule
+
+Create Ledger
+
+Create Customer Portal
+
+Create Notification Timeline
+
+Send
+
+WhatsApp
+
+SMS
+
+Email
+
+RCS
+
+=========================================
+STEP 4
+PAYMENT RECEIVED
+=========================================
+
+Automatically
+
+Update Ledger
+
+Update Family Ledger
+
+Update Booking
+
+Update Dashboard
+
+Generate Receipt
+
+Generate Tax Invoice
+
+Send Receipt PDF
+
+Send Invoice PDF
+
+WhatsApp
+
+Email
+
+SMS
+
+RCS
+
+=========================================
+STEP 5
+BALANCE REMINDER
+=========================================
+
+Automatically send
+
+30 Days
+
+15 Days
+
+7 Days
+
+3 Days
+
+1 Day
+
+Due Date
+
+After Due Date every 7 days
+
+until payment completed.
+
+=========================================
+STEP 6
+DOCUMENT COLLECTION
+=========================================
+
+Automatically remind customer to upload
+
+Passport
+
+Visa
+
+Photo
+
+PAN
+
+Aadhaar
+
+Vaccination
+
+Medical
+
+Send reminder every 3 days until completed.
+
+=========================================
+STEP 7
+VISA
+=========================================
+
+Visa Approved
+
+Automatically
+
+Generate Visa PDF
+
+Upload Customer Portal
+
+WhatsApp
+
+Email
+
+SMS
+
+=========================================
+STEP 8
+FLIGHT
+=========================================
+
+Flight Assigned
+
+Automatically
+
+Ticket PDF
+
+Reporting Time
+
+Terminal
+
+Baggage Rules
+
+Google Map
+
+WhatsApp
+
+SMS
+
+Email
+
+=========================================
+STEP 9
+HOTEL
+=========================================
+
+Room Assigned
+
+Automatically
+
+Hotel Name
+
+Address
+
+Room Number
+
+Google Maps
+
+WhatsApp
+
+SMS
+
+=========================================
+STEP 10
+BUS
+=========================================
+
+Bus Assigned
+
+Automatically
+
+Bus Number
+
+Seat Number
+
+Driver
+
+Reporting Time
+
+=========================================
+STEP 11
+DEPARTURE
+=========================================
+
+Automatically remind
+
+7 Days
+
+3 Days
+
+1 Day
+
+12 Hours
+
+6 Hours
+
+2 Hours
+
+=========================================
+STEP 12
+AIRPORT
+=========================================
+
+QR Attendance
+
+Luggage Status
+
+Boarding Reminder
+
+=========================================
+STEP 13
+ARRIVAL
+=========================================
+
+Hotel Check-in
+
+Room Confirmation
+
+Meal Timing
+
+Emergency Contact
+
+=========================================
+STEP 14
+ZIYARAT
+=========================================
+
+Automatically send
+
+Bus Number
+
+Departure Time
+
+Meeting Point
+
+Guide
+
+=========================================
+STEP 15
+RETURN
+=========================================
+
+Automatically send
+
+Flight
+
+Reporting Time
+
+Baggage Rules
+
+Airport Map
+
+=========================================
+STEP 16
+TRIP COMPLETED
+=========================================
+
+Automatically
+
+Thank You
+
+Feedback Form
+
+Google Review Link
+
+Referral Program
+
+Discount Coupon
+
+=========================================
+STEP 17
+LOYALTY
+=========================================
+
+Automatically calculate
+
+Repeat Customer
+
+Reward Points
+
+Discount
+
+VIP Status
+
+=========================================
+STEP 18
+ADMIN
+=========================================
+
+Popup
+
+Sound
+
+Browser Notification
+
+Dashboard Alert
+
+For
+
+Booking
+
+Payment
+
+Refund
+
+Visa
+
+Flight
+
+Emergency
+
+=========================================
+STEP 19
+COMMUNICATION
+=========================================
+
+Every automation should support
+
+WhatsApp
+
+SMS
+
+Email
+
+RCS
+
+Push Notification
+
+=========================================
+STEP 20
+DOCUMENTS
+=========================================
+
+Automatically generate
+
+Invoice
+
+Receipt
+
+Visa
+
+Ticket
+
+Hotel Voucher
+
+Bus Voucher
+
+QR ID Card
+
+Luggage Tag
+
+=========================================
+STEP 21
+WORKFLOW LOGS
+=========================================
+
+Log everything
+
+Who
+
+When
+
+Status
+
+Delivery
+
+Errors
+
+Retry
+
+=========================================
+STEP 22
+RETRY ENGINE
+=========================================
+
+If WhatsApp fails
+
+Retry
+
+If SMS fails
+
+Retry
+
+If Email fails
+
+Retry
+
+If RCS fails
+
+Retry
+
+Maximum
+
+3 retries.
+
+=========================================
+STEP 23
+SCHEDULER
+=========================================
+
+Background Scheduler
+
+Run every minute.
+
+Automatically execute
+
+Reminders
+
+Notifications
+
+Emails
+
+SMS
+
+WhatsApp
+
+=========================================
+STEP 24
+REPORTS
+=========================================
+
+Show
+
+Messages Sent
+
+Delivered
+
+Failed
+
+Open Rate
+
+Click Rate
+
+Outstanding
+
+Customer Journey
+
+=========================================
+FINAL REQUIREMENT
+=========================================
+
+The ERP should require almost no manual communication.
+
+Staff should only perform business actions:
+
+Approve Booking
+
+Receive Payment
+
+Upload Visa
+
+Assign Flight
+
+Assign Hotel
+
+Assign Bus
+
+Everything else should happen automatically.
+
+Test every workflow from enquiry to return journey before marking this phase complete.

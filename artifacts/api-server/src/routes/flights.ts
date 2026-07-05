@@ -4,6 +4,7 @@ import { eq, desc } from "drizzle-orm";
 import { requireAdmin, requireModuleAccess, type AuthenticatedRequest } from "../lib/auth.js";
 import { auditLog } from "../lib/audit.js";
 import { fireNotificationEvent } from "../lib/notificationEngine.js";
+import { triggerWorkflow } from "../lib/workflowEngine.js";
 
 const router = Router();
 router.use(requireModuleAccess("groups") as any);
@@ -40,8 +41,13 @@ router.post("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => 
     auditLog({ req, action: "created", entityTable: "flights", entityId: row.id, newValue: { groupId: row.groupId, flightNumber: row.flightNumber, flightType: row.flightType } }).catch(() => {});
     res.json(row);
     if (Array.isArray(pilgrimsAssigned) && pilgrimsAssigned.length > 0) {
-      pool.query(`SELECT full_name, mobile_india FROM pilgrims WHERE id=ANY($1) AND mobile_india IS NOT NULL`, [pilgrimsAssigned])
-        .then(r => { for (const p of r.rows) fireNotificationEvent("flight_assigned", { customerName: p.full_name, customerMobile: p.mobile_india, flightNumber: flightNumber || undefined, airline: airline || undefined, departureDate: departureDate || undefined }).catch(() => {}); }).catch(() => {});
+      pool.query(`SELECT id, full_name, mobile_india, booking_id FROM pilgrims WHERE id=ANY($1) AND mobile_india IS NOT NULL`, [pilgrimsAssigned])
+        .then(r => {
+          for (const p of r.rows) {
+            fireNotificationEvent("flight_assigned", { customerName: p.full_name, customerMobile: p.mobile_india, flightNumber: flightNumber || undefined, airline: airline || undefined, departureDate: departureDate || undefined }).catch(() => {});
+            triggerWorkflow("flight_assigned", { customerName: p.full_name, customerMobile: p.mobile_india, pilgramName: p.full_name, bookingId: p.booking_id, flightNumber: flightNumber || undefined, departureDate: departureDate || undefined }).catch(() => {});
+          }
+        }).catch(() => {});
     }
   } catch (err) {
     console.error("[flights] POST /", err);

@@ -47,6 +47,7 @@ import workflowsRouter from "./workflows.js";
 import ziyaratRouter from "./ziyarat.js";
 import luggageRouter from "./luggage.js";
 import allocationsRouter from "./allocations.js";
+import loyaltyRouter from "./loyalty.js";
 
 const router: IRouter = Router();
 
@@ -181,6 +182,7 @@ router.use("/workflows", workflowsRouter);
 router.use("/ziyarat", ziyaratRouter);
 router.use("/luggage", luggageRouter);
 router.use("/allocations", allocationsRouter);
+router.use("/loyalty", loyaltyRouter);
 router.use(storageRouter);
 
 export default router;

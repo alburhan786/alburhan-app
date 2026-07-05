@@ -33,6 +33,16 @@ const DEFAULT_RULES = [
   { name: "Document Expiry — 30 Days", trigger_type: "document_expiry_30", description: "Notify 30 days before passport/visa expiry", group_name: "Documents", enabled: true },
   { name: "Document Expiry — 7 Days", trigger_type: "document_expiry_7", description: "Notify 7 days before passport/visa expiry", group_name: "Documents", enabled: true },
   { name: "Medical Emergency", trigger_type: "medical_emergency", description: "Triggered on critical/high severity medical case", group_name: "Safety", enabled: true },
+  { name: "Booking Completed", trigger_type: "booking_completed", description: "Triggered when a trip is marked complete — sends thank-you + feedback link", group_name: "Bookings", enabled: true },
+  { name: "Balance Reminder — 30 Days", trigger_type: "balance_reminder_30", description: "Auto-reminder when balance due in 30 days", group_name: "Payments", enabled: true },
+  { name: "Balance Reminder — 15 Days", trigger_type: "balance_reminder_15", description: "Auto-reminder when balance due in 15 days", group_name: "Payments", enabled: true },
+  { name: "Balance Reminder — 7 Days", trigger_type: "balance_reminder_7", description: "Auto-reminder when balance due in 7 days", group_name: "Payments", enabled: true },
+  { name: "Balance Reminder — 3 Days", trigger_type: "balance_reminder_3", description: "Auto-reminder when balance due in 3 days", group_name: "Payments", enabled: true },
+  { name: "Balance Reminder — 1 Day", trigger_type: "balance_reminder_1", description: "Auto-reminder when balance due tomorrow", group_name: "Payments", enabled: true },
+  { name: "Balance Overdue", trigger_type: "balance_overdue", description: "Repeating reminder every 7 days after due date passes", group_name: "Payments", enabled: true },
+  { name: "Document Upload Reminder", trigger_type: "document_reminder", description: "Remind pilgrims every 3 days to upload missing documents", group_name: "Documents", enabled: true },
+  { name: "Ziyarat Reminder", trigger_type: "ziyarat_reminder", description: "Sent the evening before a scheduled ziyarat trip", group_name: "Travel", enabled: true },
+  { name: "Departure Reminder — 2 Hours", trigger_type: "departure_reminder_2h", description: "Auto-reminder 2 hours before departure", group_name: "Travel", enabled: true },
 ];
 
 router.get("/rules", requireAdmin as any, async (_req, res) => {

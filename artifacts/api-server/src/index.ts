@@ -68,7 +68,7 @@ import { inArray, sql } from "drizzle-orm";
 import { ADMIN_MOBILES } from "./routes/auth.js";
 import { startPaymentReminderCron } from "./jobs/paymentReminder.js";
 import { startFeedbackReminderCron } from "./jobs/feedbackReminder.js";
-import { startDepartureReminderCron, startDocumentExpiryCron, startReturnAndFeedbackCron } from "./lib/workflowEngine.js";
+import { startDepartureReminderCron, startDocumentExpiryCron, startReturnAndFeedbackCron, startBalanceReminderCron, startDocumentReminderCron, startZiyaratReminderCron } from "./lib/workflowEngine.js";
 import { DEFAULT_RULES } from "./routes/workflows.js";
 
 async function runMigrations() {
@@ -1316,6 +1316,37 @@ async function runMigrations() {
     await pool.query(`ALTER TABLE hotel_rooms ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'vacant'`);
     console.log("[Migration] Phase 2 extra columns ensured");
   } catch (err) { console.error("[Migration] Phase 2 extra columns failed:", err); }
+  // ── Loyalty tables ─────────────────────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS loyalty_points (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        customer_id TEXT NOT NULL UNIQUE,
+        customer_name TEXT,
+        customer_mobile TEXT,
+        total_points INT NOT NULL DEFAULT 0,
+        redeemed_points INT NOT NULL DEFAULT 0,
+        tier TEXT NOT NULL DEFAULT 'bronze',
+        bookings_count INT NOT NULL DEFAULT 0,
+        total_spent NUMERIC(12,2) NOT NULL DEFAULT 0,
+        last_activity TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS loyalty_transactions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        customer_id TEXT NOT NULL,
+        points INT NOT NULL,
+        type TEXT NOT NULL DEFAULT 'credit',
+        reason TEXT,
+        source TEXT DEFAULT 'system',
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_loyalty_transactions_customer ON loyalty_transactions(customer_id)`);
+    console.log("[Migration] loyalty tables ensured");
+  } catch (err) { console.error("[Migration] loyalty tables failed:", err); }
   // ── Seed default workflow rules ────────────────────────────────────────────
   try {
     for (const rule of DEFAULT_RULES) {
@@ -1370,6 +1401,9 @@ async function start() {
     startDepartureReminderCron();
     startDocumentExpiryCron();
     startReturnAndFeedbackCron();
+    startBalanceReminderCron();
+    startDocumentReminderCron();
+    startZiyaratReminderCron();
     const scheduleAuditRetention = () => {
       const now = new Date();
       const nextRun = new Date(now);

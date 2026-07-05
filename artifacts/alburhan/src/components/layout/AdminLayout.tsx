@@ -8,7 +8,7 @@ import {
   TrendingDown, Calculator, Plane, Activity, Home, CreditCard, Trash2,
   Building2, Bus, Heart, FileCheck, Sparkles, UserCheck, BookMarked, Truck,
   Scale, Users2, Package, ClipboardList, KeyRound, HeartPulse, Settings2, BellRing, Zap,
-  MapPin, Tent, Tag
+  MapPin, Tent, Tag, Bot, Award
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePermissions, type Module, type Action } from "@/hooks/use-permissions";
@@ -100,6 +100,13 @@ function buildMenu(openComplaints: number): MenuSection[] {
         { icon: MapPin, label: "Ziyarat", href: "/admin/ziyarat", require: ["groups", "view"] },
         { icon: Tent, label: "Mina / Arafat / Muzdalifah", href: "/admin/allocations", require: ["groups", "view"] },
         { icon: Tag, label: "Luggage", href: "/admin/luggage", require: ["groups", "view"] },
+      ],
+    },
+    {
+      section: "Automation",
+      items: [
+        { icon: Bot, label: "Automation Center", href: "/admin/automation-center", require: ["bookings", "edit"] },
+        { icon: Award, label: "Loyalty & Rewards", href: "/admin/loyalty", require: ["bookings", "view"] },
       ],
     },
     {

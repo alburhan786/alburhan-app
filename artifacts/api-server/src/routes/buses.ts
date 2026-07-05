@@ -3,6 +3,7 @@ import { pool } from "@workspace/db";
 import { requireAdmin, requireModuleAccess, type AuthenticatedRequest } from "../lib/auth.js";
 import { randomUUID } from "crypto";
 import { fireNotificationEvent } from "../lib/notificationEngine.js";
+import { triggerWorkflow } from "../lib/workflowEngine.js";
 
 const router = Router();
 router.use(requireModuleAccess("groups") as any);
@@ -110,8 +111,13 @@ router.post("/:busId/assign", requireAdmin as any, async (req, res) => {
       await pool.query(`UPDATE pilgrims SET bus_number=$1, seat_number=$2 WHERE id=$3`, [bus.rows[0].bus_number, seatNumber||null, pilgrimId]);
     }
     res.json({ message: "Assigned" });
-    pool.query(`SELECT p.full_name, p.mobile_india, b.bus_number FROM pilgrims p, buses b WHERE p.id=$1 AND b.id=$2`, [pilgrimId, req.params.busId])
-      .then(r => { if (r.rows[0]) fireNotificationEvent("bus_assigned", { customerName: r.rows[0].full_name, customerMobile: r.rows[0].mobile_india, busNumber: r.rows[0].bus_number, seatNumber: seatNumber || undefined }).catch(() => {}); }).catch(() => {});
+    pool.query(`SELECT p.id, p.full_name, p.mobile_india, p.booking_id, b.bus_number FROM pilgrims p, buses b WHERE p.id=$1 AND b.id=$2`, [pilgrimId, req.params.busId])
+      .then(r => {
+        if (!r.rows[0]) return;
+        const row = r.rows[0];
+        fireNotificationEvent("bus_assigned", { customerName: row.full_name, customerMobile: row.mobile_india, busNumber: row.bus_number, seatNumber: seatNumber || undefined }).catch(() => {});
+        triggerWorkflow("bus_assigned", { customerName: row.full_name, customerMobile: row.mobile_india, pilgramName: row.full_name, bookingId: row.booking_id, busNumber: row.bus_number, roomNumber: seatNumber ? `Seat ${seatNumber}` : undefined }).catch(() => {});
+      }).catch(() => {});
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
