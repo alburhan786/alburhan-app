@@ -64,7 +64,10 @@ const BOTBEE_BASE_URL = "https://app.botbee.io/api/v1/whatsapp";
 
 function toFast2SMSPhone(mobile: string): string {
   const clean = mobile.replace(/\D/g, "");
+  // Strip country code: +919876543210 or 919876543210 (12 digits)
   if (clean.startsWith("91") && clean.length === 12) return clean.slice(2);
+  // Strip leading zero: 09876543210 (11 digits)
+  if (clean.startsWith("0") && clean.length === 11) return clean.slice(1);
   return clean;
 }
 

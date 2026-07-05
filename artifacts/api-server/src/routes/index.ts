@@ -125,17 +125,25 @@ router.get("/download-dist", (_req, res) => {
   }
 });
 
-// Temporary: serve compiled API server bundle for VPS deployment
-router.get("/deploy-dist", (_req, res) => {
-  const bundle = "/home/runner/workspace/artifacts/api-server/dist/index.cjs";
-  if (fs.existsSync(bundle)) {
+// Serve compiled API server bundle for VPS deployment
+// Accessible at both /api/deploy-dist and /api/download-api
+function serveApiBundle(_req: any, res: any) {
+  const candidates = [
+    "/home/runner/workspace/artifacts/api-server/dist/index.cjs",
+    path.resolve(process.cwd(), "dist/index.cjs"),
+    path.resolve(process.cwd(), "../../artifacts/api-server/dist/index.cjs"),
+  ];
+  const found = candidates.find(p => fs.existsSync(p));
+  if (found) {
     res.setHeader("Content-Type", "application/octet-stream");
     res.setHeader("Content-Disposition", 'attachment; filename="index.cjs"');
-    res.sendFile(bundle);
+    res.sendFile(found);
   } else {
-    res.status(404).json({ error: "Bundle not found — run build first" });
+    res.status(404).json({ error: "API bundle not found — run build first", tried: candidates });
   }
-});
+}
+router.get("/deploy-dist", serveApiBundle);
+router.get("/download-api", serveApiBundle);
 
 router.use(healthRouter);
 router.use("/auth", authRouter);

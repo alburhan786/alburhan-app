@@ -96,19 +96,20 @@ router.post("/send-otp", async (req, res) => {
 
   // ── Send WhatsApp as backup ────────────────────────────────────────────────
   let waSent = false;
+  let waResult: Awaited<ReturnType<typeof sendWhatsApp>> | null = null;
   try {
     const waPromise = sendWhatsApp(
       cleanMobile,
       `Your Al Burhan Tours & Travels OTP is: *${otp}*\n\nValid for 5 minutes. Do not share with anyone.\n\nAl Burhan Tours & Travels\n+91 8989701701`
     );
-    waSent = await Promise.race([
-      waPromise,
-      new Promise<boolean>(r => setTimeout(() => r(false), 8000)),
-    ]);
+    // sendWhatsApp returns SendResult (not boolean) — extract .ok
+    const timedOut = new Promise<null>(r => setTimeout(() => r(null), 8000));
+    waResult = await Promise.race([waPromise, timedOut]);
+    waSent = waResult?.ok === true;
   } catch {
     waSent = false;
   }
-  console.log(`[OTP-SEND] WhatsApp result: waSent=${waSent}`);
+  console.log(`[OTP-SEND] WhatsApp result: waSent=${waSent} ok=${waResult?.ok} err=${waResult?.errorMessage || "none"}`);
 
   const isAdmin = ADMIN_MOBILES.includes(cleanMobile);
 
@@ -123,12 +124,14 @@ router.post("/send-otp", async (req, res) => {
     (smsResult.error ? ` smsError=${smsResult.error}` : "")
   );
 
+  const delivered = smsResult.sent || waSent;
   res.json({
+    success: delivered,
     message: smsResult.sent
-      ? `OTP sent to your mobile number (via ${smsResult.route || "SMS"})`
+      ? "OTP sent successfully"
       : waSent
         ? "OTP sent via WhatsApp. Please check your WhatsApp messages."
-        : "OTP generated. SMS delivery failed — please contact support at +91 8989701701",
+        : "OTP delivery failed — please contact support at +91 8989701701",
     requestId: `otp_${Date.now()}`,
     isNewUser,
     smsSent: smsResult.sent,
