@@ -1025,6 +1025,68 @@ async function runMigrations() {
   } catch (err) {
     console.error("[Migration] scheduled_notifications failed:", err);
   }
+  // ── notification_campaigns ─────────────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS notification_campaigns (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        audience_type TEXT NOT NULL,
+        audience_id TEXT,
+        channel TEXT NOT NULL,
+        message TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        total_count INT NOT NULL DEFAULT 0,
+        sent_count INT NOT NULL DEFAULT 0,
+        failed_count INT NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        completed_at TIMESTAMPTZ
+      )
+    `);
+    console.log("[Migration] notification_campaigns table ensured");
+  } catch (err) {
+    console.error("[Migration] notification_campaigns failed:", err);
+  }
+  // ── customer_notification_preferences ─────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS customer_notification_preferences (
+        customer_id TEXT PRIMARY KEY,
+        whatsapp BOOLEAN NOT NULL DEFAULT true,
+        sms BOOLEAN NOT NULL DEFAULT true,
+        email BOOLEAN NOT NULL DEFAULT false,
+        rcs BOOLEAN NOT NULL DEFAULT false,
+        push BOOLEAN NOT NULL DEFAULT false,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    console.log("[Migration] customer_notification_preferences table ensured");
+  } catch (err) {
+    console.error("[Migration] customer_notification_preferences failed:", err);
+  }
+  // ── Seed new notification event types ─────────────────────────────────────
+  try {
+    const newEvents = [
+      'booking_rejected','booking_completed','payment_failed','balance_reminder',
+      'invoice_paid','invoice_cancelled','passport_uploaded','visa_approved',
+      'visa_rejected','flight_changed','flight_cancelled','room_changed',
+      'seat_changed','airport_checkin','missing_pilgrim','medical_emergency'
+    ];
+    const channels2 = ['whatsapp','sms','rcs','email','push'];
+    const defaultOn2: Record<string, boolean> = { whatsapp: true, sms: true, rcs: false, email: false, push: false };
+    for (const ev of newEvents) {
+      for (const ch of channels2) {
+        await pool.query(
+          `INSERT INTO notification_settings (id, event_type, channel, enabled) VALUES ($1,$2,$3,$4) ON CONFLICT (event_type, channel) DO NOTHING`,
+          [`ns_${ev}_${ch}`, ev, ch, defaultOn2[ch] ?? false]
+        );
+      }
+    }
+    console.log("[Migration] new event types seeded");
+  } catch (err) {
+    console.error("[Migration] new event types seed failed:", err);
+  }
   // ── Invoices table ─────────────────────────────────────────────────────────
   try {
     await pool.query(`

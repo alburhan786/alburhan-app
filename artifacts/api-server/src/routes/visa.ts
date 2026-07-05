@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requireAdmin, requireModuleAccess } from "../lib/auth.js";
+import { fireNotificationEvent } from "../lib/notificationEngine.js";
 
 const router = Router();
 router.use(requireModuleAccess("pilgrims") as any);
@@ -73,6 +74,13 @@ router.put("/:pilgrimId", requireAdmin as any, async (req, res) => {
       [visaStatus||null, visaNumber||null, visaType||null, visaAppliedDate||null, visaReceivedDate||null, req.params.pilgrimId]
     );
     res.json({ message: "Visa updated" });
+    if (visaStatus === "received" || visaStatus === "approved") {
+      pool.query(`SELECT full_name, mobile_india FROM pilgrims WHERE id=$1`, [req.params.pilgrimId])
+        .then(r => { if (r.rows[0]) fireNotificationEvent("visa_approved", { customerName: r.rows[0].full_name, customerMobile: r.rows[0].mobile_india, visaNumber: visaNumber || undefined }).catch(() => {}); }).catch(() => {});
+    } else if (visaStatus === "rejected") {
+      pool.query(`SELECT full_name, mobile_india FROM pilgrims WHERE id=$1`, [req.params.pilgrimId])
+        .then(r => { if (r.rows[0]) fireNotificationEvent("visa_rejected", { customerName: r.rows[0].full_name, customerMobile: r.rows[0].mobile_india }).catch(() => {}); }).catch(() => {});
+    }
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -93,6 +101,10 @@ router.post("/bulk-update", requireAdmin as any, async (req, res) => {
       [visaStatus, visaReceivedDate||null, visaAppliedDate||null, ...pilgrimIds]
     );
     res.json({ message: `Updated ${pilgrimIds.length} pilgrims`, count: pilgrimIds.length });
+    if (visaStatus === "received" || visaStatus === "approved") {
+      pool.query(`SELECT full_name, mobile_india FROM pilgrims WHERE id=ANY($1)`, [pilgrimIds])
+        .then(r => { for (const p of r.rows) fireNotificationEvent("visa_approved", { customerName: p.full_name, customerMobile: p.mobile_india }).catch(() => {}); }).catch(() => {});
+    }
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

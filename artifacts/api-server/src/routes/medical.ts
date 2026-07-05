@@ -2,6 +2,7 @@ import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requireAdmin, requireModuleAccess, type AuthenticatedRequest } from "../lib/auth.js";
 import { randomUUID } from "crypto";
+import { fireNotificationEvent } from "../lib/notificationEngine.js";
 
 const router = Router();
 router.use(requireModuleAccess("pilgrims") as any);
@@ -66,6 +67,10 @@ router.post("/cases", requireAdmin as any, async (req: AuthenticatedRequest, res
       [id, pilgrimId, groupId||null, caseType||"general", description||null, severity||"low", handledBy||null, notes||null]
     );
     res.json(result.rows[0]);
+    if (["critical", "high"].includes(severity || "")) {
+      pool.query(`SELECT full_name, mobile_india FROM pilgrims WHERE id=$1`, [pilgrimId])
+        .then(r => { if (r.rows[0]) fireNotificationEvent("medical_emergency", { customerName: r.rows[0].full_name, customerMobile: r.rows[0].mobile_india, severity: severity || undefined, description: description || undefined }).catch(() => {}); }).catch(() => {});
+    }
   } catch (err: any) {
     console.error("[medical] POST /cases error:", err);
     res.status(500).json({ error: err.message });

@@ -1,894 +1,784 @@
 import { useState, useEffect, useCallback } from "react";
-import { AdminLayout } from "@/components/layout/AdminLayout";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { useToast } from "@/hooks/use-toast";
-import {
-  Bell, MessageSquare, Mail, Smartphone, Radio, Activity, Send, RefreshCw,
-  Clock, CheckCircle, XCircle, AlertTriangle, Settings, FileText, Megaphone,
-  Zap, BarChart2, ChevronRight, Plus, Trash2, Edit2, RotateCcw, Calendar,
-  Search, Filter, TrendingUp, Users, List, PlayCircle, X
-} from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL || "";
-
-const EVENT_LABELS: Record<string, string> = {
-  new_booking: "New Booking",
-  booking_approved: "Booking Approved",
-  booking_cancelled: "Booking Cancelled",
-  payment_received: "Payment Received",
-  payment_due: "Payment Due",
-  invoice_generated: "Invoice Generated",
-  receipt_generated: "Receipt Generated",
-  visa_ready: "Visa Ready",
-  flight_assigned: "Flight Assigned",
-  hotel_assigned: "Hotel Assigned",
-  room_assigned: "Room Assigned",
-  bus_assigned: "Bus Assigned",
-  passport_expiry: "Passport Expiry",
-  departure_reminder: "Departure Reminder",
-  arrival_reminder: "Arrival Reminder",
-  return_reminder: "Return Reminder",
-  feedback_request: "Feedback Request",
-};
-
-const CHANNEL_META: Record<string, { label: string; icon: React.ElementType; color: string; bg: string }> = {
-  whatsapp: { label: "WhatsApp", icon: MessageSquare, color: "text-green-600", bg: "bg-green-50" },
-  sms: { label: "SMS", icon: Smartphone, color: "text-blue-600", bg: "bg-blue-50" },
-  rcs: { label: "RCS", icon: Radio, color: "text-purple-600", bg: "bg-purple-50" },
-  email: { label: "Email", icon: Mail, color: "text-amber-600", bg: "bg-amber-50" },
-  push: { label: "Push", icon: Bell, color: "text-rose-600", bg: "bg-rose-50" },
-};
+function apiUrl(path: string) { return `${API}${path}`; }
 
 const TABS = [
-  { id: "dashboard", label: "Dashboard", icon: BarChart2 },
-  { id: "queue", label: "Notification Queue", icon: List },
-  { id: "settings", label: "Automation Rules", icon: Settings },
-  { id: "templates", label: "Templates", icon: FileText },
-  { id: "failed", label: "Failed Messages", icon: XCircle },
-  { id: "scheduled", label: "Scheduled Messages", icon: Calendar },
-  { id: "whatsapp", label: "WhatsApp", icon: MessageSquare },
-  { id: "sms", label: "SMS", icon: Smartphone },
-  { id: "rcs", label: "RCS", icon: Radio },
-  { id: "email", label: "Email", icon: Mail },
-  { id: "push", label: "Push Notifications", icon: Bell },
-  { id: "campaigns", label: "Campaigns", icon: Megaphone },
+  { id: "dashboard", label: "📊 Dashboard" },
+  { id: "queue", label: "📋 Delivery Logs" },
+  { id: "failed", label: "❌ Failed" },
+  { id: "campaigns", label: "📢 Campaigns" },
+  { id: "scheduled", label: "🕐 Scheduled" },
+  { id: "automation", label: "⚙️ Automation" },
+  { id: "templates", label: "📝 Templates" },
+  { id: "whatsapp", label: "💬 WhatsApp" },
+  { id: "sms", label: "📱 SMS" },
+  { id: "rcs", label: "🔵 RCS" },
+  { id: "email", label: "📧 Email" },
+  { id: "push", label: "🔔 Push" },
 ];
 
-function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, { color: string; label: string }> = {
-    sent: { color: "bg-green-100 text-green-700", label: "Sent" },
-    delivered: { color: "bg-emerald-100 text-emerald-700", label: "Delivered" },
-    failed: { color: "bg-red-100 text-red-700", label: "Failed" },
-    pending: { color: "bg-amber-100 text-amber-700", label: "Pending" },
-  };
-  const s = map[status] || { color: "bg-gray-100 text-gray-600", label: status };
-  return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${s.color}`}>{s.label}</span>;
+const CH_COLORS: Record<string, string> = {
+  whatsapp: "#25D366", sms: "#f59e0b", rcs: "#3b82f6", email: "#8b5cf6", push: "#ef4444",
+};
+
+const EVENT_GROUPS: Record<string, string[]> = {
+  "Bookings": ["new_booking","booking_approved","booking_cancelled","booking_rejected","booking_completed"],
+  "Payments": ["payment_received","payment_due","payment_failed","balance_reminder"],
+  "Invoices": ["invoice_generated","receipt_generated","invoice_paid","invoice_cancelled"],
+  "Pilgrims & Documents": ["passport_uploaded","passport_expiry","visa_approved","visa_rejected","visa_ready"],
+  "Flights": ["flight_assigned","flight_changed","flight_cancelled"],
+  "Hotels": ["hotel_assigned","room_assigned","room_changed"],
+  "Transport": ["bus_assigned","seat_changed"],
+  "Travel": ["departure_reminder","arrival_reminder","return_reminder"],
+  "Attendance & Safety": ["airport_checkin","missing_pilgrim","medical_emergency"],
+  "General": ["feedback_request"],
+};
+
+const EVENT_LABELS: Record<string, string> = {
+  new_booking:"New Booking", booking_approved:"Booking Approved", booking_cancelled:"Booking Cancelled",
+  booking_rejected:"Booking Rejected", booking_completed:"Booking Completed",
+  payment_received:"Payment Received", payment_due:"Payment Due", payment_failed:"Payment Failed",
+  balance_reminder:"Balance Reminder", invoice_generated:"Invoice Generated",
+  receipt_generated:"Receipt Generated", invoice_paid:"Invoice Paid", invoice_cancelled:"Invoice Cancelled",
+  passport_uploaded:"Passport Uploaded", passport_expiry:"Passport Expiry",
+  visa_approved:"Visa Approved", visa_rejected:"Visa Rejected", visa_ready:"Visa Ready",
+  flight_assigned:"Flight Assigned", flight_changed:"Flight Changed", flight_cancelled:"Flight Cancelled",
+  hotel_assigned:"Hotel Assigned", room_assigned:"Room Assigned", room_changed:"Room Changed",
+  bus_assigned:"Bus Assigned", seat_changed:"Seat Changed",
+  departure_reminder:"Departure Reminder", arrival_reminder:"Arrival Reminder", return_reminder:"Return Reminder",
+  airport_checkin:"Airport Check-In", missing_pilgrim:"Missing Pilgrim", medical_emergency:"Medical Emergency",
+  feedback_request:"Feedback Request",
+};
+
+const ALL_EVENTS = Object.values(EVENT_GROUPS).flat();
+const CHANNELS = ["whatsapp","sms","rcs","email","push"];
+
+function useApi<T>(url: string, deps: unknown[] = []) {
+  const [data, setData] = useState<T | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const load = useCallback(async () => {
+    setLoading(true); setError(null);
+    try {
+      const res = await fetch(apiUrl(url));
+      if (!res.ok) throw new Error(await res.text());
+      setData(await res.json());
+    } catch (e: any) { setError(e.message); }
+    finally { setLoading(false); }
+  }, [url]);
+  useEffect(() => { load(); }, deps);
+  return { data, loading, error, reload: load };
 }
 
-function ChannelBadge({ channel }: { channel: string }) {
-  const m = CHANNEL_META[channel];
-  if (!m) return <span className="text-xs text-gray-500">{channel}</span>;
-  const Icon = m.icon;
+function StatusBadge({ status }: { status: string }) {
+  const color = status === "sent" ? "#22c55e" : status === "failed" ? "#ef4444" : status === "pending" ? "#f59e0b" : status === "sending" ? "#3b82f6" : "#6b7280";
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${m.bg} ${m.color}`}>
-      <Icon className="w-3 h-3" />{m.label}
+    <span style={{ background: color + "22", color, border: `1px solid ${color}44`, borderRadius: 4, padding: "2px 8px", fontSize: 11, fontWeight: 600 }}>
+      {status}
     </span>
   );
 }
 
-function formatTS(ts: string | null) {
-  if (!ts) return "—";
-  return new Date(ts).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
-}
-
-// ── Dashboard Tab ────────────────────────────────────────────────────────────
-function DashboardTab() {
-  const [stats, setStats] = useState<any>(null);
-  const [recentLogs, setRecentLogs] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [sRes, lRes] = await Promise.all([
-        fetch(`${API}/api/notification-center/stats`, { credentials: "include" }),
-        fetch(`${API}/api/notification-center/logs?limit=10`, { credentials: "include" }),
-      ]);
-      if (sRes.ok) setStats(await sRes.json());
-      if (lRes.ok) setRecentLogs((await lRes.json()).logs || []);
-    } finally { setLoading(false); }
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
-
-  if (loading) return <div className="flex items-center justify-center h-48 text-gray-400"><RefreshCw className="w-6 h-6 animate-spin mr-2" />Loading…</div>;
-
+// ── Dashboard ─────────────────────────────────────────────────────────────────
+function Dashboard() {
+  const { data, loading, reload } = useApi<any>("/api/notification-center/stats");
+  if (loading) return <div style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>Loading stats…</div>;
+  if (!data) return null;
   const cards = [
-    { label: "Today Sent", value: stats?.sent ?? 0, icon: Send, color: "text-blue-600", bg: "bg-blue-50" },
-    { label: "Delivered", value: stats?.delivered ?? 0, icon: CheckCircle, color: "text-green-600", bg: "bg-green-50" },
-    { label: "Failed", value: stats?.failed ?? 0, icon: XCircle, color: "text-red-600", bg: "bg-red-50" },
-    { label: "Pending", value: stats?.pending ?? 0, icon: Clock, color: "text-amber-600", bg: "bg-amber-50" },
-    { label: "Delivery Rate", value: `${stats?.deliveryRate ?? 0}%`, icon: TrendingUp, color: "text-purple-600", bg: "bg-purple-50" },
+    { label: "Today Sent", val: data.sent, color: "#3b82f6", icon: "📤" },
+    { label: "Delivered", val: data.delivered, color: "#22c55e", icon: "✅" },
+    { label: "Failed", val: data.failed, color: "#ef4444", icon: "❌" },
+    { label: "Pending", val: data.pending, color: "#f59e0b", icon: "⏳" },
+    { label: "Delivery Rate", val: `${data.deliveryRate}%`, color: "#8b5cf6", icon: "📊" },
+    { label: "Campaigns", val: data.campaignCount ?? 0, color: "#06b6d4", icon: "📢" },
   ];
-
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-800">Today's Overview</h2>
-        <Button variant="outline" size="sm" onClick={load}><RefreshCw className="w-4 h-4 mr-1" />Refresh</Button>
+    <div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 16, marginBottom: 28 }}>
+        {cards.map(c => (
+          <div key={c.label} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: "20px 18px", boxShadow: "0 1px 4px #0001" }}>
+            <div style={{ fontSize: 24, marginBottom: 4 }}>{c.icon}</div>
+            <div style={{ fontSize: 30, fontWeight: 800, color: c.color }}>{c.val}</div>
+            <div style={{ fontSize: 13, color: "#6b7280", marginTop: 2 }}>{c.label}</div>
+          </div>
+        ))}
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-        {cards.map(c => {
-          const Icon = c.icon;
+      <h3 style={{ fontWeight: 700, marginBottom: 12, color: "#111827" }}>Channel Health — Today</h3>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12, marginBottom: 20 }}>
+        {CHANNELS.map(ch => {
+          const s = data.channelStats?.[ch] || {};
+          const total = (s.sent || 0) + (s.failed || 0);
+          const rate = total > 0 ? Math.round((s.sent || 0) / total * 100) : 0;
           return (
-            <div key={c.label} className={`rounded-xl p-4 ${c.bg} border border-white shadow-sm`}>
-              <div className={`w-8 h-8 rounded-lg bg-white flex items-center justify-center mb-2 shadow-sm`}>
-                <Icon className={`w-4 h-4 ${c.color}`} />
+            <div key={ch} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 16 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                <span style={{ fontWeight: 700, color: CH_COLORS[ch], fontSize: 12, textTransform: "uppercase" }}>{ch}</span>
+                <span style={{ fontSize: 11, color: "#9ca3af" }}>{total} msgs</span>
               </div>
-              <div className="text-2xl font-bold text-gray-800">{c.value}</div>
-              <div className="text-xs text-gray-500 mt-0.5">{c.label}</div>
+              <div style={{ background: "#f3f4f6", borderRadius: 6, height: 8, marginBottom: 8 }}>
+                <div style={{ background: CH_COLORS[ch], height: 8, borderRadius: 6, width: `${rate}%`, transition: "width .5s" }} />
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#6b7280" }}>
+                <span>✅ {s.sent || 0}</span>
+                <span>❌ {s.failed || 0}</span>
+                <strong style={{ color: rate >= 80 ? "#22c55e" : "#ef4444" }}>{rate}%</strong>
+              </div>
             </div>
           );
         })}
       </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <h3 className="font-medium text-gray-700 mb-3 flex items-center gap-2"><Activity className="w-4 h-4" />Channel Health</h3>
-          {Object.entries(CHANNEL_META).map(([ch, meta]) => {
-            const Icon = meta.icon;
-            const chStats = stats?.channelStats?.[ch] || {};
-            const sent = (chStats.sent || 0) + (chStats.delivered || 0);
-            const failed = chStats.failed || 0;
-            const total = sent + failed;
-            const rate = total > 0 ? Math.round((sent / total) * 100) : 0;
-            return (
-              <div key={ch} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
-                <div className={`w-7 h-7 rounded-lg ${meta.bg} flex items-center justify-center`}>
-                  <Icon className={`w-3.5 h-3.5 ${meta.color}`} />
-                </div>
-                <span className="text-sm text-gray-600 w-24">{meta.label}</span>
-                <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-emerald-400 rounded-full" style={{ width: `${rate}%` }} />
-                </div>
-                <span className="text-xs text-gray-500 w-10 text-right">{total > 0 ? `${rate}%` : "—"}</span>
-                <span className="text-xs text-gray-400 w-14 text-right">{total} msgs</span>
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <h3 className="font-medium text-gray-700 mb-3 flex items-center gap-2"><Clock className="w-4 h-4" />Recent Activity</h3>
-          {recentLogs.length === 0 ? (
-            <div className="text-center text-gray-400 py-6 text-sm">No notifications yet</div>
-          ) : (
-            <div className="space-y-2">
-              {recentLogs.map((log: any) => (
-                <div key={log.id} className="flex items-center gap-2 text-sm py-1.5 border-b border-gray-50 last:border-0">
-                  <ChannelBadge channel={log.channel} />
-                  <span className="flex-1 text-gray-600 truncate">{EVENT_LABELS[log.event_type] || log.event_type}</span>
-                  <span className="text-gray-400 text-xs">{log.recipient?.slice(-4).padStart(10, "*")}</span>
-                  <StatusBadge status={log.status} />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+      <div style={{ textAlign: "right" }}>
+        <button onClick={reload} style={{ background: "#3b82f6", color: "#fff", border: "none", borderRadius: 6, padding: "8px 18px", cursor: "pointer", fontSize: 13 }}>🔄 Refresh</button>
       </div>
     </div>
   );
 }
 
-// ── Notification Queue Tab ───────────────────────────────────────────────────
-function QueueTab({ filterStatus }: { filterStatus?: string }) {
-  const [logs, setLogs] = useState<any[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(false);
+// ── Delivery Logs ─────────────────────────────────────────────────────────────
+function DeliveryLogs({ filterStatus }: { filterStatus?: string }) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState(filterStatus || "");
   const [channel, setChannel] = useState("");
   const [eventType, setEventType] = useState("");
-  const [offset, setOffset] = useState(0);
-  const { toast } = useToast();
-  const limit = 25;
+  const [page, setPage] = useState(0);
+  const LIMIT = 30;
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
-    if (search) params.set("search", search);
-    if (status) params.set("status", status);
-    if (channel) params.set("channel", channel);
-    if (eventType) params.set("event_type", eventType);
-    try {
-      const r = await fetch(`${API}/api/notification-center/logs?${params}`, { credentials: "include" });
-      if (r.ok) { const d = await r.json(); setLogs(d.logs || []); setTotal(d.total || 0); }
-    } finally { setLoading(false); }
-  }, [search, status, channel, eventType, offset]);
+  const qs = new URLSearchParams({
+    limit: String(LIMIT), offset: String(page * LIMIT),
+    ...(status && { status }), ...(channel && { channel }),
+    ...(eventType && { event_type: eventType }), ...(search && { search }),
+  }).toString();
 
-  useEffect(() => { setOffset(0); }, [search, status, channel, eventType]);
-  useEffect(() => { load(); }, [load]);
+  const { data, loading, reload } = useApi<any>(`/api/notification-center/logs?${qs}`, [qs]);
+  const [retrying, setRetrying] = useState<string | null>(null);
 
   const retry = async (id: string) => {
-    const r = await fetch(`${API}/api/notification-center/retry/${id}`, { method: "POST", credentials: "include" });
-    if (r.ok) { toast({ title: "Retried successfully" }); load(); }
-    else toast({ title: "Retry failed", variant: "destructive" });
+    setRetrying(id);
+    await fetch(apiUrl(`/api/notification-center/retry/${id}`), { method: "POST" });
+    setRetrying(null); reload();
+  };
+  const retryAll = async () => {
+    if (!confirm("Retry all failed messages (max 3 retries each)?")) return;
+    await fetch(apiUrl("/api/notification-center/retry-all-failed"), { method: "POST" });
+    reload();
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        <div className="relative flex-1 min-w-40">
-          <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-gray-400" />
-          <Input className="pl-8 h-9" placeholder="Search recipient, booking…" value={search} onChange={e => setSearch(e.target.value)} />
-        </div>
-        <Select value={status} onValueChange={setStatus}>
-          <SelectTrigger className="w-32 h-9"><SelectValue placeholder="Status" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="">All</SelectItem>
-            <SelectItem value="sent">Sent</SelectItem>
-            <SelectItem value="failed">Failed</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={channel} onValueChange={setChannel}>
-          <SelectTrigger className="w-32 h-9"><SelectValue placeholder="Channel" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="">All</SelectItem>
-            {Object.entries(CHANNEL_META).map(([k, v]) => <SelectItem key={k} value={k}>{v.label}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={eventType} onValueChange={setEventType}>
-          <SelectTrigger className="w-40 h-9"><SelectValue placeholder="Event" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="">All Events</SelectItem>
-            {Object.entries(EVENT_LABELS).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Button variant="outline" size="sm" onClick={load}><RefreshCw className="w-4 h-4" /></Button>
+    <div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+        <input value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} placeholder="Search recipient / message…"
+          style={{ flex: 1, minWidth: 160, border: "1px solid #d1d5db", borderRadius: 6, padding: "7px 10px", fontSize: 13 }} />
+        {!filterStatus && (
+          <select value={status} onChange={e => { setStatus(e.target.value); setPage(0); }}
+            style={{ border: "1px solid #d1d5db", borderRadius: 6, padding: "7px 10px", fontSize: 13 }}>
+            <option value="">All Status</option>
+            {["sent","failed","pending"].map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        )}
+        <select value={channel} onChange={e => { setChannel(e.target.value); setPage(0); }}
+          style={{ border: "1px solid #d1d5db", borderRadius: 6, padding: "7px 10px", fontSize: 13 }}>
+          <option value="">All Channels</option>
+          {CHANNELS.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <select value={eventType} onChange={e => { setEventType(e.target.value); setPage(0); }}
+          style={{ border: "1px solid #d1d5db", borderRadius: 6, padding: "7px 10px", fontSize: 13 }}>
+          <option value="">All Events</option>
+          {ALL_EVENTS.map(e => <option key={e} value={e}>{EVENT_LABELS[e] || e}</option>)}
+        </select>
+        {filterStatus === "failed" && (
+          <button onClick={retryAll} style={{ background: "#ef4444", color: "#fff", border: "none", borderRadius: 6, padding: "7px 14px", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
+            ⟳ Retry All
+          </button>
+        )}
+        <button onClick={reload} style={{ background: "#3b82f6", color: "#fff", border: "none", borderRadius: 6, padding: "7px 12px", cursor: "pointer" }}>🔄</button>
       </div>
 
-      {loading ? (
-        <div className="flex items-center justify-center h-32 text-gray-400"><RefreshCw className="w-5 h-5 animate-spin mr-2" />Loading…</div>
-      ) : logs.length === 0 ? (
-        <div className="text-center text-gray-400 py-12">No notifications found</div>
-      ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Event</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Channel</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Recipient</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Status</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Retries</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Sent At</th>
-                <th className="px-3 py-2"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {logs.map((log: any) => (
-                <tr key={log.id} className="hover:bg-gray-50">
-                  <td className="px-3 py-2 text-gray-700">{EVENT_LABELS[log.event_type] || log.event_type}</td>
-                  <td className="px-3 py-2"><ChannelBadge channel={log.channel} /></td>
-                  <td className="px-3 py-2 text-gray-500 font-mono text-xs">{log.recipient}</td>
-                  <td className="px-3 py-2"><StatusBadge status={log.status} /></td>
-                  <td className="px-3 py-2 text-gray-400 text-center">{log.retry_count}</td>
-                  <td className="px-3 py-2 text-gray-400 text-xs">{formatTS(log.sent_at || log.created_at)}</td>
-                  <td className="px-3 py-2">
-                    {log.status === "failed" && (
-                      <Button variant="ghost" size="sm" onClick={() => retry(log.id)} className="h-6 px-2 text-xs">
-                        <RotateCcw className="w-3 h-3 mr-1" />Retry
-                      </Button>
-                    )}
-                  </td>
+      {loading ? <div style={{ padding: 32, textAlign: "center", color: "#9ca3af" }}>Loading…</div> : (
+        <>
+          <div style={{ overflowX: "auto", borderRadius: 8, border: "1px solid #e5e7eb" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, background: "#fff" }}>
+              <thead>
+                <tr style={{ background: "#f8fafc" }}>
+                  {["Time","Recipient","Channel","Event","Message","Status","Retries","Action"].map(h => (
+                    <th key={h} style={{ padding: "9px 10px", textAlign: "left", fontWeight: 600, color: "#374151", borderBottom: "1px solid #e5e7eb", whiteSpace: "nowrap" }}>{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          <div className="px-3 py-2 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
-            <span>{total} total</span>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - limit))} className="h-6 px-2 text-xs">Prev</Button>
-              <Button variant="outline" size="sm" disabled={offset + limit >= total} onClick={() => setOffset(offset + limit)} className="h-6 px-2 text-xs">Next</Button>
+              </thead>
+              <tbody>
+                {(data?.logs || []).length === 0 && (
+                  <tr><td colSpan={8} style={{ textAlign: "center", padding: 32, color: "#9ca3af" }}>No logs found</td></tr>
+                )}
+                {(data?.logs || []).map((log: any) => (
+                  <tr key={log.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                    <td style={{ padding: "8px 10px", color: "#6b7280", whiteSpace: "nowrap" }}>
+                      {new Date(log.created_at).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" })}
+                    </td>
+                    <td style={{ padding: "8px 10px" }}>{log.recipient}</td>
+                    <td style={{ padding: "8px 10px" }}>
+                      <span style={{ background: CH_COLORS[log.channel] + "22", color: CH_COLORS[log.channel], borderRadius: 4, padding: "2px 7px", fontSize: 11, fontWeight: 700 }}>{log.channel}</span>
+                    </td>
+                    <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>{EVENT_LABELS[log.event_type] || log.event_type}</td>
+                    <td style={{ padding: "8px 10px", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#6b7280" }} title={log.message}>{log.message}</td>
+                    <td style={{ padding: "8px 10px" }}><StatusBadge status={log.status} /></td>
+                    <td style={{ padding: "8px 10px", textAlign: "center" }}>{log.retry_count || 0}<span style={{ color: "#9ca3af" }}>/3</span></td>
+                    <td style={{ padding: "8px 10px" }}>
+                      {log.status === "failed" && (log.retry_count || 0) < 3 && (
+                        <button onClick={() => retry(log.id)} disabled={retrying === log.id}
+                          style={{ background: "#f59e0b", color: "#fff", border: "none", borderRadius: 4, padding: "3px 9px", cursor: "pointer", fontSize: 11 }}>
+                          {retrying === log.id ? "…" : "⟳ Retry"}
+                        </button>
+                      )}
+                      {(log.retry_count || 0) >= 3 && log.status === "failed" && (
+                        <span style={{ fontSize: 10, color: "#ef4444" }}>Max retries</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12, fontSize: 13, color: "#6b7280" }}>
+            <span>Total: {data?.total ?? 0} entries</span>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <button disabled={page === 0} onClick={() => setPage(p => p - 1)}
+                style={{ border: "1px solid #d1d5db", borderRadius: 4, padding: "4px 12px", cursor: page === 0 ? "not-allowed" : "pointer", opacity: page === 0 ? 0.4 : 1 }}>← Prev</button>
+              <span>Page {page + 1}</span>
+              <button disabled={(data?.logs?.length || 0) < LIMIT} onClick={() => setPage(p => p + 1)}
+                style={{ border: "1px solid #d1d5db", borderRadius: 4, padding: "4px 12px", cursor: "pointer" }}>Next →</button>
             </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );
 }
 
-// ── Automation Rules / Channel Settings Tab ──────────────────────────────────
-function SettingsTab() {
-  const [settings, setSettings] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const { toast } = useToast();
+// ── Campaign Manager ──────────────────────────────────────────────────────────
+function CampaignManager() {
+  const { data: aud } = useApi<any>("/api/notification-center/campaigns/audiences");
+  const { data: campData, loading: campLoading, reload: reloadCamps } = useApi<any>("/api/notification-center/campaigns");
+  const [form, setForm] = useState({ name: "", audience_type: "all_pilgrims", audience_id: "", channel: "whatsapp", message: "" });
+  const [preview, setPreview] = useState<{ count: number } | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<any>(null);
 
-  useEffect(() => {
-    fetch(`${API}/api/notification-center/settings`, { credentials: "include" })
-      .then(r => r.json()).then(d => setSettings(d.settings || [])).finally(() => setLoading(false));
-  }, []);
+  const AUDIENCE_TYPES = [
+    { value: "all_pilgrims", label: "All Pilgrims", count: aud?.counts?.all_pilgrims },
+    { value: "outstanding_payments", label: "Outstanding Payments", count: aud?.counts?.outstanding_payments },
+    { value: "visa_pending", label: "Visa Pending", count: aud?.counts?.visa_pending },
+    { value: "group", label: "By Hajj Group" },
+    { value: "bus", label: "By Bus" },
+  ];
 
-  const toggle = (eventType: string, channel: string) => {
-    setSettings(prev => prev.map(s =>
-      s.event_type === eventType && s.channel === channel ? { ...s, enabled: !s.enabled } : s
-    ));
+  const needsId = ["group","bus"].includes(form.audience_type);
+
+  const getPreview = async () => {
+    setPreviewing(true); setPreview(null);
+    try {
+      const res = await fetch(apiUrl("/api/notification-center/campaigns/preview"), {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ audience_type: form.audience_type, audience_id: form.audience_id }),
+      });
+      setPreview(await res.json());
+    } catch { setPreview(null); }
+    setPreviewing(false);
   };
 
-  const getVal = (eventType: string, channel: string) => {
-    const s = settings.find(s => s.event_type === eventType && s.channel === channel);
-    return s?.enabled ?? false;
-  };
-
-  const save = async () => {
-    setSaving(true);
-    const r = await fetch(`${API}/api/notification-center/settings`, {
-      method: "PUT", credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ settings: settings.map(s => ({ event_type: s.event_type, channel: s.channel, enabled: s.enabled })) }),
+  const send = async () => {
+    if (!form.message.trim()) { alert("Message is required"); return; }
+    if (needsId && !form.audience_id) { alert("Please select a group or bus"); return; }
+    if (!confirm(`Send to ${preview?.count ?? "?"} recipients via ${form.channel.toUpperCase()}?`)) return;
+    setSending(true); setResult(null);
+    const res = await fetch(apiUrl("/api/notification-center/campaigns"), {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form),
     });
-    setSaving(false);
-    if (r.ok) toast({ title: "Settings saved" });
-    else toast({ title: "Save failed", variant: "destructive" });
+    const d = await res.json(); setResult(d); setSending(false); reloadCamps();
   };
-
-  if (loading) return <div className="flex items-center justify-center h-32 text-gray-400"><RefreshCw className="w-5 h-5 animate-spin mr-2" />Loading…</div>;
-
-  const events = Object.entries(EVENT_LABELS);
-  const channels = Object.entries(CHANNEL_META);
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-800">Automation Rules</h2>
-          <p className="text-sm text-gray-500">Enable or disable notification channels per event type</p>
-        </div>
-        <Button onClick={save} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700 text-white">
-          {saving ? <RefreshCw className="w-4 h-4 animate-spin mr-1" /> : null}Save Changes
-        </Button>
-      </div>
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 28 }}>
+      <div>
+        <h3 style={{ fontWeight: 800, fontSize: 16, marginBottom: 16 }}>📢 New Campaign</h3>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 4 }}>Campaign Name (optional)</label>
+            <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Visa Ready Alert — June 2026"
+              style={{ width: "100%", border: "1px solid #d1d5db", borderRadius: 6, padding: "8px 10px", fontSize: 13, boxSizing: "border-box" }} />
+          </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Event</th>
-              {channels.map(([ch, meta]) => {
-                const Icon = meta.icon;
-                return (
-                  <th key={ch} className="px-3 py-3 text-center text-xs font-semibold text-gray-600">
-                    <div className="flex flex-col items-center gap-1">
-                      <div className={`w-6 h-6 rounded-md ${meta.bg} flex items-center justify-center`}>
-                        <Icon className={`w-3.5 h-3.5 ${meta.color}`} />
-                      </div>
-                      {meta.label}
-                    </div>
-                  </th>
-                );
-              })}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {events.map(([ev, label]) => (
-              <tr key={ev} className="hover:bg-gray-50">
-                <td className="px-4 py-2.5 font-medium text-gray-700">{label}</td>
-                {channels.map(([ch]) => (
-                  <td key={ch} className="px-3 py-2.5 text-center">
-                    <Switch
-                      checked={getVal(ev, ch)}
-                      onCheckedChange={() => toggle(ev, ch)}
-                      className="data-[state=checked]:bg-emerald-500"
-                    />
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 4 }}>Audience *</label>
+            <select value={form.audience_type} onChange={e => setForm(p => ({ ...p, audience_type: e.target.value, audience_id: "" }))}
+              style={{ width: "100%", border: "1px solid #d1d5db", borderRadius: 6, padding: "8px 10px", fontSize: 13 }}>
+              {AUDIENCE_TYPES.map(a => (
+                <option key={a.value} value={a.value}>
+                  {a.label}{a.count != null ? ` (${a.count} recipients)` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
 
-// ── Templates Tab ────────────────────────────────────────────────────────────
-function TemplatesTab() {
-  const [templates, setTemplates] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState<any | null>(null);
-  const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({ name: "", event_type: "", channel: "whatsapp", subject: "", body: "" });
-  const { toast } = useToast();
-
-  const load = async () => {
-    setLoading(true);
-    const r = await fetch(`${API}/api/notification-center/templates`, { credentials: "include" });
-    if (r.ok) setTemplates((await r.json()).templates || []);
-    setLoading(false);
-  };
-
-  useEffect(() => { load(); }, []);
-
-  const openEdit = (t: any) => { setEditing(t); setForm({ name: t.name, event_type: t.event_type || "", channel: t.channel, subject: t.subject || "", body: t.body }); setCreating(true); };
-  const openNew = () => { setEditing(null); setForm({ name: "", event_type: "", channel: "whatsapp", subject: "", body: "" }); setCreating(true); };
-
-  const save = async () => {
-    const url = editing ? `${API}/api/notification-center/templates/${editing.id}` : `${API}/api/notification-center/templates`;
-    const r = await fetch(url, { method: editing ? "PUT" : "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
-    if (r.ok) { toast({ title: editing ? "Template updated" : "Template created" }); setCreating(false); load(); }
-    else toast({ title: "Save failed", variant: "destructive" });
-  };
-
-  const del = async (id: string) => {
-    if (!confirm("Delete this template?")) return;
-    await fetch(`${API}/api/notification-center/templates/${id}`, { method: "DELETE", credentials: "include" });
-    toast({ title: "Deleted" }); load();
-  };
-
-  if (creating) {
-    return (
-      <div className="max-w-xl space-y-4">
-        <div className="flex items-center gap-2 mb-2">
-          <Button variant="ghost" size="sm" onClick={() => setCreating(false)}><X className="w-4 h-4" /></Button>
-          <h2 className="font-semibold text-gray-800">{editing ? "Edit Template" : "New Template"}</h2>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1 col-span-2">
-              <Label className="text-xs">Template Name *</Label>
-              <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Booking Approval WhatsApp" />
+          {form.audience_type === "group" && (
+            <div>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 4 }}>Select Group *</label>
+              <select value={form.audience_id} onChange={e => setForm(p => ({ ...p, audience_id: e.target.value }))}
+                style={{ width: "100%", border: "1px solid #d1d5db", borderRadius: 6, padding: "8px 10px", fontSize: 13 }}>
+                <option value="">— Select Group —</option>
+                {(aud?.groups || []).map((g: any) => <option key={g.id} value={g.id}>{g.name}</option>)}
+              </select>
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Event Type</Label>
-              <Select value={form.event_type} onValueChange={v => setForm(p => ({ ...p, event_type: v }))}>
-                <SelectTrigger><SelectValue placeholder="Select event" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">Generic</SelectItem>
-                  {Object.entries(EVENT_LABELS).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
-                </SelectContent>
-              </Select>
+          )}
+
+          {form.audience_type === "bus" && (
+            <div>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 4 }}>Select Bus *</label>
+              <select value={form.audience_id} onChange={e => setForm(p => ({ ...p, audience_id: e.target.value }))}
+                style={{ width: "100%", border: "1px solid #d1d5db", borderRadius: 6, padding: "8px 10px", fontSize: 13 }}>
+                <option value="">— Select Bus —</option>
+                {(aud?.buses || []).map((b: any) => <option key={b.id} value={b.id}>{b.bus_number}</option>)}
+              </select>
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Channel *</Label>
-              <Select value={form.channel} onValueChange={v => setForm(p => ({ ...p, channel: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {Object.entries(CHANNEL_META).map(([k, v]) => <SelectItem key={k} value={k}>{v.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
+          )}
+
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 6 }}>Channel *</label>
+            <div style={{ display: "flex", gap: 8 }}>
+              {["whatsapp","sms","rcs","email"].map(ch => (
+                <button key={ch} onClick={() => setForm(p => ({ ...p, channel: ch }))}
+                  style={{ flex: 1, background: form.channel === ch ? CH_COLORS[ch] : "#f3f4f6", color: form.channel === ch ? "#fff" : "#374151", border: "none", borderRadius: 6, padding: "9px 4px", cursor: "pointer", fontSize: 11, fontWeight: 700, transition: "all .2s" }}>
+                  {ch.toUpperCase()}
+                </button>
+              ))}
             </div>
-            {form.channel === "email" && (
-              <div className="space-y-1 col-span-2">
-                <Label className="text-xs">Subject</Label>
-                <Input value={form.subject} onChange={e => setForm(p => ({ ...p, subject: e.target.value }))} placeholder="Email subject…" />
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 4 }}>Message *</label>
+            <textarea rows={6} value={form.message} onChange={e => setForm(p => ({ ...p, message: e.target.value }))}
+              placeholder="Type your broadcast message here…&#10;&#10;Use Assalamu Alaikum to greet your pilgrims."
+              style={{ width: "100%", border: "1px solid #d1d5db", borderRadius: 6, padding: "8px 10px", fontSize: 13, resize: "vertical", boxSizing: "border-box" }} />
+            <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>{form.message.length} characters</div>
+          </div>
+
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button onClick={getPreview} disabled={previewing || (needsId && !form.audience_id)}
+              style={{ background: "#8b5cf6", color: "#fff", border: "none", borderRadius: 6, padding: "9px 18px", cursor: "pointer", fontWeight: 600, fontSize: 13 }}>
+              {previewing ? "…" : "👁 Preview Count"}
+            </button>
+            {preview && (
+              <div style={{ background: "#ecfdf5", border: "1px solid #bbf7d0", borderRadius: 8, padding: "9px 16px", color: "#166534", fontWeight: 700, fontSize: 15 }}>
+                👤 {preview.count} recipients
               </div>
             )}
-            <div className="space-y-1 col-span-2">
-              <Label className="text-xs">Message Body *</Label>
-              <Textarea value={form.body} onChange={e => setForm(p => ({ ...p, body: e.target.value }))} rows={7} placeholder={"Use {customerName}, {bookingNumber}, {packageName}, {amount} as variables"} className="font-mono text-xs" />
-              <p className="text-xs text-gray-400">Variables: {"{customerName}, {bookingNumber}, {packageName}, {amount}, {invoiceNumber}, {departureDate}"}</p>
-            </div>
           </div>
-          <div className="flex gap-2 justify-end">
-            <Button variant="outline" onClick={() => setCreating(false)}>Cancel</Button>
-            <Button onClick={save} className="bg-emerald-600 hover:bg-emerald-700 text-white">Save Template</Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-800">Message Templates</h2>
-        <Button onClick={openNew} className="bg-emerald-600 hover:bg-emerald-700 text-white"><Plus className="w-4 h-4 mr-1" />New Template</Button>
-      </div>
-      {loading ? (
-        <div className="flex items-center justify-center h-32 text-gray-400"><RefreshCw className="w-5 h-5 animate-spin mr-2" />Loading…</div>
-      ) : templates.length === 0 ? (
-        <div className="text-center bg-white rounded-xl border border-gray-200 py-12">
-          <FileText className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500 text-sm">No templates yet. Create your first message template.</p>
-          <Button variant="outline" className="mt-3" onClick={openNew}>Create Template</Button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {templates.map((t: any) => (
-            <div key={t.id} className="bg-white rounded-xl border border-gray-200 p-4 space-y-2">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <div className="font-medium text-gray-800 text-sm">{t.name}</div>
-                  <div className="flex gap-2 mt-1">
-                    <ChannelBadge channel={t.channel} />
-                    {t.event_type && <span className="text-xs text-gray-400">{EVENT_LABELS[t.event_type] || t.event_type}</span>}
-                  </div>
-                </div>
-                <div className="flex gap-1">
-                  <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => openEdit(t)}><Edit2 className="w-3.5 h-3.5" /></Button>
-                  <Button variant="ghost" size="sm" className="h-7 px-2 text-red-500 hover:text-red-600" onClick={() => del(t.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
-                </div>
-              </div>
-              <p className="text-xs text-gray-500 bg-gray-50 rounded p-2 line-clamp-3 font-mono">{t.body}</p>
+          {result && (
+            <div style={{ background: result.campaignId ? "#ecfdf5" : "#fef2f2", border: `1px solid ${result.campaignId ? "#bbf7d0" : "#fecaca"}`, borderRadius: 8, padding: 12, fontSize: 13, color: result.campaignId ? "#166534" : "#991b1b" }}>
+              {result.message || result.error}
             </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
+          )}
 
-// ── Failed Messages Tab ──────────────────────────────────────────────────────
-function FailedTab() {
-  const { toast } = useToast();
-  const [retrying, setRetrying] = useState(false);
-
-  const retryAll = async () => {
-    setRetrying(true);
-    const r = await fetch(`${API}/api/notification-center/retry-all-failed`, { method: "POST", credentials: "include" });
-    setRetrying(false);
-    if (r.ok) {
-      const d = await r.json();
-      toast({ title: `Retried ${d.success} messages successfully` });
-    } else toast({ title: "Retry failed", variant: "destructive" });
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-800">Failed Messages</h2>
-          <p className="text-sm text-gray-500">Messages that failed to deliver</p>
-        </div>
-        <Button onClick={retryAll} disabled={retrying} variant="outline" className="border-red-200 text-red-600 hover:bg-red-50">
-          {retrying ? <RefreshCw className="w-4 h-4 animate-spin mr-1" /> : <RotateCcw className="w-4 h-4 mr-1" />}
-          Retry All Failed
-        </Button>
-      </div>
-      <QueueTab filterStatus="failed" />
-    </div>
-  );
-}
-
-// ── Scheduled Messages Tab ───────────────────────────────────────────────────
-function ScheduledTab() {
-  const [scheduled, setScheduled] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
-  const [processing, setProcessing] = useState(false);
-  const [form, setForm] = useState({ event_type: "payment_due", channel: "whatsapp", recipient: "", customer_name: "", message: "", scheduled_at: "" });
-  const { toast } = useToast();
-
-  const load = async () => {
-    setLoading(true);
-    const r = await fetch(`${API}/api/notification-center/scheduled`, { credentials: "include" });
-    if (r.ok) setScheduled((await r.json()).scheduled || []);
-    setLoading(false);
-  };
-
-  useEffect(() => { load(); }, []);
-
-  const save = async () => {
-    if (!form.recipient || !form.message || !form.scheduled_at) {
-      toast({ title: "Fill all required fields", variant: "destructive" }); return;
-    }
-    const r = await fetch(`${API}/api/notification-center/scheduled`, {
-      method: "POST", credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-    if (r.ok) { toast({ title: "Scheduled!" }); setCreating(false); load(); }
-    else toast({ title: "Failed to schedule", variant: "destructive" });
-  };
-
-  const cancel = async (id: string) => {
-    if (!confirm("Cancel this scheduled message?")) return;
-    await fetch(`${API}/api/notification-center/scheduled/${id}`, { method: "DELETE", credentials: "include" });
-    toast({ title: "Cancelled" }); load();
-  };
-
-  const processNow = async () => {
-    setProcessing(true);
-    const r = await fetch(`${API}/api/notification-center/process-scheduled`, { method: "POST", credentials: "include" });
-    setProcessing(false);
-    if (r.ok) { const d = await r.json(); toast({ title: `Processed ${d.processed} – sent ${d.sent}` }); load(); }
-  };
-
-  const statusColors: Record<string, string> = {
-    pending: "bg-amber-100 text-amber-700",
-    sent: "bg-green-100 text-green-700",
-    failed: "bg-red-100 text-red-700",
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-800">Scheduled Messages</h2>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={processNow} disabled={processing}>
-            {processing ? <RefreshCw className="w-4 h-4 animate-spin mr-1" /> : <PlayCircle className="w-4 h-4 mr-1" />}Send Due Now
-          </Button>
-          <Button onClick={() => setCreating(!creating)} className="bg-emerald-600 hover:bg-emerald-700 text-white">
-            <Plus className="w-4 h-4 mr-1" />Schedule Message
-          </Button>
-        </div>
-      </div>
-
-      {creating && (
-        <div className="bg-white rounded-xl border border-emerald-200 p-5 space-y-4">
-          <h3 className="font-medium text-gray-800">New Scheduled Message</h3>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs">Event Type</Label>
-              <Select value={form.event_type} onValueChange={v => setForm(p => ({ ...p, event_type: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{Object.entries(EVENT_LABELS).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Channel</Label>
-              <Select value={form.channel} onValueChange={v => setForm(p => ({ ...p, channel: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{Object.entries(CHANNEL_META).map(([k, v]) => <SelectItem key={k} value={k}>{v.label}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Recipient Mobile / Email *</Label>
-              <Input value={form.recipient} onChange={e => setForm(p => ({ ...p, recipient: e.target.value }))} placeholder="+91 9XXXXXXXXX" />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Customer Name</Label>
-              <Input value={form.customer_name} onChange={e => setForm(p => ({ ...p, customer_name: e.target.value }))} placeholder="Optional" />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Send At *</Label>
-              <Input type="datetime-local" value={form.scheduled_at} onChange={e => setForm(p => ({ ...p, scheduled_at: e.target.value }))} />
-            </div>
-            <div className="space-y-1 col-span-2">
-              <Label className="text-xs">Message *</Label>
-              <Textarea value={form.message} onChange={e => setForm(p => ({ ...p, message: e.target.value }))} rows={4} placeholder="Your message…" />
-            </div>
-          </div>
-          <div className="flex gap-2 justify-end">
-            <Button variant="outline" onClick={() => setCreating(false)}>Cancel</Button>
-            <Button onClick={save} className="bg-emerald-600 hover:bg-emerald-700 text-white">Schedule</Button>
-          </div>
-        </div>
-      )}
-
-      {loading ? (
-        <div className="flex items-center justify-center h-32 text-gray-400"><RefreshCw className="w-5 h-5 animate-spin mr-2" />Loading…</div>
-      ) : scheduled.length === 0 ? (
-        <div className="text-center bg-white rounded-xl border border-gray-200 py-12">
-          <Calendar className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500 text-sm">No scheduled messages. Set up reminders, follow-ups, and more.</p>
-        </div>
-      ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Event</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Channel</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Recipient</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Scheduled At</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Status</th>
-                <th className="px-3 py-2"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {scheduled.map((s: any) => (
-                <tr key={s.id} className="hover:bg-gray-50">
-                  <td className="px-3 py-2 text-gray-700">{EVENT_LABELS[s.event_type] || s.event_type}</td>
-                  <td className="px-3 py-2"><ChannelBadge channel={s.channel} /></td>
-                  <td className="px-3 py-2 text-gray-500 font-mono text-xs">{s.recipient}</td>
-                  <td className="px-3 py-2 text-gray-500 text-xs">{formatTS(s.scheduled_at)}</td>
-                  <td className="px-3 py-2">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[s.status] || "bg-gray-100 text-gray-600"}`}>{s.status}</span>
-                  </td>
-                  <td className="px-3 py-2">
-                    {s.status === "pending" && (
-                      <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-red-500" onClick={() => cancel(s.id)}>
-                        <X className="w-3 h-3 mr-1" />Cancel
-                      </Button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Channel Info Tab (WhatsApp / SMS / RCS / Email / Push) ───────────────────
-function ChannelInfoTab({ channel }: { channel: string }) {
-  const meta = CHANNEL_META[channel];
-  const Icon = meta?.icon || Bell;
-
-  const info: Record<string, { provider: string; status: string; statusColor: string; notes: string[] }> = {
-    whatsapp: {
-      provider: "BotBee WhatsApp API", status: "Active", statusColor: "text-green-600 bg-green-50",
-      notes: [
-        "Session-based messaging via BotBee",
-        "Template messages supported via sendWhatsAppTemplate()",
-        "Configured via BOTBEE_API_KEY, BOTBEE_BUSINESS_ID, BOTBEE_PHONE_NUMBER_ID",
-        "24-hour window for session messages",
-        "Supports text, media, and rich cards",
-      ],
-    },
-    sms: {
-      provider: "Fast2SMS DLT Gateway", status: "Active", statusColor: "text-green-600 bg-green-50",
-      notes: [
-        "DLT-registered templates only for transactional SMS",
-        "Sender ID: ALBURH",
-        "Configured via FAST2SMS_API_KEY",
-        "OTP fallback to quick route if DLT fails",
-        "Supports 160-char SMS and long messages",
-      ],
-    },
-    rcs: {
-      provider: "Lemin AI RCS API", status: "Configured", statusColor: "text-amber-600 bg-amber-50",
-      notes: [
-        "Rich Communication Services via Lemin AI",
-        "Supports rich cards, carousels, and quick replies",
-        "Requires recipient device to support RCS",
-        "Falls back to SMS on unsupported devices",
-        "Configure LEMIN_API_URL, LEMIN_USER_ID, LEMIN_TEMPLATE_ID",
-      ],
-    },
-    email: {
-      provider: "SMTP / Nodemailer", status: "Active", statusColor: "text-green-600 bg-green-50",
-      notes: [
-        "Sends via configured SMTP server",
-        "HTML email support",
-        "Configure SMTP_HOST, SMTP_USER, SMTP_PASS",
-        "From address: noreply@alburhantravels.com",
-        "Supports attachments (invoices, receipts)",
-      ],
-    },
-    push: {
-      provider: "Firebase Cloud Messaging", status: "Not Configured", statusColor: "text-gray-500 bg-gray-50",
-      notes: [
-        "Firebase Push Notifications – not yet configured",
-        "Requires Firebase project setup and GOOGLE_APPLICATION_CREDENTIALS",
-        "Will send to web and mobile app subscribers",
-        "Supports rich notifications with images and action buttons",
-        "Coming soon – contact developer to enable",
-      ],
-    },
-  };
-
-  const ch = info[channel] || { provider: channel, status: "Unknown", statusColor: "text-gray-500 bg-gray-50", notes: [] };
-
-  return (
-    <div className="space-y-6">
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <div className="flex items-center gap-4 mb-4">
-          <div className={`w-12 h-12 rounded-xl ${meta?.bg || "bg-gray-100"} flex items-center justify-center`}>
-            <Icon className={`w-6 h-6 ${meta?.color || "text-gray-600"}`} />
-          </div>
-          <div>
-            <h2 className="text-lg font-semibold text-gray-800">{meta?.label || channel} Channel</h2>
-            <p className="text-sm text-gray-500">{ch.provider}</p>
-          </div>
-          <span className={`ml-auto px-3 py-1 rounded-full text-xs font-semibold ${ch.statusColor}`}>{ch.status}</span>
-        </div>
-        <div className="space-y-2">
-          {ch.notes.map((note, i) => (
-            <div key={i} className="flex items-start gap-2 text-sm text-gray-600">
-              <ChevronRight className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
-              {note}
-            </div>
-          ))}
+          <button onClick={send} disabled={sending || !form.message.trim() || (needsId && !form.audience_id)}
+            style={{ background: sending ? "#9ca3af" : "#22c55e", color: "#fff", border: "none", borderRadius: 8, padding: 12, cursor: "pointer", fontWeight: 800, fontSize: 15, transition: "background .2s" }}>
+            {sending ? "⏳ Sending Campaign…" : "📤 Send Campaign"}
+          </button>
         </div>
       </div>
 
       <div>
-        <h3 className="font-medium text-gray-700 mb-3">Recent {meta?.label} Logs</h3>
-        <QueueTab filterStatus="" />
-      </div>
-    </div>
-  );
-}
-
-// ── Campaigns Tab ────────────────────────────────────────────────────────────
-function CampaignsTab() {
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-800">Campaigns</h2>
-          <p className="text-sm text-gray-500">Send bulk messages to groups of customers</p>
-        </div>
-        <a href="/admin/broadcast" className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors">
-          <Megaphone className="w-4 h-4" />Open Broadcast Manager
-        </a>
-      </div>
-      <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
-        <Megaphone className="w-12 h-12 text-emerald-300 mx-auto mb-3" />
-        <h3 className="font-medium text-gray-700 mb-1">Broadcast Campaigns</h3>
-        <p className="text-sm text-gray-500 max-w-md mx-auto mb-4">
-          Use the Broadcast Manager to send bulk WhatsApp, SMS, RCS, and dashboard messages to customers — filter by package, status, or all customers.
-        </p>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-lg mx-auto text-xs text-left">
-          {["All Customers", "By Package", "Confirmed Bookings", "Pending Payments"].map(g => (
-            <div key={g} className="bg-gray-50 rounded-lg p-3 flex items-center gap-2">
-              <Users className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-              <span className="text-gray-600">{g}</span>
+        <h3 style={{ fontWeight: 800, fontSize: 16, marginBottom: 12 }}>📋 Campaign History</h3>
+        {campLoading ? (
+          <div style={{ color: "#9ca3af", textAlign: "center", padding: 32 }}>Loading…</div>
+        ) : (campData?.campaigns || []).length === 0 ? (
+          <div style={{ color: "#9ca3af", textAlign: "center", padding: 40, background: "#f8fafc", borderRadius: 10 }}>
+            <div style={{ fontSize: 36, marginBottom: 8 }}>📢</div>
+            No campaigns sent yet
+          </div>
+        ) : (campData?.campaigns || []).map((c: any) => (
+          <div key={c.id} style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 14, marginBottom: 10, background: "#fff" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+              <strong style={{ fontSize: 13 }}>{c.name}</strong>
+              <StatusBadge status={c.status} />
             </div>
-          ))}
-        </div>
+            <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 6 }}>
+              {new Date(c.created_at).toLocaleString("en-IN")} · {c.audience_type.replace(/_/g," ")} ·{" "}
+              <span style={{ color: CH_COLORS[c.channel], fontWeight: 700 }}>{c.channel.toUpperCase()}</span>
+            </div>
+            <div style={{ display: "flex", gap: 14, fontSize: 12, marginBottom: 6 }}>
+              <span>📊 Total: <strong>{c.total_count}</strong></span>
+              <span style={{ color: "#22c55e" }}>✅ {c.sent_count}</span>
+              <span style={{ color: "#ef4444" }}>❌ {c.failed_count}</span>
+              {c.total_count > 0 && <span style={{ color: "#8b5cf6" }}>📈 {Math.round(c.sent_count / c.total_count * 100)}%</span>}
+            </div>
+            <div style={{ fontSize: 11, color: "#9ca3af", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", background: "#f8fafc", padding: "4px 8px", borderRadius: 4 }}>
+              {c.message}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
 }
 
-// ── Main Component ───────────────────────────────────────────────────────────
-export default function CommunicationCenter() {
-  const [activeTab, setActiveTab] = useState("dashboard");
+// ── Automation Rules ──────────────────────────────────────────────────────────
+function AutomationRules() {
+  const { data, loading, reload } = useApi<any>("/api/notification-center/settings");
+  const [local, setLocal] = useState<Record<string, boolean>>({});
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
 
-  const renderTab = () => {
-    switch (activeTab) {
-      case "dashboard": return <DashboardTab />;
-      case "queue": return <QueueTab />;
-      case "settings": return <SettingsTab />;
-      case "templates": return <TemplatesTab />;
-      case "failed": return <FailedTab />;
-      case "scheduled": return <ScheduledTab />;
-      case "whatsapp":
-      case "sms":
-      case "rcs":
-      case "email":
-      case "push": return <ChannelInfoTab channel={activeTab} />;
-      case "campaigns": return <CampaignsTab />;
-      default: return <DashboardTab />;
+  useEffect(() => {
+    if (data?.settings) {
+      const m: Record<string, boolean> = {};
+      for (const s of data.settings) m[`${s.event_type}_${s.channel}`] = s.enabled;
+      setLocal(m);
     }
+  }, [data]);
+
+  const toggle = (event: string, ch: string) => setLocal(prev => ({ ...prev, [`${event}_${ch}`]: !prev[`${event}_${ch}`] }));
+
+  const save = async () => {
+    setSaving(true);
+    const settings = ALL_EVENTS.flatMap(event => CHANNELS.map(ch => ({ event_type: event, channel: ch, enabled: local[`${event}_${ch}`] ?? false })));
+    await fetch(apiUrl("/api/notification-center/settings"), { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ settings }) });
+    setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2000); reload();
+  };
+
+  if (loading) return <div style={{ padding: 32, textAlign: "center", color: "#9ca3af" }}>Loading…</div>;
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+        <p style={{ color: "#6b7280", fontSize: 13, margin: 0 }}>Enable which channels fire for each event. Changes apply immediately on save.</p>
+        <button onClick={save} disabled={saving}
+          style={{ background: saved ? "#22c55e" : "#3b82f6", color: "#fff", border: "none", borderRadius: 6, padding: "9px 22px", cursor: "pointer", fontWeight: 700, fontSize: 13 }}>
+          {saving ? "Saving…" : saved ? "✅ Saved!" : "💾 Save Rules"}
+        </button>
+      </div>
+      {Object.entries(EVENT_GROUPS).map(([group, events]) => (
+        <div key={group} style={{ marginBottom: 24 }}>
+          <h4 style={{ fontWeight: 700, color: "#374151", padding: "6px 0", borderBottom: "2px solid #e5e7eb", marginBottom: 0, fontSize: 13 }}>{group}</h4>
+          <div style={{ overflowX: "auto", border: "1px solid #e5e7eb", borderTop: "none", borderRadius: "0 0 8px 8px", background: "#fff" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+              <thead>
+                <tr style={{ background: "#f8fafc" }}>
+                  <th style={{ padding: "7px 12px", textAlign: "left", fontWeight: 600, color: "#374151", borderBottom: "1px solid #e5e7eb" }}>Event</th>
+                  {CHANNELS.map(ch => (
+                    <th key={ch} style={{ padding: "7px 12px", textAlign: "center", fontWeight: 700, color: CH_COLORS[ch], borderBottom: "1px solid #e5e7eb" }}>{ch.toUpperCase()}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {events.map(ev => (
+                  <tr key={ev} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                    <td style={{ padding: "7px 12px", color: "#374151" }}>{EVENT_LABELS[ev] || ev}</td>
+                    {CHANNELS.map(ch => {
+                      const on = local[`${ev}_${ch}`] ?? false;
+                      return (
+                        <td key={ch} style={{ padding: "7px 12px", textAlign: "center" }}>
+                          <button onClick={() => toggle(ev, ch)}
+                            style={{ background: on ? CH_COLORS[ch] : "#e5e7eb", color: on ? "#fff" : "#9ca3af", border: "none", borderRadius: 12, padding: "3px 14px", cursor: "pointer", fontSize: 11, fontWeight: 700, transition: "all .2s" }}>
+                            {on ? "ON" : "OFF"}
+                          </button>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Templates ─────────────────────────────────────────────────────────────────
+function Templates() {
+  const { data, loading, reload } = useApi<any>("/api/notification-center/templates");
+  const blank = { name: "", event_type: "", channel: "whatsapp", subject: "", body: "" };
+  const [form, setForm] = useState(blank);
+  const [editing, setEditing] = useState<any>(null);
+  const [saving, setSaving] = useState(false);
+
+  const VARS = ["{{customer_name}}","{{booking_id}}","{{amount}}","{{balance}}","{{hotel}}","{{flight}}","{{room}}","{{bus}}","{{package_name}}","{{departure_date}}","{{visa_number}}"];
+
+  const save = async () => {
+    if (!form.name || !form.body) { alert("Name and body are required"); return; }
+    setSaving(true);
+    const url = editing ? `/api/notification-center/templates/${editing.id}` : "/api/notification-center/templates";
+    await fetch(apiUrl(url), { method: editing ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+    setSaving(false); setEditing(null); setForm(blank); reload();
+  };
+
+  const del = async (id: string) => {
+    if (!confirm("Delete this template?")) return;
+    await fetch(apiUrl(`/api/notification-center/templates/${id}`), { method: "DELETE" }); reload();
+  };
+
+  const startEdit = (t: any) => { setEditing(t); setForm({ name: t.name, event_type: t.event_type || "", channel: t.channel, subject: t.subject || "", body: t.body }); };
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1.2fr", gap: 24 }}>
+      <div>
+        <h3 style={{ fontWeight: 800, fontSize: 16, marginBottom: 14 }}>{editing ? "✏️ Edit Template" : "➕ New Template"}</h3>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <input placeholder="Template name *" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
+            style={{ border: "1px solid #d1d5db", borderRadius: 6, padding: "8px 10px", fontSize: 13 }} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <select value={form.event_type} onChange={e => setForm(p => ({ ...p, event_type: e.target.value }))}
+              style={{ border: "1px solid #d1d5db", borderRadius: 6, padding: "8px 10px", fontSize: 13 }}>
+              <option value="">All Events</option>
+              {ALL_EVENTS.map(ev => <option key={ev} value={ev}>{EVENT_LABELS[ev] || ev}</option>)}
+            </select>
+            <select value={form.channel} onChange={e => setForm(p => ({ ...p, channel: e.target.value }))}
+              style={{ border: "1px solid #d1d5db", borderRadius: 6, padding: "8px 10px", fontSize: 13 }}>
+              {CHANNELS.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <input placeholder="Email subject (optional)" value={form.subject} onChange={e => setForm(p => ({ ...p, subject: e.target.value }))}
+            style={{ border: "1px solid #d1d5db", borderRadius: 6, padding: "8px 10px", fontSize: 13 }} />
+          <textarea rows={7} placeholder="Message body *" value={form.body} onChange={e => setForm(p => ({ ...p, body: e.target.value }))}
+            style={{ border: "1px solid #d1d5db", borderRadius: 6, padding: "8px 10px", fontSize: 13, resize: "vertical" }} />
+          <div style={{ background: "#f0f4ff", borderRadius: 6, padding: 8, fontSize: 11 }}>
+            <strong style={{ color: "#374151" }}>Click to insert:</strong>{" "}
+            {VARS.map(v => (
+              <code key={v} onClick={() => setForm(p => ({ ...p, body: p.body + v }))}
+                style={{ cursor: "pointer", background: "#dbeafe", color: "#1d4ed8", padding: "1px 5px", borderRadius: 3, marginRight: 4, marginBottom: 4, display: "inline-block" }}>{v}</code>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={save} disabled={saving || !form.name || !form.body}
+              style={{ flex: 1, background: editing ? "#f59e0b" : "#3b82f6", color: "#fff", border: "none", borderRadius: 6, padding: "9px", cursor: "pointer", fontWeight: 700 }}>
+              {saving ? "Saving…" : editing ? "Update Template" : "Create Template"}
+            </button>
+            {editing && (
+              <button onClick={() => { setEditing(null); setForm(blank); }}
+                style={{ border: "1px solid #d1d5db", borderRadius: 6, padding: "9px 16px", cursor: "pointer", fontSize: 13 }}>Cancel</button>
+            )}
+          </div>
+        </div>
+      </div>
+      <div>
+        <h3 style={{ fontWeight: 800, fontSize: 16, marginBottom: 12 }}>Saved Templates ({data?.templates?.length || 0})</h3>
+        {loading ? <div style={{ color: "#9ca3af" }}>Loading…</div> : (data?.templates || []).length === 0 ? (
+          <div style={{ color: "#9ca3af", textAlign: "center", padding: 32, background: "#f8fafc", borderRadius: 10 }}>No templates yet</div>
+        ) : (data?.templates || []).map((t: any) => (
+          <div key={t.id} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12, marginBottom: 8, background: "#fff" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+              <strong style={{ fontSize: 13 }}>{t.name}</strong>
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <span style={{ background: CH_COLORS[t.channel] + "22", color: CH_COLORS[t.channel], borderRadius: 4, padding: "2px 7px", fontSize: 10, fontWeight: 700 }}>{t.channel}</span>
+                <button onClick={() => startEdit(t)} style={{ background: "#3b82f6", color: "#fff", border: "none", borderRadius: 4, padding: "2px 9px", cursor: "pointer", fontSize: 11 }}>Edit</button>
+                <button onClick={() => del(t.id)} style={{ background: "#ef4444", color: "#fff", border: "none", borderRadius: 4, padding: "2px 9px", cursor: "pointer", fontSize: 11 }}>Del</button>
+              </div>
+            </div>
+            {t.event_type && <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 4 }}>Event: {EVENT_LABELS[t.event_type] || t.event_type}</div>}
+            <div style={{ fontSize: 12, color: "#374151", background: "#f8fafc", padding: "6px 8px", borderRadius: 4, maxHeight: 70, overflow: "hidden" }}>{t.body}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Scheduled Messages ────────────────────────────────────────────────────────
+function ScheduledMessages() {
+  const { data, loading, reload } = useApi<any>("/api/notification-center/scheduled");
+  const blank = { event_type: "departure_reminder", channel: "whatsapp", recipient: "", customer_name: "", message: "", scheduled_at: "" };
+  const [form, setForm] = useState(blank);
+  const [saving, setSaving] = useState(false);
+  const [processing, setProcessing] = useState(false);
+
+  const save = async () => {
+    if (!form.recipient || !form.message || !form.scheduled_at) { alert("Recipient, message and time are required"); return; }
+    setSaving(true);
+    await fetch(apiUrl("/api/notification-center/scheduled"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+    setSaving(false); setForm(blank); reload();
+  };
+
+  const cancel = async (id: string) => {
+    if (!confirm("Cancel this scheduled notification?")) return;
+    await fetch(apiUrl(`/api/notification-center/scheduled/${id}`), { method: "DELETE" }); reload();
+  };
+
+  const processDue = async () => {
+    setProcessing(true);
+    const r = await fetch(apiUrl("/api/notification-center/process-scheduled"), { method: "POST" });
+    const d = await r.json();
+    alert(`Processed ${d.processed} due messages. Sent: ${d.sent}`);
+    setProcessing(false); reload();
   };
 
   return (
-    <AdminLayout>
-      <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Bell className="w-6 h-6 text-emerald-600" />
-            Communication Center
-          </h1>
-          <p className="text-sm text-gray-500 mt-0.5">Manage all notifications, channels, templates, and delivery logs</p>
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr", gap: 24 }}>
+      <div>
+        <h3 style={{ fontWeight: 800, fontSize: 16, marginBottom: 14 }}>📅 Schedule Message</h3>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <select value={form.event_type} onChange={e => setForm(p => ({ ...p, event_type: e.target.value }))}
+            style={{ border: "1px solid #d1d5db", borderRadius: 6, padding: "8px 10px", fontSize: 13 }}>
+            {ALL_EVENTS.map(ev => <option key={ev} value={ev}>{EVENT_LABELS[ev] || ev}</option>)}
+          </select>
+          <select value={form.channel} onChange={e => setForm(p => ({ ...p, channel: e.target.value }))}
+            style={{ border: "1px solid #d1d5db", borderRadius: 6, padding: "8px 10px", fontSize: 13 }}>
+            {CHANNELS.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <input placeholder="Recipient mobile / email *" value={form.recipient} onChange={e => setForm(p => ({ ...p, recipient: e.target.value }))}
+            style={{ border: "1px solid #d1d5db", borderRadius: 6, padding: "8px 10px", fontSize: 13 }} />
+          <input placeholder="Customer name" value={form.customer_name} onChange={e => setForm(p => ({ ...p, customer_name: e.target.value }))}
+            style={{ border: "1px solid #d1d5db", borderRadius: 6, padding: "8px 10px", fontSize: 13 }} />
+          <textarea rows={4} placeholder="Message *" value={form.message} onChange={e => setForm(p => ({ ...p, message: e.target.value }))}
+            style={{ border: "1px solid #d1d5db", borderRadius: 6, padding: "8px 10px", fontSize: 13, resize: "vertical" }} />
+          <input type="datetime-local" value={form.scheduled_at} onChange={e => setForm(p => ({ ...p, scheduled_at: e.target.value }))}
+            style={{ border: "1px solid #d1d5db", borderRadius: 6, padding: "8px 10px", fontSize: 13 }} />
+          <button onClick={save} disabled={saving}
+            style={{ background: "#3b82f6", color: "#fff", border: "none", borderRadius: 6, padding: "9px", cursor: "pointer", fontWeight: 700 }}>
+            {saving ? "Saving…" : "📅 Schedule Message"}
+          </button>
         </div>
-
-        <div className="flex gap-1 overflow-x-auto pb-1 border-b border-gray-200 scrollbar-hide">
-          {TABS.map(tab => {
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-t text-sm whitespace-nowrap transition-colors ${
-                  activeTab === tab.id
-                    ? "bg-white border border-gray-200 border-b-white text-emerald-700 font-medium -mb-px"
-                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-
-        <div>{renderTab()}</div>
       </div>
-    </AdminLayout>
+
+      <div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <h3 style={{ fontWeight: 800, fontSize: 16, margin: 0 }}>Scheduled ({data?.scheduled?.length || 0})</h3>
+          <button onClick={processDue} disabled={processing}
+            style={{ background: "#f59e0b", color: "#fff", border: "none", borderRadius: 6, padding: "6px 14px", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>
+            {processing ? "…" : "⚡ Send Due Now"}
+          </button>
+        </div>
+        {loading ? <div style={{ color: "#9ca3af" }}>Loading…</div> : (data?.scheduled || []).length === 0 ? (
+          <div style={{ color: "#9ca3af", textAlign: "center", padding: 32, background: "#f8fafc", borderRadius: 10 }}>No scheduled messages</div>
+        ) : (data?.scheduled || []).map((s: any) => (
+          <div key={s.id} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12, marginBottom: 8, background: "#fff" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+              <span style={{ fontWeight: 600, fontSize: 13 }}>{s.customer_name || s.recipient}</span>
+              <StatusBadge status={s.status} />
+            </div>
+            <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 4 }}>
+              {new Date(s.scheduled_at).toLocaleString("en-IN")} ·{" "}
+              <span style={{ color: CH_COLORS[s.channel], fontWeight: 700 }}>{s.channel.toUpperCase()}</span> ·{" "}
+              {EVENT_LABELS[s.event_type] || s.event_type}
+            </div>
+            <div style={{ fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "#374151" }}>{s.message}</div>
+            {s.status === "pending" && (
+              <button onClick={() => cancel(s.id)} style={{ marginTop: 6, background: "#ef4444", color: "#fff", border: "none", borderRadius: 4, padding: "3px 10px", cursor: "pointer", fontSize: 11 }}>Cancel</button>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Channel Info Tab ──────────────────────────────────────────────────────────
+function ChannelTab({ channel }: { channel: string }) {
+  const INFO: Record<string, { provider: string; configured: boolean; desc: string }> = {
+    whatsapp: { provider: "BotBee WhatsApp Business", configured: true, desc: "Sends messages via BotBee's WhatsApp Business API using BOTBEE_API_KEY + BOTBEE_BUSINESS_ID." },
+    sms: { provider: "Fast2SMS (DLT)", configured: true, desc: "DLT-compliant SMS via Fast2SMS. Uses FAST2SMS_API_KEY for transactional messages." },
+    rcs: { provider: "Lemin RCS", configured: true, desc: "Rich Communication Services. Falls back gracefully if the device doesn't support RCS." },
+    email: { provider: "SMTP", configured: false, desc: "Transactional email via SMTP. Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS in environment secrets." },
+    push: { provider: "Firebase FCM", configured: false, desc: "Firebase Cloud Messaging push notifications. Requires FIREBASE_ADMIN_CRED environment secret." },
+  };
+  const info = INFO[channel] || { provider: channel, configured: false, desc: "" };
+
+  const { data, loading } = useApi<any>(`/api/notification-center/logs?channel=${channel}&limit=30`, [channel]);
+
+  const todaySent = (data?.logs || []).filter((l: any) => l.status === "sent").length;
+  const todayFailed = (data?.logs || []).filter((l: any) => l.status === "failed").length;
+  const rate = (todaySent + todayFailed) > 0 ? Math.round(todaySent / (todaySent + todayFailed) * 100) : 0;
+
+  return (
+    <div>
+      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 22, marginBottom: 24 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div>
+            <h2 style={{ fontWeight: 800, fontSize: 20, color: CH_COLORS[channel], marginBottom: 6 }}>{channel.toUpperCase()}</h2>
+            <p style={{ color: "#374151", fontWeight: 600, marginBottom: 4 }}>Provider: {info.provider}</p>
+            <p style={{ color: "#6b7280", fontSize: 13, maxWidth: 500 }}>{info.desc}</p>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <span style={{ display: "inline-block", background: info.configured ? "#dcfce7" : "#fef3c7", color: info.configured ? "#166534" : "#92400e", borderRadius: 20, padding: "5px 14px", fontSize: 12, fontWeight: 700, marginBottom: 12 }}>
+              {info.configured ? "✅ Configured" : "⚠️ Needs Setup"}
+            </span>
+            <div style={{ display: "flex", gap: 16, fontSize: 14 }}>
+              <div style={{ textAlign: "center" }}><div style={{ fontWeight: 800, color: "#22c55e", fontSize: 22 }}>{todaySent}</div><div style={{ color: "#6b7280", fontSize: 11 }}>Sent</div></div>
+              <div style={{ textAlign: "center" }}><div style={{ fontWeight: 800, color: "#ef4444", fontSize: 22 }}>{todayFailed}</div><div style={{ color: "#6b7280", fontSize: 11 }}>Failed</div></div>
+              <div style={{ textAlign: "center" }}><div style={{ fontWeight: 800, color: CH_COLORS[channel], fontSize: 22 }}>{rate}%</div><div style={{ color: "#6b7280", fontSize: 11 }}>Rate</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h4 style={{ fontWeight: 700, marginBottom: 10 }}>Recent {channel.toUpperCase()} Messages</h4>
+      {loading ? <div style={{ color: "#9ca3af", padding: 20 }}>Loading…</div> : (
+        <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, background: "#fff" }}>
+            <thead>
+              <tr style={{ background: "#f8fafc" }}>
+                {["Time","Recipient","Event","Status"].map(h => (
+                  <th key={h} style={{ padding: "8px 10px", textAlign: "left", fontWeight: 600, borderBottom: "1px solid #e5e7eb" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {(data?.logs || []).slice(0,20).map((log: any) => (
+                <tr key={log.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                  <td style={{ padding: "8px 10px", color: "#6b7280" }}>{new Date(log.created_at).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" })}</td>
+                  <td style={{ padding: "8px 10px" }}>{log.recipient}</td>
+                  <td style={{ padding: "8px 10px" }}>{EVENT_LABELS[log.event_type] || log.event_type}</td>
+                  <td style={{ padding: "8px 10px" }}><StatusBadge status={log.status} /></td>
+                </tr>
+              ))}
+              {(data?.logs || []).length === 0 && (
+                <tr><td colSpan={4} style={{ textAlign: "center", padding: 24, color: "#9ca3af" }}>No {channel} messages yet</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Root ──────────────────────────────────────────────────────────────────────
+export default function CommunicationCenter() {
+  const [tab, setTab] = useState("dashboard");
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#f8fafc" }}>
+      <div style={{ background: "#fff", borderBottom: "1px solid #e5e7eb", padding: "20px 32px" }}>
+        <h1 style={{ fontSize: 22, fontWeight: 800, color: "#111827", margin: 0 }}>📡 Communication Center</h1>
+        <p style={{ color: "#6b7280", fontSize: 13, margin: "4px 0 0" }}>Enterprise Notification Engine · 33 Events · WhatsApp · SMS · RCS · Email · Push</p>
+      </div>
+
+      <div style={{ background: "#fff", borderBottom: "1px solid #e5e7eb", overflowX: "auto" }}>
+        <div style={{ display: "flex", padding: "0 24px", gap: 0, minWidth: "max-content" }}>
+          {TABS.map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)}
+              style={{ background: "none", border: "none", padding: "12px 14px", cursor: "pointer", fontSize: 13, fontWeight: tab === t.id ? 700 : 500, color: tab === t.id ? "#2563eb" : "#6b7280", borderBottom: tab === t.id ? "3px solid #2563eb" : "3px solid transparent", whiteSpace: "nowrap", transition: "color .2s" }}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ padding: "28px 32px", maxWidth: 1400, margin: "0 auto" }}>
+        {tab === "dashboard" && <Dashboard />}
+        {tab === "queue" && <DeliveryLogs />}
+        {tab === "failed" && <DeliveryLogs filterStatus="failed" />}
+        {tab === "campaigns" && <CampaignManager />}
+        {tab === "scheduled" && <ScheduledMessages />}
+        {tab === "automation" && <AutomationRules />}
+        {tab === "templates" && <Templates />}
+        {tab === "whatsapp" && <ChannelTab channel="whatsapp" />}
+        {tab === "sms" && <ChannelTab channel="sms" />}
+        {tab === "rcs" && <ChannelTab channel="rcs" />}
+        {tab === "email" && <ChannelTab channel="email" />}
+        {tab === "push" && <ChannelTab channel="push" />}
+      </div>
+    </div>
   );
 }
