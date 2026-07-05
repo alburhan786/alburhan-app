@@ -5,7 +5,7 @@ function apiUrl(path: string) { return `${API}${path}`; }
 
 const TABS = [
   { id: "dashboard", label: "📊 Dashboard" },
-  { id: "test-center", label: "🧪 Test Center" },
+  { id: "test-center", label: "🔬 Test API" },
   { id: "queue", label: "📋 Delivery Logs" },
   { id: "failed", label: "❌ Failed" },
   { id: "campaigns", label: "📢 Campaigns" },
@@ -208,6 +208,85 @@ function Dashboard() {
   );
 }
 
+// ── Error Detail Panel ────────────────────────────────────────────────────────
+function ErrorDetailPanel({ log, onClose }: { log: any; onClose: () => void }) {
+  const pr = log.provider_response || {};
+  const provider = log.provider_name || pr.provider || "—";
+  const httpStatus = log.http_status || pr.httpStatus;
+  const endpoint = log.api_endpoint || pr.endpoint || "—";
+  const errorCode = log.error_code || pr.errorCode || "—";
+  const errorMessage = pr.errorMessage || pr.error || "—";
+  const reqPayload = log.request_payload || pr.requestPayload;
+  const respPayload = pr.responsePayload;
+
+  const field = (label: string, value: React.ReactNode) => (
+    <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", gap: "4px 12px", marginBottom: 6, fontSize: 12 }}>
+      <span style={{ color: "#6b7280", fontWeight: 600 }}>{label}</span>
+      <span style={{ color: "#111827", wordBreak: "break-all" }}>{value}</span>
+    </div>
+  );
+
+  const statusColor = httpStatus && httpStatus < 300 ? "#166534" : httpStatus && httpStatus < 500 ? "#92400e" : "#991b1b";
+  const statusBg = httpStatus && httpStatus < 300 ? "#dcfce7" : httpStatus && httpStatus < 500 ? "#fef3c7" : "#fef2f2";
+
+  return (
+    <tr>
+      <td colSpan={9} style={{ padding: 0, background: "#fafafa", borderBottom: "2px solid #e5e7eb" }}>
+        <div style={{ padding: "16px 20px", borderLeft: "4px solid #ef4444" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+              <span style={{ fontWeight: 800, fontSize: 14, color: "#111827" }}>{provider}</span>
+              {httpStatus && (
+                <span style={{ background: statusBg, color: statusColor, border: `1px solid ${statusColor}33`, borderRadius: 6, padding: "2px 10px", fontWeight: 700, fontSize: 12 }}>
+                  HTTP {httpStatus}
+                </span>
+              )}
+              {errorCode && errorCode !== "—" && (
+                <span style={{ background: "#fef2f2", color: "#991b1b", border: "1px solid #fecaca", borderRadius: 6, padding: "2px 10px", fontWeight: 600, fontSize: 12 }}>
+                  Code: {errorCode}
+                </span>
+              )}
+            </div>
+            <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", fontSize: 18, lineHeight: 1, padding: 2 }}>✕</button>
+          </div>
+
+          {errorMessage !== "—" && (
+            <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "10px 14px", marginBottom: 14, fontSize: 13, color: "#991b1b", fontWeight: 600 }}>
+              ❌ {errorMessage}
+            </div>
+          )}
+
+          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, padding: "12px 16px", marginBottom: 12 }}>
+            {field("Provider", <strong>{provider}</strong>)}
+            {field("API Endpoint", <code style={{ background: "#f3f4f6", padding: "1px 6px", borderRadius: 4, fontSize: 11 }}>{endpoint}</code>)}
+            {field("HTTP Status", httpStatus ? <span style={{ color: statusColor, fontWeight: 700 }}>HTTP {httpStatus}</span> : "—")}
+            {field("Error Code", errorCode)}
+            {field("Error Message", errorMessage)}
+            {field("Retry Count", `${log.retry_count || 0} / 3`)}
+            {field("Timestamp", new Date(log.created_at).toLocaleString("en-IN"))}
+            {log.booking_id && field("Booking ID", log.booking_id)}
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#374151", marginBottom: 5, textTransform: "uppercase", letterSpacing: ".04em" }}>Request Payload</div>
+              <pre style={{ background: "#1e293b", color: "#e2e8f0", borderRadius: 8, padding: "12px 14px", fontSize: 11, margin: 0, overflow: "auto", maxHeight: 220, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+                {reqPayload ? JSON.stringify(reqPayload, null, 2) : "—"}
+              </pre>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#374151", marginBottom: 5, textTransform: "uppercase", letterSpacing: ".04em" }}>Response Payload</div>
+              <pre style={{ background: "#1e293b", color: "#e2e8f0", borderRadius: 8, padding: "12px 14px", fontSize: 11, margin: 0, overflow: "auto", maxHeight: 220, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+                {respPayload ? JSON.stringify(respPayload, null, 2) : pr ? JSON.stringify(pr, null, 2) : "—"}
+              </pre>
+            </div>
+          </div>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 // ── Delivery Logs ─────────────────────────────────────────────────────────────
 function DeliveryLogs({ filterStatus }: { filterStatus?: string }) {
   const [search, setSearch] = useState("");
@@ -215,6 +294,7 @@ function DeliveryLogs({ filterStatus }: { filterStatus?: string }) {
   const [channel, setChannel] = useState("");
   const [eventType, setEventType] = useState("");
   const [page, setPage] = useState(0);
+  const [expanded, setExpanded] = useState<string | null>(null);
   const LIMIT = 30;
 
   const qs = new URLSearchParams({
@@ -236,6 +316,7 @@ function DeliveryLogs({ filterStatus }: { filterStatus?: string }) {
     await fetch(apiUrl("/api/notification-center/retry-all-failed"), { method: "POST" });
     reload();
   };
+  const toggleExpand = (id: string) => setExpanded(prev => prev === id ? null : id);
 
   return (
     <div>
@@ -273,41 +354,66 @@ function DeliveryLogs({ filterStatus }: { filterStatus?: string }) {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, background: "#fff" }}>
               <thead>
                 <tr style={{ background: "#f8fafc" }}>
-                  {["Time","Recipient","Channel","Event","Message","Status","Retries","Action"].map(h => (
+                  {["Time","Recipient","Channel","Provider","Event","Status","Retries","Action"].map(h => (
                     <th key={h} style={{ padding: "9px 10px", textAlign: "left", fontWeight: 600, color: "#374151", borderBottom: "1px solid #e5e7eb", whiteSpace: "nowrap" }}>{h}</th>
                   ))}
+                  <th style={{ padding: "9px 10px", textAlign: "left", fontWeight: 600, color: "#374151", borderBottom: "1px solid #e5e7eb" }}></th>
                 </tr>
               </thead>
               <tbody>
                 {(data?.logs || []).length === 0 && (
-                  <tr><td colSpan={8} style={{ textAlign: "center", padding: 32, color: "#9ca3af" }}>No logs found</td></tr>
+                  <tr><td colSpan={9} style={{ textAlign: "center", padding: 32, color: "#9ca3af" }}>No logs found</td></tr>
                 )}
-                {(data?.logs || []).map((log: any) => (
-                  <tr key={log.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                    <td style={{ padding: "8px 10px", color: "#6b7280", whiteSpace: "nowrap" }}>
-                      {new Date(log.created_at).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" })}
-                    </td>
-                    <td style={{ padding: "8px 10px" }}>{log.recipient}</td>
-                    <td style={{ padding: "8px 10px" }}>
-                      <span style={{ background: CH_COLORS[log.channel] + "22", color: CH_COLORS[log.channel], borderRadius: 4, padding: "2px 7px", fontSize: 11, fontWeight: 700 }}>{log.channel}</span>
-                    </td>
-                    <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>{EVENT_LABELS[log.event_type] || log.event_type}</td>
-                    <td style={{ padding: "8px 10px", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#6b7280" }} title={log.message}>{log.message}</td>
-                    <td style={{ padding: "8px 10px" }}><StatusBadge status={log.status} /></td>
-                    <td style={{ padding: "8px 10px", textAlign: "center" }}>{log.retry_count || 0}<span style={{ color: "#9ca3af" }}>/3</span></td>
-                    <td style={{ padding: "8px 10px" }}>
-                      {log.status === "failed" && (log.retry_count || 0) < 3 && (
-                        <button onClick={() => retry(log.id)} disabled={retrying === log.id}
-                          style={{ background: "#f59e0b", color: "#fff", border: "none", borderRadius: 4, padding: "3px 9px", cursor: "pointer", fontSize: 11 }}>
-                          {retrying === log.id ? "…" : "⟳ Retry"}
-                        </button>
-                      )}
-                      {(log.retry_count || 0) >= 3 && log.status === "failed" && (
-                        <span style={{ fontSize: 10, color: "#ef4444" }}>Max retries</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {(data?.logs || []).map((log: any) => {
+                  const pr = log.provider_response || {};
+                  const providerName = log.provider_name || pr.provider || "—";
+                  const httpStatus = log.http_status || pr.httpStatus;
+                  const isExpanded = expanded === log.id;
+                  return (
+                    <React.Fragment key={log.id}>
+                      <tr style={{ borderBottom: isExpanded ? "none" : "1px solid #f3f4f6", background: isExpanded ? "#fef9f9" : undefined }}>
+                        <td style={{ padding: "8px 10px", color: "#6b7280", whiteSpace: "nowrap" }}>
+                          {new Date(log.created_at).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" })}
+                        </td>
+                        <td style={{ padding: "8px 10px" }}>{log.recipient}</td>
+                        <td style={{ padding: "8px 10px" }}>
+                          <span style={{ background: CH_COLORS[log.channel] + "22", color: CH_COLORS[log.channel], borderRadius: 4, padding: "2px 7px", fontSize: 11, fontWeight: 700 }}>{log.channel}</span>
+                        </td>
+                        <td style={{ padding: "8px 10px" }}>
+                          <span style={{ fontSize: 11, color: "#374151", fontWeight: 600 }}>{providerName}</span>
+                          {httpStatus && (
+                            <span style={{ marginLeft: 4, fontSize: 10, color: httpStatus < 300 ? "#166534" : "#991b1b", background: httpStatus < 300 ? "#dcfce7" : "#fef2f2", borderRadius: 3, padding: "1px 5px" }}>
+                              {httpStatus}
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>{EVENT_LABELS[log.event_type] || log.event_type}</td>
+                        <td style={{ padding: "8px 10px" }}><StatusBadge status={log.status} /></td>
+                        <td style={{ padding: "8px 10px", textAlign: "center" }}>{log.retry_count || 0}<span style={{ color: "#9ca3af" }}>/3</span></td>
+                        <td style={{ padding: "8px 10px" }}>
+                          {log.status === "failed" && (log.retry_count || 0) < 3 && (
+                            <button onClick={() => retry(log.id)} disabled={retrying === log.id}
+                              style={{ background: "#f59e0b", color: "#fff", border: "none", borderRadius: 4, padding: "3px 9px", cursor: "pointer", fontSize: 11, marginRight: 4 }}>
+                              {retrying === log.id ? "…" : "⟳ Retry"}
+                            </button>
+                          )}
+                          {(log.retry_count || 0) >= 3 && log.status === "failed" && (
+                            <span style={{ fontSize: 10, color: "#ef4444", marginRight: 4 }}>Max retries</span>
+                          )}
+                        </td>
+                        <td style={{ padding: "8px 10px" }}>
+                          {log.status === "failed" && (
+                            <button onClick={() => toggleExpand(log.id)}
+                              style={{ background: isExpanded ? "#fef2f2" : "#fff", color: isExpanded ? "#991b1b" : "#374151", border: `1px solid ${isExpanded ? "#fecaca" : "#d1d5db"}`, borderRadius: 4, padding: "3px 9px", cursor: "pointer", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap" }}>
+                              {isExpanded ? "✕ Close" : "🔍 View Error"}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                      {isExpanded && <ErrorDetailPanel log={log} onClose={() => setExpanded(null)} />}
+                    </React.Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -816,7 +922,7 @@ function ChannelTab({ channel }: { channel: string }) {
   );
 }
 
-// ── Test Center ───────────────────────────────────────────────────────────────
+// ── Test API ──────────────────────────────────────────────────────────────────
 const TEST_PROVIDERS = [
   { id: "botbee",   label: "💬 WhatsApp",      channel: "whatsapp", needsMobile: true,  needsEmail: false },
   { id: "fast2sms", label: "📱 SMS",            channel: "sms",      needsMobile: true,  needsEmail: false },
@@ -830,10 +936,12 @@ function TestCenter() {
   const [email, setEmail] = useState("");
   const [results, setResults] = useState<Record<string, any>>({});
   const [sending, setSending] = useState<Record<string, boolean>>({});
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   const send = async (providerId: string) => {
     setSending(p => ({ ...p, [providerId]: true }));
     setResults(p => ({ ...p, [providerId]: null }));
+    setExpanded(providerId);
     try {
       const body: any = {};
       if (mobile) body.mobile = mobile;
@@ -846,17 +954,17 @@ function TestCenter() {
       const data = await res.json();
       setResults(p => ({ ...p, [providerId]: data }));
     } catch (e: any) {
-      setResults(p => ({ ...p, [providerId]: { ok: false, message: e.message } }));
+      setResults(p => ({ ...p, [providerId]: { ok: false, errorMessage: e.message } }));
     }
     setSending(p => ({ ...p, [providerId]: false }));
   };
 
   return (
-    <div style={{ maxWidth: 700 }}>
-      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 24, marginBottom: 28, boxShadow: "0 1px 4px #0001" }}>
-        <h3 style={{ fontWeight: 800, fontSize: 16, marginBottom: 4, color: "#111827" }}>🧪 Send Test Message</h3>
+    <div style={{ maxWidth: 860 }}>
+      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 24, marginBottom: 20, boxShadow: "0 1px 4px #0001" }}>
+        <h3 style={{ fontWeight: 800, fontSize: 16, marginBottom: 4, color: "#111827" }}>🔬 Test API</h3>
         <p style={{ color: "#6b7280", fontSize: 13, marginBottom: 20, marginTop: 0 }}>
-          Test each channel individually without creating a booking. Credentials are loaded from <strong>API Settings</strong>.
+          Fire a live test to any provider. Full raw JSON response is shown. Every test is logged in <strong>Delivery Logs</strong>.
         </p>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 20 }}>
           <div>
@@ -877,47 +985,94 @@ function TestCenter() {
           </div>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {TEST_PROVIDERS.map(p => {
             const res = results[p.id];
             const busy = sending[p.id];
+            const isOpen = expanded === p.id;
             const disabled = busy || (p.needsMobile && !mobile.trim()) || (p.needsEmail && !email.trim());
+            const httpStatus = res?.httpStatus;
+            const statusColor = !res ? "#374151" : res.ok ? "#166534" : "#991b1b";
+            const statusBg = !res ? "#f8fafc" : res.ok ? "#f0fdf4" : "#fef2f2";
+            const statusBorder = !res ? "#e5e7eb" : res.ok ? "#bbf7d0" : "#fecaca";
+
             return (
-              <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", background: "#f8fafc", borderRadius: 8, border: "1px solid #e5e7eb" }}>
-                <button
-                  onClick={() => send(p.id)} disabled={disabled}
-                  style={{ background: disabled ? "#e5e7eb" : "#2563eb", color: disabled ? "#9ca3af" : "#fff", border: "none", borderRadius: 7, padding: "9px 20px", cursor: disabled ? "not-allowed" : "pointer", fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", minWidth: 140, transition: "background .2s" }}
-                >
-                  {busy ? "Sending…" : `Send ${p.label}`}
-                </button>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  {p.needsMobile && !mobile.trim() && !res && (
-                    <span style={{ color: "#9ca3af", fontSize: 12 }}>Enter mobile number above to enable</span>
-                  )}
-                  {p.needsEmail && !email.trim() && !res && (
-                    <span style={{ color: "#9ca3af", fontSize: 12 }}>Enter email address above to enable</span>
-                  )}
+              <div key={p.id} style={{ border: `1px solid ${statusBorder}`, borderRadius: 10, overflow: "hidden", background: statusBg }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px" }}>
+                  <button
+                    onClick={() => send(p.id)} disabled={disabled}
+                    style={{ background: disabled ? "#e5e7eb" : "#2563eb", color: disabled ? "#9ca3af" : "#fff", border: "none", borderRadius: 7, padding: "9px 20px", cursor: disabled ? "not-allowed" : "pointer", fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", minWidth: 150 }}
+                  >
+                    {busy ? "Sending…" : `Send ${p.label}`}
+                  </button>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {!res && !busy && (p.needsMobile ? !mobile.trim() : p.needsEmail ? !email.trim() : false) && (
+                      <span style={{ color: "#9ca3af", fontSize: 12 }}>Enter {p.needsMobile ? "mobile" : "email"} above to enable</span>
+                    )}
+                    {res && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        <span style={{ background: res.ok ? "#dcfce7" : "#fef2f2", color: statusColor, border: `1px solid ${statusBorder}`, borderRadius: 6, padding: "3px 10px", fontSize: 12, fontWeight: 700 }}>
+                          {res.ok ? "✅ Sent" : "❌ Failed"}
+                        </span>
+                        {httpStatus && (
+                          <span style={{ background: httpStatus < 300 ? "#dcfce7" : "#fef2f2", color: httpStatus < 300 ? "#166534" : "#991b1b", border: "1px solid", borderRadius: 5, padding: "2px 8px", fontSize: 11, fontWeight: 700 }}>
+                            HTTP {httpStatus}
+                          </span>
+                        )}
+                        {res.errorMessage && <span style={{ fontSize: 12, color: "#991b1b", fontWeight: 600 }}>{res.errorMessage}</span>}
+                        {res.message && !res.errorMessage && <span style={{ fontSize: 12, color: "#374151" }}>{res.message}</span>}
+                        {res.logged && <span style={{ fontSize: 11, color: "#6b7280", background: "#f3f4f6", borderRadius: 4, padding: "2px 7px" }}>📋 Logged</span>}
+                      </div>
+                    )}
+                  </div>
                   {res && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                      <span style={{
-                        background: res.ok ? "#dcfce7" : "#fef2f2",
-                        color: res.ok ? "#166534" : "#991b1b",
-                        border: `1px solid ${res.ok ? "#bbf7d0" : "#fecaca"}`,
-                        borderRadius: 6, padding: "3px 10px", fontSize: 12, fontWeight: 700,
-                      }}>
-                        {res.ok ? "✅ Sent" : "❌ Failed"}
-                      </span>
-                      {res.message && <span style={{ fontSize: 12, color: "#374151" }}>{res.message}</span>}
-                    </div>
+                    <button onClick={() => setExpanded(isOpen ? null : p.id)}
+                      style={{ background: "none", border: "1px solid #d1d5db", borderRadius: 6, padding: "5px 12px", cursor: "pointer", fontSize: 12, color: "#374151", whiteSpace: "nowrap" }}>
+                      {isOpen ? "▲ Hide JSON" : "▼ Show JSON"}
+                    </button>
                   )}
                 </div>
+
+                {isOpen && res && (
+                  <div style={{ borderTop: `1px solid ${statusBorder}`, background: "#fff" }}>
+                    <div style={{ padding: "12px 14px 4px" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "6px 16px", fontSize: 12, marginBottom: 10 }}>
+                        {[
+                          ["Provider", res.provider],
+                          ["HTTP Status", httpStatus ? `HTTP ${httpStatus}` : "—"],
+                          ["API Endpoint", res.endpoint],
+                          ["Error Code", res.errorCode || "—"],
+                        ].map(([k, v]) => (
+                          <div key={k}>
+                            <span style={{ color: "#6b7280", fontWeight: 600 }}>{k}: </span>
+                            <span style={{ color: "#111827", wordBreak: "break-all" }}>{v || "—"}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0 }}>
+                      <div style={{ padding: "0 14px 14px" }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "#374151", marginBottom: 5, textTransform: "uppercase", letterSpacing: ".04em" }}>Request Payload</div>
+                        <pre style={{ background: "#1e293b", color: "#e2e8f0", borderRadius: 8, padding: "12px 14px", fontSize: 11, margin: 0, overflow: "auto", maxHeight: 260, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+                          {res.requestPayload ? JSON.stringify(res.requestPayload, null, 2) : "—"}
+                        </pre>
+                      </div>
+                      <div style={{ padding: "0 14px 14px" }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "#374151", marginBottom: 5, textTransform: "uppercase", letterSpacing: ".04em" }}>Raw Provider Response</div>
+                        <pre style={{ background: "#1e293b", color: "#e2e8f0", borderRadius: 8, padding: "12px 14px", fontSize: 11, margin: 0, overflow: "auto", maxHeight: 260, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+                          {res.responsePayload ? JSON.stringify(res.responsePayload, null, 2) : JSON.stringify(res, null, 2)}
+                        </pre>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
 
         <div style={{ marginTop: 18, background: "#fefce8", border: "1px solid #fde68a", borderRadius: 8, padding: "10px 14px", fontSize: 12, color: "#92400e" }}>
-          ⚠️ Test messages are sent to real recipients and use your live API credentials. Ensure credentials are saved in <strong>Settings → API Settings</strong> before testing.
+          ⚠️ Test messages use live API credentials and are sent to real recipients. Every test is automatically logged in Delivery Logs. Ensure credentials are saved in <strong>Settings → API Settings</strong> before testing.
         </div>
       </div>
     </div>

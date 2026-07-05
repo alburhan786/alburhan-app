@@ -247,14 +247,23 @@ export async function trackNotification(data: {
 }): Promise<void> {
   try {
     const id = await makeLogId();
+    const pr = data.providerResponse as any;
+    const providerName = data.provider || pr?.provider || null;
+    const apiEndpoint = pr?.endpoint || null;
+    const httpStatus = pr?.httpStatus || null;
+    const requestPayload = pr?.requestPayload ? JSON.stringify(pr.requestPayload) : null;
+    const errorCode = pr?.errorCode || null;
     await pool.query(
       `INSERT INTO notification_logs
-       (id, event_type, customer_id, booking_id, channel, recipient, message, status, provider_response, sent_at, retry_count)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW(),0)`,
+       (id, event_type, customer_id, booking_id, channel, recipient, message, status,
+        provider_response, provider_name, api_endpoint, http_status, request_payload, error_code,
+        sent_at, retry_count)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,NOW(),0)`,
       [
         id, data.eventType, data.customerId || null, data.bookingId || null,
         data.channel, data.recipient, data.message || null, data.status,
         data.providerResponse ? JSON.stringify(data.providerResponse) : null,
+        providerName, apiEndpoint, httpStatus, requestPayload, errorCode,
       ]
     );
   } catch (err) {
@@ -293,25 +302,29 @@ async function getTemplate(eventType: string, channel: Channel): Promise<string 
 async function sendOnChannel(channel: Channel, ctx: NotificationContext, message: string): Promise<{ status: "sent" | "failed"; providerResponse: unknown }> {
   try {
     if (channel === "whatsapp") {
-      const ok = await sendWhatsApp(ctx.customerMobile, message);
-      return { status: ok ? "sent" : "failed", providerResponse: { ok, provider: "BotBee" } };
+      const result = await sendWhatsApp(ctx.customerMobile, message);
+      return { status: result.ok ? "sent" : "failed", providerResponse: result };
     } else if (channel === "sms") {
-      await sendDLTSMS(ctx.customerMobile, ctx.customerName, ctx.bookingNumber || "", ctx.invoiceNumber || "");
-      return { status: "sent", providerResponse: { provider: "Fast2SMS" } };
+      try {
+        await sendDLTSMS(ctx.customerMobile, ctx.customerName, ctx.bookingNumber || "", ctx.invoiceNumber || "");
+        return { status: "sent", providerResponse: { ok: true, provider: "Fast2SMS", endpoint: "https://www.fast2sms.com/dev/bulkV2" } };
+      } catch (smsErr: any) {
+        return { status: "failed", providerResponse: { ok: false, provider: "Fast2SMS", endpoint: "https://www.fast2sms.com/dev/bulkV2", errorMessage: smsErr?.message } };
+      }
     } else if (channel === "rcs") {
-      const ok = await sendRCS(ctx.customerMobile, ctx.customerName, message);
-      return { status: ok ? "sent" : "failed", providerResponse: { ok, provider: "Lemin RCS" } };
+      const result = await sendRCS(ctx.customerMobile, ctx.customerName, message);
+      return { status: result.ok ? "sent" : "failed", providerResponse: result };
     } else if (channel === "email") {
-      if (!ctx.customerEmail) return { status: "failed", providerResponse: { error: "No email address" } };
+      if (!ctx.customerEmail) return { status: "failed", providerResponse: { ok: false, provider: "SMTP", endpoint: "smtp", errorMessage: "No email address" } };
       const subject = buildEmailSubject(ctx as unknown as EventType extends string ? any : never, ctx);
-      await sendEmail(ctx.customerEmail, subject, message.replace(/\n/g, "<br>"));
-      return { status: "sent", providerResponse: { provider: "SMTP" } };
+      const result = await sendEmail(ctx.customerEmail, subject, message.replace(/\n/g, "<br>"));
+      return { status: result.ok ? "sent" : "failed", providerResponse: result };
     } else if (channel === "push") {
-      return { status: "failed", providerResponse: { error: "Push not configured — Firebase credentials required" } };
+      return { status: "failed", providerResponse: { ok: false, provider: "Firebase", endpoint: "https://fcm.googleapis.com/fcm/send", errorMessage: "Push not configured — Firebase credentials required" } };
     }
-    return { status: "failed", providerResponse: { error: "Unknown channel" } };
+    return { status: "failed", providerResponse: { ok: false, provider: "unknown", endpoint: "", errorMessage: "Unknown channel" } };
   } catch (err: unknown) {
-    return { status: "failed", providerResponse: { error: err instanceof Error ? err.message : String(err) } };
+    return { status: "failed", providerResponse: { ok: false, provider: "unknown", endpoint: "", errorMessage: err instanceof Error ? err.message : String(err) } };
   }
 }
 
@@ -319,24 +332,28 @@ async function sendOnChannel(channel: Channel, ctx: NotificationContext, message
 async function sendOnChannelWithType(channel: Channel, eventType: EventType, ctx: NotificationContext, message: string): Promise<{ status: "sent" | "failed"; providerResponse: unknown }> {
   try {
     if (channel === "whatsapp") {
-      const ok = await sendWhatsApp(ctx.customerMobile, message);
-      return { status: ok ? "sent" : "failed", providerResponse: { ok, provider: "BotBee" } };
+      const result = await sendWhatsApp(ctx.customerMobile, message);
+      return { status: result.ok ? "sent" : "failed", providerResponse: result };
     } else if (channel === "sms") {
-      await sendDLTSMS(ctx.customerMobile, ctx.customerName, ctx.bookingNumber || "", ctx.invoiceNumber || "");
-      return { status: "sent", providerResponse: { provider: "Fast2SMS" } };
+      try {
+        await sendDLTSMS(ctx.customerMobile, ctx.customerName, ctx.bookingNumber || "", ctx.invoiceNumber || "");
+        return { status: "sent", providerResponse: { ok: true, provider: "Fast2SMS", endpoint: "https://www.fast2sms.com/dev/bulkV2" } };
+      } catch (smsErr: any) {
+        return { status: "failed", providerResponse: { ok: false, provider: "Fast2SMS", endpoint: "https://www.fast2sms.com/dev/bulkV2", errorMessage: smsErr?.message } };
+      }
     } else if (channel === "rcs") {
-      const ok = await sendRCS(ctx.customerMobile, ctx.customerName, message);
-      return { status: ok ? "sent" : "failed", providerResponse: { ok, provider: "Lemin RCS" } };
+      const result = await sendRCS(ctx.customerMobile, ctx.customerName, message);
+      return { status: result.ok ? "sent" : "failed", providerResponse: result };
     } else if (channel === "email") {
-      if (!ctx.customerEmail) return { status: "failed", providerResponse: { error: "No email address" } };
-      await sendEmail(ctx.customerEmail, buildEmailSubject(eventType, ctx), message.replace(/\n/g, "<br>"));
-      return { status: "sent", providerResponse: { provider: "SMTP" } };
+      if (!ctx.customerEmail) return { status: "failed", providerResponse: { ok: false, provider: "SMTP", endpoint: "smtp", errorMessage: "No email address" } };
+      const result = await sendEmail(ctx.customerEmail, buildEmailSubject(eventType, ctx), message.replace(/\n/g, "<br>"));
+      return { status: result.ok ? "sent" : "failed", providerResponse: result };
     } else if (channel === "push") {
-      return { status: "failed", providerResponse: { error: "Push not configured" } };
+      return { status: "failed", providerResponse: { ok: false, provider: "Firebase", endpoint: "https://fcm.googleapis.com/fcm/send", errorMessage: "Push not configured" } };
     }
-    return { status: "failed", providerResponse: { error: "Unknown channel" } };
+    return { status: "failed", providerResponse: { ok: false, provider: "unknown", endpoint: "", errorMessage: "Unknown channel" } };
   } catch (err: unknown) {
-    return { status: "failed", providerResponse: { error: err instanceof Error ? err.message : String(err) } };
+    return { status: "failed", providerResponse: { ok: false, provider: "unknown", endpoint: "", errorMessage: err instanceof Error ? err.message : String(err) } };
   }
 }
 
@@ -376,25 +393,33 @@ export async function retryNotification(logId: string): Promise<{ success: boole
     let providerResponse: unknown = null;
 
     if (channel === "whatsapp") {
-      const ok = await sendWhatsApp(log.recipient, message);
-      status = ok ? "sent" : "failed";
-      providerResponse = { ok, provider: "BotBee" };
+      const result = await sendWhatsApp(log.recipient, message);
+      status = result.ok ? "sent" : "failed"; providerResponse = result;
     } else if (channel === "sms") {
-      await sendDLTSMS(log.recipient, log.recipient, "", "");
-      status = "sent"; providerResponse = { provider: "Fast2SMS" };
+      try {
+        await sendDLTSMS(log.recipient, log.recipient, "", "");
+        status = "sent"; providerResponse = { ok: true, provider: "Fast2SMS", endpoint: "https://www.fast2sms.com/dev/bulkV2" };
+      } catch (smsErr: any) {
+        status = "failed"; providerResponse = { ok: false, provider: "Fast2SMS", endpoint: "https://www.fast2sms.com/dev/bulkV2", errorMessage: smsErr?.message };
+      }
     } else if (channel === "rcs") {
-      const ok = await sendRCS(log.recipient, log.recipient, message);
-      status = ok ? "sent" : "failed"; providerResponse = { ok, provider: "Lemin RCS" };
+      const result = await sendRCS(log.recipient, log.recipient, message);
+      status = result.ok ? "sent" : "failed"; providerResponse = result;
     } else if (channel === "email") {
-      await sendEmail(log.recipient, "Notification from Al Burhan Tours", message.replace(/\n/g, "<br>"));
-      status = "sent"; providerResponse = { provider: "SMTP" };
+      const result = await sendEmail(log.recipient, "Notification from Al Burhan Tours", message.replace(/\n/g, "<br>"));
+      status = result.ok ? "sent" : "failed"; providerResponse = result;
     } else {
       return { success: false, error: "Channel not supported for retry" };
     }
 
+    const pr = providerResponse as any;
     await pool.query(
-      `UPDATE notification_logs SET status=$1, provider_response=$2, sent_at=NOW(), retry_count=retry_count+1 WHERE id=$3`,
-      [status, JSON.stringify(providerResponse), logId]
+      `UPDATE notification_logs
+       SET status=$1, provider_response=$2, provider_name=$4, api_endpoint=$5,
+           http_status=$6, error_code=$7, sent_at=NOW(), retry_count=retry_count+1
+       WHERE id=$3`,
+      [status, JSON.stringify(providerResponse), logId,
+       pr?.provider || null, pr?.endpoint || null, pr?.httpStatus || null, pr?.errorCode || null]
     );
     return { success: status === "sent" };
   } catch (err) {

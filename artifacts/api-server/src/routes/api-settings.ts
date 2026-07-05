@@ -230,7 +230,7 @@ router.post("/:provider/test", requireAdmin as any, requireSuperAdmin, async (re
   }
 });
 
-// POST /api/api-settings/:provider/send-test — send actual test message
+// POST /api/api-settings/:provider/send-test — send actual test message, log to notification_logs
 router.post("/:provider/send-test", requireAdmin as any, requireSuperAdmin, async (req, res) => {
   const provider = req.params.provider;
   const { mobile, email } = req.body;
@@ -245,85 +245,151 @@ router.post("/:provider/send-test", requireAdmin as any, requireSuperAdmin, asyn
       try { extra = JSON.parse(decrypt(row.extra_fields_encrypted)); } catch {}
     }
 
+    interface TestResult {
+      ok: boolean;
+      provider: string;
+      endpoint: string;
+      httpStatus?: number;
+      requestPayload?: unknown;
+      responsePayload?: unknown;
+      errorCode?: string;
+      errorMessage?: string;
+      message?: string;
+    }
+
+    let result: TestResult = { ok: false, provider, endpoint: "" };
+    let channel = "whatsapp";
+    let recipient = mobile || email || "test";
+
     switch (provider) {
       case "botbee": {
         if (!mobile) return res.json({ ok: false, message: "Provide a mobile number" });
         if (!apiKey) return res.json({ ok: false, message: "API key not configured" });
+        channel = "whatsapp";
+        recipient = mobile;
         const phone = mobile.replace(/\D/g, "");
         const phoneWithCC = phone.length === 10 ? `91${phone}` : phone;
         const phoneNumberId = extra.phone_number_id || process.env.BOTBEE_PHONE_NUMBER_ID || "";
         const baseUrl = apiUrl || "https://app.botbee.io/api/v1/whatsapp";
-        const params = new URLSearchParams({
-          apiToken: apiKey, phone_number_id: phoneNumberId,
-          phone_number: phoneWithCC, message: "✅ Al Burhan ERP — WhatsApp test message sent successfully from API Settings.",
-        });
-        const resp = await axios.post(`${baseUrl}/send`, params.toString(), {
-          headers: { "Content-Type": "application/x-www-form-urlencoded" }, timeout: 10000,
-        }).catch(e => e.response || { data: { error: e.message }, status: 0 });
-        return res.json({ ok: resp.status >= 200 && resp.status < 300, response: resp.data });
+        const endpoint = `${baseUrl}/send`;
+        const testMsg = "✅ Al Burhan ERP — WhatsApp test message sent successfully from Test API.";
+        const reqPayload = { phone_number_id: phoneNumberId, phone_number: phoneWithCC, message: testMsg };
+        const params = new URLSearchParams({ apiToken: apiKey, phone_number_id: phoneNumberId, phone_number: phoneWithCC, message: testMsg });
+        let httpStatus = 0; let respData: any = {};
+        try {
+          const resp = await axios.post(endpoint, params.toString(), { headers: { "Content-Type": "application/x-www-form-urlencoded" }, timeout: 10000 });
+          httpStatus = resp.status; respData = resp.data;
+          const ok = !(respData?.status === "0" || respData?.status === 0);
+          result = { ok, provider: "BotBee", endpoint, httpStatus, requestPayload: reqPayload, responsePayload: respData, errorMessage: ok ? undefined : (respData?.message || "Message delivery failed") };
+        } catch (e: any) {
+          const er = e?.response; httpStatus = er?.status || 0; respData = er?.data || { error: e.message };
+          result = { ok: false, provider: "BotBee", endpoint, httpStatus, requestPayload: reqPayload, responsePayload: respData, errorCode: String(respData?.code || ""), errorMessage: respData?.message || respData?.error || e.message };
+        }
+        break;
       }
       case "fast2sms": {
         if (!mobile) return res.json({ ok: false, message: "Provide a mobile number" });
         if (!apiKey) return res.json({ ok: false, message: "API key not configured" });
+        channel = "sms";
+        recipient = mobile;
         const phone = mobile.replace(/\D/g, "").slice(-10);
-        const msg = encodeURIComponent("Al Burhan ERP test SMS from API Settings.");
-        const resp = await axios.get(
-          `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=q&message=${msg}&numbers=${phone}&flash=0`,
-          { timeout: 10000 }
-        ).catch(e => e.response || { data: { error: e.message }, status: 0 });
-        return res.json({ ok: resp.data?.return === true, response: resp.data });
+        const testMsg = "Al Burhan ERP test SMS from Test API.";
+        const endpoint = `https://www.fast2sms.com/dev/bulkV2`;
+        const reqPayload = { route: "q", numbers: phone, message: testMsg };
+        let httpStatus = 0; let respData: any = {};
+        try {
+          const resp = await axios.get(`${endpoint}?authorization=${apiKey}&route=q&message=${encodeURIComponent(testMsg)}&numbers=${phone}&flash=0`, { timeout: 10000 });
+          httpStatus = resp.status; respData = resp.data;
+          result = { ok: respData?.return === true, provider: "Fast2SMS", endpoint, httpStatus, requestPayload: reqPayload, responsePayload: respData, errorMessage: respData?.return === true ? undefined : (respData?.message || "SMS delivery failed") };
+        } catch (e: any) {
+          const er = e?.response; httpStatus = er?.status || 0; respData = er?.data || { error: e.message };
+          result = { ok: false, provider: "Fast2SMS", endpoint, httpStatus, requestPayload: reqPayload, responsePayload: respData, errorCode: String(respData?.code || ""), errorMessage: respData?.message || e.message };
+        }
+        break;
       }
       case "smtp": {
         const toEmail = email || req.body.to;
         if (!toEmail) return res.json({ ok: false, message: "Provide an email address" });
+        channel = "email";
+        recipient = toEmail;
         const smtpHost = apiUrl || extra.host || process.env.SMTP_HOST || "smtp.gmail.com";
         const smtpUser = extra.user || process.env.SMTP_USER || "";
         const smtpPass = apiKey || process.env.SMTP_PASS || "";
         if (!smtpUser || !smtpPass) return res.json({ ok: false, message: "SMTP not fully configured" });
-        const transport = nodemailer.createTransport({
-          host: smtpHost, port: Number(extra.port || 587),
-          secure: Number(extra.port || 587) === 465,
-          auth: { user: smtpUser, pass: smtpPass },
-        });
-        await transport.sendMail({
-          from: `Al Burhan Tours & Travels <${smtpUser}>`,
-          to: toEmail, subject: "✅ Al Burhan ERP — SMTP Test",
-          text: "This is a test email from Al Burhan ERP API Settings. Your SMTP is configured correctly.",
-        });
-        return res.json({ ok: true, message: `Test email sent to ${toEmail}` });
+        const endpoint = `smtp://${smtpHost}`;
+        const reqPayload = { from: smtpUser, to: toEmail, subject: "✅ Al Burhan ERP — SMTP Test" };
+        try {
+          const transport = nodemailer.createTransport({ host: smtpHost, port: Number(extra.port || 587), secure: Number(extra.port || 587) === 465, auth: { user: smtpUser, pass: smtpPass } });
+          await transport.sendMail({ from: `Al Burhan Tours & Travels <${smtpUser}>`, to: toEmail, subject: "✅ Al Burhan ERP — SMTP Test", text: "This is a test email from Al Burhan ERP Test API. Your SMTP is configured correctly." });
+          result = { ok: true, provider: "SMTP", endpoint, requestPayload: reqPayload, responsePayload: { delivered: true }, message: `Test email sent to ${toEmail}` };
+        } catch (e: any) {
+          result = { ok: false, provider: "SMTP", endpoint, requestPayload: reqPayload, responsePayload: { error: e.message }, errorCode: e.code || "", errorMessage: e.message };
+        }
+        break;
       }
       case "firebase": {
         if (!apiKey) return res.json({ ok: false, message: "Firebase Server Key not configured" });
         const testToken = req.body.device_token;
         if (!testToken) return res.json({ ok: false, message: "Provide a device FCM token" });
-        const resp = await axios.post("https://fcm.googleapis.com/fcm/send", {
-          to: testToken,
-          notification: { title: "Al Burhan ERP", body: "✅ Firebase Push test from API Settings" },
-        }, {
-          headers: { Authorization: `key=${apiKey}`, "Content-Type": "application/json" },
-          timeout: 10000,
-        }).catch(e => e.response || { data: { error: e.message }, status: 0 });
-        return res.json({ ok: resp.status === 200, response: resp.data });
+        channel = "push";
+        recipient = testToken;
+        const endpoint = "https://fcm.googleapis.com/fcm/send";
+        const reqPayload = { to: testToken, notification: { title: "Al Burhan ERP", body: "✅ Firebase Push test from Test API" } };
+        let httpStatus = 0; let respData: any = {};
+        try {
+          const resp = await axios.post(endpoint, reqPayload, { headers: { Authorization: `key=${apiKey}`, "Content-Type": "application/json" }, timeout: 10000 });
+          httpStatus = resp.status; respData = resp.data;
+          result = { ok: httpStatus === 200, provider: "Firebase", endpoint, httpStatus, requestPayload: reqPayload, responsePayload: respData };
+        } catch (e: any) {
+          const er = e?.response; httpStatus = er?.status || 0; respData = er?.data || { error: e.message };
+          result = { ok: false, provider: "Firebase", endpoint, httpStatus, requestPayload: reqPayload, responsePayload: respData, errorMessage: respData?.error || e.message };
+        }
+        break;
       }
       case "lemin": {
         if (!mobile) return res.json({ ok: false, message: "Provide a mobile number" });
         if (!apiKey) return res.json({ ok: false, message: "API key not configured" });
+        channel = "rcs";
+        recipient = mobile;
         const phone = mobile.replace(/\D/g, "").slice(-10);
         const endpoint = apiUrl || "https://rcs.leminai.com/api/send";
-        const resp = await axios.post(endpoint, {
-          type: "single", dial_code: "+91",
-          template: extra.template_id || "1473",
-          phone, user_id: extra.user_id || "",
-          variables: { name: "Test", message: "Al Burhan ERP RCS test from API Settings" },
-        }, {
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-          timeout: 10000,
-        }).catch(e => e.response || { data: { error: e.message }, status: 0 });
-        return res.json({ ok: resp.status === 200, response: resp.data });
+        const reqPayload = { type: "single", dial_code: "+91", template: extra.template_id || "1473", phone, user_id: extra.user_id || "", variables: { name: "Test", message: "Al Burhan ERP RCS test from Test API" } };
+        let httpStatus = 0; let respData: any = {};
+        try {
+          const resp = await axios.post(endpoint, reqPayload, { headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` }, timeout: 10000 });
+          httpStatus = resp.status; respData = resp.data;
+          result = { ok: httpStatus === 200, provider: "Lemin AI", endpoint, httpStatus, requestPayload: reqPayload, responsePayload: respData };
+        } catch (e: any) {
+          const er = e?.response; httpStatus = er?.status || 0; respData = er?.data || { error: e.message };
+          result = { ok: false, provider: "Lemin AI", endpoint, httpStatus, requestPayload: reqPayload, responsePayload: respData, errorCode: String(respData?.code || ""), errorMessage: respData?.message || respData?.error || e.message };
+        }
+        break;
       }
       default:
         return res.json({ ok: false, message: "No test message available for this provider" });
     }
+
+    // Log every test to notification_logs
+    await pool.query(
+      `INSERT INTO notification_logs
+       (id, event_type, channel, recipient, message, status,
+        provider_response, provider_name, api_endpoint, http_status, request_payload, error_code,
+        sent_at, retry_count)
+       VALUES (gen_random_uuid(),'test_send',$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW(),0)`,
+      [
+        channel, recipient,
+        `Test API send via ${result.provider}`,
+        result.ok ? "sent" : "failed",
+        JSON.stringify(result),
+        result.provider,
+        result.endpoint,
+        result.httpStatus || null,
+        result.requestPayload ? JSON.stringify(result.requestPayload) : null,
+        result.errorCode || null,
+      ]
+    ).catch(e => console.error("[send-test] log failed:", e.message));
+
+    res.json({ ...result, logged: true });
   } catch (err: any) {
     res.status(500).json({ ok: false, message: err.message });
   }

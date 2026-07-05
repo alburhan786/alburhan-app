@@ -2,6 +2,17 @@ import axios from "axios";
 import nodemailer from "nodemailer";
 import { getCachedConfig } from "./apiSettingsProvider.js";
 
+export interface SendResult {
+  ok: boolean;
+  provider: string;
+  endpoint: string;
+  httpStatus?: number;
+  requestPayload?: unknown;
+  responsePayload?: unknown;
+  errorCode?: string;
+  errorMessage?: string;
+}
+
 async function withRetry<T>(
   fn: () => Promise<T>,
   attempts = 3,
@@ -288,18 +299,21 @@ export async function sendDLTSMS(
   }
 }
 
-export async function sendWhatsApp(mobile: string, message: string): Promise<boolean> {
+export async function sendWhatsApp(mobile: string, message: string): Promise<SendResult> {
   const bbCfg = getCachedConfig("botbee");
-  if (bbCfg.enabled === false) { console.log("[WhatsApp] disabled in API Settings"); return false; }
+  const bbBaseUrl = bbCfg.apiUrl || BOTBEE_BASE_URL;
+  const endpoint = `${bbBaseUrl}/send`;
+  if (bbCfg.enabled === false) {
+    return { ok: false, provider: "BotBee", endpoint, errorMessage: "WhatsApp disabled in API Settings" };
+  }
   const BOTBEE_API_KEY = bbCfg.apiKey || process.env.BOTBEE_API_KEY;
   const BOTBEE_PHONE_NUMBER_ID = bbCfg.extra.phone_number_id || process.env.BOTBEE_PHONE_NUMBER_ID;
-  const bbBaseUrl = bbCfg.apiUrl || BOTBEE_BASE_URL;
   if (!BOTBEE_API_KEY || !BOTBEE_PHONE_NUMBER_ID) {
-    console.log("[WhatsApp] API not configured, skipping:", mobile);
-    return false;
+    return { ok: false, provider: "BotBee", endpoint, errorMessage: "API key or Phone Number ID not configured" };
   }
   try {
     const phone = toBotBeePhone(mobile);
+    const safePayload = { phone_number_id: BOTBEE_PHONE_NUMBER_ID, phone_number: phone, message };
     const params = new URLSearchParams({
       apiToken: BOTBEE_API_KEY,
       phone_number_id: BOTBEE_PHONE_NUMBER_ID,
@@ -307,22 +321,28 @@ export async function sendWhatsApp(mobile: string, message: string): Promise<boo
       message,
     });
     const response = await withRetry(() =>
-      axios.post(
-        `${bbBaseUrl}/send`,
-        params.toString(),
-        { headers: { "Content-Type": "application/x-www-form-urlencoded" }, timeout: 10000 }
-      )
+      axios.post(endpoint, params.toString(), {
+        headers: { "Content-Type": "application/x-www-form-urlencoded" }, timeout: 10000,
+      })
     );
     const result = response.data;
     if (result?.status === "0" || result?.status === 0) {
       console.warn("[WhatsApp] Session msg failed for", mobile, ":", result.message);
-      return false;
+      return { ok: false, provider: "BotBee", endpoint, httpStatus: response.status, requestPayload: safePayload, responsePayload: result, errorMessage: result.message || "Message delivery failed" };
     }
     console.log("[WhatsApp] Session msg sent to", mobile, result);
-    return true;
+    return { ok: true, provider: "BotBee", endpoint, httpStatus: response.status, requestPayload: safePayload, responsePayload: result };
   } catch (err: any) {
-    console.error("[WhatsApp] Error after retries for", mobile, ":", err?.response?.data || err.message);
-    return false;
+    const resp = err?.response;
+    console.error("[WhatsApp] Error after retries for", mobile, ":", resp?.data || err.message);
+    return {
+      ok: false, provider: "BotBee", endpoint,
+      httpStatus: resp?.status,
+      requestPayload: { phone_number: mobile, message: message.substring(0, 200) },
+      responsePayload: resp?.data,
+      errorCode: String(resp?.data?.code || resp?.data?.error_code || ""),
+      errorMessage: resp?.data?.message || resp?.data?.error || err.message,
+    };
   }
 }
 
@@ -337,60 +357,53 @@ export async function sendRCS(
   customerName: string,
   messageText: string,
   richData?: RcsRichData
-): Promise<boolean> {
+): Promise<SendResult> {
   const leminCfg = getCachedConfig("lemin");
-  if (leminCfg.enabled === false) { console.log("[RCS] disabled in API Settings"); return false; }
+  const endpoint = leminCfg.apiUrl || process.env.LEMIN_API_URL || "https://rcs.leminai.com/api/send";
+  if (leminCfg.enabled === false) {
+    return { ok: false, provider: "Lemin AI", endpoint, errorMessage: "RCS disabled in API Settings" };
+  }
   const LEMIN_API_KEY = leminCfg.apiKey || process.env.LEMIN_API_KEY;
-  const lemin_api_url = leminCfg.apiUrl || process.env.LEMIN_API_URL || "https://rcs.leminai.com/api/send";
   const lemin_user_id = leminCfg.extra.user_id || process.env.LEMIN_USER_ID || "0x89mqd53ph";
   const lemin_template_id = leminCfg.extra.template_id || process.env.LEMIN_TEMPLATE_ID || "1473";
   if (!LEMIN_API_KEY) {
-    console.log("[RCS] LEMIN_API_KEY not set — skipping RCS for:", mobile);
-    return false;
+    return { ok: false, provider: "Lemin AI", endpoint, errorMessage: "LEMIN_API_KEY not configured" };
   }
   try {
     const clean = mobile.replace(/\D/g, "");
     const phone = clean.startsWith("91") ? clean.slice(2) : clean;
-
     const payload: Record<string, unknown> = {
-      type: "single",
-      dial_code: "+91",
-      template: lemin_template_id,
-      phone,
-      user_id: lemin_user_id,
-      variables: {
-        name: customerName || "Pilgrim",
-        message: messageText,
-      },
+      type: "single", dial_code: "+91", template: lemin_template_id,
+      phone, user_id: lemin_user_id,
+      variables: { name: customerName || "Pilgrim", message: messageText },
     };
-
     if (richData?.active && richData?.url) {
-      payload.rich_data = {
-        url: richData.url,
-        agent: richData.agent || "jio",
-        active: "true",
-      };
+      payload.rich_data = { url: richData.url, agent: richData.agent || "jio", active: "true" };
     }
-
     const response = await withRetry(() =>
-      axios.post(lemin_api_url, payload, {
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${LEMIN_API_KEY}`,
-        },
+      axios.post(endpoint, payload, {
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${LEMIN_API_KEY}` },
         timeout: 10000,
       })
     );
     const result = response.data;
     if (result?.status === false || result?.success === false) {
       console.warn("[RCS] Send failed for", mobile, ":", result?.message || result?.error);
-      return false;
+      return { ok: false, provider: "Lemin AI", endpoint, httpStatus: response.status, requestPayload: payload, responsePayload: result, errorMessage: result?.message || result?.error || "RCS delivery failed" };
     }
     console.log("[RCS] Sent to", mobile, result);
-    return true;
+    return { ok: true, provider: "Lemin AI", endpoint, httpStatus: response.status, requestPayload: payload, responsePayload: result };
   } catch (err: any) {
-    console.error("[RCS] Error after retries for", mobile, ":", err?.response?.data || err.message);
-    return false;
+    const resp = err?.response;
+    console.error("[RCS] Error after retries for", mobile, ":", resp?.data || err.message);
+    return {
+      ok: false, provider: "Lemin AI", endpoint,
+      httpStatus: resp?.status,
+      requestPayload: { phone: mobile, dial_code: "+91", template: lemin_template_id },
+      responsePayload: resp?.data,
+      errorCode: String(resp?.data?.code || resp?.data?.error_code || ""),
+      errorMessage: resp?.data?.message || resp?.data?.error || err.message,
+    };
   }
 }
 
@@ -455,30 +468,35 @@ function getEmailTransport() {
   });
 }
 
-export async function sendEmail(to: string, subject: string, body: string): Promise<boolean> {
-  if (!to) return false;
+export async function sendEmail(to: string, subject: string, body: string): Promise<SendResult> {
+  if (!to) return { ok: false, provider: "SMTP", endpoint: "smtp", errorMessage: "No recipient email" };
   const transport = getEmailTransport();
   if (!transport) {
-    console.log("[Email] SMTP not configured. Skipping email to:", to);
-    return false;
+    return { ok: false, provider: "SMTP", endpoint: "smtp", errorMessage: "SMTP not configured — check API Settings" };
   }
+  const smtpCfg = getCachedConfig("smtp");
+  const smtpHost = smtpCfg.apiUrl || process.env.SMTP_HOST || "smtp.gmail.com";
+  const endpoint = `smtp://${smtpHost}`;
+  const from = smtpCfg.extra.from_email || smtpCfg.extra.user || process.env.SMTP_USER || "info@alburhantravels.com";
   try {
-    const smtpCfg = getCachedConfig("smtp");
-    const from = smtpCfg.extra.from_email || smtpCfg.extra.user || process.env.SMTP_USER || "info@alburhantravels.com";
     await withRetry(() =>
       transport!.sendMail({
         from: `Al Burhan Tours & Travels <${from}>`,
-        to,
-        subject,
+        to, subject,
         text: body,
         html: body.replace(/\n/g, "<br>"),
       })
     );
     console.log("[Email] Sent to:", to, "Subject:", subject);
-    return true;
+    return { ok: true, provider: "SMTP", endpoint, requestPayload: { from, to, subject }, responsePayload: { delivered: true } };
   } catch (err: any) {
     console.error("[Email] Error after retries to", to, ":", err?.message);
-    return false;
+    return {
+      ok: false, provider: "SMTP", endpoint,
+      requestPayload: { to, subject },
+      errorCode: err?.code || "",
+      errorMessage: err?.message || "SMTP delivery failed",
+    };
   }
 }
 

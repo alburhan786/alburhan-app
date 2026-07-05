@@ -43,6 +43,17 @@ router.get("/stats", requireAdmin as any, async (_req: AuthenticatedRequest, res
 });
 
 // ── Delivery Logs ─────────────────────────────────────────────────────────────
+router.get("/logs/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const result = await pool.query(`SELECT * FROM notification_logs WHERE id=$1 LIMIT 1`, [req.params.id]);
+    if (!result.rows[0]) return res.status(404).json({ message: "Log not found" });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("[notification-center] GET /logs/:id:", err);
+    res.status(500).json({ message: "Failed to get log" });
+  }
+});
+
 router.get("/logs", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
     const { status, channel, event_type, limit = "100", offset = "0", search } = req.query as any;
