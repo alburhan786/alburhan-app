@@ -1,6 +1,15 @@
 import axios from "axios";
 import nodemailer from "nodemailer";
 import { getCachedConfig } from "./apiSettingsProvider.js";
+import {
+  sendBookingCreated as smsSendBookingCreated,
+  sendBookingConfirmed as smsSendBookingConfirmed,
+  sendPaymentReceived as smsSendPaymentReceived,
+  sendPendingPaymentReminder as smsSendPendingPayment,
+  sendInvoiceCreated as smsSendInvoiceCreated,
+  sendFlightTicketIssued as smsSendTicket,
+  sendVisaIssued as smsSendVisa,
+} from "./sms.js";
 
 export interface SendResult {
   ok: boolean;
@@ -512,7 +521,7 @@ export async function sendBookingSubmissionNotification(opts: {
   const adminMsg = `New Booking Alert!\n\nBooking #${opts.bookingNumber}\nCustomer: ${opts.customerName}\nMobile: ${opts.mobile}\nPackage: ${opts.packageName}\nPilgrims: ${opts.numberOfPilgrims}\n\nReview from admin dashboard.`;
 
   await Promise.allSettled([
-    sendDLTSMS(opts.mobile, opts.customerName, opts.bookingNumber, "SUBMITTED"),
+    smsSendBookingCreated({ mobile: opts.mobile, customerName: opts.customerName, bookingNumber: opts.bookingNumber, packageName: opts.packageName }),
     sendWhatsApp(opts.mobile, customerMsg),
     opts.email ? sendEmail(opts.email, "Booking Submitted – Al Burhan Tours & Travels", customerMsg) : Promise.resolve(),
     sendWhatsApp("9893989786", adminMsg),
@@ -528,7 +537,7 @@ export async function sendBookingApprovalNotification(opts: {
 }) {
   const message = `Assalamu Alaikum ${opts.customerName},\n\nYour booking #${opts.bookingNumber} with Al Burhan Tours & Travels has been APPROVED.\n\nPlease login to complete payment.\n\nHelp: +91 8989701701 / +91 9893989786\n\nJazak Allah Khair!`;
   await Promise.allSettled([
-    sendDLTSMS(opts.mobile, opts.customerName, opts.bookingNumber, "APPROVED"),
+    smsSendBookingConfirmed({ mobile: opts.mobile, customerName: opts.customerName, bookingNumber: opts.bookingNumber }),
     sendWhatsApp(opts.mobile, message),
     opts.email ? sendEmail(opts.email, "Booking Approved – Al Burhan Tours & Travels", message) : Promise.resolve(),
   ]);
@@ -544,7 +553,7 @@ export async function sendBookingRejectionNotification(opts: {
   const reasonText = opts.reason ? `\n\nReason: ${opts.reason}` : "";
   const message = `Assalamu Alaikum ${opts.customerName},\n\nWe regret that your booking #${opts.bookingNumber} could not be processed.${reasonText}\n\nPlease contact us:\n+91 8989701701\n+91 9893989786`;
   await Promise.allSettled([
-    sendDLTSMS(opts.mobile, opts.customerName, opts.bookingNumber, "REJECTED"),
+    sendDLTSMS(opts.mobile, opts.customerName, opts.bookingNumber, "REJECTED"),  // no dedicated event type; use generic
     sendWhatsApp(opts.mobile, message),
     opts.email ? sendEmail(opts.email, "Booking Update – Al Burhan Tours & Travels", message) : Promise.resolve(),
   ]);
@@ -564,7 +573,7 @@ export async function sendPaymentConfirmationNotification(opts: {
   const adminMsg = `Payment Received!\n\nBooking: #${opts.bookingNumber}\nCustomer: ${opts.customerName}\nMobile: ${opts.mobile}\nAmount: Rs.${opts.amount}\nInvoice: ${opts.invoiceNumber}`;
 
   await Promise.allSettled([
-    sendDLTSMS(opts.mobile, opts.customerName, opts.bookingNumber, "CONFIRMED"),
+    smsSendPaymentReceived({ mobile: opts.mobile, customerName: opts.customerName, bookingNumber: opts.bookingNumber, amount: opts.amount }),
     sendWhatsApp(opts.mobile, message),
     opts.email ? sendEmail(opts.email, "Booking Confirmed – Al Burhan Tours & Travels", message) : Promise.resolve(),
     sendWhatsApp("9893989786", adminMsg),
@@ -582,7 +591,7 @@ export async function sendPartialPaymentNotification(opts: {
 }) {
   const message = `Assalamu Alaikum ${opts.customerName},\n\nPartial payment of Rs.${opts.paidAmount} received for booking #${opts.bookingNumber}.\n\nBalance remaining: Rs.${opts.remainingAmount}\n\nPlease login to pay the remaining amount.\n\nAl Burhan Tours & Travels\n+91 8989701701`;
   await Promise.allSettled([
-    sendDLTSMS(opts.mobile, opts.customerName, opts.bookingNumber, "PARTIAL PAYMENT"),
+    smsSendPendingPayment({ mobile: opts.mobile, customerName: opts.customerName, bookingNumber: opts.bookingNumber, balance: opts.remainingAmount }),
     sendWhatsApp(opts.mobile, message),
     opts.email ? sendEmail(opts.email, "Partial Payment Received – Al Burhan Tours & Travels", message) : Promise.resolve(),
   ]);
@@ -693,8 +702,13 @@ export async function sendAdminDocumentReadyNotification(opts: {
 }) {
   const docLabel = opts.documentType.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
   const message = `Assalamu Alaikum ${opts.customerName},\n\nYour ${docLabel} for booking #${opts.bookingNumber} is ready.\n\nPlease login to your dashboard to view and download it.\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 8989701701`;
+  const docSmsMap: Record<string, () => Promise<any>> = {
+    ticket: () => smsSendTicket({ mobile: opts.mobile, customerName: opts.customerName, bookingNumber: opts.bookingNumber }),
+    visa:   () => smsSendVisa({ mobile: opts.mobile, customerName: opts.customerName, bookingNumber: opts.bookingNumber }),
+  };
+  const smsKey = Object.keys(docSmsMap).find(k => opts.documentType.toLowerCase().includes(k));
   await Promise.allSettled([
-    sendDLTSMS(opts.mobile, opts.customerName, opts.bookingNumber, docLabel.toUpperCase().slice(0, 30)),
+    smsKey ? docSmsMap[smsKey]() : smsSendInvoiceCreated({ mobile: opts.mobile, customerName: opts.customerName, bookingNumber: opts.bookingNumber }),
     sendWhatsApp(opts.mobile, message),
     opts.email ? sendEmail(opts.email, `Your ${docLabel} is Ready – Al Burhan Tours & Travels`, message) : Promise.resolve(),
   ]);

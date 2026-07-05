@@ -295,17 +295,26 @@ router.post("/:provider/send-test", requireAdmin as any, requireSuperAdmin, asyn
         channel = "sms";
         recipient = mobile;
         const phone = mobile.replace(/\D/g, "").slice(-10);
-        const testMsg = "Al Burhan ERP test SMS from Test API.";
+        const testMsg = "Al Burhan Tours & Travels SMS integration is working successfully.";
+        const senderId = extra.sender_id || "ALBURH";
+        const templateId = extra.notify_template_id || "211277";
         const endpoint = `https://www.fast2sms.com/dev/bulkV2`;
-        const reqPayload = { route: "q", numbers: phone, message: testMsg };
+        // Try DLT route first, fall back to Quick
+        const dltUrl = `${endpoint}?authorization=${apiKey}&route=dlt&sender_id=${senderId}&message=${templateId}&variables_values=${encodeURIComponent("Al Burhan|Test|Success|")}&numbers=${phone}&flash=0`;
+        const quickUrl = `${endpoint}?authorization=${apiKey}&route=q&message=${encodeURIComponent(testMsg)}&numbers=${phone}&flash=0`;
+        const reqPayload = { route: "dlt→quick", sender_id: senderId, template_id: templateId, numbers: phone };
         let httpStatus = 0; let respData: any = {};
         try {
-          const resp = await axios.get(`${endpoint}?authorization=${apiKey}&route=q&message=${encodeURIComponent(testMsg)}&numbers=${phone}&flash=0`, { timeout: 10000 });
-          httpStatus = resp.status; respData = resp.data;
-          result = { ok: respData?.return === true, provider: "Fast2SMS", endpoint, httpStatus, requestPayload: reqPayload, responsePayload: respData, errorMessage: respData?.return === true ? undefined : (respData?.message || "SMS delivery failed") };
+          let resp = await axios.get(dltUrl, { timeout: 10000 }).catch(async (e: any) => {
+            // DLT failed — try Quick route
+            return axios.get(quickUrl, { timeout: 10000 }).catch(() => e?.response || { data: { error: e.message }, status: 0 });
+          });
+          httpStatus = resp.status || resp.status; respData = resp.data;
+          const ok = respData?.return === true;
+          result = { ok, provider: "Fast2SMS", endpoint, httpStatus, requestPayload: reqPayload, responsePayload: respData, messageId: respData?.request_id, errorMessage: ok ? undefined : (Array.isArray(respData?.message) ? respData.message.join("; ") : respData?.message || "SMS delivery failed") };
         } catch (e: any) {
           const er = e?.response; httpStatus = er?.status || 0; respData = er?.data || { error: e.message };
-          result = { ok: false, provider: "Fast2SMS", endpoint, httpStatus, requestPayload: reqPayload, responsePayload: respData, errorCode: String(respData?.code || ""), errorMessage: respData?.message || e.message };
+          result = { ok: false, provider: "Fast2SMS", endpoint, httpStatus, requestPayload: reqPayload, responsePayload: respData, errorCode: String(respData?.status_code || respData?.code || ""), errorMessage: Array.isArray(respData?.message) ? respData.message.join("; ") : (respData?.message || e.message) };
         }
         break;
       }

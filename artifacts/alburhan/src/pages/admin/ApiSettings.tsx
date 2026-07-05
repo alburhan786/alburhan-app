@@ -56,18 +56,28 @@ const PROVIDERS: ProviderDef[] = [
   },
   {
     id: "fast2sms",
-    label: "Fast2SMS",
+    label: "Fast2SMS DLT SMS",
     icon: Smartphone,
     color: "text-blue-600",
-    description: "Bulk SMS and OTP delivery via Fast2SMS. Used for OTP verification and booking alerts.",
+    description: "DLT-compliant bulk SMS via Fast2SMS. Booking confirmations, payment alerts, and reminders.",
     apiUrlLabel: "API URL",
     apiUrlPlaceholder: "https://www.fast2sms.com/dev/bulkV2",
     apiKeyLabel: "Authorization Key",
-    apiKeyPlaceholder: "Enter Fast2SMS API key",
+    apiKeyPlaceholder: "Enter Fast2SMS authorization API key",
     extraFields: [
-      { key: "sender_id", label: "Sender ID", placeholder: "ALBURH", isExtra: true },
-      { key: "otp_template_id", label: "OTP DLT Template ID", placeholder: "164844", isExtra: true },
-      { key: "notify_template_id", label: "Notify DLT Template ID", placeholder: "211277", isExtra: true },
+      { key: "sender_id",         label: "Sender ID",              placeholder: "ALBURH",  isExtra: true },
+      { key: "otp_template_id",   label: "OTP Template ID",        placeholder: "164844",  isExtra: true },
+      { key: "notify_template_id",label: "Default Notify Template ID", placeholder: "211277", isExtra: true },
+      { key: "booking_created_tid",    label: "Booking Created Template ID",      placeholder: "use notify_template_id", isExtra: true },
+      { key: "booking_confirmed_tid",  label: "Booking Confirmed Template ID",    placeholder: "use notify_template_id", isExtra: true },
+      { key: "payment_received_tid",   label: "Payment Received Template ID",     placeholder: "use notify_template_id", isExtra: true },
+      { key: "pending_payment_tid",    label: "Pending Payment Template ID",      placeholder: "use notify_template_id", isExtra: true },
+      { key: "invoice_created_tid",    label: "Invoice Created Template ID",      placeholder: "use notify_template_id", isExtra: true },
+      { key: "ticket_issued_tid",      label: "Ticket Issued Template ID",        placeholder: "use notify_template_id", isExtra: true },
+      { key: "visa_issued_tid",        label: "Visa Issued Template ID",          placeholder: "use notify_template_id", isExtra: true },
+      { key: "departure_reminder_tid", label: "Departure Reminder Template ID",   placeholder: "use notify_template_id", isExtra: true },
+      { key: "arrival_reminder_tid",   label: "Arrival Reminder Template ID",     placeholder: "use notify_template_id", isExtra: true },
+      { key: "eid_greeting_tid",       label: "Eid Greeting Template ID",         placeholder: "use notify_template_id", isExtra: true },
     ],
     testMessageFields: [
       { key: "mobile", label: "Test Mobile Number", placeholder: "10-digit number", type: "text" },
@@ -542,6 +552,47 @@ export default function ApiSettings() {
                           {provider.id === "botbee" ? "Send Test WhatsApp" : "Send"}
                         </button>
                       </div>
+
+                      {/* Fast2SMS rich result panel */}
+                      {provider.id === "fast2sms" && sendTestResults["fast2sms"] && (() => {
+                        const r = sendTestResults["fast2sms"];
+                        return (
+                          <div className={`mt-3 rounded-lg border-2 overflow-hidden ${r.ok ? "border-blue-200 bg-blue-50" : "border-red-200 bg-red-50"}`}>
+                            <div className="flex items-center gap-3 px-3 py-2 border-b border-inherit">
+                              <span className="text-base">{r.ok ? "✅" : "❌"}</span>
+                              <div className="flex-1">
+                                <span className={`font-bold text-sm ${r.ok ? "text-blue-800" : "text-red-800"}`}>
+                                  {r.ok ? "SMS Delivered" : "Delivery Failed"}
+                                </span>
+                                {r.httpStatus && (
+                                  <span className={`ml-2 text-xs font-bold px-1.5 py-0.5 rounded ${r.httpStatus < 300 ? "bg-blue-200 text-blue-800" : "bg-red-200 text-red-800"}`}>
+                                    HTTP {r.httpStatus}
+                                  </span>
+                                )}
+                              </div>
+                              {r.logged && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-medium">📋 Logged</span>}
+                            </div>
+                            {(r.messageId || r.requestPayload?.template_id) && (
+                              <div className="flex items-center gap-2 px-3 py-2 border-b border-inherit bg-white/60">
+                                {r.messageId && <><span className="text-xs font-semibold text-gray-500 shrink-0">Request ID:</span><code className="text-xs font-mono text-blue-700 font-bold">{r.messageId}</code></>}
+                                {r.requestPayload?.template_id && <><span className="text-xs font-semibold text-gray-500 shrink-0 ml-4">Template ID:</span><code className="text-xs font-mono text-gray-700">{r.requestPayload.template_id}</code></>}
+                              </div>
+                            )}
+                            {r.errorMessage && (
+                              <div className="px-3 py-2 border-b border-inherit bg-white/60">
+                                <span className="text-xs font-semibold text-red-600">Error: </span>
+                                <span className="text-xs text-red-700">{r.errorMessage}</span>
+                              </div>
+                            )}
+                            <div className="px-3 py-2">
+                              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">API Response</p>
+                              <pre className="bg-gray-900 text-blue-300 text-[10px] font-mono rounded-lg p-2.5 overflow-auto max-h-36 whitespace-pre-wrap break-all">
+                                {JSON.stringify(r.responsePayload ?? r, null, 2)}
+                              </pre>
+                            </div>
+                          </div>
+                        );
+                      })()}
 
                       {/* BotBee rich result panel */}
                       {provider.id === "botbee" && sendTestResults["botbee"] && (() => {
