@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
-import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { usePermissions } from "@/hooks/use-permissions";
 import {
   Shield, Eye, EyeOff, Save, Zap, Send, CheckCircle2,
   XCircle, Loader2, ChevronDown, ChevronUp, ToggleLeft, ToggleRight,
@@ -197,7 +197,7 @@ interface TestResult {
 }
 
 export default function ApiSettings() {
-  const { user } = useAuth();
+  const { isSuper: isSuperAdmin, loaded: permissionsLoaded } = usePermissions();
   const { toast } = useToast();
 
   const [states, setStates] = useState<Record<string, ProviderState>>(() =>
@@ -214,9 +214,6 @@ export default function ApiSettings() {
   const [testAllInputs, setTestAllInputs] = useState({ mobile: "", email: "" });
   const [testAllLoading, setTestAllLoading] = useState(false);
   const [testAllResults, setTestAllResults] = useState<Array<{ channel: string; ok: boolean; provider: string; httpStatus?: number; errorMessage?: string; responsePayload?: unknown }> | null>(null);
-
-  // Super admin check
-  const isSuperAdmin = (user as any)?.adminRole === "super_admin";
 
   useEffect(() => {
     if (!isSuperAdmin) return;
@@ -243,6 +240,16 @@ export default function ApiSettings() {
       })
       .catch(() => {});
   }, [isSuperAdmin]);
+
+  if (!permissionsLoaded) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+        </div>
+      </AdminLayout>
+    );
+  }
 
   if (!isSuperAdmin) {
     return (

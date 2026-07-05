@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { useToast } from "@/hooks/use-toast";
-import { Settings, Percent, DollarSign, Tag, Save, RefreshCw, CheckCircle2 } from "lucide-react";
+import { usePermissions } from "@/hooks/use-permissions";
+import { Settings, Percent, DollarSign, Tag, Save, RefreshCw, CheckCircle2, Loader2, Shield } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -66,6 +67,7 @@ function SettingRow({ label, description, children }: { label: string; descripti
 
 export default function BillingSettings() {
   const { toast } = useToast();
+  const { isSuper, loaded: permLoaded } = usePermissions();
   const [settings, setSettings] = useState<BillingSettingsData>(DEFAULT);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -118,6 +120,9 @@ export default function BillingSettings() {
       </AdminLayout>
     );
   }
+
+  if (!permLoaded) return <AdminLayout><div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-gray-400" /></div></AdminLayout>;
+  if (!isSuper) return <AdminLayout><div className="flex flex-col items-center justify-center h-64 gap-3"><Shield className="w-12 h-12 text-gray-300" /><p className="text-lg font-semibold text-gray-500">Super Admin Access Required</p><p className="text-sm text-gray-400">This page is restricted to Super Administrators only.</p></div></AdminLayout>;
 
   return (
     <AdminLayout>

@@ -3,8 +3,9 @@ import { AdminLayout } from "@/components/layout/AdminLayout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { RefreshCw, Loader2, CheckCircle, XCircle, Send, ChevronDown, ChevronRight, AlertTriangle, Wifi, WifiOff } from "lucide-react";
+import { RefreshCw, Loader2, CheckCircle, XCircle, Send, ChevronDown, ChevronRight, AlertTriangle, Wifi, WifiOff, Shield } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { usePermissions } from "@/hooks/use-permissions";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -154,6 +155,7 @@ function LogCard({ entry }: { entry: SmsLog }) {
 
 export default function OTPDebug() {
   const { toast } = useToast();
+  const { isSuper, loaded: permLoaded } = usePermissions();
   const [logs, setLogs] = useState<SmsLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [testPhone, setTestPhone] = useState("");
@@ -217,6 +219,9 @@ export default function OTPDebug() {
 
   const successCount = logs.filter(l => l.finalSuccess).length;
   const failCount = logs.filter(l => !l.finalSuccess).length;
+
+  if (!permLoaded) return <AdminLayout><div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-gray-400" /></div></AdminLayout>;
+  if (!isSuper) return <AdminLayout><div className="flex flex-col items-center justify-center h-64 gap-3"><Shield className="w-12 h-12 text-gray-300" /><p className="text-lg font-semibold text-gray-500">Super Admin Access Required</p><p className="text-sm text-gray-400">This page is restricted to Super Administrators only.</p></div></AdminLayout>;
 
   return (
     <AdminLayout>

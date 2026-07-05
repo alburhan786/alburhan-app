@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { RefreshCw, Download, Search, RotateCcw, Eye } from "lucide-react";
+import { usePermissions } from "@/hooks/use-permissions";
+import { RefreshCw, Download, Search, RotateCcw, Eye, Loader2, Shield } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import * as XLSX from "xlsx";
 
@@ -39,6 +40,7 @@ function fmtDate(ts: string) {
 
 export default function AuditLogs() {
   const { toast } = useToast();
+  const { isAdminLevel, loaded: permLoaded } = usePermissions();
   const [logs, setLogs] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -115,6 +117,9 @@ export default function AuditLogs() {
     XLSX.utils.book_append_sheet(wb, ws, "Audit Log");
     XLSX.writeFile(wb, `audit-log-${new Date().toISOString().slice(0, 10)}.xlsx`);
   }
+
+  if (!permLoaded) return <AdminLayout><div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-gray-400" /></div></AdminLayout>;
+  if (!isAdminLevel) return <AdminLayout><div className="flex flex-col items-center justify-center h-64 gap-3"><Shield className="w-12 h-12 text-gray-300" /><p className="text-lg font-semibold text-gray-500">Access Restricted</p><p className="text-sm text-gray-400">Admin or Super Admin role required.</p></div></AdminLayout>;
 
   return (
     <AdminLayout>
