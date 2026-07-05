@@ -1,0 +1,506 @@
+Build Phase 1 - Business Workflow Automation for the Al Burhan Tours & Travels ERP.
+
+IMPORTANT:
+
+- Do NOT break any existing functionality.
+- Do NOT delete any data.
+- Use the existing Notification Engine.
+- Every workflow must execute automatically.
+- Log every workflow execution.
+- Allow Admin to enable or disable each automation.
+
+==================================================
+WORKFLOW ENGINE
+==================================================
+
+Create a Workflow Engine.
+
+Every ERP event should automatically trigger actions.
+
+Workflow Status:
+
+Pending
+
+Running
+
+Completed
+
+Failed
+
+Retry
+
+Workflow Logs
+
+==================================================
+AUTOMATION RULES
+==================================================
+
+Create an Automation Rules page.
+
+Admin can:
+
+Enable
+
+Disable
+
+Edit
+
+Clone
+
+Delete
+
+Test
+
+Every automation.
+
+==================================================
+WORKFLOW 1
+NEW BOOKING
+==================================================
+
+When customer submits booking:
+
+Automatically:
+
+✓ Create Booking
+
+✓ Generate Booking ID
+
+✓ Send Admin Popup
+
+✓ Play Notification Sound
+
+✓ Browser Notification
+
+✓ Email Admin
+
+✓ WhatsApp Customer
+
+✓ SMS Customer
+
+✓ Save Notification
+
+✓ Add Customer Timeline
+
+✓ Create Activity Log
+
+==================================================
+WORKFLOW 2
+BOOKING APPROVED
+==================================================
+
+When Admin approves booking:
+
+Automatically:
+
+Generate Invoice
+
+Generate Payment Schedule
+
+Generate Receipt
+
+Generate Customer Portal
+
+Send WhatsApp
+
+Send Email
+
+Send SMS
+
+Update Booking Status
+
+Activity Log
+
+==================================================
+WORKFLOW 3
+PAYMENT RECEIVED
+==================================================
+
+When payment received:
+
+Automatically:
+
+Update Ledger
+
+Update Customer Balance
+
+Update Family Balance
+
+Update Dashboard
+
+Generate Receipt
+
+Generate Tax Invoice
+
+Send Receipt PDF
+
+Send WhatsApp
+
+Send Email
+
+Send SMS
+
+Activity Log
+
+==================================================
+WORKFLOW 4
+PAYMENT REMINDER
+==================================================
+
+Automatically send reminders:
+
+30 Days
+
+15 Days
+
+7 Days
+
+3 Days
+
+1 Day
+
+On Due Date
+
+Repeat every 7 days until paid.
+
+==================================================
+WORKFLOW 5
+DOCUMENTS
+==================================================
+
+When Passport uploaded
+
+Update Status
+
+Notify Admin
+
+Notify Customer
+
+When Visa uploaded
+
+Generate Visa PDF
+
+Send WhatsApp
+
+Send Email
+
+==================================================
+WORKFLOW 6
+FLIGHT
+==================================================
+
+When Flight assigned:
+
+Automatically
+
+Generate Ticket PDF
+
+Send Ticket
+
+Send Baggage Rules
+
+Send Reporting Time
+
+Send Airport Map
+
+==================================================
+WORKFLOW 7
+HOTEL
+==================================================
+
+When Room allocated
+
+Send:
+
+Hotel Name
+
+Room Number
+
+Check-in Date
+
+Google Maps
+
+==================================================
+WORKFLOW 8
+BUS
+==================================================
+
+When Bus assigned
+
+Send:
+
+Bus Number
+
+Seat
+
+Reporting Time
+
+Driver Name
+
+==================================================
+WORKFLOW 9
+DEPARTURE
+==================================================
+
+Automatically remind
+
+7 Days
+
+3 Days
+
+1 Day
+
+12 Hours
+
+6 Hours
+
+2 Hours
+
+==================================================
+WORKFLOW 10
+RETURN
+==================================================
+
+Automatically send
+
+Return Flight
+
+Reporting Time
+
+Baggage Rules
+
+Airport Reminder
+
+==================================================
+WORKFLOW 11
+FEEDBACK
+==================================================
+
+3 days after return
+
+Automatically send
+
+Feedback Form
+
+Google Review Link
+
+Referral Program
+
+==================================================
+WORKFLOW 12
+DOCUMENT EXPIRY
+==================================================
+
+Passport
+
+Visa
+
+Medical
+
+Insurance
+
+Notify:
+
+90 Days
+
+60 Days
+
+30 Days
+
+7 Days
+
+==================================================
+CUSTOMER TIMELINE
+==================================================
+
+Maintain a complete timeline:
+
+Enquiry
+
+Booking
+
+Payment
+
+Passport
+
+Visa
+
+Flight
+
+Hotel
+
+Room
+
+Bus
+
+Departure
+
+Arrival
+
+Return
+
+Feedback
+
+==================================================
+WORKFLOW DASHBOARD
+==================================================
+
+Show:
+
+Today's Workflows
+
+Running
+
+Completed
+
+Failed
+
+Pending
+
+Retry Queue
+
+==================================================
+WORKFLOW LOGS
+==================================================
+
+Store:
+
+Workflow ID
+
+Booking ID
+
+Customer
+
+Trigger
+
+Execution Time
+
+Status
+
+Errors
+
+Retry Count
+
+==================================================
+FAILED WORKFLOWS
+==================================================
+
+Automatically retry
+
+Maximum 3 attempts.
+
+Admin can retry manually.
+
+==================================================
+ADMIN POPUP
+==================================================
+
+Show popup for:
+
+New Booking
+
+Payment
+
+Refund
+
+Visa
+
+Flight
+
+Emergency
+
+==================================================
+NOTIFICATION CHANNELS
+==================================================
+
+Use existing Notification Engine.
+
+Automatically send through:
+
+WhatsApp
+
+SMS
+
+Email
+
+RCS
+
+Push Notification
+
+==================================================
+DATABASE
+==================================================
+
+Create:
+
+workflow_rules
+
+workflow_logs
+
+workflow_queue
+
+workflow_history
+
+==================================================
+PERMISSIONS
+==================================================
+
+Only Super Admin can:
+
+Create Workflow
+
+Delete Workflow
+
+Edit Workflow
+
+Manager can:
+
+Enable
+
+Disable
+
+View
+
+==================================================
+TESTING
+==================================================
+
+Test every workflow.
+
+Verify:
+
+Booking
+
+Payment
+
+Invoice
+
+Receipt
+
+Visa
+
+Flight
+
+Hotel
+
+Bus
+
+Notifications
+
+Dashboard
+
+Customer Portal
+
+Reports
+
+No workflow should fail.
+
+No duplicate notifications.
+
+No duplicate invoices.
+
+No duplicate receipts.
+
+No duplicate payments.
+
+Do not finish until every workflow runs automatically and successfully.

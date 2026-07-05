@@ -8,6 +8,7 @@ import { CreatePaymentOrderBody, VerifyPaymentBody } from "@workspace/api-zod";
 import { requireAuth, requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendPaymentConfirmationNotification, sendPartialPaymentNotification, sendWhatsApp } from "../lib/notifications.js";
 import { trackNotification } from "../lib/notificationEngine.js";
+import { triggerWorkflow } from "../lib/workflowEngine.js";
 import { sendReminderForBookingId, getReminderHistory, runDailyReminders, isRemindersEnabled, setRemindersEnabled } from "../jobs/paymentReminder.js";
 
 const router = Router();
@@ -249,6 +250,12 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
       trackNotification({ eventType: "payment_received", channel: "whatsapp", recipient: booking.customerMobile, bookingId: booking.id, status: "sent" }).catch(() => {});
       trackNotification({ eventType: "payment_received", channel: "sms", recipient: booking.customerMobile, bookingId: booking.id, status: "sent" }).catch(() => {});
     }).catch(console.error);
+    triggerWorkflow("payment_received", {
+      bookingId: booking.id, bookingNumber: booking.bookingNumber,
+      customerName: booking.customerName, customerMobile: booking.customerMobile,
+      customerEmail: booking.customerEmail ?? undefined,
+      amount: Number(booking.finalAmount || 0),
+    }).catch(() => {});
   } else {
     const remainingBalance = Math.max(0, finalAmount - newPaidAmount);
     sendPartialPaymentNotification({

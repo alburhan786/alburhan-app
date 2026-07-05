@@ -7,7 +7,7 @@ import {
   Printer, Menu, Megaphone, ShieldCheck, Inbox, PieChart, Star, BadgeCheck, Droplets,
   TrendingDown, Calculator, Plane, Activity, Home, CreditCard, Trash2,
   Building2, Bus, Heart, FileCheck, Sparkles, UserCheck, BookMarked, Truck,
-  Scale, Users2, Package, ClipboardList, KeyRound, HeartPulse, Settings2, BellRing
+  Scale, Users2, Package, ClipboardList, KeyRound, HeartPulse, Settings2, BellRing, Zap
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePermissions, type Module, type Action } from "@/hooks/use-permissions";
@@ -97,6 +97,7 @@ function buildMenu(openComplaints: number): MenuSection[] {
       section: "Communications",
       items: [
         { icon: BellRing, label: "Communication Center", href: "/admin/communication-center", require: ["customers", "edit"] },
+        { icon: Zap, label: "Workflow Center", href: "/admin/workflow-center", require: ["bookings", "edit"] },
       ],
     },
     {

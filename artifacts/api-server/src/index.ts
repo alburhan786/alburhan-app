@@ -68,6 +68,8 @@ import { inArray, sql } from "drizzle-orm";
 import { ADMIN_MOBILES } from "./routes/auth.js";
 import { startPaymentReminderCron } from "./jobs/paymentReminder.js";
 import { startFeedbackReminderCron } from "./jobs/feedbackReminder.js";
+import { startDepartureReminderCron, startDocumentExpiryCron, startReturnAndFeedbackCron } from "./lib/workflowEngine.js";
+import { DEFAULT_RULES } from "./routes/workflows.js";
 
 async function runMigrations() {
   // Session table — must exist BEFORE connect-pg-simple initializes
@@ -1138,6 +1140,105 @@ async function runMigrations() {
   } catch (err) {
     console.error("[Migration] assets table failed:", err);
   }
+  // ── Workflow Engine tables ─────────────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS workflow_rules (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        trigger_type TEXT NOT NULL UNIQUE,
+        description TEXT,
+        enabled BOOLEAN NOT NULL DEFAULT true,
+        group_name TEXT NOT NULL DEFAULT 'general',
+        config JSONB NOT NULL DEFAULT '{}',
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    console.log("[Migration] workflow_rules table ensured");
+  } catch (err) { console.error("[Migration] workflow_rules failed:", err); }
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS workflow_logs (
+        id SERIAL PRIMARY KEY,
+        trigger_type TEXT NOT NULL,
+        booking_id TEXT,
+        customer_id TEXT,
+        customer_name TEXT,
+        status TEXT NOT NULL DEFAULT 'pending',
+        error_message TEXT,
+        retry_count INTEGER NOT NULL DEFAULT 0,
+        execution_time_ms INTEGER,
+        context JSONB,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        completed_at TIMESTAMPTZ
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS wf_logs_status_idx ON workflow_logs(status)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS wf_logs_created_idx ON workflow_logs(created_at DESC)`);
+    console.log("[Migration] workflow_logs table ensured");
+  } catch (err) { console.error("[Migration] workflow_logs failed:", err); }
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS workflow_queue (
+        id SERIAL PRIMARY KEY,
+        trigger_type TEXT NOT NULL,
+        booking_id TEXT,
+        customer_id TEXT,
+        context JSONB,
+        status TEXT NOT NULL DEFAULT 'pending',
+        scheduled_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        attempts INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    console.log("[Migration] workflow_queue table ensured");
+  } catch (err) { console.error("[Migration] workflow_queue failed:", err); }
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS customer_timeline (
+        id SERIAL PRIMARY KEY,
+        customer_id TEXT,
+        booking_id TEXT,
+        event_type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT,
+        icon TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS timeline_booking_idx ON customer_timeline(booking_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS timeline_customer_idx ON customer_timeline(customer_id)`);
+    console.log("[Migration] customer_timeline table ensured");
+  } catch (err) { console.error("[Migration] customer_timeline failed:", err); }
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS admin_events (
+        id SERIAL PRIMARY KEY,
+        event_type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT,
+        booking_id TEXT,
+        customer_name TEXT,
+        severity TEXT NOT NULL DEFAULT 'info',
+        is_read BOOLEAN NOT NULL DEFAULT false,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    console.log("[Migration] admin_events table ensured");
+  } catch (err) { console.error("[Migration] admin_events failed:", err); }
+  // ── Seed default workflow rules ────────────────────────────────────────────
+  try {
+    for (const rule of DEFAULT_RULES) {
+      await pool.query(
+        `INSERT INTO workflow_rules (name, trigger_type, description, enabled, group_name)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (trigger_type) DO NOTHING`,
+        [rule.name, rule.trigger_type, rule.description, rule.enabled, rule.group_name]
+      );
+    }
+    console.log("[Migration] workflow rules seeded");
+  } catch (err) { console.error("[Migration] workflow rules seed failed:", err); }
 }
 
 const rawPort = process.env["PORT"];
@@ -1177,6 +1278,9 @@ async function start() {
     console.log(`Server listening on port ${finalPort}`);
     startPaymentReminderCron();
     startFeedbackReminderCron();
+    startDepartureReminderCron();
+    startDocumentExpiryCron();
+    startReturnAndFeedbackCron();
     const scheduleAuditRetention = () => {
       const now = new Date();
       const nextRun = new Date(now);

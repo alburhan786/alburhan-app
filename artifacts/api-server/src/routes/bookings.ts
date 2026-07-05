@@ -43,6 +43,7 @@ import {
   notifyBookingCancelled,
 } from "../lib/adminNotifications.js";
 import { trackNotification } from "../lib/notificationEngine.js";
+import { triggerWorkflow } from "../lib/workflowEngine.js";
 
 const router = Router();
 
@@ -466,6 +467,14 @@ router.post("/", requireAuth as any, async (req: AuthenticatedRequest, res) => {
     trackNotification({ eventType: "new_booking", channel: "sms", recipient: booking.customerMobile, customerId: booking.customerId ?? undefined, bookingId: booking.id, status: "sent" }).catch(() => {});
   }).catch(console.error);
 
+  triggerWorkflow("new_booking", {
+    bookingId: booking.id, bookingNumber: booking.bookingNumber,
+    customerId: booking.customerId ?? undefined, customerName: booking.customerName,
+    customerMobile: booking.customerMobile, customerEmail: booking.customerEmail ?? undefined,
+    packageName: booking.packageName ?? pkg?.name ?? "Travel Package",
+    amount: booking.finalAmount ? Number(booking.finalAmount) : undefined,
+  }).catch(() => {});
+
   notifyNewBooking({
     bookingId: booking.id,
     bookingNumber: booking.bookingNumber,
@@ -530,6 +539,12 @@ router.post("/:id/approve", requireAdmin as any, requirePermission("bookings", "
     trackNotification({ eventType: "booking_approved", channel: "sms", recipient: updated.customerMobile, bookingId: updated.id, status: "sent" }).catch(() => {});
   }).catch(console.error);
 
+  triggerWorkflow("booking_approved", {
+    bookingId: updated.id, bookingNumber: updated.bookingNumber,
+    customerName: updated.customerName, customerMobile: updated.customerMobile,
+    customerEmail: updated.customerEmail ?? undefined,
+  }).catch(() => {});
+
   notifyBookingApproved({
     bookingId: updated.id,
     bookingNumber: updated.bookingNumber,
@@ -565,6 +580,12 @@ router.post("/:id/reject", requireAdmin as any, requirePermission("bookings", "e
   }).then(() => {
     trackNotification({ eventType: "booking_cancelled", channel: "whatsapp", recipient: updated.customerMobile, bookingId: updated.id, status: "sent" }).catch(() => {});
   }).catch(console.error);
+
+  triggerWorkflow("booking_rejected", {
+    bookingId: updated.id, bookingNumber: updated.bookingNumber,
+    customerName: updated.customerName, customerMobile: updated.customerMobile,
+    customerEmail: updated.customerEmail ?? undefined,
+  }).catch(() => {});
 
   notifyBookingRejected({
     bookingId: updated.id,

@@ -88,6 +88,7 @@ import UserRolesManager from "@/pages/admin/UserRolesManager";
 import BillingSettings from "@/pages/admin/BillingSettings";
 import NotificationCenter from "@/pages/admin/NotificationCenter";
 import CommunicationCenter from "@/pages/admin/CommunicationCenter";
+import WorkflowCenter from "@/pages/admin/WorkflowCenter";
 import AttendanceScanPublic from "@/pages/public/AttendanceScanPublic";
 import StaffVerify from "@/pages/public/StaffVerify";
 import VerifyPilgrim from "@/pages/public/VerifyPilgrim";
@@ -217,6 +218,7 @@ function Router() {
       <Route path="/admin/notifications" component={() => <AdminRoute component={NotificationCenter} />} />
       <Route path="/admin/billing-settings" component={() => <AdminRoute component={BillingSettings} />} />
       <Route path="/admin/communication-center" component={() => <AdminRoute component={CommunicationCenter} />} />
+      <Route path="/admin/workflow-center" component={() => <AdminRoute component={WorkflowCenter} />} />
       <Route path="/admin/flights" component={() => <AdminRoute component={FlightManager} />} />
       <Route path="/admin/groups/:groupId/flights" component={() => <AdminRoute component={FlightManager} />} />
       <Route path="/admin/groups/:groupId/print/single-card/:pilgrimId"    component={() => <AdminRoute component={PrintSingleCard} />} />

@@ -43,6 +43,7 @@ import adminNotificationsRouter from "./admin-notifications.js";
 import settingsRouter from "./settings.js";
 import invoicesRouter from "./invoices.js";
 import notificationCenterRouter from "./notification-center.js";
+import workflowsRouter from "./workflows.js";
 
 const router: IRouter = Router();
 
@@ -173,6 +174,7 @@ router.use("/settings", settingsRouter);
 router.use("/admin/settings", settingsRouter);
 router.use("/invoices", invoicesRouter);
 router.use("/notification-center", notificationCenterRouter);
+router.use("/workflows", workflowsRouter);
 router.use(storageRouter);
 
 export default router;
