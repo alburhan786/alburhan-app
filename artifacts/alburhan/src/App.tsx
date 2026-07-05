@@ -87,6 +87,7 @@ import AuditLogs from "@/pages/admin/AuditLogs";
 import UserRolesManager from "@/pages/admin/UserRolesManager";
 import BillingSettings from "@/pages/admin/BillingSettings";
 import NotificationCenter from "@/pages/admin/NotificationCenter";
+import NotificationLogs from "@/pages/admin/NotificationLogs";
 import CommunicationCenter from "@/pages/admin/CommunicationCenter";
 import WorkflowCenter from "@/pages/admin/WorkflowCenter";
 import ZiyaratManager from "@/pages/admin/ZiyaratManager";
@@ -222,6 +223,7 @@ function Router() {
       <Route path="/admin/otp-debug" component={() => <AdminRoute component={OTPDebug} />} />
       <Route path="/admin/user-roles" component={() => <AdminRoute component={UserRolesManager} />} />
       <Route path="/admin/notifications" component={() => <AdminRoute component={NotificationCenter} />} />
+      <Route path="/admin/notification-logs" component={() => <AdminRoute component={NotificationLogs} />} />
       <Route path="/admin/billing-settings" component={() => <AdminRoute component={BillingSettings} />} />
       <Route path="/admin/api-settings" component={() => <AdminRoute component={ApiSettings} />} />
       <Route path="/admin/communication-center" component={() => <AdminRoute component={CommunicationCenter} />} />

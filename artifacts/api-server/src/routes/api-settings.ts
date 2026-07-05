@@ -406,4 +406,66 @@ router.post("/:provider/send-test", requireAdmin as any, requireSuperAdmin, asyn
   }
 });
 
+// POST /api/api-settings/send-test-all — fires WhatsApp + SMS + RCS + Email simultaneously
+router.post("/send-test-all", requireAdmin as any, requireSuperAdmin, async (req, res) => {
+  const { mobile, email } = req.body as { mobile?: string; email?: string };
+  if (!mobile) return res.status(400).json({ ok: false, message: "Provide a mobile number" });
+
+  const phone = mobile.replace(/\D/g, "").slice(-10);
+  const testCtx = {
+    customerName: "Test User",
+    customerMobile: phone,
+    customerEmail: email || undefined,
+    bookingNumber: "TEST-001",
+  };
+
+  // Fire all 4 channels simultaneously and collect results
+  const channels = ["whatsapp", "sms", "rcs", "email"] as const;
+  const results = await Promise.allSettled(
+    channels.map(async (ch) => {
+      try {
+        if (ch === "whatsapp") {
+          const { sendWhatsApp } = await import("../lib/notifications.js");
+          const r = await sendWhatsApp(phone, `Assalamu Alaikum Test User,\n\nAl Burhan Tours & Travels notification service is working correctly.\n\nTest Booking: #TEST-001\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`);
+          return { channel: ch, ok: r.ok, provider: "BotBee", httpStatus: r.httpStatus, responsePayload: r.responsePayload, errorMessage: r.ok ? undefined : r.errorMessage };
+        }
+        if (ch === "sms") {
+          const { sendCustomSMS } = await import("../lib/sms.js");
+          const r = await sendCustomSMS({ mobile: phone, message: "Al Burhan Tours & Travels SMS integration is working successfully." });
+          return { channel: ch, ok: r.ok, provider: "Fast2SMS", httpStatus: (r as any).httpStatus, responsePayload: (r as any).responsePayload, errorMessage: r.ok ? undefined : (r as any).errorMessage };
+        }
+        if (ch === "rcs") {
+          const { sendRCS } = await import("../lib/notifications.js");
+          const r = await sendRCS(phone, "Test User", "Al Burhan Tours & Travels RCS integration is working successfully. Test Booking: #TEST-001");
+          return { channel: ch, ok: r.ok, provider: "LeminAI", httpStatus: r.httpStatus, responsePayload: r.responsePayload, errorMessage: r.ok ? undefined : r.errorMessage };
+        }
+        if (ch === "email") {
+          if (!email) return { channel: ch, ok: false, provider: "SMTP", errorMessage: "No email address provided" };
+          const { sendEmail } = await import("../lib/notifications.js");
+          const r = await sendEmail(email, "Test Notification – Al Burhan Tours & Travels", "<p>Assalamu Alaikum,</p><p>Al Burhan Tours & Travels <b>email notification</b> is working correctly.</p><p>Test Booking: <b>#TEST-001</b></p><p>Jazak Allah Khair!</p>");
+          return { channel: ch, ok: r.ok, provider: "SMTP", httpStatus: r.httpStatus, responsePayload: r.responsePayload, errorMessage: r.ok ? undefined : r.errorMessage };
+        }
+      } catch (e: any) {
+        return { channel: ch, ok: false, provider: ch, errorMessage: e.message };
+      }
+    })
+  );
+
+  const channelResults = results.map((r, i) => {
+    if (r.status === "fulfilled") return r.value ?? { channel: channels[i], ok: false, provider: channels[i], errorMessage: "No result" };
+    return { channel: channels[i], ok: false, provider: channels[i], errorMessage: r.reason?.message || "Unexpected error" };
+  });
+
+  // Log each to notification_logs
+  await Promise.allSettled(channelResults.map(r =>
+    pool.query(
+      `INSERT INTO notification_logs (id, event_type, channel, recipient, message, status, provider_name, sent_at, retry_count)
+       VALUES (gen_random_uuid(),'test_all',$1,$2,$3,$4,$5,NOW(),0)`,
+      [r!.channel, phone, `Test All — ${r!.provider}`, r!.ok ? "sent" : "failed", r!.provider]
+    ).catch(() => {})
+  ));
+
+  res.json({ ok: channelResults.some(r => r?.ok), channels: channelResults, testCtx });
+});
+
 export default router;

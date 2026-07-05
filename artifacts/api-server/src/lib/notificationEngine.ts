@@ -14,7 +14,7 @@ export type EventType =
   // Invoices
   | "invoice_generated" | "receipt_generated" | "invoice_paid" | "invoice_cancelled"
   // Pilgrims & Documents
-  | "passport_uploaded" | "passport_expiry" | "visa_approved" | "visa_rejected" | "visa_ready"
+  | "passport_uploaded" | "passport_received" | "passport_expiry" | "visa_approved" | "visa_rejected" | "visa_ready"
   // Flights
   | "ticket_issued" | "flight_assigned" | "flight_changed" | "flight_cancelled"
   // Hotels
@@ -25,6 +25,8 @@ export type EventType =
   | "departure_reminder" | "arrival_reminder" | "return_reminder"
   // Attendance & Safety
   | "airport_checkin" | "missing_pilgrim" | "medical_emergency"
+  // Promotions & Campaigns
+  | "hajj_updates" | "umrah_promotions" | "eid_greeting" | "custom_admin"
   // General
   | "feedback_request";
 
@@ -95,6 +97,11 @@ export const EVENT_LABELS: Record<EventType, string> = {
   airport_checkin: "Airport Check-In",
   missing_pilgrim: "Missing Pilgrim Alert",
   medical_emergency: "Medical Emergency",
+  passport_received: "Passport Received",
+  hajj_updates: "Hajj Updates",
+  umrah_promotions: "Umrah Promotions",
+  eid_greeting: "Eid Greeting",
+  custom_admin: "Custom Admin Notification",
   feedback_request: "Feedback Request",
 };
 
@@ -102,17 +109,19 @@ export const EVENT_GROUPS: Record<string, EventType[]> = {
   "Bookings": ["new_booking","booking_approved","booking_cancelled","booking_rejected","booking_completed"],
   "Payments": ["payment_received","partial_payment","payment_due","payment_failed","balance_reminder","refund"],
   "Invoices": ["invoice_generated","receipt_generated","invoice_paid","invoice_cancelled"],
-  "Pilgrims & Documents": ["passport_uploaded","passport_expiry","visa_approved","visa_rejected","visa_ready"],
+  "Pilgrims & Documents": ["passport_uploaded","passport_received","passport_expiry","visa_approved","visa_rejected","visa_ready"],
   "Flights": ["ticket_issued","flight_assigned","flight_changed","flight_cancelled"],
   "Hotels": ["hotel_assigned","room_assigned","room_changed"],
   "Transport": ["bus_assigned","seat_changed"],
   "Travel": ["departure_reminder","arrival_reminder","return_reminder"],
   "Attendance & Safety": ["airport_checkin","missing_pilgrim","medical_emergency"],
+  "Promotions & Campaigns": ["hajj_updates","umrah_promotions","eid_greeting","custom_admin"],
   "General": ["feedback_request"],
 };
 
 export const EVENT_TYPES: EventType[] = Object.values(EVENT_GROUPS).flat();
 export const CHANNELS: Channel[] = ["whatsapp", "sms", "rcs", "email", "push"];
+export const CHANNEL_PRIORITY: Channel[] = ["whatsapp", "sms", "rcs", "email", "push"];
 export const MAX_RETRY = 3;
 
 function formatINR(n: number) {
@@ -376,22 +385,26 @@ export async function fireNotificationEvent(
   eventType: EventType,
   ctx: NotificationContext
 ): Promise<void> {
-  const channels = await getEnabledChannels(eventType);
-  await Promise.allSettled(
-    channels.map(async (channel) => {
-      const templateBody = await getTemplate(eventType, channel);
-      const message = templateBody
-        ? applyTemplate(templateBody, ctx)
-        : buildDefaultMessage(eventType, ctx);
-      const { status, providerResponse } = await sendOnChannelWithType(channel, eventType, ctx, message);
-      await trackNotification({
-        eventType, channel,
-        recipient: channel === "email" ? (ctx.customerEmail || ctx.customerMobile) : ctx.customerMobile,
-        customerId: ctx.customerId, bookingId: ctx.bookingId,
-        message, status, providerResponse,
-      });
-    })
-  );
+  const enabled = await getEnabledChannels(eventType);
+  const orderedChannels = CHANNEL_PRIORITY.filter(c => enabled.includes(c));
+  const templateBody = await getTemplate(eventType, orderedChannels[0] ?? "whatsapp");
+  const message = templateBody ? applyTemplate(templateBody, ctx) : buildDefaultMessage(eventType, ctx);
+
+  for (const channel of orderedChannels) {
+    const { status, providerResponse } = await sendOnChannelWithType(channel, eventType, ctx, message);
+    await trackNotification({
+      eventType, channel,
+      recipient: channel === "email" ? (ctx.customerEmail || ctx.customerMobile) : ctx.customerMobile,
+      customerId: ctx.customerId, bookingId: ctx.bookingId,
+      message, status, providerResponse,
+    });
+    if (status === "sent") {
+      console.log(`[notificationEngine] ${eventType} → delivered via ${channel}`);
+      return;
+    }
+    console.log(`[notificationEngine] ${eventType} → ${channel} failed — trying next channel`);
+  }
+  console.log(`[notificationEngine] ${eventType} → all channels failed for ${ctx.customerMobile}`);
 }
 
 export async function retryNotification(logId: string): Promise<{ success: boolean; error?: string }> {

@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Shield, Eye, EyeOff, Save, Zap, Send, CheckCircle2,
   XCircle, Loader2, ChevronDown, ChevronUp, ToggleLeft, ToggleRight,
-  MessageSquare, Mail, Smartphone, Bell, CreditCard, Radio
+  MessageSquare, Mail, Smartphone, Bell, CreditCard, Radio, RefreshCw
 } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -85,19 +85,29 @@ const PROVIDERS: ProviderDef[] = [
   },
   {
     id: "lemin",
-    label: "Lemin AI RCS",
+    label: "Lemin AI RCS (Jio)",
     icon: Radio,
     color: "text-purple-600",
-    description: "RCS rich messaging via Lemin AI. Sends enhanced messages with images and rich content.",
+    description: "Jio RCS rich messaging via Lemin AI. Sends template-based rich messages with interactive content.",
     apiUrlLabel: "API Endpoint",
     apiUrlPlaceholder: "https://rcs.leminai.com/api/send",
     apiKeyLabel: "Bearer Token",
     apiKeyPlaceholder: "Enter Lemin API bearer token",
     extraFields: [
-      { key: "agent_id", label: "Agent ID", placeholder: "e.g. agent_abc123", isExtra: true },
-      { key: "brand_name", label: "Brand Name", placeholder: "e.g. Al Burhan Tours & Travels", isExtra: true },
-      { key: "user_id", label: "User ID", placeholder: "0x89mqd53ph", isExtra: true },
-      { key: "template_id", label: "Template ID", placeholder: "1473", isExtra: true },
+      { key: "agent_id",   label: "Agent ID",     placeholder: "agent_abc123",               isExtra: true },
+      { key: "brand_name", label: "Brand Name",   placeholder: "Al Burhan Tours & Travels",  isExtra: true },
+      { key: "user_id",    label: "User ID",      placeholder: "0x89mqd53ph",                isExtra: true },
+      { key: "template_id",label: "Default Template ID", placeholder: "1473",               isExtra: true },
+      { key: "booking_created_tid",    label: "Booking Created Template ID",      placeholder: "use default", isExtra: true },
+      { key: "booking_confirmed_tid",  label: "Booking Confirmed Template ID",    placeholder: "use default", isExtra: true },
+      { key: "payment_received_tid",   label: "Payment Received Template ID",     placeholder: "use default", isExtra: true },
+      { key: "pending_payment_tid",    label: "Pending Payment Template ID",      placeholder: "use default", isExtra: true },
+      { key: "invoice_created_tid",    label: "Invoice Created Template ID",      placeholder: "use default", isExtra: true },
+      { key: "ticket_issued_tid",      label: "Ticket Issued Template ID",        placeholder: "use default", isExtra: true },
+      { key: "visa_issued_tid",        label: "Visa Issued Template ID",          placeholder: "use default", isExtra: true },
+      { key: "departure_reminder_tid", label: "Departure Reminder Template ID",   placeholder: "use default", isExtra: true },
+      { key: "arrival_reminder_tid",   label: "Arrival Reminder Template ID",     placeholder: "use default", isExtra: true },
+      { key: "eid_greeting_tid",       label: "Eid Greeting Template ID",         placeholder: "use default", isExtra: true },
     ],
     testMessageFields: [
       { key: "mobile", label: "Test Mobile Number", placeholder: "10-digit number", type: "text" },
@@ -201,6 +211,9 @@ export default function ApiSettings() {
   const [testResults, setTestResults] = useState<Record<string, TestResult | null>>({});
   const [sendTestResults, setSendTestResults] = useState<Record<string, any>>({});
   const [testMsgInputs, setTestMsgInputs] = useState<Record<string, Record<string, string>>>({});
+  const [testAllInputs, setTestAllInputs] = useState({ mobile: "", email: "" });
+  const [testAllLoading, setTestAllLoading] = useState(false);
+  const [testAllResults, setTestAllResults] = useState<Array<{ channel: string; ok: boolean; provider: string; httpStatus?: number; errorMessage?: string; responsePayload?: unknown }> | null>(null);
 
   // Super admin check
   const isSuperAdmin = (user as any)?.adminRole === "super_admin";
@@ -338,6 +351,29 @@ export default function ApiSettings() {
       if (pid !== "botbee") toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
       setSendingTest(p => ({ ...p, [pid]: false }));
+    }
+  }
+
+  async function sendTestAll() {
+    if (!testAllInputs.mobile) {
+      toast({ title: "Mobile required", description: "Enter a mobile number to test.", variant: "destructive" });
+      return;
+    }
+    setTestAllLoading(true);
+    setTestAllResults(null);
+    try {
+      const res = await fetch(`${API}/api/api-settings/send-test-all`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ mobile: testAllInputs.mobile, email: testAllInputs.email || undefined }),
+      });
+      const data = await res.json();
+      setTestAllResults(data.channels ?? []);
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setTestAllLoading(false);
     }
   }
 
@@ -594,6 +630,47 @@ export default function ApiSettings() {
                         );
                       })()}
 
+                      {/* Lemin RCS rich result panel */}
+                      {provider.id === "lemin" && sendTestResults["lemin"] && (() => {
+                        const r = sendTestResults["lemin"];
+                        return (
+                          <div className={`mt-3 rounded-lg border-2 overflow-hidden ${r.ok ? "border-purple-200 bg-purple-50" : "border-red-200 bg-red-50"}`}>
+                            <div className="flex items-center gap-3 px-3 py-2 border-b border-inherit">
+                              <span className="text-base">{r.ok ? "✅" : "❌"}</span>
+                              <div className="flex-1">
+                                <span className={`font-bold text-sm ${r.ok ? "text-purple-800" : "text-red-800"}`}>
+                                  {r.ok ? "RCS Delivered" : "Delivery Failed"}
+                                </span>
+                                {r.httpStatus && (
+                                  <span className={`ml-2 text-xs font-bold px-1.5 py-0.5 rounded ${r.httpStatus < 300 ? "bg-purple-200 text-purple-800" : "bg-red-200 text-red-800"}`}>
+                                    HTTP {r.httpStatus}
+                                  </span>
+                                )}
+                              </div>
+                              {r.logged && <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded font-medium">📋 Logged</span>}
+                            </div>
+                            {r.messageId && (
+                              <div className="flex items-center gap-2 px-3 py-2 border-b border-inherit bg-white/60">
+                                <span className="text-xs font-semibold text-gray-500 shrink-0">Message ID:</span>
+                                <code className="text-xs font-mono text-purple-700 font-bold break-all">{r.messageId}</code>
+                              </div>
+                            )}
+                            {r.errorMessage && (
+                              <div className="px-3 py-2 border-b border-inherit bg-white/60">
+                                <span className="text-xs font-semibold text-red-600">Error: </span>
+                                <span className="text-xs text-red-700">{r.errorMessage}</span>
+                              </div>
+                            )}
+                            <div className="px-3 py-2">
+                              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">API Response</p>
+                              <pre className="bg-gray-900 text-purple-300 text-[10px] font-mono rounded-lg p-2.5 overflow-auto max-h-36 whitespace-pre-wrap break-all">
+                                {JSON.stringify(r.responsePayload ?? r, null, 2)}
+                              </pre>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
                       {/* BotBee rich result panel */}
                       {provider.id === "botbee" && sendTestResults["botbee"] && (() => {
                         const r = sendTestResults["botbee"];
@@ -647,6 +724,87 @@ export default function ApiSettings() {
             </div>
           );
         })}
+
+        {/* ── Test All Channels ──────────────────────────────────────────── */}
+        <div className="bg-white rounded-xl border-2 border-indigo-200 shadow-sm overflow-hidden">
+          <div className="flex items-center gap-3 px-4 py-3 bg-indigo-50 border-b border-indigo-100">
+            <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
+              <Send className="w-4 h-4 text-indigo-600" />
+            </div>
+            <div className="flex-1">
+              <p className="font-bold text-gray-900 text-sm">Send Test Notification — All Channels</p>
+              <p className="text-xs text-gray-500">Fire WhatsApp + SMS + RCS + Email simultaneously. Results appear below in real time.</p>
+            </div>
+            <a href="/admin/notification-logs" className="text-xs text-indigo-600 hover:underline font-medium">View Delivery Logs →</a>
+          </div>
+          <div className="px-4 py-4 space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-gray-600 mb-1 block">Mobile Number <span className="text-red-500">*</span></label>
+                <input
+                  type="tel"
+                  placeholder="10-digit mobile number"
+                  value={testAllInputs.mobile}
+                  onChange={e => setTestAllInputs(p => ({ ...p, mobile: e.target.value }))}
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-600 mb-1 block">Email Address <span className="text-gray-400 font-normal">(optional, for email test)</span></label>
+                <input
+                  type="email"
+                  placeholder="test@example.com"
+                  value={testAllInputs.email}
+                  onChange={e => setTestAllInputs(p => ({ ...p, email: e.target.value }))}
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                />
+              </div>
+            </div>
+            <button
+              onClick={sendTestAll}
+              disabled={testAllLoading || !testAllInputs.mobile}
+              className="w-full py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
+            >
+              {testAllLoading ? (
+                <><RefreshCw className="w-4 h-4 animate-spin" /> Sending to all channels…</>
+              ) : (
+                <><Send className="w-4 h-4" /> Send Test to All Channels</>
+              )}
+            </button>
+
+            {/* Real-time per-channel results */}
+            {testAllResults && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-1">
+                {testAllResults.map(r => {
+                  const chMeta: Record<string, { icon: string; label: string; color: string; bg: string; border: string }> = {
+                    whatsapp: { icon: "💬", label: "WhatsApp", color: "text-green-800", bg: "bg-green-50",   border: "border-green-200" },
+                    sms:      { icon: "📱", label: "SMS",      color: "text-blue-800",  bg: "bg-blue-50",    border: "border-blue-200" },
+                    rcs:      { icon: "📡", label: "RCS",      color: "text-purple-800",bg: "bg-purple-50",  border: "border-purple-200" },
+                    email:    { icon: "✉️",  label: "Email",    color: "text-orange-800",bg: "bg-orange-50",  border: "border-orange-200" },
+                  };
+                  const m = chMeta[r.channel] || { icon: "🔔", label: r.channel, color: "text-gray-800", bg: "bg-gray-50", border: "border-gray-200" };
+                  return (
+                    <div key={r.channel} className={`rounded-lg border-2 p-2.5 ${r.ok ? m.bg + " " + m.border : "bg-red-50 border-red-200"}`}>
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="text-base">{r.ok ? "✅" : "❌"}</span>
+                        <span className={`text-xs font-bold ${r.ok ? m.color : "text-red-700"}`}>{m.label}</span>
+                      </div>
+                      <div className="text-xs text-gray-500">{r.provider}</div>
+                      {r.httpStatus && (
+                        <span className={`text-[10px] font-bold px-1 rounded ${r.httpStatus < 300 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                          HTTP {r.httpStatus}
+                        </span>
+                      )}
+                      {!r.ok && r.errorMessage && (
+                        <p className="text-[10px] text-red-600 mt-0.5 truncate" title={r.errorMessage}>{r.errorMessage}</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* Security Note */}
         <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg border border-blue-100 text-xs text-blue-700">
