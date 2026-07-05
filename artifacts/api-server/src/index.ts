@@ -1227,6 +1227,95 @@ async function runMigrations() {
     `);
     console.log("[Migration] admin_events table ensured");
   } catch (err) { console.error("[Migration] admin_events failed:", err); }
+  // ── Phase 2: Ziyarat tables ────────────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ziyarat_schedules (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        location TEXT NOT NULL,
+        city TEXT NOT NULL DEFAULT 'Makkah',
+        schedule_date TEXT NOT NULL,
+        departure_time TEXT,
+        return_time TEXT,
+        bus_id TEXT,
+        group_id TEXT,
+        guide_name TEXT,
+        guide_mobile TEXT,
+        capacity INTEGER DEFAULT 50,
+        notes TEXT,
+        status TEXT DEFAULT 'scheduled',
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ziyarat_attendance (
+        id SERIAL PRIMARY KEY,
+        schedule_id TEXT NOT NULL,
+        pilgrim_id TEXT NOT NULL,
+        checked_in BOOLEAN DEFAULT false,
+        check_in_time TIMESTAMPTZ,
+        notes TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE(schedule_id, pilgrim_id)
+      )
+    `);
+    console.log("[Migration] ziyarat tables ensured");
+  } catch (err) { console.error("[Migration] ziyarat tables failed:", err); }
+  // ── Phase 2: Holy Site Allocations (Mina/Arafat/Muzdalifah) ───────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS holy_site_allocations (
+        id TEXT PRIMARY KEY,
+        site TEXT NOT NULL,
+        pilgrim_id TEXT,
+        family_id TEXT,
+        group_id TEXT,
+        tent_number TEXT,
+        camp_number TEXT,
+        area TEXT,
+        capacity INTEGER,
+        guide_name TEXT,
+        notes TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    console.log("[Migration] holy_site_allocations table ensured");
+  } catch (err) { console.error("[Migration] holy_site_allocations failed:", err); }
+  // ── Phase 2: Luggage Tags ──────────────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS luggage_tags (
+        id TEXT PRIMARY KEY,
+        tag_number TEXT UNIQUE NOT NULL,
+        pilgrim_id TEXT,
+        booking_id TEXT,
+        pilgrim_name TEXT,
+        group_id TEXT,
+        weight NUMERIC(6,2),
+        status TEXT DEFAULT 'assigned',
+        location TEXT,
+        delivery_status TEXT DEFAULT 'pending',
+        notes TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    console.log("[Migration] luggage_tags table ensured");
+  } catch (err) { console.error("[Migration] luggage_tags failed:", err); }
+  // ── Phase 2: Extra columns on existing tables ──────────────────────────────
+  try {
+    await pool.query(`ALTER TABLE hotels ADD COLUMN IF NOT EXISTS distance_from_haram TEXT`);
+    await pool.query(`ALTER TABLE hotels ADD COLUMN IF NOT EXISTS contact_person TEXT`);
+    await pool.query(`ALTER TABLE hotels ADD COLUMN IF NOT EXISTS email TEXT`);
+    await pool.query(`ALTER TABLE buses ADD COLUMN IF NOT EXISTS guide_name TEXT`);
+    await pool.query(`ALTER TABLE group_flights ADD COLUMN IF NOT EXISTS terminal TEXT`);
+    await pool.query(`ALTER TABLE hotel_rooms ADD COLUMN IF NOT EXISTS room_type TEXT`);
+    await pool.query(`ALTER TABLE hotel_rooms ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'vacant'`);
+    console.log("[Migration] Phase 2 extra columns ensured");
+  } catch (err) { console.error("[Migration] Phase 2 extra columns failed:", err); }
   // ── Seed default workflow rules ────────────────────────────────────────────
   try {
     for (const rule of DEFAULT_RULES) {

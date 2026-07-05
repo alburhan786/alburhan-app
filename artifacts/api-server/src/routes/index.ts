@@ -44,6 +44,9 @@ import settingsRouter from "./settings.js";
 import invoicesRouter from "./invoices.js";
 import notificationCenterRouter from "./notification-center.js";
 import workflowsRouter from "./workflows.js";
+import ziyaratRouter from "./ziyarat.js";
+import luggageRouter from "./luggage.js";
+import allocationsRouter from "./allocations.js";
 
 const router: IRouter = Router();
 
@@ -175,6 +178,9 @@ router.use("/admin/settings", settingsRouter);
 router.use("/invoices", invoicesRouter);
 router.use("/notification-center", notificationCenterRouter);
 router.use("/workflows", workflowsRouter);
+router.use("/ziyarat", ziyaratRouter);
+router.use("/luggage", luggageRouter);
+router.use("/allocations", allocationsRouter);
 router.use(storageRouter);
 
 export default router;

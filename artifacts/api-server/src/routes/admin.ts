@@ -453,7 +453,8 @@ router.patch("/requests/:id/assign-group", requireAdmin as any, async (req: Auth
 // ── Operations Dashboard ──────────────────────────────────────────────────────
 router.get("/operations", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
   try {
-    const [pilgrims, families, flights, groups, bookings, attendance] = await Promise.all([
+    const [pilgrims, families, flights, groups, bookings, attendance,
+           hotels, rooms, medical, visa, luggageTags, buses] = await Promise.all([
       pool.query(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE family_id IS NOT NULL)::int AS in_family FROM pilgrims`),
       pool.query(`SELECT COUNT(DISTINCT family_id)::int AS total FROM pilgrims WHERE family_id IS NOT NULL`),
       pool.query(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE departure_date = to_char(NOW(),'YYYY-MM-DD'))::int AS today_dep FROM group_flights`),
@@ -481,6 +482,12 @@ router.get("/operations", requireAdmin as any, async (_req: AuthenticatedRequest
           COUNT(*) FILTER (WHERE status='absent')::int AS absent
         FROM attendance_logs
       `).catch(() => ({ rows: [{ total_logs: 0, present: 0, absent: 0 }] })),
+      pool.query(`SELECT COUNT(*)::int AS total FROM hotels WHERE is_deleted IS NOT true`).catch(() => ({ rows: [{ total: 0 }] })),
+      pool.query(`SELECT COUNT(*)::int AS occupied FROM pilgrim_room_assignments`).catch(() => ({ rows: [{ occupied: 0 }] })),
+      pool.query(`SELECT COUNT(*)::int AS active FROM medical_cases WHERE status='active'`).catch(() => ({ rows: [{ active: 0 }] })),
+      pool.query(`SELECT COUNT(*) FILTER (WHERE visa_status='pending' OR visa_status IS NULL)::int AS pending, COUNT(*) FILTER (WHERE passport_number IS NULL OR passport_number='')::int AS passport_pending FROM pilgrims`).catch(() => ({ rows: [{ pending: 0, passport_pending: 0 }] })),
+      pool.query(`SELECT COUNT(*)::int AS total FROM luggage_tags`).catch(() => ({ rows: [{ total: 0 }] })),
+      pool.query(`SELECT COUNT(*)::int AS total FROM buses`).catch(() => ({ rows: [{ total: 0 }] })),
     ]);
 
     const p = pilgrims.rows[0] || {};
@@ -489,6 +496,12 @@ router.get("/operations", requireAdmin as any, async (_req: AuthenticatedRequest
     const g = groups.rows[0] || {};
     const b = bookings.rows[0] || {};
     const a = attendance.rows[0] || {};
+    const h = hotels.rows[0] || {};
+    const rm = rooms.rows[0] || {};
+    const med = medical.rows[0] || {};
+    const v = visa.rows[0] || {};
+    const lt = luggageTags.rows[0] || {};
+    const bus = buses.rows[0] || {};
 
     res.json({
       totalPilgrims: p.total ?? 0,
@@ -504,6 +517,13 @@ router.get("/operations", requireAdmin as any, async (_req: AuthenticatedRequest
       pendingBalance: parseFloat(b.pending_balance ?? 0),
       attendancePresent: a.present ?? 0,
       attendanceAbsent: a.absent ?? 0,
+      totalHotels: h.total ?? 0,
+      roomsOccupied: rm.occupied ?? 0,
+      activeMedical: med.active ?? 0,
+      visaPending: v.pending ?? 0,
+      passportPending: v.passport_pending ?? 0,
+      totalLuggage: lt.total ?? 0,
+      totalBuses: bus.total ?? 0,
     });
   } catch (err: any) {
     console.error("[admin] GET /operations error:", err);

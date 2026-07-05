@@ -1,0 +1,343 @@
+PHASE 2 – HAJJ & UMRAH OPERATIONS MANAGEMENT
+
+Upgrade the Al Burhan Tours & Travels ERP into a complete Operations Management System.
+
+IMPORTANT:
+- Do NOT break existing functionality.
+- Do NOT delete existing data.
+- Keep PostgreSQL.
+- Maintain all current booking, payment, notification, and accounting modules.
+- All new modules must integrate with the existing Notification Engine and Workflow Automation.
+
+==================================================
+1. OPERATIONS DASHBOARD
+==================================================
+
+Create a live Operations Dashboard showing:
+
+• Total Pilgrims
+• Families
+• Hajj Groups
+• Hotels
+• Rooms Occupied
+• Flights Today
+• Buses Today
+• Pilgrims Checked In
+• Missing Pilgrims
+• Medical Cases
+• Passport Pending
+• Visa Pending
+• Outstanding Payments
+• Live Notifications
+
+==================================================
+2. HOTEL MANAGEMENT
+==================================================
+
+Hotel Master
+
+Fields:
+
+Hotel Name
+City
+Address
+Rating
+Distance from Haram
+Contact Person
+Phone
+Email
+
+Room Management
+
+Room Number
+Floor
+Capacity
+Occupancy
+Room Type
+Family Allocation
+Group Allocation
+
+Features:
+
+Check-In
+Check-Out
+Room Change
+Room History
+Print Room List
+Hotel Occupancy Report
+
+==================================================
+3. FLIGHT MANAGEMENT
+==================================================
+
+Store:
+
+Airline
+Flight Number
+PNR
+Departure
+Arrival
+Terminal
+Seat
+Baggage
+Meal
+Ticket PDF
+
+Features:
+
+Assign Flight to Group
+Assign Flight to Family
+Flight Reminder
+Flight Status
+Boarding Pass Upload
+
+==================================================
+4. BUS MANAGEMENT
+==================================================
+
+Create Bus Master.
+
+Fields:
+
+Bus Number
+Driver
+Driver Phone
+Vehicle Number
+Capacity
+Guide
+Route
+
+Features:
+
+Bus Allocation
+Seat Allocation
+Attendance
+Print Bus Manifest
+Bus Occupancy
+
+==================================================
+5. ZIYARAT MANAGEMENT
+==================================================
+
+Create Ziyarat Module.
+
+Support:
+
+Makkah Ziyarat
+Madinah Ziyarat
+Badr
+Uhud
+Masjid Quba
+Masjid Qiblatain
+Jannatul Baqi
+
+Features:
+
+Schedule
+Bus Assignment
+Guide Assignment
+Attendance
+Notifications
+
+==================================================
+6. MINA / ARAFAT / MUZDALIFAH
+==================================================
+
+Create Allocation Modules.
+
+Fields:
+
+Tent Number
+Camp Number
+Capacity
+Family
+Group
+Guide
+
+Print Allocation List
+
+==================================================
+7. QR ATTENDANCE
+==================================================
+
+Support:
+
+Airport
+Hotel
+Bus
+Ziyarat
+Mina
+Arafat
+Muzdalifah
+Return
+
+Methods:
+
+QR Code
+Barcode
+Manual
+
+Store:
+
+Check-in
+Check-out
+Time
+Location
+Staff
+
+Offline Mode
+
+==================================================
+8. LUGGAGE MANAGEMENT
+==================================================
+
+Assign Luggage Tags.
+
+Store:
+
+Tag Number
+Weight
+Status
+Location
+Delivery Status
+
+Print QR Luggage Tag
+
+==================================================
+9. FAMILY MANAGEMENT
+==================================================
+
+Create Family Dashboard.
+
+Show:
+
+Family ID
+Family Head
+Members
+Hotel
+Room
+Bus
+Flight
+Outstanding Balance
+
+==================================================
+10. PILGRIM TIMELINE
+==================================================
+
+Maintain complete history.
+
+Enquiry
+
+Booking
+
+Payment
+
+Passport
+
+Visa
+
+Flight
+
+Hotel
+
+Room
+
+Bus
+
+Attendance
+
+Return
+
+Feedback
+
+==================================================
+11. OPERATIONS REPORTS
+==================================================
+
+Generate:
+
+Room List
+Hotel Occupancy
+Bus List
+Flight Manifest
+Attendance Report
+Family Report
+Pilgrim Report
+Luggage Report
+
+Export:
+
+PDF
+Excel
+CSV
+
+==================================================
+12. LIVE MAP
+==================================================
+
+Integrate Google Maps.
+
+Show:
+
+Hotel Location
+Bus Route
+Airport
+Meeting Points
+
+==================================================
+13. DOCUMENTS
+==================================================
+
+Generate:
+
+Room Allocation Sheet
+Bus Manifest
+Flight Manifest
+Attendance Sheet
+Luggage Labels
+QR ID Cards
+
+==================================================
+14. NOTIFICATION INTEGRATION
+==================================================
+
+Automatically notify pilgrims when:
+
+Hotel Assigned
+Room Changed
+Flight Assigned
+Bus Assigned
+Ziyarat Scheduled
+Departure Reminder
+Return Reminder
+
+Use:
+
+WhatsApp
+SMS
+Email
+Push
+RCS
+
+==================================================
+15. TESTING
+==================================================
+
+Test every module.
+
+Verify:
+
+Bookings
+Payments
+Notifications
+Attendance
+Reports
+Printing
+Exports
+
+No duplicate records.
+No broken links.
+No console errors.
+No API errors.
+
+Only mark Phase 2 complete after every Operations module is fully functional in production.

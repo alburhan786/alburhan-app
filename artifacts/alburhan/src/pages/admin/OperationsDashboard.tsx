@@ -3,7 +3,8 @@ import { AdminLayout } from "@/components/layout/AdminLayout";
 import { useToast } from "@/hooks/use-toast";
 import {
   Users, Plane, BookOpen, Wallet, CheckCircle, Clock, AlertTriangle,
-  UsersRound, Home, BarChart2, RefreshCw, TrendingUp, UserCheck, Calendar
+  UsersRound, Home, BarChart2, RefreshCw, TrendingUp, UserCheck, Calendar,
+  Building2, Bus, Heart, FileCheck, Package, MapPin, Tent
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -29,13 +30,21 @@ interface OpsData {
   pendingBalance: number;
   attendancePresent: number;
   attendanceAbsent: number;
+  totalHotels: number;
+  roomsOccupied: number;
+  activeMedical: number;
+  visaPending: number;
+  passportPending: number;
+  totalLuggage: number;
+  totalBuses: number;
 }
 
 const ZERO: OpsData = {
   totalPilgrims: 0, pilgrimsInFamily: 0, totalFamilies: 0, totalGroups: 0,
   totalFlights: 0, todayDepartures: 0, totalBookings: 0, pendingBookings: 0,
   partialBookings: 0, confirmedBookings: 0, pendingBalance: 0,
-  attendancePresent: 0, attendanceAbsent: 0,
+  attendancePresent: 0, attendanceAbsent: 0, totalHotels: 0, roomsOccupied: 0,
+  activeMedical: 0, visaPending: 0, passportPending: 0, totalLuggage: 0, totalBuses: 0,
 };
 
 interface StatCardProps {
@@ -114,7 +123,7 @@ export default function OperationsDashboard() {
 
         {loading && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {Array.from({ length: 8 }).map((_, i) => (
+            {Array.from({ length: 16 }).map((_, i) => (
               <div key={i} className="h-32 rounded-2xl bg-muted animate-pulse" />
             ))}
           </div>
@@ -122,62 +131,58 @@ export default function OperationsDashboard() {
 
         {!loading && (
           <>
-            {/* Top row — pilgrims & groups */}
+            {/* Pilgrims & Groups */}
             <div>
               <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">Pilgrims & Groups</h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <StatCard
-                  icon={Users}
-                  label="Total Pilgrims"
-                  value={data.totalPilgrims.toLocaleString()}
-                  sub={`${data.pilgrimsInFamily} in families`}
-                  color="text-[#0d5040]" bg="bg-[#0d5040]/10"
-                  href="/admin/groups"
-                />
-                <StatCard
-                  icon={Home}
-                  label="Families Registered"
-                  value={data.totalFamilies.toLocaleString()}
-                  sub={`Across ${data.totalGroups} groups`}
-                  color="text-purple-600" bg="bg-purple-50"
-                  href="/admin/family-ledger"
-                />
-                <StatCard
-                  icon={UsersRound}
-                  label="Hajj Groups"
-                  value={data.totalGroups.toLocaleString()}
-                  color="text-blue-600" bg="bg-blue-50"
-                  href="/admin/groups"
-                />
-                <StatCard
-                  icon={UserCheck}
-                  label="Attendance"
-                  value={`${attendancePct}%`}
+                <StatCard icon={Users} label="Total Pilgrims" value={data.totalPilgrims.toLocaleString()}
+                  sub={`${data.pilgrimsInFamily} in families`} color="text-[#0d5040]" bg="bg-[#0d5040]/10" href="/admin/groups" />
+                <StatCard icon={Home} label="Families Registered" value={data.totalFamilies.toLocaleString()}
+                  sub={`Across ${data.totalGroups} groups`} color="text-purple-600" bg="bg-purple-50" href="/admin/family-ledger" />
+                <StatCard icon={UsersRound} label="Hajj Groups" value={data.totalGroups.toLocaleString()}
+                  color="text-blue-600" bg="bg-blue-50" href="/admin/groups" />
+                <StatCard icon={UserCheck} label="Attendance" value={`${attendancePct}%`}
                   sub={`${data.attendancePresent} present · ${data.attendanceAbsent} absent`}
-                  color="text-emerald-600" bg="bg-emerald-50"
-                />
+                  color="text-emerald-600" bg="bg-emerald-50" />
               </div>
             </div>
 
-            {/* Flights row */}
+            {/* Accommodation & Transport */}
+            <div>
+              <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">Accommodation & Transport</h2>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <StatCard icon={Building2} label="Hotels" value={data.totalHotels.toLocaleString()}
+                  color="text-indigo-600" bg="bg-indigo-50" href="/admin/hotels" />
+                <StatCard icon={Home} label="Rooms Occupied" value={data.roomsOccupied.toLocaleString()}
+                  color="text-teal-600" bg="bg-teal-50" href="/admin/hotels" />
+                <StatCard icon={Bus} label="Buses" value={data.totalBuses.toLocaleString()}
+                  color="text-orange-600" bg="bg-orange-50" href="/admin/buses" />
+                <StatCard icon={Package} label="Luggage Tags" value={data.totalLuggage.toLocaleString()}
+                  color="text-rose-600" bg="bg-rose-50" href="/admin/luggage" />
+              </div>
+            </div>
+
+            {/* Flights */}
             <div>
               <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">Flights</h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <StatCard
-                  icon={Plane}
-                  label="Total Flight Segments"
-                  value={data.totalFlights.toLocaleString()}
-                  color="text-sky-600" bg="bg-sky-50"
-                  href="/admin/flights"
-                />
-                <StatCard
-                  icon={Calendar}
-                  label="Departures Today"
-                  value={data.todayDepartures.toLocaleString()}
-                  alert={data.todayDepartures > 0}
-                  color="text-orange-600" bg="bg-orange-50"
-                  href="/admin/flights"
-                />
+                <StatCard icon={Plane} label="Total Flight Segments" value={data.totalFlights.toLocaleString()}
+                  color="text-sky-600" bg="bg-sky-50" href="/admin/flights" />
+                <StatCard icon={Calendar} label="Departures Today" value={data.todayDepartures.toLocaleString()}
+                  alert={data.todayDepartures > 0} color="text-orange-600" bg="bg-orange-50" href="/admin/flights" />
+              </div>
+            </div>
+
+            {/* Medical & Documents */}
+            <div>
+              <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">Medical & Documents</h2>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <StatCard icon={Heart} label="Active Medical Cases" value={data.activeMedical.toLocaleString()}
+                  alert={data.activeMedical > 0} color="text-red-600" bg="bg-red-50" href="/admin/medical" />
+                <StatCard icon={FileCheck} label="Visa Pending" value={data.visaPending.toLocaleString()}
+                  alert={data.visaPending > 0} color="text-amber-600" bg="bg-amber-50" href="/admin/visa" />
+                <StatCard icon={AlertTriangle} label="Passport Pending" value={data.passportPending.toLocaleString()}
+                  alert={data.passportPending > 0} color="text-orange-600" bg="bg-orange-50" href="/admin/groups" />
               </div>
             </div>
 
@@ -185,41 +190,19 @@ export default function OperationsDashboard() {
             <div>
               <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">Bookings & Payments</h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <StatCard
-                  icon={BookOpen}
-                  label="Total Bookings"
-                  value={data.totalBookings.toLocaleString()}
-                  color="text-indigo-600" bg="bg-indigo-50"
-                  href="/admin/bookings"
-                />
-                <StatCard
-                  icon={Clock}
-                  label="Pending / Partial"
-                  value={`${data.pendingBookings + data.partialBookings}`}
+                <StatCard icon={BookOpen} label="Total Bookings" value={data.totalBookings.toLocaleString()}
+                  color="text-indigo-600" bg="bg-indigo-50" href="/admin/bookings" />
+                <StatCard icon={Clock} label="Pending / Partial" value={`${data.pendingBookings + data.partialBookings}`}
                   sub={`${data.pendingBookings} pending · ${data.partialBookings} partial`}
-                  alert={(data.pendingBookings + data.partialBookings) > 0}
-                  color="text-amber-600" bg="bg-amber-50"
-                  href="/admin/bookings"
-                />
-                <StatCard
-                  icon={CheckCircle}
-                  label="Confirmed Bookings"
-                  value={data.confirmedBookings.toLocaleString()}
-                  color="text-emerald-600" bg="bg-emerald-50"
-                  href="/admin/bookings"
-                />
-                <StatCard
-                  icon={Wallet}
-                  label="Pending Balance"
-                  value={fmt(data.pendingBalance)}
-                  alert={data.pendingBalance > 0}
-                  color="text-red-600" bg="bg-red-50"
-                  href="/admin/payments"
-                />
+                  alert={(data.pendingBookings + data.partialBookings) > 0} color="text-amber-600" bg="bg-amber-50" href="/admin/bookings" />
+                <StatCard icon={CheckCircle} label="Confirmed" value={data.confirmedBookings.toLocaleString()}
+                  color="text-emerald-600" bg="bg-emerald-50" href="/admin/bookings" />
+                <StatCard icon={Wallet} label="Outstanding Balance" value={fmt(data.pendingBalance)}
+                  alert={data.pendingBalance > 0} color="text-red-600" bg="bg-red-50" href="/admin/payments" />
               </div>
             </div>
 
-            {/* Quick links */}
+            {/* Quick Actions */}
             <div>
               <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">Quick Actions</h2>
               <div className="flex flex-wrap gap-3">
@@ -229,14 +212,18 @@ export default function OperationsDashboard() {
                   { label: "Accounting", href: "/admin/accounting", icon: BarChart2 },
                   { label: "Family Ledger", href: "/admin/family-ledger", icon: Home },
                   { label: "Flights", href: "/admin/flights", icon: Plane },
+                  { label: "Hotels", href: "/admin/hotels", icon: Building2 },
+                  { label: "Buses", href: "/admin/buses", icon: Bus },
+                  { label: "Ziyarat", href: "/admin/ziyarat", icon: MapPin },
+                  { label: "Allocations", href: "/admin/allocations", icon: Tent },
+                  { label: "Luggage", href: "/admin/luggage", icon: Package },
+                  { label: "Medical", href: "/admin/medical", icon: Heart },
+                  { label: "Visa Tracker", href: "/admin/visa", icon: FileCheck },
                   { label: "Hajj Groups", href: "/admin/groups", icon: UsersRound },
                   { label: "Reports", href: "/admin/reports", icon: TrendingUp },
                 ].map(q => (
-                  <a
-                    key={q.href}
-                    href={q.href}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-medium text-gray-700 bg-white hover:bg-[#0d5040] hover:text-white hover:border-[#0d5040] transition-all"
-                  >
+                  <a key={q.href} href={q.href}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-medium text-gray-700 bg-white hover:bg-[#0d5040] hover:text-white hover:border-[#0d5040] transition-all">
                     <q.icon size={14} />
                     {q.label}
                   </a>
