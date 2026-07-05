@@ -246,6 +246,36 @@ async function runMigrations() {
     console.error("[Migration] bookings columns failed:", err);
   }
   try {
+    await db.execute(sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS net_amount NUMERIC(12,2)`);
+    await db.execute(sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS gst_included BOOLEAN NOT NULL DEFAULT false`);
+    await db.execute(sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS gst_rate NUMERIC(5,2) DEFAULT 5`);
+    await db.execute(sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS tcs_enabled BOOLEAN NOT NULL DEFAULT false`);
+    await db.execute(sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS tcs_rate NUMERIC(5,2) DEFAULT 2`);
+    await db.execute(sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS tcs_amount NUMERIC(12,2)`);
+    console.log("[Migration] bookings GST/TCS columns ensured");
+  } catch (err) {
+    console.error("[Migration] bookings GST/TCS columns failed:", err);
+  }
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS booking_settings (
+        id TEXT PRIMARY KEY DEFAULT 'default',
+        gst_enabled BOOLEAN NOT NULL DEFAULT true,
+        gst_rate NUMERIC(5,2) NOT NULL DEFAULT 5,
+        gst_included BOOLEAN NOT NULL DEFAULT false,
+        tcs_enabled BOOLEAN NOT NULL DEFAULT false,
+        tcs_rate NUMERIC(5,2) NOT NULL DEFAULT 2,
+        tcs_included BOOLEAN NOT NULL DEFAULT false,
+        discount_enabled BOOLEAN NOT NULL DEFAULT true,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`INSERT INTO booking_settings (id) VALUES ('default') ON CONFLICT (id) DO NOTHING`);
+    console.log("[Migration] booking_settings table ensured");
+  } catch (err) {
+    console.error("[Migration] booking_settings table failed:", err);
+  }
+  try {
     await db.execute(sql`ALTER TABLE hajj_groups ADD COLUMN IF NOT EXISTS company_id TEXT`);
     await db.execute(sql`ALTER TABLE hajj_groups ADD COLUMN IF NOT EXISTS starting_serial_number INTEGER NOT NULL DEFAULT 1`);
     await db.execute(sql`ALTER TABLE hajj_groups ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);

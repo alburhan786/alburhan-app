@@ -45,6 +45,59 @@ import {
 
 const router = Router();
 
+function round2(n: number) { return Math.round(n * 100) / 100; }
+
+function calcAmounts(opts: {
+  packagePrice: number;
+  discountAmount?: number;
+  discountPercentage?: number;
+  gstEnabled?: boolean;
+  gstIncluded: boolean;
+  gstRate: number;
+  tcsEnabled: boolean;
+  tcsIncluded: boolean;
+  tcsRate: number;
+}) {
+  const { packagePrice, gstIncluded, gstRate, tcsEnabled, tcsIncluded, tcsRate } = opts;
+  const gstEnabled = opts.gstEnabled !== false;
+
+  let discAmt = 0, discPct = 0;
+  if (opts.discountPercentage && opts.discountPercentage > 0) {
+    discPct = opts.discountPercentage;
+    discAmt = round2(packagePrice * discPct / 100);
+  } else if (opts.discountAmount && opts.discountAmount > 0) {
+    discAmt = opts.discountAmount;
+    discPct = packagePrice > 0 ? round2(discAmt / packagePrice * 100) : 0;
+  }
+
+  const netAmount = round2(Math.max(0, packagePrice - discAmt));
+
+  let gstAmount = 0;
+  if (gstEnabled && gstRate > 0 && netAmount > 0) {
+    if (gstIncluded) {
+      const taxable = round2(netAmount / (1 + gstRate / 100));
+      gstAmount = round2(netAmount - taxable);
+    } else {
+      gstAmount = round2(netAmount * gstRate / 100);
+    }
+  }
+
+  const afterGstBase = gstEnabled && !gstIncluded ? round2(netAmount + gstAmount) : netAmount;
+
+  let tcsAmount = 0;
+  if (tcsEnabled && tcsRate > 0 && afterGstBase > 0) {
+    if (tcsIncluded) {
+      tcsAmount = round2(afterGstBase - afterGstBase / (1 + tcsRate / 100));
+    } else {
+      tcsAmount = round2(afterGstBase * tcsRate / 100);
+    }
+  }
+
+  const finalAmount = tcsEnabled && !tcsIncluded ? round2(afterGstBase + tcsAmount) : afterGstBase;
+
+  return { discountAmount: discAmt, discountPercentage: discPct, netAmount, gstAmount, tcsAmount, finalAmount };
+}
+
 function generateBookingNumber(): string {
   const now = new Date();
   const yy = now.getFullYear().toString().slice(-2);
@@ -97,6 +150,12 @@ function formatBooking(b: any) {
     discountAmount: (() => { const v = get("discountAmount","discount_amount"); return v != null && v !== "" ? Number(v) : null; })(),
     discountPercentage: (() => { const v = get("discountPercentage","discount_percentage"); return v != null && v !== "" ? Number(v) : null; })(),
     discountReason: get("discountReason", "discount_reason"),
+    netAmount: (() => { const v = get("netAmount","net_amount"); return v != null && v !== "" ? Number(v) : null; })(),
+    gstIncluded: get("gstIncluded", "gst_included") ?? false,
+    gstRate: (() => { const v = get("gstRate","gst_rate"); return v != null && v !== "" ? Number(v) : 5; })(),
+    tcsEnabled: get("tcsEnabled", "tcs_enabled") ?? false,
+    tcsRate: (() => { const v = get("tcsRate","tcs_rate"); return v != null && v !== "" ? Number(v) : 2; })(),
+    tcsAmount: (() => { const v = get("tcsAmount","tcs_amount"); return v != null && v !== "" ? Number(v) : null; })(),
     advanceAmount: (() => { const v = get("advanceAmount","advance_amount"); return v ? Number(v) : null; })(),
     paidAmount: (() => { const v = get("paidAmount","paid_amount"); return v ? Number(v) : null; })(),
     onlinePaidAmount: (() => { const v = get("onlinePaidAmount","online_paid_amount"); return v ? Number(v) : null; })(),
@@ -120,40 +179,35 @@ router.post("/offline", requireAdmin as any, requirePermission("bookings", "crea
 
   try {
     let packageData = null;
-    let totalAmount: number | null = null;
-    let gstAmount: number | null = null;
-    let finalAmount: number | null = null;
+    let packagePrice: number = 0;
 
     if (data.packageId) {
       const pkgs = await db.select().from(packagesTable).where(eq(packagesTable.id, data.packageId)).limit(1);
       if (pkgs[0]) {
         packageData = pkgs[0];
-        const price = Number(packageData.pricePerPerson) * data.numberOfPilgrims;
-        const gst = price * (Number(packageData.gstPercent) / 100);
-        totalAmount = price;
-        gstAmount = gst;
-        finalAmount = price + gst;
+        packagePrice = Number(packageData.pricePerPerson) * data.numberOfPilgrims;
       }
     } else if (data.totalAmount) {
-      totalAmount = data.totalAmount;
-      gstAmount = 0;
-      finalAmount = data.totalAmount;
+      packagePrice = data.totalAmount;
     }
 
-    // Resolve discount
-    const baseForDiscount = (totalAmount ?? 0) + (gstAmount ?? 0);
-    let resolvedDiscountAmount: number = 0;
-    let resolvedDiscountPercentage: number = 0;
-    if (data.discountPercentage && data.discountPercentage > 0 && baseForDiscount > 0) {
-      resolvedDiscountPercentage = data.discountPercentage;
-      resolvedDiscountAmount = Math.round((baseForDiscount * data.discountPercentage / 100) * 100) / 100;
-    } else if (data.discountAmount && data.discountAmount > 0) {
-      resolvedDiscountAmount = data.discountAmount;
-      resolvedDiscountPercentage = baseForDiscount > 0 ? Math.round((data.discountAmount / baseForDiscount) * 10000) / 100 : 0;
-    }
-    if (finalAmount != null && resolvedDiscountAmount > 0) {
-      finalAmount = Math.max(0, finalAmount - resolvedDiscountAmount);
-    }
+    const gstIncluded = (data as any).gstIncluded === true;
+    const gstRate = (data as any).gstRate != null ? Number((data as any).gstRate) : 5;
+    const tcsEnabled = (data as any).tcsEnabled === true;
+    const tcsRate = (data as any).tcsRate != null ? Number((data as any).tcsRate) : 2;
+    const tcsIncluded = (data as any).tcsIncluded === true;
+
+    const calc = calcAmounts({
+      packagePrice,
+      discountAmount: data.discountAmount,
+      discountPercentage: data.discountPercentage,
+      gstEnabled: true,
+      gstIncluded,
+      gstRate,
+      tcsEnabled,
+      tcsIncluded,
+      tcsRate,
+    });
 
     const bookingNumber = generateBookingNumber();
     const isPaid = data.paymentStatus === "paid";
@@ -171,12 +225,18 @@ router.post("/offline", requireAdmin as any, requirePermission("bookings", "crea
       roomType: data.roomType ?? null,
       advanceAmount: data.advanceAmount ? String(data.advanceAmount) : null,
       status: isPaid ? "confirmed" : "approved",
-      totalAmount: totalAmount != null ? String(totalAmount) : null,
-      gstAmount: gstAmount != null ? String(gstAmount) : null,
-      finalAmount: finalAmount != null ? String(finalAmount) : null,
+      totalAmount: packagePrice > 0 ? String(packagePrice) : null,
+      gstAmount: calc.gstAmount > 0 ? String(calc.gstAmount) : null,
+      netAmount: packagePrice > 0 ? String(calc.netAmount) : null,
+      gstIncluded,
+      gstRate: String(gstRate),
+      tcsEnabled,
+      tcsRate: String(tcsRate),
+      tcsAmount: calc.tcsAmount > 0 ? String(calc.tcsAmount) : null,
+      finalAmount: packagePrice > 0 ? String(calc.finalAmount) : null,
       discountType: data.discountType ?? null,
-      discountAmount: resolvedDiscountAmount > 0 ? String(resolvedDiscountAmount) : null,
-      discountPercentage: resolvedDiscountPercentage > 0 ? String(resolvedDiscountPercentage) : null,
+      discountAmount: calc.discountAmount > 0 ? String(calc.discountAmount) : null,
+      discountPercentage: calc.discountPercentage > 0 ? String(calc.discountPercentage) : null,
       discountReason: data.discountReason ?? null,
       notes: data.notes ?? null,
       isOffline: true,

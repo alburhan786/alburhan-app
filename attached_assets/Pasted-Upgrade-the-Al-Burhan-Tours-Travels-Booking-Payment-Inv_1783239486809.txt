@@ -1,0 +1,301 @@
+Upgrade the Al Burhan Tours & Travels Booking, Payment, Invoice and Accounting System to support a professional travel billing workflow.
+
+=========================
+1. DISCOUNT MODULE
+=========================
+
+Add support for:
+
+• Early Booking Discount
+• Family Discount
+• Group Discount
+• Loyalty Discount
+• Promo Code Discount
+• Manual Discount
+
+Fields:
+
+- Discount Type
+- Discount Amount
+- Discount %
+- Discount Reason
+
+=========================
+2. GST OPTIONS
+=========================
+
+For every booking provide:
+
+☐ GST Included
+☐ GST Extra
+
+GST Rate should be configurable.
+
+Default:
+5%
+
+When GST Included:
+Package Amount already includes GST.
+
+When GST Extra:
+GST should be added separately.
+
+Invoice must clearly display:
+
+Package Price
+Discount
+Subtotal
+GST
+Final Amount
+
+=========================
+3. TCS MODULE
+=========================
+
+Add complete TCS support.
+
+Fields:
+
+☑ Apply TCS
+
+TCS Rate (Default 2%)
+
+TCS Included
+OR
+
+TCS Extra
+
+Allow Admin to change TCS percentage.
+
+Invoice should show:
+
+Package Amount
+Discount
+GST
+TCS
+Grand Total
+
+=========================
+4. PAYMENT CALCULATION
+=========================
+
+Automatically calculate
+
+Package Price
+
+(-) Discount
+
+=
+
+Net Package
+
+(+/- GST)
+
+(+/- TCS)
+
+=
+
+Grand Total
+
+Paid
+
+Balance
+
+Everything updates instantly.
+
+=========================
+5. EARLY PAYMENT BENEFIT
+=========================
+
+If customer pays Full Amount before specified date:
+
+Automatically apply
+
+✓ Early Booking Discount
+
+Invoice should display
+
+Early Booking Discount
+Applied Successfully
+
+=========================
+6. INVOICE DESIGN
+=========================
+
+Professional invoice.
+
+Display
+
+Company Logo
+
+Invoice Number
+
+Booking ID
+
+Customer Details
+
+Passport No
+
+Package
+
+Travel Dates
+
+Hotel
+
+Flights
+
+Package Amount
+
+Discount
+
+GST
+
+TCS
+
+Grand Total
+
+Paid
+
+Balance
+
+Payment Mode
+
+QR Code
+
+Terms & Conditions
+
+Authorized Signature
+
+Company Seal
+
+=========================
+7. ADMIN SETTINGS
+=========================
+
+Settings page:
+
+GST Rate
+
+TCS Rate
+
+Default GST Included
+
+Default GST Extra
+
+Default TCS Included
+
+Default TCS Extra
+
+Enable/Disable GST
+
+Enable/Disable TCS
+
+Enable/Disable Discount
+
+=========================
+8. REPORTS
+=========================
+
+Reports must show
+
+Total GST Collected
+
+Total TCS Collected
+
+Total Discounts Given
+
+Revenue Before GST
+
+Revenue After GST
+
+Revenue After TCS
+
+Outstanding Balance
+
+=========================
+9. EXPORT
+=========================
+
+Excel
+
+PDF
+
+CSV
+
+should include
+
+Discount
+
+GST
+
+TCS
+
+Final Amount
+
+=========================
+10. CUSTOMER PORTAL
+=========================
+
+Customer should see
+
+Package Price
+
+Discount
+
+GST
+
+TCS
+
+Amount Paid
+
+Remaining Balance
+
+Invoice Download
+
+=========================
+11. PAYMENT RECEIPT
+=========================
+
+Receipt must show
+
+Package Amount
+
+Discount
+
+GST
+
+TCS
+
+Amount Received
+
+Balance
+
+=========================
+12. TEST
+=========================
+
+Create sample booking
+
+Package Price:
+₹6,82,500
+
+Early Booking Discount:
+₹20,000
+
+GST:
+Included
+
+TCS:
+2%
+
+Generate invoice automatically.
+
+Verify all totals are correct.
+
+Verify payment module.
+
+Verify reports.
+
+Verify customer portal.
+
+Do not stop until every calculation, invoice, report, export and payment workflow is fully working.

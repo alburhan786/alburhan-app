@@ -85,6 +85,7 @@ import PayrollManager from "@/pages/admin/PayrollManager";
 import AssetManager from "@/pages/admin/AssetManager";
 import AuditLogs from "@/pages/admin/AuditLogs";
 import UserRolesManager from "@/pages/admin/UserRolesManager";
+import BillingSettings from "@/pages/admin/BillingSettings";
 import NotificationCenter from "@/pages/admin/NotificationCenter";
 import AttendanceScanPublic from "@/pages/public/AttendanceScanPublic";
 import StaffVerify from "@/pages/public/StaffVerify";
@@ -213,6 +214,7 @@ function Router() {
       <Route path="/admin/otp-debug" component={() => <AdminRoute component={OTPDebug} />} />
       <Route path="/admin/user-roles" component={() => <AdminRoute component={UserRolesManager} />} />
       <Route path="/admin/notifications" component={() => <AdminRoute component={NotificationCenter} />} />
+      <Route path="/admin/billing-settings" component={() => <AdminRoute component={BillingSettings} />} />
       <Route path="/admin/flights" component={() => <AdminRoute component={FlightManager} />} />
       <Route path="/admin/groups/:groupId/flights" component={() => <AdminRoute component={FlightManager} />} />
       <Route path="/admin/groups/:groupId/print/single-card/:pilgrimId"    component={() => <AdminRoute component={PrintSingleCard} />} />

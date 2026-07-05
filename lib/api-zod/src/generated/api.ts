@@ -660,6 +660,12 @@ export const GetInvoiceResponse = zod.object({
   discountAmount: zod.number().optional(),
   discountPercentage: zod.number().optional(),
   discountReason: zod.string().optional(),
+  netAmount: zod.number().optional(),
+  gstIncluded: zod.boolean().optional(),
+  gstRate: zod.number().optional(),
+  tcsEnabled: zod.boolean().optional(),
+  tcsRate: zod.number().optional(),
+  tcsAmount: zod.number().optional(),
 });
 
 /**
@@ -706,6 +712,11 @@ export const CreateOfflineBookingBody = zod.object({
   discountAmount: zod.number().optional(),
   discountPercentage: zod.number().optional(),
   discountReason: zod.string().optional(),
+  gstIncluded: zod.boolean().optional(),
+  gstRate: zod.number().optional(),
+  tcsEnabled: zod.boolean().optional(),
+  tcsRate: zod.number().optional(),
+  tcsIncluded: zod.boolean().optional(),
 });
 
 /**

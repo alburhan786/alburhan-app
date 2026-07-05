@@ -108,6 +108,12 @@ function InvoiceContent({ invoice }: { invoice: InvoiceType }) {
   const discountType = (invoice as any).discountType ?? "";
   const discountPercentage = (invoice as any).discountPercentage ?? 0;
   const finalAmount = invoice.finalAmount ?? 0;
+  const netAmount = (invoice as any).netAmount ?? (discountAmount > 0 ? totalAmount - discountAmount : totalAmount);
+  const gstIncluded = (invoice as any).gstIncluded ?? false;
+  const gstRate = (invoice as any).gstRate ?? 5;
+  const tcsEnabled = (invoice as any).tcsEnabled ?? false;
+  const tcsRate = (invoice as any).tcsRate ?? 2;
+  const tcsAmount = (invoice as any).tcsAmount ?? 0;
   const advanceAmount = invoice.advanceAmount ?? 0;
   const balance = finalAmount - advanceAmount;
   const previousBalance = invoice.previousBalance ?? 0;
@@ -300,33 +306,37 @@ function InvoiceContent({ invoice }: { invoice: InvoiceType }) {
             <table className="w-full text-[11px]">
               <tbody>
                 <tr>
-                  <td className="py-1 font-semibold">TAXABLE AMOUNT</td>
+                  <td className="py-1 font-semibold">PACKAGE PRICE</td>
                   <td className="py-1 text-right font-semibold">{"\u20B9"} {formatINR(totalAmount)}</td>
                 </tr>
-                <tr>
-                  <td className="py-1">CGST @{cgstRate}%</td>
-                  <td className="py-1 text-right">{"\u20B9"} {formatINR(cgstAmount)}</td>
-                </tr>
-                <tr>
-                  <td className="py-1">SGST @{sgstRate}%</td>
-                  <td className="py-1 text-right">{"\u20B9"} {formatINR(sgstAmount)}</td>
-                </tr>
                 {discountAmount > 0 && (
-                  <tr style={{ borderTop: `1px dashed ${DARK_GREEN}` }}>
-                    <td className="py-1 font-semibold">GROSS TOTAL</td>
-                    <td className="py-1 text-right font-semibold">{"\u20B9"} {formatINR(grossTotal)}</td>
+                  <tr style={{ color: "#b45309" }}>
+                    <td className="py-1">
+                      (-) Discount{discountType ? ` (${discountType})` : ""}{discountPercentage > 0 ? ` @${discountPercentage}%` : ""}
+                    </td>
+                    <td className="py-1 text-right font-semibold">- {"\u20B9"} {formatINR(discountAmount)}</td>
                   </tr>
                 )}
                 {discountAmount > 0 && (
-                  <tr>
-                    <td className="py-1" style={{ color: "#b45309" }}>
-                      Discount{discountType ? ` (${discountType})` : ""}{discountPercentage > 0 ? ` @${discountPercentage}%` : ""}
-                    </td>
-                    <td className="py-1 text-right font-semibold" style={{ color: "#b45309" }}>- {"\u20B9"} {formatINR(discountAmount)}</td>
+                  <tr style={{ borderTop: `1px dashed ${DARK_GREEN}` }}>
+                    <td className="py-1 font-semibold">NET PACKAGE</td>
+                    <td className="py-1 text-right font-semibold">{"\u20B9"} {formatINR(netAmount)}</td>
+                  </tr>
+                )}
+                {gstAmount > 0 && (
+                  <tr style={{ color: "#1d4ed8" }}>
+                    <td className="py-1">GST @{gstRate}% {gstIncluded ? "(Incl.)" : "(Extra)"}</td>
+                    <td className="py-1 text-right">{"\u20B9"} {formatINR(gstAmount)}</td>
+                  </tr>
+                )}
+                {tcsEnabled && tcsAmount > 0 && (
+                  <tr style={{ color: "#7c3aed" }}>
+                    <td className="py-1">TCS @{tcsRate}%</td>
+                    <td className="py-1 text-right">{"\u20B9"} {formatINR(tcsAmount)}</td>
                   </tr>
                 )}
                 <tr style={{ borderTop: `2px solid ${DARK_GREEN}` }}>
-                  <td className="py-1 font-bold" style={{ color: DARK_GREEN }}>TOTAL AMOUNT</td>
+                  <td className="py-1 font-bold" style={{ color: DARK_GREEN }}>GRAND TOTAL</td>
                   <td className="py-1 text-right font-bold" style={{ color: DARK_GREEN }}>{"\u20B9"} {formatINR(finalAmount)}</td>
                 </tr>
                 <tr>

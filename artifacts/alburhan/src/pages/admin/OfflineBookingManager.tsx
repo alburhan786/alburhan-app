@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { useListBookings, useListPackages } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -81,15 +81,54 @@ export default function OfflineBookingManager() {
     notes: "",
   });
   const [pilgrims, setPilgrims] = useState([{ ...EMPTY_PILGRIM }]);
+  const [settings, setSettings] = useState({ gstEnabled: true, gstIncluded: false, gstRate: 5, tcsEnabled: false, tcsIncluded: false, tcsRate: 2 });
+
+  useEffect(() => {
+    fetch(`${API}/api/settings`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d) setSettings({
+          gstEnabled: d.gstEnabled ?? true,
+          gstIncluded: d.gstIncluded ?? false,
+          gstRate: Number(d.gstRate) || 5,
+          tcsEnabled: d.tcsEnabled ?? false,
+          tcsIncluded: d.tcsIncluded ?? false,
+          tcsRate: Number(d.tcsRate) || 2,
+        });
+      })
+      .catch(() => {});
+  }, []);
 
   const setField = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+  const r2 = (n: number) => Math.round(n * 100) / 100;
   const totalAmt = parseFloat(form.totalAmount) || 0;
   const advAmt = parseFloat(form.advanceAmount) || 0;
   const discPct = parseFloat(form.discountPercentage) || 0;
   const discFlat = parseFloat(form.discountAmount) || 0;
-  const discAmt = discPct > 0 ? Math.round((totalAmt * discPct / 100) * 100) / 100 : discFlat;
-  const finalAmt = totalAmt > 0 ? Math.max(0, totalAmt - discAmt) : 0;
-  const balAmt = finalAmt > 0 ? Math.max(0, finalAmt - advAmt) : 0;
+  const discAmt = discPct > 0 ? r2(totalAmt * discPct / 100) : discFlat;
+  const netAmt = r2(Math.max(0, totalAmt - discAmt));
+
+  let gstAmt = 0;
+  if (settings.gstEnabled && settings.gstRate > 0 && netAmt > 0) {
+    if (settings.gstIncluded) {
+      const taxable = r2(netAmt / (1 + settings.gstRate / 100));
+      gstAmt = r2(netAmt - taxable);
+    } else {
+      gstAmt = r2(netAmt * settings.gstRate / 100);
+    }
+  }
+  const afterGstBase = settings.gstEnabled && !settings.gstIncluded ? r2(netAmt + gstAmt) : netAmt;
+  let tcsAmt = 0;
+  if (settings.tcsEnabled && settings.tcsRate > 0 && afterGstBase > 0) {
+    if (settings.tcsIncluded) {
+      tcsAmt = r2(afterGstBase - afterGstBase / (1 + settings.tcsRate / 100));
+    } else {
+      tcsAmt = r2(afterGstBase * settings.tcsRate / 100);
+    }
+  }
+  const grandTotal = settings.tcsEnabled && !settings.tcsIncluded ? r2(afterGstBase + tcsAmt) : afterGstBase;
+  const finalAmt = totalAmt > 0 ? grandTotal : 0;
+  const balAmt = finalAmt > 0 ? r2(Math.max(0, finalAmt - advAmt)) : 0;
 
   const addPilgrim = () => setPilgrims(p => [...p, { ...EMPTY_PILGRIM }]);
   const removePilgrim = (i: number) => setPilgrims(p => p.filter((_, idx) => idx !== i));
@@ -120,6 +159,8 @@ export default function OfflineBookingManager() {
     if (form.customerAddress) notesLines.push(`Customer Address: ${form.customerAddress}`);
     if (advAmt > 0) notesLines.push(`Advance Paid: ₹${advAmt.toLocaleString("en-IN")}`);
     if (balAmt > 0) notesLines.push(`Balance Due: ₹${balAmt.toLocaleString("en-IN")}`);
+    if (settings.gstEnabled && gstAmt > 0) notesLines.push(`GST @${settings.gstRate}% (${settings.gstIncluded ? "Included" : "Extra"}): ₹${gstAmt.toLocaleString("en-IN")}`);
+    if (settings.tcsEnabled && tcsAmt > 0) notesLines.push(`TCS @${settings.tcsRate}% (${settings.tcsIncluded ? "Included" : "Extra"}): ₹${tcsAmt.toLocaleString("en-IN")}`);
     pilgrims.forEach((p, i) => {
       if (p.passportIssue) notesLines.push(`Pilgrim ${i + 1} Passport Issue: ${p.passportIssue}`);
       if (p.address && p.address !== form.customerAddress) notesLines.push(`Pilgrim ${i + 1} Address: ${p.address}`);
@@ -162,6 +203,11 @@ export default function OfflineBookingManager() {
       if (form.discountType) payload.discountType = form.discountType;
       if (form.discountReason) payload.discountReason = form.discountReason;
     }
+    payload.gstIncluded = settings.gstIncluded;
+    payload.gstRate = settings.gstRate;
+    payload.tcsEnabled = settings.tcsEnabled;
+    payload.tcsRate = settings.tcsRate;
+    payload.tcsIncluded = settings.tcsIncluded;
 
     try {
       const res = await fetch(`${API}/api/bookings/offline`, {
@@ -355,26 +401,95 @@ export default function OfflineBookingManager() {
                       </div>
                     </div>
 
+                    {/* GST/TCS Section */}
+                    <div className="col-span-2 border border-blue-200 bg-blue-50/40 rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="text-[11px] font-bold text-blue-700 uppercase tracking-widest">Tax Settings</span>
+                        <span className="text-[10px] text-blue-400">(from Billing Settings — override per booking)</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <label className={labelCls}>GST Mode</label>
+                          <select className={inputCls}
+                            value={settings.gstIncluded ? "included" : "extra"}
+                            onChange={e => setSettings(s => ({ ...s, gstIncluded: e.target.value === "included" }))}>
+                            <option value="extra">GST Extra (added on top)</option>
+                            <option value="included">GST Included (in package price)</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className={labelCls}>GST Rate (%)</label>
+                          <input className={inputCls} type="number" min="0" max="100" step="0.01"
+                            value={settings.gstRate}
+                            onChange={e => setSettings(s => ({ ...s, gstRate: Number(e.target.value) }))} />
+                        </div>
+                        <div>
+                          <label className={labelCls}>TCS</label>
+                          <div className="flex items-center gap-2">
+                            <label className="flex items-center gap-1 text-xs text-gray-600 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={settings.tcsEnabled}
+                                onChange={e => setSettings(s => ({ ...s, tcsEnabled: e.target.checked }))}
+                                className="w-4 h-4 accent-[#0B3D2E]"
+                              />
+                              Enable
+                            </label>
+                            <input className={`${inputCls} flex-1 min-w-0`} type="number" min="0" max="100" step="0.01"
+                              disabled={!settings.tcsEnabled}
+                              value={settings.tcsRate}
+                              placeholder="Rate %"
+                              onChange={e => setSettings(s => ({ ...s, tcsRate: Number(e.target.value) }))} />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Amount Summary */}
                     {totalAmt > 0 && (
-                      <div className={`col-span-2 grid gap-3 ${discAmt > 0 ? "grid-cols-4" : "grid-cols-3"}`}>
-                        <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 text-center">
-                          <p className="text-[10px] text-gray-500 uppercase tracking-wide mb-1">Total Amount</p>
-                          <p className="font-mono font-bold text-gray-800 text-base">₹{totalAmt.toLocaleString("en-IN")}</p>
-                        </div>
-                        {discAmt > 0 && (
-                          <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 text-center">
-                            <p className="text-[10px] text-orange-600 uppercase tracking-wide mb-1">Discount</p>
-                            <p className="font-mono font-bold text-orange-600 text-base">-₹{discAmt.toLocaleString("en-IN")}</p>
+                      <div className="col-span-2 bg-[#0B3D2E]/5 border border-[#0B3D2E]/20 rounded-xl p-4">
+                        <div className="text-[10px] font-bold text-[#0B3D2E] uppercase tracking-widest mb-3">Amount Summary</div>
+                        <div className="space-y-1.5 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Package Price</span>
+                            <span className="font-mono font-semibold">₹{totalAmt.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</span>
                           </div>
-                        )}
-                        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center">
-                          <p className="text-[10px] text-emerald-600 uppercase tracking-wide mb-1">Advance Paid</p>
-                          <p className="font-mono font-bold text-emerald-700 text-base">₹{advAmt.toLocaleString("en-IN")}</p>
-                        </div>
-                        <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-center">
-                          <p className="text-[10px] text-red-600 uppercase tracking-wide mb-1">Balance Due</p>
-                          <p className="font-mono font-bold text-red-600 text-base">₹{balAmt.toLocaleString("en-IN")}</p>
+                          {discAmt > 0 && (
+                            <div className="flex justify-between text-amber-700">
+                              <span>(-) Discount{form.discountType ? ` (${form.discountType})` : ""}</span>
+                              <span className="font-mono">-₹{discAmt.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</span>
+                            </div>
+                          )}
+                          {discAmt > 0 && (
+                            <div className="flex justify-between border-t border-[#0B3D2E]/20 pt-1">
+                              <span className="font-semibold text-gray-700">Net Package</span>
+                              <span className="font-mono font-semibold">₹{netAmt.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</span>
+                            </div>
+                          )}
+                          {settings.gstEnabled && gstAmt > 0 && (
+                            <div className="flex justify-between text-blue-700">
+                              <span>GST @{settings.gstRate}% ({settings.gstIncluded ? "Included" : "Extra"})</span>
+                              <span className="font-mono">₹{gstAmt.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</span>
+                            </div>
+                          )}
+                          {settings.tcsEnabled && tcsAmt > 0 && (
+                            <div className="flex justify-between text-purple-700">
+                              <span>TCS @{settings.tcsRate}% ({settings.tcsIncluded ? "Included" : "Extra"})</span>
+                              <span className="font-mono">₹{tcsAmt.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between border-t-2 border-[#0B3D2E] pt-1.5 mt-1">
+                            <span className="font-bold text-[#0B3D2E]">Grand Total</span>
+                            <span className="font-mono font-bold text-[#0B3D2E] text-base">₹{finalAmt.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</span>
+                          </div>
+                          <div className="flex justify-between text-emerald-700">
+                            <span>Advance Paid</span>
+                            <span className="font-mono">₹{advAmt.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</span>
+                          </div>
+                          <div className="flex justify-between border-t border-red-200 pt-1 text-red-700">
+                            <span className="font-semibold">Balance Due</span>
+                            <span className="font-mono font-bold">₹{balAmt.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</span>
+                          </div>
                         </div>
                       </div>
                     )}
