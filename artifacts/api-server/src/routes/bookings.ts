@@ -575,15 +575,25 @@ router.post("/:id/send-invoice", requireAdmin as any, async (req: AuthenticatedR
     res.status(404).json({ message: "Booking not found" });
     return;
   }
-  const b = bookings[0];
-  if (b.status !== "confirmed" || !b.invoiceNumber) {
-    res.status(400).json({ message: "Invoice only available for confirmed bookings with invoice number" });
-    return;
+  let b = bookings[0];
+
+  if (!b.invoiceNumber) {
+    const { pool: pgPool } = await import("@workspace/db");
+    const year = new Date().getFullYear();
+    const prefix = `ABT/${year}/`;
+    const seqRes = await pgPool.query(
+      `SELECT COALESCE(MAX(CAST(SPLIT_PART(invoice_number,'/',3) AS BIGINT)),0)+1 AS next_seq FROM invoices WHERE invoice_number LIKE $1`,
+      [`${prefix}%`]
+    );
+    const seq = Number(seqRes.rows[0]?.next_seq ?? 1);
+    const invNum = `${prefix}${String(seq).padStart(6, "0")}`;
+    await db.update(bookingsTable).set({ invoiceNumber: invNum } as any).where(eq(bookingsTable.id, b.id));
+    b = { ...b, invoiceNumber: invNum };
   }
 
-  const baseUrl = `https://${req.get("host") || process.env.REPLIT_DEV_DOMAIN || "alburhantravels.com"}`;
+  const baseUrl = `https://alburhantravels.com`;
   const invoiceUrl = `${baseUrl}/invoice/${b.bookingNumber}`;
-  const message = `Assalamu Alaikum ${b.customerName},\n\nYour invoice #${b.invoiceNumber} for booking #${b.bookingNumber} is ready.\n\nView/Download Invoice:\n${invoiceUrl}\n\nTotal Amount: INR ${b.finalAmount ? Number(b.finalAmount).toLocaleString("en-IN") : "N/A"}\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 8989701701 | +91 9893989786`;
+  const message = `Assalamu Alaikum ${b.customerName},\n\nYour invoice #${b.invoiceNumber} for booking #${b.bookingNumber} is ready.\n\nView/Download:\n${invoiceUrl}\n\nTotal: INR ${b.finalAmount ? Number(b.finalAmount).toLocaleString("en-IN") : "N/A"}\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 9893225590`;
 
   const results = await Promise.allSettled([
     sendWhatsApp(b.customerMobile, message),
@@ -617,10 +627,6 @@ router.get("/by-number/:bookingNumber/invoice-public", async (req, res) => {
     return;
   }
   const b = bookings[0];
-  if (b.status !== "confirmed") {
-    res.status(400).json({ message: "Invoice only available for confirmed bookings" });
-    return;
-  }
   const { pkg, maktabNumber } = await resolveInvoiceData(b);
   res.json(buildInvoiceResponse(b, pkg, maktabNumber));
 });

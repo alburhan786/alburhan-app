@@ -1,499 +1,579 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
-import {
-  useListBookings,
-  useCreateOfflineBooking,
-  useSendInvoiceNotification,
-  useListPackages,
-} from "@workspace/api-client-react";
-import type {
-  Booking,
-  Package,
-  CreateOfflineBookingRequestRoomType,
-  CreateOfflineBookingRequestPaymentStatus,
-} from "@workspace/api-client-react";
+import { useListBookings, useSendInvoiceNotification } from "@workspace/api-client-react";
+import type { Booking } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
-import { FileText, Send, Eye, Plus, Search, Download } from "lucide-react";
+import {
+  Eye, Download, Printer, Mail, MessageCircle,
+  RefreshCw, MoreHorizontal, Search, FileText,
+  CheckCircle, Clock, AlertCircle, Zap
+} from "lucide-react";
 import { downloadPdf } from "@/lib/pdf-download";
+
+const API = import.meta.env.VITE_API_URL || "";
 
 type PaymentFilter = "all" | "paid" | "partial" | "pending";
 
-function getPaymentStatus(booking: Booking): "paid" | "partial" | "pending" {
-  if (booking.paymentStatus === "paid" || booking.status === "confirmed") return "paid";
-  if (
-    (booking.status === "approved" || booking.status === "pending") &&
-    booking.advanceAmount &&
-    booking.advanceAmount > 0 &&
-    booking.finalAmount &&
-    booking.advanceAmount < booking.finalAmount
-  ) {
-    return "partial";
-  }
-  if (booking.status === "rejected" || booking.status === "cancelled") return "pending";
+function fmt(n: number): string {
+  return new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+}
+
+function fmtDate(s: string | null | undefined): string {
+  if (!s) return "";
+  try { return new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(s)); }
+  catch { return s; }
+}
+
+function paymentStatus(b: Booking): "paid" | "partial" | "pending" {
+  const paid = b.paidAmount || b.advanceAmount || 0;
+  const total = b.finalAmount || b.totalAmount || 0;
+  if (b.paymentStatus === "paid" || b.status === "confirmed") return "paid";
+  if (paid > 0 && total > 0 && paid < total) return "partial";
+  if (paid > 0) return "partial";
   return "pending";
 }
 
-function InvoicePreview({ booking, onClose }: { booking: Booking; onClose: () => void }) {
-  const invoiceRef = useRef<HTMLDivElement>(null);
-
-  function formatINR(amount: number): string {
-    return new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
+function numberToWords(n: number): string {
+  const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
+    "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+  const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+  function c99(x: number) {
+    if (x < 20) return ones[x];
+    return tens[Math.floor(x / 10)] + (x % 10 ? " " + ones[x % 10] : "");
   }
+  if (n <= 0) return "Zero Rupees";
+  const cr = Math.floor(n / 10000000); n %= 10000000;
+  const lk = Math.floor(n / 100000); n %= 100000;
+  const th = Math.floor(n / 1000); n %= 1000;
+  const hd = Math.floor(n / 100);
+  const rm = n % 100;
+  let r = "";
+  if (cr) r += c99(cr) + " Crore ";
+  if (lk) r += c99(lk) + " Lakh ";
+  if (th) r += c99(th) + " Thousand ";
+  if (hd) r += ones[hd] + " Hundred ";
+  if (rm) r += (r ? "and " : "") + c99(rm);
+  return r.trim() + " Rupees Only";
+}
 
-  function formatInvoiceDate(dateString: string | null | undefined): string {
-    if (!dateString) return "N/A";
-    try {
-      return new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(dateString));
-    } catch { return dateString || "N/A"; }
-  }
+function InvoiceDoc({ booking, invoiceNumber }: { booking: Booking; invoiceNumber: string }) {
+  const DARK_GREEN = "#0B3D2E";
+  const GOLD = "#C9A23F";
 
-  const handleDownload = () => {
-    downloadPdf(invoiceRef.current, {
-      filename: `Invoice-${booking.invoiceNumber || booking.bookingNumber}.pdf`,
+  const packagePrice = booking.totalAmount || 0;
+  const discountAmount = booking.discountAmount || 0;
+  const netAmount = booking.netAmount || (packagePrice - discountAmount);
+  const gstAmount = booking.gstAmount || 0;
+  const tcsAmount = booking.tcsAmount || 0;
+  const finalAmount = booking.finalAmount || packagePrice;
+  const paidAmount = booking.paidAmount || booking.advanceAmount || 0;
+  const balance = Math.max(0, finalAmount - paidAmount);
+  const gstIncluded = booking.gstIncluded || false;
+  const gstRate = booking.gstRate || 5;
+  const tcsEnabled = booking.tcsEnabled || false;
+  const tcsRate = booking.tcsRate || 2;
+
+  const cgst = gstAmount / 2;
+  const sgst = gstAmount / 2;
+
+  const invoiceUrl = `https://alburhantravels.com/invoice/${booking.bookingNumber}`;
+
+  return (
+    <div className="bg-white text-black" style={{ fontFamily: "Arial, Helvetica, sans-serif", fontSize: "12px" }}>
+      <div style={{ border: `2px solid ${DARK_GREEN}` }}>
+
+        {/* HEADER */}
+        <div style={{ padding: "8px 16px", borderBottom: `3px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <img src={`${import.meta.env.BASE_URL}images/logo.png`} alt="Logo" style={{ height: 48 }} />
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 16, color: DARK_GREEN }}>ALBURHAN TOURS &amp; TRAVELS</div>
+              <div style={{ fontSize: 9, color: GOLD }}>Hajj • Umrah • Ziyarat Tours • 35+ Years Experience</div>
+              <div style={{ fontSize: 9, color: "#555" }}>Shop No 8-5, Khanka Masjid Complex, Sanwara Road, Burhanpur 450331 M.P.</div>
+            </div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontWeight: 700, fontSize: 20, color: DARK_GREEN }}>TAX INVOICE</div>
+            <div style={{ fontSize: 9, color: GOLD, marginTop: 2 }}>ORIGINAL FOR RECIPIENT</div>
+          </div>
+        </div>
+
+        {/* META SECTION */}
+        <div style={{ display: "flex", borderBottom: `1px solid ${DARK_GREEN}` }}>
+          <div style={{ width: "45%", padding: "10px 12px", borderRight: `1px solid ${DARK_GREEN}` }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: DARK_GREEN, marginBottom: 4 }}>BILL TO</div>
+            <div style={{ fontWeight: 700, fontSize: 13 }}>{booking.customerName}</div>
+            <div style={{ fontSize: 11 }}>Mobile: {booking.customerMobile}</div>
+            {booking.customerEmail && <div style={{ fontSize: 11 }}>Email: {booking.customerEmail}</div>}
+            <div style={{ fontSize: 11, marginTop: 4 }}>No. of Pilgrims: {booking.numberOfPilgrims}</div>
+          </div>
+          <div style={{ width: "30%", padding: "10px 12px", borderRight: `1px solid ${DARK_GREEN}` }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: DARK_GREEN, marginBottom: 4 }}>COMPANY</div>
+            <div style={{ fontSize: 10 }}>Tel: +91 9893225590 | +91 9893989786</div>
+            <div style={{ fontSize: 10 }}>Email: alburhantravels@gmail.com</div>
+            <div style={{ fontSize: 10 }}>GSTIN: 23AAGCA3205D1ZP</div>
+          </div>
+          <div style={{ width: "25%", padding: "10px 12px" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+              <tbody>
+                <tr>
+                  <td style={{ padding: "2px 4px", color: "#555" }}>Invoice No</td>
+                  <td style={{ padding: "2px 4px", fontWeight: 700 }}>{invoiceNumber}</td>
+                </tr>
+                <tr>
+                  <td style={{ padding: "2px 4px", color: "#555" }}>Booking</td>
+                  <td style={{ padding: "2px 4px", fontWeight: 700 }}>{booking.bookingNumber}</td>
+                </tr>
+                <tr>
+                  <td style={{ padding: "2px 4px", color: "#555" }}>Date</td>
+                  <td style={{ padding: "2px 4px" }}>{fmtDate(booking.createdAt)}</td>
+                </tr>
+                <tr>
+                  <td style={{ padding: "2px 4px", color: "#555" }}>Status</td>
+                  <td style={{ padding: "2px 4px" }}>
+                    <span style={{
+                      background: paidAmount >= finalAmount ? "#D4EDDA" : (paidAmount > 0 ? "#FFF3CD" : "#F8D7DA"),
+                      color: paidAmount >= finalAmount ? "#155724" : (paidAmount > 0 ? "#856404" : "#721C24"),
+                      padding: "1px 6px", borderRadius: 3, fontSize: 10, fontWeight: 700
+                    }}>
+                      {paidAmount >= finalAmount ? "PAID" : (paidAmount > 0 ? "PARTIAL" : "PENDING")}
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* PACKAGE TABLE */}
+        <div style={{ borderBottom: `1px solid ${DARK_GREEN}` }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+            <thead>
+              <tr style={{ background: DARK_GREEN, color: "white" }}>
+                <th style={{ padding: "6px 12px", textAlign: "left" }}>Description</th>
+                <th style={{ padding: "6px 12px", textAlign: "center" }}>Qty (Pilgrims)</th>
+                <th style={{ padding: "6px 12px", textAlign: "right" }}>Rate/Person</th>
+                <th style={{ padding: "6px 12px", textAlign: "right" }}>Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style={{ borderBottom: `1px solid #e5e7eb` }}>
+                <td style={{ padding: "8px 12px" }}>
+                  <div style={{ fontWeight: 600 }}>{booking.packageName || "Travel Package"}</div>
+                  {booking.roomType && <div style={{ fontSize: 10, color: "#555" }}>Room: {booking.roomType}</div>}
+                </td>
+                <td style={{ padding: "8px 12px", textAlign: "center" }}>{booking.numberOfPilgrims}</td>
+                <td style={{ padding: "8px 12px", textAlign: "right", fontFamily: "monospace" }}>
+                  ₹{fmt(booking.numberOfPilgrims > 0 ? packagePrice / booking.numberOfPilgrims : packagePrice)}
+                </td>
+                <td style={{ padding: "8px 12px", textAlign: "right", fontFamily: "monospace" }}>₹{fmt(packagePrice)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* CALCULATION SUMMARY */}
+        <div style={{ display: "flex", borderBottom: `1px solid ${DARK_GREEN}` }}>
+          <div style={{ flex: 1, padding: "10px 12px", borderRight: `1px solid ${DARK_GREEN}`, fontSize: 10, color: "#555" }}>
+            <div style={{ fontWeight: 700, color: DARK_GREEN, marginBottom: 4 }}>PAYMENT LEDGER</div>
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <span>Grand Total:</span><span style={{ fontFamily: "monospace", fontWeight: 700 }}>₹{fmt(finalAmount)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <span>Amount Paid:</span><span style={{ fontFamily: "monospace", color: "#155724" }}>₹{fmt(paidAmount)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, borderTop: "1px solid #e5e7eb", marginTop: 4, paddingTop: 4 }}>
+              <span>Balance Due:</span><span style={{ fontFamily: "monospace", color: balance > 0 ? "#721C24" : "#155724" }}>₹{fmt(balance)}</span>
+            </div>
+          </div>
+          <div style={{ width: "40%", padding: "10px 12px" }}>
+            <table style={{ width: "100%", fontSize: 12 }}>
+              <tbody>
+                <tr>
+                  <td style={{ padding: "2px 0", color: "#555" }}>Package Price</td>
+                  <td style={{ padding: "2px 0", textAlign: "right", fontFamily: "monospace" }}>₹{fmt(packagePrice)}</td>
+                </tr>
+                {discountAmount > 0 && (
+                  <tr>
+                    <td style={{ padding: "2px 0", color: "#555" }}>
+                      Discount{booking.discountPercentage ? ` (${booking.discountPercentage}%)` : ""}
+                    </td>
+                    <td style={{ padding: "2px 0", textAlign: "right", fontFamily: "monospace", color: "#155724" }}>−₹{fmt(discountAmount)}</td>
+                  </tr>
+                )}
+                {discountAmount > 0 && (
+                  <tr>
+                    <td style={{ padding: "2px 0", color: "#555" }}>Net Package</td>
+                    <td style={{ padding: "2px 0", textAlign: "right", fontFamily: "monospace" }}>₹{fmt(netAmount)}</td>
+                  </tr>
+                )}
+                {gstAmount > 0 && (
+                  <>
+                    <tr>
+                      <td style={{ padding: "2px 0", color: "#555" }}>CGST @{gstRate / 2}%{gstIncluded ? " (Incl.)" : ""}</td>
+                      <td style={{ padding: "2px 0", textAlign: "right", fontFamily: "monospace" }}>₹{fmt(cgst)}</td>
+                    </tr>
+                    <tr>
+                      <td style={{ padding: "2px 0", color: "#555" }}>SGST @{gstRate / 2}%{gstIncluded ? " (Incl.)" : ""}</td>
+                      <td style={{ padding: "2px 0", textAlign: "right", fontFamily: "monospace" }}>₹{fmt(sgst)}</td>
+                    </tr>
+                  </>
+                )}
+                {tcsEnabled && tcsAmount > 0 && (
+                  <tr>
+                    <td style={{ padding: "2px 0", color: "#555" }}>TCS @{tcsRate}%</td>
+                    <td style={{ padding: "2px 0", textAlign: "right", fontFamily: "monospace" }}>₹{fmt(tcsAmount)}</td>
+                  </tr>
+                )}
+                <tr style={{ borderTop: `2px solid ${DARK_GREEN}`, fontWeight: 700, fontSize: 14 }}>
+                  <td style={{ padding: "4px 0", color: DARK_GREEN }}>GRAND TOTAL</td>
+                  <td style={{ padding: "4px 0", textAlign: "right", fontFamily: "monospace", color: DARK_GREEN }}>₹{fmt(finalAmount)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* AMOUNT IN WORDS */}
+        <div style={{ padding: "6px 12px", background: "#f9fafb", borderBottom: `1px solid ${DARK_GREEN}`, fontSize: 11 }}>
+          <span style={{ fontWeight: 600 }}>Amount in Words: </span>
+          <span>{numberToWords(Math.round(finalAmount))}</span>
+        </div>
+
+        {/* BANK DETAILS + QR */}
+        <div style={{ display: "flex", borderBottom: `1px solid ${DARK_GREEN}` }}>
+          <div style={{ flex: 1, padding: "8px 12px", borderRight: `1px solid ${DARK_GREEN}`, fontSize: 10 }}>
+            <div style={{ fontWeight: 700, color: DARK_GREEN, marginBottom: 4 }}>BANK DETAILS</div>
+            <div>Account Name: AL BURHAN TOURS &amp; TRAVELS</div>
+            <div>Bank: Bank of India</div>
+            <div>A/C No: 678010100014014</div>
+            <div>IFSC: BKID0006780</div>
+            <div>Branch: Burhanpur, M.P.</div>
+          </div>
+          <div style={{ padding: "8px 12px", textAlign: "center", fontSize: 10 }}>
+            <div style={{ fontWeight: 700, color: DARK_GREEN, marginBottom: 4 }}>VERIFY INVOICE</div>
+            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(invoiceUrl)}`} alt="QR" style={{ width: 80, height: 80 }} />
+            <div style={{ fontSize: 8, marginTop: 2 }}>Scan to verify</div>
+          </div>
+        </div>
+
+        {/* FOOTER */}
+        <div style={{ padding: "6px 12px", textAlign: "center", fontSize: 9, color: "#666" }}>
+          This is a computer-generated invoice. For queries contact: +91 9893225590 | alburhantravels@gmail.com
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function InvoiceViewDialog({
+  booking,
+  invoiceNumber,
+  onClose,
+}: {
+  booking: Booking;
+  invoiceNumber: string;
+  onClose: () => void;
+}) {
+  const previewRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
+
+  const handleDownload = async () => {
+    toast({ title: "Generating PDF...", description: "Please wait" });
+    await new Promise(r => setTimeout(r, 200));
+    await downloadPdf(previewRef.current, {
+      filename: `Invoice-${invoiceNumber || booking.bookingNumber}.pdf`,
       orientation: "portrait",
       margin: 5,
     });
   };
 
+  const handlePrint = () => {
+    const win = window.open(`${import.meta.env.BASE_URL}invoice/${booking.bookingNumber}`, "_blank");
+    if (win) {
+      win.addEventListener("load", () => {
+        setTimeout(() => win.print(), 500);
+      });
+    }
+  };
+
   return (
-    <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+    <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto">
       <DialogHeader>
-        <DialogTitle className="flex items-center justify-between">
-          <span>Invoice Preview</span>
+        <DialogTitle className="flex items-center justify-between pr-6">
+          <span className="flex items-center gap-2">
+            <FileText className="w-5 h-5 text-[#0B3D2E]" />
+            Invoice — {invoiceNumber || "Generating..."}
+          </span>
           <div className="flex gap-2">
             <Button size="sm" variant="outline" onClick={handleDownload}>
-              <Download className="w-4 h-4 mr-2" />Download PDF
+              <Download className="w-4 h-4 mr-1" />PDF
             </Button>
-            <Button size="sm" variant="outline" onClick={() => window.open(`${import.meta.env.BASE_URL}invoice/${booking.bookingNumber}`, '_blank')}>
-              <Eye className="w-4 h-4 mr-2" />Full View
+            <Button size="sm" variant="outline" onClick={handlePrint}>
+              <Printer className="w-4 h-4 mr-1" />Print
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => window.open(`${import.meta.env.BASE_URL}invoice/${booking.bookingNumber}`, "_blank")}>
+              <Eye className="w-4 h-4 mr-1" />Full Page
             </Button>
           </div>
         </DialogTitle>
       </DialogHeader>
-      <div ref={invoiceRef} className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-        <div className="bg-[#0A3D2A] text-white px-6 py-4">
-          <div className="flex items-start justify-between">
-            <div>
-              <h2 className="text-lg font-serif font-bold">AL BURHAN TOURS & TRAVELS</h2>
-              <p className="text-emerald-200 text-xs mt-1">Shop No 8-5, Khanka Masjid Complex, Sanwara Road, Burhanpur 450331 M.P.</p>
-              <p className="text-emerald-200 text-xs">Phone: +91 9893225590 | +91 9893989786</p>
-            </div>
-            <div className="text-right">
-              <div className="text-xl font-serif font-bold text-[#C9A84C]">TAX INVOICE</div>
-              <p className="text-emerald-200 text-xs mt-1">Invoice: {booking.invoiceNumber || "N/A"}</p>
-            </div>
-          </div>
-        </div>
-        <div className="px-6 py-4">
-          <div className="grid grid-cols-2 gap-6 mb-4">
-            <div>
-              <h4 className="text-xs font-semibold text-gray-500 uppercase mb-1">Invoice Details</h4>
-              <div className="space-y-1 text-sm">
-                <p><span className="text-gray-500">Invoice No:</span> <span className="font-semibold">{booking.invoiceNumber || "N/A"}</span></p>
-                <p><span className="text-gray-500">Date:</span> <span className="font-semibold">{formatInvoiceDate(booking.updatedAt || booking.createdAt)}</span></p>
-                <p><span className="text-gray-500">Booking:</span> <span className="font-semibold">{booking.bookingNumber}</span></p>
-              </div>
-            </div>
-            <div>
-              <h4 className="text-xs font-semibold text-gray-500 uppercase mb-1">Bill To</h4>
-              <div className="space-y-1 text-sm">
-                <p className="font-semibold">{booking.customerName}</p>
-                <p><span className="text-gray-500">Mobile:</span> {booking.customerMobile}</p>
-                <p><span className="text-gray-500">Pilgrims:</span> {booking.numberOfPilgrims}</p>
-              </div>
-            </div>
-          </div>
-          <table className="w-full text-sm mb-4">
-            <thead>
-              <tr className="bg-gray-50 border-y border-gray-200">
-                <th className="text-left px-3 py-2 font-semibold text-gray-600">Description</th>
-                <th className="text-center px-3 py-2 font-semibold text-gray-600">Qty</th>
-                <th className="text-right px-3 py-2 font-semibold text-gray-600">Rate</th>
-                <th className="text-right px-3 py-2 font-semibold text-gray-600">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="border-b border-gray-100">
-                <td className="px-3 py-2 font-medium">{booking.packageName || "Travel Package"}</td>
-                <td className="px-3 py-2 text-center">{booking.numberOfPilgrims}</td>
-                <td className="px-3 py-2 text-right font-mono">{booking.totalAmount && booking.numberOfPilgrims ? `₹${formatINR(booking.totalAmount / booking.numberOfPilgrims)}` : "—"}</td>
-                <td className="px-3 py-2 text-right font-mono">{booking.totalAmount ? `₹${formatINR(booking.totalAmount)}` : "—"}</td>
-              </tr>
-            </tbody>
-          </table>
-          <div className="flex justify-end">
-            <div className="w-64">
-              <div className="flex justify-between py-1 text-sm">
-                <span className="text-gray-500">Subtotal:</span>
-                <span className="font-mono">₹{booking.totalAmount ? formatINR(booking.totalAmount) : "—"}</span>
-              </div>
-              <div className="flex justify-between py-1 text-sm border-b border-gray-100">
-                <span className="text-gray-500">GST (5%):</span>
-                <span className="font-mono">₹{booking.gstAmount ? formatINR(booking.gstAmount) : "—"}</span>
-              </div>
-              <div className="flex justify-between py-2 text-base font-bold">
-                <span>Total:</span>
-                <span className="text-[#0A3D2A] font-mono">₹{booking.finalAmount ? formatINR(booking.finalAmount) : "—"}</span>
-              </div>
-            </div>
-          </div>
-        </div>
+      <div ref={previewRef}>
+        <InvoiceDoc booking={booking} invoiceNumber={invoiceNumber} />
       </div>
     </DialogContent>
   );
 }
 
-function OfflineBookingDialog({ onSuccess }: { onSuccess: () => void }) {
-  const [open, setOpen] = useState(false);
-  const { data: packagesData } = useListPackages();
-  const packages: Package[] = packagesData || [];
-  const createMutation = useCreateOfflineBooking();
-  const { toast } = useToast();
-
-  const [form, setForm] = useState({
-    customerName: "",
-    customerMobile: "",
-    customerEmail: "",
-    packageId: "",
-    numberOfPilgrims: 1,
-    roomType: "" as CreateOfflineBookingRequestRoomType | "",
-    advanceAmount: 0,
-    paymentStatus: "pending" as CreateOfflineBookingRequestPaymentStatus,
-    notes: "",
-  });
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.customerName || !form.customerMobile) {
-      toast({ title: "Error", description: "Customer name and mobile are required", variant: "destructive" });
-      return;
-    }
-    try {
-      await createMutation.mutateAsync({
-        data: {
-          customerName: form.customerName,
-          customerMobile: form.customerMobile,
-          customerEmail: form.customerEmail || undefined,
-          packageId: form.packageId || undefined,
-          numberOfPilgrims: form.numberOfPilgrims,
-          roomType: form.roomType || undefined,
-          advanceAmount: form.advanceAmount || undefined,
-          paymentStatus: form.paymentStatus || undefined,
-          notes: form.notes || undefined,
-        },
-      });
-      toast({ title: "Offline Booking Created" });
-      setOpen(false);
-      setForm({ customerName: "", customerMobile: "", customerEmail: "", packageId: "", numberOfPilgrims: 1, roomType: "", advanceAmount: 0, paymentStatus: "pending", notes: "" });
-      onSuccess();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to create booking";
-      toast({ title: "Error", description: message, variant: "destructive" });
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button className="bg-[#0B3D2E] hover:bg-[#0B3D2E]/90">
-          <Plus className="w-4 h-4 mr-2" />New Offline Booking
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Create Offline Booking</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Customer Name *</Label>
-              <Input value={form.customerName} onChange={e => setForm(f => ({ ...f, customerName: e.target.value }))} required />
-            </div>
-            <div>
-              <Label>Mobile *</Label>
-              <Input value={form.customerMobile} onChange={e => setForm(f => ({ ...f, customerMobile: e.target.value }))} required />
-            </div>
-          </div>
-          <div>
-            <Label>Email</Label>
-            <Input type="email" value={form.customerEmail} onChange={e => setForm(f => ({ ...f, customerEmail: e.target.value }))} />
-          </div>
-          <div>
-            <Label>Package</Label>
-            <Select value={form.packageId} onValueChange={v => setForm(f => ({ ...f, packageId: v }))}>
-              <SelectTrigger><SelectValue placeholder="Select package" /></SelectTrigger>
-              <SelectContent>
-                {packages.map((pkg) => (
-                  <SelectItem key={pkg.id} value={pkg.id}>{pkg.name} - ₹{Number(pkg.pricePerPerson).toLocaleString("en-IN")}/person</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Pilgrims</Label>
-              <Input type="number" min={1} value={form.numberOfPilgrims} onChange={e => setForm(f => ({ ...f, numberOfPilgrims: parseInt(e.target.value) || 1 }))} />
-            </div>
-            <div>
-              <Label>Room Type</Label>
-              <Select value={form.roomType} onValueChange={v => setForm(f => ({ ...f, roomType: v as CreateOfflineBookingRequestRoomType }))}>
-                <SelectTrigger><SelectValue placeholder="Select room" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="sharing">Sharing</SelectItem>
-                  <SelectItem value="double">Double</SelectItem>
-                  <SelectItem value="triple">Triple</SelectItem>
-                  <SelectItem value="quad">Quad</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Advance Amount (₹)</Label>
-              <Input type="number" min={0} value={form.advanceAmount} onChange={e => setForm(f => ({ ...f, advanceAmount: parseFloat(e.target.value) || 0 }))} />
-            </div>
-            <div>
-              <Label>Payment Status</Label>
-              <Select value={form.paymentStatus} onValueChange={v => setForm(f => ({ ...f, paymentStatus: v as CreateOfflineBookingRequestPaymentStatus }))}>
-                <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="paid">Paid</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div>
-            <Label>Notes</Label>
-            <Input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Additional notes..." />
-          </div>
-          <Button type="submit" className="w-full bg-[#0B3D2E] hover:bg-[#0B3D2E]/90" disabled={createMutation.isPending}>
-            {createMutation.isPending ? "Creating..." : "Create Booking"}
-          </Button>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
+function PaymentBadge({ booking }: { booking: Booking }) {
+  const s = paymentStatus(booking);
+  if (s === "paid") return <Badge className="bg-emerald-100 text-emerald-800 border-0 text-[10px] font-bold uppercase">Paid</Badge>;
+  if (s === "partial") return <Badge className="bg-amber-100 text-amber-800 border-0 text-[10px] font-bold uppercase">Partial</Badge>;
+  return <Badge className="bg-red-100 text-red-800 border-0 text-[10px] font-bold uppercase">Pending</Badge>;
 }
 
-function DownloadPdfButton({ booking }: { booking: Booking }) {
-  const hiddenRef = useRef<HTMLDivElement>(null);
-  const [rendering, setRendering] = useState(false);
+function ActionMenu({
+  booking,
+  invoiceNumber,
+  onView,
+  onRegenerate,
+}: {
+  booking: Booking;
+  invoiceNumber: string;
+  onView: () => void;
+  onRegenerate: (newInvNum: string) => void;
+}) {
+  const { toast } = useToast();
+  const sendMutation = useSendInvoiceNotification();
+  const [regenerating, setRegenerating] = useState(false);
 
-  function formatINR(amount: number): string {
-    return new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
-  }
+  const handleRegenerate = async () => {
+    setRegenerating(true);
+    try {
+      const r = await fetch(`${API}/api/invoices/${booking.id}/regenerate`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!r.ok) throw new Error("Failed");
+      const data = await r.json();
+      const newNum = data.invoice?.invoice_number || invoiceNumber;
+      onRegenerate(newNum);
+      toast({ title: "Invoice regenerated", description: newNum });
+    } catch {
+      toast({ title: "Error", description: "Failed to regenerate invoice", variant: "destructive" });
+    } finally {
+      setRegenerating(false);
+    }
+  };
 
-  const handleDownload = async () => {
-    setRendering(true);
-    await new Promise(r => setTimeout(r, 100));
-    await downloadPdf(hiddenRef.current, {
-      filename: `Invoice-${booking.invoiceNumber || booking.bookingNumber}.pdf`,
-      orientation: "portrait",
-      margin: 5,
-    });
-    setRendering(false);
+  const handleSendWhatsApp = async () => {
+    try {
+      const result = await sendMutation.mutateAsync({ id: booking.id });
+      toast({
+        title: "Sent via WhatsApp/SMS",
+        description: `WhatsApp: ${result.whatsapp ? "✓" : "✗"} | SMS: ${result.sms ? "✓" : "✗"}`,
+      });
+    } catch {
+      toast({ title: "Error", description: "Failed to send notification", variant: "destructive" });
+    }
+  };
+
+  const handleSendEmail = () => {
+    const url = `https://alburhantravels.com/invoice/${booking.bookingNumber}`;
+    const subject = encodeURIComponent(`Invoice ${invoiceNumber} – Al Burhan Tours & Travels`);
+    const body = encodeURIComponent(`Dear ${booking.customerName},\n\nPlease find your invoice at:\n${url}\n\nJazak Allah Khair,\nAl Burhan Tours & Travels`);
+    const mail = booking.customerEmail
+      ? `mailto:${booking.customerEmail}?subject=${subject}&body=${body}`
+      : `mailto:?subject=${subject}&body=${body}`;
+    window.open(mail);
+  };
+
+  const handlePrint = () => {
+    const win = window.open(`${import.meta.env.BASE_URL}invoice/${booking.bookingNumber}`, "_blank");
+    if (win) {
+      win.addEventListener("load", () => setTimeout(() => win.print(), 600));
+    }
   };
 
   return (
-    <>
-      <Button variant="ghost" size="icon" title="Download PDF" onClick={handleDownload}>
-        <Download size={16} className="text-purple-600" />
-      </Button>
-      {rendering && (
-        <div style={{ position: "fixed", left: "-9999px", top: 0 }}>
-          <div ref={hiddenRef} style={{ width: 794, background: "white", padding: 32 }}>
-            <div style={{ background: "#0A3D2A", color: "white", padding: "24px 32px", display: "flex", justifyContent: "space-between" }}>
-              <div>
-                <div style={{ fontSize: 18, fontWeight: "bold" }}>AL BURHAN TOURS & TRAVELS</div>
-                <div style={{ fontSize: 11, color: "#6ee7b7", marginTop: 4 }}>Shop No 8-5, Khanka Masjid Complex, Sanwara Road, Burhanpur 450331 M.P.</div>
-                <div style={{ fontSize: 11, color: "#6ee7b7" }}>Phone: +91 9893225590 | +91 9893989786</div>
-              </div>
-              <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: 22, fontWeight: "bold", color: "#C9A84C" }}>TAX INVOICE</div>
-                <div style={{ fontSize: 11, color: "#6ee7b7", marginTop: 4 }}>Invoice: {booking.invoiceNumber || "N/A"}</div>
-              </div>
-            </div>
-            <div style={{ padding: "16px 32px" }}>
-              <div style={{ display: "flex", gap: 32, marginBottom: 16 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 10, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", marginBottom: 6 }}>Invoice Details</div>
-                  <div style={{ fontSize: 13 }}>Invoice No: <strong>{booking.invoiceNumber || "N/A"}</strong></div>
-                  <div style={{ fontSize: 13 }}>Booking: <strong>{booking.bookingNumber}</strong></div>
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 10, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", marginBottom: 6 }}>Bill To</div>
-                  <div style={{ fontSize: 14, fontWeight: 600 }}>{booking.customerName}</div>
-                  <div style={{ fontSize: 13 }}>Mobile: {booking.customerMobile}</div>
-                  <div style={{ fontSize: 13 }}>Pilgrims: {booking.numberOfPilgrims}</div>
-                </div>
-              </div>
-              <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse", marginBottom: 16 }}>
-                <thead>
-                  <tr style={{ background: "#f9fafb", borderTop: "1px solid #e5e7eb", borderBottom: "1px solid #e5e7eb" }}>
-                    <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 600, color: "#4b5563" }}>Description</th>
-                    <th style={{ textAlign: "center", padding: "8px 12px", fontWeight: 600, color: "#4b5563" }}>Qty</th>
-                    <th style={{ textAlign: "right", padding: "8px 12px", fontWeight: 600, color: "#4b5563" }}>Rate</th>
-                    <th style={{ textAlign: "right", padding: "8px 12px", fontWeight: 600, color: "#4b5563" }}>Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr style={{ borderBottom: "1px solid #f3f4f6" }}>
-                    <td style={{ padding: "8px 12px", fontWeight: 500 }}>{booking.packageName || "Travel Package"}</td>
-                    <td style={{ padding: "8px 12px", textAlign: "center" }}>{booking.numberOfPilgrims}</td>
-                    <td style={{ padding: "8px 12px", textAlign: "right", fontFamily: "monospace" }}>{booking.totalAmount && booking.numberOfPilgrims ? `₹${formatINR(booking.totalAmount / booking.numberOfPilgrims)}` : "—"}</td>
-                    <td style={{ padding: "8px 12px", textAlign: "right", fontFamily: "monospace" }}>{booking.totalAmount ? `₹${formatINR(booking.totalAmount)}` : "—"}</td>
-                  </tr>
-                </tbody>
-              </table>
-              <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                <div style={{ width: 240 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 13 }}>
-                    <span style={{ color: "#6b7280" }}>Subtotal:</span>
-                    <span style={{ fontFamily: "monospace" }}>₹{booking.totalAmount ? formatINR(booking.totalAmount) : "—"}</span>
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 13, borderBottom: "1px solid #f3f4f6" }}>
-                    <span style={{ color: "#6b7280" }}>GST (5%):</span>
-                    <span style={{ fontFamily: "monospace" }}>₹{booking.gstAmount ? formatINR(booking.gstAmount) : "—"}</span>
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", fontSize: 16, fontWeight: "bold" }}>
-                    <span>Total:</span>
-                    <span style={{ color: "#0A3D2A", fontFamily: "monospace" }}>₹{booking.finalAmount ? formatINR(booking.finalAmount) : "—"}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-8 w-8">
+          <MoreHorizontal className="w-4 h-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-52">
+        <DropdownMenuItem onClick={onView} className="cursor-pointer">
+          <Eye className="w-4 h-4 mr-2 text-blue-600" />View Invoice
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={handlePrint} className="cursor-pointer">
+          <Printer className="w-4 h-4 mr-2 text-gray-600" />Print Invoice
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={handleSendWhatsApp} disabled={sendMutation.isPending} className="cursor-pointer">
+          <MessageCircle className="w-4 h-4 mr-2 text-green-600" />Send WhatsApp
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={handleSendEmail} className="cursor-pointer">
+          <Mail className="w-4 h-4 mr-2 text-blue-500" />Send Email
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={handleRegenerate} disabled={regenerating} className="cursor-pointer">
+          <RefreshCw className={`w-4 h-4 mr-2 text-orange-500 ${regenerating ? "animate-spin" : ""}`} />
+          {regenerating ? "Regenerating..." : "Regenerate Invoice"}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
 export default function InvoiceManager() {
-  const { data, isLoading } = useListBookings();
+  const { data, isLoading, refetch } = useListBookings();
   const allBookings: Booking[] = data?.bookings || [];
-  const sendInvoiceMutation = useSendInvoiceNotification();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const [filter, setFilter] = useState<PaymentFilter>("all");
   const [search, setSearch] = useState("");
-  const [previewBooking, setPreviewBooking] = useState<Booking | null>(null);
+  const [viewBooking, setViewBooking] = useState<Booking | null>(null);
+  const [invoiceNumbers, setInvoiceNumbers] = useState<Record<string, string>>({});
+  const [generatingAll, setGeneratingAll] = useState(false);
+
+  const getInvoiceNumber = useCallback((booking: Booking) => {
+    return invoiceNumbers[booking.id] || booking.invoiceNumber || "";
+  }, [invoiceNumbers]);
+
+  const handleRegenerate = useCallback((bookingId: string, newNum: string) => {
+    setInvoiceNumbers(prev => ({ ...prev, [bookingId]: newNum }));
+    queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+  }, [queryClient]);
+
+  const handleGenerateAll = async () => {
+    setGeneratingAll(true);
+    try {
+      const r = await fetch(`${API}/api/invoices/generate-all`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!r.ok) throw new Error("Failed");
+      const data = await r.json();
+      toast({ title: "Invoices Generated", description: data.message });
+      await refetch();
+      queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+    } catch {
+      toast({ title: "Error", description: "Failed to generate invoices", variant: "destructive" });
+    } finally {
+      setGeneratingAll(false);
+    }
+  };
 
   const filteredBookings = allBookings.filter(b => {
-    const payStatus = getPaymentStatus(b);
-    if (filter !== "all" && payStatus !== filter) return false;
+    if (filter !== "all" && paymentStatus(b) !== filter) return false;
     if (search) {
       const q = search.toLowerCase();
+      const inv = getInvoiceNumber(b).toLowerCase();
       return (
         b.customerName.toLowerCase().includes(q) ||
         b.bookingNumber.toLowerCase().includes(q) ||
         b.customerMobile.includes(q) ||
-        (b.invoiceNumber && b.invoiceNumber.toLowerCase().includes(q))
+        inv.includes(q) ||
+        (b.packageName || "").toLowerCase().includes(q)
       );
     }
     return true;
   });
 
-  const getPaymentBadge = (booking: Booking) => {
-    const payStatus = getPaymentStatus(booking);
-    switch (payStatus) {
-      case "paid":
-        return <Badge className="bg-emerald-100 text-emerald-800 border-0 text-[10px] font-bold uppercase">Paid</Badge>;
-      case "partial":
-        return <Badge className="bg-amber-100 text-amber-800 border-0 text-[10px] font-bold uppercase">Partial</Badge>;
-      default:
-        return <Badge className="bg-red-100 text-red-800 border-0 text-[10px] font-bold uppercase">Pending</Badge>;
-    }
-  };
-
-  const handleSendInvoice = async (booking: Booking) => {
-    if (booking.status !== "confirmed" || !booking.invoiceNumber) {
-      toast({ title: "Cannot send invoice", description: "Invoice is only available for confirmed bookings", variant: "destructive" });
-      return;
-    }
-    try {
-      const result = await sendInvoiceMutation.mutateAsync({ id: booking.id });
-      toast({
-        title: "Invoice Sent",
-        description: `WhatsApp: ${result.whatsapp ? "✓" : "✗"} | SMS: ${result.sms ? "✓" : "✗"}`,
-      });
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to send invoice";
-      toast({ title: "Error", description: message, variant: "destructive" });
-    }
-  };
-
-  const paidCount = allBookings.filter(b => getPaymentStatus(b) === "paid").length;
-  const partialCount = allBookings.filter(b => getPaymentStatus(b) === "partial").length;
-  const pendingPayCount = allBookings.filter(b => getPaymentStatus(b) === "pending").length;
-  const totalRevenue = allBookings.filter(b => b.status === "confirmed").reduce((sum, b) => sum + (b.finalAmount || 0), 0);
+  const paidCount = allBookings.filter(b => paymentStatus(b) === "paid").length;
+  const partialCount = allBookings.filter(b => paymentStatus(b) === "partial").length;
+  const pendingCount = allBookings.filter(b => paymentStatus(b) === "pending").length;
+  const totalRevenue = allBookings.reduce((s, b) => s + (b.finalAmount || b.totalAmount || 0), 0);
+  const withoutInvoice = allBookings.filter(b => !getInvoiceNumber(b)).length;
 
   return (
     <AdminLayout>
-      <div className="mb-8 flex items-start justify-between">
+      <div className="mb-6 flex items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-serif font-bold text-foreground">Invoice & Billing</h1>
-          <p className="text-muted-foreground mt-1">Manage invoices, offline bookings, and payment tracking.</p>
+          <p className="text-muted-foreground mt-1">View, print, download, and send invoices for all bookings.</p>
         </div>
-        <OfflineBookingDialog onSuccess={() => queryClient.invalidateQueries({ queryKey: ['/api/bookings'] })} />
+        {withoutInvoice > 0 && (
+          <Button
+            onClick={handleGenerateAll}
+            disabled={generatingAll}
+            className="bg-amber-600 hover:bg-amber-700 text-white shrink-0"
+          >
+            <Zap className={`w-4 h-4 mr-2 ${generatingAll ? "animate-spin" : ""}`} />
+            {generatingAll ? "Generating..." : `Generate ${withoutInvoice} Missing Invoice${withoutInvoice > 1 ? "s" : ""}`}
+          </Button>
+        )}
       </div>
 
+      {/* STATS */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <Card className="p-4 border-none shadow-sm rounded-xl">
-          <div className="text-xs text-muted-foreground uppercase font-semibold">Paid</div>
-          <div className="text-2xl font-bold text-emerald-700 mt-1">{paidCount}</div>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground uppercase font-semibold mb-1">
+            <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />Paid
+          </div>
+          <div className="text-2xl font-bold text-emerald-700">{paidCount}</div>
         </Card>
         <Card className="p-4 border-none shadow-sm rounded-xl">
-          <div className="text-xs text-muted-foreground uppercase font-semibold">Partial Payment</div>
-          <div className="text-2xl font-bold text-amber-700 mt-1">{partialCount}</div>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground uppercase font-semibold mb-1">
+            <Clock className="w-3.5 h-3.5 text-amber-600" />Partial
+          </div>
+          <div className="text-2xl font-bold text-amber-700">{partialCount}</div>
         </Card>
         <Card className="p-4 border-none shadow-sm rounded-xl">
-          <div className="text-xs text-muted-foreground uppercase font-semibold">Payment Pending</div>
-          <div className="text-2xl font-bold text-red-700 mt-1">{pendingPayCount}</div>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground uppercase font-semibold mb-1">
+            <AlertCircle className="w-3.5 h-3.5 text-red-500" />Pending
+          </div>
+          <div className="text-2xl font-bold text-red-700">{pendingCount}</div>
         </Card>
         <Card className="p-4 border-none shadow-sm rounded-xl">
-          <div className="text-xs text-muted-foreground uppercase font-semibold">Total Revenue</div>
-          <div className="text-2xl font-bold text-[#0B3D2E] mt-1">{formatCurrency(totalRevenue)}</div>
+          <div className="text-xs text-muted-foreground uppercase font-semibold mb-1">Total Revenue</div>
+          <div className="text-2xl font-bold text-[#0B3D2E]">{formatCurrency(totalRevenue)}</div>
         </Card>
       </div>
 
+      {/* TABLE */}
       <Card className="border-none shadow-sm rounded-2xl overflow-hidden">
         <div className="p-4 flex flex-col md:flex-row gap-3 items-center border-b border-border">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="Search by name, booking #, mobile, invoice #..."
-              className="pl-10"
+              className="pl-9"
+              placeholder="Search by name, booking #, invoice #, mobile..."
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
           </div>
           <div className="flex gap-2">
-            {([
-              { value: "all" as PaymentFilter, label: "All" },
-              { value: "paid" as PaymentFilter, label: "Paid" },
-              { value: "partial" as PaymentFilter, label: "Partial" },
-              { value: "pending" as PaymentFilter, label: "Pending" },
-            ]).map(f => (
+            {(["all", "paid", "partial", "pending"] as PaymentFilter[]).map(f => (
               <Button
-                key={f.value}
-                variant={filter === f.value ? "default" : "outline"}
+                key={f}
+                variant={filter === f ? "default" : "outline"}
                 size="sm"
-                onClick={() => setFilter(f.value)}
-                className={filter === f.value ? "bg-[#0B3D2E] hover:bg-[#0B3D2E]/90" : ""}
+                onClick={() => setFilter(f)}
+                className={filter === f ? "bg-[#0B3D2E] hover:bg-[#0B3D2E]/90 capitalize" : "capitalize"}
               >
-                {f.label}
+                {f === "all" ? "All" : f.charAt(0).toUpperCase() + f.slice(1)}
               </Button>
             ))}
           </div>
@@ -503,88 +583,91 @@ export default function InvoiceManager() {
           <table className="w-full text-sm text-left">
             <thead className="bg-muted text-muted-foreground uppercase text-xs font-semibold">
               <tr>
-                <th className="px-6 py-4">Booking / Invoice</th>
-                <th className="px-6 py-4">Customer</th>
-                <th className="px-6 py-4">Package</th>
-                <th className="px-6 py-4 text-right">Amount</th>
-                <th className="px-6 py-4">Payment</th>
-                <th className="px-6 py-4 text-right">Actions</th>
+                <th className="px-5 py-4">Booking / Invoice</th>
+                <th className="px-5 py-4">Customer</th>
+                <th className="px-5 py-4">Package</th>
+                <th className="px-5 py-4 text-right">Amount</th>
+                <th className="px-5 py-4">Payment</th>
+                <th className="px-5 py-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {isLoading ? (
-                <tr><td colSpan={6} className="text-center py-8">Loading...</td></tr>
+                <tr><td colSpan={6} className="text-center py-10 text-muted-foreground">Loading bookings...</td></tr>
               ) : filteredBookings.length === 0 ? (
-                <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">No bookings found</td></tr>
-              ) : filteredBookings.map(booking => (
-                <tr key={booking.id} className="hover:bg-muted/30 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="font-mono font-bold text-primary text-xs">{booking.bookingNumber}</div>
-                    {booking.invoiceNumber && (
-                      <div className="font-mono text-xs text-emerald-700 mt-0.5">{booking.invoiceNumber}</div>
-                    )}
-                    <div className="text-xs text-muted-foreground mt-0.5">{formatDate(booking.createdAt)}</div>
-                    {booking.isOffline && <Badge variant="outline" className="text-[9px] mt-1 px-1.5">Offline</Badge>}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="font-bold text-sm">{booking.customerName}</div>
-                    <div className="text-xs text-muted-foreground">{booking.customerMobile}</div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="font-medium text-sm">{booking.packageName || "—"}</div>
-                    <div className="text-xs text-muted-foreground">{booking.numberOfPilgrims} Pilgrim(s)</div>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="font-mono font-bold text-sm">{booking.finalAmount ? formatCurrency(booking.finalAmount) : "—"}</div>
-                    {booking.totalAmount && (
-                      <div className="text-xs text-muted-foreground">Base: {formatCurrency(booking.totalAmount)}</div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4">{getPaymentBadge(booking)}</td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      {booking.status === "confirmed" && booking.invoiceNumber && (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            title="View Invoice"
-                            onClick={() => window.open(`${import.meta.env.BASE_URL}invoice/${booking.bookingNumber}`, '_blank')}
-                          >
-                            <Eye size={16} className="text-blue-600" />
-                          </Button>
-                          <DownloadPdfButton booking={booking} />
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            title="Preview Invoice"
-                            onClick={() => setPreviewBooking(booking)}
-                          >
-                            <FileText size={16} className="text-[#0B3D2E]" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            title="Send via WhatsApp/SMS"
-                            onClick={() => handleSendInvoice(booking)}
-                            disabled={sendInvoiceMutation.isPending}
-                          >
-                            <Send size={16} className="text-green-600" />
-                          </Button>
-                        </>
+                <tr><td colSpan={6} className="text-center py-10 text-muted-foreground">No bookings found</td></tr>
+              ) : filteredBookings.map(booking => {
+                const invNum = getInvoiceNumber(booking);
+                return (
+                  <tr key={booking.id} className="hover:bg-muted/30 transition-colors">
+                    <td className="px-5 py-3">
+                      <div className="font-mono font-bold text-primary text-xs">{booking.bookingNumber}</div>
+                      {invNum ? (
+                        <div className="font-mono text-xs text-emerald-700 mt-0.5">{invNum}</div>
+                      ) : (
+                        <div className="text-[10px] text-amber-600 mt-0.5 italic">No invoice</div>
                       )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                      <div className="text-xs text-muted-foreground mt-0.5">{formatDate(booking.createdAt)}</div>
+                      {booking.isOffline && <Badge variant="outline" className="text-[9px] mt-1 px-1.5">Offline</Badge>}
+                    </td>
+                    <td className="px-5 py-3">
+                      <div className="font-bold text-sm">{booking.customerName}</div>
+                      <div className="text-xs text-muted-foreground">{booking.customerMobile}</div>
+                      {booking.customerEmail && <div className="text-xs text-muted-foreground truncate max-w-[160px]">{booking.customerEmail}</div>}
+                    </td>
+                    <td className="px-5 py-3">
+                      <div className="font-medium text-sm">{booking.packageName || "—"}</div>
+                      <div className="text-xs text-muted-foreground">{booking.numberOfPilgrims} Pilgrim(s)</div>
+                    </td>
+                    <td className="px-5 py-3 text-right">
+                      <div className="font-mono font-bold text-sm">
+                        {booking.finalAmount ? formatCurrency(booking.finalAmount) : "—"}
+                      </div>
+                      {(booking.paidAmount || booking.advanceAmount) ? (
+                        <div className="text-xs text-emerald-700">
+                          Paid: {formatCurrency(booking.paidAmount || booking.advanceAmount || 0)}
+                        </div>
+                      ) : null}
+                      {booking.gstAmount ? (
+                        <div className="text-xs text-muted-foreground">GST: {formatCurrency(booking.gstAmount)}</div>
+                      ) : null}
+                    </td>
+                    <td className="px-5 py-3">
+                      <PaymentBadge booking={booking} />
+                    </td>
+                    <td className="px-5 py-3">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-xs gap-1 border-[#0B3D2E] text-[#0B3D2E] hover:bg-[#0B3D2E] hover:text-white"
+                          onClick={() => setViewBooking(booking)}
+                        >
+                          <Eye className="w-3.5 h-3.5" />View
+                        </Button>
+                        <ActionMenu
+                          booking={booking}
+                          invoiceNumber={invNum}
+                          onView={() => setViewBooking(booking)}
+                          onRegenerate={(newNum) => handleRegenerate(booking.id, newNum)}
+                        />
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       </Card>
 
-      {previewBooking && (
-        <Dialog open={!!previewBooking} onOpenChange={v => { if (!v) setPreviewBooking(null); }}>
-          <InvoicePreview booking={previewBooking} onClose={() => setPreviewBooking(null)} />
+      {viewBooking && (
+        <Dialog open={!!viewBooking} onOpenChange={v => { if (!v) setViewBooking(null); }}>
+          <InvoiceViewDialog
+            booking={viewBooking}
+            invoiceNumber={getInvoiceNumber(viewBooking)}
+            onClose={() => setViewBooking(null)}
+          />
         </Dialog>
       )}
     </AdminLayout>

@@ -41,6 +41,7 @@ import auditRouter from "./audit.js";
 import adminUsersRouter from "./users-admin.js";
 import adminNotificationsRouter from "./admin-notifications.js";
 import settingsRouter from "./settings.js";
+import invoicesRouter from "./invoices.js";
 
 const router: IRouter = Router();
 
@@ -169,6 +170,7 @@ router.use("/admin-users", adminUsersRouter);
 router.use("/admin-notifications", adminNotificationsRouter);
 router.use("/settings", settingsRouter);
 router.use("/admin/settings", settingsRouter);
+router.use("/invoices", invoicesRouter);
 router.use(storageRouter);
 
 export default router;

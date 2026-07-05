@@ -921,6 +921,33 @@ async function runMigrations() {
   } catch (err) {
     console.error("[Migration] employee_advances table failed:", err);
   }
+  // ── Invoices table ─────────────────────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS invoices (
+        id TEXT PRIMARY KEY,
+        invoice_number TEXT UNIQUE NOT NULL,
+        booking_id TEXT NOT NULL,
+        customer_id TEXT,
+        invoice_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        subtotal NUMERIC(12,2) NOT NULL DEFAULT 0,
+        discount NUMERIC(12,2) NOT NULL DEFAULT 0,
+        gst_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+        tcs_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+        total NUMERIC(12,2) NOT NULL DEFAULT 0,
+        paid NUMERIC(12,2) NOT NULL DEFAULT 0,
+        balance NUMERIC(12,2) NOT NULL DEFAULT 0,
+        invoice_status TEXT NOT NULL DEFAULT 'pending',
+        pdf_path TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS inv_booking_idx ON invoices(booking_id)`);
+    console.log("[Migration] invoices table ensured");
+  } catch (err) {
+    console.error("[Migration] invoices table failed:", err);
+  }
   // ── Assets table ───────────────────────────────────────────────────────────
   try {
     await pool.query(`
