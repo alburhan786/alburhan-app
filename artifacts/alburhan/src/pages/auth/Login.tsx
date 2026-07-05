@@ -25,11 +25,33 @@ async function postJson(url: string, body: object) {
   return data;
 }
 
+/**
+ * Normalise any Indian mobile input to exactly 10 digits.
+ * Accepts:  9876543210  |  +919876543210  |  919876543210  |  09876543210
+ * Returns:  "9876543210" (10 digits) or "" if unrecognisable.
+ */
+function normaliseIndianMobile(raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  if (digits.startsWith("91") && digits.length > 10) return digits.slice(2);
+  if (digits.startsWith("0") && digits.length > 10) return digits.slice(1);
+  return digits;
+}
+
+/** Returns an error string or "" if valid. */
+function validateMobile(mobile: string): string {
+  if (mobile.length === 0) return "";
+  if (mobile.length < 10) return "Enter a 10-digit mobile number";
+  if (mobile.length > 10) return "Mobile number must be exactly 10 digits";
+  if (!/^[6-9]\d{9}$/.test(mobile)) return "Invalid number — Indian mobiles start with 6, 7, 8, or 9";
+  return "";
+}
+
 export default function Login() {
   const { updateProfile, isAuthenticated, isAdmin } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [mobile, setMobile] = useState("");
+  const [mobileError, setMobileError] = useState("");
   const [otp, setOtp] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -74,14 +96,37 @@ export default function Login() {
     }, 1000);
   }
 
+  function handleMobileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const normalised = normaliseIndianMobile(e.target.value).slice(0, 10);
+    setMobile(normalised);
+    // Validate only once 3+ digits typed (avoid premature red)
+    if (normalised.length >= 3) {
+      setMobileError(validateMobile(normalised));
+    } else {
+      setMobileError("");
+    }
+  }
+
   const sendOtp = async (mobileNum: string) => {
+    const err = validateMobile(mobileNum);
+    if (err) {
+      setMobileError(err);
+      return false;
+    }
+
     setIsSendingOtp(true);
     setSmsSent(null);
     setSmsError(null);
     setWhatsappSent(false);
     setSmsFailReason(null);
+
+    // Always send the clean 10-digit number (backend will also normalise, but be explicit)
+    const cleanNum = normaliseIndianMobile(mobileNum).slice(0, 10);
+    console.log(`[Login] Sending OTP request for mobile: ${cleanNum} (E.164: +91${cleanNum})`);
+
     try {
-      const result = await postJson("/api/auth/send-otp", { mobile: mobileNum });
+      const result = await postJson("/api/auth/send-otp", { mobile: cleanNum });
+      console.log("[Login] send-otp response:", result);
       setIsNewUser(!!result?.isNewUser);
       setSmsSent(result?.smsSent === true);
       setWhatsappSent(result?.whatsappSent === true);
@@ -92,6 +137,7 @@ export default function Login() {
       return true;
     } catch (err: any) {
       const msg = err?.message || "Failed to send OTP";
+      console.error("[Login] send-otp error:", msg);
       if (msg.includes("Too many")) {
         toast({ title: "Too many requests", description: msg, variant: "destructive" });
       } else {
@@ -105,7 +151,8 @@ export default function Login() {
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (mobile.length < 10) return;
+    const err = validateMobile(mobile);
+    if (err) { setMobileError(err); return; }
     const ok = await sendOtp(mobile);
     if (ok) setStep(2);
   };
@@ -120,8 +167,10 @@ export default function Login() {
     e.preventDefault();
     if (otp.length < 4) return;
     setIsVerifyingOtp(true);
+    console.log(`[Login] Verifying OTP for mobile: ${mobile} (E.164: +91${mobile})`);
     try {
       const result = await postJson("/api/auth/verify-otp", { mobile, otp });
+      console.log("[Login] verify-otp response:", { ok: true, user: result?.user?.mobile });
       queryClient.setQueryData(["/api/auth/me"], result.user);
       if (result?.isNewUser) {
         setIsNewUser(true);
@@ -135,6 +184,7 @@ export default function Login() {
       }
     } catch (err: any) {
       const msg = err?.message || "Invalid OTP. Please try again.";
+      console.error("[Login] verify-otp error:", msg);
       let title = "Login failed";
       if (msg.includes("expired")) title = "OTP Expired";
       else if (msg.includes("already been used")) title = "OTP Already Used";
@@ -158,6 +208,8 @@ export default function Login() {
       setIsUpdating(false);
     }
   };
+
+  const isValidMobile = mobile.length === 10 && !validateMobile(mobile);
 
   return (
     <div className="min-h-screen flex">
@@ -198,17 +250,31 @@ export default function Login() {
                     <div className="flex">
                       <span className="inline-flex items-center px-4 rounded-l-xl border border-r-0 border-input bg-muted text-muted-foreground font-medium">+91</span>
                       <Input
-                        className="rounded-l-none h-12 text-lg"
+                        className={`rounded-l-none h-12 text-lg ${mobileError ? "border-destructive focus-visible:ring-destructive" : ""}`}
                         placeholder="9XXXXXXXXX"
                         value={mobile}
-                        onChange={(e) => setMobile(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                        onChange={handleMobileChange}
                         type="tel"
                         autoFocus
                         maxLength={10}
+                        inputMode="numeric"
                       />
                     </div>
+                    {mobileError && (
+                      <div className="flex items-center gap-1.5 text-destructive text-xs">
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                        <span>{mobileError}</span>
+                      </div>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Works with or without +91 prefix &mdash; we'll normalise it automatically.
+                    </p>
                   </div>
-                  <Button type="submit" className="w-full h-12 text-lg bg-primary hover:bg-primary/90 text-white rounded-xl shadow-lg shadow-primary/20" disabled={isSendingOtp || mobile.length < 10}>
+                  <Button
+                    type="submit"
+                    className="w-full h-12 text-lg bg-primary hover:bg-primary/90 text-white rounded-xl shadow-lg shadow-primary/20"
+                    disabled={isSendingOtp || !isValidMobile}
+                  >
                     {isSendingOtp ? "Sending OTP..." : "Get OTP"}
                   </Button>
                 </form>
@@ -288,6 +354,7 @@ export default function Login() {
                       value={otp}
                       onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
                       type="text"
+                      inputMode="numeric"
                       autoFocus
                     />
                   </div>

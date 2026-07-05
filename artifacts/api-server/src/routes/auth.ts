@@ -13,6 +13,27 @@ export const ADMIN_MOBILES = ["9893989786", "9893225590", "8989701701", "9999999
 
 const router = Router();
 
+/**
+ * Normalise any Indian mobile input → exactly 10 digits.
+ * Accepts:  9876543210  |  +919876543210  |  919876543210  |  09876543210
+ * Returns:  "9876543210" or "" if cannot be normalised.
+ */
+function normaliseIndianMobile(raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  if (digits.startsWith("91") && digits.length > 10) return digits.slice(2);
+  if (digits.startsWith("0") && digits.length > 10) return digits.slice(1);
+  return digits;
+}
+
+/**
+ * Returns a human-readable rejection reason or null if valid.
+ */
+function rejectMobile(mobile: string): string | null {
+  if (mobile.length !== 10) return `Mobile must be exactly 10 digits (got ${mobile.length})`;
+  if (!/^[6-9]\d{9}$/.test(mobile)) return "Indian mobile numbers must start with 6, 7, 8, or 9";
+  return null;
+}
+
 // Rate limit: max 5 OTP requests per phone per 30 minutes
 async function checkOtpRateLimit(mobile: string): Promise<boolean> {
   const cutoff = new Date(Date.now() - 30 * 60 * 1000);
@@ -25,16 +46,28 @@ async function checkOtpRateLimit(mobile: string): Promise<boolean> {
 }
 
 router.post("/send-otp", async (req, res) => {
-  const parsed = SendOtpBody.safeParse(req.body);
+  // ── Log raw incoming payload for debugging ──────────────────────────────────
+  const rawBody = req.body;
+  console.log(`[OTP-SEND] Raw request body: ${JSON.stringify(rawBody)}`);
+
+  const parsed = SendOtpBody.safeParse(rawBody);
   if (!parsed.success) {
-    res.status(400).json({ message: "Invalid mobile number" });
+    console.warn("[OTP-SEND] Zod parse failed:", parsed.error.issues);
+    res.status(400).json({ message: "Invalid request — mobile field is required" });
     return;
   }
-  const { mobile } = parsed.data;
 
-  const cleanMobile = mobile.replace(/\D/g, "");
-  if (cleanMobile.length !== 10) {
-    res.status(400).json({ message: "Please enter a valid 10-digit mobile number" });
+  // ── Normalise: accept +91/91/0 prefix or plain 10-digit ──────────────────
+  const rawMobile: string = parsed.data.mobile ?? "";
+  const cleanMobile = normaliseIndianMobile(rawMobile);
+
+  console.log(`[OTP-SEND] Received: "${rawMobile}" → normalised: "${cleanMobile}" (E.164: +91${cleanMobile})`);
+
+  // ── Validate ───────────────────────────────────────────────────────────────
+  const rejection = rejectMobile(cleanMobile);
+  if (rejection) {
+    console.warn(`[OTP-SEND] Rejected "${rawMobile}": ${rejection}`);
+    res.status(400).json({ message: `Invalid mobile number: ${rejection}` });
     return;
   }
 
@@ -56,17 +89,18 @@ router.post("/send-otp", async (req, res) => {
 
   await db.insert(otpsTable).values({ mobile: cleanMobile, otp, expiresAt });
 
-  // Send SMS (all 3 routes tried automatically)
+  // ── Send SMS (DLT → Quick fallback) ────────────────────────────────────────
+  console.log(`[OTP-SEND] Calling sendOtpSMS with cleanMobile="${cleanMobile}", otp="${otp}"`);
   const smsResult = await sendOtpSMS(cleanMobile, otp);
+  console.log(`[OTP-SEND] SMS result: sent=${smsResult.sent} route=${smsResult.route || "n/a"} error=${smsResult.error || "none"}`);
 
-  // Send WhatsApp as backup — await with timeout so we know actual result
+  // ── Send WhatsApp as backup ────────────────────────────────────────────────
   let waSent = false;
   try {
     const waPromise = sendWhatsApp(
       cleanMobile,
       `Your Al Burhan Tours & Travels OTP is: *${otp}*\n\nValid for 5 minutes. Do not share with anyone.\n\nAl Burhan Tours & Travels\n+91 8989701701`
     );
-    // Give WhatsApp 8 seconds max — don't block OTP response indefinitely
     waSent = await Promise.race([
       waPromise,
       new Promise<boolean>(r => setTimeout(() => r(false), 8000)),
@@ -74,17 +108,19 @@ router.post("/send-otp", async (req, res) => {
   } catch {
     waSent = false;
   }
+  console.log(`[OTP-SEND] WhatsApp result: waSent=${waSent}`);
 
   const isAdmin = ADMIN_MOBILES.includes(cleanMobile);
 
-  // Sanitize error: strip API keys before sending to client
+  // Sanitize SMS error before sending to client — strip any API keys
   const sanitizedError = smsResult.error
     ? smsResult.error.replace(/authorization=[^&\s]+/gi, "authorization=***").slice(0, 400)
     : undefined;
 
   console.log(
-    `[OTP] mobile=${cleanMobile} otp=${otp} newUser=${isNewUser} smsSent=${smsResult.sent} route=${smsResult.route || "n/a"} waSent=${waSent} isAdmin=${isAdmin}` +
-    (smsResult.error ? ` error=${smsResult.error}` : "")
+    `[OTP-SEND] Summary: mobile=${cleanMobile} e164=+91${cleanMobile} newUser=${isNewUser} ` +
+    `smsSent=${smsResult.sent} route=${smsResult.route || "n/a"} waSent=${waSent} isAdmin=${isAdmin}` +
+    (smsResult.error ? ` smsError=${smsResult.error}` : "")
   );
 
   res.json({
@@ -98,7 +134,6 @@ router.post("/send-otp", async (req, res) => {
     smsSent: smsResult.sent,
     smsRoute: smsResult.route,
     whatsappSent: waSent,
-    // Safe reason visible to all users (no secrets)
     smsFailReason: !smsResult.sent ? sanitizedError : undefined,
     // Admin phones: full debug including OTP and raw provider response
     ...(isAdmin ? {
@@ -113,13 +148,30 @@ router.post("/send-otp", async (req, res) => {
 });
 
 router.post("/verify-otp", async (req, res) => {
-  const parsed = VerifyOtpBody.safeParse(req.body);
+  const rawBody = req.body;
+  console.log(`[OTP-VERIFY] Raw request body: mobile="${rawBody?.mobile}" otp="${rawBody?.otp}"`);
+
+  const parsed = VerifyOtpBody.safeParse(rawBody);
   if (!parsed.success) {
     res.status(400).json({ message: "Invalid request" });
     return;
   }
-  const { mobile, otp } = parsed.data;
-  const cleanMobile = mobile.replace(/\D/g, "");
+
+  const { otp } = parsed.data;
+
+  // ── Normalise mobile (same logic as send-otp) ──────────────────────────────
+  const rawMobile: string = parsed.data.mobile ?? "";
+  const cleanMobile = normaliseIndianMobile(rawMobile);
+
+  console.log(`[OTP-VERIFY] Received: "${rawMobile}" → normalised: "${cleanMobile}"`);
+
+  const rejection = rejectMobile(cleanMobile);
+  if (rejection) {
+    console.warn(`[OTP-VERIFY] Rejected "${rawMobile}": ${rejection}`);
+    res.status(400).json({ message: `Invalid mobile number: ${rejection}` });
+    return;
+  }
+
   const now = new Date();
 
   // Check for too many recent failed attempts
@@ -172,6 +224,7 @@ router.post("/verify-otp", async (req, res) => {
       `UPDATE otps SET attempts = COALESCE(attempts, 0) + 1 WHERE mobile=$1 AND used=false AND expires_at > $2`,
       [cleanMobile, now]
     );
+    console.warn(`[OTP-VERIFY] Invalid OTP for mobile=${cleanMobile}`);
     res.status(401).json({ message: "Invalid OTP. Please check and try again." });
     return;
   }
@@ -201,7 +254,7 @@ router.post("/verify-otp", async (req, res) => {
     ).catch(() => {});
   }
 
-  console.log(`[OTP-VERIFY] Mobile: ${cleanMobile}, Success, NewUser: ${isNewUser}`);
+  console.log(`[OTP-VERIFY] Success: mobile=${cleanMobile} e164=+91${cleanMobile} newUser=${isNewUser} userId=${user.id}`);
 
   res.json({
     message: isNewUser ? "Registration successful" : "Login successful",
