@@ -7,6 +7,7 @@ import { eq, sql, inArray, and, lt, desc } from "drizzle-orm";
 import { CreatePaymentOrderBody, VerifyPaymentBody } from "@workspace/api-zod";
 import { requireAuth, requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendPaymentConfirmationNotification, sendPartialPaymentNotification, sendWhatsApp } from "../lib/notifications.js";
+import { trackNotification } from "../lib/notificationEngine.js";
 import { sendReminderForBookingId, getReminderHistory, runDailyReminders, isRemindersEnabled, setRemindersEnabled } from "../jobs/paymentReminder.js";
 
 const router = Router();
@@ -244,6 +245,9 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
       amount: Number(booking.finalAmount || 0).toLocaleString("en-IN"),
       invoiceNumber: invoiceNumber!,
       invoiceUrl,
+    }).then(() => {
+      trackNotification({ eventType: "payment_received", channel: "whatsapp", recipient: booking.customerMobile, bookingId: booking.id, status: "sent" }).catch(() => {});
+      trackNotification({ eventType: "payment_received", channel: "sms", recipient: booking.customerMobile, bookingId: booking.id, status: "sent" }).catch(() => {});
     }).catch(console.error);
   } else {
     const remainingBalance = Math.max(0, finalAmount - newPaidAmount);
@@ -254,6 +258,8 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
       bookingNumber: booking.bookingNumber,
       paidAmount: thisPayment.toLocaleString("en-IN"),
       remainingAmount: remainingBalance.toLocaleString("en-IN"),
+    }).then(() => {
+      trackNotification({ eventType: "payment_received", channel: "whatsapp", recipient: booking.customerMobile, bookingId: booking.id, status: "sent" }).catch(() => {});
     }).catch(console.error);
   }
 

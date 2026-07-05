@@ -921,6 +921,110 @@ async function runMigrations() {
   } catch (err) {
     console.error("[Migration] employee_advances table failed:", err);
   }
+  // ── Notification Engine tables ──────────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS notification_logs (
+        id TEXT PRIMARY KEY,
+        notification_id TEXT,
+        event_type TEXT NOT NULL,
+        customer_id TEXT,
+        booking_id TEXT,
+        channel TEXT NOT NULL,
+        template TEXT,
+        recipient TEXT,
+        message TEXT,
+        status TEXT NOT NULL DEFAULT 'pending',
+        provider_response JSONB,
+        sent_at TIMESTAMPTZ,
+        delivered_at TIMESTAMPTZ,
+        retry_count INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS nl_event_idx ON notification_logs(event_type)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS nl_status_idx ON notification_logs(status)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS nl_created_idx ON notification_logs(created_at DESC)`);
+    console.log("[Migration] notification_logs table ensured");
+  } catch (err) {
+    console.error("[Migration] notification_logs failed:", err);
+  }
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS notification_settings (
+        id TEXT PRIMARY KEY,
+        event_type TEXT NOT NULL,
+        channel TEXT NOT NULL,
+        enabled BOOLEAN NOT NULL DEFAULT true,
+        template_id TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE(event_type, channel)
+      )
+    `);
+    const events = [
+      'new_booking','booking_approved','booking_cancelled','payment_received',
+      'payment_due','invoice_generated','receipt_generated','visa_ready',
+      'flight_assigned','hotel_assigned','room_assigned','bus_assigned',
+      'passport_expiry','departure_reminder','arrival_reminder','return_reminder','feedback_request'
+    ];
+    const channels = ['whatsapp','sms','rcs','email','push'];
+    const defaultOn = { whatsapp: true, sms: true, rcs: false, email: false, push: false };
+    for (const ev of events) {
+      for (const ch of channels) {
+        const enabled = (defaultOn as any)[ch] ?? false;
+        await pool.query(
+          `INSERT INTO notification_settings (id, event_type, channel, enabled) VALUES ($1,$2,$3,$4) ON CONFLICT (event_type, channel) DO NOTHING`,
+          [`ns_${ev}_${ch}`, ev, ch, enabled]
+        );
+      }
+    }
+    console.log("[Migration] notification_settings table ensured");
+  } catch (err) {
+    console.error("[Migration] notification_settings failed:", err);
+  }
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS notification_templates (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        event_type TEXT,
+        channel TEXT NOT NULL,
+        subject TEXT,
+        body TEXT NOT NULL,
+        variables JSONB DEFAULT '[]',
+        is_default BOOLEAN NOT NULL DEFAULT false,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    console.log("[Migration] notification_templates table ensured");
+  } catch (err) {
+    console.error("[Migration] notification_templates failed:", err);
+  }
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS scheduled_notifications (
+        id TEXT PRIMARY KEY,
+        event_type TEXT NOT NULL,
+        channel TEXT NOT NULL,
+        recipient TEXT NOT NULL,
+        customer_id TEXT,
+        booking_id TEXT,
+        customer_name TEXT,
+        message TEXT NOT NULL,
+        subject TEXT,
+        scheduled_at TIMESTAMPTZ NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        sent_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS sn_status_idx ON scheduled_notifications(status, scheduled_at)`);
+    console.log("[Migration] scheduled_notifications table ensured");
+  } catch (err) {
+    console.error("[Migration] scheduled_notifications failed:", err);
+  }
   // ── Invoices table ─────────────────────────────────────────────────────────
   try {
     await pool.query(`

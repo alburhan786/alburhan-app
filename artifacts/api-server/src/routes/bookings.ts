@@ -42,6 +42,7 @@ import {
   notifyBookingRejected,
   notifyBookingCancelled,
 } from "../lib/adminNotifications.js";
+import { trackNotification } from "../lib/notificationEngine.js";
 
 const router = Router();
 
@@ -460,6 +461,9 @@ router.post("/", requireAuth as any, async (req: AuthenticatedRequest, res) => {
     bookingNumber: booking.bookingNumber,
     packageName: booking.packageName ?? pkg?.name ?? "Travel Package",
     numberOfPilgrims: booking.numberOfPilgrims,
+  }).then(() => {
+    trackNotification({ eventType: "new_booking", channel: "whatsapp", recipient: booking.customerMobile, customerId: booking.customerId ?? undefined, bookingId: booking.id, status: "sent" }).catch(() => {});
+    trackNotification({ eventType: "new_booking", channel: "sms", recipient: booking.customerMobile, customerId: booking.customerId ?? undefined, bookingId: booking.id, status: "sent" }).catch(() => {});
   }).catch(console.error);
 
   notifyNewBooking({
@@ -521,6 +525,9 @@ router.post("/:id/approve", requireAdmin as any, requirePermission("bookings", "
     email: updated.customerEmail,
     customerName: updated.customerName,
     bookingNumber: updated.bookingNumber,
+  }).then(() => {
+    trackNotification({ eventType: "booking_approved", channel: "whatsapp", recipient: updated.customerMobile, bookingId: updated.id, status: "sent" }).catch(() => {});
+    trackNotification({ eventType: "booking_approved", channel: "sms", recipient: updated.customerMobile, bookingId: updated.id, status: "sent" }).catch(() => {});
   }).catch(console.error);
 
   notifyBookingApproved({
@@ -555,6 +562,8 @@ router.post("/:id/reject", requireAdmin as any, requirePermission("bookings", "e
     customerName: updated.customerName,
     bookingNumber: updated.bookingNumber,
     reason,
+  }).then(() => {
+    trackNotification({ eventType: "booking_cancelled", channel: "whatsapp", recipient: updated.customerMobile, bookingId: updated.id, status: "sent" }).catch(() => {});
   }).catch(console.error);
 
   notifyBookingRejected({

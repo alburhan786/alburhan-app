@@ -1,0 +1,539 @@
+Build a complete Enterprise Notification Engine for the Al Burhan Tours & Travels ERP.
+
+IMPORTANT:
+Do not break any existing modules.
+
+The Notification Engine must become a central service used by all ERP modules.
+
+==================================================
+ARCHITECTURE
+==================================================
+
+Every ERP event should create one Notification Event.
+
+Example:
+
+Booking Created
+        │
+        ▼
+Notification Engine
+        │
+ ┌──────┼─────────┬────────┬────────┬─────────┐
+ │      │         │        │         │
+ ▼      ▼         ▼        ▼         ▼
+WhatsApp SMS      Email     RCS     Push
+        │
+        ▼
+Delivery Logs
+
+==================================================
+COMMUNICATION CENTER
+==================================================
+
+Create a new Admin Menu.
+
+Communication Center
+
+Inside it create:
+
+Dashboard
+
+Notification Queue
+
+Automation Rules
+
+Templates
+
+WhatsApp
+
+SMS
+
+RCS
+
+Email
+
+Push Notifications
+
+Campaign Manager
+
+Scheduled Messages
+
+Failed Messages
+
+Delivery Logs
+
+Notification Settings
+
+==================================================
+SUPPORTED EVENTS
+==================================================
+
+Every module should generate events.
+
+Bookings
+
+New Booking
+
+Booking Approved
+
+Booking Rejected
+
+Booking Cancelled
+
+Booking Completed
+
+Payments
+
+Payment Received
+
+Payment Pending
+
+Payment Failed
+
+Balance Reminder
+
+Invoices
+
+Invoice Generated
+
+Invoice Paid
+
+Invoice Cancelled
+
+Pilgrims
+
+Passport Uploaded
+
+Passport Expiry
+
+Visa Approved
+
+Visa Rejected
+
+Flight
+
+Flight Assigned
+
+Flight Changed
+
+Flight Cancelled
+
+Hotel
+
+Hotel Assigned
+
+Room Changed
+
+Transport
+
+Bus Assigned
+
+Seat Changed
+
+Attendance
+
+Airport Check-In
+
+Bus Attendance
+
+Hotel Check-In
+
+Ziyarat Attendance
+
+Missing Pilgrim
+
+Medical Emergency
+
+System
+
+Backup Complete
+
+Server Error
+
+Database Alert
+
+==================================================
+CHANNELS
+==================================================
+
+Support:
+
+Meta WhatsApp Cloud API
+
+BotBee
+
+Fast2SMS
+
+MSG91
+
+RCS Business Messaging
+
+SMTP Email
+
+Firebase Push Notifications
+
+==================================================
+AUTOMATION RULES
+==================================================
+
+Admin can configure.
+
+Example:
+
+Booking Approved
+
+☑ WhatsApp
+
+☑ SMS
+
+☑ Email
+
+☐ RCS
+
+☑ Push
+
+Payment Received
+
+☑ WhatsApp
+
+☐ SMS
+
+☑ Email
+
+☐ RCS
+
+==================================================
+TEMPLATE ENGINE
+==================================================
+
+Editable Templates.
+
+OTP
+
+Booking Confirmation
+
+Booking Approved
+
+Invoice
+
+Receipt
+
+Visa
+
+Flight Ticket
+
+Hotel Voucher
+
+Departure Reminder
+
+Return Reminder
+
+Feedback
+
+Birthday
+
+Ramadan
+
+Eid
+
+Custom Templates
+
+Variables
+
+{{customer_name}}
+
+{{booking_id}}
+
+{{invoice_number}}
+
+{{amount}}
+
+{{balance}}
+
+{{hotel}}
+
+{{flight}}
+
+{{room}}
+
+{{bus}}
+
+==================================================
+NOTIFICATION DASHBOARD
+==================================================
+
+Show
+
+Today's Notifications
+
+Pending
+
+Delivered
+
+Failed
+
+Scheduled
+
+Retry Queue
+
+WhatsApp Count
+
+SMS Count
+
+Email Count
+
+RCS Count
+
+Push Count
+
+Delivery %
+
+Cost
+
+==================================================
+DELIVERY LOGS
+==================================================
+
+Store
+
+Notification ID
+
+Booking ID
+
+Customer
+
+Channel
+
+Template
+
+Provider
+
+Status
+
+Provider Response
+
+Sent At
+
+Delivered At
+
+Retry Count
+
+==================================================
+FAILED QUEUE
+==================================================
+
+Automatically retry failed messages.
+
+Maximum
+
+3 retries.
+
+Show
+
+Reason
+
+Retry Button
+
+==================================================
+SCHEDULED MESSAGES
+==================================================
+
+Allow scheduling.
+
+Date
+
+Time
+
+Customer
+
+Group
+
+Family
+
+Package
+
+Campaign
+
+==================================================
+CAMPAIGN MANAGER
+==================================================
+
+Bulk Send
+
+All Customers
+
+Hajj Group
+
+Umrah Group
+
+Room
+
+Bus
+
+Family
+
+Outstanding Payments
+
+Visa Pending
+
+Flight Pending
+
+==================================================
+CUSTOMER PREFERENCES
+==================================================
+
+Allow customer preferences.
+
+WhatsApp
+
+SMS
+
+Email
+
+Push
+
+RCS
+
+==================================================
+NOTIFICATION API
+==================================================
+
+Create one internal API.
+
+sendNotification()
+
+Parameters
+
+eventType
+
+customerId
+
+bookingId
+
+channels
+
+template
+
+variables
+
+attachments
+
+priority
+
+==================================================
+ATTACHMENTS
+==================================================
+
+Support
+
+PDF Invoice
+
+Receipt
+
+Visa
+
+Ticket
+
+Hotel Voucher
+
+QR Code
+
+==================================================
+ADMIN POPUPS
+==================================================
+
+Whenever
+
+New Booking
+
+Payment
+
+Refund
+
+Cancellation
+
+show live popup.
+
+Play sound.
+
+Browser notification.
+
+==================================================
+SECURITY
+==================================================
+
+Audit every notification.
+
+Who sent
+
+When
+
+Provider
+
+Status
+
+==================================================
+DATABASE
+==================================================
+
+Create tables:
+
+notifications
+
+notification_templates
+
+notification_logs
+
+notification_campaigns
+
+notification_queue
+
+notification_settings
+
+==================================================
+PERFORMANCE
+==================================================
+
+Background Queue
+
+Retry Queue
+
+Priority Queue
+
+Worker Process
+
+No duplicate notifications.
+
+==================================================
+TESTING
+==================================================
+
+Test all notification events.
+
+Bookings
+
+Payments
+
+Invoices
+
+Flights
+
+Visa
+
+Attendance
+
+Hotel
+
+Bus
+
+Email
+
+SMS
+
+WhatsApp
+
+RCS
+
+Push
+
+Do not finish until every event successfully creates notifications and the complete Notification Engine works across the ERP.
