@@ -1,0 +1,381 @@
+Customer Journey
+
+1. Customer visits www.alburhantravels.com.
+2. Customer registers or logs in using Mobile OTP, Email OTP, or WhatsApp OTP.
+3. Customer receives a welcome message by:
+    * WhatsApp
+    * SMS
+    * Email
+4. Customer browses Hajj, Umrah, Iraq, Syria, Jordan, and Ziyarat packages.
+5. Customer books a package.
+6. Admin receives an instant notification.
+7. Customer receives:
+    * Booking ID
+    * Booking Confirmation
+    * Booking Status
+    via WhatsApp, SMS, Email, and dashboard.
+
+⸻
+
+Dashboard Improvements
+
+The dashboard shown in the screenshots must include:
+
+Profile
+
+* Name
+* Photo
+* Passport Status
+* Visa Status
+* Mobile
+* Email
+* Aadhaar
+* PAN
+* Blood Group
+* Emergency Contact
+
+⸻
+
+Booking Status
+
+Booking Requested
+
+↓
+
+Documents Pending
+
+↓
+
+Admin Verification
+
+↓
+
+Payment Pending
+
+↓
+
+Payment Received
+
+↓
+
+Invoice Generated
+
+↓
+
+Visa Processing
+
+↓
+
+Visa Approved
+
+↓
+
+Flight Confirmed
+
+↓
+
+Hotel Confirmed
+
+↓
+
+Bus Allocation
+
+↓
+
+Room Allocation
+
+↓
+
+Departure Ready
+
+↓
+
+Journey Started
+
+↓
+
+Reached Makkah
+
+↓
+
+Reached Madinah
+
+↓
+
+Return Flight
+
+↓
+
+Journey Completed
+
+Display this as a colorful progress timeline.
+
+⸻
+
+Payment Flow
+
+After clicking Pay Balance:
+
+Integrate Razorpay Live.
+
+On successful payment:
+
+* Update booking automatically.
+* Generate GST Invoice.
+* Generate Receipt.
+* Update payment status.
+* Notify Admin.
+
+Immediately send:
+
+WhatsApp
+
+* Invoice PDF
+* Payment Receipt
+* Booking Confirmation
+
+SMS
+
+“Dear {{CustomerName}}, payment of ₹{{Amount}} has been received successfully.
+Booking ID: {{BookingID}}.”
+
+Email
+
+Professional HTML email with:
+
+* Invoice PDF
+* Payment Receipt
+* Company Logo
+* QR Code
+* Contact Information
+
+⸻
+
+Automatic Notifications
+
+Whenever Admin changes status, send notifications automatically.
+
+Statuses include:
+
+* Booking Approved
+* Booking Rejected
+* Documents Received
+* Passport Verified
+* Visa Submitted
+* Visa Approved
+* Flight Ticket Uploaded
+* Hotel Voucher Uploaded
+* Bus Details
+* Room Number
+* Departure Reminder
+* Arrival Reminder
+* Ziyarat Schedule
+* Return Reminder
+
+Send through:
+
+* WhatsApp
+* SMS
+* Email
+* Push Notification
+
+No manual action required.
+
+⸻
+
+Document Upload
+
+Customer uploads:
+
+* Passport
+* Passport Size Photo
+* Aadhaar
+* PAN
+* Vaccination Certificate
+* Visa Copy
+* Other Documents
+
+Admin can:
+
+* Approve
+* Reject
+* Request Re-upload
+
+Customer receives notification immediately.
+
+⸻
+
+Admin Upload
+
+Admin uploads:
+
+* Flight Ticket
+* Visa
+* Hotel Voucher
+* Room Allocation
+* Bus Allocation
+* ID Card
+* Invoice
+* Itinerary
+* Emergency Contacts
+
+Files become instantly available in the customer dashboard.
+
+Customer receives:
+
+* WhatsApp PDF
+* Email PDF
+* SMS notification
+
+⸻
+
+Travel Timeline
+
+Display:
+
+📅 Booking Date
+
+↓
+
+🛂 Visa Submitted
+
+↓
+
+✅ Visa Approved
+
+↓
+
+✈ Flight Ticket Issued
+
+↓
+
+🏨 Hotel Allocated
+
+↓
+
+🚌 Bus Number Assigned
+
+↓
+
+🧳 Luggage Tag Issued
+
+↓
+
+🕋 Departure
+
+↓
+
+📍 Arrival in Makkah
+
+↓
+
+🕌 Madinah Visit
+
+↓
+
+🛫 Return Flight
+
+↓
+
+🏠 Journey Completed
+
+⸻
+
+Customer Communication Center
+
+Maintain complete communication history.
+
+Show:
+
+* SMS History
+* WhatsApp Messages
+* Email History
+* Payment History
+* Documents
+* Support Tickets
+
+⸻
+
+Notifications Bell
+
+Show unread notifications.
+
+Examples:
+
+* Payment Reminder
+* Visa Approved
+* Flight Uploaded
+* Room Changed
+* Departure Tomorrow
+
+⸻
+
+AI Assistant
+
+Add an AI chatbot to answer:
+
+* Package Details
+* Payment Help
+* Visa Questions
+* Flight Information
+* Hotel Details
+* Ziyarat Schedule
+* Document Requirements
+
+⸻
+
+Security
+
+Implement:
+
+* JWT Authentication
+* OTP Verification
+* Encrypted Passwords
+* File Virus Scanning
+* Secure Document Storage
+* Role-Based Permissions
+* Audit Logs
+
+⸻
+
+Admin Panel
+
+Provide management screens for:
+
+* Bookings
+* Packages
+* Customers
+* Payments
+* Refunds
+* Documents
+* Notifications
+* WhatsApp
+* SMS
+* Emails
+* Reports
+* CRM
+* Staff
+* Pilgrim Tracking
+
+⸻
+
+Performance
+
+Optimize for:
+
+* Mobile Responsive
+* Fast Loading (<2 seconds)
+* SEO Friendly
+* Progressive Web App (PWA)
+* Hostinger VPS Deployment
+* PM2 Auto Restart
+* SSL
+* Daily Database Backup
+* Error Logging
+* Monitoring
+
+⸻
+
+Final Objective
+
+The Al Burhan Tours & Travels website should provide a complete digital pilgrimage experience where every stage—from registration and booking to payment, document verification, visa processing, ticket issuance, travel updates, and journey completion—is fully automated. Customers should receive real-time updates through WhatsApp, SMS, email, push notifications, and the dashboard, while administrators manage all operations from a single secure control panel with complete CRM, reporting, and automation. This should be a production-ready, enterprise-grade platform suitable for thousands of pilgrims.
