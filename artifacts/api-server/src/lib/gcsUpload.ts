@@ -31,14 +31,31 @@ export async function uploadToGCS(
   const sanitized = originalName.replace(/[^a-zA-Z0-9.\-_]/g, "_");
   const uniquePart = `${Date.now()}_${randomUUID().slice(0, 8)}_${sanitized}`;
 
-  const gcsKey = `objects/${prefix}/${uniquePart}`;
-  const bucket = objectStorageClient.bucket(bucketId);
-  await bucket.file(gcsKey).save(buffer, {
-    contentType: mimetype,
-    resumable: false,
-  });
+  try {
+    // Replit object storage requires the sidecar at 127.0.0.1:1106
+    // This is only available on Replit infrastructure, not on VPS/self-hosted.
+    // Probe the sidecar before attempting GCS to fail fast and fall back to disk.
+    const sidecarOk = await fetch("http://127.0.0.1:1106/token", { method: "GET", signal: AbortSignal.timeout(2000) })
+      .then(r => r.ok || r.status < 500)
+      .catch(() => false);
 
-  return `/api/storage/objects/${prefix}/${uniquePart}`;
+    if (!sidecarOk) {
+      console.warn("[GCS] Replit sidecar not available — falling back to disk storage");
+      return diskFallback(buffer, originalName, prefix);
+    }
+
+    const gcsKey = `objects/${prefix}/${uniquePart}`;
+    const bucket = objectStorageClient.bucket(bucketId);
+    await bucket.file(gcsKey).save(buffer, {
+      contentType: mimetype,
+      resumable: false,
+    });
+
+    return `/api/storage/objects/${prefix}/${uniquePart}`;
+  } catch (err: any) {
+    console.error("[GCS] Upload failed, falling back to disk:", err?.message || err);
+    return diskFallback(buffer, originalName, prefix);
+  }
 }
 
 export async function deleteFromGCS(objectPath: string): Promise<void> {

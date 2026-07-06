@@ -449,7 +449,9 @@ router.post("/webhook", async (req: any, res) => {
     let booking: typeof bookingsTable.$inferSelect | undefined;
 
     if (eventType === "payment_link.paid") {
-      // Payment link flow: booking ID stored as reference_id
+      // Payment link flow: reference_id is either:
+      //   NEW format: "<bookingNumber>|<base36-timestamp>" e.g. "ABT26078035|lk3q2p8"
+      //   OLD format: "<uuid>" (booking.id) — kept for backward compat
       const referenceId: string | undefined =
         event?.payload?.payment_link?.entity?.reference_id;
       if (!referenceId) {
@@ -457,11 +459,26 @@ router.post("/webhook", async (req: any, res) => {
         res.json({ message: "No reference_id in payment_link payload" });
         return;
       }
-      const rows = await db
-        .select()
-        .from(bookingsTable)
-        .where(eq(bookingsTable.id, referenceId))
-        .limit(1);
+
+      let rows: typeof bookingsTable.$inferSelect[] = [];
+
+      if (referenceId.includes("|")) {
+        // New format: extract bookingNumber before the pipe
+        const bookingNumber = referenceId.split("|")[0];
+        rows = await db
+          .select()
+          .from(bookingsTable)
+          .where(eq(bookingsTable.bookingNumber, bookingNumber))
+          .limit(1);
+      } else {
+        // Old format: referenceId IS the booking UUID
+        rows = await db
+          .select()
+          .from(bookingsTable)
+          .where(eq(bookingsTable.id, referenceId))
+          .limit(1);
+      }
+
       booking = rows[0];
       if (!booking) {
         console.warn("[Webhook] payment_link.paid: no booking found for reference_id:", referenceId);
@@ -706,11 +723,16 @@ router.post("/:bookingId/payment-link", requireAdmin as any, async (req: Authent
     const clean = booking.customerMobile.replace(/\D/g, "");
     const contact = clean.length === 10 ? `91${clean}` : clean;
 
+    // reference_id must be unique per payment link — append a base-36 timestamp
+    // so admins can create multiple links for the same booking (e.g. partial payments).
+    // Format: "<bookingNumber>|<timestamp-base36>" — max ~22 chars, within Razorpay 40-char limit.
+    const referenceId = `${booking.bookingNumber}|${Date.now().toString(36)}`;
+
     const linkPayload: RazorpayPaymentLinkPayload = {
       amount: Math.round(remaining * 100),
       currency: "INR",
       description: `Balance payment for booking ${booking.bookingNumber}`,
-      reference_id: booking.id,
+      reference_id: referenceId,
       customer: {
         name: booking.customerName,
         contact,
