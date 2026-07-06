@@ -716,3 +716,42 @@ export async function sendAdminDocumentReadyNotification(opts: {
     opts.email ? sendEmail(opts.email, `Your ${docLabel} is Ready – Al Burhan Tours & Travels`, message) : Promise.resolve(),
   ]);
 }
+
+const JOURNEY_STATUS_MESSAGES: Record<string, { title: string; body: (name: string, bn: string) => string }> = {
+  booking_requested:  { title: "Booking Submitted",     body: (n, b) => `Assalamu Alaikum ${n},\n\nYour booking #${b} has been submitted. Our team will review shortly and notify you once approved.\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 8989701701` },
+  documents_pending:  { title: "Documents Required",    body: (n, b) => `Assalamu Alaikum ${n},\n\n📄 We need your documents for booking #${b}.\n\nPlease upload: Passport, Aadhaar, PAN Card & Photo in your dashboard.\n\nLogin: alburhantravels.com\n\nAl Burhan Tours & Travels\n+91 8989701701` },
+  documents_received: { title: "Documents Received",    body: (n, b) => `Assalamu Alaikum ${n},\n\n✅ Documents received for booking #${b}.\n\nWe are reviewing your documents. You will be notified once verification is complete.\n\nAl Burhan Tours & Travels` },
+  admin_verification: { title: "Under Verification",    body: (n, b) => `Assalamu Alaikum ${n},\n\n🔍 Booking #${b} is currently under admin verification.\n\nWe will notify you as soon as the process is complete.\n\nAl Burhan Tours & Travels` },
+  payment_pending:    { title: "Payment Pending",        body: (n, b) => `Assalamu Alaikum ${n},\n\n💰 Payment pending for booking #${b}.\n\nPlease login to complete your payment and secure your seat.\n\nLogin: alburhantravels.com\n\nAl Burhan Tours & Travels\n+91 8989701701` },
+  payment_received:   { title: "Payment Received",       body: (n, b) => `Assalamu Alaikum ${n},\n\n✅ Payment received for booking #${b}.\n\nJazak Allah Khair! Your seat is now confirmed.\n\nAl Burhan Tours & Travels` },
+  invoice_generated:  { title: "Invoice Generated",      body: (n, b) => `Assalamu Alaikum ${n},\n\n🧾 Your invoice for booking #${b} is ready.\n\nLogin to download it from your dashboard.\n\nalburhantravels.com\n\nAl Burhan Tours & Travels` },
+  visa_processing:    { title: "Visa Processing",        body: (n, b) => `Assalamu Alaikum ${n},\n\n🛂 Your visa application for booking #${b} has been submitted.\n\nWe will notify you as soon as the visa is approved, Insha'Allah.\n\nAl Burhan Tours & Travels` },
+  visa_approved:      { title: "Visa Approved",          body: (n, b) => `Assalamu Alaikum ${n},\n\nAlhamdulillah! 🎉 Your VISA is APPROVED for booking #${b}.\n\nPlease visit our office to collect your travel documents.\n\nAl Burhan Tours & Travels\n+91 8989701701` },
+  flight_confirmed:   { title: "Flight Ticket Issued",   body: (n, b) => `Assalamu Alaikum ${n},\n\n✈️ Flight ticket issued for booking #${b}.\n\nYour flight is confirmed. Login to view your e-ticket.\n\nalburhantravels.com\n\nAl Burhan Tours & Travels` },
+  hotel_confirmed:    { title: "Hotel Confirmed",        body: (n, b) => `Assalamu Alaikum ${n},\n\n🏨 Hotel confirmed for booking #${b}.\n\nYour accommodation has been booked. Login to view details.\n\nAl Burhan Tours & Travels` },
+  bus_allocated:      { title: "Bus Allocated",          body: (n, b) => `Assalamu Alaikum ${n},\n\n🚌 Bus details assigned for booking #${b}.\n\nYour bus has been allocated. Login to view your bus number and schedule.\n\nAl Burhan Tours & Travels` },
+  room_allocated:     { title: "Room Allocated",         body: (n, b) => `Assalamu Alaikum ${n},\n\n🛏️ Room allocated for booking #${b}.\n\nYour room assignment is ready. Login to view details.\n\nAl Burhan Tours & Travels` },
+  departure_ready:    { title: "Departure Ready",        body: (n, b) => `Assalamu Alaikum ${n},\n\n🧳 DEPARTURE READY — Booking #${b}\n\nAlhamdulillah! Everything is set for your departure.\n\nPlease check your dashboard for all travel details and report time.\n\nMay Allah accept your Hajj/Umrah. Ameen!\nAl Burhan Tours & Travels\n+91 8989701701` },
+  journey_started:    { title: "Journey Started",        body: (n, b) => `Assalamu Alaikum ${n},\n\n🛫 Bismillah! Your journey has begun — Booking #${b}.\n\nMay Allah make your journey safe, blessed and accepted. Ameen!\n\nAl Burhan Tours & Travels` },
+  reached_makkah:     { title: "Reached Makkah",        body: (n, b) => `Assalamu Alaikum ${n},\n\nAlhamdulillah! 🕋 You have reached Makkah Al-Mukarramah — Booking #${b}.\n\nMay Allah grant you Tawaf, Sa'ee and all the blessings of this sacred land. Ameen!\n\nAl Burhan Tours & Travels` },
+  reached_madinah:    { title: "Reached Madinah",       body: (n, b) => `Assalamu Alaikum ${n},\n\nAlhamdulillah! 🕌 You have reached Madinah Al-Munawwarah — Booking #${b}.\n\nMay Allah grant you the honour of Salawat at Masjid Al-Nabawi. Ameen!\n\nAl Burhan Tours & Travels` },
+  return_flight:      { title: "Return Journey",         body: (n, b) => `Assalamu Alaikum ${n},\n\n🛫 Return journey has begun for Booking #${b}.\n\nMay Allah accept all your ibadah and grant you Hajj Mabroor. Ameen!\n\nAl Burhan Tours & Travels` },
+  journey_completed:  { title: "Journey Completed",      body: (n, b) => `Assalamu Alaikum ${n},\n\nAlhamdulillah! 🏠 Welcome home! Booking #${b} — Journey Completed.\n\nMay Allah accept your Hajj/Umrah and grant you Hajj Mabroor.\n\nJazak Allah Khair for choosing Al Burhan Tours & Travels!\n+91 8989701701` },
+};
+
+export async function sendJourneyStatusNotification(opts: {
+  mobile: string;
+  email?: string | null;
+  customerName: string;
+  bookingNumber: string;
+  journeyStatus: string;
+}) {
+  const entry = JOURNEY_STATUS_MESSAGES[opts.journeyStatus];
+  if (!entry) return;
+  const message = entry.body(opts.customerName, opts.bookingNumber);
+  const subject = `${entry.title} – Al Burhan Tours & Travels`;
+  await Promise.allSettled([
+    sendWhatsApp(opts.mobile, message),
+    opts.email ? sendEmail(opts.email, subject, message) : Promise.resolve(),
+  ]);
+}

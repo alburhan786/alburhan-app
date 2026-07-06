@@ -714,6 +714,75 @@ function getStatusMessage(status: string) {
   }
 }
 
+const JOURNEY_STAGES = [
+  { key: "booking_requested",  label: "Submitted",   emoji: "🕌" },
+  { key: "documents_pending",  label: "Docs Needed", emoji: "📄" },
+  { key: "documents_received", label: "Docs In",     emoji: "📋" },
+  { key: "admin_verification", label: "Verifying",   emoji: "🔍" },
+  { key: "payment_pending",    label: "Pay Now",     emoji: "💰" },
+  { key: "payment_received",   label: "Paid",        emoji: "✅" },
+  { key: "invoice_generated",  label: "Invoice",     emoji: "🧾" },
+  { key: "visa_processing",    label: "Visa",        emoji: "🛂" },
+  { key: "visa_approved",      label: "Visa ✓",      emoji: "🎉" },
+  { key: "flight_confirmed",   label: "Flight",      emoji: "✈️" },
+  { key: "hotel_confirmed",    label: "Hotel",       emoji: "🏨" },
+  { key: "bus_allocated",      label: "Bus",         emoji: "🚌" },
+  { key: "room_allocated",     label: "Room",        emoji: "🛏️" },
+  { key: "departure_ready",    label: "Ready!",      emoji: "🧳" },
+  { key: "journey_started",    label: "Departed",    emoji: "🛫" },
+  { key: "reached_makkah",     label: "Makkah",      emoji: "🕋" },
+  { key: "reached_madinah",    label: "Madinah",     emoji: "🕌" },
+  { key: "return_flight",      label: "Returning",   emoji: "🛫" },
+  { key: "journey_completed",  label: "Home ♥",      emoji: "🏠" },
+];
+
+function BookingJourneyTimeline({ journeyStatus }: { journeyStatus: string }) {
+  const currentIdx = JOURNEY_STAGES.findIndex(s => s.key === journeyStatus);
+  const effectiveIdx = currentIdx < 0 ? 0 : currentIdx;
+  return (
+    <div className="border-t border-border bg-gradient-to-b from-primary/5 to-transparent">
+      <div className="px-5 pt-3 pb-1">
+        <p className="text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-1.5 mb-3">
+          <span>🗺️</span> Booking Journey — Step {effectiveIdx + 1} of {JOURNEY_STAGES.length}
+        </p>
+      </div>
+      <div className="overflow-x-auto px-5 pb-4">
+        <div className="flex items-start gap-0" style={{ minWidth: `${JOURNEY_STAGES.length * 68}px` }}>
+          {JOURNEY_STAGES.map((stage, idx) => {
+            const done = idx < effectiveIdx;
+            const active = idx === effectiveIdx;
+            return (
+              <div key={stage.key} className="flex flex-col items-center relative flex-1">
+                {idx > 0 && (
+                  <div className={`absolute h-0.5 top-4 ${done ? "bg-emerald-400" : active ? "bg-primary/40" : "bg-gray-200"}`}
+                    style={{ left: "calc(-50%)", right: "calc(50%)", width: "100%", transform: "translateX(0)" }} />
+                )}
+                <div className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center text-sm border-2 transition-all select-none ${
+                  done   ? "bg-emerald-500 border-emerald-500 text-white shadow-sm" :
+                  active ? "bg-primary border-primary text-white shadow-lg ring-4 ring-primary/25 scale-110" :
+                           "bg-white border-gray-200 text-gray-300"
+                }`}>
+                  {done ? "✓" : stage.emoji}
+                </div>
+                <p className={`mt-1.5 text-center leading-tight px-0.5 ${
+                  active ? "text-primary font-bold" : done ? "text-emerald-700 font-medium" : "text-gray-400"
+                }`} style={{ fontSize: "9px", maxWidth: "60px" }}>
+                  {stage.label}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <div className="px-5 pb-3">
+        <span className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary px-2.5 py-1 rounded-full font-semibold">
+          📍 Currently: {JOURNEY_STAGES[effectiveIdx]?.label}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 const NOTIF_TYPE_EMOJI: Record<string, string> = {
   mina_update: "🕌", tawaf_update: "🕋", madinah_update: "🟢",
   flight_update: "✈️", bus_update: "🚌", food_update: "🍽️",
@@ -1066,6 +1135,39 @@ export default function CustomerDashboard() {
   const [unreadCount, setUnreadCount] = useState(0);
   const prevUnreadRef = React.useRef(0);
 
+  const [profileExt, setProfileExt] = useState<{ blood_group?: string; emergency_contact_name?: string; emergency_contact_mobile?: string }>({});
+  const [showProfileEdit, setShowProfileEdit] = useState(false);
+  const [profileForm, setProfileForm] = useState({ name: "", email: "", blood_group: "", emergency_contact_name: "", emergency_contact_mobile: "" });
+  const [savingProfile, setSavingProfile] = useState(false);
+
+  useEffect(() => {
+    fetch(`${BASE_API}/api/auth/me`, { credentials: "include" })
+      .then(r => r.json())
+      .then(d => {
+        setProfileExt({ blood_group: d.blood_group, emergency_contact_name: d.emergency_contact_name, emergency_contact_mobile: d.emergency_contact_mobile });
+        setProfileForm({ name: d.name || "", email: d.email || "", blood_group: d.blood_group || "", emergency_contact_name: d.emergency_contact_name || "", emergency_contact_mobile: d.emergency_contact_mobile || "" });
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleSaveProfile = async () => {
+    setSavingProfile(true);
+    try {
+      const res = await fetch(`${BASE_API}/api/auth/profile`, {
+        method: "PATCH", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(profileForm),
+      });
+      if (!res.ok) throw new Error();
+      const updated = await res.json();
+      setProfileExt({ blood_group: updated.blood_group, emergency_contact_name: updated.emergency_contact_name, emergency_contact_mobile: updated.emergency_contact_mobile });
+      setShowProfileEdit(false);
+      toast({ title: "Profile updated!", description: "Your details have been saved." });
+    } catch {
+      toast({ title: "Error", description: "Could not save profile.", variant: "destructive" });
+    } finally { setSavingProfile(false); }
+  };
+
   const fetchUnreadCount = useCallback(async () => {
     try {
       const res = await fetch(`${BASE_API}/api/notifications/my/unread-count`, { credentials: "include" });
@@ -1224,15 +1326,67 @@ export default function CustomerDashboard() {
 
           {/* Sidebar */}
           <div className="lg:col-span-1 space-y-6">
-            <Card className="p-6 shadow-lg border-border/50 rounded-2xl">
-              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4 mx-auto">
-                <span className="text-2xl font-bold text-primary">{(user?.name || user?.mobile || "?")[0].toUpperCase()}</span>
+            {showProfileEdit && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+                <Card className="w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden">
+                  <div className="bg-primary p-4 text-white flex items-center justify-between">
+                    <h3 className="font-bold">Edit Profile</h3>
+                    <button onClick={() => setShowProfileEdit(false)}><X size={18} /></button>
+                  </div>
+                  <div className="p-5 space-y-3">
+                    <div><label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">Full Name</label>
+                      <Input value={profileForm.name} onChange={e => setProfileForm(f => ({ ...f, name: e.target.value }))} placeholder="As per passport" /></div>
+                    <div><label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">Email</label>
+                      <Input value={profileForm.email} onChange={e => setProfileForm(f => ({ ...f, email: e.target.value }))} placeholder="email@example.com" type="email" /></div>
+                    <div><label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">Blood Group</label>
+                      <select className="w-full h-10 rounded-lg border border-input bg-background px-3 text-sm" value={profileForm.blood_group} onChange={e => setProfileForm(f => ({ ...f, blood_group: e.target.value }))}>
+                        <option value="">Select</option>
+                        {["A+","A-","B+","B-","O+","O-","AB+","AB-"].map(g => <option key={g} value={g}>{g}</option>)}
+                      </select></div>
+                    <div><label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">Emergency Contact Name</label>
+                      <Input value={profileForm.emergency_contact_name} onChange={e => setProfileForm(f => ({ ...f, emergency_contact_name: e.target.value }))} placeholder="Contact person's name" /></div>
+                    <div><label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">Emergency Contact Mobile</label>
+                      <Input value={profileForm.emergency_contact_mobile} onChange={e => setProfileForm(f => ({ ...f, emergency_contact_mobile: e.target.value }))} placeholder="10-digit mobile" /></div>
+                    <Button className="w-full bg-primary text-white mt-2" onClick={handleSaveProfile} disabled={savingProfile}>
+                      {savingProfile ? "Saving…" : "Save Profile"}
+                    </Button>
+                  </div>
+                </Card>
               </div>
-              <h3 className="font-bold text-lg mb-4 text-center">My Profile</h3>
-              <div className="space-y-3 text-sm">
-                <div><span className="text-muted-foreground block text-xs uppercase tracking-wide">Name</span><span className="font-medium">{user?.name || <span className="text-muted-foreground italic">Not set</span>}</span></div>
-                <div><span className="text-muted-foreground block text-xs uppercase tracking-wide">Mobile</span><span className="font-medium">+91 {user?.mobile}</span></div>
-                <div><span className="text-muted-foreground block text-xs uppercase tracking-wide">Email</span><span className="font-medium">{user?.email || <span className="text-muted-foreground italic">Not set</span>}</span></div>
+            )}
+
+            <Card className="overflow-hidden shadow-lg border-border/50 rounded-2xl">
+              <div className="bg-gradient-to-br from-primary to-primary/80 p-5 text-white text-center">
+                <div className="w-16 h-16 rounded-full bg-white/20 border-2 border-white/40 flex items-center justify-center mb-3 mx-auto">
+                  <span className="text-2xl font-bold">{(user?.name || user?.mobile || "?")[0].toUpperCase()}</span>
+                </div>
+                <h3 className="font-bold text-base">{user?.name || <span className="italic opacity-70">Name not set</span>}</h3>
+                <p className="text-white/70 text-xs mt-0.5">+91 {user?.mobile}</p>
+              </div>
+              <div className="p-4 space-y-2.5 text-sm">
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground text-xs uppercase tracking-wide">Email</span>
+                  <span className="font-medium text-xs text-right">{user?.email || <span className="italic text-muted-foreground">Not set</span>}</span>
+                </div>
+                {profileExt.blood_group && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground text-xs uppercase tracking-wide">Blood Group</span>
+                    <span className="font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full text-xs">{profileExt.blood_group}</span>
+                  </div>
+                )}
+                {profileExt.emergency_contact_name && (
+                  <div className="pt-1 border-t border-border/50">
+                    <p className="text-muted-foreground text-xs uppercase tracking-wide mb-1">Emergency Contact</p>
+                    <p className="font-semibold text-xs">{profileExt.emergency_contact_name}</p>
+                    {profileExt.emergency_contact_mobile && <p className="text-muted-foreground text-xs">+91 {profileExt.emergency_contact_mobile}</p>}
+                  </div>
+                )}
+                <button
+                  onClick={() => setShowProfileEdit(true)}
+                  className="w-full text-xs text-primary border border-primary/30 rounded-lg py-1.5 hover:bg-primary/5 transition-colors font-semibold mt-1"
+                >
+                  ✏️ Edit Profile
+                </button>
               </div>
             </Card>
 
@@ -1297,6 +1451,9 @@ export default function CustomerDashboard() {
                         {getStatusMessage(booking.status)}
                       </div>
                     )}
+
+                    {/* Journey Timeline */}
+                    <BookingJourneyTimeline journeyStatus={booking.journeyStatus || "booking_requested"} />
 
                     {/* Core details */}
                     <div className="p-5 grid grid-cols-2 sm:grid-cols-3 gap-4">

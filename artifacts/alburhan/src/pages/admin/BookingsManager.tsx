@@ -627,6 +627,28 @@ function AdminPaymentLedger({ booking }: { booking: BookingWithAmounts }) {
   );
 }
 
+const JOURNEY_STATUS_OPTIONS = [
+  { value: "booking_requested",  label: "🕌 Booking Submitted" },
+  { value: "documents_pending",  label: "📄 Documents Required" },
+  { value: "documents_received", label: "📋 Documents Received" },
+  { value: "admin_verification", label: "🔍 Under Verification" },
+  { value: "payment_pending",    label: "💰 Payment Pending" },
+  { value: "payment_received",   label: "✅ Payment Received" },
+  { value: "invoice_generated",  label: "🧾 Invoice Generated" },
+  { value: "visa_processing",    label: "🛂 Visa Processing" },
+  { value: "visa_approved",      label: "🎉 Visa Approved" },
+  { value: "flight_confirmed",   label: "✈️ Flight Confirmed" },
+  { value: "hotel_confirmed",    label: "🏨 Hotel Confirmed" },
+  { value: "bus_allocated",      label: "🚌 Bus Allocated" },
+  { value: "room_allocated",     label: "🛏️ Room Allocated" },
+  { value: "departure_ready",    label: "🧳 Departure Ready" },
+  { value: "journey_started",    label: "🛫 Journey Started" },
+  { value: "reached_makkah",     label: "🕋 Reached Makkah" },
+  { value: "reached_madinah",    label: "🕌 Reached Madinah" },
+  { value: "return_flight",      label: "🛫 Return Flight" },
+  { value: "journey_completed",  label: "🏠 Journey Completed" },
+];
+
 function BookingDetailModal({ booking, open, onClose }: { booking: Booking | null; open: boolean; onClose: () => void }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -636,6 +658,8 @@ function BookingDetailModal({ booking, open, onClose }: { booking: Booking | nul
   const [selectedGroupId, setSelectedGroupId] = useState("");
   const [availableGroups, setAvailableGroups] = useState<{ id: string; name: string; year: number; maktabNumber?: string }[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(false);
+  const [selectedJourneyStatus, setSelectedJourneyStatus] = useState("");
+  const [updatingJourneyStatus, setUpdatingJourneyStatus] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -650,8 +674,30 @@ function BookingDetailModal({ booking, open, onClose }: { booking: Booking | nul
         .finally(() => setLoadingGroups(false));
       if (booking?.groupId) setSelectedGroupId(booking.groupId);
       else setSelectedGroupId("");
+      setSelectedJourneyStatus((booking as any)?.journeyStatus || "booking_requested");
     }
   }, [open, booking?.id]);
+
+  const handleUpdateJourneyStatus = async () => {
+    if (!booking || !selectedJourneyStatus) return;
+    setUpdatingJourneyStatus(true);
+    try {
+      const res = await fetch(`${API}/api/bookings/${booking.id}/journey-status`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ journey_status: selectedJourneyStatus }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Update failed");
+      toast({ title: "Journey status updated!", description: `Customer notified via WhatsApp & SMS. Status: ${selectedJourneyStatus.replace(/_/g, " ")}` });
+      queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+    } catch (err: any) {
+      toast({ title: "Update failed", description: err.message, variant: "destructive" });
+    } finally {
+      setUpdatingJourneyStatus(false);
+    }
+  };
 
   const handleAutoFillPilgrim = async () => {
     if (!booking) return;
@@ -831,6 +877,36 @@ function BookingDetailModal({ booking, open, onClose }: { booking: Booking | nul
               </div>
             </div>
           )}
+
+          {/* Journey Status Control */}
+          <div className="rounded-xl border border-primary/20 bg-gradient-to-br from-primary/5 to-transparent p-4 space-y-3">
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-primary flex items-center gap-2">
+              🗺️ Journey Status
+              <span className="font-normal text-muted-foreground normal-case tracking-normal">— auto-notifies customer via WhatsApp + SMS</span>
+            </h4>
+            <div className="flex items-center gap-2 flex-wrap">
+              <select
+                className="h-9 flex-1 min-w-[200px] rounded-lg border border-primary/20 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                value={selectedJourneyStatus}
+                onChange={e => setSelectedJourneyStatus(e.target.value)}
+              >
+                {JOURNEY_STATUS_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+              <Button
+                size="sm"
+                className="bg-primary text-white hover:bg-primary/90 font-semibold"
+                onClick={handleUpdateJourneyStatus}
+                disabled={updatingJourneyStatus || selectedJourneyStatus === ((booking as any).journeyStatus || "booking_requested")}
+              >
+                {updatingJourneyStatus ? "Updating…" : "Update & Notify"}
+              </Button>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Current: <strong className="text-primary">{JOURNEY_STATUS_OPTIONS.find(o => o.value === ((booking as any).journeyStatus || "booking_requested"))?.label || "🕌 Booking Submitted"}</strong>
+            </p>
+          </div>
 
           <div>
             <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2 flex items-center gap-1.5">

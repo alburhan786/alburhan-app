@@ -33,6 +33,7 @@ import {
   sendBookingSubmissionNotification,
   sendPaymentConfirmationNotification,
   sendAdminNewBookingEmail,
+  sendJourneyStatusNotification,
   sendWhatsApp,
   sendDLTSMS,
 } from "../lib/notifications.js";
@@ -161,6 +162,7 @@ function formatBooking(b: any) {
     advanceAmount: (() => { const v = get("advanceAmount","advance_amount"); return v ? Number(v) : null; })(),
     paidAmount: (() => { const v = get("paidAmount","paid_amount"); return v ? Number(v) : null; })(),
     onlinePaidAmount: (() => { const v = get("onlinePaidAmount","online_paid_amount"); return v ? Number(v) : null; })(),
+    journeyStatus: get("journeyStatus", "journey_status") ?? "booking_requested",
     createdAt: (() => { const v = get("createdAt","created_at"); return v?.toISOString?.() ?? v; })(),
     updatedAt: (() => { const v = get("updatedAt","updated_at"); return v?.toISOString?.() ?? v; })(),
   };
@@ -597,6 +599,53 @@ router.post("/:id/reject", requireAdmin as any, requirePermission("bookings", "e
 
   auditLog({ req, action: "rejected", entityTable: "bookings", entityId: updated.id, newValue: { bookingNumber: updated.bookingNumber, status: "rejected", reason } }).catch(() => {});
   res.json(formatBooking(updated));
+});
+
+router.post("/:id/journey-status", requireAdmin as any, requirePermission("bookings", "edit") as any, async (req: AuthenticatedRequest, res) => {
+  const { journey_status } = req.body;
+  if (!journey_status || typeof journey_status !== "string") {
+    res.status(400).json({ message: "journey_status is required" }); return;
+  }
+  const VALID_JOURNEY_STATUSES = [
+    "booking_requested","documents_pending","documents_received","admin_verification",
+    "payment_pending","payment_received","invoice_generated","visa_processing",
+    "visa_approved","flight_confirmed","hotel_confirmed","bus_allocated",
+    "room_allocated","departure_ready","journey_started","reached_makkah",
+    "reached_madinah","return_flight","journey_completed",
+  ];
+  if (!VALID_JOURNEY_STATUSES.includes(journey_status)) {
+    res.status(400).json({ message: "Invalid journey_status value" }); return;
+  }
+  try {
+    const r = await pool.query(
+      `UPDATE bookings SET journey_status = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+      [journey_status, req.params.id]
+    );
+    if (!r.rows[0]) { res.status(404).json({ message: "Booking not found" }); return; }
+    const booking = r.rows[0];
+
+    sendJourneyStatusNotification({
+      mobile: booking.customer_mobile,
+      email: booking.customer_email,
+      customerName: booking.customer_name,
+      bookingNumber: booking.booking_number,
+      journeyStatus: journey_status,
+    }).catch(console.error);
+
+    trackNotification({ eventType: journey_status, channel: "whatsapp", recipient: booking.customer_mobile, bookingId: booking.id, status: "sent" }).catch(() => {});
+
+    triggerWorkflow(journey_status, {
+      bookingId: booking.id, bookingNumber: booking.booking_number,
+      customerName: booking.customer_name, customerMobile: booking.customer_mobile,
+      customerEmail: booking.customer_email ?? undefined,
+    }).catch(() => {});
+
+    auditLog({ req, action: "journey_status_changed", entityTable: "bookings", entityId: booking.id, newValue: { journey_status } }).catch(() => {});
+    res.json({ ok: true, journey_status, booking: formatBooking(booking) });
+  } catch (err: any) {
+    console.error("[bookings] POST /:id/journey-status error:", err);
+    res.status(500).json({ message: err?.message || "Failed to update journey status" });
+  }
 });
 
 router.post("/:id/send-invoice", requireAdmin as any, async (req: AuthenticatedRequest, res) => {

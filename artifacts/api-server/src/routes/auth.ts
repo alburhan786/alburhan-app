@@ -274,30 +274,30 @@ router.post("/verify-otp", async (req, res) => {
 });
 
 router.patch("/profile", requireAuth as any, async (req: AuthenticatedRequest, res) => {
-  const { name, email } = req.body;
+  const { name, email, blood_group, emergency_contact_name, emergency_contact_mobile } = req.body;
 
-  if (!name && !email) {
-    res.status(400).json({ message: "At least name or email is required" });
+  if (!name && !email && !blood_group && !emergency_contact_name && !emergency_contact_mobile) {
+    res.status(400).json({ message: "At least one field is required" });
     return;
   }
 
-  const updates: Partial<{ name: string; email: string; updatedAt: Date }> = { updatedAt: new Date() };
-  if (name) updates.name = String(name).trim();
-  if (email) updates.email = String(email).trim();
-
-  const [updated] = await db
-    .update(usersTable)
-    .set(updates)
-    .where(eq(usersTable.id, req.user!.id))
-    .returning();
-
-  res.json({
-    id: updated.id,
-    name: updated.name,
-    mobile: updated.mobile,
-    email: updated.email,
-    role: updated.role,
-  });
+  try {
+    const r = await pool.query(
+      `UPDATE users SET
+        name = COALESCE(NULLIF($1,''), name),
+        email = COALESCE(NULLIF($2,''), email),
+        blood_group = COALESCE(NULLIF($3,''), blood_group),
+        emergency_contact_name = COALESCE(NULLIF($4,''), emergency_contact_name),
+        emergency_contact_mobile = COALESCE(NULLIF($5,''), emergency_contact_mobile),
+        updated_at = NOW()
+      WHERE id = $6 RETURNING id, name, mobile, email, role, blood_group, emergency_contact_name, emergency_contact_mobile`,
+      [name ?? "", email ?? "", blood_group ?? "", emergency_contact_name ?? "", emergency_contact_mobile ?? "", req.user!.id]
+    );
+    const u = r.rows[0];
+    res.json({ id: u.id, name: u.name, mobile: u.mobile, email: u.email, role: u.role, blood_group: u.blood_group, emergency_contact_name: u.emergency_contact_name, emergency_contact_mobile: u.emergency_contact_mobile });
+  } catch (err: any) {
+    res.status(500).json({ message: err.message || "Failed to update profile" });
+  }
 });
 
 router.post("/logout", (req, res) => {
@@ -306,14 +306,18 @@ router.post("/logout", (req, res) => {
 });
 
 router.get("/me", requireAuth as any, async (req: AuthenticatedRequest, res) => {
-  const user = req.user!;
-  res.json({
-    id: user.id,
-    name: user.name,
-    mobile: user.mobile,
-    email: user.email,
-    role: user.role,
-  });
+  try {
+    const r = await pool.query(
+      `SELECT id, name, mobile, email, role, blood_group, emergency_contact_name, emergency_contact_mobile FROM users WHERE id = $1`,
+      [req.user!.id]
+    );
+    const u = r.rows[0];
+    if (!u) { res.status(404).json({ message: "User not found" }); return; }
+    res.json({ id: u.id, name: u.name, mobile: u.mobile, email: u.email, role: u.role, blood_group: u.blood_group, emergency_contact_name: u.emergency_contact_name, emergency_contact_mobile: u.emergency_contact_mobile });
+  } catch {
+    const user = req.user!;
+    res.json({ id: user.id, name: user.name, mobile: user.mobile, email: user.email, role: user.role });
+  }
 });
 
 export default router;

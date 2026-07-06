@@ -1490,6 +1490,16 @@ async function runMigrations() {
     console.log("[Migration] wa_templates built-in templates seeded");
   } catch (err) { console.error("[Migration] wa_templates failed:", err); }
 
+  // ── journey_status + user profile columns ─────────────────────────────────
+  try {
+    await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS journey_status TEXT DEFAULT 'booking_requested'`);
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS blood_group TEXT`);
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS emergency_contact_name TEXT`);
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS emergency_contact_mobile TEXT`);
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_photo_url TEXT`);
+    console.log("[Migration] journey_status + user profile columns ensured");
+  } catch (err) { console.error("[Migration] journey_status/profile migration failed:", err); }
+
   // ── Seed default workflow rules ────────────────────────────────────────────
   try {
     for (const rule of DEFAULT_RULES) {

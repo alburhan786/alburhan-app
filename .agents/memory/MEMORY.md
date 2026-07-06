@@ -5,3 +5,4 @@
 - [Admin page API pattern](admin-api-pattern.md) — admin pages use `const API = import.meta.env.VITE_API_URL || ""` for fetch; no @/lib/api module exists
 - [Automation engine triggers](automation-engine.md) — workflowEngine.ts is the master trigger hub; routes must call triggerWorkflow() (not just fireNotificationEvent) to get logs + timeline
 - [Frontend JSX convention](frontend-jsx.md) — project uses React (className=, not class=); preact/hooks imports will break Vite build
+- [Journey status + profile columns](journey-status-schema.md) — journey_status TEXT on bookings (pool.query only, not Drizzle); blood_group/emergency_contact_name/emergency_contact_mobile on users; POST /api/bookings/:id/journey-status auto-notifies customer
