@@ -301,10 +301,11 @@ async function getEnabledChannels(eventType: string): Promise<Channel[]> {
       `SELECT channel FROM notification_settings WHERE event_type=$1 AND enabled=true`,
       [eventType]
     );
-    if (res.rows.length === 0) return ["whatsapp", "sms"];
+    // Default: all 4 live channels if no settings exist
+    if (res.rows.length === 0) return ["whatsapp", "sms", "email", "rcs"];
     return res.rows.map((r: any) => r.channel as Channel);
   } catch {
-    return ["whatsapp", "sms"];
+    return ["whatsapp", "sms", "email", "rcs"];
   }
 }
 
@@ -390,8 +391,20 @@ export async function fireNotificationEvent(
   const templateBody = await getTemplate(eventType, orderedChannels[0] ?? "whatsapp");
   const message = templateBody ? applyTemplate(templateBody, ctx) : buildDefaultMessage(eventType, ctx);
 
-  for (const channel of orderedChannels) {
-    const { status, providerResponse } = await sendOnChannelWithType(channel, eventType, ctx, message);
+  // ── BROADCAST MODE: fire ALL enabled channels in parallel ──────────────────
+  // (previously was cascade/fallback — stopped after first success)
+  const results = await Promise.allSettled(
+    orderedChannels.map(channel => sendOnChannelWithType(channel, eventType, ctx, message))
+  );
+
+  let successCount = 0;
+  for (let i = 0; i < orderedChannels.length; i++) {
+    const channel = orderedChannels[i];
+    const result = results[i];
+    const { status, providerResponse } = result.status === "fulfilled"
+      ? result.value
+      : { status: "failed" as const, providerResponse: { ok: false, errorMessage: (result.reason as Error)?.message } };
+
     await trackNotification({
       eventType, channel,
       recipient: channel === "email" ? (ctx.customerEmail || ctx.customerMobile) : ctx.customerMobile,
@@ -399,12 +412,17 @@ export async function fireNotificationEvent(
       message, status, providerResponse,
     });
     if (status === "sent") {
-      console.log(`[notificationEngine] ${eventType} → delivered via ${channel}`);
-      return;
+      successCount++;
+      console.log(`[notificationEngine] ${eventType} → sent via ${channel}`);
+    } else {
+      console.log(`[notificationEngine] ${eventType} → ${channel} failed`);
     }
-    console.log(`[notificationEngine] ${eventType} → ${channel} failed — trying next channel`);
   }
-  console.log(`[notificationEngine] ${eventType} → all channels failed for ${ctx.customerMobile}`);
+  if (successCount === 0) {
+    console.warn(`[notificationEngine] ${eventType} → ALL channels failed for ${ctx.customerMobile}`);
+  } else {
+    console.log(`[notificationEngine] ${eventType} → ${successCount}/${orderedChannels.length} channels succeeded`);
+  }
 }
 
 export async function retryNotification(logId: string): Promise<{ success: boolean; error?: string }> {

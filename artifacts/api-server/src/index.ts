@@ -1549,6 +1549,30 @@ async function runMigrations() {
     console.log("[Migration] bank_settings + offline_payments tables ensured");
   } catch (err) { console.error("[Migration] offline payments migration failed:", err); }
 
+  // ── notification_settings: enable email+rcs for all key pipeline events ────
+  try {
+    const keyEvents = [
+      "booking_approved", "payment_received", "visa_approved", "visa_rejected",
+      "flight_assigned", "hotel_assigned", "new_booking", "booking_rejected",
+      "booking_completed", "ticket_issued", "room_assigned", "bus_assigned",
+      "departure_reminder", "invoice_generated",
+    ];
+    const allChannels: Array<[string, boolean]> = [
+      ["whatsapp", true], ["sms", true], ["email", true], ["rcs", true], ["push", false],
+    ];
+    for (const ev of keyEvents) {
+      for (const [ch, enabled] of allChannels) {
+        await pool.query(
+          `INSERT INTO notification_settings (id, event_type, channel, enabled)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (event_type, channel) DO UPDATE SET enabled = $4`,
+          [`ns_${ev}_${ch}`, ev, ch, enabled]
+        );
+      }
+    }
+    console.log("[Migration] notification_settings: email+rcs enabled for all key events");
+  } catch (err) { console.error("[Migration] notification_settings key events failed:", err); }
+
   // ── documents: extra tracking columns + download logs ─────────────────────
   try {
     await pool.query(`ALTER TABLE documents ADD COLUMN IF NOT EXISTS download_count INTEGER NOT NULL DEFAULT 0`);

@@ -1,0 +1,60 @@
+I need you to fix and complete the multi-channel notification automation on 
+alburhantravels.com. Here is the current state from the Communication Center 
+dashboard:
+
+CURRENT ISSUES:
+1. WhatsApp (BotBee) provider shows "Failed" status on connectivity test — 
+   0% functioning. Today's channel health shows WhatsApp at 50% delivery 
+   (5 sent / 5 failed).
+2. Email (SMTP) shows "Connected" on the basic test, but real delivery is 
+   only 10% (1 delivered / 9 failed) — something is wrong beyond the 
+   connectivity check.
+3. RCS (Lemin AI) is Connected and tested successfully, but only 1 message 
+   has gone out today — needs to be verified under real automation traffic, 
+   not just the manual test.
+4. SMS (Fast2SMS) is at 89% delivery — acceptable but check the 1 failure.
+
+TASKS — please do these in order:
+
+1. WHATSAPP (BotBee): 
+   - Pull the exact error response from the last failed BotBee API call 
+     (check server logs / API response body, not just the UI status).
+   - Verify the BotBee auth token/API key hasn't expired and matches what's 
+     stored in environment variables/secrets.
+   - Verify the sender WhatsApp number is still active and approved in BotBee.
+   - Re-test and confirm "Connected" status before moving on.
+
+2. EMAIL (SMTP):
+   - Pull the bounce/error messages for the 9 failed emails from today's logs.
+   - Check whether failures are SMTP auth errors, rate limiting, or 
+     recipient-side rejections (e.g., missing SPF/DKIM/DMARC records for 
+     alburhantravels.com causing spam/rejection).
+   - If it's an SPF/DKIM issue, tell me exactly what DNS TXT records I need 
+     to add and where.
+   - Fix and re-test until delivery rate is consistently above 90%.
+
+3. AUTOMATION RULE MAPPING:
+   For each of these pipeline events, confirm ALL FOUR channels (WhatsApp, 
+   SMS, Email, RCS) are wired as actions — not just one or two:
+   - Step 3: Booking Approved (invoice + notifications)
+   - Step 4: Payment Received (receipt)
+   - Step 7: Visa status update (approved/rejected)
+   - Step 8: Flight Assigned (ticket, terminal, baggage info)
+   - Step 9: Hotel/Room Assigned
+   If any channel is missing from a rule's action list, add it and show me 
+   the updated rule config.
+
+4. TEMPLATE APPROVAL CHECK:
+   Confirm that WhatsApp and RCS message templates for invoice, ticket, and 
+   visa updates are in "Approved" status with the respective providers 
+   (Meta/BotBee for WhatsApp, Jio/Lemin AI for RCS). List any templates 
+   still pending or rejected.
+
+5. END-TO-END TEST:
+   Run one complete test booking through the full pipeline (enquiry → 
+   booking → payment → visa → flight → hotel) and show me the Recent Logs 
+   output confirming all 4 channels fired successfully at each relevant step.
+
+Please report back after each numbered task with what you found and what 
+you changed, rather than doing everything silently and showing me a summary 
+at the end.

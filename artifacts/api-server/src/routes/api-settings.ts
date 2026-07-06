@@ -165,11 +165,19 @@ router.post("/:provider/test", requireAdmin as any, requireSuperAdmin, async (re
     switch (provider) {
       case "botbee": {
         if (!apiKey) { result = { ok: false, message: "API key not set" }; break; }
-        const phoneNumberId = extra.phone_number_id || process.env.BOTBEE_PHONE_NUMBER_ID || "";
+        // Normalize phone_number_id: BotBee expects digits only (no + prefix)
+        const rawPhoneId = extra.phone_number_id || process.env.BOTBEE_PHONE_NUMBER_ID || "";
+        const phoneNumberId = rawPhoneId.replace(/^\+/, "").replace(/\s/g, "");
         const baseUrl = apiUrl || "https://app.botbee.io/api/v1/whatsapp";
         const params = new URLSearchParams({ apiToken: apiKey, phone_number_id: phoneNumberId });
         const resp = await axios.get(`${baseUrl}/status?${params}`, { timeout: 8000 }).catch(e => e.response || { data: { error: e.message }, status: 0 });
-        result = { ok: resp.status >= 200 && resp.status < 300, httpStatus: resp.status, response: resp.data };
+        // BotBee /status: ok if 2xx OR if response contains a known "active" field
+        const botbeeOk = (resp.status >= 200 && resp.status < 300) ||
+          resp.data?.status === "active" || resp.data?.active === true;
+        const botbeeMsg = botbeeOk
+          ? `Connected (phone_id: ${phoneNumberId})`
+          : `Failed — HTTP ${resp.status}: ${JSON.stringify(resp.data).slice(0, 200)}`;
+        result = { ok: botbeeOk, message: botbeeMsg, httpStatus: resp.status, response: resp.data };
         break;
       }
       case "fast2sms": {
@@ -269,7 +277,7 @@ router.post("/:provider/send-test", requireAdmin as any, requireSuperAdmin, asyn
         recipient = mobile;
         const phone = mobile.replace(/\D/g, "");
         const phoneWithCC = phone.length === 10 ? `91${phone}` : phone;
-        const phoneNumberId = extra.phone_number_id || process.env.BOTBEE_PHONE_NUMBER_ID || "";
+        const phoneNumberId = (extra.phone_number_id || process.env.BOTBEE_PHONE_NUMBER_ID || "").replace(/^\+/, "").replace(/\s/g, "");
         const baseUrl = apiUrl || "https://app.botbee.io/api/v1/whatsapp";
         const endpoint = `${baseUrl}/send`;
         const testMsg = "✅ WhatsApp Integration Successful.\nAl Burhan Tours & Travels Notification System is Connected.";

@@ -78,6 +78,11 @@ function toBotBeePhone(mobile: string): string {
   return clean;
 }
 
+/** Strip leading + from phone_number_id (BotBee expects digits only, e.g. 918989701701 not +918989701701) */
+function normalizeBotBeePhoneNumberId(id: string): string {
+  return id.replace(/^\+/, "").replace(/\s/g, "");
+}
+
 // ── In-memory SMS attempt log (last 50 entries) ─────────────────────────────
 
 export interface SmsRouteAttempt {
@@ -319,7 +324,7 @@ export async function sendWhatsApp(mobile: string, message: string): Promise<Sen
     return { ok: false, provider: "BotBee", endpoint, errorMessage: "WhatsApp disabled in API Settings" };
   }
   const BOTBEE_API_KEY = bbCfg.apiKey || process.env.BOTBEE_API_KEY;
-  const BOTBEE_PHONE_NUMBER_ID = bbCfg.extra.phone_number_id || process.env.BOTBEE_PHONE_NUMBER_ID;
+  const BOTBEE_PHONE_NUMBER_ID = normalizeBotBeePhoneNumberId(bbCfg.extra.phone_number_id || process.env.BOTBEE_PHONE_NUMBER_ID || "");
   if (!BOTBEE_API_KEY || !BOTBEE_PHONE_NUMBER_ID) {
     return { ok: false, provider: "BotBee", endpoint, errorMessage: "API key or Phone Number ID not configured" };
   }
@@ -427,7 +432,7 @@ export async function sendWhatsAppTemplate(
   const bbCfg2 = getCachedConfig("botbee");
   if (bbCfg2.enabled === false) { console.log("[WhatsApp-Template] disabled in API Settings"); return false; }
   const BOTBEE_API_KEY = bbCfg2.apiKey || process.env.BOTBEE_API_KEY;
-  const BOTBEE_PHONE_NUMBER_ID = bbCfg2.extra.phone_number_id || process.env.BOTBEE_PHONE_NUMBER_ID;
+  const BOTBEE_PHONE_NUMBER_ID = normalizeBotBeePhoneNumberId(bbCfg2.extra.phone_number_id || process.env.BOTBEE_PHONE_NUMBER_ID || "");
   const BOTBEE_BUSINESS_ID = bbCfg2.extra.business_id || process.env.BOTBEE_BUSINESS_ID;
   const bbBaseUrl2 = bbCfg2.apiUrl || BOTBEE_BASE_URL;
   if (!BOTBEE_API_KEY || !BOTBEE_PHONE_NUMBER_ID) {
@@ -477,7 +482,37 @@ function getEmailTransport() {
     port,
     secure: port === 465,
     auth: { user, pass },
+    tls: { rejectUnauthorized: false },
   });
+}
+
+/** Build a properly styled HTML email — avoids spam filters, renders correctly */
+function buildHtmlEmail(bodyText: string): string {
+  const escaped = bodyText
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/\n/g, "<br>");
+  return `<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Al Burhan Tours &amp; Travels</title></head>
+<body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:20px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+  <tr><td style="background:#0B3D2E;padding:24px 32px;text-align:center;">
+    <h1 style="color:#C9A84C;margin:0;font-size:20px;font-weight:bold;">Al Burhan Tours &amp; Travels</h1>
+    <p style="color:#90c4a8;margin:4px 0 0;font-size:12px;">Trusted Hajj &amp; Umrah Services — 35+ Years</p>
+  </td></tr>
+  <tr><td style="padding:32px;color:#333333;font-size:15px;line-height:1.7;">
+    ${escaped}
+  </td></tr>
+  <tr><td style="background:#f8f8f8;padding:16px 32px;text-align:center;border-top:1px solid #eee;">
+    <p style="margin:0;font-size:12px;color:#888888;">Al Burhan Tours &amp; Travels | Bhopal, India</p>
+    <p style="margin:4px 0 0;font-size:12px;color:#888888;">📞 +91 9893225590 | ✉ info@alburhantravels.com</p>
+    <p style="margin:4px 0 0;font-size:11px;color:#aaaaaa;">This is an automated notification. Please do not reply to this email.</p>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>`;
 }
 
 export async function sendEmail(to: string, subject: string, body: string): Promise<SendResult> {
@@ -489,14 +524,24 @@ export async function sendEmail(to: string, subject: string, body: string): Prom
   const smtpCfg = getCachedConfig("smtp");
   const smtpHost = smtpCfg.apiUrl || process.env.SMTP_HOST || "smtp.gmail.com";
   const endpoint = `smtp://${smtpHost}`;
-  const from = smtpCfg.extra.from_email || smtpCfg.extra.user || process.env.SMTP_USER || "info@alburhantravels.com";
+  // IMPORTANT: 'from' MUST match the SMTP authenticated user, otherwise Gmail/SMTP rejects it
+  // Use the auth user as the sender; set replyTo to the business address
+  const smtpUser = smtpCfg.extra.user || process.env.SMTP_USER || "";
+  const fromDisplay = smtpCfg.extra.from_name || "Al Burhan Tours & Travels";
+  const replyTo = smtpCfg.extra.from_email || "info@alburhantravels.com";
+  const from = `${fromDisplay} <${smtpUser}>`;
+
+  // Strip HTML tags from body text for plain-text version
+  const plainText = body.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "");
+
   try {
     await withRetry(() =>
       transport!.sendMail({
-        from: `Al Burhan Tours & Travels <${from}>`,
+        from,
+        replyTo,
         to, subject,
-        text: body,
-        html: body.replace(/\n/g, "<br>"),
+        text: plainText,
+        html: buildHtmlEmail(plainText),
       })
     );
     console.log("[Email] Sent to:", to, "Subject:", subject);
@@ -506,7 +551,7 @@ export async function sendEmail(to: string, subject: string, body: string): Prom
     return {
       ok: false, provider: "SMTP", endpoint,
       requestPayload: { to, subject },
-      errorCode: err?.code || "",
+      errorCode: err?.code || err?.responseCode || "",
       errorMessage: err?.message || "SMTP delivery failed",
     };
   }
