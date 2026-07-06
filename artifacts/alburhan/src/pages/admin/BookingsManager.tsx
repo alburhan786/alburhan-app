@@ -16,18 +16,27 @@ import { useQueryClient } from "@tanstack/react-query";
 import { CheckCircle, XCircle, Eye, ExternalLink, Plus, Trash2, FileText, Download, ImageIcon, RefreshCw, Upload, Wallet, ClipboardList, User, Link2, Send, Bell, Pencil, Copy, History, RotateCcw, AlertTriangle, Search, Loader2 } from "lucide-react";
 
 const DOC_TYPE_LABELS: Record<string, string> = {
+  // Customer KYC docs
   passport: "Passport",
   pan_card: "PAN Card",
   aadhaar: "Aadhaar Card",
   passport_photo: "Passport Photo",
+  medical_certificate: "Medical Certificate",
+  other: "Other Document",
+  // Admin travel docs
   flight_ticket: "Flight Ticket",
   visa: "Visa",
+  hotel_voucher: "Hotel Voucher",
   room_allotment: "Room Allotment",
   bus_allotment: "Bus Allotment",
   model_contract: "Model Contract",
   tour_itinerary: "Tour Itinerary",
-  medical_certificate: "Medical Certificate",
-  other: "Other Document",
+  payment_receipt: "Payment Receipt",
+  ziyarat_schedule: "Ziyarat Schedule",
+  insurance: "Insurance",
+  hajj_id: "Hajj ID Card",
+  luggage_tag: "Luggage Tag",
+  emergency_contact_card: "Emergency Contact Card",
 };
 
 const DOC_TYPE_COLOR: Record<string, string> = {
@@ -37,10 +46,17 @@ const DOC_TYPE_COLOR: Record<string, string> = {
   passport_photo: "bg-pink-100 text-pink-800",
   flight_ticket: "bg-sky-100 text-sky-800",
   visa: "bg-green-100 text-green-800",
+  hotel_voucher: "bg-cyan-100 text-cyan-800",
   room_allotment: "bg-teal-100 text-teal-800",
   bus_allotment: "bg-indigo-100 text-indigo-800",
   model_contract: "bg-rose-100 text-rose-800",
   tour_itinerary: "bg-amber-100 text-amber-800",
+  payment_receipt: "bg-emerald-100 text-emerald-800",
+  ziyarat_schedule: "bg-lime-100 text-lime-800",
+  insurance: "bg-yellow-100 text-yellow-800",
+  hajj_id: "bg-violet-100 text-violet-800",
+  luggage_tag: "bg-fuchsia-100 text-fuchsia-800",
+  emergency_contact_card: "bg-red-100 text-red-800",
   medical_certificate: "bg-red-100 text-red-800",
   other: "bg-gray-100 text-gray-800",
 };
@@ -61,9 +77,11 @@ function AdminDocumentsSection({ bookingId }: { bookingId: string }) {
   const queryClient = useQueryClient();
 
   const [uploading, setUploading] = useState(false);
-  const [docType, setDocType] = useState("passport");
+  const [docType, setDocType] = useState("flight_ticket");
   const [file, setFile] = useState<File | null>(null);
+  const [dragging, setDragging] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const dropRef = useRef<HTMLDivElement>(null);
 
   const handleDelete = (docId: string, fileName: string) => {
     requestDelete(`Document: ${fileName}`, async (token) => {
@@ -77,12 +95,11 @@ function AdminDocumentsSection({ bookingId }: { bookingId: string }) {
     });
   };
 
-  const handleUpload = async () => {
-    if (!file) { toast({ title: "Please select a file", variant: "destructive" }); return; }
+  const doUpload = async (f: File) => {
     setUploading(true);
     try {
       const fd = new FormData();
-      fd.append("file", file);
+      fd.append("file", f);
       fd.append("bookingId", bookingId);
       fd.append("documentType", docType);
       const res = await fetch(`${BASE_API}/api/documents/upload`, { method: "POST", body: fd, credentials: "include" });
@@ -90,7 +107,7 @@ function AdminDocumentsSection({ bookingId }: { bookingId: string }) {
         const err = await res.json();
         throw new Error(err.message || "Upload failed");
       }
-      toast({ title: "Document uploaded!" });
+      toast({ title: "Document uploaded!", description: `${DOC_TYPE_LABELS[docType] || docType} — customer notified automatically.` });
       setFile(null);
       if (fileRef.current) fileRef.current.value = "";
       refetch();
@@ -102,93 +119,132 @@ function AdminDocumentsSection({ bookingId }: { bookingId: string }) {
     }
   };
 
+  const handleUpload = () => { if (file) doUpload(file); else toast({ title: "Please select a file", variant: "destructive" }); };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragging(false);
+    const dropped = e.dataTransfer.files[0];
+    if (dropped) { setFile(dropped); doUpload(dropped); }
+  };
+
   const docList = (docs || []) as any[];
+  // Separate admin-uploaded travel docs from customer KYC docs
+  const adminDocs = docList.filter((d: any) => d.uploadedBy === "admin");
+  const customerDocs = docList.filter((d: any) => d.uploadedBy !== "admin");
+
+  const renderDoc = (doc: any) => {
+    const label = DOC_TYPE_LABELS[doc.documentType] || doc.documentType;
+    const color = DOC_TYPE_COLOR[doc.documentType] || "bg-gray-100 text-gray-800";
+    const fileUrl = `${BASE_API}${doc.fileUrl}`;
+    const isImg = isImageFile(doc.fileName || "");
+    const downloads = doc.downloadCount ?? doc.download_count ?? 0;
+    const lastDl = doc.lastDownloadedAt ?? doc.last_downloaded_at;
+
+    return (
+      <div key={doc.id} className="flex items-start gap-3 border rounded-lg p-3 bg-white">
+        <div className="flex-shrink-0 mt-0.5">
+          {isImg ? <ImageIcon size={18} className="text-blue-500" /> : <FileText size={18} className="text-gray-500" />}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Badge className={`text-[10px] px-2 py-0.5 font-semibold border-0 ${color}`}>{label}</Badge>
+            <span className="text-xs text-muted-foreground truncate max-w-[160px]">{doc.fileName}</span>
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-0.5">
+            {doc.uploadedBy === "admin" ? "👤 Admin" : "👤 Customer"}
+            {doc.createdAt ? ` · ${new Date(doc.createdAt).toLocaleDateString("en-IN")}` : ""}
+          </p>
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            {downloads > 0 ? (
+              <span className="text-[10px] bg-green-100 text-green-800 rounded px-1.5 py-0.5 font-medium">
+                ✓ Downloaded {downloads}×{lastDl ? ` · Last: ${new Date(lastDl).toLocaleDateString("en-IN")}` : ""}
+              </span>
+            ) : (
+              <span className="text-[10px] bg-amber-100 text-amber-700 rounded px-1.5 py-0.5 font-medium">⏳ Not downloaded yet</span>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <a href={fileUrl} target="_blank" rel="noreferrer" title="View">
+            <Button variant="ghost" size="icon" className="h-7 w-7 text-blue-600 hover:bg-blue-50"><Eye size={13} /></Button>
+          </a>
+          <a href={fileUrl} download={doc.fileName} title="Download">
+            <Button variant="ghost" size="icon" className="h-7 w-7 text-emerald-600 hover:bg-emerald-50"><Download size={13} /></Button>
+          </a>
+          <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:bg-red-50" title="Delete"
+            onClick={() => handleDelete(doc.id, doc.fileName)}>
+            <Trash2 size={13} />
+          </Button>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-3">
-      {/* Admin Upload Row */}
-      <div className="flex items-center gap-2 p-3 bg-muted/40 rounded-lg border border-dashed">
-        <Select value={docType} onValueChange={setDocType}>
-          <SelectTrigger className="h-8 w-40 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {DOC_TYPES.map(t => (
-              <SelectItem key={t.value} value={t.value} className="text-xs">{t.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <input
-          ref={fileRef}
-          type="file"
-          accept=".pdf,.jpg,.jpeg,.png,.webp"
-          className="text-xs flex-1 min-w-0"
-          onChange={e => setFile(e.target.files?.[0] || null)}
-        />
-        <Button size="sm" className="h-8 text-xs gap-1.5 bg-[#0B3D2E] hover:bg-[#0d5038] text-white shrink-0" onClick={handleUpload} disabled={uploading || !file}>
-          <Upload size={12} /> {uploading ? "Uploading…" : "Upload"}
-        </Button>
-        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-muted-foreground shrink-0" title="Refresh list" onClick={() => refetch()}>
-          <RefreshCw size={13} className={isLoading ? "animate-spin" : ""} />
-        </Button>
+      {/* Drag & Drop Upload Zone */}
+      <div
+        ref={dropRef}
+        onDragOver={e => { e.preventDefault(); setDragging(true); }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={handleDrop}
+        className={`rounded-lg border-2 border-dashed p-4 transition-colors ${dragging ? "border-[#0B3D2E] bg-emerald-50" : "border-border bg-muted/30"}`}
+      >
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          <Select value={docType} onValueChange={setDocType}>
+            <SelectTrigger className="h-8 w-48 text-xs shrink-0">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <div className="px-2 py-1 text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Travel Documents (Delivered to Customer)</div>
+              {["flight_ticket","visa","hotel_voucher","room_allotment","bus_allotment","model_contract","tour_itinerary","payment_receipt","ziyarat_schedule","insurance","hajj_id","luggage_tag","emergency_contact_card"].map(v => (
+                <SelectItem key={v} value={v} className="text-xs">{DOC_TYPE_LABELS[v]}</SelectItem>
+              ))}
+              <div className="px-2 py-1 text-[10px] font-bold text-muted-foreground uppercase tracking-wide mt-1 border-t">KYC / Other</div>
+              {["passport","pan_card","aadhaar","passport_photo","medical_certificate","other"].map(v => (
+                <SelectItem key={v} value={v} className="text-xs">{DOC_TYPE_LABELS[v]}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <div className="flex items-center gap-2 flex-1 w-full">
+            <label className={`flex-1 flex items-center gap-2 text-xs cursor-pointer px-3 py-2 rounded-md border bg-white hover:bg-muted/40 transition-colors ${file ? "text-foreground font-medium" : "text-muted-foreground"}`}>
+              <Upload size={12} />
+              {file ? file.name : dragging ? "Drop file here…" : "Click or drag & drop (PDF, JPG, PNG, DOCX · max 25 MB)"}
+              <input ref={fileRef} type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
+                onChange={e => setFile(e.target.files?.[0] || null)} />
+            </label>
+            <Button size="sm" className="h-8 text-xs gap-1.5 bg-[#0B3D2E] hover:bg-[#0d5038] text-white shrink-0"
+              onClick={handleUpload} disabled={uploading || !file}>
+              <Upload size={12} /> {uploading ? "Uploading…" : "Upload"}
+            </Button>
+            <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-muted-foreground shrink-0" onClick={() => refetch()}>
+              <RefreshCw size={13} className={isLoading ? "animate-spin" : ""} />
+            </Button>
+          </div>
+        </div>
+        {dragging && <p className="text-xs text-center text-[#0B3D2E] font-medium mt-2">Drop to upload as {DOC_TYPE_LABELS[docType] || docType}</p>}
       </div>
 
       {/* Document List */}
       {isLoading && <p className="text-sm text-muted-foreground">Loading documents…</p>}
       {!isLoading && docList.length === 0 && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/40 rounded-lg p-3">
-          <FileText size={16} />
-          <span>No documents uploaded yet.</span>
+          <FileText size={16} /><span>No documents uploaded yet.</span>
         </div>
       )}
-      {docList.map((doc: any) => {
-        const label = DOC_TYPE_LABELS[doc.documentType] || doc.documentType;
-        const color = DOC_TYPE_COLOR[doc.documentType] || "bg-gray-100 text-gray-800";
-        const fileUrl = `${BASE_API}${doc.fileUrl}`;
-        const isImg = isImageFile(doc.fileName || "");
-
-        return (
-          <div key={doc.id} className="flex items-center gap-3 border rounded-lg p-3 bg-white">
-            <div className="flex-shrink-0">
-              {isImg
-                ? <ImageIcon size={20} className="text-blue-500" />
-                : <FileText size={20} className="text-gray-500" />
-              }
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <Badge className={`text-[10px] px-2 py-0.5 font-semibold border-0 ${color}`}>{label}</Badge>
-                <span className="text-xs text-muted-foreground truncate">{doc.fileName}</span>
-              </div>
-              <p className="text-[10px] text-muted-foreground mt-0.5">
-                Uploaded by {doc.uploadedBy === "admin" ? "Admin" : "Customer"}
-                {doc.createdAt ? ` · ${new Date(doc.createdAt).toLocaleDateString("en-IN")}` : ""}
-              </p>
-            </div>
-            <div className="flex items-center gap-1 flex-shrink-0">
-              <a href={fileUrl} target="_blank" rel="noreferrer" title="View">
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-blue-600 hover:bg-blue-50">
-                  <Eye size={14} />
-                </Button>
-              </a>
-              <a href={fileUrl} download={doc.fileName} title="Download">
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-emerald-600 hover:bg-emerald-50">
-                  <Download size={14} />
-                </Button>
-              </a>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-red-500 hover:bg-red-50"
-                title="Delete"
-                onClick={() => handleDelete(doc.id, doc.fileName)}
-              >
-                <Trash2 size={14} />
-              </Button>
-            </div>
-          </div>
-        );
-      })}
+      {adminDocs.length > 0 && (
+        <div>
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide mb-1.5">Admin-delivered (visible to customer)</p>
+          <div className="space-y-2">{adminDocs.map(renderDoc)}</div>
+        </div>
+      )}
+      {customerDocs.length > 0 && (
+        <div>
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide mb-1.5 mt-2">Customer-uploaded (KYC)</p>
+          <div className="space-y-2">{customerDocs.map(renderDoc)}</div>
+        </div>
+      )}
     </div>
   );
 }

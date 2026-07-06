@@ -1549,6 +1549,26 @@ async function runMigrations() {
     console.log("[Migration] bank_settings + offline_payments tables ensured");
   } catch (err) { console.error("[Migration] offline payments migration failed:", err); }
 
+  // ── documents: extra tracking columns + download logs ─────────────────────
+  try {
+    await pool.query(`ALTER TABLE documents ADD COLUMN IF NOT EXISTS download_count INTEGER NOT NULL DEFAULT 0`);
+    await pool.query(`ALTER TABLE documents ADD COLUMN IF NOT EXISTS last_downloaded_at TIMESTAMPTZ`);
+    await pool.query(`ALTER TABLE documents ADD COLUMN IF NOT EXISTS is_revoked BOOLEAN NOT NULL DEFAULT FALSE`);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS document_download_logs (
+        id TEXT PRIMARY KEY,
+        document_id TEXT NOT NULL,
+        booking_id TEXT NOT NULL,
+        customer_id TEXT,
+        downloaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        ip_address TEXT
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS ddl_doc_idx ON document_download_logs(document_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS ddl_booking_idx ON document_download_logs(booking_id)`);
+    console.log("[Migration] documents tracking columns + download_logs ensured");
+  } catch (err) { console.error("[Migration] documents tracking migration failed:", err); }
+
   // ── booking_confirmation_notifications ─────────────────────────────────────
   try {
     await pool.query(`

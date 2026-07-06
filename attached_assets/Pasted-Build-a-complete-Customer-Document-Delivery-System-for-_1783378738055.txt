@@ -1,0 +1,261 @@
+Build a complete Customer Document Delivery System for Al Burhan Tours & Travels.
+
+Goal:
+Whenever the admin uploads any customer document, it must instantly appear in the customer's dashboard and automatically notify the customer.
+
+====================================================
+CUSTOMER DASHBOARD
+====================================================
+
+Create a "My Travel Documents" section.
+
+Documents should include:
+
+1. Tax Invoice (PDF)
+2. Payment Receipt
+3. Flight Ticket
+4. Visa Copy
+5. Passport Copy
+6. Hotel Voucher
+7. Room Allocation
+8. Bus Allocation
+9. Ziyarat Schedule
+10. Tour Itinerary
+11. Model Contract
+12. Insurance
+13. Hajj ID
+14. Luggage Tag
+15. Emergency Contact Card
+
+Each document card must display:
+
+✓ Icon
+✓ Document Name
+✓ Status
+    Pending
+    Uploaded
+    Verified
+✓ Upload Date
+✓ Download Button
+✓ View Button
+✓ Share Button
+
+====================================================
+ADMIN PANEL
+====================================================
+
+Inside every booking create:
+
+Customer Documents
+
+Upload:
+
+Invoice
+Receipt
+Flight Ticket
+Visa
+Hotel Voucher
+Bus Allocation
+Room Allocation
+Tour Itinerary
+Contract
+Insurance
+Luggage Tag
+Passport Copy
+Any Custom PDF
+
+Allow PDF JPG PNG DOCX.
+
+Maximum 25 MB.
+
+Drag and Drop Upload.
+
+====================================================
+AUTO DELIVERY
+====================================================
+
+When Admin uploads a document:
+
+Immediately:
+
+Save document
+
+Link to Booking ID
+
+Link to Customer ID
+
+Show inside customer dashboard
+
+Generate secure download link
+
+Expire link after 30 days
+
+Allow unlimited dashboard downloads
+
+====================================================
+AUTOMATIC NOTIFICATIONS
+====================================================
+
+After upload automatically send:
+
+WhatsApp
+
+SMS
+
+Email
+
+RCS
+
+Push Notification
+
+Example:
+
+Dear Mohammed Altaf,
+
+Your Flight Ticket for Booking ABT26078035 has been uploaded.
+
+Download it from your dashboard.
+
+https://alburhantravels.com/dashboard
+
+Al Burhan Tours & Travels
+
+====================================================
+STATUS TIMELINE
+====================================================
+
+Show timeline:
+
+Booking Submitted
+
+Documents Submitted
+
+Verification Complete
+
+Payment Received
+
+Invoice Uploaded
+
+Visa Ready
+
+Flight Ticket Uploaded
+
+Hotel Confirmed
+
+Room Allocation
+
+Bus Allocation
+
+Departure Reminder
+
+Journey Started
+
+Return Completed
+
+Each completed step should become green.
+
+====================================================
+CUSTOMER DASHBOARD
+====================================================
+
+Documents should automatically change
+
+Pending
+
+↓
+
+Ready
+
+↓
+
+Downloaded
+
+Show download history.
+
+====================================================
+SECURITY
+====================================================
+
+Only booking owner can access files.
+
+Use signed secure URLs.
+
+Prevent direct file access.
+
+Admin can revoke links anytime.
+
+====================================================
+ADMIN FEATURES
+====================================================
+
+See:
+
+Downloaded
+
+Not Downloaded
+
+Viewed
+
+Shared
+
+Email Delivered
+
+WhatsApp Delivered
+
+SMS Delivered
+
+Last Opened Time
+
+====================================================
+SEND REMINDERS
+====================================================
+
+If customer has not downloaded documents within 24 hours:
+
+Automatically send:
+
+WhatsApp Reminder
+
+SMS Reminder
+
+Email Reminder
+
+====================================================
+MOBILE FRIENDLY
+====================================================
+
+Dashboard must work perfectly on Android, iPhone, Tablet and Desktop.
+
+====================================================
+FINAL REQUIREMENT
+====================================================
+
+Test the complete workflow:
+
+Admin uploads Flight Ticket
+
+↓
+
+Customer instantly sees Flight Ticket in Dashboard
+
+↓
+
+WhatsApp arrives
+
+↓
+
+SMS arrives
+
+↓
+
+Email arrives
+
+↓
+
+Customer downloads PDF
+
+↓
+
+Admin sees "Downloaded Successfully"
+
+Fix every bug until this works 100%.

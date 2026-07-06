@@ -514,12 +514,19 @@ function UploadModal({ bookingId, bookingNumber, onClose }: { bookingId: string;
 }
 
 const TRAVEL_DOC_TYPES: Record<string, { label: string; icon: React.ElementType; color: string; bg: string }> = {
-  flight_ticket:  { label: "Flight Ticket",          icon: Plane,          color: "text-sky-700",     bg: "bg-sky-50 border-sky-200" },
-  visa:           { label: "Visa",                   icon: Stamp,          color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200" },
-  room_allotment: { label: "Hotel / Room Allotment", icon: Hotel,          color: "text-violet-700",  bg: "bg-violet-50 border-violet-200" },
-  bus_allotment:  { label: "Bus Allotment",          icon: Bus,            color: "text-orange-700",  bg: "bg-orange-50 border-orange-200" },
-  model_contract: { label: "Model Contract",         icon: FileText,       color: "text-rose-700",    bg: "bg-rose-50 border-rose-200" },
-  tour_itinerary: { label: "Tour Itinerary",         icon: ClipboardList,  color: "text-amber-700",   bg: "bg-amber-50 border-amber-200" },
+  flight_ticket:          { label: "Flight Ticket",          icon: Plane,          color: "text-sky-700",     bg: "bg-sky-50 border-sky-200" },
+  visa:                   { label: "Visa",                   icon: Stamp,          color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200" },
+  hotel_voucher:          { label: "Hotel Voucher",          icon: Hotel,          color: "text-cyan-700",    bg: "bg-cyan-50 border-cyan-200" },
+  room_allotment:         { label: "Room Allotment",         icon: Hotel,          color: "text-violet-700",  bg: "bg-violet-50 border-violet-200" },
+  bus_allotment:          { label: "Bus Allotment",          icon: Bus,            color: "text-orange-700",  bg: "bg-orange-50 border-orange-200" },
+  model_contract:         { label: "Model Contract",         icon: FileText,       color: "text-rose-700",    bg: "bg-rose-50 border-rose-200" },
+  tour_itinerary:         { label: "Tour Itinerary",         icon: ClipboardList,  color: "text-amber-700",   bg: "bg-amber-50 border-amber-200" },
+  payment_receipt:        { label: "Payment Receipt",        icon: IndianRupee,    color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200" },
+  ziyarat_schedule:       { label: "Ziyarat Schedule",       icon: ClipboardList,  color: "text-lime-700",    bg: "bg-lime-50 border-lime-200" },
+  insurance:              { label: "Insurance",              icon: ShieldAlert,    color: "text-yellow-700",  bg: "bg-yellow-50 border-yellow-200" },
+  hajj_id:                { label: "Hajj ID Card",           icon: User,           color: "text-violet-700",  bg: "bg-violet-50 border-violet-200" },
+  luggage_tag:            { label: "Luggage Tag",            icon: Download,       color: "text-fuchsia-700", bg: "bg-fuchsia-50 border-fuchsia-200" },
+  emergency_contact_card: { label: "Emergency Contact Card", icon: Bell,           color: "text-red-700",     bg: "bg-red-50 border-red-200" },
 };
 
 function TravelDocumentsCard({ bookingId, bookingNumber, invoiceNumber, bookingStatus }: {
@@ -560,6 +567,14 @@ function TravelDocumentsCard({ bookingId, bookingNumber, invoiceNumber, bookingS
         toast({ title: "Share", description: fullUrl, variant: "destructive" });
       }
     }
+  }
+
+  async function logDownload(docId: string) {
+    try {
+      await fetch(`${BASE_API}/api/documents/${docId}/log-download`, {
+        method: "POST", credentials: "include",
+      });
+    } catch (_) {}
   }
 
   return (
@@ -644,6 +659,7 @@ function TravelDocumentsCard({ bookingId, bookingNumber, invoiceNumber, bookingS
           return uploaded.map((doc: any) => {
             const fileUrl = `${BASE_API}${doc.fileUrl}`;
             const isPdf = doc.fileName?.toLowerCase().endsWith(".pdf");
+            const uploadedDate = doc.createdAt ? new Date(doc.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : null;
             return (
               <div key={doc.id} className={`rounded-xl border ${meta.bg} overflow-hidden`}>
                 <div className={`flex items-center gap-3 p-3`}>
@@ -653,14 +669,18 @@ function TravelDocumentsCard({ bookingId, bookingNumber, invoiceNumber, bookingS
                   <div className="flex-1 min-w-0">
                     <p className={`text-xs font-bold ${meta.color}`}>{meta.label}</p>
                     <p className="text-[11px] text-muted-foreground truncate">{doc.fileName}</p>
+                    {uploadedDate && <p className="text-[10px] text-muted-foreground/60 mt-0.5">Ready: {uploadedDate}</p>}
                   </div>
+                  <span className="text-[9px] font-semibold bg-white/70 text-emerald-700 border border-emerald-200 rounded-full px-2 py-0.5 shrink-0">NEW</span>
                 </div>
                 <div className={`grid grid-cols-4 border-t border-black/5 divide-x divide-black/5`}>
                   <a href={fileUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1 py-2 hover:bg-black/5 transition-colors">
                     <Eye size={15} className={meta.color} />
                     <span className="text-[10px] font-medium text-muted-foreground">View</span>
                   </a>
-                  <a href={fileUrl} download={doc.fileName} className="flex flex-col items-center gap-1 py-2 hover:bg-black/5 transition-colors">
+                  <a href={fileUrl} download={doc.fileName}
+                    onClick={() => logDownload(doc.id)}
+                    className="flex flex-col items-center gap-1 py-2 hover:bg-black/5 transition-colors">
                     <Download size={15} className={meta.color} />
                     <span className="text-[10px] font-medium text-muted-foreground">Download</span>
                   </a>
