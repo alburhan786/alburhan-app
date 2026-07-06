@@ -47,6 +47,7 @@ function buildMenu(openComplaints: number): MenuSection[] {
         { icon: ClipboardPlus, label: "Offline Booking", href: "/admin/offline-bookings", require: ["bookings", "create"] },
         { icon: Receipt, label: "Invoices", href: "/admin/invoices", require: ["bookings", "view"] },
         { icon: CreditCard, label: "Payment Management", href: "/admin/payments", require: ["payments", "view"] },
+        { icon: Building2, label: "Offline Payments", href: "/admin/offline-payments", require: ["payments", "view"] },
         { icon: Trash2, label: "Payment Trash", href: "/admin/payment-trash", require: ["payments", "delete"] },
         { icon: TrendingDown, label: "Expenses", href: "/admin/expenses", require: ["expenses", "view"] },
         { icon: Calculator, label: "Accounting", href: "/admin/accounting", require: ["accounting", "view"] },

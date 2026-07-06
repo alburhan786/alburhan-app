@@ -44,6 +44,7 @@ import CustomerManager from "@/pages/admin/CustomerManager";
 import RequestsManager from "@/pages/admin/RequestsManager";
 import InquiryManager from "@/pages/admin/InquiryManager";
 import OfflineBookingManager from "@/pages/admin/OfflineBookingManager";
+import OfflinePaymentsManager from "@/pages/admin/OfflinePaymentsManager";
 import QRTracker from "@/pages/admin/QRTracker";
 import ReportsManager from "@/pages/admin/ReportsManager";
 import PaymentAnalytics from "@/pages/admin/PaymentAnalytics";
@@ -187,6 +188,7 @@ function Router() {
       <Route path="/admin/offline-bookings" component={() => <AdminRoute component={OfflineBookingManager} />} />
       <Route path="/admin/qr-tracker" component={() => <AdminRoute component={QRTracker} />} />
       <Route path="/admin/reports" component={() => <AdminRoute component={ReportsManager} />} />
+      <Route path="/admin/offline-payments" component={() => <AdminRoute component={OfflinePaymentsManager} />} />
       <Route path="/admin/payment-analytics" component={() => <AdminRoute component={PaymentAnalytics} />} />
       <Route path="/admin/payments" component={() => <AdminRoute component={PaymentAnalytics} />} />
       <Route path="/admin/payment-trash" component={() => <AdminRoute component={PaymentTrash} />} />

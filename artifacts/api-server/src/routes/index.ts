@@ -48,6 +48,7 @@ import ziyaratRouter from "./ziyarat.js";
 import luggageRouter from "./luggage.js";
 import allocationsRouter from "./allocations.js";
 import loyaltyRouter from "./loyalty.js";
+import offlinePaymentsRouter from "./offline-payments.js";
 import apiSettingsRouter from "./api-settings.js";
 import whatsappRouter from "./whatsapp.js";
 
@@ -193,6 +194,7 @@ router.use("/ziyarat", ziyaratRouter);
 router.use("/luggage", luggageRouter);
 router.use("/allocations", allocationsRouter);
 router.use("/loyalty", loyaltyRouter);
+router.use("/offline-payments", offlinePaymentsRouter);
 router.use("/api-settings", apiSettingsRouter);
 router.use("/whatsapp", whatsappRouter);
 router.use(storageRouter);

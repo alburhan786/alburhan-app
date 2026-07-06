@@ -1,0 +1,237 @@
+Implement a complete Offline Bank Transfer Payment Module for Al Burhan Tours & Travels. Customers will pay directly to the company’s bank account instead of using an online payment gateway.
+
+Customer Payment Flow
+
+After the booking is approved, display a “Pay via Bank Transfer” button.
+
+When the customer clicks it, show the company’s bank details.
+
+Company Bank Details
+
+* Account Name: Al Burhan Tours & Travels
+* Bank Name: (Admin Editable)
+* Branch: (Admin Editable)
+* Account Number: (Admin Editable)
+* IFSC Code: (Admin Editable)
+* Account Type: Current Account
+* UPI QR Code (Optional)
+* Download Bank Details PDF
+* Copy Account Number button
+* Copy IFSC button
+
+⸻
+
+Customer Payment Submission Form
+
+After making payment through:
+
+* NEFT
+* RTGS
+* IMPS
+* Cash Deposit
+* Bank Transfer
+
+Customer must fill in the following:
+
+* Booking ID (Auto Filled)
+* Customer Name
+* Mobile Number
+* Email ID
+* Amount Paid
+* Payment Date
+* Payment Time
+* Bank Name
+* Branch Name
+* Payment Method (NEFT / RTGS / IMPS / Cash Deposit / Bank Transfer)
+* UTR / Transaction Reference Number (Required)
+* Sender Account Number (Last 4 digits)
+* Remarks
+* Upload Payment Proof (JPG, PNG, PDF up to 10 MB)
+
+Display a Submit Payment Details button.
+
+⸻
+
+After Submission
+
+Immediately show:
+
+Payment Details Submitted Successfully
+
+Status:
+
+Waiting for Verification
+
+Display on customer dashboard:
+
+🟡 Payment Submitted
+
+⸻
+
+Admin Panel
+
+Create a new menu:
+
+Offline Payments
+
+Show a table with:
+
+* Booking ID
+* Customer Name
+* Package
+* Amount
+* Payment Method
+* UTR Number
+* Date
+* Payment Screenshot
+* Verification Status
+
+Buttons:
+
+* View
+* Approve
+* Reject
+* Request Correction
+
+⸻
+
+If Admin Approves
+
+Automatically:
+
+* Booking Status → Payment Confirmed
+* Generate GST Invoice
+* Generate Receipt
+* Update Dashboard
+* Unlock Next Process (Visa Processing)
+
+Automatically send:
+
+WhatsApp
+
+Dear {{CustomerName}}
+
+Your bank transfer has been verified successfully.
+
+Booking ID:
+{{BookingID}}
+
+Amount:
+₹{{Amount}}
+
+UTR:
+{{UTR}}
+
+Thank you for choosing Al Burhan Tours & Travels.
+
+Invoice attached.
+
+⸻
+
+SMS
+
+Payment verified successfully.
+
+Booking:
+{{BookingID}}
+
+Thank you.
+
+⸻
+
+Email
+
+Subject:
+
+Payment Verified Successfully
+
+Include:
+
+* GST Invoice PDF
+* Payment Receipt
+* Company Logo
+* Booking Summary
+
+⸻
+
+If Admin Rejects
+
+Customer receives:
+
+WhatsApp
+
+Your submitted bank payment could not be verified.
+
+Reason:
+
+{{Reason}}
+
+Please upload the correct payment proof.
+
+⸻
+
+Dashboard Status:
+
+🔴 Payment Rejected
+
+Show:
+
+Upload New Payment Proof
+
+⸻
+
+Customer Dashboard
+
+Create a Bank Payment section showing:
+
+* Booking Amount
+* Amount Paid
+* Balance Amount
+* Company Bank Details
+* UTR Number
+* Payment Status
+* Payment Proof
+* Invoice
+* Receipt
+
+Status badges:
+
+* Pending Payment
+* Payment Submitted
+* Under Verification
+* Payment Verified
+* Payment Rejected
+
+⸻
+
+Security
+
+* UTR Number must be unique.
+* Prevent duplicate UTR submissions.
+* Validate payment amount.
+* Secure file uploads.
+* Maintain complete audit logs.
+* Record verification date, time, and admin name.
+
+⸻
+
+Admin Settings
+
+Allow the admin to edit bank details without changing the code:
+
+* Bank Name
+* Branch
+* Account Name
+* Account Number
+* IFSC Code
+* Swift Code (Optional)
+* UPI ID
+* QR Code Image
+
+Changes should automatically appear on the customer payment page.
+
+⸻
+
+Final Objective
+
+Build a secure, production-ready Offline Bank Transfer Payment System where customers can pay via NEFT, RTGS, IMPS, Cash Deposit, or Bank Transfer, submit their UTR number and payment proof, and have the payment verified by the admin. After approval, the system should automatically generate invoices, update booking status, and send notifications via WhatsApp, SMS, Email, and the customer dashboard. This module should integrate seamlessly with the existing booking workflow and require no manual coding for future bank detail updates.

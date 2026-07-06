@@ -755,3 +755,117 @@ export async function sendJourneyStatusNotification(opts: {
     opts.email ? sendEmail(opts.email, subject, message) : Promise.resolve(),
   ]);
 }
+
+// ── Offline Bank Transfer Notifications ───────────────────────────────────
+
+export async function sendOfflinePaymentApprovedNotification(opts: {
+  mobile: string;
+  email?: string | null;
+  customerName: string;
+  bookingId: string;
+  bookingNumber?: string | null;
+  amount: number | string;
+  utrNumber: string;
+}) {
+  const ref = opts.bookingNumber || opts.bookingId;
+  const amt = Number(opts.amount).toLocaleString("en-IN");
+  const message =
+`Dear ${opts.customerName},
+
+Assalamu Alaikum! ✅
+
+Your bank transfer has been *verified successfully*.
+
+📋 *Booking ID:* ${ref}
+💰 *Amount:* ₹${amt}
+🔖 *UTR:* ${opts.utrNumber}
+
+Your invoice and receipt have been generated. You will receive them shortly.
+
+Jazakallah Khair for choosing Al Burhan Tours & Travels. 🕌
+May Allah accept your Hajj/Umrah. Ameen.`;
+
+  const adminMsg =
+`[Al Burhan] Bank Transfer Approved
+Booking: ${ref} | ₹${amt}
+UTR: ${opts.utrNumber}
+Customer: ${opts.customerName}`;
+
+  await Promise.allSettled([
+    sendWhatsApp(opts.mobile, message),
+    opts.email ? sendEmail(opts.email, "Payment Verified Successfully – Al Burhan Tours & Travels", message) : Promise.resolve(),
+    sendWhatsApp("9893989786", adminMsg),
+    sendWhatsApp("8989701701", adminMsg),
+  ]);
+}
+
+export async function sendOfflinePaymentRejectedNotification(opts: {
+  mobile: string;
+  email?: string | null;
+  customerName: string;
+  bookingId: string;
+  bookingNumber?: string | null;
+  reason: string;
+}) {
+  const ref = opts.bookingNumber || opts.bookingId;
+  const message =
+`Dear ${opts.customerName},
+
+Assalamu Alaikum.
+
+Your submitted bank payment could not be verified. ❌
+
+📋 *Booking ID:* ${ref}
+📝 *Reason:* ${opts.reason}
+
+Please upload the correct payment proof or contact us for assistance.
+
+Al Burhan Tours & Travels
+📞 For help, contact our support team.`;
+
+  await Promise.allSettled([
+    sendWhatsApp(opts.mobile, message),
+    opts.email ? sendEmail(opts.email, "Payment Verification Failed – Al Burhan Tours & Travels", message) : Promise.resolve(),
+  ]);
+}
+
+export async function sendOfflinePaymentSubmittedNotification(opts: {
+  mobile: string;
+  customerName: string;
+  bookingId: string;
+  bookingNumber?: string | null;
+  amount: number | string;
+  utrNumber: string;
+}) {
+  const ref = opts.bookingNumber || opts.bookingId;
+  const amt = Number(opts.amount).toLocaleString("en-IN");
+  const message =
+`Dear ${opts.customerName},
+
+Assalamu Alaikum! 🕌
+
+We have received your *bank transfer details*.
+
+📋 *Booking ID:* ${ref}
+💰 *Amount:* ₹${amt}
+🔖 *UTR:* ${opts.utrNumber}
+
+⏳ Status: *Waiting for Verification*
+
+Our team will verify your payment within 24 hours. You will be notified once verified.
+
+Jazakallah Khair – Al Burhan Tours & Travels`;
+
+  const adminMsg =
+`[Al Burhan] New Bank Transfer Submitted 🏦
+Booking: ${ref} | ₹${amt}
+UTR: ${opts.utrNumber}
+Customer: ${opts.customerName}
+Action needed: Verify payment`;
+
+  await Promise.allSettled([
+    sendWhatsApp(opts.mobile, message),
+    sendWhatsApp("9893989786", adminMsg),
+    sendWhatsApp("8989701701", adminMsg),
+  ]);
+}

@@ -1500,6 +1500,55 @@ async function runMigrations() {
     console.log("[Migration] journey_status + user profile columns ensured");
   } catch (err) { console.error("[Migration] journey_status/profile migration failed:", err); }
 
+  // ── bank_settings + offline_payments ──────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS bank_settings (
+        id TEXT PRIMARY KEY DEFAULT 'default',
+        bank_name TEXT DEFAULT 'State Bank of India',
+        branch TEXT DEFAULT '',
+        account_name TEXT DEFAULT 'Al Burhan Tours & Travels',
+        account_number TEXT DEFAULT '',
+        ifsc_code TEXT DEFAULT '',
+        swift_code TEXT DEFAULT '',
+        upi_id TEXT DEFAULT '',
+        qr_code_url TEXT DEFAULT '',
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await pool.query(`INSERT INTO bank_settings (id) VALUES ('default') ON CONFLICT (id) DO NOTHING`);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS offline_payments (
+        id TEXT PRIMARY KEY,
+        booking_id TEXT NOT NULL,
+        customer_id TEXT,
+        customer_name TEXT,
+        mobile TEXT,
+        email TEXT,
+        amount_paid NUMERIC(12,2),
+        payment_date TEXT,
+        payment_time TEXT,
+        bank_name TEXT,
+        branch_name TEXT,
+        payment_method TEXT,
+        utr_number TEXT UNIQUE,
+        sender_account_last4 TEXT,
+        remarks TEXT,
+        proof_url TEXT,
+        status TEXT NOT NULL DEFAULT 'pending',
+        rejection_reason TEXT,
+        verified_at TIMESTAMPTZ,
+        verified_by TEXT,
+        verified_by_name TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS offline_payments_booking_idx ON offline_payments(booking_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS offline_payments_customer_idx ON offline_payments(customer_id)`);
+    console.log("[Migration] bank_settings + offline_payments tables ensured");
+  } catch (err) { console.error("[Migration] offline payments migration failed:", err); }
+
   // ── Seed default workflow rules ────────────────────────────────────────────
   try {
     for (const rule of DEFAULT_RULES) {

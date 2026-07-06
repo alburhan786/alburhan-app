@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { CreditCard, FileText, Download, Clock, Upload, Trash2, CheckCircle, AlertCircle, X, Eye, ShieldAlert, IndianRupee, Plane, Stamp, Hotel, Bus, Printer, Share2, Copy, Bell, BellRing, CheckCheck, Megaphone, ClipboardList, MessageSquare, Send, User, XCircle } from "lucide-react";
+import { CreditCard, FileText, Download, Clock, Upload, Trash2, CheckCircle, AlertCircle, X, Eye, ShieldAlert, IndianRupee, Plane, Stamp, Hotel, Bus, Printer, Share2, Copy, Bell, BellRing, CheckCheck, Megaphone, ClipboardList, MessageSquare, Send, User, XCircle, Building2, Banknote } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -1117,6 +1117,255 @@ function MyRequestsSection() {
   );
 }
 
+// ── Bank Transfer Section (self-contained per booking) ────────────────────
+
+const PAYMENT_STATUS_STYLES: Record<string, { badge: string; label: string }> = {
+  pending:              { badge: "bg-yellow-100 text-yellow-800 border-yellow-300",  label: "🟡 Awaiting Verification" },
+  approved:             { badge: "bg-emerald-100 text-emerald-800 border-emerald-300", label: "✅ Payment Verified" },
+  rejected:             { badge: "bg-red-100 text-red-800 border-red-300",           label: "🔴 Payment Rejected" },
+  correction_requested: { badge: "bg-orange-100 text-orange-800 border-orange-300",  label: "🟠 Correction Needed" },
+};
+
+function BankTransferSection({ booking }: { booking: any }) {
+  const { toast } = useToast();
+  const [bankSettings, setBankSettings] = useState<any>(null);
+  const [existingPayments, setExistingPayments] = useState<any[]>([]);
+  const [showDetails, setShowDetails] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [proofFile, setProofFile] = useState<File | null>(null);
+  const [form, setForm] = useState({
+    customerName: "", mobile: "", email: "",
+    amountPaid: "", paymentDate: new Date().toISOString().slice(0, 10),
+    paymentTime: "", bankName: "", branchName: "",
+    paymentMethod: "NEFT", utrNumber: "", senderAccountLast4: "", remarks: "",
+  });
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    fetch(`${BASE_API}/api/offline-payments/bank-settings`).then(r => r.json()).then(setBankSettings).catch(() => {});
+    fetch(`${BASE_API}/api/offline-payments/booking/${booking.id}`, { credentials: "include" })
+      .then(r => r.json()).then(d => setExistingPayments(d.payments || [])).catch(() => {});
+  }, [booking.id]);
+
+  const latestPayment = existingPayments[0];
+  const canSubmit = !latestPayment || latestPayment.status === "rejected" || latestPayment.status === "correction_requested";
+
+  const handleSubmit = async () => {
+    if (!form.utrNumber.trim()) return toast({ title: "UTR number required", variant: "destructive" });
+    if (!form.amountPaid || Number(form.amountPaid) <= 0) return toast({ title: "Valid amount required", variant: "destructive" });
+    setSubmitting(true);
+    try {
+      const fd = new FormData();
+      Object.entries(form).forEach(([k, v]) => fd.append(k === "amountPaid" ? "amountPaid" : k, v));
+      fd.set("bookingId", booking.id);
+      if (proofFile) fd.append("proof", proofFile);
+      const res = await fetch(`${BASE_API}/api/offline-payments`, { method: "POST", credentials: "include", body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Submission failed");
+      toast({ title: "Payment details submitted!", description: "Our team will verify within 24 hours. You will be notified." });
+      setShowForm(false);
+      fetch(`${BASE_API}/api/offline-payments/booking/${booking.id}`, { credentials: "include" })
+        .then(r => r.json()).then(d => setExistingPayments(d.payments || [])).catch(() => {});
+      queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+    } catch (e: any) {
+      toast({ title: "Submission failed", description: e.message, variant: "destructive" });
+    } finally { setSubmitting(false); }
+  };
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text).then(() => toast({ title: `${label} copied!` }));
+  };
+
+  if (!["approved", "partially_paid", "confirmed"].includes(booking.status)) return null;
+
+  return (
+    <>
+      {/* Payment Status Banner (if already submitted) */}
+      {latestPayment && (
+        <div className={`mx-5 mb-3 rounded-xl border px-4 py-3 ${PAYMENT_STATUS_STYLES[latestPayment.status]?.badge || "bg-gray-100"}`}>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <p className="font-semibold text-sm">{PAYMENT_STATUS_STYLES[latestPayment.status]?.label || latestPayment.status}</p>
+              <p className="text-xs mt-0.5 opacity-80">UTR: {latestPayment.utr_number} • ₹{Number(latestPayment.amount_paid).toLocaleString("en-IN")}</p>
+              {latestPayment.rejection_reason && <p className="text-xs mt-1 font-medium">Reason: {latestPayment.rejection_reason}</p>}
+            </div>
+            {canSubmit && (
+              <Button size="sm" variant="outline" className="text-xs h-7 border-current" onClick={() => setShowForm(true)}>
+                Resubmit
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Pay via Bank Transfer card */}
+      {!latestPayment && (
+        <div className="mx-5 mb-4 rounded-xl border border-primary/20 bg-gradient-to-br from-primary/5 to-transparent p-4">
+          <div className="flex items-center gap-3 flex-wrap justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Building2 className="w-4.5 h-4.5 text-primary" />
+              </div>
+              <div>
+                <p className="font-semibold text-sm text-primary">Pay via Bank Transfer</p>
+                <p className="text-xs text-muted-foreground">NEFT / RTGS / IMPS / UPI</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" className="h-8 text-xs border-primary/30 text-primary hover:bg-primary/5" onClick={() => setShowDetails(true)}>
+                <Building2 className="w-3 h-3 mr-1" /> Bank Details
+              </Button>
+              <Button size="sm" className="h-8 text-xs bg-primary text-white hover:bg-primary/90" onClick={() => { setShowDetails(false); setShowForm(true); }}>
+                <Banknote className="w-3 h-3 mr-1" /> Submit Payment
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bank Details Modal */}
+      <Dialog open={showDetails} onOpenChange={setShowDetails}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Building2 size={18} className="text-primary" /> Bank Account Details</DialogTitle>
+          </DialogHeader>
+          {bankSettings ? (
+            <div className="space-y-3">
+              <div className="bg-primary/5 rounded-xl border border-primary/15 p-4 space-y-2.5">
+                {[
+                  { label: "Account Name", value: bankSettings.account_name },
+                  { label: "Bank Name", value: bankSettings.bank_name },
+                  { label: "Branch", value: bankSettings.branch },
+                  { label: "Account Number", value: bankSettings.account_number, copy: true },
+                  { label: "IFSC Code", value: bankSettings.ifsc_code, copy: true },
+                  { label: "Account Type", value: "Current Account" },
+                  bankSettings.upi_id && { label: "UPI ID", value: bankSettings.upi_id, copy: true },
+                ].filter(Boolean).map((item: any) => item.value && (
+                  <div key={item.label} className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs text-muted-foreground">{item.label}</p>
+                      <p className="font-semibold text-sm">{item.value}</p>
+                    </div>
+                    {item.copy && (
+                      <button onClick={() => copyToClipboard(item.value, item.label)} className="text-primary hover:text-primary/80 transition-colors">
+                        <Copy className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {bankSettings.qr_code_url && (
+                <div className="text-center">
+                  <p className="text-xs text-muted-foreground mb-2">Scan to Pay via UPI</p>
+                  <img src={bankSettings.qr_code_url} alt="UPI QR" className="mx-auto rounded-xl border max-h-48 object-contain" />
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground text-center">After payment, click "Submit Payment" with your UTR number</p>
+              <Button className="w-full bg-primary text-white" onClick={() => { setShowDetails(false); setShowForm(true); }}>
+                <Banknote className="w-4 h-4 mr-2" /> I've Paid — Submit Details
+              </Button>
+            </div>
+          ) : <div className="text-center text-muted-foreground py-8">Loading bank details…</div>}
+        </DialogContent>
+      </Dialog>
+
+      {/* Submit Payment Form Modal */}
+      <Dialog open={showForm} onOpenChange={setShowForm}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Banknote size={18} className="text-primary" /> Submit Payment Details</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Booking ID</Label>
+                <Input className="h-9 text-sm mt-1 bg-muted/40" value={`#${booking.bookingNumber}`} readOnly />
+              </div>
+              <div>
+                <Label className="text-xs">Amount Paid (₹) <span className="text-red-500">*</span></Label>
+                <Input className="h-9 text-sm mt-1" type="number" placeholder="e.g. 50000" value={form.amountPaid}
+                  onChange={e => setForm(f => ({ ...f, amountPaid: e.target.value }))} />
+              </div>
+              <div>
+                <Label className="text-xs">Your Name</Label>
+                <Input className="h-9 text-sm mt-1" placeholder="Full name" value={form.customerName}
+                  onChange={e => setForm(f => ({ ...f, customerName: e.target.value }))} />
+              </div>
+              <div>
+                <Label className="text-xs">Mobile</Label>
+                <Input className="h-9 text-sm mt-1" placeholder="10-digit mobile" value={form.mobile}
+                  onChange={e => setForm(f => ({ ...f, mobile: e.target.value }))} />
+              </div>
+              <div>
+                <Label className="text-xs">Email</Label>
+                <Input className="h-9 text-sm mt-1" type="email" placeholder="your@email.com" value={form.email}
+                  onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
+              </div>
+              <div>
+                <Label className="text-xs">Payment Date</Label>
+                <Input className="h-9 text-sm mt-1" type="date" value={form.paymentDate}
+                  onChange={e => setForm(f => ({ ...f, paymentDate: e.target.value }))} />
+              </div>
+              <div>
+                <Label className="text-xs">Payment Time</Label>
+                <Input className="h-9 text-sm mt-1" type="time" value={form.paymentTime}
+                  onChange={e => setForm(f => ({ ...f, paymentTime: e.target.value }))} />
+              </div>
+              <div>
+                <Label className="text-xs">Payment Method</Label>
+                <select className="w-full mt-1 h-9 border border-border rounded-md px-3 text-sm bg-white"
+                  value={form.paymentMethod} onChange={e => setForm(f => ({ ...f, paymentMethod: e.target.value }))}>
+                  {["NEFT", "RTGS", "IMPS", "Cash Deposit", "Bank Transfer", "UPI"].map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label className="text-xs">Sender Bank Name</Label>
+                <Input className="h-9 text-sm mt-1" placeholder="Your bank" value={form.bankName}
+                  onChange={e => setForm(f => ({ ...f, bankName: e.target.value }))} />
+              </div>
+              <div>
+                <Label className="text-xs">Branch Name</Label>
+                <Input className="h-9 text-sm mt-1" placeholder="Branch" value={form.branchName}
+                  onChange={e => setForm(f => ({ ...f, branchName: e.target.value }))} />
+              </div>
+              <div className="col-span-2">
+                <Label className="text-xs">UTR / Transaction Reference Number <span className="text-red-500">*</span></Label>
+                <Input className="h-9 text-sm mt-1 font-mono" placeholder="12-digit UTR or reference number" value={form.utrNumber}
+                  onChange={e => setForm(f => ({ ...f, utrNumber: e.target.value }))} />
+              </div>
+              <div>
+                <Label className="text-xs">Sender A/C Last 4 Digits</Label>
+                <Input className="h-9 text-sm mt-1 font-mono" maxLength={4} placeholder="XXXX" value={form.senderAccountLast4}
+                  onChange={e => setForm(f => ({ ...f, senderAccountLast4: e.target.value }))} />
+              </div>
+              <div>
+                <Label className="text-xs">Remarks (Optional)</Label>
+                <Input className="h-9 text-sm mt-1" placeholder="Any note" value={form.remarks}
+                  onChange={e => setForm(f => ({ ...f, remarks: e.target.value }))} />
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">Upload Payment Proof (JPG / PNG / PDF, max 10 MB)</Label>
+              <input type="file" accept="image/jpeg,image/png,application/pdf" className="mt-1 w-full text-sm"
+                onChange={e => setProofFile(e.target.files?.[0] || null)} />
+              {proofFile && <p className="text-xs text-emerald-600 mt-1">✓ {proofFile.name}</p>}
+            </div>
+            <div className="flex gap-2 pt-2">
+              <Button variant="outline" className="flex-1" onClick={() => setShowForm(false)}>Cancel</Button>
+              <Button className="flex-1 bg-primary text-white hover:bg-primary/90 font-semibold" onClick={handleSubmit} disabled={submitting}>
+                {submitting ? "Submitting…" : "Submit Payment Details"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 export default function CustomerDashboard() {
   const { user } = useAuth();
   const { data } = useListBookings();
@@ -1578,6 +1827,9 @@ export default function CustomerDashboard() {
                         </div>
                       </div>
                     )}
+
+                    {/* Bank Transfer Section */}
+                    <BankTransferSection booking={booking} />
 
                     {/* Actions */}
                     <div className="p-4 bg-muted/20 border-t border-border flex flex-wrap justify-end gap-3">
