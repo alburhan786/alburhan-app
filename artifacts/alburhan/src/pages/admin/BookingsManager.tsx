@@ -649,6 +649,8 @@ const JOURNEY_STATUS_OPTIONS = [
   { value: "journey_completed",  label: "🏠 Journey Completed" },
 ];
 
+type ConfirmChannel = { channel: string; status: string; error_message?: string | null; sent_at?: string | null };
+
 function BookingDetailModal({ booking, open, onClose }: { booking: Booking | null; open: boolean; onClose: () => void }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -660,6 +662,32 @@ function BookingDetailModal({ booking, open, onClose }: { booking: Booking | nul
   const [loadingGroups, setLoadingGroups] = useState(false);
   const [selectedJourneyStatus, setSelectedJourneyStatus] = useState("");
   const [updatingJourneyStatus, setUpdatingJourneyStatus] = useState(false);
+  const [confirmChannels, setConfirmChannels] = useState<ConfirmChannel[]>([]);
+  const [resending, setResending] = useState(false);
+
+  const fetchConfirmStatus = async (id: string) => {
+    try {
+      const res = await fetch(`${API}/api/bookings/${id}/confirmation-status`, { credentials: "include" });
+      const data = await res.json();
+      setConfirmChannels(data.channels || []);
+    } catch { setConfirmChannels([]); }
+  };
+
+  const handleResendConfirmation = async () => {
+    if (!booking) return;
+    setResending(true);
+    try {
+      await fetch(`${API}/api/bookings/${booking.id}/resend-confirmation`, {
+        method: "POST", credentials: "include",
+      });
+      toast({ title: "Resending notifications", description: "WhatsApp, SMS, Email & Dashboard notifications are being sent." });
+      setTimeout(() => fetchConfirmStatus(booking.id), 5000);
+    } catch (err: any) {
+      toast({ title: "Resend failed", description: err.message, variant: "destructive" });
+    } finally {
+      setResending(false);
+    }
+  };
 
   useEffect(() => {
     if (open) {
@@ -675,6 +703,11 @@ function BookingDetailModal({ booking, open, onClose }: { booking: Booking | nul
       if (booking?.groupId) setSelectedGroupId(booking.groupId);
       else setSelectedGroupId("");
       setSelectedJourneyStatus((booking as any)?.journeyStatus || "booking_requested");
+      if (booking?.id && (booking.status === "approved" || booking.status === "confirmed" || booking.status === "partially_paid")) {
+        fetchConfirmStatus(booking.id);
+      } else {
+        setConfirmChannels([]);
+      }
     }
   }, [open, booking?.id]);
 
@@ -840,6 +873,44 @@ function BookingDetailModal({ booking, open, onClose }: { booking: Booking | nul
             <div>
               <h4 className="text-xs font-semibold text-red-600 uppercase mb-2">Rejection Reason</h4>
               <p className="text-sm bg-red-50 rounded-lg p-3 text-red-800">{booking.rejectionReason}</p>
+            </div>
+          )}
+
+          {(booking.status === "approved" || booking.status === "confirmed" || booking.status === "partially_paid") && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase">Booking Confirmation Notifications</h4>
+                <button
+                  onClick={handleResendConfirmation}
+                  disabled={resending}
+                  className="text-xs px-3 py-1 rounded-md bg-[#0B3D2E] text-white hover:bg-[#0d4f3c] disabled:opacity-50 flex items-center gap-1"
+                >
+                  {resending ? "Sending..." : "↻ Resend All"}
+                </button>
+              </div>
+              {confirmChannels.length === 0 ? (
+                <p className="text-xs text-muted-foreground italic">No notification records yet.</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {(["whatsapp","sms","email","dashboard"] as const).map(ch => {
+                    const rec = confirmChannels.find(c => c.channel === ch);
+                    const icons: Record<string, string> = { whatsapp: "💬", sms: "📱", email: "📧", dashboard: "🔔" };
+                    const labels: Record<string, string> = { whatsapp: "WhatsApp", sms: "SMS", email: "Email", dashboard: "Dashboard" };
+                    if (!rec) return (
+                      <span key={ch} className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-gray-100 text-gray-500">
+                        {icons[ch]} {labels[ch]} —
+                      </span>
+                    );
+                    const sent = rec.status === "sent";
+                    return (
+                      <span key={ch} title={rec.error_message || undefined} className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium ${sent ? "bg-green-100 text-green-800" : "bg-red-100 text-red-700"}`}>
+                        {icons[ch]} {sent ? "✓" : "✗"} {labels[ch]}
+                        {!sent && rec.error_message && <span className="max-w-[120px] truncate opacity-75">— {rec.error_message}</span>}
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 

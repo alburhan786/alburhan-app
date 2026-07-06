@@ -1,0 +1,152 @@
+Implement a professional Booking Confirmation Notification System for Al Burhan Tours & Travels.
+
+When an admin approves a booking, the system must automatically send a Booking Confirmation via WhatsApp, SMS, Email, and Dashboard Notification without requiring any manual action.
+
+Booking ID must be generated automatically in the format:
+ABT + Current Year + 6-digit random number
+Example:
+ABT26078035
+
+-----------------------------------
+WHATSAPP MESSAGE
+-----------------------------------
+
+🌙 Assalamu Alaikum {{customerName}},
+
+Alhamdulillah!
+
+Your Hajj/Umrah booking with Al Burhan Tours & Travels has been successfully confirmed.
+
+📌 Booking ID:
+{{bookingId}}
+
+🕋 Package:
+{{packageName}}
+
+👤 Pilgrims:
+{{pilgrimCount}}
+
+📅 Departure:
+{{departureDate}}
+
+💰 Total Package Cost:
+₹{{totalAmount}}
+
+💳 Amount Paid:
+₹{{paidAmount}}
+
+💵 Balance:
+₹{{balanceAmount}}
+
+Please log in to your customer dashboard to:
+
+• Complete your travel profile
+• Upload Passport, PAN & Aadhaar
+• Submit bank payment (NEFT/RTGS/IMPS) if pending
+• Track visa status
+• Download Invoice
+• Download Flight Ticket
+• Download Hotel Voucher
+• Download Visa
+• View Journey Status
+
+Dashboard:
+https://www.alburhantravels.com/dashboard
+
+Need Help?
+
+📞 +91 9893225590
+📧 info@alburhantravels.com
+🌐 https://www.alburhantravels.com
+
+May Allah accept your pilgrimage.
+
+Al Burhan Tours & Travels
+
+-----------------------------------
+SMS MESSAGE
+-----------------------------------
+
+Dear {{customerName}},
+
+Your Hajj/Umrah booking with Al Burhan Tours & Travels has been confirmed.
+
+Booking ID:
+{{bookingId}}
+
+Package:
+{{packageName}}
+
+Departure:
+{{departureDate}}
+
+Login:
+https://www.alburhantravels.com/dashboard
+
+Support:
++91 9893225590
+
+-----------------------------------
+EMAIL
+-----------------------------------
+
+Subject:
+
+Booking Confirmed | Al Burhan Tours & Travels
+
+Professional HTML email with:
+
+• Company Logo
+• Customer Name
+• Booking ID
+• Package Details
+• Departure Date
+• Total Amount
+• Paid Amount
+• Balance Amount
+• Dashboard Login Button
+• Company Contact Details
+• Terms & Conditions
+
+Attach:
+• Booking Confirmation PDF
+• Invoice (if available)
+
+-----------------------------------
+DASHBOARD NOTIFICATION
+-----------------------------------
+
+Title:
+Booking Confirmed
+
+Message:
+
+Congratulations!
+
+Your booking has been approved successfully.
+
+Booking ID:
+{{bookingId}}
+
+Please complete your travel profile and upload required documents to continue your pilgrimage process.
+
+-----------------------------------
+SYSTEM REQUIREMENTS
+-----------------------------------
+
+Automatically trigger notifications immediately after admin approves the booking.
+
+Store notification history in the database.
+
+Retry failed WhatsApp, SMS and Email notifications up to 3 times.
+
+Display delivery status:
+
+✓ WhatsApp Sent
+✓ SMS Sent
+✓ Email Sent
+✓ Dashboard Notification Sent
+
+If any notification fails, show the failure reason in the admin panel and allow manual resend.
+
+Do not require any manual button clicks after booking approval. Everything must run automatically in the background.

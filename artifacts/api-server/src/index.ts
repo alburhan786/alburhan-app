@@ -1549,6 +1549,24 @@ async function runMigrations() {
     console.log("[Migration] bank_settings + offline_payments tables ensured");
   } catch (err) { console.error("[Migration] offline payments migration failed:", err); }
 
+  // ── booking_confirmation_notifications ─────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS booking_confirmation_notifications (
+        id TEXT PRIMARY KEY,
+        booking_id TEXT NOT NULL,
+        channel TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        error_message TEXT,
+        sent_at TIMESTAMPTZ,
+        retry_count INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS bcn_booking_idx ON booking_confirmation_notifications(booking_id)`);
+    console.log("[Migration] booking_confirmation_notifications table ensured");
+  } catch (err) { console.error("[Migration] booking_confirmation_notifications failed:", err); }
+
   // ── Seed default workflow rules ────────────────────────────────────────────
   try {
     for (const rule of DEFAULT_RULES) {

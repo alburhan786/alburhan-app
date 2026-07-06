@@ -29,6 +29,7 @@ import { auditLog } from "../lib/audit.js";
 import { validateDeleteToken } from "./delete-auth.js";
 import {
   sendBookingApprovalNotification,
+  sendBookingConfirmationNotification,
   sendBookingRejectionNotification,
   sendBookingSubmissionNotification,
   sendPaymentConfirmationNotification,
@@ -104,9 +105,8 @@ function calcAmounts(opts: {
 function generateBookingNumber(): string {
   const now = new Date();
   const yy = now.getFullYear().toString().slice(-2);
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  const rand = Math.floor(1000 + Math.random() * 9000);
-  return `ABT${yy}${mm}${rand}`;
+  const rand = String(Math.floor(100000 + Math.random() * 900000));
+  return `ABT${yy}${rand}`;
 }
 
 function generateInvoiceNumber(): string {
@@ -531,15 +531,49 @@ router.post("/:id/approve", requireAdmin as any, requirePermission("bookings", "
     .where(eq(bookingsTable.id, req.params.id))
     .returning();
 
-  sendBookingApprovalNotification({
-    mobile: updated.customerMobile,
-    email: updated.customerEmail,
-    customerName: updated.customerName,
-    bookingNumber: updated.bookingNumber,
-  }).then(() => {
-    trackNotification({ eventType: "booking_approved", channel: "whatsapp", recipient: updated.customerMobile, bookingId: updated.id, status: "sent" }).catch(() => {});
-    trackNotification({ eventType: "booking_approved", channel: "sms", recipient: updated.customerMobile, bookingId: updated.id, status: "sent" }).catch(() => {});
-  }).catch(console.error);
+  // Fire rich confirmation notifications in background — WhatsApp + SMS + Email + Dashboard
+  (async () => {
+    try {
+      const { randomUUID } = await import("crypto");
+      const paidAmt = Number(updated.paidAmount || 0);
+      const totalAmt = Number(updated.finalAmount || updated.totalAmount || 0);
+      const balanceAmt = Math.max(0, totalAmt - paidAmt);
+
+      const result = await sendBookingConfirmationNotification({
+        mobile: updated.customerMobile,
+        email: updated.customerEmail,
+        customerName: updated.customerName,
+        bookingNumber: updated.bookingNumber,
+        packageName: updated.packageName,
+        numberOfPilgrims: updated.numberOfPilgrims,
+        departureDate: updated.preferredDepartureDate,
+        totalAmount: totalAmt,
+        paidAmount: paidAmt,
+        balanceAmount: balanceAmt,
+        customerId: updated.customerId,
+        bookingId: updated.id,
+        pool,
+      });
+
+      const channels: Array<{ channel: string; r: { ok: boolean; errorMessage?: string } }> = [
+        { channel: "whatsapp", r: result.whatsapp },
+        { channel: "sms",      r: result.sms },
+        { channel: "email",    r: result.email },
+        { channel: "dashboard",r: result.dashboard },
+      ];
+      for (const { channel, r } of channels) {
+        await pool.query(
+          `INSERT INTO booking_confirmation_notifications (id, booking_id, channel, status, error_message, sent_at, retry_count)
+           VALUES ($1, $2, $3, $4, $5, NOW(), 0)
+           ON CONFLICT (id) DO NOTHING`,
+          [randomUUID(), updated.id, channel, r.ok ? "sent" : "failed", r.ok ? null : ((r as any).errorMessage || "failed")]
+        ).catch(() => {});
+        trackNotification({ eventType: "booking_approved", channel, recipient: updated.customerMobile, bookingId: updated.id, status: r.ok ? "sent" : "failed" }).catch(() => {});
+      }
+    } catch (err) {
+      console.error("[approve] confirmation notification error:", err);
+    }
+  })();
 
   triggerWorkflow("booking_approved", {
     bookingId: updated.id, bookingNumber: updated.bookingNumber,
@@ -556,6 +590,76 @@ router.post("/:id/approve", requireAdmin as any, requirePermission("bookings", "
 
   auditLog({ req, action: "approved", entityTable: "bookings", entityId: updated.id, newValue: { bookingNumber: updated.bookingNumber, status: "approved" } }).catch(() => {});
   res.json(formatBooking(updated));
+});
+
+// GET /:id/confirmation-status — delivery status per channel
+router.get("/:id/confirmation-status", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT channel, status, error_message, sent_at, retry_count
+       FROM booking_confirmation_notifications
+       WHERE booking_id = $1
+       ORDER BY created_at DESC`,
+      [req.params.id]
+    );
+    // Deduplicate: keep latest per channel
+    const latest: Record<string, any> = {};
+    for (const row of rows) {
+      if (!latest[row.channel]) latest[row.channel] = row;
+    }
+    res.json({ channels: Object.values(latest) });
+  } catch (err) {
+    res.json({ channels: [] });
+  }
+});
+
+// POST /:id/resend-confirmation — admin resend all channels
+router.post("/:id/resend-confirmation", requireAdmin as any, requirePermission("bookings", "approve") as any, async (req: AuthenticatedRequest, res) => {
+  const bookings = await db.select().from(bookingsTable).where(eq(bookingsTable.id, req.params.id)).limit(1);
+  if (!bookings[0]) { res.status(404).json({ message: "Booking not found" }); return; }
+  const b = bookings[0];
+  res.json({ message: "Resending notifications..." });
+
+  (async () => {
+    try {
+      const { randomUUID } = await import("crypto");
+      const paidAmt = Number(b.paidAmount || 0);
+      const totalAmt = Number(b.finalAmount || b.totalAmount || 0);
+      const balanceAmt = Math.max(0, totalAmt - paidAmt);
+
+      const result = await sendBookingConfirmationNotification({
+        mobile: b.customerMobile,
+        email: b.customerEmail,
+        customerName: b.customerName,
+        bookingNumber: b.bookingNumber,
+        packageName: b.packageName,
+        numberOfPilgrims: b.numberOfPilgrims,
+        departureDate: b.preferredDepartureDate,
+        totalAmount: totalAmt,
+        paidAmount: paidAmt,
+        balanceAmount: balanceAmt,
+        customerId: b.customerId,
+        bookingId: b.id,
+        pool,
+      });
+
+      const channels: Array<{ channel: string; r: { ok: boolean; errorMessage?: string } }> = [
+        { channel: "whatsapp", r: result.whatsapp },
+        { channel: "sms",      r: result.sms },
+        { channel: "email",    r: result.email },
+        { channel: "dashboard",r: result.dashboard },
+      ];
+      for (const { channel, r } of channels) {
+        await pool.query(
+          `INSERT INTO booking_confirmation_notifications (id, booking_id, channel, status, error_message, sent_at, retry_count)
+           VALUES ($1, $2, $3, $4, $5, NOW(), 1)`,
+          [randomUUID(), b.id, channel, r.ok ? "sent" : "failed", r.ok ? null : ((r as any).errorMessage || "failed")]
+        ).catch(() => {});
+      }
+    } catch (err) {
+      console.error("[resend-confirmation] error:", err);
+    }
+  })();
 });
 
 router.post("/:id/reject", requireAdmin as any, requirePermission("bookings", "edit") as any, async (req: AuthenticatedRequest, res) => {

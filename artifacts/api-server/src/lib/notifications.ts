@@ -756,6 +756,238 @@ export async function sendJourneyStatusNotification(opts: {
   ]);
 }
 
+// ── Booking Confirmation Notification (rich, full-detail) ─────────────────
+
+export interface ConfirmationChannelResult {
+  whatsapp: SendResult;
+  sms: SendResult;
+  email: SendResult;
+  dashboard: { ok: boolean; errorMessage?: string };
+}
+
+export async function sendBookingConfirmationNotification(opts: {
+  mobile: string;
+  email?: string | null;
+  customerName: string;
+  bookingNumber: string;
+  packageName?: string | null;
+  numberOfPilgrims?: number | null;
+  departureDate?: string | null;
+  totalAmount?: number | string | null;
+  paidAmount?: number | string | null;
+  balanceAmount?: number | string | null;
+  customerId?: string | null;
+  bookingId?: string | null;
+  pool: any;
+}): Promise<ConfirmationChannelResult> {
+  const fmt = (n: any) => n != null && Number(n) > 0 ? Number(n).toLocaleString("en-IN") : "0";
+  const total   = fmt(opts.totalAmount);
+  const paid    = fmt(opts.paidAmount);
+  const balance = fmt(opts.balanceAmount ?? (Number(opts.totalAmount || 0) - Number(opts.paidAmount || 0)));
+  const dep     = opts.departureDate ? new Date(opts.departureDate).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "To be announced";
+  const pilgrims = opts.numberOfPilgrims ?? 1;
+  const pkg = opts.packageName || "Hajj / Umrah Package";
+
+  const waMsg =
+`🌙 Assalamu Alaikum ${opts.customerName},
+
+Alhamdulillah!
+
+Your Hajj/Umrah booking with Al Burhan Tours & Travels has been successfully confirmed.
+
+📌 Booking ID:
+${opts.bookingNumber}
+
+🕋 Package:
+${pkg}
+
+👤 Pilgrims:
+${pilgrims}
+
+📅 Departure:
+${dep}
+
+💰 Total Package Cost:
+₹${total}
+
+💳 Amount Paid:
+₹${paid}
+
+💵 Balance:
+₹${balance}
+
+Please log in to your customer dashboard to:
+
+• Complete your travel profile
+• Upload Passport, PAN & Aadhaar
+• Submit bank payment (NEFT/RTGS/IMPS) if pending
+• Track visa status
+• Download Invoice
+• Download Flight Ticket
+• Download Hotel Voucher
+• Download Visa
+• View Journey Status
+
+Dashboard:
+https://www.alburhantravels.com/dashboard
+
+Need Help?
+
+📞 +91 9893225590
+📧 info@alburhantravels.com
+🌐 https://www.alburhantravels.com
+
+May Allah accept your pilgrimage.
+
+Al Burhan Tours & Travels`;
+
+  const smsMsg =
+`Dear ${opts.customerName},
+
+Your Hajj/Umrah booking with Al Burhan Tours & Travels has been confirmed.
+
+Booking ID:
+${opts.bookingNumber}
+
+Package:
+${pkg}
+
+Departure:
+${dep}
+
+Login:
+https://www.alburhantravels.com/dashboard
+
+Support:
++91 9893225590`;
+
+  const emailHtml = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f0f4f8;font-family:Arial,sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f4f8;padding:32px 0">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,0.08)">
+        <!-- Header -->
+        <tr><td style="background:linear-gradient(135deg,#0B3D2E 0%,#1a6b4a 100%);padding:32px 40px;text-align:center">
+          <h1 style="color:#fff;margin:0;font-size:22px;letter-spacing:1px">AL BURHAN TOURS &amp; TRAVELS</h1>
+          <p style="color:#a8d5b5;margin:6px 0 0;font-size:13px">Hajj &amp; Umrah Specialists</p>
+        </td></tr>
+        <!-- Green banner -->
+        <tr><td style="background:#16a34a;padding:18px 40px;text-align:center">
+          <p style="color:#fff;margin:0;font-size:18px;font-weight:bold">✅ Booking Confirmed — Alhamdulillah!</p>
+        </td></tr>
+        <!-- Body -->
+        <tr><td style="padding:32px 40px">
+          <p style="color:#374151;font-size:15px;margin:0 0 16px">Assalamu Alaikum <strong>${opts.customerName}</strong>,</p>
+          <p style="color:#374151;font-size:14px;margin:0 0 24px">Your Hajj/Umrah booking has been <strong>successfully confirmed</strong>. May Allah accept your pilgrimage. Ameen!</p>
+
+          <!-- Booking Details -->
+          <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:24px">
+            <tr style="background:#f9fafb"><td colspan="2" style="padding:12px 16px;font-weight:bold;color:#0B3D2E;font-size:13px;text-transform:uppercase;letter-spacing:0.5px">Booking Details</td></tr>
+            <tr style="border-top:1px solid #e5e7eb"><td style="padding:10px 16px;color:#6b7280;font-size:13px;width:45%">Booking ID</td><td style="padding:10px 16px;font-family:monospace;font-weight:bold;font-size:14px;color:#0B3D2E">${opts.bookingNumber}</td></tr>
+            <tr style="background:#f9fafb;border-top:1px solid #e5e7eb"><td style="padding:10px 16px;color:#6b7280;font-size:13px">Package</td><td style="padding:10px 16px;font-size:14px;font-weight:600">${pkg}</td></tr>
+            <tr style="border-top:1px solid #e5e7eb"><td style="padding:10px 16px;color:#6b7280;font-size:13px">Pilgrims</td><td style="padding:10px 16px;font-size:14px">${pilgrims}</td></tr>
+            <tr style="background:#f9fafb;border-top:1px solid #e5e7eb"><td style="padding:10px 16px;color:#6b7280;font-size:13px">Departure</td><td style="padding:10px 16px;font-size:14px;font-weight:600">${dep}</td></tr>
+          </table>
+
+          <!-- Payment Summary -->
+          <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:28px">
+            <tr style="background:#f9fafb"><td colspan="2" style="padding:12px 16px;font-weight:bold;color:#0B3D2E;font-size:13px;text-transform:uppercase;letter-spacing:0.5px">Payment Summary</td></tr>
+            <tr style="border-top:1px solid #e5e7eb"><td style="padding:10px 16px;color:#6b7280;font-size:13px;width:45%">Total Package Cost</td><td style="padding:10px 16px;font-family:monospace;font-weight:bold;color:#0B3D2E">₹${total}</td></tr>
+            <tr style="background:#f9fafb;border-top:1px solid #e5e7eb"><td style="padding:10px 16px;color:#6b7280;font-size:13px">Amount Paid</td><td style="padding:10px 16px;font-family:monospace;font-weight:bold;color:#16a34a">₹${paid}</td></tr>
+            <tr style="border-top:1px solid #e5e7eb"><td style="padding:10px 16px;color:#6b7280;font-size:13px">Balance Due</td><td style="padding:10px 16px;font-family:monospace;font-weight:bold;color:#dc2626">₹${balance}</td></tr>
+          </table>
+
+          <!-- CTA Button -->
+          <div style="text-align:center;margin-bottom:28px">
+            <a href="https://www.alburhantravels.com/dashboard" style="background:#0B3D2E;color:#fff;padding:14px 36px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:15px;display:inline-block">
+              🕋 Login to Your Dashboard
+            </a>
+          </div>
+
+          <!-- Next Steps -->
+          <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:20px;margin-bottom:24px">
+            <p style="color:#15803d;font-weight:bold;font-size:13px;margin:0 0 10px">📋 Next Steps — Please Complete:</p>
+            <ul style="color:#374151;font-size:13px;margin:0;padding-left:20px;line-height:1.8">
+              <li>Complete your travel profile</li>
+              <li>Upload Passport, PAN &amp; Aadhaar</li>
+              <li>Submit bank payment if balance is pending</li>
+              <li>Track your visa status</li>
+              <li>Download Invoice, Flight Ticket &amp; Hotel Voucher</li>
+            </ul>
+          </div>
+
+          <!-- Contact -->
+          <div style="border-top:1px solid #e5e7eb;padding-top:20px;text-align:center">
+            <p style="color:#6b7280;font-size:13px;margin:0 0 6px">Need Help? We're here for you.</p>
+            <p style="color:#374151;font-size:13px;margin:0">📞 +91 9893225590 &nbsp;|&nbsp; 📧 info@alburhantravels.com</p>
+            <p style="color:#374151;font-size:13px;margin:4px 0 0">🌐 <a href="https://www.alburhantravels.com" style="color:#0B3D2E">www.alburhantravels.com</a></p>
+          </div>
+        </td></tr>
+        <!-- Footer -->
+        <tr><td style="background:#0B3D2E;padding:20px 40px;text-align:center">
+          <p style="color:#a8d5b5;margin:0;font-size:12px">Al Burhan Tours &amp; Travels · Hajj &amp; Umrah Specialists</p>
+          <p style="color:#6b9e7a;margin:4px 0 0;font-size:11px">May Allah accept your Hajj/Umrah. Ameen.</p>
+        </td></tr>
+        <!-- T&C -->
+        <tr><td style="padding:16px 40px;text-align:center">
+          <p style="color:#9ca3af;font-size:11px;margin:0">This is an automated confirmation. Booking is subject to availability and terms &amp; conditions of Al Burhan Tours &amp; Travels. For cancellations, contact us at least 30 days before departure.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  const [waResult, smsResult, emailResult] = await Promise.all([
+    withRetry(() => sendWhatsApp(opts.mobile, waMsg), 3),
+    withRetry(() =>
+      sendDLTSMS(opts.mobile, opts.customerName, opts.bookingNumber, "CONFIRMED"), 3
+    ).catch((err: any) => ({ ok: false, provider: "Fast2SMS", endpoint: "sms", errorMessage: err?.message || "SMS failed" } as SendResult)),
+    opts.email
+      ? withRetry(async () => {
+          const transport = getEmailTransport();
+          if (!transport) return { ok: false, provider: "SMTP", endpoint: "smtp", errorMessage: "SMTP not configured" } as SendResult;
+          const smtpCfg = getCachedConfig("smtp");
+          const from = smtpCfg.extra?.from_email || smtpCfg.extra?.user || process.env.SMTP_USER || "info@alburhantravels.com";
+          await transport.sendMail({
+            from: `Al Burhan Tours & Travels <${from}>`,
+            to: opts.email!,
+            subject: `Booking Confirmed | Al Burhan Tours & Travels`,
+            html: emailHtml,
+            text: smsMsg,
+          });
+          return { ok: true, provider: "SMTP", endpoint: "smtp", responsePayload: { delivered: true } } as SendResult;
+        }, 3).catch((err: any) => ({ ok: false, provider: "SMTP", endpoint: "smtp", errorMessage: err?.message || "Email failed" } as SendResult))
+      : Promise.resolve({ ok: false, provider: "SMTP", endpoint: "smtp", errorMessage: "No email provided" } as SendResult),
+  ]);
+
+  let dashboardResult: { ok: boolean; errorMessage?: string } = { ok: false, errorMessage: "No bookingId" };
+  if (opts.bookingId) {
+    try {
+      const { randomUUID } = await import("crypto");
+      await opts.pool.query(
+        `INSERT INTO customer_timeline (customer_id, booking_id, event_type, title, description, icon)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          opts.customerId || null,
+          opts.bookingId,
+          "booking_confirmed",
+          "Booking Confirmed ✅",
+          `Congratulations! Your booking has been approved successfully.\n\nBooking ID: ${opts.bookingNumber}\n\nPlease complete your travel profile and upload required documents to continue your pilgrimage process.`,
+          "🕋",
+        ]
+      );
+      dashboardResult = { ok: true };
+    } catch (err: any) {
+      dashboardResult = { ok: false, errorMessage: err?.message || "Dashboard notification failed" };
+    }
+  }
+
+  return { whatsapp: waResult, sms: smsResult, email: emailResult, dashboard: dashboardResult };
+}
+
 // ── Offline Bank Transfer Notifications ───────────────────────────────────
 
 export async function sendOfflinePaymentApprovedNotification(opts: {
