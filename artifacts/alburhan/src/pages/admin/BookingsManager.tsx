@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { PermissionGuard } from "@/components/PermissionGuard";
 import { useListBookings, useApproveBooking, useRejectBooking, useListDocuments } from "@workspace/api-client-react";
@@ -66,6 +66,222 @@ function isImageFile(fileName: string) {
 }
 
 const DOC_TYPES = Object.entries(DOC_TYPE_LABELS).map(([value, label]) => ({ value, label }));
+
+const TRAVEL_DOC_SLOTS = [
+  { value: "flight_ticket", label: "Flight Ticket", icon: "✈️" },
+  { value: "visa", label: "Visa", icon: "🛂" },
+  { value: "hotel_voucher", label: "Hotel Voucher", icon: "🏨" },
+  { value: "room_allotment", label: "Room Allotment", icon: "🛏" },
+  { value: "bus_allotment", label: "Bus Allotment", icon: "🚌" },
+  { value: "model_contract", label: "Model Contract", icon: "📑" },
+  { value: "tour_itinerary", label: "Tour Itinerary", icon: "📍" },
+  { value: "payment_receipt", label: "Payment Receipt", icon: "🧾" },
+  { value: "ziyarat_schedule", label: "Ziyarat Schedule", icon: "📋" },
+  { value: "insurance", label: "Insurance", icon: "🛡️" },
+  { value: "hajj_id", label: "Hajj ID Card", icon: "🪪" },
+  { value: "luggage_tag", label: "Luggage Tag", icon: "🧳" },
+  { value: "emergency_contact_card", label: "Emergency Contact Card", icon: "📞" },
+];
+const KYC_DOC_SLOTS = [
+  { value: "passport", label: "Passport Copy", icon: "📷" },
+  { value: "pan_card", label: "PAN Card", icon: "💳" },
+  { value: "aadhaar", label: "Aadhaar Card", icon: "🆔" },
+  { value: "passport_photo", label: "Passport Photo", icon: "📸" },
+  { value: "medical_certificate", label: "Medical Certificate", icon: "💉" },
+  { value: "other", label: "Other Document", icon: "📁" },
+];
+
+function DocumentManagerDialog({ bookingId, open, onClose }: { bookingId: string; open: boolean; onClose: () => void }) {
+  const { data: docs, isLoading, refetch } = useListDocuments(bookingId, { query: { refetchOnMount: "always" } });
+  const { toast } = useToast();
+  const { requestDelete } = useDeleteGuard();
+  const queryClient = useQueryClient();
+
+  const [selectedSlot, setSelectedSlot] = useState("flight_ticket");
+  const [uploading, setUploading] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const docList = (docs || []) as any[];
+  const docMap = useMemo(() => {
+    const map: Record<string, any> = {};
+    docList.forEach((d: any) => { if (!map[d.documentType]) map[d.documentType] = d; });
+    return map;
+  }, [docList]);
+
+  const selectedDoc = docMap[selectedSlot];
+  const selectedSlotInfo = [...TRAVEL_DOC_SLOTS, ...KYC_DOC_SLOTS].find(s => s.value === selectedSlot);
+  const previewUrl = selectedDoc ? `${BASE_API}${selectedDoc.fileUrl}` : null;
+  const isPdf = selectedDoc && (selectedDoc.fileName || "").toLowerCase().endsWith(".pdf");
+  const isImg = selectedDoc && isImageFile(selectedDoc.fileName || "");
+
+  const handleDelete = (docId: string, fileName: string) => {
+    requestDelete(`Document: ${fileName}`, async (token) => {
+      const res = await fetch(`${BASE_API}/api/documents/${docId}`, {
+        method: "DELETE", credentials: "include",
+        headers: { "X-Delete-Token": token },
+      });
+      if (!res.ok) throw new Error("Could not delete document");
+      queryClient.invalidateQueries({ queryKey: [`/api/documents/${bookingId}`] });
+      toast({ title: "Document deleted" });
+      refetch();
+    });
+  };
+
+  const doUpload = async (f: File) => {
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", f);
+      fd.append("bookingId", bookingId);
+      fd.append("documentType", selectedSlot);
+      const res = await fetch(`${BASE_API}/api/documents/upload`, { method: "POST", body: fd, credentials: "include" });
+      if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Upload failed"); }
+      toast({ title: "Uploaded!", description: `${DOC_TYPE_LABELS[selectedSlot]} sent to customer.` });
+      setFile(null);
+      if (fileRef.current) fileRef.current.value = "";
+      refetch();
+      queryClient.invalidateQueries({ queryKey: [`/api/documents/${bookingId}`] });
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } finally { setUploading(false); }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={v => !v && onClose()}>
+      <DialogContent className="max-w-5xl w-full p-0 overflow-hidden flex flex-col" style={{ height: "85vh" }}>
+        <DialogHeader className="px-4 py-3 border-b shrink-0">
+          <DialogTitle className="flex items-center gap-2 text-sm font-semibold">
+            <FileText size={15} /> Customer Documents
+          </DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-1 overflow-hidden min-h-0">
+          {/* LEFT SIDEBAR */}
+          <div className="w-72 shrink-0 border-r flex flex-col overflow-hidden bg-gray-50/80">
+            <div className="px-3 py-2 bg-white border-b">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Travel Documents</p>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {TRAVEL_DOC_SLOTS.map(slot => {
+                const uploaded = docMap[slot.value];
+                const active = selectedSlot === slot.value;
+                return (
+                  <button key={slot.value} onClick={() => setSelectedSlot(slot.value)}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors border-b border-gray-100 ${active ? "bg-emerald-50 border-r-2 border-r-emerald-700" : "hover:bg-gray-100"}`}>
+                    <span className="text-sm shrink-0">{slot.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-xs font-medium truncate ${active ? "text-emerald-800" : "text-gray-700"}`}>{slot.label}</p>
+                      {uploaded
+                        ? <p className="text-[10px] text-emerald-600">✅ {new Date(uploaded.createdAt).toLocaleDateString("en-IN")}</p>
+                        : <p className="text-[10px] text-gray-400">❌ Not uploaded</p>}
+                    </div>
+                  </button>
+                );
+              })}
+              <div className="px-3 py-2 bg-white border-y">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">KYC / Other</p>
+              </div>
+              {KYC_DOC_SLOTS.map(slot => {
+                const uploaded = docMap[slot.value];
+                const active = selectedSlot === slot.value;
+                return (
+                  <button key={slot.value} onClick={() => setSelectedSlot(slot.value)}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors border-b border-gray-100 ${active ? "bg-emerald-50 border-r-2 border-r-emerald-700" : "hover:bg-gray-100"}`}>
+                    <span className="text-sm shrink-0">{slot.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-xs font-medium truncate ${active ? "text-emerald-800" : "text-gray-700"}`}>{slot.label}</p>
+                      {uploaded
+                        ? <p className="text-[10px] text-emerald-600">✅ {new Date(uploaded.createdAt).toLocaleDateString("en-IN")}</p>
+                        : <p className="text-[10px] text-gray-400">❌ Not uploaded</p>}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* RIGHT PANEL */}
+          <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+            {/* Upload zone */}
+            <div className="px-4 py-3 border-b bg-white shrink-0"
+              onDragOver={e => { e.preventDefault(); setDragging(true); }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={e => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f) { setFile(f); doUpload(f); } }}>
+              <p className="text-xs font-semibold text-gray-700 mb-2">
+                Uploading as: <span className="text-emerald-700">{selectedSlotInfo?.icon} {selectedSlotInfo?.label}</span>
+                {selectedDoc && <span className="ml-2 text-[10px] text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">Already uploaded — will replace</span>}
+              </p>
+              <div className="flex items-center gap-2">
+                <label className={`flex-1 flex items-center gap-2 text-xs cursor-pointer px-3 py-2 rounded-md border transition-colors ${dragging ? "border-emerald-400 bg-emerald-50" : "bg-gray-50 hover:bg-gray-100"} ${file ? "text-gray-800 font-medium" : "text-gray-400"}`}>
+                  <Upload size={12} />
+                  {file ? file.name : dragging ? "Drop to upload…" : "Click to select or drag & drop — PDF, JPG, PNG, DOCX (max 25 MB)"}
+                  <input ref={fileRef} type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
+                    onChange={e => setFile(e.target.files?.[0] || null)} />
+                </label>
+                <Button size="sm" className="h-8 text-xs gap-1.5 bg-[#0B3D2E] hover:bg-[#0d5038] text-white shrink-0"
+                  onClick={() => { if (file) doUpload(file); else toast({ title: "Select a file first", variant: "destructive" }); }}
+                  disabled={uploading || !file}>
+                  <Upload size={12} />{uploading ? "Uploading…" : "Upload"}
+                </Button>
+                <Button size="sm" variant="ghost" className="h-8 w-8 p-0 shrink-0" title="Refresh" onClick={() => refetch()}>
+                  <RefreshCw size={12} className={isLoading ? "animate-spin" : ""} />
+                </Button>
+              </div>
+            </div>
+
+            {/* Preview area */}
+            <div className="flex-1 overflow-auto flex flex-col min-h-0">
+              {!selectedDoc ? (
+                <div className="flex-1 flex flex-col items-center justify-center text-center p-10 bg-gray-50">
+                  <span className="text-5xl mb-4">{selectedSlotInfo?.icon}</span>
+                  <p className="text-sm font-semibold text-gray-600">{selectedSlotInfo?.label}</p>
+                  <p className="text-xs text-gray-400 mt-1">❌ Not uploaded yet</p>
+                  <p className="text-xs text-gray-400 mt-4">Select a file and click Upload above to add this document.</p>
+                </div>
+              ) : (
+                <div className="flex flex-col h-full min-h-0">
+                  <div className="flex items-center gap-2 px-4 py-2 bg-white border-b shrink-0">
+                    <FileText size={14} className="text-gray-400 shrink-0" />
+                    <span className="text-xs font-medium text-gray-700 flex-1 truncate">{selectedDoc.fileName}</span>
+                    <span className="text-[10px] text-gray-400 shrink-0">
+                      {selectedDoc.createdAt ? new Date(selectedDoc.createdAt).toLocaleDateString("en-IN") : ""}
+                    </span>
+                    <a href={previewUrl!} target="_blank" rel="noreferrer">
+                      <Button size="sm" variant="outline" className="h-7 text-xs gap-1"><Eye size={11} /> View</Button>
+                    </a>
+                    <a href={previewUrl!} download={selectedDoc.fileName}>
+                      <Button size="sm" variant="outline" className="h-7 text-xs gap-1 text-emerald-700 border-emerald-200 hover:bg-emerald-50"><Download size={11} /> Download</Button>
+                    </a>
+                    <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 text-red-500 hover:bg-red-50"
+                      onClick={() => handleDelete(selectedDoc.id, selectedDoc.fileName)}>
+                      <Trash2 size={11} /> Delete
+                    </Button>
+                  </div>
+                  <div className="flex-1 overflow-auto p-4 bg-gray-50">
+                    {isPdf ? (
+                      <iframe src={`${previewUrl}#toolbar=0`} className="w-full rounded border bg-white" style={{ height: "100%", minHeight: 400 }} />
+                    ) : isImg ? (
+                      <img src={previewUrl!} alt={selectedDoc.fileName} className="max-w-full max-h-full object-contain mx-auto rounded border shadow-sm" />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-full">
+                        <FileText size={48} className="text-gray-200 mb-3" />
+                        <p className="text-sm text-gray-500">{selectedDoc.fileName}</p>
+                        <a href={previewUrl!} target="_blank" rel="noreferrer" className="mt-3">
+                          <Button size="sm" variant="outline">Open File</Button>
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 const BASE_API = import.meta.env.VITE_API_URL || "";
 
 function AdminDocumentsSection({ bookingId }: { bookingId: string }) {
@@ -715,6 +931,7 @@ function BookingDetailModal({ booking, open, onClose }: { booking: Booking | nul
   const [autoFilling, setAutoFilling] = useState(false);
   const [assigningGroup, setAssigningGroup] = useState(false);
   const [selectedGroupId, setSelectedGroupId] = useState("");
+  const [docsOpen, setDocsOpen] = useState(false);
   const [availableGroups, setAvailableGroups] = useState<{ id: string; name: string; year: number; maktabNumber?: string }[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(false);
   const [selectedJourneyStatus, setSelectedJourneyStatus] = useState("");
@@ -1040,7 +1257,16 @@ function BookingDetailModal({ booking, open, onClose }: { booking: Booking | nul
             <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2 flex items-center gap-1.5">
               <FileText size={12} /> Customer Documents
             </h4>
-            <AdminDocumentsSection bookingId={booking.id} />
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full justify-start gap-2 text-xs h-9 border-dashed hover:bg-emerald-50 hover:border-emerald-400 hover:text-emerald-800"
+              onClick={() => setDocsOpen(true)}
+            >
+              <FileText size={13} />
+              Manage Documents — view, upload & preview all files
+            </Button>
+            {booking && <DocumentManagerDialog bookingId={booking.id} open={docsOpen} onClose={() => setDocsOpen(false)} />}
           </div>
 
           <div>
