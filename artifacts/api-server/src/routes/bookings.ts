@@ -464,6 +464,8 @@ router.post("/", requireAuth as any, async (req: AuthenticatedRequest, res) => {
     bookingNumber: booking.bookingNumber,
     packageName: booking.packageName ?? pkg?.name ?? "Travel Package",
     numberOfPilgrims: booking.numberOfPilgrims,
+    bookingId: booking.id,
+    pool,
   }).then(() => {
     trackNotification({ eventType: "new_booking", channel: "whatsapp", recipient: booking.customerMobile, customerId: booking.customerId ?? undefined, bookingId: booking.id, status: "sent" }).catch(() => {});
     trackNotification({ eventType: "new_booking", channel: "sms", recipient: booking.customerMobile, customerId: booking.customerId ?? undefined, bookingId: booking.id, status: "sent" }).catch(() => {});
@@ -559,6 +561,7 @@ router.post("/:id/approve", requireAdmin as any, requirePermission("bookings", "
         { channel: "whatsapp", r: result.whatsapp },
         { channel: "sms",      r: result.sms },
         { channel: "email",    r: result.email },
+        { channel: "rcs",      r: result.rcs },
         { channel: "dashboard",r: result.dashboard },
       ];
       for (const { channel, r } of channels) {
@@ -618,11 +621,29 @@ router.post("/:id/resend-confirmation", requireAdmin as any, requirePermission("
   const bookings = await db.select().from(bookingsTable).where(eq(bookingsTable.id, req.params.id)).limit(1);
   if (!bookings[0]) { res.status(404).json({ message: "Booking not found" }); return; }
   const b = bookings[0];
-  res.json({ message: "Resending notifications..." });
+  res.json({ message: "Resending notifications...", bookingStatus: b.status });
 
   (async () => {
     try {
       const { randomUUID } = await import("crypto");
+
+      if (b.status === "pending" || b.status === "submitted") {
+        // Booking not yet approved — resend submission notification
+        await sendBookingSubmissionNotification({
+          mobile: b.customerMobile,
+          email: b.customerEmail,
+          customerName: b.customerName,
+          bookingNumber: b.bookingNumber,
+          packageName: b.packageName ?? "Travel Package",
+          numberOfPilgrims: b.numberOfPilgrims,
+          bookingId: b.id,
+          pool,
+        });
+        // Submission function handles its own DB logging
+        return;
+      }
+
+      // Booking is approved/confirmed — resend the rich confirmation
       const paidAmt = Number(b.paidAmount || 0);
       const totalAmt = Number(b.finalAmount || b.totalAmount || 0);
       const balanceAmt = Math.max(0, totalAmt - paidAmt);
@@ -647,6 +668,7 @@ router.post("/:id/resend-confirmation", requireAdmin as any, requirePermission("
         { channel: "whatsapp", r: result.whatsapp },
         { channel: "sms",      r: result.sms },
         { channel: "email",    r: result.email },
+        { channel: "rcs",      r: result.rcs },
         { channel: "dashboard",r: result.dashboard },
       ];
       for (const { channel, r } of channels) {

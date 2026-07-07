@@ -515,7 +515,7 @@ function buildHtmlEmail(bodyText: string): string {
 </body></html>`;
 }
 
-export async function sendEmail(to: string, subject: string, body: string): Promise<SendResult> {
+export async function sendEmail(to: string, subject: string, body: string, htmlBody?: string): Promise<SendResult> {
   if (!to) return { ok: false, provider: "SMTP", endpoint: "smtp", errorMessage: "No recipient email" };
   const transport = getEmailTransport();
   if (!transport) {
@@ -541,7 +541,7 @@ export async function sendEmail(to: string, subject: string, body: string): Prom
         replyTo,
         to, subject,
         text: plainText,
-        html: buildHtmlEmail(plainText),
+        html: htmlBody || buildHtmlEmail(plainText),
       })
     );
     console.log("[Email] Sent to:", to, "Subject:", subject);
@@ -564,17 +564,58 @@ export async function sendBookingSubmissionNotification(opts: {
   bookingNumber: string;
   packageName: string;
   numberOfPilgrims: number;
+  bookingId?: string | null;
+  pool?: any;
 }) {
   const customerMsg = `Assalamu Alaikum ${opts.customerName},\n\nYour booking #${opts.bookingNumber} for "${opts.packageName}" (${opts.numberOfPilgrims} pilgrim${opts.numberOfPilgrims > 1 ? "s" : ""}) has been submitted.\n\nOur team will review shortly and notify you once approved.\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 8989701701`;
   const adminMsg = `New Booking Alert!\n\nBooking #${opts.bookingNumber}\nCustomer: ${opts.customerName}\nMobile: ${opts.mobile}\nPackage: ${opts.packageName}\nPilgrims: ${opts.numberOfPilgrims}\n\nReview from admin dashboard.`;
 
-  await Promise.allSettled([
-    smsSendBookingCreated({ mobile: opts.mobile, customerName: opts.customerName, bookingNumber: opts.bookingNumber, packageName: opts.packageName }),
+  const [waRes, smsRes, emailRes, rcsRes] = await Promise.allSettled([
     sendWhatsApp(opts.mobile, customerMsg),
-    opts.email ? sendEmail(opts.email, "Booking Submitted – Al Burhan Tours & Travels", customerMsg) : Promise.resolve(),
+    sendDLTSMS(opts.mobile, opts.customerName, opts.bookingNumber, "CONFIRMED")
+      .then((ok): SendResult => ok
+        ? { ok: true, provider: "Fast2SMS", endpoint: "sms-dlt", responsePayload: { sent: true } }
+        : { ok: false, provider: "Fast2SMS", endpoint: "sms-dlt", errorMessage: "DLT SMS failed" })
+      .catch((e: any): SendResult => ({ ok: false, provider: "Fast2SMS", endpoint: "sms-dlt", errorMessage: e?.message || "SMS error" })),
+    opts.email ? sendEmail(opts.email, "Booking Submitted – Al Burhan Tours & Travels", customerMsg) : Promise.resolve({ ok: false, provider: "SMTP", endpoint: "smtp", errorMessage: "No email" } as SendResult),
+    sendRCS(opts.mobile, opts.customerName, customerMsg),
+  ]);
+
+  // Fire admin WhatsApp alerts (fire-and-forget)
+  Promise.allSettled([
     sendWhatsApp("9893989786", adminMsg),
     sendWhatsApp("8989701701", adminMsg),
-  ]);
+  ]).catch(() => {});
+
+  const waOk    = waRes.status === "fulfilled"    && (waRes.value as SendResult).ok;
+  const smsOk   = smsRes.status === "fulfilled"   && (smsRes.value as SendResult).ok;
+  const emailOk = emailRes.status === "fulfilled" && (emailRes.value as SendResult).ok;
+  const rcsOk   = rcsRes.status === "fulfilled"   && (rcsRes.value as SendResult).ok;
+
+  console.log("[Submission] WA:", waOk, "SMS:", smsOk, "Email:", emailOk, "RCS:", rcsOk);
+  if (!waOk)    console.error("[Submission] WhatsApp:", waRes.status === "rejected" ? waRes.reason : (waRes.value as SendResult).errorMessage);
+  if (!smsOk)   console.error("[Submission] SMS:", smsRes.status === "rejected" ? smsRes.reason : (smsRes.value as SendResult).errorMessage);
+  if (!emailOk) console.error("[Submission] Email:", emailRes.status === "rejected" ? emailRes.reason : (emailRes.value as SendResult).errorMessage);
+  if (!rcsOk)   console.error("[Submission] RCS:", rcsRes.status === "rejected" ? rcsRes.reason : (rcsRes.value as SendResult).errorMessage);
+
+  // Log to booking_confirmation_notifications so UI shows real delivery status
+  if (opts.bookingId && opts.pool) {
+    const { randomUUID } = await import("crypto");
+    const channelRows: Array<{ ch: string; ok: boolean; msg?: string }> = [
+      { ch: "whatsapp", ok: waOk,    msg: !waOk    ? String((waRes.status === "rejected" ? waRes.reason : (waRes.value as SendResult).errorMessage) ?? "failed") : undefined },
+      { ch: "sms",      ok: smsOk,   msg: !smsOk   ? String((smsRes.status === "rejected" ? smsRes.reason : (smsRes.value as SendResult).errorMessage) ?? "failed") : undefined },
+      { ch: "email",    ok: emailOk, msg: !emailOk ? String((emailRes.status === "rejected" ? emailRes.reason : (emailRes.value as SendResult).errorMessage) ?? "failed") : undefined },
+      { ch: "rcs",      ok: rcsOk,   msg: !rcsOk   ? String((rcsRes.status === "rejected" ? rcsRes.reason : (rcsRes.value as SendResult).errorMessage) ?? "failed") : undefined },
+    ];
+    for (const row of channelRows) {
+      await opts.pool.query(
+        `INSERT INTO booking_confirmation_notifications (id, booking_id, channel, status, error_message, sent_at, retry_count)
+         VALUES ($1, $2, $3, $4, $5, NOW(), 0)
+         ON CONFLICT (id) DO NOTHING`,
+        [randomUUID(), opts.bookingId, row.ch, row.ok ? "sent" : "failed", row.ok ? null : row.msg]
+      ).catch((e: any) => console.error("[Submission] DB log failed:", e?.message));
+    }
+  }
 }
 
 export async function sendBookingApprovalNotification(opts: {
@@ -807,6 +848,7 @@ export interface ConfirmationChannelResult {
   whatsapp: SendResult;
   sms: SendResult;
   email: SendResult;
+  rcs: SendResult;
   dashboard: { ok: boolean; errorMessage?: string };
 }
 
@@ -985,27 +1027,25 @@ Support:
 </body>
 </html>`;
 
-  const [waResult, smsResult, emailResult] = await Promise.all([
-    withRetry(() => sendWhatsApp(opts.mobile, waMsg), 3),
-    withRetry(() =>
-      sendDLTSMS(opts.mobile, opts.customerName, opts.bookingNumber, "CONFIRMED"), 3
-    ).catch((err: any) => ({ ok: false, provider: "Fast2SMS", endpoint: "sms", errorMessage: err?.message || "SMS failed" } as SendResult)),
+  const [waResult, smsResult, emailResult, rcsResult] = await Promise.all([
+    // ── WhatsApp ──────────────────────────────────────────────────────────────
+    sendWhatsApp(opts.mobile, waMsg),
+
+    // ── SMS (DLT) — wrap boolean return to SendResult ─────────────────────────
+    sendDLTSMS(opts.mobile, opts.customerName, opts.bookingNumber, "CONFIRMED")
+      .then((ok): SendResult => ok
+        ? { ok: true, provider: "Fast2SMS", endpoint: "sms-dlt", responsePayload: { sent: true } }
+        : { ok: false, provider: "Fast2SMS", endpoint: "sms-dlt", errorMessage: "DLT SMS delivery failed" })
+      .catch((err: any): SendResult => ({ ok: false, provider: "Fast2SMS", endpoint: "sms-dlt", errorMessage: err?.message || "SMS error" })),
+
+    // ── Email — use sendEmail() helper so from-address matches SMTP auth user ─
     opts.email
-      ? withRetry(async () => {
-          const transport = getEmailTransport();
-          if (!transport) return { ok: false, provider: "SMTP", endpoint: "smtp", errorMessage: "SMTP not configured" } as SendResult;
-          const smtpCfg = getCachedConfig("smtp");
-          const from = smtpCfg.extra?.from_email || smtpCfg.extra?.user || process.env.SMTP_USER || "info@alburhantravels.com";
-          await transport.sendMail({
-            from: `Al Burhan Tours & Travels <${from}>`,
-            to: opts.email!,
-            subject: `Booking Confirmed | Al Burhan Tours & Travels`,
-            html: emailHtml,
-            text: smsMsg,
-          });
-          return { ok: true, provider: "SMTP", endpoint: "smtp", responsePayload: { delivered: true } } as SendResult;
-        }, 3).catch((err: any) => ({ ok: false, provider: "SMTP", endpoint: "smtp", errorMessage: err?.message || "Email failed" } as SendResult))
+      ? sendEmail(opts.email, "Booking Confirmed | Al Burhan Tours & Travels", smsMsg, emailHtml)
+          .catch((err: any): SendResult => ({ ok: false, provider: "SMTP", endpoint: "smtp", errorMessage: err?.message || "Email failed" }))
       : Promise.resolve({ ok: false, provider: "SMTP", endpoint: "smtp", errorMessage: "No email provided" } as SendResult),
+
+    // ── RCS (Lemin AI / Jio) ──────────────────────────────────────────────────
+    sendRCS(opts.mobile, opts.customerName, smsMsg, { active: true, url: "https://www.alburhantravels.com/dashboard", agent: "jio" }),
   ]);
 
   let dashboardResult: { ok: boolean; errorMessage?: string } = { ok: false, errorMessage: "No bookingId" };
@@ -1030,7 +1070,13 @@ Support:
     }
   }
 
-  return { whatsapp: waResult, sms: smsResult, email: emailResult, dashboard: dashboardResult };
+  console.log("[Confirmation] WA:", waResult.ok, "SMS:", smsResult.ok, "Email:", emailResult.ok, "RCS:", rcsResult.ok, "Dashboard:", dashboardResult.ok);
+  if (!waResult.ok)    console.error("[Confirmation] WhatsApp failed:", waResult.errorMessage);
+  if (!smsResult.ok)   console.error("[Confirmation] SMS failed:", smsResult.errorMessage);
+  if (!emailResult.ok) console.error("[Confirmation] Email failed:", emailResult.errorMessage);
+  if (!rcsResult.ok)   console.error("[Confirmation] RCS failed:", rcsResult.errorMessage);
+
+  return { whatsapp: waResult, sms: smsResult, email: emailResult, rcs: rcsResult, dashboard: dashboardResult };
 }
 
 // ── Offline Bank Transfer Notifications ───────────────────────────────────

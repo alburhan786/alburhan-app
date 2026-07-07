@@ -1,0 +1,40 @@
+My admin panel (Al Burhan Tours & Travels booking system) is failing to send 
+booking confirmation notifications through ALL channels: SMS, WhatsApp, Email, 
+and RCS (via Lemin AI + Jio). The "Booking Confirmation Notifications" section 
+shows "No notification records yet" even after bookings are submitted, and 
+"Resend All" does not appear to send anything either.
+
+Please do a full audit and fix, in this order:
+
+1. Locate the code path triggered when a booking is submitted/created. Confirm 
+   whether a notification-sending function is actually called in that flow. 
+   If it's missing, add the call.
+
+2. Check every notification-sending function (SMS, WhatsApp, Email, RCS) for 
+   silent error handling — any try/catch that swallows errors without logging. 
+   Add proper error logging (console.error with full error object, plus save 
+   the failure reason to the notification_records table/collection) for every 
+   channel.
+
+3. Verify all required environment variables/secrets exist and are being read 
+   correctly at runtime (SMS provider key, WhatsApp Business API token, SMTP 
+   credentials, Lemin AI API key, Jio RCS credentials including User ID). 
+   Print (server-side only, never to the client) which secrets are missing 
+   or empty.
+
+4. Check if there's a background job/queue system handling notification 
+   delivery. If so, confirm the worker process is actually running and 
+   processing the queue — if it's not started or crashed, restart/fix it.
+
+5. Fix the "Resend All" button so it actually re-triggers all four channels 
+   and creates a notification_records entry per attempt (success or failure), 
+   so the UI reflects real status instead of staying empty.
+
+6. For each channel, run a real test send after your fix and show me the 
+   actual API response/error for: SMS, WhatsApp, Email, and RCS.
+
+7. Give me a summary of what was actually broken for each channel — don't 
+   just say "fixed," show me the specific bug found in each case.
+
+Do not guess — trace the actual code path from booking submission to 
+notification send, and show me the relevant code before and after each fix.
