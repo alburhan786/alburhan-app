@@ -142,51 +142,54 @@ function AdminDocumentsSection({ bookingId }: { bookingId: string }) {
     const lastDl = doc.lastDownloadedAt ?? doc.last_downloaded_at;
 
     return (
-      <div key={doc.id} className="flex items-start gap-3 border rounded-lg p-3 bg-white">
-        <div className="flex-shrink-0 mt-0.5">
-          {isImg ? <ImageIcon size={18} className="text-blue-500" /> : <FileText size={18} className="text-gray-500" />}
+      <div key={doc.id} className="flex items-center gap-2 border rounded-lg px-3 py-2 bg-white">
+        <div className="flex-shrink-0">
+          {isImg ? <ImageIcon size={15} className="text-blue-500" /> : <FileText size={15} className="text-gray-400" />}
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Badge className={`text-[10px] px-2 py-0.5 font-semibold border-0 ${color}`}>{label}</Badge>
-            <span className="text-xs text-muted-foreground truncate max-w-[160px]">{doc.fileName}</span>
+        <div className="flex-1 min-w-0 text-left">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Badge className={`text-[10px] px-1.5 py-0 font-semibold border-0 shrink-0 ${color}`}>{label}</Badge>
+            <span className="text-[11px] text-gray-700 font-medium truncate">{doc.fileName}</span>
           </div>
-          <p className="text-[10px] text-muted-foreground mt-0.5">
-            {doc.uploadedBy === "admin" ? "👤 Admin" : "👤 Customer"}
-            {doc.createdAt ? ` · ${new Date(doc.createdAt).toLocaleDateString("en-IN")}` : ""}
-          </p>
-          <div className="flex items-center gap-2 mt-1 flex-wrap">
+          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+            <span className="text-[10px] text-muted-foreground">
+              {doc.uploadedBy === "admin" ? "Admin" : "Customer"}
+              {doc.createdAt ? ` · ${new Date(doc.createdAt).toLocaleDateString("en-IN")}` : ""}
+            </span>
+            <span className="text-muted-foreground/30 text-[10px]">·</span>
             {doc.notificationSent || doc.notification_sent ? (
-              <span className="text-[10px] bg-blue-100 text-blue-700 rounded px-1.5 py-0.5 font-medium">📨 Notified</span>
+              <span className="text-[10px] bg-blue-50 text-blue-600 rounded px-1 py-0 font-medium">📨 Notified</span>
             ) : (
-              <span className="text-[10px] bg-gray-100 text-gray-500 rounded px-1.5 py-0.5 font-medium">📭 No notification</span>
+              <span className="text-[10px] text-gray-400 font-medium">No notif</span>
             )}
+            <span className="text-muted-foreground/30 text-[10px]">·</span>
             {(doc.viewedAt || doc.viewed_at) ? (
-              <span className="text-[10px] bg-purple-100 text-purple-700 rounded px-1.5 py-0.5 font-medium">
-                👁 Viewed: {new Date(doc.viewedAt || doc.viewed_at).toLocaleDateString("en-IN")}
+              <span className="text-[10px] bg-purple-50 text-purple-600 rounded px-1 py-0 font-medium">
+                👁 {new Date(doc.viewedAt || doc.viewed_at).toLocaleDateString("en-IN")}
               </span>
             ) : (
-              <span className="text-[10px] bg-amber-100 text-amber-700 rounded px-1.5 py-0.5 font-medium">⏳ Not viewed</span>
+              <span className="text-[10px] text-amber-600 font-medium">Not viewed</span>
             )}
+            <span className="text-muted-foreground/30 text-[10px]">·</span>
             {downloads > 0 ? (
-              <span className="text-[10px] bg-green-100 text-green-800 rounded px-1.5 py-0.5 font-medium">
-                ✓ Downloaded {downloads}×{lastDl ? ` · Last: ${new Date(lastDl).toLocaleDateString("en-IN")}` : ""}
+              <span className="text-[10px] bg-green-50 text-green-700 rounded px-1 py-0 font-medium">
+                ✓ {downloads}×{lastDl ? ` ${new Date(lastDl).toLocaleDateString("en-IN")}` : ""}
               </span>
             ) : (
-              <span className="text-[10px] bg-slate-100 text-slate-600 rounded px-1.5 py-0.5 font-medium">⬇ Not downloaded</span>
+              <span className="text-[10px] text-slate-400 font-medium">Not downloaded</span>
             )}
           </div>
         </div>
-        <div className="flex items-center gap-1 flex-shrink-0">
+        <div className="flex items-center gap-0.5 flex-shrink-0">
           <a href={fileUrl} target="_blank" rel="noreferrer" title="View">
-            <Button variant="ghost" size="icon" className="h-7 w-7 text-blue-600 hover:bg-blue-50"><Eye size={13} /></Button>
+            <Button variant="ghost" size="icon" className="h-6 w-6 text-blue-600 hover:bg-blue-50"><Eye size={12} /></Button>
           </a>
           <a href={fileUrl} download={doc.fileName} title="Download">
-            <Button variant="ghost" size="icon" className="h-7 w-7 text-emerald-600 hover:bg-emerald-50"><Download size={13} /></Button>
+            <Button variant="ghost" size="icon" className="h-6 w-6 text-emerald-600 hover:bg-emerald-50"><Download size={12} /></Button>
           </a>
-          <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:bg-red-50" title="Delete"
+          <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:bg-red-50" title="Delete"
             onClick={() => handleDelete(doc.id, doc.fileName)}>
-            <Trash2 size={13} />
+            <Trash2 size={12} />
           </Button>
         </div>
       </div>
