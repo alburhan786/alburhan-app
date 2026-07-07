@@ -91,6 +91,10 @@ import NotificationCenter from "@/pages/admin/NotificationCenter";
 import NotificationLogs from "@/pages/admin/NotificationLogs";
 import CommunicationCenter from "@/pages/admin/CommunicationCenter";
 import WhatsAppTemplateManager from "@/pages/admin/WhatsAppTemplateManager";
+import SMSTemplateManager from "@/pages/admin/SMSTemplateManager";
+import RCSTemplateManager from "@/pages/admin/RCSTemplateManager";
+import EmailTemplateManager from "@/pages/admin/EmailTemplateManager";
+import TestNotifications from "@/pages/admin/TestNotifications";
 import WorkflowCenter from "@/pages/admin/WorkflowCenter";
 import ZiyaratManager from "@/pages/admin/ZiyaratManager";
 import LuggageManager from "@/pages/admin/LuggageManager";
@@ -231,6 +235,10 @@ function Router() {
       <Route path="/admin/api-settings" component={() => <AdminRoute component={ApiSettings} />} />
       <Route path="/admin/communication-center" component={() => <AdminRoute component={CommunicationCenter} />} />
       <Route path="/admin/whatsapp-templates" component={() => <AdminRoute component={WhatsAppTemplateManager} />} />
+      <Route path="/admin/sms-templates" component={() => <AdminRoute component={SMSTemplateManager} />} />
+      <Route path="/admin/rcs-templates" component={() => <AdminRoute component={RCSTemplateManager} />} />
+      <Route path="/admin/email-templates" component={() => <AdminRoute component={EmailTemplateManager} />} />
+      <Route path="/admin/test-notifications" component={() => <AdminRoute component={TestNotifications} />} />
       <Route path="/admin/workflow-center" component={() => <AdminRoute component={WorkflowCenter} />} />
       <Route path="/admin/ziyarat" component={() => <AdminRoute component={ZiyaratManager} />} />
       <Route path="/admin/luggage" component={() => <AdminRoute component={LuggageManager} />} />

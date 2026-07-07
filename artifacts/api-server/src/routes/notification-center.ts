@@ -112,9 +112,12 @@ router.put("/settings", requireAdmin as any, async (req: AuthenticatedRequest, r
 });
 
 // ── Templates ─────────────────────────────────────────────────────────────────
-router.get("/templates", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
+router.get("/templates", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
-    const result = await pool.query(`SELECT * FROM notification_templates ORDER BY event_type, channel, name`);
+    const { channel } = req.query as any;
+    const result = channel
+      ? await pool.query(`SELECT * FROM notification_templates WHERE channel=$1 ORDER BY event_type, name`, [channel])
+      : await pool.query(`SELECT * FROM notification_templates ORDER BY event_type, channel, name`);
     res.json({ templates: result.rows });
   } catch (err) {
     res.status(500).json({ message: "Failed to get templates" });
@@ -123,31 +126,73 @@ router.get("/templates", requireAdmin as any, async (_req: AuthenticatedRequest,
 
 router.post("/templates", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
-    const { name, event_type, channel, subject, body, variables } = req.body;
+    const {
+      name, event_type, channel, subject, body, variables,
+      meta_template_id, botbee_template_id, dlt_template_id, dlt_entity_id,
+      sender_id, provider, language, category, header_text, footer_text,
+      buttons, html_body, rcs_agent_id, rcs_campaign_id, rich_card,
+      priority, enabled,
+    } = req.body;
     if (!name || !channel || !body) return res.status(400).json({ message: "name, channel, body required" });
     const id = `tpl_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const result = await pool.query(
-      `INSERT INTO notification_templates (id, name, event_type, channel, subject, body, variables)
-       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-      [id, name, event_type || null, channel, subject || null, body, JSON.stringify(variables || [])]
+      `INSERT INTO notification_templates (
+         id, name, event_type, channel, subject, body, variables,
+         meta_template_id, botbee_template_id, dlt_template_id, dlt_entity_id,
+         sender_id, provider, language, category, header_text, footer_text,
+         buttons, html_body, rcs_agent_id, rcs_campaign_id, rich_card,
+         priority, enabled
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
+       RETURNING *`,
+      [
+        id, name, event_type || null, channel, subject || null, body, JSON.stringify(variables || []),
+        meta_template_id || null, botbee_template_id || null, dlt_template_id || null, dlt_entity_id || null,
+        sender_id || null, provider || "generic", language || "en", category || "UTILITY",
+        header_text || null, footer_text || null,
+        JSON.stringify(buttons || []), html_body || null,
+        rcs_agent_id || null, rcs_campaign_id || null, JSON.stringify(rich_card || {}),
+        priority ?? 0, enabled !== false,
+      ]
     );
     res.json({ template: result.rows[0] });
-  } catch (err) {
+  } catch (err: any) {
+    console.error("[notification-center] POST /templates:", err);
     res.status(500).json({ message: "Failed to create template" });
   }
 });
 
 router.put("/templates/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
-    const { name, event_type, channel, subject, body, variables } = req.body;
+    const {
+      name, event_type, channel, subject, body, variables,
+      meta_template_id, botbee_template_id, dlt_template_id, dlt_entity_id,
+      sender_id, provider, language, category, header_text, footer_text,
+      buttons, html_body, rcs_agent_id, rcs_campaign_id, rich_card,
+      priority, enabled,
+    } = req.body;
     const result = await pool.query(
-      `UPDATE notification_templates SET name=$1,event_type=$2,channel=$3,subject=$4,body=$5,variables=$6,updated_at=NOW()
-       WHERE id=$7 RETURNING *`,
-      [name, event_type || null, channel, subject || null, body, JSON.stringify(variables || []), req.params.id]
+      `UPDATE notification_templates SET
+         name=$1, event_type=$2, channel=$3, subject=$4, body=$5, variables=$6,
+         meta_template_id=$7, botbee_template_id=$8, dlt_template_id=$9, dlt_entity_id=$10,
+         sender_id=$11, provider=$12, language=$13, category=$14, header_text=$15, footer_text=$16,
+         buttons=$17, html_body=$18, rcs_agent_id=$19, rcs_campaign_id=$20, rich_card=$21,
+         priority=$22, enabled=$23, updated_at=NOW()
+       WHERE id=$24 RETURNING *`,
+      [
+        name, event_type || null, channel, subject || null, body, JSON.stringify(variables || []),
+        meta_template_id || null, botbee_template_id || null, dlt_template_id || null, dlt_entity_id || null,
+        sender_id || null, provider || "generic", language || "en", category || "UTILITY",
+        header_text || null, footer_text || null,
+        JSON.stringify(buttons || []), html_body || null,
+        rcs_agent_id || null, rcs_campaign_id || null, JSON.stringify(rich_card || {}),
+        priority ?? 0, enabled !== false,
+        req.params.id,
+      ]
     );
     if (!result.rows[0]) return res.status(404).json({ message: "Template not found" });
     res.json({ template: result.rows[0] });
-  } catch (err) {
+  } catch (err: any) {
+    console.error("[notification-center] PUT /templates/:id:", err);
     res.status(500).json({ message: "Failed to update template" });
   }
 });
@@ -158,6 +203,54 @@ router.delete("/templates/:id", requireAdmin as any, async (req: AuthenticatedRe
     res.json({ message: "Template deleted" });
   } catch (err) {
     res.status(500).json({ message: "Failed to delete template" });
+  }
+});
+
+// ── Test Send (all channels) ──────────────────────────────────────────────────
+router.post("/test-send", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { channel, recipient, message, subject, html_body, templateId } = req.body;
+    if (!channel || !recipient) return res.status(400).json({ message: "channel and recipient required" });
+
+    const { sendWhatsApp, sendDLTSMS, sendEmail, sendRCS } = await import("../lib/notifications.js");
+
+    let result: { ok: boolean; httpStatus?: number; errorMessage?: string; requestPayload?: any; responsePayload?: any; endpoint?: string; provider?: string };
+
+    if (channel === "whatsapp") {
+      const r = await sendWhatsApp(recipient, message || "Test message from Al Burhan Tours & Travels");
+      result = r as any;
+    } else if (channel === "sms") {
+      const r = await sendDLTSMS(recipient, recipient, "", message || "Test SMS from Al Burhan Tours & Travels");
+      result = r as any;
+    } else if (channel === "rcs") {
+      const r = await sendRCS(recipient, "Test Recipient", message || "Test RCS from Al Burhan Tours & Travels");
+      result = r as any;
+    } else if (channel === "email") {
+      if (!recipient.includes("@")) return res.status(400).json({ message: "Email recipient must be a valid email address" });
+      const r = await sendEmail(recipient, subject || "Test Email from Al Burhan", message || "This is a test email.", html_body || undefined);
+      result = r as any;
+    } else {
+      return res.status(400).json({ message: `Unsupported channel: ${channel}` });
+    }
+
+    await pool.query(
+      `INSERT INTO notification_logs (id, event_type, channel, recipient, message, status, provider_response, provider_name, api_endpoint, http_status, request_payload, sent_at, created_at)
+       VALUES ($1,'test_send',$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10::jsonb,NOW(),NOW())`,
+      [
+        `test_${Date.now()}`, channel, recipient, message || "",
+        (result as any).ok ? "sent" : "failed",
+        JSON.stringify(result),
+        (result as any).provider || channel,
+        (result as any).endpoint || "",
+        (result as any).httpStatus || null,
+        JSON.stringify({ channel, recipient, message, subject, templateId }),
+      ]
+    ).catch(() => {});
+
+    res.json({ ok: (result as any).ok, channel, recipient, ...result });
+  } catch (err: any) {
+    console.error("[notification-center] POST /test-send:", err);
+    res.status(500).json({ ok: false, message: err.message || "Test send failed" });
   }
 });
 

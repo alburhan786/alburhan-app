@@ -8,7 +8,7 @@ import {
   TrendingDown, Calculator, Plane, Activity, Home, CreditCard, Trash2,
   Building2, Bus, Heart, FileCheck, Sparkles, UserCheck, BookMarked, Truck,
   Scale, Users2, Package, ClipboardList, KeyRound, HeartPulse, Settings2, BellRing, Zap,
-  MapPin, Tent, Tag, Bot, Award
+  MapPin, Tent, Tag, Bot, Award, Smartphone, Layers, Mail, Globe, FileText, TestTube2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePermissions, type Module, type Action } from "@/hooks/use-permissions";
@@ -111,10 +111,21 @@ function buildMenu(openComplaints: number): MenuSection[] {
       ],
     },
     {
-      section: "Communications",
+      section: "Communication Center",
       items: [
-        { icon: BellRing, label: "Communication Center", href: "/admin/communication-center", require: ["customers", "edit"] },
-        { icon: Zap, label: "Workflow Center", href: "/admin/workflow-center", require: ["bookings", "edit"] },
+        { icon: BellRing,       label: "Communication Center",   href: "/admin/communication-center",  require: ["customers", "edit"] as [any,any] },
+        { icon: Zap,            label: "Workflow Center",         href: "/admin/workflow-center",        require: ["bookings", "edit"]  as [any,any] },
+        { icon: MessageSquare,  label: "WhatsApp Templates",      href: "/admin/whatsapp-templates",     require: ["settings", "view"]  as [any,any] },
+        { icon: Smartphone,     label: "SMS Templates",           href: "/admin/sms-templates",          require: ["settings", "view"]  as [any,any] },
+        { icon: Layers,         label: "RCS Templates",           href: "/admin/rcs-templates",          require: ["settings", "view"]  as [any,any] },
+        { icon: Mail,           label: "Email Templates",         href: "/admin/email-templates",        require: ["settings", "view"]  as [any,any] },
+        { icon: FileText,       label: "DLT Template Manager",    href: "/admin/sms-templates",          require: ["settings", "view"]  as [any,any] },
+        { icon: Globe,          label: "Meta WhatsApp Manager",   href: "/admin/whatsapp-templates",     require: ["settings", "view"]  as [any,any] },
+        { icon: Bot,            label: "BotBee Settings",         href: "/admin/api-settings",           require: ["settings", "view"]  as [any,any] },
+        { icon: Smartphone,     label: "Fast2SMS Settings",       href: "/admin/api-settings",           require: ["settings", "view"]  as [any,any] },
+        { icon: Layers,         label: "Lemin AI RCS Settings",   href: "/admin/api-settings",           require: ["settings", "view"]  as [any,any] },
+        { icon: Mail,           label: "SMTP Settings",           href: "/admin/api-settings",           require: ["settings", "view"]  as [any,any] },
+        { icon: TestTube2,      label: "Test Notifications",      href: "/admin/test-notifications",     require: ["settings", "view"]  as [any,any] },
       ],
     },
     {

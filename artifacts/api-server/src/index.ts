@@ -1006,6 +1006,31 @@ async function runMigrations() {
   }
   try {
     await pool.query(`
+      ALTER TABLE notification_templates
+        ADD COLUMN IF NOT EXISTS meta_template_id TEXT,
+        ADD COLUMN IF NOT EXISTS botbee_template_id TEXT,
+        ADD COLUMN IF NOT EXISTS dlt_template_id TEXT,
+        ADD COLUMN IF NOT EXISTS dlt_entity_id TEXT,
+        ADD COLUMN IF NOT EXISTS sender_id TEXT,
+        ADD COLUMN IF NOT EXISTS provider TEXT DEFAULT 'generic',
+        ADD COLUMN IF NOT EXISTS language TEXT DEFAULT 'en',
+        ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'UTILITY',
+        ADD COLUMN IF NOT EXISTS header_text TEXT,
+        ADD COLUMN IF NOT EXISTS footer_text TEXT,
+        ADD COLUMN IF NOT EXISTS buttons JSONB DEFAULT '[]',
+        ADD COLUMN IF NOT EXISTS html_body TEXT,
+        ADD COLUMN IF NOT EXISTS rcs_agent_id TEXT,
+        ADD COLUMN IF NOT EXISTS rcs_campaign_id TEXT,
+        ADD COLUMN IF NOT EXISTS rich_card JSONB DEFAULT '{}',
+        ADD COLUMN IF NOT EXISTS priority INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS enabled BOOLEAN DEFAULT true
+    `);
+    console.log("[Migration] notification_templates extended columns ensured");
+  } catch (err) {
+    console.error("[Migration] notification_templates extended columns failed:", err);
+  }
+  try {
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS scheduled_notifications (
         id TEXT PRIMARY KEY,
         event_type TEXT NOT NULL,

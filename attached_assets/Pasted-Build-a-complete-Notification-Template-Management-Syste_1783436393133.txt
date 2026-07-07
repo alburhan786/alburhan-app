@@ -1,0 +1,307 @@
+Build a complete Notification Template Management System for Al Burhan Tours & Travels.
+
+Goal:
+The website owner should never edit source code when changing WhatsApp, SMS, RCS or Email templates.
+
+==================================================
+ADMIN MENU
+==================================================
+
+Create a new menu:
+
+Communication Center
+
+Inside it create:
+
+1. WhatsApp Templates
+2. SMS Templates
+3. RCS Templates
+4. Email Templates
+5. DLT Template Manager
+6. Meta WhatsApp Manager
+7. BotBee Settings
+8. Fast2SMS Settings
+9. Lemin AI RCS Settings
+10. SMTP Settings
+11. Test Notifications
+
+==================================================
+WHATSAPP TEMPLATE MANAGER
+==================================================
+
+Admin can:
+
+Add Template
+
+Edit Template
+
+Delete Template
+
+Sync Meta Templates
+
+Sync BotBee Templates
+
+Fields:
+
+Template Name
+
+Meta Template ID
+
+BotBee Template ID
+
+Language
+
+Category
+
+Header
+
+Body
+
+Footer
+
+Buttons
+
+Variables
+
+Status
+
+Approved/Pending
+
+Preview
+
+Test Send
+
+==================================================
+SMS DLT TEMPLATE MANAGER
+==================================================
+
+Fields:
+
+DLT Template ID
+
+DLT Entity ID
+
+Sender ID
+
+Provider
+
+Template Name
+
+Message Body
+
+Variables
+
+Priority
+
+Test SMS
+
+Enable/Disable
+
+==================================================
+RCS TEMPLATE MANAGER
+
+Fields:
+
+Agent ID
+
+Campaign ID
+
+Rich Card
+
+Carousel
+
+Buttons
+
+Media
+
+Variables
+
+Preview
+
+Test
+
+==================================================
+EMAIL TEMPLATE MANAGER
+
+Fields:
+
+Subject
+
+HTML Body
+
+Variables
+
+Attachments
+
+Preview
+
+Test Email
+
+==================================================
+VARIABLE SYSTEM
+
+Support dynamic variables:
+
+{{customer_name}}
+
+{{booking_id}}
+
+{{package_name}}
+
+{{departure_date}}
+
+{{amount}}
+
+{{balance}}
+
+{{invoice_number}}
+
+{{visa_status}}
+
+{{flight_number}}
+
+{{hotel_name}}
+
+{{room_number}}
+
+{{bus_number}}
+
+{{utr_number}}
+
+{{payment_status}}
+
+==================================================
+AUTOMATION
+
+Each workflow step should allow the admin to choose:
+
+WhatsApp Template
+
+SMS DLT Template
+
+RCS Template
+
+Email Template
+
+Example
+
+Booking Submitted
+
+↓
+
+WhatsApp Template
+
+booking_confirmation_meta
+
+↓
+
+SMS Template
+
+booking_confirmation_dlt
+
+↓
+
+Email Template
+
+booking_confirmation_email
+
+↓
+
+RCS Template
+
+booking_confirmation_rcs
+
+==================================================
+TEST PANEL
+
+Create buttons:
+
+Test WhatsApp
+
+Test SMS
+
+Test RCS
+
+Test Email
+
+Send to any number or email.
+
+Display:
+
+API Request
+
+API Response
+
+Status
+
+Delivery
+
+Error
+
+==================================================
+PROVIDER SETTINGS
+
+BotBee
+
+API Key
+
+Business ID
+
+Phone Number ID
+
+Webhook
+
+Meta Access Token
+
+Meta App ID
+
+Meta App Secret
+
+Verify Token
+
+Fast2SMS
+
+API Key
+
+Sender ID
+
+DLT Entity ID
+
+Route
+
+Lemin AI
+
+API Key
+
+Agent ID
+
+Campaign ID
+
+SMTP
+
+Host
+
+Port
+
+Username
+
+Password
+
+Encryption
+
+Sender Email
+
+Sender Name
+
+==================================================
+FINAL REQUIREMENTS
+
+No template should be hardcoded.
+
+All templates must be editable from the Admin Panel.
+
+If a Meta or DLT template changes, the admin should only update it in the Template Manager.
+
+All automations must immediately use the updated template without changing code.
+
+The system should support unlimited templates for WhatsApp, SMS, RCS and Email and include full delivery logs and testing tools.
