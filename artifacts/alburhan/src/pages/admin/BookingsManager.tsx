@@ -197,7 +197,7 @@ function AdminDocumentsSection({ bookingId }: { bookingId: string }) {
             <SelectTrigger className="h-8 w-48 text-xs shrink-0">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent align="start" side="bottom" className="max-h-72 overflow-y-auto">
               <div className="px-2 py-1 text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Travel Documents (Delivered to Customer)</div>
               {["flight_ticket","visa","hotel_voucher","room_allotment","bus_allotment","model_contract","tour_itinerary","payment_receipt","ziyarat_schedule","insurance","hajj_id","luggage_tag","emergency_contact_card"].map(v => (
                 <SelectItem key={v} value={v} className="text-xs">{DOC_TYPE_LABELS[v]}</SelectItem>
