@@ -146,39 +146,25 @@ function AdminDocumentsSection({ bookingId }: { bookingId: string }) {
         <div className="flex-shrink-0">
           {isImg ? <ImageIcon size={15} className="text-blue-500" /> : <FileText size={15} className="text-gray-400" />}
         </div>
-        <div className="flex-1 min-w-0 text-left">
-          <div className="flex items-center gap-1.5 flex-wrap">
+        <div className="flex-1 min-w-0 text-left overflow-hidden">
+          <div className="flex items-center gap-2 min-w-0">
             <Badge className={`text-[10px] px-1.5 py-0 font-semibold border-0 shrink-0 ${color}`}>{label}</Badge>
-            <span className="text-[11px] text-gray-700 font-medium truncate">{doc.fileName}</span>
+            <span className="text-[11px] text-gray-800 font-medium truncate block">{doc.fileName}</span>
           </div>
-          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-            <span className="text-[10px] text-muted-foreground">
-              {doc.uploadedBy === "admin" ? "Admin" : "Customer"}
-              {doc.createdAt ? ` · ${new Date(doc.createdAt).toLocaleDateString("en-IN")}` : ""}
-            </span>
-            <span className="text-muted-foreground/30 text-[10px]">·</span>
-            {doc.notificationSent || doc.notification_sent ? (
-              <span className="text-[10px] bg-blue-50 text-blue-600 rounded px-1 py-0 font-medium">📨 Notified</span>
-            ) : (
-              <span className="text-[10px] text-gray-400 font-medium">No notif</span>
-            )}
-            <span className="text-muted-foreground/30 text-[10px]">·</span>
-            {(doc.viewedAt || doc.viewed_at) ? (
-              <span className="text-[10px] bg-purple-50 text-purple-600 rounded px-1 py-0 font-medium">
-                👁 {new Date(doc.viewedAt || doc.viewed_at).toLocaleDateString("en-IN")}
-              </span>
-            ) : (
-              <span className="text-[10px] text-amber-600 font-medium">Not viewed</span>
-            )}
-            <span className="text-muted-foreground/30 text-[10px]">·</span>
-            {downloads > 0 ? (
-              <span className="text-[10px] bg-green-50 text-green-700 rounded px-1 py-0 font-medium">
-                ✓ {downloads}×{lastDl ? ` ${new Date(lastDl).toLocaleDateString("en-IN")}` : ""}
-              </span>
-            ) : (
-              <span className="text-[10px] text-slate-400 font-medium">Not downloaded</span>
-            )}
-          </div>
+          <p className="text-[10px] text-gray-400 mt-0.5 truncate">
+            {doc.uploadedBy === "admin" ? "Admin" : "Customer"}
+            {doc.createdAt ? ` · ${new Date(doc.createdAt).toLocaleDateString("en-IN")}` : ""}
+            {" · "}
+            {(doc.notificationSent || doc.notification_sent) ? "Notified" : "No notif"}
+            {" · "}
+            {(doc.viewedAt || doc.viewed_at)
+              ? `Viewed ${new Date(doc.viewedAt || doc.viewed_at).toLocaleDateString("en-IN")}`
+              : "Not viewed"}
+            {" · "}
+            {downloads > 0
+              ? `Downloaded ${downloads}×`
+              : "Not downloaded"}
+          </p>
         </div>
         <div className="flex items-center gap-0.5 flex-shrink-0">
           <a href={fileUrl} target="_blank" rel="noreferrer" title="View">
