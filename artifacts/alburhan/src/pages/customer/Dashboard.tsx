@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { CreditCard, FileText, Download, Clock, Upload, Trash2, CheckCircle, AlertCircle, X, Eye, ShieldAlert, IndianRupee, Plane, Stamp, Hotel, Bus, Printer, Share2, Copy, Bell, BellRing, CheckCheck, Megaphone, ClipboardList, MessageSquare, Send, User, XCircle, Building2, Banknote } from "lucide-react";
+import { CreditCard, FileText, Download, Clock, Upload, Trash2, CheckCircle, AlertCircle, X, Eye, ShieldAlert, IndianRupee, Plane, Stamp, Hotel, Bus, Printer, Share2, Copy, Bell, BellRing, CheckCheck, Megaphone, ClipboardList, MessageSquare, Send, User, XCircle, Building2, Banknote, RefreshCcw, Syringe } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -514,19 +514,21 @@ function UploadModal({ bookingId, bookingNumber, onClose }: { bookingId: string;
 }
 
 const TRAVEL_DOC_TYPES: Record<string, { label: string; icon: React.ElementType; color: string; bg: string }> = {
-  flight_ticket:          { label: "Flight Ticket",          icon: Plane,          color: "text-sky-700",     bg: "bg-sky-50 border-sky-200" },
-  visa:                   { label: "Visa",                   icon: Stamp,          color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200" },
-  hotel_voucher:          { label: "Hotel Voucher",          icon: Hotel,          color: "text-cyan-700",    bg: "bg-cyan-50 border-cyan-200" },
-  room_allotment:         { label: "Room Allotment",         icon: Hotel,          color: "text-violet-700",  bg: "bg-violet-50 border-violet-200" },
-  bus_allotment:          { label: "Bus Allotment",          icon: Bus,            color: "text-orange-700",  bg: "bg-orange-50 border-orange-200" },
-  model_contract:         { label: "Model Contract",         icon: FileText,       color: "text-rose-700",    bg: "bg-rose-50 border-rose-200" },
-  tour_itinerary:         { label: "Tour Itinerary",         icon: ClipboardList,  color: "text-amber-700",   bg: "bg-amber-50 border-amber-200" },
-  payment_receipt:        { label: "Payment Receipt",        icon: IndianRupee,    color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200" },
-  ziyarat_schedule:       { label: "Ziyarat Schedule",       icon: ClipboardList,  color: "text-lime-700",    bg: "bg-lime-50 border-lime-200" },
-  insurance:              { label: "Insurance",              icon: ShieldAlert,    color: "text-yellow-700",  bg: "bg-yellow-50 border-yellow-200" },
-  hajj_id:                { label: "Hajj ID Card",           icon: User,           color: "text-violet-700",  bg: "bg-violet-50 border-violet-200" },
-  luggage_tag:            { label: "Luggage Tag",            icon: Download,       color: "text-fuchsia-700", bg: "bg-fuchsia-50 border-fuchsia-200" },
-  emergency_contact_card: { label: "Emergency Contact Card", icon: Bell,           color: "text-red-700",     bg: "bg-red-50 border-red-200" },
+  flight_ticket:          { label: "Flight Ticket",             icon: Plane,          color: "text-sky-700",     bg: "bg-sky-50 border-sky-200" },
+  visa:                   { label: "Visa",                      icon: Stamp,          color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200" },
+  hotel_voucher:          { label: "Hotel Voucher",             icon: Hotel,          color: "text-cyan-700",    bg: "bg-cyan-50 border-cyan-200" },
+  room_allotment:         { label: "Room Allotment",            icon: Hotel,          color: "text-violet-700",  bg: "bg-violet-50 border-violet-200" },
+  bus_allotment:          { label: "Bus Allotment",             icon: Bus,            color: "text-orange-700",  bg: "bg-orange-50 border-orange-200" },
+  tour_itinerary:         { label: "Tour Itinerary",            icon: ClipboardList,  color: "text-amber-700",   bg: "bg-amber-50 border-amber-200" },
+  model_contract:         { label: "Model Contract",            icon: FileText,       color: "text-rose-700",    bg: "bg-rose-50 border-rose-200" },
+  insurance:              { label: "Insurance",                 icon: ShieldAlert,    color: "text-yellow-700",  bg: "bg-yellow-50 border-yellow-200" },
+  hajj_id:                { label: "Haj ID Card",               icon: User,           color: "text-violet-700",  bg: "bg-violet-50 border-violet-200" },
+  payment_receipt:        { label: "Payment Receipt",           icon: IndianRupee,    color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200" },
+  ziyarat_schedule:       { label: "Ziyarat Schedule",          icon: ClipboardList,  color: "text-lime-700",    bg: "bg-lime-50 border-lime-200" },
+  passport_copy:          { label: "Passport Copy",             icon: FileText,       color: "text-blue-700",    bg: "bg-blue-50 border-blue-200" },
+  vaccination_certificate:{ label: "Vaccination Certificate",   icon: Syringe,        color: "text-teal-700",    bg: "bg-teal-50 border-teal-200" },
+  luggage_tag:            { label: "Luggage Tag",               icon: Download,       color: "text-fuchsia-700", bg: "bg-fuchsia-50 border-fuchsia-200" },
+  emergency_contact_card: { label: "Emergency Contact Card",    icon: Bell,           color: "text-red-700",     bg: "bg-red-50 border-red-200" },
 };
 
 function TravelDocumentsCard({ bookingId, bookingNumber, invoiceNumber, bookingStatus }: {
@@ -537,36 +539,23 @@ function TravelDocumentsCard({ bookingId, bookingNumber, invoiceNumber, bookingS
 }) {
   const BASE_API = import.meta.env.VITE_API_URL || "";
   const { toast } = useToast();
-  const { data: docs } = useListDocuments(bookingId, { query: { refetchOnMount: "always" } });
+  const { data: docs, refetch } = useListDocuments(bookingId, {
+    query: { refetchOnMount: "always", refetchInterval: 30000 },
+  });
   const allDocs = (docs || []) as any[];
   const travelDocs = allDocs.filter((d: any) => d.uploadedBy === "admin" && TRAVEL_DOC_TYPES[d.documentType]);
 
+  const [previewDoc, setPreviewDoc] = useState<{
+    url: string; name: string; isPdf: boolean; isImage: boolean; docId: string;
+  } | null>(null);
+
   const slots = Object.keys(TRAVEL_DOC_TYPES);
 
-  function handlePrint(url: string) {
-    const win = window.open(url, "_blank");
-    if (win) {
-      win.addEventListener("load", () => {
-        win.focus();
-        win.print();
-      });
-    }
-  }
-
-  async function handleShare(url: string, fileName: string) {
-    const fullUrl = `${window.location.origin}${url.startsWith("/") ? url : `/${url}`}`;
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: fileName, url: fullUrl });
-      } catch (_) {}
-    } else {
-      try {
-        await navigator.clipboard.writeText(fullUrl);
-        toast({ title: "Link copied!", description: "Document link copied to clipboard." });
-      } catch (_) {
-        toast({ title: "Share", description: fullUrl, variant: "destructive" });
-      }
-    }
+  function formatFileSize(bytes?: number | null) {
+    if (!bytes) return null;
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   }
 
   async function logDownload(docId: string) {
@@ -577,133 +566,274 @@ function TravelDocumentsCard({ bookingId, bookingNumber, invoiceNumber, bookingS
     } catch (_) {}
   }
 
+  async function logView(docId: string) {
+    try {
+      await fetch(`${BASE_API}/api/documents/${docId}/viewed`, {
+        method: "PATCH", credentials: "include",
+      });
+    } catch (_) {}
+  }
+
+  function openPreview(doc: any) {
+    const fileUrl = `${BASE_API}${doc.fileUrl}`;
+    const name = doc.fileName || "Document";
+    const mime = doc.mimeType || "";
+    const isPdf = name.toLowerCase().endsWith(".pdf") || mime === "application/pdf";
+    const isImage = /\.(jpg|jpeg|png|webp|gif)$/i.test(name) || mime.startsWith("image/");
+    setPreviewDoc({ url: fileUrl, name, isPdf, isImage, docId: doc.id });
+    logView(doc.id);
+  }
+
+  function handlePrint(url: string) {
+    const win = window.open(url, "_blank");
+    if (win) win.addEventListener("load", () => { win.focus(); win.print(); });
+  }
+
+  async function handleShare(rawUrl: string, fileName: string) {
+    const fullUrl = `${window.location.origin}${rawUrl.startsWith("/") ? rawUrl : `/${rawUrl}`}`;
+    if (navigator.share) {
+      try { await navigator.share({ title: fileName, url: fullUrl }); } catch (_) {}
+    } else {
+      try {
+        await navigator.clipboard.writeText(fullUrl);
+        toast({ title: "Link copied!", description: "Document link copied to clipboard." });
+      } catch (_) {
+        toast({ title: "Share", description: fullUrl, variant: "destructive" });
+      }
+    }
+  }
+
   return (
-    <Card className="overflow-hidden rounded-2xl shadow-md border-2 border-primary/20">
-      <div className="px-5 py-4 flex items-center gap-3 bg-primary/5 border-b border-primary/15">
-        <Plane className="w-5 h-5 text-primary shrink-0" />
-        <div>
-          <h4 className="font-bold text-sm text-primary">Your Travel Documents</h4>
-          <p className="text-xs text-muted-foreground mt-0.5">Uploaded by Al Burhan Tours — visible once ready</p>
+    <>
+      {/* ── Preview Modal ─────────────────────────────────────────────────── */}
+      <Dialog open={!!previewDoc} onOpenChange={open => { if (!open) setPreviewDoc(null); }}>
+        <DialogContent className="max-w-4xl w-full h-[85vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="px-4 py-3 border-b shrink-0">
+            <div className="flex items-center justify-between gap-3">
+              <DialogTitle className="text-sm font-semibold truncate flex-1">{previewDoc?.name}</DialogTitle>
+              <a
+                href={previewDoc?.url}
+                download={previewDoc?.name}
+                onClick={() => previewDoc && logDownload(previewDoc.docId)}
+                className="text-xs bg-emerald-600 text-white px-3 py-1.5 rounded-lg hover:bg-emerald-700 flex items-center gap-1.5 shrink-0"
+              >
+                <Download size={12} /> Download
+              </a>
+            </div>
+          </DialogHeader>
+          <div className="flex-1 min-h-0 overflow-auto bg-muted/30">
+            {previewDoc?.isPdf ? (
+              <iframe
+                src={previewDoc.url}
+                className="w-full h-full border-0"
+                title={previewDoc.name}
+              />
+            ) : previewDoc?.isImage ? (
+              <div className="flex items-center justify-center h-full p-4">
+                <img
+                  src={previewDoc.url}
+                  alt={previewDoc.name}
+                  className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+                />
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full gap-4 text-muted-foreground">
+                <FileText size={48} className="opacity-30" />
+                <p className="text-sm">Preview not available for this file type.</p>
+                <a
+                  href={previewDoc?.url}
+                  download={previewDoc?.name}
+                  className="text-xs bg-primary text-white px-4 py-2 rounded-lg hover:opacity-90"
+                >
+                  Download to view
+                </a>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Document Cards ───────────────────────────────────────────────── */}
+      <Card className="overflow-hidden rounded-2xl shadow-md border-2 border-primary/20">
+        <div className="px-5 py-4 flex items-center gap-3 bg-primary/5 border-b border-primary/15">
+          <Plane className="w-5 h-5 text-primary shrink-0" />
+          <div className="flex-1 min-w-0">
+            <h4 className="font-bold text-sm text-primary">Your Travel Documents</h4>
+            <p className="text-xs text-muted-foreground mt-0.5">Uploaded by Al Burhan Tours · auto-refreshes every 30 s</p>
+          </div>
+          <button
+            onClick={() => refetch()}
+            title="Refresh documents"
+            className="p-1.5 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors shrink-0"
+          >
+            <RefreshCcw size={14} />
+          </button>
         </div>
-      </div>
-      <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
 
-        {/* Invoice slot — always shown; active only when confirmed with invoice number */}
-        {bookingNumber && bookingStatus === 'confirmed' && invoiceNumber ? (
-          <div className="rounded-xl border bg-emerald-50 border-emerald-200 overflow-hidden">
-            <div className="flex items-center gap-3 p-3">
-              <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-white/50">
-                <FileText className="w-4 h-4 text-emerald-700" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-emerald-700">TAX INVOICE</p>
-                <p className="text-[11px] text-emerald-600 font-mono mt-0.5">#{invoiceNumber}</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-3 border-t border-black/5 divide-x divide-black/5">
-              <button
-                onClick={() => window.open((import.meta.env.BASE_URL || "/") + "invoice/" + bookingNumber, "_blank")}
-                className="flex flex-col items-center gap-1 py-2 hover:bg-black/5 transition-colors w-full"
-              >
-                <Eye size={15} className="text-emerald-700" />
-                <span className="text-[10px] font-medium text-muted-foreground">View</span>
-              </button>
-              <button
-                onClick={() => {
-                  const win = window.open((import.meta.env.BASE_URL || "/") + "invoice/" + bookingNumber, "_blank");
-                  if (win) win.addEventListener("load", () => { win.focus(); win.print(); });
-                }}
-                className="flex flex-col items-center gap-1 py-2 hover:bg-black/5 transition-colors w-full"
-              >
-                <Printer size={15} className="text-emerald-700" />
-                <span className="text-[10px] font-medium text-muted-foreground">Print</span>
-              </button>
-              <button
-                onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(`My Tax Invoice from Al Burhan Tours & Travels\nInvoice No: ${invoiceNumber}\nView here: ${window.location.origin}${import.meta.env.BASE_URL || "/"}invoice/${bookingNumber}`)}`, "_blank")}
-                className="flex flex-col items-center gap-1 py-2 hover:bg-black/5 transition-colors w-full"
-              >
-                <Share2 size={15} className="text-emerald-700" />
-                <span className="text-[10px] font-medium text-muted-foreground">WhatsApp</span>
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="flex items-center gap-3 p-3 rounded-xl border border-dashed border-border bg-muted/20">
-            <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
-              <FileText className="w-4 h-4 text-muted-foreground" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground">TAX INVOICE</p>
-              <p className="text-[11px] text-muted-foreground/70 mt-0.5">Will appear once payment is confirmed</p>
-            </div>
-          </div>
-        )}
-
-        {slots.map(type => {
-          const meta = TRAVEL_DOC_TYPES[type];
-          const Icon = meta.icon;
-          const uploaded = travelDocs.filter((d: any) => d.documentType === type);
-          if (uploaded.length === 0) {
-            return (
-              <div key={type} className="flex items-center gap-3 p-3 rounded-xl border border-dashed border-border bg-muted/20">
-                <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                  <Icon className="w-4 h-4 text-muted-foreground" />
+          {/* ── Tax Invoice slot ──────────────────────────────────────────── */}
+          {bookingNumber && bookingStatus === "confirmed" && invoiceNumber ? (
+            <div className="rounded-xl border bg-emerald-50 border-emerald-200 overflow-hidden">
+              <div className="flex items-center gap-3 p-3">
+                <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-white/50">
+                  <FileText className="w-4 h-4 text-emerald-700" />
                 </div>
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground">{meta.label}</p>
-                  <p className="text-[11px] text-muted-foreground/70 mt-0.5">Will appear once ready</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-emerald-700">TAX INVOICE</p>
+                  <p className="text-[11px] text-emerald-600 font-mono mt-0.5">#{invoiceNumber}</p>
                 </div>
+                <span className="text-[9px] font-semibold bg-emerald-600 text-white rounded-full px-2 py-0.5 shrink-0">READY</span>
               </div>
-            );
-          }
-          return uploaded.map((doc: any) => {
-            const fileUrl = `${BASE_API}${doc.fileUrl}`;
-            const isPdf = doc.fileName?.toLowerCase().endsWith(".pdf");
-            const uploadedDate = doc.createdAt ? new Date(doc.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : null;
-            return (
-              <div key={doc.id} className={`rounded-xl border ${meta.bg} overflow-hidden`}>
-                <div className={`flex items-center gap-3 p-3`}>
-                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-white/50`}>
-                    <Icon className={`w-4 h-4 ${meta.color}`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-xs font-bold ${meta.color}`}>{meta.label}</p>
-                    <p className="text-[11px] text-muted-foreground truncate">{doc.fileName}</p>
-                    {uploadedDate && <p className="text-[10px] text-muted-foreground/60 mt-0.5">Ready: {uploadedDate}</p>}
-                  </div>
-                  <span className="text-[9px] font-semibold bg-white/70 text-emerald-700 border border-emerald-200 rounded-full px-2 py-0.5 shrink-0">NEW</span>
-                </div>
-                <div className={`grid grid-cols-4 border-t border-black/5 divide-x divide-black/5`}>
-                  <a href={fileUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1 py-2 hover:bg-black/5 transition-colors">
-                    <Eye size={15} className={meta.color} />
-                    <span className="text-[10px] font-medium text-muted-foreground">View</span>
-                  </a>
-                  <a href={fileUrl} download={doc.fileName}
-                    onClick={() => logDownload(doc.id)}
-                    className="flex flex-col items-center gap-1 py-2 hover:bg-black/5 transition-colors">
-                    <Download size={15} className={meta.color} />
-                    <span className="text-[10px] font-medium text-muted-foreground">Download</span>
-                  </a>
-                  {isPdf && (
-                    <button onClick={() => handlePrint(fileUrl)} className="flex flex-col items-center gap-1 py-2 hover:bg-black/5 transition-colors w-full">
-                      <Printer size={15} className={meta.color} />
-                      <span className="text-[10px] font-medium text-muted-foreground">Print</span>
-                    </button>
+              <div className="grid grid-cols-3 border-t border-black/5 divide-x divide-black/5">
+                <button
+                  onClick={() => window.open((import.meta.env.BASE_URL || "/") + "invoice/" + bookingNumber, "_blank")}
+                  className="flex flex-col items-center gap-1 py-2 hover:bg-black/5 transition-colors w-full"
+                >
+                  <Eye size={15} className="text-emerald-700" />
+                  <span className="text-[10px] font-medium text-muted-foreground">View</span>
+                </button>
+                <button
+                  onClick={() => {
+                    const win = window.open((import.meta.env.BASE_URL || "/") + "invoice/" + bookingNumber, "_blank");
+                    if (win) win.addEventListener("load", () => { win.focus(); win.print(); });
+                  }}
+                  className="flex flex-col items-center gap-1 py-2 hover:bg-black/5 transition-colors w-full"
+                >
+                  <Printer size={15} className="text-emerald-700" />
+                  <span className="text-[10px] font-medium text-muted-foreground">Print</span>
+                </button>
+                <button
+                  onClick={() => window.open(
+                    `https://wa.me/?text=${encodeURIComponent(`My Tax Invoice from Al Burhan Tours & Travels\nInvoice No: ${invoiceNumber}\nView here: ${window.location.origin}${import.meta.env.BASE_URL || "/"}invoice/${bookingNumber}`)}`,
+                    "_blank"
                   )}
-                  <button
-                    onClick={() => handleShare(doc.fileUrl, doc.fileName)}
-                    className={`flex flex-col items-center gap-1 py-2 hover:bg-black/5 transition-colors w-full ${!isPdf ? "col-span-2" : ""}`}
-                  >
-                    <Share2 size={15} className={meta.color} />
-                    <span className="text-[10px] font-medium text-muted-foreground">Share</span>
-                  </button>
-                </div>
+                  className="flex flex-col items-center gap-1 py-2 hover:bg-black/5 transition-colors w-full"
+                >
+                  <Share2 size={15} className="text-emerald-700" />
+                  <span className="text-[10px] font-medium text-muted-foreground">WhatsApp</span>
+                </button>
               </div>
-            );
-          });
-        })}
-      </div>
-    </Card>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 p-3 rounded-xl border border-dashed border-amber-300 bg-amber-50/60">
+              <div className="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
+                <FileText className="w-4 h-4 text-amber-600" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-amber-700">TAX INVOICE</p>
+                <p className="text-[11px] text-amber-600 mt-0.5">⏳ Awaiting Upload</p>
+              </div>
+            </div>
+          )}
+
+          {/* ── All other travel doc slots ────────────────────────────────── */}
+          {slots.map(type => {
+            const meta = TRAVEL_DOC_TYPES[type];
+            const Icon = meta.icon;
+            const uploaded = travelDocs.filter((d: any) => d.documentType === type);
+
+            if (uploaded.length === 0) {
+              return (
+                <div key={type} className="flex items-center gap-3 p-3 rounded-xl border border-dashed border-amber-300 bg-amber-50/60">
+                  <div className="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
+                    <Icon className="w-4 h-4 text-amber-600" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-amber-700">{meta.label.toUpperCase()}</p>
+                    <p className="text-[11px] text-amber-600 mt-0.5">⏳ Awaiting Upload</p>
+                  </div>
+                </div>
+              );
+            }
+
+            return uploaded.map((doc: any) => {
+              const fileUrl = `${BASE_API}${doc.fileUrl}`;
+              const name = doc.fileName || "Document";
+              const mime = doc.mimeType || "";
+              const isPdf = name.toLowerCase().endsWith(".pdf") || mime === "application/pdf";
+              const isImage = /\.(jpg|jpeg|png|webp|gif)$/i.test(name) || mime.startsWith("image/");
+              const canPreview = isPdf || isImage;
+              const uploadedDate = doc.createdAt
+                ? new Date(doc.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+                : null;
+              const sizeStr = formatFileSize(doc.fileSize ?? doc.file_size);
+              const colCount = isPdf ? 4 : 3;
+
+              return (
+                <div key={doc.id} className={`rounded-xl border ${meta.bg} overflow-hidden`}>
+                  <div className="flex items-center gap-3 p-3">
+                    <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-white/50">
+                      <Icon className={`w-4 h-4 ${meta.color}`} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-xs font-bold ${meta.color}`}>{meta.label}</p>
+                      <p className="text-[11px] text-muted-foreground truncate">{name}</p>
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                        {uploadedDate && (
+                          <span className="text-[10px] text-muted-foreground/70">📅 {uploadedDate}</span>
+                        )}
+                        {sizeStr && (
+                          <span className="text-[10px] text-muted-foreground/70">· {sizeStr}</span>
+                        )}
+                      </div>
+                    </div>
+                    <span className="text-[9px] font-semibold bg-white/80 text-emerald-700 border border-emerald-200 rounded-full px-2 py-0.5 shrink-0">
+                      READY
+                    </span>
+                  </div>
+                  <div className={`grid grid-cols-${colCount} border-t border-black/5 divide-x divide-black/5`}>
+                    {canPreview ? (
+                      <button
+                        onClick={() => openPreview(doc)}
+                        className="flex flex-col items-center gap-1 py-2 hover:bg-black/5 transition-colors w-full"
+                      >
+                        <Eye size={15} className={meta.color} />
+                        <span className="text-[10px] font-medium text-muted-foreground">Preview</span>
+                      </button>
+                    ) : (
+                      <a
+                        href={fileUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex flex-col items-center gap-1 py-2 hover:bg-black/5 transition-colors"
+                      >
+                        <Eye size={15} className={meta.color} />
+                        <span className="text-[10px] font-medium text-muted-foreground">Open</span>
+                      </a>
+                    )}
+                    <a
+                      href={fileUrl}
+                      download={name}
+                      onClick={() => logDownload(doc.id)}
+                      className="flex flex-col items-center gap-1 py-2 hover:bg-black/5 transition-colors"
+                    >
+                      <Download size={15} className={meta.color} />
+                      <span className="text-[10px] font-medium text-muted-foreground">Download</span>
+                    </a>
+                    {isPdf && (
+                      <button
+                        onClick={() => handlePrint(fileUrl)}
+                        className="flex flex-col items-center gap-1 py-2 hover:bg-black/5 transition-colors w-full"
+                      >
+                        <Printer size={15} className={meta.color} />
+                        <span className="text-[10px] font-medium text-muted-foreground">Print</span>
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleShare(doc.fileUrl, name)}
+                      className="flex flex-col items-center gap-1 py-2 hover:bg-black/5 transition-colors w-full"
+                    >
+                      <Share2 size={15} className={meta.color} />
+                      <span className="text-[10px] font-medium text-muted-foreground">Share</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            });
+          })}
+        </div>
+      </Card>
+    </>
   );
 }
 

@@ -1,0 +1,127 @@
+Fix the Customer Documents system completely.
+
+Current issue:
+Admin uploads Flight Ticket, Visa, Hotel Voucher, Room Allotment, Bus Allotment, Tour Itinerary, Invoice and other documents successfully, but they are not visible in the Customer Dashboard after upload.
+
+Implement the following permanent solution.
+
+1. Create a central booking_documents table linked to booking_id and customer_id.
+
+Columns:
+- id
+- booking_id
+- customer_id
+- document_type
+- original_filename
+- stored_filename
+- file_url
+- file_size
+- mime_type
+- uploaded_by
+- uploaded_at
+- is_visible_to_customer
+- notification_sent
+- download_count
+- viewed_at
+
+2. When Admin uploads any document:
+- Save the file in secure storage.
+- Save the metadata in booking_documents.
+- Link it to the correct booking_id.
+- Link it to the correct customer_id.
+- Set is_visible_to_customer = true by default.
+- Do not overwrite previous documents.
+
+3. Customer Dashboard must automatically load every document where:
+booking_id = current booking
+AND
+customer_id = logged in customer
+AND
+is_visible_to_customer = true
+
+4. Display documents as beautiful cards.
+
+Documents:
+
+✓ Tax Invoice
+✓ Flight Ticket
+✓ Visa
+✓ Hotel Voucher
+✓ Room Allotment
+✓ Bus Allotment
+✓ Tour Itinerary
+✓ Model Contract
+✓ Insurance
+✓ Haj ID Card
+✓ Payment Receipt
+✓ Ziyarat Schedule
+✓ Passport Copy
+✓ Vaccination Certificate
+✓ Other Documents
+
+Each card must show:
+
+Document Icon
+Document Name
+Upload Date
+File Size
+Status
+Preview Button
+Download Button
+View Button
+
+5. Preview must work for:
+PDF
+JPG
+PNG
+JPEG
+
+6. Download must work.
+
+7. If document not uploaded show:
+
+Status: Awaiting Upload
+
+Instead of hiding it.
+
+8. After Admin uploads document automatically:
+
+Customer Dashboard refreshes
+WhatsApp Notification sent
+SMS Notification sent
+Email Notification sent
+RCS Notification sent (if available)
+
+Example:
+
+Flight Ticket Ready
+
+Dear {{customer_name}}
+
+Your Flight Ticket for Booking {{booking_id}} is ready.
+
+Please login to your dashboard.
+
+https://www.alburhantravels.com/dashboard
+
+9. Admin Dashboard must show:
+
+Delivered
+Viewed
+Downloaded
+Last Viewed Time
+Notification Status
+
+10. Add live synchronization.
+
+When admin uploads a document, customer dashboard should update immediately without requiring logout/login.
+
+11. Secure every document.
+
+Only the customer assigned to that booking and admin can access the file.
+
+No public URLs.
+
+12. Fix all API endpoints and React state so uploaded documents appear instantly in the Customer Dashboard.
+
+13. Test every document type and ensure Flight Ticket, Visa, Hotel Voucher, Invoice, Room Allotment, Bus Allotment, Tour Itinerary and all other documents are visible, previewable and downloadable immediately after upload.

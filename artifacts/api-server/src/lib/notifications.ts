@@ -800,6 +800,7 @@ export async function sendAdminDocumentReadyNotification(opts: {
     smsKey ? docSmsMap[smsKey]() : smsSendInvoiceCreated({ mobile: opts.mobile, customerName: opts.customerName, bookingNumber: opts.bookingNumber }),
     sendWhatsApp(opts.mobile, message),
     opts.email ? sendEmail(opts.email, `Your ${docLabel} is Ready – Al Burhan Tours & Travels`, message) : Promise.resolve(),
+    sendRCS(opts.mobile, opts.customerName, message, { active: true, url: "https://www.alburhantravels.com/dashboard", agent: "jio" }),
   ]);
 }
 

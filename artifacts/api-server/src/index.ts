@@ -1618,6 +1618,30 @@ async function runMigrations() {
     console.log("[Migration] documents tracking columns + download_logs ensured");
   } catch (err) { console.error("[Migration] documents tracking migration failed:", err); }
 
+  // ── documents: extend enum + full lifecycle columns ─────────────────────────
+  try {
+    const newDocTypes = [
+      "hotel_voucher","payment_receipt","ziyarat_schedule","insurance",
+      "hajj_id","luggage_tag","emergency_contact_card","medical_certificate",
+      "vaccination_certificate","passport_copy",
+    ];
+    for (const t of newDocTypes) {
+      try { await pool.query(`ALTER TYPE document_type ADD VALUE IF NOT EXISTS '${t}'`); } catch(_) {}
+    }
+    await pool.query(`ALTER TABLE documents ADD COLUMN IF NOT EXISTS customer_id TEXT`);
+    await pool.query(`ALTER TABLE documents ADD COLUMN IF NOT EXISTS is_visible_to_customer BOOLEAN NOT NULL DEFAULT TRUE`);
+    await pool.query(`ALTER TABLE documents ADD COLUMN IF NOT EXISTS notification_sent BOOLEAN NOT NULL DEFAULT FALSE`);
+    await pool.query(`ALTER TABLE documents ADD COLUMN IF NOT EXISTS viewed_at TIMESTAMPTZ`);
+    await pool.query(`ALTER TABLE documents ADD COLUMN IF NOT EXISTS file_size INTEGER`);
+    await pool.query(`ALTER TABLE documents ADD COLUMN IF NOT EXISTS mime_type TEXT`);
+    await pool.query(`ALTER TABLE documents ADD COLUMN IF NOT EXISTS original_filename TEXT`);
+    await pool.query(`
+      UPDATE documents d SET customer_id = b.customer_id
+      FROM bookings b WHERE d.booking_id = b.id AND d.customer_id IS NULL
+    `);
+    console.log("[Migration] documents: extended enum + lifecycle columns ensured");
+  } catch (err) { console.error("[Migration] documents lifecycle migration failed:", err); }
+
   // ── booking_confirmation_notifications ─────────────────────────────────────
   try {
     await pool.query(`

@@ -156,12 +156,24 @@ function AdminDocumentsSection({ bookingId }: { bookingId: string }) {
             {doc.createdAt ? ` · ${new Date(doc.createdAt).toLocaleDateString("en-IN")}` : ""}
           </p>
           <div className="flex items-center gap-2 mt-1 flex-wrap">
+            {doc.notificationSent || doc.notification_sent ? (
+              <span className="text-[10px] bg-blue-100 text-blue-700 rounded px-1.5 py-0.5 font-medium">📨 Notified</span>
+            ) : (
+              <span className="text-[10px] bg-gray-100 text-gray-500 rounded px-1.5 py-0.5 font-medium">📭 No notification</span>
+            )}
+            {(doc.viewedAt || doc.viewed_at) ? (
+              <span className="text-[10px] bg-purple-100 text-purple-700 rounded px-1.5 py-0.5 font-medium">
+                👁 Viewed: {new Date(doc.viewedAt || doc.viewed_at).toLocaleDateString("en-IN")}
+              </span>
+            ) : (
+              <span className="text-[10px] bg-amber-100 text-amber-700 rounded px-1.5 py-0.5 font-medium">⏳ Not viewed</span>
+            )}
             {downloads > 0 ? (
               <span className="text-[10px] bg-green-100 text-green-800 rounded px-1.5 py-0.5 font-medium">
                 ✓ Downloaded {downloads}×{lastDl ? ` · Last: ${new Date(lastDl).toLocaleDateString("en-IN")}` : ""}
               </span>
             ) : (
-              <span className="text-[10px] bg-amber-100 text-amber-700 rounded px-1.5 py-0.5 font-medium">⏳ Not downloaded yet</span>
+              <span className="text-[10px] bg-slate-100 text-slate-600 rounded px-1.5 py-0.5 font-medium">⬇ Not downloaded</span>
             )}
           </div>
         </div>
