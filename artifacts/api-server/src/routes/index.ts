@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import webhooksRouter from "./webhooks.js";
 import fs from "fs";
 import path from "path";
 import healthRouter from "./health.js";
@@ -197,6 +198,7 @@ router.use("/loyalty", loyaltyRouter);
 router.use("/offline-payments", offlinePaymentsRouter);
 router.use("/api-settings", apiSettingsRouter);
 router.use("/whatsapp", whatsappRouter);
+router.use("/webhook", webhooksRouter);
 router.use(storageRouter);
 
 export default router;

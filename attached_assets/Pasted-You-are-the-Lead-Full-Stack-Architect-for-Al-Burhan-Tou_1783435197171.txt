@@ -1,0 +1,643 @@
+You are the Lead Full Stack Architect for Al Burhan Tours & Travels.
+
+MISSION
+
+Build a 100% production-ready communication and automation engine for www.alburhantravels.com.
+
+DO NOT create mock functions or fake success messages.
+
+DO NOT mark messages as delivered unless they are actually delivered.
+
+Every API response must be logged.
+
+Fix every bug until the entire workflow works end-to-end.
+
+====================================================
+
+BUSINESS FLOW
+
+Customer visits website
+
+↓
+
+Login using Mobile OTP
+
+↓
+
+Explore Hajj / Umrah / Ziyarat Packages
+
+↓
+
+Book Package
+
+↓
+
+Booking ID Generated
+
+↓
+
+Booking Confirmation
+
+↓
+
+Customer uploads documents
+
+↓
+
+Admin verifies documents
+
+↓
+
+Customer pays online OR Offline (NEFT / RTGS / IMPS / UPI)
+
+↓
+
+Payment verified
+
+↓
+
+Invoice generated
+
+↓
+
+Visa issued
+
+↓
+
+Flight Ticket uploaded
+
+↓
+
+Hotel Voucher uploaded
+
+↓
+
+Room Allocation
+
+↓
+
+Bus Allocation
+
+↓
+
+Departure Reminder
+
+↓
+
+Journey Updates
+
+↓
+
+Return Flight
+
+↓
+
+Trip Completed
+
+↓
+
+Feedback Request
+
+====================================================
+
+EVERY STEP MUST AUTOMATICALLY SEND
+
+1 WhatsApp
+
+2 SMS
+
+3 RCS
+
+4 Email
+
+5 Dashboard Notification
+
+6 Push Notification (if app installed)
+
+No manual intervention.
+
+====================================================
+
+SUPPORTED PROVIDERS
+
+WhatsApp
+
+BotBee API
+
+SMS
+
+Fast2SMS
+
+RCS
+
+Lemin AI
+
+Email
+
+Brevo SMTP
+
+Payments
+
+Razorpay
+
+Offline Payments
+
+Bank Transfer
+
+====================================================
+
+AUTOMATIC EVENTS
+
+BOOKING CREATED
+
+Immediately send
+
+WhatsApp
+
+SMS
+
+RCS
+
+Email
+
+Example
+
+Dear Mohammed Altaf,
+
+Thank you for choosing Al Burhan Tours & Travels.
+
+Your booking has been received.
+
+Booking ID
+
+ABT26078035
+
+Package
+
+Ramadan Umrah Special
+
+Login
+
+https://www.alburhantravels.com/dashboard
+
+====================================================
+
+BOOKING APPROVED
+
+Automatically send
+
+Booking Approved
+
+Invoice
+
+Payment Instructions
+
+Dashboard Link
+
+====================================================
+
+PAYMENT REMINDER
+
+Automatically
+
+30 days
+
+15 days
+
+7 days
+
+3 days
+
+1 day
+
+12 Hours
+
+6 Hours
+
+2 Hours
+
+====================================================
+
+PAYMENT RECEIVED
+
+Automatically send
+
+Receipt
+
+Invoice
+
+Remaining Balance
+
+WhatsApp
+
+SMS
+
+RCS
+
+Email
+
+====================================================
+
+OFFLINE PAYMENT
+
+Customer selects
+
+NEFT
+
+RTGS
+
+IMPS
+
+UPI
+
+Customer enters
+
+Bank Name
+
+Account Holder
+
+Amount
+
+Transaction Date
+
+UTR Number
+
+Reference Number
+
+Branch
+
+Upload Screenshot
+
+PDF
+
+PNG
+
+JPG
+
+Admin verifies
+
+After approval
+
+Automatically send
+
+Payment Confirmed
+
+Receipt
+
+Invoice
+
+Balance
+
+====================================================
+
+DOCUMENT REMINDERS
+
+If customer has not uploaded
+
+Passport
+
+Photo
+
+PAN
+
+Aadhaar
+
+Automatically remind every 3 days
+
+====================================================
+
+VISA READY
+
+Upload Visa PDF
+
+Customer instantly receives
+
+WhatsApp
+
+SMS
+
+RCS
+
+Email
+
+Dashboard Notification
+
+====================================================
+
+FLIGHT READY
+
+Upload Flight Ticket
+
+Automatically notify customer
+
+Include
+
+PNR
+
+Flight Number
+
+Departure
+
+Reporting Time
+
+Airport
+
+====================================================
+
+HOTEL READY
+
+Hotel Name
+
+Address
+
+Google Maps
+
+Room Sharing
+
+Check In
+
+Check Out
+
+Automatically notify
+
+====================================================
+
+ROOM ALLOCATION
+
+Room Number
+
+Building
+
+Floor
+
+Automatically notify
+
+====================================================
+
+BUS ALLOCATION
+
+Bus Number
+
+Seat Number
+
+Driver
+
+Meeting Point
+
+Automatically notify
+
+====================================================
+
+DEPARTURE REMINDERS
+
+7 Days
+
+3 Days
+
+1 Day
+
+12 Hours
+
+6 Hours
+
+2 Hours
+
+Automatically notify
+
+====================================================
+
+RETURN FLIGHT
+
+Automatically send
+
+Return Ticket
+
+Airport
+
+Reporting Time
+
+====================================================
+
+TRIP COMPLETE
+
+Automatically send
+
+Thank You
+
+Feedback Form
+
+Google Review Link
+
+Referral Program
+
+====================================================
+
+COMMUNICATION ENGINE
+
+Every notification must support
+
+WhatsApp
+
+SMS
+
+RCS
+
+Email
+
+Dashboard
+
+Push
+
+====================================================
+
+MESSAGE RETRY ENGINE
+
+If WhatsApp fails
+
+Retry 3 times
+
+If still fails
+
+Send SMS
+
+If SMS fails
+
+Send Email
+
+If Email fails
+
+Create Admin Alert
+
+Never lose notifications.
+
+====================================================
+
+ADMIN DASHBOARD
+
+Real-time delivery status
+
+Delivered
+
+Failed
+
+Pending
+
+Read
+
+Clicked
+
+Downloaded
+
+====================================================
+
+DELIVERY LOGS
+
+Store
+
+Booking ID
+
+Customer
+
+Channel
+
+Provider
+
+API Request
+
+API Response
+
+Status Code
+
+Error Message
+
+Retry Count
+
+Timestamp
+
+====================================================
+
+ERROR HANDLING
+
+If API Key missing
+
+Show exact reason.
+
+If Template missing
+
+Show exact template name.
+
+If Authentication fails
+
+Show response.
+
+If Webhook fails
+
+Retry.
+
+Never hide errors.
+
+====================================================
+
+WEBHOOKS
+
+Listen for
+
+WhatsApp Delivery
+
+SMS Delivery
+
+RCS Delivery
+
+Email Opens
+
+Email Clicks
+
+Payment Success
+
+Payment Failure
+
+Document Upload
+
+====================================================
+
+SECURITY
+
+Encrypt API Keys
+
+Encrypt Customer Data
+
+Secure Signed URLs
+
+Role Based Access
+
+Audit Logs
+
+====================================================
+
+PERFORMANCE
+
+Queue all outgoing messages.
+
+Use background workers.
+
+Prevent duplicate messages.
+
+Messages must survive server restart.
+
+====================================================
+
+FINAL REQUIREMENT
+
+Audit the entire project.
+
+Find every broken notification.
+
+Repair every API integration.
+
+Repair every webhook.
+
+Repair every cron job.
+
+Repair every template mapping.
+
+Repair every provider connection.
+
+Repair every database trigger.
+
+Repair every message queue.
+
+Repair every automation rule.
+
+Run complete end-to-end tests.
+
+Generate a final report showing
+
+✓ Booking Confirmation Working
+
+✓ WhatsApp Working
+
+✓ SMS Working
+
+✓ RCS Working
+
+✓ Email Working
+
+✓ Offline Payment Working
+
+✓ Invoice Delivery Working
+
+✓ Visa Delivery Working
+
+✓ Flight Ticket Delivery Working
+
+✓ Hotel Voucher Delivery Working
+
+✓ Room Allocation Working
+
+✓ Departure Reminder Working
+
+✓ Return Reminder Working
+
+✓ Feedback Working
+
+Do not stop until every automation works successfully in production.

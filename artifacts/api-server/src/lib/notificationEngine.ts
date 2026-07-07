@@ -384,15 +384,37 @@ async function sendOnChannelWithType(channel: Channel, eventType: EventType, ctx
 
 export async function fireNotificationEvent(
   eventType: EventType,
-  ctx: NotificationContext
+  ctx: NotificationContext,
+  opts: { dedupWindowHours?: number } = {}
 ): Promise<void> {
+  // ── IDEMPOTENCY: skip if this exact event+booking was sent recently ─────────
+  const dedupWindow = opts.dedupWindowHours ?? defaultDedupWindow(eventType);
+  if (dedupWindow > 0 && ctx.bookingId) {
+    try {
+      const recent = await pool.query(
+        `SELECT id FROM notification_logs
+         WHERE event_type = $1
+           AND booking_id = $2
+           AND status     = 'sent'
+           AND sent_at    > NOW() - ($3 || ' hours')::interval
+         LIMIT 1`,
+        [eventType, ctx.bookingId, String(dedupWindow)]
+      );
+      if (recent.rows.length > 0) {
+        console.log(`[notificationEngine] ${eventType} for booking ${ctx.bookingId} — SKIPPED (already sent within ${dedupWindow}h)`);
+        return;
+      }
+    } catch (dedupErr: any) {
+      console.warn(`[notificationEngine] dedup check failed (non-fatal):`, dedupErr?.message);
+    }
+  }
+
   const enabled = await getEnabledChannels(eventType);
   const orderedChannels = CHANNEL_PRIORITY.filter(c => enabled.includes(c));
   const templateBody = await getTemplate(eventType, orderedChannels[0] ?? "whatsapp");
   const message = templateBody ? applyTemplate(templateBody, ctx) : buildDefaultMessage(eventType, ctx);
 
   // ── BROADCAST MODE: fire ALL enabled channels in parallel ──────────────────
-  // (previously was cascade/fallback — stopped after first success)
   const results = await Promise.allSettled(
     orderedChannels.map(channel => sendOnChannelWithType(channel, eventType, ctx, message))
   );
@@ -415,13 +437,80 @@ export async function fireNotificationEvent(
       successCount++;
       console.log(`[notificationEngine] ${eventType} → sent via ${channel}`);
     } else {
-      console.log(`[notificationEngine] ${eventType} → ${channel} failed`);
+      console.warn(`[notificationEngine] ${eventType} → ${channel} FAILED for ${ctx.customerMobile}`);
     }
   }
+
   if (successCount === 0) {
-    console.warn(`[notificationEngine] ${eventType} → ALL channels failed for ${ctx.customerMobile}`);
+    console.error(`[notificationEngine] ${eventType} → ALL channels failed for ${ctx.customerMobile}`);
+    // Create admin alert so the failure is visible in the dashboard
+    await pool.query(
+      `INSERT INTO admin_notifications (id, type, title, body, booking_id, is_read, created_at)
+       VALUES ($1, 'notification_failure', $2, $3::jsonb, $4, false, NOW())
+       ON CONFLICT DO NOTHING`,
+      [
+        (await import("crypto")).randomUUID(),
+        `⚠️ All channels failed: ${eventType}`,
+        JSON.stringify({
+          customerName: ctx.customerName,
+          customerMobile: ctx.customerMobile,
+          eventType,
+          bookingId: ctx.bookingId ?? null,
+          bookingNumber: ctx.bookingNumber ?? null,
+          failedChannels: orderedChannels,
+          extra: `Tried ${orderedChannels.length} channel(s) — all failed`,
+        }),
+        ctx.bookingId ?? null,
+      ]
+    ).catch((e: any) => console.error("[notificationEngine] admin alert insert failed:", e?.message));
   } else {
     console.log(`[notificationEngine] ${eventType} → ${successCount}/${orderedChannels.length} channels succeeded`);
+  }
+}
+
+// ── Dedup window per event type (hours) ──────────────────────────────────────
+// How long to wait before re-sending the same event for the same booking.
+// 0 = no dedup (always fire). Adjust per-event as needed.
+function defaultDedupWindow(eventType: EventType): number {
+  switch (eventType) {
+    // One-shot events — deduplicate aggressively
+    case "booking_approved":
+    case "visa_approved":
+    case "visa_rejected":
+    case "ticket_issued":
+    case "flight_assigned":
+    case "hotel_assigned":
+    case "room_assigned":
+    case "bus_assigned":
+    case "payment_received":
+    case "invoice_generated":
+    case "booking_completed":
+    case "feedback_request":
+      return 12; // never fire more than once per 12h for these
+
+    // Reminders — allow re-sending but not too often
+    case "departure_reminder":
+    case "return_reminder":
+    case "balance_reminder":
+    case "payment_due":
+      return 1; // deduplicate per hour (intraday crons)
+
+    // Document reminders — 3-day window per spec
+    case "passport_uploaded":
+    case "passport_expiry":
+      return 72;
+
+    // No dedup for high-urgency or campaign events
+    case "medical_emergency":
+    case "missing_pilgrim":
+    case "custom_admin":
+    case "hajj_updates":
+    case "umrah_promotions":
+    case "eid_greeting":
+      return 0;
+
+    default:
+      return 6;
   }
 }
 
