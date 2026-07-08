@@ -91,6 +91,7 @@ import NotificationCenter from "@/pages/admin/NotificationCenter";
 import NotificationLogs from "@/pages/admin/NotificationLogs";
 import CommunicationCenter from "@/pages/admin/CommunicationCenter";
 import WhatsAppTemplateManager from "@/pages/admin/WhatsAppTemplateManager";
+import BotBeeDashboard from "@/pages/admin/BotBeeDashboard";
 import SMSTemplateManager from "@/pages/admin/SMSTemplateManager";
 import RCSTemplateManager from "@/pages/admin/RCSTemplateManager";
 import EmailTemplateManager from "@/pages/admin/EmailTemplateManager";
@@ -234,6 +235,7 @@ function Router() {
       <Route path="/admin/billing-settings" component={() => <AdminRoute component={BillingSettings} />} />
       <Route path="/admin/api-settings" component={() => <AdminRoute component={ApiSettings} />} />
       <Route path="/admin/communication-center" component={() => <AdminRoute component={CommunicationCenter} />} />
+      <Route path="/admin/botbee-dashboard" component={() => <AdminRoute component={BotBeeDashboard} />} />
       <Route path="/admin/whatsapp-templates" component={() => <AdminRoute component={WhatsAppTemplateManager} />} />
       <Route path="/admin/sms-templates" component={() => <AdminRoute component={SMSTemplateManager} />} />
       <Route path="/admin/rcs-templates" component={() => <AdminRoute component={RCSTemplateManager} />} />

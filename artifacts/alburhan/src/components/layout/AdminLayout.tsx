@@ -115,6 +115,7 @@ function buildMenu(openComplaints: number): MenuSection[] {
       items: [
         { icon: BellRing,       label: "Communication Center",   href: "/admin/communication-center",  require: ["customers", "edit"] as [any,any] },
         { icon: Zap,            label: "Workflow Center",         href: "/admin/workflow-center",        require: ["bookings", "edit"]  as [any,any] },
+        { icon: Bot,            label: "BotBee Dashboard",        href: "/admin/botbee-dashboard",       require: ["settings", "view"]  as [any,any] },
         { icon: MessageSquare,  label: "WhatsApp Templates",      href: "/admin/whatsapp-templates",     require: ["settings", "view"]  as [any,any] },
         { icon: Smartphone,     label: "SMS Templates",           href: "/admin/sms-templates",          require: ["settings", "view"]  as [any,any] },
         { icon: Layers,         label: "RCS Templates",           href: "/admin/rcs-templates",          require: ["settings", "view"]  as [any,any] },

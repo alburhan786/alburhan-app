@@ -305,6 +305,151 @@ router.get("/delivery-logs", requireAdmin as any, async (req, res) => {
   } catch (err: any) { res.status(500).json({ ok: false, message: err.message }); }
 });
 
+// POST /api/whatsapp/connection-test — live ping to BotBee API
+router.post("/connection-test", requireAdmin as any, async (_req, res) => {
+  const { getCachedConfig } = await import("../lib/apiSettingsProvider.js");
+  const axios = (await import("axios")).default;
+  const bbCfg = getCachedConfig("botbee");
+  const apiToken = bbCfg.apiKey || process.env.BOTBEE_API_KEY || "";
+  const phone_number_id = bbCfg.extra?.phone_number_id || process.env.BOTBEE_PHONE_NUMBER_ID || "";
+  const baseUrl = (bbCfg.apiUrl || "https://app.botbee.io/api/v1").replace(/\/whatsapp\/?$/, "");
+
+  if (!apiToken || !phone_number_id) {
+    return res.json({ ok: false, connected: false, error: "API Key or Phone Number ID not configured" });
+  }
+
+  try {
+    const endpoint = `${baseUrl}/whatsapp/templates`;
+    const params = new URLSearchParams({ apiToken, phone_number_id });
+    const start = Date.now();
+    const r = await axios.get(`${endpoint}?${params}`, { timeout: 10000 });
+    const latencyMs = Date.now() - start;
+    const ok = r.status >= 200 && r.status < 300;
+    res.json({ ok, connected: ok, httpStatus: r.status, latencyMs, baseUrl, responseSnippet: JSON.stringify(r.data).slice(0, 200) });
+  } catch (err: any) {
+    const resp = err?.response;
+    res.json({
+      ok: false, connected: false,
+      httpStatus: resp?.status,
+      error: resp?.data?.message || err.message,
+      responseSnippet: resp?.data ? JSON.stringify(resp.data).slice(0, 200) : null,
+    });
+  }
+});
+
+// GET /api/whatsapp/retry-queue — list failed messages ready for retry
+router.get("/retry-queue", requireAdmin as any, async (req, res) => {
+  const limit = Math.min(100, parseInt(String(req.query.limit || "50")));
+  try {
+    const r = await pool.query(
+      `SELECT id, event_type, recipient, message, status, sent_at, retry_count, error_code, provider_name, http_status, provider_response
+       FROM notification_logs
+       WHERE channel='whatsapp' AND status='failed' AND retry_count < 5
+       ORDER BY sent_at DESC LIMIT $1`,
+      [limit]
+    );
+    res.json({ ok: true, queue: r.rows, count: r.rowCount });
+  } catch (err: any) { res.status(500).json({ ok: false, message: err.message }); }
+});
+
+// POST /api/whatsapp/retry-all — retry all failed messages (max 5 retries each)
+router.post("/retry-all", requireAdmin as any, async (_req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT * FROM notification_logs WHERE channel='whatsapp' AND status='failed' AND retry_count < 5 ORDER BY sent_at DESC LIMIT 50`
+    );
+    const jobs = r.rows;
+    let retried = 0; let succeeded = 0;
+    for (const log of jobs) {
+      try {
+        const reqPayload = log.request_payload as any;
+        const templateName = reqPayload?.template?.name;
+        const message = log.message;
+        let result: BotBeeResult;
+        if (templateName) {
+          result = await sendTemplate(log.recipient, templateName, reqPayload?.template?.components || [], { eventType: log.event_type });
+        } else if (message) {
+          result = await sendText(log.recipient, message.replace(/^\[template\] /, ""), { eventType: log.event_type });
+        } else { continue; }
+        await pool.query(
+          `UPDATE notification_logs SET retry_count=retry_count+1, status=$1, provider_response=$2, updated_at=NOW() WHERE id=$3`,
+          [result.ok ? "sent" : "failed", JSON.stringify(result), log.id]
+        ).catch(() => {});
+        retried++;
+        if (result.ok) succeeded++;
+        await new Promise(r => setTimeout(r, 500)); // rate limit
+      } catch { /* continue */ }
+    }
+    res.json({ ok: true, retried, succeeded, failed: retried - succeeded });
+  } catch (err: any) { res.status(500).json({ ok: false, message: err.message }); }
+});
+
+// POST /api/whatsapp/automation-test — run a full multi-channel notification test
+router.post("/automation-test", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  const { mobile, email } = req.body;
+  if (!mobile?.trim()) return res.status(400).json({ ok: false, message: "mobile is required for test" });
+
+  const steps: { step: string; status: "pass" | "fail" | "skip"; detail?: string }[] = [];
+
+  // 1. Connection test
+  try {
+    const { getCachedConfig } = await import("../lib/apiSettingsProvider.js");
+    const axios = (await import("axios")).default;
+    const bbCfg = getCachedConfig("botbee");
+    const apiToken = bbCfg.apiKey || process.env.BOTBEE_API_KEY || "";
+    const phone_number_id = bbCfg.extra?.phone_number_id || process.env.BOTBEE_PHONE_NUMBER_ID || "";
+    const baseUrl = (bbCfg.apiUrl || "https://app.botbee.io/api/v1").replace(/\/whatsapp\/?$/, "");
+    const r = await axios.get(`${baseUrl}/whatsapp/templates?apiToken=${apiToken}&phone_number_id=${phone_number_id}`, { timeout: 8000 });
+    steps.push({ step: "BotBee Connection", status: r.status < 300 ? "pass" : "fail", detail: `HTTP ${r.status}` });
+  } catch (err: any) { steps.push({ step: "BotBee Connection", status: "fail", detail: err.message }); }
+
+  // 2. Template fetch
+  try {
+    const result = await fetchTemplates();
+    const approved = (result.templates || []).filter(t => t.status === "APPROVED").length;
+    steps.push({ step: "Template Fetch", status: result.ok ? "pass" : "fail", detail: result.ok ? `${approved} approved templates` : result.errorMessage });
+  } catch (err: any) { steps.push({ step: "Template Fetch", status: "fail", detail: err.message }); }
+
+  // 3. WhatsApp send test
+  const waMsg = `🧪 Al Burhan ERP Automation Test\n\nThis is an automated test from Al Burhan Tours & Travels ERP system.\n\nTime: ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}\n\nIf you received this, WhatsApp automation is working correctly. ✅`;
+  try {
+    const result = await sendText(mobile.trim(), waMsg, { eventType: "automation_test" });
+    steps.push({ step: "WhatsApp Send", status: result.ok ? "pass" : "fail", detail: result.ok ? `Sent to ${mobile}` : result.errorMessage });
+  } catch (err: any) { steps.push({ step: "WhatsApp Send", status: "fail", detail: err.message }); }
+
+  // 4. SMS test
+  try {
+    const { sendDLTSMS } = await import("../lib/notifications.js");
+    const result = await sendDLTSMS(mobile.trim(), mobile.trim(), "test", "notification");
+    steps.push({ step: "SMS Send", status: (result as any).ok ? "pass" : "fail", detail: (result as any).ok ? `SMS sent to ${mobile}` : (result as any).errorMessage });
+  } catch (err: any) { steps.push({ step: "SMS Send", status: "fail", detail: err.message }); }
+
+  // 5. Email test
+  if (email?.trim()) {
+    try {
+      const { sendEmail } = await import("../lib/notifications.js");
+      const result = await sendEmail(email.trim(), "Al Burhan ERP — Automation Test", `<p>This is an automated test email from Al Burhan Tours & Travels ERP.</p><p>Time: ${new Date().toISOString()}</p><p>If you received this, email automation is working correctly. ✅</p>`);
+      steps.push({ step: "Email Send", status: result.ok ? "pass" : "fail", detail: result.ok ? `Email sent to ${email}` : result.errorMessage });
+    } catch (err: any) { steps.push({ step: "Email Send", status: "fail", detail: err.message }); }
+  } else {
+    steps.push({ step: "Email Send", status: "skip", detail: "No email provided" });
+  }
+
+  // 6. DB log test
+  try {
+    const id = `test_${Date.now()}`;
+    await pool.query(
+      `INSERT INTO notification_logs (id, event_type, channel, recipient, message, status, provider_name, sent_at, retry_count) VALUES ($1,'automation_test','whatsapp',$2,'Automation test','sent','BotBee',NOW(),0)`,
+      [id, mobile.trim()]
+    );
+    steps.push({ step: "DB Logging", status: "pass", detail: "Log entry created" });
+  } catch (err: any) { steps.push({ step: "DB Logging", status: "fail", detail: err.message }); }
+
+  const passed = steps.filter(s => s.status === "pass").length;
+  const failed = steps.filter(s => s.status === "fail").length;
+  res.json({ ok: failed === 0, steps, summary: { passed, failed, skipped: steps.filter(s => s.status === "skip").length } });
+});
+
 // POST /api/whatsapp/retry/:logId — retry a failed delivery
 router.post("/retry/:logId", requireAdmin as any, async (req, res) => {
   try {

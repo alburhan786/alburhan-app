@@ -1738,6 +1738,74 @@ async function start() {
     };
     scheduleAuditRetention();
     console.log("[AuditRetention] Scheduled: daily purge of audit_logs older than 12 months");
+
+    // ── BotBee template auto-sync every 10 minutes ──────────────────────────
+    const syncBotBeeTemplates = async () => {
+      try {
+        const { fetchTemplates } = await import("./lib/botbee.js");
+        const result = await fetchTemplates();
+        if (result.ok && result.templates) {
+          for (const lt of result.templates) {
+            await pool.query(
+              `UPDATE wa_templates SET status=$1, updated_at=NOW() WHERE meta_template_name=$2 OR name=$2`,
+              [lt.status?.toLowerCase() || "unknown", lt.name]
+            ).catch(() => {});
+          }
+          console.log(`[BotBee] Auto-synced ${result.templates.length} templates`);
+        }
+      } catch (err) {
+        console.error("[BotBee] Auto-sync failed:", err);
+      }
+    };
+    syncBotBeeTemplates();
+    setInterval(syncBotBeeTemplates, 10 * 60 * 1000);
+    console.log("[BotBee] Template auto-sync scheduled every 10 minutes");
+
+    // ── WhatsApp retry engine — runs every 2 minutes ─────────────────────────
+    const runRetryEngine = async () => {
+      try {
+        const now = Date.now();
+        // Find failed messages that need retry based on retry_count and last attempt time
+        const failed = await pool.query(
+          `SELECT id, event_type, recipient, message, retry_count, request_payload, updated_at
+           FROM notification_logs
+           WHERE channel='whatsapp' AND status='failed' AND retry_count < 5
+             AND (
+               (retry_count=0 AND updated_at < NOW()-INTERVAL '1 minute') OR
+               (retry_count=1 AND updated_at < NOW()-INTERVAL '5 minutes') OR
+               (retry_count=2 AND updated_at < NOW()-INTERVAL '30 minutes') OR
+               (retry_count=3 AND updated_at < NOW()-INTERVAL '2 hours') OR
+               (retry_count=4 AND updated_at < NOW()-INTERVAL '6 hours')
+             )
+           ORDER BY updated_at ASC LIMIT 10`
+        );
+        if (failed.rowCount && failed.rowCount > 0) {
+          console.log(`[RetryEngine] ${failed.rowCount} messages queued for retry`);
+          const { sendText, sendTemplate } = await import("./lib/botbee.js");
+          for (const log of failed.rows) {
+            try {
+              const reqPayload = log.request_payload as any;
+              const templateName = reqPayload?.template?.name;
+              const message = log.message;
+              let result: any;
+              if (templateName) {
+                result = await sendTemplate(log.recipient, templateName, reqPayload?.template?.components || [], { eventType: log.event_type });
+              } else if (message) {
+                result = await sendText(log.recipient, message.replace(/^\[template\] /, ""), { eventType: log.event_type });
+              } else { continue; }
+              await pool.query(
+                `UPDATE notification_logs SET retry_count=retry_count+1, status=$1, provider_response=$2, updated_at=NOW() WHERE id=$3`,
+                [result.ok ? "sent" : "failed", JSON.stringify(result), log.id]
+              ).catch(() => {});
+              console.log(`[RetryEngine] ${log.id} → ${result.ok ? "sent" : "failed"} (retry #${log.retry_count + 1})`);
+              await new Promise(r => setTimeout(r, 1000));
+            } catch (err) { console.error("[RetryEngine] retry error:", err); }
+          }
+        }
+      } catch (err) { console.error("[RetryEngine] engine error:", err); }
+    };
+    setInterval(runRetryEngine, 2 * 60 * 1000);
+    console.log("[RetryEngine] WhatsApp retry engine scheduled every 2 minutes");
   });
 }
 

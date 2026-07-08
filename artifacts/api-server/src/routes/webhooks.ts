@@ -64,6 +64,45 @@ router.post("/rcs", async (req, res) => {
   res.json({ ok: true });
 });
 
+// ── POST /api/webhook/botbee — BotBee general webhook (logs every request) ──
+router.post("/botbee", async (req, res) => {
+  const body = req.body ?? {};
+  const raw = JSON.stringify(body);
+  console.log("[Webhook][BotBee] Received:", raw.slice(0, 500));
+
+  try {
+    await pool.query(
+      `INSERT INTO notification_logs
+       (id, event_type, channel, recipient, message, status, provider_response, provider_name, sent_at, retry_count)
+       VALUES ($1,'webhook_received','whatsapp_webhook',$2,$3,'received',$4,'BotBee',NOW(),0)`,
+      [
+        `wh_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        body.phone_number || body.phone || "unknown",
+        raw.slice(0, 300),
+        JSON.stringify(body),
+      ]
+    );
+  } catch (e) { console.error("[Webhook][BotBee] DB log failed:", e); }
+
+  // Also process delivery status if present
+  const phone: string = body.phone_number || body.phone || body.recipient || "";
+  const event: string = (body.status || body.event || body.type || "").toLowerCase();
+  let newStatus: "delivered" | "read" | "failed" | "clicked" | null = null;
+  if (event.includes("deliver")) newStatus = "delivered";
+  else if (event.includes("read") || event.includes("seen")) newStatus = "read";
+  else if (event.includes("fail") || event.includes("error") || event === "0") newStatus = "failed";
+  else if (event.includes("click")) newStatus = "clicked";
+
+  if (phone && newStatus) {
+    const clean = phone.replace(/\D/g, "");
+    const mobile = clean.length === 12 && clean.startsWith("91") ? clean.slice(2) : clean;
+    await updateDeliveryStatus(mobile, "whatsapp", newStatus, body);
+    console.log(`[Webhook][BotBee] ${mobile} → ${newStatus}`);
+  }
+
+  res.status(200).json({ ok: true, received: true });
+});
+
 // ── POST /api/webhook/whatsapp-dlr — BotBee ───────────────────────────────
 router.post("/whatsapp-dlr", async (req, res) => {
   const body = req.body ?? {};

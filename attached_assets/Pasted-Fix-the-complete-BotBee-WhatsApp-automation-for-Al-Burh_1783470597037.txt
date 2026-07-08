@@ -1,0 +1,412 @@
+Fix the complete BotBee WhatsApp automation for Al Burhan Tours & Travels. Do not use mock data. Build a production-ready integration.
+
+OBJECTIVE
+Customers should never need manual WhatsApp sending. Every notification must be triggered automatically based on booking events.
+
+==================================================
+1. BOTBEE HTTP API
+==================================================
+
+Create a complete BotBee HTTP API integration.
+
+• Verify API Token
+• Verify Base URL
+• Verify Phone Number ID
+• Verify Business Account ID
+• Verify Instance ID
+• Test Connection
+• Auto reconnect if disconnected
+
+Show connection status:
+🟢 Connected
+🔴 Disconnected
+
+==================================================
+2. LIVE TEMPLATE SYNC
+==================================================
+
+Remove fake templates.
+
+Fetch approved templates directly from BotBee/Meta API.
+
+Create API:
+
+GET /api/v1/whatsapp/templates
+
+Automatically sync every 10 minutes.
+
+Show
+
+Approved
+
+Pending
+
+Rejected
+
+Disabled
+
+If API fails display detailed error instead of "Failed to fetch".
+
+==================================================
+3. HTTP WEBHOOK
+==================================================
+
+Create
+
+POST /api/webhooks/botbee
+
+Log every request.
+
+Return HTTP 200.
+
+Save request and response in database.
+
+==================================================
+4. AUTOMATIC EVENTS
+==================================================
+
+Automatically send WhatsApp whenever these events happen.
+
+Booking Submitted
+
+Booking Approved
+
+Payment Received
+
+Payment Reminder
+
+Balance Reminder
+
+Invoice Generated
+
+Passport Uploaded
+
+Documents Verified
+
+Visa Approved
+
+Visa Rejected
+
+Flight Ticket Uploaded
+
+Hotel Voucher Uploaded
+
+Room Allotment
+
+Bus Allotment
+
+Ziyarat Schedule
+
+Departure Reminder
+
+Arrival
+
+Trip Completed
+
+Refund
+
+Cancellation
+
+No manual Send button.
+
+Everything automatic.
+
+==================================================
+5. VARIABLES
+==================================================
+
+Pass all variables automatically.
+
+customer_name
+
+customer_mobile
+
+booking_id
+
+invoice_number
+
+package_name
+
+departure_date
+
+return_date
+
+amount
+
+paid
+
+balance
+
+payment_status
+
+passport_number
+
+visa_number
+
+visa_status
+
+flight_number
+
+airline
+
+pnr
+
+hotel_name
+
+room_number
+
+bus_number
+
+seat_number
+
+driver_name
+
+guide_name
+
+ziyarat_date
+
+company_name
+
+support_number
+
+website
+
+These variables must be visible in BotBee Test & Verify.
+
+"No variables detected" must never appear.
+
+==================================================
+6. ADMIN PANEL
+==================================================
+
+Create BotBee Dashboard.
+
+Show
+
+API Status
+
+Webhook Status
+
+Template Status
+
+Last Sync
+
+Live Templates
+
+Approved Templates
+
+Rejected Templates
+
+Failed Messages
+
+Delivery Logs
+
+Retry Queue
+
+Connection Test
+
+Send Test Booking
+
+Sync Templates
+
+==================================================
+7. DELIVERY LOGS
+==================================================
+
+Save
+
+Customer
+
+Booking ID
+
+Template Name
+
+WhatsApp Message ID
+
+Request
+
+Response
+
+Delivery Status
+
+Sent Time
+
+Delivered Time
+
+Read Time
+
+Failure Reason
+
+Retry Count
+
+==================================================
+8. RETRY ENGINE
+==================================================
+
+If WhatsApp fails
+
+Retry after
+
+1 minute
+
+5 minutes
+
+30 minutes
+
+2 hours
+
+Maximum 5 retries.
+
+==================================================
+9. CUSTOMER AUTOMATION
+==================================================
+
+Customer books package.
+
+Immediately send
+
+WhatsApp
+
+SMS
+
+Email
+
+RCS
+
+Dashboard Notification
+
+Admin Notification
+
+Automatically.
+
+==================================================
+10. DOCUMENT DELIVERY
+==================================================
+
+When admin uploads
+
+Invoice
+
+Receipt
+
+Visa
+
+Flight Ticket
+
+Hotel Voucher
+
+Room Allotment
+
+Bus Allotment
+
+Model Contract
+
+Insurance
+
+Ziyarat Schedule
+
+Hajj ID Card
+
+QR Card
+
+Passport Copy
+
+Automatically
+
+Store document
+
+Show in customer dashboard
+
+Generate secure download link
+
+Send WhatsApp
+
+Send SMS
+
+Send Email
+
+Send RCS
+
+No manual work.
+
+==================================================
+11. AUTOMATION ENGINE
+==================================================
+
+Run automatically.
+
+No manual send.
+
+No manual template selection.
+
+No manual customer selection.
+
+Trigger based on booking status changes.
+
+==================================================
+12. ERROR HANDLING
+==================================================
+
+Show detailed errors.
+
+Examples
+
+Invalid API Token
+
+Invalid Phone Number ID
+
+Template Not Approved
+
+Webhook Failed
+
+BotBee Timeout
+
+Meta Authentication Failed
+
+Network Error
+
+Rate Limit Exceeded
+
+==================================================
+13. TEST MODE
+==================================================
+
+Create one button
+
+"Run Complete Automation Test"
+
+It should
+
+Create demo booking
+
+Send booking to BotBee
+
+Verify webhook
+
+Verify template
+
+Verify variables
+
+Verify WhatsApp
+
+Verify SMS
+
+Verify Email
+
+Verify RCS
+
+Show PASS or FAIL for every step.
+
+==================================================
+14. FINAL REQUIREMENT
+==================================================
+
+Remove all mock data.
+
+Use only live BotBee API.
+
+Use only Meta approved templates.
+
+Use secure production code.
+
+Ensure 100% automatic communication workflow from booking until trip completion without any manual sending.
