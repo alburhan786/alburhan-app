@@ -1273,8 +1273,17 @@ const PAYMENT_STATUS_STYLES: Record<string, { badge: string; label: string }> = 
   pending:              { badge: "bg-yellow-100 text-yellow-800 border-yellow-300",  label: "🟡 Awaiting Verification" },
   approved:             { badge: "bg-emerald-100 text-emerald-800 border-emerald-300", label: "✅ Payment Verified" },
   rejected:             { badge: "bg-red-100 text-red-800 border-red-300",           label: "🔴 Payment Rejected" },
-  correction_requested: { badge: "bg-orange-100 text-orange-800 border-orange-300",  label: "🟠 Correction Needed" },
+  correction_requested: { badge: "bg-orange-100 text-orange-800 border-orange-300",  label: "🟠 More Info Required" },
 };
+
+const ALLOWED_FILE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp", "application/pdf"];
+const MAX_FILE_MB = 25;
+
+function validateProofFile(file: File): string | null {
+  if (!ALLOWED_FILE_TYPES.includes(file.type)) return "Only PDF, JPG, JPEG, PNG, WEBP files are allowed.";
+  if (file.size > MAX_FILE_MB * 1024 * 1024) return `File too large. Maximum size is ${MAX_FILE_MB} MB.`;
+  return null;
+}
 
 function BankTransferSection({ booking }: { booking: any }) {
   const { toast } = useToast();
@@ -1282,12 +1291,18 @@ function BankTransferSection({ booking }: { booking: any }) {
   const [existingPayments, setExistingPayments] = useState<any[]>([]);
   const [showDetails, setShowDetails] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState<{ paymentReference: string; message: string } | null>(null);
   const [proofFile, setProofFile] = useState<File | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
-    customerName: "", mobile: "", email: "",
+    customerName: booking.customerName || "", mobile: booking.customerMobile || "",
+    email: booking.customerEmail || "",
     amountPaid: "", paymentDate: new Date().toISOString().slice(0, 10),
-    paymentTime: "", bankName: "", branchName: "",
+    paymentTime: new Date().toTimeString().slice(0, 5),
+    bankName: "", branchName: "",
     paymentMethod: "NEFT", utrNumber: "", senderAccountLast4: "", remarks: "",
   });
   const queryClient = useQueryClient();
@@ -1301,22 +1316,42 @@ function BankTransferSection({ booking }: { booking: any }) {
   const latestPayment = existingPayments[0];
   const canSubmit = !latestPayment || latestPayment.status === "rejected" || latestPayment.status === "correction_requested";
 
+  const handleFileSelect = (file: File) => {
+    const err = validateProofFile(file);
+    if (err) { toast({ title: "Invalid file", description: err, variant: "destructive" }); return; }
+    setProofFile(file);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault(); setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) handleFileSelect(file);
+  };
+
+  const reloadPayments = () =>
+    fetch(`${BASE_API}/api/offline-payments/booking/${booking.id}`, { credentials: "include" })
+      .then(r => r.json()).then(d => setExistingPayments(d.payments || [])).catch(() => {});
+
   const handleSubmit = async () => {
     if (!form.utrNumber.trim()) return toast({ title: "UTR number required", variant: "destructive" });
     if (!form.amountPaid || Number(form.amountPaid) <= 0) return toast({ title: "Valid amount required", variant: "destructive" });
+    if (proofFile) {
+      const err = validateProofFile(proofFile);
+      if (err) return toast({ title: "Invalid file", description: err, variant: "destructive" });
+    }
     setSubmitting(true);
     try {
       const fd = new FormData();
-      Object.entries(form).forEach(([k, v]) => fd.append(k === "amountPaid" ? "amountPaid" : k, v));
+      Object.entries(form).forEach(([k, v]) => fd.append(k, v));
       fd.set("bookingId", booking.id);
       if (proofFile) fd.append("proof", proofFile);
       const res = await fetch(`${BASE_API}/api/offline-payments`, { method: "POST", credentials: "include", body: fd });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Submission failed");
-      toast({ title: "Payment details submitted!", description: "Our team will verify within 24 hours. You will be notified." });
+      setSubmitted({ paymentReference: data.paymentReference, message: data.message });
       setShowForm(false);
-      fetch(`${BASE_API}/api/offline-payments/booking/${booking.id}`, { credentials: "include" })
-        .then(r => r.json()).then(d => setExistingPayments(d.payments || [])).catch(() => {});
+      setProofFile(null);
+      reloadPayments();
       queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
     } catch (e: any) {
       toast({ title: "Submission failed", description: e.message, variant: "destructive" });
@@ -1331,35 +1366,70 @@ function BankTransferSection({ booking }: { booking: any }) {
 
   return (
     <>
-      {/* Payment Status Banner (if already submitted) */}
-      {latestPayment && (
+      {/* Success Banner after submission */}
+      {submitted && (
+        <div className="mx-5 mb-3 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3">
+          <div className="flex items-start gap-3">
+            <CheckCircle className="w-5 h-5 text-emerald-600 mt-0.5 shrink-0" />
+            <div className="flex-1">
+              <p className="font-semibold text-sm text-emerald-800">Payment Submitted Successfully</p>
+              <p className="text-xs mt-0.5 text-emerald-700">{submitted.message}</p>
+              {submitted.paymentReference && (
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="text-xs text-emerald-700">Reference No:</span>
+                  <span className="font-mono text-xs font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">{submitted.paymentReference}</span>
+                  <button onClick={() => copyToClipboard(submitted.paymentReference, "Reference")} className="text-emerald-600 hover:text-emerald-800">
+                    <Copy className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
+            </div>
+            <button onClick={() => setSubmitted(null)} className="text-emerald-400 hover:text-emerald-600"><X className="w-4 h-4" /></button>
+          </div>
+        </div>
+      )}
+
+      {/* Latest Payment Status Banner */}
+      {latestPayment && !submitted && (
         <div className={`mx-5 mb-3 rounded-xl border px-4 py-3 ${PAYMENT_STATUS_STYLES[latestPayment.status]?.badge || "bg-gray-100"}`}>
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
               <p className="font-semibold text-sm">{PAYMENT_STATUS_STYLES[latestPayment.status]?.label || latestPayment.status}</p>
-              <p className="text-xs mt-0.5 opacity-80">UTR: {latestPayment.utr_number} • ₹{Number(latestPayment.amount_paid).toLocaleString("en-IN")}</p>
-              {latestPayment.rejection_reason && <p className="text-xs mt-1 font-medium">Reason: {latestPayment.rejection_reason}</p>}
+              <p className="text-xs mt-0.5 opacity-80">
+                {latestPayment.payment_reference && <span>Ref: {latestPayment.payment_reference} · </span>}
+                UTR: {latestPayment.utr_number} · ₹{Number(latestPayment.amount_paid).toLocaleString("en-IN")}
+              </p>
+              {(latestPayment.rejection_reason || latestPayment.admin_remarks) && (
+                <p className="text-xs mt-1 font-medium">
+                  {latestPayment.admin_remarks || latestPayment.rejection_reason}
+                </p>
+              )}
             </div>
-            {canSubmit && (
-              <Button size="sm" variant="outline" className="text-xs h-7 border-current" onClick={() => setShowForm(true)}>
-                Resubmit
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" className="text-xs h-7 border-current" onClick={() => setShowHistory(true)}>
+                History
               </Button>
-            )}
+              {canSubmit && (
+                <Button size="sm" variant="outline" className="text-xs h-7 border-current" onClick={() => setShowForm(true)}>
+                  Resubmit
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       )}
 
       {/* Pay via Bank Transfer card */}
-      {!latestPayment && (
+      {!latestPayment && !submitted && (
         <div className="mx-5 mb-4 rounded-xl border border-primary/20 bg-gradient-to-br from-primary/5 to-transparent p-4">
           <div className="flex items-center gap-3 flex-wrap justify-between">
             <div className="flex items-center gap-2.5">
               <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
-                <Building2 className="w-4.5 h-4.5 text-primary" />
+                <Building2 className="w-4 h-4 text-primary" />
               </div>
               <div>
                 <p className="font-semibold text-sm text-primary">Pay via Bank Transfer</p>
-                <p className="text-xs text-muted-foreground">NEFT / RTGS / IMPS / UPI</p>
+                <p className="text-xs text-muted-foreground">NEFT · RTGS · IMPS · UPI · Cheque · Cash</p>
               </div>
             </div>
             <div className="flex gap-2">

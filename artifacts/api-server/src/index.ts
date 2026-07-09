@@ -1571,6 +1571,10 @@ async function runMigrations() {
     `);
     await pool.query(`CREATE INDEX IF NOT EXISTS offline_payments_booking_idx ON offline_payments(booking_id)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS offline_payments_customer_idx ON offline_payments(customer_id)`);
+    // Add new columns if not exist (upgrade)
+    await pool.query(`ALTER TABLE offline_payments ADD COLUMN IF NOT EXISTS payment_reference TEXT`).catch(() => {});
+    await pool.query(`ALTER TABLE offline_payments ADD COLUMN IF NOT EXISTS admin_remarks TEXT`).catch(() => {});
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS offline_payments_ref_idx ON offline_payments(payment_reference) WHERE payment_reference IS NOT NULL`).catch(() => {});
     console.log("[Migration] bank_settings + offline_payments tables ensured");
   } catch (err) { console.error("[Migration] offline payments migration failed:", err); }
 

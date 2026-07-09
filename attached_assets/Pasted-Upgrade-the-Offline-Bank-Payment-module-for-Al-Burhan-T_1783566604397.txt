@@ -1,0 +1,218 @@
+Upgrade the Offline Bank Payment module for Al Burhan Tours & Travels.
+
+CUSTOMER PAYMENT FORM
+
+Allow customers to upload payment proof in the following formats:
+
+• PDF
+• JPG
+• JPEG
+• PNG
+• WEBP
+
+Maximum file size: 25 MB.
+
+Validate file type and size before upload.
+
+====================================
+
+Required Fields
+
+Booking ID (Auto-filled)
+
+Customer Name (Auto-filled)
+
+Mobile Number (Auto-filled)
+
+Email
+
+Amount Paid
+
+Payment Date
+
+Payment Time
+
+Payment Method
+
+NEFT
+
+RTGS
+
+IMPS
+
+UPI
+
+Bank Transfer
+
+Cash Deposit
+
+Cheque
+
+Sender Bank Name
+
+Branch Name
+
+UTR / Transaction Reference Number
+
+Sender Account Last 4 Digits
+
+Remarks
+
+Upload Payment Receipt
+
+====================================
+
+After customer clicks Submit
+
+1. Save payment details in database.
+
+2. Save uploaded receipt securely.
+
+3. Generate Payment Reference Number.
+
+Example:
+PAY-2026-000145
+
+4. Show success message.
+
+"Your payment details have been submitted successfully. Our Accounts Team will verify your payment within 24 hours."
+
+====================================
+
+Automatically notify Admin.
+
+Send notification via:
+
+Dashboard
+
+Email
+
+SMS
+
+WhatsApp
+
+====================================
+
+Admin Panel
+
+Create "Offline Payment Verification"
+
+Show
+
+Pending Verification
+
+Verified
+
+Rejected
+
+Need Clarification
+
+Display
+
+Booking ID
+
+Customer Name
+
+Package
+
+Amount
+
+Payment Method
+
+UTR Number
+
+Payment Date
+
+Bank Name
+
+Uploaded Receipt Preview
+
+Buttons
+
+View Receipt
+
+Download Receipt
+
+Approve Payment
+
+Reject Payment
+
+Request More Information
+
+====================================
+
+When Admin clicks Approve
+
+Automatically
+
+Update payment ledger
+
+Reduce customer balance
+
+Generate payment receipt PDF
+
+Upload receipt to customer dashboard
+
+Send customer:
+
+WhatsApp Confirmation
+
+SMS Confirmation
+
+Email Confirmation
+
+RCS Message
+
+Dashboard Notification
+
+Example
+
+Dear {{customer_name}},
+
+We have successfully verified your offline bank payment of ₹{{amount}}.
+
+Booking ID: {{booking_id}}
+
+Receipt No: {{receipt_no}}
+
+Remaining Balance: ₹{{balance}}
+
+Thank you.
+
+Al Burhan Tours & Travels
+
+====================================
+
+Customer Dashboard
+
+Create a Payment History section showing
+
+Payment Date
+
+Amount
+
+Method
+
+UTR Number
+
+Status
+
+Receipt Download
+
+Admin Remarks
+
+====================================
+
+Support drag-and-drop upload.
+
+Support mobile and desktop.
+
+Compress images automatically before storing.
+
+Store all files securely with unique filenames.
+
+Only PDF, JPG, JPEG, PNG, and WEBP are allowed.
+
+Reject executable or unsafe files.
+
+Everything must be production-ready and fully integrated with the existing booking, ledger, invoice, and notification system.
