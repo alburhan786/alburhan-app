@@ -6,9 +6,9 @@ import { eq, sql, inArray, and, lt, desc } from "drizzle-orm";
 // Note: onlinePaidAmount tracks Razorpay-only payments; manual ledger entries are in payment_transactions
 import { CreatePaymentOrderBody, VerifyPaymentBody } from "@workspace/api-zod";
 import { requireAuth, requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
-import { sendPaymentConfirmationNotification, sendPartialPaymentNotification, sendWhatsApp } from "../lib/notifications.js";
-import { trackNotification } from "../lib/notificationEngine.js";
+import { sendAdminPaymentAlert, sendWhatsApp, type EmailAttachment } from "../lib/notifications.js";
 import { triggerWorkflow } from "../lib/workflowEngine.js";
+import { generateInvoicePdfBuffer, generateReceiptPdfBuffer } from "../lib/paymentDocs.js";
 import { sendReminderForBookingId, getReminderHistory, runDailyReminders, isRemindersEnabled, setRemindersEnabled } from "../jobs/paymentReminder.js";
 
 const router = Router();
@@ -33,6 +33,100 @@ interface RazorpayWithPaymentLink extends Razorpay {
   paymentLink: {
     create(payload: RazorpayPaymentLinkPayload): Promise<RazorpayPaymentLinkResponse>;
   };
+}
+
+/**
+ * Single, awaited path that fires after ANY successful payment (full or
+ * partial), via /verify, /sync-payment, or the Razorpay webhook. Replaces
+ * the old ad-hoc fire-and-forget notification calls that silently swallowed
+ * failures. Generates invoice/receipt PDFs, runs the customer notification
+ * workflow (WhatsApp/SMS/Email with retry + logging via
+ * notification_logs/customer_timeline), and alerts admins
+ * (WhatsApp/Email/Dashboard). Every step is logged; failures never abort the
+ * payment response since the DB write already succeeded.
+ */
+async function processPaymentSuccessNotifications(opts: {
+  booking: {
+    id: string;
+    bookingNumber: string;
+    customerName: string;
+    customerMobile: string;
+    customerEmail?: string | null;
+    packageName?: string | null;
+    numberOfPilgrims?: number | null;
+    finalAmount?: string | number | null;
+  };
+  isFullyPaid: boolean;
+  thisPaymentAmount: number;
+  newPaidAmount: number;
+  remainingBalance: number;
+  invoiceNumber?: string | null;
+  paymentRef?: string;
+}) {
+  const { booking, isFullyPaid, thisPaymentAmount, newPaidAmount, remainingBalance, invoiceNumber, paymentRef } = opts;
+  const finalAmountNum = Number(booking.finalAmount || 0);
+
+  const docOpts = {
+    bookingNumber: booking.bookingNumber,
+    customerName: booking.customerName,
+    customerMobile: booking.customerMobile,
+    customerEmail: booking.customerEmail,
+    packageName: booking.packageName,
+    numberOfPilgrims: booking.numberOfPilgrims,
+    totalAmount: finalAmountNum,
+    finalAmount: finalAmountNum,
+    paidAmount: newPaidAmount,
+    balanceAmount: remainingBalance,
+    invoiceNumber,
+    paymentAmount: thisPaymentAmount,
+    paymentRef,
+  };
+
+  const attachments: EmailAttachment[] = [];
+  try {
+    const receiptBuf = await generateReceiptPdfBuffer(docOpts);
+    attachments.push({ filename: `Receipt-${booking.bookingNumber}.pdf`, content: receiptBuf, contentType: "application/pdf" });
+    if (isFullyPaid) {
+      const invBuf = await generateInvoicePdfBuffer(docOpts);
+      attachments.push({ filename: `Invoice-${invoiceNumber || booking.bookingNumber}.pdf`, content: invBuf, contentType: "application/pdf" });
+    }
+  } catch (err) {
+    console.error("[payments] PDF generation failed:", err);
+  }
+
+  const trigger = isFullyPaid ? "payment_received" : "partial_payment_received";
+  const displayAmount = (isFullyPaid ? finalAmountNum : thisPaymentAmount).toLocaleString("en-IN");
+
+  const results = await Promise.allSettled([
+    triggerWorkflow(trigger as any, {
+      bookingId: booking.id,
+      bookingNumber: booking.bookingNumber,
+      customerName: booking.customerName,
+      customerMobile: booking.customerMobile,
+      customerEmail: booking.customerEmail ?? undefined,
+      amount: isFullyPaid ? finalAmountNum : thisPaymentAmount,
+      paidAmount: thisPaymentAmount,
+      balanceAmount: remainingBalance,
+      invoiceNumber: invoiceNumber ?? undefined,
+      attachments,
+    } as any),
+    sendAdminPaymentAlert({
+      bookingId: booking.id,
+      bookingNumber: booking.bookingNumber,
+      customerName: booking.customerName,
+      mobile: booking.customerMobile,
+      amount: displayAmount,
+      isFullyPaid,
+      invoiceNumber,
+      balance: remainingBalance > 0 ? remainingBalance.toLocaleString("en-IN") : undefined,
+    }),
+  ]);
+
+  results.forEach((r, i) => {
+    if (r.status === "rejected") {
+      console.error(`[payments] Notification step ${i === 0 ? "triggerWorkflow" : "sendAdminPaymentAlert"} failed for booking ${booking.bookingNumber}:`, r.reason);
+    }
+  });
 }
 
 function getRazorpay(): RazorpayWithPaymentLink {
@@ -237,37 +331,19 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
 
   const invoiceUrl = isFullyPaid ? `${baseUrl}/invoice/${booking.bookingNumber}` : undefined;
 
-  if (isFullyPaid) {
-    sendPaymentConfirmationNotification({
-      mobile: booking.customerMobile,
-      email: booking.customerEmail,
-      customerName: booking.customerName,
-      bookingNumber: booking.bookingNumber,
-      amount: Number(booking.finalAmount || 0).toLocaleString("en-IN"),
-      invoiceNumber: invoiceNumber!,
-      invoiceUrl,
-    }).then(() => {
-      trackNotification({ eventType: "payment_received", channel: "whatsapp", recipient: booking.customerMobile, bookingId: booking.id, status: "sent" }).catch(() => {});
-      trackNotification({ eventType: "payment_received", channel: "sms", recipient: booking.customerMobile, bookingId: booking.id, status: "sent" }).catch(() => {});
-    }).catch(console.error);
-    triggerWorkflow("payment_received", {
-      bookingId: booking.id, bookingNumber: booking.bookingNumber,
-      customerName: booking.customerName, customerMobile: booking.customerMobile,
-      customerEmail: booking.customerEmail ?? undefined,
-      amount: Number(booking.finalAmount || 0),
-    }).catch(() => {});
-  } else {
-    const remainingBalance = Math.max(0, finalAmount - newPaidAmount);
-    sendPartialPaymentNotification({
-      mobile: booking.customerMobile,
-      email: booking.customerEmail,
-      customerName: booking.customerName,
-      bookingNumber: booking.bookingNumber,
-      paidAmount: thisPayment.toLocaleString("en-IN"),
-      remainingAmount: remainingBalance.toLocaleString("en-IN"),
-    }).then(() => {
-      trackNotification({ eventType: "payment_received", channel: "whatsapp", recipient: booking.customerMobile, bookingId: booking.id, status: "sent" }).catch(() => {});
-    }).catch(console.error);
+  const remainingBalance = Math.max(0, finalAmount - newPaidAmount);
+  try {
+    await processPaymentSuccessNotifications({
+      booking,
+      isFullyPaid,
+      thisPaymentAmount: thisPayment,
+      newPaidAmount,
+      remainingBalance,
+      invoiceNumber,
+      paymentRef: razorpayPaymentId,
+    });
+  } catch (err) {
+    console.error("[verify] processPaymentSuccessNotifications failed:", err);
   }
 
   res.json({
@@ -364,27 +440,19 @@ router.post("/sync-payment", requireAuth as any, async (req: AuthenticatedReques
     ? `https://${process.env.REPLIT_DEV_DOMAIN}`
     : (process.env.SITE_URL || "https://alburhantravels.com");
 
-  if (isFullyPaid) {
-    const invoiceUrl = `${baseUrl}/invoice/${updated.bookingNumber}`;
-    sendPaymentConfirmationNotification({
-      mobile: updated.customerMobile,
-      email: updated.customerEmail,
-      customerName: updated.customerName,
-      bookingNumber: updated.bookingNumber,
-      amount: Number(updated.finalAmount || 0).toLocaleString("en-IN"),
-      invoiceNumber: invoiceNumber!,
-      invoiceUrl,
-    }).catch(console.error);
-  } else {
-    const remainingBalance = Math.max(0, finalAmount - newPaidAmount);
-    sendPartialPaymentNotification({
-      mobile: updated.customerMobile,
-      email: updated.customerEmail,
-      customerName: updated.customerName,
-      bookingNumber: updated.bookingNumber,
-      paidAmount: thisPayment.toLocaleString("en-IN"),
-      remainingAmount: remainingBalance.toLocaleString("en-IN"),
-    }).catch(console.error);
+  const remainingBalance = Math.max(0, finalAmount - newPaidAmount);
+  try {
+    await processPaymentSuccessNotifications({
+      booking: updated,
+      isFullyPaid,
+      thisPaymentAmount: thisPayment,
+      newPaidAmount,
+      remainingBalance,
+      invoiceNumber,
+      paymentRef: capturedPayment?.id,
+    });
+  } catch (err) {
+    console.error("[sync-payment] processPaymentSuccessNotifications failed:", err);
   }
 
   res.json({
@@ -544,27 +612,19 @@ router.post("/webhook", async (req: any, res) => {
       ? `https://${process.env.REPLIT_DEV_DOMAIN}`
       : (process.env.SITE_URL || "https://alburhantravels.com");
 
-    if (isFullyPaid) {
-      const invoiceUrl = `${baseUrl}/invoice/${updated.bookingNumber}`;
-      sendPaymentConfirmationNotification({
-        mobile: updated.customerMobile,
-        email: updated.customerEmail,
-        customerName: updated.customerName,
-        bookingNumber: updated.bookingNumber,
-        amount: Number(updated.finalAmount || 0).toLocaleString("en-IN"),
-        invoiceNumber: invoiceNumber!,
-        invoiceUrl,
-      }).catch(console.error);
-    } else {
-      const remainingBalance = Math.max(0, finalAmount - newPaidAmount);
-      sendPartialPaymentNotification({
-        mobile: updated.customerMobile,
-        email: updated.customerEmail,
-        customerName: updated.customerName,
-        bookingNumber: updated.bookingNumber,
-        paidAmount: thisPayment.toLocaleString("en-IN"),
-        remainingAmount: remainingBalance.toLocaleString("en-IN"),
-      }).catch(console.error);
+    const remainingBalance = Math.max(0, finalAmount - newPaidAmount);
+    try {
+      await processPaymentSuccessNotifications({
+        booking: updated,
+        isFullyPaid,
+        thisPaymentAmount: thisPayment,
+        newPaidAmount,
+        remainingBalance,
+        invoiceNumber,
+        paymentRef: paymentId,
+      });
+    } catch (err) {
+      console.error("[Webhook] processPaymentSuccessNotifications failed:", err);
     }
 
     res.json({ message: "Webhook processed", status: newStatus });

@@ -515,7 +515,13 @@ function buildHtmlEmail(bodyText: string): string {
 </body></html>`;
 }
 
-export async function sendEmail(to: string, subject: string, body: string, htmlBody?: string): Promise<SendResult> {
+export interface EmailAttachment {
+  filename: string;
+  content: Buffer;
+  contentType?: string;
+}
+
+export async function sendEmail(to: string, subject: string, body: string, htmlBody?: string, attachments?: EmailAttachment[]): Promise<SendResult> {
   if (!to) return { ok: false, provider: "SMTP", endpoint: "smtp", errorMessage: "No recipient email" };
   const transport = getEmailTransport();
   if (!transport) {
@@ -542,9 +548,10 @@ export async function sendEmail(to: string, subject: string, body: string, htmlB
         to, subject,
         text: plainText,
         html: htmlBody || buildHtmlEmail(plainText),
+        attachments: attachments?.map(a => ({ filename: a.filename, content: a.content, contentType: a.contentType })),
       })
     );
-    console.log("[Email] Sent to:", to, "Subject:", subject);
+    console.log("[Email] Sent to:", to, "Subject:", subject, attachments?.length ? `(+${attachments.length} attachment${attachments.length > 1 ? "s" : ""})` : "");
     return { ok: true, provider: "SMTP", endpoint, requestPayload: { from, to, subject }, responsePayload: { delivered: true } };
   } catch (err: any) {
     console.error("[Email] Error after retries to", to, ":", err?.message);
@@ -648,6 +655,54 @@ export async function sendBookingRejectionNotification(opts: {
   ]);
 }
 
+/**
+ * Notifies office admins of a payment event via WhatsApp + Email + Dashboard.
+ * Customer-facing notifications (WhatsApp/SMS/Email with retry + logging) are
+ * handled separately via triggerWorkflow()/fireNotificationEvent() — this is
+ * ONLY the admin-side alert. Every channel result is tracked so failures are
+ * never silent (see notification_logs / admin_notifications).
+ */
+export async function sendAdminPaymentAlert(opts: {
+  bookingId: string;
+  bookingNumber: string;
+  customerName: string;
+  mobile: string;
+  amount: string;
+  isFullyPaid: boolean;
+  invoiceNumber?: string | null;
+  balance?: string;
+}): Promise<{ whatsapp: SendResult[]; email: SendResult[] }> {
+  const label = opts.isFullyPaid ? "Full Payment Received — Booking CONFIRMED" : "Partial Payment Received";
+  const adminMsg = `💰 ${label}\n\nBooking: #${opts.bookingNumber}\nCustomer: ${opts.customerName}\nMobile: ${opts.mobile}\nAmount: Rs.${opts.amount}${opts.balance ? `\nBalance: Rs.${opts.balance}` : ""}${opts.invoiceNumber ? `\nInvoice: ${opts.invoiceNumber}` : ""}`;
+  const adminNumbers = ["9893989786", "8989701701"];
+  const adminEmails = ["admin@alburhantravels.com", "altaf@alburhantravels.com"];
+
+  const [waResults, emailResults] = await Promise.all([
+    Promise.all(adminNumbers.map((n) => sendWhatsApp(n, adminMsg))),
+    Promise.all(adminEmails.map((e) => sendEmail(e, `[Al Burhan] ${label}`, adminMsg))),
+  ]);
+
+  waResults.forEach((r, i) => { if (!r.ok) console.error(`[AdminAlert] WhatsApp to ${adminNumbers[i]} failed:`, r.errorMessage); });
+  emailResults.forEach((r, i) => { if (!r.ok) console.error(`[AdminAlert] Email to ${adminEmails[i]} failed:`, r.errorMessage); });
+
+  try {
+    const { createAdminNotification } = await import("./adminNotifications.js");
+    await createAdminNotification("payment_received", `${label} — ${opts.customerName}`, {
+      bookingId: opts.bookingId,
+      bookingNumber: opts.bookingNumber,
+      customerName: opts.customerName,
+      customerMobile: opts.mobile,
+      amount: opts.amount,
+      extra: { isFullyPaid: opts.isFullyPaid, balance: opts.balance, invoiceNumber: opts.invoiceNumber },
+    });
+  } catch (err: any) {
+    console.error("[AdminAlert] Dashboard notification failed:", err?.message);
+  }
+
+  return { whatsapp: waResults, email: emailResults };
+}
+
+/** @deprecated kept temporarily; superseded by triggerWorkflow("payment_received") + sendAdminPaymentAlert */
 export async function sendPaymentConfirmationNotification(opts: {
   mobile: string;
   email?: string | null;
@@ -659,17 +714,15 @@ export async function sendPaymentConfirmationNotification(opts: {
 }) {
   const invoiceLine = opts.invoiceUrl ? `\n\nInvoice: ${opts.invoiceUrl}` : "";
   const message = `Assalamu Alaikum ${opts.customerName},\n\nPayment of Rs.${opts.amount} received for booking #${opts.bookingNumber}.\n\nYour booking is CONFIRMED!\nInvoice No: ${opts.invoiceNumber}${invoiceLine}\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 8989701701`;
-  const adminMsg = `Payment Received!\n\nBooking: #${opts.bookingNumber}\nCustomer: ${opts.customerName}\nMobile: ${opts.mobile}\nAmount: Rs.${opts.amount}\nInvoice: ${opts.invoiceNumber}`;
 
   await Promise.allSettled([
     smsSendPaymentReceived({ mobile: opts.mobile, customerName: opts.customerName, bookingNumber: opts.bookingNumber, amount: opts.amount }),
     sendWhatsApp(opts.mobile, message),
     opts.email ? sendEmail(opts.email, "Booking Confirmed – Al Burhan Tours & Travels", message) : Promise.resolve(),
-    sendWhatsApp("9893989786", adminMsg),
-    sendWhatsApp("8989701701", adminMsg),
   ]);
 }
 
+/** @deprecated kept temporarily; superseded by triggerWorkflow("partial_payment_received") + sendAdminPaymentAlert */
 export async function sendPartialPaymentNotification(opts: {
   mobile: string;
   email?: string | null;

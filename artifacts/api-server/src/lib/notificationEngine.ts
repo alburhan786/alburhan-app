@@ -448,7 +448,8 @@ async function sendOnChannelWithType(channel: Channel, eventType: EventType, ctx
       return { status: result.ok ? "sent" : "failed", providerResponse: result };
     } else if (channel === "email") {
       if (!ctx.customerEmail) return { status: "failed", providerResponse: { ok: false, provider: "SMTP", endpoint: "smtp", errorMessage: "No email address" } };
-      const result = await sendEmail(ctx.customerEmail, buildEmailSubject(eventType, ctx), message.replace(/\n/g, "<br>"));
+      const attachments = ctx.attachments as import("./notifications.js").EmailAttachment[] | undefined;
+      const result = await sendEmail(ctx.customerEmail, buildEmailSubject(eventType, ctx), message.replace(/\n/g, "<br>"), undefined, attachments);
       return { status: result.ok ? "sent" : "failed", providerResponse: result };
     } else if (channel === "push") {
       return { status: "failed", providerResponse: { ok: false, provider: "Firebase", endpoint: "https://fcm.googleapis.com/fcm/send", errorMessage: "Push not configured" } };
@@ -571,6 +572,13 @@ function defaultDedupWindow(eventType: EventType): number {
     case "balance_reminder":
     case "payment_due":
       return 1; // deduplicate per hour (intraday crons)
+
+    // Each partial payment is a distinct financial event — never dedup by
+    // time window, or a second real payment within the window would be
+    // silently skipped. Idempotency for duplicate webhook retries of the
+    // *same* transaction is handled upstream via razorpayPaymentId checks.
+    case "partial_payment":
+      return 0;
 
     // Document reminders — 3-day window per spec
     case "passport_uploaded":

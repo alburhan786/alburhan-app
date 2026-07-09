@@ -3,7 +3,7 @@ import { fireNotificationEvent, type NotificationContext } from "./notificationE
 
 export type WorkflowTrigger =
   | "new_booking" | "booking_approved" | "booking_rejected" | "booking_completed"
-  | "payment_received"
+  | "payment_received" | "partial_payment_received"
   | "payment_reminder_30" | "payment_reminder_15" | "payment_reminder_7"
   | "payment_reminder_3" | "payment_reminder_1"
   | "balance_reminder_30" | "balance_reminder_15" | "balance_reminder_7"
@@ -49,6 +49,7 @@ const TRIGGER_TO_EVENT: Record<string, string> = {
   booking_rejected: "booking_cancelled",
   booking_completed: "booking_completed",
   payment_received: "payment_received",
+  partial_payment_received: "partial_payment",
   payment_reminder_30: "payment_reminder",
   payment_reminder_15: "payment_reminder",
   payment_reminder_7: "payment_reminder",
@@ -84,7 +85,7 @@ const TRIGGER_TO_EVENT: Record<string, string> = {
 };
 
 const ADMIN_EVENT_TRIGGERS = new Set([
-  "new_booking", "payment_received", "medical_emergency",
+  "new_booking", "payment_received", "partial_payment_received", "medical_emergency",
   "visa_approved", "visa_rejected", "booking_approved", "booking_rejected",
   "booking_completed", "balance_overdue",
 ]);
@@ -94,6 +95,7 @@ const TIMELINE_LABELS: Record<string, { icon: string; title: string }> = {
   booking_approved: { icon: "✅", title: "Booking Approved" },
   booking_rejected: { icon: "❌", title: "Booking Rejected" },
   payment_received: { icon: "💰", title: "Payment Received" },
+  partial_payment_received: { icon: "💵", title: "Partial Payment Received" },
   payment_reminder_30: { icon: "🔔", title: "Payment Reminder (30 Days)" },
   payment_reminder_15: { icon: "🔔", title: "Payment Reminder (15 Days)" },
   payment_reminder_7: { icon: "⚠️", title: "Payment Reminder (7 Days)" },
@@ -272,7 +274,7 @@ export async function triggerWorkflow(
         customerName: ctx.customerName,
         severity:
           triggerType === "medical_emergency" ? "error"
-          : triggerType === "payment_received" ? "success"
+          : (triggerType === "payment_received" || triggerType === "partial_payment_received") ? "success"
           : triggerType === "new_booking" ? "info"
           : "info",
       });
