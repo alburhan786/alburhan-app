@@ -59,3 +59,9 @@ id = "1NRElREVNIBATBSNtIpSW"
 uri = "file://FINAL_PRODUCTION_REPORT.md"
 type = "text"
 title = "Final Production Report"
+
+[[outputs]]
+id = "l2U8OjMikxcGmhFJ_2UB_"
+uri = "file://DEPLOYMENT_PACKAGE.md"
+type = "text"
+title = "Production Deployment Package"
