@@ -200,6 +200,67 @@ app.get("/api/migrate/dump.sql", (req, res) => {
   res.sendFile(dumpPath);
 });
 
+// DIAGNOSTIC: full notification pipeline trace for a single booking (key-protected, read-only)
+app.get("/api/migrate/notif-trace", async (req, res) => {
+  const key = req.query.key as string;
+  const validKeys = [process.env.MIGRATION_KEY, "alburhan-migrate-2026"].filter(Boolean);
+  if (!key || !validKeys.includes(key)) return res.status(403).send("Forbidden");
+  const bookingNumber = req.query.booking as string;
+  if (!bookingNumber) return res.status(400).json({ error: "Missing ?booking=BOOKING_NUMBER" });
+  const { pool } = await import("@workspace/db");
+  const out: Record<string, unknown> = { bookingNumber };
+  try {
+    const b = await pool.query(
+      `SELECT id, booking_number, status, customer_name, customer_mobile, customer_email,
+              final_amount, paid_amount, created_at, updated_at
+       FROM bookings WHERE booking_number = $1`,
+      [bookingNumber]
+    );
+    out.booking = b.rows[0] || null;
+    const bookingId = b.rows[0]?.id;
+
+    if (bookingId) {
+      const pt = await pool.query(
+        `SELECT id, amount, payment_date, payment_mode, reference_number, is_deleted, created_at
+         FROM payment_transactions WHERE booking_id = $1 ORDER BY created_at DESC LIMIT 10`,
+        [bookingId]
+      );
+      out.payment_transactions = pt.rows;
+
+      const wl = await pool.query(
+        `SELECT id, trigger_type, status, error_message, execution_time_ms, retry_count, created_at, completed_at
+         FROM workflow_logs WHERE booking_id = $1 ORDER BY created_at DESC LIMIT 10`,
+        [bookingId]
+      );
+      out.workflow_logs = wl.rows;
+
+      const nl = await pool.query(
+        `SELECT id, channel, event_type, recipient, status, error_code, http_status, sent_at, retry_count, created_at, provider_response
+         FROM notification_logs WHERE booking_id = $1 ORDER BY created_at DESC LIMIT 20`,
+        [bookingId]
+      ).catch((e: any) => ({ rows: [], error: e.message }));
+      out.notification_logs = (nl as any).rows ?? nl;
+
+      const rq = await pool.query(
+        `SELECT id, event_type, channel, recipient, status, last_error, next_retry_at, retry_count, created_at
+         FROM notification_retry_queue WHERE booking_id = $1 ORDER BY created_at DESC LIMIT 20`,
+        [bookingId]
+      ).catch((e: any) => ({ rows: [], error: e.message }));
+      out.notification_retry_queue = (rq as any).rows ?? rq;
+
+      const tl = await pool.query(
+        `SELECT id, event_type, title, description, created_at
+         FROM customer_timeline WHERE booking_id = $1 ORDER BY created_at DESC LIMIT 10`,
+        [bookingId]
+      ).catch((e: any) => ({ rows: [], error: e.message }));
+      out.customer_timeline = (tl as any).rows ?? tl;
+    }
+    res.json(out);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message, partial: out });
+  }
+});
+
 // TEMPORARY: soft-delete test bookings + all their payment records
 app.get("/api/migrate/delete-bookings", async (req, res) => {
   const key = req.query.key as string;
