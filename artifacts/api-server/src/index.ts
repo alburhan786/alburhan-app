@@ -1676,6 +1676,47 @@ async function runMigrations() {
     }
     console.log("[Migration] workflow rules seeded");
   } catch (err) { console.error("[Migration] workflow rules seed failed:", err); }
+
+  // ── notification_retry_queue: generic cross-channel retry (5/15/30 min, max 3) ──
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS notification_retry_queue (
+        id TEXT PRIMARY KEY,
+        notification_log_id TEXT,
+        event_type TEXT NOT NULL,
+        channel TEXT NOT NULL,
+        customer_id TEXT,
+        booking_id TEXT,
+        recipient TEXT NOT NULL,
+        message TEXT NOT NULL,
+        context JSONB,
+        retry_count INTEGER NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'pending',
+        last_error TEXT,
+        next_retry_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS nrq_status_idx ON notification_retry_queue(status, next_retry_at)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS nrq_booking_idx ON notification_retry_queue(booking_id)`);
+    console.log("[Migration] notification_retry_queue table ensured");
+  } catch (err) { console.error("[Migration] notification_retry_queue migration failed:", err); }
+
+  // ── customer_push_tokens: Firebase Cloud Messaging device tokens ────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS customer_push_tokens (
+        id TEXT PRIMARY KEY,
+        customer_id TEXT NOT NULL,
+        token TEXT NOT NULL,
+        platform TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE(customer_id, token)
+      )
+    `);
+    console.log("[Migration] customer_push_tokens table ensured");
+  } catch (err) { console.error("[Migration] customer_push_tokens migration failed:", err); }
 }
 
 const rawPort = process.env["PORT"];
@@ -1810,6 +1851,77 @@ async function start() {
     };
     setInterval(runRetryEngine, 2 * 60 * 1000);
     console.log("[RetryEngine] WhatsApp retry engine scheduled every 2 minutes");
+
+    // ── Generic cross-channel retry engine (SMS/RCS/Email/Push) — 5/15/30 min, max 3 ──
+    const RETRY_DELAYS_MIN = [5, 15, 30];
+    const runGenericRetryEngine = async () => {
+      try {
+        const due = await pool.query(
+          `SELECT * FROM notification_retry_queue
+           WHERE status='pending' AND retry_count < 3 AND next_retry_at <= NOW()
+           ORDER BY next_retry_at ASC LIMIT 20`
+        );
+        if (!due.rowCount) return;
+        console.log(`[GenericRetryEngine] ${due.rowCount} item(s) due for retry`);
+        const { sendRCS, sendEmail } = await import("./lib/notifications.js");
+        const { sendCustomSMS } = await import("./lib/sms.js");
+        for (const item of due.rows) {
+          let ok = false;
+          let errorMessage: string | undefined;
+          try {
+            if (item.channel === "sms") {
+              const r = await sendCustomSMS({ mobile: item.recipient, message: item.message });
+              ok = !!r.ok; errorMessage = (r as any).errorMessage;
+            } else if (item.channel === "rcs") {
+              const r = await sendRCS(item.recipient, item.recipient, item.message);
+              ok = r.ok; errorMessage = r.errorMessage;
+            } else if (item.channel === "email") {
+              const r = await sendEmail(item.recipient, "Update from Al Burhan Tours & Travels", item.message.replace(/\n/g, "<br>"));
+              ok = r.ok; errorMessage = r.errorMessage;
+            } else {
+              errorMessage = "Push retry not supported (Firebase not configured)";
+            }
+          } catch (err: any) {
+            errorMessage = err?.message || "Retry error";
+          }
+
+          const newRetryCount = item.retry_count + 1;
+          if (ok) {
+            await pool.query(
+              `UPDATE notification_retry_queue SET status='sent', retry_count=$1, updated_at=NOW() WHERE id=$2`,
+              [newRetryCount, item.id]
+            );
+            await pool.query(
+              `UPDATE notification_logs SET status='sent', retry_count=$1 WHERE id=$2`,
+              [newRetryCount, item.notification_log_id]
+            ).catch(() => {});
+            console.log(`[GenericRetryEngine] ${item.channel} → SENT on retry #${newRetryCount} (${item.recipient})`);
+          } else if (newRetryCount >= 3) {
+            await pool.query(
+              `UPDATE notification_retry_queue SET status='failed', retry_count=$1, last_error=$2, updated_at=NOW() WHERE id=$3`,
+              [newRetryCount, errorMessage || "Max retries reached", item.id]
+            );
+            await pool.query(
+              `UPDATE notification_logs SET retry_count=$1 WHERE id=$2`,
+              [newRetryCount, item.notification_log_id]
+            ).catch(() => {});
+            console.warn(`[GenericRetryEngine] ${item.channel} → giving up after ${newRetryCount} attempts (${item.recipient})`);
+          } else {
+            const delayMin = RETRY_DELAYS_MIN[newRetryCount] ?? 30;
+            await pool.query(
+              `UPDATE notification_retry_queue SET retry_count=$1, last_error=$2, next_retry_at=NOW() + ($3 || ' minutes')::interval, updated_at=NOW() WHERE id=$4`,
+              [newRetryCount, errorMessage || "Retry failed", String(delayMin), item.id]
+            );
+            console.log(`[GenericRetryEngine] ${item.channel} → retry #${newRetryCount} failed, next attempt in ${delayMin}m (${item.recipient})`);
+          }
+          await new Promise(r => setTimeout(r, 500));
+        }
+      } catch (err) {
+        console.error("[GenericRetryEngine] engine error:", err);
+      }
+    };
+    setInterval(runGenericRetryEngine, 60 * 1000);
+    console.log("[GenericRetryEngine] SMS/RCS/Email retry engine scheduled every 1 minute (5/15/30 min backoff, max 3 retries)");
   });
 }
 

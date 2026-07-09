@@ -320,6 +320,12 @@ function DeliveryLogs({ filterStatus }: { filterStatus?: string }) {
     reload();
   };
   const toggleExpand = (id: string) => setExpanded(prev => prev === id ? null : id);
+  const exportCsv = () => {
+    const exportQs = new URLSearchParams({
+      ...(status && { status }), ...(channel && { channel }), ...(search && { customer: search }),
+    }).toString();
+    window.open(apiUrl(`/api/communication/logs/export?${exportQs}`), "_blank");
+  };
 
   return (
     <div>
@@ -349,6 +355,9 @@ function DeliveryLogs({ filterStatus }: { filterStatus?: string }) {
           </button>
         )}
         <button onClick={reload} style={{ background: "#3b82f6", color: "#fff", border: "none", borderRadius: 6, padding: "7px 12px", cursor: "pointer" }}>🔄</button>
+        <button onClick={exportCsv} style={{ background: "#16a34a", color: "#fff", border: "none", borderRadius: 6, padding: "7px 14px", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
+          ⬇ Export CSV
+        </button>
       </div>
 
       {loading ? <div style={{ padding: 32, textAlign: "center", color: "#9ca3af" }}>Loading…</div> : (

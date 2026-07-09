@@ -1,0 +1,235 @@
+Build the remaining Automation Center and Communication Center in phases without breaking any existing functionality.
+
+IMPORTANT:
+- Do NOT remove or rewrite any existing working features.
+- Preserve all database data, APIs, bookings, CRM, Android app, iOS app, customer portal, and admin portal.
+- Only extend the existing system.
+
+Phase 1 (Highest Priority)
+
+1. Complete Communication Center
+- WhatsApp (BotBee)
+- SMS (Fast2SMS)
+- Email (SMTP)
+- RCS (Lemin AI)
+- Firebase Push Notifications
+
+Every channel must work independently.
+If WhatsApp fails, SMS, Email, RCS and Push must still send successfully.
+
+2. Create a Unified Notification Engine
+
+Create one notification service:
+
+notifyCustomer(eventType, bookingId)
+
+Supported events:
+
+- Customer Registration
+- Email Verification
+- Mobile OTP
+- Login Alert
+- Booking Request
+- Booking Approved
+- Booking Rejected
+- Invoice Generated
+- Offline Payment Submitted
+- Payment Verified
+- Payment Rejected
+- Balance Reminder 30 Days
+- Balance Reminder 15 Days
+- Balance Reminder 7 Days
+- Balance Reminder 3 Days
+- Balance Overdue
+- Passport Reminder
+- Visa Approved
+- Visa Rejected
+- Flight Assigned
+- Hotel Assigned
+- Bus Assigned
+- Room Assigned
+- Departure Reminder
+- Airport Reporting Reminder
+- Ziyarat Schedule
+- Hajj Guide Update
+- Emergency Alert
+- Feedback Request
+- Refund Processed
+- Booking Cancelled
+
+3. Retry Queue
+
+If one provider fails:
+
+Retry automatically
+
+Retry after:
+5 minutes
+15 minutes
+30 minutes
+
+Maximum 3 retries.
+
+Log every attempt.
+
+4. Communication Dashboard
+
+Create dashboard with:
+
+Today's messages
+
+Delivered
+
+Failed
+
+Pending
+
+Retry Queue
+
+Delivery %
+
+SMS Count
+
+WhatsApp Count
+
+Email Count
+
+RCS Count
+
+Push Count
+
+Search by Booking ID
+
+Search by Customer
+
+Export CSV
+
+5. Notification Logs
+
+Show:
+
+Booking ID
+
+Customer
+
+Provider
+
+Channel
+
+Status
+
+Error
+
+Response
+
+Timestamp
+
+Retry Count
+
+6. System Health
+
+Show live status:
+
+BotBee
+
+Fast2SMS
+
+SMTP
+
+Lemin AI RCS
+
+Firebase
+
+Cron Jobs
+
+Database
+
+Storage
+
+API
+
+Green = Online
+
+Red = Offline
+
+7. Test Notifications
+
+Add Test Notification page.
+
+Send test to:
+
+SMS
+
+WhatsApp
+
+Email
+
+RCS
+
+Push
+
+without affecting customer data.
+
+8. Scheduled Jobs
+
+Automatic reminders for:
+
+Balance Due
+
+Passport Pending
+
+Visa Pending
+
+Departure
+
+Airport Reporting
+
+Ziyarat
+
+Medical Reminder
+
+Feedback
+
+9. Workflow Progress
+
+Show customer progress:
+
+Registration
+
+Booking
+
+Payment
+
+Documents
+
+Visa
+
+Flight
+
+Hotel
+
+Bus
+
+Departure
+
+Completed
+
+Display as timeline and progress bar.
+
+10. Safety Requirements
+
+No existing feature should stop working.
+
+Do not change URLs.
+
+Do not remove APIs.
+
+Do not delete database tables.
+
+Run migrations safely.
+
+After implementation:
+
+Generate a complete test report showing every notification channel working independently.
+
+Fix every error before marking the phase complete.

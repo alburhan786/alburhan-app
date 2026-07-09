@@ -3,7 +3,7 @@ import { AdminLayout } from "@/components/layout/AdminLayout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, XCircle, AlertTriangle, RefreshCw, Send, Loader2, Activity, MessageCircle, Database, Shield, Clock } from "lucide-react";
+import { CheckCircle, XCircle, AlertTriangle, RefreshCw, Send, Loader2, Activity, MessageCircle, Database, Shield, Clock, Mail, Radio, Bell, ListChecks } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/use-permissions";
 
@@ -146,6 +146,12 @@ export default function SystemHealth() {
           {/* Status Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <CheckCard label="SMS Gateway (Fast2SMS)" icon={MessageCircle} check={c?.sms_provider} />
+            <CheckCard label="WhatsApp (BotBee)" icon={MessageCircle} check={c?.whatsapp_provider} />
+            <CheckCard label="RCS (Lemin AI)" icon={Radio} check={c?.rcs_provider} />
+            <CheckCard label="Email (SMTP)" icon={Mail} check={c?.email_provider} />
+            <CheckCard label="Push (Firebase)" icon={Bell} check={c?.push_provider} />
+            <CheckCard label="Retry Queue" icon={ListChecks} check={c?.retry_queue} />
+            <CheckCard label="Cron Jobs" icon={Clock} check={c?.cron_jobs} />
             <CheckCard label="Database" icon={Database} check={c?.database} />
             <CheckCard label="OTP Table" icon={Shield} check={c?.otp_table} />
             <CheckCard label="Session Store" icon={Shield} check={c?.sessions} />

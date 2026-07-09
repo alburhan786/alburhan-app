@@ -52,6 +52,7 @@ import loyaltyRouter from "./loyalty.js";
 import offlinePaymentsRouter from "./offline-payments.js";
 import apiSettingsRouter from "./api-settings.js";
 import whatsappRouter from "./whatsapp.js";
+import communicationRouter from "./communication.js";
 
 const router: IRouter = Router();
 
@@ -198,6 +199,7 @@ router.use("/loyalty", loyaltyRouter);
 router.use("/offline-payments", offlinePaymentsRouter);
 router.use("/api-settings", apiSettingsRouter);
 router.use("/whatsapp", whatsappRouter);
+router.use("/communication", communicationRouter);
 router.use("/webhook", webhooksRouter);
 router.use(storageRouter);
 

@@ -7,3 +7,4 @@
 - [Frontend JSX convention](frontend-jsx.md) — project uses React (className=, not class=); preact/hooks imports will break Vite build
 - [Journey status + profile columns](journey-status-schema.md) — journey_status TEXT on bookings (pool.query only, not Drizzle); blood_group/emergency_contact_name/emergency_contact_mobile on users; POST /api/bookings/:id/journey-status auto-notifies customer
 - [Offline bank transfer module](offline-payments-schema.md) — bank_settings + offline_payments tables; POST /api/offline-payments (multipart); approve/reject fire notifications; BankTransferSection is self-contained customer component
+- [Notification system dual architecture](notification-dual-architecture.md) — two parallel systems (notificationEngine/EventType vs workflowEngine/WorkflowTrigger) already exist; check both before adding new reminder types to avoid duplicating coverage.

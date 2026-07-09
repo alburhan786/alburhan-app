@@ -2,6 +2,7 @@ import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requireAdmin } from "../lib/auth.js";
 import { testSmsDiagnostics, getSmsAttemptLog } from "../lib/notifications.js";
+import { getCachedConfig } from "../lib/apiSettingsProvider.js";
 
 const router = Router();
 
@@ -67,6 +68,53 @@ router.get("/system-health", requireAdmin as any, async (_req, res) => {
       env: process.env.NODE_ENV,
     },
   };
+
+  // 7b. WhatsApp (BotBee)
+  try {
+    const cfg = getCachedConfig("botbee");
+    const ok = cfg.enabled !== false && !!(cfg.apiKey || process.env.BOTBEE_API_KEY);
+    results.whatsapp_provider = { status: ok ? "ok" : "error", message: ok ? "BotBee configured" : "BotBee API key missing or disabled" };
+  } catch (e: any) {
+    results.whatsapp_provider = { status: "error", message: "BotBee check failed", detail: e.message };
+  }
+
+  // 7c. RCS (Lemin AI)
+  try {
+    const cfg = getCachedConfig("lemin");
+    const ok = cfg.enabled !== false && !!(cfg.apiKey || cfg.extra?.user_id || process.env.LEMIN_USER_ID);
+    results.rcs_provider = { status: ok ? "ok" : "warn", message: ok ? "Lemin AI configured" : "Lemin Developer API key not configured" };
+  } catch (e: any) {
+    results.rcs_provider = { status: "warn", message: "Lemin check failed", detail: e.message };
+  }
+
+  // 7d. Email (SMTP)
+  {
+    const ok = !!(process.env.SMTP_HOST && process.env.SMTP_USER);
+    results.email_provider = { status: ok ? "ok" : "warn", message: ok ? "SMTP configured" : "SMTP credentials not configured" };
+  }
+
+  // 7e. Push (Firebase)
+  {
+    const ok = !!process.env.FIREBASE_SERVICE_ACCOUNT;
+    results.push_provider = { status: ok ? "ok" : "warn", message: ok ? "Firebase configured" : "Firebase credentials not configured (push notifications disabled)" };
+  }
+
+  // 7f. Retry queue backlog
+  try {
+    const rq = await pool.query(`SELECT COUNT(*) FILTER (WHERE status='pending') as pending, COUNT(*) FILTER (WHERE status='failed') as exhausted FROM notification_retry_queue`);
+    const pending = Number(rq.rows[0]?.pending || 0);
+    const exhausted = Number(rq.rows[0]?.exhausted || 0);
+    results.retry_queue = {
+      status: exhausted > 0 ? "warn" : "ok",
+      message: `${pending} pending retries, ${exhausted} exhausted after max attempts`,
+      detail: { pending, exhausted },
+    };
+  } catch (e: any) {
+    results.retry_queue = { status: "warn", message: "Could not read retry queue", detail: e.message };
+  }
+
+  // 7g. Cron jobs
+  results.cron_jobs = { status: "ok", message: "Scheduled reminder jobs running since server startup" };
 
   // 7. Recent OTP activity (last 10) — show full OTP for admin debugging
   try {

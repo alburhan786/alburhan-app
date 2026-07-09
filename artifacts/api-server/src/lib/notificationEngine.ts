@@ -7,14 +7,18 @@ import {
 } from "./notifications.js";
 
 export type EventType =
+  // Account & Auth
+  | "customer_registration" | "email_verification" | "mobile_otp" | "login_alert"
   // Bookings
   | "new_booking" | "booking_approved" | "booking_cancelled" | "booking_rejected" | "booking_completed"
   // Payments
   | "payment_received" | "partial_payment" | "payment_due" | "payment_failed" | "balance_reminder" | "refund"
+  | "offline_payment_submitted" | "payment_verified" | "payment_rejected"
+  | "balance_reminder_30d" | "balance_reminder_15d" | "balance_reminder_7d" | "balance_reminder_3d" | "balance_overdue"
   // Invoices
   | "invoice_generated" | "receipt_generated" | "invoice_paid" | "invoice_cancelled"
   // Pilgrims & Documents
-  | "passport_uploaded" | "passport_received" | "passport_expiry" | "visa_approved" | "visa_rejected" | "visa_ready"
+  | "passport_uploaded" | "passport_received" | "passport_expiry" | "passport_reminder" | "visa_approved" | "visa_rejected" | "visa_ready"
   // Flights
   | "ticket_issued" | "flight_assigned" | "flight_changed" | "flight_cancelled"
   // Hotels
@@ -22,9 +26,11 @@ export type EventType =
   // Transport
   | "bus_assigned" | "seat_changed"
   // Travel
-  | "departure_reminder" | "arrival_reminder" | "return_reminder"
+  | "departure_reminder" | "airport_reporting_reminder" | "arrival_reminder" | "return_reminder" | "ziyarat_schedule"
   // Attendance & Safety
-  | "airport_checkin" | "missing_pilgrim" | "medical_emergency"
+  | "airport_checkin" | "missing_pilgrim" | "medical_emergency" | "emergency_alert"
+  // Content
+  | "hajj_guide_update"
   // Promotions & Campaigns
   | "hajj_updates" | "umrah_promotions" | "eid_greeting" | "custom_admin"
   // General
@@ -62,6 +68,23 @@ export interface NotificationContext {
 }
 
 export const EVENT_LABELS: Record<EventType, string> = {
+  customer_registration: "Customer Registration",
+  email_verification: "Email Verification",
+  mobile_otp: "Mobile OTP",
+  login_alert: "Login Alert",
+  offline_payment_submitted: "Offline Payment Submitted",
+  payment_verified: "Payment Verified",
+  payment_rejected: "Payment Rejected",
+  balance_reminder_30d: "Balance Reminder (30 Days)",
+  balance_reminder_15d: "Balance Reminder (15 Days)",
+  balance_reminder_7d: "Balance Reminder (7 Days)",
+  balance_reminder_3d: "Balance Reminder (3 Days)",
+  balance_overdue: "Balance Overdue",
+  passport_reminder: "Passport Reminder",
+  airport_reporting_reminder: "Airport Reporting Reminder",
+  ziyarat_schedule: "Ziyarat Schedule",
+  hajj_guide_update: "Hajj Guide Update",
+  emergency_alert: "Emergency Alert",
   new_booking: "New Booking",
   booking_approved: "Booking Approved",
   booking_cancelled: "Booking Cancelled",
@@ -106,15 +129,17 @@ export const EVENT_LABELS: Record<EventType, string> = {
 };
 
 export const EVENT_GROUPS: Record<string, EventType[]> = {
+  "Account & Auth": ["customer_registration","email_verification","mobile_otp","login_alert"],
   "Bookings": ["new_booking","booking_approved","booking_cancelled","booking_rejected","booking_completed"],
-  "Payments": ["payment_received","partial_payment","payment_due","payment_failed","balance_reminder","refund"],
+  "Payments": ["payment_received","partial_payment","payment_due","payment_failed","balance_reminder","refund","offline_payment_submitted","payment_verified","payment_rejected","balance_reminder_30d","balance_reminder_15d","balance_reminder_7d","balance_reminder_3d","balance_overdue"],
   "Invoices": ["invoice_generated","receipt_generated","invoice_paid","invoice_cancelled"],
-  "Pilgrims & Documents": ["passport_uploaded","passport_received","passport_expiry","visa_approved","visa_rejected","visa_ready"],
+  "Pilgrims & Documents": ["passport_uploaded","passport_received","passport_expiry","passport_reminder","visa_approved","visa_rejected","visa_ready"],
   "Flights": ["ticket_issued","flight_assigned","flight_changed","flight_cancelled"],
   "Hotels": ["hotel_assigned","room_assigned","room_changed"],
   "Transport": ["bus_assigned","seat_changed"],
-  "Travel": ["departure_reminder","arrival_reminder","return_reminder"],
-  "Attendance & Safety": ["airport_checkin","missing_pilgrim","medical_emergency"],
+  "Travel": ["departure_reminder","airport_reporting_reminder","arrival_reminder","return_reminder","ziyarat_schedule"],
+  "Attendance & Safety": ["airport_checkin","missing_pilgrim","medical_emergency","emergency_alert"],
+  "Content": ["hajj_guide_update"],
   "Promotions & Campaigns": ["hajj_updates","umrah_promotions","eid_greeting","custom_admin"],
   "General": ["feedback_request"],
 };
@@ -137,6 +162,39 @@ export function buildDefaultMessage(eventType: EventType, ctx: NotificationConte
     : "https://alburhantravels.com";
 
   switch (eventType) {
+    case "customer_registration":
+      return `Assalamu Alaikum ${name},\n\nWelcome to Al Burhan Tours & Travels! Your account has been created successfully.\n\nStart exploring Hajj & Umrah packages today.\n\nFor queries: +91 9893225590\n\nJazak Allah Khair!`;
+    case "email_verification":
+      return `Assalamu Alaikum ${name},\n\nPlease verify your email address to complete your registration with Al Burhan Tours & Travels.\n\nJazak Allah Khair!`;
+    case "mobile_otp":
+      return `Your Al Burhan Tours & Travels OTP is ${ctx.otp || "------"}. Valid for 5 minutes. Do not share this with anyone.`;
+    case "login_alert":
+      return `Assalamu Alaikum ${name},\n\nA new login was detected on your Al Burhan Tours & Travels account${ctx.description ? ` (${ctx.description})` : ""}.\n\nIf this wasn't you, contact us immediately at +91 9893225590.`;
+    case "offline_payment_submitted":
+      return `Assalamu Alaikum ${name},\n\nWe've received your offline payment submission of ₹${formatINR(ctx.amount || 0)} for booking ${booking}. Our team will verify it shortly.\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
+    case "payment_verified":
+      return `Assalamu Alaikum ${name},\n\nYour payment of ₹${formatINR(ctx.amount || 0)} for booking ${booking} has been VERIFIED.\n\nBalance: ₹${formatINR(ctx.balanceAmount || 0)}\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
+    case "payment_rejected":
+      return `Assalamu Alaikum ${name},\n\nYour payment submission for booking ${booking} could not be verified${ctx.reason ? `: ${ctx.reason}` : ""}. Please resubmit or contact us.\n\nPhone: +91 9893225590\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
+    case "balance_reminder_30d":
+    case "balance_reminder_15d":
+    case "balance_reminder_7d":
+    case "balance_reminder_3d": {
+      const days = eventType.match(/(\d+)d/)?.[1] || "";
+      return `Assalamu Alaikum ${name},\n\nReminder: Outstanding balance of ₹${formatINR(ctx.balanceAmount || 0)} for booking ${booking} (${pkg}) is due in ${days} days.\n\nPay now: ${invUrl}\n\nQueries: +91 9893225590\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
+    }
+    case "balance_overdue":
+      return `Assalamu Alaikum ${name},\n\nURGENT: Your balance of ₹${formatINR(ctx.balanceAmount || 0)} for booking ${booking} is OVERDUE. Please pay immediately to avoid cancellation.\n\nPay now: ${invUrl}\n\nPhone: +91 9893225590\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
+    case "passport_reminder":
+      return `Assalamu Alaikum ${name},\n\nReminder: Please submit your passport for booking ${booking} at the earliest to avoid delays in visa processing.\n\nFor queries: +91 9893225590\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
+    case "airport_reporting_reminder":
+      return `Assalamu Alaikum ${name},\n\nReminder: Please report at the airport for booking ${booking} (${pkg}) on ${ctx.departureDate || "your scheduled date"}, at least 4 hours before departure.\n\nPhone: +91 9893225590\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
+    case "ziyarat_schedule":
+      return `Assalamu Alaikum ${name},\n\nYour Ziyarat schedule for ${pkg} has been updated${ctx.description ? `:\n${ctx.description}` : "."}. Please check with your group leader for details.\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
+    case "hajj_guide_update":
+      return `Assalamu Alaikum ${name},\n\nAn important update to your Hajj/Umrah guide is available${ctx.description ? `:\n${ctx.description}` : "."}\n\nAl Burhan Tours & Travels\n+91 9893225590`;
+    case "emergency_alert":
+      return `URGENT ALERT: ${name} — ${ctx.description || "An emergency has been reported."} Please contact your group leader or call +91 9893225590 immediately.\n\nAl Burhan Tours & Travels`;
     case "new_booking":
       return `Assalamu Alaikum ${name},\n\nYour booking ${booking} for ${pkg} has been received. Our team will review and approve it shortly.\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 9893225590`;
     case "booking_approved":
@@ -290,6 +348,25 @@ export async function trackNotification(data: {
         providerName, apiEndpoint, httpStatus, requestPayload, errorCode,
       ]
     );
+    // ── Enqueue non-WhatsApp failures into the generic retry queue ──────────
+    // (WhatsApp already has its own dedicated retry engine in index.ts)
+    if (data.status === "failed" && data.channel !== "whatsapp") {
+      try {
+        await pool.query(
+          `INSERT INTO notification_retry_queue
+           (id, notification_log_id, event_type, channel, customer_id, booking_id, recipient, message, context, retry_count, status, last_error, next_retry_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,0,'pending',$10, NOW() + INTERVAL '5 minutes')`,
+          [
+            `nrq_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+            id, data.eventType, data.channel, data.customerId || null, data.bookingId || null,
+            data.recipient, data.message || "", JSON.stringify({ eventType: data.eventType }),
+            (data.providerResponse as any)?.errorMessage || "Delivery failed",
+          ]
+        );
+      } catch (enqueueErr) {
+        console.error("[notificationEngine] retry queue enqueue failed:", enqueueErr);
+      }
+    }
   } catch (err) {
     console.error("[notificationEngine] trackNotification failed:", err);
   }
@@ -503,11 +580,29 @@ function defaultDedupWindow(eventType: EventType): number {
     // No dedup for high-urgency or campaign events
     case "medical_emergency":
     case "missing_pilgrim":
+    case "emergency_alert":
     case "custom_admin":
     case "hajj_updates":
     case "umrah_promotions":
     case "eid_greeting":
+    case "mobile_otp":
+    case "login_alert":
       return 0;
+
+    case "balance_reminder_30d":
+    case "balance_reminder_15d":
+    case "balance_reminder_7d":
+    case "balance_reminder_3d":
+    case "balance_overdue":
+    case "passport_reminder":
+    case "airport_reporting_reminder":
+      return 20; // once per day-ish for daily cron reminders
+
+    case "customer_registration":
+    case "offline_payment_submitted":
+    case "payment_verified":
+    case "payment_rejected":
+      return 1;
 
     default:
       return 6;
