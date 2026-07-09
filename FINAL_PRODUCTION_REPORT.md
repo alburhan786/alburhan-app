@@ -23,7 +23,7 @@ under 5 minutes once deployed.
 | Invoice Generation | `GET /api/invoices`, `POST /api/invoices/generate-all`, `POST /:bookingId/regenerate`, `GET /by-booking/:bookingId` | ✅ Present |
 | WhatsApp | `POST /api/whatsapp/test`, `GET /templates`, `GET /db-templates`, `POST /automation-test`, `GET /delivery-logs` | ✅ Present |
 | SMS | Sent via `lib/sms.ts` (Fast2SMS), delivery reports at `POST /api/webhook/sms-dlr` | ✅ Present |
-| Email | Sent via `lib/notifications.ts` (Nodemailer/SMTP), open-tracking at `GET /api/webhook/email-open` | ✅ Present (SMTP credentials missing — see §3) |
+| Email | Sent via `lib/notifications.ts` (Nodemailer/SMTP), open-tracking at `GET /api/webhook/email-open` | ✅ Present — SMTP configured & verified (see §15) |
 | Push Notification | `EventType`/health-check scaffolding exists; no live FCM send path | ⚠️ Stubbed — needs `FIREBASE_SERVICE_ACCOUNT` |
 | Admin Dashboard | `GET /api/admin/stats`, `/operations`, `/reports/bookings`, `/reports/discounts`, `POST /broadcast`, `PATCH /requests/:id/approve`, `GET /api/admin/system-health` | ✅ Present |
 | Customer Dashboard | `GET /api/auth/me`, `GET /api/bookings`, `GET /api/documents/:bookingId`, `GET /api/invoices/by-booking/:bookingId` | ✅ Present |
@@ -51,10 +51,10 @@ Full authoritative list already delivered in `DEPLOYMENT_PACKAGE.md` §2. Summar
 | Payments (`RAZORPAY_KEY_ID`, `RAZORPAY_SECRET`) | ✅ Present as secrets in this environment |
 | WhatsApp (`BOTBEE_API_KEY`, `BOTBEE_BUSINESS_ID`, `BOTBEE_PHONE_NUMBER_ID`) | ✅ Present |
 | SMS (`FAST2SMS_API_KEY`) | ✅ Present |
-| Email (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`) | ❌ **Missing — blocks real email delivery** |
+| Email (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `SMTP_SECURE`) | ✅ Configured (Hostinger, port 465/SSL) — auth verified, test email delivered |
 | Optional (RCS/`LEMIN_*`, Push/`FIREBASE_*`, `ADMIN_MOBILE`, `MIGRATION_KEY`) | ⚠️ Not configured, non-blocking |
 
-**Action required from you before go-live:** SMTP credentials. Everything else needed for this fix is available.
+**Action required from you before go-live:** none — SMTP is now fully configured and verified end-to-end.
 
 ---
 
@@ -130,34 +130,41 @@ All run inside try/catch — a single failing job cannot crash the process. ✅ 
 - ✅ Order creation, signature verification (client + webhook), and manual sync-payment fallback all present and fixed this session to reliably trigger notifications for both full and partial payments.
 
 ## 15. SMTP Configuration
-- ❌ **Not configured** — no `SMTP_HOST`/`SMTP_USER`/`SMTP_PASS` set anywhere (dev or documented for prod).
-- Code fails gracefully: `getEmailTransport()` returns `null` → `sendEmail()` returns `{ok:false, errorMessage:"SMTP not configured"}` → logged as `failed` and retried (will keep failing until configured, no crash).
-- **This is the one credential I cannot fix myself — I need it from you** (host/port/user/pass/from address) to unblock invoice/receipt email delivery.
+- ✅ **Configured and verified.** Host `smtp.hostinger.com`, port `465` (SSL), user `info@alburhantravels.com`.
+- ✅ `transporter.verify()` succeeds — authentication confirmed against Hostinger's mail server.
+- ✅ Real test email delivered (accepted `250 2.0.0 Ok: queued`).
+- ✅ Verified through the actual application code paths (not just raw SMTP):
+  - `sendEmail()` — direct send, confirmed delivered.
+  - `sendBookingConfirmationNotification()` — booking confirmation HTML email, confirmed delivered.
+  - `sendPaymentConfirmationNotification()` — payment/receipt confirmation email, confirmed delivered.
+  - `sendAdminPaymentAlert()` — admin notification emails to both configured admin addresses, confirmed delivered.
+  - Full `triggerWorkflow("payment_received", …)` path with real generated PDF invoice + receipt attachments (`generateInvoicePdfBuffer`/`generateReceiptPdfBuffer`, ~220KB each) — confirmed delivered with both PDFs attached.
+- 🐛 **Critical bug found & fixed while testing:** `triggerWorkflow()` in `workflowEngine.ts` was calling `fireNotificationEvent(eventType, ctx.customerMobile, ctx)` — a 3-argument call against a 2-argument function `(eventType, ctx, opts)`. This silently passed the mobile number where the real context belonged, so **every notification fired through the production trigger path** (payment confirmations, partial payments, and other `triggerWorkflow`-routed events) had `customerName`/`customerEmail`/`amount`/PDF attachments all lost — producing blank/₹0 messages and "No email address" failures, even with SMTP fully working. Fixed in two call sites in `workflowEngine.ts`; re-tested and confirmed the fix restores correct customer name, amount, and PDF attachments in the delivered email.
 
 ---
 
-## Production Readiness Score: **88 / 100**
+## Production Readiness Score: **96 / 100**
 
 | Category | Weight | Score |
 |---|---|---|
 | API endpoint coverage | 15 | 14/15 (Push stubbed, non-blocking) |
 | Database migrations | 10 | 10/10 |
-| Environment variables | 10 | 7/10 (SMTP missing) |
+| Environment variables | 10 | 10/10 (SMTP now configured) |
 | PM2 config | 5 | 5/5 (fixed) |
 | Nginx / SSL | 10 | 5/10 (unverifiable without VPS access — assumed correct per existing prod site, must confirm) |
 | File permissions / storage paths | 10 | 9/10 |
 | Cron jobs | 10 | 10/10 |
 | Notification queue correctness | 10 | 8/10 (works; status vocabulary differs from spec) |
 | Webhook signature security | 10 | 10/10 |
-| Provider integrations (BotBee/Fast2SMS/Razorpay/SMTP) | 10 | 8/10 (3 of 4 solid, SMTP down) |
+| Provider integrations (BotBee/Fast2SMS/Razorpay/SMTP) | 10 | 10/10 (all 4 verified working, incl. SMTP end-to-end + the triggerWorkflow arg-bug fix) |
 
 ### Blocking issues before go-live
-1. **SMTP credentials** — required for email invoice/receipt delivery. *(Waiting on you.)*
-2. **Confirm live nginx + SSL on the VPS** — I cannot check this remotely; run the two checklists in §5–§6 once you deploy.
+1. **Confirm live nginx + SSL on the VPS** — I cannot check this remotely; run the checklists in §5–§6 once you deploy.
+2. **Deploy the `workflowEngine.ts` fix to the VPS** — this bug also exists in the currently-live production code and is silently dropping notification content there too. Redeploy after pulling latest.
 
 ### Non-blocking, safe to ship without
 - Push notifications (Firebase) — not started anywhere in this product yet.
 - BotBee template-listing route 404 — admin convenience feature only.
 - Notification status vocabulary — functionally correct, cosmetic naming gap.
 
-**Recommendation:** Deploy now using `DEPLOYMENT_PACKAGE.md`. SMS, WhatsApp, PDF invoices/receipts, admin alerts, and dashboard timeline entries will work immediately on your existing credentials. Send me SMTP credentials in parallel — I'll wire them in and you can redeploy just that one env var (`pm2 restart alburhan-tours --update-env`, no rebuild needed) to complete email delivery.
+**Recommendation:** Deploy now using `DEPLOYMENT_PACKAGE.md`. All core channels (SMS, WhatsApp, Email, PDF invoices/receipts, admin alerts, dashboard timeline) are verified working end-to-end in this environment with your real SMTP credentials, and the notification-dropping bug in `triggerWorkflow` is fixed. After deploying, confirm nginx/SSL on the VPS per §5–§6.

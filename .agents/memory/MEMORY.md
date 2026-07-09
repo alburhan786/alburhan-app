@@ -10,3 +10,4 @@
 - [Customer profile 403 investigation](customer-profile-403-fix.md) — requireAuth never returns 403; unreproducible 403s are likely proxy/stale-bundle, not app auth code. Also: no global JSON error handler existed for multer errors.
 - [Notification system dual architecture](notification-dual-architecture.md) — two parallel systems (notificationEngine/EventType vs workflowEngine/WorkflowTrigger) already exist; check both before adding new reminder types to avoid duplicating coverage.
 - [Per-route auth pattern](per-route-auth-pattern.md) — this codebase applies requireAdmin/requireAuth per-route, not at router.use() mount; audits that only check mount-level auth will false-positive as "unprotected".
+- [triggerWorkflow/fireNotificationEvent arg bug](smtp-workflow-arg-bug.md) — wrong-arity call silently dropped ctx (name/email/amount/attachments) on all triggerWorkflow-routed notifications; fixed, but pattern worth re-checking if fields go blank again.

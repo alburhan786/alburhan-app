@@ -249,7 +249,7 @@ export async function triggerWorkflow(
   try {
     const eventType = TRIGGER_TO_EVENT[triggerType];
     if (eventType && ctx.customerMobile) {
-      await fireNotificationEvent(eventType as any, ctx.customerMobile, ctx);
+      await fireNotificationEvent(eventType as any, ctx);
     }
 
     const ms = Date.now() - start;
@@ -305,7 +305,7 @@ export async function retryWorkflowLog(logId: number): Promise<{ success: boolea
     const start = Date.now();
     try {
       if (eventType && ctx.customerMobile) {
-        await fireNotificationEvent(eventType as any, ctx.customerMobile as string, ctx);
+        await fireNotificationEvent(eventType as any, ctx);
       }
       const ms = Date.now() - start;
       await pool.query(
