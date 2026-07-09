@@ -1,0 +1,223 @@
+CRITICAL PRODUCTION BUG – PAYMENT SUCCESS BUT NOTIFICATION WORKFLOW NOT EXECUTING
+
+The payment gateway is working correctly.
+
+After a successful payment the customer sees:
+
+"Partial Payment Received"
+
+The payment is saved in the database.
+
+However NONE of the following are being sent:
+
+• SMS
+• WhatsApp
+• Email
+• PDF Invoice
+• Payment Receipt
+• Customer Notification
+• Admin Notification
+
+The popup incorrectly says the notification has been sent.
+
+=================================================
+
+TASK
+
+Trace the payment workflow from beginning to end.
+
+Customer clicks Pay
+↓
+
+Payment Gateway Success
+↓
+
+Webhook/API Callback
+↓
+
+Payment Database Update
+↓
+
+Booking Status Update
+↓
+
+Invoice Generation
+↓
+
+Notification Queue
+↓
+
+SMS
+↓
+
+WhatsApp
+↓
+
+Email
+↓
+
+Customer Dashboard Timeline
+
+=================================================
+
+Find the exact failure point.
+
+Check:
+
+✓ Razorpay webhook
+✓ Payment success event
+✓ Payment callback API
+✓ Notification queue
+✓ Cron jobs
+✓ Background workers
+✓ SMTP
+✓ Fast2SMS API
+✓ BotBee WhatsApp API
+✓ Meta WhatsApp API
+✓ Email queue
+✓ PDF invoice generation
+✓ Notification logs
+✓ Retry queue
+
+=================================================
+
+REQUIRED AFTER PAYMENT
+
+Immediately after payment:
+
+1. Save payment
+2. Update booking status
+3. Generate invoice PDF
+4. Generate receipt PDF
+5. Email invoice
+6. Send SMS confirmation
+7. Send WhatsApp confirmation
+8. Send payment receipt
+9. Send invoice download link
+10. Notify Admin
+11. Add booking timeline entry
+12. Add notification logs
+13. Retry automatically if any provider fails
+
+=================================================
+
+CUSTOMER SMS
+
+Payment Received
+
+Dear {{CustomerName}}
+
+We have received your payment of ₹{{Amount}}.
+
+Booking ID:
+{{BookingID}}
+
+Balance:
+₹{{Balance}}
+
+Invoice:
+{{InvoiceLink}}
+
+Al Burhan Tours & Travels
+
+=================================================
+
+WHATSAPP
+
+Include:
+
+✓ Company Logo
+
+✓ Payment Success
+
+✓ Amount
+
+✓ Balance
+
+✓ Booking Number
+
+✓ Invoice Button
+
+✓ Dashboard Button
+
+✓ Contact Support Button
+
+=================================================
+
+EMAIL
+
+Generate beautiful HTML email.
+
+Attach PDF Invoice.
+
+Attach Payment Receipt.
+
+=================================================
+
+ADMIN
+
+Notify Admin via:
+
+SMS
+
+WhatsApp
+
+Email
+
+Dashboard
+
+=================================================
+
+LOGGING
+
+Create notification logs.
+
+Status:
+
+Queued
+
+Sending
+
+Delivered
+
+Failed
+
+Retry
+
+Show provider response.
+
+=================================================
+
+VERIFY
+
+After paying ₹10:
+
+✓ Payment saved
+
+✓ Booking updated
+
+✓ Invoice created
+
+✓ SMS delivered
+
+✓ WhatsApp delivered
+
+✓ Email delivered
+
+✓ Admin notified
+
+✓ Dashboard updated
+
+✓ Logs recorded
+
+=================================================
+
+DO NOT STOP UNTIL THE COMPLETE PAYMENT NOTIFICATION WORKFLOW HAS BEEN TESTED, VERIFIED, AND WORKS IN PRODUCTION.
+
+Finally provide:
+
+1. Root cause.
+2. Files changed.
+3. APIs fixed.
+4. Notification logs.
+5. Test results for SMS, WhatsApp, Email, and Invoice.
