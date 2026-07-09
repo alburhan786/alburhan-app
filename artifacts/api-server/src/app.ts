@@ -72,6 +72,19 @@ app.use(session({
 
 app.use("/api", router);
 
+// Global JSON error handler — ensures multer (file upload) errors and any other
+// uncaught route errors return a friendly JSON message instead of an HTML/stack trace.
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (!err) return next();
+  const status = err.status || err.statusCode || (err.code === "LIMIT_FILE_SIZE" ? 413 : 400);
+  const message = err.code === "LIMIT_FILE_SIZE"
+    ? "File is too large. Maximum allowed size is 25MB."
+    : err.message || "Something went wrong processing your request.";
+  console.error(`[${new Date().toISOString()}] ${req.method} ${req.path} ERROR (${status}):`, err.message || err);
+  if (res.headersSent) return next(err);
+  res.status(status).json({ message });
+});
+
 if (process.env.NODE_ENV === 'production') {
   const staticDir = process.env.STATIC_FILES_DIR || (() => {
     const candidates = [

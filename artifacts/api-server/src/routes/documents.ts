@@ -13,18 +13,19 @@ import { randomUUID } from "crypto";
 const UPLOADS_DIR = process.env.UPLOADS_DIR ||
   path.resolve(process.cwd(), process.env.NODE_ENV === "production" ? "uploads" : "../../uploads");
 
+const ALLOWED_DOC_MIME_TYPES = [
+  "image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif", "image/heic", "image/heif",
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/msword",
+];
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 25 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    const allowed = [
-      "image/jpeg", "image/jpg", "image/png", "image/webp",
-      "application/pdf",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "application/msword",
-    ];
-    if (allowed.includes(file.mimetype)) cb(null, true);
-    else cb(new Error("Only JPG, PNG, WebP, PDF, DOC, DOCX files are allowed"));
+    if (ALLOWED_DOC_MIME_TYPES.includes(file.mimetype)) cb(null, true);
+    else cb(new Error("Only JPG, PNG, WebP, GIF, HEIC, PDF, DOC or DOCX files are allowed."));
   },
 });
 

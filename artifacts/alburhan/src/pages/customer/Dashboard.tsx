@@ -1606,7 +1606,13 @@ export default function CustomerDashboard() {
 
   const [profileExt, setProfileExt] = useState<{ blood_group?: string; emergency_contact_name?: string; emergency_contact_mobile?: string }>({});
   const [showProfileEdit, setShowProfileEdit] = useState(false);
-  const [profileForm, setProfileForm] = useState({ name: "", email: "", blood_group: "", emergency_contact_name: "", emergency_contact_mobile: "" });
+  const emptyProfileForm = {
+    name: "", email: "", blood_group: "", emergency_contact_name: "", emergency_contact_mobile: "",
+    dateOfBirth: "", gender: "", address: "",
+    passportNumber: "", passportIssueDate: "", passportExpiryDate: "", passportPlaceOfIssue: "",
+    aadharNumber: "", panNumber: "",
+  };
+  const [profileForm, setProfileForm] = useState(emptyProfileForm);
   const [savingProfile, setSavingProfile] = useState(false);
 
   useEffect(() => {
@@ -1614,7 +1620,14 @@ export default function CustomerDashboard() {
       .then(r => r.json())
       .then(d => {
         setProfileExt({ blood_group: d.blood_group, emergency_contact_name: d.emergency_contact_name, emergency_contact_mobile: d.emergency_contact_mobile });
-        setProfileForm({ name: d.name || "", email: d.email || "", blood_group: d.blood_group || "", emergency_contact_name: d.emergency_contact_name || "", emergency_contact_mobile: d.emergency_contact_mobile || "" });
+        setProfileForm({
+          name: d.name || "", email: d.email || "", blood_group: d.blood_group || "",
+          emergency_contact_name: d.emergency_contact_name || "", emergency_contact_mobile: d.emergency_contact_mobile || "",
+          dateOfBirth: d.dateOfBirth || "", gender: d.gender || "", address: d.address || "",
+          passportNumber: d.passportNumber || "", passportIssueDate: d.passportIssueDate || "",
+          passportExpiryDate: d.passportExpiryDate || "", passportPlaceOfIssue: d.passportPlaceOfIssue || "",
+          aadharNumber: d.aadharNumber || "", panNumber: d.panNumber || "",
+        });
       })
       .catch(() => {});
   }, []);
@@ -1627,13 +1640,16 @@ export default function CustomerDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(profileForm),
       });
-      if (!res.ok) throw new Error();
-      const updated = await res.json();
-      setProfileExt({ blood_group: updated.blood_group, emergency_contact_name: updated.emergency_contact_name, emergency_contact_mobile: updated.emergency_contact_mobile });
+      let data: any = null;
+      try { data = await res.json(); } catch { /* no body */ }
+      if (!res.ok) {
+        throw new Error(data?.message || (res.status === 401 ? "Your session has expired. Please log in again." : "Could not save your details. Please try again."));
+      }
+      setProfileExt({ blood_group: data.blood_group, emergency_contact_name: data.emergency_contact_name, emergency_contact_mobile: data.emergency_contact_mobile });
       setShowProfileEdit(false);
       toast({ title: "Profile updated!", description: "Your details have been saved." });
-    } catch {
-      toast({ title: "Error", description: "Could not save profile.", variant: "destructive" });
+    } catch (err: any) {
+      toast({ title: "Could not save profile", description: err?.message || "Something went wrong. Please try again.", variant: "destructive" });
     } finally { setSavingProfile(false); }
   };
 
@@ -1797,25 +1813,59 @@ export default function CustomerDashboard() {
           <div className="lg:col-span-1 space-y-6">
             {showProfileEdit && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-                <Card className="w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden">
-                  <div className="bg-primary p-4 text-white flex items-center justify-between">
+                <Card className="w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+                  <div className="bg-primary p-4 text-white flex items-center justify-between shrink-0">
                     <h3 className="font-bold">Edit Profile</h3>
                     <button onClick={() => setShowProfileEdit(false)}><X size={18} /></button>
                   </div>
-                  <div className="p-5 space-y-3">
+                  <div className="p-5 space-y-3 overflow-y-auto">
                     <div><label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">Full Name</label>
                       <Input value={profileForm.name} onChange={e => setProfileForm(f => ({ ...f, name: e.target.value }))} placeholder="As per passport" /></div>
                     <div><label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">Email</label>
                       <Input value={profileForm.email} onChange={e => setProfileForm(f => ({ ...f, email: e.target.value }))} placeholder="email@example.com" type="email" /></div>
+                    <div><label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">Date of Birth</label>
+                      <Input type="date" value={profileForm.dateOfBirth} onChange={e => setProfileForm(f => ({ ...f, dateOfBirth: e.target.value }))} /></div>
+                    <div><label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">Gender</label>
+                      <select className="w-full h-10 rounded-lg border border-input bg-background px-3 text-sm" value={profileForm.gender} onChange={e => setProfileForm(f => ({ ...f, gender: e.target.value }))}>
+                        <option value="">Select</option>
+                        <option value="male">Male</option>
+                        <option value="female">Female</option>
+                        <option value="other">Other</option>
+                      </select></div>
+                    <div><label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">Address</label>
+                      <Input value={profileForm.address} onChange={e => setProfileForm(f => ({ ...f, address: e.target.value }))} placeholder="Full residential address" /></div>
                     <div><label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">Blood Group</label>
                       <select className="w-full h-10 rounded-lg border border-input bg-background px-3 text-sm" value={profileForm.blood_group} onChange={e => setProfileForm(f => ({ ...f, blood_group: e.target.value }))}>
                         <option value="">Select</option>
                         {["A+","A-","B+","B-","O+","O-","AB+","AB-"].map(g => <option key={g} value={g}>{g}</option>)}
                       </select></div>
-                    <div><label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">Emergency Contact Name</label>
-                      <Input value={profileForm.emergency_contact_name} onChange={e => setProfileForm(f => ({ ...f, emergency_contact_name: e.target.value }))} placeholder="Contact person's name" /></div>
-                    <div><label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">Emergency Contact Mobile</label>
-                      <Input value={profileForm.emergency_contact_mobile} onChange={e => setProfileForm(f => ({ ...f, emergency_contact_mobile: e.target.value }))} placeholder="10-digit mobile" /></div>
+                    <div className="border-t pt-3 mt-1">
+                      <p className="text-xs font-bold text-primary uppercase tracking-wide mb-2">Passport Details</p>
+                      <div className="space-y-2">
+                        <Input value={profileForm.passportNumber} onChange={e => setProfileForm(f => ({ ...f, passportNumber: e.target.value }))} placeholder="Passport Number" />
+                        <div className="grid grid-cols-2 gap-2">
+                          <div><label className="text-[10px] text-muted-foreground block mb-0.5">Issue Date</label>
+                            <Input type="date" value={profileForm.passportIssueDate} onChange={e => setProfileForm(f => ({ ...f, passportIssueDate: e.target.value }))} /></div>
+                          <div><label className="text-[10px] text-muted-foreground block mb-0.5">Expiry Date</label>
+                            <Input type="date" value={profileForm.passportExpiryDate} onChange={e => setProfileForm(f => ({ ...f, passportExpiryDate: e.target.value }))} /></div>
+                        </div>
+                        <Input value={profileForm.passportPlaceOfIssue} onChange={e => setProfileForm(f => ({ ...f, passportPlaceOfIssue: e.target.value }))} placeholder="Place of Issue" />
+                      </div>
+                    </div>
+                    <div className="border-t pt-3 mt-1">
+                      <p className="text-xs font-bold text-primary uppercase tracking-wide mb-2">Identity Documents</p>
+                      <div className="space-y-2">
+                        <Input value={profileForm.aadharNumber} onChange={e => setProfileForm(f => ({ ...f, aadharNumber: e.target.value }))} placeholder="Aadhaar Number" />
+                        <Input value={profileForm.panNumber} onChange={e => setProfileForm(f => ({ ...f, panNumber: e.target.value }))} placeholder="PAN Number" />
+                      </div>
+                    </div>
+                    <div className="border-t pt-3 mt-1">
+                      <p className="text-xs font-bold text-primary uppercase tracking-wide mb-2">Emergency Contact</p>
+                      <div className="space-y-2">
+                        <Input value={profileForm.emergency_contact_name} onChange={e => setProfileForm(f => ({ ...f, emergency_contact_name: e.target.value }))} placeholder="Contact person's name" />
+                        <Input value={profileForm.emergency_contact_mobile} onChange={e => setProfileForm(f => ({ ...f, emergency_contact_mobile: e.target.value }))} placeholder="10-digit mobile" />
+                      </div>
+                    </div>
                     <Button className="w-full bg-primary text-white mt-2" onClick={handleSaveProfile} disabled={savingProfile}>
                       {savingProfile ? "Saving…" : "Save Profile"}
                     </Button>

@@ -944,9 +944,11 @@ async function runMigrations() {
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
+    await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
     await pool.query(`CREATE INDEX IF NOT EXISTS nl_event_idx ON notification_logs(event_type)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS nl_status_idx ON notification_logs(status)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS nl_created_idx ON notification_logs(created_at DESC)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS nl_updated_idx ON notification_logs(updated_at)`);
     console.log("[Migration] notification_logs table ensured");
   } catch (err) {
     console.error("[Migration] notification_logs failed:", err);

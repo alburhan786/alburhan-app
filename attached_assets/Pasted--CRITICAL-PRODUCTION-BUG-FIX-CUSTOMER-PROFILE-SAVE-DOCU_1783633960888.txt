@@ -1,0 +1,265 @@
+# CRITICAL PRODUCTION BUG FIX – CUSTOMER PROFILE SAVE & DOCUMENT UPLOAD
+
+This is a production system for Al Burhan Tours & Travels.
+
+There is a critical issue in the Customer Dashboard.
+
+The customer can log in successfully and upload a photo, but when clicking "Save Details" the request fails with HTTP 403 Forbidden. The profile data is not saved.
+
+This must be fixed completely before any new features.
+
+====================================================
+STEP 1 – FIND THE ROOT CAUSE
+====================================================
+
+Do NOT bypass authentication.
+
+Investigate the real cause by checking:
+
+• Authentication middleware
+• Authorization middleware
+• Customer role permissions
+• Session cookies
+• JWT authentication
+• CSRF protection
+• API route protection
+• Customer ownership validation
+• CORS configuration
+• Database permissions
+• File upload middleware
+• Storage permissions
+
+Identify the exact reason for the HTTP 403 error.
+
+====================================================
+STEP 2 – FIX CUSTOMER PROFILE SAVE
+====================================================
+
+The logged-in customer must be able to edit ONLY their own profile.
+
+Save all fields:
+
+• Full Name
+• Date of Birth
+• Gender
+• Address
+• Passport Number
+• Passport Issue Date
+• Passport Expiry Date
+• Place of Issue
+• Blood Group
+• Emergency Contact
+• Email
+• Mobile Number
+• Nationality
+• Any future profile fields
+
+After clicking Save Details:
+
+• Save successfully
+• Return HTTP 200
+• Update database
+• Refresh UI automatically
+• Show:
+
+✅ Profile updated successfully
+
+No page refresh required.
+
+====================================================
+STEP 3 – FIX DOCUMENT UPLOAD
+====================================================
+
+Support uploading:
+
+• Passport Photo
+• Passport Front
+• Passport Back
+• Aadhaar Card
+• PAN Card
+• Visa Copy
+• Flight Ticket
+• Hotel Voucher
+• Medical Certificate
+• Vaccination Certificate
+• Passport Scan
+• Any Travel Document
+
+Accepted formats:
+
+• JPG
+• JPEG
+• PNG
+• WEBP
+• GIF
+• HEIC
+• PDF
+
+Maximum upload size:
+
+25 MB
+
+====================================================
+STEP 4 – DOCUMENT MANAGEMENT
+====================================================
+
+Allow customers to:
+
+• Upload
+• Replace
+• Delete
+• Preview Images
+• Preview PDFs
+• Download Files
+
+Store secure file URLs in the database.
+
+====================================================
+STEP 5 – DATABASE
+====================================================
+
+Every uploaded file must contain:
+
+Customer ID
+
+Booking ID
+
+Pilgrim ID
+
+Document Type
+
+Upload Date
+
+Verification Status
+
+Verified By
+
+Verification Date
+
+Storage URL
+
+====================================================
+STEP 6 – CUSTOMER DASHBOARD
+====================================================
+
+Immediately display:
+
+• Uploaded Passport
+• Uploaded Aadhaar
+• Uploaded PAN
+• Uploaded Visa
+• Uploaded Flight Ticket
+• Uploaded Hotel Voucher
+
+Show:
+
+• Upload Progress
+• Verification Status
+• Download Button
+• Preview Button
+• Replace Button
+
+====================================================
+STEP 7 – ERROR HANDLING
+====================================================
+
+Never display generic errors like:
+
+Forbidden
+
+Instead display:
+
+"Your session has expired. Please log in again."
+
+or
+
+"You are not authorized to edit this profile."
+
+Log all server errors.
+
+====================================================
+STEP 8 – SECURITY
+====================================================
+
+Customers:
+
+Can edit ONLY their own profile.
+
+Admins:
+
+Can edit all customers.
+
+Prevent:
+
+• ID tampering
+• Unauthorized uploads
+• SQL Injection
+• XSS
+• CSRF
+• Horizontal privilege escalation
+
+====================================================
+STEP 9 – TESTING
+====================================================
+
+Run complete end-to-end tests.
+
+Verify:
+
+✅ Customer Login
+
+✅ Upload JPG
+
+✅ Upload PNG
+
+✅ Upload PDF
+
+✅ Upload WEBP
+
+✅ Save Profile
+
+✅ Reload Page
+
+✅ Database Updated
+
+✅ Dashboard Updated
+
+✅ Preview Works
+
+✅ Download Works
+
+✅ Replace Works
+
+✅ No HTTP 401
+
+✅ No HTTP 403
+
+✅ No HTTP 500
+
+====================================================
+STEP 10 – DEPLOY
+====================================================
+
+After fixing:
+
+• Deploy to VPS
+• Restart services
+• Run database migrations if required
+• Verify production is working
+
+====================================================
+FINAL REPORT
+====================================================
+
+Provide:
+
+1. Exact cause of the HTTP 403 error.
+2. Files modified.
+3. APIs fixed.
+4. Database changes.
+5. Security improvements.
+6. Deployment confirmation.
+7. Screenshot or log showing profile save works successfully.
+8. Confirm all document formats upload successfully.
+
+Do not stop until the issue is fully resolved, tested, deployed, and verified in production.

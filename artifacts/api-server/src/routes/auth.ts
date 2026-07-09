@@ -273,11 +273,33 @@ router.post("/verify-otp", async (req, res) => {
   });
 });
 
-router.patch("/profile", requireAuth as any, async (req: AuthenticatedRequest, res) => {
-  const { name, email, blood_group, emergency_contact_name, emergency_contact_mobile } = req.body;
+// Fields that live on customer_profiles (extended KYC-style fields), keyed by request-body field name.
+const EXTENDED_PROFILE_FIELDS = [
+  "dateOfBirth", "gender", "address",
+  "passportNumber", "passportIssueDate", "passportExpiryDate", "passportPlaceOfIssue",
+  "aadharNumber", "panNumber",
+] as const;
 
-  if (!name && !email && !blood_group && !emergency_contact_name && !emergency_contact_mobile) {
-    res.status(400).json({ message: "At least one field is required" });
+const EMAIL_RX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+router.patch("/profile", requireAuth as any, async (req: AuthenticatedRequest, res) => {
+  const body = req.body || {};
+  const { name, email, blood_group, emergency_contact_name, emergency_contact_mobile } = body;
+
+  const hasBasicField = [name, email, blood_group, emergency_contact_name, emergency_contact_mobile].some(v => v !== undefined && v !== null && v !== "");
+  const hasExtendedField = EXTENDED_PROFILE_FIELDS.some(f => body[f] !== undefined && body[f] !== null && body[f] !== "");
+
+  if (!hasBasicField && !hasExtendedField) {
+    res.status(400).json({ message: "Please fill in at least one field before saving." });
+    return;
+  }
+
+  if (email && !EMAIL_RX.test(email)) {
+    res.status(400).json({ message: "Please enter a valid email address." });
+    return;
+  }
+  if (emergency_contact_mobile && !/^[6-9]\d{9}$/.test(emergency_contact_mobile)) {
+    res.status(400).json({ message: "Emergency contact mobile must be a valid 10-digit Indian number." });
     return;
   }
 
@@ -293,10 +315,39 @@ router.patch("/profile", requireAuth as any, async (req: AuthenticatedRequest, r
       WHERE id = $6 RETURNING id, name, mobile, email, role, blood_group, emergency_contact_name, emergency_contact_mobile`,
       [name ?? "", email ?? "", blood_group ?? "", emergency_contact_name ?? "", emergency_contact_mobile ?? "", req.user!.id]
     );
+    if (!r.rows[0]) {
+      res.status(404).json({ message: "Your account could not be found. Please log in again." });
+      return;
+    }
     const u = r.rows[0];
-    res.json({ id: u.id, name: u.name, mobile: u.mobile, email: u.email, role: u.role, blood_group: u.blood_group, emergency_contact_name: u.emergency_contact_name, emergency_contact_mobile: u.emergency_contact_mobile });
+
+    // Upsert extended (KYC-style) fields onto customer_profiles so the same "Save Details" form
+    // can capture DOB, gender, address, passport, Aadhaar and PAN without a separate KYC submission.
+    let extended: Record<string, any> = {};
+    if (hasExtendedField) {
+      const cols = EXTENDED_PROFILE_FIELDS.map(f => f.replace(/[A-Z]/g, c => "_" + c.toLowerCase()));
+      const values = EXTENDED_PROFILE_FIELDS.map(f => body[f] ?? null);
+      const setClauses = cols.map((c, i) => `${c} = COALESCE($${i + 3}, customer_profiles.${c})`).join(", ");
+      const insertCols = cols.join(", ");
+      const insertPlaceholders = cols.map((_, i) => `$${i + 3}`).join(", ");
+      const extRes = await pool.query(
+        `INSERT INTO customer_profiles (id, user_id, name, ${insertCols})
+         VALUES (gen_random_uuid()::text, $1, $2, ${insertPlaceholders})
+         ON CONFLICT (user_id) DO UPDATE SET ${setClauses}, updated_at = NOW()
+         RETURNING ${cols.join(", ")}`,
+        [req.user!.id, name || u.name || "", ...values]
+      );
+      extended = extRes.rows[0] || {};
+    }
+
+    res.json({
+      id: u.id, name: u.name, mobile: u.mobile, email: u.email, role: u.role,
+      blood_group: u.blood_group, emergency_contact_name: u.emergency_contact_name, emergency_contact_mobile: u.emergency_contact_mobile,
+      ...extended,
+    });
   } catch (err: any) {
-    res.status(500).json({ message: err.message || "Failed to update profile" });
+    console.error(`[Profile] Save failed for user ${req.user?.id}:`, err.message);
+    res.status(500).json({ message: "We couldn't save your details right now. Please try again in a moment." });
   }
 });
 
@@ -313,10 +364,31 @@ router.get("/me", requireAuth as any, async (req: AuthenticatedRequest, res) => 
     );
     const u = r.rows[0];
     if (!u) { res.status(404).json({ message: "User not found" }); return; }
-    res.json({ id: u.id, name: u.name, mobile: u.mobile, email: u.email, role: u.role, blood_group: u.blood_group, emergency_contact_name: u.emergency_contact_name, emergency_contact_mobile: u.emergency_contact_mobile });
-  } catch {
-    const user = req.user!;
-    res.json({ id: user.id, name: user.name, mobile: user.mobile, email: user.email, role: user.role });
+
+    let extended: Record<string, any> = {};
+    try {
+      const extRes = await pool.query(
+        `SELECT date_of_birth, gender, address, passport_number, passport_issue_date,
+                passport_expiry_date, passport_place_of_issue, aadhar_number, pan_number
+         FROM customer_profiles WHERE user_id = $1`,
+        [req.user!.id]
+      );
+      extended = extRes.rows[0] || {};
+    } catch (e) {
+      console.error("[Profile] Failed to load extended profile:", (e as any).message);
+    }
+
+    res.json({
+      id: u.id, name: u.name, mobile: u.mobile, email: u.email, role: u.role,
+      blood_group: u.blood_group, emergency_contact_name: u.emergency_contact_name, emergency_contact_mobile: u.emergency_contact_mobile,
+      dateOfBirth: extended.date_of_birth, gender: extended.gender, address: extended.address,
+      passportNumber: extended.passport_number, passportIssueDate: extended.passport_issue_date,
+      passportExpiryDate: extended.passport_expiry_date, passportPlaceOfIssue: extended.passport_place_of_issue,
+      aadharNumber: extended.aadhar_number, panNumber: extended.pan_number,
+    });
+  } catch (err: any) {
+    console.error(`[Profile] /me failed for user ${req.user?.id}:`, err.message);
+    res.status(500).json({ message: "Could not load your profile. Please refresh and try again." });
   }
 });
 
