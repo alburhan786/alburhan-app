@@ -32,6 +32,7 @@ channel = "stable-25_05"
 
 [userenv.shared]
 SITE_URL = "https://alburhantravels.com"
+SMTP_SECURE = "true"
 
 [[ports]]
 localPort = 8080
