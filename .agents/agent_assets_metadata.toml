@@ -58,7 +58,7 @@ title = "Frontend Build (frontend-dist.tar.gz)"
 id = "1NRElREVNIBATBSNtIpSW"
 uri = "file://FINAL_PRODUCTION_REPORT.md"
 type = "text"
-title = "Final Production Report"
+title = "Final Production Readiness Report"
 
 [[outputs]]
 id = "l2U8OjMikxcGmhFJ_2UB_"
