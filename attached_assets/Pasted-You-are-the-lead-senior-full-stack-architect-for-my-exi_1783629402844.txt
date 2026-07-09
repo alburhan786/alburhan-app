@@ -1,0 +1,460 @@
+You are the lead senior full-stack architect for my existing project "Al Burhan Tours & Travels".
+
+IMPORTANT:
+Do NOT rebuild my website.
+Do NOT remove existing features.
+Do NOT change my database structure unless absolutely necessary.
+Extend my current project and keep all existing data intact.
+
+GOAL:
+Complete the Automation Center and Communication Center so the system works like a professional Hajj & Umrah ERP.
+
+=========================
+AUTOMATION CENTER
+=========================
+
+Create a complete event-driven workflow.
+
+Events:
+
+1. Customer Signup
+2. OTP Verified
+3. Customer Login
+4. Booking Submitted
+5. Booking Approved
+6. Booking Rejected
+7. Invoice Generated
+8. Payment Received
+9. Balance Reminder
+10. Document Reminder
+11. Passport Uploaded
+12. Visa Submitted
+13. Visa Approved
+14. Visa Rejected
+15. Flight Assigned
+16. Hotel Assigned
+17. Room Assigned
+18. Bus Assigned
+19. Ziyarat Assigned
+20. Airport Reporting
+21. Departure Reminder
+22. Arrival in Saudi
+23. Return Flight Reminder
+24. Tour Completed
+25. Feedback Request
+
+Each event must trigger automatic notifications.
+
+=========================
+COMMUNICATION CENTER
+=========================
+
+Each event should automatically send notifications through:
+
+1. WhatsApp (BotBee)
+2. SMS (Fast2SMS)
+3. Email (SMTP)
+4. RCS (Lemin AI)
+5. Firebase Push Notification
+
+Each channel must work independently.
+
+If WhatsApp fails:
+
+SMS must still send.
+
+Email must still send.
+
+RCS must still send.
+
+Push Notification must still send.
+
+Never stop the workflow because one provider fails.
+
+=========================
+RETRY SYSTEM
+=========================
+
+Create a retry queue.
+
+Retry failed notifications:
+
+Retry 1
+Retry 2
+Retry 3
+
+After third failure:
+
+Mark Failed
+
+Notify Admin
+
+Store provider response.
+
+=========================
+NOTIFICATION LOGS
+=========================
+
+Store:
+
+Booking ID
+
+Customer ID
+
+Customer Name
+
+Event Name
+
+Channel
+
+Template Name
+
+Provider
+
+Sent Time
+
+Delivered Time
+
+Failure Reason
+
+Retry Count
+
+Status
+
+=========================
+COMMUNICATION DASHBOARD
+=========================
+
+Create dashboard cards:
+
+Today's Messages
+
+WhatsApp Sent
+
+SMS Sent
+
+Email Sent
+
+RCS Sent
+
+Push Sent
+
+Delivered
+
+Failed
+
+Pending
+
+Delivery Rate
+
+Recent Notifications
+
+Failed Notifications
+
+Retry Queue
+
+=========================
+WORKFLOW DASHBOARD
+=========================
+
+Create live progress.
+
+Customer Signup
+
+↓
+
+Booking Submitted
+
+↓
+
+Booking Approved
+
+↓
+
+Invoice Generated
+
+↓
+
+Payment Received
+
+↓
+
+Documents Uploaded
+
+↓
+
+Visa Approved
+
+↓
+
+Flight Assigned
+
+↓
+
+Hotel Assigned
+
+↓
+
+Room Assigned
+
+↓
+
+Bus Assigned
+
+↓
+
+Departure Reminder
+
+↓
+
+Arrival
+
+↓
+
+Return
+
+↓
+
+Completed
+
+Show progress percentage.
+
+=========================
+AUTO DOCUMENTS
+=========================
+
+Automatically generate:
+
+Invoice PDF
+
+Payment Receipt PDF
+
+Booking Confirmation
+
+Visa Letter
+
+Flight Ticket
+
+Hotel Voucher
+
+Room Allotment
+
+Bus Allotment
+
+Tour Itinerary
+
+Airport Reporting Letter
+
+Upload automatically to customer portal.
+
+Customer can download.
+
+Admin can resend.
+
+=========================
+AUTO NOTIFICATIONS
+=========================
+
+Automatically send:
+
+Welcome
+
+OTP
+
+Booking Submitted
+
+Booking Approved
+
+Booking Rejected
+
+Invoice
+
+Payment Reminder
+
+Payment Received
+
+Receipt
+
+Document Reminder
+
+Visa Update
+
+Flight Details
+
+Hotel Details
+
+Room Details
+
+Bus Details
+
+Airport Reminder
+
+Departure Reminder
+
+Arrival Welcome
+
+Feedback
+
+=========================
+ADMIN FEATURES
+=========================
+
+Add:
+
+Notification Queue
+
+Retry Queue
+
+Broadcast Message
+
+Bulk WhatsApp
+
+Bulk SMS
+
+Bulk Email
+
+Bulk RCS
+
+Message Scheduler
+
+Holiday Greetings
+
+Ramadan Campaign
+
+Hajj Campaign
+
+Umrah Campaign
+
+=========================
+CUSTOMER PORTAL
+=========================
+
+Customer should see:
+
+Booking Status
+
+Journey Progress
+
+Payment Ledger
+
+Invoices
+
+Receipts
+
+Flight Ticket
+
+Visa
+
+Hotel Voucher
+
+Room Number
+
+Bus Number
+
+Ziyarat Schedule
+
+Download Center
+
+Notifications
+
+=========================
+SYSTEM HEALTH
+=========================
+
+Add monitoring:
+
+BotBee Status
+
+Fast2SMS Status
+
+SMTP Status
+
+Lemin AI Status
+
+Firebase Status
+
+Database Status
+
+Queue Status
+
+Webhook Status
+
+Show green/red indicators.
+
+=========================
+ERROR HANDLING
+=========================
+
+Never stop workflow because one notification provider fails.
+
+Each provider must use independent try/catch.
+
+Log all errors.
+
+Queue failed notifications.
+
+Retry automatically.
+
+=========================
+PERFORMANCE
+=========================
+
+Queue notifications in background.
+
+Never block booking process.
+
+Optimize database queries.
+
+Lazy load dashboard.
+
+=========================
+SECURITY
+=========================
+
+Keep all API Keys in environment variables.
+
+Never hardcode secrets.
+
+Audit every notification.
+
+=========================
+FINAL REQUIREMENT
+=========================
+
+Do NOT create placeholders.
+
+Do NOT leave TODO comments.
+
+Complete every workflow.
+
+Test every automation.
+
+Produce a report showing:
+
+✓ Booking Submitted
+
+✓ Booking Approved
+
+✓ Invoice Generated
+
+✓ WhatsApp Sent
+
+✓ SMS Sent
+
+✓ Email Sent
+
+✓ RCS Sent
+
+✓ Push Sent
+
+✓ Payment Reminder
+
+✓ Visa Approved
+
+✓ Flight Assigned
+
+✓ Hotel Assigned
+
+✓ Journey Completed
+
+Everything must work automatically without manual intervention.
