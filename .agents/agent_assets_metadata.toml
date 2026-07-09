@@ -53,3 +53,9 @@ id = "-Vg8GL7OcPxevzFQYgyWZ"
 uri = "file://artifacts/alburhan/dist/public/frontend-dist.tar.gz"
 type = "unspecified"
 title = "Frontend Build (frontend-dist.tar.gz)"
+
+[[outputs]]
+id = "1NRElREVNIBATBSNtIpSW"
+uri = "file://FINAL_PRODUCTION_REPORT.md"
+type = "text"
+title = "Final Production Report"

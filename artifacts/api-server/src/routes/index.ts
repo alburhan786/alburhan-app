@@ -53,11 +53,12 @@ import offlinePaymentsRouter from "./offline-payments.js";
 import apiSettingsRouter from "./api-settings.js";
 import whatsappRouter from "./whatsapp.js";
 import communicationRouter from "./communication.js";
+import { requireAdmin } from "../lib/auth.js";
 
 const router: IRouter = Router();
 
-// ── Public env diagnostic (no auth) — safe to expose: values are masked ──────
-router.get("/diag", (_req, res) => {
+// ── Env diagnostic (admin-only) — values are masked but still restricted ────
+router.get("/diag", requireAdmin as any, (_req, res) => {
   const fast2smsKey = process.env.FAST2SMS_API_KEY || process.env.FAST2SMS_XXL_API_KEY;
   const mask = (v: string | undefined, label: string) =>
     v ? `${v.slice(0, 6)}...${v.slice(-4)} (len=${v.length})` : `❌ ${label} NOT SET`;
@@ -109,8 +110,8 @@ router.get("/diag", (_req, res) => {
   });
 });
 
-// Temporary: serve pre-built frontend dist for VPS deployment
-router.get("/download-dist", (_req, res) => {
+// Temporary: serve pre-built frontend dist for VPS deployment (admin-only)
+router.get("/download-dist", requireAdmin as any, (_req, res) => {
   const candidates = [
     "/home/runner/workspace/artifacts/alburhan/dist/public/frontend-dist.tar.gz",
     "/home/runner/workspace/frontend-dist.tar.gz",
@@ -145,8 +146,8 @@ function serveApiBundle(_req: any, res: any) {
     res.status(404).json({ error: "API bundle not found — run build first", tried: candidates });
   }
 }
-router.get("/deploy-dist", serveApiBundle);
-router.get("/download-api", serveApiBundle);
+router.get("/deploy-dist", requireAdmin as any, serveApiBundle);
+router.get("/download-api", requireAdmin as any, serveApiBundle);
 
 router.use(healthRouter);
 router.use("/auth", authRouter);

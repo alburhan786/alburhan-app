@@ -1717,6 +1717,16 @@ async function runMigrations() {
     `);
     console.log("[Migration] customer_push_tokens table ensured");
   } catch (err) { console.error("[Migration] customer_push_tokens migration failed:", err); }
+
+  // ── Performance indexes (additive, safe — production stabilization pass) ────
+  try {
+    await pool.query(`CREATE INDEX IF NOT EXISTS bookings_customer_id_idx ON bookings(customer_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS bookings_status_idx ON bookings(status)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS bookings_group_id_idx ON bookings(group_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS pilgrims_group_id_idx ON pilgrims(group_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS notification_logs_booking_id_idx ON notification_logs(booking_id)`);
+    console.log("[Migration] performance indexes ensured");
+  } catch (err) { console.error("[Migration] performance indexes failed:", err); }
 }
 
 const rawPort = process.env["PORT"];
