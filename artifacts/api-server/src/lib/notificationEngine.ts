@@ -5,6 +5,7 @@ import {
   sendRCS,
   sendEmail,
 } from "./notifications.js";
+import { sendTemplate as sendBotBeeTemplate } from "./botbee.js";
 
 export type EventType =
   // Account & Auth
@@ -355,7 +356,7 @@ export async function trackNotification(data: {
         await pool.query(
           `INSERT INTO notification_retry_queue
            (id, notification_log_id, event_type, channel, customer_id, booking_id, recipient, message, context, retry_count, status, last_error, next_retry_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,0,'pending',$10, NOW() + INTERVAL '5 minutes')`,
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,0,'pending',$10, NOW() + INTERVAL '30 seconds')`,
           [
             `nrq_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
             id, data.eventType, data.channel, data.customerId || null, data.bookingId || null,
@@ -430,12 +431,57 @@ async function sendOnChannel(channel: Channel, ctx: NotificationContext, message
   }
 }
 
+// ── WhatsApp business-initiated sends must use a pre-approved Meta template
+// once the customer's 24-hour service window has closed. We look up an
+// enabled wa_templates row mapped to this eventType and send it via BotBee's
+// template endpoint (built from {{n}}-style placeholders matching the
+// template's `variables` order). If no approved template exists, we fall
+// back to the free-form session message (sendWhatsApp) — this only succeeds
+// if the customer messaged within the last 24h, otherwise BotBee/Meta will
+// reject it and the failure is logged + retried as usual.
+async function sendWhatsAppForEvent(eventType: EventType, ctx: NotificationContext, message: string, bookingId?: string, customerId?: string): Promise<{ status: "sent" | "failed"; providerResponse: unknown }> {
+  try {
+    const tpl = await pool.query(
+      `SELECT name, variables FROM wa_templates WHERE event_type=$1 AND enabled=true AND status IN ('approved','local') ORDER BY is_builtin DESC LIMIT 1`,
+      [eventType]
+    );
+    if (tpl.rows.length > 0) {
+      const { name, variables } = tpl.rows[0];
+      const varNames: string[] = Array.isArray(variables) ? variables : JSON.parse(variables || "[]");
+      const varMap: Record<string, unknown> = {
+        customer_name: ctx.customerName,
+        booking_id: ctx.bookingNumber,
+        package_name: ctx.packageName,
+        amount: ctx.amount != null ? formatINR(ctx.amount) : undefined,
+        invoice_number: ctx.invoiceNumber,
+        ticket_number: ctx.invoiceNumber,
+        flight_number: ctx.flightNumber,
+        departure_date: ctx.departureDate,
+        departure_time: (ctx as Record<string, unknown>).departureTime ?? ctx.departureDate,
+        visa_number: ctx.visaNumber,
+        hotel_name: ctx.hotelName,
+        room_number: ctx.roomNumber,
+      };
+      const params = varNames.map((v) => ({ type: "text", text: String(varMap[v] ?? "-") }));
+      const components = params.length ? [{ type: "body", parameters: params }] : [];
+      const result = await sendBotBeeTemplate(ctx.customerMobile, name, components, { eventType, bookingId, customerId });
+      if (result.ok) return { status: "sent", providerResponse: result };
+      console.warn(`[notificationEngine] WhatsApp template "${name}" failed for ${eventType}, falling back to session message:`, result.errorMessage);
+    }
+    // No approved template mapped, or template send failed — try free-form
+    // session message as a best-effort fallback (works only inside 24h window).
+    const result = await sendWhatsApp(ctx.customerMobile, message);
+    return { status: result.ok ? "sent" : "failed", providerResponse: result };
+  } catch (err: unknown) {
+    return { status: "failed", providerResponse: { ok: false, provider: "BotBee", errorMessage: err instanceof Error ? err.message : String(err) } };
+  }
+}
+
 // Fix email subject — must pass eventType separately
 async function sendOnChannelWithType(channel: Channel, eventType: EventType, ctx: NotificationContext, message: string): Promise<{ status: "sent" | "failed"; providerResponse: unknown }> {
   try {
     if (channel === "whatsapp") {
-      const result = await sendWhatsApp(ctx.customerMobile, message);
-      return { status: result.ok ? "sent" : "failed", providerResponse: result };
+      return await sendWhatsAppForEvent(eventType, ctx, message, ctx.bookingId, ctx.customerId);
     } else if (channel === "sms") {
       try {
         await sendDLTSMS(ctx.customerMobile, ctx.customerName, ctx.bookingNumber || "", ctx.invoiceNumber || "");

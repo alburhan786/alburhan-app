@@ -26,10 +26,14 @@ function getCredentials() {
   return { apiToken, phone_number_id, enabled, baseUrl };
 }
 
-function toBotBeePhone(mobile: string): string {
+function toBotBeePhone(mobile: string | null | undefined): string {
+  if (!mobile || typeof mobile !== "string" || !mobile.trim()) {
+    throw new Error("Missing or invalid mobile number");
+  }
   const clean = mobile.replace(/\D/g, "");
+  if (!clean) throw new Error("Missing or invalid mobile number");
   if (clean.length === 10) return `91${clean}`;
-  if (clean.startsWith("+")) return clean.slice(1);
+  if (mobile.trim().startsWith("+")) return clean;
   return clean;
 }
 
@@ -82,7 +86,16 @@ export async function sendText(
   if (!enabled) return { ok: false, provider: "BotBee", endpoint, errorMessage: "WhatsApp disabled in API Settings" };
   if (!apiToken || !phone_number_id) return { ok: false, provider: "BotBee", endpoint, errorMessage: "BotBee API key or Phone Number ID not configured" };
 
-  const phone = toBotBeePhone(to);
+  let phone: string;
+  try {
+    phone = toBotBeePhone(to);
+  } catch (err: any) {
+    const result: BotBeeResult = { ok: false, provider: "BotBee", endpoint, errorMessage: err?.message || "Invalid mobile number" };
+    if (opts?.eventType) {
+      await logToDb({ eventType: opts.eventType, channel: "whatsapp", recipient: to || "unknown", bookingId: opts.bookingId, customerId: opts.customerId, message: opts.logMessage || message.substring(0, 300), status: "failed", result });
+    }
+    return result;
+  }
   const reqPayload = { phone_number_id, phone_number: phone, message };
   const params = new URLSearchParams({ apiToken, phone_number_id, phone_number: phone, message });
 
@@ -127,7 +140,16 @@ export async function sendTemplate(
   if (!enabled) return { ok: false, provider: "BotBee", endpoint, errorMessage: "WhatsApp disabled in API Settings" };
   if (!apiToken || !phone_number_id) return { ok: false, provider: "BotBee", endpoint, errorMessage: "BotBee credentials not configured" };
 
-  const phone = toBotBeePhone(to);
+  let phone: string;
+  try {
+    phone = toBotBeePhone(to);
+  } catch (err: any) {
+    const result: BotBeeResult = { ok: false, provider: "BotBee", endpoint, errorMessage: err?.message || "Invalid mobile number" };
+    if (opts?.eventType) {
+      await logToDb({ eventType: opts.eventType, channel: "whatsapp", recipient: to || "unknown", bookingId: opts.bookingId, customerId: opts.customerId, message: `Template: ${templateName}`, status: "failed", result });
+    }
+    return result;
+  }
   const payload = { apiToken, phone_number_id, phone_number: phone, template: { name: templateName, language: { code: "en" }, components } };
   const reqPayload = { ...payload, apiToken: "***" };
 
@@ -163,7 +185,16 @@ export async function sendInteractiveButtons(
   if (!enabled) return { ok: false, provider: "BotBee", endpoint, errorMessage: "WhatsApp disabled" };
   if (!apiToken || !phone_number_id) return { ok: false, provider: "BotBee", endpoint, errorMessage: "BotBee credentials not configured" };
 
-  const phone = toBotBeePhone(to);
+  let phone: string;
+  try {
+    phone = toBotBeePhone(to);
+  } catch (err: any) {
+    const result: BotBeeResult = { ok: false, provider: "BotBee", endpoint, errorMessage: err?.message || "Invalid mobile number" };
+    if (opts?.eventType) {
+      await logToDb({ eventType: opts.eventType, channel: "whatsapp", recipient: to || "unknown", bookingId: opts.bookingId, customerId: opts.customerId, message: body, status: "failed", result });
+    }
+    return result;
+  }
   const payload = {
     apiToken, phone_number_id, phone_number: phone,
     interactive: {
@@ -205,7 +236,16 @@ export async function sendFile(
   if (!enabled) return { ok: false, provider: "BotBee", endpoint, errorMessage: "WhatsApp disabled" };
   if (!apiToken || !phone_number_id) return { ok: false, provider: "BotBee", endpoint, errorMessage: "BotBee credentials not configured" };
 
-  const phone = toBotBeePhone(to);
+  let phone: string;
+  try {
+    phone = toBotBeePhone(to);
+  } catch (err: any) {
+    const result: BotBeeResult = { ok: false, provider: "BotBee", endpoint, errorMessage: err?.message || "Invalid mobile number" };
+    if (opts?.eventType) {
+      await logToDb({ eventType: opts.eventType, channel: "whatsapp", recipient: to || "unknown", bookingId: opts.bookingId, customerId: opts.customerId, message: `File: ${mediaId}${caption ? ` — ${caption}` : ""}`, status: "failed", result });
+    }
+    return result;
+  }
   const payload = { apiToken, phone_number_id, phone_number: phone, media_id: mediaId, caption: caption || "" };
   const reqPayload = { ...payload, apiToken: "***" };
 

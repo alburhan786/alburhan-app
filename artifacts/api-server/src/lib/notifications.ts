@@ -62,7 +62,10 @@ function getFast2SMSExtra() {
 
 const BOTBEE_BASE_URL = "https://app.botbee.io/api/v1/whatsapp";
 
-function toFast2SMSPhone(mobile: string): string {
+function toFast2SMSPhone(mobile: string | null | undefined): string {
+  if (!mobile || typeof mobile !== "string" || !mobile.trim()) {
+    throw new Error("Missing or invalid mobile number");
+  }
   const clean = mobile.replace(/\D/g, "");
   // Strip country code: +919876543210 or 919876543210 (12 digits)
   if (clean.startsWith("91") && clean.length === 12) return clean.slice(2);
@@ -71,10 +74,14 @@ function toFast2SMSPhone(mobile: string): string {
   return clean;
 }
 
-function toBotBeePhone(mobile: string): string {
+function toBotBeePhone(mobile: string | null | undefined): string {
+  if (!mobile || typeof mobile !== "string" || !mobile.trim()) {
+    throw new Error("Missing or invalid mobile number");
+  }
   const clean = mobile.replace(/\D/g, "");
+  if (!clean) throw new Error("Missing or invalid mobile number");
   if (clean.length === 10) return `91${clean}`;
-  if (clean.startsWith("+")) return clean.slice(1);
+  if (mobile.trim().startsWith("+")) return clean;
   return clean;
 }
 
@@ -291,11 +298,15 @@ export async function testSmsDiagnostics(phone: string, otp: string): Promise<Re
 }
 
 export async function sendDLTSMS(
-  mobile: string,
+  mobile: string | null | undefined,
   var1: string,
   var2: string,
   var3: string
 ): Promise<boolean> {
+  if (!mobile || typeof mobile !== "string" || !mobile.trim()) {
+    console.error("[SMS-DLT] Aborted — missing/invalid mobile number. vars:", var1, var2, var3);
+    return false;
+  }
   const apiKey = getFast2SMSKey();
   if (!apiKey) {
     console.log("[SMS-DLT] API key not set — vars:", var1, var2, var3, "for:", mobile);
@@ -316,10 +327,13 @@ export async function sendDLTSMS(
   }
 }
 
-export async function sendWhatsApp(mobile: string, message: string): Promise<SendResult> {
+export async function sendWhatsApp(mobile: string | null | undefined, message: string): Promise<SendResult> {
   const bbCfg = getCachedConfig("botbee");
   const bbBaseUrl = bbCfg.apiUrl || BOTBEE_BASE_URL;
   const endpoint = `${bbBaseUrl}/send`;
+  if (!mobile || typeof mobile !== "string" || !mobile.trim()) {
+    return { ok: false, provider: "BotBee", endpoint, errorMessage: "Missing or invalid mobile number" };
+  }
   if (bbCfg.enabled === false) {
     return { ok: false, provider: "BotBee", endpoint, errorMessage: "WhatsApp disabled in API Settings" };
   }
@@ -370,13 +384,16 @@ export interface RcsRichData {
 }
 
 export async function sendRCS(
-  mobile: string,
+  mobile: string | null | undefined,
   customerName: string,
   messageText: string,
   richData?: RcsRichData
 ): Promise<SendResult> {
   const leminCfg = getCachedConfig("lemin");
   const endpoint = leminCfg.apiUrl || process.env.LEMIN_API_URL || "https://rcs.leminai.com/api/send/template";
+  if (!mobile || typeof mobile !== "string" || !mobile.trim()) {
+    return { ok: false, provider: "Lemin AI", endpoint, errorMessage: "Missing or invalid mobile number" };
+  }
   if (leminCfg.enabled === false) {
     return { ok: false, provider: "Lemin AI", endpoint, errorMessage: "RCS disabled in API Settings" };
   }

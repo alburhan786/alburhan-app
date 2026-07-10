@@ -93,12 +93,17 @@ function buildEnvFallback(provider: ProviderName): ProviderConfig {
         },
       };
     case "lemin":
+      // No hardcoded placeholder user_id — a fake default caused Lemin's
+      // "Invalid User ID" error in production. Leave unset unless the real
+      // LEMIN_USER_ID/LEMIN_API_KEY secrets are configured; sendRCS() will
+      // then correctly report "not configured" instead of failing silently
+      // against the provider with bogus credentials.
       return {
-        enabled: true,
+        enabled: !!(process.env.LEMIN_API_KEY || process.env.LEMIN_USER_ID),
         apiUrl: process.env.LEMIN_API_URL || "https://rcs.leminai.com/api/send",
         apiKey: process.env.LEMIN_API_KEY,
         extra: {
-          user_id: process.env.LEMIN_USER_ID || "0x89mqd53ph",
+          user_id: process.env.LEMIN_USER_ID || "",
           template_id: process.env.LEMIN_TEMPLATE_ID || "1473",
         },
       };

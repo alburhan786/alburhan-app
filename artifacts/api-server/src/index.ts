@@ -1818,7 +1818,7 @@ async function start() {
     setInterval(syncBotBeeTemplates, 10 * 60 * 1000);
     console.log("[BotBee] Template auto-sync scheduled every 10 minutes");
 
-    // ── WhatsApp retry engine — runs every 2 minutes ─────────────────────────
+    // ── WhatsApp retry engine — runs every 15 seconds, 30-second backoff between attempts ──
     const runRetryEngine = async () => {
       try {
         const now = Date.now();
@@ -1827,13 +1827,7 @@ async function start() {
           `SELECT id, event_type, recipient, message, retry_count, request_payload, updated_at
            FROM notification_logs
            WHERE channel='whatsapp' AND status='failed' AND retry_count < 5
-             AND (
-               (retry_count=0 AND updated_at < NOW()-INTERVAL '1 minute') OR
-               (retry_count=1 AND updated_at < NOW()-INTERVAL '5 minutes') OR
-               (retry_count=2 AND updated_at < NOW()-INTERVAL '30 minutes') OR
-               (retry_count=3 AND updated_at < NOW()-INTERVAL '2 hours') OR
-               (retry_count=4 AND updated_at < NOW()-INTERVAL '6 hours')
-             )
+             AND updated_at < NOW() - INTERVAL '30 seconds'
            ORDER BY updated_at ASC LIMIT 10`
         );
         if (failed.rowCount && failed.rowCount > 0) {
@@ -1861,11 +1855,11 @@ async function start() {
         }
       } catch (err) { console.error("[RetryEngine] engine error:", err); }
     };
-    setInterval(runRetryEngine, 2 * 60 * 1000);
-    console.log("[RetryEngine] WhatsApp retry engine scheduled every 2 minutes");
+    setInterval(runRetryEngine, 15 * 1000);
+    console.log("[RetryEngine] WhatsApp retry engine scheduled every 15 seconds (30s backoff, max 5 retries)");
 
-    // ── Generic cross-channel retry engine (SMS/RCS/Email/Push) — 5/15/30 min, max 3 ──
-    const RETRY_DELAYS_MIN = [5, 15, 30];
+    // ── Generic cross-channel retry engine (SMS/RCS/Email/Push) — 30s backoff, max 3 ──
+    const RETRY_DELAYS_SEC = [30, 30, 30];
     const runGenericRetryEngine = async () => {
       try {
         const due = await pool.query(
@@ -1919,12 +1913,12 @@ async function start() {
             ).catch(() => {});
             console.warn(`[GenericRetryEngine] ${item.channel} → giving up after ${newRetryCount} attempts (${item.recipient})`);
           } else {
-            const delayMin = RETRY_DELAYS_MIN[newRetryCount] ?? 30;
+            const delaySec = RETRY_DELAYS_SEC[newRetryCount] ?? 30;
             await pool.query(
-              `UPDATE notification_retry_queue SET retry_count=$1, last_error=$2, next_retry_at=NOW() + ($3 || ' minutes')::interval, updated_at=NOW() WHERE id=$4`,
-              [newRetryCount, errorMessage || "Retry failed", String(delayMin), item.id]
+              `UPDATE notification_retry_queue SET retry_count=$1, last_error=$2, next_retry_at=NOW() + ($3 || ' seconds')::interval, updated_at=NOW() WHERE id=$4`,
+              [newRetryCount, errorMessage || "Retry failed", String(delaySec), item.id]
             );
-            console.log(`[GenericRetryEngine] ${item.channel} → retry #${newRetryCount} failed, next attempt in ${delayMin}m (${item.recipient})`);
+            console.log(`[GenericRetryEngine] ${item.channel} → retry #${newRetryCount} failed, next attempt in ${delaySec}s (${item.recipient})`);
           }
           await new Promise(r => setTimeout(r, 500));
         }
@@ -1932,8 +1926,8 @@ async function start() {
         console.error("[GenericRetryEngine] engine error:", err);
       }
     };
-    setInterval(runGenericRetryEngine, 60 * 1000);
-    console.log("[GenericRetryEngine] SMS/RCS/Email retry engine scheduled every 1 minute (5/15/30 min backoff, max 3 retries)");
+    setInterval(runGenericRetryEngine, 10 * 1000);
+    console.log("[GenericRetryEngine] SMS/RCS/Email retry engine scheduled every 10 seconds (30s backoff, max 3 retries)");
   });
 }
 
