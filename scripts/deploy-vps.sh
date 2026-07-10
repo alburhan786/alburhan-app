@@ -30,15 +30,73 @@ fail_and_exit() {
 step() { STEP=$((STEP+1)); echo; echo "=== [$STEP/$TOTAL_STEPS] $1 ==="; }
 
 # ---------------------------------------------------------------------------
-step "Pull latest code from GitHub"
+step "Pull latest code from GitHub (safe — auto-backs up untracked files if blocked)"
 if [ ! -d "$APP_DIR/.git" ]; then
   fail_and_exit "No git repo at $APP_DIR — clone it first: git clone <repo-url> $APP_DIR"
 fi
-git pull 2>&1 | tee /tmp/deploy_git.log
-if grep -qiE "error|conflict|fatal" /tmp/deploy_git.log; then
-  fail_and_exit "git pull reported an error — see /tmp/deploy_git.log above"
+
+BACKUP_DIR="$APP_DIR/.deploy-backups/$(date +%Y%m%d_%H%M%S)"
+
+git fetch origin 2>&1 | tee /tmp/deploy_fetch.log
+if grep -qiE "fatal" /tmp/deploy_fetch.log; then
+  fail_and_exit "git fetch origin failed — see /tmp/deploy_fetch.log above"
 fi
-pass "git pull completed"
+
+git pull origin master 2>&1 | tee /tmp/deploy_git.log
+if grep -qiE "would be overwritten|untracked working tree files" /tmp/deploy_git.log; then
+  echo "  ⚠️  git pull blocked by untracked files — backing them up safely before continuing"
+  mkdir -p "$BACKUP_DIR"
+
+  # Always protect .env and common upload/data dirs no matter what git reports
+  for keep in .env .env.local uploads storage; do
+    if [ -e "$APP_DIR/$keep" ]; then
+      mkdir -p "$(dirname "$BACKUP_DIR/$keep")"
+      cp -a "$APP_DIR/$keep" "$BACKUP_DIR/$keep" 2>/dev/null || true
+    fi
+  done
+
+  # Back up every untracked file/dir that git would otherwise delete, preserving paths
+  git status --porcelain 2>/dev/null | grep '^??' | cut -c4- | while IFS= read -r f; do
+    if [ -e "$APP_DIR/$f" ]; then
+      mkdir -p "$BACKUP_DIR/$(dirname "$f")"
+      cp -a "$APP_DIR/$f" "$BACKUP_DIR/$f" 2>/dev/null || true
+    fi
+  done
+  echo "  Untracked files backed up to $BACKUP_DIR"
+
+  # Remove only untracked files/dirs that block the merge (never touches tracked/committed files)
+  git clean -fd 2>&1 | tee /tmp/deploy_clean.log
+
+  echo "  Re-syncing hard to origin/master"
+  git fetch origin 2>&1 | tee -a /tmp/deploy_fetch.log
+  git reset --hard origin/master 2>&1 | tee /tmp/deploy_reset.log
+  if grep -qiE "fatal" /tmp/deploy_reset.log; then
+    fail_and_exit "git reset --hard origin/master failed — see /tmp/deploy_reset.log. Your untracked files are safe in $BACKUP_DIR"
+  fi
+
+  # Restore protected local config/data files from the backup on top of the fresh checkout
+  for keep in .env .env.local uploads storage; do
+    if [ -e "$BACKUP_DIR/$keep" ]; then
+      echo "  Restoring $keep from backup"
+      cp -a "$BACKUP_DIR/$keep" "$APP_DIR/$keep"
+    fi
+  done
+
+  pass "untracked files backed up to $BACKUP_DIR, repo reset to origin/master, .env/uploads restored"
+elif grep -qiE "^\s*error|fatal" /tmp/deploy_git.log; then
+  fail_and_exit "git pull reported an error — see /tmp/deploy_git.log above"
+else
+  pass "git pull completed cleanly"
+fi
+
+echo "  --- git status (should be clean) ---"
+git status
+if ! git status --porcelain | grep -qE '^\s*$' && [ -n "$(git status --porcelain)" ]; then
+  echo "  ⚠️  Repo has local changes/untracked files remaining (likely .env/uploads restored above, or expected local-only files) — continuing"
+fi
+
+[ -f "$APP_DIR/scripts/deploy-vps.sh" ] || fail_and_exit "scripts/deploy-vps.sh still missing after pull — the branch/remote may be wrong. Check: git remote -v && git branch -vv"
+pass "confirmed scripts/deploy-vps.sh exists after update"
 
 # ---------------------------------------------------------------------------
 step "Verify toolchain (node / pnpm / pm2)"
