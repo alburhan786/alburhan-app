@@ -212,6 +212,21 @@ export default function ApiSettings() {
   const [testAllInputs, setTestAllInputs] = useState({ mobile: "", email: "" });
   const [testAllLoading, setTestAllLoading] = useState(false);
   const [testAllResults, setTestAllResults] = useState<Array<{ channel: string; ok: boolean; provider: string; httpStatus?: number; errorMessage?: string; responsePayload?: unknown }> | null>(null);
+  const [fast2smsStatus, setFast2smsStatus] = useState<any>(null);
+  const [loadingStatus, setLoadingStatus] = useState(false);
+
+  async function loadFast2smsStatus() {
+    setLoadingStatus(true);
+    try {
+      const res = await fetch(`${API}/api/api-settings/fast2sms/status`, { credentials: "include" });
+      const data = await res.json();
+      setFast2smsStatus(data);
+    } catch (err: any) {
+      setFast2smsStatus({ error: err.message });
+    } finally {
+      setLoadingStatus(false);
+    }
+  }
   const [settingWebhook, setSettingWebhook] = useState(false);
   const [webhookResult, setWebhookResult] = useState<{ ok: boolean; message?: string; httpStatus?: number; responsePayload?: unknown } | null>(null);
 
@@ -582,6 +597,18 @@ export default function ApiSettings() {
                       </span>
                     )}
 
+                    {/* Fast2SMS — Show Current Status button */}
+                    {provider.id === "fast2sms" && (
+                      <button
+                        onClick={loadFast2smsStatus}
+                        disabled={loadingStatus}
+                        className="flex items-center gap-1.5 bg-blue-100 hover:bg-blue-200 text-blue-800 text-xs font-semibold px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        {loadingStatus ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+                        Show Current Status
+                      </button>
+                    )}
+
                     {/* Lemin — Set Webhook button */}
                     {provider.id === "lemin" && (
                       <>
@@ -602,6 +629,25 @@ export default function ApiSettings() {
                       </>
                     )}
                   </div>
+
+                  {/* Fast2SMS — Current Status Panel */}
+                  {provider.id === "fast2sms" && fast2smsStatus && (
+                    <div className="rounded-lg p-3 space-y-1.5 bg-blue-50 border border-blue-100 text-xs">
+                      {fast2smsStatus.error ? (
+                        <p className="text-red-600 font-medium">{fast2smsStatus.error}</p>
+                      ) : (
+                        <>
+                          <div className="flex justify-between"><span className="text-gray-500">API Key Loaded</span><span className={`font-semibold ${fast2smsStatus.apiKeyLoaded ? "text-green-700" : "text-red-600"}`}>{fast2smsStatus.apiKeyLoaded ? `Yes (${fast2smsStatus.apiKeyMasked})` : "No"}</span></div>
+                          <div className="flex justify-between"><span className="text-gray-500">Sender ID</span><span className="font-semibold text-gray-700">{fast2smsStatus.senderId}</span></div>
+                          <div className="flex justify-between"><span className="text-gray-500">OTP Template ID</span><span className="font-semibold text-gray-700">{fast2smsStatus.otpTemplateId}</span></div>
+                          <div className="flex justify-between"><span className="text-gray-500">Wallet Balance</span><span className="font-semibold text-gray-700">{fast2smsStatus.walletBalance != null ? `₹${fast2smsStatus.walletBalance}` : (fast2smsStatus.walletError || "—")}</span></div>
+                          <div className="flex justify-between"><span className="text-gray-500">Last Test</span><span className="font-semibold text-gray-700">{fast2smsStatus.lastTestTime ? new Date(fast2smsStatus.lastTestTime).toLocaleString() : "Never"} ({fast2smsStatus.lastTestStatus})</span></div>
+                          <div className="flex justify-between"><span className="text-gray-500">Last OTP SMS</span><span className="font-semibold text-gray-700">{fast2smsStatus.lastSmsAt ? new Date(fast2smsStatus.lastSmsAt).toLocaleString() : "Never"} — {fast2smsStatus.lastSmsStatus || "—"}</span></div>
+                          <div className="flex justify-between pt-1 border-t border-blue-100"><span className="text-gray-500">OTP Sending</span><span className={`font-semibold ${fast2smsStatus.otpSendingEnabled ? "text-green-700" : "text-red-600"}`}>{fast2smsStatus.otpSendingEnabled ? "Enabled" : "Disabled"}</span></div>
+                        </>
+                      )}
+                    </div>
+                  )}
 
                   {/* Test Message Section */}
                   {def.testMessageFields && def.testMessageFields.length > 0 && (

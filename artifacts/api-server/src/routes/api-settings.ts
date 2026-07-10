@@ -4,6 +4,7 @@ import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import { encrypt, decrypt, maskKey } from "../lib/encryption.js";
 import { invalidateCache } from "../lib/apiSettingsProvider.js";
 import { auditLog } from "../lib/audit.js";
+import { isPlaceholderKey } from "../lib/keyValidation.js";
 import axios from "axios";
 import nodemailer from "nodemailer";
 
@@ -141,7 +142,98 @@ router.put("/:provider", requireAdmin as any, requireSuperAdmin, async (req: Aut
     // Invalidate cache so next notification uses new settings
     invalidateCache();
 
-    res.json({ ok: true, message: `${provider} settings saved` });
+    // ── Auto-verify Fast2SMS immediately after save: wallet check + real test SMS ──
+    let autoTest: Record<string, any> | undefined;
+    if (provider === "fast2sms") {
+      const savedKey = apiKeyEncrypted ? decrypt(apiKeyEncrypted) : "";
+      if (!savedKey || isPlaceholderKey(savedKey)) {
+        autoTest = { ok: false, message: "Fast2SMS API Key is not configured." };
+      } else {
+        const walletResp = await axios
+          .get(`https://www.fast2sms.com/dev/wallet?authorization=${savedKey}`, { timeout: 8000 })
+          .catch((e) => e.response || { data: { error: e.message }, status: 0 });
+        const walletOk = walletResp.data?.return === true;
+        const isAuthError = walletResp.status === 412 || /invalid authentication/i.test(JSON.stringify(walletResp.data?.message || ""));
+        autoTest = {
+          ok: walletOk,
+          walletBalance: walletOk ? walletResp.data?.wallet : undefined,
+          message: walletOk
+            ? `Connected — Wallet balance: ₹${walletResp.data?.wallet ?? "?"}`
+            : (isAuthError ? "Invalid Fast2SMS Authorization Key." : "Fast2SMS connection failed"),
+        };
+
+        await pool.query(
+          `UPDATE api_settings SET status=$1, last_tested=NOW() WHERE provider='fast2sms'`,
+          [walletOk ? "connected" : "failed"]
+        ).catch(() => {});
+
+        // Auto send a real test SMS to confirm end-to-end delivery, only if key is valid
+        if (walletOk) {
+          const adminMobile = (req.user as any)?.mobile;
+          if (adminMobile && /^[6-9]\d{9}$/.test(adminMobile)) {
+            const { sendOtpSMS } = await import("../lib/notifications.js");
+            const testOtp = String(Math.floor(100000 + Math.random() * 900000));
+            const smsResult = await sendOtpSMS(adminMobile, testOtp);
+            autoTest.testSmsSent = smsResult.sent;
+            autoTest.testSmsResponse = smsResult.providerResponse;
+            autoTest.testSmsError = smsResult.error;
+            await pool.query(
+              `UPDATE api_settings SET last_sms_status=$1, last_sms_at=NOW() WHERE provider='fast2sms'`,
+              [smsResult.sent ? "sent" : `failed: ${smsResult.error || "unknown"}`]
+            ).catch(() => {});
+          } else {
+            autoTest.testSmsSent = false;
+            autoTest.testSmsError = "No verified admin mobile on this session to send a live test to";
+          }
+        }
+      }
+    }
+
+    res.json({ ok: true, message: `${provider} settings saved`, autoTest });
+  } catch (err: any) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// GET /api/api-settings/fast2sms/status — live status snapshot for the admin "Show Current Status" view
+router.get("/fast2sms/status", requireAdmin as any, requireSuperAdmin, async (_req, res) => {
+  try {
+    const r = await pool.query(`SELECT * FROM api_settings WHERE provider='fast2sms'`);
+    const row = r.rows[0];
+    const apiKey = row?.api_key_encrypted ? decrypt(row.api_key_encrypted) : "";
+    const apiKeyLoaded = !!apiKey && !isPlaceholderKey(apiKey);
+    let extra: Record<string, string> = {};
+    if (row?.extra_fields_encrypted) {
+      try { extra = JSON.parse(decrypt(row.extra_fields_encrypted)); } catch {}
+    }
+
+    let walletBalance: string | number | null = null;
+    let walletError: string | undefined;
+    if (apiKeyLoaded) {
+      const walletResp = await axios
+        .get(`https://www.fast2sms.com/dev/wallet?authorization=${apiKey}`, { timeout: 8000 })
+        .catch((e) => e.response || { data: { error: e.message }, status: 0 });
+      if (walletResp.data?.return === true) {
+        walletBalance = walletResp.data?.wallet ?? null;
+      } else {
+        const isAuthError = walletResp.status === 412 || /invalid authentication/i.test(JSON.stringify(walletResp.data?.message || ""));
+        walletError = isAuthError ? "Invalid Fast2SMS Authorization Key." : "Could not fetch wallet balance";
+      }
+    }
+
+    res.json({
+      apiKeyLoaded,
+      apiKeyMasked: apiKeyLoaded ? maskKey(apiKey) : null,
+      senderId: extra.sender_id || "ALBURH",
+      otpTemplateId: extra.otp_template_id || "164844",
+      walletBalance,
+      walletError,
+      lastTestTime: row?.last_tested || null,
+      lastTestStatus: row?.status || "unknown",
+      lastSmsStatus: row?.last_sms_status || null,
+      lastSmsAt: row?.last_sms_at || null,
+      otpSendingEnabled: apiKeyLoaded && row?.status === "connected",
+    });
   } catch (err: any) {
     res.status(500).json({ message: err.message });
   }
@@ -181,10 +273,18 @@ router.post("/:provider/test", requireAdmin as any, requireSuperAdmin, async (re
         break;
       }
       case "fast2sms": {
-        if (!apiKey) { result = { ok: false, message: "API key not set" }; break; }
+        if (!apiKey || isPlaceholderKey(apiKey)) { result = { ok: false, message: "Fast2SMS API Key is not configured." }; break; }
         const resp = await axios.get(`https://www.fast2sms.com/dev/wallet?authorization=${apiKey}`, { timeout: 8000 }).catch(e => e.response || { data: { error: e.message }, status: 0 });
         const ok = resp.data?.return === true;
-        result = { ok, message: ok ? `Wallet balance: ₹${resp.data?.wallet || "?"}` : "Invalid API key", response: resp.data };
+        const isAuthError = resp.status === 412 || /invalid authentication/i.test(JSON.stringify(resp.data?.message || ""));
+        result = {
+          ok,
+          message: ok
+            ? `Wallet balance: ₹${resp.data?.wallet || "?"}`
+            : (isAuthError ? "Invalid Fast2SMS Authorization Key." : "Invalid API key"),
+          httpStatus: resp.status,
+          response: resp.data,
+        };
         break;
       }
       case "lemin": {

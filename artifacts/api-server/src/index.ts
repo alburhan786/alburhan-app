@@ -1406,6 +1406,9 @@ async function runMigrations() {
     console.log("[Migration] api_settings table ensured");
     await pool.query(`ALTER TABLE api_settings ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'unknown'`);
     await pool.query(`ALTER TABLE api_settings ADD COLUMN IF NOT EXISTS last_tested TIMESTAMPTZ`);
+    await pool.query(`ALTER TABLE api_settings ADD COLUMN IF NOT EXISTS last_sms_status TEXT`);
+    await pool.query(`ALTER TABLE api_settings ADD COLUMN IF NOT EXISTS last_sms_at TIMESTAMPTZ`);
+    console.log("[Migration] api_settings last_sms_status/last_sms_at columns ensured");
     await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS provider_name TEXT`);
     await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS api_endpoint TEXT`);
     await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS http_status INTEGER`);

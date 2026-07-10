@@ -1,5 +1,6 @@
 import { pool } from "@workspace/db";
-import { decrypt } from "./encryption.js";
+import { decrypt, encrypt } from "./encryption.js";
+import { isPlaceholderKey } from "./keyValidation.js";
 
 export interface ProviderConfig {
   enabled: boolean;
@@ -37,8 +38,42 @@ async function loadFromDB(): Promise<void> {
   }
 }
 
+/**
+ * One-time import: if the fast2sms DB row has no usable (non-placeholder) key
+ * but a real key is present in process.env, copy it into the DB once so the
+ * admin UI/status page reflect reality and future lookups don't depend on env.
+ * Never overwrites an existing valid DB key.
+ */
+async function autoImportFast2SmsFromEnv(): Promise<void> {
+  try {
+    const existing = cache.get("fast2sms");
+    if (existing?.apiKey && !isPlaceholderKey(existing.apiKey)) return; // DB already has a real key
+
+    const envKey = process.env.FAST2SMS_API_KEY || process.env.FAST2SMS_XXL_API_KEY;
+    if (isPlaceholderKey(envKey)) return; // nothing usable to import
+
+    console.log("[ApiSettings] fast2sms DB key missing/placeholder — importing real key from env once");
+    const encryptedKey = encrypt(envKey!);
+    await pool.query(
+      `INSERT INTO api_settings (provider, enabled, api_url, api_key_encrypted, updated_at, updated_by)
+       VALUES ('fast2sms', true, 'https://www.fast2sms.com/dev/bulkV2', $1, NOW(), 'system-auto-import')
+       ON CONFLICT (provider) DO UPDATE SET
+         api_key_encrypted = EXCLUDED.api_key_encrypted,
+         enabled = true,
+         updated_at = NOW(),
+         updated_by = 'system-auto-import'`,
+      [encryptedKey]
+    );
+    await loadFromDB();
+    console.log("[ApiSettings] fast2sms API key imported from env into database");
+  } catch (err) {
+    console.error("[ApiSettings] fast2sms auto-import from env failed:", err);
+  }
+}
+
 export async function initApiSettingsProvider(): Promise<void> {
   await loadFromDB();
+  await autoImportFast2SmsFromEnv();
   // Refresh every 5 minutes
   setInterval(() => { loadFromDB().catch(() => {}); }, CACHE_TTL_MS);
   console.log("[ApiSettings] Provider initialized");
@@ -81,17 +116,19 @@ function buildEnvFallback(provider: ProviderName): ProviderConfig {
           business_id: process.env.BOTBEE_BUSINESS_ID || "",
         },
       };
-    case "fast2sms":
+    case "fast2sms": {
+      const envKey = process.env.FAST2SMS_API_KEY || process.env.FAST2SMS_XXL_API_KEY;
       return {
         enabled: true,
         apiUrl: "https://www.fast2sms.com/dev/bulkV2",
-        apiKey: process.env.FAST2SMS_API_KEY || process.env.FAST2SMS_XXL_API_KEY,
+        apiKey: isPlaceholderKey(envKey) ? undefined : envKey,
         extra: {
           sender_id: "ALBURH",
           otp_template_id: "164844",
           notify_template_id: "211277",
         },
       };
+    }
     case "lemin":
       // No hardcoded placeholder user_id — a fake default caused Lemin's
       // "Invalid User ID" error in production. Leave unset unless the real

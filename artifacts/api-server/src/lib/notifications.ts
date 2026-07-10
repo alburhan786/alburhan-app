@@ -1,6 +1,7 @@
 import axios from "axios";
 import nodemailer from "nodemailer";
 import { getCachedConfig } from "./apiSettingsProvider.js";
+import { isPlaceholderKey } from "./keyValidation.js";
 import {
   sendBookingCreated as smsSendBookingCreated,
   sendBookingConfirmed as smsSendBookingConfirmed,
@@ -42,23 +43,6 @@ async function withRetry<T>(
 }
 
 // Read at call time — DB settings take priority, fall back to process.env
-const FAST2SMS_PLACEHOLDER_VALUES = new Set([
-  "your_key_here",
-  "your-fast2sms-key-here",
-  "YOUR_API_KEY",
-  "YOUR_NEW_API_KEY",
-  "your_api_key",
-  "your_new_api_key",
-  "changeme",
-  "null",
-  "",
-]);
-
-function isPlaceholderKey(k: string | undefined | null): boolean {
-  if (!k) return true;
-  return FAST2SMS_PLACEHOLDER_VALUES.has(k.trim());
-}
-
 function getFast2SMSKey(): string | undefined {
   const dbCfg = getCachedConfig("fast2sms");
   if (dbCfg.enabled === false) return undefined;
