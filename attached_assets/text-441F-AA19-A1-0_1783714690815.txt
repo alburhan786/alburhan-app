@@ -1,0 +1,21 @@
+The deployment is blocked because git pull fails with:
+
+"The following untracked working tree files would be overwritten by merge."
+
+Update scripts/deploy-vps.sh so it automatically handles this safely.
+
+Requirements:
+
+1. Detect untracked files that block git pull.
+2. Back them up automatically into:
+/var/backups/alburhan/<timestamp>/
+3. Clean only the conflicting files.
+4. Run git pull again automatically.
+5. Verify the repository is clean.
+6. Continue deployment automatically.
+7. Never require manual rm commands.
+8. Never delete .env, uploads, database files or user documents.
+9. Print a backup report before removing anything.
+10. Finish deployment automatically after git pull succeeds.
+
+Commit and push the updated deployment script t

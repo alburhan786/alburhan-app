@@ -35,7 +35,10 @@ if [ ! -d "$APP_DIR/.git" ]; then
   fail_and_exit "No git repo at $APP_DIR — clone it first: git clone <repo-url> $APP_DIR"
 fi
 
-BACKUP_DIR="$APP_DIR/.deploy-backups/$(date +%Y%m%d_%H%M%S)"
+BACKUP_ROOT="/var/backups/alburhan"
+BACKUP_DIR="$BACKUP_ROOT/$(date +%Y%m%d_%H%M%S)"
+# Never touched/removed by cleanup — always preserved as-is or restored from backup
+PROTECTED_PATHS=(.env .env.local .env.production uploads storage database data db backups documents user_documents)
 
 git fetch origin 2>&1 | tee /tmp/deploy_fetch.log
 if grep -qiE "fatal" /tmp/deploy_fetch.log; then
@@ -44,45 +47,104 @@ fi
 
 git pull origin master 2>&1 | tee /tmp/deploy_git.log
 if grep -qiE "would be overwritten|untracked working tree files" /tmp/deploy_git.log; then
-  echo "  ⚠️  git pull blocked by untracked files — backing them up safely before continuing"
-  mkdir -p "$BACKUP_DIR"
+  echo "  ⚠️  git pull blocked by untracked files — backing them up automatically before continuing"
 
-  # Always protect .env and common upload/data dirs no matter what git reports
-  for keep in .env .env.local uploads storage; do
-    if [ -e "$APP_DIR/$keep" ]; then
-      mkdir -p "$(dirname "$BACKUP_DIR/$keep")"
-      cp -a "$APP_DIR/$keep" "$BACKUP_DIR/$keep" 2>/dev/null || true
+  # BACKUP_ROOT lives outside the repo (/var/backups) — create it, falling back to an
+  # in-repo location only if we truly cannot write there (e.g. no sudo).
+  if ! mkdir -p "$BACKUP_DIR" 2>/tmp/deploy_backup_mkdir.log; then
+    echo "  Could not create $BACKUP_DIR ($(cat /tmp/deploy_backup_mkdir.log)) — trying with sudo"
+    sudo mkdir -p "$BACKUP_DIR" 2>/tmp/deploy_backup_mkdir2.log || true
+    sudo chown "$(whoami)":"$(whoami)" "$BACKUP_DIR" 2>/dev/null || true
+    if [ ! -d "$BACKUP_DIR" ]; then
+      BACKUP_DIR="$APP_DIR/.deploy-backups/$(date +%Y%m%d_%H%M%S)"
+      echo "  Falling back to in-repo backup location: $BACKUP_DIR"
+      mkdir -p "$BACKUP_DIR"
     fi
-  done
-
-  # Back up every untracked file/dir that git would otherwise delete, preserving paths
-  git status --porcelain 2>/dev/null | grep '^??' | cut -c4- | while IFS= read -r f; do
-    if [ -e "$APP_DIR/$f" ]; then
-      mkdir -p "$BACKUP_DIR/$(dirname "$f")"
-      cp -a "$APP_DIR/$f" "$BACKUP_DIR/$f" 2>/dev/null || true
-    fi
-  done
-  echo "  Untracked files backed up to $BACKUP_DIR"
-
-  # Remove only untracked files/dirs that block the merge (never touches tracked/committed files)
-  git clean -fd 2>&1 | tee /tmp/deploy_clean.log
-
-  echo "  Re-syncing hard to origin/master"
-  git fetch origin 2>&1 | tee -a /tmp/deploy_fetch.log
-  git reset --hard origin/master 2>&1 | tee /tmp/deploy_reset.log
-  if grep -qiE "fatal" /tmp/deploy_reset.log; then
-    fail_and_exit "git reset --hard origin/master failed — see /tmp/deploy_reset.log. Your untracked files are safe in $BACKUP_DIR"
   fi
 
-  # Restore protected local config/data files from the backup on top of the fresh checkout
-  for keep in .env .env.local uploads storage; do
-    if [ -e "$BACKUP_DIR/$keep" ]; then
-      echo "  Restoring $keep from backup"
-      cp -a "$BACKUP_DIR/$keep" "$APP_DIR/$keep"
+  # Collect every untracked file/dir git sees, plus force-include the protected paths
+  # (config/data/docs) even if git doesn't flag them, so nothing is ever lost.
+  BACKUP_LIST=$(mktemp)
+  git status --porcelain 2>/dev/null | grep '^??' | cut -c4- > "$BACKUP_LIST" || true
+  for p in "${PROTECTED_PATHS[@]}"; do
+    [ -e "$APP_DIR/$p" ] && echo "$p" >> "$BACKUP_LIST"
+  done
+  sort -u -o "$BACKUP_LIST" "$BACKUP_LIST"
+
+  echo
+  echo "  --- BACKUP REPORT (before anything is removed) ---"
+  echo "  Backup destination: $BACKUP_DIR"
+  BACKED_UP_COUNT=0
+  while IFS= read -r f; do
+    [ -z "$f" ] && continue
+    if [ -e "$APP_DIR/$f" ]; then
+      mkdir -p "$BACKUP_DIR/$(dirname "$f")" 2>/dev/null
+      if cp -a "$APP_DIR/$f" "$BACKUP_DIR/$f" 2>/dev/null; then
+        echo "    ✓ backed up: $f"
+        BACKED_UP_COUNT=$((BACKED_UP_COUNT+1))
+      else
+        echo "    ⚠️  could not back up: $f (check permissions)"
+      fi
+    fi
+  done < "$BACKUP_LIST"
+  echo "  Total items backed up: $BACKED_UP_COUNT"
+  echo "  --- end backup report ---"
+  echo
+
+  if [ "$BACKED_UP_COUNT" -eq 0 ] && [ -s "$BACKUP_LIST" ]; then
+    fail_and_exit "Backup step produced 0 successful copies but files were expected — aborting before any cleanup to avoid data loss. Check permissions on $BACKUP_DIR"
+  fi
+  rm -f "$BACKUP_LIST"
+
+  # Remove only the specific untracked files that git reported as blocking the merge —
+  # never .env, uploads, database, or document paths, which are excluded explicitly.
+  CONFLICT_LIST=$(grep -A200 "would be overwritten by merge" /tmp/deploy_git.log \
+    | sed -n '/error: The following untracked/,/Please move or remove/p' \
+    | sed '1d;$d' | sed 's/^\s*//' || true)
+  if [ -z "$CONFLICT_LIST" ]; then
+    # Fall back to git's own dry-run list of untracked files it would remove
+    CONFLICT_LIST=$(git clean -nd 2>/dev/null | sed -E 's/^Would remove //')
+  fi
+
+  echo "  Removing only the conflicting untracked files (protected paths are skipped):"
+  echo "$CONFLICT_LIST" | while IFS= read -r f; do
+    [ -z "$f" ] && continue
+    skip=0
+    for p in "${PROTECTED_PATHS[@]}"; do
+      case "$f" in "$p"|"$p"/*) skip=1; break;; esac
+    done
+    if [ "$skip" -eq 1 ]; then
+      echo "    ⏭️  skipped (protected): $f"
+      continue
+    fi
+    echo "    🗑️  removing: $f"
+    rm -rf "$APP_DIR/${f%/}" 2>/dev/null || true
+  done
+
+  echo "  Re-running git pull now that conflicting files are cleared"
+  git pull origin master 2>&1 | tee /tmp/deploy_git_retry.log
+  if grep -qiE "would be overwritten|untracked working tree files" /tmp/deploy_git_retry.log; then
+    echo "  Still blocked — falling back to fetch + hard reset (all untracked files already backed up to $BACKUP_DIR)"
+    git fetch origin 2>&1 | tee -a /tmp/deploy_fetch.log
+    git reset --hard origin/master 2>&1 | tee /tmp/deploy_reset.log
+    if grep -qiE "fatal" /tmp/deploy_reset.log; then
+      fail_and_exit "git reset --hard origin/master failed — see /tmp/deploy_reset.log. All your untracked files are safe in $BACKUP_DIR"
+    fi
+  elif grep -qiE "^\s*error|fatal" /tmp/deploy_git_retry.log; then
+    fail_and_exit "git pull retry failed — see /tmp/deploy_git_retry.log. Your untracked files are safe in $BACKUP_DIR"
+  fi
+
+  # Restore protected local config/data/document files from the backup on top of the
+  # fresh checkout, in case the reset/pull touched their paths.
+  for p in "${PROTECTED_PATHS[@]}"; do
+    if [ -e "$BACKUP_DIR/$p" ] && [ ! -e "$APP_DIR/$p" ]; then
+      echo "  Restoring $p from backup"
+      mkdir -p "$(dirname "$APP_DIR/$p")"
+      cp -a "$BACKUP_DIR/$p" "$APP_DIR/$p"
     fi
   done
 
-  pass "untracked files backed up to $BACKUP_DIR, repo reset to origin/master, .env/uploads restored"
+  pass "untracked files backed up to $BACKUP_DIR, conflicts cleared, repo synced to origin/master, .env/uploads/database/documents preserved"
 elif grep -qiE "^\s*error|fatal" /tmp/deploy_git.log; then
   fail_and_exit "git pull reported an error — see /tmp/deploy_git.log above"
 else
@@ -91,8 +153,11 @@ fi
 
 echo "  --- git status (should be clean) ---"
 git status
-if ! git status --porcelain | grep -qE '^\s*$' && [ -n "$(git status --porcelain)" ]; then
-  echo "  ⚠️  Repo has local changes/untracked files remaining (likely .env/uploads restored above, or expected local-only files) — continuing"
+REMAINING=$(git status --porcelain | grep -v -E "$(printf '%s\n' "${PROTECTED_PATHS[@]}" | paste -sd'|' -)" || true)
+if [ -n "$REMAINING" ]; then
+  echo "  ⚠️  Repo has other local changes remaining (shown above) — continuing, but review before your next commit"
+else
+  echo "  ✅ Repository is clean (only protected local paths, if any, remain untracked)"
 fi
 
 [ -f "$APP_DIR/scripts/deploy-vps.sh" ] || fail_and_exit "scripts/deploy-vps.sh still missing after pull — the branch/remote may be wrong. Check: git remote -v && git branch -vv"
