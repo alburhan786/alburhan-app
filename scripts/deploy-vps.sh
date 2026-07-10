@@ -13,7 +13,7 @@
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$APP_DIR"
 
-TOTAL_STEPS=10
+TOTAL_STEPS=13
 STEP=0
 RESULTS=()
 TEST_MOBILE="${1:-9893989786}"
@@ -300,6 +300,27 @@ pass "PM2 process '$PM2_NAME' is online"
 echo "--- pm2 logs (last 30 lines) ---"
 pm2 logs "$PM2_NAME" --lines 30 --nostream || true
 
+# Detect a crash-restart loop (common cause of intermittent 502s): if restart count
+# is climbing rapidly or uptime is near-zero repeatedly, the process is crashing on boot.
+RESTART_COUNT=$(pm2 jlist | node -e '
+  let data=""; process.stdin.on("data",d=>data+=d); process.stdin.on("end",()=>{
+    try { const list=JSON.parse(data); const p=list.find(x=>x.name===process.env.PM2_NAME);
+      console.log(p ? p.pm2_env.restart_time : 0); } catch(e){ console.log(0); }
+  });' 2>/dev/null)
+if [ -n "$RESTART_COUNT" ] && [ "$RESTART_COUNT" -gt 5 ] 2>/dev/null; then
+  echo "  ⚠️  PM2 restart_time=$RESTART_COUNT — process may be crash-looping. Checking logs for the cause:"
+  pm2 logs "$PM2_NAME" --lines 60 --nostream --err | tee /tmp/deploy_pm2_err.log || true
+  if grep -qi "DATABASE_URL" /tmp/deploy_pm2_err.log; then
+    fail_and_exit "Backend is crash-looping due to a DATABASE_URL problem — verify it in $ENV_FILE and that the DB is reachable from this VPS"
+  elif grep -qi "EADDRINUSE" /tmp/deploy_pm2_err.log; then
+    echo "  Port already in use — another process is bound to it. Attempting to free it and restart."
+    OLD_PORT_PID=$(lsof -ti tcp:"$PORT" 2>/dev/null | head -1)
+    [ -n "$OLD_PORT_PID" ] && kill -9 "$OLD_PORT_PID" 2>/dev/null || true
+    pm2 restart "$PM2_NAME" --update-env
+    sleep 3
+  fi
+fi
+
 # ---------------------------------------------------------------------------
 step "Detect production domain + backend port from nginx"
 PORT=$(grep -E "^\s*PORT=" "$ENV_FILE" | head -1 | cut -d'=' -f2- || true)
@@ -319,7 +340,45 @@ fi
 LOCAL_URL="http://localhost:$PORT"
 
 # ---------------------------------------------------------------------------
-step "Verify /api/health"
+step "Diagnose and fix Nginx → backend proxy (root cause of 502 Bad Gateway)"
+NGINX_FIXED=0
+if command -v nginx >/dev/null; then
+  systemctl is-active --quiet nginx 2>/dev/null || service nginx status >/dev/null 2>&1 || echo "  ⚠️  nginx service status unclear — will still check config"
+
+  SITE_CONF=$(grep -RIl "proxy_pass" /etc/nginx/sites-enabled/ 2>/dev/null | head -1)
+  if [ -n "$SITE_CONF" ]; then
+    PROXY_PORT=$(grep -oE "proxy_pass\s+http://(127\.0\.0\.1|localhost):[0-9]+" "$SITE_CONF" | grep -oE "[0-9]+$" | head -1)
+    echo "  nginx config: $SITE_CONF, proxying to port: ${PROXY_PORT:-unknown}, backend PORT in .env: $PORT"
+    if [ -n "$PROXY_PORT" ] && [ "$PROXY_PORT" != "$PORT" ]; then
+      echo "  ⚠️  Mismatch detected: nginx proxies to $PROXY_PORT but backend listens on $PORT — this causes 502."
+      echo "  Fixing automatically: updating nginx proxy_pass to port $PORT"
+      cp "$SITE_CONF" "$SITE_CONF.bak.$(date +%s)" 2>/dev/null || sudo cp "$SITE_CONF" "$SITE_CONF.bak.$(date +%s)" 2>/dev/null
+      sed -i "s#proxy_pass http://127.0.0.1:$PROXY_PORT#proxy_pass http://127.0.0.1:$PORT#g; s#proxy_pass http://localhost:$PROXY_PORT#proxy_pass http://localhost:$PORT#g" "$SITE_CONF" 2>/dev/null \
+        || sudo sed -i "s#proxy_pass http://127.0.0.1:$PROXY_PORT#proxy_pass http://127.0.0.1:$PORT#g; s#proxy_pass http://localhost:$PROXY_PORT#proxy_pass http://localhost:$PORT#g" "$SITE_CONF"
+      NGINX_FIXED=1
+    fi
+  else
+    echo "  No nginx site with proxy_pass found under /etc/nginx/sites-enabled — skipping proxy port check (may be handled elsewhere, e.g. reverse proxy container)"
+  fi
+
+  nginx -t 2>&1 | tee /tmp/deploy_nginx_test.log || sudo nginx -t 2>&1 | tee -a /tmp/deploy_nginx_test.log
+  if grep -qi "syntax is ok" /tmp/deploy_nginx_test.log; then
+    if [ "$NGINX_FIXED" = "1" ]; then
+      echo "  Reloading nginx to apply the proxy_pass fix"
+      systemctl reload nginx 2>/dev/null || sudo systemctl reload nginx 2>/dev/null || service nginx reload 2>/dev/null || sudo service nginx reload 2>/dev/null
+      pass "nginx proxy_pass corrected to port $PORT and reloaded"
+    else
+      pass "nginx config valid, proxy_pass already points to the correct port"
+    fi
+  else
+    echo "  ⚠️  nginx config test failed — see /tmp/deploy_nginx_test.log. Not reloading to avoid breaking the live site; fix nginx config manually then re-run."
+  fi
+else
+  echo "  nginx not found on this VPS — assuming a different reverse proxy or direct exposure; skipping this check"
+fi
+
+# ---------------------------------------------------------------------------
+step "Verify /api/health (local + public, auto-retry after any fixes above)"
 HEALTH_CODE=$(curl -s -o /tmp/deploy_health.out -w "%{http_code}" "$LOCAL_URL/api/health" || echo "000")
 cat /tmp/deploy_health.out; echo
 [ "$HEALTH_CODE" = "200" ] || fail_and_exit "/api/health returned HTTP $HEALTH_CODE on $LOCAL_URL — check: pm2 logs $PM2_NAME"
@@ -327,10 +386,18 @@ pass "/api/health returned 200 on $LOCAL_URL"
 
 if [ "$BASE_URL" != "$LOCAL_URL" ]; then
   PUB_CODE=$(curl -s -o /tmp/deploy_health_pub.out -w "%{http_code}" "$BASE_URL/api/health" || echo "000")
+  if [ "$PUB_CODE" = "502" ]; then
+    echo "  Still 502 on public URL after nginx fix attempt — retrying once more after a short wait (nginx reload / PM2 boot lag)"
+    sleep 5
+    pm2 restart "$PM2_NAME" --update-env >/dev/null 2>&1
+    sleep 4
+    PUB_CODE=$(curl -s -o /tmp/deploy_health_pub.out -w "%{http_code}" "$BASE_URL/api/health" || echo "000")
+  fi
+  cat /tmp/deploy_health_pub.out 2>/dev/null; echo
   if [ "$PUB_CODE" = "200" ]; then
     pass "public site $BASE_URL/api/health returned 200"
   else
-    echo "  ⚠️  Public URL check returned HTTP $PUB_CODE (nginx/proxy issue) — continuing with local OTP test"
+    fail_and_exit "Public URL $BASE_URL/api/health still returns HTTP $PUB_CODE after auto-fix attempts — likely nginx is pointed at the wrong upstream, SSL/vhost misconfig, or firewall blocking port $PORT. Check: nginx -t, systemctl status nginx, pm2 logs $PM2_NAME, and 'curl -v $LOCAL_URL/api/health' locally on the VPS."
   fi
 fi
 
@@ -347,8 +414,21 @@ MAX_ATTEMPTS=3
 OTP_OK=0
 while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
   echo "  Attempt $ATTEMPT/$MAX_ATTEMPTS..."
-  RESP=$(send_otp)
-  echo "  Response: $RESP"
+  OTP_CODE=$(curl -s -o /tmp/deploy_otp.out -w "%{http_code}" -X POST "$LOCAL_URL/api/auth/send-otp" \
+    -H "Content-Type: application/json" -d "{\"mobile\":\"$TEST_MOBILE\"}")
+  RESP=$(cat /tmp/deploy_otp.out)
+  echo "  HTTP $OTP_CODE — Response: $RESP"
+
+  if [ "$OTP_CODE" = "502" ]; then
+    echo "  502 on send-otp locally — backend likely crashed handling this request. Checking PM2 status/logs:"
+    pm2 status "$PM2_NAME" || true
+    pm2 logs "$PM2_NAME" --lines 40 --nostream --err || true
+    echo "  Restarting PM2 process and retrying..."
+    pm2 restart "$PM2_NAME" --update-env >/dev/null 2>&1
+    sleep 5
+    ATTEMPT=$((ATTEMPT+1))
+    continue
+  fi
 
   if echo "$RESP" | grep -qi '"success":true\|"ok":true'; then
     OTP_OK=1
@@ -387,6 +467,37 @@ if [ "$OTP_OK" != "1" ]; then
   fail_and_exit "OTP could not be delivered to $TEST_MOBILE after $MAX_ATTEMPTS attempts — see responses above and: pm2 logs $PM2_NAME"
 fi
 pass "OTP send request succeeded for $TEST_MOBILE — confirm receipt on the phone"
+
+# ---------------------------------------------------------------------------
+step "Final production verification: POST /api/auth/send-otp on the public URL"
+if [ "$BASE_URL" != "$LOCAL_URL" ]; then
+  PUB_OTP_CODE=$(curl -s -o /tmp/deploy_otp_pub.out -w "%{http_code}" -X POST "$BASE_URL/api/auth/send-otp" \
+    -H "Content-Type: application/json" -d "{\"mobile\":\"$TEST_MOBILE\"}")
+  PUB_OTP_RESP=$(cat /tmp/deploy_otp_pub.out)
+  echo "  HTTP $PUB_OTP_CODE — Response: $PUB_OTP_RESP"
+
+  if [ "$PUB_OTP_CODE" = "502" ]; then
+    echo "  Public URL still 502 even though local works — nginx is not proxying correctly. Reloading nginx once more and retrying."
+    systemctl reload nginx 2>/dev/null || sudo systemctl reload nginx 2>/dev/null || service nginx reload 2>/dev/null || sudo service nginx reload 2>/dev/null
+    sleep 3
+    PUB_OTP_CODE=$(curl -s -o /tmp/deploy_otp_pub.out -w "%{http_code}" -X POST "$BASE_URL/api/auth/send-otp" \
+      -H "Content-Type: application/json" -d "{\"mobile\":\"$TEST_MOBILE\"}")
+    PUB_OTP_RESP=$(cat /tmp/deploy_otp_pub.out)
+    echo "  Retry: HTTP $PUB_OTP_CODE — Response: $PUB_OTP_RESP"
+  fi
+
+  if [ "$PUB_OTP_CODE" = "502" ] || [ "$PUB_OTP_CODE" = "000" ]; then
+    fail_and_exit "Public $BASE_URL/api/auth/send-otp still returns HTTP $PUB_OTP_CODE — backend works locally but nginx cannot reach it publicly. Check: nginx -t, cat /etc/nginx/sites-enabled/* (proxy_pass target/port), systemctl status nginx, and firewall rules (ufw status) for port $PORT."
+  fi
+
+  if ! echo "$PUB_OTP_RESP" | node -e 'let d="";process.stdin.on("data",c=>d+=c);process.stdin.on("end",()=>{try{JSON.parse(d);process.exit(0)}catch(e){process.exit(1)}})' 2>/dev/null; then
+    fail_and_exit "Public $BASE_URL/api/auth/send-otp returned HTTP $PUB_OTP_CODE but the body is not valid JSON: $PUB_OTP_RESP — check nginx is not injecting an HTML error page for this route"
+  fi
+
+  pass "public $BASE_URL/api/auth/send-otp returned HTTP $PUB_OTP_CODE with valid JSON"
+else
+  echo "  No public domain detected — production verification skipped (only local $LOCAL_URL was tested above)"
+fi
 
 # ---------------------------------------------------------------------------
 echo
