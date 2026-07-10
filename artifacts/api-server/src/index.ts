@@ -54,6 +54,21 @@ for (const k of _envKeys) {
 }
 console.log("=".repeat(60));
 
+// ── Fatal startup guard: DATABASE_URL is required for the app to function ────
+// Fail fast and loud instead of booting into a broken state (undefined pool,
+// silent query failures, session store crashes, etc.)
+if (!process.env.DATABASE_URL) {
+  console.error("=".repeat(60));
+  console.error("[FATAL STARTUP ERROR] DATABASE_URL is not set.");
+  console.error("[FATAL STARTUP ERROR] The server cannot start without a database connection.");
+  console.error("[FATAL STARTUP ERROR] Checked .env paths:", ENV_CANDIDATES.join(", "));
+  console.error("[FATAL STARTUP ERROR] Fix: add DATABASE_URL=postgres://... to your .env file");
+  console.error("[FATAL STARTUP ERROR] on the VPS (e.g. /var/www/alburhan/.env), then restart PM2:");
+  console.error("[FATAL STARTUP ERROR]   pm2 restart alburhan-tours --update-env");
+  console.error("=".repeat(60));
+  process.exit(1);
+}
+
 process.on("uncaughtException", (err) => {
   console.error("[UNCAUGHT EXCEPTION] Server will NOT exit:", err);
 });

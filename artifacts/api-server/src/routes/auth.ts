@@ -89,27 +89,14 @@ router.post("/send-otp", async (req, res) => {
 
   await db.insert(otpsTable).values({ mobile: cleanMobile, otp, expiresAt });
 
-  // ── Send SMS (DLT → Quick fallback) ────────────────────────────────────────
-  console.log(`[OTP-SEND] Calling sendOtpSMS with cleanMobile="${cleanMobile}", otp="${otp}"`);
+  // ── PRIMARY channel: Fast2SMS (DLT → Quick fallback) ───────────────────────
+  // WhatsApp is a best-effort secondary notification only — it must NEVER
+  // block or fail the OTP request. The 24h-window / template-only restriction
+  // on WhatsApp Business API means it will legitimately fail for many users;
+  // that is expected and must not be treated as a delivery failure.
+  console.log(`[OTP-SEND][SMS] Calling sendOtpSMS with cleanMobile="${cleanMobile}", otp="${otp}"`);
   const smsResult = await sendOtpSMS(cleanMobile, otp);
-  console.log(`[OTP-SEND] SMS result: sent=${smsResult.sent} route=${smsResult.route || "n/a"} error=${smsResult.error || "none"}`);
-
-  // ── Send WhatsApp as backup ────────────────────────────────────────────────
-  let waSent = false;
-  let waResult: Awaited<ReturnType<typeof sendWhatsApp>> | null = null;
-  try {
-    const waPromise = sendWhatsApp(
-      cleanMobile,
-      `Your Al Burhan Tours & Travels OTP is: *${otp}*\n\nValid for 5 minutes. Do not share with anyone.\n\nAl Burhan Tours & Travels\n+91 8989701701`
-    );
-    // sendWhatsApp returns SendResult (not boolean) — extract .ok
-    const timedOut = new Promise<null>(r => setTimeout(() => r(null), 8000));
-    waResult = await Promise.race([waPromise, timedOut]);
-    waSent = waResult?.ok === true;
-  } catch {
-    waSent = false;
-  }
-  console.log(`[OTP-SEND] WhatsApp result: waSent=${waSent} ok=${waResult?.ok} err=${waResult?.errorMessage || "none"}`);
+  console.log(`[OTP-SEND][SMS] Result: sent=${smsResult.sent} route=${smsResult.route || "n/a"} error=${smsResult.error || "none"}`);
 
   const isAdmin = ADMIN_MOBILES.includes(cleanMobile);
 
@@ -120,23 +107,20 @@ router.post("/send-otp", async (req, res) => {
 
   console.log(
     `[OTP-SEND] Summary: mobile=${cleanMobile} e164=+91${cleanMobile} newUser=${isNewUser} ` +
-    `smsSent=${smsResult.sent} route=${smsResult.route || "n/a"} waSent=${waSent} isAdmin=${isAdmin}` +
+    `smsSent=${smsResult.sent} route=${smsResult.route || "n/a"} isAdmin=${isAdmin}` +
     (smsResult.error ? ` smsError=${smsResult.error}` : "")
   );
 
-  const delivered = smsResult.sent || waSent;
+  // ── Respond immediately based on SMS result only — do not wait on WhatsApp ─
   res.json({
-    success: delivered,
+    success: smsResult.sent,
     message: smsResult.sent
       ? "OTP sent successfully"
-      : waSent
-        ? "OTP sent via WhatsApp. Please check your WhatsApp messages."
-        : "OTP delivery failed — please contact support at +91 8989701701",
+      : "OTP delivery failed — please contact support at +91 8989701701",
     requestId: `otp_${Date.now()}`,
     isNewUser,
     smsSent: smsResult.sent,
     smsRoute: smsResult.route,
-    whatsappSent: waSent,
     smsFailReason: !smsResult.sent ? sanitizedError : undefined,
     // Admin phones: full debug including OTP and raw provider response
     ...(isAdmin ? {
@@ -147,6 +131,19 @@ router.post("/send-otp", async (req, res) => {
       smsUrlUsed: smsResult.urlUsed,
       smsLogId: smsResult.logId,
     } : {}),
+  });
+
+  // ── SECONDARY channel: WhatsApp — fire-and-forget, logged separately ───────
+  // Runs AFTER the response is already sent. Any failure here (including the
+  // WhatsApp Business 24h-window restriction) is logged but never surfaces to
+  // the client and never affects OTP success/failure.
+  sendWhatsApp(
+    cleanMobile,
+    `Your Al Burhan Tours & Travels OTP is: *${otp}*\n\nValid for 5 minutes. Do not share with anyone.\n\nAl Burhan Tours & Travels\n+91 8989701701`
+  ).then((waResult) => {
+    console.log(`[OTP-SEND][WhatsApp] Result: ok=${waResult?.ok} err=${waResult?.errorMessage || "none"} (secondary channel, does not affect OTP success)`);
+  }).catch((err) => {
+    console.log(`[OTP-SEND][WhatsApp] Failed (secondary channel, ignored): ${err?.message || err}`);
   });
 });
 
