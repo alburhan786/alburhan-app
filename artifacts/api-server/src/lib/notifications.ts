@@ -42,12 +42,29 @@ async function withRetry<T>(
 }
 
 // Read at call time — DB settings take priority, fall back to process.env
+const FAST2SMS_PLACEHOLDER_VALUES = new Set([
+  "your_key_here",
+  "your-fast2sms-key-here",
+  "YOUR_API_KEY",
+  "YOUR_NEW_API_KEY",
+  "your_api_key",
+  "your_new_api_key",
+  "changeme",
+  "null",
+  "",
+]);
+
+function isPlaceholderKey(k: string | undefined | null): boolean {
+  if (!k) return true;
+  return FAST2SMS_PLACEHOLDER_VALUES.has(k.trim());
+}
+
 function getFast2SMSKey(): string | undefined {
   const dbCfg = getCachedConfig("fast2sms");
   if (dbCfg.enabled === false) return undefined;
-  if (dbCfg.apiKey) return dbCfg.apiKey;
+  if (dbCfg.apiKey && !isPlaceholderKey(dbCfg.apiKey)) return dbCfg.apiKey;
   const k = process.env.FAST2SMS_API_KEY || process.env.FAST2SMS_XXL_API_KEY;
-  if (!k || k === "your_key_here" || k === "your-fast2sms-key-here") return undefined;
+  if (isPlaceholderKey(k)) return undefined;
   return k;
 }
 
@@ -141,7 +158,11 @@ function extractF2sError(data: any): { code?: string; message: string } {
       ? [String(data.message)]
       : [];
   const code = data.status_code ? String(data.status_code) : data.code ? String(data.code) : undefined;
-  return { code, message: msgs.join("; ") || JSON.stringify(data) };
+  let message = msgs.join("; ") || JSON.stringify(data);
+  if (code === "412" || /invalid authentication/i.test(message)) {
+    message = "Fast2SMS API Key is invalid. Please update it from Admin Settings.";
+  }
+  return { code, message };
 }
 
 // ── Main OTP SMS sender ──────────────────────────────────────────────────────
@@ -164,9 +185,8 @@ export async function sendOtpSMS(mobile: string, otp: string): Promise<SmsResult
   const apiKeyMasked = apiKey ? `${apiKey.slice(0, 8)}...${apiKey.slice(-4)}` : "NOT_FOUND";
 
   if (!apiKey) {
-    const envKeys = Object.keys(process.env).filter(k => k.includes("FAST2SMS")).join(", ");
-    const msg = `FAST2SMS_API_KEY not set. Env keys found: [${envKeys || "none"}]`;
-    console.error(`[OTP-SMS] ❌ ${msg}`);
+    const msg = "Fast2SMS API Key is not configured.";
+    console.error(`[OTP-SMS] ❌ ${msg} (checked DB api_settings.fast2sms and FAST2SMS_API_KEY env — both missing or placeholder)`);
     const logEntry: SmsAttemptLog = {
       id, ts: new Date().toISOString(), mobileMasked: maskMobile(mobile), otp,
       finalSuccess: false, attempts: [], totalDurationMs: 0,

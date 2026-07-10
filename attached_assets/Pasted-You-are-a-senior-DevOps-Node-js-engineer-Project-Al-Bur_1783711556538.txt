@@ -1,0 +1,89 @@
+You are a senior DevOps + Node.js engineer.
+
+Project: Al Burhan Tours & Travels
+Hosting: Hostinger VPS
+Backend: Node.js + Express + PM2
+SMS Provider: Fast2SMS
+
+Current issue:
+- OTP API is returning "Invalid Authentication, Check Authorization Key".
+- The .env file still contains placeholder values such as:
+  FAST2SMS_API_KEY=YOUR_NEW_API_KEY
+- SMS OTP is not reaching users.
+
+Automatically perform the following:
+
+1. Detect the project root and locate:
+   - .env
+   - ecosystem.config.cjs
+   - package.json
+
+2. Verify environment variables:
+   FAST2SMS_API_KEY
+   FAST2SMS_SENDER
+   DATABASE_URL
+   SESSION_SECRET
+
+3. If FAST2SMS_API_KEY is missing or equals:
+   YOUR_API_KEY
+   YOUR_NEW_API_KEY
+   ""
+   null
+
+   then stop startup and show a clear admin error:
+   "Fast2SMS API Key is not configured."
+
+4. Add an Admin Settings page:
+   /admin/settings/sms
+
+   Allow the administrator to:
+   - Save Fast2SMS API Key
+   - Save Sender ID
+   - Test SMS
+   - Validate API
+   - Store encrypted values
+
+5. Never require editing .env manually again.
+   If the admin updates the API key,
+   automatically update runtime configuration and restart PM2 safely.
+
+6. Before sending OTP:
+   - Validate API key
+   - Validate sender
+   - Validate mobile number
+   - Log Fast2SMS response
+
+7. Add endpoint:
+
+   POST /api/admin/test-sms
+
+   which sends a test SMS and returns:
+
+   {
+     success:true,
+     provider:"Fast2SMS",
+     response:...
+   }
+
+8. If Fast2SMS returns:
+   status_code=412
+   Invalid Authentication
+
+   show:
+   "Fast2SMS API Key is invalid. Please update it from Admin Settings."
+
+9. Never expose API keys in logs.
+
+10. After configuration:
+    - Restart PM2 automatically
+    - Verify server is listening
+    - Test /api/health
+    - Test /api/auth/send-otp
+    - Display final success report
+
+11. If SMS still fails:
+    automatically switch to WhatsApp OTP if configured.
+
+12. Generate all required backend code, admin UI, database migration, encryption, validation, logging, and deployment scripts.
+
+Return only the completed code changes and deployment summary. Do not ask me to edit terminal commands manually.
