@@ -167,8 +167,39 @@ function serveApiBundle(_req: any, res: any) {
     res.status(404).json({ error: "API bundle not found — run build first", tried: candidates });
   }
 }
-router.get("/deploy-dist", requireAdmin as any, serveApiBundle);
-router.get("/download-api", requireAdmin as any, serveApiBundle);
+// Allow download with either admin session OR x-admin-password header (for VPS CI)
+function adminOrPassword(req: any, res: any, next: any) {
+  const pw = req.headers["x-admin-password"];
+  const expected = process.env.DELETE_ADMIN_PASSWORD;
+  if (pw && expected && pw === expected) return next();
+  return (requireAdmin as any)(req, res, next);
+}
+router.get("/deploy-dist", adminOrPassword, serveApiBundle);
+router.get("/download-api", adminOrPassword, serveApiBundle);
+
+// VPS self-deploy: download latest bundle from Replit dev server and restart pm2
+// POST /api/hot-reload  — requires X-Admin-Password header matching DELETE_ADMIN_PASSWORD
+router.post("/hot-reload", async (req: any, res: any) => {
+  const pw = req.headers["x-admin-password"] || req.body?.password;
+  const expected = process.env.DELETE_ADMIN_PASSWORD;
+  if (!expected || pw !== expected) return res.status(401).json({ error: "Unauthorized" });
+
+  const bundleUrl = req.body?.bundleUrl as string | undefined;
+  if (!bundleUrl) return res.status(400).json({ error: "bundleUrl required" });
+
+  const dest = "/var/www/alburhan/artifacts/api-server/dist/index.cjs";
+  const { spawn } = await import("child_process");
+  const cmd = [
+    `curl -fsSL -H "Cookie: ${req.body?.cookie || ""}" "${bundleUrl}" -o "${dest}.tmp"`,
+    `mv "${dest}.tmp" "${dest}"`,
+    "pm2 restart alburhan-api",
+  ].join(" && ");
+
+  const child = spawn("sh", ["-c", `sleep 2 && ${cmd}`], { detached: true, stdio: "ignore" });
+  child.unref();
+
+  res.json({ ok: true, message: "Deploy triggered — server restarting in ~2s", dest, bundleUrl });
+});
 
 router.use(healthRouter);
 router.use("/auth", authRouter);

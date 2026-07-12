@@ -364,14 +364,10 @@ export async function sendWhatsApp(mobile: string | null | undefined, message: s
     if (result?.status === "0" || result?.status === 0) {
       const errMsg: string = result.message || "Message delivery failed";
       console.warn("[WhatsApp] Session msg failed for", mobile, ":", errMsg);
-      // 24-hour window: customer hasn't messaged the bot recently — fall back to hello_world template
+      // 24-hour window: customer hasn't messaged the bot recently — template API not supported by BotBee
       if (errMsg.toLowerCase().includes("24 hour") || errMsg.toLowerCase().includes("outside")) {
-        console.log("[WhatsApp] 24h window — falling back to hello_world template for", mobile);
-        const sent = await sendWhatsAppTemplate(mobile, "hello_world", []).catch(() => false);
-        if (sent) {
-          return { ok: true, provider: "BotBee", endpoint, responsePayload: { fallback: "template:hello_world" } };
-        }
-        return { ok: false, provider: "BotBee", endpoint, httpStatus: response.status, requestPayload: safePayload, responsePayload: result, errorMessage: "24h window: register a WhatsApp template in BotBee dashboard (hello_world or booking_approved) to reach cold contacts." };
+        console.log("[WhatsApp] 24h window for", mobile, "— cold contact, message skipped");
+        return { ok: false, provider: "BotBee", endpoint, httpStatus: response.status, requestPayload: safePayload, responsePayload: result, errorMessage: "24h window: customer has not messaged in the last 24h. WhatsApp message not delivered." };
       }
       return { ok: false, provider: "BotBee", endpoint, httpStatus: response.status, requestPayload: safePayload, responsePayload: result, errorMessage: errMsg };
     }
@@ -383,12 +379,8 @@ export async function sendWhatsApp(mobile: string | null | undefined, message: s
     console.error("[WhatsApp] Error after retries for", mobile, ":", resp?.data || err.message);
     // 24-hour window error can also surface as an HTTP error
     if (errMsg.toLowerCase().includes("24 hour") || errMsg.toLowerCase().includes("outside")) {
-      console.log("[WhatsApp] 24h window (catch) — falling back to hello_world template for", mobile);
-      const sent = await sendWhatsAppTemplate(mobile, "hello_world", []).catch(() => false);
-      if (sent) {
-        return { ok: true, provider: "BotBee", endpoint, responsePayload: { fallback: "template:hello_world" } };
-      }
-      return { ok: false, provider: "BotBee", endpoint, httpStatus: resp?.status, requestPayload: { phone_number: mobile, message: message.substring(0, 200) }, responsePayload: resp?.data, errorMessage: "24h window: register a WhatsApp template in BotBee dashboard to reach cold contacts." };
+      console.log("[WhatsApp] 24h window (catch) for", mobile, "— cold contact, message skipped");
+      return { ok: false, provider: "BotBee", endpoint, httpStatus: resp?.status, requestPayload: { phone_number: mobile, message: message.substring(0, 200) }, responsePayload: resp?.data, errorMessage: "24h window: customer has not messaged in the last 24h. WhatsApp message not delivered." };
     }
     return {
       ok: false, provider: "BotBee", endpoint,

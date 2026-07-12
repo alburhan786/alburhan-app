@@ -10,6 +10,7 @@ import { sendAdminPaymentAlert, sendWhatsApp, type EmailAttachment } from "../li
 import { triggerWorkflow } from "../lib/workflowEngine.js";
 import { generateInvoicePdfBuffer, generateReceiptPdfBuffer } from "../lib/paymentDocs.js";
 import { sendReminderForBookingId, getReminderHistory, runDailyReminders, isRemindersEnabled, setRemindersEnabled } from "../jobs/paymentReminder.js";
+import { upsertInvoiceForBooking } from "./invoices.js";
 
 const router = Router();
 
@@ -45,7 +46,7 @@ interface RazorpayWithPaymentLink extends Razorpay {
  * (WhatsApp/Email/Dashboard). Every step is logged; failures never abort the
  * payment response since the DB write already succeeded.
  */
-async function processPaymentSuccessNotifications(opts: {
+export async function processPaymentSuccessNotifications(opts: {
   booking: {
     id: string;
     bookingNumber: string;
@@ -324,6 +325,13 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
     .returning();
 
   console.log("[verify] Payment verified:", razorpayPaymentId, "→ Booking", booking.bookingNumber, newStatus);
+
+  // Ensure invoice record exists in DB for fully-paid bookings
+  if (isFullyPaid) {
+    upsertInvoiceForBooking(bookingId).catch((err) =>
+      console.error("[verify] upsertInvoice failed:", err)
+    );
+  }
 
   const baseUrl = process.env.REPLIT_DEV_DOMAIN
     ? `https://${process.env.REPLIT_DEV_DOMAIN}`

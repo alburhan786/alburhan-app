@@ -5,6 +5,8 @@ import { requireAdmin, requireModuleAccess, requirePermission, type Authenticate
 import { auditLog } from "../lib/audit.js";
 import { upsertPilgrimFromProfile } from "../lib/pilgrimUtils.js";
 import { postPaymentJournal, voidJournalEntry } from "../lib/journalHelper.js";
+import { upsertInvoiceForBooking } from "./invoices.js";
+import { processPaymentSuccessNotifications } from "./payments.js";
 
 type BookingStatus = "pending" | "approved" | "rejected" | "confirmed" | "cancelled" | "partially_paid";
 type PaymentMode = "cash" | "neft" | "upi" | "cheque" | "online";
@@ -216,7 +218,7 @@ router.post("/:id/payments", requireAdmin as RequestHandler, async (req: Authent
       });
       auditLog({ req, action: "created", entityTable: "payments", entityId: txnId, newValue: { bookingId, amount, paymentMode, paymentDate } }).catch(() => {});
 
-      return { entry, updated };
+      return { entry, updated, booking };
     });
 
     // Auto-post double-entry journal (fire-and-forget, non-fatal)
@@ -227,6 +229,35 @@ router.post("/:id/payments", requireAdmin as RequestHandler, async (req: Authent
       date: String(paymentDate),
       bookingNumber: bookingId,
     }).catch(() => {});
+
+    // Auto-upsert invoice + send notifications after every payment (fire-and-forget)
+    const isFullyPaid = result.updated?.newStatus === "confirmed";
+    const isPaymentStatus = result.updated?.newStatus === "confirmed" || result.updated?.newStatus === "partially_paid";
+    if (isPaymentStatus) {
+      if (isFullyPaid) {
+        upsertInvoiceForBooking(bookingId).catch((err) =>
+          console.error("[admin-payments] upsertInvoice failed:", err)
+        );
+      }
+      processPaymentSuccessNotifications({
+        booking: {
+          id: bookingId,
+          bookingNumber: result.booking.bookingNumber ?? "",
+          customerName: result.booking.customerName ?? "",
+          customerMobile: result.booking.customerMobile ?? "",
+          customerEmail: result.booking.customerEmail,
+          packageName: result.booking.packageName,
+          numberOfPilgrims: result.booking.numberOfPilgrims,
+          finalAmount: result.booking.finalAmount,
+        },
+        isFullyPaid,
+        thisPaymentAmount: Number(amount),
+        newPaidAmount: result.updated!.totalPaid,
+        remainingBalance: Math.max(0, Number(result.booking.finalAmount || 0) - result.updated!.totalPaid),
+        invoiceNumber: result.updated?.invoiceNumber,
+        paymentRef: typeof referenceNumber === "string" ? referenceNumber : undefined,
+      }).catch((err) => console.error("[admin-payments] processPaymentSuccessNotifications failed:", err));
+    }
 
     return res.status(201).json({
       entry: { ...result.entry, amount: Number(result.entry.amount) },

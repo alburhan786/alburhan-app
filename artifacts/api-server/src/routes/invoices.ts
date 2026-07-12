@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { pool } from "@workspace/db";
-import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
+import { requireAdmin, requireAuth, type AuthenticatedRequest } from "../lib/auth.js";
+import { generateInvoicePdfBuffer } from "../lib/paymentDocs.js";
 
 const router = Router();
 
@@ -23,7 +24,7 @@ async function generateInvoiceNumber(year: number): Promise<string> {
   return `${prefix}${String(seq).padStart(6, "0")}`;
 }
 
-async function upsertInvoiceForBooking(bookingId: string): Promise<Record<string, unknown> | null> {
+export async function upsertInvoiceForBooking(bookingId: string): Promise<Record<string, unknown> | null> {
   const bRes = await pool.query(
     `SELECT * FROM bookings WHERE id = $1 LIMIT 1`,
     [bookingId]
@@ -123,6 +124,44 @@ router.post("/generate-all", requireAdmin as any, async (_req: AuthenticatedRequ
   } catch (err) {
     console.error("[invoices] POST /generate-all:", err);
     res.status(500).json({ message: "Failed to generate invoices" });
+  }
+});
+
+router.get("/:bookingId/pdf", requireAuth as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { bookingId } = req.params;
+    const bRes = await pool.query(
+      `SELECT b.*, i.invoice_number as inv_num
+       FROM bookings b
+       LEFT JOIN invoices i ON i.booking_id = b.id
+       WHERE b.id = $1 LIMIT 1`,
+      [bookingId]
+    );
+    const b = bRes.rows[0];
+    if (!b) return res.status(404).json({ message: "Booking not found" });
+    if (req.user?.role !== "admin" && b.customer_mobile !== req.user?.mobile) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    const invoiceNumber = b.inv_num || b.invoice_number;
+    const buf = await generateInvoicePdfBuffer({
+      bookingNumber: b.booking_number,
+      customerName: b.customer_name,
+      customerMobile: b.customer_mobile,
+      customerEmail: b.customer_email,
+      packageName: b.package_name,
+      numberOfPilgrims: b.number_of_pilgrims,
+      totalAmount: Number(b.total_amount) || 0,
+      finalAmount: Number(b.final_amount) || 0,
+      paidAmount: Number(b.paid_amount) || 0,
+      balanceAmount: Math.max(0, Number(b.final_amount || 0) - Number(b.paid_amount || 0)),
+      invoiceNumber,
+    });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="Invoice-${invoiceNumber || b.booking_number}.pdf"`);
+    res.send(buf);
+  } catch (err) {
+    console.error("[invoices] GET /:bookingId/pdf:", err);
+    res.status(500).json({ message: "Failed to generate PDF" });
   }
 });
 

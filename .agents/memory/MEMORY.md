@@ -12,3 +12,4 @@
 - [Notification system dual architecture](notification-dual-architecture.md) — two parallel systems (notificationEngine/EventType vs workflowEngine/WorkflowTrigger) already exist; check both before adding new reminder types to avoid duplicating coverage.
 - [Per-route auth pattern](per-route-auth-pattern.md) — this codebase applies requireAdmin/requireAuth per-route, not at router.use() mount; audits that only check mount-level auth will false-positive as "unprotected".
 - [triggerWorkflow/fireNotificationEvent arg bug](smtp-workflow-arg-bug.md) — wrong-arity call silently dropped ctx (name/email/amount/attachments) on all triggerWorkflow-routed notifications; fixed, but pattern worth re-checking if fields go blank again.
+- [Invoice E2E deploy patterns](invoice-e2e-deploy.md) — upsertInvoice call sites, PDF endpoint, BotBee template API removed, VPS deploy
