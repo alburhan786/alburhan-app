@@ -375,6 +375,37 @@ router.post("/logout", (req, res) => {
   res.json({ message: "Logged out successfully" });
 });
 
+// ── Admin: reset OTP rate limit for a specific mobile (or all) ───────────────
+// POST /api/auth/reset-otp-limit  { mobile?: "9876543210" }
+// No mobile = clears ALL recent OTP rows (full reset)
+router.post("/reset-otp-limit", requireAuth as any, async (req: AuthenticatedRequest, res) => {
+  if (req.user?.role !== "admin") {
+    res.status(403).json({ message: "Admin only" });
+    return;
+  }
+  const mobile = req.body?.mobile ? normaliseIndianMobile(String(req.body.mobile)) : null;
+  try {
+    let result;
+    if (mobile) {
+      result = await pool.query(
+        `DELETE FROM otps WHERE mobile = $1 AND created_at > NOW() - INTERVAL '30 minutes'`,
+        [mobile]
+      );
+      console.log(`[OTP-RESET] Cleared rate limit for ${mobile}: ${result.rowCount} rows deleted`);
+      res.json({ ok: true, mobile, rowsDeleted: result.rowCount });
+    } else {
+      result = await pool.query(
+        `DELETE FROM otps WHERE created_at > NOW() - INTERVAL '30 minutes'`
+      );
+      console.log(`[OTP-RESET] Cleared ALL recent OTP rows: ${result.rowCount} rows deleted`);
+      res.json({ ok: true, mobile: "ALL", rowsDeleted: result.rowCount });
+    }
+  } catch (err: any) {
+    console.error("[OTP-RESET] Failed:", err.message);
+    res.status(500).json({ message: err.message });
+  }
+});
+
 router.get("/me", requireAuth as any, async (req: AuthenticatedRequest, res) => {
   try {
     const r = await pool.query(

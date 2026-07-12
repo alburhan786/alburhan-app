@@ -1,0 +1,117 @@
+The production VPS is almost working but needs a final repair.
+
+Current status:
+
+✅ nginx syntax is OK
+✅ PM2 is online
+✅ Server listening on port 5000
+✅ https://alburhantravels.com/api/health returns HTTP 200
+✅ https://alburhantravels.com/api/me returns 401 Unauthorized (expected)
+
+Remaining issues:
+
+1. OTP endpoint returns HTTP 429 "Too many OTP requests".
+Reset or clear the OTP rate limiter.
+Remove stale Redis/database entries if necessary.
+Allow testing again immediately.
+
+2. Register every production API route.
+
+Verify these routes exist:
+
+GET /api/health
+GET /api/me
+GET /api/routes
+POST /api/auth/send-otp
+POST /api/auth/verify-otp
+GET /api/admin/*
+GET /api/customer/*
+GET /api/packages/*
+GET /api/bookings/*
+
+If /api/routes does not exist, create a diagnostics endpoint that prints all registered Express routes.
+
+3. Production environment variables are missing.
+
+Load from VPS .env:
+
+FAST2SMS_API_KEY
+FAST2SMS_SENDER_ID
+BOTBEE_API_KEY
+BOTBEE_PHONE_NUMBER_ID
+BOTBEE_BUSINESS_ID
+RAZORPAY_KEY_ID
+RAZORPAY_SECRET
+JWT_SECRET
+DATABASE_URL
+
+Verify every required variable exists.
+
+4. Confirm OTP works in production.
+
+Test sending OTP from:
+
+https://alburhantravels.com/login
+
+The OTP must be delivered using the configured provider (Fast2SMS/BotBee).
+
+5. Verify authentication.
+
+Login with OTP.
+
+Open:
+
+/customer/dashboard
+
+Verify the dashboard loads correctly.
+
+6. Verify all admin modules are restored.
+
+Packages
+Customers
+Bookings
+Package Requests
+Broadcast Messages
+Reports
+Hajj Groups
+Flights
+Hotels
+Buses
+Medical
+Ziyarat
+Automation Center
+Communication Center
+WhatsApp Templates
+SMS Templates
+Email Templates
+RCS Templates
+BotBee
+Fast2SMS
+SMTP
+API Settings
+OTP Debug
+Workflow Center
+Loyalty & Rewards
+
+Restore any missing routes or menu items.
+
+7. Rebuild production.
+
+pnpm install
+pnpm build
+
+Restart PM2.
+
+Run final tests and produce a deployment report showing:
+
+- Registered routes
+- PM2 status
+- nginx status
+- Environment variables loaded
+- OTP working
+- Dashboard working
+- Admin panel working
+- No missing routes
+- No production errors
+
+Do not stop until production behaves exactly like the Replit development version.

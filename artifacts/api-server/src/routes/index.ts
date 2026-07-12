@@ -57,6 +57,27 @@ import { requireAdmin } from "../lib/auth.js";
 
 const router: IRouter = Router();
 
+// ── Public env-check: shows which required vars are SET vs MISSING (no values) ──
+router.get("/env-check", (_req, res) => {
+  const required = [
+    "DATABASE_URL", "FAST2SMS_API_KEY", "BOTBEE_API_KEY",
+    "BOTBEE_PHONE_NUMBER_ID", "BOTBEE_BUSINESS_ID",
+    "RAZORPAY_KEY_ID", "RAZORPAY_SECRET", "SESSION_SECRET",
+  ];
+  const optional = ["FAST2SMS_SENDER_ID", "SMTP_HOST", "SMTP_USER", "SMTP_FROM", "JWT_SECRET"];
+  const check = (keys: string[]) =>
+    Object.fromEntries(keys.map(k => [k, process.env[k] ? `✅ set (len=${process.env[k]!.length})` : "❌ MISSING"]));
+  const missing = required.filter(k => !process.env[k]);
+  res.json({
+    allRequiredSet: missing.length === 0,
+    missingRequired: missing,
+    required: check(required),
+    optional: check(optional),
+    nodeEnv: process.env.NODE_ENV,
+    cwd: process.cwd(),
+  });
+});
+
 // ── Env diagnostic (admin-only) — values are masked but still restricted ────
 router.get("/diag", requireAdmin as any, (_req, res) => {
   const fast2smsKey = process.env.FAST2SMS_API_KEY || process.env.FAST2SMS_XXL_API_KEY;
