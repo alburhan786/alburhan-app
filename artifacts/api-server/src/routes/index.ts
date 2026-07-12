@@ -194,10 +194,9 @@ router.get("/routes", (_req, res) => {
     return out;
   }
 
-  // Express 5 uses app.router; Express 4 uses app._router
-  const topStack: any[] = (res.app as any).router?.stack
-    ?? (res.app as any)._router?.stack
-    ?? [];
+  // Read directly from this router's own .stack — avoids Express version differences
+  // and esbuild CJS bundling which makes res.app.router unreliable.
+  const topStack: any[] = (router as any).stack ?? [];
   const routes = collectRoutes(topStack);
 
   // Critical routes — matched by relative path suffix (prefixes not stored in Express 5)
