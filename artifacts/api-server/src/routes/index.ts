@@ -175,29 +175,52 @@ router.use("/auth", authRouter);
 router.use(authRouter);
 
 // ── No-auth diagnostics: lists every registered route and confirms critical ones ──
+// Express 5: app.router (not app._router), layer.path is always undefined → must recurse
 router.get("/routes", (_req, res) => {
-  const routes: string[] = [];
-  (res.app._router?.stack ?? []).forEach((layer: any) => {
-    if (layer.route) {
-      const methods = Object.keys(layer.route.methods).map((m: string) => m.toUpperCase()).join(",");
-      routes.push(`${methods} ${layer.route.path}`);
-    } else if (layer.handle?.stack) {
-      const prefix = layer.regexp?.source?.includes("api") ? "/api" : "";
-      layer.handle.stack.forEach((r: any) => {
-        if (r.route) {
-          const methods = Object.keys(r.route.methods).map((m: string) => m.toUpperCase()).join(",");
-          routes.push(`${methods} ${prefix}${r.route.path}`);
-        }
-      });
+  function collectRoutes(stack: any[], depth = 0): string[] {
+    const out: string[] = [];
+    if (!Array.isArray(stack) || depth > 8) return out;
+    for (const layer of stack) {
+      if (layer?.route?.path != null) {
+        const methods = Object.keys(layer.route.methods || {})
+          .map((m: string) => m.toUpperCase()).join(",");
+        out.push(`${methods} ${layer.route.path}`);
+      }
+      // Express 5: sub-routers live in layer.handle.stack
+      if (layer?.handle?.stack) out.push(...collectRoutes(layer.handle.stack, depth + 1));
+      // Express 5: some layers nest via layer.router?.stack
+      if (layer?.router?.stack)  out.push(...collectRoutes(layer.router.stack,  depth + 1));
     }
-  });
-  const critical = ["/health", "/healthz", "/auth/send-otp", "/auth/verify-otp", "/me"];
-  const missing = critical.filter(p => !routes.some(r => r.includes(p)));
+    return out;
+  }
+
+  // Express 5 uses app.router; Express 4 uses app._router
+  const topStack: any[] = (res.app as any).router?.stack
+    ?? (res.app as any)._router?.stack
+    ?? [];
+  const routes = collectRoutes(topStack);
+
+  // Critical routes — matched by relative path suffix (prefixes not stored in Express 5)
+  const critical = [
+    { label: "GET /api/health",            match: (r: string) => /GET.*\/health/.test(r) },
+    { label: "GET /api/healthz",           match: (r: string) => /GET.*\/healthz/.test(r) },
+    { label: "POST /api/auth/send-otp",    match: (r: string) => /POST.*\/send-otp/.test(r) },
+    { label: "POST /api/auth/verify-otp",  match: (r: string) => /POST.*\/verify-otp/.test(r) },
+    { label: "GET /api/me",                match: (r: string) => /GET.*\/me/.test(r) },
+    { label: "GET /api/routes",            match: (r: string) => /GET.*\/routes/.test(r) },
+    { label: "GET /api/packages",          match: (r: string) => /GET.*\/packages/.test(r) },
+    { label: "GET /api/bookings",          match: (r: string) => /GET.*\/bookings/.test(r) },
+  ];
+  const missing = critical.filter(c => !routes.some(c.match)).map(c => c.label);
+  const found   = critical.filter(c =>  routes.some(c.match)).map(c => c.label);
+
   res.json({
+    note: "Express 5: path prefixes (/api) not stored on layers; paths shown are relative to mount point",
     totalRoutes: routes.length,
+    criticalFound:   found,
     criticalMissing: missing,
     allOk: missing.length === 0,
-    routes,
+    routes: routes.sort(),
   });
 });
 router.use("/packages", packagesRouter);
