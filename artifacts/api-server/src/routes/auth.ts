@@ -133,18 +133,40 @@ router.post("/send-otp", async (req, res) => {
     } : {}),
   });
 
-  // ── SECONDARY channel: WhatsApp — fire-and-forget, logged separately ───────
-  // Runs AFTER the response is already sent. Any failure here (including the
-  // WhatsApp Business 24h-window restriction) is logged but never surfaces to
-  // the client and never affects OTP success/failure.
-  sendWhatsApp(
-    cleanMobile,
-    `Your Al Burhan Tours & Travels OTP is: *${otp}*\n\nValid for 5 minutes. Do not share with anyone.\n\nAl Burhan Tours & Travels\n+91 8989701701`
-  ).then((waResult) => {
-    console.log(`[OTP-SEND][WhatsApp] Result: ok=${waResult?.ok} err=${waResult?.errorMessage || "none"} (secondary channel, does not affect OTP success)`);
-  }).catch((err) => {
-    console.log(`[OTP-SEND][WhatsApp] Failed (secondary channel, ignored): ${err?.message || err}`);
-  });
+  // ── SECONDARY channel: WhatsApp — fire-and-forget, template-first ───────────
+  // Template messages work even outside the 24h session window.
+  // sendText() is only tried as a last resort for users who have an open session.
+  // Any failure here is logged but never surfaces to the client.
+  (async () => {
+    try {
+      const { sendTemplate, sendText } = await import("../lib/botbee.js");
+      // Try approved OTP template first (works outside 24h window)
+      const templateResult = await sendTemplate(
+        cleanMobile,
+        "otp_alburhan",   // approved template name in BotBee/Meta
+        [
+          {
+            type: "body",
+            parameters: [{ type: "text", text: otp }],
+          },
+        ],
+        { eventType: "mobile_otp" }
+      );
+      if (templateResult.ok) {
+        console.log(`[OTP-SEND][WhatsApp] Template sent ✓ (outside-window safe)`);
+        return;
+      }
+      // If template fails (e.g. not approved yet), fall back to session text
+      const waResult = await sendText(
+        cleanMobile,
+        `Your Al Burhan Tours & Travels OTP is: *${otp}*\n\nValid for 5 minutes. Do not share with anyone.\n\nAl Burhan Tours & Travels\n+91 8989701701`,
+        { eventType: "mobile_otp" }
+      );
+      console.log(`[OTP-SEND][WhatsApp] Fallback text: ok=${waResult?.ok} err=${waResult?.errorMessage || "none"}`);
+    } catch (err: any) {
+      console.log(`[OTP-SEND][WhatsApp] Failed (secondary channel, ignored): ${err?.message || err}`);
+    }
+  })();
 });
 
 router.post("/verify-otp", async (req, res) => {

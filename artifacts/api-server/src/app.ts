@@ -63,10 +63,12 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
+    // 'lax' (not 'strict') is required for HTTPS — 'strict' blocks cookies on top-level
+    // navigations and redirects, causing every /api/me call after a page load to return 401.
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
     maxAge: 7 * 24 * 60 * 60 * 1000,
-    sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+    sameSite: 'lax',
   },
 }));
 
@@ -97,8 +99,9 @@ if (process.env.NODE_ENV === 'production') {
   if (fs.existsSync(staticDir)) {
     app.use(express.static(staticDir));
 
-    app.use('/api', (_req, res) => {
-      res.status(404).json({ error: 'API route not found' });
+    app.use('/api', (req, res) => {
+      console.warn(`[404] Unhandled API route: ${req.method} ${req.originalUrl}`);
+      res.status(404).json({ error: 'API route not found', method: req.method, path: req.originalUrl });
     });
 
     app.get('{*path}', (_req, res) => {
