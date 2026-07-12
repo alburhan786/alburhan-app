@@ -152,6 +152,33 @@ router.get("/download-api", requireAdmin as any, serveApiBundle);
 router.use(healthRouter);
 router.use("/auth", authRouter);
 router.use(authRouter);
+
+// ── No-auth diagnostics: lists every registered route and confirms critical ones ──
+router.get("/routes", (_req, res) => {
+  const routes: string[] = [];
+  (res.app._router?.stack ?? []).forEach((layer: any) => {
+    if (layer.route) {
+      const methods = Object.keys(layer.route.methods).map((m: string) => m.toUpperCase()).join(",");
+      routes.push(`${methods} ${layer.route.path}`);
+    } else if (layer.handle?.stack) {
+      const prefix = layer.regexp?.source?.includes("api") ? "/api" : "";
+      layer.handle.stack.forEach((r: any) => {
+        if (r.route) {
+          const methods = Object.keys(r.route.methods).map((m: string) => m.toUpperCase()).join(",");
+          routes.push(`${methods} ${prefix}${r.route.path}`);
+        }
+      });
+    }
+  });
+  const critical = ["/health", "/healthz", "/auth/send-otp", "/auth/verify-otp", "/me"];
+  const missing = critical.filter(p => !routes.some(r => r.includes(p)));
+  res.json({
+    totalRoutes: routes.length,
+    criticalMissing: missing,
+    allOk: missing.length === 0,
+    routes,
+  });
+});
 router.use("/packages", packagesRouter);
 router.use("/packages", packageMediaRouter);
 router.use("/bookings", bookingsRouter);
