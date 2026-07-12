@@ -362,21 +362,41 @@ export async function sendWhatsApp(mobile: string | null | undefined, message: s
     );
     const result = response.data;
     if (result?.status === "0" || result?.status === 0) {
-      console.warn("[WhatsApp] Session msg failed for", mobile, ":", result.message);
-      return { ok: false, provider: "BotBee", endpoint, httpStatus: response.status, requestPayload: safePayload, responsePayload: result, errorMessage: result.message || "Message delivery failed" };
+      const errMsg: string = result.message || "Message delivery failed";
+      console.warn("[WhatsApp] Session msg failed for", mobile, ":", errMsg);
+      // 24-hour window: customer hasn't messaged the bot recently — fall back to hello_world template
+      if (errMsg.toLowerCase().includes("24 hour") || errMsg.toLowerCase().includes("outside")) {
+        console.log("[WhatsApp] 24h window — falling back to hello_world template for", mobile);
+        const sent = await sendWhatsAppTemplate(mobile, "hello_world", []).catch(() => false);
+        if (sent) {
+          return { ok: true, provider: "BotBee", endpoint, responsePayload: { fallback: "template:hello_world" } };
+        }
+        return { ok: false, provider: "BotBee", endpoint, httpStatus: response.status, requestPayload: safePayload, responsePayload: result, errorMessage: "24h window: register a WhatsApp template in BotBee dashboard (hello_world or booking_approved) to reach cold contacts." };
+      }
+      return { ok: false, provider: "BotBee", endpoint, httpStatus: response.status, requestPayload: safePayload, responsePayload: result, errorMessage: errMsg };
     }
     console.log("[WhatsApp] Session msg sent to", mobile, result);
     return { ok: true, provider: "BotBee", endpoint, httpStatus: response.status, requestPayload: safePayload, responsePayload: result };
   } catch (err: any) {
     const resp = err?.response;
+    const errMsg: string = resp?.data?.message || resp?.data?.error || err.message || "";
     console.error("[WhatsApp] Error after retries for", mobile, ":", resp?.data || err.message);
+    // 24-hour window error can also surface as an HTTP error
+    if (errMsg.toLowerCase().includes("24 hour") || errMsg.toLowerCase().includes("outside")) {
+      console.log("[WhatsApp] 24h window (catch) — falling back to hello_world template for", mobile);
+      const sent = await sendWhatsAppTemplate(mobile, "hello_world", []).catch(() => false);
+      if (sent) {
+        return { ok: true, provider: "BotBee", endpoint, responsePayload: { fallback: "template:hello_world" } };
+      }
+      return { ok: false, provider: "BotBee", endpoint, httpStatus: resp?.status, requestPayload: { phone_number: mobile, message: message.substring(0, 200) }, responsePayload: resp?.data, errorMessage: "24h window: register a WhatsApp template in BotBee dashboard to reach cold contacts." };
+    }
     return {
       ok: false, provider: "BotBee", endpoint,
       httpStatus: resp?.status,
       requestPayload: { phone_number: mobile, message: message.substring(0, 200) },
       responsePayload: resp?.data,
       errorCode: String(resp?.data?.code || resp?.data?.error_code || ""),
-      errorMessage: resp?.data?.message || resp?.data?.error || err.message,
+      errorMessage: errMsg,
     };
   }
 }
@@ -433,6 +453,12 @@ export async function sendRCS(
     return { ok: true, provider: "Lemin AI", endpoint, httpStatus: response.status, requestPayload: payload, responsePayload: result };
   } catch (err: any) {
     const resp = err?.response;
+    const rcsErrMsg: string = resp?.data?.message || resp?.data?.error || err.message || "";
+    // "Invalid User ID" means Lemin credentials aren't configured correctly — treat as "not configured"
+    if (rcsErrMsg.toLowerCase().includes("invalid user") || rcsErrMsg.toLowerCase().includes("invalid_user")) {
+      console.warn("[RCS] Lemin user_id is invalid — configure LEMIN_USER_ID in API Settings to enable RCS");
+      return { ok: false, provider: "Lemin AI", endpoint, errorMessage: "RCS not configured: invalid Lemin user_id. Set in Admin → API Settings." };
+    }
     console.error("[RCS] Error after retries for", mobile, ":", resp?.data || err.message);
     return {
       ok: false, provider: "Lemin AI", endpoint,
@@ -440,7 +466,7 @@ export async function sendRCS(
       requestPayload: { phone: mobile, dial_code: "+91", template: lemin_template_id },
       responsePayload: resp?.data,
       errorCode: String(resp?.data?.code || resp?.data?.error_code || ""),
-      errorMessage: resp?.data?.message || resp?.data?.error || err.message,
+      errorMessage: rcsErrMsg,
     };
   }
 }
