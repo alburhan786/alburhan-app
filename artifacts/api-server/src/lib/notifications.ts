@@ -799,7 +799,7 @@ export async function sendAdminNewBookingEmail(opts: {
   const subject = opts.isOffline
     ? `[Al Burhan] New Offline Booking — ${opts.customerName}`
     : `[Al Burhan] New Booking Request — ${opts.customerName}`;
-  const dashLink = `https://alburhantravels.in/admin/bookings`;
+  const dashLink = `https://alburhantravels.com/admin/bookings`;
   const amountLine = opts.finalAmount
     ? `₹${Number(opts.finalAmount).toLocaleString("en-IN")}`
     : "To be calculated";
