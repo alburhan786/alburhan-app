@@ -1,0 +1,171 @@
+Recover the complete original Al Burhan Tours & Travels Admin Portal exactly as it existed before. Do NOT create demo pages, placeholders, or simplified versions. Recover all missing modules, pages, backend APIs, database models, navigation, permissions, workflows, and UI components.
+
+CRITICAL RULES
+- Never delete or overwrite production data.
+- Never reset the database.
+- Never remove customer records, bookings, invoices, payments, KYC documents, or uploaded files.
+- Preserve authentication, OTP login, customer dashboard, admin dashboard, and all integrations.
+- Search Git history, deployment artifacts, backups, previous builds, and project files to restore missing code before creating anything new.
+
+RECOVER ALL SIDEBAR MODULES
+
+Dashboard
+- Dashboard
+- Analytics
+- Revenue
+- Booking Statistics
+
+Packages & Content
+- Packages
+- Package Categories
+- Package Pricing
+- Gallery
+
+Customers & Reports
+- Customers
+- Customer Profile
+- Customer Ledger
+- KYC Management
+- Feedback
+- Package Requests
+- Inquiries
+- Broadcast Messages
+- Reports
+
+Finance
+- Customer Ledger
+- Hajj Ledger
+- Vendors
+- GST Reports
+- Payroll
+- Assets
+- Trash
+
+Pilgrims & Groups
+- Hajj Groups
+- Flights
+- Hotels
+- Buses
+- Medical
+- Room Allocation
+- QR Tracker
+- Staff ID Cards
+- Print Center
+
+Hajj Operations
+- Ziyarat
+- Mina
+- Arafat
+- Muzdalifah
+- Luggage
+
+Communication Center
+- Communication Center
+- Workflow Center
+- WhatsApp Templates
+- SMS Templates
+- Email Templates
+- RCS Templates
+- Push Notifications
+
+Settings
+- Meta WhatsApp Manager
+- BotBee Settings
+- Fast2SMS Settings
+- Lemin AI RCS Settings
+- SMTP Settings
+- DLT Template Manager
+- API Settings
+- Billing Settings
+- User Roles
+- Audit Logs
+- System Health
+- OTP Debug
+- Test Notifications
+- AI Assistant
+
+BACKEND
+Restore every missing API including:
+- Authentication
+- OTP
+- Customers
+- Bookings
+- Packages
+- Payments
+- Razorpay
+- Fast2SMS
+- WhatsApp
+- Email
+- RCS
+- Notifications
+- Reports
+- Uploads
+- KYC
+- Admin
+
+Restore every missing Express route and middleware.
+
+DATABASE
+Recover all:
+- Tables
+- Relations
+- Foreign Keys
+- Indexes
+- Migrations
+- Seed Data
+- Views
+
+Do not recreate tables if they already exist.
+
+FRONTEND
+Restore:
+- Complete sidebar
+- Navigation
+- Dashboard widgets
+- Cards
+- Charts
+- Reports
+- Tables
+- Filters
+- Search
+- Pagination
+- Responsive layout
+
+Every sidebar menu must open its correct page without 404 errors.
+
+PERMISSIONS
+Restore:
+- Super Admin
+- Admin
+- Manager
+- Staff
+- Accountant
+- Customer
+
+VALIDATION
+Automatically verify:
+- No missing routes
+- No missing imports
+- No TypeScript errors
+- No React errors
+- No build errors
+- No console errors
+- No broken API calls
+- No broken navigation
+- No blank pages
+- No missing sidebar items
+
+Run:
+npm install
+npm run build
+
+Fix every error automatically until the project builds successfully.
+
+Finally, generate a Recovery Report listing:
+- Recovered pages
+- Recovered APIs
+- Recovered database tables
+- Recovered routes
+- Remaining issues (if any)
+
+Do not stop until the Admin Portal is fully restored to its original working state with all menus, features, dashboards, and integrations functioning correctly.

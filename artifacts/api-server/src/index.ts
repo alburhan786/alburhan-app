@@ -1836,45 +1836,86 @@ async function start() {
     setInterval(syncBotBeeTemplates, 10 * 60 * 1000);
     console.log("[BotBee] Template auto-sync scheduled every 10 minutes");
 
-    // ── WhatsApp retry engine — runs every 15 seconds, 30-second backoff between attempts ──
+    // ── WhatsApp retry engine — runs every 60 seconds, exponential backoff, max 5 retries ──
+    // Errors that indicate a PERMANENT failure (never worth retrying):
+    const WA_PERMANENT_ERRORS = [
+      "outside 24 hour window",
+      "24 hour window",
+      "not in window",
+      "user not opted in",
+      "blocked by user",
+    ];
+    const isWAPermanentError = (msg: string): boolean =>
+      WA_PERMANENT_ERRORS.some(e => msg?.toLowerCase().includes(e));
+
+    // First, clean up any existing permanently-failed rows so they stop clogging the queue
+    pool.query(
+      `UPDATE notification_logs SET status='permanently_failed', updated_at=NOW()
+       WHERE channel='whatsapp' AND status='failed' AND retry_count >= 5`
+    ).catch(() => {});
+
     const runRetryEngine = async () => {
       try {
-        const now = Date.now();
-        // Find failed messages that need retry based on retry_count and last attempt time
+        // Only retry messages that: failed, have retries left, waited long enough
+        // Exponential backoff: 2min, 5min, 15min, 30min, 60min between attempts
         const failed = await pool.query(
-          `SELECT id, event_type, recipient, message, retry_count, request_payload, updated_at
+          `SELECT id, event_type, recipient, message, retry_count, request_payload, updated_at,
+                  provider_response
            FROM notification_logs
            WHERE channel='whatsapp' AND status='failed' AND retry_count < 5
-             AND updated_at < NOW() - INTERVAL '30 seconds'
-           ORDER BY updated_at ASC LIMIT 10`
+             AND updated_at < NOW() - (INTERVAL '2 minutes' * POWER(2, retry_count))
+           ORDER BY updated_at ASC LIMIT 5`
         );
-        if (failed.rowCount && failed.rowCount > 0) {
-          console.log(`[RetryEngine] ${failed.rowCount} messages queued for retry`);
-          const { sendText, sendTemplate } = await import("./lib/botbee.js");
-          for (const log of failed.rows) {
-            try {
-              const reqPayload = log.request_payload as any;
-              const templateName = reqPayload?.template?.name;
-              const message = log.message;
-              let result: any;
-              if (templateName) {
-                result = await sendTemplate(log.recipient, templateName, reqPayload?.template?.components || [], { eventType: log.event_type });
-              } else if (message) {
-                result = await sendText(log.recipient, message.replace(/^\[template\] /, ""), { eventType: log.event_type });
-              } else { continue; }
-              await pool.query(
-                `UPDATE notification_logs SET retry_count=retry_count+1, status=$1, provider_response=$2, updated_at=NOW() WHERE id=$3`,
-                [result.ok ? "sent" : "failed", JSON.stringify(result), log.id]
-              ).catch(() => {});
-              console.log(`[RetryEngine] ${log.id} → ${result.ok ? "sent" : "failed"} (retry #${log.retry_count + 1})`);
-              await new Promise(r => setTimeout(r, 1000));
-            } catch (err) { console.error("[RetryEngine] retry error:", err); }
-          }
+        if (!failed.rowCount || failed.rowCount === 0) return;
+
+        const { sendText, sendTemplate } = await import("./lib/botbee.js");
+        for (const log of failed.rows) {
+          try {
+            // Check if this is a permanent error from a previous attempt — if so, give up now
+            const prevResponse = log.provider_response;
+            if (prevResponse) {
+              const prevMsg = typeof prevResponse === "string"
+                ? prevResponse
+                : JSON.stringify(prevResponse);
+              if (isWAPermanentError(prevMsg)) {
+                await pool.query(
+                  `UPDATE notification_logs SET status='permanently_failed', updated_at=NOW() WHERE id=$1`,
+                  [log.id]
+                ).catch(() => {});
+                continue; // Don't log this — it would spam
+              }
+            }
+
+            const reqPayload = log.request_payload as any;
+            const templateName = reqPayload?.template?.name;
+            const message = log.message;
+            let result: any;
+            if (templateName) {
+              result = await sendTemplate(log.recipient, templateName, reqPayload?.template?.components || [], { eventType: log.event_type });
+            } else if (message) {
+              result = await sendText(log.recipient, message.replace(/^\[template\] /, ""), { eventType: log.event_type });
+            } else { continue; }
+
+            // If this attempt itself returned a permanent error, mark done immediately
+            const resultMsg = result?.errorMessage || JSON.stringify(result);
+            const isPermanent = !result.ok && isWAPermanentError(resultMsg);
+            const newStatus = result.ok ? "sent" : (isPermanent ? "permanently_failed" : "failed");
+
+            await pool.query(
+              `UPDATE notification_logs SET retry_count=retry_count+1, status=$1, provider_response=$2, updated_at=NOW() WHERE id=$3`,
+              [newStatus, JSON.stringify(result), log.id]
+            ).catch(() => {});
+
+            if (!isPermanent) {
+              console.log(`[RetryEngine] ${log.id} → ${result.ok ? "sent ✓" : "failed"} (retry #${log.retry_count + 1})`);
+            }
+            await new Promise(r => setTimeout(r, 1500));
+          } catch (err) { console.error("[RetryEngine] retry error:", err); }
         }
       } catch (err) { console.error("[RetryEngine] engine error:", err); }
     };
-    setInterval(runRetryEngine, 15 * 1000);
-    console.log("[RetryEngine] WhatsApp retry engine scheduled every 15 seconds (30s backoff, max 5 retries)");
+    setInterval(runRetryEngine, 60 * 1000); // every 60s instead of every 15s
+    console.log("[RetryEngine] WhatsApp retry engine scheduled every 60 seconds (exponential backoff, max 5 retries)");
 
     // ── Generic cross-channel retry engine (SMS/RCS/Email/Push) — 30s backoff, max 3 ──
     const RETRY_DELAYS_SEC = [30, 30, 30];
