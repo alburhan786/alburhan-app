@@ -1,0 +1,191 @@
+Implement a complete Automatic Travel Notification & Document Delivery System for Al Burhan Tours & Travels.
+
+OBJECTIVE
+
+Whenever the admin uploads any customer travel document (Flight Ticket, Visa, Hotel Voucher, Tour Itinerary, Model Agreement, Insurance, Room Allotment, Bus Allotment, Haj ID Card, Tax Invoice, Payment Receipt, Passport Copy, Vaccination Certificate, Ziyarat Schedule, etc.), the system must automatically notify the customer via WhatsApp, SMS, Email, and RCS.
+
+----------------------------------------------------
+FLIGHT REMINDER AUTOMATION
+----------------------------------------------------
+
+Automatically send reminders based on the flight departure date.
+
+Reminder Schedule:
+
+• 7 Days Before Flight
+• 3 Days Before Flight
+• 2 Days Before Flight
+• 1 Day Before Flight
+• 12 Hours Before Flight
+• 6 Hours Before Flight
+• 3 Hours Before Flight
+
+Stop reminders automatically after the flight departs.
+
+----------------------------------------------------
+FLIGHT REMINDER MESSAGE
+----------------------------------------------------
+
+Assalamu Alaikum {Customer Name},
+
+This is a reminder that your Hajj/Umrah flight is scheduled on {Flight Date}.
+
+Flight Number: {Flight Number}
+Departure: {Departure Airport}
+Arrival: {Arrival Airport}
+Reporting Time: {Reporting Time}
+Terminal: {Terminal}
+
+Please report at the airport at least 4 hours before departure.
+
+May Allah accept your journey.
+
+Al Burhan Tours & Travels
++91 9893225590
+
+----------------------------------------------------
+WHEN ADMIN UPLOADS DOCUMENTS
+----------------------------------------------------
+
+Immediately after upload, automatically notify the customer.
+
+Supported Documents:
+
+• Flight Ticket
+• Visa
+• Hotel Voucher
+• Tax Invoice
+• Payment Receipt
+• Model Agreement
+• Tour Itinerary
+• Room Allotment
+• Bus Allotment
+• Insurance
+• Haj ID Card
+• Passport Copy
+• Vaccination Certificate
+• Ziyarat Schedule
+• Emergency Contact Card
+• Luggage Tag
+• Any PDF or Image uploaded by Admin
+
+----------------------------------------------------
+AUTOMATIC DOCUMENT MESSAGE
+----------------------------------------------------
+
+Assalamu Alaikum {Customer Name},
+
+Your {Document Name} has been uploaded successfully.
+
+Booking ID:
+{Booking ID}
+
+Package:
+{Package Name}
+
+Please log in to your Al Burhan Tours & Travels Dashboard to download or view your document.
+
+Dashboard:
+https://alburhantravels.com/dashboard
+
+For assistance:
++91 9893225590
+
+JazakAllah Khair.
+
+Al Burhan Tours & Travels
+
+----------------------------------------------------
+AUTOMATIC DELIVERY
+----------------------------------------------------
+
+Whenever a document is uploaded:
+
+✓ Save document
+✓ Show document in Customer Dashboard
+✓ Send WhatsApp notification
+✓ Send SMS notification
+✓ Send Email notification
+✓ Send RCS notification (if enabled)
+✓ Generate notification log
+✓ Mark document status as Delivered
+
+----------------------------------------------------
+ADMIN PANEL
+----------------------------------------------------
+
+Add Automatic Notification Settings
+
+Enable/Disable:
+
+✓ Flight Reminder Automation
+✓ Document Upload Notifications
+✓ WhatsApp
+✓ SMS
+✓ Email
+✓ RCS
+
+Add "Send Again" button for every document.
+
+----------------------------------------------------
+CUSTOMER DASHBOARD
+----------------------------------------------------
+
+Show:
+
+✓ New Document Available
+✓ Download Button
+✓ View PDF
+✓ Upload Date
+✓ Notification Sent Status
+
+----------------------------------------------------
+CRON JOBS
+----------------------------------------------------
+
+Run automatically every hour.
+
+Check:
+
+• Flight reminders
+• New uploaded documents
+• Failed notifications
+• Retry failed notifications
+
+----------------------------------------------------
+NOTIFICATION LOGS
+----------------------------------------------------
+
+Store:
+
+Booking ID
+Customer Name
+Document Name
+Notification Type
+Channel (SMS / WhatsApp / Email / RCS)
+Delivery Status
+Date & Time
+Retry Count
+Error Message
+
+----------------------------------------------------
+DEPLOYMENT
+----------------------------------------------------
+
+After implementation:
+
+• Build Backend
+• Build Frontend
+• Deploy to VPS
+• Restart PM2
+• Test complete workflow
+
+Verify:
+
+✓ Document upload appears instantly in Customer Dashboard.
+✓ WhatsApp notification sent.
+✓ SMS notification sent.
+✓ Email notification sent.
+✓ RCS notification sent.
+✓ Flight reminders are automatically sent 7, 3, 2, 1 days, 12 hours, 6 hours, and 3 hours before departure.
+✓ Notification logs are updated successfully.

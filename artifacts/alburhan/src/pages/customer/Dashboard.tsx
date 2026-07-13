@@ -777,9 +777,16 @@ function TravelDocumentsCard({ bookingId, bookingNumber, invoiceNumber, bookingS
                         )}
                       </div>
                     </div>
-                    <span className="text-[9px] font-semibold bg-white/80 text-emerald-700 border border-emerald-200 rounded-full px-2 py-0.5 shrink-0">
-                      READY
-                    </span>
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <span className="text-[9px] font-semibold bg-white/80 text-emerald-700 border border-emerald-200 rounded-full px-2 py-0.5">
+                        READY
+                      </span>
+                      {(doc.notificationSent || doc.notification_sent) && (
+                        <span className="text-[9px] font-semibold bg-emerald-100 text-emerald-700 rounded-full px-2 py-0.5 flex items-center gap-0.5">
+                          <CheckCheck size={9} /> Sent
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className={`grid grid-cols-${colCount} border-t border-black/5 divide-x divide-black/5`}>
                     {canPreview ? (

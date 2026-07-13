@@ -104,6 +104,7 @@ import AutomationCenter from "@/pages/admin/AutomationCenter";
 import LoyaltyManager from "@/pages/admin/LoyaltyManager";
 import ApiSettings from "@/pages/admin/ApiSettings";
 import PaymentReminderSettings from "@/pages/admin/PaymentReminderSettings";
+import AutoNotificationSettings from "@/pages/admin/AutoNotificationSettings";
 import AttendanceScanPublic from "@/pages/public/AttendanceScanPublic";
 import StaffVerify from "@/pages/public/StaffVerify";
 import VerifyPilgrim from "@/pages/public/VerifyPilgrim";
@@ -198,6 +199,7 @@ function Router() {
       <Route path="/admin/payment-analytics" component={() => <AdminRoute component={PaymentAnalytics} />} />
       <Route path="/admin/payments" component={() => <AdminRoute component={PaymentAnalytics} />} />
       <Route path="/admin/payment-reminders" component={() => <AdminRoute component={PaymentReminderSettings} />} />
+      <Route path="/admin/auto-notifications" component={() => <AdminRoute component={AutoNotificationSettings} />} />
       <Route path="/admin/payment-trash" component={() => <AdminRoute component={PaymentTrash} />} />
       <Route path="/admin/print-center" component={() => <AdminRoute component={PrintCenter} />} />
       <Route path="/admin/customers" component={() => <AdminRoute component={CustomerManager} />} />

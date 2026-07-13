@@ -53,12 +53,13 @@ import offlinePaymentsRouter from "./offline-payments.js";
 import apiSettingsRouter from "./api-settings.js";
 import whatsappRouter from "./whatsapp.js";
 import communicationRouter from "./communication.js";
+import autoNotificationsRouter from "./autoNotifications.js";
 import { requireAdmin } from "../lib/auth.js";
 
 const router: IRouter = Router();
 
 // ── Build fingerprint — confirms which bundle is running on VPS (no auth needed) ──
-const BUILD_STAMP = "2026-07-13-v15";
+const BUILD_STAMP = "2026-07-13-v16";
 router.get("/version", (_req, res) => {
   res.json({
     build: BUILD_STAMP,
@@ -322,6 +323,7 @@ router.use("/offline-payments", offlinePaymentsRouter);
 router.use("/api-settings", apiSettingsRouter);
 router.use("/whatsapp", whatsappRouter);
 router.use("/communication", communicationRouter);
+router.use("/auto-notifications", autoNotificationsRouter);
 router.use("/webhook", webhooksRouter);
 router.use(storageRouter);
 

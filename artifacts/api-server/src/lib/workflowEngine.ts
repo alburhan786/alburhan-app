@@ -12,8 +12,9 @@ export type WorkflowTrigger =
   | "visa_approved" | "visa_rejected"
   | "flight_assigned" | "hotel_assigned" | "bus_assigned"
   | "ziyarat_reminder"
-  | "departure_reminder_7d" | "departure_reminder_3d" | "departure_reminder_1d"
-  | "departure_reminder_12h" | "departure_reminder_6h" | "departure_reminder_2h"
+  | "departure_reminder_7d" | "departure_reminder_3d" | "departure_reminder_2d"
+  | "departure_reminder_1d" | "departure_reminder_12h" | "departure_reminder_6h"
+  | "departure_reminder_3h"
   | "return_reminder" | "feedback_request"
   | "document_expiry_90" | "document_expiry_60"
   | "document_expiry_30" | "document_expiry_7"
@@ -36,6 +37,11 @@ export interface WorkflowContext extends NotificationContext {
   busNumber?: string;
   flightNumber?: string;
   departureDate?: string;
+  departureTime?: string;
+  departureAirport?: string;
+  arrivalAirport?: string;
+  terminal?: string;
+  reportingTime?: string;
   visaStatus?: string;
   documentType?: string;
   expiryDate?: string;
@@ -71,10 +77,11 @@ const TRIGGER_TO_EVENT: Record<string, string> = {
   ziyarat_reminder: "departure_reminder",
   departure_reminder_7d: "departure_reminder",
   departure_reminder_3d: "departure_reminder",
+  departure_reminder_2d: "departure_reminder",
   departure_reminder_1d: "departure_reminder",
   departure_reminder_12h: "departure_reminder",
   departure_reminder_6h: "departure_reminder",
-  departure_reminder_2h: "departure_reminder",
+  departure_reminder_3h: "departure_reminder",
   return_reminder: "return_flight",
   feedback_request: "feedback_request",
   document_expiry_90: "document_expiry",
@@ -109,9 +116,11 @@ const TIMELINE_LABELS: Record<string, { icon: string; title: string }> = {
   bus_assigned: { icon: "🚌", title: "Bus Assigned" },
   departure_reminder_7d: { icon: "⏰", title: "Departure in 7 Days" },
   departure_reminder_3d: { icon: "⏰", title: "Departure in 3 Days" },
+  departure_reminder_2d: { icon: "⏰", title: "Departure in 2 Days" },
   departure_reminder_1d: { icon: "⏰", title: "Departure Tomorrow" },
   departure_reminder_12h: { icon: "🔔", title: "Departure in 12 Hours" },
   departure_reminder_6h: { icon: "🔔", title: "Departure in 6 Hours" },
+  departure_reminder_3h: { icon: "🔔", title: "Departure in 3 Hours" },
   return_reminder: { icon: "🏠", title: "Return Journey Details" },
   feedback_request: { icon: "⭐", title: "Feedback Requested" },
   document_expiry_90: { icon: "📅", title: "Document Expiry (90 Days)" },
@@ -328,12 +337,13 @@ export async function retryWorkflowLog(logId: number): Promise<{ success: boolea
 
 export function startDepartureReminderCron() {
   const TRIGGERS: Array<{ trigger: WorkflowTrigger; hoursAhead: number }> = [
-    { trigger: "departure_reminder_7d", hoursAhead: 7 * 24 },
-    { trigger: "departure_reminder_3d", hoursAhead: 3 * 24 },
-    { trigger: "departure_reminder_1d", hoursAhead: 24 },
+    { trigger: "departure_reminder_7d",  hoursAhead: 7 * 24 },
+    { trigger: "departure_reminder_3d",  hoursAhead: 3 * 24 },
+    { trigger: "departure_reminder_2d",  hoursAhead: 2 * 24 },
+    { trigger: "departure_reminder_1d",  hoursAhead: 24 },
     { trigger: "departure_reminder_12h", hoursAhead: 12 },
-    { trigger: "departure_reminder_6h", hoursAhead: 6 },
-    { trigger: "departure_reminder_2h", hoursAhead: 2 },
+    { trigger: "departure_reminder_6h",  hoursAhead: 6 },
+    { trigger: "departure_reminder_3h",  hoursAhead: 3 },
   ];
 
   const run = async () => {
@@ -342,30 +352,41 @@ export function startDepartureReminderCron() {
       if (!enabled) continue;
       try {
         const res = await pool.query(`
-          SELECT p.name, p.mobile, p.booking_id, b.booking_number, b.customer_name, b.customer_mobile,
-                 gf.flight_number, gf.departure_date
+          SELECT p.name, p.mobile, p.booking_id, b.booking_number, b.customer_name,
+                 b.customer_mobile, b.customer_email, b.customer_id,
+                 gf.flight_number, gf.departure_date, gf.departure_time,
+                 gf.departure_airport, gf.arrival_airport, gf.terminal
           FROM pilgrims p
           JOIN bookings b ON b.id = p.booking_id
           JOIN hajj_groups hg ON hg.id = p.group_id
-          JOIN group_flights gf ON gf.group_id = hg.id
+          JOIN group_flights gf ON gf.group_id = hg.id AND gf.flight_type = 'outbound'
           WHERE gf.departure_date IS NOT NULL
             AND gf.departure_date::timestamptz BETWEEN NOW() + interval '${hoursAhead - 1} hours'
             AND NOW() + interval '${hoursAhead + 1} hours'
             AND b.status = 'approved'
+            AND (b.is_deleted IS NULL OR b.is_deleted = false)
           LIMIT 100
         `);
         for (const row of res.rows) {
           await triggerWorkflow(trigger, {
             bookingId: row.booking_id,
             bookingNumber: row.booking_number,
+            customerId: row.customer_id,
             customerName: row.customer_name,
             customerMobile: row.customer_mobile,
+            customerEmail: row.customer_email,
             flightNumber: row.flight_number,
             departureDate: row.departure_date,
+            departureTime: row.departure_time,
+            departureAirport: row.departure_airport,
+            arrivalAirport: row.arrival_airport,
+            terminal: row.terminal,
             pilgramName: row.name,
           });
         }
-      } catch {}
+      } catch (err: any) {
+        console.error(`[DepartureReminder] Error for ${trigger}:`, err?.message || err);
+      }
     }
   };
 
@@ -375,7 +396,7 @@ export function startDepartureReminderCron() {
   };
   run().catch(() => {});
   schedule();
-  console.log("[DepartureReminder] Cron scheduled: hourly checks");
+  console.log("[DepartureReminder] Cron scheduled: hourly checks (7d/3d/2d/1d/12h/6h/3h)");
 }
 
 export function startDocumentExpiryCron() {

@@ -256,8 +256,14 @@ export function buildDefaultMessage(eventType: EventType, ctx: NotificationConte
       return `Assalamu Alaikum ${name},\n\nTransport details for your journey:\nBus: ${ctx.busNumber || "TBA"}${ctx.seatNumber ? `\nSeat: ${ctx.seatNumber}` : ""}\n\nPlease be at the assembly point 30 mins early.\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
     case "seat_changed":
       return `Assalamu Alaikum ${name},\n\nYour bus seat has been changed.\nBus: ${ctx.busNumber || "TBA"}\nNew Seat: ${ctx.seatNumber || "TBA"}\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
-    case "departure_reminder":
-      return `Assalamu Alaikum ${name},\n\nReminder: Your departure for ${pkg} is on ${ctx.departureDate || "the scheduled date"}. Please ensure all documents are ready.\n\nFor queries: +91 9893225590\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
+    case "departure_reminder": {
+      const depAirport = (ctx as any).departureAirport || ctx.departureAirport || "TBA";
+      const arrAirport = (ctx as any).arrivalAirport || ctx.arrivalAirport || "TBA";
+      const terminal   = (ctx as any).terminal || ctx.terminal || "TBA";
+      const depTime    = (ctx as any).departureTime || ctx.departureTime || "";
+      const repTime    = (ctx as any).reportingTime || (depTime ? `${depTime} (4 hours before departure)` : "4 hours before departure");
+      return `Assalamu Alaikum ${name},\n\nThis is a reminder that your Hajj/Umrah flight is scheduled on ${ctx.departureDate || "the scheduled date"}.\n\nFlight Number: ${ctx.flightNumber || "TBA"}\nDeparture: ${depAirport}\nArrival: ${arrAirport}\nReporting Time: ${repTime}\nTerminal: ${terminal}\n\nPlease report at the airport at least 4 hours before departure.\n\nMay Allah accept your journey.\n\nAl Burhan Tours & Travels\n+91 9893225590`;
+    }
     case "arrival_reminder":
       return `Assalamu Alaikum ${name},\n\nWelcome! Your arrival for ${pkg} is approaching. Our team will assist you at the destination.\n\nPhone: +91 9893225590\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
     case "return_reminder":

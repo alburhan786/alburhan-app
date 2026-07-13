@@ -14,7 +14,7 @@ import {
   IndianRupee, Users, Package as PackageIcon, Clock, Send, FileText,
   CheckCircle, XCircle, ScanLine, Printer, ClipboardPlus, BarChart2,
   BookOpen, UsersRound, MessageSquare, ImageIcon, Wallet, TrendingUp,
-  ShieldCheck, Megaphone, PieChart, Bell
+  ShieldCheck, Megaphone, PieChart, Bell, Plane
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -56,6 +56,7 @@ const MODULE_CARDS = [
   { icon: FileText, label: "Invoices", desc: "Billing & payment status", href: "/admin/invoices", color: "bg-orange-50 text-orange-700", border: "border-orange-200" },
   { icon: PieChart, label: "Payment Analytics", desc: "Today's collection & overdue", href: "/admin/payment-analytics", color: "bg-green-50 text-green-700", border: "border-green-200" },
   { icon: Bell, label: "Payment Reminders", desc: "Auto-reminders for pending balances", href: "/admin/payment-reminders", color: "bg-amber-50 text-amber-700", border: "border-amber-200" },
+  { icon: Plane, label: "Auto Notifications", desc: "Flight reminders & document alerts", href: "/admin/auto-notifications", color: "bg-sky-50 text-sky-700", border: "border-sky-200" },
   { icon: MessageSquare, label: "Inquiries", desc: "Customer inquiries", href: "/admin/inquiries", color: "bg-pink-50 text-pink-700", border: "border-pink-200" },
   { icon: ImageIcon, label: "Gallery", desc: "Homepage banner images", href: "/admin/gallery", color: "bg-lime-50 text-lime-700", border: "border-lime-200" },
   { icon: ShieldCheck, label: "KYC Management", desc: "Review & verify documents", href: "/admin/kyc", color: "bg-indigo-50 text-indigo-700", border: "border-indigo-200" },

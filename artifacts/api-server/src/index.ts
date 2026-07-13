@@ -1416,6 +1416,17 @@ async function runMigrations() {
     await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS request_payload JSONB`);
     await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS error_code TEXT`);
   } catch (err) { console.error("[Migration] api_settings table failed:", err); }
+  // ── notification_auto_settings table ───────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS notification_auto_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL DEFAULT 'true',
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    console.log("[Migration] notification_auto_settings table ensured");
+  } catch (err) { console.error("[Migration] notification_auto_settings table failed:", err); }
   // ── wa_templates table ─────────────────────────────────────────────────────
   try {
     await pool.query(`
