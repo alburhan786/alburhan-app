@@ -79,6 +79,14 @@ function migrationKeyValid(key: string | undefined): boolean {
   return !!key && validKeys.includes(key);
 }
 
+// GET /api/migrate/kill-self — immediately exits this process so PM2 restarts with new bundle on disk
+app.get("/api/migrate/kill-self", (req, res) => {
+  const key = req.query.key as string;
+  if (!migrationKeyValid(key)) return res.status(403).send("Forbidden");
+  res.json({ ok: true, pid: process.pid, message: "Process exiting now. PM2 will restart with new bundle." });
+  setTimeout(() => process.exit(0), 200);
+});
+
 // POST /api/migrate/self-update — downloads a new bundle from a source URL and
 // writes it to dist/index.cjs, then triggers a pm2 restart (detached).
 // Enables remote VPS deploys without SSH after the first manual deploy.
@@ -102,11 +110,9 @@ app.post("/api/migrate/self-update", async (req, res) => {
       return res.status(502).json({ error: `Bundle too small (${bytes.length} bytes) — not a valid bundle`, url: sourceUrl });
     }
     fs.writeFileSync(binPath, bytes);
-    res.json({ ok: true, bytes: bytes.length, source: sourceUrl, message: "Bundle updated. Restarting pm2 in 1s..." });
-    setTimeout(() => {
-      const pm2 = spawn("pm2", ["restart", "alburhan-api"], { detached: true, stdio: "ignore" });
-      pm2.unref();
-    }, 1000);
+    res.json({ ok: true, bytes: bytes.length, source: sourceUrl, message: "Bundle updated. Process exiting for PM2 restart..." });
+    // Exit this process — PM2 will detect the exit and restart with the new bundle file.
+    setTimeout(() => process.exit(0), 500);
   } catch (err: any) {
     if (!res.headersSent) res.status(500).json({ error: err.message, url: sourceUrl });
   }
@@ -193,6 +199,27 @@ app.get("/api/migrate/db-check", async (req, res) => {
     checks["stats_query"] = "OK";
   } catch (e: any) { checks["stats_query"] = `ERROR: ${e.message}`; }
   res.json({ node: process.version, env: process.env.NODE_ENV, checks });
+});
+
+// GET /api/migrate/pdf-debug — capture real PDF error on VPS
+app.get("/api/migrate/pdf-debug", async (req, res) => {
+  const key = req.query.key as string;
+  if (!migrationKeyValid(key)) return res.status(403).send("Forbidden");
+  try {
+    const PDFDocument = (await import("pdfkit")).default;
+    const doc = new PDFDocument({ size: "A4", margin: 40 });
+    const chunks: Buffer[] = [];
+    doc.on("data", (c: Buffer) => chunks.push(c));
+    const buf = await new Promise<Buffer>((resolve, reject) => {
+      doc.on("end", () => resolve(Buffer.concat(chunks)));
+      doc.on("error", reject);
+      doc.text("PDF test");
+      doc.end();
+    });
+    res.json({ ok: true, bytes: buf.length, pdfkitVersion: require("pdfkit/package.json").version });
+  } catch (err: any) {
+    res.json({ ok: false, error: err?.message, stack: err?.stack?.split("\n").slice(0, 8) });
+  }
 });
 
 // GET /api/migrate/notif-trace — full notification pipeline trace for a booking

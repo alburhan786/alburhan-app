@@ -213,10 +213,12 @@ router.post("/hot-reload", async (req: any, res: any) => {
     "pm2 save",
   ].join(" && ");
 
-  const child = spawn("sh", ["-c", `sleep 1 && ${cmd}`], { detached: true, stdio: "ignore" });
+  // Download + replace bundle in background, then exit so PM2 restarts with new file.
+  const child = spawn("sh", ["-c", cmd], { detached: true, stdio: "ignore" });
   child.unref();
 
-  res.json({ ok: true, message: "Deploy triggered — restarting in ~5s", dest, bundleUrl, pid: process.pid });
+  res.json({ ok: true, message: "Deploy triggered — process exiting for PM2 restart", dest, bundleUrl, pid: process.pid });
+  setTimeout(() => process.exit(0), 3000);
 });
 
 router.use(healthRouter);
