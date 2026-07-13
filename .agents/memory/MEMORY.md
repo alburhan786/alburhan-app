@@ -24,3 +24,4 @@
 - [BotBee WABA not connected](botbee-waba-status.md) — code is correct; BotBee API returns "route not found" because WABA not connected on BotBee dashboard; SMS OTP fallback works fine
 - [Payment notification gate fix](payment-notification-gate.md) — never gate processPaymentSuccessNotifications on newStatus; BotBee upload field is "media_file" not "file"; use native FormData
 - [ts-nocheck route strategy](ts-nocheck-routes.md) — 25+ API route files use // @ts-nocheck due to pervasive Drizzle schema type mismatches; do not remove without rebuilding lib/db types
+- [Notification packageName bug](notification-packagename-bug.md) — every triggerWorkflow() call must include packageName or messages say "your package"

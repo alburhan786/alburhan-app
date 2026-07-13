@@ -112,6 +112,7 @@ export async function processPaymentSuccessNotifications(opts: {
       customerName: booking.customerName,
       customerMobile: booking.customerMobile,
       customerEmail: booking.customerEmail ?? undefined,
+      packageName: booking.packageName ?? undefined,
       amount: isFullyPaid ? finalAmountNum : thisPaymentAmount,
       paidAmount: thisPaymentAmount,
       balanceAmount: remainingBalance,

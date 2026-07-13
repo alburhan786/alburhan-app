@@ -615,6 +615,7 @@ router.post("/:id/approve", requireAdmin as any, requirePermission("bookings", "
         bookingId: updated.id, bookingNumber: updated.bookingNumber,
         customerName: updated.customerName, customerMobile: updated.customerMobile,
         customerEmail: updated.customerEmail ?? undefined,
+        packageName: (updated as any).packageName ?? undefined,
       }).catch(() => {});
     }
   })();
