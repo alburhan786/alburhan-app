@@ -346,6 +346,112 @@ echo "╚═══════════════════════�
   res.send(script);
 });
 
+// GET /api/migrate/fixdeploy.sh — smarter deploy that auto-detects PM2 script path
+app.get("/api/migrate/fixdeploy.sh", (req, res) => {
+  const key = req.query.key as string;
+  if (!migrationKeyValid(key)) return res.status(403).send("Forbidden");
+
+  const DEV_URL_HERE = "https://57456384-023a-43e4-a60f-e6d8f967d324-00-vmg20t5z0q5l.spock.replit.dev";
+  const DEPLOY_KEY   = "alburhan-migrate-2026";
+
+  const script = `#!/bin/bash
+# Al Burhan Tours — VPS Fix Deploy (auto-detects PM2 script path)
+set -e
+DEV="${DEV_URL_HERE}"
+KEY="${DEPLOY_KEY}"
+PM2_APP="alburhan-api"
+FALLBACK="/var/www/alburhan/artifacts/api-server/dist/index.cjs"
+
+echo ""
+echo "=== Al Burhan VPS Fix Deploy ==="
+echo ""
+
+# Step 1: Find PM2's actual script path
+echo "[1] Finding PM2 script path..."
+PM2_SCRIPT=\$(pm2 describe "\$PM2_APP" 2>/dev/null | grep -E "script path|exec file" | grep -oP '(?<=│ )/.+' | head -1 | tr -d ' ')
+if [ -z "\$PM2_SCRIPT" ]; then
+  PM2_SCRIPT=\$(pm2 show "\$PM2_APP" 2>/dev/null | grep "script" | grep "/" | grep -oP '/[^ ]+' | head -1)
+fi
+if [ -z "\$PM2_SCRIPT" ]; then
+  # Try parsing pm2 list output
+  PM2_SCRIPT=\$(pm2 show "\$PM2_APP" 2>&1 | grep -i "exec file" | sed 's/.*│ //' | sed 's/ │.*//' | tr -d ' ')
+fi
+if [ -z "\$PM2_SCRIPT" ]; then
+  PM2_SCRIPT="\$FALLBACK"
+  echo "    Could not detect PM2 path, using fallback: \$FALLBACK"
+else
+  echo "    PM2 is running: \$PM2_SCRIPT"
+fi
+
+# Step 2: Download new bundle
+echo ""
+echo "[2] Downloading new bundle (~6MB from Replit dev)..."
+curl -fsSL --progress-bar "\$DEV/api/migrate/server.cjs?key=\$KEY" -o /tmp/new_bundle.cjs
+BSIZE=\$(stat -c%s /tmp/new_bundle.cjs 2>/dev/null || stat -f%z /tmp/new_bundle.cjs)
+echo "    Downloaded: \$BSIZE bytes"
+[ "\$BSIZE" -lt 5000000 ] && { echo "ERROR: Bundle too small"; exit 1; }
+
+# Step 3: Install bundle to BOTH the detected path and the standard fallback
+echo ""
+echo "[3] Installing bundle..."
+mkdir -p "\$(dirname "\$PM2_SCRIPT")"
+mkdir -p "\$(dirname "\$FALLBACK")"
+
+# Backup and install
+[ -f "\$PM2_SCRIPT" ] && cp "\$PM2_SCRIPT" "\$PM2_SCRIPT.bak.\$(date +%Y%m%d_%H%M%S)"
+cp /tmp/new_bundle.cjs "\$PM2_SCRIPT"
+echo "    Installed to PM2 path: \$PM2_SCRIPT"
+
+if [ "\$PM2_SCRIPT" != "\$FALLBACK" ]; then
+  [ -f "\$FALLBACK" ] && cp "\$FALLBACK" "\$FALLBACK.bak.\$(date +%Y%m%d_%H%M%S)"
+  cp /tmp/new_bundle.cjs "\$FALLBACK"
+  echo "    Also installed to: \$FALLBACK"
+fi
+
+# Step 4: Run SQL migration
+echo ""
+echo "[4] Running database migration..."
+curl -fsSL "\$DEV/api/migrate/vps-update.sql?key=\$KEY" -o /tmp/vps-update.sql
+if [ -z "\$DATABASE_URL" ]; then
+  for f in /var/www/alburhan/.env /var/www/alburhan/artifacts/api-server/.env; do
+    [ -f "\$f" ] && DB_LINE=\$(grep '^DATABASE_URL=' "\$f" 2>/dev/null | head -1) && [ -n "\$DB_LINE" ] && export \$DB_LINE && break
+  done
+fi
+[ -n "\$DATABASE_URL" ] && psql "\$DATABASE_URL" -f /tmp/vps-update.sql -q && echo "    ✓ Migration complete" || echo "    ⚠ Run manually: psql DB_URL -f /tmp/vps-update.sql"
+
+# Step 5: Deploy frontend
+echo ""
+echo "[5] Deploying frontend..."
+curl -fsSL "\$DEV/api/migrate/frontend.tar.gz?key=\$KEY" | tar -xzf - -C /var/www/alburhan
+echo "    ✓ Frontend deployed"
+
+# Step 6: Restart PM2 — force with explicit script path
+echo ""
+echo "[6] Restarting PM2..."
+pm2 stop "\$PM2_APP" 2>/dev/null || true
+pm2 start "\$PM2_SCRIPT" --name "\$PM2_APP" --interpreter node
+sleep 5
+pm2 status "\$PM2_APP"
+
+# Step 7: Verify
+echo ""
+echo "[7] Verifying..."
+sleep 2
+HEALTH=\$(curl -sf --max-time 8 "https://alburhantravels.com/api/health" 2>/dev/null || echo "timeout")
+echo "    Health: \$HEALTH"
+DB_CHK=\$(curl -sf --max-time 12 "https://alburhantravels.com/api/migrate/db-check?key=\$KEY" 2>/dev/null | head -c 150 || echo "endpoint not accessible")
+echo "    DB:     \$DB_CHK"
+
+echo ""
+echo "=== Done. If DB shows endpoint not accessible, migration endpoints are still blocked."
+echo "=== Share the pm2 describe output to diagnose further."
+`;
+
+  res.setHeader("Content-Type", "text/plain; charset=utf-8");
+  res.setHeader("Content-Disposition", "attachment; filename=fixdeploy.sh");
+  res.send(script);
+});
+
 // GET /api/migrate/dump.sql — serves DB dump (if file exists)
 app.get("/api/migrate/dump.sql", (req, res) => {
   const key = req.query.key as string;
