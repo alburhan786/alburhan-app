@@ -65,6 +65,9 @@ export interface NotificationContext {
   severity?: string;
   description?: string;
   groupName?: string;
+  invoiceUrl?: string;
+  invoicePdfUrl?: string;
+  finalAmount?: number;
   [key: string]: unknown;
 }
 
@@ -454,8 +457,59 @@ async function sendOnChannel(channel: Channel, ctx: NotificationContext, message
 // back to the free-form session message (sendWhatsApp) — this only succeeds
 // if the customer messaged within the last 24h, otherwise BotBee/Meta will
 // reject it and the failure is logged + retried as usual.
+// Events eligible for the approved BotBee Confirmation Template (ID 333473).
+// ALL other events must NOT use this template — they keep existing behaviour.
+const CONFIRMATION_TEMPLATE_EVENTS = new Set<EventType>(["payment_received", "booking_approved"]);
+
 async function sendWhatsAppForEvent(eventType: EventType, ctx: NotificationContext, message: string, bookingId?: string, customerId?: string): Promise<{ status: "sent" | "failed"; providerResponse: unknown }> {
   try {
+    // ── Priority path: BotBee Confirmation Template (ID 333473 / "conformation")
+    // Only fires for payment_received and booking_approved — never for document
+    // uploads, reminders, or any other event type.
+    if (CONFIRMATION_TEMPLATE_EVENTS.has(eventType)) {
+      const { sendConfirmationTemplate } = await import("./botbee.js");
+      const siteBase = "https://alburhantravels.com";
+      // Resolve invoice URL: prefer explicit invoiceUrl/invoicePdfUrl on context,
+      // then construct from bookingNumber, then fall back to site root.
+      const invoiceLink =
+        (ctx.invoiceUrl as string | undefined) ||
+        (ctx.invoicePdfUrl as string | undefined) ||
+        (ctx.bookingNumber ? `${siteBase}/invoice/${ctx.bookingNumber}` : siteBase);
+      // Use finalAmount if available (full booking amount), otherwise fall back
+      // to amount (= finalAmount on full-payment trigger from payments.ts).
+      const rawAmount =
+        ctx.finalAmount ??
+        ctx.amount ??
+        (ctx as Record<string, unknown>).totalAmount;
+      const totalAmountStr =
+        rawAmount != null
+          ? `₹${formatINR(Number(rawAmount))}`
+          : (ctx.paidAmount != null ? `₹${formatINR(Number(ctx.paidAmount))}` : "₹0");
+
+      const tplResult = await sendConfirmationTemplate(
+        ctx.customerMobile,
+        {
+          customerName:   ctx.customerName,
+          packageName:    ctx.packageName || "Hajj / Umrah Package",
+          totalAmount:    totalAmountStr,
+          attachmentLink: invoiceLink,
+        },
+        { eventType, bookingId, customerId },
+      );
+
+      if (tplResult.ok) {
+        console.log(`[notificationEngine] Confirmation template 333473 sent for ${eventType} → ${ctx.customerMobile}`);
+        return { status: "sent", providerResponse: tplResult };
+      }
+      // Template failed — log warning and fall through to free-form fallback
+      console.warn(
+        `[notificationEngine] Confirmation template 333473 failed for ${eventType} (${ctx.customerMobile}):`,
+        tplResult.errorMessage,
+        "— falling back to free-form session message",
+      );
+    }
+
+    // ── Standard path: look up wa_templates table for any other event ─────────
     const tpl = await pool.query(
       `SELECT name, variables FROM wa_templates WHERE event_type=$1 AND enabled=true AND status IN ('approved','local') ORDER BY is_builtin DESC LIMIT 1`,
       [eventType]
@@ -465,17 +519,19 @@ async function sendWhatsAppForEvent(eventType: EventType, ctx: NotificationConte
       const varNames: string[] = Array.isArray(variables) ? variables : JSON.parse(variables || "[]");
       const varMap: Record<string, unknown> = {
         customer_name: ctx.customerName,
-        booking_id: ctx.bookingNumber,
-        package_name: ctx.packageName,
-        amount: ctx.amount != null ? formatINR(ctx.amount) : undefined,
+        booking_id:    ctx.bookingNumber,
+        package_name:  ctx.packageName,
+        amount:        ctx.amount != null ? formatINR(ctx.amount) : undefined,
         invoice_number: ctx.invoiceNumber,
-        ticket_number: ctx.invoiceNumber,
-        flight_number: ctx.flightNumber,
+        ticket_number:  ctx.invoiceNumber,
+        flight_number:  ctx.flightNumber,
         departure_date: ctx.departureDate,
         departure_time: (ctx as Record<string, unknown>).departureTime ?? ctx.departureDate,
-        visa_number: ctx.visaNumber,
-        hotel_name: ctx.hotelName,
-        room_number: ctx.roomNumber,
+        visa_number:    ctx.visaNumber,
+        hotel_name:     ctx.hotelName,
+        room_number:    ctx.roomNumber,
+        invoice_url:    (ctx.invoiceUrl as string | undefined) ||
+                        (ctx.bookingNumber ? `https://alburhantravels.com/invoice/${ctx.bookingNumber}` : undefined),
       };
       const params = varNames.map((v) => ({ type: "text", text: String(varMap[v] ?? "-") }));
       const components = params.length ? [{ type: "body", parameters: params }] : [];
@@ -483,8 +539,8 @@ async function sendWhatsAppForEvent(eventType: EventType, ctx: NotificationConte
       if (result.ok) return { status: "sent", providerResponse: result };
       console.warn(`[notificationEngine] WhatsApp template "${name}" failed for ${eventType}, falling back to session message:`, result.errorMessage);
     }
-    // No approved template mapped, or template send failed — try free-form
-    // session message as a best-effort fallback (works only inside 24h window).
+
+    // ── Last-resort: free-form session message (works only inside 24h window) ──
     const result = await sendWhatsApp(ctx.customerMobile, message);
     return { status: result.ok ? "sent" : "failed", providerResponse: result };
   } catch (err: unknown) {

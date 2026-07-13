@@ -408,6 +408,132 @@ export async function sendPDFDocument(
   return sendFile(to, up.mediaId, caption || filename, opts);
 }
 
+// ── Approved BotBee Confirmation Template (ID 333473 / "conformation") ────────
+//
+// Utility template — Category: Utility, Language: English (UK)
+// Variables in order:
+//   {{User-Name}}                  → customerName
+//   {{system-appointment-name}}    → packageName
+//   {{system-cart-total-price}}    → totalAmount  (pre-formatted, e.g. "₹90,000")
+//   {{system-attachment-link}}     → attachmentLink (invoice page URL)
+//
+// Use ONLY for:
+//   • payment_received  (fully paid — booking confirmed + invoice generated)
+//   • booking_approved  (admin approval confirmation)
+//
+// Do NOT use for: flight reminder, visa, tickets, travel docs, payment reminders,
+// or any other general notification.
+
+export const CONFIRMATION_TEMPLATE_NAME = "conformation";
+export const CONFIRMATION_TEMPLATE_ID   = "333473";
+
+export async function sendConfirmationTemplate(
+  to: string,
+  ctx: {
+    customerName:   string;
+    packageName:    string;
+    totalAmount:    string;
+    attachmentLink: string;
+  },
+  opts?: { eventType?: string; bookingId?: string; customerId?: string }
+): Promise<BotBeeResult> {
+  const { apiToken, phone_number_id, enabled, baseUrl } = getCredentials();
+  const endpoint = `${baseUrl}/whatsapp/send/template`;
+
+  if (!enabled) {
+    return { ok: false, provider: "BotBee", endpoint, errorMessage: "WhatsApp disabled in API Settings" };
+  }
+  if (!apiToken || !phone_number_id) {
+    return { ok: false, provider: "BotBee", endpoint, errorMessage: "BotBee credentials not configured" };
+  }
+
+  let phone: string;
+  try {
+    phone = toBotBeePhone(to);
+  } catch (err: any) {
+    const result: BotBeeResult = {
+      ok: false, provider: "BotBee", endpoint,
+      errorMessage: err?.message || "Invalid mobile number",
+    };
+    if (opts?.eventType) {
+      await logToDb({
+        eventType: opts.eventType, channel: "whatsapp",
+        recipient: to || "unknown",
+        bookingId: opts.bookingId, customerId: opts.customerId,
+        message: `Template: ${CONFIRMATION_TEMPLATE_NAME} (ID: ${CONFIRMATION_TEMPLATE_ID})`,
+        status: "failed", result,
+      });
+    }
+    return result;
+  }
+
+  const BOTBEE_BUSINESS_ID = (process.env.BOTBEE_BUSINESS_ID || "").trim();
+  const payload: Record<string, unknown> = {
+    apiToken,
+    phone_number_id,
+    phone_number: phone,
+    template: {
+      name: CONFIRMATION_TEMPLATE_NAME,
+      id:   CONFIRMATION_TEMPLATE_ID,
+      language: { code: "en_GB" },
+      components: [{
+        type: "body",
+        parameters: [
+          { type: "text", text: ctx.customerName   },
+          { type: "text", text: ctx.packageName    },
+          { type: "text", text: ctx.totalAmount    },
+          { type: "text", text: ctx.attachmentLink },
+        ],
+      }],
+    },
+  };
+  if (BOTBEE_BUSINESS_ID) payload.business_account_id = BOTBEE_BUSINESS_ID;
+  const reqPayload = { ...payload, apiToken: "***" };
+
+  let result: BotBeeResult;
+  try {
+    const response = await withRetry(() =>
+      axios.post(endpoint, payload, { headers: { "Content-Type": "application/json" }, timeout: 12000 })
+    );
+    const data = response.data;
+    const failed = data?.status === "0" || data?.status === 0 || !!data?.error;
+    result = failed
+      ? {
+          ok: false, provider: "BotBee", endpoint,
+          httpStatus: response.status, requestPayload: reqPayload, responsePayload: data,
+          errorMessage: data.message || data.error || "Confirmation template send failed",
+        }
+      : {
+          ok: true, provider: "BotBee", endpoint,
+          httpStatus: response.status, requestPayload: reqPayload, responsePayload: data,
+          messageId: data?.messages?.[0]?.id || data?.message_id,
+        };
+    console.log(
+      result.ok ? "[BotBee] sendConfirmationTemplate sent" : "[BotBee] sendConfirmationTemplate failed",
+      `(ID: ${CONFIRMATION_TEMPLATE_ID}, name: ${CONFIRMATION_TEMPLATE_NAME}) to`, to,
+    );
+  } catch (err: any) {
+    const resp = err?.response;
+    result = {
+      ok: false, provider: "BotBee", endpoint,
+      httpStatus: resp?.status, requestPayload: reqPayload, responsePayload: resp?.data,
+      errorMessage: resp?.data?.message || err.message,
+    };
+    console.error("[BotBee] sendConfirmationTemplate error:", err.message);
+  }
+
+  if (opts?.eventType) {
+    await logToDb({
+      eventType: opts.eventType, channel: "whatsapp", recipient: to,
+      bookingId: opts.bookingId, customerId: opts.customerId,
+      message: `Template: ${CONFIRMATION_TEMPLATE_NAME} (ID: ${CONFIRMATION_TEMPLATE_ID}) | ${ctx.customerName} | ${ctx.packageName} | ${ctx.totalAmount} | ${ctx.attachmentLink}`,
+      status: result.ok ? "sent" : "failed",
+      result,
+    });
+  }
+  return result;
+}
+
 // ── Template management ───────────────────────────────────────────────────────
 
 export interface WaTemplate {

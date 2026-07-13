@@ -600,6 +600,7 @@ router.post("/:id/approve", requireAdmin as any, requirePermission("bookings", "
         invoiceNumber:    (inv as any)?.invoice_number ?? (updated as any).invoiceNumber ?? undefined,
       });
       const attachments = [{ filename: `Invoice-${updated.bookingNumber}.pdf`, content: pdfBuf, contentType: "application/pdf" }];
+      const approvedInvoiceUrl = `https://alburhantravels.com/invoice/${updated.bookingNumber}`;
       await triggerWorkflow("booking_approved", {
         bookingId:     updated.id,
         bookingNumber: updated.bookingNumber,
@@ -607,6 +608,7 @@ router.post("/:id/approve", requireAdmin as any, requirePermission("bookings", "
         customerMobile: updated.customerMobile,
         customerEmail: updated.customerEmail ?? undefined,
         packageName:   (updated as any).packageName ?? undefined,
+        invoiceUrl:    approvedInvoiceUrl,
         attachments,
       });
     } catch (pdfErr) {
@@ -616,6 +618,7 @@ router.post("/:id/approve", requireAdmin as any, requirePermission("bookings", "
         customerName: updated.customerName, customerMobile: updated.customerMobile,
         customerEmail: updated.customerEmail ?? undefined,
         packageName: (updated as any).packageName ?? undefined,
+        invoiceUrl: `https://alburhantravels.com/invoice/${updated.bookingNumber}`,
       }).catch(() => {});
     }
   })();

@@ -1,0 +1,70 @@
+Update the WhatsApp notification workflow to use ONLY my approved BotBee WhatsApp template.
+
+BotBee Template Details:
+- Template ID: 333473
+- Template Name: conformation
+- Category: Utility
+- Language: English (UK)
+
+IMPORTANT RULES:
+
+1. Use Template ID 333473 ONLY for:
+   ✅ Booking Confirmation
+   ✅ Invoice Generated AFTER successful payment
+
+2. Do NOT use this template for:
+   ❌ Flight Reminder
+   ❌ Visa Uploaded
+   ❌ Ticket Uploaded
+   ❌ Travel Itinerary Uploaded
+   ❌ Model Agreement Uploaded
+   ❌ Passport Upload
+   ❌ Payment Reminder
+   ❌ General Notifications
+
+3. Trigger the template automatically ONLY after:
+   - Customer payment is successful (Razorpay/Manual Payment).
+   - Booking status changes to CONFIRMED.
+   - Invoice PDF has been generated.
+
+4. Attach the generated Invoice PDF to the WhatsApp message.
+
+5. Map template variables as:
+   {{User-Name}} → customer.fullName
+   {{system-appointment-name}} → booking.packageName
+   {{system-cart-total-price}} → booking.totalAmount
+   {{system-attachment-link}} → invoicePdfUrl
+
+6. Workflow:
+   Customer makes payment
+        ↓
+   Payment verified
+        ↓
+   Booking automatically confirmed
+        ↓
+   Generate invoice PDF
+        ↓
+   Send WhatsApp Template ID 333473 with invoice PDF attached
+        ↓
+   Save delivery status in notification_logs
+
+7. Prevent duplicate messages.
+   If the Booking Confirmation WhatsApp has already been sent, do not send it again.
+
+8. Log:
+   - Booking ID
+   - Customer Name
+   - WhatsApp Number
+   - Template ID (333473)
+   - Invoice URL
+   - Delivery Status
+   - Date & Time
+
+9. If WhatsApp delivery fails:
+   - Retry up to 3 times.
+   - Record the error.
+   - Do not create duplicate invoices.
+
+10. Keep all other WhatsApp notifications unchanged. Only Booking Confirmation and Invoice Generated after successful payment should use Template ID 333473.
+
+Deploy the changes, test with a successful payment, and verify that the customer automatically receives the approved WhatsApp template with the invoice PDF attached.
