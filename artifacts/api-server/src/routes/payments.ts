@@ -87,9 +87,11 @@ export async function processPaymentSuccessNotifications(opts: {
   try {
     const receiptBuf = await generateReceiptPdfBuffer(docOpts);
     attachments.push({ filename: `Receipt-${booking.bookingNumber}.pdf`, content: receiptBuf, contentType: "application/pdf" });
-    if (isFullyPaid) {
+    // Generate invoice PDF for any payment that has an invoice number (partial or full)
+    if (invoiceNumber) {
       const invBuf = await generateInvoicePdfBuffer(docOpts);
-      attachments.push({ filename: `Invoice-${invoiceNumber || booking.bookingNumber}.pdf`, content: invBuf, contentType: "application/pdf" });
+      const safeInvNum = invoiceNumber.replace(/\//g, "-");
+      attachments.push({ filename: `Invoice-${safeInvNum}.pdf`, content: invBuf, contentType: "application/pdf" });
     }
   } catch (err) {
     console.error("[payments] PDF generation failed:", err);
