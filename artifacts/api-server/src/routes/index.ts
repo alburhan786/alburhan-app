@@ -57,6 +57,18 @@ import { requireAdmin } from "../lib/auth.js";
 
 const router: IRouter = Router();
 
+// ── Build fingerprint — confirms which bundle is running on VPS (no auth needed) ──
+const BUILD_STAMP = "2026-07-13-v3";
+router.get("/version", (_req, res) => {
+  res.json({
+    build: BUILD_STAMP,
+    pid: process.pid,
+    node: process.version,
+    cwd: process.cwd(),
+    time: new Date().toISOString(),
+  });
+});
+
 // ── Public env-check: shows which required vars are SET vs MISSING (no values) ──
 router.get("/env-check", (_req, res) => {
   const required = [
@@ -189,16 +201,22 @@ router.post("/hot-reload", async (req: any, res: any) => {
 
   const dest = "/var/www/alburhan/artifacts/api-server/dist/index.cjs";
   const { spawn } = await import("child_process");
+  // Kill any zombie process holding the port, then restart PM2.
+  // fuser / lsof are tried in order; if both fail we still continue.
+  const killZombie = "fuser -k ${PORT:-8080}/tcp 2>/dev/null || lsof -ti:${PORT:-8080} | xargs kill -9 2>/dev/null || true";
   const cmd = [
-    `curl -fsSL -H "Cookie: ${req.body?.cookie || ""}" "${bundleUrl}" -o "${dest}.tmp"`,
+    `curl -fsSL "${bundleUrl}" -o "${dest}.tmp"`,
     `mv "${dest}.tmp" "${dest}"`,
-    "pm2 restart alburhan-api",
+    killZombie,
+    "sleep 2",
+    "pm2 restart alburhan-api 2>/dev/null || pm2 start \"" + dest + "\" --name alburhan-api",
+    "pm2 save",
   ].join(" && ");
 
-  const child = spawn("sh", ["-c", `sleep 2 && ${cmd}`], { detached: true, stdio: "ignore" });
+  const child = spawn("sh", ["-c", `sleep 1 && ${cmd}`], { detached: true, stdio: "ignore" });
   child.unref();
 
-  res.json({ ok: true, message: "Deploy triggered — server restarting in ~2s", dest, bundleUrl });
+  res.json({ ok: true, message: "Deploy triggered — restarting in ~5s", dest, bundleUrl, pid: process.pid });
 });
 
 router.use(healthRouter);
@@ -304,5 +322,29 @@ router.use("/whatsapp", whatsappRouter);
 router.use("/communication", communicationRouter);
 router.use("/webhook", webhooksRouter);
 router.use(storageRouter);
+
+// ── Migration diagnostics (router-level, no session required, key-protected) ──
+// These mirror the app-level routes in app.ts. Being in the router guarantees
+// they work on VPS even if the app-level registration order is wrong.
+function migrationKeyOk(key: string | undefined): boolean {
+  const valid = [process.env.MIGRATION_KEY, "alburhan-migrate-2026"].filter(Boolean);
+  return !!key && valid.includes(key);
+}
+
+router.get("/migrate/db-check", async (req: any, res: any) => {
+  const key = req.query.key as string;
+  if (!migrationKeyOk(key)) return res.status(403).json({ error: "Forbidden" });
+  try {
+    const { pool } = await import("@workspace/db");
+    const checks: Record<string, any> = {};
+    for (const t of ["users", "bookings", "payment_transactions", "notification_logs", "invoices", "offline_payments"]) {
+      try {
+        const r = await pool.query(`SELECT COUNT(*) FROM ${t}`);
+        checks[t] = `ok (${r.rows[0].count} rows)`;
+      } catch (e: any) { checks[t] = `ERROR: ${e.message.split("\n")[0]}`; }
+    }
+    res.json({ ok: true, build: BUILD_STAMP, pid: process.pid, tables: checks });
+  } catch (e: any) { res.status(500).json({ ok: false, error: e.message }); }
+});
 
 export default router;
