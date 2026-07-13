@@ -13,3 +13,5 @@
 - [Per-route auth pattern](per-route-auth-pattern.md) — this codebase applies requireAdmin/requireAuth per-route, not at router.use() mount; audits that only check mount-level auth will false-positive as "unprotected".
 - [triggerWorkflow/fireNotificationEvent arg bug](smtp-workflow-arg-bug.md) — wrong-arity call silently dropped ctx (name/email/amount/attachments) on all triggerWorkflow-routed notifications; fixed, but pattern worth re-checking if fields go blank again.
 - [Invoice E2E deploy patterns](invoice-e2e-deploy.md) — upsertInvoice call sites, PDF endpoint, BotBee template API removed, VPS deploy
+- [SMS DLT quick route fallback](sms-dlt-quick-route.md) — sendDLTSMS tries DLT first then quick route; old notify_template_id "211277" invalid, quick route confirmed working
+- [BotBee template status](botbee-template-status.md) — /whatsapp/send/template endpoint correct (slash not hyphen); "WhatsApp account not found" is BotBee dashboard setup issue, not code

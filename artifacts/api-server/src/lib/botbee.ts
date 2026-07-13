@@ -136,7 +136,7 @@ export async function sendTemplate(
   opts?: { eventType?: string; bookingId?: string; customerId?: string }
 ): Promise<BotBeeResult> {
   const { apiToken, phone_number_id, enabled, baseUrl } = getCredentials();
-  const endpoint = `${baseUrl}/whatsapp/send-template`;
+  const endpoint = `${baseUrl}/whatsapp/send/template`;
   if (!enabled) return { ok: false, provider: "BotBee", endpoint, errorMessage: "WhatsApp disabled in API Settings" };
   if (!apiToken || !phone_number_id) return { ok: false, provider: "BotBee", endpoint, errorMessage: "BotBee credentials not configured" };
 
@@ -150,7 +150,9 @@ export async function sendTemplate(
     }
     return result;
   }
-  const payload = { apiToken, phone_number_id, phone_number: phone, template: { name: templateName, language: { code: "en" }, components } };
+  const BOTBEE_BUSINESS_ID = process.env.BOTBEE_BUSINESS_ID || "";
+  const payload: Record<string, unknown> = { apiToken, phone_number_id, phone_number: phone, template: { name: templateName, language: { code: "en" }, components } };
+  if (BOTBEE_BUSINESS_ID) payload.business_account_id = BOTBEE_BUSINESS_ID;
   const reqPayload = { ...payload, apiToken: "***" };
 
   let result: BotBeeResult;

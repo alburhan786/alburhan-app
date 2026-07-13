@@ -316,17 +316,47 @@ export async function sendDLTSMS(
     console.log("[SMS-DLT] API key not set — vars:", var1, var2, var3, "for:", mobile);
     return false;
   }
+  const phone = toFast2SMSPhone(mobile);
+  const f2sExtra = getFast2SMSExtra();
+
+  // ── Route 1: DLT (registered template, required for production India) ────
+  if (f2sExtra.notify_template_id) {
+    try {
+      const variables = encodeURIComponent(`${var1}|${var2}|${var3}|`);
+      const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=dlt&sender_id=${f2sExtra.sender_id}&message=${f2sExtra.notify_template_id}&variables_values=${variables}&numbers=${phone}&flash=0`;
+      const response = await withRetry(() => axios.get(url));
+      const data = response.data;
+      // Fast2SMS returns HTTP 200 even on failure — must check body
+      if (data?.return === false || data?.status_code >= 400) {
+        console.error(`[SMS-DLT] DLT failed for ${mobile}:`, JSON.stringify(data), "— falling back to quick route");
+      } else {
+        console.log("[SMS-DLT] Sent via DLT to", mobile, data);
+        return true;
+      }
+    } catch (err: any) {
+      console.error(`[SMS-DLT] DLT error for ${mobile}:`, err?.message, "— falling back to quick route");
+    }
+  } else {
+    console.log("[SMS-DLT] No notify_template_id configured — skipping DLT, using quick route");
+  }
+
+  // ── Route 2: Quick (plain text fallback, no DLT registration needed) ─────
   try {
-    const phone = toFast2SMSPhone(mobile);
-    const f2sExtra = getFast2SMSExtra();
-    const variables = encodeURIComponent(`${var1}|${var2}|${var3}|`);
-    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=dlt&sender_id=${f2sExtra.sender_id}&message=${f2sExtra.notify_template_id}&variables_values=${variables}&numbers=${phone}&flash=0`;
+    const plainMsg = encodeURIComponent(
+      `Dear ${var1}, your booking ${var2} is confirmed. Thank you for choosing Al Burhan Tours & Travels.`
+    );
+    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=q&message=${plainMsg}&flash=0&numbers=${phone}`;
     const response = await withRetry(() => axios.get(url));
-    console.log("[SMS-DLT] Sent to", mobile, response.data);
+    const data = response.data;
+    if (data?.return === false || data?.status_code >= 400) {
+      console.error(`[SMS-Quick] Failed for ${mobile}:`, JSON.stringify(data));
+      return false;
+    }
+    console.log("[SMS-Quick] Sent via quick route to", mobile, data);
     return true;
   } catch (err: any) {
     const errData = err?.response?.data || err.message;
-    console.error("[SMS-DLT] Error after retries for", mobile, ":", JSON.stringify(errData));
+    console.error("[SMS-Quick] Error for", mobile, ":", JSON.stringify(errData));
     return false;
   }
 }
