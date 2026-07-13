@@ -14,4 +14,6 @@
 - [triggerWorkflow/fireNotificationEvent arg bug](smtp-workflow-arg-bug.md) — wrong-arity call silently dropped ctx (name/email/amount/attachments) on all triggerWorkflow-routed notifications; fixed, but pattern worth re-checking if fields go blank again.
 - [Invoice E2E deploy patterns](invoice-e2e-deploy.md) — upsertInvoice call sites, PDF endpoint, BotBee template API removed, VPS deploy
 - [SMS DLT quick route fallback](sms-dlt-quick-route.md) — sendDLTSMS tries DLT first then quick route; old notify_template_id "211277" invalid, quick route confirmed working
-- [BotBee template status](botbee-template-status.md) — /whatsapp/send/template endpoint correct (slash not hyphen); "WhatsApp account not found" is BotBee dashboard setup issue, not code
+- [pdfkit must stay external in bundle](pdfkit-bundle-external.md) — pdfkit loads AFM/ICC data files from __dirname at runtime; bundling breaks all PDF endpoints on VPS with HTTP 500
+- [VPS self-update uses process.exit(0)](vps-self-update-exit.md) — spawn("pm2",...) silently fails (not in PATH); process.exit(0) lets PM2 detect crash and restart with new bundle file on disk
+- [BotBee WABA not connected](botbee-waba-status.md) — code is correct; BotBee API returns "route not found" because WABA not connected on BotBee dashboard; SMS OTP fallback works fine
