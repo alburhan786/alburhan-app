@@ -105,19 +105,22 @@ export interface DocDeliveryInput {
   fileName: string;
   fileUrl: string;
   mimeType?: string | null;
+  packageName?: string | null;
 }
 
 export async function sendDocumentToCustomer(input: DocDeliveryInput): Promise<{ whatsapp: boolean; email: boolean; sms: boolean }> {
   const {
     docId, bookingId, bookingNumber, customerId, customerName,
     customerMobile, customerEmail, documentType, fileName, fileUrl, mimeType,
+    packageName,
   } = input;
 
   const label = DOC_TYPE_LABELS[documentType] || documentType.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
   const siteBase = process.env.SITE_URL || "https://alburhantravels.com";
   const dashboardUrl = `${siteBase}/dashboard`;
+  const pkgLine = packageName ? `\nPackage:\n${packageName}` : "";
 
-  const whatsappMessage = `Assalamu Alaikum ${customerName},\n\nAlhamdulillah! 🎉 Your *${label}* for booking *#${bookingNumber}* is ready.\n\nPlease login to your dashboard to view and download all your documents:\n📱 ${dashboardUrl}\n\nFor any queries:\n📞 +91 8989701701\n\nJazak Allah Khair!\n*Al Burhan Tours & Travels*`;
+  const whatsappMessage = `Assalamu Alaikum ${customerName},\n\nYour *${label}* has been uploaded successfully.\n\nBooking ID:\n#${bookingNumber}${pkgLine}\n\nPlease login to your dashboard to view and download:\n📱 ${dashboardUrl}\n\nFor assistance:\n📞 +91 9893225590\n\n*Al Burhan Tours & Travels*`;
 
   const notifOpts = { eventType: "document_delivered", bookingId, customerId: customerId || undefined };
 

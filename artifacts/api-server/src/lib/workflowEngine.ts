@@ -335,66 +335,70 @@ export async function retryWorkflowLog(logId: number): Promise<{ success: boolea
   }
 }
 
-export function startDepartureReminderCron() {
-  const TRIGGERS: Array<{ trigger: WorkflowTrigger; hoursAhead: number }> = [
-    { trigger: "departure_reminder_7d",  hoursAhead: 7 * 24 },
-    { trigger: "departure_reminder_3d",  hoursAhead: 3 * 24 },
-    { trigger: "departure_reminder_2d",  hoursAhead: 2 * 24 },
-    { trigger: "departure_reminder_1d",  hoursAhead: 24 },
-    { trigger: "departure_reminder_12h", hoursAhead: 12 },
-    { trigger: "departure_reminder_6h",  hoursAhead: 6 },
-    { trigger: "departure_reminder_3h",  hoursAhead: 3 },
-  ];
+const DEPARTURE_TRIGGERS: Array<{ trigger: WorkflowTrigger; hoursAhead: number }> = [
+  { trigger: "departure_reminder_7d",  hoursAhead: 7 * 24 },
+  { trigger: "departure_reminder_3d",  hoursAhead: 3 * 24 },
+  { trigger: "departure_reminder_2d",  hoursAhead: 2 * 24 },
+  { trigger: "departure_reminder_1d",  hoursAhead: 24 },
+  { trigger: "departure_reminder_12h", hoursAhead: 12 },
+  { trigger: "departure_reminder_6h",  hoursAhead: 6 },
+  { trigger: "departure_reminder_3h",  hoursAhead: 3 },
+];
 
-  const run = async () => {
-    for (const { trigger, hoursAhead } of TRIGGERS) {
-      const enabled = await getRuleEnabled(trigger);
-      if (!enabled) continue;
-      try {
-        const res = await pool.query(`
-          SELECT p.name, p.mobile, p.booking_id, b.booking_number, b.customer_name,
-                 b.customer_mobile, b.customer_email, b.customer_id,
-                 gf.flight_number, gf.departure_date, gf.departure_time,
-                 gf.departure_airport, gf.arrival_airport, gf.terminal
-          FROM pilgrims p
-          JOIN bookings b ON b.id = p.booking_id
-          JOIN hajj_groups hg ON hg.id = p.group_id
-          JOIN group_flights gf ON gf.group_id = hg.id AND gf.flight_type = 'outbound'
-          WHERE gf.departure_date IS NOT NULL
-            AND gf.departure_date::timestamptz BETWEEN NOW() + interval '${hoursAhead - 1} hours'
-            AND NOW() + interval '${hoursAhead + 1} hours'
-            AND b.status = 'approved'
-            AND (b.is_deleted IS NULL OR b.is_deleted = false)
-          LIMIT 100
-        `);
-        for (const row of res.rows) {
-          await triggerWorkflow(trigger, {
-            bookingId: row.booking_id,
-            bookingNumber: row.booking_number,
-            customerId: row.customer_id,
-            customerName: row.customer_name,
-            customerMobile: row.customer_mobile,
-            customerEmail: row.customer_email,
-            flightNumber: row.flight_number,
-            departureDate: row.departure_date,
-            departureTime: row.departure_time,
-            departureAirport: row.departure_airport,
-            arrivalAirport: row.arrival_airport,
-            terminal: row.terminal,
-            pilgramName: row.name,
-          });
-        }
-      } catch (err: any) {
-        console.error(`[DepartureReminder] Error for ${trigger}:`, err?.message || err);
+export async function runDepartureReminderCheck(): Promise<{ processed: number; skipped: number }> {
+  let processed = 0;
+  let skipped = 0;
+  for (const { trigger, hoursAhead } of DEPARTURE_TRIGGERS) {
+    const enabled = await getRuleEnabled(trigger);
+    if (!enabled) { skipped++; continue; }
+    try {
+      const res = await pool.query(`
+        SELECT p.name, p.mobile, p.booking_id, b.booking_number, b.customer_name,
+               b.customer_mobile, b.customer_email, b.customer_id,
+               gf.flight_number, gf.departure_date, gf.departure_time,
+               gf.departure_airport, gf.arrival_airport, gf.terminal
+        FROM pilgrims p
+        JOIN bookings b ON b.id = p.booking_id
+        JOIN hajj_groups hg ON hg.id = p.group_id
+        JOIN group_flights gf ON gf.group_id = hg.id AND gf.flight_type = 'outbound'
+        WHERE gf.departure_date IS NOT NULL
+          AND gf.departure_date::timestamptz BETWEEN NOW() + interval '${hoursAhead - 1} hours'
+          AND NOW() + interval '${hoursAhead + 1} hours'
+          AND b.status = 'approved'
+          AND (b.is_deleted IS NULL OR b.is_deleted = false)
+        LIMIT 100
+      `);
+      for (const row of res.rows) {
+        await triggerWorkflow(trigger, {
+          bookingId: row.booking_id,
+          bookingNumber: row.booking_number,
+          customerId: row.customer_id,
+          customerName: row.customer_name,
+          customerMobile: row.customer_mobile,
+          customerEmail: row.customer_email,
+          flightNumber: row.flight_number,
+          departureDate: row.departure_date,
+          departureTime: row.departure_time,
+          departureAirport: row.departure_airport,
+          arrivalAirport: row.arrival_airport,
+          terminal: row.terminal,
+          pilgramName: row.name,
+        });
+        processed++;
       }
+    } catch (err: any) {
+      console.error(`[DepartureReminder] Error for ${trigger}:`, err?.message || err);
     }
-  };
+  }
+  return { processed, skipped };
+}
 
+export function startDepartureReminderCron() {
   const schedule = () => {
     const next = 60 * 60 * 1000;
-    setTimeout(() => { run().catch(() => {}); schedule(); }, next);
+    setTimeout(() => { runDepartureReminderCheck().catch(() => {}); schedule(); }, next);
   };
-  run().catch(() => {});
+  runDepartureReminderCheck().catch(() => {});
   schedule();
   console.log("[DepartureReminder] Cron scheduled: hourly checks (7d/3d/2d/1d/12h/6h/3h)");
 }

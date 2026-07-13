@@ -1416,6 +1416,13 @@ async function runMigrations() {
     await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS request_payload JSONB`);
     await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS error_code TEXT`);
   } catch (err) { console.error("[Migration] api_settings table failed:", err); }
+  // ── notification_logs: customer_name + booking_number columns ──────────────
+  try {
+    await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS customer_name TEXT`);
+    await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS booking_number TEXT`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS nl_booking_number_idx ON notification_logs(booking_number)`);
+    console.log("[Migration] notification_logs customer_name/booking_number ensured");
+  } catch (err) { console.error("[Migration] notification_logs customer_name/booking_number failed:", err); }
   // ── notification_auto_settings table ───────────────────────────────────────
   try {
     await pool.query(`

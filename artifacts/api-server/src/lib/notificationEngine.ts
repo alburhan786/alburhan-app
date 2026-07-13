@@ -334,6 +334,8 @@ export async function trackNotification(data: {
   recipient: string;
   customerId?: string;
   bookingId?: string;
+  customerName?: string;
+  bookingNumber?: string;
   message?: string;
   status: "sent" | "failed" | "pending";
   providerResponse?: unknown;
@@ -349,12 +351,14 @@ export async function trackNotification(data: {
     const errorCode = pr?.errorCode || null;
     await pool.query(
       `INSERT INTO notification_logs
-       (id, event_type, customer_id, booking_id, channel, recipient, message, status,
+       (id, event_type, customer_id, booking_id, customer_name, booking_number,
+        channel, recipient, message, status,
         provider_response, provider_name, api_endpoint, http_status, request_payload, error_code,
         sent_at, retry_count)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,NOW(),0)`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,NOW(),0)`,
       [
         id, data.eventType, data.customerId || null, data.bookingId || null,
+        data.customerName || null, data.bookingNumber || null,
         data.channel, data.recipient, data.message || null, data.status,
         data.providerResponse ? JSON.stringify(data.providerResponse) : null,
         providerName, apiEndpoint, httpStatus, requestPayload, errorCode,
@@ -634,6 +638,7 @@ export async function fireNotificationEvent(
       eventType, channel,
       recipient: channel === "email" ? (ctx.customerEmail || ctx.customerMobile) : ctx.customerMobile,
       customerId: ctx.customerId, bookingId: ctx.bookingId,
+      customerName: ctx.customerName, bookingNumber: ctx.bookingNumber,
       message, status, providerResponse,
     });
     if (status === "sent") {

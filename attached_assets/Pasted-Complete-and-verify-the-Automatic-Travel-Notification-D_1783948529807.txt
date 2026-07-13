@@ -1,0 +1,172 @@
+Complete and verify the Automatic Travel Notification & Document Management System for Al Burhan Tours & Travels.
+
+Requirements:
+
+1. Flight Reminder Automation
+- Automatically send reminders:
+  • 7 days before departure
+  • 3 days before departure
+  • 2 days before departure
+  • 1 day before departure
+  • 12 hours before departure
+  • 6 hours before departure
+  • 3 hours before departure
+- Run through cron every hour.
+- Stop reminders after departure.
+
+2. Supported Notification Channels
+- WhatsApp
+- SMS (Fast2SMS DLT)
+- Email
+- RCS (if enabled)
+
+3. Document Upload Automation
+
+Whenever the admin uploads any document:
+
+• Flight Ticket
+• Visa
+• Hotel Voucher
+• Tour Itinerary
+• Model Agreement
+• Tax Invoice
+• Payment Receipt
+• Room Allotment
+• Bus Allotment
+• Insurance
+• Passport Copy
+• Haj ID Card
+• Vaccination Certificate
+• Any PDF or Image
+
+Automatically:
+
+✓ Save document
+✓ Show in Customer Dashboard
+✓ Generate secure download URL
+✓ Send WhatsApp notification
+✓ Send SMS notification
+✓ Send Email
+✓ Send RCS
+✓ Record notification log
+✓ Mark Delivered
+
+4. Customer Notification
+
+Message:
+
+Assalamu Alaikum {CustomerName},
+
+Your {DocumentName} has been uploaded successfully.
+
+Booking ID:
+{BookingId}
+
+Package:
+{PackageName}
+
+Download:
+{DocumentURL}
+
+Dashboard:
+https://alburhantravels.com/dashboard
+
+For assistance:
++91 9893225590
+
+Al Burhan Tours & Travels
+
+5. Flight Reminder Message
+
+Assalamu Alaikum {CustomerName},
+
+This is a reminder for your upcoming Hajj/Umrah journey.
+
+Flight:
+{FlightNo}
+
+Date:
+{FlightDate}
+
+Reporting Time:
+{ReportingTime}
+
+Departure:
+{DepartureAirport}
+
+Arrival:
+{ArrivalAirport}
+
+Please report at the airport at least 4 hours before departure.
+
+May Allah accept your journey.
+
+Al Burhan Tours & Travels
++91 9893225590
+
+6. Admin Panel
+
+Create Auto Notification Settings page.
+
+Allow enabling/disabling:
+
+✓ Flight Reminder
+✓ Document Upload Notification
+✓ Payment Reminder
+✓ WhatsApp
+✓ SMS
+✓ Email
+✓ RCS
+
+Also add:
+
+✓ Send Again
+✓ Test Notification
+✓ Notification History
+✓ Retry Failed Notification
+
+7. Customer Dashboard
+
+Display:
+
+✓ Documents
+✓ Ticket
+✓ Visa
+✓ Invoice
+✓ Receipt
+✓ Agreement
+✓ Download Button
+✓ View PDF
+✓ Notification Status
+✓ Upload Date
+
+8. Notification Logs
+
+Store:
+
+Booking ID
+Customer ID
+Customer Name
+Document Name
+Channel
+Delivery Status
+Sent Time
+Retry Count
+Error Details
+
+9. Deployment
+
+After implementation:
+
+• Build frontend
+• Build backend
+• Run database migrations
+• Restart PM2
+• Deploy to VPS
+• Verify all APIs
+• Verify cron jobs
+• Verify automatic reminders
+• Verify document upload notifications
+• Verify notification logs
+
+Do not stop until the complete workflow is tested end-to-end and every automation works without manual intervention.

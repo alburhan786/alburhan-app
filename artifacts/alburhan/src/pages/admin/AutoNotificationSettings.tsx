@@ -1,13 +1,14 @@
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
   Plane, FileText, Bell, BellRing, CheckCircle2, XCircle, RefreshCcw,
   Send, Clock, Wifi, MessageSquare, Mail, Radio, AlertTriangle,
-  Play, RotateCcw, ChevronRight
+  Play, RotateCcw, IndianRupee, FlaskConical
 } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -47,6 +48,9 @@ export default function AutoNotificationSettings() {
   const qc = useQueryClient();
   const [runningFlight, setRunningFlight] = useState(false);
   const [retryingDocs, setRetryingDocs] = useState(false);
+  const [testMobile, setTestMobile] = useState("");
+  const [testChannel, setTestChannel] = useState<"whatsapp" | "sms">("whatsapp");
+  const [testingNotif, setTestingNotif] = useState(false);
 
   const { data: settings = {} } = useQuery<Record<string, string>>({
     queryKey: ["/api/auto-notifications/auto-settings"],
@@ -96,12 +100,39 @@ export default function AutoNotificationSettings() {
         headers: { "Content-Type": "application/json" },
       });
       const d = await r.json();
-      toast({ title: "Flight Reminders Triggered", description: d.message || "Check notification logs for results." });
+      toast({
+        title: d.processed > 0 ? `✅ Sent to ${d.processed} pilgrim(s)` : "No departures in window",
+        description: d.message || "Check notification logs for results.",
+      });
       qc.invalidateQueries({ queryKey: ["/api/auto-notifications/flight-reminder/stats"] });
     } catch {
       toast({ title: "Error", description: "Failed to trigger", variant: "destructive" });
     }
     setRunningFlight(false);
+  }
+
+  async function sendTestNotification() {
+    if (!testMobile.trim()) {
+      toast({ title: "Mobile required", description: "Enter a mobile number to send a test notification.", variant: "destructive" });
+      return;
+    }
+    setTestingNotif(true);
+    try {
+      const r = await fetch(`${API}/api/auto-notifications/test-notification`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mobile: testMobile.trim(), channel: testChannel }),
+      });
+      const d = await r.json();
+      if (d.ok) {
+        toast({ title: "✅ Test Sent", description: d.message || `Test ${testChannel} sent successfully.` });
+      } else {
+        toast({ title: "Test Failed", description: d.message, variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Error", description: "Test notification failed", variant: "destructive" });
+    }
+    setTestingNotif(false);
   }
 
   async function retryFailedDocs() {
@@ -122,6 +153,7 @@ export default function AutoNotificationSettings() {
 
   const flightEnabled = getSetting("flight_reminders_enabled");
   const docNotifyEnabled = getSetting("doc_notifications_enabled");
+  const paymentReminderEnabled = getSetting("payment_reminder_enabled");
 
   return (
     <AdminLayout>
@@ -161,6 +193,30 @@ export default function AutoNotificationSettings() {
                 </div>
               );
             })}
+          </div>
+        </Card>
+
+        {/* ── PAYMENT REMINDER SECTION ─────────────────────────────────── */}
+        <Card className="overflow-hidden rounded-2xl border shadow-sm">
+          <div className="px-5 py-3 border-b bg-amber-50/50 flex items-center gap-2 justify-between">
+            <div className="flex items-center gap-2">
+              <IndianRupee className="w-4 h-4 text-amber-600" />
+              <span className="font-semibold text-sm text-amber-900">Payment Reminder Automation</span>
+            </div>
+            <ToggleSwitch checked={paymentReminderEnabled} onChange={() => toggle("payment_reminder_enabled")} />
+          </div>
+          <div className="p-5 space-y-4">
+            <p className="text-xs text-muted-foreground">
+              Automatically reminds customers of pending balance payments before the due date.
+              Runs daily at 08:30 IST.
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+              {["30 Days", "15 Days", "7 Days", "3 Days", "1 Day"].map((d, i) => (
+                <div key={i} className={`rounded-lg border p-2 text-center ${paymentReminderEnabled ? "bg-amber-50 border-amber-200" : "bg-gray-50 border-gray-200"}`}>
+                  <p className={`text-[10px] font-bold ${paymentReminderEnabled ? "text-amber-700" : "text-gray-400"}`}>{d} Before</p>
+                </div>
+              ))}
+            </div>
           </div>
         </Card>
 
@@ -401,6 +457,52 @@ Al Burhan Tours & Travels`}
                 </div>
               </div>
             )}
+          </div>
+        </Card>
+
+        {/* ── TEST NOTIFICATION SECTION ─────────────────────────────────── */}
+        <Card className="overflow-hidden rounded-2xl border shadow-sm">
+          <div className="px-5 py-3 border-b bg-violet-50/50 flex items-center gap-2">
+            <FlaskConical className="w-4 h-4 text-violet-600" />
+            <span className="font-semibold text-sm text-violet-900">Test Notification</span>
+          </div>
+          <div className="p-5 space-y-4">
+            <p className="text-xs text-muted-foreground">
+              Send a test notification to any mobile number to verify the notification system is working.
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setTestChannel("whatsapp")}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border text-xs font-semibold transition-colors ${testChannel === "whatsapp" ? "bg-green-600 text-white border-green-600" : "bg-white text-muted-foreground border-gray-200 hover:bg-green-50"}`}
+              >
+                <MessageSquare className="w-3.5 h-3.5" /> WhatsApp
+              </button>
+              <button
+                type="button"
+                onClick={() => setTestChannel("sms")}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border text-xs font-semibold transition-colors ${testChannel === "sms" ? "bg-blue-600 text-white border-blue-600" : "bg-white text-muted-foreground border-gray-200 hover:bg-blue-50"}`}
+              >
+                <Send className="w-3.5 h-3.5" /> SMS
+              </button>
+            </div>
+            <div className="flex gap-2">
+              <Input
+                placeholder="Mobile number (e.g. 9893225590)"
+                value={testMobile}
+                onChange={e => setTestMobile(e.target.value)}
+                className="flex-1 text-sm"
+                maxLength={15}
+              />
+              <Button
+                onClick={sendTestNotification}
+                disabled={testingNotif || !testMobile.trim()}
+                className="bg-violet-600 hover:bg-violet-700 text-white gap-1.5 shrink-0"
+              >
+                {testingNotif ? <RefreshCcw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                {testingNotif ? "Sending…" : "Send Test"}
+              </Button>
+            </div>
           </div>
         </Card>
 

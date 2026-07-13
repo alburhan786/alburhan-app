@@ -529,6 +529,7 @@ const TRAVEL_DOC_TYPES: Record<string, { label: string; icon: React.ElementType;
   vaccination_certificate:{ label: "Vaccination Certificate",   icon: Syringe,        color: "text-teal-700",    bg: "bg-teal-50 border-teal-200" },
   luggage_tag:            { label: "Luggage Tag",               icon: Download,       color: "text-fuchsia-700", bg: "bg-fuchsia-50 border-fuchsia-200" },
   emergency_contact_card: { label: "Emergency Contact Card",    icon: Bell,           color: "text-red-700",     bg: "bg-red-50 border-red-200" },
+  other:                  { label: "Document",                  icon: FileText,       color: "text-gray-700",    bg: "bg-gray-50 border-gray-200" },
 };
 
 function TravelDocumentsCard({ bookingId, bookingNumber, invoiceNumber, bookingStatus }: {

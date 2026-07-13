@@ -2,7 +2,8 @@ import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requireAuth, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendDocumentToCustomer } from "../lib/documentDelivery.js";
-import { startDepartureReminderCron } from "../lib/workflowEngine.js";
+import { runDepartureReminderCheck } from "../lib/workflowEngine.js";
+import { fireNotificationEvent } from "../lib/notificationEngine.js";
 
 const router = Router();
 
@@ -101,10 +102,53 @@ router.get("/flight-reminder/stats", requireAuth as any, async (req: Authenticat
 // ── POST run flight reminders now ─────────────────────────────────────────────
 router.post("/flight-reminder/run-now", requireAuth as any, async (req: AuthenticatedRequest, res) => {
   if (req.user?.role !== "admin") { res.status(403).json({ message: "Admin only" }); return; }
-  res.json({ ok: true, message: "Flight reminder check triggered — results in notification logs." });
-  // Re-run departure reminder cron check immediately (fire-and-forget)
-  // This uses the already-running cron; we just log the intent
   console.log(`[AutoNotif] Admin ${req.user.id} triggered manual flight-reminder run`);
+  try {
+    const { processed, skipped } = await runDepartureReminderCheck();
+    res.json({
+      ok: true,
+      processed,
+      skipped,
+      message: processed > 0
+        ? `Sent reminders to ${processed} pilgrim(s). Check notification logs for details.`
+        : "No departures found in the reminder windows right now (7d/3d/2d/1d/12h/6h/3h).",
+    });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, message: err?.message || "Run failed" });
+  }
+});
+
+// ── POST send test notification ───────────────────────────────────────────────
+router.post("/test-notification", requireAuth as any, async (req: AuthenticatedRequest, res) => {
+  if (req.user?.role !== "admin") { res.status(403).json({ message: "Admin only" }); return; }
+  const { mobile, channel = "whatsapp" } = req.body;
+  if (!mobile) { res.status(400).json({ message: "mobile is required" }); return; }
+
+  try {
+    const testCtx = {
+      customerName: "Admin Test",
+      customerMobile: mobile,
+      customerEmail: undefined,
+      bookingNumber: "TEST-001",
+      packageName: "Hajj/Umrah Package",
+    };
+
+    if (channel === "whatsapp") {
+      await fireNotificationEvent("custom_admin" as any, {
+        ...testCtx,
+        description: "This is a test notification from Al Burhan Tours & Travels admin panel. If you received this, WhatsApp notifications are working correctly. Jazak Allah Khair!",
+      });
+      res.json({ ok: true, message: `Test WhatsApp sent to ${mobile}` });
+    } else if (channel === "sms") {
+      await fireNotificationEvent("custom_admin" as any, testCtx);
+      res.json({ ok: true, message: `Test SMS triggered for ${mobile}` });
+    } else {
+      await fireNotificationEvent("custom_admin" as any, testCtx);
+      res.json({ ok: true, message: `Test notification triggered for ${mobile}` });
+    }
+  } catch (err: any) {
+    res.status(500).json({ ok: false, message: err?.message || "Test failed" });
+  }
 });
 
 // ── GET document notification stats ──────────────────────────────────────────

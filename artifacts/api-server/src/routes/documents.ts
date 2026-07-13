@@ -144,6 +144,7 @@ router.post(
         fileName: req.file.originalname,
         fileUrl: doc.file_url,
         mimeType: req.file.mimetype,
+        packageName: (booking as any).packageName || (booking as any).package_name || null,
       }).catch(err => console.error("[Documents] sendDocumentToCustomer error:", err));
     } else if (!isAdmin) {
       sendCustomerDocumentUploadNotification({
@@ -281,7 +282,8 @@ router.post("/:id/resend", requireAuth as any, async (req: AuthenticatedRequest,
   const docId = req.params.id;
   try {
     const { rows } = await pool.query(
-      `SELECT d.*, b.booking_number, b.customer_name, b.customer_mobile, b.customer_email, b.customer_id AS b_customer_id
+      `SELECT d.*, b.booking_number, b.customer_name, b.customer_mobile, b.customer_email,
+              b.customer_id AS b_customer_id, b.package_name
        FROM documents d
        JOIN bookings b ON b.id = d.booking_id
        WHERE d.id = $1`,
@@ -305,6 +307,7 @@ router.post("/:id/resend", requireAuth as any, async (req: AuthenticatedRequest,
       fileName: doc.file_name,
       fileUrl: doc.file_url,
       mimeType: doc.mime_type,
+      packageName: doc.package_name || null,
     }).catch(err => console.error("[Documents] resend error:", err));
   } catch (err: any) {
     console.error("[Documents] resend endpoint error:", err);

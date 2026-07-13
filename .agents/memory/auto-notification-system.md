@@ -35,4 +35,16 @@ notification_sent=TRUE is set on documents table after successful send.
 /admin/auto-notifications → AutoNotificationSettings.tsx
 Channel toggles (WhatsApp/SMS/Email/RCS), flight reminder section, doc notify section.
 
+## notification_logs columns (after v17)
+customer_name TEXT and booking_number TEXT added via ALTER TABLE migration.
+trackNotification() accepts and stores these fields. fireNotificationEvent() passes ctx.customerName + ctx.bookingNumber.
+
+## run-now endpoint
+POST /api/auto-notifications/flight-reminder/run-now now calls the exported
+runDepartureReminderCheck() function (not a stub). Returns { processed, skipped, message }.
+
+## test-notification endpoint
+POST /api/auto-notifications/test-notification — { mobile, channel } — fires
+fireNotificationEvent("custom_admin", ...) to test WA/SMS delivery.
+
 **Why:** Channel toggle keys must match the `key` field in notification_auto_settings. The notification engine does NOT yet read these toggles automatically — they are informational/for future enforcement. The cron runs regardless of toggle state (toggle is advisory UI for now unless wired to engine).
