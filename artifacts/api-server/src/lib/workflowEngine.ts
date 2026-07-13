@@ -352,37 +352,33 @@ export async function runDepartureReminderCheck(): Promise<{ processed: number; 
     const enabled = await getRuleEnabled(trigger);
     if (!enabled) { skipped++; continue; }
     try {
+      // pilgrims has group_id only — no direct booking_id column.
+      // Notify the pilgrim directly using their own name/mobile.
       const res = await pool.query(`
-        SELECT p.name, p.mobile, p.booking_id, b.booking_number, b.customer_name,
-               b.customer_mobile, b.customer_email, b.customer_id,
-               gf.flight_number, gf.departure_date, gf.departure_time,
+        SELECT p.id        AS pilgrim_id,
+               p.full_name AS customer_name,
+               p.mobile_india AS customer_mobile,
+               p.group_id,
+               gf.flight_number,  gf.departure_date, gf.departure_time,
                gf.departure_airport, gf.arrival_airport, gf.terminal
         FROM pilgrims p
-        JOIN bookings b ON b.id = p.booking_id
         JOIN hajj_groups hg ON hg.id = p.group_id
-        JOIN group_flights gf ON gf.group_id = hg.id AND gf.flight_type = 'outbound'
+        JOIN group_flights gf ON gf.group_id = hg.id
+          AND gf.flight_type = 'outbound'
         WHERE gf.departure_date IS NOT NULL
-          AND gf.departure_date::timestamptz BETWEEN NOW() + interval '${hoursAhead - 1} hours'
-          AND NOW() + interval '${hoursAhead + 1} hours'
-          AND b.status = 'approved'
-          AND (b.is_deleted IS NULL OR b.is_deleted = false)
+          AND gf.departure_date::timestamptz
+              BETWEEN NOW() + interval '${hoursAhead - 1} hours'
+                  AND NOW() + interval '${hoursAhead + 1} hours'
         LIMIT 100
       `);
       for (const row of res.rows) {
         await triggerWorkflow(trigger, {
-          bookingId: row.booking_id,
-          bookingNumber: row.booking_number,
-          customerId: row.customer_id,
-          customerName: row.customer_name,
-          customerMobile: row.customer_mobile,
-          customerEmail: row.customer_email,
-          flightNumber: row.flight_number,
-          departureDate: row.departure_date,
-          departureTime: row.departure_time,
-          departureAirport: row.departure_airport,
-          arrivalAirport: row.arrival_airport,
-          terminal: row.terminal,
-          pilgramName: row.name,
+          customerName:    row.customer_name,
+          customerMobile:  row.customer_mobile,
+          flightNumber:    row.flight_number,
+          departureDate:   row.departure_date,
+          departureTime:   row.departure_time,
+          pilgramName:     row.customer_name,
         });
         processed++;
       }
@@ -416,28 +412,25 @@ export function startDocumentExpiryCron() {
       const enabled = await getRuleEnabled(trigger);
       if (!enabled) continue;
       try {
+        // pilgrims.passport_expiry_date is the actual column (no booking_id column).
         const res = await pool.query(`
-          SELECT p.name, p.mobile, p.booking_id, p.passport_expiry, p.visa_expiry,
-                 b.booking_number, b.customer_name, b.customer_mobile
+          SELECT p.id           AS pilgrim_id,
+                 p.full_name    AS customer_name,
+                 p.mobile_india AS customer_mobile,
+                 p.passport_expiry_date AS passport_expiry
           FROM pilgrims p
-          JOIN bookings b ON b.id = p.booking_id
-          WHERE (
-            p.passport_expiry::date = (CURRENT_DATE + interval '${daysAhead} days')::date
-            OR p.visa_expiry::date = (CURRENT_DATE + interval '${daysAhead} days')::date
-          )
+          WHERE p.passport_expiry_date IS NOT NULL
+            AND p.passport_expiry_date::date
+                = (CURRENT_DATE + interval '${daysAhead} days')::date
           LIMIT 100
         `);
         for (const row of res.rows) {
-          const docType = row.passport_expiry ? "Passport" : "Visa";
-          const expiryDate = row.passport_expiry ?? row.visa_expiry;
           await triggerWorkflow(trigger, {
-            bookingId: row.booking_id,
-            bookingNumber: row.booking_number,
-            customerName: row.customer_name,
-            customerMobile: row.customer_mobile,
-            pilgramName: row.name,
-            documentType: docType,
-            expiryDate,
+            customerName:    row.customer_name,
+            customerMobile:  row.customer_mobile,
+            pilgramName:     row.customer_name,
+            documentType:    "Passport",
+            expiryDate:      row.passport_expiry,
           });
         }
       } catch {}
@@ -462,26 +455,24 @@ export function startReturnAndFeedbackCron() {
 
     if (returnEnabled) {
       try {
+        // pilgrims has no booking_id — notify pilgrim directly.
         const res = await pool.query(`
-          SELECT p.name, p.mobile, p.booking_id, b.booking_number, b.customer_name, b.customer_mobile,
+          SELECT p.full_name    AS customer_name,
+                 p.mobile_india AS customer_mobile,
                  gf.return_date, gf.flight_number
           FROM pilgrims p
-          JOIN bookings b ON b.id = p.booking_id
           JOIN hajj_groups hg ON hg.id = p.group_id
           JOIN group_flights gf ON gf.group_id = hg.id
           WHERE gf.return_date::date = CURRENT_DATE
-            AND b.status = 'approved'
           LIMIT 100
         `);
         for (const row of res.rows) {
           await triggerWorkflow("return_reminder", {
-            bookingId: row.booking_id,
-            bookingNumber: row.booking_number,
-            customerName: row.customer_name,
+            customerName:   row.customer_name,
             customerMobile: row.customer_mobile,
-            flightNumber: row.flight_number,
-            departureDate: row.return_date,
-            pilgramName: row.name,
+            flightNumber:   row.flight_number,
+            departureDate:  row.return_date,
+            pilgramName:    row.customer_name,
           });
         }
       } catch {}
@@ -489,23 +480,22 @@ export function startReturnAndFeedbackCron() {
 
     if (feedbackEnabled) {
       try {
+        // pilgrims has no booking_id — notify pilgrim directly.
         const res = await pool.query(`
-          SELECT p.name, p.mobile, p.booking_id, b.booking_number, b.customer_name, b.customer_mobile
+          SELECT p.full_name    AS customer_name,
+                 p.mobile_india AS customer_mobile
           FROM pilgrims p
-          JOIN bookings b ON b.id = p.booking_id
           JOIN hajj_groups hg ON hg.id = p.group_id
           JOIN group_flights gf ON gf.group_id = hg.id
-          WHERE gf.return_date::date = (CURRENT_DATE - interval '3 days')::date
-            AND b.status = 'approved'
+          WHERE gf.return_date::date
+                = (CURRENT_DATE - interval '3 days')::date
           LIMIT 100
         `);
         for (const row of res.rows) {
           await triggerWorkflow("feedback_request", {
-            bookingId: row.booking_id,
-            bookingNumber: row.booking_number,
-            customerName: row.customer_name,
+            customerName:   row.customer_name,
             customerMobile: row.customer_mobile,
-            pilgramName: row.name,
+            pilgramName:    row.customer_name,
           });
         }
       } catch {}
