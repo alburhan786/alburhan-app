@@ -56,25 +56,35 @@ router.get("/logs/:id", requireAdmin as any, async (req: AuthenticatedRequest, r
 
 router.get("/logs", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
-    const { status, channel, event_type, limit = "100", offset = "0", search } = req.query as any;
+    const { status, channel, event_type, limit = "100", offset = "0", search, booking_number } = req.query as any;
     const conditions: string[] = [];
     const params: unknown[] = [];
     let idx = 1;
 
-    if (status) { conditions.push(`status=$${idx++}`); params.push(status); }
-    if (channel) { conditions.push(`channel=$${idx++}`); params.push(channel); }
-    if (event_type) { conditions.push(`event_type=$${idx++}`); params.push(event_type); }
+    if (status) { conditions.push(`nl.status=$${idx++}`); params.push(status); }
+    if (channel) { conditions.push(`nl.channel=$${idx++}`); params.push(channel); }
+    if (event_type) { conditions.push(`nl.event_type=$${idx++}`); params.push(event_type); }
     if (search) {
-      conditions.push(`(recipient ILIKE $${idx} OR message ILIKE $${idx} OR booking_id ILIKE $${idx})`);
+      conditions.push(`(nl.recipient ILIKE $${idx} OR nl.message ILIKE $${idx} OR nl.booking_id ILIKE $${idx} OR b.booking_number ILIKE $${idx})`);
       params.push(`%${search}%`); idx++;
+    }
+    if (booking_number) {
+      conditions.push(`nl.booking_id IN (SELECT id FROM bookings WHERE booking_number ILIKE $${idx++})`);
+      params.push(`%${booking_number}%`);
     }
 
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
     const result = await pool.query(
-      `SELECT * FROM notification_logs ${where} ORDER BY created_at DESC LIMIT $${idx} OFFSET $${idx + 1}`,
+      `SELECT nl.*, b.booking_number, b.customer_name
+       FROM notification_logs nl
+       LEFT JOIN bookings b ON b.id = nl.booking_id
+       ${where} ORDER BY nl.created_at DESC LIMIT $${idx} OFFSET $${idx + 1}`,
       [...params, Number(limit), Number(offset)]
     );
-    const countRes = await pool.query(`SELECT COUNT(*) FROM notification_logs ${where}`, params);
+    const countRes = await pool.query(
+      `SELECT COUNT(*) FROM notification_logs nl LEFT JOIN bookings b ON b.id = nl.booking_id ${where}`,
+      params
+    );
     res.json({ logs: result.rows, total: Number(countRes.rows[0]?.count ?? 0) });
   } catch (err) {
     console.error("[notification-center] GET /logs:", err);

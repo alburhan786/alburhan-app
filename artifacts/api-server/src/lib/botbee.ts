@@ -371,6 +371,42 @@ export async function uploadMedia(
   }
 }
 
+// ── PDF document sending ──────────────────────────────────────────────────────
+
+/**
+ * Upload a PDF buffer to BotBee media storage, then send it as a WhatsApp
+ * document to the given number. Logs every attempt (success or failure) in
+ * notification_logs. Returns the BotBeeResult of the sendFile call, or an
+ * upload-failure result if the media upload step fails.
+ */
+export async function sendPDFDocument(
+  to: string,
+  pdfBuffer: Buffer,
+  filename: string,
+  caption?: string,
+  opts?: { eventType?: string; bookingId?: string; customerId?: string }
+): Promise<BotBeeResult> {
+  const { enabled, baseUrl } = getCredentials();
+  const uploadEndpoint = `${baseUrl}/whatsapp/upload/media`;
+  if (!enabled) {
+    const res: BotBeeResult = { ok: false, provider: "BotBee", endpoint: uploadEndpoint, errorMessage: "WhatsApp disabled" };
+    if (opts?.eventType) await logToDb({ eventType: opts.eventType, channel: "whatsapp", recipient: to, bookingId: opts.bookingId, customerId: opts.customerId, message: `PDF: ${filename}`, status: "failed", result: res });
+    return res;
+  }
+
+  // Step 1: upload the PDF buffer as WhatsApp media
+  const up = await uploadMedia(pdfBuffer, "application/pdf", filename);
+  if (!up.ok || !up.mediaId) {
+    console.warn("[BotBee] sendPDFDocument upload failed:", up.errorMessage);
+    const res: BotBeeResult = { ok: false, provider: "BotBee", endpoint: uploadEndpoint, errorMessage: up.errorMessage || "PDF upload failed", responsePayload: up.responsePayload };
+    if (opts?.eventType) await logToDb({ eventType: opts.eventType, channel: "whatsapp", recipient: to, bookingId: opts.bookingId, customerId: opts.customerId, message: `PDF upload failed: ${filename}`, status: "failed", result: res });
+    return res;
+  }
+
+  // Step 2: send the media file as a document
+  return sendFile(to, up.mediaId, caption || filename, opts);
+}
+
 // ── Template management ───────────────────────────────────────────────────────
 
 export interface WaTemplate {

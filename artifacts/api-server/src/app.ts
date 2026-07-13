@@ -7,6 +7,7 @@ import connectPgSimple from "connect-pg-simple";
 import pg from "pg";
 import path from "path";
 import fs from "fs";
+import os from "os";
 import { fileURLToPath } from "url";
 import { spawn } from "child_process";
 import router from "./routes/index.js";
@@ -144,6 +145,43 @@ app.get("/api/migrate/vps-update.sql", (req, res) => {
   res.setHeader("Content-Type", "text/plain");
   res.setHeader("Content-Disposition", "attachment; filename=vps-update.sql");
   res.sendFile(sqlPath);
+});
+
+// POST /api/migrate/deploy-frontend — VPS pulls latest frontend from dev server and extracts it
+app.post("/api/migrate/deploy-frontend", async (req, res) => {
+  const key = (req.query.key || req.body?.key) as string;
+  if (!migrationKeyValid(key)) return res.status(403).json({ error: "Forbidden" });
+
+  const DEV_URL = "https://57456384-023a-43e4-a60f-e6d8f967d324-00-vmg20t5z0q5l.spock.replit.dev";
+  const sourceUrl = ((req.query.source || req.body?.source) as string) ||
+    `${DEV_URL}/api/migrate/frontend.tar.gz?key=alburhan-migrate-2026`;
+
+  // Determine extraction target — strip leading "artifacts/alburhan/dist/public" prefix from tar
+  const extractTo = path.resolve(__dirname, "../../..");  // /var/www/alburhan (3 levels up from dist/)
+  try {
+    const response = await fetch(sourceUrl, { signal: AbortSignal.timeout(180_000) });
+    if (!response.ok) return res.status(502).json({ error: `Download failed: HTTP ${response.status}` });
+    const buffer = await response.arrayBuffer();
+    const bytes = Buffer.from(buffer);
+    if (bytes.length < 10_000) return res.status(502).json({ error: `Tarball too small (${bytes.length} bytes)` });
+
+    // Write tarball to a temp file then extract
+    const tmpTar = path.join(os.tmpdir(), `frontend-${Date.now()}.tar.gz`);
+    fs.writeFileSync(tmpTar, bytes);
+
+    await new Promise<void>((resolve, reject) => {
+      const proc = spawn("tar", ["-xzf", tmpTar, "-C", extractTo], { stdio: "pipe" });
+      proc.stderr.on("data", (d: Buffer) => console.error("[deploy-frontend tar]", d.toString()));
+      proc.on("close", (code: number) => {
+        fs.unlinkSync(tmpTar);
+        code === 0 ? resolve() : reject(new Error(`tar exited ${code}`));
+      });
+    });
+
+    res.json({ ok: true, bytes: bytes.length, extractedTo: extractTo, source: sourceUrl });
+  } catch (err: any) {
+    if (!res.headersSent) res.status(500).json({ error: err.message });
+  }
 });
 
 // GET /api/migrate/frontend.tar.gz — serves updated frontend assets

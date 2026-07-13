@@ -4,7 +4,7 @@ import {
   MessageSquare, Smartphone, Radio, Mail, Bell,
   CheckCircle2, XCircle, Clock, RefreshCw, Search,
   ChevronLeft, ChevronRight, RotateCcw, Eye, Filter,
-  TrendingUp, Send, AlertTriangle, Activity,
+  TrendingUp, Send, AlertTriangle, Activity, Paperclip,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -79,6 +79,7 @@ export default function NotificationLogs() {
   const [filterChannel, setFilterChannel] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [filterEvent, setFilterEvent] = useState("");
+  const [filterBooking, setFilterBooking] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const limit = 50;
@@ -92,6 +93,7 @@ export default function NotificationLogs() {
         ...(filterChannel && { channel: filterChannel }),
         ...(filterStatus && { status: filterStatus }),
         ...(filterEvent && { event_type: filterEvent }),
+        ...(filterBooking && { booking_number: filterBooking }),
         ...(search && { search }),
       });
       const r = await fetch(`${API}/api/notification-center/logs?${params}`, { credentials: "include" });
@@ -110,7 +112,7 @@ export default function NotificationLogs() {
     } catch {}
   }, []);
 
-  useEffect(() => { fetchLogs(); fetchStats(); }, [fetchLogs, fetchStats]);
+  useEffect(() => { fetchLogs(); fetchStats(); }, [fetchLogs, fetchStats, filterBooking]);
 
   // Auto-refresh every 30s
   useEffect(() => {
@@ -202,6 +204,12 @@ export default function NotificationLogs() {
             <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-gray-400" />
             <Input placeholder="Search recipient, booking, message…" value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} className="pl-9 h-9 text-sm" />
           </div>
+          <Input
+            placeholder="Booking # (e.g. ABT26…)"
+            value={filterBooking}
+            onChange={e => { setFilterBooking(e.target.value); setPage(0); }}
+            className="h-9 text-sm w-44"
+          />
           <select value={filterChannel} onChange={e => { setFilterChannel(e.target.value); setPage(0); }} className="h-9 border rounded-lg px-2 text-sm bg-white">
             <option value="">All Channels</option>
             {Object.entries(CHANNEL_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
@@ -214,12 +222,12 @@ export default function NotificationLogs() {
           </select>
           <select value={filterEvent} onChange={e => { setFilterEvent(e.target.value); setPage(0); }} className="h-9 border rounded-lg px-2 text-sm bg-white min-w-40">
             <option value="">All Events</option>
-            {["new_booking","booking_approved","booking_rejected","payment_received","partial_payment","invoice_generated","ticket_issued","visa_ready","departure_reminder","arrival_reminder","eid_greeting","hajj_updates","umrah_promotions","custom_admin","test_send","test_all"].map(e => (
+            {["new_booking","booking_approved","booking_approved_pdf","booking_rejected","payment_received","payment_received_pdf","partial_payment","invoice_generated","ticket_issued","visa_ready","departure_reminder","arrival_reminder","eid_greeting","hajj_updates","umrah_promotions","custom_admin","test_send","test_all"].map(e => (
               <option key={e} value={e}>{e.replace(/_/g, " ")}</option>
             ))}
           </select>
-          {(filterChannel || filterStatus || filterEvent || search) && (
-            <Button variant="ghost" size="sm" className="text-gray-500 gap-1" onClick={() => { setFilterChannel(""); setFilterStatus(""); setFilterEvent(""); setSearch(""); setPage(0); }}>
+          {(filterChannel || filterStatus || filterEvent || filterBooking || search) && (
+            <Button variant="ghost" size="sm" className="text-gray-500 gap-1" onClick={() => { setFilterChannel(""); setFilterStatus(""); setFilterEvent(""); setFilterBooking(""); setSearch(""); setPage(0); }}>
               <Filter className="w-3.5 h-3.5" /> Clear
             </Button>
           )}
@@ -277,9 +285,16 @@ export default function NotificationLogs() {
                         {log.booking_number && <div className="text-xs text-gray-400">#{log.booking_number}</div>}
                       </td>
                       <td className="px-4 py-3">
-                        <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-medium">
-                          {(log.event_type || "").replace(/_/g, " ")}
-                        </span>
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-medium">
+                            {(log.event_type || "").replace(/_pdf$/, "").replace(/_/g, " ")}
+                          </span>
+                          {(log.event_type || "").endsWith("_pdf") && (
+                            <span className="inline-flex items-center gap-0.5 text-[10px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-bold">
+                              <Paperclip className="w-2.5 h-2.5" /> PDF
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3 max-w-48">
                         <span className="text-gray-600 text-xs">{truncate(log.message)}</span>

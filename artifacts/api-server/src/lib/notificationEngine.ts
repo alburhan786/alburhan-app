@@ -205,8 +205,13 @@ export function buildDefaultMessage(eventType: EventType, ctx: NotificationConte
       return `Assalamu Alaikum ${name},\n\nYour booking ${booking} has been ${eventType === "booking_rejected" ? "rejected" : "cancelled"}${ctx.reason ? `: ${ctx.reason}` : ""}. Please contact us for assistance.\n\nPhone: +91 9893225590\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
     case "booking_completed":
       return `Assalamu Alaikum ${name},\n\nAlhamdulillah! Your journey ${booking} (${pkg}) is complete. May Allah accept your Ibadah.\n\nWe hope to serve you again.\nAl Burhan Tours & Travels\n+91 9893225590`;
-    case "payment_received":
-      return `Assalamu Alaikum ${name},\n\nPayment of ₹${formatINR(ctx.amount || 0)} received for booking ${booking}.\n\nBalance: ₹${formatINR(ctx.balanceAmount || 0)}\n\nView invoice: ${invUrl}\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
+    case "payment_received": {
+      const totalPaid = ctx.paidAmount ?? ctx.amount ?? 0;
+      const bal = ctx.balanceAmount ?? 0;
+      const flightLine = ctx.flightNumber ? `\n✈️ Flight: ${ctx.flightNumber}${ctx.airline ? ` (${ctx.airline})` : ""}${ctx.departureDate ? ` — ${ctx.departureDate}` : ""}` : "";
+      const balanceLine = Number(bal) > 0 ? `Balance Due: ₹${formatINR(Number(bal))}` : "Status: Fully Paid ✅";
+      return `Assalamu Alaikum ${name},\n\n✅ *Payment Received — JazakAllah Khair!*\n\n📋 Booking: ${booking}\n📦 Package: ${pkg}${flightLine}\n\n💰 Amount Paid: ₹${formatINR(ctx.amount || 0)}\n💳 Total Paid: ₹${formatINR(Number(totalPaid))}\n${balanceLine}\n\n📄 View Invoice: ${invUrl}\n\nYour invoice & receipt are attached.\nFor queries: +91 9893225590\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
+    }
     case "partial_payment":
       return `Assalamu Alaikum ${name},\n\nPartial payment of ₹${formatINR(ctx.paidAmount || ctx.amount || 0)} received for booking ${booking} (${pkg}).\n\n💰 Remaining Balance: ₹${formatINR(ctx.balanceAmount || 0)}\n\nPay remaining: ${invUrl}\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 9893225590`;
     case "refund":
@@ -481,7 +486,27 @@ async function sendWhatsAppForEvent(eventType: EventType, ctx: NotificationConte
 async function sendOnChannelWithType(channel: Channel, eventType: EventType, ctx: NotificationContext, message: string): Promise<{ status: "sent" | "failed"; providerResponse: unknown }> {
   try {
     if (channel === "whatsapp") {
-      return await sendWhatsAppForEvent(eventType, ctx, message, ctx.bookingId, ctx.customerId);
+      const waResult = await sendWhatsAppForEvent(eventType, ctx, message, ctx.bookingId, ctx.customerId);
+
+      // After the text message, send any PDF attachments as WhatsApp documents (fire-and-forget)
+      const attachments = ctx.attachments as Array<{ filename: string; content: Buffer; contentType?: string }> | undefined;
+      if (attachments?.length) {
+        (async () => {
+          const { sendPDFDocument } = await import("./botbee.js");
+          for (const att of attachments) {
+            if (att.content instanceof Buffer && (att.contentType === "application/pdf" || (att.filename || "").endsWith(".pdf"))) {
+              const caption = `📄 ${att.filename}`;
+              await sendPDFDocument(ctx.customerMobile, att.content, att.filename, caption, {
+                eventType: eventType + "_pdf",
+                bookingId: ctx.bookingId,
+                customerId: ctx.customerId,
+              }).catch((e: unknown) => console.error("[notificationEngine] WhatsApp PDF send failed:", e));
+            }
+          }
+        })().catch((e: unknown) => console.error("[notificationEngine] WhatsApp PDF batch error:", e));
+      }
+
+      return waResult;
     } else if (channel === "sms") {
       try {
         await sendDLTSMS(ctx.customerMobile, ctx.customerName, ctx.bookingNumber || "", ctx.invoiceNumber || "");

@@ -578,11 +578,45 @@ router.post("/:id/approve", requireAdmin as any, requirePermission("bookings", "
     }
   })();
 
-  triggerWorkflow("booking_approved", {
-    bookingId: updated.id, bookingNumber: updated.bookingNumber,
-    customerName: updated.customerName, customerMobile: updated.customerMobile,
-    customerEmail: updated.customerEmail ?? undefined,
-  }).catch(() => {});
+  // Generate invoice PDF to attach to booking approval notifications
+  (async () => {
+    try {
+      const { generateInvoicePdfBuffer } = await import("../lib/paymentDocs.js");
+      const { upsertInvoiceForBooking } = await import("./invoices.js");
+      const inv = await upsertInvoiceForBooking(updated.id).catch(() => null);
+      const finalAmt = Number(updated.finalAmount || 0);
+      const paidAmt  = Number(updated.paidAmount  || 0);
+      const pdfBuf = await generateInvoicePdfBuffer({
+        bookingNumber:    updated.bookingNumber,
+        customerName:     updated.customerName,
+        customerMobile:   updated.customerMobile,
+        customerEmail:    updated.customerEmail ?? undefined,
+        packageName:      (updated as any).packageName ?? undefined,
+        totalAmount:      finalAmt,
+        finalAmount:      finalAmt,
+        paidAmount:       paidAmt,
+        balanceAmount:    finalAmt - paidAmt,
+        invoiceNumber:    (inv as any)?.invoice_number ?? (updated as any).invoiceNumber ?? undefined,
+      });
+      const attachments = [{ filename: `Invoice-${updated.bookingNumber}.pdf`, content: pdfBuf, contentType: "application/pdf" }];
+      await triggerWorkflow("booking_approved", {
+        bookingId:     updated.id,
+        bookingNumber: updated.bookingNumber,
+        customerName:  updated.customerName,
+        customerMobile: updated.customerMobile,
+        customerEmail: updated.customerEmail ?? undefined,
+        packageName:   (updated as any).packageName ?? undefined,
+        attachments,
+      });
+    } catch (pdfErr) {
+      console.error("[approve] PDF generation failed, sending without attachment:", pdfErr);
+      triggerWorkflow("booking_approved", {
+        bookingId: updated.id, bookingNumber: updated.bookingNumber,
+        customerName: updated.customerName, customerMobile: updated.customerMobile,
+        customerEmail: updated.customerEmail ?? undefined,
+      }).catch(() => {});
+    }
+  })();
 
   notifyBookingApproved({
     bookingId: updated.id,
