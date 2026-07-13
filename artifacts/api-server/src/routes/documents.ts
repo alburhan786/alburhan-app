@@ -2,7 +2,8 @@ import { Router } from "express";
 import { db, bookingsTable, pilgrimsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth, type AuthenticatedRequest } from "../lib/auth.js";
-import { sendAdminDocumentReadyNotification, sendCustomerDocumentUploadNotification } from "../lib/notifications.js";
+import { sendCustomerDocumentUploadNotification } from "../lib/notifications.js";
+import { sendDocumentToCustomer, TRAVEL_DOC_TYPES } from "../lib/documentDelivery.js";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -36,12 +37,6 @@ const VALID_DOCUMENT_TYPES = [
   "tour_itinerary", "hotel_voucher", "payment_receipt", "ziyarat_schedule",
   "insurance", "hajj_id", "luggage_tag", "emergency_contact_card",
 ];
-
-const ADMIN_NOTIFIED_DOC_TYPES = new Set([
-  "flight_ticket", "visa", "room_allotment", "bus_allotment", "model_contract",
-  "tour_itinerary", "hotel_voucher", "payment_receipt", "ziyarat_schedule",
-  "insurance", "hajj_id", "luggage_tag", "emergency_contact_card",
-]);
 
 const router = Router();
 
@@ -136,16 +131,20 @@ router.post(
     const custMobile = booking.customerMobile;
     const custEmail = booking.customerEmail;
 
-    if (isAdmin && ADMIN_NOTIFIED_DOC_TYPES.has(documentType)) {
-      sendAdminDocumentReadyNotification({
-        mobile: custMobile,
-        email: custEmail,
-        customerName: custName,
+    if (isAdmin && TRAVEL_DOC_TYPES.has(documentType)) {
+      sendDocumentToCustomer({
+        docId,
+        bookingId,
         bookingNumber: bkNum,
+        customerId: booking.customerId || null,
+        customerName: custName,
+        customerMobile: custMobile,
+        customerEmail: custEmail,
         documentType,
-      }).then(() => {
-        pool.query(`UPDATE documents SET notification_sent = TRUE WHERE id = $1`, [docId]).catch(() => {});
-      }).catch(err => console.error("[Documents] Admin doc notification error:", err));
+        fileName: req.file.originalname,
+        fileUrl: doc.file_url,
+        mimeType: req.file.mimetype,
+      }).catch(err => console.error("[Documents] sendDocumentToCustomer error:", err));
     } else if (!isAdmin) {
       sendCustomerDocumentUploadNotification({
         customerName: custName,
@@ -273,6 +272,43 @@ router.get("/:bookingId", requireAuth as any, async (req: AuthenticatedRequest, 
   } catch (err) {
     console.error("[Documents] list error:", err);
     res.json([]);
+  }
+});
+
+// ── Admin: resend document to customer ───────────────────────────────────────
+router.post("/:id/resend", requireAuth as any, async (req: AuthenticatedRequest, res) => {
+  if (req.user?.role !== "admin") { res.status(403).json({ message: "Admin only" }); return; }
+  const docId = req.params.id;
+  try {
+    const { rows } = await pool.query(
+      `SELECT d.*, b.booking_number, b.customer_name, b.customer_mobile, b.customer_email, b.customer_id AS b_customer_id
+       FROM documents d
+       JOIN bookings b ON b.id = d.booking_id
+       WHERE d.id = $1`,
+      [docId]
+    );
+    const doc = rows[0];
+    if (!doc) { res.status(404).json({ message: "Document not found" }); return; }
+
+    // Fire delivery asynchronously — respond immediately
+    res.json({ ok: true, message: "Resending document to customer…" });
+
+    sendDocumentToCustomer({
+      docId,
+      bookingId: doc.booking_id,
+      bookingNumber: doc.booking_number,
+      customerId: doc.b_customer_id || doc.customer_id || null,
+      customerName: doc.customer_name,
+      customerMobile: doc.customer_mobile,
+      customerEmail: doc.customer_email,
+      documentType: doc.document_type,
+      fileName: doc.file_name,
+      fileUrl: doc.file_url,
+      mimeType: doc.mime_type,
+    }).catch(err => console.error("[Documents] resend error:", err));
+  } catch (err: any) {
+    console.error("[Documents] resend endpoint error:", err);
+    res.status(500).json({ message: err?.message || "Resend failed" });
   }
 });
 

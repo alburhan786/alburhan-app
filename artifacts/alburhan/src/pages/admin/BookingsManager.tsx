@@ -296,8 +296,25 @@ function AdminDocumentsSection({ bookingId }: { bookingId: string }) {
   const [docType, setDocType] = useState("flight_ticket");
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [resendingDocId, setResendingDocId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
+
+  const handleResend = async (docId: string, label: string) => {
+    setResendingDocId(docId);
+    try {
+      const res = await fetch(`${BASE_API}/api/documents/${docId}/resend`, {
+        method: "POST", credentials: "include",
+      });
+      if (!res.ok) throw new Error((await res.json()).message || "Resend failed");
+      toast({ title: "Document resent", description: `${label} — WhatsApp, Email & SMS queued.` });
+      setTimeout(() => refetch(), 2500);
+    } catch (err: any) {
+      toast({ title: "Resend failed", description: err.message, variant: "destructive" });
+    } finally {
+      setResendingDocId(null);
+    }
+  };
 
   const handleDelete = (docId: string, fileName: string) => {
     requestDelete(`Document: ${fileName}`, async (token) => {
@@ -349,13 +366,22 @@ function AdminDocumentsSection({ bookingId }: { bookingId: string }) {
   const adminDocs = docList.filter((d: any) => d.uploadedBy === "admin");
   const customerDocs = docList.filter((d: any) => d.uploadedBy !== "admin");
 
+  const TRAVEL_DOC_SET = new Set([
+    "flight_ticket","visa","room_allotment","bus_allotment","hotel_voucher",
+    "tour_itinerary","payment_receipt","ziyarat_schedule","insurance","hajj_id",
+    "luggage_tag","emergency_contact_card","vaccination_certificate","passport_copy",
+    "model_contract","other",
+  ]);
+
   const renderDoc = (doc: any) => {
     const label = DOC_TYPE_LABELS[doc.documentType] || doc.documentType;
     const color = DOC_TYPE_COLOR[doc.documentType] || "bg-gray-100 text-gray-800";
     const fileUrl = `${BASE_API}${doc.fileUrl}`;
     const isImg = isImageFile(doc.fileName || "");
     const downloads = doc.downloadCount ?? doc.download_count ?? 0;
-    const lastDl = doc.lastDownloadedAt ?? doc.last_downloaded_at;
+    const notified = doc.notificationSent || doc.notification_sent;
+    const isTravelDoc = doc.uploadedBy === "admin" && TRAVEL_DOC_SET.has(doc.documentType);
+    const isResending = resendingDocId === doc.id;
 
     return (
       <div key={doc.id} className="flex items-center gap-2 border rounded-lg px-3 py-2 bg-white">
@@ -371,18 +397,28 @@ function AdminDocumentsSection({ bookingId }: { bookingId: string }) {
             {doc.uploadedBy === "admin" ? "Admin" : "Customer"}
             {doc.createdAt ? ` · ${new Date(doc.createdAt).toLocaleDateString("en-IN")}` : ""}
             {" · "}
-            {(doc.notificationSent || doc.notification_sent) ? "Notified" : "No notif"}
+            <span className={notified ? "text-emerald-600 font-medium" : "text-amber-600"}>
+              {notified ? "✓ Delivered" : "Not sent"}
+            </span>
             {" · "}
             {(doc.viewedAt || doc.viewed_at)
               ? `Viewed ${new Date(doc.viewedAt || doc.viewed_at).toLocaleDateString("en-IN")}`
               : "Not viewed"}
-            {" · "}
-            {downloads > 0
-              ? `Downloaded ${downloads}×`
-              : "Not downloaded"}
+            {downloads > 0 ? ` · DL ${downloads}×` : ""}
           </p>
         </div>
         <div className="flex items-center gap-0.5 flex-shrink-0">
+          {isTravelDoc && (
+            <Button
+              variant="ghost" size="icon"
+              className="h-6 w-6 text-violet-600 hover:bg-violet-50"
+              title="Resend to customer (WhatsApp + Email + SMS)"
+              disabled={isResending}
+              onClick={() => handleResend(doc.id, label)}
+            >
+              {isResending ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+            </Button>
+          )}
           <a href={fileUrl} target="_blank" rel="noreferrer" title="View">
             <Button variant="ghost" size="icon" className="h-6 w-6 text-blue-600 hover:bg-blue-50"><Eye size={12} /></Button>
           </a>
