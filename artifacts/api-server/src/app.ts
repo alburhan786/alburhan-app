@@ -517,6 +517,21 @@ echo "=== Share the pm2 describe output to diagnose further."
   res.send(script);
 });
 
+// POST /api/migrate/db-query — run a read-only SELECT query for live debugging
+app.post("/api/migrate/db-query", async (req, res) => {
+  const key = req.body?.key as string;
+  if (!migrationKeyValid(key)) return res.status(403).send("Forbidden");
+  const sql = req.body?.sql as string;
+  if (!sql || !/^\s*SELECT\b/i.test(sql)) return res.status(400).json({ error: "Only SELECT queries allowed" });
+  try {
+    const { pool: qPool } = await import("@workspace/db");
+    const result = await qPool.query(sql);
+    res.json({ rows: result.rows, rowCount: result.rowCount });
+  } catch (e: any) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
 // GET /api/migrate/dump.sql — serves DB dump (if file exists)
 app.get("/api/migrate/dump.sql", (req, res) => {
   const key = req.query.key as string;

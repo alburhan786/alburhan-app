@@ -348,16 +348,17 @@ export async function uploadMedia(
   if (!apiToken || !phone_number_id) return { ok: false, errorMessage: "BotBee credentials not configured" };
 
   try {
-    const FormData = (await import("form-data")).default;
+    // Use Node 20 native FormData + fetch (no npm form-data package needed)
     const form = new FormData();
     form.append("apiToken", apiToken);
     form.append("phone_number_id", phone_number_id);
-    form.append("file", fileBuffer, { filename: fileName, contentType: mimeType });
+    form.append("media_file", new Blob([fileBuffer], { type: mimeType }), fileName);
 
-    const response = await withRetry(() =>
-      axios.post(endpoint, form, { headers: form.getHeaders(), timeout: 30000 })
-    );
-    const data = response.data;
+    const rawResponse = await withRetry(async () => {
+      const r = await fetch(endpoint, { method: "POST", body: form, signal: AbortSignal.timeout(30000) });
+      return r;
+    });
+    const data: any = await rawResponse.json();
     const mediaId = data?.media_id || data?.id || data?.data?.id;
     if (!mediaId) {
       return { ok: false, errorMessage: data?.message || "No media ID in response", responsePayload: data };

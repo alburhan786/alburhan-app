@@ -1853,9 +1853,18 @@ async function start() {
             ).catch(() => {});
           }
           console.log(`[BotBee] Auto-synced ${result.templates.length} templates`);
+        } else if (!result.ok) {
+          // Silently suppress "route not found" (BotBee WABA not yet connected — expected)
+          const msg = result.errorMessage || "";
+          if (!msg.includes("not found") && !msg.includes("404") && !msg.includes("could not be found")) {
+            console.warn("[BotBee] Template sync skipped:", msg);
+          }
         }
-      } catch (err) {
-        console.error("[BotBee] Auto-sync failed:", err);
+      } catch (err: any) {
+        const msg = String(err?.message || err);
+        if (!msg.includes("not found") && !msg.includes("404")) {
+          console.warn("[BotBee] Auto-sync failed:", msg);
+        }
       }
     };
     syncBotBeeTemplates();
@@ -1874,10 +1883,14 @@ async function start() {
     const isWAPermanentError = (msg: string): boolean =>
       WA_PERMANENT_ERRORS.some(e => msg?.toLowerCase().includes(e));
 
-    // First, clean up any existing permanently-failed rows so they stop clogging the queue
+    // Clean up permanently-failed rows: max retries reached, or 24h-window error
     pool.query(
       `UPDATE notification_logs SET status='permanently_failed', updated_at=NOW()
-       WHERE channel='whatsapp' AND status='failed' AND retry_count >= 5`
+       WHERE channel='whatsapp' AND status='failed'
+         AND (retry_count >= 5
+              OR provider_response::text ILIKE '%24 hour%'
+              OR provider_response::text ILIKE '%outside 24 hour%'
+              OR provider_response::text ILIKE '%24h window%')`
     ).catch(() => {});
 
     const runRetryEngine = async () => {

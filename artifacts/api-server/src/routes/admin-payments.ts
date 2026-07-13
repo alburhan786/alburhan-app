@@ -230,34 +230,39 @@ router.post("/:id/payments", requireAdmin as RequestHandler, async (req: Authent
       bookingNumber: bookingId,
     }).catch(() => {});
 
-    // Auto-upsert invoice + send notifications after every payment (fire-and-forget)
+    // Always fire payment notifications regardless of booking status transition.
+    // The previous `if (isPaymentStatus)` gate silently skipped notifications when
+    // recalculateBookingPayment returned "approved" (e.g. first-time cash payment where
+    // the DB status was already set elsewhere). We now always notify on any recorded payment.
     const isFullyPaid = result.updated?.newStatus === "confirmed";
-    const isPaymentStatus = result.updated?.newStatus === "confirmed" || result.updated?.newStatus === "partially_paid";
-    if (isPaymentStatus) {
-      if (isFullyPaid) {
-        upsertInvoiceForBooking(bookingId).catch((err) =>
-          console.error("[admin-payments] upsertInvoice failed:", err)
-        );
-      }
-      processPaymentSuccessNotifications({
-        booking: {
-          id: bookingId,
-          bookingNumber: result.booking.bookingNumber ?? "",
-          customerName: result.booking.customerName ?? "",
-          customerMobile: result.booking.customerMobile ?? "",
-          customerEmail: result.booking.customerEmail,
-          packageName: result.booking.packageName,
-          numberOfPilgrims: result.booking.numberOfPilgrims,
-          finalAmount: result.booking.finalAmount,
-        },
-        isFullyPaid,
-        thisPaymentAmount: Number(amount),
-        newPaidAmount: result.updated!.totalPaid,
-        remainingBalance: Math.max(0, Number(result.booking.finalAmount || 0) - result.updated!.totalPaid),
-        invoiceNumber: result.updated?.invoiceNumber,
-        paymentRef: typeof referenceNumber === "string" ? referenceNumber : undefined,
-      }).catch((err) => console.error("[admin-payments] processPaymentSuccessNotifications failed:", err));
+    const newPaidAmount = result.updated?.totalPaid ?? Number(amount);
+    const remainingBalance = Math.max(0, Number(result.booking.finalAmount || 0) - newPaidAmount);
+
+    if (isFullyPaid) {
+      upsertInvoiceForBooking(bookingId).catch((err) =>
+        console.error("[admin-payments] upsertInvoice failed:", err)
+      );
     }
+
+    console.log(`[admin-payments] Firing payment notification: booking=${result.booking.bookingNumber} amount=${amount} newStatus=${result.updated?.newStatus} newPaid=${newPaidAmount} remaining=${remainingBalance}`);
+    processPaymentSuccessNotifications({
+      booking: {
+        id: bookingId,
+        bookingNumber: result.booking.bookingNumber ?? "",
+        customerName: result.booking.customerName ?? "",
+        customerMobile: result.booking.customerMobile ?? "",
+        customerEmail: result.booking.customerEmail,
+        packageName: result.booking.packageName,
+        numberOfPilgrims: result.booking.numberOfPilgrims,
+        finalAmount: result.booking.finalAmount,
+      },
+      isFullyPaid,
+      thisPaymentAmount: Number(amount),
+      newPaidAmount,
+      remainingBalance,
+      invoiceNumber: result.updated?.invoiceNumber,
+      paymentRef: typeof referenceNumber === "string" ? referenceNumber : undefined,
+    }).catch((err) => console.error("[admin-payments] processPaymentSuccessNotifications failed:", err));
 
     return res.status(201).json({
       entry: { ...result.entry, amount: Number(result.entry.amount) },
