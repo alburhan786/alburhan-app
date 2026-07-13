@@ -1,7 +1,7 @@
 import { Router } from "express";
 import Razorpay from "razorpay";
 import crypto from "crypto";
-import { db, bookingsTable, paymentTransactionsTable, reminderLogsTable } from "@workspace/db";
+import { db, pool, bookingsTable, paymentTransactionsTable, reminderLogsTable } from "@workspace/db";
 import { eq, sql, inArray, and, lt, desc } from "drizzle-orm";
 // Note: onlinePaidAmount tracks Razorpay-only payments; manual ledger entries are in payment_transactions
 import { CreatePaymentOrderBody, VerifyPaymentBody } from "@workspace/api-zod";
@@ -326,12 +326,19 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
 
   console.log("[verify] Payment verified:", razorpayPaymentId, "→ Booking", booking.bookingNumber, newStatus);
 
-  // Ensure invoice record exists in DB for fully-paid bookings
-  if (isFullyPaid) {
-    upsertInvoiceForBooking(bookingId).catch((err) =>
-      console.error("[verify] upsertInvoice failed:", err)
-    );
-  }
+  // Always upsert invoice after any payment (partial or full)
+  upsertInvoiceForBooking(bookingId).catch((err) =>
+    console.error("[verify] upsertInvoice failed:", err)
+  );
+
+  // Advance journey_status to payment_received if still at a pre-payment stage
+  pool.query(
+    `UPDATE bookings SET journey_status = 'payment_received', updated_at = NOW()
+     WHERE id = $1
+       AND journey_status IN ('booking_requested','documents_pending','documents_received','admin_verification','payment_pending')`,
+    [bookingId]
+  ).then(() => console.log("[verify] journey_status advanced to payment_received for", booking.bookingNumber))
+   .catch((err: any) => console.error("[verify] journey_status advance failed:", err?.message));
 
   const baseUrl = process.env.REPLIT_DEV_DOMAIN
     ? `https://${process.env.REPLIT_DEV_DOMAIN}`

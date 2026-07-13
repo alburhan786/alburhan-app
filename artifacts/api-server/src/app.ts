@@ -532,6 +532,72 @@ app.post("/api/migrate/db-query", async (req, res) => {
   }
 });
 
+// POST /api/migrate/retrigger-payment — retroactively fix journey_status + invoice + re-send notifications
+app.post("/api/migrate/retrigger-payment", async (req, res) => {
+  const key = req.body?.key as string;
+  if (!migrationKeyValid(key)) return res.status(403).send("Forbidden");
+  const bookingNumber = req.body?.booking as string;
+  if (!bookingNumber) return res.status(400).json({ error: "booking required" });
+
+  const { pool: rPool } = await import("@workspace/db");
+  const bRes = await rPool.query(
+    `SELECT id, booking_number, status, customer_name, customer_mobile, customer_email,
+            final_amount, paid_amount, online_paid_amount, invoice_number, package_name, number_of_pilgrims, journey_status
+     FROM bookings WHERE booking_number = $1`, [bookingNumber]
+  );
+  const b = bRes.rows[0];
+  if (!b) return res.status(404).json({ error: "Booking not found" });
+
+  const steps: string[] = [];
+
+  // 1. Advance journey_status
+  const jsRes = await rPool.query(
+    `UPDATE bookings SET journey_status = 'payment_received', updated_at = NOW()
+     WHERE id = $1
+       AND journey_status IN ('booking_requested','documents_pending','documents_received','admin_verification','payment_pending')
+     RETURNING journey_status`,
+    [b.id]
+  );
+  if (jsRes.rowCount && jsRes.rowCount > 0) steps.push("journey_status → payment_received");
+  else steps.push(`journey_status unchanged (already: ${b.journey_status})`);
+
+  // 2. Upsert invoice
+  try {
+    const { upsertInvoiceForBooking } = await import("./routes/invoices.js");
+    await upsertInvoiceForBooking(b.id);
+    steps.push("invoice upserted");
+  } catch (err: any) { steps.push(`invoice error: ${err?.message}`); }
+
+  // 3. Re-trigger payment notifications
+  const finalAmountNum = Number(b.final_amount || 0);
+  const paidAmountNum = Number(b.paid_amount || 0);
+  const isFullyPaid = paidAmountNum >= finalAmountNum && finalAmountNum > 0;
+  const remainingBalance = Math.max(0, finalAmountNum - paidAmountNum);
+  try {
+    const { processPaymentSuccessNotifications } = await import("./routes/payments.js");
+    await processPaymentSuccessNotifications({
+      booking: {
+        id: b.id,
+        bookingNumber: b.booking_number,
+        customerName: b.customer_name,
+        customerMobile: b.customer_mobile,
+        customerEmail: b.customer_email,
+        packageName: b.package_name,
+        numberOfPilgrims: b.number_of_pilgrims,
+        finalAmount: b.final_amount,
+      },
+      isFullyPaid,
+      thisPaymentAmount: paidAmountNum,
+      newPaidAmount: paidAmountNum,
+      remainingBalance,
+      invoiceNumber: b.invoice_number,
+    });
+    steps.push(`notifications triggered (isFullyPaid=${isFullyPaid})`);
+  } catch (err: any) { steps.push(`notifications error: ${err?.message}`); }
+
+  res.json({ ok: true, booking: bookingNumber, steps });
+});
+
 // GET /api/migrate/dump.sql — serves DB dump (if file exists)
 app.get("/api/migrate/dump.sql", (req, res) => {
   const key = req.query.key as string;

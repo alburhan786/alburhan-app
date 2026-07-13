@@ -1154,6 +1154,7 @@ async function runMigrations() {
       )
     `);
     await pool.query(`CREATE INDEX IF NOT EXISTS inv_booking_idx ON invoices(booking_id)`);
+    await pool.query(`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS due_date TIMESTAMPTZ`).catch(() => {});
     console.log("[Migration] invoices table ensured");
   } catch (err) {
     console.error("[Migration] invoices table failed:", err);

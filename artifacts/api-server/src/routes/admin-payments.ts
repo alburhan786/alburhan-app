@@ -244,6 +244,19 @@ router.post("/:id/payments", requireAdmin as RequestHandler, async (req: Authent
       );
     }
 
+    // Always upsert invoice after any payment (partial or full)
+    upsertInvoiceForBooking(bookingId).catch((err) =>
+      console.error("[admin-payments] upsertInvoice (any-payment) failed:", err)
+    );
+
+    // Advance journey_status to payment_received if still at a pre-payment stage
+    pool.query(
+      `UPDATE bookings SET journey_status = 'payment_received', updated_at = NOW()
+       WHERE id = $1
+         AND journey_status IN ('booking_requested','documents_pending','documents_received','admin_verification','payment_pending')`,
+      [bookingId]
+    ).catch((err: any) => console.error("[admin-payments] journey_status advance failed:", err?.message));
+
     console.log(`[admin-payments] Firing payment notification: booking=${result.booking.bookingNumber} amount=${amount} newStatus=${result.updated?.newStatus} newPaid=${newPaidAmount} remaining=${remainingBalance}`);
     processPaymentSuccessNotifications({
       booking: {
