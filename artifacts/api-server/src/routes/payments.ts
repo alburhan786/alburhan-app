@@ -66,6 +66,10 @@ export async function processPaymentSuccessNotifications(opts: {
 }) {
   const { booking, isFullyPaid, thisPaymentAmount, newPaidAmount, remainingBalance, invoiceNumber, paymentRef } = opts;
   const finalAmountNum = Number(booking.finalAmount || 0);
+  const siteBase = process.env.REPLIT_DEV_DOMAIN
+    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+    : (process.env.SITE_URL || "https://alburhantravels.com");
+  const invoiceUrl = invoiceNumber ? `${siteBase}/invoice/${booking.bookingNumber}` : undefined;
 
   const docOpts = {
     bookingNumber: booking.bookingNumber,
@@ -111,6 +115,7 @@ export async function processPaymentSuccessNotifications(opts: {
       paidAmount: thisPaymentAmount,
       balanceAmount: remainingBalance,
       invoiceNumber: invoiceNumber ?? undefined,
+      invoiceUrl,
       attachments,
     } as any),
     sendAdminPaymentAlert({
@@ -346,7 +351,7 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
     ? `https://${process.env.REPLIT_DEV_DOMAIN}`
     : (process.env.SITE_URL || "https://alburhantravels.com");
 
-  const invoiceUrl = isFullyPaid ? `${baseUrl}/invoice/${booking.bookingNumber}` : undefined;
+  const invoiceUrl = invoiceNumber ? `${baseUrl}/invoice/${booking.bookingNumber}` : undefined;
 
   const remainingBalance = Math.max(0, finalAmount - newPaidAmount);
   try {

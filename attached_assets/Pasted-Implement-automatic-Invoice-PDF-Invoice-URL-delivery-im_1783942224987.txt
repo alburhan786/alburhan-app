@@ -1,0 +1,102 @@
+Implement automatic Invoice PDF/Invoice URL delivery immediately after a successful payment.
+
+Requirements:
+
+1. Trigger automatically after:
+   - Razorpay payment success (partial or full)
+   - Admin records an offline payment
+
+2. Generate the invoice PDF if it does not already exist.
+
+3. Store the invoice PDF and create a secure public download URL, for example:
+https://alburhantravels.com/invoices/ABT-2026-000011.pdf
+
+or
+
+https://alburhantravels.com/customer/invoice/ABT26936498
+
+4. Send notifications automatically through all enabled channels:
+
+A. WhatsApp
+- Send a booking confirmation.
+- Attach the Invoice PDF if the WhatsApp provider supports PDF documents.
+- If PDF attachments are not supported, include the secure Invoice URL.
+
+Example:
+
+💰 Payment Received Successfully
+
+Assalamu Alaikum Mohammed Altaf,
+
+Jazak Allah Khair for choosing Al Burhan Tours & Travels.
+
+Booking ID: ABT26936498
+Invoice No: ABT/2026/000011
+Amount Paid: ₹10
+Balance: ₹57,740
+
+Download Invoice:
+https://alburhantravels.com/customer/invoice/ABT26936498
+
+Warm Regards,
+Al Burhan Tours & Travels
+
+B. Email
+- Attach the Invoice PDF.
+- Include the invoice download link.
+
+C. SMS (Fast2SMS)
+- Send a short SMS including the Invoice URL.
+
+Example:
+
+Assalamu Alaikum Mohammed Altaf,
+Payment of ₹10 received successfully.
+Booking ID: ABT26936498.
+Invoice:
+https://alburhantravels.com/customer/invoice/ABT26936498
+
+Al Burhan Tours & Travels
+
+5. Customer Dashboard
+Immediately after payment:
+- Show Invoice card.
+- Show Download Invoice button.
+- Show Payment Receipt.
+- Update booking status automatically without refreshing.
+
+6. Admin Dashboard
+Display:
+- Invoice Generated
+- Invoice URL
+- PDF Status
+- WhatsApp Delivery Status
+- Email Delivery Status
+- SMS Delivery Status
+- Retry buttons if sending fails
+
+7. Notification Logs
+Log every notification with:
+- Booking ID
+- Invoice Number
+- Customer Name
+- Mobile
+- Email
+- Invoice URL
+- WhatsApp Status
+- Email Status
+- SMS Status
+- Timestamp
+- Error message if any
+
+8. Retry Logic
+If WhatsApp, Email, or SMS fails:
+- Retry automatically up to 3 times.
+- Keep the invoice available for download.
+- Allow the admin to resend manually.
+
+9. Security
+- Customers can download only their own invoice.
+- Invoice links must be secure and validated before download.
+
+10. Do not break any existing booking, payment, invoice, or notification functionality. Only enhance the workflow so every successful payment automatically generates the invoice and sends the Invoice PDF or secure Invoice URL through WhatsApp, Email, and SMS.

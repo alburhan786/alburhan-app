@@ -12,6 +12,7 @@ function getConfig() {
   return {
     apiKey,
     enabled,
+    ex,
     sender_id: ex.sender_id || "ALBURH",
     // Per-event template IDs — fall back to generic notify_template_id
     notify_tid: ex.notify_template_id || "211277",
@@ -127,7 +128,11 @@ async function sendDLT(
   }
 
   const phone = toPhone(mobile);
-  const vars = encodeURIComponent(variables.map(v => String(v).substring(0, 30)).join("|") + "|");
+  const vars = encodeURIComponent(variables.map(v => {
+    const s = String(v);
+    // URLs may be up to 100 chars; other variables capped at 30
+    return (s.startsWith("http://") || s.startsWith("https://")) ? s.substring(0, 100) : s.substring(0, 30);
+  }).join("|") + "|");
   const endpoint = `https://www.fast2sms.com/dev/bulkV2`;
   const url = `${endpoint}?authorization=${apiKey}&route=dlt&sender_id=${sender_id}&message=${templateId}&variables_values=${vars}&numbers=${phone}&flash=0`;
   const maskedUrl = url.replace(apiKey, `${apiKey.slice(0, 6)}***`);
@@ -201,20 +206,24 @@ export async function sendBookingConfirmed(ctx: BookingCtx): Promise<SMSResult> 
   );
 }
 
-export async function sendPaymentReceived(ctx: BookingCtx & { amount: string; invoiceNumber?: string }): Promise<SMSResult> {
-  const { tids } = getConfig();
+export async function sendPaymentReceived(ctx: BookingCtx & { amount: string; invoiceNumber?: string; invoiceUrl?: string }): Promise<SMSResult> {
+  const { tids, ex } = getConfig();
+  const vars: string[] = [ctx.customerName, ctx.bookingNumber, ctx.amount];
+  if (ctx.invoiceUrl && ex.payment_url_in_sms === "1") vars.push(ctx.invoiceUrl);
   return sendDLT(
     ctx.mobile, tids.payment_received,
-    [ctx.customerName, ctx.bookingNumber, ctx.amount],
+    vars,
     { eventType: "payment_received", message: `Payment ₹${ctx.amount} for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId }
   );
 }
 
-export async function sendPartialPaymentReceived(ctx: BookingCtx & { paidAmount: string; balanceAmount: string }): Promise<SMSResult> {
-  const { tids } = getConfig();
+export async function sendPartialPaymentReceived(ctx: BookingCtx & { paidAmount: string; balanceAmount: string; invoiceUrl?: string }): Promise<SMSResult> {
+  const { tids, ex } = getConfig();
+  const vars: string[] = [ctx.customerName, ctx.bookingNumber, ctx.packageName || "your package", ctx.paidAmount, ctx.balanceAmount];
+  if (ctx.invoiceUrl && ex.payment_url_in_sms === "1") vars.push(ctx.invoiceUrl);
   return sendDLT(
     ctx.mobile, tids.partial_payment,
-    [ctx.customerName, ctx.bookingNumber, ctx.packageName || "your package", ctx.paidAmount, ctx.balanceAmount],
+    vars,
     { eventType: "partial_payment", message: `Partial payment ₹${ctx.paidAmount} for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId }
   );
 }

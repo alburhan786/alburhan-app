@@ -858,6 +858,25 @@ router.post("/:id/send-invoice", requireAdmin as any, async (req: AuthenticatedR
   res.json({ message: "Invoice notification sent", whatsapp: whatsappOk, sms: smsOk });
 });
 
+router.get("/:id/notification-logs", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { pool: pgPool } = await import("@workspace/db");
+    const result = await pgPool.query(
+      `SELECT id, channel, event_type, status, recipient, message, provider_name,
+              provider_response, sent_at, retry_count, error_message
+       FROM notification_logs
+       WHERE booking_id = $1
+       ORDER BY sent_at DESC
+       LIMIT 60`,
+      [req.params.id]
+    );
+    res.json({ logs: result.rows });
+  } catch (err) {
+    console.error("[bookings] notification-logs error:", err);
+    res.status(500).json({ message: "Failed to fetch notification logs" });
+  }
+});
+
 async function resolveInvoiceData(b: typeof bookingsTable.$inferSelect) {
   let pkg = null;
   if (b.packageId) {

@@ -213,7 +213,7 @@ export function buildDefaultMessage(eventType: EventType, ctx: NotificationConte
       return `Assalamu Alaikum ${name},\n\n✅ *Payment Received — JazakAllah Khair!*\n\n📋 Booking: ${booking}\n📦 Package: ${pkg}${flightLine}\n\n💰 Amount Paid: ₹${formatINR(ctx.amount || 0)}\n💳 Total Paid: ₹${formatINR(Number(totalPaid))}\n${balanceLine}\n\n📄 View Invoice: ${invUrl}\n\nYour invoice & receipt are attached.\nFor queries: +91 9893225590\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
     }
     case "partial_payment":
-      return `Assalamu Alaikum ${name},\n\nPartial payment of ₹${formatINR(ctx.paidAmount || ctx.amount || 0)} received for booking ${booking} (${pkg}).\n\n💰 Remaining Balance: ₹${formatINR(ctx.balanceAmount || 0)}\n\nPay remaining: ${invUrl}\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 9893225590`;
+      return `Assalamu Alaikum ${name},\n\n✅ *Partial Payment Received — JazakAllah Khair!*\n\n📋 Booking: ${booking}\n📦 Package: ${pkg}\n\n💰 Amount Paid: ₹${formatINR(ctx.paidAmount || ctx.amount || 0)}\n💳 Balance Due: ₹${formatINR(ctx.balanceAmount || 0)}\n\n📄 View Invoice: ${invUrl}\n\nFor queries: +91 9893225590\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
     case "refund":
       return `Assalamu Alaikum ${name},\n\nYour refund of ₹${formatINR(ctx.amount || 0)} for booking ${booking} has been processed.\n\nIt will reflect in your account within 5-7 business days.\n\nFor queries: +91 9893225590\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
     case "payment_due":
@@ -530,6 +530,7 @@ async function sendOnChannelWithType(channel: Channel, eventType: EventType, ctx
             result = await smsLib.sendPaymentReceived({
               ...smsCtx,
               amount: ctx.amount != null ? String(Math.round(Number(ctx.amount))) : "0",
+              invoiceUrl: ctx.invoiceUrl || (ctx.bookingNumber ? `https://alburhantravels.com/invoice/${ctx.bookingNumber}` : undefined),
             });
             break;
           case "partial_payment":
@@ -537,6 +538,7 @@ async function sendOnChannelWithType(channel: Channel, eventType: EventType, ctx
               ...smsCtx,
               paidAmount: ctx.paidAmount != null ? String(Math.round(Number(ctx.paidAmount))) : "0",
               balanceAmount: ctx.balanceAmount != null ? String(Math.round(Number(ctx.balanceAmount))) : "0",
+              invoiceUrl: ctx.invoiceUrl || (ctx.bookingNumber ? `https://alburhantravels.com/invoice/${ctx.bookingNumber}` : undefined),
             });
             break;
           default:

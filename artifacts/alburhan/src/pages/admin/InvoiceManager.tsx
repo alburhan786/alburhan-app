@@ -25,7 +25,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   Eye, Download, Printer, Mail, MessageCircle,
   RefreshCw, MoreHorizontal, Search, FileText,
-  CheckCircle, Clock, AlertCircle, Zap
+  CheckCircle, Clock, AlertCircle, Zap, Activity, XCircle
 } from "lucide-react";
 import { downloadPdf } from "@/lib/pdf-download";
 
@@ -351,16 +351,152 @@ function PaymentBadge({ booking }: { booking: Booking }) {
   return <Badge className="bg-red-100 text-red-800 border-0 text-[10px] font-bold uppercase">Pending</Badge>;
 }
 
+type NotifLog = {
+  id: string; channel: string; event_type: string; status: string;
+  recipient: string; sent_at: string; retry_count: number; provider_name?: string;
+  provider_response?: Record<string, unknown>;
+};
+
+function channelIcon(ch: string) {
+  if (ch === "whatsapp") return <MessageCircle className="w-3.5 h-3.5 text-green-600" />;
+  if (ch === "email")    return <Mail className="w-3.5 h-3.5 text-blue-500" />;
+  if (ch === "sms")      return <Activity className="w-3.5 h-3.5 text-orange-500" />;
+  return <Activity className="w-3.5 h-3.5 text-muted-foreground" />;
+}
+
+function DeliveryLogDialog({ booking, onClose, onResend }: { booking: Booking; onClose: () => void; onResend: () => void }) {
+  const [logs, setLogs] = useState<NotifLog[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [resending, setResending] = useState(false);
+  const { toast } = useToast();
+  const sendMutation = useSendInvoiceNotification();
+
+  const refresh = async () => {
+    setLoading(true);
+    try {
+      const r = await fetch(`${API}/api/bookings/${booking.id}/notification-logs`, { credentials: "include" });
+      const d = await r.json();
+      setLogs(d.logs || []);
+    } catch { setLogs([]); }
+    finally { setLoading(false); }
+  };
+
+  useState(() => { refresh(); });
+
+  const handleResend = async () => {
+    setResending(true);
+    try {
+      const result = await sendMutation.mutateAsync({ id: booking.id });
+      toast({ title: "Sent", description: `WhatsApp: ${result.whatsapp ? "✓" : "✗"} | SMS: ${result.sms ? "✓" : "✗"}` });
+      onResend();
+      await refresh();
+    } catch {
+      toast({ title: "Error", description: "Failed to resend", variant: "destructive" });
+    } finally { setResending(false); }
+  };
+
+  const sentChannels = new Set(logs.filter(l => l.status === "sent").map(l => l.channel));
+  const failedChannels = new Set(logs.filter(l => l.status === "failed").map(l => l.channel));
+
+  return (
+    <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+      <DialogHeader>
+        <DialogTitle className="flex items-center gap-2">
+          <Activity className="w-5 h-5 text-[#0B3D2E]" />
+          Notification Delivery — {booking.bookingNumber}
+        </DialogTitle>
+      </DialogHeader>
+
+      {/* Channel summary */}
+      <div className="grid grid-cols-3 gap-3 mb-4">
+        {["whatsapp", "email", "sms"].map(ch => {
+          const ok = sentChannels.has(ch);
+          const fail = failedChannels.has(ch);
+          return (
+            <div key={ch} className={`rounded-xl border p-3 flex items-center gap-2 ${ok ? "border-emerald-200 bg-emerald-50" : fail ? "border-red-200 bg-red-50" : "border-border bg-muted/20"}`}>
+              {channelIcon(ch)}
+              <div>
+                <div className="text-xs font-semibold capitalize">{ch}</div>
+                <div className={`text-[10px] font-bold ${ok ? "text-emerald-700" : fail ? "text-red-600" : "text-muted-foreground"}`}>
+                  {ok ? "Delivered" : fail ? "Failed" : "No record"}
+                </div>
+              </div>
+              {ok ? <CheckCircle className="w-3.5 h-3.5 text-emerald-600 ml-auto" /> : fail ? <XCircle className="w-3.5 h-3.5 text-red-500 ml-auto" /> : null}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Log table */}
+      <div className="rounded-xl border overflow-hidden">
+        <table className="w-full text-xs text-left">
+          <thead className="bg-muted text-muted-foreground uppercase font-semibold">
+            <tr>
+              <th className="px-3 py-2">Channel</th>
+              <th className="px-3 py-2">Event</th>
+              <th className="px-3 py-2">Status</th>
+              <th className="px-3 py-2">Recipient</th>
+              <th className="px-3 py-2">Time</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {loading ? (
+              <tr><td colSpan={5} className="text-center py-6 text-muted-foreground">Loading logs…</td></tr>
+            ) : logs.length === 0 ? (
+              <tr><td colSpan={5} className="text-center py-6 text-muted-foreground">No notification logs found for this booking.</td></tr>
+            ) : logs.map(log => (
+              <tr key={log.id} className="hover:bg-muted/30">
+                <td className="px-3 py-2 font-medium capitalize flex items-center gap-1.5">{channelIcon(log.channel)}{log.channel}</td>
+                <td className="px-3 py-2 text-muted-foreground">{log.event_type?.replace(/_/g, " ")}</td>
+                <td className="px-3 py-2">
+                  <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${log.status === "sent" ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-700"}`}>
+                    {log.status === "sent" ? <CheckCircle className="w-2.5 h-2.5" /> : <XCircle className="w-2.5 h-2.5" />}
+                    {log.status}
+                  </span>
+                </td>
+                <td className="px-3 py-2 text-muted-foreground truncate max-w-[140px]">{log.recipient}</td>
+                <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">
+                  {log.sent_at ? new Date(log.sent_at).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="flex justify-between items-center mt-4 gap-3">
+        <Button variant="outline" size="sm" onClick={refresh} className="gap-1.5">
+          <RefreshCw className="w-3.5 h-3.5" /> Refresh
+        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={onClose}>Close</Button>
+          <Button
+            size="sm"
+            onClick={handleResend}
+            disabled={resending || sendMutation.isPending}
+            className="bg-[#0B3D2E] hover:bg-[#0B3D2E]/90 text-white gap-1.5"
+          >
+            <MessageCircle className="w-3.5 h-3.5" />
+            {resending ? "Sending…" : "Resend WhatsApp + SMS"}
+          </Button>
+        </div>
+      </div>
+    </DialogContent>
+  );
+}
+
 function ActionMenu({
   booking,
   invoiceNumber,
   onView,
   onRegenerate,
+  onDeliveryStatus,
 }: {
   booking: Booking;
   invoiceNumber: string;
   onView: () => void;
   onRegenerate: (newInvNum: string) => void;
+  onDeliveryStatus: () => void;
 }) {
   const { toast } = useToast();
   const sendMutation = useSendInvoiceNotification();
@@ -440,6 +576,10 @@ function ActionMenu({
           <RefreshCw className={`w-4 h-4 mr-2 text-orange-500 ${regenerating ? "animate-spin" : ""}`} />
           {regenerating ? "Regenerating..." : "Regenerate Invoice"}
         </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={onDeliveryStatus} className="cursor-pointer">
+          <Activity className="w-4 h-4 mr-2 text-[#0B3D2E]" />Delivery Status
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -454,6 +594,7 @@ export default function InvoiceManager() {
   const [filter, setFilter] = useState<PaymentFilter>("all");
   const [search, setSearch] = useState("");
   const [viewBooking, setViewBooking] = useState<Booking | null>(null);
+  const [deliveryBooking, setDeliveryBooking] = useState<Booking | null>(null);
   const [invoiceNumbers, setInvoiceNumbers] = useState<Record<string, string>>({});
   const [generatingAll, setGeneratingAll] = useState(false);
 
@@ -650,6 +791,7 @@ export default function InvoiceManager() {
                           invoiceNumber={invNum}
                           onView={() => setViewBooking(booking)}
                           onRegenerate={(newNum) => handleRegenerate(booking.id, newNum)}
+                          onDeliveryStatus={() => setDeliveryBooking(booking)}
                         />
                       </div>
                     </td>
@@ -667,6 +809,16 @@ export default function InvoiceManager() {
             booking={viewBooking}
             invoiceNumber={getInvoiceNumber(viewBooking)}
             onClose={() => setViewBooking(null)}
+          />
+        </Dialog>
+      )}
+
+      {deliveryBooking && (
+        <Dialog open={!!deliveryBooking} onOpenChange={v => { if (!v) setDeliveryBooking(null); }}>
+          <DeliveryLogDialog
+            booking={deliveryBooking}
+            onClose={() => setDeliveryBooking(null)}
+            onResend={() => queryClient.invalidateQueries({ queryKey: ["/api/bookings"] })}
           />
         </Dialog>
       )}

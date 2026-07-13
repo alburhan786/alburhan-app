@@ -1949,7 +1949,7 @@ export default function CustomerDashboard() {
                       <div>
                         <div className="text-xs text-muted-foreground font-mono mb-1">#{booking.bookingNumber}</div>
                         <h3 className="text-lg font-serif font-bold text-primary">{booking.packageName || "Package Booking"}</h3>
-                        {booking.status === 'confirmed' && booking.invoiceNumber && (
+                        {booking.invoiceNumber && (
                           <div className="mt-1 flex items-center gap-1.5">
                             <FileText className="w-3 h-3 text-emerald-600" />
                             <span className="text-xs font-mono text-emerald-700 font-semibold">Invoice #{booking.invoiceNumber}</span>
@@ -2058,12 +2058,14 @@ export default function CustomerDashboard() {
                       </div>
                     )}
 
-                    {/* Invoice Card — shown prominently for confirmed bookings */}
-                    {booking.status === 'confirmed' && booking.invoiceNumber && (
+                    {/* Invoice Card — shown for any booking with an invoice number */}
+                    {booking.invoiceNumber && (
                       <div className="mx-5 mb-4 rounded-xl border border-emerald-200 overflow-hidden" style={{ background: "linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%)" }}>
                         <div className="px-4 py-3 border-b border-emerald-200 flex items-center gap-2 bg-emerald-700/10">
                           <FileText className="w-4 h-4 text-emerald-700" />
-                          <span className="font-semibold text-emerald-800 text-sm">Your Invoice — Booking Confirmed</span>
+                          <span className="font-semibold text-emerald-800 text-sm">
+                            {booking.status === 'confirmed' ? 'Your Invoice — Booking Confirmed' : 'Your Invoice — Payment Received'}
+                          </span>
                           <CheckCircle className="w-4 h-4 text-emerald-600 ml-auto" />
                         </div>
                         <div className="p-4">
@@ -2073,8 +2075,19 @@ export default function CustomerDashboard() {
                               <p className="font-mono font-bold text-emerald-900 text-base">{booking.invoiceNumber}</p>
                             </div>
                             <div className="text-right">
-                              <p className="text-xs text-emerald-600 uppercase tracking-wide mb-0.5">Amount Paid</p>
-                              <p className="font-bold text-emerald-900 text-base">{booking.finalAmount ? formatCurrency(booking.finalAmount) : '—'}</p>
+                              <p className="text-xs text-emerald-600 uppercase tracking-wide mb-0.5">
+                                {booking.status === 'partially_paid' ? 'Amount Paid' : 'Total Amount'}
+                              </p>
+                              <p className="font-bold text-emerald-900 text-base">
+                                {booking.status === 'partially_paid' && booking.paidAmount
+                                  ? formatCurrency(booking.paidAmount)
+                                  : booking.finalAmount ? formatCurrency(booking.finalAmount) : '—'}
+                              </p>
+                              {booking.status === 'partially_paid' && booking.finalAmount && booking.paidAmount && (
+                                <p className="text-xs text-amber-700 font-medium mt-0.5">
+                                  Balance: {formatCurrency(Number(booking.finalAmount) - Number(booking.paidAmount))}
+                                </p>
+                              )}
                             </div>
                           </div>
                           <div className="flex gap-2">
@@ -2089,9 +2102,9 @@ export default function CustomerDashboard() {
                               size="sm"
                               variant="outline"
                               className="flex-1 border-emerald-500 text-emerald-700 hover:bg-emerald-50 font-semibold"
-                              onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(`Assalamu Alaikum! My Hajj/Umrah booking with Al Burhan Tours & Travels is confirmed.\n\nInvoice No: ${booking.invoiceNumber}\nBooking: #${booking.bookingNumber}\n\nView Invoice: https://alburhantravels.com/invoice/${booking.bookingNumber}`)}`, "_blank")}
+                              onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(`Assalamu Alaikum! My Hajj/Umrah booking with Al Burhan Tours & Travels.\n\nInvoice No: ${booking.invoiceNumber}\nBooking: #${booking.bookingNumber}\n\nView Invoice: https://alburhantravels.com/invoice/${booking.bookingNumber}`)}`, "_blank")}
                             >
-                              <Share2 className="w-3.5 h-3.5 mr-1.5" /> Share on WhatsApp
+                              <Share2 className="w-3.5 h-3.5 mr-1.5" /> Share
                             </Button>
                           </div>
                         </div>
@@ -2118,7 +2131,7 @@ export default function CustomerDashboard() {
                         </Button>
                       )}
 
-                      {booking.status === 'confirmed' && (
+                      {booking.invoiceNumber && (
                         <Button
                           variant="outline"
                           onClick={() => handleDownloadInvoice(booking.id)}
