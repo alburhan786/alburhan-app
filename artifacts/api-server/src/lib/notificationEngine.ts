@@ -560,8 +560,8 @@ async function sendOnChannelWithType(channel: Channel, eventType: EventType, ctx
           case "balance_reminder_15d": {
             // Payment reminder: var1=customer name, var2=pending balance (per DLT template)
             const balStr = ctx.balanceAmount != null ? String(Math.round(Number(ctx.balanceAmount))) : "0";
-            const smsRes = await sendDLTSMS(ctx.customerMobile, ctx.customerName, balStr, "");
-            return { status: smsRes.ok ? "sent" : "failed", providerResponse: smsRes };
+            const smsOk = await sendDLTSMS(ctx.customerMobile, ctx.customerName, balStr, "");
+            return { status: smsOk ? "sent" : "failed", providerResponse: { ok: smsOk, provider: "Fast2SMS" } };
           }
           default:
             // All other events: use generic notify template

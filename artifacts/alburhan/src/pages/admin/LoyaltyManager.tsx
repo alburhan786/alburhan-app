@@ -152,7 +152,7 @@ export default function LoyaltyManager() {
       </div>
 
       {msg && (
-        <div class={`mb-4 px-4 py-3 rounded-lg text-sm font-medium ${msg.type === "success" ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
+        <div className={`mb-4 px-4 py-3 rounded-lg text-sm font-medium ${msg.type === "success" ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
           {msg.type === "success" ? "✓" : "✗"} {msg.text}
         </div>
       )}
@@ -173,7 +173,7 @@ export default function LoyaltyManager() {
             <div className="text-xs text-slate-500 mt-0.5">Redeemed</div>
           </div>
           {(["bronze", "silver", "gold", "platinum"] as const).map(tier => (
-            <div class={`border rounded-xl p-4 text-center ${TIER_CONFIG[tier].color}`}>
+            <div className={`border rounded-xl p-4 text-center ${TIER_CONFIG[tier].color}`}>
               <div className="text-xl">{TIER_CONFIG[tier].icon}</div>
               <div className="text-xl font-bold">{(stats as any)[tier]}</div>
               <div className="text-xs mt-0.5">{TIER_CONFIG[tier].label}</div>
@@ -203,7 +203,7 @@ export default function LoyaltyManager() {
         </div>
         <div className="mt-3 flex gap-3 flex-wrap text-xs text-slate-600">
           {(["bronze", "silver", "gold", "platinum"] as const).map(tier => (
-            <span class={`px-2 py-0.5 rounded border font-medium ${TIER_CONFIG[tier].color}`}>
+            <span className={`px-2 py-0.5 rounded border font-medium ${TIER_CONFIG[tier].color}`}>
               {TIER_CONFIG[tier].icon} {TIER_CONFIG[tier].label}: {tier === "platinum" ? "5000+" : `${TIER_CONFIG[tier].min}–${TIER_CONFIG[tier].max}`} pts
             </span>
           ))}
@@ -265,11 +265,11 @@ export default function LoyaltyManager() {
                   </td>
                   <td className="px-4 py-3">
                     <div>
-                      <span class={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border font-medium ${cfg.color}`}>
+                      <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border font-medium ${cfg.color}`}>
                         {cfg.icon} {cfg.label}
                       </span>
                       <div className="mt-1.5 w-20 bg-slate-200 rounded-full h-1">
-                        <div className="bg-blue-500 h-1 rounded-full" style={`width:${progress}%`} />
+                        <div className="bg-blue-500 h-1 rounded-full" style={{ width: `${progress}%` }} />
                       </div>
                     </div>
                   </td>

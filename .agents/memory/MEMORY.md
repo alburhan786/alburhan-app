@@ -7,6 +7,8 @@
 - [Frontend JSX convention](frontend-jsx.md) — project uses React (className=, not class=); preact/hooks imports will break Vite build
 - [Journey status + profile columns](journey-status-schema.md) — journey_status TEXT on bookings (pool.query only, not Drizzle); blood_group/emergency_contact_name/emergency_contact_mobile on users; POST /api/bookings/:id/journey-status auto-notifies customer
 - [Offline bank transfer module](offline-payments-schema.md) — bank_settings + offline_payments tables; POST /api/offline-payments (multipart); approve/reject fire notifications; BankTransferSection is self-contained customer component
+- [SMS DLT return type](sms-dlt-return-type.md) — sendDLTSMS() in notifications.ts returns Promise<boolean>; do NOT treat as {ok:boolean}
+- [JSX class vs className](jsx-classname.md) — AutomationCenter.tsx and LoyaltyManager.tsx had class= instead of className=; style= must be object not string
 - [Document delivery module](document-delivery.md) — lib/documentDelivery.ts: sendDocumentToCustomer fetches buffer from GCS/disk and sends PDF via BotBee upload, image via uploadMedia+sendFile, fallback to text; POST /api/documents/:id/resend for admin one-click resend
 - [Payment reminder system](payment-reminder-system.md) — jobs/paymentReminder.ts: schedule 7d/3d/1d/due/post-3d based on due_date; 9 AM IST cron; dedup via notes field "type:7d"; SMS uses var1=name var2=balance for DLT; admin page at /admin/payment-reminders
 - [Auto notification system](auto-notification-system.md) — workflowEngine startDepartureReminderCron: 7d/3d/2d/1d/12h/6h/3h slots hourly; notification_auto_settings table for channel toggles; routes at /api/auto-notifications/*; doc delivery auto-fires on admin upload via sendDocumentToCustomer

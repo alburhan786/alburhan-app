@@ -161,7 +161,7 @@ export default function AutomationCenter() {
           { label: "Total Rules", value: totalRules, color: "text-slate-600" },
         ].map(s => (
           <div className="bg-white border border-slate-200 rounded-xl p-4 text-center shadow-sm">
-            <div class={`text-2xl font-bold ${s.color}`}>{loading ? "—" : s.value}</div>
+            <div className={`text-2xl font-bold ${s.color}`}>{loading ? "—" : s.value}</div>
             <div className="text-xs text-slate-500 mt-0.5">{s.label}</div>
           </div>
         ))}
@@ -172,7 +172,7 @@ export default function AutomationCenter() {
         {(["pipeline", "rules", "logs"] as const).map(t => (
           <button
             onClick={() => setTab(t)}
-            class={`px-4 py-2 text-sm font-medium border-b-2 transition-colors capitalize ${tab === t ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-700"}`}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors capitalize ${tab === t ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-700"}`}
           >
             {t === "pipeline" ? "🔗 Pipeline View" : t === "rules" ? "⚙️ Automation Rules" : "📊 Recent Logs"}
           </button>
@@ -187,7 +187,7 @@ export default function AutomationCenter() {
             const recent = recentForTriggers(step.triggers);
             const cls = colorMap[step.color] || colorMap.slate;
             return (
-              <div class={`border rounded-xl p-4 ${cls} relative`}>
+              <div className={`border rounded-xl p-4 ${cls} relative`}>
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <span className="text-2xl">{step.icon}</span>
@@ -198,7 +198,7 @@ export default function AutomationCenter() {
                       </div>
                     </div>
                   </div>
-                  <span class={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                     status === "active" ? "bg-green-100 text-green-700" :
                     status === "partial" ? "bg-amber-100 text-amber-700" :
                     status === "system" ? "bg-blue-100 text-blue-700" :
@@ -213,7 +213,7 @@ export default function AutomationCenter() {
                     {step.triggers.map(t => {
                       const rule = rules.find(r => r.trigger_type === t);
                       return (
-                        <span class={`text-xs px-1.5 py-0.5 rounded font-mono ${rule?.enabled ? "bg-green-200 text-green-800" : "bg-slate-200 text-slate-500"}`}>
+                        <span className={`text-xs px-1.5 py-0.5 rounded font-mono ${rule?.enabled ? "bg-green-200 text-green-800" : "bg-slate-200 text-slate-500"}`}>
                           {t.replace(/_/g, " ")}
                         </span>
                       );
@@ -263,9 +263,9 @@ export default function AutomationCenter() {
                     <button
                       onClick={() => toggleRule(rule)}
                       disabled={togglingId === rule.id}
-                      class={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${rule.enabled ? "bg-blue-600" : "bg-slate-300"} ${togglingId === rule.id ? "opacity-50" : ""}`}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${rule.enabled ? "bg-blue-600" : "bg-slate-300"} ${togglingId === rule.id ? "opacity-50" : ""}`}
                     >
-                      <span class={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${rule.enabled ? "translate-x-6" : "translate-x-1"}`} />
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${rule.enabled ? "translate-x-6" : "translate-x-1"}`} />
                     </button>
                   </div>
                 ))}
@@ -296,7 +296,7 @@ export default function AutomationCenter() {
                   </td>
                   <td className="px-4 py-3 text-slate-700">{log.customer_name || "—"}</td>
                   <td className="px-4 py-3">
-                    <span class={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${
+                    <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${
                       log.status === "completed" ? "bg-green-100 text-green-700" :
                       log.status === "failed" ? "bg-red-100 text-red-700" :
                       log.status === "running" ? "bg-blue-100 text-blue-700" :
