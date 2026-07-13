@@ -19,6 +19,7 @@ function getConfig() {
       booking_created:    ex.booking_created_tid    || ex.notify_template_id || "211277",
       booking_confirmed:  ex.booking_confirmed_tid  || ex.notify_template_id || "211277",
       payment_received:   ex.payment_received_tid   || ex.notify_template_id || "211277",
+      partial_payment:    ex.partial_payment_tid    || ex.payment_received_tid || ex.notify_template_id || "211277",
       pending_payment:    ex.pending_payment_tid    || ex.notify_template_id || "211277",
       invoice_created:    ex.invoice_created_tid    || ex.notify_template_id || "211277",
       ticket_issued:      ex.ticket_issued_tid      || ex.notify_template_id || "211277",
@@ -206,6 +207,15 @@ export async function sendPaymentReceived(ctx: BookingCtx & { amount: string; in
     ctx.mobile, tids.payment_received,
     [ctx.customerName, ctx.bookingNumber, ctx.amount],
     { eventType: "payment_received", message: `Payment ₹${ctx.amount} for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId }
+  );
+}
+
+export async function sendPartialPaymentReceived(ctx: BookingCtx & { paidAmount: string; balanceAmount: string }): Promise<SMSResult> {
+  const { tids } = getConfig();
+  return sendDLT(
+    ctx.mobile, tids.partial_payment,
+    [ctx.customerName, ctx.bookingNumber, ctx.packageName || "your package", ctx.paidAmount, ctx.balanceAmount],
+    { eventType: "partial_payment", message: `Partial payment ₹${ctx.paidAmount} for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId }
   );
 }
 

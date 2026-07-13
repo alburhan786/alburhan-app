@@ -509,8 +509,42 @@ async function sendOnChannelWithType(channel: Channel, eventType: EventType, ctx
       return waResult;
     } else if (channel === "sms") {
       try {
-        await sendDLTSMS(ctx.customerMobile, ctx.customerName, ctx.bookingNumber || "", ctx.invoiceNumber || "");
-        return { status: "sent", providerResponse: { ok: true, provider: "Fast2SMS", endpoint: "https://www.fast2sms.com/dev/bulkV2" } };
+        const smsLib = await import("./sms.js");
+        const smsCtx = {
+          mobile: ctx.customerMobile,
+          customerName: ctx.customerName,
+          bookingNumber: ctx.bookingNumber || "",
+          packageName: ctx.packageName,
+          bookingId: ctx.bookingId,
+          customerId: ctx.customerId,
+        };
+        let result: import("./sms.js").SMSResult;
+        switch (eventType) {
+          case "new_booking":
+            result = await smsLib.sendBookingCreated(smsCtx);
+            break;
+          case "booking_approved":
+            result = await smsLib.sendBookingConfirmed(smsCtx);
+            break;
+          case "payment_received":
+            result = await smsLib.sendPaymentReceived({
+              ...smsCtx,
+              amount: ctx.amount != null ? String(Math.round(Number(ctx.amount))) : "0",
+            });
+            break;
+          case "partial_payment":
+            result = await smsLib.sendPartialPaymentReceived({
+              ...smsCtx,
+              paidAmount: ctx.paidAmount != null ? String(Math.round(Number(ctx.paidAmount))) : "0",
+              balanceAmount: ctx.balanceAmount != null ? String(Math.round(Number(ctx.balanceAmount))) : "0",
+            });
+            break;
+          default:
+            // All other events: use generic notify template
+            await sendDLTSMS(ctx.customerMobile, ctx.customerName, ctx.bookingNumber || "", ctx.invoiceNumber || "");
+            return { status: "sent", providerResponse: { ok: true, provider: "Fast2SMS", endpoint: "https://www.fast2sms.com/dev/bulkV2" } };
+        }
+        return { status: result.ok ? "sent" : "failed", providerResponse: result };
       } catch (smsErr: any) {
         return { status: "failed", providerResponse: { ok: false, provider: "Fast2SMS", endpoint: "https://www.fast2sms.com/dev/bulkV2", errorMessage: smsErr?.message } };
       }
