@@ -1,22 +1,31 @@
 ---
 name: BotBee WhatsApp Template Status
-description: BotBee /whatsapp/send/template endpoint exists and returns JSON, but "WhatsApp account not found" for all numbers — BotBee dashboard setup required
+description: BotBee /whatsapp/send/template endpoint exists and returns JSON, but "WhatsApp account not found" for all numbers — BotBee dashboard setup required. Also: PHONE_NUMBER_ID has trailing space — always trim.
 ---
 # BotBee WhatsApp Template
 
-## Rule
-- **Endpoint**: `POST /api/v1/whatsapp/send/template` (slash, not hyphen `/send-template` which is 404)
-- **Session messages**: `/api/v1/whatsapp/send` works (returns 24h window error for real numbers, not 404)
-- **Template messages**: Returns `{"status":"0","message":"WhatsApp account not found."}` for ALL numbers including real ones with `business_account_id` included
+## Critical: Trim all credentials
+`BOTBEE_PHONE_NUMBER_ID` env var has a trailing space (`+918989701701 ` len=14).
+Without `.trim()`, BotBee returns "Please enter a valid mobile number. After clearing all non-numeric characters it is empty."
+Fixed in `getCredentials()` and `sendTemplate()` — both use `.trim()` now.
 
-**Why:** "WhatsApp account not found" is a BotBee ACCOUNT configuration issue, not a code issue. The template messaging feature must be enabled and templates must be registered in the BotBee dashboard before template sends will work.
+## Endpoint facts
+- Session messages: `POST ${baseUrl}/whatsapp/send` with `application/x-www-form-urlencoded`
+- Template messages: `POST ${baseUrl}/whatsapp/send/template` with `application/json`
+- BOTBEE_BASE = `https://app.botbee.io/api/v1`
+
+## Current runtime status
+- Session messages (within 24h): ✅ Works
+- Session messages (outside 24h): ❌ "Sending outside 24h window not allowed" — expected
+- Templates: ❌ "WhatsApp account not found" — BotBee DASHBOARD issue, not code
+
+**Why:** "WhatsApp account not found" is a BotBee account configuration issue.
+Templates must be registered in app.botbee.io dashboard for that phone_number_id.
 
 ## How to apply
 Code is correct. User action needed:
 1. Log into app.botbee.io
-2. Enable template messaging for the phone number
-3. Import WhatsApp Business templates (hello_world, booking_confirmed, payment_received, etc.)
-4. Once done, `sendTemplate` in botbee.ts will work without any code change
-
-## Note on `business_account_id`
-Added `BOTBEE_BUSINESS_ID` to the template payload in botbee.ts. Does not fix "account not found" but is correct per BotBee API spec.
+2. Connect WhatsApp Business Account (Meta WABA)
+3. Import templates (booking_confirmed, payment_received, booking_approved, invoice_ready)
+4. Wait for Meta approval
+5. `sendTemplate` in botbee.ts will then work without code change

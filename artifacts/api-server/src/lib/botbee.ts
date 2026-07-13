@@ -18,8 +18,8 @@ export interface BotBeeResult {
 
 function getCredentials() {
   const bbCfg = getCachedConfig("botbee");
-  const apiToken = bbCfg.apiKey || process.env.BOTBEE_API_KEY || "";
-  const phone_number_id = bbCfg.extra?.phone_number_id || process.env.BOTBEE_PHONE_NUMBER_ID || "";
+  const apiToken = (bbCfg.apiKey || process.env.BOTBEE_API_KEY || "").trim();
+  const phone_number_id = (bbCfg.extra?.phone_number_id || process.env.BOTBEE_PHONE_NUMBER_ID || "").trim();
   const enabled = bbCfg.enabled !== false;
   const rawUrl = bbCfg.apiUrl || BOTBEE_BASE;
   const baseUrl = rawUrl.replace(/\/whatsapp\/?$/, "");
@@ -150,7 +150,7 @@ export async function sendTemplate(
     }
     return result;
   }
-  const BOTBEE_BUSINESS_ID = process.env.BOTBEE_BUSINESS_ID || "";
+  const BOTBEE_BUSINESS_ID = (process.env.BOTBEE_BUSINESS_ID || "").trim();
   const payload: Record<string, unknown> = { apiToken, phone_number_id, phone_number: phone, template: { name: templateName, language: { code: "en" }, components } };
   if (BOTBEE_BUSINESS_ID) payload.business_account_id = BOTBEE_BUSINESS_ID;
   const reqPayload = { ...payload, apiToken: "***" };

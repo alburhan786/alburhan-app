@@ -1,27 +1,38 @@
 ---
 name: Invoice E2E deploy patterns
-description: Key lessons from invoice auto-creation, PDF endpoint, VPS deploy, and BotBee template API
+description: Key lessons from invoice auto-creation, PDF endpoint, admin payment route, migration endpoint positions, VPS deploy
 ---
 
 ## Invoice auto-creation
-`upsertInvoiceForBooking(bookingId)` must be called fire-and-forget after:
+`upsertInvoiceForBooking(bookingId)` fires fire-and-forget after:
 - `POST /api/admin/bookings/:id/payments` (admin-payments.ts) when `isFullyPaid`
 - `POST /api/payments/verify` (payments.ts) when `isFullyPaid`
 
-**Why:** The invoices table record is NOT created by the booking flow itself — only by explicit call to `upsertInvoiceForBooking`.
+Invoice response shape: `{ invoice: { invoiceNumber, invoiceStatus, ... } }` — NOT flat.
+Must unwrap `.invoice` when consuming the API response.
+
+**Why:** The invoices table record is NOT created by the booking flow — only by explicit call.
+
+## Admin payment route
+`POST /api/admin/bookings/:id/payments` — adminPaymentsRouter is mounted at `/admin/bookings`, not `/admin/payments`.
+Requires booking to be in status: `approved | partially_paid | confirmed`. Booking must be approved first.
 
 ## PDF download endpoint
-`GET /api/invoices/:bookingId/pdf` — added to invoices.ts, uses `generateInvoicePdfBuffer` from paymentDocs.ts.
-Auth: `requireAuth` + mobile-match check (admin can see all, customer only their own).
+`GET /api/invoices/:bookingId/pdf` — uses `generateInvoicePdfBuffer` from paymentDocs.ts.
 
-## BotBee WhatsApp template API (July 2026)
-BotBee has **removed all template API endpoints** — `/send/template`, `/send-template`, `/template` all return HTML 404.
-Only `/whatsapp/send` works (session messages, within 24h window).
-**Fix:** Removed the hello_world template fallback retry in notifications.ts — on 24h window error, skip gracefully.
-**Why:** Retrying template 3× (1.5s backoff) was wasting ~5s per event and flooding logs.
+## Migration endpoints — MUST be before router
+In app.ts, migration routes MUST be registered **BEFORE** `app.use("/api", router)`.
+In production mode, there is a `app.use('/api', 404-handler)` that blocks any unhandled `/api/*`
+routes. If migration routes come after this (as they were before the fix), they are unreachable on VPS.
 
-## VPS deploy (no SSH from Replit)
+## VPS self-update mechanism
+`POST /api/migrate/self-update?key=alburhan-migrate-2026` — downloads bundle from source URL,
+writes to `dist/index.cjs`, triggers `pm2 restart alburhan-api` (detached, fire-and-forget).
+Default source: Replit dev server URL. After one-time SSH deploy of new bundle, future deploys
+are fully automated via this endpoint.
+
+## VPS deploy (one-time SSH, then automated)
 - VPS at `/var/www/alburhan`, pm2 `alburhan-api`, runs `dist/index.cjs`
-- GET `/api/deploy-dist` now accepts `x-admin-password` header (no session needed)
-- POST `/api/hot-reload` endpoint added for future self-deploy (requires bundleUrl + password)
-- First-time deploy: user must SSH and run curl + pm2 restart manually
+- One-time SSH: `curl -fsSL "${DEV}/api/migrate/server.cjs?key=alburhan-migrate-2026" -o /var/www/alburhan/artifacts/api-server/dist/index.cjs && pm2 restart alburhan-api`
+- SQL migration: `curl -fsSL "${DEV}/api/migrate/vps-update.sql?key=alburhan-migrate-2026" | psql $DATABASE_URL`
+- Future deploys: `curl -X POST "https://alburhantravels.com/api/migrate/self-update?key=alburhan-migrate-2026"`
