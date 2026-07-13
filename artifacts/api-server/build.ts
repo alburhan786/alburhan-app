@@ -37,7 +37,9 @@ const allowlist = [
   "openai",
   "passport",
   "passport-local",
-  "pdfkit",
+  // "pdfkit" intentionally excluded — pdfkit loads AFM/ICC data files from
+  // disk at runtime using __dirname, which breaks when bundled by esbuild.
+  // Keep pdfkit external so VPS node_modules/pdfkit has all its data/ files.
   "pg",
   "qrcode",
   "razorpay",
