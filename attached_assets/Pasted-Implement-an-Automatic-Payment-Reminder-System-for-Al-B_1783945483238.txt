@@ -1,0 +1,80 @@
+Implement an Automatic Payment Reminder System for Al Burhan Tours & Travels.
+
+Requirements:
+
+1. Automatically send payment reminders to customers who have an outstanding balance after booking approval.
+
+2. Reminder schedule:
+   - 7 days before due date
+   - 3 days before due date
+   - 1 day before due date
+   - On due date
+   - Every 3 days after the due date until the balance is fully paid.
+
+3. Stop sending reminders automatically when the customer's balance becomes ₹0.
+
+4. Send reminders through all enabled channels:
+   - SMS (Fast2SMS DLT)
+   - WhatsApp (BotBee)
+   - Email
+   - RCS (if enabled)
+
+5. Use the Fast2SMS DLT Template configured in Admin Settings.
+   Route: DLT SMS
+   Sender ID: ABURHA
+
+6. Pass these variables:
+   Variable 1 = Customer Name
+   Variable 2 = Pending Balance Amount
+
+7. SMS / WhatsApp / Email Message:
+
+Assalamu Alaikum {#var#},
+
+Your pending payment of Rs {#var#} for your Hajj/Umrah booking is due.
+
+Please complete your payment to confirm your seat.
+
+For assistance:
++91 9893225590
+
+Warm Regards,
+Al Burhan Tours & Travels
+
+8. Create a daily cron job that runs every day at 9:00 AM IST.
+
+9. Before sending reminders, verify:
+   - Booking Status = Approved
+   - Balance Amount > 0
+   - Reminder for the current schedule has not already been sent.
+
+10. Save every reminder in Notification Logs with:
+    - Booking ID
+    - Customer Name
+    - Mobile Number
+    - Balance Amount
+    - Reminder Type
+    - Notification Channel
+    - Date & Time
+    - Delivery Status
+    - Error Message (if any)
+
+11. Add an Admin Panel section called "Payment Reminder Settings" with:
+    - Enable/Disable Automatic Reminders
+    - Reminder Schedule Settings
+    - Send Reminder Now Button
+    - Last Reminder Sent
+    - Next Reminder Date
+    - Total Reminders Sent
+
+12. Add a "Send Payment Reminder" button on every booking page so the admin can manually resend reminders through SMS, WhatsApp, Email, and RCS.
+
+13. Update the Customer Dashboard to display:
+    - Pending Balance
+    - Due Date
+    - Last Reminder Sent
+    - Next Reminder Date
+
+14. Prevent duplicate reminders for the same schedule.
+
+15. Build, test, deploy the backend and frontend to the VPS, and verify that automatic payment reminders are working correctly on all notification channels.

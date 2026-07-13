@@ -1,7 +1,5 @@
 import cron from "node-cron";
-import { db, bookingsTable, reminderLogsTable } from "@workspace/db";
 import { pool } from "@workspace/db";
-import { eq, inArray, and, gt, sql, desc } from "drizzle-orm";
 import { fireNotificationEvent } from "../lib/notificationEngine.js";
 
 const PROD_DOMAIN = "https://alburhantravels.com";
@@ -17,79 +15,118 @@ export function setRemindersEnabled(enabled: boolean): void {
   console.log(`[PaymentReminder] Reminders ${enabled ? "ENABLED" : "DISABLED"} by admin`);
 }
 
-const ELIGIBLE_STATUSES = ["pending", "approved", "partially_paid"] as const;
+const ELIGIBLE_STATUSES = ["pending", "approved", "partially_paid"];
 
 function fmt(n: number): string {
   return "₹" + n.toLocaleString("en-IN", { maximumFractionDigits: 0 });
 }
 
+// Schedule: which days relative to due_date trigger a reminder
+// negative = N days before; 0 = on due date; positive = N days after
+// After due date: every 3 days (3, 6, 9, 12…)
+function getReminderType(dueDate: Date | null): string | null {
+  if (!dueDate) return null;
+
+  const now = new Date();
+  // Work in IST (UTC+5:30) to align with 9 AM IST cron
+  const istOffset = 5.5 * 60 * 60 * 1000;
+  const todayIST = new Date(now.getTime() + istOffset);
+  const dueDateIST = new Date(dueDate.getTime() + istOffset);
+
+  const todayMidnight = Date.UTC(todayIST.getUTCFullYear(), todayIST.getUTCMonth(), todayIST.getUTCDate());
+  const dueMidnight   = Date.UTC(dueDateIST.getUTCFullYear(), dueDateIST.getUTCMonth(), dueDateIST.getUTCDate());
+
+  const diffDays = Math.round((dueMidnight - todayMidnight) / (24 * 60 * 60 * 1000));
+
+  if (diffDays === 7)  return "7d";
+  if (diffDays === 3)  return "3d";
+  if (diffDays === 1)  return "1d";
+  if (diffDays === 0)  return "due";
+  // After due date: fire every 3 days (day 3, 6, 9…)
+  if (diffDays < 0 && (-diffDays) % 3 === 0) return `post${-diffDays}d`;
+
+  return null; // not a scheduled day
+}
+
+// Dedup: check if this reminder type was already sent in the last 20 hours
+async function wasReminderSentForType(bookingId: string, reminderType: string): Promise<boolean> {
+  const cutoff = new Date(Date.now() - 20 * 60 * 60 * 1000);
+  const res = await pool.query(
+    `SELECT 1 FROM reminder_logs
+     WHERE booking_id = $1 AND notes LIKE $2 AND status = 'sent' AND sent_at > $3 LIMIT 1`,
+    [bookingId, `type:${reminderType}%`, cutoff]
+  );
+  return res.rows.length > 0;
+}
+
 export async function sendReminderForBookingId(
   bookingId: string,
-  triggeredBy: "cron" | "admin" | "intraday" = "admin"
+  triggeredBy: "cron" | "admin" | "intraday" = "admin",
+  reminderTypeOverride?: string
 ): Promise<{ success: boolean; message: string }> {
-  const bookings = await db
-    .select()
-    .from(bookingsTable)
-    .where(eq(bookingsTable.id, bookingId))
-    .limit(1);
-  const booking = bookings[0];
+  const res = await pool.query(
+    `SELECT id, booking_number, customer_name, customer_mobile, customer_email, customer_id,
+            package_name, final_amount, paid_amount, due_date, invoice_number, status
+     FROM bookings WHERE id = $1 LIMIT 1`,
+    [bookingId]
+  );
+  const booking = res.rows[0];
 
   if (!booking) return { success: false, message: "Booking not found" };
-  if (!booking.customerMobile) return { success: false, message: "No mobile number on booking" };
-  if (!(ELIGIBLE_STATUSES as readonly string[]).includes(booking.status)) {
+  if (!booking.customer_mobile) return { success: false, message: "No mobile number on booking" };
+  if (!ELIGIBLE_STATUSES.includes(booking.status)) {
     return { success: false, message: `Booking status "${booking.status}" is not eligible for reminder` };
   }
 
-  const finalAmount = Number(booking.finalAmount || 0);
-  const paidAmount = Number(booking.paidAmount || 0);
-  const remaining = finalAmount - paidAmount;
+  const finalAmount = Number(booking.final_amount || 0);
+  const paidAmount  = Number(booking.paid_amount  || 0);
+  const remaining   = finalAmount - paidAmount;
   if (remaining <= 0) return { success: false, message: "No outstanding balance" };
 
-  const payLink = `${PROD_DOMAIN}/pay/${booking.bookingNumber}`;
+  const payLink = booking.booking_number
+    ? `${PROD_DOMAIN}/invoice/${booking.booking_number}`
+    : PROD_DOMAIN;
+
+  const reminderType = reminderTypeOverride
+    || (triggeredBy === "admin" ? "manual"
+      : (getReminderType(booking.due_date ? new Date(booking.due_date) : null) || "manual"));
 
   try {
-    // Fire ALL 4 channels via the central notification engine
     await fireNotificationEvent("balance_reminder", {
-      customerName: booking.customerName || "Pilgrim",
-      customerMobile: booking.customerMobile,
-      customerEmail: booking.customerEmail ?? undefined,
-      customerId: booking.customerId ?? undefined,
-      bookingId: booking.id,
-      bookingNumber: booking.bookingNumber ?? undefined,
-      packageName: booking.packageName ?? undefined,
-      amount: finalAmount,
-      balanceAmount: remaining,
-      description: payLink,
+      customerName:  booking.customer_name  || "Pilgrim",
+      customerMobile: booking.customer_mobile,
+      customerEmail:  booking.customer_email ?? undefined,
+      customerId:     booking.customer_id   ?? undefined,
+      bookingId:      booking.id,
+      bookingNumber:  booking.booking_number ?? undefined,
+      packageName:    booking.package_name  ?? undefined,
+      invoiceNumber:  booking.invoice_number ?? undefined,
+      amount:         finalAmount,
+      balanceAmount:  remaining,
+      description:    payLink,
     });
 
-    await db.insert(reminderLogsTable).values({
-      bookingId: booking.id,
-      channel: "all",
-      status: "sent",
-      triggeredBy,
-      notes: `All-channel reminder sent. Balance: ${fmt(remaining)}`,
-    });
+    await pool.query(
+      `INSERT INTO reminder_logs (booking_id, channel, status, triggered_by, notes, sent_at)
+       VALUES ($1, 'all', 'sent', $2, $3, NOW())`,
+      [booking.id, triggeredBy, `type:${reminderType} | Balance: ${fmt(remaining)}`]
+    );
 
     return {
       success: true,
-      message: `Reminder sent (WA+SMS+RCS+Email) to ${booking.customerName} (${booking.customerMobile}) — balance ${fmt(remaining)}`,
+      message: `Reminder sent to ${booking.customer_name} (${booking.customer_mobile}) — balance ${fmt(remaining)}`,
     };
   } catch (err: any) {
-    await db.insert(reminderLogsTable).values({
-      bookingId: booking.id,
-      channel: "all",
-      status: "failed",
-      triggeredBy,
-      notes: err?.message || "Unknown error",
-    });
+    await pool.query(
+      `INSERT INTO reminder_logs (booking_id, channel, status, triggered_by, notes, sent_at)
+       VALUES ($1, 'all', 'failed', $2, $3, NOW())`,
+      [booking.id, triggeredBy, `type:${reminderType} | Error: ${err?.message || "Unknown"}`]
+    );
     return { success: false, message: err?.message || "Reminder send failed" };
   }
 }
 
-async function getEligibleBookingsWithBalance(): Promise<Array<{
-  id: string; bookingNumber: string; customerName: string; customerMobile: string;
-  customerEmail: string | null; finalAmount: string; paidAmount: string; dueDate: string | null;
-}>> {
+async function getEligibleBookingsWithBalance() {
   const res = await pool.query(`
     SELECT id, booking_number, customer_name, customer_mobile, customer_email,
            final_amount, paid_amount, due_date
@@ -97,120 +134,66 @@ async function getEligibleBookingsWithBalance(): Promise<Array<{
     WHERE status = ANY($1)
       AND CAST(COALESCE(final_amount,'0') AS numeric) > 0
       AND CAST(COALESCE(final_amount,'0') AS numeric) - CAST(COALESCE(paid_amount,'0') AS numeric) > 0
-    LIMIT 200
+    LIMIT 300
   `, [ELIGIBLE_STATUSES]);
-  return res.rows;
+  return res.rows as Array<{
+    id: string; booking_number: string; customer_name: string; customer_mobile: string;
+    customer_email: string | null; final_amount: string; paid_amount: string; due_date: string | null;
+  }>;
 }
 
-async function wasReminderRecentlySent(bookingId: string, windowHours: number): Promise<boolean> {
-  const cutoff = new Date(Date.now() - windowHours * 60 * 60 * 1000);
-  const recent = await db
-    .select({ bookingId: reminderLogsTable.bookingId })
-    .from(reminderLogsTable)
-    .where(
-      and(
-        eq(reminderLogsTable.bookingId, bookingId),
-        eq(reminderLogsTable.status, "sent"),
-        gt(reminderLogsTable.sentAt, cutoff)
-      )
-    )
-    .limit(1);
-  return recent.length > 0;
-}
-
-// ── Daily run (30/15/7/3/1 day reminders) ──────────────────────────────────
+// ── Daily run at 9 AM IST ───────────────────────────────────────────────────
 export async function runDailyReminders(): Promise<void> {
   if (!remindersEnabled) {
-    console.log("[PaymentReminder] Reminders are disabled — skipping run");
+    console.log("[PaymentReminder] Reminders disabled — skipping");
     return;
   }
   console.log("[PaymentReminder] Starting daily reminder run…");
   try {
     const eligible = await getEligibleBookingsWithBalance();
     if (eligible.length === 0) {
-      console.log("[PaymentReminder] No eligible bookings for reminders.");
+      console.log("[PaymentReminder] No eligible bookings.");
       return;
     }
 
-    let sentCount = 0;
-    let failCount = 0;
-    let skippedCount = 0;
+    let sentCount = 0, failCount = 0, skippedCount = 0;
 
     for (const booking of eligible) {
-      // Dedup: skip if sent within last 23 hours (daily run)
-      const recentlySent = await wasReminderRecentlySent(booking.id, 23);
-      if (recentlySent) { skippedCount++; continue; }
+      const dueDate      = booking.due_date ? new Date(booking.due_date) : null;
+      const reminderType = getReminderType(dueDate);
 
-      const result = await sendReminderForBookingId(booking.id, "cron");
+      // Not a scheduled reminder day for this booking
+      if (!reminderType) { skippedCount++; continue; }
+
+      // Already sent this type today
+      const alreadySent = await wasReminderSentForType(booking.id, reminderType);
+      if (alreadySent) { skippedCount++; continue; }
+
+      console.log(`[PaymentReminder] Sending ${reminderType} reminder → ${booking.customer_name} (due: ${booking.due_date})`);
+      const result = await sendReminderForBookingId(booking.id, "cron", reminderType);
       if (result.success) sentCount++; else failCount++;
       await new Promise(r => setTimeout(r, 300));
     }
 
-    console.log(`[PaymentReminder] Daily done — sent: ${sentCount}, failed: ${failCount}, skipped (recent): ${skippedCount}`);
+    console.log(`[PaymentReminder] Done — sent:${sentCount} failed:${failCount} skipped:${skippedCount}`);
   } catch (err: any) {
-    console.error("[PaymentReminder] Error during daily run:", err?.message);
+    console.error("[PaymentReminder] Error:", err?.message);
   }
 }
 
-// ── Intraday run (12h / 6h / 2h reminders before due_date) ──────────────────
-export async function runIntradayReminders(): Promise<void> {
-  if (!remindersEnabled) return;
-
-  const WINDOWS = [
-    { hours: 12, label: "12h" },
-    { hours: 6,  label: "6h" },
-    { hours: 2,  label: "2h" },
-  ];
-
-  for (const { hours, label } of WINDOWS) {
-    try {
-      // Find bookings whose due_date falls within the next `hours` window (±30 min tolerance)
-      const res = await pool.query(`
-        SELECT id, booking_number, customer_name, customer_mobile, customer_email,
-               final_amount, paid_amount, due_date
-        FROM bookings
-        WHERE status = ANY($1)
-          AND due_date IS NOT NULL
-          AND due_date::timestamptz BETWEEN NOW() + interval '${hours} hours' - interval '30 minutes'
-                                        AND NOW() + interval '${hours} hours' + interval '30 minutes'
-          AND CAST(COALESCE(final_amount,'0') AS numeric) - CAST(COALESCE(paid_amount,'0') AS numeric) > 0
-        LIMIT 50
-      `, [ELIGIBLE_STATUSES]);
-
-      for (const booking of res.rows) {
-        // Dedup: skip if sent within last 1 hour for intraday
-        const recentlySent = await wasReminderRecentlySent(booking.id, 1);
-        if (recentlySent) continue;
-
-        console.log(`[PaymentReminder][${label}] Sending intraday reminder to ${booking.customer_name}`);
-        await sendReminderForBookingId(booking.id, "intraday");
-        await new Promise(r => setTimeout(r, 300));
-      }
-    } catch (err: any) {
-      console.error(`[PaymentReminder][${label}] Error:`, err?.message);
-    }
-  }
-}
-
-// ── Cron schedule ─────────────────────────────────────────────────────────
+// ── Cron: 9:00 AM IST = 03:30 UTC ─────────────────────────────────────────
 export function startPaymentReminderCron(): void {
-  // Daily run at 10:00 AM IST (04:30 UTC)
-  cron.schedule("30 4 * * *", () => {
+  cron.schedule("30 3 * * *", () => {
     void runDailyReminders();
   }, { timezone: "UTC" });
 
-  // Intraday run every hour — catches 12h/6h/2h windows relative to due_date
-  cron.schedule("0 * * * *", () => {
-    void runIntradayReminders();
-  }, { timezone: "UTC" });
-
-  console.log("[PaymentReminder] Cron scheduled: daily at 10:00 AM IST + intraday every hour");
+  console.log("[PaymentReminder] Cron scheduled: daily at 9:00 AM IST (03:30 UTC)");
 }
 
 export async function getReminderHistory(bookingId: string) {
-  return db
-    .select()
-    .from(reminderLogsTable)
-    .where(eq(reminderLogsTable.bookingId, bookingId))
-    .orderBy(desc(reminderLogsTable.sentAt));
+  const res = await pool.query(
+    `SELECT * FROM reminder_logs WHERE booking_id = $1 ORDER BY sent_at DESC LIMIT 20`,
+    [bookingId]
+  );
+  return res.rows;
 }

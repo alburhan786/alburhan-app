@@ -218,7 +218,7 @@ export function buildDefaultMessage(eventType: EventType, ctx: NotificationConte
       return `Assalamu Alaikum ${name},\n\nYour refund of ₹${formatINR(ctx.amount || 0)} for booking ${booking} has been processed.\n\nIt will reflect in your account within 5-7 business days.\n\nFor queries: +91 9893225590\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
     case "payment_due":
     case "balance_reminder":
-      return `Assalamu Alaikum ${name},\n\nReminder: Outstanding balance of ₹${formatINR(ctx.balanceAmount || 0)} is due for your booking ${booking} (${pkg}).\n\nPay now: ${invUrl}\n\nQueries: +91 9893225590\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
+      return `Assalamu Alaikum ${name},\n\nYour pending payment of Rs ${formatINR(ctx.balanceAmount || 0)} for your Hajj/Umrah booking is due.\n\nPlease complete your payment to confirm your seat.\n\nFor assistance:\n+91 9893225590\n\nWarm Regards,\nAl Burhan Tours & Travels`;
     case "payment_failed":
       return `Assalamu Alaikum ${name},\n\nYour payment for booking ${booking} could not be processed. Please try again or contact us.\n\nRetry: ${invUrl}\nPhone: +91 9893225590\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
     case "invoice_generated":
@@ -541,6 +541,18 @@ async function sendOnChannelWithType(channel: Channel, eventType: EventType, ctx
               invoiceUrl: ctx.invoiceUrl || (ctx.bookingNumber ? `https://alburhantravels.com/invoice/${ctx.bookingNumber}` : undefined),
             });
             break;
+          case "balance_reminder":
+          case "payment_due":
+          case "balance_overdue":
+          case "balance_reminder_7d":
+          case "balance_reminder_3d":
+          case "balance_reminder_30d":
+          case "balance_reminder_15d": {
+            // Payment reminder: var1=customer name, var2=pending balance (per DLT template)
+            const balStr = ctx.balanceAmount != null ? String(Math.round(Number(ctx.balanceAmount))) : "0";
+            const smsRes = await sendDLTSMS(ctx.customerMobile, ctx.customerName, balStr, "");
+            return { status: smsRes.ok ? "sent" : "failed", providerResponse: smsRes };
+          }
           default:
             // All other events: use generic notify template
             await sendDLTSMS(ctx.customerMobile, ctx.customerName, ctx.bookingNumber || "", ctx.invoiceNumber || "");

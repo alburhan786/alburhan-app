@@ -1251,6 +1251,56 @@ router.get("/reminders/status", requireAdmin as any, async (req: AuthenticatedRe
   res.json({ enabled: isRemindersEnabled() });
 });
 
+router.get("/reminders/stats", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const [totalRes, lastRes, eligRes, logsRes, upcomingRes] = await Promise.all([
+      pool.query(`SELECT COUNT(*) AS count FROM reminder_logs WHERE status = 'sent'`),
+      pool.query(`SELECT MAX(sent_at) AS last_sent FROM reminder_logs WHERE status = 'sent'`),
+      pool.query(`
+        SELECT COUNT(*) AS count FROM bookings
+        WHERE status = ANY($1)
+          AND CAST(COALESCE(final_amount,'0') AS numeric) - CAST(COALESCE(paid_amount,'0') AS numeric) > 0
+      `, [["pending","approved","partially_paid"]]),
+      pool.query(`
+        SELECT rl.id, rl.booking_id, rl.channel, rl.status, rl.triggered_by, rl.notes,
+               rl.sent_at, b.customer_name, b.booking_number, b.customer_mobile,
+               CAST(COALESCE(b.final_amount,'0') AS numeric) - CAST(COALESCE(b.paid_amount,'0') AS numeric) AS balance
+        FROM reminder_logs rl
+        LEFT JOIN bookings b ON rl.booking_id = b.id
+        ORDER BY rl.sent_at DESC LIMIT 30
+      `),
+      pool.query(`
+        SELECT id, booking_number, customer_name, customer_mobile, due_date,
+               CAST(COALESCE(final_amount,'0') AS numeric) - CAST(COALESCE(paid_amount,'0') AS numeric) AS balance
+        FROM bookings
+        WHERE status = ANY($1)
+          AND due_date IS NOT NULL
+          AND CAST(COALESCE(final_amount,'0') AS numeric) - CAST(COALESCE(paid_amount,'0') AS numeric) > 0
+        ORDER BY due_date ASC LIMIT 10
+      `, [["pending","approved","partially_paid"]]),
+    ]);
+
+    res.json({
+      enabled: isRemindersEnabled(),
+      total: parseInt(totalRes.rows[0].count, 10),
+      lastSent: lastRes.rows[0].last_sent,
+      eligibleCount: parseInt(eligRes.rows[0].count, 10),
+      recentLogs: logsRes.rows,
+      upcomingDueDates: upcomingRes.rows,
+      schedule: [
+        { label: "7 days before due date",  key: "7d"  },
+        { label: "3 days before due date",  key: "3d"  },
+        { label: "1 day before due date",   key: "1d"  },
+        { label: "On due date",             key: "due" },
+        { label: "Every 3 days after due",  key: "post"  },
+      ],
+    });
+  } catch (err: any) {
+    console.error("[reminders/stats]", err?.message);
+    res.status(500).json({ message: "Failed to load reminder stats" });
+  }
+});
+
 router.post("/reminders/enable", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   setRemindersEnabled(true);
   res.json({ success: true, enabled: true, message: "Daily payment reminders enabled" });

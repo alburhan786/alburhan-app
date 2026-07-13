@@ -2111,6 +2111,78 @@ export default function CustomerDashboard() {
                       </div>
                     )}
 
+                    {/* Payment Status Card — shown when balance > 0 */}
+                    {(() => {
+                      const finalAmt  = Number(booking.finalAmount  || 0);
+                      const paidAmt   = Number(booking.paidAmount   || 0);
+                      const balance   = finalAmt - paidAmt;
+                      const dueDate   = (booking as any).dueDate ? new Date((booking as any).dueDate) : null;
+                      if (balance <= 0 || !['approved','partially_paid'].includes(booking.status)) return null;
+
+                      // Calculate next reminder date based on schedule
+                      let nextReminderText = "";
+                      if (dueDate) {
+                        const istOffset = 5.5 * 60 * 60 * 1000;
+                        const todayIST  = new Date(Date.now() + istOffset);
+                        const dueDateIST = new Date(dueDate.getTime() + istOffset);
+                        const todayMid = Date.UTC(todayIST.getUTCFullYear(), todayIST.getUTCMonth(), todayIST.getUTCDate());
+                        const dueMid   = Date.UTC(dueDateIST.getUTCFullYear(), dueDateIST.getUTCMonth(), dueDateIST.getUTCDate());
+                        const diff     = Math.round((dueMid - todayMid) / 86400000);
+                        const slots = [7, 3, 1, 0];
+                        const nextSlot = slots.find(s => diff >= s);
+                        if (nextSlot !== undefined) {
+                          if (nextSlot === 0) nextReminderText = "Today (due date)";
+                          else {
+                            const reminderDate = new Date(dueDate.getTime() - nextSlot * 86400000);
+                            nextReminderText = reminderDate.toLocaleDateString("en-IN", { dateStyle: "medium" });
+                          }
+                        } else if (diff < 0) {
+                          const daysOver = -diff;
+                          const daysToNext = 3 - (daysOver % 3);
+                          if (daysToNext === 3) nextReminderText = "Today (overdue)";
+                          else {
+                            const d = new Date(Date.now() + daysToNext * 86400000);
+                            nextReminderText = d.toLocaleDateString("en-IN", { dateStyle: "medium" });
+                          }
+                        }
+                      }
+
+                      return (
+                        <div className="mx-5 mb-4 rounded-xl border border-orange-200 overflow-hidden bg-orange-50/60">
+                          <div className="px-4 py-2.5 border-b border-orange-200 flex items-center gap-2 bg-orange-100/70">
+                            <IndianRupee className="w-4 h-4 text-orange-700" />
+                            <span className="font-semibold text-orange-800 text-sm">Payment Status</span>
+                          </div>
+                          <div className="p-4 grid grid-cols-2 gap-3">
+                            <div>
+                              <p className="text-[10px] text-orange-600 uppercase font-semibold tracking-wide">Pending Balance</p>
+                              <p className="font-bold text-orange-900 text-lg font-mono">{formatCurrency(balance)}</p>
+                            </div>
+                            {dueDate && (
+                              <div>
+                                <p className="text-[10px] text-orange-600 uppercase font-semibold tracking-wide">Due Date</p>
+                                <p className="font-semibold text-orange-900 text-sm">{dueDate.toLocaleDateString("en-IN", { dateStyle: "medium" })}</p>
+                              </div>
+                            )}
+                            {nextReminderText && (
+                              <div className="col-span-2">
+                                <p className="text-[10px] text-orange-600 uppercase font-semibold tracking-wide">Next Reminder</p>
+                                <p className="text-sm text-orange-800 flex items-center gap-1">
+                                  <Bell className="w-3.5 h-3.5" /> {nextReminderText} at 9:00 AM
+                                </p>
+                              </div>
+                            )}
+                            {!dueDate && (
+                              <div className="col-span-2">
+                                <p className="text-[10px] text-orange-600 uppercase font-semibold tracking-wide">Reminder</p>
+                                <p className="text-xs text-orange-700">Scheduled reminders will be sent — contact us for your due date</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                     {/* Bank Transfer Section */}
                     <BankTransferSection booking={booking} />
 
