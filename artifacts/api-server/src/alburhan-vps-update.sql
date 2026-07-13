@@ -1,5 +1,5 @@
 -- Al Burhan Tours VPS Schema Sync — idempotent, run-safe
--- Generated: 2026-07-13
+-- Generated: 2026-07-13 (v2 — fixes invoices column names, adds due_date to bookings)
 
 -- ── session table ────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS "session" (
@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS "session" (
   "sess" json NOT NULL,
   "expire" timestamp(6) NOT NULL
 );
+ALTER TABLE "session" ADD CONSTRAINT IF NOT EXISTS "session_pkey" PRIMARY KEY ("sid");
 CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");
 
 -- ── users new columns ────────────────────────────────────────────────────────
@@ -55,6 +56,8 @@ ALTER TABLE bookings ADD COLUMN IF NOT EXISTS tcs_enabled BOOLEAN NOT NULL DEFAU
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS tcs_rate NUMERIC(5,2) DEFAULT 2;
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS tcs_amount NUMERIC(12,2);
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS journey_status TEXT DEFAULT 'not_started';
+-- due_date: payment deadline for balance reminders (used by payment reminder cron)
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS due_date TIMESTAMPTZ;
 
 -- ── booking_settings ─────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS booking_settings (
@@ -71,18 +74,21 @@ CREATE TABLE IF NOT EXISTS booking_settings (
 INSERT INTO booking_settings (id) VALUES ('default') ON CONFLICT (id) DO NOTHING;
 
 -- ── invoices table ────────────────────────────────────────────────────────────
+-- NOTE: Column names MUST match what the application code uses:
+--   discount (not discount_amount), total (not total_amount),
+--   paid (not paid_amount), balance (not balance_due)
 CREATE TABLE IF NOT EXISTS invoices (
   id TEXT PRIMARY KEY,
   invoice_number TEXT UNIQUE NOT NULL,
   booking_id TEXT NOT NULL,
   customer_id TEXT,
   subtotal NUMERIC(12,2) NOT NULL DEFAULT 0,
+  discount NUMERIC(12,2) NOT NULL DEFAULT 0,
   gst_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
   tcs_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
-  discount_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
-  total_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
-  paid_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
-  balance_due NUMERIC(12,2) NOT NULL DEFAULT 0,
+  total NUMERIC(12,2) NOT NULL DEFAULT 0,
+  paid NUMERIC(12,2) NOT NULL DEFAULT 0,
+  balance NUMERIC(12,2) NOT NULL DEFAULT 0,
   invoice_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   due_date TIMESTAMPTZ,
   invoice_status TEXT NOT NULL DEFAULT 'unpaid',
@@ -91,6 +97,43 @@ CREATE TABLE IF NOT EXISTS invoices (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Rename columns if they were created with old (wrong) names
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns
+             WHERE table_name='invoices' AND column_name='discount_amount') THEN
+    ALTER TABLE invoices RENAME COLUMN discount_amount TO discount;
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns
+             WHERE table_name='invoices' AND column_name='total_amount') THEN
+    ALTER TABLE invoices RENAME COLUMN total_amount TO total;
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns
+             WHERE table_name='invoices' AND column_name='paid_amount') THEN
+    ALTER TABLE invoices RENAME COLUMN paid_amount TO paid;
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns
+             WHERE table_name='invoices' AND column_name='balance_due') THEN
+    ALTER TABLE invoices RENAME COLUMN balance_due TO balance;
+  END IF;
+END $$;
+
+-- Add any missing invoice columns (handles upgrades from old schema)
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS discount NUMERIC(12,2) NOT NULL DEFAULT 0;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS total NUMERIC(12,2) NOT NULL DEFAULT 0;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS paid NUMERIC(12,2) NOT NULL DEFAULT 0;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS balance NUMERIC(12,2) NOT NULL DEFAULT 0;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS due_date TIMESTAMPTZ;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS notes TEXT;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS line_items JSONB DEFAULT '[]';
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
 CREATE INDEX IF NOT EXISTS inv_booking_idx ON invoices(booking_id);
 CREATE INDEX IF NOT EXISTS inv_number_idx ON invoices(invoice_number);
 
@@ -291,4 +334,39 @@ CREATE TABLE IF NOT EXISTS attendance_logs (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-SELECT 'VPS schema sync complete' AS result;
+-- ── payment_transactions (ensure table exists with all columns) ───────────────
+CREATE TABLE IF NOT EXISTS payment_transactions (
+  id TEXT PRIMARY KEY,
+  booking_id TEXT NOT NULL,
+  amount NUMERIC(12,2) NOT NULL,
+  payment_mode TEXT NOT NULL DEFAULT 'cash',
+  payment_date TEXT,
+  reference_number TEXT,
+  notes TEXT,
+  recorded_by TEXT,
+  is_deleted BOOLEAN NOT NULL DEFAULT false,
+  deleted_at TIMESTAMPTZ,
+  deletion_reason TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS pt_booking_idx ON payment_transactions(booking_id);
+ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS deletion_reason TEXT;
+ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
+-- ── reminder_logs (payment reminder cron history) ────────────────────────────
+CREATE TABLE IF NOT EXISTS reminder_logs (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
+  booking_id TEXT NOT NULL,
+  channel TEXT NOT NULL DEFAULT 'all',
+  status TEXT NOT NULL DEFAULT 'sent',
+  triggered_by TEXT NOT NULL DEFAULT 'cron',
+  notes TEXT,
+  sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS rl_booking_idx ON reminder_logs(booking_id);
+CREATE INDEX IF NOT EXISTS rl_sent_at_idx ON reminder_logs(sent_at DESC);
+
+SELECT 'VPS schema sync complete — v2' AS result;

@@ -50,15 +50,21 @@ export async function upsertInvoiceForBooking(bookingId: string): Promise<Record
   const balance     = round2(total - paid);
   const invoiceStatus = deriveInvoiceStatus(total, paid);
 
+  // due_date = 30 days from today (used by payment reminder cron)
+  const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
   if (existing.rows[0]) {
     const inv = existing.rows[0];
     await pool.query(
-      `UPDATE invoices SET subtotal=$1,discount=$2,gst_amount=$3,tcs_amount=$4,
-       total=$5,paid=$6,balance=$7,invoice_status=$8,updated_at=NOW()
-       WHERE id=$9`,
-      [subtotal, discount, gstAmount, tcsAmount, total, paid, balance, invoiceStatus, inv.id]
+      `UPDATE invoices
+       SET subtotal=$1, discount=$2, gst_amount=$3, tcs_amount=$4,
+           total=$5, paid=$6, balance=$7, invoice_status=$8,
+           due_date=COALESCE(due_date, $9), updated_at=NOW()
+       WHERE id=$10`,
+      [subtotal, discount, gstAmount, tcsAmount, total, paid, balance, invoiceStatus, dueDate, inv.id]
     );
-    return { ...inv, subtotal, discount, gst_amount: gstAmount, tcs_amount: tcsAmount, total, paid, balance, invoice_status: invoiceStatus };
+    return { ...inv, subtotal, discount, gst_amount: gstAmount, tcs_amount: tcsAmount,
+             total, paid, balance, invoice_status: invoiceStatus, due_date: inv.due_date || dueDate };
   }
 
   const invoiceNumber = await generateInvoiceNumber(year);
@@ -66,10 +72,10 @@ export async function upsertInvoiceForBooking(bookingId: string): Promise<Record
 
   await pool.query(
     `INSERT INTO invoices
-     (id, invoice_number, booking_id, customer_id, invoice_date,
+     (id, invoice_number, booking_id, customer_id, invoice_date, due_date,
       subtotal, discount, gst_amount, tcs_amount, total, paid, balance, invoice_status)
-     VALUES ($1,$2,$3,$4,NOW(),$5,$6,$7,$8,$9,$10,$11,$12)`,
-    [id, invoiceNumber, bookingId, b.customer_id || null,
+     VALUES ($1,$2,$3,$4,NOW(),$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+    [id, invoiceNumber, bookingId, b.customer_id || null, dueDate,
      subtotal, discount, gstAmount, tcsAmount, total, paid, balance, invoiceStatus]
   );
 

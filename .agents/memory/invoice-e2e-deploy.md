@@ -1,38 +1,42 @@
 ---
 name: Invoice E2E deploy patterns
-description: Key lessons from invoice auto-creation, PDF endpoint, admin payment route, migration endpoint positions, VPS deploy
+description: Invoice auto-creation, PDF endpoint, admin payment route, migration endpoints, VPS deploy one-liner
 ---
 
 ## Invoice auto-creation
 `upsertInvoiceForBooking(bookingId)` fires fire-and-forget after:
-- `POST /api/admin/bookings/:id/payments` (admin-payments.ts) when `isFullyPaid`
-- `POST /api/payments/verify` (payments.ts) when `isFullyPaid`
+- `POST /api/admin/bookings/:id/payments` when `isFullyPaid`
+- `POST /api/payments/verify` when `isFullyPaid`
 
 Invoice response shape: `{ invoice: { invoiceNumber, invoiceStatus, ... } }` — NOT flat.
-Must unwrap `.invoice` when consuming the API response.
+Invoice INSERT uses columns: `subtotal, discount, gst_amount, tcs_amount, total, paid, balance`
+(NOT `discount_amount`, `total_amount`, `paid_amount`, `balance_due` — those are wrong names).
+`due_date` is now set in INSERT (NOW() + 30 days).
 
-**Why:** The invoices table record is NOT created by the booking flow — only by explicit call.
+**Why:** Invoices table was created with wrong column names in the original SQL migration.
+The VPS SQL migration (v2) includes DO $$ RENAME blocks to fix old tables automatically.
 
 ## Admin payment route
-`POST /api/admin/bookings/:id/payments` — adminPaymentsRouter is mounted at `/admin/bookings`, not `/admin/payments`.
-Requires booking to be in status: `approved | partially_paid | confirmed`. Booking must be approved first.
-
-## PDF download endpoint
-`GET /api/invoices/:bookingId/pdf` — uses `generateInvoicePdfBuffer` from paymentDocs.ts.
+`POST /api/admin/bookings/:id/payments` — adminPaymentsRouter is mounted at `/admin/bookings`.
+Valid modes: `cash | neft | upi | cheque | online | bank_transfer | imps | rtgs | dd`
+Booking must be approved first. Status must be: `approved | partially_paid | confirmed`.
 
 ## Migration endpoints — MUST be before router
 In app.ts, migration routes MUST be registered **BEFORE** `app.use("/api", router)`.
-In production mode, there is a `app.use('/api', 404-handler)` that blocks any unhandled `/api/*`
-routes. If migration routes come after this (as they were before the fix), they are unreachable on VPS.
+In production mode the catch-all 404 handler blocks routes registered after it.
 
-## VPS self-update mechanism
-`POST /api/migrate/self-update?key=alburhan-migrate-2026` — downloads bundle from source URL,
-writes to `dist/index.cjs`, triggers `pm2 restart alburhan-api` (detached, fire-and-forget).
-Default source: Replit dev server URL. After one-time SSH deploy of new bundle, future deploys
-are fully automated via this endpoint.
+## VPS deploy — one-liner (uses deploy.sh endpoint)
+```
+bash <(curl -fsSL "https://57456384-023a-43e4-a60f-e6d8f967d324-00-vmg20t5z0q5l.spock.replit.dev/api/migrate/deploy.sh?key=alburhan-migrate-2026")
+```
+This: downloads 6MB bundle + runs SQL migration + deploys frontend + restarts PM2.
 
-## VPS deploy (one-time SSH, then automated)
-- VPS at `/var/www/alburhan`, pm2 `alburhan-api`, runs `dist/index.cjs`
-- One-time SSH: `curl -fsSL "${DEV}/api/migrate/server.cjs?key=alburhan-migrate-2026" -o /var/www/alburhan/artifacts/api-server/dist/index.cjs && pm2 restart alburhan-api`
-- SQL migration: `curl -fsSL "${DEV}/api/migrate/vps-update.sql?key=alburhan-migrate-2026" | psql $DATABASE_URL`
-- Future deploys: `curl -X POST "https://alburhantravels.com/api/migrate/self-update?key=alburhan-migrate-2026"`
+After first SSH deploy: future deploys need NO SSH:
+```
+curl -X POST "https://alburhantravels.com/api/migrate/self-update?key=alburhan-migrate-2026"
+```
+
+## DB migration (v2 SQL file)
+`GET /api/migrate/vps-update.sql?key=...` — 372-line idempotent script.
+Includes: DO $$ RENAME blocks for invoices columns, due_date on bookings+invoices,
+payment_transactions + reminder_logs tables, all notification tables.

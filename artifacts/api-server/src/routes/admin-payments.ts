@@ -9,11 +9,11 @@ import { upsertInvoiceForBooking } from "./invoices.js";
 import { processPaymentSuccessNotifications } from "./payments.js";
 
 type BookingStatus = "pending" | "approved" | "rejected" | "confirmed" | "cancelled" | "partially_paid";
-type PaymentMode = "cash" | "neft" | "upi" | "cheque" | "online";
+type PaymentMode = "cash" | "neft" | "upi" | "cheque" | "online" | "bank_transfer" | "imps" | "rtgs" | "dd";
 type DbOrTx = typeof db;
 
 const PAYABLE_STATUSES: BookingStatus[] = ["approved", "partially_paid", "confirmed"];
-const VALID_MODES: PaymentMode[] = ["cash", "neft", "upi", "cheque", "online"];
+const VALID_MODES: PaymentMode[] = ["cash", "neft", "upi", "cheque", "online", "bank_transfer", "imps", "rtgs", "dd"];
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 const router = Router();

@@ -249,6 +249,103 @@ app.get("/api/migrate/notif-trace", async (req, res) => {
   }
 });
 
+// GET /api/migrate/deploy.sh — serves the complete VPS deploy shell script
+app.get("/api/migrate/deploy.sh", (req, res) => {
+  const key = req.query.key as string;
+  if (!migrationKeyValid(key)) return res.status(403).send("Forbidden");
+
+  const DEV_URL_HERE = "https://57456384-023a-43e4-a60f-e6d8f967d324-00-vmg20t5z0q5l.spock.replit.dev";
+  const DEPLOY_KEY   = "alburhan-migrate-2026";
+
+  const script = `#!/bin/bash
+set -e
+DEV="${DEV_URL_HERE}"
+KEY="${DEPLOY_KEY}"
+VPS_DIR="/var/www/alburhan"
+BUNDLE="$VPS_DIR/artifacts/api-server/dist/index.cjs"
+PM2_APP="alburhan-api"
+
+echo ""
+echo "╔══════════════════════════════════════════════════════╗"
+echo "║   Al Burhan Tours & Travels — VPS Deploy v2         ║"
+echo "╚══════════════════════════════════════════════════════╝"
+echo ""
+
+# 1. Create dirs
+mkdir -p "$VPS_DIR/artifacts/api-server/dist"
+mkdir -p "$VPS_DIR/artifacts/alburhan/dist/public"
+
+# 2. Download bundle
+echo "[1/5] Downloading server bundle (~6MB)..."
+curl -fsSL --progress-bar "$DEV/api/migrate/server.cjs?key=$KEY" -o "$BUNDLE.new"
+BSIZE=$(stat -c%s "$BUNDLE.new" 2>/dev/null || stat -f%z "$BUNDLE.new")
+echo "      Downloaded: $BSIZE bytes"
+[ "$BSIZE" -lt 5000000 ] && { echo "Bundle too small — aborting"; exit 1; }
+
+# 3. SQL migration
+echo ""
+echo "[2/5] Downloading SQL migration..."
+curl -fsSL "$DEV/api/migrate/vps-update.sql?key=$KEY" -o /tmp/vps-update.sql
+echo "      $(wc -l < /tmp/vps-update.sql) lines"
+
+echo "      Running migration..."
+# Find DATABASE_URL
+if [ -z "$DATABASE_URL" ]; then
+  for ENV_FILE in "$VPS_DIR/.env" "$VPS_DIR/artifacts/api-server/.env" "/etc/alburhan.env"; do
+    if [ -f "$ENV_FILE" ]; then
+      DB_LINE=\$(grep '^DATABASE_URL=' "$ENV_FILE" 2>/dev/null | head -1)
+      [ -n "$DB_LINE" ] && export $DB_LINE && break
+    fi
+  done
+fi
+
+if [ -n "$DATABASE_URL" ]; then
+  psql "$DATABASE_URL" -f /tmp/vps-update.sql -q && echo "      ✓ Migration complete"
+else
+  echo "      ⚠ DATABASE_URL not found — run manually:"
+  echo "        psql YOUR_DB_URL -f /tmp/vps-update.sql"
+fi
+
+# 4. Frontend
+echo ""
+echo "[3/5] Deploying frontend..."
+curl -fsSL "$DEV/api/migrate/frontend.tar.gz?key=$KEY" | tar -xzf - -C "$VPS_DIR"
+echo "      ✓ Frontend deployed"
+
+# 5. Swap bundle
+echo ""
+echo "[4/5] Installing new bundle..."
+[ -f "$BUNDLE" ] && cp "$BUNDLE" "$BUNDLE.bak.\$(date +%Y%m%d_%H%M%S)"
+mv "$BUNDLE.new" "$BUNDLE"
+echo "      ✓ Bundle installed (\$(stat -c%s "$BUNDLE") bytes)"
+
+# 6. Restart
+echo ""
+echo "[5/5] Restarting PM2..."
+pm2 restart "$PM2_APP" || pm2 start "$BUNDLE" --name "$PM2_APP"
+sleep 5
+
+# 7. Health check
+echo ""
+HEALTH=\$(curl -sf --max-time 8 "https://alburhantravels.com/api/health" 2>/dev/null || echo "timeout")
+echo "Health: $HEALTH"
+DB_CHK=\$(curl -sf --max-time 10 "https://alburhantravels.com/api/migrate/db-check?key=$KEY" 2>/dev/null | head -c 200 || echo "not ready yet")
+echo "DB:     $DB_CHK"
+
+echo ""
+echo "╔══════════════════════════════════════════════════════╗"
+echo "║  ✅ DEPLOY COMPLETE                                  ║"
+echo "║  Future deploys (no SSH):                            ║"
+echo "║  curl -X POST 'https://alburhantravels.com/api/      ║"
+echo "║    migrate/self-update?key=$KEY'                     ║"
+echo "╚══════════════════════════════════════════════════════╝"
+`;
+
+  res.setHeader("Content-Type", "text/plain; charset=utf-8");
+  res.setHeader("Content-Disposition", "attachment; filename=alburhan-deploy.sh");
+  res.send(script);
+});
+
 // GET /api/migrate/dump.sql — serves DB dump (if file exists)
 app.get("/api/migrate/dump.sql", (req, res) => {
   const key = req.query.key as string;
