@@ -540,7 +540,7 @@ async function sendOnChannelWithType(channel: Channel, eventType: EventType, ctx
             result = await smsLib.sendPaymentReceived({
               ...smsCtx,
               amount: ctx.amount != null ? String(Math.round(Number(ctx.amount))) : "0",
-              invoiceUrl: ctx.invoiceUrl || (ctx.bookingNumber ? `https://alburhantravels.com/invoice/${ctx.bookingNumber}` : undefined),
+              invoiceUrl: (ctx.invoiceUrl as string | undefined) || (ctx.bookingNumber ? `https://alburhantravels.com/invoice/${ctx.bookingNumber}` : undefined),
             });
             break;
           case "partial_payment":
@@ -548,7 +548,7 @@ async function sendOnChannelWithType(channel: Channel, eventType: EventType, ctx
               ...smsCtx,
               paidAmount: ctx.paidAmount != null ? String(Math.round(Number(ctx.paidAmount))) : "0",
               balanceAmount: ctx.balanceAmount != null ? String(Math.round(Number(ctx.balanceAmount))) : "0",
-              invoiceUrl: ctx.invoiceUrl || (ctx.bookingNumber ? `https://alburhantravels.com/invoice/${ctx.bookingNumber}` : undefined),
+              invoiceUrl: (ctx.invoiceUrl as string | undefined) || (ctx.bookingNumber ? `https://alburhantravels.com/invoice/${ctx.bookingNumber}` : undefined),
             });
             break;
           case "balance_reminder":

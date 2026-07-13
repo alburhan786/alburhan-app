@@ -92,7 +92,7 @@ const KYC_DOC_SLOTS = [
 ];
 
 function DocumentManagerDialog({ bookingId, open, onClose }: { bookingId: string; open: boolean; onClose: () => void }) {
-  const { data: docs, isLoading, refetch } = useListDocuments(bookingId, { query: { refetchOnMount: "always" } });
+  const { data: docs, isLoading, refetch } = useListDocuments(bookingId, { query: { refetchOnMount: "always" } as any });
   const { toast } = useToast();
   const { requestDelete } = useDeleteGuard();
   const queryClient = useQueryClient();
@@ -286,7 +286,7 @@ const BASE_API = import.meta.env.VITE_API_URL || "";
 
 function AdminDocumentsSection({ bookingId }: { bookingId: string }) {
   const { data: docs, isLoading, refetch } = useListDocuments(bookingId, {
-    query: { refetchOnMount: "always" },
+    query: { refetchOnMount: "always" } as any,
   });
   const { toast } = useToast();
   const { requestDelete } = useDeleteGuard();

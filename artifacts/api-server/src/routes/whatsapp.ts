@@ -10,7 +10,7 @@ const router = Router();
 // POST /api/whatsapp/test
 router.post("/test", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   const { mobile, message, templateName, components, buttons, bodyText } = req.body;
-  if (!mobile?.trim()) return res.status(400).json({ ok: false, message: "mobile is required" });
+  if (!mobile?.trim()) return void res.status(400).json({ ok: false, message: "mobile is required" });
 
   const to = mobile.trim();
   const testMessage = message?.trim() ||
@@ -61,15 +61,15 @@ router.get("/status", requireAdmin as any, async (_req, res) => {
 // GET /api/whatsapp/templates — fetch live templates from BotBee/Meta
 router.get("/templates", requireAdmin as any, async (_req, res) => {
   const result = await fetchTemplates();
-  if (!result.ok) return res.status(502).json({ ok: false, errorMessage: result.errorMessage, responsePayload: result.responsePayload });
+  if (!result.ok) return void res.status(502).json({ ok: false, errorMessage: result.errorMessage, responsePayload: result.responsePayload });
   res.json({ ok: true, templates: result.templates, count: result.templates?.length ?? 0 });
 });
 
 // POST /api/whatsapp/templates/send
 router.post("/templates/send", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   const { mobile, templateName, language, components, eventType, bookingId, customerId } = req.body;
-  if (!mobile?.trim()) return res.status(400).json({ ok: false, message: "mobile is required" });
-  if (!templateName?.trim()) return res.status(400).json({ ok: false, message: "templateName is required" });
+  if (!mobile?.trim()) return void res.status(400).json({ ok: false, message: "mobile is required" });
+  if (!templateName?.trim()) return void res.status(400).json({ ok: false, message: "templateName is required" });
 
   const result = await sendTemplate(mobile.trim(), templateName, components || [], {
     eventType: eventType || "template_send", bookingId: bookingId || undefined, customerId: customerId || undefined,
@@ -106,7 +106,7 @@ router.get("/db-templates", requireAdmin as any, async (_req, res) => {
 router.post("/db-templates", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   const { name, display_name, category, language, header_type, header_text, body_text, footer_text, buttons, variables, event_type, meta_template_name } = req.body;
   if (!name?.trim() || !display_name?.trim() || !body_text?.trim()) {
-    return res.status(400).json({ ok: false, message: "name, display_name, and body_text are required" });
+    return void res.status(400).json({ ok: false, message: "name, display_name, and body_text are required" });
   }
   try {
     const r = await pool.query(
@@ -120,7 +120,7 @@ router.post("/db-templates", requireAdmin as any, async (req: AuthenticatedReque
     );
     res.json({ ok: true, template: r.rows[0] });
   } catch (err: any) {
-    if (err.code === "23505") return res.status(409).json({ ok: false, message: "Template name already exists" });
+    if (err.code === "23505") return void res.status(409).json({ ok: false, message: "Template name already exists" });
     res.status(500).json({ ok: false, message: err.message });
   }
 });
@@ -143,7 +143,7 @@ router.put("/db-templates/:id", requireAdmin as any, async (req: AuthenticatedRe
        buttons ? JSON.stringify(buttons) : null, variables ? JSON.stringify(variables) : null,
        event_type || null, meta_template_name || null, status || null, req.params.id]
     );
-    if (!r.rows[0]) return res.status(404).json({ ok: false, message: "Template not found" });
+    if (!r.rows[0]) return void res.status(404).json({ ok: false, message: "Template not found" });
     res.json({ ok: true, template: r.rows[0] });
   } catch (err: any) { res.status(500).json({ ok: false, message: err.message }); }
 });
@@ -152,7 +152,7 @@ router.put("/db-templates/:id", requireAdmin as any, async (req: AuthenticatedRe
 router.delete("/db-templates/:id", requireAdmin as any, async (_req, res) => {
   try {
     const r = await pool.query(`DELETE FROM wa_templates WHERE id=$1 AND is_builtin=false RETURNING id`, [_req.params.id]);
-    if (!r.rows[0]) return res.status(404).json({ ok: false, message: "Template not found or is a built-in template" });
+    if (!r.rows[0]) return void res.status(404).json({ ok: false, message: "Template not found or is a built-in template" });
     res.json({ ok: true });
   } catch (err: any) { res.status(500).json({ ok: false, message: err.message }); }
 });
@@ -164,7 +164,7 @@ router.post("/db-templates/:id/toggle", requireAdmin as any, async (req, res) =>
       `UPDATE wa_templates SET enabled=NOT enabled, updated_at=NOW() WHERE id=$1 RETURNING id, enabled`,
       [req.params.id]
     );
-    if (!r.rows[0]) return res.status(404).json({ ok: false, message: "Template not found" });
+    if (!r.rows[0]) return void res.status(404).json({ ok: false, message: "Template not found" });
     res.json({ ok: true, enabled: r.rows[0].enabled });
   } catch (err: any) { res.status(500).json({ ok: false, message: err.message }); }
 });
@@ -172,11 +172,11 @@ router.post("/db-templates/:id/toggle", requireAdmin as any, async (req, res) =>
 // POST /api/whatsapp/db-templates/send-text — send body_text via sendText (no Meta template required)
 router.post("/db-templates/send-text", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   const { mobile, template_id, variables } = req.body;
-  if (!mobile?.trim() || !template_id) return res.status(400).json({ ok: false, message: "mobile and template_id are required" });
+  if (!mobile?.trim() || !template_id) return void res.status(400).json({ ok: false, message: "mobile and template_id are required" });
   try {
     const r = await pool.query(`SELECT * FROM wa_templates WHERE id=$1`, [template_id]);
     const tpl = r.rows[0];
-    if (!tpl) return res.status(404).json({ ok: false, message: "Template not found" });
+    if (!tpl) return void res.status(404).json({ ok: false, message: "Template not found" });
 
     // Replace named variables in body_text
     let body = tpl.body_text as string;
@@ -196,7 +196,7 @@ router.post("/db-templates/send-text", requireAdmin as any, async (req: Authenti
 router.post("/sync", requireAdmin as any, async (_req, res) => {
   try {
     const liveResult = await fetchTemplates();
-    if (!liveResult.ok) return res.status(502).json({ ok: false, message: liveResult.errorMessage });
+    if (!liveResult.ok) return void res.status(502).json({ ok: false, message: liveResult.errorMessage });
 
     const liveTemplates = liveResult.templates || [];
     let synced = 0;
@@ -315,7 +315,7 @@ router.post("/connection-test", requireAdmin as any, async (_req, res) => {
   const baseUrl = (bbCfg.apiUrl || "https://app.botbee.io/api/v1").replace(/\/whatsapp\/?$/, "");
 
   if (!apiToken || !phone_number_id) {
-    return res.json({ ok: false, connected: false, error: "API Key or Phone Number ID not configured" });
+    return void res.json({ ok: false, connected: false, error: "API Key or Phone Number ID not configured" });
   }
 
   try {
@@ -387,7 +387,7 @@ router.post("/retry-all", requireAdmin as any, async (_req, res) => {
 // POST /api/whatsapp/automation-test — run a full multi-channel notification test
 router.post("/automation-test", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   const { mobile, email } = req.body;
-  if (!mobile?.trim()) return res.status(400).json({ ok: false, message: "mobile is required for test" });
+  if (!mobile?.trim()) return void res.status(400).json({ ok: false, message: "mobile is required for test" });
 
   const steps: { step: string; status: "pass" | "fail" | "skip"; detail?: string }[] = [];
 
@@ -458,7 +458,7 @@ router.post("/retry/:logId", requireAdmin as any, async (req, res) => {
       [req.params.logId]
     );
     const log = r.rows[0];
-    if (!log) return res.status(404).json({ ok: false, message: "Log not found" });
+    if (!log) return void res.status(404).json({ ok: false, message: "Log not found" });
 
     // Extract original send details from request_payload or provider_response
     const reqPayload = log.request_payload as any;
@@ -474,7 +474,7 @@ router.post("/retry/:logId", requireAdmin as any, async (req, res) => {
       const cleanMsg = message.replace(/^\[template\] /, "");
       result = await sendText(to, cleanMsg, { eventType: log.event_type });
     } else {
-      return res.status(400).json({ ok: false, message: "Cannot determine retry payload" });
+      return void res.status(400).json({ ok: false, message: "Cannot determine retry payload" });
     }
 
     // Update original log retry count + status

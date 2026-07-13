@@ -752,8 +752,8 @@ function ReceiptDialog({ txn, booking, onClose }: { txn: PaymentTxn; booking: Bo
           ["Package Total", booking.finalAmount != null ? fmt(booking.finalAmount) : "—"],
           ["Total Paid", fmt(booking.paidAmount)],
           ["Balance Due", (booking.remainingAmount ?? 0) > 0 ? fmt(booking.remainingAmount!) : "Paid in Full ✓"],
-        ].filter(Boolean).map(([label, value]) => (
-          <div key={label as string} className="flex justify-between items-center py-1.5 border-b border-gray-50 text-sm">
+        ].filter((x): x is [string, string] => x !== null).map(([label, value]) => (
+          <div key={label} className="flex justify-between items-center py-1.5 border-b border-gray-50 text-sm">
             <span className="text-gray-500">{label}</span>
             <span className="font-semibold text-gray-800">{value}</span>
           </div>

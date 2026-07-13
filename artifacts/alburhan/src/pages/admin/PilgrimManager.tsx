@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -1478,7 +1479,7 @@ export default function PilgrimManager() {
                     (() => {
                       if (familyGroupsForDisplay.families.length === 0 && familyGroupsForDisplay.ungrouped.length === 0)
                         return <tr><td colSpan={11} className="text-center py-8 text-muted-foreground">{pilgrimSearch ? `No pilgrims match "${pilgrimSearch}"` : "No pilgrims with a Family ID yet."}</td></tr>;
-                      const rows: JSX.Element[] = [];
+                      const rows: ReactElement[] = [];
                       familyGroupsForDisplay.families.forEach(([familyId, members], fi) => {
                         const head = members.find(m => m.familyHead) || members[0];
                         const isCollapsed = collapsedFamilies.has(familyId);
@@ -2585,15 +2586,15 @@ export default function PilgrimManager() {
                                   <input
                                     autoFocus
                                     className="w-20 border rounded px-1.5 py-0.5 text-xs font-mono"
-                                    value={editingRoom.value}
+                                    value={editingRoom!.value}
                                     onChange={e => setEditingRoom({ familyId: fam.familyId, value: e.target.value })}
                                     onKeyDown={e => {
-                                      if (e.key === "Enter") handleChangeRoomNumber(fam.familyId, editingRoom.value);
+                                      if (e.key === "Enter") handleChangeRoomNumber(fam.familyId, editingRoom!.value);
                                       if (e.key === "Escape") setEditingRoom(null);
                                     }}
                                   />
                                   <div className="flex gap-1">
-                                    <button onClick={() => handleChangeRoomNumber(fam.familyId, editingRoom.value)}
+                                    <button onClick={() => handleChangeRoomNumber(fam.familyId, editingRoom!.value)}
                                       className="text-green-600 hover:text-green-800"><Check size={12} /></button>
                                     <button onClick={() => setEditingRoom(null)}
                                       className="text-red-400 hover:text-red-700"><X size={12} /></button>

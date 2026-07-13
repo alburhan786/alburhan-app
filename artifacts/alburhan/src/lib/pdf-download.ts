@@ -26,7 +26,7 @@ export async function downloadPdf(
   } = options;
 
   try {
-    await html2pdf()
+    await (html2pdf() as any)
       .set({
         margin,
         filename: filename.endsWith(".pdf") ? filename : `${filename}.pdf`,

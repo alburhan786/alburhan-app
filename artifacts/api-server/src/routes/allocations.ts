@@ -53,7 +53,7 @@ router.post("/", requireAdmin as any, async (req, res) => {
       tent_number, camp_number, area, capacity, guide_name, notes
     } = req.body;
     if (!site || !["mina", "arafat", "muzdalifah"].includes(site)) {
-      return res.status(400).json({ message: "site must be mina, arafat, or muzdalifah" });
+      return void res.status(400).json({ message: "site must be mina, arafat, or muzdalifah" });
     }
     const id = randomUUID();
     await pool.query(

@@ -179,7 +179,7 @@ export default function PackageDetail() {
 
   const { data: bookingsData } = useListBookings(
     {},
-    { query: { enabled: isAuthenticated } }
+    { query: { enabled: isAuthenticated } as any }
   );
 
   const approvedBooking = bookingsData?.bookings?.find(

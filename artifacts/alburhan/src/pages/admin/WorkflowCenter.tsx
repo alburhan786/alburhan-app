@@ -243,8 +243,8 @@ function RulesTab() {
                 </div>
                 <div className="flex gap-1">
                   {testResult?.id === rule.id && (
-                    <span className={`text-xs px-2 py-1 rounded ${testResult.ok ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-                      {testResult.msg}
+                    <span className={`text-xs px-2 py-1 rounded ${testResult!.ok ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                      {testResult!.msg}
                     </span>
                   )}
                   <button

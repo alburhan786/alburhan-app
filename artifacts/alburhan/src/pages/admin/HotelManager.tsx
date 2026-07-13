@@ -97,7 +97,7 @@ export default function HotelManager() {
   }
 
   async function save() {
-    if (!form.name || !form.city) return toast({ title: "Name and city required", variant: "destructive" });
+    if (!form.name || !form.city) { toast({ title: "Name and city required", variant: "destructive" }); return; }
     setSaving(true);
     try {
       const url = editId ? `${API}/api/hotels/${editId}` : `${API}/api/hotels`;
@@ -127,7 +127,7 @@ export default function HotelManager() {
   }
 
   async function saveRoom() {
-    if (!roomForm.room_number) return toast({ title: "Room number required", variant: "destructive" });
+    if (!roomForm.room_number) { toast({ title: "Room number required", variant: "destructive" }); return; }
     setSaving(true);
     try {
       const r = await fetch(`${API}/api/hotels/${activeHotelId}/rooms`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(roomForm) });

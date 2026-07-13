@@ -444,8 +444,8 @@ export default function Invoice() {
 
   const isInvoiceNumber = identifier.startsWith("INV");
 
-  const bookingQuery = useGetPublicInvoice(isInvoiceNumber ? "" : identifier, { query: { enabled: !isInvoiceNumber && !!identifier } });
-  const invoiceNumQuery = useGetPublicInvoiceByNumber(isInvoiceNumber ? identifier : "", { query: { enabled: isInvoiceNumber && !!identifier } });
+  const bookingQuery = useGetPublicInvoice(isInvoiceNumber ? "" : identifier, { query: { enabled: !isInvoiceNumber && !!identifier } as any });
+  const invoiceNumQuery = useGetPublicInvoiceByNumber(isInvoiceNumber ? identifier : "", { query: { enabled: isInvoiceNumber && !!identifier } as any });
 
   const activeQuery = isInvoiceNumber ? invoiceNumQuery : bookingQuery;
   const { data: invoice, isLoading, error } = activeQuery;

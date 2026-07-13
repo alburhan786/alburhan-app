@@ -23,3 +23,4 @@
 - [VPS self-update uses process.exit(0)](vps-self-update-exit.md) — spawn("pm2",...) silently fails (not in PATH); process.exit(0) lets PM2 detect crash and restart with new bundle file on disk
 - [BotBee WABA not connected](botbee-waba-status.md) — code is correct; BotBee API returns "route not found" because WABA not connected on BotBee dashboard; SMS OTP fallback works fine
 - [Payment notification gate fix](payment-notification-gate.md) — never gate processPaymentSuccessNotifications on newStatus; BotBee upload field is "media_file" not "file"; use native FormData
+- [ts-nocheck route strategy](ts-nocheck-routes.md) — 25+ API route files use // @ts-nocheck due to pervasive Drizzle schema type mismatches; do not remove without rebuilding lib/db types

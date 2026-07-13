@@ -47,7 +47,7 @@ export default function HajjiLedger() {
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [ledger, setLedger] = useState<any>(null);
   const [loadingLedger, setLoadingLedger] = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   async function search(val: string) {
     setQuery(val);

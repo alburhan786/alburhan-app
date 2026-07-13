@@ -13,7 +13,7 @@ const router = Router();
 // Super Admin only guard
 function requireSuperAdmin(req: any, res: any, next: any) {
   if (req.user?.adminRole !== "super_admin") {
-    return res.status(403).json({ message: "Super Admin access required" });
+    return void res.status(403).json({ message: "Super Admin access required" });
   }
   next();
 }
@@ -59,7 +59,7 @@ router.get("/", requireAdmin as any, requireSuperAdmin, async (_req, res) => {
 router.get("/:provider", requireAdmin as any, requireSuperAdmin, async (req, res) => {
   try {
     const r = await pool.query(`SELECT * FROM api_settings WHERE provider=$1`, [req.params.provider]);
-    if (!r.rows[0]) return res.status(404).json({ message: "Not found" });
+    if (!r.rows[0]) return void res.status(404).json({ message: "Not found" });
     const row = r.rows[0];
     const decrypted = row.extra_fields_encrypted ? (() => {
       try { return JSON.parse(decrypt(row.extra_fields_encrypted)); } catch { return {}; }
@@ -87,7 +87,7 @@ router.get("/:provider", requireAdmin as any, requireSuperAdmin, async (req, res
 // PUT /api/api-settings/:provider — save credentials (Super Admin only)
 router.put("/:provider", requireAdmin as any, requireSuperAdmin, async (req: AuthenticatedRequest, res) => {
   const provider = req.params.provider as Provider;
-  if (!PROVIDERS.includes(provider)) return res.status(400).json({ message: "Invalid provider" });
+  if (!PROVIDERS.includes(provider)) return void res.status(400).json({ message: "Invalid provider" });
 
   try {
     const { enabled, api_url, api_key, extra_fields } = req.body;
@@ -371,8 +371,8 @@ router.post("/:provider/send-test", requireAdmin as any, requireSuperAdmin, asyn
 
     switch (provider) {
       case "botbee": {
-        if (!mobile) return res.json({ ok: false, message: "Provide a mobile number" });
-        if (!apiKey) return res.json({ ok: false, message: "API key not configured" });
+        if (!mobile) return void res.json({ ok: false, message: "Provide a mobile number" });
+        if (!apiKey) return void res.json({ ok: false, message: "API key not configured" });
         channel = "whatsapp";
         recipient = mobile;
         const phone = mobile.replace(/\D/g, "");
@@ -397,8 +397,8 @@ router.post("/:provider/send-test", requireAdmin as any, requireSuperAdmin, asyn
         break;
       }
       case "fast2sms": {
-        if (!mobile) return res.json({ ok: false, message: "Provide a mobile number" });
-        if (!apiKey) return res.json({ ok: false, message: "API key not configured" });
+        if (!mobile) return void res.json({ ok: false, message: "Provide a mobile number" });
+        if (!apiKey) return void res.json({ ok: false, message: "API key not configured" });
         channel = "sms";
         recipient = mobile;
         const phone = mobile.replace(/\D/g, "").slice(-10);
@@ -427,13 +427,13 @@ router.post("/:provider/send-test", requireAdmin as any, requireSuperAdmin, asyn
       }
       case "smtp": {
         const toEmail = email || req.body.to;
-        if (!toEmail) return res.json({ ok: false, message: "Provide an email address" });
+        if (!toEmail) return void res.json({ ok: false, message: "Provide an email address" });
         channel = "email";
         recipient = toEmail;
         const smtpHost = apiUrl || extra.host || process.env.SMTP_HOST || "smtp.gmail.com";
         const smtpUser = extra.user || process.env.SMTP_USER || "";
         const smtpPass = apiKey || process.env.SMTP_PASS || "";
-        if (!smtpUser || !smtpPass) return res.json({ ok: false, message: "SMTP not fully configured" });
+        if (!smtpUser || !smtpPass) return void res.json({ ok: false, message: "SMTP not fully configured" });
         const endpoint = `smtp://${smtpHost}`;
         const reqPayload = { from: smtpUser, to: toEmail, subject: "✅ Al Burhan ERP — SMTP Test" };
         try {
@@ -446,9 +446,9 @@ router.post("/:provider/send-test", requireAdmin as any, requireSuperAdmin, asyn
         break;
       }
       case "firebase": {
-        if (!apiKey) return res.json({ ok: false, message: "Firebase Server Key not configured" });
+        if (!apiKey) return void res.json({ ok: false, message: "Firebase Server Key not configured" });
         const testToken = req.body.device_token;
-        if (!testToken) return res.json({ ok: false, message: "Provide a device FCM token" });
+        if (!testToken) return void res.json({ ok: false, message: "Provide a device FCM token" });
         channel = "push";
         recipient = testToken;
         const endpoint = "https://fcm.googleapis.com/fcm/send";
@@ -465,9 +465,9 @@ router.post("/:provider/send-test", requireAdmin as any, requireSuperAdmin, asyn
         break;
       }
       case "lemin": {
-        if (!mobile) return res.json({ ok: false, message: "Provide a mobile number" });
+        if (!mobile) return void res.json({ ok: false, message: "Provide a mobile number" });
         const userId = apiKey || extra.user_id;
-        if (!userId) return res.json({ ok: false, message: "Developer API Key not configured" });
+        if (!userId) return void res.json({ ok: false, message: "Developer API Key not configured" });
         channel = "rcs";
         recipient = mobile;
         const phone = mobile.replace(/\D/g, "").slice(-10);
@@ -494,7 +494,7 @@ router.post("/:provider/send-test", requireAdmin as any, requireSuperAdmin, asyn
         break;
       }
       default:
-        return res.json({ ok: false, message: "No test message available for this provider" });
+        return void res.json({ ok: false, message: "No test message available for this provider" });
     }
 
     // Log every test to notification_logs
@@ -528,14 +528,14 @@ router.post("/lemin/set-webhook", requireAdmin as any, requireSuperAdmin, async 
   try {
     const row = await pool.query(`SELECT api_key_encrypted, api_url, extra_fields_encrypted FROM api_settings WHERE provider='lemin' LIMIT 1`);
     const r = row.rows[0];
-    if (!r) return res.json({ ok: false, message: "Lemin AI not configured — save settings first" });
+    if (!r) return void res.json({ ok: false, message: "Lemin AI not configured — save settings first" });
     const decryptedKey = r.api_key_encrypted ? decrypt(r.api_key_encrypted) : "";
     let extraFields: Record<string, string> = {};
     if (r.extra_fields_encrypted) {
       try { extraFields = JSON.parse(decrypt(r.extra_fields_encrypted)); } catch {}
     }
     const userId = decryptedKey || extraFields.user_id || "";
-    if (!userId) return res.json({ ok: false, message: "Developer API Key not set — save settings first" });
+    if (!userId) return void res.json({ ok: false, message: "Developer API Key not set — save settings first" });
     const webhookUrl = req.body?.url || "https://alburhantravels.com/api/webhook/rcs";
     const payload = { url: webhookUrl, agent: "jio", active: true, user_id: userId };
     const resp = await axios.post("https://rcs.leminai.com/api/webhook/set", payload, {
@@ -553,7 +553,7 @@ router.post("/lemin/set-webhook", requireAdmin as any, requireSuperAdmin, async 
 // POST /api/api-settings/send-test-all — fires WhatsApp + SMS + RCS + Email simultaneously
 router.post("/send-test-all", requireAdmin as any, requireSuperAdmin, async (req, res) => {
   const { mobile, email } = req.body as { mobile?: string; email?: string };
-  if (!mobile) return res.status(400).json({ ok: false, message: "Provide a mobile number" });
+  if (!mobile) return void res.status(400).json({ ok: false, message: "Provide a mobile number" });
 
   const phone = mobile.replace(/\D/g, "").slice(-10);
   const testCtx = {
@@ -589,6 +589,7 @@ router.post("/send-test-all", requireAdmin as any, requireSuperAdmin, async (req
           const r = await sendEmail(email, "Test Notification – Al Burhan Tours & Travels", "<p>Assalamu Alaikum,</p><p>Al Burhan Tours & Travels <b>email notification</b> is working correctly.</p><p>Test Booking: <b>#TEST-001</b></p><p>Jazak Allah Khair!</p>");
           return { channel: ch, ok: r.ok, provider: "SMTP", httpStatus: r.httpStatus, responsePayload: r.responsePayload, errorMessage: r.ok ? undefined : r.errorMessage };
         }
+        return { channel: ch, ok: false, provider: ch, errorMessage: "Unknown channel" };
       } catch (e: any) {
         return { channel: ch, ok: false, provider: ch, errorMessage: e.message };
       }

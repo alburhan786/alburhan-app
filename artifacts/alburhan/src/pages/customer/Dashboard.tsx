@@ -541,7 +541,7 @@ function TravelDocumentsCard({ bookingId, bookingNumber, invoiceNumber, bookingS
   const BASE_API = import.meta.env.VITE_API_URL || "";
   const { toast } = useToast();
   const { data: docs, refetch } = useListDocuments(bookingId, {
-    query: { refetchOnMount: "always", refetchInterval: 30000 },
+    query: { refetchOnMount: "always", refetchInterval: 30000 } as any,
   });
   const allDocs = (docs || []) as any[];
   const travelDocs = allDocs.filter((d: any) => d.uploadedBy === "admin" && TRAVEL_DOC_TYPES[d.documentType]);
@@ -1341,11 +1341,11 @@ function BankTransferSection({ booking }: { booking: any }) {
       .then(r => r.json()).then(d => setExistingPayments(d.payments || [])).catch(() => {});
 
   const handleSubmit = async () => {
-    if (!form.utrNumber.trim()) return toast({ title: "UTR number required", variant: "destructive" });
-    if (!form.amountPaid || Number(form.amountPaid) <= 0) return toast({ title: "Valid amount required", variant: "destructive" });
+    if (!form.utrNumber.trim()) { toast({ title: "UTR number required", variant: "destructive" }); return; }
+    if (!form.amountPaid || Number(form.amountPaid) <= 0) { toast({ title: "Valid amount required", variant: "destructive" }); return; }
     if (proofFile) {
       const err = validateProofFile(proofFile);
-      if (err) return toast({ title: "Invalid file", description: err, variant: "destructive" });
+      if (err) { toast({ title: "Invalid file", description: err, variant: "destructive" }); return; }
     }
     setSubmitting(true);
     try {

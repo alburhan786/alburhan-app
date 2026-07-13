@@ -1,7 +1,20 @@
 import { useState, useRef, useCallback } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { useListBookings, useSendInvoiceNotification } from "@workspace/api-client-react";
-import type { Booking } from "@workspace/api-client-react";
+import type { Booking as _Booking } from "@workspace/api-client-react";
+
+type Booking = _Booking & {
+  paidAmount?: number;
+  discountAmount?: number;
+  discountPercentage?: number;
+  netAmount?: number;
+  gstAmount?: number;
+  tcsAmount?: number;
+  gstIncluded?: boolean;
+  gstRate?: number;
+  tcsEnabled?: boolean;
+  tcsRate?: number;
+};
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";

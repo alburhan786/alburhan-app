@@ -59,7 +59,7 @@ import { requireAdmin } from "../lib/auth.js";
 const router: IRouter = Router();
 
 // ── Build fingerprint — confirms which bundle is running on VPS (no auth needed) ──
-const BUILD_STAMP = "2026-07-13-v18";
+const BUILD_STAMP = "2026-07-13-v19";
 router.get("/version", (_req, res) => {
   res.json({
     build: BUILD_STAMP,
@@ -195,10 +195,10 @@ router.get("/download-api", adminOrPassword, serveApiBundle);
 router.post("/hot-reload", async (req: any, res: any) => {
   const pw = req.headers["x-admin-password"] || req.body?.password;
   const expected = process.env.DELETE_ADMIN_PASSWORD;
-  if (!expected || pw !== expected) return res.status(401).json({ error: "Unauthorized" });
+  if (!expected || pw !== expected) return void res.status(401).json({ error: "Unauthorized" });
 
   const bundleUrl = req.body?.bundleUrl as string | undefined;
-  if (!bundleUrl) return res.status(400).json({ error: "bundleUrl required" });
+  if (!bundleUrl) return void res.status(400).json({ error: "bundleUrl required" });
 
   const dest = "/var/www/alburhan/artifacts/api-server/dist/index.cjs";
   const { spawn } = await import("child_process");
@@ -337,7 +337,7 @@ function migrationKeyOk(key: string | undefined): boolean {
 
 router.get("/migrate/db-check", async (req: any, res: any) => {
   const key = req.query.key as string;
-  if (!migrationKeyOk(key)) return res.status(403).json({ error: "Forbidden" });
+  if (!migrationKeyOk(key)) return void res.status(403).json({ error: "Forbidden" });
   try {
     const { pool } = await import("@workspace/db");
     const checks: Record<string, any> = {};

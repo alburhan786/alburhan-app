@@ -30,7 +30,7 @@ function getClient() {
 // Generate a WhatsApp message draft for pilgrims
 router.post("/whatsapp-writer", requireAdmin as any, async (req, res) => {
   const { context, tone, recipientType, language, extraInstructions } = req.body;
-  if (!context) return res.status(400).json({ error: "Context is required" });
+  if (!context) return void res.status(400).json({ error: "Context is required" });
 
   try {
     const client = getClient();
@@ -160,7 +160,7 @@ Format as bullet points with emojis. Be specific with numbers.`,
 // Extract passport/visa data from base64 image
 router.post("/ocr-passport", requireAdmin as any, async (req, res) => {
   const { imageBase64, mediaType, documentType } = req.body;
-  if (!imageBase64) return res.status(400).json({ error: "Image data required" });
+  if (!imageBase64) return void res.status(400).json({ error: "Image data required" });
 
   try {
     const client = getClient();

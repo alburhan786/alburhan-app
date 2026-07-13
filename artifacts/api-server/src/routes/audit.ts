@@ -72,13 +72,13 @@ router.post(
   async (req: AuthenticatedRequest, res) => {
     try {
       const logResult = await pool.query(`SELECT * FROM audit_logs WHERE id=$1`, [req.params.id]);
-      if (!logResult.rows[0]) return res.status(404).json({ error: "Audit log entry not found" });
+      if (!logResult.rows[0]) return void res.status(404).json({ error: "Audit log entry not found" });
 
       const log = logResult.rows[0];
       if (log.action !== "deleted")
-        return res.status(400).json({ error: "Only deleted records can be restored" });
+        return void res.status(400).json({ error: "Only deleted records can be restored" });
       if (!log.old_value)
-        return res.status(400).json({ error: "No snapshot available to restore from" });
+        return void res.status(400).json({ error: "No snapshot available to restore from" });
 
       const data = typeof log.old_value === "string" ? JSON.parse(log.old_value) : log.old_value;
 
@@ -98,7 +98,7 @@ router.post(
           ]
         );
       } else {
-        return res.status(400).json({ error: `Restore not yet supported for '${log.entity_table}'` });
+        return void res.status(400).json({ error: `Restore not yet supported for '${log.entity_table}'` });
       }
 
       await auditLog({

@@ -352,7 +352,7 @@ export async function uploadMedia(
     const form = new FormData();
     form.append("apiToken", apiToken);
     form.append("phone_number_id", phone_number_id);
-    form.append("media_file", new Blob([fileBuffer], { type: mimeType }), fileName);
+    form.append("media_file", new Blob([new Uint8Array(fileBuffer)], { type: mimeType }), fileName);
 
     const rawResponse = await withRetry(async () => {
       const r = await fetch(endpoint, { method: "POST", body: form, signal: AbortSignal.timeout(30000) });

@@ -51,7 +51,7 @@ router.post("/", requireAdmin as any, async (req, res) => {
       tag_number, pilgrim_id, booking_id, pilgrim_name, group_id,
       weight, status = "assigned", location, delivery_status = "pending", notes
     } = req.body;
-    if (!tag_number) return res.status(400).json({ message: "tag_number required" });
+    if (!tag_number) return void res.status(400).json({ message: "tag_number required" });
     const id = randomUUID();
     await pool.query(
       `INSERT INTO luggage_tags (id, tag_number, pilgrim_id, booking_id, pilgrim_name, group_id, weight, status, location, delivery_status, notes)
@@ -62,7 +62,7 @@ router.post("/", requireAdmin as any, async (req, res) => {
     const row = await pool.query(`SELECT * FROM luggage_tags WHERE id=$1`, [id]);
     res.status(201).json(row.rows[0]);
   } catch (err: any) {
-    if (err.code === "23505") return res.status(400).json({ message: "Tag number already exists" });
+    if (err.code === "23505") return void res.status(400).json({ message: "Tag number already exists" });
     res.status(500).json({ message: err.message });
   }
 });
@@ -82,7 +82,7 @@ router.put("/:id", requireAdmin as any, async (req, res) => {
     );
     res.json({ ok: true });
   } catch (err: any) {
-    if (err.code === "23505") return res.status(400).json({ message: "Tag number already exists" });
+    if (err.code === "23505") return void res.status(400).json({ message: "Tag number already exists" });
     res.status(500).json({ message: err.message });
   }
 });

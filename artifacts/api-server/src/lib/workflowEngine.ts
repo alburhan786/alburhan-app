@@ -20,7 +20,7 @@ export type WorkflowTrigger =
   | "document_expiry_30" | "document_expiry_7"
   | "medical_emergency";
 
-export interface WorkflowContext extends NotificationContext {
+export interface WorkflowContext extends Omit<NotificationContext, "customerName"> {
   bookingId?: string;
   bookingNumber?: string;
   customerId?: string;

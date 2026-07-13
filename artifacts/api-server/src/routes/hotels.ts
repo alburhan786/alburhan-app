@@ -77,8 +77,8 @@ router.get("/:hotelId/assignments", requireAdmin as any, async (req, res) => {
 // POST create hotel
 router.post("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   const { name, city, address, stars, groupId, checkInDate, checkOutDate, totalRooms, contactPhone, notes } = req.body;
-  if (!name || !city) return res.status(400).json({ error: "Name and city are required" });
-  if (city && !CITIES.includes(city)) return res.status(400).json({ error: "Invalid city" });
+  if (!name || !city) return void res.status(400).json({ error: "Name and city are required" });
+  if (city && !CITIES.includes(city)) return void res.status(400).json({ error: "Invalid city" });
   try {
     const id = randomUUID();
     const result = await pool.query(
@@ -103,7 +103,7 @@ router.put("/:id", requireAdmin as any, async (req, res) => {
        WHERE id=$11 AND is_deleted=false RETURNING *`,
       [name, city, address||null, stars||null, groupId||null, checkInDate||null, checkOutDate||null, totalRooms||null, contactPhone||null, notes||null, req.params.id]
     );
-    if (!result.rows[0]) return res.status(404).json({ error: "Hotel not found" });
+    if (!result.rows[0]) return void res.status(404).json({ error: "Hotel not found" });
     res.json(result.rows[0]);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -136,7 +136,7 @@ router.post("/:id/restore", requireAdmin as any, async (req, res) => {
 // POST add room
 router.post("/:hotelId/rooms", requireAdmin as any, async (req, res) => {
   const { roomNumber, floor, capacity, bedType, notes } = req.body;
-  if (!roomNumber) return res.status(400).json({ error: "Room number required" });
+  if (!roomNumber) return void res.status(400).json({ error: "Room number required" });
   try {
     const id = randomUUID();
     const result = await pool.query(
@@ -163,7 +163,7 @@ router.delete("/:hotelId/rooms/:roomId", requireAdmin as any, async (req, res) =
 // POST assign pilgrim to room
 router.post("/:hotelId/rooms/:roomId/assign", requireAdmin as any, async (req, res) => {
   const { pilgrimId } = req.body;
-  if (!pilgrimId) return res.status(400).json({ error: "pilgrimId required" });
+  if (!pilgrimId) return void res.status(400).json({ error: "pilgrimId required" });
   try {
     const id = randomUUID();
     await pool.query(

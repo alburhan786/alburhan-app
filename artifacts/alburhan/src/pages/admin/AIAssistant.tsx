@@ -61,7 +61,7 @@ export default function AIAssistant() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function generateWhatsApp() {
-    if (!waContext.trim()) return toast({ title: "Please describe the message purpose", variant: "destructive" });
+    if (!waContext.trim()) { toast({ title: "Please describe the message purpose", variant: "destructive" }); return; }
     setWaLoading(true);
     setWaResult("");
     try {
@@ -113,7 +113,7 @@ export default function AIAssistant() {
   }
 
   async function runOCR() {
-    if (!ocrImage) return toast({ title: "Please upload an image first", variant: "destructive" });
+    if (!ocrImage) { toast({ title: "Please upload an image first", variant: "destructive" }); return; }
     setOcrLoading(true);
     setOcrResult(null);
     try {

@@ -1,0 +1,83 @@
+Complete the remaining production fixes for Al Burhan Tours & Travels and do not stop until everything is fully working.
+
+Current status:
+- API v18 is deployed.
+- VPS deployment completed.
+- Payment Reminder, Flight Reminder and Document Notifications are implemented.
+- Customer Dashboard exists.
+- SMS Reminder still reports failed even when SMS is delivered.
+- There are remaining TypeScript/runtime issues.
+
+Fix everything below.
+
+1. Fix sendDLTSMS() so the workflow correctly handles Promise<boolean> instead of { ok: boolean }.
+2. Update workflowEngine.ts to correctly await sendDLTSMS().
+3. Fix all Payment Reminder status reporting.
+4. Fix SMS notification logs.
+5. Fix Notification History.
+6. Fix Retry Notification.
+7. Fix all TypeScript errors.
+8. Replace every HTML class attribute with React className.
+9. Replace every inline style string with proper React style objects.
+10. Fix LoyaltyManager.tsx completely.
+11. Fix AutomationCenter.tsx.
+12. Fix AutoNotificationSettings.tsx.
+13. Fix Dashboard.tsx.
+14. Fix notification engine runtime errors.
+15. Fix document upload notifications.
+16. Fix invoice generation notifications.
+17. Fix WhatsApp notifications.
+18. Fix Email notifications.
+19. Fix Flight Reminder scheduler.
+20. Fix Payment Reminder scheduler.
+21. Verify Cron Jobs.
+22. Verify Notification Queue.
+23. Verify SMS delivery logs.
+24. Verify Fast2SMS DLT integration.
+25. Verify WhatsApp API.
+26. Verify Email SMTP.
+27. Verify Customer Dashboard updates.
+28. Verify Admin Dashboard.
+29. Verify Invoice PDF generation.
+30. Verify automatic document delivery.
+
+Then perform a complete production test:
+
+• Create booking
+• Confirm booking
+• Receive partial payment
+• Receive full payment
+• Generate invoice
+• Generate receipt
+• Send Invoice PDF
+• Send Receipt PDF
+• Send SMS
+• Send WhatsApp
+• Send Email
+• Upload Ticket
+• Upload Visa
+• Upload Travel Itinerary
+• Upload Agreement
+• Upload Passport Copy
+• Verify customer receives notification instantly
+• Trigger Payment Reminder
+• Trigger Flight Reminder
+• Verify Notification History
+• Verify Retry Notification
+• Verify Notification Logs
+
+Finally:
+
+- Build frontend.
+- Build backend.
+- Deploy both to VPS.
+- Restart PM2.
+- Restart Nginx.
+- Run production health check.
+- Confirm zero TypeScript errors.
+- Confirm zero runtime errors.
+- Confirm browser console has zero errors.
+- Confirm all endpoints respond correctly.
+- Confirm all notifications are working automatically.
+
+Do not stop until the website is fully production-ready and every workflow is verified end-to-end.

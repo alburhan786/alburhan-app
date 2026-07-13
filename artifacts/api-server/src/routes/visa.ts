@@ -65,7 +65,7 @@ router.get("/stats", requireAdmin as any, async (req, res) => {
 router.put("/:pilgrimId", requireAdmin as any, async (req, res) => {
   const { visaStatus, visaNumber, visaType, visaAppliedDate, visaReceivedDate } = req.body;
   if (visaStatus && !VISA_STATUSES.includes(visaStatus)) {
-    return res.status(400).json({ error: "Invalid visa status" });
+    return void res.status(400).json({ error: "Invalid visa status" });
   }
   try {
     await pool.query(
@@ -100,9 +100,9 @@ router.put("/:pilgrimId", requireAdmin as any, async (req, res) => {
 // POST bulk update visa status
 router.post("/bulk-update", requireAdmin as any, async (req, res) => {
   const { pilgrimIds, visaStatus, visaReceivedDate, visaAppliedDate } = req.body;
-  if (!pilgrimIds?.length) return res.status(400).json({ error: "No pilgrims selected" });
+  if (!pilgrimIds?.length) return void res.status(400).json({ error: "No pilgrims selected" });
   if (visaStatus && !VISA_STATUSES.includes(visaStatus)) {
-    return res.status(400).json({ error: "Invalid visa status" });
+    return void res.status(400).json({ error: "Invalid visa status" });
   }
   try {
     const placeholders = pilgrimIds.map((_: string, i: number) => `$${i + 4}`).join(",");

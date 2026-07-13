@@ -72,7 +72,7 @@ router.post("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => 
       warranty_date, depreciation_rate, location, notes
     } = req.body;
     if (!name || !purchase_date || !purchase_price) {
-      return res.status(400).json({ error: "name, purchase_date, purchase_price required" });
+      return void res.status(400).json({ error: "name, purchase_date, purchase_price required" });
     }
     const rate = depreciation_rate || DEFAULT_RATES[category] || 0.15;
     const row = await q1(
@@ -106,7 +106,7 @@ router.put("/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) =
        serial_number||null, warranty_date||null, String(rate), location||null,
        notes||null, is_active !== undefined ? is_active : null, req.params.id]
     );
-    if (!row) return res.status(404).json({ error: "Asset not found" });
+    if (!row) return void res.status(404).json({ error: "Asset not found" });
     res.json(row);
   } catch (err) {
     console.error("[assets] PUT /:id:", err);

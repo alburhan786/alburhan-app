@@ -25,7 +25,7 @@ router.get("/", requireAdmin as any, async (_req, res) => {
 router.post("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
     const { name, category, gst_number, pan, bank_account, ifsc, contact, email, address, notes } = req.body;
-    if (!name) return res.status(400).json({ error: "name is required" });
+    if (!name) return void res.status(400).json({ error: "name is required" });
     const row = await q1(
       `INSERT INTO vendors (id,name,category,gst_number,pan,bank_account,ifsc,contact,email,address,notes)
        VALUES (gen_random_uuid()::text,$1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
@@ -49,7 +49,7 @@ router.put("/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) =
       [name, category || "other", gst_number || null, pan || null, bank_account || null, ifsc || null,
        contact || null, email || null, address || null, notes || null, is_active !== false, req.params.id]
     );
-    if (!row) return res.status(404).json({ error: "Vendor not found" });
+    if (!row) return void res.status(404).json({ error: "Vendor not found" });
     res.json(row);
   } catch (err) {
     console.error("[vendors] PUT /:id", err);
@@ -63,7 +63,7 @@ router.delete("/:id", requireAdmin as any, async (req: AuthenticatedRequest, res
       `UPDATE vendors SET is_deleted=true,deleted_at=NOW() WHERE id=$1 AND is_deleted=false RETURNING id`,
       [req.params.id]
     );
-    if (!row) return res.status(404).json({ error: "Vendor not found" });
+    if (!row) return void res.status(404).json({ error: "Vendor not found" });
     res.json({ success: true });
   } catch (err) {
     console.error("[vendors] DELETE /:id", err);
@@ -75,7 +75,7 @@ router.get("/:id/ledger", requireAdmin as any, async (req: AuthenticatedRequest,
   try {
     const { from, to } = req.query as Record<string, string>;
     const vendor = await q1(`SELECT * FROM vendors WHERE id=$1 AND is_deleted=false`, [req.params.id]);
-    if (!vendor) return res.status(404).json({ error: "Vendor not found" });
+    if (!vendor) return void res.status(404).json({ error: "Vendor not found" });
 
     let sql = `SELECT e.*, g.name AS group_name FROM expenses e
                LEFT JOIN hajj_groups g ON g.id=e.group_id

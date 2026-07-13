@@ -51,7 +51,7 @@ router.get("/:busId/pilgrims", requireAdmin as any, async (req, res) => {
 // POST create bus
 router.post("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   const { busNumber, groupId, capacity, vehicleType, driverName, driverMobile, routeDescription, notes } = req.body;
-  if (!busNumber || !groupId) return res.status(400).json({ error: "Bus number and group ID are required" });
+  if (!busNumber || !groupId) return void res.status(400).json({ error: "Bus number and group ID are required" });
   try {
     const id = randomUUID();
     const result = await pool.query(
@@ -76,7 +76,7 @@ router.put("/:id", requireAdmin as any, async (req, res) => {
        WHERE id=$9 AND is_deleted=false RETURNING *`,
       [busNumber, groupId, capacity||45, vehicleType||"Coach", driverName||null, driverMobile||null, routeDescription||null, notes||null, req.params.id]
     );
-    if (!result.rows[0]) return res.status(404).json({ error: "Bus not found" });
+    if (!result.rows[0]) return void res.status(404).json({ error: "Bus not found" });
     res.json(result.rows[0]);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -96,7 +96,7 @@ router.delete("/:id", requireAdmin as any, async (req: AuthenticatedRequest, res
 // POST assign pilgrim to bus
 router.post("/:busId/assign", requireAdmin as any, async (req, res) => {
   const { pilgrimId, seatNumber } = req.body;
-  if (!pilgrimId) return res.status(400).json({ error: "pilgrimId required" });
+  if (!pilgrimId) return void res.status(400).json({ error: "pilgrimId required" });
   try {
     const id = randomUUID();
     await pool.query(

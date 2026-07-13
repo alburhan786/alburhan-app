@@ -83,7 +83,7 @@ function migrationKeyValid(key: string | undefined): boolean {
 // GET /api/migrate/kill-self — immediately exits this process so PM2 restarts with new bundle on disk
 app.get("/api/migrate/kill-self", (req, res) => {
   const key = req.query.key as string;
-  if (!migrationKeyValid(key)) return res.status(403).send("Forbidden");
+  if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
   res.json({ ok: true, pid: process.pid, message: "Process exiting now. PM2 will restart with new bundle." });
   setTimeout(() => process.exit(0), 200);
 });
@@ -93,7 +93,7 @@ app.get("/api/migrate/kill-self", (req, res) => {
 // Enables remote VPS deploys without SSH after the first manual deploy.
 app.post("/api/migrate/self-update", async (req, res) => {
   const key = (req.query.key || req.body?.key) as string;
-  if (!migrationKeyValid(key)) return res.status(403).json({ error: "Forbidden" });
+  if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
 
   const DEV_URL = "https://57456384-023a-43e4-a60f-e6d8f967d324-00-vmg20t5z0q5l.spock.replit.dev";
   const sourceUrl = ((req.query.source || req.body?.source) as string) ||
@@ -103,12 +103,12 @@ app.post("/api/migrate/self-update", async (req, res) => {
   try {
     const response = await fetch(sourceUrl, { signal: AbortSignal.timeout(120_000) });
     if (!response.ok) {
-      return res.status(502).json({ error: `Download failed: HTTP ${response.status}`, url: sourceUrl });
+      return void res.status(502).json({ error: `Download failed: HTTP ${response.status}`, url: sourceUrl });
     }
     const buffer = await response.arrayBuffer();
     const bytes = Buffer.from(buffer);
     if (bytes.length < 1_000_000) {
-      return res.status(502).json({ error: `Bundle too small (${bytes.length} bytes) — not a valid bundle`, url: sourceUrl });
+      return void res.status(502).json({ error: `Bundle too small (${bytes.length} bytes) — not a valid bundle`, url: sourceUrl });
     }
     fs.writeFileSync(binPath, bytes);
     res.json({ ok: true, bytes: bytes.length, source: sourceUrl, message: "Bundle updated. Process exiting for PM2 restart..." });
@@ -122,9 +122,9 @@ app.post("/api/migrate/self-update", async (req, res) => {
 // GET /api/migrate/server.cjs — serves the built bundle for VPS to download
 app.get("/api/migrate/server.cjs", (req, res) => {
   const key = req.query.key as string;
-  if (!migrationKeyValid(key)) return res.status(403).send("Forbidden");
+  if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
   const binPath = path.join(__dirname, "../dist/index.cjs");
-  if (!fs.existsSync(binPath)) return res.status(404).send("Not found");
+  if (!fs.existsSync(binPath)) return void res.status(404).send("Not found");
   res.setHeader("Content-Type", "application/octet-stream");
   res.setHeader("Content-Disposition", "attachment; filename=index.cjs");
   res.sendFile(binPath);
@@ -133,7 +133,7 @@ app.get("/api/migrate/server.cjs", (req, res) => {
 // GET /api/migrate/vps-update.sql — serves the DB migration SQL for VPS
 app.get("/api/migrate/vps-update.sql", (req, res) => {
   const key = req.query.key as string;
-  if (!migrationKeyValid(key)) return res.status(403).send("Forbidden");
+  if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
   // Search multiple paths: works in both dev (src/) and production bundle (dist/)
   const sqlCandidates = [
     path.join(__dirname, "alburhan-vps-update.sql"),
@@ -141,7 +141,7 @@ app.get("/api/migrate/vps-update.sql", (req, res) => {
     path.resolve(process.cwd(), "artifacts/api-server/src/alburhan-vps-update.sql"),
   ];
   const sqlPath = sqlCandidates.find(p => fs.existsSync(p));
-  if (!sqlPath) return res.status(404).send("Not found");
+  if (!sqlPath) return void res.status(404).send("Not found");
   res.setHeader("Content-Type", "text/plain");
   res.setHeader("Content-Disposition", "attachment; filename=vps-update.sql");
   res.sendFile(sqlPath);
@@ -150,7 +150,7 @@ app.get("/api/migrate/vps-update.sql", (req, res) => {
 // POST /api/migrate/deploy-frontend — VPS pulls latest frontend from dev server and extracts it
 app.post("/api/migrate/deploy-frontend", async (req, res) => {
   const key = (req.query.key || req.body?.key) as string;
-  if (!migrationKeyValid(key)) return res.status(403).json({ error: "Forbidden" });
+  if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
 
   const DEV_URL = "https://57456384-023a-43e4-a60f-e6d8f967d324-00-vmg20t5z0q5l.spock.replit.dev";
   const sourceUrl = ((req.query.source || req.body?.source) as string) ||
@@ -160,10 +160,10 @@ app.post("/api/migrate/deploy-frontend", async (req, res) => {
   const extractTo = path.resolve(__dirname, "../../..");  // /var/www/alburhan (3 levels up from dist/)
   try {
     const response = await fetch(sourceUrl, { signal: AbortSignal.timeout(180_000) });
-    if (!response.ok) return res.status(502).json({ error: `Download failed: HTTP ${response.status}` });
+    if (!response.ok) return void res.status(502).json({ error: `Download failed: HTTP ${response.status}` });
     const buffer = await response.arrayBuffer();
     const bytes = Buffer.from(buffer);
-    if (bytes.length < 10_000) return res.status(502).json({ error: `Tarball too small (${bytes.length} bytes)` });
+    if (bytes.length < 10_000) return void res.status(502).json({ error: `Tarball too small (${bytes.length} bytes)` });
 
     // Write tarball to a temp file then extract
     const tmpTar = path.join(os.tmpdir(), `frontend-${Date.now()}.tar.gz`);
@@ -187,7 +187,7 @@ app.post("/api/migrate/deploy-frontend", async (req, res) => {
 // GET /api/migrate/frontend.tar.gz — serves updated frontend assets
 app.get("/api/migrate/frontend.tar.gz", (req, res) => {
   const key = req.query.key as string;
-  if (!migrationKeyValid(key)) return res.status(403).send("Forbidden");
+  if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
 
   const candidates = [
     path.resolve(process.cwd(), "artifacts/alburhan/dist/public"),
@@ -199,10 +199,10 @@ app.get("/api/migrate/frontend.tar.gz", (req, res) => {
 
   if (!distDir) {
     const tarPath = path.join(__dirname, "alburhan-frontend.tar.gz");
-    if (!fs.existsSync(tarPath)) return res.status(404).send("Frontend dist not found");
+    if (!fs.existsSync(tarPath)) return void res.status(404).send("Frontend dist not found");
     res.setHeader("Content-Type", "application/gzip");
     res.setHeader("Content-Disposition", "attachment; filename=alburhan-frontend.tar.gz");
-    return res.sendFile(tarPath);
+    return void res.sendFile(tarPath);
   }
 
   res.setHeader("Content-Type", "application/gzip");
@@ -219,7 +219,7 @@ app.get("/api/migrate/frontend.tar.gz", (req, res) => {
 // GET /api/migrate/db-check — checks DB tables/columns on VPS
 app.get("/api/migrate/db-check", async (req, res) => {
   const key = req.query.key as string;
-  if (!migrationKeyValid(key)) return res.status(403).send("Forbidden");
+  if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
   const { pool: diagPool } = await import("@workspace/db");
   const checks: Record<string, string> = {};
   const tables = ["bookings", "users", "packages", "hajj_groups", "pilgrims", "hajj_rooms",
@@ -242,7 +242,7 @@ app.get("/api/migrate/db-check", async (req, res) => {
 // GET /api/migrate/pdf-debug — capture real PDF error on VPS
 app.get("/api/migrate/pdf-debug", async (req, res) => {
   const key = req.query.key as string;
-  if (!migrationKeyValid(key)) return res.status(403).send("Forbidden");
+  if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
   try {
     const PDFDocument = (await import("pdfkit")).default;
     const doc = new PDFDocument({ size: "A4", margin: 40 });
@@ -263,9 +263,9 @@ app.get("/api/migrate/pdf-debug", async (req, res) => {
 // GET /api/migrate/notif-trace — full notification pipeline trace for a booking
 app.get("/api/migrate/notif-trace", async (req, res) => {
   const key = req.query.key as string;
-  if (!migrationKeyValid(key)) return res.status(403).send("Forbidden");
+  if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
   const bookingNumber = req.query.booking as string;
-  if (!bookingNumber) return res.status(400).json({ error: "Missing ?booking=BOOKING_NUMBER" });
+  if (!bookingNumber) return void res.status(400).json({ error: "Missing ?booking=BOOKING_NUMBER" });
   const { pool: tracePool } = await import("@workspace/db");
   const out: Record<string, unknown> = { bookingNumber };
   try {
@@ -317,7 +317,7 @@ app.get("/api/migrate/notif-trace", async (req, res) => {
 // GET /api/migrate/deploy.sh — serves the complete VPS deploy shell script
 app.get("/api/migrate/deploy.sh", (req, res) => {
   const key = req.query.key as string;
-  if (!migrationKeyValid(key)) return res.status(403).send("Forbidden");
+  if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
 
   const DEV_URL_HERE = "https://57456384-023a-43e4-a60f-e6d8f967d324-00-vmg20t5z0q5l.spock.replit.dev";
   const DEPLOY_KEY   = "alburhan-migrate-2026";
@@ -414,7 +414,7 @@ echo "╚═══════════════════════�
 // GET /api/migrate/fixdeploy.sh — smarter deploy that auto-detects PM2 script path
 app.get("/api/migrate/fixdeploy.sh", (req, res) => {
   const key = req.query.key as string;
-  if (!migrationKeyValid(key)) return res.status(403).send("Forbidden");
+  if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
 
   const DEV_URL_HERE = "https://57456384-023a-43e4-a60f-e6d8f967d324-00-vmg20t5z0q5l.spock.replit.dev";
   const DEPLOY_KEY   = "alburhan-migrate-2026";
@@ -520,9 +520,9 @@ echo "=== Share the pm2 describe output to diagnose further."
 // POST /api/migrate/db-query — run a read-only SELECT query for live debugging
 app.post("/api/migrate/db-query", async (req, res) => {
   const key = req.body?.key as string;
-  if (!migrationKeyValid(key)) return res.status(403).send("Forbidden");
+  if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
   const sql = req.body?.sql as string;
-  if (!sql || !/^\s*SELECT\b/i.test(sql)) return res.status(400).json({ error: "Only SELECT queries allowed" });
+  if (!sql || !/^\s*SELECT\b/i.test(sql)) return void res.status(400).json({ error: "Only SELECT queries allowed" });
   try {
     const { pool: qPool } = await import("@workspace/db");
     const result = await qPool.query(sql);
@@ -535,9 +535,9 @@ app.post("/api/migrate/db-query", async (req, res) => {
 // POST /api/migrate/retrigger-payment — retroactively fix journey_status + invoice + re-send notifications
 app.post("/api/migrate/retrigger-payment", async (req, res) => {
   const key = req.body?.key as string;
-  if (!migrationKeyValid(key)) return res.status(403).send("Forbidden");
+  if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
   const bookingNumber = req.body?.booking as string;
-  if (!bookingNumber) return res.status(400).json({ error: "booking required" });
+  if (!bookingNumber) return void res.status(400).json({ error: "booking required" });
 
   const { pool: rPool } = await import("@workspace/db");
   const bRes = await rPool.query(
@@ -546,7 +546,7 @@ app.post("/api/migrate/retrigger-payment", async (req, res) => {
      FROM bookings WHERE booking_number = $1`, [bookingNumber]
   );
   const b = bRes.rows[0];
-  if (!b) return res.status(404).json({ error: "Booking not found" });
+  if (!b) return void res.status(404).json({ error: "Booking not found" });
 
   const steps: string[] = [];
 
@@ -601,9 +601,9 @@ app.post("/api/migrate/retrigger-payment", async (req, res) => {
 // GET /api/migrate/dump.sql — serves DB dump (if file exists)
 app.get("/api/migrate/dump.sql", (req, res) => {
   const key = req.query.key as string;
-  if (!migrationKeyValid(key)) return res.status(403).send("Forbidden");
+  if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
   const dumpPath = path.join(__dirname, "alburhan-dump.sql");
-  if (!fs.existsSync(dumpPath)) return res.status(404).send("Not found");
+  if (!fs.existsSync(dumpPath)) return void res.status(404).send("Not found");
   res.setHeader("Content-Type", "text/plain");
   res.setHeader("Content-Disposition", "attachment; filename=alburhan-dump.sql");
   res.sendFile(dumpPath);
@@ -612,7 +612,7 @@ app.get("/api/migrate/dump.sql", (req, res) => {
 // GET /api/migrate/delete-bookings — soft-delete test bookings
 app.get("/api/migrate/delete-bookings", async (req, res) => {
   const key = req.query.key as string;
-  if (!migrationKeyValid(key)) return res.status(403).send("Forbidden");
+  if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
   const { pool: delPool } = await import("@workspace/db");
   const nums = [
     'ABT26033710','ABT26034356','ABT26038022','ABT26033123','ABT26031895',

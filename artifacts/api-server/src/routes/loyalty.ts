@@ -55,7 +55,7 @@ router.get("/:customerId", requireAdmin as any, async (req, res) => {
       `SELECT *, (total_points - redeemed_points) as available_points FROM loyalty_points WHERE customer_id=$1`,
       [req.params.customerId]
     );
-    if (!r.rows[0]) return res.status(404).json({ message: "Not found" });
+    if (!r.rows[0]) return void res.status(404).json({ message: "Not found" });
     const txn = await pool.query(
       `SELECT * FROM loyalty_transactions WHERE customer_id=$1 ORDER BY created_at DESC LIMIT 50`,
       [req.params.customerId]
@@ -70,7 +70,7 @@ router.get("/:customerId", requireAdmin as any, async (req, res) => {
 router.post("/award", requireAdmin as any, async (req, res) => {
   try {
     const { customer_id, customer_name, customer_mobile, points, reason, source = "manual" } = req.body;
-    if (!customer_id || !points) return res.status(400).json({ message: "customer_id and points required" });
+    if (!customer_id || !points) return void res.status(400).json({ message: "customer_id and points required" });
 
     // Upsert loyalty record
     await pool.query(`
@@ -108,12 +108,12 @@ router.post("/award", requireAdmin as any, async (req, res) => {
 router.post("/redeem", requireAdmin as any, async (req, res) => {
   try {
     const { customer_id, points, reason } = req.body;
-    if (!customer_id || !points) return res.status(400).json({ message: "customer_id and points required" });
+    if (!customer_id || !points) return void res.status(400).json({ message: "customer_id and points required" });
 
     const r = await pool.query(`SELECT total_points, redeemed_points FROM loyalty_points WHERE customer_id=$1`, [customer_id]);
-    if (!r.rows[0]) return res.status(404).json({ message: "Customer not in loyalty program" });
+    if (!r.rows[0]) return void res.status(404).json({ message: "Customer not in loyalty program" });
     const available = r.rows[0].total_points - r.rows[0].redeemed_points;
-    if (points > available) return res.status(400).json({ message: `Only ${available} points available` });
+    if (points > available) return void res.status(400).json({ message: `Only ${available} points available` });
 
     await pool.query(
       `UPDATE loyalty_points SET redeemed_points = redeemed_points + $1, last_activity = NOW() WHERE customer_id = $2`,

@@ -78,7 +78,7 @@ export default function BusManager() {
   }
 
   async function save() {
-    if (!form.bus_number || !form.group_id) return toast({ title: "Bus number and group required", variant: "destructive" });
+    if (!form.bus_number || !form.group_id) { toast({ title: "Bus number and group required", variant: "destructive" }); return; }
     setSaving(true);
     try {
       const url = editId ? `${API}/api/buses/${editId}` : `${API}/api/buses`;

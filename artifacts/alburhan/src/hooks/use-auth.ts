@@ -14,7 +14,7 @@ export function useAuth() {
     query: {
       retry: false,
       staleTime: 1000 * 60 * 5,
-    }
+    } as any
   });
 
   const sendOtpMutation = useSendOtp();

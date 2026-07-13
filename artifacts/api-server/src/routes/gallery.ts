@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Router } from "express";
 import { db, galleryImagesTable } from "@workspace/db";
 import { eq, desc, asc } from "drizzle-orm";

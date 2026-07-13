@@ -113,7 +113,7 @@ router.get("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
     // Guide role: restrict to assigned groups only
     if (req.user?.adminRole === "guide") {
       const allowed = req.user.assignedGroupIds;
-      return res.json(groupList.filter((g: any) => allowed.includes(g.id)));
+      return void res.json(groupList.filter((g: any) => allowed.includes(g.id)));
     }
     res.json(groupList);
   } catch (err: any) {

@@ -37,7 +37,7 @@ export default function CustomerLedger() {
   const [ledger, setLedger] = useState<any>(null);
   const [loadingLedger, setLoadingLedger] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   async function search(val: string) {
     setQuery(val);

@@ -82,7 +82,7 @@ export default function MedicalManager() {
   }
 
   async function save() {
-    if (!form.pilgrimId) return toast({ title: "Pilgrim ID required", variant: "destructive" });
+    if (!form.pilgrimId) { toast({ title: "Pilgrim ID required", variant: "destructive" }); return; }
     setSaving(true);
     try {
       const body = { pilgrimId: form.pilgrimId, groupId: form.groupId, caseType: form.caseType, description: form.description, severity: form.severity, handledBy: form.handledBy, notes: form.notes };

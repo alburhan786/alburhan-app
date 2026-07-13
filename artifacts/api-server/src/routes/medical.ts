@@ -58,7 +58,7 @@ router.get("/stats", requireAdmin as any, async (_req, res) => {
 // POST create case
 router.post("/cases", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   const { pilgrimId, groupId, caseType, description, severity, handledBy, notes } = req.body;
-  if (!pilgrimId) return res.status(400).json({ error: "pilgrimId required" });
+  if (!pilgrimId) return void res.status(400).json({ error: "pilgrimId required" });
   try {
     const id = randomUUID();
     const result = await pool.query(
@@ -89,7 +89,7 @@ router.put("/cases/:id", requireAdmin as any, async (req, res) => {
        WHERE id=$7 RETURNING *`,
       [caseType, description||null, severity, status, handledBy||null, notes||null, req.params.id]
     );
-    if (!result.rows[0]) return res.status(404).json({ error: "Case not found" });
+    if (!result.rows[0]) return void res.status(404).json({ error: "Case not found" });
     res.json(result.rows[0]);
   } catch (err: any) {
     res.status(500).json({ error: err.message });

@@ -29,7 +29,7 @@ router.post("/", requireAdmin as any, async (req, res) => {
       name, location, city = "Makkah", schedule_date, departure_time, return_time,
       bus_id, group_id, guide_name, guide_mobile, capacity = 50, notes, status = "scheduled"
     } = req.body;
-    if (!name || !location || !schedule_date) return res.status(400).json({ message: "name, location, schedule_date required" });
+    if (!name || !location || !schedule_date) return void res.status(400).json({ message: "name, location, schedule_date required" });
     const id = randomUUID();
     await pool.query(
       `INSERT INTO ziyarat_schedules (id, name, location, city, schedule_date, departure_time, return_time, bus_id, group_id, guide_name, guide_mobile, capacity, notes, status)
