@@ -534,6 +534,126 @@ export async function sendConfirmationTemplate(
   return result;
 }
 
+// ── Al Burhan Production Templates (July 2026) ───────────────────────────────
+// These 7 templates REPLACE the broken template 333473 ("conformation") which
+// returned "Message template not found." from BotBee. Template IDs and names
+// confirmed from BotBee dashboard by the business owner.
+
+export const ABT_TEMPLATES = {
+  booking_submitted:  { id: "407645", name: "bookingsubmitted" },
+  payment_received:   { id: "407646", name: "paymentreceived" },
+  pending_payment:    { id: "407648", name: "pending_payment_reminder" },
+  booking_approved:   { id: "407642", name: "approve" },
+  departure_reminder: { id: "407664", name: "departure_reminder" },
+  visa_issued:        { id: "407667", name: "visa_issued" },
+  flight_issued:      { id: "361654", name: "flight" },
+} as const;
+
+function bodyParams(texts: (string | null | undefined)[]): object[] {
+  if (!texts.length) return [];
+  return [{
+    type: "body",
+    parameters: texts.map(t => ({ type: "text", text: String(t ?? "-") })),
+  }];
+}
+
+/** Template 407645 bookingsubmitted — fires when a new booking is submitted */
+export async function sendBookingSubmittedTemplate(
+  to: string,
+  ctx: { customerName: string; packageName: string; bookingId: string; invoiceUrl?: string },
+  opts?: { eventType?: string; bookingId?: string; customerId?: string }
+): Promise<BotBeeResult> {
+  const url = ctx.invoiceUrl || `https://alburhantravels.com/invoice/${ctx.bookingId}`;
+  return sendTemplate(to, ABT_TEMPLATES.booking_submitted.name, bodyParams([
+    ctx.customerName, ctx.packageName, ctx.bookingId, url,
+  ]), opts);
+}
+
+/** Template 407646 paymentreceived — fires on full/partial payment (NO amount shown) */
+export async function sendPaymentReceivedTemplate(
+  to: string,
+  ctx: { customerName: string; packageName: string; bookingId: string; invoiceUrl?: string },
+  opts?: { eventType?: string; bookingId?: string; customerId?: string }
+): Promise<BotBeeResult> {
+  const url = ctx.invoiceUrl || `https://alburhantravels.com/invoice/${ctx.bookingId}`;
+  return sendTemplate(to, ABT_TEMPLATES.payment_received.name, bodyParams([
+    ctx.customerName, ctx.packageName, ctx.bookingId, "Paid", url,
+  ]), opts);
+}
+
+/** Template 407648 pending_payment_reminder — fires for unpaid bookings at 3d/7d/15d */
+export async function sendPendingPaymentTemplate(
+  to: string,
+  ctx: { customerName: string; packageName: string; bookingId: string; paymentUrl?: string },
+  opts?: { eventType?: string; bookingId?: string; customerId?: string }
+): Promise<BotBeeResult> {
+  const url = ctx.paymentUrl || `https://alburhantravels.com/pay/${ctx.bookingId}`;
+  return sendTemplate(to, ABT_TEMPLATES.pending_payment.name, bodyParams([
+    ctx.customerName, ctx.packageName, ctx.bookingId, url,
+  ]), opts);
+}
+
+/** Template 407642 approve — fires when admin approves a booking */
+export async function sendApprovalTemplate(
+  to: string,
+  ctx: { customerName: string; packageName: string; bookingId: string; invoiceUrl?: string },
+  opts?: { eventType?: string; bookingId?: string; customerId?: string }
+): Promise<BotBeeResult> {
+  const url = ctx.invoiceUrl || `https://alburhantravels.com/invoice/${ctx.bookingId}`;
+  return sendTemplate(to, ABT_TEMPLATES.booking_approved.name, bodyParams([
+    ctx.customerName, ctx.packageName, ctx.bookingId, url,
+  ]), opts);
+}
+
+/** Template 407664 departure_reminder — fires 7d/3d/1d before departure */
+export async function sendDepartureReminderTemplate(
+  to: string,
+  ctx: {
+    customerName: string; packageName: string; bookingId: string;
+    flightNumber?: string; departureDate?: string; reportingTime?: string;
+    departureAirport?: string; hotelName?: string; emergencyContact?: string;
+  },
+  opts?: { eventType?: string; bookingId?: string; customerId?: string }
+): Promise<BotBeeResult> {
+  return sendTemplate(to, ABT_TEMPLATES.departure_reminder.name, bodyParams([
+    ctx.customerName,
+    ctx.packageName,
+    ctx.flightNumber || "TBA",
+    ctx.departureDate || "TBA",
+    ctx.reportingTime || "4 hours before departure",
+    ctx.departureAirport || "TBA",
+    ctx.hotelName || "TBA",
+    ctx.emergencyContact || "+91 9893225590",
+  ]), opts);
+}
+
+/** Template 407667 visa_issued — fires when visa is uploaded/approved */
+export async function sendVisaIssuedTemplate(
+  to: string,
+  ctx: { customerName: string; bookingId: string; packageName?: string; visaUrl?: string },
+  opts?: { eventType?: string; bookingId?: string; customerId?: string }
+): Promise<BotBeeResult> {
+  const url = ctx.visaUrl || `https://alburhantravels.com/invoice/${ctx.bookingId}`;
+  return sendTemplate(to, ABT_TEMPLATES.visa_issued.name, bodyParams([
+    ctx.customerName, ctx.bookingId, ctx.packageName || "Hajj/Umrah Package", url,
+  ]), opts);
+}
+
+/** Template 361654 flight — fires when flight ticket is issued */
+export async function sendFlightTemplate(
+  to: string,
+  ctx: {
+    customerName: string; bookingId: string;
+    flightNumber?: string; departureDate?: string; ticketUrl?: string;
+  },
+  opts?: { eventType?: string; bookingId?: string; customerId?: string }
+): Promise<BotBeeResult> {
+  const url = ctx.ticketUrl || `https://alburhantravels.com/invoice/${ctx.bookingId}`;
+  return sendTemplate(to, ABT_TEMPLATES.flight_issued.name, bodyParams([
+    ctx.customerName, ctx.bookingId, ctx.flightNumber || "TBA", ctx.departureDate || "TBA", url,
+  ]), opts);
+}
+
 // ── Template management ───────────────────────────────────────────────────────
 
 export interface WaTemplate {

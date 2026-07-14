@@ -1,0 +1,331 @@
+Build a complete production-grade Notification Automation Engine for Al Burhan Tours & Travels.
+
+Every booking event must automatically trigger the correct BotBee WhatsApp template, Email, SMS, PDF generation and notification log.
+
+──────────────────────────────
+BOTBEE TEMPLATE MAPPING
+──────────────────────────────
+
+Booking Submitted
+Template ID: 407645
+Template Name: bookingsubmitted
+
+Payment Received
+Template ID: 407646
+Template Name: paymentreceived
+
+Pending Payment Reminder
+Template ID: 407648
+Template Name: pending_payment_reminder
+
+Booking Approved
+Template ID: 407642
+Template Name: approve
+
+Departure Reminder
+Template ID: 407664
+Template Name: departure_reminder
+
+Visa Issued
+Template ID: 407667
+Template Name: visa_issued
+
+Flight Ticket Issued
+Template ID: 361654
+Template Name: flight
+
+──────────────────────────────
+AUTOMATIC WORKFLOW
+──────────────────────────────
+
+1. Customer submits booking
+
+Automatically
+
+• Save booking
+• Generate Booking ID
+• Generate Agreement ID
+• Generate QR Code
+• Send Booking Submitted WhatsApp
+• Send Email
+• Save notification log
+
+──────────────────────────────
+
+2. Customer makes payment
+
+Automatically
+
+Verify Razorpay Payment
+
+Update Booking Status = PAID
+
+Generate
+
+Booking Confirmation PDF
+
+Invoice PDF
+
+Receipt PDF
+
+Store PDFs securely
+
+Generate secure URLs
+
+Example
+
+https://alburhantravels.com/invoice/{bookingId}
+
+https://alburhantravels.com/receipt/{bookingId}
+
+https://alburhantravels.com/agreement/{agreementId}
+
+Send
+
+Payment Received WhatsApp
+
+Booking Confirmation Email
+
+Invoice Email
+
+Attach all PDFs
+
+Do NOT show payment amount in WhatsApp
+
+Show only
+
+Customer Name
+
+Booking ID
+
+Package Name
+
+Payment Status = Paid
+
+Invoice Link
+
+Save complete notification log.
+
+──────────────────────────────
+
+3. Admin approves booking
+
+Automatically
+
+Update Booking Status
+
+Send Approve WhatsApp
+
+Send Approval Email
+
+Update dashboard timeline.
+
+──────────────────────────────
+
+4. Visa uploaded
+
+Automatically
+
+Upload Visa PDF
+
+Store securely
+
+Generate Visa Download Link
+
+Send Visa Issued WhatsApp
+
+Send Visa Email
+
+Attach Visa PDF.
+
+──────────────────────────────
+
+5. Flight uploaded
+
+Automatically
+
+Upload Ticket PDF
+
+Generate Download Link
+
+Send Flight WhatsApp
+
+Send Flight Email
+
+Attach Ticket PDF.
+
+──────────────────────────────
+
+6. Departure Reminder
+
+Automatically
+
+7 Days Before
+
+3 Days Before
+
+1 Day Before
+
+Send Departure Reminder Template
+
+Include
+
+Package
+
+Flight Number
+
+Departure Date
+
+Reporting Time
+
+Airport
+
+Hotel
+
+Emergency Contact
+
+──────────────────────────────
+
+7. Pending Payment Reminder
+
+Automatically
+
+If booking unpaid
+
+3 Days
+
+7 Days
+
+15 Days
+
+Send Pending Payment Reminder Template
+
+──────────────────────────────
+
+8. Customer Dashboard
+
+Customer can download
+
+Invoice PDF
+
+Receipt PDF
+
+Agreement PDF
+
+Visa PDF
+
+Flight Ticket
+
+Room Allocation
+
+Ziyarat Schedule
+
+Payment Receipt
+
+──────────────────────────────
+
+ADMIN PANEL
+
+Create Notification Center
+
+Show
+
+WhatsApp Status
+
+Email Status
+
+SMS Status
+
+PDF Generated
+
+BotBee Response
+
+Template Used
+
+Delivery Time
+
+Retry Button
+
+Resend WhatsApp
+
+Resend Email
+
+Resend SMS
+
+Preview Template
+
+Notification History
+
+──────────────────────────────
+
+BOTBEE SETTINGS
+
+Create Admin Settings
+
+API Key
+
+Sender Number
+
+Webhook URL
+
+Template IDs
+
+Language
+
+Enable/Disable Template
+
+Test Template Button
+
+──────────────────────────────
+
+LOGGING
+
+Save
+
+Booking ID
+
+Customer
+
+Template ID
+
+Template Name
+
+Response
+
+HTTP Status
+
+Delivery Status
+
+Error Message
+
+Retry Count
+
+Timestamp
+
+──────────────────────────────
+
+SECURITY
+
+Every PDF must have
+
+Booking ID
+
+Agreement ID
+
+QR Code
+
+Watermark
+
+Digital Verification
+
+Secure Download Token
+
+No public access.
+
+──────────────────────────────
+
+Everything must be fully automatic.
+
+No manual sending should be required after payment, approval, visa upload, flight upload or departure reminder.
+
+Deploy to production and verify every workflow.

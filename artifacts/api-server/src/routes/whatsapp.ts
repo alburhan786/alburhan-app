@@ -263,7 +263,8 @@ router.get("/analytics", requireAdmin as any, async (_req, res) => {
 
 // ── Delivery Logs ─────────────────────────────────────────────────────────────
 
-// GET /api/whatsapp/delivery-logs?page=1&limit=50&status=&event=&search=
+// GET /api/whatsapp/delivery-logs?page=1&limit=50&status=&event=&search=&channel=
+// channel param: comma-separated e.g. "whatsapp,email,sms" — default "whatsapp"
 router.get("/delivery-logs", requireAdmin as any, async (req, res) => {
   const page = Math.max(1, parseInt(String(req.query.page || "1")));
   const limit = Math.min(100, Math.max(10, parseInt(String(req.query.limit || "50"))));
@@ -271,22 +272,36 @@ router.get("/delivery-logs", requireAdmin as any, async (req, res) => {
   const status = String(req.query.status || "");
   const event = String(req.query.event || "");
   const search = String(req.query.search || "");
+  const channelParam = String(req.query.channel || "whatsapp");
+  const channels = channelParam.split(",").map(c => c.trim()).filter(Boolean);
 
-  const conditions: string[] = ["channel='whatsapp'"];
+  const conditions: string[] = [];
   const params: any[] = [];
   let pi = 1;
 
+  if (channels.length === 1) {
+    conditions.push(`channel=$${pi++}`); params.push(channels[0]);
+  } else if (channels.length > 1) {
+    conditions.push(`channel = ANY($${pi++})`); params.push(channels);
+  } else {
+    conditions.push(`channel='whatsapp'`);
+  }
+
   if (status) { conditions.push(`status=$${pi++}`); params.push(status); }
   if (event) { conditions.push(`event_type=$${pi++}`); params.push(event); }
-  if (search) { conditions.push(`(recipient ILIKE $${pi} OR message ILIKE $${pi})`); params.push(`%${search}%`); pi++; }
+  if (search) {
+    conditions.push(`(recipient ILIKE $${pi} OR message ILIKE $${pi} OR booking_id ILIKE $${pi} OR booking_number ILIKE $${pi} OR customer_name ILIKE $${pi})`);
+    params.push(`%${search}%`); pi++;
+  }
 
   const where = conditions.join(" AND ");
 
   try {
     const [rows, countRes] = await Promise.all([
       pool.query(
-        `SELECT id, event_type, recipient, message, status, sent_at, delivered_at,
-                retry_count, error_code, provider_name, http_status, request_payload, provider_response
+        `SELECT id, event_type, channel, recipient, message, status, sent_at, delivered_at,
+                retry_count, error_code, provider_name, http_status, request_payload, provider_response,
+                booking_id, booking_number, customer_name
          FROM notification_logs WHERE ${where}
          ORDER BY sent_at DESC LIMIT ${limit} OFFSET ${offset}`,
         params
@@ -294,13 +309,14 @@ router.get("/delivery-logs", requireAdmin as any, async (req, res) => {
       pool.query(`SELECT COUNT(*) FROM notification_logs WHERE ${where}`, params),
     ]);
 
+    const total = parseInt(countRes.rows[0].count);
     res.json({
       ok: true,
       logs: rows.rows,
-      total: parseInt(countRes.rows[0].count),
+      total,
       page,
+      pages: Math.ceil(total / limit),
       limit,
-      totalPages: Math.ceil(parseInt(countRes.rows[0].count) / limit),
     });
   } catch (err: any) { res.status(500).json({ ok: false, message: err.message }); }
 });

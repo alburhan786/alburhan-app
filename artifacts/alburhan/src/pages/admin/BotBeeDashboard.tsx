@@ -467,6 +467,38 @@ export default function BotBeeDashboard() {
         {/* ── TEMPLATES ── */}
         {activeTab === "templates" && (
           <div className="space-y-4">
+            {/* ABT Production Templates — hardcoded reference for the 7 approved templates */}
+            <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-4">
+              <h3 className="text-xs font-bold text-emerald-800 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                <Zap size={12} className="text-emerald-600" />
+                Al Burhan Production Templates (July 2026)
+                <span className="ml-1 text-[10px] bg-emerald-200 text-emerald-800 px-1.5 py-0.5 rounded font-semibold">ACTIVE</span>
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {[
+                  { event: "Booking Submitted",       name: "bookingsubmitted",         id: "407645", params: "name, package, bookingId, invoiceUrl" },
+                  { event: "Payment Received",        name: "paymentreceived",          id: "407646", params: "name, package, bookingId, status=Paid, invoiceUrl" },
+                  { event: "Pending Payment Reminder",name: "pending_payment_reminder", id: "407648", params: "name, package, bookingId, paymentUrl" },
+                  { event: "Booking Approved",        name: "approve",                  id: "407642", params: "name, package, bookingId, invoiceUrl" },
+                  { event: "Departure Reminder",      name: "departure_reminder",       id: "407664", params: "name, package, flight, date, reportingTime, airport, hotel, emergency" },
+                  { event: "Visa Issued",             name: "visa_issued",              id: "407667", params: "name, bookingId, package, visaUrl" },
+                  { event: "Flight Ticket Issued",    name: "flight",                   id: "361654", params: "name, bookingId, flightNo, date, ticketUrl" },
+                ].map(t => (
+                  <div key={t.id} className="flex items-start gap-2 bg-white rounded-lg border border-emerald-100 px-3 py-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-semibold text-xs text-gray-900">{t.event}</span>
+                        <code className="text-[10px] bg-gray-100 px-1 rounded font-mono text-gray-600">{t.name}</code>
+                        <span className="text-[10px] bg-indigo-100 text-indigo-700 px-1 rounded font-bold">#{t.id}</span>
+                      </div>
+                      <p className="text-[10px] text-gray-400 mt-0.5 truncate">{t.params}</p>
+                    </div>
+                    <span className="shrink-0 text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-semibold">LIVE</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <div className="flex items-center gap-3 flex-wrap">
               <div className="flex gap-3">
                 {[

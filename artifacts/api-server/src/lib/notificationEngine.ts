@@ -445,62 +445,127 @@ async function sendOnChannel(channel: Channel, ctx: NotificationContext, message
   }
 }
 
-// ── WhatsApp business-initiated sends must use a pre-approved Meta template
-// once the customer's 24-hour service window has closed. We look up an
-// enabled wa_templates row mapped to this eventType and send it via BotBee's
-// template endpoint (built from {{n}}-style placeholders matching the
-// template's `variables` order). If no approved template exists, we fall
-// back to the free-form session message (sendWhatsApp) — this only succeeds
-// if the customer messaged within the last 24h, otherwise BotBee/Meta will
-// reject it and the failure is logged + retried as usual.
-// Events eligible for the approved BotBee Confirmation Template (ID 333473).
-// ALL other events must NOT use this template — they keep existing behaviour.
-const CONFIRMATION_TEMPLATE_EVENTS = new Set<EventType>(["payment_received", "booking_approved"]);
+// ── WhatsApp business-initiated sends must use a pre-approved Meta template.
+// Priority path: route each event to its dedicated production-approved BotBee
+// template (July 2026 — these replace broken template 333473 "conformation").
+// If the BotBee template fails, fall through to wa_templates table lookup,
+// then last-resort free-form session message.
+
+const ABT_TEMPLATE_EVENTS = new Set<EventType>([
+  "new_booking", "payment_received", "payment_due", "balance_reminder",
+  "booking_approved", "departure_reminder", "visa_ready", "visa_approved",
+  "ticket_issued", "flight_assigned",
+]);
+
+async function sendBotBeeEventTemplate(
+  eventType: EventType,
+  ctx: NotificationContext,
+  bookingId?: string,
+  customerId?: string,
+): Promise<BotBeeResult> {
+  const {
+    sendBookingSubmittedTemplate,
+    sendPaymentReceivedTemplate,
+    sendPendingPaymentTemplate,
+    sendApprovalTemplate,
+    sendDepartureReminderTemplate,
+    sendVisaIssuedTemplate,
+    sendFlightTemplate,
+  } = await import("./botbee.js");
+
+  const siteBase = "https://alburhantravels.com";
+  const bookingRef = ctx.bookingNumber || bookingId || "-";
+  const invoiceUrl = (ctx.invoiceUrl as string | undefined) ||
+    (ctx.bookingNumber ? `${siteBase}/invoice/${ctx.bookingNumber}` : `${siteBase}`);
+  const paymentUrl = ctx.bookingNumber
+    ? `${siteBase}/pay/${ctx.bookingNumber}` : `${siteBase}`;
+  const opts = { eventType, bookingId, customerId };
+
+  switch (eventType) {
+    case "new_booking":
+      return sendBookingSubmittedTemplate(ctx.customerMobile, {
+        customerName: ctx.customerName,
+        packageName: ctx.packageName || "Hajj/Umrah Package",
+        bookingId: bookingRef,
+        invoiceUrl,
+      }, opts);
+
+    case "payment_received":
+      return sendPaymentReceivedTemplate(ctx.customerMobile, {
+        customerName: ctx.customerName,
+        packageName: ctx.packageName || "Hajj/Umrah Package",
+        bookingId: bookingRef,
+        invoiceUrl,
+      }, opts);
+
+    case "payment_due":
+    case "balance_reminder":
+      return sendPendingPaymentTemplate(ctx.customerMobile, {
+        customerName: ctx.customerName,
+        packageName: ctx.packageName || "Hajj/Umrah Package",
+        bookingId: bookingRef,
+        paymentUrl,
+      }, opts);
+
+    case "booking_approved":
+      return sendApprovalTemplate(ctx.customerMobile, {
+        customerName: ctx.customerName,
+        packageName: ctx.packageName || "Hajj/Umrah Package",
+        bookingId: bookingRef,
+        invoiceUrl,
+      }, opts);
+
+    case "departure_reminder":
+      return sendDepartureReminderTemplate(ctx.customerMobile, {
+        customerName: ctx.customerName,
+        packageName: ctx.packageName || "Hajj/Umrah Package",
+        bookingId: bookingRef,
+        flightNumber: ctx.flightNumber,
+        departureDate: ctx.departureDate,
+        reportingTime: (ctx as any).reportingTime,
+        departureAirport: (ctx as any).departureAirport,
+        hotelName: ctx.hotelName,
+        emergencyContact: (ctx as any).emergencyContact || "+91 9893225590",
+      }, opts);
+
+    case "visa_ready":
+    case "visa_approved":
+      return sendVisaIssuedTemplate(ctx.customerMobile, {
+        customerName: ctx.customerName,
+        bookingId: bookingRef,
+        packageName: ctx.packageName,
+        visaUrl: (ctx as any).visaUrl || invoiceUrl,
+      }, opts);
+
+    case "ticket_issued":
+    case "flight_assigned":
+      return sendFlightTemplate(ctx.customerMobile, {
+        customerName: ctx.customerName,
+        bookingId: bookingRef,
+        flightNumber: ctx.flightNumber,
+        departureDate: ctx.departureDate,
+        ticketUrl: (ctx as any).ticketUrl || invoiceUrl,
+      }, opts);
+
+    default:
+      return { ok: false, provider: "BotBee", endpoint: "", errorMessage: `No ABT template for event: ${eventType}` };
+  }
+}
 
 async function sendWhatsAppForEvent(eventType: EventType, ctx: NotificationContext, message: string, bookingId?: string, customerId?: string): Promise<{ status: "sent" | "failed"; providerResponse: unknown }> {
   try {
-    // ── Priority path: BotBee Confirmation Template (ID 333473 / "conformation")
-    // Only fires for payment_received and booking_approved — never for document
-    // uploads, reminders, or any other event type.
-    if (CONFIRMATION_TEMPLATE_EVENTS.has(eventType)) {
-      const { sendConfirmationTemplate } = await import("./botbee.js");
-      const siteBase = "https://alburhantravels.com";
-      // Resolve invoice URL: prefer explicit invoiceUrl/invoicePdfUrl on context,
-      // then construct from bookingNumber, then fall back to site root.
-      const invoiceLink =
-        (ctx.invoiceUrl as string | undefined) ||
-        (ctx.invoicePdfUrl as string | undefined) ||
-        (ctx.bookingNumber ? `${siteBase}/invoice/${ctx.bookingNumber}` : siteBase);
-
-      // 3rd template variable ({{system-cart-total-price}}) = Booking ID.
-      // Per business requirement: NEVER show payment amount in confirmation WhatsApp.
-      const bookingRef = ctx.bookingNumber || "-";
-
-      const tplResult = await sendConfirmationTemplate(
-        ctx.customerMobile,
-        {
-          customerName:   ctx.customerName,
-          packageName:    ctx.packageName || "Hajj / Umrah Package",
-          bookingRef,
-          attachmentLink: invoiceLink,
-        },
-        { eventType, bookingId, customerId },
-      );
-
+    // ── Priority: production BotBee templates (July 2026) ─────────────────────
+    if (ABT_TEMPLATE_EVENTS.has(eventType)) {
+      const tplResult = await sendBotBeeEventTemplate(eventType, ctx, bookingId, customerId);
       if (tplResult.ok) {
-        console.log(`[notificationEngine] Confirmation template 333473 sent for ${eventType} → ${ctx.customerMobile} ref=${bookingRef}`);
+        console.log(`[notificationEngine] ABT template sent for ${eventType} → ${ctx.customerMobile} (bookingRef=${ctx.bookingNumber || bookingId || "-"})`);
         return { status: "sent", providerResponse: tplResult };
       }
-      // Template 333473 failed — skip wa_templates (wrong variable ordering) and
-      // fall through to free-form session message as a reliable fallback.
       console.warn(
-        `[notificationEngine] Confirmation template 333473 FAILED for ${eventType} (${ctx.customerMobile}) ref=${bookingRef}:`,
+        `[notificationEngine] ABT template FAILED for ${eventType} (${ctx.customerMobile}):`,
         tplResult.errorMessage,
-        "— falling back to free-form session message",
+        "— falling back to wa_templates / free-form",
       );
-      const freeFormMsg = buildDefaultMessage(eventType, ctx);
-      const ffResult = await sendWhatsApp(ctx.customerMobile, freeFormMsg);
-      return { status: ffResult.ok ? "sent" : "failed", providerResponse: ffResult };
     }
 
     // ── Standard path: look up wa_templates table for any other event ─────────
