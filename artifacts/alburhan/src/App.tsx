@@ -110,6 +110,9 @@ import StaffVerify from "@/pages/public/StaffVerify";
 import VerifyPilgrim from "@/pages/public/VerifyPilgrim";
 import VerifyFamily from "@/pages/public/VerifyFamily";
 import ScanPilgrim from "@/pages/public/ScanPilgrim";
+import AgreementCenter from "@/pages/admin/AgreementCenter";
+import AgreementSigning from "@/pages/customer/AgreementSigning";
+import VerifyAgreement from "@/pages/public/VerifyAgreement";
 import NotFound from "@/pages/not-found";
 import { useAuth } from "@/hooks/use-auth";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -163,9 +166,13 @@ function Router() {
       <Route path="/scan/:barcodeId" component={ScanPilgrim} />
       <Route path="/attendance-scan/:groupId/:eventId" component={AttendanceScanPublic} />
 
+      {/* Public Agreement Verification */}
+      <Route path="/verify-agreement/:token" component={VerifyAgreement} />
+
       {/* Customer Routes */}
       <Route path="/customer/dashboard" component={() => <CustomerRoute component={CustomerDashboard} />} />
       <Route path="/kyc" component={() => <CustomerRoute component={KYCPage} />} />
+      <Route path="/agreement/:id/sign" component={() => <CustomerRoute component={AgreementSigning} />} />
 
       {/* Admin Routes */}
       <Route path="/admin/dashboard" component={() => <AdminRoute component={AdminDashboard} />} />
@@ -230,6 +237,7 @@ function Router() {
       <Route path="/admin/gst-reports" component={() => <AdminRoute component={GSTReports} />} />
       <Route path="/admin/payroll" component={() => <AdminRoute component={PayrollManager} />} />
       <Route path="/admin/assets" component={() => <AdminRoute component={AssetManager} />} />
+      <Route path="/admin/agreements" component={() => <AdminRoute component={AgreementCenter} />} />
       <Route path="/admin/audit-logs" component={() => <AdminRoute component={AuditLogs} />} />
       <Route path="/admin/system-health" component={() => <AdminRoute component={SystemHealth} />} />
       <Route path="/admin/otp-debug" component={() => <AdminRoute component={OTPDebug} />} />

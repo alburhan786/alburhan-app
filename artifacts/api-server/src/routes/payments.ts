@@ -12,6 +12,7 @@ import { triggerWorkflow } from "../lib/workflowEngine.js";
 import { generateInvoicePdfBuffer, generateReceiptPdfBuffer } from "../lib/paymentDocs.js";
 import { sendReminderForBookingId, getReminderHistory, runDailyReminders, isRemindersEnabled, setRemindersEnabled } from "../jobs/paymentReminder.js";
 import { upsertInvoiceForBooking } from "./invoices.js";
+import { autoGenerateAgreement } from "./agreements.js";
 
 const router = Router();
 
@@ -136,6 +137,13 @@ export async function processPaymentSuccessNotifications(opts: {
       console.error(`[payments] Notification step ${i === 0 ? "triggerWorkflow" : "sendAdminPaymentAlert"} failed for booking ${booking.bookingNumber}:`, r.reason);
     }
   });
+
+  // Auto-generate Hajj Agreement when fully paid
+  if (isFullyPaid && booking.id) {
+    autoGenerateAgreement(booking.id).catch(err =>
+      console.error("[payments] autoGenerateAgreement failed:", err)
+    );
+  }
 }
 
 function getRazorpay(): RazorpayWithPaymentLink {

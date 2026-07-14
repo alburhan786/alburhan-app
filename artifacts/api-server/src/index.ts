@@ -1766,6 +1766,50 @@ async function runMigrations() {
     await pool.query(`CREATE INDEX IF NOT EXISTS notification_logs_booking_id_idx ON notification_logs(booking_id)`);
     console.log("[Migration] performance indexes ensured");
   } catch (err) { console.error("[Migration] performance indexes failed:", err); }
+
+  // ── Agreements + audit tables ─────────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS agreements (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        agreement_number TEXT UNIQUE NOT NULL,
+        booking_id UUID NOT NULL,
+        customer_id UUID,
+        status TEXT NOT NULL DEFAULT 'draft',
+        terms_accepted JSONB,
+        signature_data TEXT,
+        signed_at TIMESTAMPTZ,
+        signed_ip TEXT,
+        signed_user_agent TEXT,
+        otp_verified BOOLEAN DEFAULT FALSE,
+        otp_verified_at TIMESTAMPTZ,
+        signing_otp TEXT,
+        signing_otp_expires_at TIMESTAMPTZ,
+        pdf_generated BOOLEAN DEFAULT FALSE,
+        verification_token TEXT UNIQUE DEFAULT gen_random_uuid()::text,
+        cancelled_at TIMESTAMPTZ,
+        cancelled_reason TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS agreement_audit_logs (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        agreement_id UUID NOT NULL,
+        action TEXT NOT NULL,
+        details JSONB,
+        ip_address TEXT,
+        user_agent TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS agreements_booking_id_idx ON agreements(booking_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS agreements_customer_id_idx ON agreements(customer_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS agreements_status_idx ON agreements(status)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS agreements_token_idx ON agreements(verification_token)`);
+    console.log("[Migration] agreements + agreement_audit_logs tables ensured");
+  } catch (err) { console.error("[Migration] agreements migration failed:", err); }
 }
 
 const rawPort = process.env["PORT"];

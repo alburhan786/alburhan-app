@@ -1,0 +1,83 @@
+Final Major Milestone – Smart Legal Hajj Agreement Module
+
+Build a complete Legal Hajj Agreement Module for Al Burhan Tours & Travels that is fully automated, secure, and legally compliant for India.
+
+Features Required
+
+1. Auto Agreement Generation
+    * Generate a unique Agreement ID (e.g., ABT-AGR-2027-000001).
+    * Link the Agreement ID with the Booking ID.
+    * Automatically populate all customer and package details.
+2. Digital Signature
+    * Customer can sign using touch, mouse, or stylus.
+    * Save the signature securely.
+    * Include the signature in the final PDF.
+3. OTP Verification
+    * Verify the customer’s mobile number using OTP before signing.
+    * Record successful OTP verification.
+4. Mandatory Terms & Conditions
+    * Every clause must have an acceptance checkbox.
+    * Customer cannot proceed unless all required checkboxes are accepted.
+5. Legal Audit Trail
+    Automatically record:
+    * Date & time of acceptance
+    * IP address
+    * Device information
+    * Browser details
+    * OTP verification status
+    * Digital signature timestamp
+6. QR Code Verification
+    * Generate a QR code on every agreement.
+    * QR code opens a secure verification page showing:
+        * Agreement ID
+        * Booking ID
+        * Customer Name
+        * Package Name
+        * Agreement Status
+        * Date Signed
+7. Automatic PDF Generation
+    * Generate a professional advocate-style PDF (12–15 pages).
+    * Include company logo and branding.
+    * Include Agreement ID and Booking ID.
+    * Include QR code.
+    * Include customer signature.
+    * Include all accepted terms.
+8. Automatic Delivery
+    After successful payment and agreement completion:
+    * Email the Agreement PDF to the customer.
+    * Send the Agreement PDF via WhatsApp using the approved BotBee template.
+    * Store the PDF in the customer’s account.
+9. Customer Dashboard
+    Customers can:
+    * View Agreement
+    * Download PDF
+    * Print Agreement
+    * Verify Agreement
+    * View Agreement Status
+10. Admin Dashboard
+    Admin can:
+    * View all agreements
+    * Search by Agreement ID or Booking ID
+    * Download PDFs
+    * Resend via WhatsApp
+    * Resend via Email
+    * View audit logs
+    * View signature details
+    * Verify QR code
+    * Cancel or regenerate agreements (with full audit history)
+11. Security
+    * PDFs must be tamper-evident.
+    * Every agreement must have a unique verification URL.
+    * Protect customer data using secure authentication and access control.
+12. Automation Workflow
+    * Customer submits booking.
+    * Admin approves booking.
+    * Customer completes Razorpay payment.
+    * Booking status changes to Confirmed.
+    * Agreement is generated automatically.
+    * Customer signs digitally after OTP verification.
+    * PDF is created automatically.
+    * QR code is generated automatically.
+    * Agreement is sent via WhatsApp and Email.
+    * Agreement is stored in the customer portal.
+    * All actions are logged for legal compliance.

@@ -26,3 +26,4 @@
 - [ts-nocheck route strategy](ts-nocheck-routes.md) — 25+ API route files use // @ts-nocheck due to pervasive Drizzle schema type mismatches; do not remove without rebuilding lib/db types
 - [Notification packageName bug](notification-packagename-bug.md) — every triggerWorkflow() call must include packageName or messages say "your package"
 - [VPS deploy requires pnpm build first](vps-deploy-build-step.md) — self-update downloads dist/index.cjs; must run `pnpm --filter @workspace/api-server run build` before self-update or VPS gets stale bundle (same byte count = no change)
+- [Agreements module pool import](agreements-module.md) — pool import must be @workspace/db (not ../lib/db.js); deploy key is hardcoded "alburhan-migrate-2026"; migrate route is /api/migrate/self-update not /api/self-update

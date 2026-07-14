@@ -54,12 +54,13 @@ import apiSettingsRouter from "./api-settings.js";
 import whatsappRouter from "./whatsapp.js";
 import communicationRouter from "./communication.js";
 import autoNotificationsRouter from "./autoNotifications.js";
+import agreementsRouter from "./agreements.js";
 import { requireAdmin } from "../lib/auth.js";
 
 const router: IRouter = Router();
 
 // ── Build fingerprint — confirms which bundle is running on VPS (no auth needed) ──
-const BUILD_STAMP = "2026-07-14-v20.4";
+const BUILD_STAMP = "2026-07-14-v20.5";
 router.get("/version", (_req, res) => {
   res.json({
     build: BUILD_STAMP,
@@ -324,6 +325,7 @@ router.use("/api-settings", apiSettingsRouter);
 router.use("/whatsapp", whatsappRouter);
 router.use("/communication", communicationRouter);
 router.use("/auto-notifications", autoNotificationsRouter);
+router.use("/agreements", agreementsRouter);
 router.use("/webhook", webhooksRouter);
 router.use(storageRouter);
 
