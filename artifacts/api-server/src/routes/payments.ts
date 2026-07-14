@@ -89,6 +89,7 @@ export async function processPaymentSuccessNotifications(opts: {
   };
 
   const attachments: EmailAttachment[] = [];
+  let invoiceGeneratedOk = false;
   try {
     const receiptBuf = await generateReceiptPdfBuffer(docOpts);
     attachments.push({ filename: `Receipt-${booking.bookingNumber}.pdf`, content: receiptBuf, contentType: "application/pdf" });
@@ -97,9 +98,27 @@ export async function processPaymentSuccessNotifications(opts: {
       const invBuf = await generateInvoicePdfBuffer(docOpts);
       const safeInvNum = invoiceNumber.replace(/\//g, "-");
       attachments.push({ filename: `Invoice-${safeInvNum}.pdf`, content: invBuf, contentType: "application/pdf" });
+      invoiceGeneratedOk = true;
     }
   } catch (err) {
-    console.error("[payments] PDF generation failed:", err);
+    console.error("[payments] PDF generation failed — WhatsApp confirmation will not be sent:", err);
+  }
+
+  // Block confirmation WhatsApp if invoice PDF failed to generate.
+  // Only applies to full payments (payment_received) where an invoice is expected.
+  if (isFullyPaid && invoiceNumber && !invoiceGeneratedOk) {
+    console.warn(`[payments] Skipping WhatsApp confirmation for ${booking.bookingNumber} — invoice generation failed`);
+    await sendAdminPaymentAlert({
+      bookingId: booking.id,
+      bookingNumber: booking.bookingNumber,
+      customerName: booking.customerName,
+      mobile: booking.customerMobile,
+      amount: (isFullyPaid ? finalAmountNum : thisPaymentAmount).toLocaleString("en-IN"),
+      isFullyPaid,
+      invoiceNumber,
+      balance: remainingBalance > 0 ? remainingBalance.toLocaleString("en-IN") : undefined,
+    });
+    return;
   }
 
   const trigger = isFullyPaid ? "payment_received" : "partial_payment_received";

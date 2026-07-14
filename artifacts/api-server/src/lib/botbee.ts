@@ -432,7 +432,7 @@ export async function sendConfirmationTemplate(
   ctx: {
     customerName:   string;
     packageName:    string;
-    totalAmount:    string;
+    bookingRef:     string;
     attachmentLink: string;
   },
   opts?: { eventType?: string; bookingId?: string; customerId?: string }
@@ -481,7 +481,7 @@ export async function sendConfirmationTemplate(
         parameters: [
           { type: "text", text: ctx.customerName   },
           { type: "text", text: ctx.packageName    },
-          { type: "text", text: ctx.totalAmount    },
+          { type: "text", text: ctx.bookingRef     },
           { type: "text", text: ctx.attachmentLink },
         ],
       }],
@@ -526,7 +526,7 @@ export async function sendConfirmationTemplate(
     await logToDb({
       eventType: opts.eventType, channel: "whatsapp", recipient: to,
       bookingId: opts.bookingId, customerId: opts.customerId,
-      message: `Template: ${CONFIRMATION_TEMPLATE_NAME} (ID: ${CONFIRMATION_TEMPLATE_ID}) | ${ctx.customerName} | ${ctx.packageName} | ${ctx.totalAmount} | ${ctx.attachmentLink}`,
+      message: `Template: ${CONFIRMATION_TEMPLATE_NAME} (ID: ${CONFIRMATION_TEMPLATE_ID}) | ${ctx.customerName} | ${ctx.packageName} | ref=${ctx.bookingRef} | ${ctx.attachmentLink}`,
       status: result.ok ? "sent" : "failed",
       result,
     });

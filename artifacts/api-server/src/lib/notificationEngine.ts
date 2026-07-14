@@ -475,38 +475,34 @@ async function sendWhatsAppForEvent(eventType: EventType, ctx: NotificationConte
         (ctx.invoiceUrl as string | undefined) ||
         (ctx.invoicePdfUrl as string | undefined) ||
         (ctx.bookingNumber ? `${siteBase}/invoice/${ctx.bookingNumber}` : siteBase);
-      // Use finalAmount if available (full booking amount), otherwise fall back
-      // to amount (= finalAmount on full-payment trigger from payments.ts).
-      const rawAmount =
-        ctx.finalAmount ??
-        ctx.amount ??
-        (ctx as Record<string, unknown>).totalAmount;
-      const totalAmountStr =
-        rawAmount != null
-          ? `₹${formatINR(Number(rawAmount))}`
-          : (ctx.paidAmount != null ? `₹${formatINR(Number(ctx.paidAmount))}` : "₹0");
+
+      // 3rd template variable ({{system-cart-total-price}}) = Booking ID.
+      // Per business requirement: NEVER show payment amount in confirmation WhatsApp.
+      const bookingRef = ctx.bookingNumber || "-";
 
       const tplResult = await sendConfirmationTemplate(
         ctx.customerMobile,
         {
           customerName:   ctx.customerName,
           packageName:    ctx.packageName || "Hajj / Umrah Package",
-          totalAmount:    totalAmountStr,
+          bookingRef,
           attachmentLink: invoiceLink,
         },
         { eventType, bookingId, customerId },
       );
 
       if (tplResult.ok) {
-        console.log(`[notificationEngine] Confirmation template 333473 sent for ${eventType} → ${ctx.customerMobile}`);
+        console.log(`[notificationEngine] Confirmation template 333473 sent for ${eventType} → ${ctx.customerMobile} ref=${bookingRef}`);
         return { status: "sent", providerResponse: tplResult };
       }
-      // Template failed — log warning and fall through to free-form fallback
+      // Template failed — return immediately. Do NOT fall through to wa_templates:
+      // the built-in wa_templates seeds have wrong variable ordering for these events
+      // and would put booking_id into {{system-cart-total-price}} again.
       console.warn(
-        `[notificationEngine] Confirmation template 333473 failed for ${eventType} (${ctx.customerMobile}):`,
+        `[notificationEngine] Confirmation template 333473 FAILED for ${eventType} (${ctx.customerMobile}) ref=${bookingRef}:`,
         tplResult.errorMessage,
-        "— falling back to free-form session message",
       );
+      return { status: "failed", providerResponse: tplResult };
     }
 
     // ── Standard path: look up wa_templates table for any other event ─────────
