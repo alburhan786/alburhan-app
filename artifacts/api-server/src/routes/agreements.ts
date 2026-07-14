@@ -49,7 +49,7 @@ export async function autoGenerateAgreement(bookingId: string): Promise<void> {
 
     const bRes = await pool.query(
       `SELECT b.*, u.email AS customer_email, u.name AS customer_name_user,
-              hg.name AS group_name, hg.departure_date
+              hg.group_name, hg.departure_date
        FROM bookings b
        LEFT JOIN users u ON u.id = b.customer_id
        LEFT JOIN hajj_groups hg ON hg.id = b.group_id
@@ -107,8 +107,9 @@ router.get("/verify/:token", async (req, res) => {
       createdAt: ag.created_at,
       isValid: ag.status === "signed",
     });
-  } catch (err) {
-    res.status(500).json({ error: "Verification failed" });
+  } catch (err: any) {
+    console.error("[Agreement] Verify error:", err?.message || err);
+    res.status(500).json({ error: "Verification failed", detail: process.env.NODE_ENV !== "production" ? err?.message : undefined });
   }
 });
 
@@ -137,7 +138,7 @@ router.get("/my/:id", requireAuth, async (req: any, res) => {
     const agRes = await pool.query(
       `SELECT a.*, b.booking_number, b.package_name, b.final_amount, b.paid_amount,
               b.customer_name, b.customer_mobile, b.customer_email, b.number_of_pilgrims,
-              hg.name AS group_name, hg.departure_date
+              hg.group_name, hg.departure_date
        FROM agreements a
        LEFT JOIN bookings b ON b.id = a.booking_id
        LEFT JOIN hajj_groups hg ON hg.id = b.group_id
@@ -205,7 +206,7 @@ router.post("/my/:id/sign", requireAuth, async (req: any, res) => {
     const agRes = await pool.query(
       `SELECT a.*, b.customer_name, b.customer_mobile, b.customer_email, b.package_name,
               b.booking_number, b.final_amount, b.paid_amount, b.number_of_pilgrims, b.group_id,
-              hg.name AS group_name, hg.departure_date,
+              hg.group_name, hg.departure_date,
               u.name AS user_name, u.email AS user_email
        FROM agreements a
        LEFT JOIN bookings b ON b.id = a.booking_id
@@ -343,7 +344,7 @@ router.get("/my/:id/pdf", requireAuth, async (req: any, res) => {
     const agRes = await pool.query(
       `SELECT a.*, b.booking_number, b.customer_name, b.customer_mobile, b.customer_email,
               b.package_name, b.final_amount, b.paid_amount, b.number_of_pilgrims,
-              hg.name AS group_name, hg.departure_date,
+              hg.group_name, hg.departure_date,
               u.email AS user_email
        FROM agreements a
        LEFT JOIN bookings b ON b.id = a.booking_id
@@ -450,7 +451,7 @@ router.get("/:id", requireAdmin, async (req: any, res) => {
     const agRes = await pool.query(
       `SELECT a.*, b.booking_number, b.customer_name, b.customer_mobile, b.customer_email,
               b.package_name, b.final_amount, b.paid_amount, b.number_of_pilgrims,
-              hg.name AS group_name, hg.departure_date
+              hg.group_name, hg.departure_date
        FROM agreements a
        LEFT JOIN bookings b ON b.id = a.booking_id
        LEFT JOIN hajj_groups hg ON hg.id = b.group_id
@@ -496,7 +497,7 @@ router.get("/:id/pdf", requireAdmin, async (req: any, res) => {
     const agRes = await pool.query(
       `SELECT a.*, b.booking_number, b.customer_name, b.customer_mobile, b.customer_email,
               b.package_name, b.final_amount, b.paid_amount, b.number_of_pilgrims,
-              hg.name AS group_name, hg.departure_date
+              hg.group_name, hg.departure_date
        FROM agreements a
        LEFT JOIN bookings b ON b.id = a.booking_id
        LEFT JOIN hajj_groups hg ON hg.id = b.group_id
@@ -565,7 +566,7 @@ router.post("/:id/resend-email", requireAdmin, async (req: any, res) => {
     const agRes = await pool.query(
       `SELECT a.*, b.booking_number, b.customer_name, b.customer_mobile, b.customer_email,
               b.package_name, b.final_amount, b.paid_amount, b.number_of_pilgrims,
-              hg.name AS group_name, hg.departure_date
+              hg.group_name, hg.departure_date
        FROM agreements a LEFT JOIN bookings b ON b.id=a.booking_id
        LEFT JOIN hajj_groups hg ON hg.id=b.group_id
        WHERE a.id=$1`, [id]
@@ -615,7 +616,7 @@ router.post("/:id/resend-whatsapp", requireAdmin, async (req: any, res) => {
     const agRes = await pool.query(
       `SELECT a.*, b.booking_number, b.customer_name, b.customer_mobile,
               b.package_name, b.final_amount, b.paid_amount, b.number_of_pilgrims,
-              hg.name AS group_name, hg.departure_date, b.customer_email
+              hg.group_name, hg.departure_date, b.customer_email
        FROM agreements a LEFT JOIN bookings b ON b.id=a.booking_id
        LEFT JOIN hajj_groups hg ON hg.id=b.group_id
        WHERE a.id=$1`, [id]

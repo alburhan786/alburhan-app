@@ -928,7 +928,7 @@ router.get("/:id/notification-logs", requireAdmin as any, async (req: Authentica
     const { pool: pgPool } = await import("@workspace/db");
     const result = await pgPool.query(
       `SELECT id, channel, event_type, status, recipient, message, provider_name,
-              provider_response, sent_at, retry_count, error_message
+              provider_response, sent_at, retry_count, error_code
        FROM notification_logs
        WHERE booking_id = $1
        ORDER BY sent_at DESC

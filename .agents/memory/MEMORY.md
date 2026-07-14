@@ -27,3 +27,6 @@
 - [Notification packageName bug](notification-packagename-bug.md) — every triggerWorkflow() call must include packageName or messages say "your package"
 - [VPS deploy requires pnpm build first](vps-deploy-build-step.md) — self-update downloads dist/index.cjs; must run `pnpm --filter @workspace/api-server run build` before self-update or VPS gets stale bundle (same byte count = no change)
 - [Agreements module pool import](agreements-module.md) — pool import must be @workspace/db (not ../lib/db.js); deploy key is hardcoded "alburhan-migrate-2026"; migrate route is /api/migrate/self-update not /api/self-update
+- [Agreements schema column types](agreements-schema-types.md) — booking_id/customer_id must be TEXT (not UUID); hajj_groups column is group_name not name; notification_logs error column is error_code not error_message
+- [SMTP VPS injection](smtp-vps-injection.md) — SMTP_HOST/PORT/USER/PASS/FROM added to injectKeys in build.ts; migration auto-inserts smtp row in api_settings on first run; getCachedConfig falls back to env vars if DB decrypt fails (safe)
+- [Agreement signing API fields](agreement-signing-api.md) — sign endpoint uses signatureData (not signature); termsAccepted must include all 13 clause IDs as {id:true}; signing OTP stored in agreements.signing_otp; customer route is /api/agreements/my/:id/sign

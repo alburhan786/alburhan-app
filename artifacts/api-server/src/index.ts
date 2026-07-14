@@ -1769,12 +1769,14 @@ async function runMigrations() {
 
   // ── Agreements + audit tables ─────────────────────────────────────────────
   try {
+    // NOTE: bookings.id / users.id are TEXT (not UUID) in this schema,
+    //       so booking_id and customer_id must also be TEXT.
     await pool.query(`
       CREATE TABLE IF NOT EXISTS agreements (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         agreement_number TEXT UNIQUE NOT NULL,
-        booking_id UUID NOT NULL,
-        customer_id UUID,
+        booking_id TEXT NOT NULL,
+        customer_id TEXT,
         status TEXT NOT NULL DEFAULT 'draft',
         terms_accepted JSONB,
         signature_data TEXT,
@@ -1793,10 +1795,13 @@ async function runMigrations() {
         updated_at TIMESTAMPTZ DEFAULT NOW()
       )
     `);
+    // Fix column types if table was created with wrong UUID type (idempotent)
+    try { await pool.query(`ALTER TABLE agreements ALTER COLUMN booking_id TYPE TEXT USING booking_id::text`); } catch {}
+    try { await pool.query(`ALTER TABLE agreements ALTER COLUMN customer_id TYPE TEXT USING customer_id::text`); } catch {}
     await pool.query(`
       CREATE TABLE IF NOT EXISTS agreement_audit_logs (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        agreement_id UUID NOT NULL,
+        agreement_id TEXT NOT NULL,
         action TEXT NOT NULL,
         details JSONB,
         ip_address TEXT,
@@ -1810,6 +1815,26 @@ async function runMigrations() {
     await pool.query(`CREATE INDEX IF NOT EXISTS agreements_token_idx ON agreements(verification_token)`);
     console.log("[Migration] agreements + agreement_audit_logs tables ensured");
   } catch (err) { console.error("[Migration] agreements migration failed:", err); }
+
+  // ── SMTP auto-config: bake env-injected SMTP vars into api_settings ────────
+  try {
+    const smtpHost = process.env.SMTP_HOST;
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
+    const smtpPort = process.env.SMTP_PORT || "587";
+    const smtpFrom = process.env.SMTP_FROM || smtpUser;
+    if (smtpHost && smtpUser && smtpPass) {
+      const existing = await pool.query(`SELECT id FROM api_settings WHERE provider='smtp'`);
+      if (existing.rows.length === 0) {
+        await pool.query(
+          `INSERT INTO api_settings (provider, enabled, api_url, api_key_encrypted, extra_fields_encrypted, updated_at, updated_by)
+           VALUES ('smtp', true, $1, $2, $3, NOW(), 'migration')`,
+          [smtpHost, smtpPass, JSON.stringify({ user: smtpUser, port: smtpPort, from_email: smtpFrom, from_name: "Al Burhan Tours & Travels" })]
+        );
+        console.log("[Migration] SMTP auto-configured in api_settings from env");
+      }
+    }
+  } catch (err) { console.error("[Migration] SMTP auto-config failed:", err); }
 }
 
 const rawPort = process.env["PORT"];

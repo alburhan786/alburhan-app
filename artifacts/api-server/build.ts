@@ -81,6 +81,12 @@ async function buildAll() {
     "BOTBEE_BUSINESS_ID",
     "RAZORPAY_KEY_ID",
     "RAZORPAY_SECRET",
+    // SMTP — baked in so VPS doesn't need .env for email
+    "SMTP_HOST",
+    "SMTP_PORT",
+    "SMTP_USER",
+    "SMTP_PASS",
+    "SMTP_FROM",
   ];
   for (const key of injectKeys) {
     const val = process.env[key];
