@@ -1,0 +1,195 @@
+URGENT PRODUCTION FIX – PAYMENT CONFIRMATION, WHATSAPP & EMAIL AUTOMATION
+
+There is a critical production issue that must be fixed immediately.
+
+CURRENT ISSUE
+After a customer successfully completes payment through Razorpay:
+
+• Booking is confirmed.
+• Invoice is generated.
+• Booking Confirmation PDF is generated.
+• BUT WhatsApp confirmation is NOT sent.
+• Email confirmation is NOT sent.
+
+EXPECTED WORKFLOW
+
+1. Customer completes Razorpay payment successfully.
+2. Verify payment status = CAPTURED/SUCCESS.
+3. Update booking status to CONFIRMED.
+4. Generate Booking Confirmation PDF.
+5. Generate Invoice PDF.
+6. Save both PDFs.
+7. Send Booking Confirmation via WhatsApp.
+8. Send Invoice via WhatsApp (attach PDF if supported, otherwise include secure download links).
+9. Send Booking Confirmation via Email.
+10. Attach Booking Confirmation PDF.
+11. Attach Invoice PDF.
+12. Update notification logs.
+13. Show notification status in Admin Panel.
+
+WHATSAPP SETTINGS
+
+Use ONLY approved WhatsApp Template.
+
+Template ID:
+333473
+
+Trigger ONLY after:
+
+• Razorpay payment successful
+• Booking confirmed
+• Invoice generated successfully
+• Booking Confirmation PDF generated successfully
+
+Message Variables
+
+{{customerName}}
+{{bookingId}}
+{{packageName}}
+
+DO NOT display payment amount in the WhatsApp message.
+
+Example Message
+
+Assalamu Alaikum Dear {{customerName}},
+
+Your booking with Al Burhan Tours & Travels has been confirmed.
+
+Booking ID:
+{{bookingId}}
+
+Package:
+{{packageName}}
+
+Your Booking Confirmation and Invoice are attached.
+
+Thank you for choosing Al Burhan Tours & Travels.
+
+Trusted Excellence in Holy Journeys.
+
+EMAIL SETTINGS
+
+Subject
+
+Booking Confirmed – Al Burhan Tours & Travels
+
+Email Body
+
+Dear {{customerName}},
+
+Thank you for choosing Al Burhan Tours & Travels.
+
+Your booking has been confirmed successfully.
+
+Booking ID:
+{{bookingId}}
+
+Package:
+{{packageName}}
+
+Payment Status:
+Paid
+
+Please find attached:
+
+• Booking Confirmation PDF
+• Invoice PDF
+
+For assistance contact us anytime.
+
+Regards,
+Al Burhan Tours & Travels
+
+BACKEND FIXES
+
+Check and fix the complete notification workflow.
+
+Verify:
+
+• Razorpay payment webhook
+• Payment success callback
+• Booking confirmation event
+• Invoice generation service
+• Booking Confirmation PDF generation
+• WhatsApp API integration
+• BotBee API configuration
+• Email SMTP configuration
+• Notification queue
+• Background jobs
+• Retry queue
+• Error handling
+• Transaction rollback if notification fails
+
+DATABASE LOGGING
+
+Save:
+
+Payment Time
+
+Booking Confirmed Time
+
+Invoice Generated
+
+Booking PDF Generated
+
+WhatsApp Status
+
+Email Status
+
+Retry Count
+
+Error Message
+
+Delivered Time
+
+ADMIN PANEL
+
+Add Notification Status:
+
+✓ WhatsApp Sent
+
+✓ Email Sent
+
+✓ Invoice Generated
+
+✓ Booking PDF Generated
+
+✓ Last Delivery Time
+
+✓ Retry Button
+
+✓ Resend WhatsApp
+
+✓ Resend Email
+
+✓ Notification History
+
+AUTO RETRY
+
+If WhatsApp fails:
+
+Retry automatically 3 times.
+
+If Email fails:
+
+Retry automatically 3 times.
+
+Store failure reason in database.
+
+FINAL TEST
+
+Perform a complete end-to-end production test.
+
+Verify:
+
+✓ Payment successful
+✓ Booking confirmed
+✓ Invoice generated
+✓ Booking Confirmation PDF generated
+✓ WhatsApp delivered
+✓ Email delivered
+✓ Attachments available
+✓ Admin logs updated
+✓ Customer dashboard updated
+
+Do not mark the task complete until the full payment-to-notification workflow has been tested successfully and both WhatsApp and Email confirmations are working automatically.

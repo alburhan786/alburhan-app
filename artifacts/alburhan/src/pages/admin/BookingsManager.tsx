@@ -974,6 +974,8 @@ function BookingDetailModal({ booking, open, onClose }: { booking: Booking | nul
   const [updatingJourneyStatus, setUpdatingJourneyStatus] = useState(false);
   const [confirmChannels, setConfirmChannels] = useState<ConfirmChannel[]>([]);
   const [resending, setResending] = useState(false);
+  const [resendingWa, setResendingWa] = useState(false);
+  const [resendingEmail, setResendingEmail] = useState(false);
 
   const fetchConfirmStatus = async (id: string) => {
     try {
@@ -996,6 +998,41 @@ function BookingDetailModal({ booking, open, onClose }: { booking: Booking | nul
       toast({ title: "Resend failed", description: err.message, variant: "destructive" });
     } finally {
       setResending(false);
+    }
+  };
+
+  const handleResendWhatsApp = async () => {
+    if (!booking) return;
+    setResendingWa(true);
+    try {
+      const res = await fetch(`${API}/api/bookings/${booking.id}/resend-whatsapp`, {
+        method: "POST", credentials: "include",
+      });
+      const data = await res.json();
+      toast({ title: "WhatsApp sending", description: data.message || "Template 333473 sent to customer." });
+      setTimeout(() => fetchConfirmStatus(booking.id), 6000);
+    } catch (err: any) {
+      toast({ title: "WhatsApp failed", description: err.message, variant: "destructive" });
+    } finally {
+      setResendingWa(false);
+    }
+  };
+
+  const handleResendEmail = async () => {
+    if (!booking) return;
+    setResendingEmail(true);
+    try {
+      const res = await fetch(`${API}/api/bookings/${booking.id}/resend-email`, {
+        method: "POST", credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Email failed");
+      toast({ title: "Email sending", description: data.message || "Booking confirmation email sent." });
+      setTimeout(() => fetchConfirmStatus(booking.id), 6000);
+    } catch (err: any) {
+      toast({ title: "Email failed", description: err.message, variant: "destructive" });
+    } finally {
+      setResendingEmail(false);
     }
   };
 
@@ -1189,17 +1226,36 @@ function BookingDetailModal({ booking, open, onClose }: { booking: Booking | nul
           {(booking.status === "approved" || booking.status === "confirmed" || booking.status === "partially_paid") && (
             <div>
               <div className="flex items-center justify-between mb-2">
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase">Booking Confirmation Notifications</h4>
-                <button
-                  onClick={handleResendConfirmation}
-                  disabled={resending}
-                  className="text-xs px-3 py-1 rounded-md bg-[#0B3D2E] text-white hover:bg-[#0d4f3c] disabled:opacity-50 flex items-center gap-1"
-                >
-                  {resending ? "Sending..." : "↻ Resend All"}
-                </button>
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase">Notification Status</h4>
+                <div className="flex gap-1.5 flex-wrap justify-end">
+                  <button
+                    onClick={handleResendWhatsApp}
+                    disabled={resendingWa}
+                    title="Resend booking confirmation via WhatsApp (template 333473)"
+                    className="text-xs px-2.5 py-1 rounded-md bg-green-700 text-white hover:bg-green-800 disabled:opacity-50 flex items-center gap-1"
+                  >
+                    {resendingWa ? "…" : "💬 WhatsApp"}
+                  </button>
+                  <button
+                    onClick={handleResendEmail}
+                    disabled={resendingEmail}
+                    title="Resend booking confirmation email"
+                    className="text-xs px-2.5 py-1 rounded-md bg-blue-700 text-white hover:bg-blue-800 disabled:opacity-50 flex items-center gap-1"
+                  >
+                    {resendingEmail ? "…" : "📧 Email"}
+                  </button>
+                  <button
+                    onClick={handleResendConfirmation}
+                    disabled={resending}
+                    title="Resend all channels (WhatsApp, SMS, Email, Dashboard)"
+                    className="text-xs px-2.5 py-1 rounded-md bg-[#0B3D2E] text-white hover:bg-[#0d4f3c] disabled:opacity-50 flex items-center gap-1"
+                  >
+                    {resending ? "…" : "↻ All"}
+                  </button>
+                </div>
               </div>
               {confirmChannels.length === 0 ? (
-                <p className="text-xs text-muted-foreground italic">No notification records yet.</p>
+                <p className="text-xs text-muted-foreground italic">No notification records yet. Try resending above.</p>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {(["whatsapp","sms","email","dashboard"] as const).map(ch => {
@@ -1213,7 +1269,7 @@ function BookingDetailModal({ booking, open, onClose }: { booking: Booking | nul
                     );
                     const sent = rec.status === "sent";
                     return (
-                      <span key={ch} title={rec.error_message || undefined} className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium ${sent ? "bg-green-100 text-green-800" : "bg-red-100 text-red-700"}`}>
+                      <span key={ch} title={rec.error_message || (sent ? `Sent at ${rec.sent_at ? new Date(rec.sent_at).toLocaleString() : "?"}` : undefined)} className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium cursor-help ${sent ? "bg-green-100 text-green-800" : "bg-red-100 text-red-700"}`}>
                         {icons[ch]} {sent ? "✓" : "✗"} {labels[ch]}
                         {!sent && rec.error_message && <span className="max-w-[120px] truncate opacity-75">— {rec.error_message}</span>}
                       </span>

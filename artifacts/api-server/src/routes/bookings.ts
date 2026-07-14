@@ -723,6 +723,66 @@ router.post("/:id/resend-confirmation", requireAdmin as any, requirePermission("
   })();
 });
 
+// POST /:id/resend-whatsapp — resend template 333473 to customer
+router.post("/:id/resend-whatsapp", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  const rows = await db.select().from(bookingsTable).where(eq(bookingsTable.id, req.params.id)).limit(1);
+  if (!rows[0]) { res.status(404).json({ message: "Booking not found" }); return; }
+  const b = rows[0];
+  res.json({ message: "Resending WhatsApp...", bookingNumber: b.bookingNumber });
+  (async () => {
+    try {
+      const { sendConfirmationTemplate } = await import("../lib/botbee.js");
+      const { sendWhatsApp } = await import("../lib/botbee.js");
+      const siteBase = "https://alburhantravels.com";
+      const invoiceLink = b.bookingNumber ? `${siteBase}/invoice/${b.bookingNumber}` : siteBase;
+      const bookingRef = b.bookingNumber || "-";
+      const pkg = (b as any).packageName || "Hajj / Umrah Package";
+      const tplResult = await sendConfirmationTemplate(
+        b.customerMobile,
+        { customerName: b.customerName, packageName: pkg, bookingRef, attachmentLink: invoiceLink },
+        { eventType: "payment_received", bookingId: b.id, customerId: b.customerId ?? undefined },
+      );
+      if (!tplResult.ok) {
+        const msg = `Assalamu Alaikum Dear ${b.customerName},\n\nYour booking with Al Burhan Tours & Travels has been confirmed.\n\nBooking ID: ${bookingRef}\n\nPackage: ${pkg}\n\nThank you for choosing Al Burhan Tours & Travels.\n\nTrusted Excellence in Holy Journeys.`;
+        await sendWhatsApp(b.customerMobile, msg);
+      }
+      await pool.query(
+        `INSERT INTO notification_logs (id, event_type, channel, recipient, customer_name, booking_id, booking_number, message, status, sent_at, retry_count)
+         VALUES ($1,'payment_received','whatsapp',$2,$3,$4,$5,$6,$7,NOW(),0)`,
+        [(await import("crypto")).randomUUID(), b.customerMobile, b.customerName, b.id, b.bookingNumber,
+         `Template 333473 resend | ref=${bookingRef}`, tplResult.ok ? "sent" : "failed"]
+      ).catch(() => {});
+    } catch (err) {
+      console.error("[resend-whatsapp] error:", err);
+    }
+  })();
+});
+
+// POST /:id/resend-email — resend booking confirmation email
+router.post("/:id/resend-email", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  const rows = await db.select().from(bookingsTable).where(eq(bookingsTable.id, req.params.id)).limit(1);
+  if (!rows[0]) { res.status(404).json({ message: "Booking not found" }); return; }
+  const b = rows[0];
+  if (!b.customerEmail) { res.status(400).json({ message: "No email address on file for this customer" }); return; }
+  res.json({ message: "Resending email...", to: b.customerEmail });
+  (async () => {
+    try {
+      const { sendEmail } = await import("../lib/notifications.js");
+      const pkg = (b as any).packageName || "Hajj / Umrah Package";
+      const body = `Dear ${b.customerName},<br><br>Thank you for choosing Al Burhan Tours &amp; Travels.<br><br>Your booking has been confirmed successfully.<br><br><strong>Booking ID:</strong> ${b.bookingNumber}<br><br><strong>Package:</strong> ${pkg}<br><br><strong>Payment Status:</strong> Paid<br><br>Please find attached your Booking Confirmation PDF and Invoice PDF.<br><br>For assistance contact us anytime.<br><br>Regards,<br>Al Burhan Tours &amp; Travels`;
+      const result = await sendEmail(b.customerEmail, `Booking Confirmed – Al Burhan Tours & Travels`, body);
+      await pool.query(
+        `INSERT INTO notification_logs (id, event_type, channel, recipient, customer_name, booking_id, booking_number, message, status, sent_at, retry_count)
+         VALUES ($1,'payment_received','email',$2,$3,$4,$5,$6,$7,NOW(),0)`,
+        [(await import("crypto")).randomUUID(), b.customerEmail, b.customerName, b.id, b.bookingNumber,
+         `Email resend to ${b.customerEmail}`, result.ok ? "sent" : "failed"]
+      ).catch(() => {});
+    } catch (err) {
+      console.error("[resend-email] error:", err);
+    }
+  })();
+});
+
 router.post("/:id/reject", requireAdmin as any, requirePermission("bookings", "edit") as any, async (req: AuthenticatedRequest, res) => {
   const parsed = RejectBookingBody.safeParse(req.body);
   const reason = parsed.success ? parsed.data.reason : undefined;

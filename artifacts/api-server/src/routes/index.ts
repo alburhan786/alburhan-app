@@ -59,7 +59,7 @@ import { requireAdmin } from "../lib/auth.js";
 const router: IRouter = Router();
 
 // ── Build fingerprint — confirms which bundle is running on VPS (no auth needed) ──
-const BUILD_STAMP = "2026-07-14-v20.2";
+const BUILD_STAMP = "2026-07-14-v20.3";
 router.get("/version", (_req, res) => {
   res.json({
     build: BUILD_STAMP,

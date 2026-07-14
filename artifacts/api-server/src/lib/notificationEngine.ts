@@ -209,11 +209,7 @@ export function buildDefaultMessage(eventType: EventType, ctx: NotificationConte
     case "booking_completed":
       return `Assalamu Alaikum ${name},\n\nAlhamdulillah! Your journey ${booking} (${pkg}) is complete. May Allah accept your Ibadah.\n\nWe hope to serve you again.\nAl Burhan Tours & Travels\n+91 9893225590`;
     case "payment_received": {
-      const totalPaid = ctx.paidAmount ?? ctx.amount ?? 0;
-      const bal = ctx.balanceAmount ?? 0;
-      const flightLine = ctx.flightNumber ? `\n✈️ Flight: ${ctx.flightNumber}${ctx.airline ? ` (${ctx.airline})` : ""}${ctx.departureDate ? ` — ${ctx.departureDate}` : ""}` : "";
-      const balanceLine = Number(bal) > 0 ? `Balance Due: ₹${formatINR(Number(bal))}` : "Status: Fully Paid ✅";
-      return `Assalamu Alaikum ${name},\n\n✅ *Payment Received — JazakAllah Khair!*\n\n📋 Booking: ${booking}\n📦 Package: ${pkg}${flightLine}\n\n💰 Amount Paid: ₹${formatINR(ctx.amount || 0)}\n💳 Total Paid: ₹${formatINR(Number(totalPaid))}\n${balanceLine}\n\n📄 View Invoice: ${invUrl}\n\nYour invoice & receipt are attached.\nFor queries: +91 9893225590\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
+      return `Assalamu Alaikum Dear ${name},\n\nYour booking with Al Burhan Tours & Travels has been confirmed.\n\nBooking ID: ${ctx.bookingNumber || "-"}\n\nPackage: ${pkg}\n\nYour Booking Confirmation and Invoice are attached.\n\nThank you for choosing Al Burhan Tours & Travels.\n\nTrusted Excellence in Holy Journeys.`;
     }
     case "partial_payment":
       return `Assalamu Alaikum ${name},\n\n✅ *Partial Payment Received — JazakAllah Khair!*\n\n📋 Booking: ${booking}\n📦 Package: ${pkg}\n\n💰 Amount Paid: ₹${formatINR(ctx.paidAmount || ctx.amount || 0)}\n💳 Balance Due: ₹${formatINR(ctx.balanceAmount || 0)}\n\n📄 View Invoice: ${invUrl}\n\nFor queries: +91 9893225590\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
@@ -292,7 +288,7 @@ function buildEmailSubject(eventType: EventType, ctx: NotificationContext): stri
     booking_cancelled: `Booking Cancelled ${booking} – Al Burhan`,
     booking_rejected: `Booking Rejected ${booking} – Al Burhan`,
     booking_completed: `Journey Complete ${booking} – Al Burhan`,
-    payment_received: `Payment Received – Booking ${booking}`,
+    payment_received: `Booking Confirmed – Al Burhan Tours & Travels`,
     partial_payment: `Partial Payment Received – Booking ${booking}`,
     payment_due: `Payment Reminder – Booking ${booking}`,
     payment_failed: `Payment Failed – Booking ${booking}`,
@@ -495,14 +491,16 @@ async function sendWhatsAppForEvent(eventType: EventType, ctx: NotificationConte
         console.log(`[notificationEngine] Confirmation template 333473 sent for ${eventType} → ${ctx.customerMobile} ref=${bookingRef}`);
         return { status: "sent", providerResponse: tplResult };
       }
-      // Template failed — return immediately. Do NOT fall through to wa_templates:
-      // the built-in wa_templates seeds have wrong variable ordering for these events
-      // and would put booking_id into {{system-cart-total-price}} again.
+      // Template 333473 failed — skip wa_templates (wrong variable ordering) and
+      // fall through to free-form session message as a reliable fallback.
       console.warn(
         `[notificationEngine] Confirmation template 333473 FAILED for ${eventType} (${ctx.customerMobile}) ref=${bookingRef}:`,
         tplResult.errorMessage,
+        "— falling back to free-form session message",
       );
-      return { status: "failed", providerResponse: tplResult };
+      const freeFormMsg = buildDefaultMessage(eventType, ctx);
+      const ffResult = await sendWhatsApp(ctx.customerMobile, freeFormMsg);
+      return { status: ffResult.ok ? "sent" : "failed", providerResponse: ffResult };
     }
 
     // ── Standard path: look up wa_templates table for any other event ─────────
