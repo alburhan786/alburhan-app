@@ -1,0 +1,155 @@
+The deployment is complete, but I will only accept the work after a full production verification.
+
+Please perform a REAL end-to-end production test using a new booking.
+
+Create a fresh test booking.
+
+Then complete the payment.
+
+After payment, verify every one of the following:
+
+1. Booking Status
+✔ Booking Submitted
+✔ Payment Received
+✔ Invoice Generated
+✔ Invoice Status = PAID
+
+2. Dashboard
+Before payment:
+- No invoice card
+- No invoice number
+- No download button
+
+After payment:
+- Invoice card appears automatically
+- Invoice Number generated
+- Download PDF works
+- View Invoice works
+- Share Invoice works
+- Payment status = Paid
+
+3. Invoice
+Generate Tax Invoice only after payment.
+
+Verify:
+- Invoice Number
+- GST
+- Customer Name
+- Package
+- Amount
+- QR Code
+- Company Details
+- Payment Status
+- PDF download works
+
+4. Email
+Send automatically.
+
+Verify:
+- Email delivered
+- PDF attached
+- Subject correct
+- Download button works
+
+5. SMS
+Send automatically.
+
+Verify:
+- SMS delivered
+- Invoice URL included
+- Booking Number included
+- Payment amount included
+
+6. WhatsApp (BotBee)
+Send automatically.
+
+Verify:
+- Approved template used
+- Invoice PDF attached
+- Invoice number shown
+- Booking number shown
+- Payment amount shown
+- Download button works
+
+7. Notification Logs
+Verify all notifications are logged.
+
+Email = SUCCESS
+SMS = SUCCESS
+WhatsApp = SUCCESS
+
+Retry failed notifications automatically.
+
+8. Database
+Confirm these fields are saved:
+
+invoice_number
+
+invoice_pdf_url
+
+invoice_status
+
+payment_status
+
+payment_date
+
+payment_reference
+
+notification_logs
+
+9. Customer Portal
+
+Invoice should NEVER appear before payment.
+
+Invoice should ALWAYS appear immediately after payment.
+
+10. Admin Panel
+
+Approving offline payment must:
+
+Generate invoice
+
+Generate PDF
+
+Upload PDF
+
+Send Email
+
+Send SMS
+
+Send WhatsApp
+
+Refresh customer dashboard automatically.
+
+11. Production Test
+
+Create a brand new booking.
+
+Pay ₹1.
+
+Do NOT use existing bookings.
+
+Show me:
+
+Booking Number
+
+Invoice Number
+
+Email delivery result
+
+SMS delivery result
+
+WhatsApp delivery result
+
+Invoice PDF URL
+
+Notification Logs
+
+Finally produce a checklist:
+
+PASS / FAIL
+
+for every feature.
+
+If any single item fails, continue fixing the code until every item passes.
+Do not stop after deployment. Only finish when the complete production workflow is working from booking to payment to invoice generation to PDF download to Email, SMS, WhatsApp, and Dashboard update.
