@@ -9,6 +9,7 @@ interface Customer {
   id: string;
   name: string;
   email?: string;
+  mobile?: string;
   phone?: string;
   createdAt?: string;
   totalBookings?: number;
@@ -31,6 +32,7 @@ export default function CustomerManager() {
     !search ||
     c.name?.toLowerCase().includes(search.toLowerCase()) ||
     c.email?.toLowerCase().includes(search.toLowerCase()) ||
+    c.mobile?.includes(search) ||
     c.phone?.includes(search)
   );
 
@@ -91,7 +93,7 @@ export default function CustomerManager() {
                   <td className="px-5 py-3 text-muted-foreground">{i + 1}</td>
                   <td className="px-5 py-3 font-semibold text-foreground">{c.name}</td>
                   <td className="px-5 py-3 text-muted-foreground">{c.email || "—"}</td>
-                  <td className="px-5 py-3 text-muted-foreground">{c.phone || "—"}</td>
+                  <td className="px-5 py-3 text-muted-foreground">{c.mobile || c.phone || "—"}</td>
                   <td className="px-5 py-3">
                     <span className="bg-green-100 text-green-800 px-2.5 py-0.5 rounded-full font-semibold text-xs">
                       {c.totalBookings ?? 0}

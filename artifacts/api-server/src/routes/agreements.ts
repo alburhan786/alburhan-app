@@ -51,7 +51,8 @@ const RICH_SELECT = `
          hg.group_name, hg.departure_date,
          u.name AS user_name, u.email AS user_email,
          u.blood_group, u.emergency_contact_name, u.emergency_contact_mobile,
-         cp.passport_number, cp.date_of_birth, cp.gender, cp.aadhaar, cp.pan
+         cp.passport_number, cp.date_of_birth, cp.gender, cp.aadhar_number AS aadhaar, cp.pan_number AS pan,
+         cp.photo_url, cp.aadhar_image_url, cp.pan_image_url, cp.passport_image_url
   FROM agreements a
   LEFT JOIN bookings b  ON b.id  = a.booking_id
   LEFT JOIN hajj_groups hg ON hg.id = b.group_id

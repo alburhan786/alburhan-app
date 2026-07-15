@@ -637,13 +637,17 @@ export default function AgreementCenter() {
 
       {/* ── Hotel & Flight Details Modal ── */}
       {detailsModal && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16 }}>
-          <div style={{ background: "white", borderRadius: 12, width: "100%", maxWidth: 560, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 8px 40px rgba(0,0,0,0.25)" }}>
+        <div onClick={() => setDetailsModal(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: "white", borderRadius: 12, width: "100%", maxWidth: 560, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 8px 40px rgba(0,0,0,0.25)" }}>
 
-            <div style={{ background: G, borderRadius: "12px 12px 0 0", padding: "18px 22px" }}>
+            <div style={{ background: G, borderRadius: "12px 12px 0 0", padding: "18px 22px", position: "relative" }}>
               <div style={{ color: GOLD, fontSize: 10, letterSpacing: 2 }}>AGREEMENT DETAILS</div>
               <div style={{ color: "white", fontWeight: 700, fontSize: 16, marginTop: 2 }}>Edit Hotel & Flight Details</div>
               <div style={{ color: "#a8d5be", fontSize: 12, marginTop: 2 }}>These details appear on the printed PDF agreement</div>
+              <button onClick={() => setDetailsModal(null)}
+                style={{ position: "absolute", top: 12, right: 14, background: "transparent", border: "none", color: "#a8d5be", fontSize: 22, cursor: "pointer", lineHeight: 1 }}>
+                ×
+              </button>
             </div>
 
             <div style={{ padding: "22px 24px" }}>
