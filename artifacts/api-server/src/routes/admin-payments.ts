@@ -198,6 +198,16 @@ router.post("/:id/payments", requireAdmin as RequestHandler, async (req: Authent
       if (!PAYABLE_STATUSES.includes(booking.status as BookingStatus))
         throw Object.assign(new Error(`Cannot record payment for a ${booking.status} booking`), { statusCode: 422 });
 
+      const bookingFinal = Number(booking.finalAmount || 0);
+      const bookingPaid  = Number(booking.paidAmount  || 0);
+      const bookingRemaining = bookingFinal - bookingPaid;
+      if (bookingFinal > 0 && Math.round(Number(amount) * 100) > Math.round(bookingRemaining * 100) + 1) {
+        throw Object.assign(
+          new Error(`Amount ₹${Number(amount).toLocaleString("en-IN")} exceeds remaining balance ₹${bookingRemaining.toLocaleString("en-IN")}`),
+          { statusCode: 422 }
+        );
+      }
+
       await ensureOnlineBaselineSeeded(tx, bookingId, booking);
 
       const txnId = crypto.randomUUID();

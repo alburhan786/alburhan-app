@@ -655,7 +655,7 @@ function AdminPaymentLedger({ booking }: { booking: BookingWithAmounts }) {
   };
 
   const handleSendPaymentLink = async () => {
-    if (!confirm(`Generate a Razorpay payment link and send via WhatsApp to ${booking.customerName} (${booking.customerMobile})?`)) return;
+    if (!confirm(`Generate a Razorpay payment link and send via SMS, WhatsApp & Email to ${booking.customerName} (${booking.customerMobile})?`)) return;
     setSendingLink(true);
     setGeneratedLink(null);
     try {
@@ -663,14 +663,14 @@ function AdminPaymentLedger({ booking }: { booking: BookingWithAmounts }) {
         method: "POST",
         credentials: "include",
       });
-      const data = (await res.json()) as { paymentUrl?: string; waSent?: boolean; message?: string };
+      const data = (await res.json()) as { paymentUrl?: string; linkAmount?: number; remaining?: number; isCapped?: boolean; message?: string };
       if (!res.ok) throw new Error(data.message ?? "Failed to generate payment link");
-      setGeneratedLink({ url: data.paymentUrl ?? "", waSent: !!data.waSent });
+      setGeneratedLink({ url: data.paymentUrl ?? "", waSent: true });
+      const amtStr = data.linkAmount != null ? `₹${data.linkAmount.toLocaleString("en-IN")}` : "";
+      const cappedNote = data.isCapped ? ` (capped at ₹5L; total balance ₹${data.remaining?.toLocaleString("en-IN") ?? ""})` : "";
       toast({
-        title: data.waSent ? "Payment link sent via WhatsApp!" : "Payment link generated",
-        description: data.waSent
-          ? `Link sent to ${booking.customerMobile}`
-          : "WhatsApp not configured — copy the link manually",
+        title: `Payment link sent — ${amtStr}${cappedNote}`,
+        description: `SMS, WhatsApp & Email sent to ${booking.customerMobile}`,
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to generate payment link";

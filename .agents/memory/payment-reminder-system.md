@@ -1,51 +1,31 @@
 ---
 name: Payment reminder system
-description: How automatic payment reminders work — schedule, cron, dedup, DLT variables, admin UI
+description: paymentReminder.ts schema quirks, VPS column names, reminder_logs constraints
 ---
 
-## Schedule logic (getReminderType in paymentReminder.ts)
-Calculates days between today (IST midnight) and due_date (IST midnight):
-- diffDays === 7 → "7d"
-- diffDays === 3 → "3d"
-- diffDays === 1 → "1d"
-- diffDays === 0 → "due"
-- diffDays < 0 AND (-diffDays) % 3 === 0 → "post{N}d" (every 3 days after)
-- Otherwise → null (not a scheduled day, skip)
+## VPS schema quirks
 
-## Dedup
-Checks `reminder_logs` WHERE `notes LIKE 'type:{reminderType}%'` AND `status='sent'` AND `sent_at > NOW() - 20h`.
-Notes format: `type:7d | Balance: ₹50,000`
-No new DB column needed — uses existing `notes TEXT` field.
+- `bookings` table has NO `due_date` column on VPS — use `preferred_departure_date AS due_date` alias in all SELECT queries
+- `reminder_logs.channel` is an enum type `reminder_channel` that only accepts `{sms, whatsapp}` — never insert `'all'`
+- `reminder_logs.id` has NO default — must supply a value (e.g. `rl_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`)
 
-## Cron
-`cron.schedule("30 3 * * *", ...)` = 9:00 AM IST (03:30 UTC daily)
+## Schedule logic
 
-## All DB ops via pool.query()
-The reminderLogsTable Drizzle schema has a pgEnum for channel ("whatsapp","sms") that conflicts with "all" inserts. Use pool.query directly to bypass Drizzle enum validation.
+- admin-triggered: always `reminderType = "manual"`  
+- cron-triggered: 7d/3d/1d/due/post-3d slots based on `preferred_departure_date`
+- dedup via notes field `"type:7d"` or similar; 9 AM IST daily cron
 
-## SMS DLT variables for balance_reminder
-notificationEngine.ts SMS handler has explicit case for balance_reminder:
-- var1 = customerName (ctx.customerName)
-- var2 = pending balance as integer string (Math.round(ctx.balanceAmount))
-- Sender ID configured in fast2sms API settings (should be ABURHA)
+## Notifications
 
-## API routes (all under /api/payments/reminders/)
-- GET /status → { enabled }
-- POST /enable → enable cron
-- POST /disable → disable cron
-- POST /run-now → fire runDailyReminders() async
-- GET /stats → full stats: total, lastSent, eligibleCount, recentLogs, upcomingDueDates, schedule
-- POST /:bookingId/send-reminder → per-booking manual send
-- GET /:bookingId/reminder-history → booking's reminder log
+- `fireNotificationEvent("balance_reminder", ...)` fires WhatsApp template `pending_payment_reminder` (id 407648) + SMS DLT + Email
+- SMS uses Fast2SMS DLT (var1=name, var2=balance)
+- WhatsApp template lookup failure is non-fatal; SMS is fallback
+- notification_logs captures all attempts per channel (2 whatsapp entries = ABT template attempt + free-form fallback)
 
-## Admin UI
-Page: /admin/payment-reminders → PaymentReminderSettings.tsx
-- Enable/disable toggle, Send Now button, 4-stat cards
-- Visual schedule, DLT message preview, upcoming due dates table, recent logs
+**Why:** `due_date` was silently failing on VPS because the column doesn't exist in the production schema. This caused the entire booking SELECT to throw, propagating as 500 "Failed to send reminder" masked by enum error in old catch block.
 
-## Customer Dashboard
-Orange "Payment Status" card shown when balance > 0 and status=approved/partially_paid.
-Shows: pending balance, due date, next reminder date (calculated inline).
-Uses (booking as any).dueDate since TypeScript type may not include it yet.
+**How to apply:** Any new query on bookings that needs the payment due date must use `preferred_departure_date` not `due_date`.
 
-**Why:** The schedule must be based on due_date-relative slots (not arbitrary 23h dedup). DLT template expects var1=name, var2=balance (not bookingNumber as default did). Admin needs visibility into who is getting reminded and when.
+## Admin page
+
+`/admin/payment-reminders` — enable/disable, run-now, stats

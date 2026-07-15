@@ -64,12 +64,18 @@ export async function sendReminderForBookingId(
   triggeredBy: "cron" | "admin" | "intraday" = "admin",
   reminderTypeOverride?: string
 ): Promise<{ success: boolean; message: string }> {
-  const res = await pool.query(
-    `SELECT id, booking_number, customer_name, customer_mobile, customer_email, customer_id,
-            package_name, final_amount, paid_amount, due_date, invoice_number, status
-     FROM bookings WHERE id = $1 LIMIT 1`,
-    [bookingId]
-  );
+  let res: Awaited<ReturnType<typeof pool.query>>;
+  try {
+    res = await pool.query(
+      `SELECT id, booking_number, customer_name, customer_mobile, customer_email, customer_id,
+              package_name, final_amount, paid_amount, preferred_departure_date AS due_date, invoice_number, status
+       FROM bookings WHERE id = $1 LIMIT 1`,
+      [bookingId]
+    );
+  } catch (qErr: any) {
+    console.error("[PaymentReminder] booking query failed:", qErr?.message);
+    return { success: false, message: `DB error: ${qErr?.message}` };
+  }
   const booking = res.rows[0];
 
   if (!booking) return { success: false, message: "Booking not found" };
@@ -91,6 +97,23 @@ export async function sendReminderForBookingId(
     || (triggeredBy === "admin" ? "manual"
       : (getReminderType(booking.due_date ? new Date(booking.due_date) : null) || "manual"));
 
+  const notesSent   = `type:${reminderType} | Balance: ${fmt(remaining)}`;
+  const notesFailed = `type:${reminderType} | Error: `;
+
+  const logReminderChannel = async (ch: "sms" | "whatsapp", status: "sent" | "failed", extra?: string) => {
+    try {
+      const id = `rl_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      await pool.query(
+        `INSERT INTO reminder_logs (id, booking_id, channel, status, triggered_by, notes, sent_at)
+         VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+        [id, booking.id, ch, status, triggeredBy, status === "sent" ? notesSent : `${notesFailed}${extra || "unknown"}`]
+      );
+    } catch (logErr: any) {
+      console.error("[PaymentReminder] logReminderChannel failed:", logErr?.message);
+    }
+  };
+
+  let notifyError: string | null = null;
   try {
     await fireNotificationEvent("balance_reminder", {
       customerName:  booking.customer_name  || "Pilgrim",
@@ -103,33 +126,33 @@ export async function sendReminderForBookingId(
       invoiceNumber:  booking.invoice_number ?? undefined,
       amount:         finalAmount,
       balanceAmount:  remaining,
+      paidAmount:     finalAmount - remaining,
       description:    payLink,
     });
-
-    await pool.query(
-      `INSERT INTO reminder_logs (booking_id, channel, status, triggered_by, notes, sent_at)
-       VALUES ($1, 'all', 'sent', $2, $3, NOW())`,
-      [booking.id, triggeredBy, `type:${reminderType} | Balance: ${fmt(remaining)}`]
-    );
-
-    return {
-      success: true,
-      message: `Reminder sent to ${booking.customer_name} (${booking.customer_mobile}) — balance ${fmt(remaining)}`,
-    };
   } catch (err: any) {
-    await pool.query(
-      `INSERT INTO reminder_logs (booking_id, channel, status, triggered_by, notes, sent_at)
-       VALUES ($1, 'all', 'failed', $2, $3, NOW())`,
-      [booking.id, triggeredBy, `type:${reminderType} | Error: ${err?.message || "Unknown"}`]
-    );
-    return { success: false, message: err?.message || "Reminder send failed" };
+    notifyError = err?.message || "Reminder send failed";
+    console.error("[PaymentReminder] fireNotificationEvent error:", notifyError);
   }
+
+  await Promise.all([
+    logReminderChannel("sms",      notifyError ? "failed" : "sent", notifyError ?? undefined),
+    logReminderChannel("whatsapp", notifyError ? "failed" : "sent", notifyError ?? undefined),
+  ]);
+
+  if (notifyError) {
+    return { success: false, message: notifyError };
+  }
+
+  return {
+    success: true,
+    message: `Reminder sent to ${booking.customer_name} (${booking.customer_mobile}) — balance ${fmt(remaining)}`,
+  };
 }
 
 async function getEligibleBookingsWithBalance() {
   const res = await pool.query(`
     SELECT id, booking_number, customer_name, customer_mobile, customer_email,
-           final_amount, paid_amount, due_date
+           final_amount, paid_amount, preferred_departure_date AS due_date
     FROM bookings
     WHERE status = ANY($1)
       AND CAST(COALESCE(final_amount,'0') AS numeric) > 0

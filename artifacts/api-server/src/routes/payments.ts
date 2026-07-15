@@ -8,6 +8,7 @@ import { eq, sql, inArray, and, lt, desc } from "drizzle-orm";
 import { CreatePaymentOrderBody, VerifyPaymentBody } from "@workspace/api-zod";
 import { requireAuth, requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendAdminPaymentAlert, sendWhatsApp, type EmailAttachment } from "../lib/notifications.js";
+import { fireNotificationEvent } from "../lib/notificationEngine.js";
 import { sendPaymentReceipt } from "../services/emailService.js";
 import { triggerWorkflow } from "../lib/workflowEngine.js";
 import { generateInvoicePdfBuffer, generateReceiptPdfBuffer } from "../lib/paymentDocs.js";
@@ -820,6 +821,9 @@ router.get("/analytics", requireAdmin as any, async (req: AuthenticatedRequest, 
   }
 });
 
+// Razorpay maximum payment link amount: ₹5,00,000 per link
+const RAZORPAY_MAX_LINK_AMOUNT = 500000;
+
 router.post("/:bookingId/payment-link", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   const { bookingId } = req.params;
   try {
@@ -840,35 +844,38 @@ router.post("/:bookingId/payment-link", requireAdmin as any, async (req: Authent
     }
 
     const finalAmount = Number(booking.finalAmount);
-    const paidAmount = Number(booking.paidAmount || 0);
-    const remaining = finalAmount - paidAmount;
+    const paidAmount  = Number(booking.paidAmount || 0);
+    const remaining   = finalAmount - paidAmount;
 
     if (remaining <= 0) {
       res.status(400).json({ message: "This booking is already fully paid" });
       return;
     }
 
+    // Cap at Razorpay maximum per link — customer can pay remaining in multiple links
+    const linkAmount  = Math.min(remaining, RAZORPAY_MAX_LINK_AMOUNT);
+    const isCapped    = linkAmount < remaining;
+
     const rz = getRazorpay();
     const expireBy = Math.floor(Date.now() / 1000) + 7 * 24 * 3600;
 
-    const clean = booking.customerMobile.replace(/\D/g, "");
+    const clean   = booking.customerMobile.replace(/\D/g, "");
     const contact = clean.length === 10 ? `91${clean}` : clean;
 
-    // reference_id must be unique per payment link — append a base-36 timestamp
-    // so admins can create multiple links for the same booking (e.g. partial payments).
-    // Format: "<bookingNumber>|<timestamp-base36>" — max ~22 chars, within Razorpay 40-char limit.
+    // reference_id: "<bookingNumber>|<base36-ts>" — unique per link, ≤40 chars (Razorpay limit)
     const referenceId = `${booking.bookingNumber}|${Date.now().toString(36)}`;
 
+    const linkDesc = isCapped
+      ? `Partial payment for ${booking.bookingNumber} (₹${linkAmount.toLocaleString("en-IN")} of ₹${remaining.toLocaleString("en-IN")} balance)`
+      : `Balance payment for booking ${booking.bookingNumber}`;
+
     const linkPayload: RazorpayPaymentLinkPayload = {
-      amount: Math.round(remaining * 100),
-      currency: "INR",
-      description: `Balance payment for booking ${booking.bookingNumber}`,
+      amount:       Math.round(linkAmount * 100),
+      currency:     "INR",
+      description:  linkDesc,
       reference_id: referenceId,
-      customer: {
-        name: booking.customerName,
-        contact,
-      },
-      expire_by: expireBy,
+      customer:     { name: booking.customerName, contact },
+      expire_by:    expireBy,
       reminder_enable: false,
       notify: { sms: false, email: false },
     };
@@ -881,15 +888,37 @@ router.post("/:bookingId/payment-link", requireAdmin as any, async (req: Authent
     }
     const paymentUrl: string = link.short_url;
 
-    const waMsg = `Assalamu Alaikum ${booking.customerName},\n\nYour booking #${booking.bookingNumber} has a balance of ₹${remaining.toLocaleString("en-IN")}.\n\nPlease complete your payment using the secure link below:\n${paymentUrl}\n\nThis link expires in 7 days.\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 9893989786`;
+    // Send via all channels: SMS, WhatsApp (template), Email, Dashboard
+    // fireNotificationEvent("payment_due") handles all channels and logs each in notification_logs
+    // Pass paymentUrl as `description` — notificationEngine uses it as paymentUrl for the WA template
+    const notifCtx = {
+      customerName:   booking.customerName,
+      customerMobile: booking.customerMobile,
+      customerEmail:  booking.customerEmail ?? undefined,
+      customerId:     booking.customerId    ?? undefined,
+      bookingId:      booking.id,
+      bookingNumber:  booking.bookingNumber ?? undefined,
+      packageName:    booking.packageName   ?? undefined,
+      invoiceNumber:  booking.invoiceNumber ?? undefined,
+      amount:         finalAmount,
+      balanceAmount:  remaining,
+      paidAmount:     paidAmount,
+      description:    paymentUrl,
+    };
 
-    const waSent = await sendWhatsApp(booking.customerMobile, waMsg);
+    // Fire notifications — non-fatal, so errors are logged but don't fail the response
+    fireNotificationEvent("payment_due", notifCtx).catch((err: any) => {
+      console.error("[payment-link] notification error:", err?.message);
+    });
+
+    console.log(`[payment-link] Created for ${booking.bookingNumber}: ₹${linkAmount} (of ₹${remaining} remaining), capped=${isCapped}, url=${paymentUrl}`);
 
     res.json({
       paymentUrl,
-      waSent,
+      linkAmount,
       remaining,
-      customerName: booking.customerName,
+      isCapped,
+      customerName:  booking.customerName,
       bookingNumber: booking.bookingNumber,
     });
   } catch (err: any) {
@@ -1270,8 +1299,8 @@ router.post("/:bookingId/send-reminder", requireAdmin as any, async (req: Authen
     }
     res.json({ success: true, message: result.message });
   } catch (err: any) {
-    console.error("[send-reminder]", err?.message);
-    res.status(500).json({ message: "Failed to send reminder" });
+    console.error("[send-reminder]", err?.message, err?.stack);
+    res.status(500).json({ message: err?.message || "Failed to send reminder" });
   }
 });
 

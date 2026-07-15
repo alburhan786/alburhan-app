@@ -148,6 +148,7 @@ app.get("/api/migrate/vps-update.sql", (req, res) => {
 });
 
 // POST /api/migrate/deploy-frontend — VPS pulls latest frontend from dev server and extracts it
+// Add ?async=true to respond immediately (avoids nginx proxy timeout for large tarballs)
 app.post("/api/migrate/deploy-frontend", async (req, res) => {
   const key = (req.query.key || req.body?.key) as string;
   if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
@@ -155,17 +156,19 @@ app.post("/api/migrate/deploy-frontend", async (req, res) => {
   const DEV_URL = "https://57456384-023a-43e4-a60f-e6d8f967d324-00-vmg20t5z0q5l.spock.replit.dev";
   const sourceUrl = ((req.query.source || req.body?.source) as string) ||
     `${DEV_URL}/api/migrate/frontend.tar.gz?key=alburhan-migrate-2026`;
+  const asyncMode = (req.query.async || req.body?.async) === true
+    || req.query.async === "true" || req.body?.async === "true";
 
   // Determine extraction target — strip leading "artifacts/alburhan/dist/public" prefix from tar
   const extractTo = path.resolve(__dirname, "../../..");  // /var/www/alburhan (3 levels up from dist/)
-  try {
-    const response = await fetch(sourceUrl, { signal: AbortSignal.timeout(180_000) });
-    if (!response.ok) return void res.status(502).json({ error: `Download failed: HTTP ${response.status}` });
+
+  const doWork = async () => {
+    const response = await fetch(sourceUrl, { signal: AbortSignal.timeout(300_000) });
+    if (!response.ok) throw new Error(`Download failed: HTTP ${response.status}`);
     const buffer = await response.arrayBuffer();
     const bytes = Buffer.from(buffer);
-    if (bytes.length < 10_000) return void res.status(502).json({ error: `Tarball too small (${bytes.length} bytes)` });
+    if (bytes.length < 10_000) throw new Error(`Tarball too small (${bytes.length} bytes)`);
 
-    // Write tarball to a temp file then extract
     const tmpTar = path.join(os.tmpdir(), `frontend-${Date.now()}.tar.gz`);
     fs.writeFileSync(tmpTar, bytes);
 
@@ -173,12 +176,24 @@ app.post("/api/migrate/deploy-frontend", async (req, res) => {
       const proc = spawn("tar", ["-xzf", tmpTar, "-C", extractTo], { stdio: "pipe" });
       proc.stderr.on("data", (d: Buffer) => console.error("[deploy-frontend tar]", d.toString()));
       proc.on("close", (code: number) => {
-        fs.unlinkSync(tmpTar);
+        try { fs.unlinkSync(tmpTar); } catch {}
         code === 0 ? resolve() : reject(new Error(`tar exited ${code}`));
       });
     });
+    return bytes.length;
+  };
 
-    res.json({ ok: true, bytes: bytes.length, extractedTo: extractTo, source: sourceUrl });
+  if (asyncMode) {
+    res.json({ ok: true, message: "Frontend deploy started in background", source: sourceUrl });
+    doWork()
+      .then(bytes => console.log(`[deploy-frontend] async complete: ${bytes} bytes extracted to ${extractTo}`))
+      .catch(err => console.error("[deploy-frontend] async failed:", err?.message));
+    return;
+  }
+
+  try {
+    const bytes = await doWork();
+    res.json({ ok: true, bytes, extractedTo: extractTo, source: sourceUrl });
   } catch (err: any) {
     if (!res.headersSent) res.status(500).json({ error: err.message });
   }
