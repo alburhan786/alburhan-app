@@ -581,47 +581,21 @@ router.post("/:id/approve", requireAdmin as any, requirePermission("bookings", "
     }
   })();
 
-  // Generate invoice PDF to attach to booking approval notifications
+  // Booking approved notification — invoice is NOT generated here.
+  // Invoice is generated only after payment (online or offline).
   (async () => {
     try {
-      const { generateInvoicePdfBuffer } = await import("../lib/paymentDocs.js");
-      const { upsertInvoiceForBooking } = await import("./invoices.js");
-      const inv = await upsertInvoiceForBooking(updated.id).catch(() => null);
-      const finalAmt = Number(updated.finalAmount || 0);
-      const paidAmt  = Number(updated.paidAmount  || 0);
-      const pdfBuf = await generateInvoicePdfBuffer({
-        bookingNumber:    updated.bookingNumber,
-        customerName:     updated.customerName,
-        customerMobile:   updated.customerMobile,
-        customerEmail:    updated.customerEmail ?? undefined,
-        packageName:      (updated as any).packageName ?? undefined,
-        totalAmount:      finalAmt,
-        finalAmount:      finalAmt,
-        paidAmount:       paidAmt,
-        balanceAmount:    finalAmt - paidAmt,
-        invoiceNumber:    (inv as any)?.invoice_number ?? (updated as any).invoiceNumber ?? undefined,
-      });
-      const attachments = [{ filename: `Invoice-${updated.bookingNumber}.pdf`, content: pdfBuf, contentType: "application/pdf" }];
-      const approvedInvoiceUrl = `https://alburhantravels.com/invoice/${updated.bookingNumber}`;
       await triggerWorkflow("booking_approved", {
-        bookingId:     updated.id,
-        bookingNumber: updated.bookingNumber,
-        customerName:  updated.customerName,
+        bookingId:      updated.id,
+        bookingNumber:  updated.bookingNumber,
+        customerName:   updated.customerName,
         customerMobile: updated.customerMobile,
-        customerEmail: updated.customerEmail ?? undefined,
-        packageName:   (updated as any).packageName ?? undefined,
-        invoiceUrl:    approvedInvoiceUrl,
-        attachments,
+        customerEmail:  updated.customerEmail ?? undefined,
+        packageName:    (updated as any).packageName ?? undefined,
+        invoiceUrl:     `https://alburhantravels.com/invoice/${updated.bookingNumber}`,
       });
-    } catch (pdfErr) {
-      console.error("[approve] PDF generation failed, sending without attachment:", pdfErr);
-      triggerWorkflow("booking_approved", {
-        bookingId: updated.id, bookingNumber: updated.bookingNumber,
-        customerName: updated.customerName, customerMobile: updated.customerMobile,
-        customerEmail: updated.customerEmail ?? undefined,
-        packageName: (updated as any).packageName ?? undefined,
-        invoiceUrl: `https://alburhantravels.com/invoice/${updated.bookingNumber}`,
-      }).catch(() => {});
+    } catch (err) {
+      console.error("[approve] booking_approved notification error:", err);
     }
   })();
 

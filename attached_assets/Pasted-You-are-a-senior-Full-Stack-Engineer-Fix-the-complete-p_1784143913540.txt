@@ -1,0 +1,235 @@
+You are a senior Full Stack Engineer.
+
+Fix the complete payment, invoice and notification workflow for Al Burhan Tours & Travels.
+
+Current Problems:
+
+1. Customer completes payment successfully but receives:
+- No WhatsApp
+- No SMS
+- No Email
+
+2. Dashboard displays Invoice before payment is completed.
+This is incorrect.
+
+Invoice must only be generated after payment success or after offline payment is approved.
+
+3. Dashboard currently shows Invoice No. immediately after booking.
+Hide the invoice section until payment is successful.
+
+Required Workflow
+
+STEP 1
+Customer creates booking.
+
+Status:
+Booking Submitted
+
+Do NOT generate invoice.
+
+Dashboard should display:
+Waiting for Payment.
+
+STEP 2
+Customer pays online through Razorpay
+OR
+Admin approves offline payment.
+
+Immediately after successful payment:
+
+• Generate official Tax Invoice.
+• Generate PDF.
+• Store PDF in Google Cloud Storage.
+• Save invoice number.
+• Save PDF URL.
+• Save invoice status = PAID.
+
+STEP 3
+Update Customer Dashboard automatically.
+
+Hide:
+Pending Invoice
+
+Show:
+Invoice Number
+Invoice Date
+Payment Status = PAID
+Download Invoice PDF button
+View Invoice button
+
+STEP 4
+Automatically send notifications.
+
+EMAIL
+
+Subject:
+Payment Received - Invoice ABT/2026/000017
+
+Attach:
+Invoice PDF
+
+Include:
+Booking Number
+Invoice Number
+Amount Paid
+Package
+Customer Name
+Download Invoice Button
+
+SMS
+
+Send immediately.
+
+Example:
+
+AL BURHAN TOURS
+
+Payment Received.
+
+Invoice:
+ABT/2026/000017
+
+Download:
+https://alburhantravels.com/invoices/ABT2026000017
+
+Thank you.
+
+WHATSAPP
+
+Use approved BotBee template.
+
+Send:
+
+Payment Successful
+
+Customer Name
+
+Booking Number
+
+Invoice Number
+
+Amount Paid
+
+Package
+
+Attach Invoice PDF
+
+Include Download Button
+
+STEP 5
+
+Notification Logs
+
+Save:
+
+Email Status
+
+SMS Status
+
+WhatsApp Status
+
+PDF Generated
+
+PDF Uploaded
+
+Retry if failed.
+
+STEP 6
+
+Fix Dashboard.
+
+Before payment:
+
+Show
+
+Booking Submitted
+
+Pending Payment
+
+Pay Now
+
+NO Invoice
+
+NO Download PDF
+
+After payment:
+
+Show
+
+Invoice Card
+
+Invoice Number
+
+Payment Received
+
+Download PDF
+
+Share Invoice
+
+STEP 7
+
+Fix Admin Panel.
+
+Admin Payment Approval
+
+When approved:
+
+Generate invoice
+
+Generate PDF
+
+Upload PDF
+
+Send Email
+
+Send SMS
+
+Send WhatsApp
+
+Refresh Dashboard
+
+STEP 8
+
+Testing
+
+Perform complete production testing.
+
+Create booking
+
+Complete payment
+
+Verify:
+
+✓ Invoice generated
+
+✓ PDF generated
+
+✓ PDF stored
+
+✓ Dashboard updated
+
+✓ Invoice Number created
+
+✓ Email received
+
+✓ Email contains PDF
+
+✓ SMS received
+
+✓ SMS contains invoice URL
+
+✓ WhatsApp received
+
+✓ WhatsApp contains PDF
+
+✓ Notification logs saved
+
+✓ No pending invoice shown after payment
+
+Deploy backend.
+
+Deploy frontend.
+
+Run production tests until every item passes.
+
+Return a final checklist showing PASS or FAIL for every feature.

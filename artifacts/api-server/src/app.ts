@@ -570,6 +570,30 @@ app.post("/api/migrate/save-invoice-pdfs", async (req, res) => {
   }
 });
 
+// POST /api/migrate/fix-payment-status — fix bookings where paid_amount >= final_amount but status is not confirmed
+app.post("/api/migrate/fix-payment-status", async (req, res) => {
+  const key = req.body?.key as string;
+  if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
+  try {
+    const { pool: sPool } = await import("@workspace/db");
+    const result = await sPool.query(`
+      UPDATE bookings
+      SET status = 'confirmed',
+          journey_status = CASE WHEN journey_status IN ('booking_requested','documents_pending','documents_received','admin_verification','payment_pending') THEN 'payment_received' ELSE journey_status END,
+          updated_at = NOW()
+      WHERE status = 'approved'
+        AND (is_deleted IS NULL OR is_deleted = false)
+        AND CAST(paid_amount AS NUMERIC) >= CAST(final_amount AS NUMERIC)
+        AND final_amount IS NOT NULL
+        AND CAST(final_amount AS NUMERIC) > 0
+      RETURNING booking_number, status, paid_amount, final_amount
+    `);
+    res.json({ ok: true, fixed: result.rowCount, rows: result.rows });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // POST /api/migrate/db-query — run a read-only SELECT query for live debugging
 app.post("/api/migrate/db-query", async (req, res) => {
   const key = req.body?.key as string;

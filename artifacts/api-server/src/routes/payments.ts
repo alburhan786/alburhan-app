@@ -370,10 +370,21 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
 
   console.log("[verify] Payment verified:", razorpayPaymentId, "→ Booking", booking.bookingNumber, newStatus);
 
-  // Always upsert invoice after any payment (partial or full)
-  upsertInvoiceForBooking(bookingId).catch((err) =>
-    console.error("[verify] upsertInvoice failed:", err)
-  );
+  // Await invoice upsert so we have the real invoice number for notifications
+  let finalInvoiceNumber = invoiceNumber;
+  try {
+    const upserted = await upsertInvoiceForBooking(bookingId);
+    if (upserted?.invoice_number) {
+      finalInvoiceNumber = upserted.invoice_number as string;
+      // Persist invoice_number on the booking row if not already set
+      await pool.query(
+        `UPDATE bookings SET invoice_number=$1, updated_at=NOW() WHERE id=$2 AND (invoice_number IS NULL OR invoice_number='')`,
+        [finalInvoiceNumber, bookingId]
+      );
+    }
+  } catch (err) {
+    console.error("[verify] upsertInvoice failed:", err);
+  }
 
   // Advance journey_status to payment_received if still at a pre-payment stage
   pool.query(
@@ -384,12 +395,6 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
   ).then(() => console.log("[verify] journey_status advanced to payment_received for", booking.bookingNumber))
    .catch((err: any) => console.error("[verify] journey_status advance failed:", err?.message));
 
-  const baseUrl = process.env.REPLIT_DEV_DOMAIN
-    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-    : (process.env.SITE_URL || "https://alburhantravels.com");
-
-  const invoiceUrl = invoiceNumber ? `${baseUrl}/invoice/${booking.bookingNumber}` : undefined;
-
   const remainingBalance = Math.max(0, finalAmount - newPaidAmount);
   try {
     await processPaymentSuccessNotifications({
@@ -398,18 +403,24 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
       thisPaymentAmount: thisPayment,
       newPaidAmount,
       remainingBalance,
-      invoiceNumber,
+      invoiceNumber: finalInvoiceNumber,
       paymentRef: razorpayPaymentId,
     });
   } catch (err) {
     console.error("[verify] processPaymentSuccessNotifications failed:", err);
   }
 
+  const siteBase = process.env.REPLIT_DEV_DOMAIN
+    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+    : (process.env.SITE_URL || "https://alburhantravels.com");
+  const invoiceUrl = finalInvoiceNumber ? `${siteBase}/invoice/${booking.bookingNumber}` : null;
+
   res.json({
     success: true,
     invoice: invoiceUrl || null,
     status: newStatus,
     isFullyPaid,
+    invoiceNumber: finalInvoiceNumber || null,
     booking: {
       ...booking,
       totalAmount: booking.totalAmount ? Number(booking.totalAmount) : null,
@@ -417,6 +428,7 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
       finalAmount: booking.finalAmount ? Number(booking.finalAmount) : null,
       paidAmount: newPaidAmount,
       remainingBalance: Math.max(0, finalAmount - newPaidAmount),
+      invoiceNumber: finalInvoiceNumber || booking.invoiceNumber || null,
       createdAt: booking.createdAt?.toISOString?.(),
       updatedAt: booking.updatedAt?.toISOString?.(),
     },

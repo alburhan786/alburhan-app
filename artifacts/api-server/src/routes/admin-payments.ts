@@ -239,16 +239,20 @@ router.post("/:id/payments", requireAdmin as RequestHandler, async (req: Authent
     const newPaidAmount = result.updated?.totalPaid ?? Number(amount);
     const remainingBalance = Math.max(0, Number(result.booking.finalAmount || 0) - newPaidAmount);
 
-    if (isFullyPaid) {
-      upsertInvoiceForBooking(bookingId).catch((err) =>
-        console.error("[admin-payments] upsertInvoice failed:", err)
-      );
+    // Await invoice upsert so we have the real invoice number for notifications
+    let finalInvoiceNumber: string | null | undefined = result.updated?.invoiceNumber;
+    try {
+      const upserted = await upsertInvoiceForBooking(bookingId);
+      if (upserted?.invoice_number) {
+        finalInvoiceNumber = upserted.invoice_number as string;
+        await pool.query(
+          `UPDATE bookings SET invoice_number=$1, updated_at=NOW() WHERE id=$2 AND (invoice_number IS NULL OR invoice_number='')`,
+          [finalInvoiceNumber, bookingId]
+        );
+      }
+    } catch (err) {
+      console.error("[admin-payments] upsertInvoice failed:", err);
     }
-
-    // Always upsert invoice after any payment (partial or full)
-    upsertInvoiceForBooking(bookingId).catch((err) =>
-      console.error("[admin-payments] upsertInvoice (any-payment) failed:", err)
-    );
 
     // Advance journey_status to payment_received if still at a pre-payment stage
     pool.query(
@@ -258,7 +262,7 @@ router.post("/:id/payments", requireAdmin as RequestHandler, async (req: Authent
       [bookingId]
     ).catch((err: any) => console.error("[admin-payments] journey_status advance failed:", err?.message));
 
-    console.log(`[admin-payments] Firing payment notification: booking=${result.booking.bookingNumber} amount=${amount} newStatus=${result.updated?.newStatus} newPaid=${newPaidAmount} remaining=${remainingBalance}`);
+    console.log(`[admin-payments] Firing payment notification: booking=${result.booking.bookingNumber} amount=${amount} newStatus=${result.updated?.newStatus} newPaid=${newPaidAmount} remaining=${remainingBalance} invoice=${finalInvoiceNumber}`);
     processPaymentSuccessNotifications({
       booking: {
         id: bookingId,
@@ -274,7 +278,7 @@ router.post("/:id/payments", requireAdmin as RequestHandler, async (req: Authent
       thisPaymentAmount: Number(amount),
       newPaidAmount,
       remainingBalance,
-      invoiceNumber: result.updated?.invoiceNumber,
+      invoiceNumber: finalInvoiceNumber,
       paymentRef: typeof referenceNumber === "string" ? referenceNumber : undefined,
     }).catch((err) => console.error("[admin-payments] processPaymentSuccessNotifications failed:", err));
 
