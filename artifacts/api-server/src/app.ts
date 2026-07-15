@@ -532,6 +532,79 @@ echo "=== Share the pm2 describe output to diagnose further."
   res.send(script);
 });
 
+// GET /api/migrate/fast2sms-diag — show Fast2SMS key state (masked) on VPS
+app.get("/api/migrate/fast2sms-diag", async (req, res) => {
+  const key = req.query.key as string;
+  if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
+  try {
+    const { getCachedConfig } = await import("./lib/apiSettingsProvider.js");
+    const { isPlaceholderKey } = await import("./lib/keyValidation.js");
+    const cfg = getCachedConfig("fast2sms");
+    const envKey = process.env.FAST2SMS_API_KEY || process.env.FAST2SMS_XXL_API_KEY || "";
+    const dbKey  = cfg.apiKey || "";
+    const mask   = (k: string) => k ? `${k.slice(0, 8)}...${k.slice(-4)} (len=${k.length})` : "NOT_SET";
+    res.json({
+      env_key:      mask(envKey),
+      env_valid:    !isPlaceholderKey(envKey),
+      db_key:       mask(dbKey),
+      db_valid:     !isPlaceholderKey(dbKey),
+      in_sync:      !!envKey && !!dbKey && envKey === dbKey,
+      db_enabled:   cfg.enabled,
+      node_version: process.version,
+      uptime_min:   Math.floor(process.uptime() / 60),
+    });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/migrate/resync-fast2sms — force-write bundle env key into DB (no admin login needed)
+app.post("/api/migrate/resync-fast2sms", async (req, res) => {
+  const key = (req.query.key || req.body?.key) as string;
+  if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
+  try {
+    const { forceResyncFast2SmsKey, getCachedConfig } = await import("./lib/apiSettingsProvider.js");
+    const result = await forceResyncFast2SmsKey();
+    const cfg = getCachedConfig("fast2sms");
+    const { isPlaceholderKey } = await import("./lib/keyValidation.js");
+    res.json({
+      ok: result.ok,
+      reason: result.reason,
+      maskedKey: result.maskedKey,
+      cacheNowHasKey: !!cfg.apiKey && !isPlaceholderKey(cfg.apiKey),
+    });
+  } catch (e: any) {
+    res.status(500).json({ ok: false, reason: e.message });
+  }
+});
+
+// GET /api/migrate/deploy-status — lightweight deploy health check for monitoring
+app.get("/api/migrate/deploy-status", async (req, res) => {
+  const key = req.query.key as string;
+  if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
+  try {
+    const { pool: dPool } = await import("@workspace/db");
+    const dbRes = await dPool.query("SELECT NOW()");
+    const { getCachedConfig } = await import("./lib/apiSettingsProvider.js");
+    const { isPlaceholderKey } = await import("./lib/keyValidation.js");
+    const smsCfg = getCachedConfig("fast2sms");
+    const waCfg  = getCachedConfig("botbee");
+    res.json({
+      ok: true,
+      time: new Date().toISOString(),
+      node: process.version,
+      uptime_min: Math.floor(process.uptime() / 60),
+      pid: process.pid,
+      db: "connected",
+      dbServerTime: dbRes.rows[0].now,
+      sms: !!smsCfg.apiKey && !isPlaceholderKey(smsCfg.apiKey) ? "configured" : "missing",
+      whatsapp: !!waCfg.apiKey ? "configured" : "missing",
+    });
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
 // POST /api/migrate/save-invoice-pdfs — generate + upload PDFs for all invoices missing pdf_path
 app.post("/api/migrate/save-invoice-pdfs", async (req, res) => {
   const key = req.body?.key as string;

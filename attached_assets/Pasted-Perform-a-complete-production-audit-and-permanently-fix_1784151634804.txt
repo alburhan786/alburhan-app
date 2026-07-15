@@ -1,0 +1,117 @@
+Perform a complete production audit and permanently fix all deployment, payment reminder, and WhatsApp messaging issues for Al Burhan Tours & Travels.
+
+DO NOT apply temporary workarounds. Find the root cause and implement permanent fixes.
+
+1. DEPLOYMENT
+- Investigate why frontend deployment times out.
+- Fix nginx timeout issues.
+- Fix VPS deployment pipeline.
+- Fix tar extraction permission errors.
+- Ensure deployment is atomic and rollback-safe.
+- Verify frontend and backend versions always match.
+- Automatically rebuild frontend after code changes.
+- Automatically clear cache after deployment.
+- Verify deployment with health checks.
+
+2. VPS
+- Check file ownership and permissions.
+- Fix extract directory permissions.
+- Ensure deploy user has correct access.
+- Prevent corrupted deployments.
+- Log all deployment failures.
+
+3. FRONTEND
+- Build production assets.
+- Verify latest React build is deployed.
+- Remove stale cached assets.
+- Ensure index.html references the latest asset hashes.
+- Enable cache busting.
+
+4. PAYMENT REMINDER SYSTEM
+- Verify scheduler/cron jobs.
+- Verify reminder dates.
+- Verify customer payment status logic.
+- Prevent duplicate reminders.
+- Add delivery logs and retry mechanism.
+- Allow admin to manually resend reminders.
+
+5. BOTBEE WHATSAPP
+- Verify API credentials.
+- Verify template registration.
+- Check whether "pending_payment_reminder" exists.
+- If missing, automatically fall back to another approved template.
+- Display a clear admin error if a template is unavailable.
+- Log all API requests and responses.
+- Retry failed messages safely.
+
+6. NOTIFICATIONS
+Verify all notification channels:
+- WhatsApp
+- Email
+- SMS
+- RCS
+- Push Notifications
+
+7. ADMIN DASHBOARD
+Create a Deployment Health page showing:
+- Backend Status
+- Frontend Status
+- Database Status
+- WhatsApp Status
+- Email Status
+- SMS Status
+- VPS Status
+- SSL Status
+- Disk Usage
+- Memory Usage
+- CPU Usage
+- Last Deployment
+- Last Backup
+
+8. AGREEMENT SYSTEM
+After deployment issues are fixed, upgrade the Premium Digital Agreement:
+- Exactly 4 pages
+- Professional layout
+- Customer photo
+- QR verification
+- OTP verification
+- Digital signature
+- Audit trail
+- Payment summary
+- Flight details
+- Hotel details
+- Saudi partner details
+- Maktab details
+- Cancellation policy
+- Privacy policy
+- Legal declaration
+- Auto-generated PDF
+
+9. TESTING
+Run end-to-end tests for:
+- Booking
+- Payment
+- Payment reminder
+- Agreement generation
+- PDF download
+- QR verification
+- WhatsApp
+- Email
+- SMS
+- Customer dashboard
+- Admin dashboard
+
+10. FINAL REPORT
+Do not stop until every issue is fixed.
+
+Provide:
+- Root cause of each issue
+- Files changed
+- Database changes
+- API changes
+- Deployment changes
+- Test results
+- PASS/FAIL checklist
+- Confirmation that production is fully working
+
+Only mark the task complete when all production features are verified and operational.

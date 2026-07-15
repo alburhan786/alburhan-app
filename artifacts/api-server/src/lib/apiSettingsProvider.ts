@@ -39,35 +39,80 @@ async function loadFromDB(): Promise<void> {
 }
 
 /**
- * One-time import: if the fast2sms DB row has no usable (non-placeholder) key
- * but a real key is present in process.env, copy it into the DB once so the
- * admin UI/status page reflect reality and future lookups don't depend on env.
- * Never overwrites an existing valid DB key.
+ * Permanent sync: every startup, if the bundle's injected env key differs from
+ * what is stored in the DB (or DB has no key / stale key), overwrite DB with
+ * the env key. This ensures a fresh bundle deploy always wins, without needing
+ * manual admin action. Never runs if env has no real key to offer.
  */
 async function autoImportFast2SmsFromEnv(): Promise<void> {
   try {
-    const existing = cache.get("fast2sms");
-    if (existing?.apiKey && !isPlaceholderKey(existing.apiKey)) return; // DB already has a real key
-
     const envKey = process.env.FAST2SMS_API_KEY || process.env.FAST2SMS_XXL_API_KEY;
-    if (isPlaceholderKey(envKey)) return; // nothing usable to import
+    if (isPlaceholderKey(envKey)) {
+      console.log("[ApiSettings] fast2sms: no valid env key to sync");
+      return;
+    }
 
-    console.log("[ApiSettings] fast2sms DB key missing/placeholder — importing real key from env once");
+    const existing = cache.get("fast2sms");
+    const dbKey = existing?.apiKey;
+
+    // Already in sync — skip the write
+    if (dbKey && !isPlaceholderKey(dbKey) && dbKey === envKey) {
+      console.log("[ApiSettings] fast2sms: DB key matches env key — no sync needed");
+      return;
+    }
+
+    const reason = !dbKey
+      ? "no DB key"
+      : isPlaceholderKey(dbKey)
+        ? "DB key is placeholder"
+        : "DB key is stale/different from bundle";
+
+    console.log(`[ApiSettings] fast2sms: syncing env key → DB (reason: ${reason})`);
     const encryptedKey = encrypt(envKey!);
     await pool.query(
       `INSERT INTO api_settings (provider, enabled, api_url, api_key_encrypted, updated_at, updated_by)
-       VALUES ('fast2sms', true, 'https://www.fast2sms.com/dev/bulkV2', $1, NOW(), 'system-auto-import')
+       VALUES ('fast2sms', true, 'https://www.fast2sms.com/dev/bulkV2', $1, NOW(), 'system-auto-sync')
        ON CONFLICT (provider) DO UPDATE SET
          api_key_encrypted = EXCLUDED.api_key_encrypted,
          enabled = true,
          updated_at = NOW(),
-         updated_by = 'system-auto-import'`,
+         updated_by = 'system-auto-sync'`,
       [encryptedKey]
     );
     await loadFromDB();
-    console.log("[ApiSettings] fast2sms API key imported from env into database");
+    console.log("[ApiSettings] fast2sms: key synced from bundle env → DB ✓");
   } catch (err) {
-    console.error("[ApiSettings] fast2sms auto-import from env failed:", err);
+    console.error("[ApiSettings] fast2sms auto-sync failed:", err);
+  }
+}
+
+/**
+ * Force-resync: called from /api/migrate/resync-fast2sms.
+ * Always overwrites DB with current process.env value (bundle-injected key).
+ * Returns the masked key written.
+ */
+export async function forceResyncFast2SmsKey(): Promise<{ ok: boolean; reason: string; maskedKey: string }> {
+  const envKey = process.env.FAST2SMS_API_KEY || process.env.FAST2SMS_XXL_API_KEY;
+  if (isPlaceholderKey(envKey)) {
+    return { ok: false, reason: "No valid FAST2SMS key found in bundle env (placeholder or missing)", maskedKey: "NOT_FOUND" };
+  }
+  const maskedKey = `${envKey!.slice(0, 8)}...${envKey!.slice(-4)} (len=${envKey!.length})`;
+  try {
+    const encryptedKey = encrypt(envKey!);
+    await pool.query(
+      `INSERT INTO api_settings (provider, enabled, api_url, api_key_encrypted, updated_at, updated_by)
+       VALUES ('fast2sms', true, 'https://www.fast2sms.com/dev/bulkV2', $1, NOW(), 'admin-force-resync')
+       ON CONFLICT (provider) DO UPDATE SET
+         api_key_encrypted = EXCLUDED.api_key_encrypted,
+         enabled = true,
+         updated_at = NOW(),
+         updated_by = 'admin-force-resync'`,
+      [encryptedKey]
+    );
+    await loadFromDB();
+    return { ok: true, reason: "Key force-written from bundle env to DB and cache refreshed", maskedKey };
+  } catch (err: any) {
+    return { ok: false, reason: `DB write failed: ${err.message}`, maskedKey };
   }
 }
 
