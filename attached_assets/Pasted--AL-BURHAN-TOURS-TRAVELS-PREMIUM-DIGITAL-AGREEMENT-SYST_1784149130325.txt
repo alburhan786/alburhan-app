@@ -1,0 +1,508 @@
+# AL BURHAN TOURS & TRAVELS – PREMIUM DIGITAL AGREEMENT SYSTEM
+
+You are a senior Full Stack Engineer, UI/UX Designer, PDF Designer, Legal Document Specialist, and Security Expert.
+
+Upgrade the existing Al Burhan Tours & Travels website and booking system by replacing the current Hajj Agreement with a premium, enterprise-grade Digital Agreement.
+
+Do NOT create a simple agreement. Design a professional agreement comparable to banks, insurance companies, and international travel operators.
+
+Maintain compatibility with the existing Al Burhan Tours & Travels website, customer dashboard, admin panel, booking system, payment system, and document upload module.
+
+==================================================
+OBJECTIVE
+==================================================
+
+• Replace the existing 6-page agreement with a professionally designed 4-page agreement.
+• Keep all important legal clauses from the current agreement.
+• Add useful clauses from the old paper agreement.
+• Remove duplicate content.
+• Improve readability.
+• Reduce unnecessary blank space.
+• Use a modern, premium layout.
+• Automatically generate the agreement as a PDF.
+
+==================================================
+DESIGN
+==================================================
+
+Theme
+• Dark Green
+• Gold
+• White
+
+Style
+• Luxury Islamic branding
+• Premium typography
+• Responsive
+• Mobile friendly
+• Print friendly
+• Professional spacing
+• Modern cards
+• Clean tables
+• Icons where appropriate
+
+==================================================
+PAGE 1 – BOOKING SUMMARY
+==================================================
+
+Display
+
+• Company Logo
+• Agreement ID
+• Booking ID
+• Invoice Number
+• QR Verification Code
+• Barcode
+• Customer Photograph
+
+Customer Information
+
+• Name
+• Passport Number
+• Aadhaar Number
+• PAN Number
+• Date of Birth
+• Blood Group
+• Gender
+• Nationality
+• Mobile
+• Email
+• Address
+• Emergency Contact
+
+Package Information
+
+• Package Name
+• Package Category
+• Duration
+• Departure Date
+• Return Date
+• Group Number
+• Maktab Number
+• Saudi Service Provider
+
+Hotel Information
+
+• Makkah Hotel
+• Makkah Near Haram Hotel
+• Madinah Hotel
+• Hotel Address
+• Distance from Haram
+• Check In
+• Check Out
+• Room Sharing
+
+Flight Information
+
+• Airline
+• Flight Number
+• Departure
+• Arrival
+• Transit
+• Baggage Allowance
+
+Payment Summary
+
+• Package Amount
+• Discount
+• GST
+• TCS
+• Paid Amount
+• Balance Amount
+• Payment Status
+
+==================================================
+PAGE 2 – SERVICES & PAYMENT
+==================================================
+
+Package Includes
+
+✔ Air Ticket
+
+✔ Hajj Visa
+
+✔ Hotel Accommodation
+
+✔ Airport Transfers
+
+✔ Makkah Transport
+
+✔ Madinah Transport
+
+✔ Mina Transport
+
+✔ Arafat Transport
+
+✔ Muzdalifah Transport
+
+✔ Breakfast
+
+✔ Lunch
+
+✔ Dinner
+
+✔ Laundry (if included)
+
+✔ Local Ziyarat
+
+✔ Zamzam Water
+
+✔ Hajj Kit
+
+✔ ID Card
+
+✔ Orientation Programme
+
+✔ Group Guide
+
+✔ Medical Assistance
+
+✔ Travel Insurance (if included)
+
+✔ SIM Card (if included)
+
+Package Excludes
+
+• Personal Expenses
+
+• Shopping
+
+• Taxi
+
+• Medical Treatment
+
+• Room Upgrade
+
+• Extra Luggage
+
+• Government Charges
+
+• Airline Change Charges
+
+• Repeat Hajj Charges
+
+• RTPCR (if applicable)
+
+Payment Policy
+
+• Booking Amount
+
+• Installment Schedule
+
+• Due Dates
+
+• Late Payment Charges
+
+Accepted Payments
+
+• Razorpay
+
+• UPI
+
+• NEFT
+
+• RTGS
+
+• Cash with Receipt
+
+Cancellation & Refund Policy
+
+Display a professional refund table
+
+• 90+ Days
+
+• 60–89 Days
+
+• 30–59 Days
+
+• 15–29 Days
+
+• Less than 15 Days
+
+• Visa Issued
+
+• MOFA/Nusuk Processed
+
+• Force Majeure
+
+==================================================
+PAGE 3 – TERMS & DECLARATION
+==================================================
+
+Merge the best content from the current agreement and the old agreement.
+
+Include
+
+• Booking Confirmation
+
+• Medical Insurance
+
+• Group Accident Insurance
+
+• Passport Requirements
+
+• Visa Policy
+
+• Medical Fitness
+
+• Vaccination Requirements
+
+• Accommodation Policy
+
+• Transportation Policy
+
+• Saudi Correspondent Details
+
+• Orientation Programme
+
+• Group Discipline
+
+• Child Policy
+
+• Female Pilgrim Guidelines (as per current Saudi regulations)
+
+• Privacy Policy
+
+• Data Protection
+
+• Liability Limitation
+
+• Force Majeure
+
+• Arbitration
+
+• Governing Law
+
+• Dispute Resolution
+
+Customer Declaration
+
+Mandatory Checkboxes
+
+☐ I have read all Terms & Conditions.
+
+☐ I accept the Payment Policy.
+
+☐ I accept the Cancellation Policy.
+
+☐ I confirm Medical Fitness.
+
+☐ I agree to Saudi Laws.
+
+☐ I consent to Data Processing.
+
+☐ I accept Digital Signature.
+
+The agreement cannot be signed until every checkbox is accepted.
+
+==================================================
+PAGE 4 – DIGITAL EXECUTION
+==================================================
+
+Display
+
+• Customer Photograph
+
+• Customer Digital Signature
+
+• Agency Signature
+
+• Company Seal
+
+• QR Code
+
+• Barcode
+
+• Agreement Verification URL
+
+Audit Trail
+
+• Agreement Generated Date
+
+• OTP Verification Date
+
+• Email Verification Date
+
+• Signature Date
+
+• Download Date
+
+• IP Address
+
+• Browser
+
+• Device
+
+• Operating System
+
+• GPS Location (if permitted)
+
+• Document Version
+
+• SHA Hash Verification
+
+Legal Statement
+
+Mention
+
+• Information Technology Act, 2000
+
+• Indian Contract Act, 1872
+
+• Electronic Signature Rules
+
+• Digital Evidence
+
+==================================================
+SMART FEATURES
+==================================================
+
+Automatically Generate
+
+• Agreement Number
+
+• Booking Number
+
+• Invoice Number
+
+• QR Code
+
+• Barcode
+
+• Verification URL
+
+• Customer Photo
+
+• Customer Signature
+
+• Company Seal
+
+Customer Portal
+
+Allow customer to
+
+• Read Agreement
+
+• Accept Terms
+
+• Mobile OTP Verification
+
+• Email OTP Verification
+
+• Upload Signature
+
+• Upload Photograph
+
+• Preview Agreement
+
+• Download PDF
+
+Automatically send PDF through
+
+• WhatsApp
+
+• Email
+
+• SMS
+
+• RCS
+
+Admin Portal
+
+Allow Admin to
+
+• Create Agreement
+
+• Edit Agreement
+
+• Update Hotel
+
+• Update Flights
+
+• Update Payments
+
+• Generate PDF
+
+• Regenerate Agreement
+
+• Cancel Agreement
+
+• View Audit Trail
+
+• View OTP Logs
+
+• View Signature Logs
+
+• View Download Logs
+
+• Track Customer Activity
+
+==================================================
+SECURITY
+==================================================
+
+• Tamper-proof PDF
+
+• Secure QR Verification
+
+• Store Audit Logs
+
+• Store IP Address
+
+• Store Device Information
+
+• Store Browser Information
+
+• Store Timestamp
+
+• Encrypt Agreement PDF
+
+• Restrict Public Access
+
+==================================================
+PDF REQUIREMENTS
+==================================================
+
+• Exactly 4 Pages
+
+• Professional A4 Layout
+
+• Premium Typography
+
+• Proper Margins
+
+• No Blank Pages
+
+• No Overflow
+
+• Automatic Page Numbers
+
+• Premium Header
+
+• Professional Footer
+
+• Optimized for Mobile and Desktop Printing
+
+==================================================
+TECHNICAL REQUIREMENTS
+==================================================
+
+• React + TypeScript
+
+• Tailwind CSS
+
+• Responsive Design
+
+• Server-side PDF Generation
+
+• Clean Component Architecture
+
+• Input Validation
+
+• Optimized Performance
+
+• Editable Legal Content from Admin Panel
+
+• Maintain backward compatibility with the existing Al Burhan Tours & Travels booking system, customer dashboard, payment module, document upload system, WhatsApp notifications, email notifications, SMS, and RCS messaging.
+
+The final agreement must look premium, modern, legally compliant, easy to read, and suitable for both digital and printed use while reflecting the professional image of Al Burhan Tours & Travels.
