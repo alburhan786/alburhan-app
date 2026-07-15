@@ -30,3 +30,4 @@
 - [Agreements schema column types](agreements-schema-types.md) — booking_id/customer_id must be TEXT (not UUID); hajj_groups column is group_name not name; notification_logs error column is error_code not error_message
 - [SMTP VPS injection](smtp-vps-injection.md) — SMTP_HOST/PORT/USER/PASS/FROM added to injectKeys in build.ts; migration auto-inserts smtp row in api_settings on first run; getCachedConfig falls back to env vars if DB decrypt fails (safe)
 - [Agreement signing API fields](agreement-signing-api.md) — sign endpoint uses signatureData (not signature); termsAccepted must include all 13 clause IDs as {id:true}; signing OTP stored in agreements.signing_otp; customer route is /api/agreements/my/:id/sign
+- [emailService.ts location and pattern](email-service.md) — emailService.ts at src/services/; test endpoint in app.ts BEFORE app.use("/api",router); test endpoint in app.ts only (not index.ts — 404 fires first)

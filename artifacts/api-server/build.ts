@@ -87,6 +87,7 @@ async function buildAll() {
     "SMTP_USER",
     "SMTP_PASS",
     "SMTP_FROM",
+    "SMTP_FROM_NAME",
   ];
   for (const key of injectKeys) {
     const val = process.env[key];

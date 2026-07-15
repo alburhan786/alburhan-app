@@ -3,6 +3,7 @@ import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requireAdmin, requireAuth, type AuthenticatedRequest } from "../lib/auth.js";
 import { generateInvoicePdfBuffer } from "../lib/paymentDocs.js";
+import { sendInvoiceEmail, sendPaymentReceipt } from "../services/emailService.js";
 
 const router = Router();
 
@@ -181,6 +182,89 @@ router.post("/:bookingId/regenerate", requireAdmin as any, async (req: Authentic
   } catch (err) {
     console.error("[invoices] POST /:id/regenerate:", err);
     res.status(500).json({ message: "Failed to regenerate invoice" });
+  }
+});
+
+// ── Send invoice email to customer — POST /api/invoices/:bookingId/send-email ─
+// Admin-triggered: generates invoice PDF and emails it to the customer using
+// the MSG91 SMTP branded template. Safe to call multiple times (idempotent).
+router.post("/:bookingId/send-email", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { bookingId } = req.params;
+
+    // Fetch booking + existing invoice in one query
+    const bRes = await pool.query(
+      `SELECT b.*, i.invoice_number as inv_num, i.id as inv_id,
+              i.subtotal, i.discount, i.gst_amount, i.tcs_amount,
+              i.total, i.paid, i.balance, i.invoice_status, i.due_date
+       FROM bookings b
+       LEFT JOIN invoices i ON i.booking_id = b.id
+       WHERE b.id = $1 LIMIT 1`,
+      [bookingId]
+    );
+    const b = bRes.rows[0];
+    if (!b) return void res.status(404).json({ message: "Booking not found" });
+
+    const customerEmail = b.customer_email;
+    if (!customerEmail) {
+      return void res.status(422).json({ message: "Customer has no email address on file" });
+    }
+
+    // Ensure invoice exists (create if missing)
+    const inv = await upsertInvoiceForBooking(bookingId);
+    const invoiceNumber = (inv as any)?.invoice_number || b.inv_num || b.invoice_number || `ABT/${new Date().getFullYear()}/000000`;
+
+    // Generate PDF attachment
+    let pdfBuffer: Buffer | undefined;
+    try {
+      pdfBuffer = await generateInvoicePdfBuffer({
+        bookingNumber:    b.booking_number,
+        customerName:     b.customer_name,
+        customerMobile:   b.customer_mobile,
+        customerEmail:    customerEmail,
+        packageName:      b.package_name,
+        numberOfPilgrims: b.number_of_pilgrims,
+        totalAmount:      Number(b.total_amount) || 0,
+        finalAmount:      Number(b.final_amount) || 0,
+        paidAmount:       Number(b.paid_amount)  || 0,
+        balanceAmount:    Math.max(0, Number(b.final_amount || 0) - Number(b.paid_amount || 0)),
+        invoiceNumber,
+      });
+    } catch (pdfErr) {
+      console.warn("[invoices] PDF gen failed, sending without attachment:", pdfErr);
+    }
+
+    // Send branded invoice email via MSG91 SMTP
+    const result = await sendInvoiceEmail(
+      customerEmail,
+      {
+        customerName:  b.customer_name,
+        bookingNumber: b.booking_number,
+        invoiceNumber,
+        packageName:   b.package_name,
+        invoiceDate:   b.created_at,
+        dueDate:       (inv as any)?.due_date || b.due_date,
+        subtotal:      Number((inv as any)?.subtotal  || b.total_amount  || 0),
+        discount:      Number((inv as any)?.discount  || b.discount_amount || 0),
+        gstAmount:     Number((inv as any)?.gst_amount || b.gst_amount   || 0),
+        totalAmount:   Number((inv as any)?.total     || b.final_amount  || 0),
+        paidAmount:    Number((inv as any)?.paid      || b.paid_amount   || 0),
+        balanceDue:    Number((inv as any)?.balance   || Math.max(0, Number(b.final_amount || 0) - Number(b.paid_amount || 0))),
+        invoiceStatus: (inv as any)?.invoice_status || "pending",
+      },
+      pdfBuffer
+    );
+
+    if (!result.ok) {
+      console.error(`[invoices] send-email failed to ${customerEmail}:`, result.error);
+      return void res.status(500).json({ message: "Failed to send invoice email", error: result.error });
+    }
+
+    console.log(`[invoices] Invoice email sent to ${customerEmail} for booking ${b.booking_number}`);
+    res.json({ ok: true, message: `Invoice email sent to ${customerEmail}`, messageId: result.messageId });
+  } catch (err: any) {
+    console.error("[invoices] POST /:bookingId/send-email:", err);
+    res.status(500).json({ message: "Failed to send invoice email", error: err?.message });
   }
 });
 

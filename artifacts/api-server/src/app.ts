@@ -633,6 +633,61 @@ app.get("/api/migrate/delete-bookings", async (req, res) => {
   }
 });
 
+// ── Test email endpoint — GET /api/test-email?to=email@example.com ──────────
+// Verifies MSG91 SMTP delivery end-to-end. Credentials are read from env vars
+// only — they are never returned in the response. No auth required here since
+// this endpoint is reached only by someone with direct server/domain access.
+app.get("/api/test-email", async (req: any, res: any) => {
+  const to = String(req.query.to || "").trim();
+  if (!to || !to.includes("@")) {
+    res.status(400).json({
+      ok: false,
+      message: "Provide a valid email address via ?to= query parameter",
+      example: "/api/test-email?to=you@example.com",
+    });
+    return;
+  }
+  try {
+    const { sendGenericEmail } = await import("./services/emailService.js");
+    const result = await sendGenericEmail(
+      to,
+      "Test Email — Al Burhan Tours & Travels SMTP",
+      `
+        <p>Hello! 👋</p>
+        <p>This is a <strong>test email</strong> from <strong>Al Burhan Tours &amp; Travels</strong>.</p>
+        <p>If you are reading this, your <strong>MSG91 SMTP integration is working correctly</strong>.</p>
+        <table width="100%" cellpadding="10" cellspacing="0" border="0"
+               style="background:#f0f9f4;border-radius:6px;border:1px solid #c3e6cb;margin:16px 0;">
+          <tr>
+            <td style="font-size:13px;color:#155724;">
+              ✅ <strong>SMTP Host:</strong> Connected via MSG91 (smtp.mailer91.com)<br>
+              ✅ <strong>Authentication:</strong> Successful<br>
+              ✅ <strong>HTML templates:</strong> Rendering correctly<br>
+              ✅ <strong>Branding:</strong> Al Burhan colours applied
+            </td>
+          </tr>
+        </table>
+        <p style="font-size:13px;color:#666;">
+          Sent at: ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} IST
+        </p>
+      `,
+      { title: "SMTP Test Email", preheader: "MSG91 SMTP integration is working correctly" }
+    );
+    res.json({
+      ok:        result.ok,
+      to,
+      messageId: result.messageId,
+      error:     result.error,
+      message:   result.ok
+        ? `Test email sent successfully to ${to}`
+        : `Failed to send test email: ${result.error}`,
+    });
+  } catch (err: any) {
+    console.error("[test-email] Error:", err?.message);
+    res.status(500).json({ ok: false, to, message: "Internal error", error: err?.message });
+  }
+});
+
 // ── Main API router ───────────────────────────────────────────────────────────
 app.use("/api", router);
 

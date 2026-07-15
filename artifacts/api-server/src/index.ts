@@ -1876,7 +1876,7 @@ async function start() {
 
   // ── Startup route confirmation ──────────────────────────────────────────────
   // Express 5 initialises the router lazily (no _router until first request),
-  // so counting via app._router at startup always shows 0 in dev mode.
+  // so counting via app._router at startup already shows 0 in dev mode.
   // Routes are verified live at GET /api/routes (VPS confirmed 467 routes).
   console.log("[Startup] ✅ Routes mounted — verify live at GET /api/routes");
 

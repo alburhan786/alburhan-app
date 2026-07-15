@@ -33,6 +33,7 @@ channel = "stable-25_05"
 [userenv.shared]
 SITE_URL = "https://alburhantravels.com"
 SMTP_SECURE = "true"
+SMTP_FROM_NAME = "Al Burhan Tours & Travels"
 
 [[ports]]
 localPort = 8080

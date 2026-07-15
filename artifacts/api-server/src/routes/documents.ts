@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { requireAuth, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendCustomerDocumentUploadNotification } from "../lib/notifications.js";
 import { sendDocumentToCustomer, TRAVEL_DOC_TYPES } from "../lib/documentDelivery.js";
+import { sendTicketEmail, sendVisaEmail } from "../services/emailService.js";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -133,6 +134,7 @@ router.post(
     const custEmail = booking.customerEmail;
 
     if (isAdmin && TRAVEL_DOC_TYPES.has(documentType)) {
+      // ── WhatsApp / SMS notification (existing channel) ──────────────────────
       sendDocumentToCustomer({
         docId,
         bookingId,
@@ -147,6 +149,53 @@ router.post(
         mimeType: req.file.mimetype,
         packageName: (booking as any).packageName || (booking as any).package_name || null,
       }).catch(err => console.error("[Documents] sendDocumentToCustomer error:", err));
+
+      // ── Email notification (new channel) — fire-and-forget ──────────────────
+      // Only fires if customer has an email on the booking record.
+      // Attaches the document as PDF when the upload is a PDF file.
+      if (custEmail) {
+        (async () => {
+          try {
+            // Build optional PDF attachment if the uploaded file is a PDF
+            const pdfBuffer = req.file.mimetype === "application/pdf"
+              ? req.file.buffer
+              : undefined;
+
+            const pkgName = (booking as any).packageName || (booking as any).package_name || undefined;
+
+            if (documentType === "flight_ticket" || documentType === "return_ticket" || documentType === "ticket") {
+              // Flight ticket email with optional PDF attachment
+              const result = await sendTicketEmail(
+                custEmail,
+                {
+                  customerName:  custName,
+                  bookingNumber: bkNum,
+                  packageName:   pkgName,
+                  fileName:      req.file.originalname,
+                },
+                pdfBuffer
+              );
+              console.log(`[Documents][Email] Ticket email to ${custEmail}: ok=${result.ok}${result.error ? ` err=${result.error}` : ""}`);
+
+            } else if (documentType === "visa" || documentType === "visa_copy") {
+              // Visa document email with optional PDF attachment
+              const result = await sendVisaEmail(
+                custEmail,
+                {
+                  customerName:  custName,
+                  bookingNumber: bkNum,
+                  packageName:   pkgName,
+                  fileName:      req.file.originalname,
+                },
+                pdfBuffer
+              );
+              console.log(`[Documents][Email] Visa email to ${custEmail}: ok=${result.ok}${result.error ? ` err=${result.error}` : ""}`);
+            }
+          } catch (err: any) {
+            console.error("[Documents][Email] Email send failed (non-fatal):", err?.message || err);
+          }
+        })();
+      }
     } else if (!isAdmin) {
       sendCustomerDocumentUploadNotification({
         customerName: custName,

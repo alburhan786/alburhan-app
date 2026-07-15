@@ -9,6 +9,7 @@ import {
 } from "@workspace/api-zod";
 import { generateOtp, requireAuth, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendOtpSMS, sendWhatsApp } from "../lib/notifications.js";
+import { sendOTPEmail } from "../services/emailService.js";
 
 export const ADMIN_MOBILES = ["9893989786", "9893225590", "8989701701"];
 
@@ -166,6 +167,21 @@ router.post("/send-otp", async (req, res) => {
       console.log(`[OTP-SEND][WhatsApp] Fallback text: ok=${waResult?.ok} err=${waResult?.errorMessage || "none"}`);
     } catch (err: any) {
       console.log(`[OTP-SEND][WhatsApp] Failed (secondary channel, ignored): ${err?.message || err}`);
+    }
+  })();
+
+  // ── TERTIARY channel: Email OTP — fire-and-forget ─────────────────────────
+  // Only fires if the customer already has an email address on their profile.
+  // Never blocks the response or affects success/failure status.
+  (async () => {
+    try {
+      const userEmail = existing[0]?.email;
+      if (!userEmail) return;
+      const userName = existing[0]?.name || "Pilgrim";
+      const result = await sendOTPEmail(userEmail, userName, otp);
+      console.log(`[OTP-SEND][Email] Sent to ${userEmail}: ok=${result.ok}${result.error ? ` err=${result.error}` : ""}`);
+    } catch (err: any) {
+      console.log(`[OTP-SEND][Email] Failed (tertiary channel, ignored): ${err?.message || err}`);
     }
   })();
 });
