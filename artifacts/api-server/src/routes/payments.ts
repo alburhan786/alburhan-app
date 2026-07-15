@@ -14,6 +14,7 @@ import { generateInvoicePdfBuffer, generateReceiptPdfBuffer } from "../lib/payme
 import { sendReminderForBookingId, getReminderHistory, runDailyReminders, isRemindersEnabled, setRemindersEnabled } from "../jobs/paymentReminder.js";
 import { upsertInvoiceForBooking } from "./invoices.js";
 import { autoGenerateAgreement } from "./agreements.js";
+import { uploadToGCS } from "../lib/gcsUpload.js";
 
 const router = Router();
 
@@ -98,6 +99,15 @@ export async function processPaymentSuccessNotifications(opts: {
       const invBuf = await generateInvoicePdfBuffer(docOpts);
       const safeInvNum = invoiceNumber.replace(/\//g, "-");
       attachments.push({ filename: `Invoice-${safeInvNum}.pdf`, content: invBuf, contentType: "application/pdf" });
+      // Save invoice PDF to object storage and persist URL so downloads are instant
+      uploadToGCS(invBuf, `Invoice-${safeInvNum}.pdf`, "application/pdf", "invoices")
+        .then((pdfUrl) =>
+          pool.query(
+            `UPDATE invoices SET pdf_path=$1, updated_at=NOW() WHERE booking_id=$2`,
+            [pdfUrl, booking.id]
+          )
+        )
+        .catch((err) => console.error("[payments] Failed to save invoice PDF to storage:", err));
     }
   } catch (err) {
     console.error("[payments] PDF generation failed (notifications will still send without attachments):", err);

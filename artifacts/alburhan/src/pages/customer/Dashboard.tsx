@@ -1712,50 +1712,21 @@ export default function CustomerDashboard() {
 
   const uploadBooking = bookings.find((b: any) => b.id === uploadBookingId);
 
-  const handleDownloadInvoice = async (bookingId: string) => {
+  const handleDownloadInvoice = async (bookingId: string, bookingNumber?: string) => {
     try {
-      const res = await fetch(`${BASE_API}/api/bookings/${bookingId}/invoice`, { credentials: "include" });
-      if (!res.ok) throw new Error();
-      const inv = await res.json();
-      const invoiceHtml = `
-        <html><head><title>Invoice ${inv.invoiceNumber}</title>
-        <style>body{font-family:sans-serif;max-width:700px;margin:40px auto;padding:20px;color:#1a1a1a}
-        .header{text-align:center;border-bottom:3px solid #1a4a2e;padding-bottom:20px;margin-bottom:24px}
-        .logo{font-size:24px;font-weight:bold;color:#1a4a2e}.subtitle{color:#888;font-size:13px}
-        .invoice-num{background:#1a4a2e;color:white;padding:8px 20px;border-radius:6px;display:inline-block;margin-top:10px}
-        table{width:100%;border-collapse:collapse;margin:16px 0}
-        td{padding:10px 8px;border-bottom:1px solid #eee;font-size:14px}
-        td:first-child{color:#666;width:45%} .total{font-size:18px;font-weight:bold;color:#1a4a2e}
-        .footer{text-align:center;margin-top:30px;color:#888;font-size:12px;border-top:1px solid #eee;padding-top:16px}</style></head>
-        <body>
-        <div class="header">
-          <div class="logo">Al Burhan Tours & Travels</div>
-          <div class="subtitle">${inv.companyAddress} | ${inv.companyPhone}</div>
-          <div class="invoice-num">Invoice #${inv.invoiceNumber}</div>
-        </div>
-        <table>
-          <tr><td>Booking Number</td><td><strong>${inv.bookingNumber}</strong></td></tr>
-          <tr><td>Customer Name</td><td>${inv.customerName}</td></tr>
-          <tr><td>Mobile</td><td>${inv.customerMobile}</td></tr>
-          <tr><td>Package</td><td>${inv.packageName}</td></tr>
-          <tr><td>Number of Pilgrims</td><td>${inv.numberOfPilgrims}</td></tr>
-          <tr><td>Departure Date</td><td>${inv.departureDate ? new Date(inv.departureDate).toLocaleDateString('en-IN') : '-'}</td></tr>
-          <tr><td>Base Amount</td><td>₹${Number(inv.totalAmount).toLocaleString('en-IN')}</td></tr>
-          <tr><td>GST (5%)</td><td>₹${Number(inv.gstAmount).toLocaleString('en-IN')}</td></tr>
-          <tr><td class="total">Total Amount</td><td class="total">₹${Number(inv.finalAmount).toLocaleString('en-IN')}</td></tr>
-        </table>
-        <div class="footer">Thank you for choosing Al Burhan Tours & Travels. Jazak Allah Khair!<br/>${inv.companyEmail}</div>
-        </body></html>
-      `;
-      const blob = new Blob([invoiceHtml], { type: "text/html" });
+      const res = await fetch(`${BASE_API}/api/invoices/${bookingId}/pdf`, { credentials: "include" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `Invoice_${inv.invoiceNumber}.html`;
+      a.download = `Invoice-${bookingNumber || bookingId}.pdf`;
+      document.body.appendChild(a);
       a.click();
+      document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch {
-      toast({ title: "Error", description: "Could not download invoice", variant: "destructive" });
+      toast({ title: "Error", description: "Could not download invoice. Please try again.", variant: "destructive" });
     }
   };
 
@@ -2214,7 +2185,7 @@ export default function CustomerDashboard() {
                       {booking.invoiceNumber && (
                         <Button
                           variant="outline"
-                          onClick={() => handleDownloadInvoice(booking.id)}
+                          onClick={() => handleDownloadInvoice(booking.id, booking.bookingNumber)}
                           className="border-primary text-primary hover:bg-primary/5"
                         >
                           <Download className="w-4 h-4 mr-2" /> Download Invoice PDF

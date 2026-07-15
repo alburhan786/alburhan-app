@@ -135,6 +135,47 @@ router.post("/generate-all", requireAdmin as any, async (_req: AuthenticatedRequ
   }
 });
 
+// ── Download PDF by human-readable booking number — GET /api/invoices/by-number/:bookingNumber/pdf ──
+// Accessible to authenticated customers (must own the booking) or admins.
+// Useful for linking from emails and admin panels without exposing internal UUIDs.
+router.get("/by-number/:bookingNumber/pdf", requireAuth as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { bookingNumber } = req.params;
+    const bRes = await pool.query(
+      `SELECT b.*, i.invoice_number as inv_num, i.pdf_path
+       FROM bookings b
+       LEFT JOIN invoices i ON i.booking_id = b.id
+       WHERE b.booking_number = $1 LIMIT 1`,
+      [bookingNumber]
+    );
+    const b = bRes.rows[0];
+    if (!b) return void res.status(404).json({ message: "Booking not found" });
+    if (req.user?.role !== "admin" && b.customer_mobile !== req.user?.mobile) {
+      return void res.status(403).json({ message: "Forbidden" });
+    }
+    const invoiceNumber = b.inv_num || b.invoice_number;
+    const buf = await generateInvoicePdfBuffer({
+      bookingNumber: b.booking_number,
+      customerName: b.customer_name,
+      customerMobile: b.customer_mobile,
+      customerEmail: b.customer_email,
+      packageName: b.package_name,
+      numberOfPilgrims: b.number_of_pilgrims,
+      totalAmount: Number(b.total_amount) || 0,
+      finalAmount: Number(b.final_amount) || 0,
+      paidAmount: Number(b.paid_amount) || 0,
+      balanceAmount: Math.max(0, Number(b.final_amount || 0) - Number(b.paid_amount || 0)),
+      invoiceNumber,
+    });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="Invoice-${invoiceNumber || bookingNumber}.pdf"`);
+    res.send(buf);
+  } catch (err) {
+    console.error("[invoices] GET /by-number/:bookingNumber/pdf:", err);
+    res.status(500).json({ message: "Failed to generate PDF" });
+  }
+});
+
 router.get("/:bookingId/pdf", requireAuth as any, async (req: AuthenticatedRequest, res) => {
   try {
     const { bookingId } = req.params;
