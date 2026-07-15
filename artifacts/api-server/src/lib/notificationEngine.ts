@@ -452,7 +452,7 @@ async function sendOnChannel(channel: Channel, ctx: NotificationContext, message
 // then last-resort free-form session message.
 
 const ABT_TEMPLATE_EVENTS = new Set<EventType>([
-  "new_booking", "payment_received", "payment_due", "balance_reminder",
+  "new_booking", "payment_received", "partial_payment", "payment_due", "balance_reminder",
   "booking_approved", "departure_reminder", "visa_ready", "visa_approved",
   "ticket_issued", "flight_assigned",
 ]);
@@ -491,6 +491,7 @@ async function sendBotBeeEventTemplate(
       }, opts);
 
     case "payment_received":
+    case "partial_payment":
       return sendPaymentReceivedTemplate(ctx.customerMobile, {
         customerName: ctx.customerName,
         packageName: ctx.packageName || "Hajj/Umrah Package",

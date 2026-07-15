@@ -5,14 +5,12 @@ import multer from "multer";
 import { randomUUID } from "crypto";
 import { requireAuth, requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import { auditLog } from "../lib/audit.js";
-import { trackNotification } from "../lib/notificationEngine.js";
-import { triggerWorkflow } from "../lib/workflowEngine.js";
 import { uploadToGCS } from "../lib/gcsUpload.js";
 import {
-  sendOfflinePaymentApprovedNotification,
   sendOfflinePaymentRejectedNotification,
   sendOfflinePaymentSubmittedNotification,
 } from "../lib/notifications.js";
+import { processPaymentSuccessNotifications } from "./payments.js";
 
 const router = Router();
 
@@ -294,7 +292,10 @@ router.post("/:id/approve", requireAdmin as any, async (req: AuthenticatedReques
   try {
     const { adminRemarks } = req.body;
     const { rows } = await pool.query(
-      `SELECT op.*, b.booking_number, b.customer_mobile, b.customer_email, b.final_amount, b.paid_amount
+      `SELECT op.*,
+              b.booking_number, b.customer_mobile, b.customer_email,
+              b.final_amount, b.paid_amount,
+              b.package_name, b.number_of_pilgrims
        FROM offline_payments op
        LEFT JOIN bookings b ON b.id = op.booking_id
        WHERE op.id=$1 LIMIT 1`,
@@ -317,9 +318,10 @@ router.post("/:id/approve", requireAdmin as any, async (req: AuthenticatedReques
     );
     const bk = currentPaid.rows[0] || {};
     const newPaid = Number(bk.paid_amount || 0) + Number(op.amount_paid || 0);
-    const finalAmt = Number(bk.final_amount || 0);
+    const finalAmt = Number(op.final_amount || bk.final_amount || 0);
     const balance = Math.max(0, finalAmt - newPaid);
-    const newStatus = finalAmt > 0 && newPaid >= finalAmt ? "confirmed" : "partially_paid";
+    const isFullyPaid = finalAmt > 0 && newPaid >= finalAmt;
+    const newStatus = isFullyPaid ? "confirmed" : "partially_paid";
 
     await pool.query(
       `UPDATE bookings SET paid_amount=$1, status=$2, updated_at=NOW() WHERE id=$3`,
@@ -333,21 +335,28 @@ router.post("/:id/approve", requireAdmin as any, async (req: AuthenticatedReques
     const invRes = await pool.query(`SELECT invoice_number FROM bookings WHERE id=$1`, [op.booking_id]);
     const invoiceNumber = invRes.rows[0]?.invoice_number || op.payment_reference;
 
-    // Send full notification suite: WhatsApp + SMS + Email + dashboard
-    sendOfflinePaymentApprovedNotification({
-      mobile: op.mobile || op.customer_mobile,
-      email: op.email || op.customer_email,
-      customerName: op.customer_name,
-      bookingId: op.booking_id,
-      bookingNumber: op.booking_number,
-      amount: op.amount_paid,
-      utrNumber: op.utr_number,
-      balance,
-      receiptNo: invoiceNumber,
-    }).catch(() => {});
+    // ── Full notification suite: WhatsApp (BotBee template) + SMS (Fast2SMS DLT) ──
+    // + Email (MSG91 SMTP premium receipt) + notification_logs + retry queue
+    // Same pipeline as online Razorpay payments — all channels, all logged.
+    processPaymentSuccessNotifications({
+      booking: {
+        id:               op.booking_id,
+        bookingNumber:    op.booking_number,
+        customerName:     op.customer_name,
+        customerMobile:   op.mobile || op.customer_mobile,
+        customerEmail:    op.email  || op.customer_email,
+        packageName:      op.package_name,
+        numberOfPilgrims: op.number_of_pilgrims,
+        finalAmount:      finalAmt,
+      },
+      isFullyPaid,
+      thisPaymentAmount: Number(op.amount_paid),
+      newPaidAmount:     newPaid,
+      remainingBalance:  balance,
+      invoiceNumber,
+      paymentRef:        op.utr_number || op.payment_reference,
+    }).catch(err => console.error("[offline-payments] processPaymentSuccessNotifications failed:", err));
 
-    trackNotification({ eventType: "payment_verified", channel: "whatsapp", recipient: op.mobile, bookingId: op.booking_id, status: "sent" }).catch(() => {});
-    triggerWorkflow("offline_payment_approved", { bookingId: op.booking_id, paymentId: op.id, utrNumber: op.utr_number }).catch(() => {});
     auditLog({ req, action: "approved", entityTable: "offline_payments", entityId: op.id, newValue: { approvedBy: adminName, bookingId: op.booking_id, balance } }).catch(() => {});
 
     res.json({ message: "Payment approved. Customer notified via all channels.", newBookingStatus: newStatus, newPaid, balance });
