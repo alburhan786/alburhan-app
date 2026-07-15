@@ -68,7 +68,7 @@ export async function autoGenerateAgreement(bookingId: string): Promise<void> {
     const agId = crypto.randomUUID();
     await pool.query(
       `INSERT INTO agreements (id, agreement_number, booking_id, customer_id, status, verification_token, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,'draft',$5,NOW(),NOW())`,
+       VALUES ($1,$2,$3,$4,'pending_signature',$5,NOW(),NOW())`,
       [agId, agreementNumber, bookingId, booking.customer_id, verificationToken]
     );
 
@@ -688,11 +688,96 @@ router.post("/:id/regenerate", requireAdmin, async (req: any, res) => {
 
     await autoGenerateAgreement(ag.booking_id);
     const newAg = await pool.query(
-      `SELECT * FROM agreements WHERE booking_id=$1 AND status='draft' ORDER BY created_at DESC LIMIT 1`, [ag.booking_id]
+      `SELECT * FROM agreements WHERE booking_id=$1 AND status!='cancelled' ORDER BY created_at DESC LIMIT 1`, [ag.booking_id]
     );
     res.json({ ok: true, newAgreement: newAg.rows[0] || null });
   } catch (err) {
     res.status(500).json({ error: "Failed to regenerate" });
+  }
+});
+
+// ── ADMIN: Update agreement status ────────────────────────────────────────────
+router.patch("/:id/status", requireAdmin, async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    const allowed = ["pending_signature", "signed", "cancelled"];
+    if (!allowed.includes(status)) {
+      return res.status(400).json({ error: `Status must be one of: ${allowed.join(", ")}` });
+    }
+    const extra: any = { status, updated_at: "NOW()" };
+    let q = `UPDATE agreements SET status=$1, updated_at=NOW()`;
+    const params: any[] = [status, id];
+    if (status === "cancelled") {
+      q += `, cancelled_at=NOW(), cancelled_reason='Updated by admin'`;
+    } else if (status === "signed" && !req.body.keepSignedAt) {
+      // Only set signed_at if not already set
+      q += `, signed_at=COALESCE(signed_at, NOW())`;
+    }
+    q += ` WHERE id=$2`;
+    await pool.query(q, params);
+    await logAgreementAudit(id, "status_updated_admin", {
+      newStatus: status,
+      adminId: req.user?.id,
+    }, req.headers?.["x-forwarded-for"]?.split(",")[0] || req.socket?.remoteAddress || "unknown");
+    // Return updated agreement
+    const agRes = await pool.query(
+      `SELECT a.*, b.booking_number, b.customer_name, b.customer_mobile, b.package_name, b.final_amount, b.paid_amount
+       FROM agreements a LEFT JOIN bookings b ON b.id=a.booking_id WHERE a.id=$1`, [id]
+    );
+    res.json({ ok: true, agreement: agRes.rows[0] });
+  } catch (err) {
+    console.error("[Agreement] Status update error:", err);
+    res.status(500).json({ error: "Failed to update status" });
+  }
+});
+
+// ── ADMIN: Backfill — create agreements for all approved bookings missing one ─
+router.post("/backfill-approved", requireAdmin, async (req: any, res) => {
+  try {
+    // Find all approved/confirmed/partially_paid bookings with no active agreement
+    const { rows } = await pool.query(
+      `SELECT b.id, b.booking_number FROM bookings b
+       WHERE b.status IN ('approved','confirmed','partially_paid')
+         AND NOT EXISTS (
+           SELECT 1 FROM agreements a
+           WHERE a.booking_id=b.id AND a.status != 'cancelled'
+         )
+       ORDER BY b.created_at DESC`
+    );
+    let created = 0;
+    const skipped: string[] = [];
+    for (const row of rows) {
+      try {
+        await autoGenerateAgreement(row.id);
+        created++;
+      } catch (e: any) {
+        skipped.push(row.booking_number);
+        console.error(`[Agreement] Backfill failed for ${row.booking_number}:`, e?.message);
+      }
+    }
+    res.json({ ok: true, found: rows.length, created, skipped });
+  } catch (err) {
+    console.error("[Agreement] Backfill error:", err);
+    res.status(500).json({ error: "Backfill failed" });
+  }
+});
+
+// ── ADMIN: Ensure agreement exists for a specific booking ─────────────────────
+router.post("/ensure/:bookingId", requireAdmin, async (req: any, res) => {
+  try {
+    const { bookingId } = req.params;
+    await autoGenerateAgreement(bookingId);
+    const agRes = await pool.query(
+      `SELECT a.*, b.booking_number, b.customer_name, b.customer_mobile, b.package_name, b.final_amount, b.paid_amount
+       FROM agreements a LEFT JOIN bookings b ON b.id=a.booking_id
+       WHERE a.booking_id=$1 AND a.status!='cancelled'
+       ORDER BY a.created_at DESC LIMIT 1`, [bookingId]
+    );
+    if (!agRes.rows.length) return res.status(400).json({ error: "Could not create agreement" });
+    res.json({ ok: true, agreement: agRes.rows[0] });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to ensure agreement" });
   }
 });
 

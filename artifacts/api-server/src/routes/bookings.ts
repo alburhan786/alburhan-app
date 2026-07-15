@@ -27,6 +27,7 @@ import {
 } from "@workspace/api-zod";
 import { requireAuth, requireAdmin, requirePermission, type AuthenticatedRequest } from "../lib/auth.js";
 import { auditLog } from "../lib/audit.js";
+import { autoGenerateAgreement } from "./agreements.js";
 import { validateDeleteToken } from "./delete-auth.js";
 import {
   sendBookingApprovalNotification,
@@ -632,6 +633,12 @@ router.post("/:id/approve", requireAdmin as any, requirePermission("bookings", "
   });
 
   auditLog({ req, action: "approved", entityTable: "bookings", entityId: updated.id, newValue: { bookingNumber: updated.bookingNumber, status: "approved" } }).catch(() => {});
+
+  // Auto-generate agreement for this booking immediately on approval
+  autoGenerateAgreement(updated.id).catch(err =>
+    console.error("[approve] autoGenerateAgreement failed:", err)
+  );
+
   res.json(formatBooking(updated));
 });
 
