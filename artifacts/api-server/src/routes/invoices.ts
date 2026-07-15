@@ -4,6 +4,20 @@ import { pool } from "@workspace/db";
 import { requireAdmin, requireAuth, type AuthenticatedRequest } from "../lib/auth.js";
 import { generateInvoicePdfBuffer } from "../lib/paymentDocs.js";
 import { sendInvoiceEmail, sendPaymentReceipt } from "../services/emailService.js";
+import { uploadToGCS } from "../lib/gcsUpload.js";
+
+// Fire-and-forget: upload PDF to GCS/disk and save pdf_path in invoices table.
+// Non-blocking — the HTTP response is sent first, this runs in the background.
+async function saveInvoicePdfToStorage(bookingId: string, invoiceNumber: string, buf: Buffer) {
+  try {
+    const safeNum = (invoiceNumber || bookingId).replace(/[^a-zA-Z0-9\-_]/g, "_");
+    const url = await uploadToGCS(buf, `Invoice-${safeNum}.pdf`, "application/pdf", "invoices");
+    await pool.query(`UPDATE invoices SET pdf_path=$1, updated_at=NOW() WHERE booking_id=$2`, [url, bookingId]);
+    console.log(`[invoices] pdf saved → ${url.slice(0, 80)}`);
+  } catch (err) {
+    console.warn("[invoices] pdf_path save failed (non-fatal):", err?.message || err);
+  }
+}
 
 const router = Router();
 
@@ -187,6 +201,8 @@ router.get("/by-number/:bookingNumber/pdf", async (req, res) => {
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="Invoice-${invoiceNumber || bookingNumber}.pdf"`);
     res.send(buf);
+    // Save to GCS/disk in the background (non-blocking)
+    if (b.id) saveInvoicePdfToStorage(b.id, invoiceNumber, buf).catch(() => {});
   } catch (err) {
     console.error("[invoices] GET /by-number/:bookingNumber/pdf:", err);
     res.status(500).json({ message: "Failed to generate PDF" });
@@ -225,6 +241,8 @@ router.get("/:bookingId/pdf", requireAuth as any, async (req: AuthenticatedReque
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="Invoice-${invoiceNumber || b.booking_number}.pdf"`);
     res.send(buf);
+    // Save to GCS/disk in the background (non-blocking)
+    saveInvoicePdfToStorage(bookingId, invoiceNumber, buf).catch(() => {});
   } catch (err) {
     console.error("[invoices] GET /:bookingId/pdf:", err);
     res.status(500).json({ message: "Failed to generate PDF" });

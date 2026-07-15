@@ -517,6 +517,59 @@ echo "=== Share the pm2 describe output to diagnose further."
   res.send(script);
 });
 
+// POST /api/migrate/save-invoice-pdfs — generate + upload PDFs for all invoices missing pdf_path
+app.post("/api/migrate/save-invoice-pdfs", async (req, res) => {
+  const key = req.body?.key as string;
+  if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
+  try {
+    const { pool: sPool } = await import("@workspace/db");
+    const { generateInvoicePdfBuffer } = await import("./routes/invoices.js").then(m => m).catch(() => ({})) as any;
+    const { uploadToGCS } = await import("./lib/gcsUpload.js") as any;
+    const { generateInvoicePdfBuffer: genPdf } = await import("./lib/paymentDocs.js") as any;
+
+    const rows = await sPool.query(`
+      SELECT b.id, b.booking_number, b.customer_name, b.customer_mobile, b.customer_email,
+             b.package_name, b.number_of_pilgrims, b.total_amount, b.final_amount, b.paid_amount,
+             i.invoice_number as inv_num, i.invoice_status
+      FROM bookings b
+      JOIN invoices i ON i.booking_id = b.id
+      WHERE (i.pdf_path IS NULL OR i.pdf_path = '')
+        AND (b.is_deleted IS NULL OR b.is_deleted = false)
+      ORDER BY i.created_at ASC
+      LIMIT 50
+    `);
+    const saved: string[] = [];
+    const failed: string[] = [];
+    for (const b of rows.rows) {
+      try {
+        const invoiceNumber = b.inv_num || `ABT/${new Date().getFullYear()}/000000`;
+        const buf = await genPdf({
+          bookingNumber: b.booking_number,
+          customerName: b.customer_name,
+          customerMobile: b.customer_mobile,
+          customerEmail: b.customer_email,
+          packageName: b.package_name,
+          numberOfPilgrims: b.number_of_pilgrims,
+          totalAmount: Number(b.total_amount) || 0,
+          finalAmount: Number(b.final_amount) || 0,
+          paidAmount: Number(b.paid_amount) || 0,
+          balanceAmount: Math.max(0, Number(b.final_amount || 0) - Number(b.paid_amount || 0)),
+          invoiceNumber,
+        });
+        const safeNum = invoiceNumber.replace(/[^a-zA-Z0-9\-_]/g, "_");
+        const url = await uploadToGCS(buf, `Invoice-${safeNum}.pdf`, "application/pdf", "invoices");
+        await sPool.query(`UPDATE invoices SET pdf_path=$1, updated_at=NOW() WHERE booking_id=$2`, [url, b.id]);
+        saved.push(`${b.booking_number} → ${url.slice(0, 60)}`);
+      } catch (e: any) {
+        failed.push(`${b.booking_number}: ${e.message}`);
+      }
+    }
+    res.json({ ok: true, saved, failed, totalProcessed: rows.rows.length });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // POST /api/migrate/db-query — run a read-only SELECT query for live debugging
 app.post("/api/migrate/db-query", async (req, res) => {
   const key = req.body?.key as string;
