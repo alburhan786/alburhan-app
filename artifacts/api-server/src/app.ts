@@ -673,18 +673,23 @@ app.get("/api/test-email", async (req: any, res: any) => {
       `,
       { title: "SMTP Test Email", preheader: "MSG91 SMTP integration is working correctly" }
     );
+    if (!result.ok) {
+      res.status(500).json({
+        success: false,
+        message: `Failed to send test email: ${result.error}`,
+        to,
+      });
+      return;
+    }
     res.json({
-      ok:        result.ok,
+      success:   true,
+      message:   "Test email sent successfully",
       to,
       messageId: result.messageId,
-      error:     result.error,
-      message:   result.ok
-        ? `Test email sent successfully to ${to}`
-        : `Failed to send test email: ${result.error}`,
     });
   } catch (err: any) {
     console.error("[test-email] Error:", err?.message);
-    res.status(500).json({ ok: false, to, message: "Internal error", error: err?.message });
+    res.status(500).json({ success: false, message: "Internal error sending test email", error: err?.message });
   }
 });
 
