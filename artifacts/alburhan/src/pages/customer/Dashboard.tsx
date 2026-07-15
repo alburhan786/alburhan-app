@@ -1714,17 +1714,22 @@ export default function CustomerDashboard() {
 
   const handleDownloadInvoice = async (bookingId: string, bookingNumber?: string) => {
     try {
-      const res = await fetch(`${BASE_API}/api/invoices/${bookingId}/pdf`, { credentials: "include" });
+      // Use the public by-number endpoint (no auth required, booking number is the token).
+      // Falls back to the auth-required UUID endpoint if booking number is not available.
+      const url = bookingNumber
+        ? `${BASE_API}/api/invoices/by-number/${encodeURIComponent(bookingNumber)}/pdf`
+        : `${BASE_API}/api/invoices/${bookingId}/pdf`;
+      const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
+      const objectUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url;
+      a.href = objectUrl;
       a.download = `Invoice-${bookingNumber || bookingId}.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      URL.revokeObjectURL(objectUrl);
     } catch {
       toast({ title: "Error", description: "Could not download invoice. Please try again.", variant: "destructive" });
     }

@@ -135,10 +135,10 @@ router.post("/generate-all", requireAdmin as any, async (_req: AuthenticatedRequ
   }
 });
 
-// ── Download PDF by human-readable booking number — GET /api/invoices/by-number/:bookingNumber/pdf ──
-// Accessible to authenticated customers (must own the booking) or admins.
-// Useful for linking from emails and admin panels without exposing internal UUIDs.
-router.get("/by-number/:bookingNumber/pdf", requireAuth as any, async (req: AuthenticatedRequest, res) => {
+// ── Public PDF download by booking number — GET /api/invoices/by-number/:bookingNumber/pdf ──
+// No session required. The booking number acts as the access token (unique, shown on booking docs).
+// This is the canonical download URL for customers and admins — avoids all session/mobile-match issues.
+router.get("/by-number/:bookingNumber/pdf", async (req, res) => {
   try {
     const { bookingNumber } = req.params;
     const bRes = await pool.query(
@@ -150,9 +150,26 @@ router.get("/by-number/:bookingNumber/pdf", requireAuth as any, async (req: Auth
     );
     const b = bRes.rows[0];
     if (!b) return void res.status(404).json({ message: "Booking not found" });
-    if (req.user?.role !== "admin" && b.customer_mobile !== req.user?.mobile) {
-      return void res.status(403).json({ message: "Forbidden" });
+
+    // If a pre-generated PDF is stored in object storage, serve it directly
+    if (b.pdf_path) {
+      // Redirect to stored URL for fast delivery
+      if (b.pdf_path.startsWith("http")) {
+        return void res.redirect(302, b.pdf_path);
+      }
+      // Internal path — proxy it
+      const fs = await import("fs");
+      const path = await import("path");
+      const fullPath = path.resolve(process.cwd(), b.pdf_path.replace(/^\//, ""));
+      if (fs.existsSync(fullPath)) {
+        const invoiceNumber = b.inv_num || b.invoice_number;
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `attachment; filename="Invoice-${invoiceNumber || bookingNumber}.pdf"`);
+        return void res.sendFile(fullPath);
+      }
     }
+
+    // Generate PDF on-the-fly
     const invoiceNumber = b.inv_num || b.invoice_number;
     const buf = await generateInvoicePdfBuffer({
       bookingNumber: b.booking_number,
