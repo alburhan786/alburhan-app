@@ -1,0 +1,114 @@
+Now perform a complete production validation for the entire Al Burhan Tours & Travels platform.
+
+Do not assume anything is working because the configuration is correct. Verify every feature end-to-end.
+
+1. Authentication
+- Test customer registration.
+- Test mobile OTP using Fast2SMS.
+- Test email OTP.
+- Test login and logout.
+- Test forgot password.
+
+2. Booking System
+- Create a new Hajj booking.
+- Create a new Umrah booking.
+- Verify booking status updates.
+- Verify Booking ID generation.
+
+3. Payment
+- Test Razorpay payment.
+- Test partial payment.
+- Test balance payment.
+- Verify invoice generation.
+- Verify payment reminder scheduling.
+
+4. Notifications
+Verify delivery through:
+- Fast2SMS
+- WhatsApp (BotBee)
+- Email
+- RCS (if enabled)
+
+If any channel fails, identify the root cause and fix it.
+
+5. Agreement System
+Upgrade and verify the Premium Digital Agreement:
+- Exactly 4 pages.
+- Customer photo.
+- QR verification.
+- OTP verification.
+- Digital signature.
+- Flight details.
+- Hotel details.
+- Saudi partner details.
+- Maktab details.
+- Payment summary.
+- Cancellation policy.
+- Audit trail.
+- PDF generation.
+
+6. Customer Dashboard
+Verify:
+- Booking history.
+- Payment history.
+- Agreement download.
+- Invoice download.
+- Ticket download.
+- Visa download.
+- Document upload.
+- Profile update.
+
+7. Admin Dashboard
+Verify:
+- Customer management.
+- Booking management.
+- Agreement generation.
+- Payment management.
+- Reminder management.
+- WhatsApp logs.
+- SMS logs.
+- Email logs.
+- Audit logs.
+- System Health Dashboard.
+
+8. Website
+Verify:
+- Home page.
+- Package pages.
+- Booking pages.
+- Contact page.
+- Forms.
+- Mobile responsiveness.
+- Performance.
+- SEO metadata.
+
+9. Security
+Verify:
+- Authentication.
+- Authorization.
+- Rate limiting.
+- Input validation.
+- SQL injection protection.
+- XSS protection.
+- File upload validation.
+- Audit logging.
+
+10. Deployment
+Verify:
+- Frontend version matches backend.
+- Latest assets are deployed.
+- No stale cache.
+- SSL is valid.
+- Health endpoints return OK.
+
+11. Final Report
+Provide:
+- PASS/FAIL checklist for every feature.
+- Root cause of any failure.
+- Files modified.
+- Database migrations (if any).
+- APIs changed.
+- Remaining issues (if any).
+- Confirmation that the production website is fully operational.
+
+Do not finish until every critical feature has been tested and verified in production.
