@@ -958,10 +958,18 @@ export async function sendJourneyStatusNotification(opts: {
   const entry = JOURNEY_STATUS_MESSAGES[opts.journeyStatus];
   if (!entry) return;
   const message = entry.body(opts.customerName, opts.bookingNumber);
-  const subject = `${entry.title} – Al Burhan Tours & Travels`;
+
   await Promise.allSettled([
     sendWhatsApp(opts.mobile, message),
-    opts.email ? sendEmail(opts.email, subject, message) : Promise.resolve(),
+    opts.email
+      ? import("../services/emailService.js").then(({ sendBookingStatusEmail }) =>
+          sendBookingStatusEmail(opts.email!, {
+            customerName:  opts.customerName,
+            bookingNumber: opts.bookingNumber,
+            newStatus:     opts.journeyStatus,
+          })
+        )
+      : Promise.resolve(),
   ]);
 }
 

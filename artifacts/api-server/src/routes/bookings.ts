@@ -47,6 +47,7 @@ import {
 } from "../lib/adminNotifications.js";
 import { trackNotification, fireNotificationEvent } from "../lib/notificationEngine.js";
 import { triggerWorkflow } from "../lib/workflowEngine.js";
+import { sendInvoiceEmail } from "../services/emailService.js";
 
 const router = Router();
 
@@ -902,11 +903,29 @@ router.post("/:id/send-invoice", requireAdmin as any, async (req: AuthenticatedR
   const results = await Promise.allSettled([
     sendWhatsApp(b.customerMobile, message),
     sendDLTSMS(b.customerMobile, b.customerName, b.bookingNumber, b.invoiceNumber || ""),
+    b.customerEmail
+      ? sendInvoiceEmail(b.customerEmail, {
+          customerName:  b.customerName,
+          bookingNumber: b.bookingNumber,
+          invoiceNumber: b.invoiceNumber || "",
+          packageName:   b.packageName ?? undefined,
+          totalAmount:   b.finalAmount ? Number(b.finalAmount) : 0,
+          paidAmount:    b.paidAmount  ? Number(b.paidAmount)  : undefined,
+          balanceDue:    b.finalAmount && b.paidAmount
+                           ? Math.max(0, Number(b.finalAmount) - Number(b.paidAmount))
+                           : undefined,
+        })
+      : Promise.resolve({ ok: false, error: "No customer email" }),
   ]);
 
   const whatsappResult = results[0].status === "fulfilled" ? (results[0] as any).value : null;
   const whatsappOk = whatsappResult?.ok === true;
   const smsOk = results[1].status === "fulfilled";
+  const emailResult = results[2].status === "fulfilled" ? (results[2] as any).value : null;
+  const emailOk = emailResult?.ok === true;
+  if (!emailOk && b.customerEmail) {
+    console.error(`[bookings] Invoice email failed for ${b.bookingNumber}:`, emailResult?.error);
+  }
 
   fireNotificationEvent("invoice_generated", {
     customerName: b.customerName,

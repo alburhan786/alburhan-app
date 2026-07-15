@@ -9,7 +9,7 @@ import {
 } from "@workspace/api-zod";
 import { generateOtp, requireAuth, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendOtpSMS, sendWhatsApp } from "../lib/notifications.js";
-import { sendOTPEmail } from "../services/emailService.js";
+import { sendOTPEmail, sendGenericEmail } from "../services/emailService.js";
 
 export const ADMIN_MOBILES = ["9893989786", "9893225590", "8989701701"];
 
@@ -286,6 +286,37 @@ router.post("/verify-otp", async (req, res) => {
       cleanMobile,
       `Assalamu Alaikum! Welcome to Al Burhan Tours & Travels.\n\nWe are delighted to have you with us. With 35+ years of experience, we are here to guide you on your sacred journey.\n\nFor assistance, call us:\n+91 8989701701\n+91 9893989786\n\nJazak Allah Khair!`
     ).catch(() => {});
+
+    // Send welcome email if customer already has an email on profile
+    if (user.email) {
+      sendGenericEmail(
+        user.email,
+        "Welcome to Al Burhan Tours & Travels",
+        `
+          <p>Assalamu Alaikum! 🌙</p>
+          <p>Welcome to <strong>Al Burhan Tours &amp; Travels</strong> — your trusted partner for Hajj &amp; Umrah for over 35 years.</p>
+          <p>Your account has been created successfully. You can now:</p>
+          <ul style="line-height:1.9;color:#374151;font-size:14px;">
+            <li>Browse and book Hajj &amp; Umrah packages</li>
+            <li>Complete your travel profile</li>
+            <li>Upload your passport and documents</li>
+            <li>Track your booking and journey status</li>
+          </ul>
+          <p style="margin-top:24px;">
+            <a href="https://alburhantravels.com/dashboard"
+               style="background:#0B5D3B;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold;">
+              Go to Your Dashboard
+            </a>
+          </p>
+          <p style="margin-top:24px;font-size:13px;color:#6b7280;">
+            Need help? Call us on <strong>+91 9893225590</strong> or email
+            <a href="mailto:info@alburhantravels.com" style="color:#0B5D3B;">info@alburhantravels.com</a>
+          </p>
+          <p style="font-size:13px;color:#6b7280;">Jazak Allah Khair! — Al Burhan Tours &amp; Travels</p>
+        `,
+        { title: "Welcome to Al Burhan Tours & Travels", preheader: "Your Hajj & Umrah journey begins here" }
+      ).catch(() => {});
+    }
   } else {
     sendWhatsApp(
       cleanMobile,
