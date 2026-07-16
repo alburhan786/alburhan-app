@@ -32,3 +32,4 @@
 - [SMTP VPS injection](smtp-vps-injection.md) — SMTP_HOST/PORT/USER/PASS/FROM added to injectKeys in build.ts; migration auto-inserts smtp row in api_settings on first run; getCachedConfig falls back to env vars if DB decrypt fails (safe)
 - [Agreement signing API fields](agreement-signing-api.md) — sign endpoint uses signatureData (not signature); termsAccepted must include all 13 clause IDs as {id:true}; signing OTP stored in agreements.signing_otp; customer route is /api/agreements/my/:id/sign
 - [emailService.ts location and pattern](email-service.md) — emailService.ts at src/services/; test endpoint in app.ts BEFORE app.use("/api",router); test endpoint in app.ts only (not index.ts — 404 fires first)
+- [Notification engine bug patterns](notification-engine-bugs.md) — sendDLTSMS returns boolean (not object); TRIGGER_TO_EVENT must use valid EventType values; Razorpay order route needs same amount cap as payment links

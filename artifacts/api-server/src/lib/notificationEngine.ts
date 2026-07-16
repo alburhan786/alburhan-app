@@ -679,10 +679,11 @@ async function sendOnChannelWithType(channel: Channel, eventType: EventType, ctx
             const smsOk = await sendDLTSMS(ctx.customerMobile, ctx.customerName, balStr, "");
             return { status: smsOk ? "sent" : "failed", providerResponse: { ok: smsOk, provider: "Fast2SMS" } };
           }
-          default:
+          default: {
             // All other events: use generic notify template
-            await sendDLTSMS(ctx.customerMobile, ctx.customerName, ctx.bookingNumber || "", ctx.invoiceNumber || "");
-            return { status: "sent", providerResponse: { ok: true, provider: "Fast2SMS", endpoint: "https://www.fast2sms.com/dev/bulkV2" } };
+            const defaultSmsOk = await sendDLTSMS(ctx.customerMobile, ctx.customerName, ctx.bookingNumber || "", ctx.invoiceNumber || "");
+            return { status: defaultSmsOk ? "sent" : "failed", providerResponse: { ok: defaultSmsOk, provider: "Fast2SMS", endpoint: "https://www.fast2sms.com/dev/bulkV2" } };
+          }
         }
         return { status: result.ok ? "sent" : "failed", providerResponse: result };
       } catch (smsErr: any) {
@@ -880,12 +881,15 @@ export async function retryNotification(logId: string): Promise<{ success: boole
       const result = await sendWhatsApp(log.recipient, message);
       status = result.ok ? "sent" : "failed"; providerResponse = result;
     } else if (channel === "sms") {
-      try {
-        await sendDLTSMS(log.recipient, log.recipient, "", "");
-        status = "sent"; providerResponse = { ok: true, provider: "Fast2SMS", endpoint: "https://www.fast2sms.com/dev/bulkV2" };
-      } catch (smsErr: any) {
-        status = "failed"; providerResponse = { ok: false, provider: "Fast2SMS", endpoint: "https://www.fast2sms.com/dev/bulkV2", errorMessage: smsErr?.message };
-      }
+      // sendDLTSMS returns boolean — capture it rather than assuming success
+      const smsRetryOk = await sendDLTSMS(
+        log.recipient,
+        log.customer_name || log.recipient,
+        log.booking_number || "",
+        "",
+      );
+      status = smsRetryOk ? "sent" : "failed";
+      providerResponse = { ok: smsRetryOk, provider: "Fast2SMS", endpoint: "https://www.fast2sms.com/dev/bulkV2" };
     } else if (channel === "rcs") {
       const result = await sendRCS(log.recipient, log.recipient, message);
       status = result.ok ? "sent" : "failed"; providerResponse = result;

@@ -960,6 +960,17 @@ router.post("/by-number/:bookingNumber/create-order", async (req, res) => {
       return;
     }
 
+    // Cap at Razorpay max per-order amount to avoid "Amount exceeds maximum" errors
+    const RAZORPAY_ORDER_MAX = 500000; // ₹5,00,000
+    if (remaining > RAZORPAY_ORDER_MAX) {
+      res.status(400).json({
+        message: `This booking has a large outstanding balance (₹${remaining.toLocaleString("en-IN")}). Please ask the admin to generate a payment link instead, or pay in instalments.`,
+        remaining,
+        maxPerOrder: RAZORPAY_ORDER_MAX,
+      });
+      return;
+    }
+
     const rz = getRazorpay();
     const order = await rz.orders.create({
       amount: Math.round(remaining * 100),
