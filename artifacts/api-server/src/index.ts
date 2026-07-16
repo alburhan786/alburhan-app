@@ -1939,6 +1939,46 @@ async function start() {
     setInterval(syncBotBeeTemplates, 10 * 60 * 1000);
     console.log("[BotBee] Template auto-sync scheduled every 10 minutes");
 
+    // ── WhatsApp template startup validation ─────────────────────────────────
+    // Logs every configured template name + failure rate from notification_logs.
+    // A template with 0 successes or >80% failures triggers a clear error log.
+    setTimeout(async () => {
+      try {
+        const { TEMPLATE_CONFIGS } = await import("./lib/templateConfig.js");
+        console.log("[TemplateValidation] Checking configured WhatsApp templates:");
+        for (const t of TEMPLATE_CONFIGS) {
+          const envOverride = (process.env[t.envVar] || "").trim();
+          const source = envOverride ? `env:${t.envVar}` : "default";
+          const statsRes = await pool.query(
+            `SELECT status, COUNT(*) AS n FROM notification_logs
+             WHERE channel='whatsapp' AND event_type = ANY($1)
+             GROUP BY status`,
+            [t.eventTypes]
+          ).catch(() => ({ rows: [] as { status: string; n: string }[] }));
+          const stats = { sent: 0, failed: 0 };
+          for (const row of statsRes.rows as { status: string; n: string }[]) {
+            if (row.status === "sent") stats.sent += parseInt(row.n, 10);
+            else stats.failed += parseInt(row.n, 10);
+          }
+          const total = stats.sent + stats.failed;
+          const rate = total > 0 ? Math.round((stats.sent / total) * 100) : null;
+          const rateStr = rate !== null ? `${rate}% success (${stats.sent}/${total})` : "untested";
+          if (total > 0 && (rate === null || rate < 20)) {
+            console.error(
+              `[TemplateValidation] ❌ FAILING  "${t.displayName}" → name="${t.name}" id=${t.id} [${source}] | ${rateStr}`,
+              `\n  → Set env var ${t.envVar} to the correct BotBee template name.`
+            );
+          } else if (total > 0 && rate !== null && rate < 60) {
+            console.warn(`[TemplateValidation] ⚠️  WARNING  "${t.displayName}" → name="${t.name}" id=${t.id} [${source}] | ${rateStr}`);
+          } else {
+            console.log(`[TemplateValidation] ✅ OK       "${t.displayName}" → name="${t.name}" id=${t.id} [${source}] | ${rateStr}`);
+          }
+        }
+      } catch (err: any) {
+        console.error("[TemplateValidation] Failed:", err.message);
+      }
+    }, 5000); // Run 5s after server starts (after DB migrations complete)
+
     // ── WhatsApp retry engine — runs every 60 seconds, exponential backoff, max 5 retries ──
     // Errors that indicate a PERMANENT failure (never worth retrying):
     const WA_PERMANENT_ERRORS = [

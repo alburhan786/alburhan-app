@@ -90,6 +90,7 @@ import BillingSettings from "@/pages/admin/BillingSettings";
 import NotificationCenter from "@/pages/admin/NotificationCenter";
 import NotificationLogs from "@/pages/admin/NotificationLogs";
 import CommunicationCenter from "@/pages/admin/CommunicationCenter";
+import NotificationTemplates from "@/pages/admin/NotificationTemplates";
 import WhatsAppTemplateManager from "@/pages/admin/WhatsAppTemplateManager";
 import BotBeeDashboard from "@/pages/admin/BotBeeDashboard";
 import SMSTemplateManager from "@/pages/admin/SMSTemplateManager";
@@ -244,6 +245,7 @@ function Router() {
       <Route path="/admin/user-roles" component={() => <AdminRoute component={UserRolesManager} />} />
       <Route path="/admin/notifications" component={() => <AdminRoute component={NotificationCenter} />} />
       <Route path="/admin/notification-logs" component={() => <AdminRoute component={NotificationLogs} />} />
+      <Route path="/admin/notification-templates" component={() => <AdminRoute component={NotificationTemplates} />} />
       <Route path="/admin/billing-settings" component={() => <AdminRoute component={BillingSettings} />} />
       <Route path="/admin/api-settings" component={() => <AdminRoute component={ApiSettings} />} />
       <Route path="/admin/communication-center" component={() => <AdminRoute component={CommunicationCenter} />} />

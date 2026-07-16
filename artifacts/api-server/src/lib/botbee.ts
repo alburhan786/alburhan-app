@@ -534,20 +534,21 @@ export async function sendConfirmationTemplate(
   return result;
 }
 
-// ── Al Burhan Production Templates (July 2026) ───────────────────────────────
-// These 7 templates REPLACE the broken template 333473 ("conformation") which
-// returned "Message template not found." from BotBee. Template IDs and names
-// confirmed from BotBee dashboard by the business owner.
+// ── Al Burhan Production Templates — env-var backed, never hardcoded ─────────
+// All template names are read from environment variables at startup.
+// Override any name by setting the corresponding env var (e.g. on the VPS).
+// Central config: src/lib/templateConfig.ts
+// Fallback defaults are used only when the env var is not set.
 
-export const ABT_TEMPLATES = {
-  booking_submitted:  { id: "407645", name: "bookingsubmitted" },
-  payment_received:   { id: "407646", name: "paymentreceived" },
-  pending_payment:    { id: "407648", name: "pending_payment_reminder" },
-  booking_approved:   { id: "407642", name: "approve" },
-  departure_reminder: { id: "407664", name: "departure_reminder" },
-  visa_issued:        { id: "407667", name: "visa_issued" },
-  flight_issued:      { id: "361654", name: "flight" },
-} as const;
+export const ABT_TEMPLATES: Record<string, { id: string; name: string }> = {
+  booking_submitted:  { id: "407645", name: (process.env.BOTBEE_BOOKING_SUBMITTED_TEMPLATE  || "bookingsubmitted").trim() },
+  payment_received:   { id: "407646", name: (process.env.BOTBEE_PAYMENT_RECEIVED_TEMPLATE   || "paymentreceived").trim() },
+  pending_payment:    { id: "407648", name: (process.env.BOTBEE_PENDING_PAYMENT_TEMPLATE    || "pending_payment_reminder").trim() },
+  booking_approved:   { id: "407642", name: (process.env.BOTBEE_BOOKING_APPROVED_TEMPLATE   || "bookingapproved").trim() },
+  departure_reminder: { id: "407664", name: (process.env.BOTBEE_DEPARTURE_REMINDER_TEMPLATE || "departure_reminder").trim() },
+  visa_issued:        { id: "407667", name: (process.env.BOTBEE_VISA_ISSUED_TEMPLATE        || "visa_issued").trim() },
+  flight_issued:      { id: "361654", name: (process.env.BOTBEE_FLIGHT_ISSUED_TEMPLATE      || "flight").trim() },
+};
 
 function bodyParams(texts: (string | null | undefined)[]): object[] {
   if (!texts.length) return [];

@@ -378,6 +378,115 @@ app.post("/api/migrate/trigger-test-notification", async (req, res) => {
   }
 });
 
+// POST /api/migrate/test-approval-template — fire booking_approved WhatsApp template (no auth)
+app.post("/api/migrate/test-approval-template", async (req, res) => {
+  const key = (req.query.key || req.body?.key) as string;
+  if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
+
+  const { pool: p } = await import("@workspace/db");
+  const { sendApprovalTemplate, ABT_TEMPLATES } = await import("./lib/botbee.js");
+
+  // Use provided mobile or fallback to a real booking's mobile
+  let mobile = (req.body?.mobile || req.query.mobile) as string | undefined;
+  if (!mobile) {
+    const r = await p.query(`SELECT customer_mobile FROM bookings WHERE customer_mobile IS NOT NULL LIMIT 1`);
+    mobile = r.rows[0]?.customer_mobile || "9867114562";
+  }
+
+  const { sendTemplate } = await import("./lib/botbee.js");
+
+  const configuredName = ABT_TEMPLATES.booking_approved?.name || "bookingapproved";
+  const templateId     = ABT_TEMPLATES.booking_approved?.id   || "407642";
+
+  // If overrideName provided, probe that specific name; otherwise run all candidates
+  const overrideName = (req.body?.overrideName || req.query.overrideName) as string | undefined;
+  const candidates: string[] = overrideName
+    ? [overrideName.trim()]
+    : [configuredName, "booking_approved", "approved", "approve", "bookingapproved",
+       "approval", "hajjapproval", "booking_confirmation", "bookingconfirmation", "conformation"];
+
+  const results: Array<{ name: string; ok: boolean; httpStatus?: number; error?: string; response?: unknown }> = [];
+
+  for (const name of candidates) {
+    try {
+      const r = await sendTemplate(mobile!, name,
+        [{ type: "body", parameters: [
+          { type: "text", text: "Test Customer" },
+          { type: "text", text: "Hajj 2026 (TEST)" },
+          { type: "text", text: "TEST001" },
+          { type: "text", text: "https://alburhantravels.com/invoice/TEST001" },
+        ]}],
+        { eventType: `test_approval_probe_${name}` }
+      );
+      results.push({ name, ok: r.ok, httpStatus: r.httpStatus, error: r.errorMessage || undefined, response: r.responsePayload });
+      if (r.ok) break; // Stop on first success
+    } catch (e: any) {
+      results.push({ name, ok: false, error: e.message });
+    }
+  }
+
+  const winner = results.find(r => r.ok);
+  res.json({
+    ok:             !!winner,
+    winnerName:     winner?.name || null,
+    configuredName,
+    templateId,
+    mobile,
+    results,
+    hint: winner
+      ? `✅ Template "${winner.name}" works! Set BOTBEE_BOOKING_APPROVED_TEMPLATE=${winner.name} in VPS .env`
+      : "❌ None of the candidate names matched. Check BotBee dashboard for the exact template name.",
+  });
+});
+
+// GET /api/migrate/botbee-discovery — try multiple BotBee API paths to list all registered templates
+app.get("/api/migrate/botbee-discovery", async (req, res) => {
+  const key = req.query.key as string;
+  if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
+
+  const axios = (await import("axios")).default;
+  const apiToken        = (process.env.BOTBEE_API_KEY || "").trim();
+  const phone_number_id = (process.env.BOTBEE_PHONE_NUMBER_ID || "").trim();
+  const businessId      = (process.env.BOTBEE_BUSINESS_ID || "").trim();
+  const baseUrl         = "https://app.botbee.io/api/v1";
+
+  const probes = [
+    `${baseUrl}/whatsapp/templates`,
+    `${baseUrl}/whatsapp/template`,
+    `${baseUrl}/templates`,
+    `${baseUrl}/whatsapp/templates/list`,
+    `${baseUrl}/whatsapp/approved-templates`,
+    `${baseUrl}/business/templates`,
+    `${baseUrl}/whatsapp/template/all`,
+  ];
+
+  const findings: Array<{ endpoint: string; status: number | string; data: unknown }> = [];
+
+  for (const endpoint of probes) {
+    try {
+      const params: Record<string, string> = { apiToken, phone_number_id };
+      if (businessId) params.business_id = businessId;
+      const r = await axios.get(`${endpoint}?${new URLSearchParams(params)}`, { timeout: 8000, validateStatus: () => true });
+      findings.push({ endpoint, status: r.status, data: r.data });
+    } catch (e: any) {
+      findings.push({ endpoint, status: e.message, data: null });
+    }
+  }
+
+  const templateLists = findings.filter(f =>
+    f.status === 200 && f.data && typeof f.data === "object" &&
+    (Array.isArray(f.data) || Array.isArray((f.data as any)?.templates) || Array.isArray((f.data as any)?.data))
+  );
+
+  res.json({
+    ok: templateLists.length > 0,
+    baseUrl,
+    phone_number_id: `${phone_number_id.slice(0, 4)}...`,
+    templateListsFound: templateLists,
+    allProbes: findings.map(f => ({ endpoint: f.endpoint, status: f.status })),
+  });
+});
+
 // GET /api/migrate/pdf-debug — capture real PDF error on VPS
 app.get("/api/migrate/pdf-debug", async (req, res) => {
   const key = req.query.key as string;

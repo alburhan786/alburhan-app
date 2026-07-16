@@ -466,6 +466,120 @@ router.post("/automation-test", requireAdmin as any, async (req: AuthenticatedRe
   res.json({ ok: failed === 0, steps, summary: { passed, failed, skipped: steps.filter(s => s.status === "skip").length } });
 });
 
+// GET /api/whatsapp/template-status — all configured templates + DB delivery stats
+router.get("/template-status", requireAdmin as any, async (_req, res) => {
+  try {
+    const { TEMPLATE_CONFIGS } = await import("../lib/templateConfig.js");
+
+    // Query delivery stats per template (event_type → whatsapp channel)
+    const statsQ = await pool.query(`
+      SELECT event_type, status, COUNT(*) AS count,
+             MAX(sent_at) AS last_used
+      FROM notification_logs
+      WHERE channel = 'whatsapp'
+        AND event_type = ANY($1)
+      GROUP BY event_type, status`,
+      [TEMPLATE_CONFIGS.flatMap(t => t.eventTypes)]
+    );
+
+    type StatRow = { event_type: string; status: string; count: string; last_used: string | null };
+    const statsByEvent: Record<string, { sent: number; failed: number; permanently_failed: number; last_used: string | null }> = {};
+    for (const row of statsQ.rows as StatRow[]) {
+      const key = row.event_type;
+      if (!statsByEvent[key]) statsByEvent[key] = { sent: 0, failed: 0, permanently_failed: 0, last_used: null };
+      const n = parseInt(row.count, 10);
+      if (row.status === "sent") statsByEvent[key].sent += n;
+      else if (row.status === "permanently_failed") statsByEvent[key].permanently_failed += n;
+      else statsByEvent[key].failed += n;
+      if (row.last_used && (!statsByEvent[key].last_used || row.last_used > statsByEvent[key].last_used!)) {
+        statsByEvent[key].last_used = row.last_used;
+      }
+    }
+
+    const templates = TEMPLATE_CONFIGS.map(t => {
+      const agg = { sent: 0, failed: 0, permanently_failed: 0, last_used: null as string | null };
+      for (const evt of t.eventTypes) {
+        const s = statsByEvent[evt];
+        if (s) {
+          agg.sent += s.sent;
+          agg.failed += s.failed;
+          agg.permanently_failed += s.permanently_failed;
+          if (s.last_used && (!agg.last_used || s.last_used > agg.last_used)) agg.last_used = s.last_used;
+        }
+      }
+      const total = agg.sent + agg.failed + agg.permanently_failed;
+      const successRate = total > 0 ? Math.round((agg.sent / total) * 100) : null;
+      const health: "healthy" | "warning" | "failing" | "untested" =
+        total === 0 ? "untested" :
+        successRate === null ? "untested" :
+        successRate >= 80 ? "healthy" :
+        successRate >= 40 ? "warning" : "failing";
+      return {
+        key:          t.key,
+        displayName:  t.displayName,
+        id:           t.id,
+        name:         t.name,
+        envVar:       t.envVar,
+        language:     t.language,
+        eventTypes:   t.eventTypes,
+        description:  t.description,
+        stats:        { sent: agg.sent, failed: agg.failed + agg.permanently_failed, total, successRate, last_used: agg.last_used },
+        health,
+      };
+    });
+
+    res.json({ ok: true, templates, generated_at: new Date().toISOString() });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, message: err.message });
+  }
+});
+
+// POST /api/whatsapp/template-test/:templateKey — fire a live test for a specific template
+router.post("/template-test/:templateKey", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  const { templateKey } = req.params;
+  const { mobile } = req.body;
+  if (!mobile?.trim()) return void res.status(400).json({ ok: false, message: "mobile is required" });
+
+  try {
+    const { TEMPLATE_CONFIGS } = await import("../lib/templateConfig.js");
+    const tpl = TEMPLATE_CONFIGS.find(t => t.key === templateKey);
+    if (!tpl) return void res.status(404).json({ ok: false, message: `Unknown template key: ${templateKey}` });
+
+    const { sendTemplate } = await import("../lib/botbee.js");
+    const sampleParams = [
+      { type: "body", parameters: Array.from({ length: tpl.paramCount }, (_, i) => ({ type: "text", text: `Sample${i + 1}` })) }
+    ];
+
+    const result = await sendTemplate(mobile.trim(), tpl.name, sampleParams, { eventType: `test_${tpl.key}` });
+
+    // Log the test
+    try {
+      const id = `nl_tpl_test_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      await pool.query(
+        `INSERT INTO notification_logs (id, event_type, channel, recipient, message, status, provider_response, provider_name, api_endpoint, http_status, request_payload, error_code, sent_at, retry_count)
+         VALUES ($1,$2,'whatsapp',$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW(),0)`,
+        [id, `test_${tpl.key}`, mobile.trim(), `[template-test] ${tpl.name}`,
+         result.ok ? "sent" : "failed", JSON.stringify(result),
+         result.provider, result.endpoint, result.httpStatus || null,
+         result.requestPayload ? JSON.stringify(result.requestPayload) : null, result.errorCode || null]
+      );
+    } catch {}
+
+    res.json({
+      ok:             result.ok,
+      templateKey,
+      templateName:   tpl.name,
+      templateId:     tpl.id,
+      mobile:         mobile.trim(),
+      httpStatus:     result.httpStatus,
+      errorMessage:   result.errorMessage,
+      responsePayload: result.responsePayload,
+    });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, message: err.message });
+  }
+});
+
 // POST /api/whatsapp/retry/:logId — retry a failed delivery
 router.post("/retry/:logId", requireAdmin as any, async (req, res) => {
   try {
