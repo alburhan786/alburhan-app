@@ -1,0 +1,62 @@
+STOP rebuilding the same code repeatedly.
+
+The Agreement UI has already been implemented.
+
+The real problem is that production is still serving an old frontend bundle.
+
+Do NOT make more UI changes until production is serving the latest build.
+
+Perform a complete production deployment audit.
+
+Check all of the following:
+
+1. Verify the VPS is serving the newest dist folder.
+2. Delete every old frontend bundle before deployment.
+3. Clear Nginx cache if enabled.
+4. Clear CDN/cache if configured.
+5. Remove old hashed JS/CSS bundles.
+6. Ensure index.html references the newest bundle hash.
+7. Confirm only one dist folder exists.
+8. Confirm the deployment script actually replaces the previous build.
+9. Verify browser cache headers.
+10. Verify service worker is not serving cached assets.
+11. Disable service worker temporarily if necessary.
+12. Confirm PM2 is serving the latest frontend.
+13. Restart PM2 after deployment.
+14. Verify production by opening the deployed index.html and checking the loaded JS filename.
+15. Compare local bundle hash with the production bundle hash.
+
+Only after confirming production is using the newest bundle should you verify the Agreement UI.
+
+Then confirm the following:
+
+✓ My Agreements section appears in the customer dashboard.
+✓ Agreement card displays correctly.
+✓ View Agreement works.
+✓ Download PDF works.
+✓ Sign Agreement works.
+✓ Share Agreement works.
+✓ Agreement status updates automatically.
+✓ Sidebar Agreement count updates.
+✓ Admin Agreement details display IP, Device, Browser, OTP, Signature timestamp.
+✓ Public verification page works.
+
+Finally perform a real production end-to-end test:
+
+Booking →
+Approval →
+Agreement →
+Customer Login →
+Agreement Visible →
+Sign →
+Payment →
+Invoice PDF →
+WhatsApp →
+SMS →
+Email →
+Dashboard Update →
+Verification Page
+
+If any step fails, identify the exact failing API, frontend component, deployment script, or server configuration.
+
+Do not report "deployment successful" unless the live production website is actually serving the newest frontend bundle.
