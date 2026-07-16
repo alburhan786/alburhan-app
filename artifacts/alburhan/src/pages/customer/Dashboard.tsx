@@ -1611,6 +1611,7 @@ export default function CustomerDashboard() {
   const [notifications, setNotifications] = useState<CustomerNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const prevUnreadRef = React.useRef(0);
+  const [agreementsByBooking, setAgreementsByBooking] = useState<Record<string, any>>({});
 
   const [profileExt, setProfileExt] = useState<{ blood_group?: string; emergency_contact_name?: string; emergency_contact_mobile?: string }>({});
   const [showProfileEdit, setShowProfileEdit] = useState(false);
@@ -1683,6 +1684,19 @@ export default function CustomerDashboard() {
     return () => clearInterval(interval);
   }, [fetchUnreadCount]);
 
+  const reloadAgreements = useCallback(() => {
+    fetch(`${BASE_API}/api/agreements/my`, { credentials: "include" })
+      .then(r => r.json())
+      .then(d => {
+        const map: Record<string, any> = {};
+        (d.agreements || []).forEach((ag: any) => { map[ag.booking_id] = ag; });
+        setAgreementsByBooking(map);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => { reloadAgreements(); }, [reloadAgreements]);
+
   const loadNotifications = useCallback(async () => {
     try {
       const res = await fetch(`${BASE_API}/api/notifications/my`, { credentials: "include" });
@@ -1711,6 +1725,24 @@ export default function CustomerDashboard() {
   };
 
   const uploadBooking = bookings.find((b: any) => b.id === uploadBookingId);
+
+  const handleDownloadAgreementPdf = async (agreementId: string, agreementNumber: string) => {
+    try {
+      const res = await fetch(`${BASE_API}/api/agreements/my/${agreementId}/pdf`, { credentials: "include" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objectUrl;
+      a.download = `Agreement-${agreementNumber}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(objectUrl);
+    } catch {
+      toast({ title: "Download Error", description: "Could not download the agreement PDF. Please try again.", variant: "destructive" });
+    }
+  };
 
   const handleDownloadInvoice = async (bookingId: string, bookingNumber?: string) => {
     try {
@@ -1893,6 +1925,60 @@ export default function CustomerDashboard() {
               </div>
             </Card>
 
+            {/* Agreements Summary sidebar card */}
+            {(() => {
+              const allAgs = Object.values(agreementsByBooking);
+              const pending = allAgs.filter((ag: any) => ag.status === "pending_signature");
+              const signed  = allAgs.filter((ag: any) => ag.status === "signed");
+              if (allAgs.length === 0) return null;
+              return (
+                <Card className="overflow-hidden shadow-sm border-border/50 rounded-2xl">
+                  <div className={`px-4 py-3 flex items-center gap-2 ${pending.length > 0 ? "bg-amber-50 border-b border-amber-200" : "bg-emerald-50 border-b border-emerald-200"}`}>
+                    <span className="text-base">{pending.length > 0 ? "📜" : "✅"}</span>
+                    <span className={`font-bold text-sm ${pending.length > 0 ? "text-amber-800" : "text-emerald-800"}`}>My Agreements</span>
+                    {pending.length > 0 && (
+                      <span className="ml-auto bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse">{pending.length} Pending</span>
+                    )}
+                  </div>
+                  <div className="p-4 space-y-2 text-sm">
+                    {pending.length > 0 && (
+                      <div className="text-xs text-amber-700 font-medium bg-amber-50 rounded-lg px-3 py-2 border border-amber-200">
+                        ⚠️ {pending.length} agreement{pending.length > 1 ? "s" : ""} awaiting your signature.
+                      </div>
+                    )}
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Total</span>
+                      <span className="font-semibold">{allAgs.length}</span>
+                    </div>
+                    {signed.length > 0 && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-muted-foreground">Signed</span>
+                        <span className="font-semibold text-emerald-700">✅ {signed.length}</span>
+                      </div>
+                    )}
+                    {pending.length > 0 && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-muted-foreground">Pending</span>
+                        <span className="font-semibold text-amber-700">⏳ {pending.length}</span>
+                      </div>
+                    )}
+                    {pending.length > 0 && (
+                      <button
+                        className="w-full text-xs font-bold py-2 rounded-lg mt-1 text-white"
+                        style={{ background: "#d97706" }}
+                        onClick={() => {
+                          const firstPending = pending[0] as any;
+                          window.open((import.meta.env.BASE_URL || "/") + "agreement/" + firstPending.id + "/sign", "_blank");
+                        }}
+                      >
+                        ✍ Sign Now
+                      </button>
+                    )}
+                  </div>
+                </Card>
+              );
+            })()}
+
             <Card className="p-5 shadow-sm border-border/50 rounded-2xl bg-accent/10">
               <h4 className="font-semibold text-sm text-primary mb-3">Need Help?</h4>
               <p className="text-xs text-muted-foreground mb-3">Our team is here to assist you with your booking.</p>
@@ -2041,6 +2127,90 @@ export default function CustomerDashboard() {
                         />
                       </div>
                     )}
+
+                    {/* ── My Agreement Card ── */}
+                    {(() => {
+                      const ag = agreementsByBooking[booking.id];
+                      if (!ag) return null;
+                      const isPending = ag.status === "pending_signature";
+                      const isSigned  = ag.status === "signed";
+                      if (!isPending && !isSigned) return null;
+                      return (
+                        <div className="mx-5 mb-4 rounded-xl border overflow-hidden"
+                          style={{
+                            background: isPending
+                              ? "linear-gradient(135deg,#fffbeb 0%,#fef9ec 100%)"
+                              : "linear-gradient(135deg,#ecfdf5 0%,#f0fdf4 100%)",
+                            borderColor: isPending ? "#fcd34d" : "#6ee7b7",
+                          }}>
+                          <div className="px-4 py-3 border-b flex items-center gap-2"
+                            style={{
+                              background: isPending ? "rgba(251,191,36,0.12)" : "rgba(16,185,129,0.12)",
+                              borderColor: isPending ? "#fcd34d" : "#6ee7b7",
+                            }}>
+                            <span className="text-base">{isPending ? "📜" : "✅"}</span>
+                            <span className="font-semibold text-sm" style={{ color: isPending ? "#92400e" : "#065f46" }}>
+                              {isPending ? "Hajj Agreement — Action Required" : "Hajj Agreement — Signed"}
+                            </span>
+                            <span className={`ml-auto text-[11px] font-bold px-2.5 py-0.5 rounded-full ${isPending ? "bg-amber-100 text-amber-800 animate-pulse" : "bg-emerald-100 text-emerald-800"}`}>
+                              {isPending ? "⏳ Pending Signature" : "✅ Signed"}
+                            </span>
+                          </div>
+                          <div className="p-4">
+                            <div className="flex justify-between items-start mb-3">
+                              <div>
+                                <p className="text-[10px] uppercase tracking-wider mb-0.5 font-semibold" style={{ color: isPending ? "#92400e" : "#065f46" }}>Agreement ID</p>
+                                <p className="font-mono font-bold text-sm" style={{ color: isPending ? "#78350f" : "#064e3b" }}>{ag.agreement_number}</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-[10px] uppercase tracking-wider mb-0.5 font-semibold" style={{ color: isPending ? "#92400e" : "#065f46" }}>Generated</p>
+                                <p className="text-xs font-medium text-muted-foreground">{new Date(ag.created_at).toLocaleDateString("en-IN", { dateStyle: "medium" })}</p>
+                              </div>
+                            </div>
+                            {isSigned && ag.signed_at && (
+                              <p className="text-xs mb-3 font-medium" style={{ color: "#065f46" }}>
+                                ✅ Signed on {new Date(ag.signed_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+                              </p>
+                            )}
+                            {isPending && (
+                              <p className="text-xs mb-3 text-amber-700">
+                                Please review and sign your Hajj Agreement to confirm your booking.
+                              </p>
+                            )}
+                            <div className="flex gap-2 flex-wrap">
+                              {isPending && (
+                                <Button
+                                  size="sm"
+                                  className="flex-1 text-white font-semibold shadow-sm"
+                                  style={{ background: "#d97706", minWidth: 120 }}
+                                  onClick={() => window.open((import.meta.env.BASE_URL || "/") + "agreement/" + ag.id + "/sign", "_blank")}
+                                >
+                                  ✍ Sign Agreement
+                                </Button>
+                              )}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="flex-1 font-semibold"
+                                style={{ borderColor: isPending ? "#d97706" : "#059669", color: isPending ? "#92400e" : "#065f46", minWidth: 120 }}
+                                onClick={() => handleDownloadAgreementPdf(ag.id, ag.agreement_number)}
+                              >
+                                ⬇ Download PDF
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="font-semibold text-xs"
+                                style={{ borderColor: "#9ca3af", color: "#4b5563" }}
+                                onClick={() => window.open((import.meta.env.BASE_URL || "/") + "verify-agreement/" + ag.verification_token, "_blank")}
+                              >
+                                🔍 Verify
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     {/* Invoice Card — only shown after payment has been made */}
                     {booking.invoiceNumber && (booking.status === 'confirmed' || booking.status === 'partially_paid') && (

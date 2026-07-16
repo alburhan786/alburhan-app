@@ -1,0 +1,176 @@
+Implement a complete Digital Agreement Automation system for the Al Burhan Tours & Travels website and customer portal.
+
+Workflow:
+
+1. After a customer completes booking (online or offline) and the booking is confirmed, automatically generate:
+   - Agreement ID (Example: ABT-AGR-2026-000001)
+   - Booking ID
+   - Secure Agreement PDF
+   - QR Code for verification
+   - Digital signature page
+   - OTP verification
+
+2. Automatically save the agreement in the database.
+
+3. Automatically display the Agreement inside the Customer Dashboard under a new menu:
+   My Dashboard
+   ├── My Bookings
+   ├── My Agreements
+   ├── Invoices
+   ├── Payments
+   ├── Documents
+   ├── Tickets
+   ├── Visa
+   ├── Hotel Voucher
+   ├── Notifications
+
+4. Customer should be able to:
+   - View Agreement
+   - Download PDF
+   - Sign Digitally
+   - Verify Agreement using QR Code
+   - Print Agreement
+
+5. Immediately after the Agreement is generated, automatically send it to the customer through:
+
+   ✅ WhatsApp
+      - PDF Attachment
+      - Booking ID
+      - Agreement ID
+      - Customer Name
+      - Package Name
+      - Payment Status
+      - Secure Dashboard Link
+
+   ✅ Email
+      - PDF Attachment
+      - Company Logo
+      - Booking Summary
+      - Agreement PDF
+      - Customer Dashboard Link
+
+   ✅ Customer Dashboard
+      - Show Agreement instantly
+      - Show "Pending Signature" or "Signed"
+      - Show Download PDF button
+
+6. Admin Panel
+
+Create a new module:
+
+Agreement Management
+
+Admin can:
+- View all agreements
+- Search by Booking ID
+- Search by Agreement ID
+- Search by Customer Name
+- Download PDF
+- Regenerate PDF
+- Resend via WhatsApp
+- Resend via Email
+- Check Signature Status
+- Check OTP Status
+- View Audit Trail
+- View Date & Time Sent
+- View Delivery Status
+- View Read Status (WhatsApp if supported)
+- View Email Delivery Status
+
+7. Notification Automation
+
+Whenever:
+- Agreement Created
+- Agreement Signed
+- Agreement Updated
+- Payment Received
+- Booking Confirmed
+
+Automatically send notifications through:
+- WhatsApp
+- Email
+- SMS
+- Push Notification
+
+8. Dashboard Status Cards
+
+Customer Dashboard should display:
+- Booking Confirmed
+- Agreement Generated
+- Agreement Sent
+- Pending Signature
+- Signed
+- Payment Pending
+- Payment Completed
+- Visa Pending
+- Visa Approved
+- Ticket Issued
+
+9. Security
+
+Every Agreement must include:
+- QR Verification
+- Unique Hash
+- OTP Verification
+- Digital Signature
+- IP Address
+- Device Information
+- Browser Information
+- Timestamp
+- Audit Log
+
+10. PDF Features
+
+Professional branded PDF including:
+- Al Burhan Tours & Travels logo
+- Agreement ID
+- Booking ID
+- Customer Details
+- Package Details
+- Payment Schedule
+- Terms & Conditions
+- QR Code
+- Digital Signature
+- Company Stamp
+- Footer with website and contact details
+
+11. APIs
+
+Integrate:
+- WhatsApp Business API (BotBee/Meta)
+- Email SMTP
+- SMS Gateway
+- Firebase Push Notifications
+
+12. Error Handling
+
+If WhatsApp fails:
+- Retry automatically.
+- Send Email.
+- Send SMS with Agreement link.
+- Notify Admin.
+
+13. Customer Experience
+
+After booking confirmation:
+Booking Confirmed
+↓
+Agreement Generated
+↓
+Agreement Saved
+↓
+Agreement appears in Dashboard
+↓
+PDF sent on WhatsApp
+↓
+PDF sent by Email
+↓
+SMS sent with Agreement link
+↓
+Customer signs digitally
+↓
+Admin receives signed confirmation
+↓
+Agreement status changes to "Signed"
+
+Everything must run automatically without any manual intervention. All activities should be logged in the database with complete audit history.
