@@ -807,7 +807,6 @@ function defaultDedupWindow(eventType: EventType): number {
     case "hotel_assigned":
     case "room_assigned":
     case "bus_assigned":
-    case "payment_received":
     case "invoice_generated":
     case "booking_completed":
     case "feedback_request":
@@ -820,10 +819,11 @@ function defaultDedupWindow(eventType: EventType): number {
     case "payment_due":
       return 1; // deduplicate per hour (intraday crons)
 
-    // Each partial payment is a distinct financial event — never dedup by
-    // time window, or a second real payment within the window would be
-    // silently skipped. Idempotency for duplicate webhook retries of the
-    // *same* transaction is handled upstream via razorpayPaymentId checks.
+    // Payment events are distinct financial events — never dedup by time window,
+    // or a second real payment or webhook retry of the same event within the
+    // window would be silently skipped. Idempotency for duplicate Razorpay
+    // webhook retries is handled upstream via razorpayPaymentId uniqueness checks.
+    case "payment_received":
     case "partial_payment":
       return 0;
 

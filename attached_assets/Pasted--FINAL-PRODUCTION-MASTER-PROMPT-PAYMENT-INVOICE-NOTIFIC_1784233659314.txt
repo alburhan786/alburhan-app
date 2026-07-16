@@ -1,0 +1,400 @@
+🚨 FINAL PRODUCTION MASTER PROMPT – PAYMENT, INVOICE & NOTIFICATION SYSTEM
+
+This is a PRODUCTION system for Al Burhan Tours & Travels.
+
+Do NOT make assumptions.
+Do NOT stop after code changes.
+Find the root cause.
+Fix it.
+Deploy to VPS.
+Verify on production with a real payment.
+
+==================================================
+1. PAYMENT SUCCESS MUST TRIGGER EVERYTHING
+==================================================
+
+After Razorpay confirms payment (success webhook or verified callback), execute ONE production workflow.
+
+Payment Success
+↓
+
+Update Booking
+↓
+
+Update Payment Status
+↓
+
+Update Balance
+↓
+
+Generate Final Tax Invoice
+↓
+
+Generate Invoice PDF
+
+↓
+
+Store PDF
+
+↓
+
+Send WhatsApp
+
+↓
+
+Send SMS
+
+↓
+
+Send Email
+
+↓
+
+Refresh Dashboard
+
+Nothing should require manual refresh or admin action.
+
+==================================================
+2. CUSTOMER DASHBOARD
+==================================================
+
+Before payment:
+
+Show
+
+• Bank Details
+• Submit Payment
+• Pay Balance
+
+Hide
+
+• Tax Invoice
+• Invoice Card
+• Download Invoice PDF
+• Print Invoice
+• Share Invoice
+
+==================================================
+3. AFTER PAYMENT
+==================================================
+
+Immediately after successful payment:
+
+Generate Tax Invoice.
+
+Generate Final Invoice PDF.
+
+Store PDF.
+
+Customer Dashboard instantly shows:
+
+• Tax Invoice
+• Download Invoice
+• Print
+• Share
+
+Invoice status should be
+
+PAID
+
+or
+
+PARTIALLY PAID
+
+depending on balance.
+
+==================================================
+4. REMOVE LAST UI BUG
+==================================================
+
+TravelDocumentsCard still exposes invoice area without checking paidAmount.
+
+Every invoice component must use:
+
+paidAmount > 0
+
+Never booking status.
+
+Never confirmation status.
+
+Invoice visibility depends ONLY on successful payment.
+
+==================================================
+5. BOOKING NUMBER
+==================================================
+
+DO NOT MODIFY.
+
+Booking Number remains everywhere.
+
+Admin
+
+Database
+
+Invoice PDF
+
+Booking Details
+
+Internal APIs
+
+Keep current format exactly.
+
+==================================================
+6. WHATSAPP NOTIFICATION
+==================================================
+
+Current pipeline exists but customer receives nothing.
+
+Trace entire flow.
+
+Check:
+
+Webhook
+
+triggerWorkflow()
+
+BotBee API
+
+Template name
+
+Template status
+
+Authentication
+
+Phone formatting
+
+Country code
+
+Attachment upload
+
+Media URL
+
+HTTP response
+
+Retry queue
+
+Worker logs
+
+Database logs
+
+If any API fails
+
+Retry automatically.
+
+Store delivery status.
+
+==================================================
+7. SMS
+==================================================
+
+Immediately after payment send SMS.
+
+Booking Confirmed
+
+Payment Received
+
+Balance
+
+Invoice Number
+
+Support Number
+
+Log provider response.
+
+Retry failures.
+
+==================================================
+8. EMAIL
+==================================================
+
+Send:
+
+Booking Confirmation
+
+Payment Receipt
+
+Invoice PDF
+
+Agreement PDF
+
+Payment Summary
+
+Email must contain attachments.
+
+==================================================
+9. ADMIN
+==================================================
+
+Admin immediately receives:
+
+WhatsApp
+
+Email
+
+Payment Alert
+
+Customer Name
+
+Booking Number
+
+Amount
+
+Remaining Balance
+
+Payment Mode
+
+Time
+
+Invoice Number
+
+==================================================
+10. PAYMENT WORKFLOW
+==================================================
+
+Partial Payment
+
+↓
+
+Generate Partial Receipt
+
+↓
+
+Update Balance
+
+↓
+
+Notify Customer
+
+↓
+
+Dashboard updates instantly
+
+↓
+
+Customer pays remaining
+
+↓
+
+Generate Final Invoice
+
+↓
+
+Final Paid Status
+
+==================================================
+11. LIVE TEST
+==================================================
+
+Run REAL production tests.
+
+Not local.
+
+Use VPS.
+
+Perform:
+
+Real payment
+
+Generate invoice
+
+Generate PDF
+
+Open PDF
+
+WhatsApp delivery
+
+SMS delivery
+
+Email delivery
+
+Dashboard refresh
+
+Admin notification
+
+Webhook verification
+
+==================================================
+12. VERIFY
+==================================================
+
+Provide evidence.
+
+Show:
+
+Webhook response
+
+BotBee response
+
+SMS response
+
+Email response
+
+Invoice ID
+
+PDF URL
+
+Database payment record
+
+Payment log
+
+Notification log
+
+Delivery status
+
+==================================================
+13. DEPLOY
+==================================================
+
+Build production.
+
+Deploy to VPS.
+
+Clear cache.
+
+Restart services.
+
+Verify production bundle.
+
+==================================================
+14. COMPLETE ONLY WHEN
+==================================================
+
+Customer pays.
+
+↓
+
+Booking updates.
+
+↓
+
+Invoice generated.
+
+↓
+
+PDF generated.
+
+↓
+
+Dashboard updates.
+
+↓
+
+WhatsApp received.
+
+↓
+
+SMS received.
+
+↓
+
+Email received.
+
+↓
+
+Admin notified.
+
+↓
+
+Everything verified on LIVE production.
+
+Do NOT mark this task complete until every step succeeds on the production VPS.

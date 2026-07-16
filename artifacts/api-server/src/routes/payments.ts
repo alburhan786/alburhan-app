@@ -1402,5 +1402,82 @@ router.post("/reminders/disable", requireAdmin as any, async (req: Authenticated
   res.json({ success: true, enabled: false, message: "Daily payment reminders disabled" });
 });
 
+/**
+ * POST /api/payments/resend-notification/:bookingId
+ * Admin-only: fire (or re-fire) the full payment notification pipeline for a
+ * booking. Useful when a customer did not receive WhatsApp/SMS/Email after
+ * their payment. Since payment_received dedup window is now 0, this always
+ * fires a fresh notification regardless of prior logs.
+ */
+router.post("/resend-notification/:bookingId", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  const { bookingId } = req.params;
+  try {
+    const result = await pool.query(
+      `SELECT b.*, u.email AS customer_email
+       FROM bookings b
+       LEFT JOIN users u ON u.id = b.customer_id
+       WHERE b.id = $1
+       LIMIT 1`,
+      [bookingId]
+    );
+    const row = result.rows[0];
+    if (!row) {
+      res.status(404).json({ success: false, message: "Booking not found" });
+      return;
+    }
+
+    const paidAmount   = Number(row.paid_amount || 0);
+    const finalAmount  = Number(row.final_amount || 0);
+    const isFullyPaid  = paidAmount >= finalAmount && finalAmount > 0;
+    const remaining    = Math.max(0, finalAmount - paidAmount);
+
+    if (paidAmount <= 0) {
+      res.status(400).json({ success: false, message: "No payment recorded for this booking — nothing to resend" });
+      return;
+    }
+
+    const booking = {
+      id:                row.id,
+      bookingNumber:     row.booking_number,
+      customerName:      row.customer_name,
+      customerMobile:    row.customer_mobile,
+      customerEmail:     row.customer_email || row.customer_email_field || null,
+      customerId:        row.customer_id,
+      packageName:       row.package_name,
+      numberOfPilgrims:  row.number_of_pilgrims,
+      finalAmount:       row.final_amount,
+    };
+
+    console.log(`[resend-notification] Admin ${req.user?.email || req.user?.mobile} firing payment notification for booking ${booking.bookingNumber}`);
+
+    await processPaymentSuccessNotifications({
+      booking,
+      isFullyPaid,
+      thisPaymentAmount: paidAmount,
+      newPaidAmount: paidAmount,
+      remainingBalance: remaining,
+      invoiceNumber: row.invoice_number || null,
+      paymentRef: row.razorpay_payment_id || "manual-resend",
+    });
+
+    res.json({
+      success: true,
+      message: `Payment notification re-fired for booking ${booking.bookingNumber}`,
+      booking: {
+        id: booking.id,
+        bookingNumber: booking.bookingNumber,
+        customerName: booking.customerName,
+        customerMobile: booking.customerMobile,
+        isFullyPaid,
+        paidAmount,
+        remainingBalance: remaining,
+      },
+    });
+  } catch (err: any) {
+    console.error("[resend-notification] failed:", err?.message);
+    res.status(500).json({ success: false, message: err?.message || "Failed to resend notification" });
+  }
+});
+
 export default router;
 
