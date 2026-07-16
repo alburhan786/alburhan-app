@@ -749,11 +749,12 @@ const TRAVEL_DOC_TYPES: Record<string, { label: string; icon: React.ElementType;
   other:                  { label: "Document",                  icon: FileText,       color: "text-gray-700",    bg: "bg-gray-50 border-gray-200" },
 };
 
-function TravelDocumentsCard({ bookingId, bookingNumber, invoiceNumber, bookingStatus }: {
+function TravelDocumentsCard({ bookingId, bookingNumber, invoiceNumber, bookingStatus, paidAmount }: {
   bookingId: string;
   bookingNumber: string;
   invoiceNumber: string | null;
   bookingStatus: string;
+  paidAmount?: number | null;
 }) {
   const BASE_API = import.meta.env.VITE_API_URL || "";
   const { toast } = useToast();
@@ -890,7 +891,7 @@ function TravelDocumentsCard({ bookingId, bookingNumber, invoiceNumber, bookingS
         <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
 
           {/* ── Tax Invoice slot ──────────────────────────────────────────── */}
-          {bookingNumber && bookingStatus === "confirmed" && invoiceNumber ? (
+          {bookingNumber && Number(paidAmount || 0) > 0 && (bookingStatus === "confirmed" || bookingStatus === "partially_paid") && invoiceNumber ? (
             <div className="rounded-xl border bg-emerald-50 border-emerald-200 overflow-hidden">
               <div className="flex items-center gap-3 p-3">
                 <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-white/50">
@@ -2360,6 +2361,7 @@ export default function CustomerDashboard() {
                           bookingNumber={booking.bookingNumber}
                           invoiceNumber={booking.invoiceNumber}
                           bookingStatus={booking.status}
+                          paidAmount={booking.paidAmount}
                         />
                       </div>
                     )}

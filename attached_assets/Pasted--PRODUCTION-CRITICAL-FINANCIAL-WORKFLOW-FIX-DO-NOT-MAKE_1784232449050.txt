@@ -1,0 +1,482 @@
+🚨 PRODUCTION CRITICAL - FINANCIAL WORKFLOW FIX
+
+DO NOT MAKE ANY ASSUMPTIONS.
+
+Analyze the existing production code first, identify every place where invoices are created, displayed, downloaded and notifications are triggered.
+
+This is a LIVE production system for AL BURHAN TOURS & TRAVELS.
+
+=========================================================
+1. NEVER CREATE PENDING INVOICE
+=========================================================
+
+Current behaviour is WRONG.
+
+Currently:
+
+Booking
+↓
+
+Invoice Generated (PENDING)
+
+↓
+
+Customer Dashboard shows Pending Invoice
+
+This must NEVER happen.
+
+NEW FLOW
+
+Booking Submitted
+↓
+
+Admin Approves Booking
+↓
+
+NO Invoice Created
+
+NO Invoice Number
+
+NO Invoice PDF
+
+NO Download Button
+
+NO Print Button
+
+NO Share Button
+
+NO Invoice in Customer Dashboard
+
+↓
+
+Customer receives Payment Link ONLY
+
+↓
+
+Customer completes payment
+
+↓
+
+Payment verified successfully
+
+↓
+
+NOW create Tax Invoice
+
+↓
+
+Generate Invoice Number
+
+↓
+
+Generate Invoice PDF
+
+↓
+
+Generate Receipt
+
+↓
+
+Store PDF
+
+↓
+
+Show Invoice in Customer Dashboard
+
+↓
+
+Trigger Notifications
+
+=========================================================
+2. CUSTOMER DASHBOARD
+=========================================================
+
+Hide completely before payment:
+
+Invoice Card
+
+Invoice Number
+
+Download PDF
+
+Print
+
+Share
+
+Receipt
+
+Payment History
+
+Tax Invoice
+
+Pending Invoice
+
+Customer must NEVER know a pending invoice exists.
+
+=========================================================
+3. AFTER PAYMENT
+=========================================================
+
+Immediately after payment
+
+Generate
+
+Invoice Number
+
+Tax Invoice
+
+Receipt
+
+PDF
+
+Show
+
+Download PDF
+
+Print
+
+Share
+
+Payment History
+
+Payment Status
+
+Amount Paid
+
+Remaining Balance
+
+=========================================================
+4. REMOVE BOOKING NUMBER
+=========================================================
+
+Remove Booking Number
+
+Example
+
+ABT26817072
+
+Do NOT show this on customer invoice PDF.
+
+Instead show only
+
+Invoice No
+
+Tax Invoice
+
+Original For Recipient
+
+Customer Name
+
+Package
+
+Payment Details
+
+GST
+
+Invoice Date
+
+Payment Date
+
+Payment Status
+
+=========================================================
+5. PDF DESIGN
+=========================================================
+
+Top Header
+
+AL BURHAN TOURS & TRAVELS
+
+Tax Invoice
+
+ORIGINAL FOR RECIPIENT
+
+Do NOT display Booking Number anywhere on customer PDF.
+
+Only Invoice Number.
+
+=========================================================
+6. PAYMENT SUCCESS
+=========================================================
+
+Immediately after Razorpay verification
+
+Automatically
+
+Generate Invoice
+
+Generate PDF
+
+Generate Receipt
+
+Update Ledger
+
+Update Dashboard
+
+Update Payment Status
+
+=========================================================
+7. WHATSAPP
+=========================================================
+
+Immediately after payment send automatically
+
+Message 1
+
+Payment Received
+
+Dear {{Customer}}
+
+We have received your payment.
+
+Amount
+
+Invoice Number
+
+Payment Status
+
+Message 2
+
+Booking Confirmed
+
+Dear {{Customer}}
+
+Your booking has been confirmed.
+
+Package
+
+Departure Date
+
+Invoice Number
+
+Message 3
+
+Attach
+
+Invoice PDF
+
+Receipt PDF
+
+If Agreement Signed
+
+Agreement PDF
+
+=========================================================
+8. SMS
+=========================================================
+
+Automatically send
+
+Payment Received
+
+Booking Confirmed
+
+Invoice Number
+
+Amount
+
+Support Number
+
+=========================================================
+9. EMAIL
+=========================================================
+
+Automatically send
+
+Payment Confirmation
+
+Booking Confirmation
+
+Invoice PDF
+
+Receipt PDF
+
+Agreement PDF (if signed)
+
+=========================================================
+10. RCS
+=========================================================
+
+If configured
+
+Send
+
+Booking Confirmation
+
+Payment Confirmation
+
+Invoice
+
+=========================================================
+11. NOTIFICATION PIPELINE
+=========================================================
+
+Verify every trigger.
+
+Payment Success
+
+↓
+
+Invoice Generated
+
+↓
+
+PDF Generated
+
+↓
+
+WhatsApp
+
+↓
+
+SMS
+
+↓
+
+Email
+
+↓
+
+RCS
+
+↓
+
+Dashboard Refresh
+
+No manual action should be required.
+
+=========================================================
+12. BOTBEE
+=========================================================
+
+Verify
+
+Payment Success Template
+
+Booking Confirmation Template
+
+Invoice PDF Attachment
+
+Receipt Attachment
+
+If template approval is missing
+
+Return exact Meta error.
+
+=========================================================
+13. CUSTOMER DASHBOARD
+=========================================================
+
+Only display
+
+PAID
+
+PARTIALLY PAID
+
+ADVANCE PAID
+
+FULLY PAID
+
+Never display
+
+Pending
+
+Awaiting Payment
+
+Unpaid
+
+Payment Link Sent
+
+Payment Failed
+
+=========================================================
+14. SECURITY
+=========================================================
+
+Pending invoices
+
+Cannot be downloaded
+
+Cannot be printed
+
+Cannot be shared
+
+Cannot be accessed by URL
+
+Cannot be returned by API
+
+=========================================================
+15. END-TO-END TESTS
+=========================================================
+
+Run complete production tests.
+
+Test Booking
+
+Admin Approval
+
+Payment Link
+
+Payment
+
+Invoice Generation
+
+Invoice Number
+
+Invoice PDF
+
+Receipt
+
+Dashboard
+
+WhatsApp
+
+SMS
+
+Email
+
+RCS
+
+Payment History
+
+Ledger
+
+Admin Panel
+
+Customer Panel
+
+=========================================================
+16. ACCEPTANCE CRITERIA
+=========================================================
+
+PASS only if:
+
+✅ No pending invoice exists before payment.
+
+✅ Invoice is created ONLY after successful payment.
+
+✅ Customer Dashboard shows only paid or partially paid invoices.
+
+✅ Booking Number is removed from the customer invoice PDF.
+
+✅ Tax Invoice displays "ORIGINAL FOR RECIPIENT".
+
+✅ Invoice PDF is automatically generated after payment.
+
+✅ WhatsApp Booking Confirmation is sent automatically.
+
+✅ WhatsApp Payment Confirmation is sent automatically.
+
+✅ Invoice PDF is attached on WhatsApp.
+
+✅ SMS Booking Confirmation is sent automatically.
+
+✅ SMS Payment Confirmation is sent automatically.
+
+✅ Email with Invoice PDF is sent automatically.
+
+✅ Admin dashboard updates instantly.
+
+✅ Customer dashboard updates instantly.
+
+Build production, deploy to VPS, clear cache, verify live production, and provide a PASS/FAIL report with screenshots. Do not mark this task complete until every item above passes.
