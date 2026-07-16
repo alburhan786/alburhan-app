@@ -254,6 +254,130 @@ app.get("/api/migrate/db-check", async (req, res) => {
   res.json({ node: process.version, env: process.env.NODE_ENV, checks });
 });
 
+// GET /api/migrate/notification-audit — real production notification log dump + optional resend trigger
+app.get("/api/migrate/notification-audit", async (req, res) => {
+  const key = req.query.key as string;
+  if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
+  const { pool: auditPool } = await import("@workspace/db");
+
+  // 1. Most recent paid bookings
+  const paidQ = await auditPool.query(`
+    SELECT id, booking_number, customer_name, customer_mobile, customer_email,
+           paid_amount, final_amount, status, created_at
+    FROM bookings
+    WHERE paid_amount > 0
+    ORDER BY created_at DESC
+    LIMIT 10`);
+
+  // 2. Recent notification logs (last 50)
+  const logsQ = await auditPool.query(`
+    SELECT nl.id, nl.booking_id, nl.channel, nl.event_type, nl.status,
+           nl.provider_response, nl.provider_name, nl.http_status,
+           nl.error_code, nl.sent_at, nl.retry_count,
+           b.booking_number, b.customer_name, b.customer_mobile
+    FROM notification_logs nl
+    LEFT JOIN bookings b ON b.id = nl.booking_id
+    ORDER BY nl.sent_at DESC
+    LIMIT 50`);
+
+  // 3. Channel delivery summary
+  const summaryQ = await auditPool.query(`
+    SELECT channel, event_type, status, COUNT(*) as count
+    FROM notification_logs
+    GROUP BY channel, event_type, status
+    ORDER BY channel, event_type, status`);
+
+  res.json({
+    generated_at: new Date().toISOString(),
+    paid_bookings: paidQ.rows,
+    notification_summary: summaryQ.rows,
+    recent_logs: logsQ.rows,
+  });
+});
+
+// POST /api/migrate/trigger-test-notification — fire live resend on a real paid booking (no session needed)
+app.post("/api/migrate/trigger-test-notification", async (req, res) => {
+  const key = (req.query.key || req.body?.key) as string;
+  if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
+  const bookingId = (req.query.bookingId || req.body?.bookingId) as string;
+
+  const { pool: trigPool } = await import("@workspace/db");
+  const { processPaymentSuccessNotifications } = await import("./routes/payments.js");
+
+  // Find most recent paid booking if no bookingId specified
+  let targetId = bookingId;
+  if (!targetId) {
+    const r = await trigPool.query(
+      `SELECT id FROM bookings WHERE paid_amount > 0 ORDER BY created_at DESC LIMIT 1`
+    );
+    if (!r.rows.length) return void res.status(404).json({ error: "No paid bookings found" });
+    targetId = r.rows[0].id;
+  }
+
+  // Fetch the booking row
+  const bRow = await trigPool.query(
+    `SELECT b.*, u.email AS customer_email_field2
+     FROM bookings b
+     LEFT JOIN users u ON u.id = b.customer_id
+     WHERE b.id = $1 LIMIT 1`, [targetId]
+  );
+  if (!bRow.rows.length) return void res.status(404).json({ error: "Booking not found" });
+  const row = bRow.rows[0];
+
+  const paidAmount  = Number(row.paid_amount  || 0);
+  const finalAmount = Number(row.final_amount || 0);
+  if (paidAmount <= 0) return void res.status(400).json({ error: "No payment on this booking" });
+
+  const booking = {
+    id:               row.id,
+    bookingNumber:    row.booking_number,
+    customerName:     row.customer_name,
+    customerMobile:   row.customer_mobile,
+    customerEmail:    row.customer_email || row.customer_email_field2 || null,
+    customerId:       row.customer_id,
+    packageName:      row.package_name,
+    numberOfPilgrims: row.number_of_pilgrims,
+    finalAmount:      row.final_amount,
+  };
+
+  const startMs = Date.now();
+  try {
+    console.log(`[migrate-trigger] Firing test notification for booking ${booking.bookingNumber} (${booking.customerMobile})`);
+    await processPaymentSuccessNotifications({
+      booking,
+      isFullyPaid:        paidAmount >= finalAmount && finalAmount > 0,
+      thisPaymentAmount:  paidAmount,
+      newPaidAmount:      paidAmount,
+      remainingBalance:   Math.max(0, finalAmount - paidAmount),
+      invoiceNumber:      row.invoice_number || null,
+      paymentRef:         row.razorpay_payment_id || "audit-trigger",
+    });
+    const elapsed = Date.now() - startMs;
+
+    // Wait 4s then pull the fresh notification logs for this booking
+    await new Promise(r => setTimeout(r, 4000));
+    const freshLogs = await trigPool.query(`
+      SELECT channel, event_type, status, provider_response, provider_name,
+             http_status, error_code, sent_at, retry_count
+      FROM notification_logs
+      WHERE booking_id = $1
+      ORDER BY sent_at DESC
+      LIMIT 20`, [targetId]);
+
+    res.json({
+      ok: true,
+      booking_id:   targetId,
+      booking_number: booking.bookingNumber,
+      customer_mobile: booking.customerMobile,
+      customer_email:  booking.customerEmail,
+      elapsed_ms:   elapsed,
+      fresh_notification_logs: freshLogs.rows,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message, booking_id: targetId });
+  }
+});
+
 // GET /api/migrate/pdf-debug — capture real PDF error on VPS
 app.get("/api/migrate/pdf-debug", async (req, res) => {
   const key = req.query.key as string;
