@@ -1,0 +1,246 @@
+The backend Agreement system is complete and deployed.
+
+Verified:
+
+✓ GET /api/agreements/my exists
+✓ Agreement download endpoint exists
+✓ Agreement signing API exists
+✓ Agreement verification API exists
+✓ VPS deployment completed
+✓ Build completed
+
+However the Customer Dashboard still has NO Agreement UI.
+
+This is now a FRONTEND integration task.
+
+Implement the complete Agreement module inside the Customer Dashboard.
+
+---------------------------------------
+
+CUSTOMER DASHBOARD
+
+Create a new section:
+
+📄 My Agreements
+
+For every booking display:
+
+• Agreement Number
+• Booking Number
+• Package Name
+• Agreement Status
+• Created Date
+• Signed Date
+• Verification Status
+
+Buttons:
+
+View Agreement
+
+Download PDF
+
+Sign Agreement
+
+Verify Agreement
+
+Share Agreement
+
+If signed:
+
+Show green badge
+
+✓ Signed
+
+If unsigned:
+
+Show orange badge
+
+Pending Signature
+
+---------------------------------------
+
+Customer Sidebar
+
+Add
+
+My Agreements
+
+with total agreement count.
+
+---------------------------------------
+
+Booking Card
+
+Every booking should display
+
+Agreement Status
+
+Signed
+
+Pending
+
+Rejected
+
+Expired
+
+Buttons:
+
+View Agreement
+
+Download PDF
+
+Sign
+
+---------------------------------------
+
+Notifications
+
+When agreement becomes available automatically send
+
+Email
+
+Agreement PDF attachment
+
+WhatsApp
+
+Agreement PDF
+
+Agreement URL
+
+SMS
+
+Agreement URL
+
+Customer Dashboard notification
+
+---------------------------------------
+
+Admin Dashboard
+
+Agreement Status
+
+Signed
+
+Pending
+
+Rejected
+
+Viewed
+
+Downloaded
+
+Signed Date
+
+IP Address
+
+Device
+
+Browser
+
+OTP Verified
+
+Signature Timestamp
+
+---------------------------------------
+
+Live Updates
+
+After customer signs
+
+Dashboard updates automatically
+
+Admin updates automatically
+
+Customer updates automatically
+
+No refresh required.
+
+---------------------------------------
+
+Verification Page
+
+Public verification page
+
+Shows
+
+Agreement Number
+
+Booking Number
+
+Customer Name
+
+Package
+
+Status
+
+Signed Date
+
+QR verification
+
+---------------------------------------
+
+Download
+
+PDF download must work
+
+Customer Dashboard
+
+Admin Dashboard
+
+Public verification page
+
+Email attachment
+
+WhatsApp attachment
+
+---------------------------------------
+
+Security
+
+Customer can access ONLY their agreements.
+
+Admin can access all.
+
+Public can verify only.
+
+---------------------------------------
+
+Testing
+
+Run full production tests
+
+Booking
+
+Approval
+
+Agreement generation
+
+Customer login
+
+Agreement visible
+
+Agreement download
+
+Agreement signing
+
+OTP verification
+
+PDF generation
+
+Email
+
+SMS
+
+WhatsApp
+
+Dashboard refresh
+
+QR verification
+
+Admin dashboard
+
+Customer dashboard
+
+All tests must PASS.
+
+Do not stop until every Agreement workflow works end-to-end in production.

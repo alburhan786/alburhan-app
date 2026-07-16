@@ -460,6 +460,17 @@ export default function AgreementCenter() {
                   ["Paid",         `₹${Number(selected.paid_amount  || 0).toLocaleString("en-IN")}`],
                   ["OTP Verified", selected.otp_verified ? "✅ Yes" : "❌ No"],
                   ["Signed At",    selected.signed_at ? new Date(selected.signed_at).toLocaleString("en-IN") : "Not signed"],
+                  ["Signer IP",    selected.signed_ip || "—"],
+                  ["Device/Browser", (() => {
+                    const ua = selected.signed_user_agent || "";
+                    if (!ua) return "—";
+                    if (ua.includes("Edg")) return "Edge";
+                    if (ua.includes("Chrome") && !ua.includes("Edg")) return "Chrome";
+                    if (ua.includes("Firefox")) return "Firefox";
+                    if (ua.includes("Safari") && !ua.includes("Chrome")) return "Safari";
+                    if (ua.includes("Mobile")) return "Mobile Browser";
+                    return ua.substring(0, 40);
+                  })()],
                   ["Created",      new Date(selected.created_at).toLocaleString("en-IN")],
                 ] as [string, string][]).map(([k, v]) => (
                   <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #f5f5f5", fontSize: 12 }}>

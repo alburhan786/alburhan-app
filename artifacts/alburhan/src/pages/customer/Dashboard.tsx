@@ -45,6 +45,223 @@ function DocWarningBadge({ bookingId }: { bookingId: string }) {
   );
 }
 
+// ── My Agreements Section ──────────────────────────────────────────────────────
+function MyAgreementsSection({
+  agreements,
+  onDownload,
+  onRefresh,
+}: {
+  agreements: any[];
+  onDownload: (id: string, num: string) => void;
+  onRefresh: () => void;
+}) {
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const BASE = import.meta.env.BASE_URL || "/";
+
+  const handleShare = (ag: any) => {
+    const url = `https://alburhantravels.com/verify-agreement/${ag.verification_token}`;
+    if (navigator.share) {
+      navigator.share({ title: `Hajj Agreement ${ag.agreement_number}`, text: `Al Burhan Tours & Travels — ${ag.agreement_number}`, url }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(url).then(() => {
+        setCopiedId(ag.id);
+        setTimeout(() => setCopiedId(null), 2500);
+      }).catch(() => {});
+    }
+  };
+
+  const agStatusColor = (s: string) => {
+    if (s === "signed")            return "bg-emerald-100 text-emerald-800 border-emerald-300";
+    if (s === "pending_signature") return "bg-amber-100 text-amber-800 border-amber-300";
+    if (s === "expired")           return "bg-gray-100 text-gray-600 border-gray-300";
+    if (s === "rejected")          return "bg-red-100 text-red-700 border-red-300";
+    return "bg-blue-100 text-blue-800 border-blue-300";
+  };
+  const agStatusLabel = (s: string) => {
+    if (s === "signed")            return "✅ Signed";
+    if (s === "pending_signature") return "⏳ Pending Signature";
+    if (s === "expired")           return "⌛ Expired";
+    if (s === "rejected")          return "❌ Rejected";
+    return s;
+  };
+
+  if (agreements.length === 0) return null;
+
+  const pending = agreements.filter(a => a.status === "pending_signature");
+
+  return (
+    <div className="space-y-4">
+      {/* Section heading */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <h2 className="text-2xl font-serif font-bold text-foreground">📄 My Agreements</h2>
+          {pending.length > 0 && (
+            <span className="bg-amber-500 text-white text-xs font-bold px-2.5 py-1 rounded-full animate-pulse">
+              {pending.length} Action Required
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="text-muted-foreground">
+            {agreements.length} agreement{agreements.length !== 1 ? "s" : ""}
+          </Badge>
+          <button
+            onClick={onRefresh}
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors px-2 py-1 rounded-lg hover:bg-accent"
+          >
+            <RefreshCcw className="w-3 h-3" /> Refresh
+          </button>
+        </div>
+      </div>
+
+      {/* Pending alert banner */}
+      {pending.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-start gap-3">
+          <span className="text-xl shrink-0">⚠️</span>
+          <div>
+            <p className="text-sm font-semibold text-amber-800">
+              {pending.length} agreement{pending.length > 1 ? "s" : ""} awaiting your signature
+            </p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              Please review and digitally sign your Hajj Agreement to confirm your booking. Signing requires OTP verification on your registered mobile.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Agreement cards */}
+      <div className="space-y-4">
+        {agreements.map((ag: any) => {
+          const isPending = ag.status === "pending_signature";
+          const isSigned  = ag.status === "signed";
+          const borderClr = isPending ? "#fcd34d" : isSigned ? "#6ee7b7" : "#e5e7eb";
+          const bgGrad    = isPending
+            ? "linear-gradient(135deg,#fffbeb 0%,#fef9ec 100%)"
+            : isSigned
+            ? "linear-gradient(135deg,#ecfdf5 0%,#f0fdf4 100%)"
+            : "linear-gradient(135deg,#f9fafb 0%,#f3f4f6 100%)";
+          const accentClr = isPending ? "#92400e" : isSigned ? "#065f46" : "#374151";
+
+          return (
+            <Card key={ag.id} className="overflow-hidden rounded-2xl shadow-sm" style={{ border: `1.5px solid ${borderClr}` }}>
+              {/* Card header */}
+              <div
+                className="px-5 py-4 border-b flex flex-wrap items-center justify-between gap-3"
+                style={{ background: isPending ? "rgba(251,191,36,0.1)" : isSigned ? "rgba(16,185,129,0.1)" : "rgba(0,0,0,0.03)", borderColor: borderClr }}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">{isSigned ? "✅" : isPending ? "📜" : "📄"}</span>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-0.5">Agreement ID</p>
+                    <p className="font-mono font-bold text-base" style={{ color: accentClr }}>{ag.agreement_number}</p>
+                  </div>
+                </div>
+                <Badge className={`text-xs font-bold px-3 py-1 border ${agStatusColor(ag.status)} ${isPending ? "animate-pulse" : ""}`}>
+                  {agStatusLabel(ag.status)}
+                </Badge>
+              </div>
+
+              {/* Details + buttons */}
+              <div className="p-5" style={{ background: bgGrad }}>
+                {/* Info grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3 mb-4">
+                  {ag.booking_number && (
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-1">Booking No.</p>
+                      <p className="font-mono font-semibold text-sm">#{ag.booking_number}</p>
+                    </div>
+                  )}
+                  {ag.package_name && (
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-1">Package</p>
+                      <p className="font-semibold text-sm leading-tight">{ag.package_name}</p>
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-1">Generated On</p>
+                    <p className="font-semibold text-sm">{new Date(ag.created_at).toLocaleDateString("en-IN", { dateStyle: "medium" })}</p>
+                  </div>
+                  {isSigned && ag.signed_at && (
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-1">Signed On</p>
+                      <p className="font-semibold text-sm text-emerald-700">
+                        {new Date(ag.signed_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+                      </p>
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-1">Verification</p>
+                    <p className={`font-semibold text-sm ${isSigned ? "text-emerald-700" : "text-amber-700"}`}>
+                      {isSigned ? "✅ Verified" : "⏳ Pending"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-1">Status</p>
+                    <p className={`font-semibold text-sm ${isSigned ? "text-emerald-700" : isPending ? "text-amber-700" : "text-gray-600"}`}>
+                      {agStatusLabel(ag.status)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Action buttons */}
+                <div className="flex flex-wrap gap-2">
+                  {isPending ? (
+                    <Button
+                      size="sm"
+                      className="text-white font-semibold text-xs shadow-sm"
+                      style={{ background: "#d97706" }}
+                      onClick={() => window.open(BASE + "agreement/" + ag.id + "/sign", "_blank")}
+                    >
+                      ✍ Sign Agreement
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      className="text-white font-semibold text-xs"
+                      style={{ background: "#059669" }}
+                      onClick={() => window.open(BASE + "agreement/" + ag.id + "/sign", "_blank")}
+                    >
+                      <Eye className="w-3.5 h-3.5 mr-1.5" /> View Agreement
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="font-semibold text-xs"
+                    style={{ borderColor: isPending ? "#d97706" : "#059669", color: isPending ? "#92400e" : "#065f46" }}
+                    onClick={() => onDownload(ag.id, ag.agreement_number)}
+                  >
+                    <Download className="w-3.5 h-3.5 mr-1.5" /> Download PDF
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="font-semibold text-xs border-gray-300 text-gray-600 hover:bg-gray-50"
+                    onClick={() => window.open(BASE + "verify-agreement/" + ag.verification_token, "_blank")}
+                  >
+                    🔍 Verify Agreement
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="font-semibold text-xs border-gray-300 text-gray-600 hover:bg-gray-50"
+                    onClick={() => handleShare(ag)}
+                  >
+                    {copiedId === ag.id
+                      ? <><CheckCircle className="w-3.5 h-3.5 mr-1.5 text-emerald-600" /> Copied!</>
+                      : <><Share2 className="w-3.5 h-3.5 mr-1.5" /> Share</>
+                    }
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function MandatoryDocumentsCard({ bookingId, onOpenUpload }: { bookingId: string; onOpenUpload: () => void }) {
   const { data: docs } = useListDocuments(bookingId);
   const uploadedTypes = (docs || []).map((d: any) => d.documentType);
@@ -1695,7 +1912,11 @@ export default function CustomerDashboard() {
       .catch(() => {});
   }, []);
 
-  useEffect(() => { reloadAgreements(); }, [reloadAgreements]);
+  useEffect(() => {
+    reloadAgreements();
+    const iv = setInterval(reloadAgreements, 30000);
+    return () => clearInterval(iv);
+  }, [reloadAgreements]);
 
   const loadNotifications = useCallback(async () => {
     try {
@@ -1995,6 +2216,12 @@ export default function CustomerDashboard() {
           <div className="lg:col-span-3 space-y-8">
             <MyRequestsSection />
 
+            <MyAgreementsSection
+              agreements={Object.values(agreementsByBooking)}
+              onDownload={handleDownloadAgreementPdf}
+              onRefresh={reloadAgreements}
+            />
+
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-serif font-bold text-foreground">My Bookings</h2>
               <Badge variant="outline" className="text-muted-foreground">{bookings.length} booking{bookings.length !== 1 ? 's' : ''}</Badge>
@@ -2028,6 +2255,15 @@ export default function CustomerDashboard() {
                       </div>
                       <div className="flex items-center gap-2">
                         {booking.status === 'confirmed' && <DocWarningBadge bookingId={booking.id} />}
+                        {agreementsByBooking[booking.id] && (
+                          <Badge className={`text-[10px] px-2 py-0.5 font-bold border ${
+                            agreementsByBooking[booking.id].status === 'signed'
+                              ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                              : 'bg-amber-100 text-amber-800 border-amber-300 animate-pulse'
+                          }`}>
+                            📜 {agreementsByBooking[booking.id].status === 'signed' ? 'Agreement ✓' : 'Sign Agreement'}
+                          </Badge>
+                        )}
                         <Badge variant="outline" className={`px-3 py-1 uppercase tracking-wider text-xs font-bold ${getStatusColor(booking.status)}`}>
                           {getStatusLabel(booking.status)}
                         </Badge>
@@ -2178,24 +2414,33 @@ export default function CustomerDashboard() {
                               </p>
                             )}
                             <div className="flex gap-2 flex-wrap">
-                              {isPending && (
+                              {isPending ? (
                                 <Button
                                   size="sm"
-                                  className="flex-1 text-white font-semibold shadow-sm"
-                                  style={{ background: "#d97706", minWidth: 120 }}
+                                  className="text-white font-semibold shadow-sm text-xs"
+                                  style={{ background: "#d97706" }}
                                   onClick={() => window.open((import.meta.env.BASE_URL || "/") + "agreement/" + ag.id + "/sign", "_blank")}
                                 >
                                   ✍ Sign Agreement
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  className="text-white font-semibold text-xs"
+                                  style={{ background: "#059669" }}
+                                  onClick={() => window.open((import.meta.env.BASE_URL || "/") + "agreement/" + ag.id + "/sign", "_blank")}
+                                >
+                                  <Eye className="w-3.5 h-3.5 mr-1" /> View Agreement
                                 </Button>
                               )}
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="flex-1 font-semibold"
-                                style={{ borderColor: isPending ? "#d97706" : "#059669", color: isPending ? "#92400e" : "#065f46", minWidth: 120 }}
+                                className="font-semibold text-xs"
+                                style={{ borderColor: isPending ? "#d97706" : "#059669", color: isPending ? "#92400e" : "#065f46" }}
                                 onClick={() => handleDownloadAgreementPdf(ag.id, ag.agreement_number)}
                               >
-                                ⬇ Download PDF
+                                <Download className="w-3.5 h-3.5 mr-1" /> Download PDF
                               </Button>
                               <Button
                                 size="sm"
@@ -2205,6 +2450,18 @@ export default function CustomerDashboard() {
                                 onClick={() => window.open((import.meta.env.BASE_URL || "/") + "verify-agreement/" + ag.verification_token, "_blank")}
                               >
                                 🔍 Verify
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="font-semibold text-xs"
+                                style={{ borderColor: "#9ca3af", color: "#4b5563" }}
+                                onClick={() => {
+                                  const url = `https://alburhantravels.com/verify-agreement/${ag.verification_token}`;
+                                  navigator.clipboard?.writeText(url).catch(() => {});
+                                }}
+                              >
+                                <Share2 className="w-3.5 h-3.5 mr-1" /> Share
                               </Button>
                             </div>
                           </div>
