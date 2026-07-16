@@ -115,6 +115,46 @@ export async function processPaymentSuccessNotifications(opts: {
     console.error("[payments] PDF generation failed (notifications will still send without attachments):", err);
   }
 
+  // ── Auto-send PDFs via WhatsApp document (fire-and-forget, after template message) ──
+  // attachments[0] = Receipt PDF, attachments[1] = Invoice PDF (only when invoiceNumber exists)
+  if (attachments.length > 0) {
+    const _pdfAttachments = [...attachments]; // capture before async gap
+    const _bookingMobile  = booking.customerMobile;
+    const _bookingNumber  = booking.bookingNumber;
+    const _bookingId      = booking.id;
+    const _customerId     = booking.customerId ?? undefined;
+    (async () => {
+      try {
+        const { sendPDFDocument } = await import("../lib/botbee.js");
+        const waOpts = { eventType: "payment_received", bookingId: _bookingId, customerId: _customerId };
+        // Send Receipt first (index 0)
+        if (_pdfAttachments[0]) {
+          const r = await sendPDFDocument(
+            _bookingMobile,
+            _pdfAttachments[0].content as Buffer,
+            _pdfAttachments[0].filename,
+            `Your Payment Receipt – Al Burhan Tours & Travels (Booking: ${_bookingNumber})`,
+            waOpts,
+          );
+          console.log(`[payments] WhatsApp Receipt PDF for ${_bookingNumber}: ${r.ok ? "✅ sent" : "❌ " + r.errorMessage}`);
+        }
+        // Send Invoice PDF (index 1 — only present if invoiceNumber exists)
+        if (_pdfAttachments[1]) {
+          const r = await sendPDFDocument(
+            _bookingMobile,
+            _pdfAttachments[1].content as Buffer,
+            _pdfAttachments[1].filename,
+            `Your Tax Invoice – Al Burhan Tours & Travels (Booking: ${_bookingNumber})`,
+            waOpts,
+          );
+          console.log(`[payments] WhatsApp Invoice PDF for ${_bookingNumber}: ${r.ok ? "✅ sent" : "❌ " + r.errorMessage}`);
+        }
+      } catch (pdfWaErr: any) {
+        console.error("[payments] WhatsApp PDF auto-delivery failed (non-fatal):", pdfWaErr?.message);
+      }
+    })();
+  }
+
   const trigger = isFullyPaid ? "payment_received" : "partial_payment_received";
   const displayAmount = (isFullyPaid ? finalAmountNum : thisPaymentAmount).toLocaleString("en-IN");
 

@@ -1,0 +1,357 @@
+PRODUCTION MASTER PROMPT – FINAL END-TO-END PAYMENT & NOTIFICATION AUDIT
+
+Do not assume anything is working. Verify everything on the live VPS using a real production payment flow.
+
+Perform a complete end-to-end production audit and fix every issue until ALL tests pass.
+
+=========================================================
+1. COMPLETE PAYMENT FLOW TEST
+=========================================================
+
+Create a real booking and complete a real payment.
+
+Verify:
+
+✅ Booking created successfully.
+✅ Razorpay payment captured.
+✅ Webhook received.
+✅ Booking status updated automatically.
+✅ Payment status updated.
+✅ Paid amount updated.
+✅ Balance updated.
+✅ Invoice generated.
+✅ Receipt generated.
+✅ Customer dashboard updated.
+✅ Admin dashboard updated.
+
+=========================================================
+2. WHATSAPP NOTIFICATION
+=========================================================
+
+Immediately after successful payment verify:
+
+• Booking Confirmation WhatsApp
+• Payment Confirmation WhatsApp
+• Invoice PDF attached
+• Receipt PDF attached
+
+Verify:
+
+• BotBee API request
+• API response
+• HTTP status
+• Delivery status
+• Template used
+• PDF attachment
+• Customer mobile number
+• Message ID
+
+If any error occurs, fix it.
+
+Never report "Sent" unless BotBee confirms success.
+
+=========================================================
+3. SMS NOTIFICATION
+=========================================================
+
+Immediately after payment verify:
+
+Booking Confirmation SMS
+
+Payment Confirmation SMS
+
+Invoice Number
+
+Amount Paid
+
+Balance
+
+Booking Number
+
+Package Name
+
+Verify:
+
+Fast2SMS request
+
+Fast2SMS response
+
+DLT template
+
+Sender ID
+
+Delivery status
+
+Message ID
+
+If failed, fix it.
+
+=========================================================
+4. EMAIL NOTIFICATION
+=========================================================
+
+Immediately after payment send:
+
+Booking Confirmation
+
+Payment Receipt
+
+Tax Invoice PDF
+
+Receipt PDF
+
+Verify SMTP logs.
+
+Verify delivery.
+
+Verify attachment.
+
+=========================================================
+5. CUSTOMER DASHBOARD
+=========================================================
+
+Before payment:
+
+NO invoice card
+
+NO invoice PDF
+
+NO tax invoice
+
+NO download invoice button
+
+NO share button
+
+NO pending invoice
+
+NO pending tax invoice
+
+Only show:
+
+Booking
+
+Agreement
+
+Payment Pending
+
+Balance
+
+---------------------------------------------------------
+
+After payment:
+
+Automatically generate:
+
+Tax Invoice
+
+Original for Recipient
+
+Paid Invoice
+
+Receipt PDF
+
+Download Invoice PDF
+
+Share Invoice
+
+Print Invoice
+
+Everything must appear automatically.
+
+=========================================================
+6. REMOVE PENDING INVOICE
+=========================================================
+
+Customer Dashboard MUST NEVER display:
+
+Pending Invoice
+
+Pending Tax Invoice
+
+Draft Invoice
+
+Temporary Invoice
+
+Invoice before payment
+
+Generate invoice ONLY after payment.
+
+=========================================================
+7. BOOKING NUMBER
+=========================================================
+
+DO NOT MODIFY
+
+DO NOT REMOVE
+
+DO NOT CHANGE
+
+Booking Number
+
+Agreement Number
+
+Invoice Number
+
+These must remain exactly as they are.
+
+Only remove the "Download Invoice PDF" button BEFORE payment.
+
+=========================================================
+8. ADMIN RESEND CENTER
+=========================================================
+
+Admin booking page must have buttons:
+
+Resend WhatsApp
+
+Resend SMS
+
+Resend Email
+
+Regenerate Invoice PDF
+
+Regenerate Receipt PDF
+
+Resend All Notifications
+
+Each resend must log:
+
+Time
+
+Status
+
+API Response
+
+Delivered / Failed
+
+=========================================================
+9. LOGGING
+=========================================================
+
+Store complete logs for every notification.
+
+WhatsApp
+
+SMS
+
+Email
+
+Invoice
+
+Receipt
+
+Webhook
+
+Razorpay
+
+Delivery Result
+
+API Response
+
+Timestamp
+
+Retry Count
+
+Error Message
+
+=========================================================
+10. ERROR HANDLING
+=========================================================
+
+Never silently fail.
+
+If WhatsApp fails
+
+Retry automatically.
+
+If SMS fails
+
+Retry automatically.
+
+If Email fails
+
+Retry automatically.
+
+Log exact error.
+
+=========================================================
+11. FINAL LIVE TEST
+=========================================================
+
+Perform one complete production payment.
+
+Verify ALL of the following:
+
+✅ Booking created
+
+✅ Payment captured
+
+✅ Webhook received
+
+✅ Booking confirmed
+
+✅ Invoice generated
+
+✅ Receipt generated
+
+✅ Customer Dashboard updated
+
+✅ Admin Dashboard updated
+
+✅ WhatsApp delivered
+
+✅ SMS delivered
+
+✅ Email delivered
+
+✅ Invoice PDF attached
+
+✅ Receipt PDF attached
+
+✅ Notification logs created
+
+✅ Admin resend working
+
+=========================================================
+12. FINAL REPORT
+=========================================================
+
+Do NOT finish until every item passes.
+
+Provide a production report containing:
+
+PASS / FAIL
+
+Booking Creation
+
+Payment
+
+Webhook
+
+Invoice
+
+Receipt
+
+Customer Dashboard
+
+Admin Dashboard
+
+WhatsApp
+
+SMS
+
+Email
+
+PDF Attachment
+
+Notification Logs
+
+Resend Functions
+
+Retry Logic
+
+API Responses
+
+Delivery Status
+
+If anything fails, automatically fix it, redeploy to the VPS, rerun all production tests, and continue until 100% PASS with zero critical issues.

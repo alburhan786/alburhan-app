@@ -782,7 +782,7 @@ router.post("/:id/resend-sms", requireAdmin as any, async (req: AuthenticatedReq
         mobile: b.customer_mobile,
         customerName: b.customer_name,
         bookingNumber: b.booking_number,
-        amount: paidAmt,
+        amount: String(Math.round(paidAmt)),
         invoiceUrl: invoiceLink,
         bookingId: b.id,
         customerId: b.customer_id ?? undefined,
