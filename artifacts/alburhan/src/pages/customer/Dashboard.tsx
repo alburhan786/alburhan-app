@@ -2246,7 +2246,7 @@ export default function CustomerDashboard() {
                       <div>
                         <div className="text-xs text-muted-foreground font-mono mb-1">#{booking.bookingNumber}</div>
                         <h3 className="text-lg font-serif font-bold text-primary">{booking.packageName || "Package Booking"}</h3>
-                        {booking.invoiceNumber && (booking.status === 'confirmed' || booking.status === 'partially_paid') && (
+                        {booking.invoiceNumber && Number(booking.paidAmount || 0) > 0 && (booking.status === 'confirmed' || booking.status === 'partially_paid') && (
                           <div className="mt-1 flex items-center gap-1.5">
                             <FileText className="w-3 h-3 text-emerald-600" />
                             <span className="text-xs font-mono text-emerald-700 font-semibold">Invoice #{booking.invoiceNumber}</span>
@@ -2470,7 +2470,7 @@ export default function CustomerDashboard() {
                     })()}
 
                     {/* Invoice Card — only shown after payment has been made */}
-                    {booking.invoiceNumber && (booking.status === 'confirmed' || booking.status === 'partially_paid') && (
+                    {booking.invoiceNumber && Number(booking.paidAmount || 0) > 0 && (booking.status === 'confirmed' || booking.status === 'partially_paid') && (
                       <div className="mx-5 mb-4 rounded-xl border border-emerald-200 overflow-hidden" style={{ background: "linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%)" }}>
                         <div className="px-4 py-3 border-b border-emerald-200 flex items-center gap-2 bg-emerald-700/10">
                           <FileText className="w-4 h-4 text-emerald-700" />
@@ -2614,7 +2614,7 @@ export default function CustomerDashboard() {
                         </Button>
                       )}
 
-                      {booking.invoiceNumber && (booking.status === 'confirmed' || booking.status === 'partially_paid') && (
+                      {booking.invoiceNumber && Number(booking.paidAmount || 0) > 0 && (booking.status === 'confirmed' || booking.status === 'partially_paid') && (
                         <Button
                           variant="outline"
                           onClick={() => handleDownloadInvoice(booking.id, booking.bookingNumber)}

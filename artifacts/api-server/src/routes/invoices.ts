@@ -150,13 +150,13 @@ router.post("/generate-all", requireAdmin as any, async (_req: AuthenticatedRequ
 });
 
 // ── Public PDF download by booking number — GET /api/invoices/by-number/:bookingNumber/pdf ──
-// No session required. The booking number acts as the access token (unique, shown on booking docs).
-// This is the canonical download URL for customers and admins — avoids all session/mobile-match issues.
+// The booking number acts as the access token — but ONLY if payment has been recorded.
+// Pending/unpaid invoices are never served to protect financial data.
 router.get("/by-number/:bookingNumber/pdf", async (req, res) => {
   try {
     const { bookingNumber } = req.params;
     const bRes = await pool.query(
-      `SELECT b.*, i.invoice_number as inv_num, i.pdf_path
+      `SELECT b.*, i.invoice_number as inv_num, i.pdf_path, i.paid as inv_paid, i.invoice_status
        FROM bookings b
        LEFT JOIN invoices i ON i.booking_id = b.id
        WHERE b.booking_number = $1 LIMIT 1`,
@@ -164,6 +164,15 @@ router.get("/by-number/:bookingNumber/pdf", async (req, res) => {
     );
     const b = bRes.rows[0];
     if (!b) return void res.status(404).json({ message: "Booking not found" });
+
+    // Security: never serve invoice PDF before payment is received
+    const paidAmount = Number(b.paid_amount || b.inv_paid || 0);
+    if (paidAmount <= 0) {
+      return void res.status(403).json({
+        message: "Invoice not available. Please complete your payment to access the invoice.",
+        code: "PAYMENT_REQUIRED",
+      });
+    }
 
     // If a pre-generated PDF is stored in object storage, serve it directly
     if (b.pdf_path) {
@@ -213,7 +222,7 @@ router.get("/:bookingId/pdf", requireAuth as any, async (req: AuthenticatedReque
   try {
     const { bookingId } = req.params;
     const bRes = await pool.query(
-      `SELECT b.*, i.invoice_number as inv_num
+      `SELECT b.*, i.invoice_number as inv_num, i.paid as inv_paid
        FROM bookings b
        LEFT JOIN invoices i ON i.booking_id = b.id
        WHERE b.id = $1 LIMIT 1`,
@@ -223,6 +232,16 @@ router.get("/:bookingId/pdf", requireAuth as any, async (req: AuthenticatedReque
     if (!b) return void res.status(404).json({ message: "Booking not found" });
     if (req.user?.role !== "admin" && b.customer_mobile !== req.user?.mobile) {
       return void res.status(403).json({ message: "Forbidden" });
+    }
+    // Non-admin customers cannot download pending invoices (no payment recorded)
+    if (req.user?.role !== "admin") {
+      const paidAmount = Number(b.paid_amount || b.inv_paid || 0);
+      if (paidAmount <= 0) {
+        return void res.status(403).json({
+          message: "Invoice not available until payment is received.",
+          code: "PAYMENT_REQUIRED",
+        });
+      }
     }
     const invoiceNumber = b.inv_num || b.invoice_number;
     const buf = await generateInvoicePdfBuffer({

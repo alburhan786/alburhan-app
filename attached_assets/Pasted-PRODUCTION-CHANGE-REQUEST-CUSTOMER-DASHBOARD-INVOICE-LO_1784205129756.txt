@@ -1,0 +1,268 @@
+PRODUCTION CHANGE REQUEST – CUSTOMER DASHBOARD INVOICE LOGIC
+
+This is a production-critical financial workflow. Follow these instructions exactly.
+
+OBJECTIVE
+
+The Customer Dashboard must NEVER show Pending or Unpaid invoices.
+
+Only invoices with actual payments received should be visible to customers.
+
+====================================================
+RULES
+====================================================
+
+1. DO NOT display any invoice in the Customer Dashboard if:
+
+- Status = Pending
+- Status = Unpaid
+- Status = Awaiting Payment
+- Status = Payment Link Sent
+- Amount Paid = 0
+- Payment Verification Pending
+- Payment Failed
+
+These invoices must remain completely hidden from the customer dashboard.
+
+====================================================
+SHOW ONLY PAID INVOICES
+====================================================
+
+Display an invoice ONLY when at least one successful payment has been recorded.
+
+Examples:
+
+✔ Partially Paid
+✔ Advance Paid
+✔ 50% Paid
+✔ Balance Paid
+✔ Fully Paid
+✔ Paid
+
+Only these invoices should appear.
+
+====================================================
+PAYMENT FLOW
+====================================================
+
+Booking Submitted
+↓
+Admin Approval
+↓
+Customer Dashboard
+(NO invoice visible)
+↓
+Customer receives Payment Link
+↓
+Customer Pays
+↓
+Payment Verified
+↓
+Invoice Generated / Updated
+↓
+Invoice PDF Generated
+↓
+Invoice appears in Customer Dashboard
+↓
+WhatsApp + Email + SMS + RCS sent
+
+====================================================
+DASHBOARD RULES
+====================================================
+
+Before payment:
+
+Hide:
+• Invoice Card
+• Invoice PDF
+• Download Invoice
+• Share Invoice
+• Invoice Number
+• Tax Invoice
+• Balance Invoice
+
+After payment:
+
+Automatically show:
+
+✓ Invoice Number
+✓ Invoice Date
+✓ Payment Status
+✓ Amount Paid
+✓ Balance
+✓ Download PDF
+✓ Share PDF
+✓ Payment History
+✓ GST Details
+✓ Receipt
+
+====================================================
+PARTIAL PAYMENT
+====================================================
+
+Customer pays 50%
+
+Dashboard should show:
+
+Invoice Status:
+PARTIALLY PAID
+
+Advance Received:
+₹xxxxxx
+
+Remaining Balance:
+₹xxxxxx
+
+Buttons:
+
+Download Invoice
+Download Receipt
+Payment History
+
+====================================================
+FULL PAYMENT
+====================================================
+
+After final payment:
+
+Dashboard automatically updates to
+
+PAID
+
+Show:
+
+Invoice PDF
+Receipt
+Tax Invoice
+Payment History
+
+====================================================
+ADMIN PANEL
+====================================================
+
+Admin must still see:
+
+Pending Invoice
+Payment Link
+Reminder
+Outstanding Balance
+Payment Ledger
+
+Only the CUSTOMER dashboard should hide pending invoices.
+
+====================================================
+API LOGIC
+====================================================
+
+Filter invoices using payment status.
+
+Never return pending invoices to the customer dashboard API.
+
+Only return invoices where:
+
+amountPaid > 0
+
+OR
+
+paymentStatus IN
+
+PARTIAL
+PARTIALLY_PAID
+ADVANCE_PAID
+PAID
+FULLY_PAID
+
+====================================================
+SECURITY
+====================================================
+
+Customers must never access pending invoice PDFs via URL.
+
+Pending invoices should not be downloadable.
+
+Pending invoices should not be searchable.
+
+Pending invoices should not appear in browser history.
+
+====================================================
+TEST CASES
+====================================================
+
+Test 1
+
+Booking Approved
+No Payment
+
+Expected:
+NO Invoice
+
+PASS
+
+----------------------------------------
+
+Test 2
+
+50% Payment
+
+Expected:
+Invoice Visible
+
+Status:
+PARTIALLY PAID
+
+PASS
+
+----------------------------------------
+
+Test 3
+
+100% Payment
+
+Expected:
+Invoice Visible
+
+Status:
+PAID
+
+PASS
+
+----------------------------------------
+
+Test 4
+
+Failed Payment
+
+Expected:
+Invoice Hidden
+
+PASS
+
+----------------------------------------
+
+Test 5
+
+Payment Refunded
+
+Expected:
+
+Show Refund Status
+
+Do NOT show Paid invoice as active.
+
+====================================================
+DEPLOYMENT
+====================================================
+
+• Build production.
+• Deploy to VPS.
+• Clear cache.
+• Verify production.
+• Run complete E2E tests.
+• Confirm:
+  - Pending invoices never appear in the Customer Dashboard.
+  - Paid and Partially Paid invoices appear correctly.
+  - Admin retains full access to pending invoices and reminders.
+  - Invoice PDFs are generated only after successful payment.
+  - Existing payment and agreement workflows remain unaffected.
+
+Do not finish until every production test passes and provide a PASS/FAIL report with screenshots.

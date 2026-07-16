@@ -58,6 +58,7 @@ export async function processPaymentSuccessNotifications(opts: {
     customerName: string;
     customerMobile: string;
     customerEmail?: string | null;
+    customerId?: string | null;
     packageName?: string | null;
     numberOfPilgrims?: number | null;
     finalAmount?: string | number | null;
@@ -119,16 +120,17 @@ export async function processPaymentSuccessNotifications(opts: {
 
   const results = await Promise.allSettled([
     triggerWorkflow(trigger as any, {
-      bookingId: booking.id,
-      bookingNumber: booking.bookingNumber,
-      customerName: booking.customerName,
+      bookingId:      booking.id,
+      bookingNumber:  booking.bookingNumber,
+      customerId:     booking.customerId    ?? undefined,
+      customerName:   booking.customerName,
       customerMobile: booking.customerMobile,
-      customerEmail: booking.customerEmail ?? undefined,
-      packageName: booking.packageName ?? undefined,
-      amount: isFullyPaid ? finalAmountNum : thisPaymentAmount,
-      paidAmount: thisPaymentAmount,
-      balanceAmount: remainingBalance,
-      invoiceNumber: invoiceNumber ?? undefined,
+      customerEmail:  booking.customerEmail ?? undefined,
+      packageName:    booking.packageName   ?? undefined,
+      amount:         isFullyPaid ? finalAmountNum : thisPaymentAmount,
+      paidAmount:     thisPaymentAmount,
+      balanceAmount:  remainingBalance,
+      invoiceNumber:  invoiceNumber         ?? undefined,
       invoiceUrl,
       attachments,
     } as any),

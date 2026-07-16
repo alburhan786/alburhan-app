@@ -1,0 +1,270 @@
+====================================================
+CRITICAL FIX – PAYMENT NOTIFICATIONS
+====================================================
+
+This is a PRODUCTION CRITICAL issue.
+
+Current issue:
+
+Customer successfully completes payment, but:
+
+❌ No WhatsApp booking confirmation
+❌ No WhatsApp payment confirmation
+❌ No Invoice PDF sent on WhatsApp
+❌ No Email invoice
+❌ No SMS confirmation
+❌ No RCS notification (if enabled)
+
+This is NOT acceptable.
+
+====================================================
+REQUIRED PAYMENT FLOW
+====================================================
+
+Customer clicks Payment Link
+↓
+
+Payment Successful
+↓
+
+Payment verified by Razorpay
+↓
+
+Payment recorded in database
+↓
+
+Invoice generated/updated
+↓
+
+Invoice PDF generated
+↓
+
+Booking status updated
+↓
+
+Trigger ALL notifications automatically
+
+====================================================
+WHATSAPP
+====================================================
+
+Immediately after successful payment send:
+
+Message 1
+
+✅ Payment Received
+
+Dear {{CustomerName}}
+
+We have successfully received your payment of ₹{{Amount}}.
+
+Booking ID:
+{{BookingID}}
+
+Invoice No:
+{{InvoiceNumber}}
+
+Payment Status:
+{{PaymentStatus}}
+
+Thank you for choosing
+AL BURHAN TOURS & TRAVELS.
+
+----------------------------------------------------
+
+Message 2
+
+✅ Booking Confirmation
+
+Dear {{CustomerName}}
+
+Your booking has been confirmed.
+
+Package:
+{{Package}}
+
+Travel Date:
+{{DepartureDate}}
+
+Booking ID:
+{{BookingID}}
+
+Please find your invoice attached.
+
+----------------------------------------------------
+
+Message 3
+
+Attach PDF Invoice
+
+Invoice PDF
+
+Booking Confirmation PDF (if available)
+
+Receipt PDF (if generated)
+
+These must be sent automatically.
+
+====================================================
+EMAIL
+====================================================
+
+Automatically send:
+
+Subject:
+
+Payment Received - Booking Confirmed
+
+Attachments:
+
+Invoice PDF
+
+Receipt PDF
+
+Agreement PDF (if signed)
+
+====================================================
+SMS
+====================================================
+
+Send SMS
+
+Payment of ₹{{Amount}} received.
+
+Booking confirmed.
+
+Booking ID:
+{{BookingID}}
+
+Invoice:
+{{InvoiceNumber}}
+
+====================================================
+RCS
+====================================================
+
+If RCS enabled
+
+Send:
+
+Payment received
+
+Invoice attached
+
+Booking confirmed
+
+====================================================
+CUSTOMER DASHBOARD
+====================================================
+
+Immediately after payment:
+
+Refresh automatically
+
+Show:
+
+✓ Payment Success
+
+✓ Invoice PDF
+
+✓ Receipt
+
+✓ Download Invoice
+
+✓ Download Receipt
+
+✓ Payment History
+
+====================================================
+ADMIN DASHBOARD
+====================================================
+
+Admin should instantly see:
+
+Payment received
+
+Transaction ID
+
+Razorpay Payment ID
+
+Payment Method
+
+Timestamp
+
+Notification status
+
+WhatsApp
+
+Email
+
+SMS
+
+RCS
+
+====================================================
+RETRY LOGIC
+====================================================
+
+If WhatsApp fails
+
+Retry automatically.
+
+If Email fails
+
+Retry automatically.
+
+If SMS fails
+
+Retry automatically.
+
+Store every attempt in Notification Logs.
+
+====================================================
+BOTBEE
+====================================================
+
+Verify BotBee API.
+
+Verify Meta templates.
+
+Verify PDF attachment delivery.
+
+Verify text message delivery.
+
+If template approval is missing,
+
+show the exact template name and Meta error.
+
+====================================================
+PRODUCTION TEST
+====================================================
+
+Run complete production E2E tests.
+
+Verify:
+
+✅ Payment Success
+
+✅ Invoice Created
+
+✅ Invoice PDF Generated
+
+✅ WhatsApp Payment Message Sent
+
+✅ WhatsApp Booking Confirmation Sent
+
+✅ WhatsApp Invoice PDF Delivered
+
+✅ Email Sent
+
+✅ SMS Sent
+
+✅ Customer Dashboard Updated
+
+✅ Admin Dashboard Updated
+
+✅ Notification Logs Recorded
+
+Provide a PASS/FAIL report for every notification channel.
+
+Do not mark this task complete until every notification works correctly in the live production environment.

@@ -33,3 +33,4 @@
 - [Agreement signing API fields](agreement-signing-api.md) — sign endpoint uses signatureData (not signature); termsAccepted must include all 13 clause IDs as {id:true}; signing OTP stored in agreements.signing_otp; customer route is /api/agreements/my/:id/sign
 - [emailService.ts location and pattern](email-service.md) — emailService.ts at src/services/; test endpoint in app.ts BEFORE app.use("/api",router); test endpoint in app.ts only (not index.ts — 404 fires first)
 - [Notification engine bug patterns](notification-engine-bugs.md) — sendDLTSMS returns boolean (not object); TRIGGER_TO_EVENT must use valid EventType values; Razorpay order route needs same amount cap as payment links
+- [Invoice visibility rules](invoice-visibility-rules.md) — never serve invoice PDF if paid_amount<=0; both /by-number/:num/pdf (public) and /:id/pdf (auth) enforce 403 PAYMENT_REQUIRED; frontend checks paidAmount>0 in addition to status
