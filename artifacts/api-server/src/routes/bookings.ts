@@ -765,6 +765,138 @@ router.post("/:id/resend-email", requireAdmin as any, async (req: AuthenticatedR
   })();
 });
 
+// POST /:id/resend-sms — resend payment SMS to customer
+router.post("/:id/resend-sms", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  const rows = await pool.query(`SELECT * FROM bookings WHERE id = $1 LIMIT 1`, [req.params.id]);
+  if (!rows.rows[0]) { res.status(404).json({ message: "Booking not found" }); return; }
+  const b = rows.rows[0];
+  res.json({ message: "Sending SMS...", bookingNumber: b.booking_number });
+  (async () => {
+    try {
+      const { sendPaymentReceived } = await import("../lib/sms.js");
+      const { randomUUID } = await import("crypto");
+      const paidAmt = Number(b.paid_amount || 0);
+      const siteBase = "https://alburhantravels.com";
+      const invoiceLink = b.booking_number ? `${siteBase}/invoice/${b.booking_number}` : siteBase;
+      const result = await sendPaymentReceived({
+        mobile: b.customer_mobile,
+        customerName: b.customer_name,
+        bookingNumber: b.booking_number,
+        amount: paidAmt,
+        invoiceUrl: invoiceLink,
+        bookingId: b.id,
+        customerId: b.customer_id ?? undefined,
+      });
+      await pool.query(
+        `INSERT INTO notification_logs (id, event_type, channel, recipient, customer_name, booking_id, booking_number, message, status, sent_at, retry_count)
+         VALUES ($1,'payment_received','sms',$2,$3,$4,$5,$6,$7,NOW(),0)`,
+        [randomUUID(), b.customer_mobile, b.customer_name, b.id, b.booking_number,
+         `SMS resend | mobile=${b.customer_mobile}`, result.ok ? "sent" : "failed"]
+      ).catch(() => {});
+    } catch (err) {
+      console.error("[resend-sms] error:", err);
+    }
+  })();
+});
+
+// POST /:id/resend-invoice — generate Tax Invoice PDF and send via WhatsApp document
+router.post("/:id/resend-invoice", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  const rows = await pool.query(`SELECT * FROM bookings WHERE id = $1 LIMIT 1`, [req.params.id]);
+  if (!rows.rows[0]) { res.status(404).json({ message: "Booking not found" }); return; }
+  const b = rows.rows[0];
+  const paidAmt = Number(b.paid_amount || 0);
+  if (paidAmt <= 0) { res.status(400).json({ message: "No payment recorded — invoice cannot be generated" }); return; }
+  res.json({ message: "Generating & sending Invoice PDF...", bookingNumber: b.booking_number });
+  (async () => {
+    try {
+      const { generateInvoicePdfBuffer } = await import("../lib/paymentDocs.js");
+      const { sendPDFDocument } = await import("../lib/botbee.js");
+      const { randomUUID } = await import("crypto");
+      const totalAmt = Number(b.final_amount || b.total_amount || 0);
+      const balanceAmt = Math.max(0, totalAmt - paidAmt);
+      const docOpts = {
+        customerName: b.customer_name,
+        customerMobile: b.customer_mobile,
+        customerEmail: b.customer_email ?? undefined,
+        bookingNumber: b.booking_number,
+        invoiceNumber: b.invoice_number ?? undefined,
+        packageName: b.package_name ?? "Hajj / Umrah Package",
+        numberOfPilgrims: b.number_of_pilgrims,
+        totalAmount: totalAmt,
+        paidAmount: paidAmt,
+        balanceAmount: balanceAmt,
+        gstAmount: Number(b.gst_amount || 0),
+        paymentDate: b.updated_at || new Date(),
+        razorpayPaymentId: b.razorpay_payment_id ?? undefined,
+      };
+      const pdfBuf = await generateInvoicePdfBuffer(docOpts);
+      const waResult = await sendPDFDocument(
+        b.customer_mobile, pdfBuf,
+        `Invoice-${b.booking_number}.pdf`,
+        `Your Tax Invoice – Al Burhan Tours & Travels (Booking: ${b.booking_number})`,
+        { eventType: "payment_received", bookingId: b.id, customerId: b.customer_id ?? undefined }
+      );
+      await pool.query(
+        `INSERT INTO notification_logs (id, event_type, channel, recipient, customer_name, booking_id, booking_number, message, status, sent_at, retry_count)
+         VALUES ($1,'payment_received','whatsapp',$2,$3,$4,$5,$6,$7,NOW(),0)`,
+        [randomUUID(), b.customer_mobile, b.customer_name, b.id, b.booking_number,
+         `Invoice PDF resend via WhatsApp | booking=${b.booking_number}`, waResult.ok ? "sent" : "failed"]
+      ).catch(() => {});
+    } catch (err) {
+      console.error("[resend-invoice] error:", err);
+    }
+  })();
+});
+
+// POST /:id/resend-receipt — generate Receipt PDF and send via WhatsApp document
+router.post("/:id/resend-receipt", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  const rows = await pool.query(`SELECT * FROM bookings WHERE id = $1 LIMIT 1`, [req.params.id]);
+  if (!rows.rows[0]) { res.status(404).json({ message: "Booking not found" }); return; }
+  const b = rows.rows[0];
+  const paidAmt = Number(b.paid_amount || 0);
+  if (paidAmt <= 0) { res.status(400).json({ message: "No payment recorded — receipt cannot be generated" }); return; }
+  res.json({ message: "Generating & sending Receipt PDF...", bookingNumber: b.booking_number });
+  (async () => {
+    try {
+      const { generateReceiptPdfBuffer } = await import("../lib/paymentDocs.js");
+      const { sendPDFDocument } = await import("../lib/botbee.js");
+      const { randomUUID } = await import("crypto");
+      const totalAmt = Number(b.final_amount || b.total_amount || 0);
+      const balanceAmt = Math.max(0, totalAmt - paidAmt);
+      const docOpts = {
+        customerName: b.customer_name,
+        customerMobile: b.customer_mobile,
+        customerEmail: b.customer_email ?? undefined,
+        bookingNumber: b.booking_number,
+        invoiceNumber: b.invoice_number ?? undefined,
+        packageName: b.package_name ?? "Hajj / Umrah Package",
+        numberOfPilgrims: b.number_of_pilgrims,
+        totalAmount: totalAmt,
+        paidAmount: paidAmt,
+        balanceAmount: balanceAmt,
+        gstAmount: Number(b.gst_amount || 0),
+        paymentDate: b.updated_at || new Date(),
+        razorpayPaymentId: b.razorpay_payment_id ?? undefined,
+      };
+      const pdfBuf = await generateReceiptPdfBuffer(docOpts);
+      const waResult = await sendPDFDocument(
+        b.customer_mobile, pdfBuf,
+        `Receipt-${b.booking_number}.pdf`,
+        `Your Payment Receipt – Al Burhan Tours & Travels (Booking: ${b.booking_number})`,
+        { eventType: "payment_received", bookingId: b.id, customerId: b.customer_id ?? undefined }
+      );
+      await pool.query(
+        `INSERT INTO notification_logs (id, event_type, channel, recipient, customer_name, booking_id, booking_number, message, status, sent_at, retry_count)
+         VALUES ($1,'payment_received','whatsapp',$2,$3,$4,$5,$6,$7,NOW(),0)`,
+        [randomUUID(), b.customer_mobile, b.customer_name, b.id, b.booking_number,
+         `Receipt PDF resend via WhatsApp | booking=${b.booking_number}`, waResult.ok ? "sent" : "failed"]
+      ).catch(() => {});
+    } catch (err) {
+      console.error("[resend-receipt] error:", err);
+    }
+  })();
+});
+
 router.post("/:id/reject", requireAdmin as any, requirePermission("bookings", "edit") as any, async (req: AuthenticatedRequest, res) => {
   const parsed = RejectBookingBody.safeParse(req.body);
   const reason = parsed.success ? parsed.data.reason : undefined;

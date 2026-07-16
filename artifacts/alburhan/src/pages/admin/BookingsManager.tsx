@@ -976,6 +976,12 @@ function BookingDetailModal({ booking, open, onClose }: { booking: Booking | nul
   const [resending, setResending] = useState(false);
   const [resendingWa, setResendingWa] = useState(false);
   const [resendingEmail, setResendingEmail] = useState(false);
+  const [resendingSms, setResendingSms] = useState(false);
+  const [resendingInvoice, setResendingInvoice] = useState(false);
+  const [resendingReceipt, setResendingReceipt] = useState(false);
+  const [resendingAll, setResendingAll] = useState(false);
+  const [notifLogs, setNotifLogs] = useState<any[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
 
   const fetchConfirmStatus = async (id: string) => {
     try {
@@ -1028,11 +1034,95 @@ function BookingDetailModal({ booking, open, onClose }: { booking: Booking | nul
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Email failed");
       toast({ title: "Email sending", description: data.message || "Booking confirmation email sent." });
-      setTimeout(() => fetchConfirmStatus(booking.id), 6000);
+      setTimeout(() => { fetchConfirmStatus(booking.id); loadNotifLogs(booking.id); }, 6000);
     } catch (err: any) {
       toast({ title: "Email failed", description: err.message, variant: "destructive" });
     } finally {
       setResendingEmail(false);
+    }
+  };
+
+  const loadNotifLogs = async (id: string) => {
+    setLoadingLogs(true);
+    try {
+      const r = await fetch(`${API}/api/bookings/${id}/notification-logs`, { credentials: "include" });
+      const data = await r.json();
+      setNotifLogs(data.logs || []);
+    } catch {
+      setNotifLogs([]);
+    } finally {
+      setLoadingLogs(false);
+    }
+  };
+
+  const handleResendSms = async () => {
+    if (!booking) return;
+    setResendingSms(true);
+    try {
+      const res = await fetch(`${API}/api/bookings/${booking.id}/resend-sms`, {
+        method: "POST", credentials: "include",
+      });
+      const data = await res.json();
+      toast({ title: "SMS sending", description: data.message || "Payment SMS sent to customer." });
+      setTimeout(() => loadNotifLogs(booking.id), 5000);
+    } catch (err: any) {
+      toast({ title: "SMS failed", description: err.message, variant: "destructive" });
+    } finally {
+      setResendingSms(false);
+    }
+  };
+
+  const handleResendInvoice = async () => {
+    if (!booking) return;
+    setResendingInvoice(true);
+    try {
+      const res = await fetch(`${API}/api/bookings/${booking.id}/resend-invoice`, {
+        method: "POST", credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Invoice send failed");
+      toast({ title: "Invoice PDF sending", description: data.message || "Tax Invoice PDF sent via WhatsApp." });
+      setTimeout(() => loadNotifLogs(booking.id), 8000);
+    } catch (err: any) {
+      toast({ title: "Invoice failed", description: err.message, variant: "destructive" });
+    } finally {
+      setResendingInvoice(false);
+    }
+  };
+
+  const handleResendReceipt = async () => {
+    if (!booking) return;
+    setResendingReceipt(true);
+    try {
+      const res = await fetch(`${API}/api/bookings/${booking.id}/resend-receipt`, {
+        method: "POST", credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Receipt send failed");
+      toast({ title: "Receipt PDF sending", description: data.message || "Payment Receipt PDF sent via WhatsApp." });
+      setTimeout(() => loadNotifLogs(booking.id), 8000);
+    } catch (err: any) {
+      toast({ title: "Receipt failed", description: err.message, variant: "destructive" });
+    } finally {
+      setResendingReceipt(false);
+    }
+  };
+
+  const handleResendAll = async () => {
+    if (!booking) return;
+    setResendingAll(true);
+    try {
+      const res = await fetch(`${API}/api/payments/resend-notification/${booking.id}`, {
+        method: "POST", credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Resend failed");
+      toast({ title: "Full notification pipeline fired", description: "WhatsApp template, SMS, Email + Invoice & Receipt PDFs are being sent." });
+      setTimeout(() => { fetchConfirmStatus(booking.id); loadNotifLogs(booking.id); }, 8000);
+    } catch (err: any) {
+      toast({ title: "Resend all failed", description: err.message, variant: "destructive" });
+    } finally {
+      setResendingAll(false);
     }
   };
 
@@ -1052,8 +1142,10 @@ function BookingDetailModal({ booking, open, onClose }: { booking: Booking | nul
       setSelectedJourneyStatus((booking as any)?.journeyStatus || "booking_requested");
       if (booking?.id && (booking.status === "approved" || booking.status === "confirmed" || booking.status === "partially_paid")) {
         fetchConfirmStatus(booking.id);
+        loadNotifLogs(booking.id);
       } else {
         setConfirmChannels([]);
+        setNotifLogs([]);
       }
     }
   }, [open, booking?.id]);
@@ -1224,59 +1316,138 @@ function BookingDetailModal({ booking, open, onClose }: { booking: Booking | nul
           )}
 
           {(booking.status === "approved" || booking.status === "confirmed" || booking.status === "partially_paid") && (
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase">Notification Status</h4>
-                <div className="flex gap-1.5 flex-wrap justify-end">
-                  <button
-                    onClick={handleResendWhatsApp}
-                    disabled={resendingWa}
-                    title="Resend booking confirmation via WhatsApp (template 333473)"
-                    className="text-xs px-2.5 py-1 rounded-md bg-green-700 text-white hover:bg-green-800 disabled:opacity-50 flex items-center gap-1"
-                  >
-                    {resendingWa ? "…" : "💬 WhatsApp"}
-                  </button>
-                  <button
-                    onClick={handleResendEmail}
-                    disabled={resendingEmail}
-                    title="Resend booking confirmation email"
-                    className="text-xs px-2.5 py-1 rounded-md bg-blue-700 text-white hover:bg-blue-800 disabled:opacity-50 flex items-center gap-1"
-                  >
-                    {resendingEmail ? "…" : "📧 Email"}
-                  </button>
-                  <button
-                    onClick={handleResendConfirmation}
-                    disabled={resending}
-                    title="Resend all channels (WhatsApp, SMS, Email, Dashboard)"
-                    className="text-xs px-2.5 py-1 rounded-md bg-[#0B3D2E] text-white hover:bg-[#0d4f3c] disabled:opacity-50 flex items-center gap-1"
-                  >
-                    {resending ? "…" : "↻ All"}
-                  </button>
-                </div>
+            <div className="rounded-xl border border-purple-200 bg-purple-50/30 p-4 space-y-4">
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-purple-800 flex items-center gap-2">
+                  <Bell size={12} /> Notification Center
+                </h4>
+                <button
+                  onClick={() => loadNotifLogs(booking.id)}
+                  disabled={loadingLogs}
+                  className="text-[11px] text-purple-600 hover:text-purple-800 flex items-center gap-1 px-2 py-1 rounded hover:bg-purple-100 transition-colors"
+                >
+                  <RefreshCw size={10} className={loadingLogs ? "animate-spin" : ""} /> Refresh logs
+                </button>
               </div>
-              {confirmChannels.length === 0 ? (
-                <p className="text-xs text-muted-foreground italic">No notification records yet. Try resending above.</p>
-              ) : (
-                <div className="flex flex-wrap gap-2">
+
+              {/* Channel status summary */}
+              {confirmChannels.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
                   {(["whatsapp","sms","email","dashboard"] as const).map(ch => {
                     const rec = confirmChannels.find(c => c.channel === ch);
                     const icons: Record<string, string> = { whatsapp: "💬", sms: "📱", email: "📧", dashboard: "🔔" };
-                    const labels: Record<string, string> = { whatsapp: "WhatsApp", sms: "SMS", email: "Email", dashboard: "Dashboard" };
+                    const labels: Record<string, string> = { whatsapp: "WA", sms: "SMS", email: "Email", dashboard: "Push" };
                     if (!rec) return (
-                      <span key={ch} className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-gray-100 text-gray-500">
+                      <span key={ch} className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-400 font-medium">
                         {icons[ch]} {labels[ch]} —
                       </span>
                     );
                     const sent = rec.status === "sent";
                     return (
-                      <span key={ch} title={rec.error_message || (sent ? `Sent at ${rec.sent_at ? new Date(rec.sent_at).toLocaleString() : "?"}` : undefined)} className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium cursor-help ${sent ? "bg-green-100 text-green-800" : "bg-red-100 text-red-700"}`}>
-                        {icons[ch]} {sent ? "✓" : "✗"} {labels[ch]}
-                        {!sent && rec.error_message && <span className="max-w-[120px] truncate opacity-75">— {rec.error_message}</span>}
+                      <span key={ch} title={rec.error_message || (sent ? `Sent at ${rec.sent_at ? new Date(rec.sent_at).toLocaleString() : "?"}` : undefined)}
+                        className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold cursor-help ${sent ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
+                        {sent ? "✓" : "✗"} {icons[ch]} {labels[ch]}
                       </span>
                     );
                   })}
                 </div>
               )}
+
+              {/* 6 Resend Buttons */}
+              <div className="grid grid-cols-3 gap-1.5">
+                <button onClick={handleResendWhatsApp} disabled={resendingWa}
+                  title="Resend WhatsApp booking confirmation"
+                  className="flex items-center justify-center gap-1.5 text-[11px] font-semibold px-2 py-2 rounded-lg bg-green-700 text-white hover:bg-green-800 disabled:opacity-50 transition-colors">
+                  {resendingWa ? <Loader2 size={11} className="animate-spin" /> : <span>💬</span>}
+                  WhatsApp
+                </button>
+                <button onClick={handleResendSms} disabled={resendingSms}
+                  title="Resend payment SMS"
+                  className="flex items-center justify-center gap-1.5 text-[11px] font-semibold px-2 py-2 rounded-lg bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-50 transition-colors">
+                  {resendingSms ? <Loader2 size={11} className="animate-spin" /> : <span>📱</span>}
+                  SMS
+                </button>
+                <button onClick={handleResendEmail} disabled={resendingEmail}
+                  title="Resend booking confirmation email"
+                  className="flex items-center justify-center gap-1.5 text-[11px] font-semibold px-2 py-2 rounded-lg bg-blue-700 text-white hover:bg-blue-800 disabled:opacity-50 transition-colors">
+                  {resendingEmail ? <Loader2 size={11} className="animate-spin" /> : <span>📧</span>}
+                  Email
+                </button>
+                <button onClick={handleResendInvoice} disabled={resendingInvoice}
+                  title="Generate & send Tax Invoice PDF via WhatsApp"
+                  className="flex items-center justify-center gap-1.5 text-[11px] font-semibold px-2 py-2 rounded-lg bg-teal-700 text-white hover:bg-teal-800 disabled:opacity-50 transition-colors">
+                  {resendingInvoice ? <Loader2 size={11} className="animate-spin" /> : <span>🧾</span>}
+                  Invoice PDF
+                </button>
+                <button onClick={handleResendReceipt} disabled={resendingReceipt}
+                  title="Generate & send Receipt PDF via WhatsApp"
+                  className="flex items-center justify-center gap-1.5 text-[11px] font-semibold px-2 py-2 rounded-lg bg-indigo-700 text-white hover:bg-indigo-800 disabled:opacity-50 transition-colors">
+                  {resendingReceipt ? <Loader2 size={11} className="animate-spin" /> : <span>📄</span>}
+                  Receipt PDF
+                </button>
+                <button onClick={handleResendAll} disabled={resendingAll}
+                  title="Fire full payment pipeline: WhatsApp template + SMS + Email + both PDFs"
+                  className="flex items-center justify-center gap-1.5 text-[11px] font-semibold px-2 py-2 rounded-lg bg-purple-700 text-white hover:bg-purple-800 disabled:opacity-50 transition-colors">
+                  {resendingAll ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
+                  Resend All
+                </button>
+              </div>
+
+              {/* Notification Log Table */}
+              <div>
+                <p className="text-[10px] font-semibold text-purple-700 uppercase tracking-wide mb-1.5">Delivery Log</p>
+                {loadingLogs ? (
+                  <div className="flex items-center gap-2 py-3 text-xs text-muted-foreground">
+                    <Loader2 size={13} className="animate-spin" /> Loading logs…
+                  </div>
+                ) : notifLogs.length === 0 ? (
+                  <p className="text-xs text-muted-foreground italic py-2">No notification logs yet — try resending above.</p>
+                ) : (
+                  <div className="border border-purple-100 rounded-lg overflow-hidden bg-white">
+                    <table className="w-full text-[11px]">
+                      <thead className="bg-purple-50 border-b border-purple-100">
+                        <tr>
+                          <th className="px-2.5 py-1.5 text-left font-semibold text-purple-700">Channel</th>
+                          <th className="px-2.5 py-1.5 text-left font-semibold text-purple-700">Event</th>
+                          <th className="px-2.5 py-1.5 text-left font-semibold text-purple-700">Status</th>
+                          <th className="px-2.5 py-1.5 text-left font-semibold text-purple-700">Time</th>
+                          <th className="px-2.5 py-1.5 text-center font-semibold text-purple-700">Retries</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {notifLogs.map((log: any) => (
+                          <tr key={log.id} title={log.provider_response || log.error_code || undefined}
+                            className="hover:bg-purple-50/40 transition-colors cursor-help">
+                            <td className="px-2.5 py-1.5">
+                              <span className="inline-flex items-center gap-1 font-medium capitalize">
+                                {log.channel === "whatsapp" ? "💬" : log.channel === "sms" ? "📱" : log.channel === "email" ? "📧" : "🔔"}
+                                {log.channel}
+                              </span>
+                            </td>
+                            <td className="px-2.5 py-1.5 text-gray-500 capitalize">
+                              {(log.event_type || "").replace(/_/g, " ")}
+                            </td>
+                            <td className="px-2.5 py-1.5">
+                              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                log.status === "sent" ? "bg-green-100 text-green-700"
+                                : log.status === "failed" ? "bg-red-100 text-red-700"
+                                : "bg-yellow-100 text-yellow-700"
+                              }`}>
+                                {log.status === "sent" ? "✓ Sent" : log.status === "failed" ? "✗ Failed" : log.status}
+                              </span>
+                            </td>
+                            <td className="px-2.5 py-1.5 text-gray-400 whitespace-nowrap">
+                              {log.sent_at ? new Date(log.sent_at).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" }) : "—"}
+                            </td>
+                            <td className="px-2.5 py-1.5 text-center text-gray-400">{log.retry_count ?? 0}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

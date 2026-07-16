@@ -1,0 +1,333 @@
+🚨 FINAL PRODUCTION FIX – PAYMENT NOTIFICATIONS MUST BE 100% RELIABLE
+
+This is a LIVE production system.
+
+Do not only fix the code.
+Find the root cause.
+Test with a real booking.
+Deploy to VPS.
+Verify every notification is delivered.
+
+==================================================
+1. REMOVE PAYMENT NOTIFICATION DEDUP BLOCK
+==================================================
+
+The payment_received notification must NEVER be blocked because of an old notification log.
+
+If payment succeeds:
+
+Always send notifications.
+
+Do not suppress because a previous attempt exists.
+
+Retry failed notifications automatically.
+
+==================================================
+2. ADMIN RESEND PANEL
+==================================================
+
+Create an Admin feature:
+
+Booking Details →
+
+Notification Center
+
+Buttons:
+
+• Resend WhatsApp
+• Resend SMS
+• Resend Email
+• Resend Invoice PDF
+• Resend Receipt PDF
+• Resend All Notifications
+
+Admin must not create another payment.
+
+Resend must reuse existing booking/payment data.
+
+==================================================
+3. PAYMENT SUCCESS WORKFLOW
+==================================================
+
+After Razorpay verifies payment:
+
+Update payment
+
+↓
+
+Update booking
+
+↓
+
+Generate Tax Invoice
+
+↓
+
+Generate Receipt PDF
+
+↓
+
+Store PDFs
+
+↓
+
+Send WhatsApp
+
+↓
+
+Send SMS
+
+↓
+
+Send Email
+
+↓
+
+Notify Admin
+
+↓
+
+Refresh customer dashboard
+
+No manual action.
+
+==================================================
+4. WHATSAPP
+==================================================
+
+Trace entire pipeline.
+
+Check:
+
+BotBee API
+
+Access Token
+
+Template Name
+
+Template Approval
+
+Phone Format
+
+Country Code
+
+Media Upload
+
+PDF URL
+
+Webhook Response
+
+Delivery Status
+
+If template fails:
+
+Retry.
+
+If attachment fails:
+
+Retry.
+
+Store failure reason.
+
+Admin can resend.
+
+==================================================
+5. SMS
+==================================================
+
+Immediately after payment send:
+
+Booking Confirmed
+
+Payment Received
+
+Amount Paid
+
+Remaining Balance
+
+Booking Number
+
+Invoice Number
+
+Support Number
+
+Log provider response.
+
+Retry failures.
+
+==================================================
+6. EMAIL
+==================================================
+
+Send:
+
+Booking Confirmation
+
+Payment Receipt
+
+Tax Invoice PDF
+
+Agreement PDF
+
+Receipt PDF
+
+Attachments mandatory.
+
+==================================================
+7. ADMIN ALERT
+==================================================
+
+Immediately notify admin:
+
+Customer
+
+Booking Number
+
+Payment Amount
+
+Remaining Balance
+
+Invoice Number
+
+Payment Time
+
+WhatsApp
+
+Email
+
+==================================================
+8. DELIVERY LOG
+==================================================
+
+Store every notification:
+
+Notification ID
+
+Booking Number
+
+Customer
+
+Channel
+
+WhatsApp
+
+SMS
+
+Email
+
+Provider Response
+
+HTTP Code
+
+Delivered
+
+Failed
+
+Retry Count
+
+Timestamp
+
+Visible in Admin Panel.
+
+==================================================
+9. RETRY ENGINE
+==================================================
+
+If notification fails:
+
+Retry after:
+
+30 seconds
+
+2 minutes
+
+5 minutes
+
+15 minutes
+
+1 hour
+
+Stop only after maximum retry count.
+
+Show failure in admin.
+
+==================================================
+10. CUSTOMER DASHBOARD
+==================================================
+
+After payment:
+
+Immediately show:
+
+Paid Status
+
+Tax Invoice
+
+Receipt
+
+Download PDF
+
+Print
+
+Share
+
+Before payment:
+
+Hide every invoice.
+
+==================================================
+11. VERIFY
+==================================================
+
+Run REAL production tests.
+
+Not local.
+
+Not mocked.
+
+Verify:
+
+✓ Razorpay success
+✓ Booking updated
+✓ Invoice generated
+✓ Receipt generated
+✓ PDF stored
+✓ WhatsApp delivered
+✓ SMS delivered
+✓ Email delivered
+✓ Admin notified
+✓ Dashboard updated
+✓ Resend buttons work
+✓ Retry engine works
+✓ Logs created
+
+==================================================
+12. DEPLOY
+==================================================
+
+Deploy to VPS.
+
+Restart services.
+
+Clear cache.
+
+Verify production bundle.
+
+==================================================
+13. DO NOT MARK COMPLETE UNTIL
+==================================================
+
+A real payment successfully triggers:
+
+✓ Booking Confirmation
+✓ WhatsApp delivered
+✓ SMS delivered
+✓ Email delivered
+✓ Invoice PDF attached
+✓ Receipt PDF attached
+✓ Admin alert delivered
+✓ Customer dashboard updated
+✓ Resend works from Admin
+✓ Retry works automatically
+
+If any step fails, continue debugging until the live production system works completely.
