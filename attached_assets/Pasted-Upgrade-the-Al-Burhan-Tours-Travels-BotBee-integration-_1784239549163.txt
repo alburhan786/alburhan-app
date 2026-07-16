@@ -1,0 +1,241 @@
+Upgrade the Al Burhan Tours & Travels BotBee integration to use the COMPLETE official BotBee WhatsApp API.
+
+Do NOT use undocumented endpoints.
+
+Use only official BotBee APIs.
+
+Messaging APIs
+--------------
+Template List
+Send Template
+Send Message
+Upload Media
+Get Delivery Status
+Get Message Status
+Conversation History
+Postback List
+
+Subscriber APIs
+---------------
+Subscriber Create
+Subscriber Update
+Subscriber Get
+Subscriber List
+Subscriber Delete
+
+Automation APIs
+---------------
+Trigger Bot Flow
+Reset User Input Flow
+
+CRM APIs
+--------
+Assign Chat To Team Member
+Create Custom Fields
+List Custom Fields
+Assign Custom Fields
+Assign Labels
+Remove Labels
+Assign Sequences
+Remove Sequences
+Add Notes
+
+Booking Workflow
+----------------
+
+When a customer registers:
+
+• Create Subscriber
+• Save Subscriber ID
+• Save Chat ID
+• Save Phone Number
+• Save WhatsApp Number
+• Save Booking ID
+
+Automatically create custom fields:
+
+booking_id
+agreement_id
+package_name
+departure_date
+return_date
+passport_number
+passport_expiry
+visa_status
+payment_status
+payment_due
+total_amount
+paid_amount
+balance_amount
+room_type
+hotel_makkah
+hotel_madinah
+flight_pnr
+ticket_number
+passport_uploaded
+visa_uploaded
+agreement_signed
+
+Automatically assign labels:
+
+New Lead
+Website Booking
+Inquiry
+Pending Documents
+Pending Payment
+Payment Received
+Visa Processing
+Visa Issued
+Ticket Issued
+Confirmed
+Travelled
+Completed
+Cancelled
+Refund Pending
+Refund Completed
+VIP Customer
+Repeat Customer
+
+Automatically assign sequences:
+
+New Inquiry Follow-up
+Payment Reminder
+Document Reminder
+Visa Reminder
+Flight Reminder
+Departure Reminder
+Arrival Welcome
+Return Follow-up
+Review Request
+
+Automatically add notes:
+
+Booking created
+Agreement signed
+Passport uploaded
+Visa uploaded
+Payment received
+Ticket generated
+Room allocated
+Flight updated
+Travel completed
+
+Whenever a booking status changes:
+
+Update Subscriber
+
+Update custom fields
+
+Update labels
+
+Update notes
+
+Update sequences
+
+Trigger Bot Flow if configured
+
+After every WhatsApp message:
+
+Store
+
+WA Message ID
+
+Conversation ID
+
+Delivery Status
+
+Read Status
+
+Timestamp
+
+Store complete chat history in database.
+
+Admin Dashboard
+
+Create WhatsApp CRM Dashboard.
+
+Display:
+
+Customer profile
+
+Booking
+
+Agreement
+
+Payments
+
+Messages
+
+Conversation timeline
+
+Notes
+
+Labels
+
+Sequences
+
+Custom Fields
+
+Message Status
+
+Delivery Status
+
+Assigned Team Member
+
+Allow admin to:
+
+Open live conversation
+
+Send template
+
+Send media
+
+Assign team
+
+Add notes
+
+Add labels
+
+Remove labels
+
+Trigger bot flow
+
+Reset flow
+
+Delete subscriber
+
+Customer Dashboard
+
+Display complete WhatsApp communication history.
+
+Allow customer to download:
+
+Agreement PDF
+
+Invoice
+
+Receipt
+
+Visa
+
+Ticket
+
+Boarding Pass
+
+Final Requirement
+
+No hardcoded template IDs.
+
+No hardcoded subscriber IDs.
+
+No guessed endpoints.
+
+Everything must use official BotBee APIs.
+
+Log every API request and response.
+
+Retry failed requests once.
+
+Automatically refresh template list if template errors occur.
+
+Deployment is only complete after every booking workflow and every WhatsApp API works successfully.

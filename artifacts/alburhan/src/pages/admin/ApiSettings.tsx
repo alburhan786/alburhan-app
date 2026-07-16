@@ -489,6 +489,30 @@ export default function ApiSettings() {
               {/* Expanded Content */}
               {isOpen && (
                 <div className="border-t border-gray-100 p-4 space-y-4">
+                  {/* BotBee WABA configuration warning */}
+                  {provider.id === "botbee" && (
+                    <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 space-y-2">
+                      <div className="flex items-start gap-2">
+                        <span className="text-base shrink-0">⚠️</span>
+                        <div>
+                          <p className="text-xs font-bold text-amber-800">WhatsApp Template Sending — Action Required</p>
+                          <p className="text-xs text-amber-700 mt-1">
+                            Template messages (booking approval, payment receipt, etc.) are currently failing with <span className="font-mono font-semibold">"Message template not found"</span> from BotBee's API. Plain-text WhatsApp messages are working fine as a fallback.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-xs text-amber-800 space-y-1 pl-6">
+                        <p className="font-semibold">To fix this, ask BotBee support to:</p>
+                        <ol className="list-decimal list-inside space-y-0.5 text-amber-700">
+                          <li>Confirm that templates (approve, bookingsubmitted, etc.) are linked to Phone Number ID <span className="font-mono font-bold">965912196611113</span></li>
+                          <li>Re-sync or re-approve the templates under the current WABA (WhatsApp Business Account)</li>
+                          <li>Verify the Meta access token in the templates has not expired</li>
+                        </ol>
+                        <p className="mt-1 text-amber-600 italic">Until fixed, plain-text WhatsApp messages are sent as fallback — customers receive notifications but without the formatted template design.</p>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Last updated info */}
                   {s.updated_at && (
                     <div className="text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2">

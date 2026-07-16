@@ -479,7 +479,9 @@ async function sendBotBeeEventTemplate(
     (ctx.bookingNumber ? `${siteBase}/invoice/${ctx.bookingNumber}` : `${siteBase}`);
   const paymentUrl = ctx.bookingNumber
     ? `${siteBase}/pay/${ctx.bookingNumber}` : `${siteBase}`;
-  const opts = { eventType, bookingId, customerId };
+  // skipFailureLog: true — template failures are expected while BotBee WABA is misconfigured;
+  // suppress them from notification_logs so text fallback is the only logged outcome.
+  const opts = { eventType, bookingId, customerId, skipFailureLog: true };
 
   switch (eventType) {
     case "new_booking":
@@ -513,6 +515,7 @@ async function sendBotBeeEventTemplate(
         customerName: ctx.customerName,
         packageName: ctx.packageName || "Hajj/Umrah Package",
         bookingId: bookingRef,
+        amount: ctx.finalAmount ?? ctx.amount ?? 0,
         invoiceUrl,
       }, opts);
 

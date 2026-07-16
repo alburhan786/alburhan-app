@@ -116,9 +116,59 @@ export async function forceResyncFast2SmsKey(): Promise<{ ok: boolean; reason: s
   }
 }
 
+/**
+ * BotBee auto-sync: if the bundle's injected BOTBEE_API_KEY differs from what is
+ * stored in the DB (or DB has no key / wrong key), overwrite DB with env key.
+ * This ensures a fresh bundle deploy always wins over manually-entered DB keys.
+ * Does NOT overwrite extra_fields_encrypted (phone_number_id, business_id) —
+ * those are admin-managed and should not be clobbered.
+ */
+async function autoImportBotBeeFromEnv(): Promise<void> {
+  try {
+    const envKey = process.env.BOTBEE_API_KEY;
+    if (isPlaceholderKey(envKey)) {
+      console.log("[ApiSettings] botbee: no valid env key to sync");
+      return;
+    }
+
+    const existing = cache.get("botbee");
+    const dbKey = existing?.apiKey;
+
+    // Already in sync — skip the write
+    if (dbKey && !isPlaceholderKey(dbKey) && dbKey === envKey) {
+      console.log("[ApiSettings] botbee: DB key matches env key — no sync needed");
+      return;
+    }
+
+    const reason = !dbKey
+      ? "no DB key"
+      : isPlaceholderKey(dbKey)
+        ? "DB key is placeholder"
+        : "DB key differs from bundle env (overwriting with env key)";
+
+    console.log(`[ApiSettings] botbee: syncing env key → DB (reason: ${reason})`);
+    const encryptedKey = encrypt(envKey!);
+    await pool.query(
+      `INSERT INTO api_settings (provider, enabled, api_url, api_key_encrypted, updated_at, updated_by)
+       VALUES ('botbee', true, 'https://app.botbee.io/api/v1/whatsapp', $1, NOW(), 'system-auto-sync')
+       ON CONFLICT (provider) DO UPDATE SET
+         api_key_encrypted = EXCLUDED.api_key_encrypted,
+         enabled = true,
+         updated_at = NOW(),
+         updated_by = 'system-auto-sync'`,
+      [encryptedKey]
+    );
+    await loadFromDB();
+    console.log("[ApiSettings] botbee: API key synced from bundle env → DB ✓");
+  } catch (err) {
+    console.error("[ApiSettings] botbee auto-sync failed:", err);
+  }
+}
+
 export async function initApiSettingsProvider(): Promise<void> {
   await loadFromDB();
   await autoImportFast2SmsFromEnv();
+  await autoImportBotBeeFromEnv();
   // Refresh every 5 minutes
   setInterval(() => { loadFromDB().catch(() => {}); }, CACHE_TTL_MS);
   console.log("[ApiSettings] Provider initialized");

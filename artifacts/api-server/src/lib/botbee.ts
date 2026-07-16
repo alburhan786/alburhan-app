@@ -4,6 +4,18 @@ import { pool } from "@workspace/db";
 
 const BOTBEE_BASE = "https://app.botbee.io/api/v1";
 
+/** Shared options for all BotBee template send functions */
+export interface BotBeeTemplateOpts {
+  eventType?: string;
+  bookingId?: string;
+  customerId?: string;
+  language?: string;
+  /** When true, a template send failure is NOT written to notification_logs.
+   *  Use this when the caller will fall back to a plain-text message so that
+   *  only the final outcome (text ok/fail) appears in the logs. */
+  skipFailureLog?: boolean;
+}
+
 export interface BotBeeResult {
   ok: boolean;
   provider: string;
@@ -133,7 +145,7 @@ export async function sendText(
 
 export async function sendTemplate(
   to: string, templateName: string, components: object[],
-  opts?: { eventType?: string; bookingId?: string; customerId?: string }
+  opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
   const { apiToken, phone_number_id, enabled, baseUrl } = getCredentials();
   const endpoint = `${baseUrl}/whatsapp/send/template`;
@@ -151,9 +163,20 @@ export async function sendTemplate(
     return result;
   }
   const BOTBEE_BUSINESS_ID = (process.env.BOTBEE_BUSINESS_ID || "").trim();
-  const payload: Record<string, unknown> = { apiToken, phone_number_id, phone_number: phone, template: { name: templateName, language: { code: "en" }, components } };
+  const langCode = (opts?.language || "en").trim();
+  const payload: Record<string, unknown> = { apiToken, phone_number_id, phone_number: phone, template: { name: templateName, language: { code: langCode }, components } };
   if (BOTBEE_BUSINESS_ID) payload.business_account_id = BOTBEE_BUSINESS_ID;
   const reqPayload = { ...payload, apiToken: "***" };
+
+  // Detailed outgoing-request log so every send is traceable in PM2 logs
+  console.log("[BotBee] sendTemplate REQUEST →", JSON.stringify({
+    endpoint,
+    phone_number_id: String(phone_number_id).slice(0, 6) + "...",
+    phone_number:  phone,
+    template_name: templateName,
+    language:      "en",
+    param_count:   Array.isArray(components) ? components.reduce((s: number, c: any) => s + (Array.isArray(c?.parameters) ? c.parameters.length : 0), 0) : 0,
+  }));
 
   let result: BotBeeResult;
   try {
@@ -165,22 +188,25 @@ export async function sendTemplate(
     result = failed
       ? { ok: false, provider: "BotBee", endpoint, httpStatus: response.status, requestPayload: reqPayload, responsePayload: data, errorMessage: data.message || data.error || "Template send failed" }
       : { ok: true, provider: "BotBee", endpoint, httpStatus: response.status, requestPayload: reqPayload, responsePayload: data };
-    console.log(result.ok ? "[BotBee] sendTemplate sent" : "[BotBee] sendTemplate failed", templateName, "to", to);
+    console.log("[BotBee] sendTemplate RESPONSE ←", templateName, "| status:", response.status, "| ok:", result.ok, "| msg:", (data?.message || data?.status || "").toString().slice(0, 120));
   } catch (err: any) {
     const resp = err?.response;
     result = { ok: false, provider: "BotBee", endpoint, httpStatus: resp?.status, requestPayload: reqPayload, responsePayload: resp?.data, errorMessage: resp?.data?.message || err.message };
-    console.error("[BotBee] sendTemplate error:", err.message);
+    console.error("[BotBee] sendTemplate ERROR:", templateName, "→", err.message, "| response:", JSON.stringify(resp?.data || {}).slice(0, 200));
   }
 
   if (opts?.eventType) {
-    await logToDb({ eventType: opts.eventType, channel: "whatsapp", recipient: to, bookingId: opts.bookingId, customerId: opts.customerId, message: `Template: ${templateName}`, status: result.ok ? "sent" : "failed", result });
+    // Skip failure logging when caller will fall back to plain text (avoids noise in notification_logs)
+    if (result.ok || !opts.skipFailureLog) {
+      await logToDb({ eventType: opts.eventType, channel: "whatsapp", recipient: to, bookingId: opts.bookingId, customerId: opts.customerId, message: `Template: ${templateName}`, status: result.ok ? "sent" : "failed", result });
+    }
   }
   return result;
 }
 
 export async function sendInteractiveButtons(
   to: string, body: string, buttons: Array<{ id: string; title: string }>,
-  opts?: { eventType?: string; bookingId?: string; customerId?: string }
+  opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
   const { apiToken, phone_number_id, enabled, baseUrl } = getCredentials();
   const endpoint = `${baseUrl}/whatsapp/send/interactive-buttons`;
@@ -231,7 +257,7 @@ export async function sendInteractiveButtons(
 
 export async function sendFile(
   to: string, mediaId: string, caption?: string,
-  opts?: { eventType?: string; bookingId?: string; customerId?: string }
+  opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
   const { apiToken, phone_number_id, enabled, baseUrl } = getCredentials();
   const endpoint = `${baseUrl}/whatsapp/send/file`;
@@ -318,7 +344,7 @@ export async function sendVoucher(to: string, ctx: {
 
 export async function sendImage(
   to: string, imageUrl: string, caption?: string,
-  opts?: { eventType?: string; bookingId?: string; customerId?: string }
+  opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
   const message = caption ? `${caption}\n\n${imageUrl}` : imageUrl;
   return sendText(to, message, { eventType: opts?.eventType || "new_booking", bookingId: opts?.bookingId, customerId: opts?.customerId });
@@ -326,7 +352,7 @@ export async function sendImage(
 
 export async function sendPDF(
   to: string, pdfUrl: string, caption?: string,
-  opts?: { eventType?: string; bookingId?: string; customerId?: string }
+  opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
   const message = `${caption || "Document ready"}:\n📎 ${pdfUrl}`;
   return sendText(to, message, { eventType: opts?.eventType || "invoice_generated", bookingId: opts?.bookingId, customerId: opts?.customerId });
@@ -334,7 +360,7 @@ export async function sendPDF(
 
 export async function sendButtons(
   to: string, body: string, buttons: Array<{ id: string; title: string }>,
-  opts?: { eventType?: string; bookingId?: string; customerId?: string }
+  opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
   return sendInteractiveButtons(to, body, buttons, opts);
 }
@@ -385,7 +411,7 @@ export async function sendPDFDocument(
   pdfBuffer: Buffer,
   filename: string,
   caption?: string,
-  opts?: { eventType?: string; bookingId?: string; customerId?: string }
+  opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
   const { enabled, baseUrl } = getCredentials();
   const uploadEndpoint = `${baseUrl}/whatsapp/upload/media`;
@@ -435,7 +461,7 @@ export async function sendConfirmationTemplate(
     bookingRef:     string;
     attachmentLink: string;
   },
-  opts?: { eventType?: string; bookingId?: string; customerId?: string }
+  opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
   const { apiToken, phone_number_id, enabled, baseUrl } = getCredentials();
   const endpoint = `${baseUrl}/whatsapp/send/template`;
@@ -544,7 +570,7 @@ export const ABT_TEMPLATES: Record<string, { id: string; name: string }> = {
   booking_submitted:  { id: "407645", name: (process.env.BOTBEE_BOOKING_SUBMITTED_TEMPLATE  || "bookingsubmitted").trim() },
   payment_received:   { id: "407646", name: (process.env.BOTBEE_PAYMENT_RECEIVED_TEMPLATE   || "paymentreceived").trim() },
   pending_payment:    { id: "407648", name: (process.env.BOTBEE_PENDING_PAYMENT_TEMPLATE    || "pending_payment_reminder").trim() },
-  booking_approved:   { id: "407642", name: (process.env.BOTBEE_BOOKING_APPROVED_TEMPLATE   || "bookingapproved").trim() },
+  booking_approved:   { id: "407642", name: (process.env.BOTBEE_BOOKING_APPROVED_TEMPLATE   || "approve").trim() },
   departure_reminder: { id: "407664", name: (process.env.BOTBEE_DEPARTURE_REMINDER_TEMPLATE || "departure_reminder").trim() },
   visa_issued:        { id: "407667", name: (process.env.BOTBEE_VISA_ISSUED_TEMPLATE        || "visa_issued").trim() },
   flight_issued:      { id: "361654", name: (process.env.BOTBEE_FLIGHT_ISSUED_TEMPLATE      || "flight").trim() },
@@ -562,7 +588,7 @@ function bodyParams(texts: (string | null | undefined)[]): object[] {
 export async function sendBookingSubmittedTemplate(
   to: string,
   ctx: { customerName: string; packageName: string; bookingId: string; invoiceUrl?: string },
-  opts?: { eventType?: string; bookingId?: string; customerId?: string }
+  opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
   const url = ctx.invoiceUrl || `https://alburhantravels.com/invoice/${ctx.bookingId}`;
   return sendTemplate(to, ABT_TEMPLATES.booking_submitted.name, bodyParams([
@@ -574,7 +600,7 @@ export async function sendBookingSubmittedTemplate(
 export async function sendPaymentReceivedTemplate(
   to: string,
   ctx: { customerName: string; packageName: string; bookingId: string; invoiceUrl?: string },
-  opts?: { eventType?: string; bookingId?: string; customerId?: string }
+  opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
   const url = ctx.invoiceUrl || `https://alburhantravels.com/invoice/${ctx.bookingId}`;
   return sendTemplate(to, ABT_TEMPLATES.payment_received.name, bodyParams([
@@ -586,7 +612,7 @@ export async function sendPaymentReceivedTemplate(
 export async function sendPendingPaymentTemplate(
   to: string,
   ctx: { customerName: string; packageName: string; bookingId: string; paymentUrl?: string },
-  opts?: { eventType?: string; bookingId?: string; customerId?: string }
+  opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
   const url = ctx.paymentUrl || `https://alburhantravels.com/pay/${ctx.bookingId}`;
   return sendTemplate(to, ABT_TEMPLATES.pending_payment.name, bodyParams([
@@ -594,16 +620,27 @@ export async function sendPendingPaymentTemplate(
   ]), opts);
 }
 
-/** Template 407642 approve — fires when admin approves a booking */
+/** Template 407642 approve — fires when admin approves a booking.
+ *  BotBee template locale: en_US  |  params: {{1}}=name, {{2}}=bookingId, {{3}}=package, {{4}}=amount (₹)
+ */
 export async function sendApprovalTemplate(
   to: string,
-  ctx: { customerName: string; packageName: string; bookingId: string; invoiceUrl?: string },
-  opts?: { eventType?: string; bookingId?: string; customerId?: string }
+  ctx: { customerName: string; packageName: string; bookingId: string; amount?: string | number; invoiceUrl?: string },
+  opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
-  const url = ctx.invoiceUrl || `https://alburhantravels.com/invoice/${ctx.bookingId}`;
-  return sendTemplate(to, ABT_TEMPLATES.booking_approved.name, bodyParams([
-    ctx.customerName, ctx.packageName, ctx.bookingId, url,
-  ]), opts);
+  // Format amount — template shows "💰 Amount: ₹{{4}}"
+  const amountStr = ctx.amount != null ? String(Math.round(Number(ctx.amount))) : "0";
+  return sendTemplate(
+    to,
+    ABT_TEMPLATES.booking_approved.name,
+    bodyParams([
+      ctx.customerName,    // {{1}} Assalamu Alaikum {{1}}
+      ctx.bookingId,       // {{2}} 📋 Booking ID:{{2}}
+      ctx.packageName,     // {{3}} 📦 Package:{{3}}
+      amountStr,           // {{4}} 💰 Amount: ₹{{4}}
+    ]),
+    { ...opts, language: "en_US" },
+  );
 }
 
 /** Template 407664 departure_reminder — fires 7d/3d/1d before departure */
@@ -614,7 +651,7 @@ export async function sendDepartureReminderTemplate(
     flightNumber?: string; departureDate?: string; reportingTime?: string;
     departureAirport?: string; hotelName?: string; emergencyContact?: string;
   },
-  opts?: { eventType?: string; bookingId?: string; customerId?: string }
+  opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
   return sendTemplate(to, ABT_TEMPLATES.departure_reminder.name, bodyParams([
     ctx.customerName,
@@ -632,7 +669,7 @@ export async function sendDepartureReminderTemplate(
 export async function sendVisaIssuedTemplate(
   to: string,
   ctx: { customerName: string; bookingId: string; packageName?: string; visaUrl?: string },
-  opts?: { eventType?: string; bookingId?: string; customerId?: string }
+  opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
   const url = ctx.visaUrl || `https://alburhantravels.com/invoice/${ctx.bookingId}`;
   return sendTemplate(to, ABT_TEMPLATES.visa_issued.name, bodyParams([
@@ -647,7 +684,7 @@ export async function sendFlightTemplate(
     customerName: string; bookingId: string;
     flightNumber?: string; departureDate?: string; ticketUrl?: string;
   },
-  opts?: { eventType?: string; bookingId?: string; customerId?: string }
+  opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
   const url = ctx.ticketUrl || `https://alburhantravels.com/invoice/${ctx.bookingId}`;
   return sendTemplate(to, ABT_TEMPLATES.flight_issued.name, bodyParams([
@@ -675,20 +712,40 @@ export interface WaTemplate {
 export async function fetchTemplates(): Promise<{ ok: boolean; templates?: WaTemplate[]; errorMessage?: string; responsePayload?: unknown }> {
   const { apiToken, phone_number_id, enabled, baseUrl } = getCredentials();
   const bbCfg = getCachedConfig("botbee");
-  const business_id = bbCfg.extra?.business_id || process.env.BOTBEE_BUSINESS_ID || "";
+  const business_id = (bbCfg.extra?.business_id || process.env.BOTBEE_BUSINESS_ID || "").trim();
 
   if (!enabled) return { ok: false, errorMessage: "WhatsApp disabled in API Settings" };
   if (!apiToken || !phone_number_id) return { ok: false, errorMessage: "BotBee credentials not configured" };
 
-  const endpoint = `${baseUrl}/whatsapp/templates`;
+  // Official BotBee endpoint: POST /api/v1/whatsapp/template/list
+  const endpoint = `${baseUrl}/whatsapp/template/list`;
   try {
-    const params = new URLSearchParams({ apiToken, phone_number_id });
-    if (business_id) params.set("business_id", business_id);
-    const response = await axios.get(`${endpoint}?${params}`, { timeout: 15000 });
+    const body: Record<string, string> = { apiToken, phone_number_id };
+    if (business_id) body.business_id = business_id;
+    const response = await axios.post(endpoint, body, { headers: { "Content-Type": "application/json" }, timeout: 15000 });
     const data = response.data;
 
-    // BotBee may wrap in data/templates/result
-    const raw: WaTemplate[] = data?.templates || data?.data?.templates || data?.data || data?.result || (Array.isArray(data) ? data : []);
+    // BotBee POST /template/list returns { status: "1", message: [ { template_name, template_id, template_category, ... } ] }
+    // Fallback: standard paths used by some other providers
+    const rawArr: unknown[] =
+      (Array.isArray(data?.message) ? data.message : null) ||
+      data?.templates ||
+      data?.data?.templates ||
+      data?.data ||
+      data?.result ||
+      (Array.isArray(data) ? data : []);
+
+    if (!Array.isArray(rawArr)) return { ok: false, errorMessage: "Unexpected response format", responsePayload: data };
+
+    // Normalise BotBee field names (template_name → name, template_category → category, etc.)
+    const raw: WaTemplate[] = rawArr.map((t: any) => ({
+      id:         String(t.template_id || t.id || ""),
+      name:       (t.template_name || t.name || "").toLowerCase(),
+      status:     (t.template_status || t.status || "UNKNOWN").toUpperCase(),
+      category:   (t.template_category || t.category || "UTILITY").toUpperCase(),
+      language:   t.template_language || t.language || "en",
+      components: Array.isArray(t.components) ? t.components : [],
+    }));
     if (!Array.isArray(raw)) return { ok: false, errorMessage: "Unexpected response format", responsePayload: data };
 
     const templates = raw.map((t: any) => ({

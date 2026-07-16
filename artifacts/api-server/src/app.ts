@@ -402,7 +402,7 @@ app.post("/api/migrate/test-approval-template", async (req, res) => {
   const overrideName = (req.body?.overrideName || req.query.overrideName) as string | undefined;
   const candidates: string[] = overrideName
     ? [overrideName.trim()]
-    : [configuredName, "booking_approved", "approved", "approve", "bookingapproved",
+    : ["approve", configuredName, "booking_approved", "approved", "bookingapproved",
        "approval", "hajjapproval", "booking_confirmation", "bookingconfirmation", "conformation"];
 
   const results: Array<{ name: string; ok: boolean; httpStatus?: number; error?: string; response?: unknown }> = [];
@@ -439,51 +439,184 @@ app.post("/api/migrate/test-approval-template", async (req, res) => {
   });
 });
 
-// GET /api/migrate/botbee-discovery — try multiple BotBee API paths to list all registered templates
+// GET /api/migrate/botbee-discovery — fetch real template list via POST + try sending with different credentials
 app.get("/api/migrate/botbee-discovery", async (req, res) => {
   const key = req.query.key as string;
   if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
 
   const axios = (await import("axios")).default;
-  const apiToken        = (process.env.BOTBEE_API_KEY || "").trim();
-  const phone_number_id = (process.env.BOTBEE_PHONE_NUMBER_ID || "").trim();
-  const businessId      = (process.env.BOTBEE_BUSINESS_ID || "").trim();
-  const baseUrl         = "https://app.botbee.io/api/v1";
+  const { pool: p } = await import("@workspace/db");
 
-  const probes = [
-    `${baseUrl}/whatsapp/templates`,
-    `${baseUrl}/whatsapp/template`,
-    `${baseUrl}/templates`,
-    `${baseUrl}/whatsapp/templates/list`,
-    `${baseUrl}/whatsapp/approved-templates`,
-    `${baseUrl}/business/templates`,
-    `${baseUrl}/whatsapp/template/all`,
-  ];
+  // Get credentials from BOTH env vars and DB
+  const envApiToken  = (process.env.BOTBEE_API_KEY || "").trim();
+  const envPhoneId   = (process.env.BOTBEE_PHONE_NUMBER_ID || "").trim();
+  const envBizId     = (process.env.BOTBEE_BUSINESS_ID || "").trim();
+  const baseUrl      = "https://app.botbee.io/api/v1";
 
-  const findings: Array<{ endpoint: string; status: number | string; data: unknown }> = [];
+  // Also get DB-stored credentials (api_settings) — correct schema: provider, api_url, api_key_encrypted, extra_fields_encrypted
+  let dbPhoneId = "", dbApiUrl = "", dbBizId = "", dbRawExtra = "";
+  try {
+    const r = await p.query(`SELECT provider, enabled, api_url, api_key_encrypted, extra_fields_encrypted FROM api_settings WHERE provider = 'botbee' LIMIT 1`);
+    if (r.rows.length > 0) {
+      const row = r.rows[0];
+      dbApiUrl  = row.api_url || "";
+      // extra_fields_encrypted contains JSON with phone_number_id and business_id
+      // We import decrypt to read it
+      const { decrypt } = await import("./lib/encryption.js");
+      try {
+        const extra = JSON.parse(decrypt(row.extra_fields_encrypted || ""));
+        dbPhoneId = extra?.phone_number_id || "";
+        dbBizId   = extra?.business_id || "";
+        dbRawExtra = JSON.stringify(extra);
+      } catch { dbRawExtra = "(decrypt failed)"; }
+    }
+  } catch (e: any) { dbRawExtra = `(query error: ${e.message})`; }
 
-  for (const endpoint of probes) {
+  // Try official POST /template/list with both env and DB credentials
+  const allCredSets = [
+    { label: "DB credentials",  apiToken: envApiToken, phone_number_id: dbPhoneId  || envPhoneId, business_id: dbBizId  || envBizId },
+    { label: "Env credentials", apiToken: envApiToken, phone_number_id: envPhoneId || dbPhoneId, business_id: envBizId || dbBizId },
+  ].filter((c, i, arr) => arr.findIndex(x => x.phone_number_id === c.phone_number_id) === i); // deduplicate
+
+  const templateListResults: Array<{ label: string; phone_number_id: string; ok: boolean; count?: number; templates?: unknown[]; error?: string }> = [];
+  let allTemplates: unknown[] = [];
+
+  for (const cred of allCredSets) {
     try {
-      const params: Record<string, string> = { apiToken, phone_number_id };
-      if (businessId) params.business_id = businessId;
-      const r = await axios.get(`${endpoint}?${new URLSearchParams(params)}`, { timeout: 8000, validateStatus: () => true });
-      findings.push({ endpoint, status: r.status, data: r.data });
+      const body: Record<string, string> = { apiToken: cred.apiToken, phone_number_id: cred.phone_number_id };
+      if (cred.business_id) body.business_id = cred.business_id;
+      const r = await axios.post(`${baseUrl}/whatsapp/template/list`, body, { headers: { "Content-Type": "application/json" }, timeout: 10000, validateStatus: () => true });
+      const data = r.data;
+      // BotBee uses { status:"1", message:[...] } — check message first
+      const raw: unknown[] =
+        (Array.isArray(data?.message) ? data.message : null) ||
+        data?.templates || data?.data?.templates || data?.data || data?.result ||
+        (Array.isArray(data) ? data : []);
+      if (Array.isArray(raw) && raw.length > 0) {
+        allTemplates = raw;
+        templateListResults.push({ label: cred.label, phone_number_id: cred.phone_number_id, ok: true, count: raw.length, templates: raw });
+      } else {
+        templateListResults.push({ label: cred.label, phone_number_id: cred.phone_number_id, ok: false, error: `HTTP ${r.status}: ${JSON.stringify(data).slice(0, 200)}` });
+      }
     } catch (e: any) {
-      findings.push({ endpoint, status: e.message, data: null });
+      templateListResults.push({ label: cred.label, phone_number_id: cred.phone_number_id, ok: false, error: e.message });
     }
   }
 
-  const templateLists = findings.filter(f =>
-    f.status === 200 && f.data && typeof f.data === "object" &&
-    (Array.isArray(f.data) || Array.isArray((f.data as any)?.templates) || Array.isArray((f.data as any)?.data))
-  );
+  // BotBee raw fields use template_name, template_status, template_category — normalise for display
+  const normName   = (t: any) => (t.template_name || t.name || "").toString().toLowerCase();
+  const normStatus = (t: any) => (t.template_status || t.status || "?").toString().toUpperCase();
+
+  const approveTemplate = (allTemplates as any[]).find((t: any) => normName(t) === "approve");
+  const allNames = (allTemplates as any[]).map((t: any) => `${normName(t)} [${normStatus(t)}] id=${t.template_id || t.id || "?"}`);
+
+  const { getCachedConfig: getLiveCfg } = await import("./lib/apiSettingsProvider.js");
+  const liveConfig = getLiveCfg("botbee");
+  const sendApiToken = envApiToken;
+  const sendPid = (liveConfig.extra?.phone_number_id || allCredSets[0]?.phone_number_id || envPhoneId).trim();
+  const sendBizId = liveConfig.extra?.business_id || liveConfig.extra?.whatsapp_business_id || "";
+
+  // All format attempts — trying every plausible BotBee send/template payload shape
+  const approveRaw = approveTemplate as any;
+  const sendPayloads: Array<{ label: string; payload: Record<string, unknown> }> = [
+    // F1: Meta-style with phone_number_id + components
+    { label: "F1:meta-components", payload: {
+        apiToken: sendApiToken, phone_number_id: sendPid, phone_number: "919867114562",
+        template: { name: "approve", language: { code: "en_US" }, components: [{ type: "body", parameters: [{ type:"text",text:"Test" },{ type:"text",text:"ABT001" },{ type:"text",text:"Hajj 2026" },{ type:"text",text:"95000" }] }] } } },
+    // F2: BotBee-native variable_map
+    { label: "F2:variable_map", payload: {
+        apiToken: sendApiToken, phone_number_id: sendPid, phone_number: "919867114562",
+        template_name: "approve", language_code: "en_US",
+        variable_map: { header: [], body: { "1":"Test","2":"ABT001","3":"Hajj 2026","4":"95000" }, button: [] } } },
+    // F3: whatsapp_business_id (from template raw data: 151951)
+    { label: "F3:waba-biz-id", payload: {
+        apiToken: sendApiToken, whatsapp_business_id: approveRaw?.whatsapp_business_id || "151951",
+        phone_number: "919867114562",
+        template: { name: "approve", language: { code: "en_US" }, components: [{ type: "body", parameters: [{ type:"text",text:"Test" },{ type:"text",text:"ABT001" },{ type:"text",text:"Hajj 2026" },{ type:"text",text:"95000" }] }] } } },
+    // F4: template_id + phone_number_id + variables dict
+    { label: "F4:template-id+vars", payload: {
+        apiToken: sendApiToken, phone_number_id: sendPid, phone_number: "919867114562",
+        template_id: approveRaw?.template_id || "1540618371136355",
+        template_name: "approve", language_code: "en_US",
+        variables: { "1":"Test","2":"ABT001","3":"Hajj 2026","4":"95000" } } },
+    // F5: "to" instead of "phone_number", with phone_number_id
+    { label: "F5:to-field", payload: {
+        apiToken: sendApiToken, phone_number_id: sendPid, to: "919867114562",
+        template: { name: "approve", language: { code: "en_US" }, components: [{ type: "body", parameters: [{ type:"text",text:"Test" },{ type:"text",text:"ABT001" },{ type:"text",text:"Hajj 2026" },{ type:"text",text:"95000" }] }] } } },
+    // F6: bookingsubmitted with F1 format (to confirm if this template also fails)
+    { label: "F6:bookingsubmitted-meta", payload: {
+        apiToken: sendApiToken, phone_number_id: sendPid, phone_number: "919867114562",
+        template: { name: "bookingsubmitted", language: { code: "en" }, components: [{ type: "body", parameters: [{ type:"text",text:"Test" },{ type:"text",text:"ABT001" },{ type:"text",text:"Hajj 2026" },{ type:"text",text:"https://alburhantravels.com" }] }] } } },
+    // F7: business_account_id from DB extra fields (this is what BOTBEE_BUSINESS_ID maps to)
+    { label: "F7:business_account_id", payload: {
+        apiToken: sendApiToken, phone_number_id: sendPid, phone_number: "919867114562",
+        business_account_id: liveConfig.extra?.business_id || liveConfig.extra?.business_account_id || sendBizId,
+        template: { name: "approve", language: { code: "en_US" }, components: [{ type: "body", parameters: [{ type:"text",text:"Test" },{ type:"text",text:"ABT001" },{ type:"text",text:"Hajj 2026" },{ type:"text",text:"95000" }] }] } } },
+    // F8: whatsapp_bot_id (BotBee's internal bot identifier — from template raw_data)
+    { label: "F8:whatsapp_bot_id-334520", payload: {
+        apiToken: sendApiToken, whatsapp_bot_id: "334520", phone_number: "919867114562",
+        template_name: "approve", language_code: "en_US",
+        variables: { "1":"Test","2":"ABT001","3":"Hajj 2026","4":"95000" } } },
+  ];
+
+  const sendProbes: Array<{ template: string; lang: string; format: string; ok: boolean; error?: string; response?: unknown }> = [];
+  for (const { label, payload } of sendPayloads) {
+    try {
+      const r = await axios.post(`${baseUrl}/whatsapp/send/template`, payload, { headers: { "Content-Type": "application/json" }, timeout: 10000, validateStatus: () => true });
+      const data = r.data;
+      const ok = (data?.status === "1" || data?.status === 1) && !data?.error;
+      const errMsg = ok ? undefined : String(data?.message || data?.error || JSON.stringify(data).slice(0, 120));
+      sendProbes.push({ template: (payload as any).template?.name || (payload as any).template_name || "?", lang: "?", format: label, ok, error: errMsg, response: data });
+    } catch (e: any) {
+      sendProbes.push({ template: "?", lang: "?", format: label, ok: false, error: e.message });
+    }
+  }
+
+  // Query notification_logs for last 2 SUCCESSFUL WA template sends to see their exact request payload
+  let successPayloadSamples: unknown[] = [];
+  try {
+    const sr = await p.query(`
+      SELECT event_type, request_payload, provider_response, created_at
+      FROM notification_logs
+      WHERE status = 'sent' AND channel = 'whatsapp'
+        AND request_payload IS NOT NULL
+        AND request_payload::text LIKE '%template%'
+      ORDER BY created_at DESC LIMIT 3
+    `);
+    successPayloadSamples = sr.rows.map(r => ({
+      event_type: r.event_type,
+      created_at: r.created_at,
+      request_payload: r.request_payload,
+    }));
+  } catch (e: any) { successPayloadSamples = [{ error: e.message }]; }
+
+  // Also show what getCachedConfig actually returns (this is what production uses)
+  const { getCachedConfig } = await import("./lib/apiSettingsProvider.js");
+  const liveCfg = getCachedConfig("botbee");
+  // Show extra field KEYS and masked values (safe to expose — no secrets)
+  const extraKeys = liveCfg?.extra ? Object.keys(liveCfg.extra) : [];
+  const extraKeysSafe = extraKeys.map(k => {
+    const v = String(liveCfg.extra[k] || "");
+    return `${k}=${v.slice(0, 8)}...`;
+  });
 
   res.json({
-    ok: templateLists.length > 0,
-    baseUrl,
-    phone_number_id: `${phone_number_id.slice(0, 4)}...`,
-    templateListsFound: templateLists,
-    allProbes: findings.map(f => ({ endpoint: f.endpoint, status: f.status })),
+    ok: templateListResults.some(r => r.ok),
+    env_phone_id:   envPhoneId ? `${envPhoneId.slice(0, 6)}...` : "(not set)",
+    db_phone_id:    dbPhoneId  ? `${dbPhoneId.slice(0, 6)}...`  : "(not set)",
+    db_api_url:     dbApiUrl,
+    db_extra_fields: dbRawExtra ? dbRawExtra.replace(/"([^"]{4})[^"]*/g, '"$1...') : "(none)",
+    live_cfg_extra_keys: extraKeysSafe,
+    live_cfg_phone_id: liveCfg?.extra?.phone_number_id
+      ? `${String(liveCfg.extra.phone_number_id).slice(0, 6)}...`
+      : "(not set)",
+    live_cfg_api_url: liveCfg?.apiUrl || "(not set)",
+    live_cfg_has_key: !!(liveCfg?.apiKey),
+    templateListResults,
+    approveTemplateFound: !!approveTemplate,
+    approveTemplate:      approveTemplate || null,
+    allRegisteredNames:   allNames,
+    sendProbes,
   });
 });
 

@@ -59,7 +59,7 @@ export const TEMPLATE_CONFIGS: TemplateConfig[] = [
     key:         "booking_approved",
     displayName: "Booking Approved",
     id:          "407642",
-    name:        envName("BOTBEE_BOOKING_APPROVED_TEMPLATE", "bookingapproved"),
+    name:        envName("BOTBEE_BOOKING_APPROVED_TEMPLATE", "approve"),
     envVar:      "BOTBEE_BOOKING_APPROVED_TEMPLATE",
     language:    "en",
     eventTypes:  ["booking_approved"],

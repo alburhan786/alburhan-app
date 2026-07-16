@@ -335,10 +335,10 @@ router.post("/connection-test", requireAdmin as any, async (_req, res) => {
   }
 
   try {
-    const endpoint = `${baseUrl}/whatsapp/templates`;
-    const params = new URLSearchParams({ apiToken, phone_number_id });
+    // Official BotBee endpoint: POST /api/v1/whatsapp/template/list
+    const endpoint = `${baseUrl}/whatsapp/template/list`;
     const start = Date.now();
-    const r = await axios.get(`${endpoint}?${params}`, { timeout: 10000 });
+    const r = await axios.post(endpoint, { apiToken, phone_number_id }, { headers: { "Content-Type": "application/json" }, timeout: 10000 });
     const latencyMs = Date.now() - start;
     const ok = r.status >= 200 && r.status < 300;
     res.json({ ok, connected: ok, httpStatus: r.status, latencyMs, baseUrl, responseSnippet: JSON.stringify(r.data).slice(0, 200) });
@@ -415,7 +415,8 @@ router.post("/automation-test", requireAdmin as any, async (req: AuthenticatedRe
     const apiToken = bbCfg.apiKey || process.env.BOTBEE_API_KEY || "";
     const phone_number_id = bbCfg.extra?.phone_number_id || process.env.BOTBEE_PHONE_NUMBER_ID || "";
     const baseUrl = (bbCfg.apiUrl || "https://app.botbee.io/api/v1").replace(/\/whatsapp\/?$/, "");
-    const r = await axios.get(`${baseUrl}/whatsapp/templates?apiToken=${apiToken}&phone_number_id=${phone_number_id}`, { timeout: 8000 });
+    // Official BotBee endpoint: POST /api/v1/whatsapp/template/list
+    const r = await axios.post(`${baseUrl}/whatsapp/template/list`, { apiToken, phone_number_id }, { headers: { "Content-Type": "application/json" }, timeout: 8000 });
     steps.push({ step: "BotBee Connection", status: r.status < 300 ? "pass" : "fail", detail: `HTTP ${r.status}` });
   } catch (err: any) { steps.push({ step: "BotBee Connection", status: "fail", detail: err.message }); }
 
