@@ -25,7 +25,7 @@ interface DbTemplate {
   id: string; name: string; display_name: string; category: string; language: string;
   status: string; header_type: string; header_text?: string; body_text: string;
   footer_text?: string; buttons: any[]; variables: string[]; event_type?: string;
-  meta_template_name?: string; enabled: boolean; is_builtin: boolean;
+  meta_template_name?: string; template_id?: string; enabled: boolean; is_builtin: boolean;
   created_at: string; updated_at: string;
 }
 interface DeliveryLog {
@@ -323,18 +323,21 @@ function LiveTemplatesTab() {
 
   async function handleSend() {
     if (!selected || !mobile.trim()) return;
-    const components = buildWaComponents(selected, headerVars, bodyVars);
+    if (!selected.id) {
+      toast({ title: "No Template ID", description: "This template has no BotBee ID. Cannot send.", variant: "destructive" });
+      return;
+    }
     setSending(true); setResult(null);
     try {
       const res = await fetch(`${API}/api/whatsapp/templates/send`, {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mobile: mobile.trim(), templateName: selected.name, language: selected.language, components, eventType, bookingId: bookingId || undefined }),
+        body: JSON.stringify({ mobile: mobile.trim(), templateId: selected.id, eventType, bookingId: bookingId || undefined }),
       });
       const data = await res.json();
       setResult(data);
       if (data.ok) toast({ title: "Template sent!", description: `Delivered to ${mobile}` });
-      else toast({ title: "Failed", description: data.errorMessage, variant: "destructive" });
+      else toast({ title: "Failed", description: data.errorMessage || data.message, variant: "destructive" });
     } catch (e: any) { setResult({ ok: false, errorMessage: e.message }); }
     finally { setSending(false); }
   }
@@ -515,6 +518,12 @@ function LiveTemplatesTab() {
                 <p className="text-[10px] font-semibold text-gray-500 uppercase mb-0.5">Template</p>
                 <p className="text-xs font-bold text-gray-800 font-mono">{selected.name}</p>
                 <p className="text-[10px] text-gray-400">{selected.category} · {selected.language}</p>
+                {selected.id && (
+                  <p className="text-[10px] text-green-700 font-mono mt-0.5">ID: {selected.id}</p>
+                )}
+                {!selected.id && (
+                  <div className="flex items-center gap-1 mt-1"><AlertTriangle className="w-3 h-3 text-red-400" /><span className="text-[10px] text-red-600">No Template ID — cannot send</span></div>
+                )}
                 {selected.status !== "APPROVED" && (
                   <div className="flex items-center gap-1 mt-1"><AlertTriangle className="w-3 h-3 text-yellow-500" /><span className="text-[10px] text-yellow-700">Status: {selected.status}</span></div>
                 )}
@@ -535,7 +544,7 @@ function LiveTemplatesTab() {
 }
 
 // ── Template Form Modal ───────────────────────────────────────────────────────
-const EMPTY_FORM = { name: "", display_name: "", category: "UTILITY", language: "en", header_type: "none", header_text: "", body_text: "", footer_text: "", variables: [] as string[], event_type: "", meta_template_name: "" };
+const EMPTY_FORM = { name: "", display_name: "", category: "UTILITY", language: "en", header_type: "none", header_text: "", body_text: "", footer_text: "", variables: [] as string[], event_type: "", meta_template_name: "", template_id: "" };
 type TemplateForm = typeof EMPTY_FORM;
 
 function TemplateFormModal({ initial, onSave, onClose }: { initial?: DbTemplate | null; onSave: (f: TemplateForm) => Promise<void>; onClose: () => void }) {
@@ -545,6 +554,7 @@ function TemplateFormModal({ initial, onSave, onClose }: { initial?: DbTemplate 
     body_text: initial.body_text, footer_text: initial.footer_text || "",
     variables: Array.isArray(initial.variables) ? initial.variables : [],
     event_type: initial.event_type || "", meta_template_name: initial.meta_template_name || "",
+    template_id: initial.template_id || "",
   } : { ...EMPTY_FORM });
   const [saving, setSaving] = useState(false);
   const isEdit = !!initial;
@@ -659,6 +669,13 @@ function TemplateFormModal({ initial, onSave, onClose }: { initial?: DbTemplate 
               className="w-full border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-300" placeholder="booking_approved_en" />
           </div>
 
+          <div className="rounded-lg bg-green-50 border border-green-200 p-3">
+            <label className="text-xs font-semibold text-green-800 block mb-1">BotBee Template ID <span className="font-normal text-green-600">(required to send via WhatsApp template)</span></label>
+            <input value={form.template_id} onChange={e => setForm(f => ({ ...f, template_id: e.target.value.trim() }))}
+              className="w-full border border-green-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-300 bg-white" placeholder="407642" />
+            <p className="text-[10px] text-green-600 mt-1">Find this in your BotBee dashboard → Templates → Template ID column</p>
+          </div>
+
           <div>
             <label className="text-xs font-semibold text-gray-600 block mb-1.5">Variables used in this template</label>
             <div className="flex flex-wrap gap-1.5">
@@ -698,6 +715,7 @@ function MyTemplatesTab() {
   const [sendMobile, setSendMobile] = useState("");
   const [sendVars, setSendVars] = useState<Record<string, string>>({});
   const [sending, setSending] = useState(false);
+  const [sendingTemplate, setSendingTemplate] = useState(false);
   const [sendResult, setSendResult] = useState<SendResult | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
 
@@ -722,7 +740,7 @@ function MyTemplatesTab() {
   async function saveTemplate(form: TemplateForm) {
     const url = editing ? `${API}/api/whatsapp/db-templates/${editing.id}` : `${API}/api/whatsapp/db-templates`;
     const method = editing ? "PUT" : "POST";
-    const res = await fetch(url, { method, credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+    const res = await fetch(url, { method, credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, template_id: form.template_id?.trim() || null }) });
     const data = await res.json();
     if (data.ok) {
       toast({ title: editing ? "Template updated" : "Template created" });
@@ -759,8 +777,24 @@ function MyTemplatesTab() {
     const data = await res.json();
     setSendResult(data);
     if (data.ok) toast({ title: "Sent!", description: `Delivered to ${sendMobile}` });
-    else toast({ title: "Failed", description: data.errorMessage, variant: "destructive" });
+    else toast({ title: "Failed", description: data.errorMessage || data.message, variant: "destructive" });
     setSending(false);
+  }
+
+  async function handleSendTemplate() {
+    if (!sendModal || !sendMobile.trim()) return;
+    setSendingTemplate(true); setSendResult(null);
+    try {
+      const res = await fetch(`${API}/api/whatsapp/db-templates/${sendModal.id}/send-template`, {
+        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mobile: sendMobile.trim() }),
+      });
+      const data = await res.json();
+      setSendResult(data);
+      if (data.ok) toast({ title: "Template sent!", description: `BotBee template delivered to ${sendMobile}` });
+      else toast({ title: "Template send failed", description: data.errorMessage || data.message, variant: "destructive" });
+    } catch (e: any) { setSendResult({ ok: false, errorMessage: e.message }); }
+    finally { setSendingTemplate(false); }
   }
 
   const previewBody = preview ? fillNamedVars(preview.body_text, {}) : "";
@@ -824,6 +858,7 @@ function MyTemplatesTab() {
                   <span className="text-[10px] text-gray-400">{LANGUAGES.find(l => l.code === t.language)?.label || t.language}</span>
                   {t.event_type && <span className="text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-100">⚡ {EVENT_LABELS[t.event_type] || t.event_type}</span>}
                   {t.variables?.length > 0 && <span className="text-[10px] bg-yellow-50 text-yellow-700 px-1.5 py-0.5 rounded border border-yellow-100">{t.variables.length} var{t.variables.length > 1 ? "s" : ""}</span>}
+                  {t.template_id && <span className="text-[10px] bg-green-50 text-green-700 px-1.5 py-0.5 rounded border border-green-100 font-mono">#{t.template_id}</span>}
                 </div>
 
                 {/* Actions */}
@@ -888,7 +923,12 @@ function MyTemplatesTab() {
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setSendModal(null)}>
           <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-gray-900">Send — {sendModal.display_name}</h3>
+              <div>
+                <h3 className="font-bold text-gray-900">Send — {sendModal.display_name}</h3>
+                {sendModal.template_id && (
+                  <p className="text-[10px] text-green-700 font-mono mt-0.5">BotBee Template ID: {sendModal.template_id}</p>
+                )}
+              </div>
               <button onClick={() => setSendModal(null)} className="text-gray-400 hover:text-gray-600">✕</button>
             </div>
             <div className="space-y-3">
@@ -912,10 +952,23 @@ function MyTemplatesTab() {
                 </div>
               )}
               {sendResult && <SendResultBadge result={sendResult} onClose={() => setSendResult(null)} />}
-              <button onClick={handleSendText} disabled={sending || !sendMobile.trim()}
-                className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white font-bold text-sm rounded-lg disabled:opacity-50 flex items-center justify-center gap-2">
-                {sending ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</> : <><Send className="w-4 h-4" /> Send</>}
-              </button>
+              {sendModal.template_id ? (
+                <div className="flex gap-2">
+                  <button onClick={handleSendTemplate} disabled={sendingTemplate || sending || !sendMobile.trim()}
+                    className="flex-1 py-2.5 bg-green-600 hover:bg-green-700 text-white font-bold text-sm rounded-lg disabled:opacity-50 flex items-center justify-center gap-2">
+                    {sendingTemplate ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</> : <><Send className="w-4 h-4" /> Send via Template</>}
+                  </button>
+                  <button onClick={handleSendText} disabled={sending || sendingTemplate || !sendMobile.trim()}
+                    className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-sm rounded-lg disabled:opacity-50 flex items-center justify-center gap-2">
+                    {sending ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</> : "Send as Text"}
+                  </button>
+                </div>
+              ) : (
+                <button onClick={handleSendText} disabled={sending || !sendMobile.trim()}
+                  className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white font-bold text-sm rounded-lg disabled:opacity-50 flex items-center justify-center gap-2">
+                  {sending ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</> : <><Send className="w-4 h-4" /> Send as Text</>}
+                </button>
+              )}
             </div>
           </div>
         </div>

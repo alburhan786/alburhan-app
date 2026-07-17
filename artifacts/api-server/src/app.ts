@@ -395,47 +395,27 @@ app.post("/api/migrate/test-approval-template", async (req, res) => {
 
   const { sendTemplate } = await import("./lib/botbee.js");
 
-  const configuredName = ABT_TEMPLATES.booking_approved?.name || "bookingapproved";
-  const templateId     = ABT_TEMPLATES.booking_approved?.id   || "407642";
+  // Accept templateId from body/query, or fall back to the configured booking_approved ID
+  const templateId = ((req.body?.templateId || req.query.templateId) as string | undefined)?.trim()
+    || ABT_TEMPLATES.booking_approved?.id || "407642";
 
-  // If overrideName provided, probe that specific name; otherwise run all candidates
-  const overrideName = (req.body?.overrideName || req.query.overrideName) as string | undefined;
-  const candidates: string[] = overrideName
-    ? [overrideName.trim()]
-    : ["approve", configuredName, "booking_approved", "approved", "bookingapproved",
-       "approval", "hajjapproval", "booking_confirmation", "bookingconfirmation", "conformation"];
-
-  const results: Array<{ name: string; ok: boolean; httpStatus?: number; error?: string; response?: unknown }> = [];
-
-  for (const name of candidates) {
-    try {
-      const r = await sendTemplate(mobile!, name,
-        [{ type: "body", parameters: [
-          { type: "text", text: "Test Customer" },
-          { type: "text", text: "Hajj 2026 (TEST)" },
-          { type: "text", text: "TEST001" },
-          { type: "text", text: "https://alburhantravels.com/invoice/TEST001" },
-        ]}],
-        { eventType: `test_approval_probe_${name}` }
-      );
-      results.push({ name, ok: r.ok, httpStatus: r.httpStatus, error: r.errorMessage || undefined, response: r.responsePayload });
-      if (r.ok) break; // Stop on first success
-    } catch (e: any) {
-      results.push({ name, ok: false, error: e.message });
-    }
+  const results: Array<{ templateId: string; ok: boolean; httpStatus?: number; error?: string; response?: unknown }> = [];
+  try {
+    const r = await sendTemplate(mobile!, templateId, { eventType: "test_approval_probe" });
+    results.push({ templateId, ok: r.ok, httpStatus: r.httpStatus, error: r.errorMessage || undefined, response: r.responsePayload });
+  } catch (e: any) {
+    results.push({ templateId, ok: false, error: e.message });
   }
 
   const winner = results.find(r => r.ok);
   res.json({
-    ok:             !!winner,
-    winnerName:     winner?.name || null,
-    configuredName,
+    ok:        !!winner,
     templateId,
     mobile,
     results,
     hint: winner
-      ? `✅ Template "${winner.name}" works! Set BOTBEE_BOOKING_APPROVED_TEMPLATE=${winner.name} in VPS .env`
-      : "❌ None of the candidate names matched. Check BotBee dashboard for the exact template name.",
+      ? `✅ Template ID ${templateId} works!`
+      : `❌ Template ID ${templateId} failed. Check BotBee dashboard for the correct template ID.`,
   });
 });
 

@@ -144,13 +144,14 @@ export async function sendText(
 }
 
 export async function sendTemplate(
-  to: string, templateName: string, components: object[],
+  to: string, templateId: string,
   opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
   const { apiToken, phone_number_id, enabled, baseUrl } = getCredentials();
   const endpoint = `${baseUrl}/whatsapp/send/template`;
   if (!enabled) return { ok: false, provider: "BotBee", endpoint, errorMessage: "WhatsApp disabled in API Settings" };
   if (!apiToken || !phone_number_id) return { ok: false, provider: "BotBee", endpoint, errorMessage: "BotBee credentials not configured" };
+  if (!templateId?.trim()) return { ok: false, provider: "BotBee", endpoint, errorMessage: "Template ID is required" };
 
   let phone: string;
   try {
@@ -158,25 +159,16 @@ export async function sendTemplate(
   } catch (err: any) {
     const result: BotBeeResult = { ok: false, provider: "BotBee", endpoint, errorMessage: err?.message || "Invalid mobile number" };
     if (opts?.eventType) {
-      await logToDb({ eventType: opts.eventType, channel: "whatsapp", recipient: to || "unknown", bookingId: opts.bookingId, customerId: opts.customerId, message: `Template: ${templateName}`, status: "failed", result });
+      await logToDb({ eventType: opts.eventType, channel: "whatsapp", recipient: to || "unknown", bookingId: opts.bookingId, customerId: opts.customerId, message: `Template ID: ${templateId}`, status: "failed", result });
     }
     return result;
   }
-  const BOTBEE_BUSINESS_ID = (process.env.BOTBEE_BUSINESS_ID || "").trim();
-  const langCode = (opts?.language || "en").trim();
-  const payload: Record<string, unknown> = { apiToken, phone_number_id, phone_number: phone, template: { name: templateName, language: { code: langCode }, components } };
-  if (BOTBEE_BUSINESS_ID) payload.business_account_id = BOTBEE_BUSINESS_ID;
-  const reqPayload = { ...payload, apiToken: "***" };
 
-  // Detailed outgoing-request log so every send is traceable in PM2 logs
-  console.log("[BotBee] sendTemplate REQUEST →", JSON.stringify({
-    endpoint,
-    phone_number_id: String(phone_number_id).slice(0, 6) + "...",
-    phone_number:  phone,
-    template_name: templateName,
-    language:      "en",
-    param_count:   Array.isArray(components) ? components.reduce((s: number, c: any) => s + (Array.isArray(c?.parameters) ? c.parameters.length : 0), 0) : 0,
-  }));
+  // BotBee requires exactly 4 fields — no template name, language, or components
+  const payload: Record<string, unknown> = { apiToken, phone_number_id, phone_number: phone, template_id: templateId };
+  const reqPayload = { phone_number_id, phone_number: phone, template_id: templateId };
+
+  console.log("[BotBee] sendTemplate REQUEST →", JSON.stringify(reqPayload));
 
   let result: BotBeeResult;
   try {
@@ -188,17 +180,16 @@ export async function sendTemplate(
     result = failed
       ? { ok: false, provider: "BotBee", endpoint, httpStatus: response.status, requestPayload: reqPayload, responsePayload: data, errorMessage: data.message || data.error || "Template send failed" }
       : { ok: true, provider: "BotBee", endpoint, httpStatus: response.status, requestPayload: reqPayload, responsePayload: data };
-    console.log("[BotBee] sendTemplate RESPONSE ←", templateName, "| status:", response.status, "| ok:", result.ok, "| msg:", (data?.message || data?.status || "").toString().slice(0, 120));
+    console.log("[BotBee] sendTemplate RESPONSE ←", JSON.stringify({ templateId, httpStatus: response.status, ok: result.ok, data }));
   } catch (err: any) {
     const resp = err?.response;
     result = { ok: false, provider: "BotBee", endpoint, httpStatus: resp?.status, requestPayload: reqPayload, responsePayload: resp?.data, errorMessage: resp?.data?.message || err.message };
-    console.error("[BotBee] sendTemplate ERROR:", templateName, "→", err.message, "| response:", JSON.stringify(resp?.data || {}).slice(0, 200));
+    console.error("[BotBee] sendTemplate ERROR:", JSON.stringify({ templateId, error: err.message, response: resp?.data }));
   }
 
   if (opts?.eventType) {
-    // Skip failure logging when caller will fall back to plain text (avoids noise in notification_logs)
     if (result.ok || !opts.skipFailureLog) {
-      await logToDb({ eventType: opts.eventType, channel: "whatsapp", recipient: to, bookingId: opts.bookingId, customerId: opts.customerId, message: `Template: ${templateName}`, status: result.ok ? "sent" : "failed", result });
+      await logToDb({ eventType: opts.eventType, channel: "whatsapp", recipient: to, bookingId: opts.bookingId, customerId: opts.customerId, message: `Template ID: ${templateId}`, status: result.ok ? "sent" : "failed", result });
     }
   }
   return result;
@@ -455,109 +446,10 @@ export const CONFIRMATION_TEMPLATE_ID   = "333473";
 
 export async function sendConfirmationTemplate(
   to: string,
-  ctx: {
-    customerName:   string;
-    packageName:    string;
-    bookingRef:     string;
-    attachmentLink: string;
-  },
+  _ctx: { customerName: string; packageName: string; bookingRef: string; attachmentLink: string },
   opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
-  const { apiToken, phone_number_id, enabled, baseUrl } = getCredentials();
-  const endpoint = `${baseUrl}/whatsapp/send/template`;
-
-  if (!enabled) {
-    return { ok: false, provider: "BotBee", endpoint, errorMessage: "WhatsApp disabled in API Settings" };
-  }
-  if (!apiToken || !phone_number_id) {
-    return { ok: false, provider: "BotBee", endpoint, errorMessage: "BotBee credentials not configured" };
-  }
-
-  let phone: string;
-  try {
-    phone = toBotBeePhone(to);
-  } catch (err: any) {
-    const result: BotBeeResult = {
-      ok: false, provider: "BotBee", endpoint,
-      errorMessage: err?.message || "Invalid mobile number",
-    };
-    if (opts?.eventType) {
-      await logToDb({
-        eventType: opts.eventType, channel: "whatsapp",
-        recipient: to || "unknown",
-        bookingId: opts.bookingId, customerId: opts.customerId,
-        message: `Template: ${CONFIRMATION_TEMPLATE_NAME} (ID: ${CONFIRMATION_TEMPLATE_ID})`,
-        status: "failed", result,
-      });
-    }
-    return result;
-  }
-
-  const BOTBEE_BUSINESS_ID = (process.env.BOTBEE_BUSINESS_ID || "").trim();
-  const payload: Record<string, unknown> = {
-    apiToken,
-    phone_number_id,
-    phone_number: phone,
-    template: {
-      name: CONFIRMATION_TEMPLATE_NAME,
-      id:   CONFIRMATION_TEMPLATE_ID,
-      language: { code: "en_GB" },
-      components: [{
-        type: "body",
-        parameters: [
-          { type: "text", text: ctx.customerName   },
-          { type: "text", text: ctx.packageName    },
-          { type: "text", text: ctx.bookingRef     },
-          { type: "text", text: ctx.attachmentLink },
-        ],
-      }],
-    },
-  };
-  if (BOTBEE_BUSINESS_ID) payload.business_account_id = BOTBEE_BUSINESS_ID;
-  const reqPayload = { ...payload, apiToken: "***" };
-
-  let result: BotBeeResult;
-  try {
-    const response = await withRetry(() =>
-      axios.post(endpoint, payload, { headers: { "Content-Type": "application/json" }, timeout: 12000 })
-    );
-    const data = response.data;
-    const failed = data?.status === "0" || data?.status === 0 || !!data?.error;
-    result = failed
-      ? {
-          ok: false, provider: "BotBee", endpoint,
-          httpStatus: response.status, requestPayload: reqPayload, responsePayload: data,
-          errorMessage: data.message || data.error || "Confirmation template send failed",
-        }
-      : {
-          ok: true, provider: "BotBee", endpoint,
-          httpStatus: response.status, requestPayload: reqPayload, responsePayload: data,
-          messageId: data?.messages?.[0]?.id || data?.message_id,
-        };
-    console.log(
-      result.ok ? "[BotBee] sendConfirmationTemplate sent" : "[BotBee] sendConfirmationTemplate failed",
-      `(ID: ${CONFIRMATION_TEMPLATE_ID}, name: ${CONFIRMATION_TEMPLATE_NAME}) to`, to,
-    );
-  } catch (err: any) {
-    const resp = err?.response;
-    result = {
-      ok: false, provider: "BotBee", endpoint,
-      httpStatus: resp?.status, requestPayload: reqPayload, responsePayload: resp?.data,
-      errorMessage: resp?.data?.message || err.message,
-    };
-    console.error("[BotBee] sendConfirmationTemplate error:", err.message);
-  }
-
-  if (opts?.eventType) {
-    await logToDb({
-      eventType: opts.eventType, channel: "whatsapp", recipient: to,
-      bookingId: opts.bookingId, customerId: opts.customerId,
-      message: `Template: ${CONFIRMATION_TEMPLATE_NAME} (ID: ${CONFIRMATION_TEMPLATE_ID}) | ${ctx.customerName} | ${ctx.packageName} | ref=${ctx.bookingRef} | ${ctx.attachmentLink}`,
-      status: result.ok ? "sent" : "failed",
-      result,
-    });
-  }
-  return result;
+  return sendTemplate(to, CONFIRMATION_TEMPLATE_ID, opts);
 }
 
 // ── Al Burhan Production Templates — env-var backed, never hardcoded ─────────
@@ -587,109 +479,68 @@ function bodyParams(texts: (string | null | undefined)[]): object[] {
 /** Template 407645 bookingsubmitted — fires when a new booking is submitted */
 export async function sendBookingSubmittedTemplate(
   to: string,
-  ctx: { customerName: string; packageName: string; bookingId: string; invoiceUrl?: string },
+  _ctx: { customerName: string; packageName: string; bookingId: string; invoiceUrl?: string },
   opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
-  const url = ctx.invoiceUrl || `https://alburhantravels.com/invoice/${ctx.bookingId}`;
-  return sendTemplate(to, ABT_TEMPLATES.booking_submitted.name, bodyParams([
-    ctx.customerName, ctx.packageName, ctx.bookingId, url,
-  ]), opts);
+  return sendTemplate(to, ABT_TEMPLATES.booking_submitted.id, opts);
 }
 
-/** Template 407646 paymentreceived — fires on full/partial payment (NO amount shown) */
+/** Template 407646 paymentreceived — fires on full/partial payment */
 export async function sendPaymentReceivedTemplate(
   to: string,
-  ctx: { customerName: string; packageName: string; bookingId: string; invoiceUrl?: string },
+  _ctx: { customerName: string; packageName: string; bookingId: string; invoiceUrl?: string },
   opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
-  const url = ctx.invoiceUrl || `https://alburhantravels.com/invoice/${ctx.bookingId}`;
-  return sendTemplate(to, ABT_TEMPLATES.payment_received.name, bodyParams([
-    ctx.customerName, ctx.packageName, ctx.bookingId, "Paid", url,
-  ]), opts);
+  return sendTemplate(to, ABT_TEMPLATES.payment_received.id, opts);
 }
 
 /** Template 407648 pending_payment_reminder — fires for unpaid bookings at 3d/7d/15d */
 export async function sendPendingPaymentTemplate(
   to: string,
-  ctx: { customerName: string; packageName: string; bookingId: string; paymentUrl?: string },
+  _ctx: { customerName: string; packageName: string; bookingId: string; paymentUrl?: string },
   opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
-  const url = ctx.paymentUrl || `https://alburhantravels.com/pay/${ctx.bookingId}`;
-  return sendTemplate(to, ABT_TEMPLATES.pending_payment.name, bodyParams([
-    ctx.customerName, ctx.packageName, ctx.bookingId, url,
-  ]), opts);
+  return sendTemplate(to, ABT_TEMPLATES.pending_payment.id, opts);
 }
 
-/** Template 407642 approve — fires when admin approves a booking.
- *  BotBee template locale: en_US  |  params: {{1}}=name, {{2}}=bookingId, {{3}}=package, {{4}}=amount (₹)
- */
+/** Template 407642 approve — fires when admin approves a booking */
 export async function sendApprovalTemplate(
   to: string,
-  ctx: { customerName: string; packageName: string; bookingId: string; amount?: string | number; invoiceUrl?: string },
+  _ctx: { customerName: string; packageName: string; bookingId: string; amount?: string | number; invoiceUrl?: string },
   opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
-  // Format amount — template shows "💰 Amount: ₹{{4}}"
-  const amountStr = ctx.amount != null ? String(Math.round(Number(ctx.amount))) : "0";
-  return sendTemplate(
-    to,
-    ABT_TEMPLATES.booking_approved.name,
-    bodyParams([
-      ctx.customerName,    // {{1}} Assalamu Alaikum {{1}}
-      ctx.bookingId,       // {{2}} 📋 Booking ID:{{2}}
-      ctx.packageName,     // {{3}} 📦 Package:{{3}}
-      amountStr,           // {{4}} 💰 Amount: ₹{{4}}
-    ]),
-    { ...opts, language: "en_US" },
-  );
+  return sendTemplate(to, ABT_TEMPLATES.booking_approved.id, opts);
 }
 
 /** Template 407664 departure_reminder — fires 7d/3d/1d before departure */
 export async function sendDepartureReminderTemplate(
   to: string,
-  ctx: {
+  _ctx: {
     customerName: string; packageName: string; bookingId: string;
     flightNumber?: string; departureDate?: string; reportingTime?: string;
     departureAirport?: string; hotelName?: string; emergencyContact?: string;
   },
   opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
-  return sendTemplate(to, ABT_TEMPLATES.departure_reminder.name, bodyParams([
-    ctx.customerName,
-    ctx.packageName,
-    ctx.flightNumber || "TBA",
-    ctx.departureDate || "TBA",
-    ctx.reportingTime || "4 hours before departure",
-    ctx.departureAirport || "TBA",
-    ctx.hotelName || "TBA",
-    ctx.emergencyContact || "+91 9893225590",
-  ]), opts);
+  return sendTemplate(to, ABT_TEMPLATES.departure_reminder.id, opts);
 }
 
 /** Template 407667 visa_issued — fires when visa is uploaded/approved */
 export async function sendVisaIssuedTemplate(
   to: string,
-  ctx: { customerName: string; bookingId: string; packageName?: string; visaUrl?: string },
+  _ctx: { customerName: string; bookingId: string; packageName?: string; visaUrl?: string },
   opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
-  const url = ctx.visaUrl || `https://alburhantravels.com/invoice/${ctx.bookingId}`;
-  return sendTemplate(to, ABT_TEMPLATES.visa_issued.name, bodyParams([
-    ctx.customerName, ctx.bookingId, ctx.packageName || "Hajj/Umrah Package", url,
-  ]), opts);
+  return sendTemplate(to, ABT_TEMPLATES.visa_issued.id, opts);
 }
 
 /** Template 361654 flight — fires when flight ticket is issued */
 export async function sendFlightTemplate(
   to: string,
-  ctx: {
-    customerName: string; bookingId: string;
-    flightNumber?: string; departureDate?: string; ticketUrl?: string;
-  },
+  _ctx: { customerName: string; bookingId: string; flightNumber?: string; departureDate?: string; ticketUrl?: string },
   opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
-  const url = ctx.ticketUrl || `https://alburhantravels.com/invoice/${ctx.bookingId}`;
-  return sendTemplate(to, ABT_TEMPLATES.flight_issued.name, bodyParams([
-    ctx.customerName, ctx.bookingId, ctx.flightNumber || "TBA", ctx.departureDate || "TBA", url,
-  ]), opts);
+  return sendTemplate(to, ABT_TEMPLATES.flight_issued.id, opts);
 }
 
 // ── Template management ───────────────────────────────────────────────────────

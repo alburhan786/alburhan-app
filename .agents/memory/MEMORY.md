@@ -7,7 +7,7 @@
 - [Frontend JSX convention](frontend-jsx.md) — project uses React (className=, not class=); preact/hooks imports will break Vite build
 - [Journey status + profile columns](journey-status-schema.md) — journey_status TEXT on bookings (pool.query only, not Drizzle); blood_group/emergency_contact_name/emergency_contact_mobile on users; POST /api/bookings/:id/journey-status auto-notifies customer
 - [Offline bank transfer module](offline-payments-schema.md) — bank_settings + offline_payments tables; POST /api/offline-payments (multipart); approve/reject fire notifications; BankTransferSection is self-contained customer component
-- [BotBee booking_approved template blocker](botbee-template-name-blocker.md) — template ID 407642 not found by any name (10 tried); BotBee has no template list API; admin must check dashboard for exact name + set BOTBEE_BOOKING_APPROVED_TEMPLATE in VPS .env
+- [BotBee Template API — 4-param ID-only send](botbee-template-api.md) — sendTemplate() uses only {apiToken, phone_number_id, phone_number, template_id}; no template name, language, or components ever.
 - [SMS DLT return type](sms-dlt-return-type.md) — sendDLTSMS() in notifications.ts returns Promise<boolean>; do NOT treat as {ok:boolean}
 - [JSX class vs className](jsx-classname.md) — AutomationCenter.tsx and LoyaltyManager.tsx had class= instead of className=; style= must be object not string
 - [Document delivery module](document-delivery.md) — lib/documentDelivery.ts: sendDocumentToCustomer fetches buffer from GCS/disk and sends PDF via BotBee upload, image via uploadMedia+sendFile, fallback to text; POST /api/documents/:id/resend for admin one-click resend

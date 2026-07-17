@@ -3,13 +3,21 @@ import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendText, sendTemplate, sendInteractiveButtons, fetchTemplates, type BotBeeResult } from "../lib/botbee.js";
 import { pool } from "@workspace/db";
 
+// Ensure wa_templates has the template_id column
+;(async () => {
+  try {
+    await pool.query(`ALTER TABLE wa_templates ADD COLUMN IF NOT EXISTS template_id TEXT`);
+    console.log("[WhatsApp] wa_templates.template_id column ensured");
+  } catch (e) { console.error("[WhatsApp] wa_templates migration error:", e); }
+})();
+
 const router = Router();
 
 // ── Existing routes ───────────────────────────────────────────────────────────
 
 // POST /api/whatsapp/test
 router.post("/test", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
-  const { mobile, message, templateName, components, buttons, bodyText } = req.body;
+  const { mobile, message, templateId, buttons, bodyText } = req.body;
   if (!mobile?.trim()) return void res.status(400).json({ ok: false, message: "mobile is required" });
 
   const to = mobile.trim();
@@ -17,8 +25,8 @@ router.post("/test", requireAdmin as any, async (req: AuthenticatedRequest, res)
     `🧪 Test from Al Burhan ERP\n${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })}\n\nAl Burhan Tours & Travels`;
 
   let result: BotBeeResult;
-  if (templateName) {
-    result = await sendTemplate(to, templateName, components || []);
+  if (templateId?.trim()) {
+    result = await sendTemplate(to, templateId.trim());
   } else if (buttons && Array.isArray(buttons) && buttons.length > 0) {
     result = await sendInteractiveButtons(to, bodyText || testMessage, buttons);
   } else {
@@ -32,7 +40,7 @@ router.post("/test", requireAdmin as any, async (req: AuthenticatedRequest, res)
        (id, event_type, channel, recipient, message, status, provider_response,
         provider_name, api_endpoint, http_status, request_payload, error_code, sent_at, retry_count)
        VALUES ($1,'test_send','whatsapp',$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW(),0)`,
-      [id, to, templateName ? `[template] ${templateName}` : testMessage.substring(0, 300),
+      [id, to, templateId ? `[template_id] ${templateId}` : testMessage.substring(0, 300),
        result.ok ? "sent" : "failed", JSON.stringify(result),
        result.provider, result.endpoint, result.httpStatus || null,
        result.requestPayload ? JSON.stringify(result.requestPayload) : null, result.errorCode || null]
@@ -67,27 +75,13 @@ router.get("/templates", requireAdmin as any, async (_req, res) => {
 
 // POST /api/whatsapp/templates/send
 router.post("/templates/send", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
-  const { mobile, templateName, language, components, eventType, bookingId, customerId } = req.body;
+  const { mobile, templateId, eventType, bookingId, customerId } = req.body;
   if (!mobile?.trim()) return void res.status(400).json({ ok: false, message: "mobile is required" });
-  if (!templateName?.trim()) return void res.status(400).json({ ok: false, message: "templateName is required" });
+  if (!templateId?.trim()) return void res.status(400).json({ ok: false, message: "templateId is required" });
 
-  const result = await sendTemplate(mobile.trim(), templateName, components || [], {
+  const result = await sendTemplate(mobile.trim(), templateId.trim(), {
     eventType: eventType || "template_send", bookingId: bookingId || undefined, customerId: customerId || undefined,
   });
-
-  if (!eventType) {
-    try {
-      const id = `nl_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      await pool.query(
-        `INSERT INTO notification_logs (id, event_type, channel, recipient, message, status, provider_response, provider_name, api_endpoint, http_status, request_payload, error_code, customer_id, booking_id, sent_at, retry_count)
-         VALUES ($1,'template_send','whatsapp',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NOW(),0)`,
-        [id, mobile.trim(), `[template] ${templateName}`, result.ok ? "sent" : "failed",
-         JSON.stringify(result), result.provider, result.endpoint, result.httpStatus || null,
-         result.requestPayload ? JSON.stringify(result.requestPayload) : null,
-         result.errorCode || null, customerId || null, bookingId || null]
-      );
-    } catch (e) { console.error("[templates/send] log failed:", e); }
-  }
 
   res.json({ ok: result.ok, provider: result.provider, endpoint: result.endpoint, httpStatus: result.httpStatus, requestPayload: result.requestPayload, responsePayload: result.responsePayload, errorCode: result.errorCode, errorMessage: result.errorMessage, logged: true });
 });
@@ -104,19 +98,19 @@ router.get("/db-templates", requireAdmin as any, async (_req, res) => {
 
 // POST /api/whatsapp/db-templates — create
 router.post("/db-templates", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
-  const { name, display_name, category, language, header_type, header_text, body_text, footer_text, buttons, variables, event_type, meta_template_name } = req.body;
+  const { name, display_name, category, language, header_type, header_text, body_text, footer_text, buttons, variables, event_type, meta_template_name, template_id } = req.body;
   if (!name?.trim() || !display_name?.trim() || !body_text?.trim()) {
     return void res.status(400).json({ ok: false, message: "name, display_name, and body_text are required" });
   }
   try {
     const r = await pool.query(
-      `INSERT INTO wa_templates (name, display_name, category, language, status, header_type, header_text, body_text, footer_text, buttons, variables, event_type, meta_template_name, enabled, is_builtin)
-       VALUES ($1,$2,$3,$4,'local',$5,$6,$7,$8,$9::jsonb,$10::jsonb,$11,$12,true,false)
+      `INSERT INTO wa_templates (name, display_name, category, language, status, header_type, header_text, body_text, footer_text, buttons, variables, event_type, meta_template_name, template_id, enabled, is_builtin)
+       VALUES ($1,$2,$3,$4,'local',$5,$6,$7,$8,$9::jsonb,$10::jsonb,$11,$12,$13,true,false)
        RETURNING *`,
       [name.trim(), display_name.trim(), category || "UTILITY", language || "en",
        header_type || "none", header_text || null, body_text.trim(), footer_text || null,
        JSON.stringify(buttons || []), JSON.stringify(variables || []),
-       event_type || null, meta_template_name || null]
+       event_type || null, meta_template_name || null, template_id?.trim() || null]
     );
     res.json({ ok: true, template: r.rows[0] });
   } catch (err: any) {
@@ -127,7 +121,7 @@ router.post("/db-templates", requireAdmin as any, async (req: AuthenticatedReque
 
 // PUT /api/whatsapp/db-templates/:id — update
 router.put("/db-templates/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
-  const { display_name, category, language, header_type, header_text, body_text, footer_text, buttons, variables, event_type, meta_template_name, status } = req.body;
+  const { display_name, category, language, header_type, header_text, body_text, footer_text, buttons, variables, event_type, meta_template_name, template_id, status } = req.body;
   try {
     const r = await pool.query(
       `UPDATE wa_templates SET
@@ -135,13 +129,13 @@ router.put("/db-templates/:id", requireAdmin as any, async (req: AuthenticatedRe
          language=COALESCE($3,language), header_type=COALESCE($4,header_type),
          header_text=$5, body_text=COALESCE($6,body_text), footer_text=$7,
          buttons=COALESCE($8::jsonb,buttons), variables=COALESCE($9::jsonb,variables),
-         event_type=$10, meta_template_name=$11, status=COALESCE($12,status),
+         event_type=$10, meta_template_name=$11, template_id=$12, status=COALESCE($13,status),
          updated_at=NOW()
-       WHERE id=$13 RETURNING *`,
+       WHERE id=$14 RETURNING *`,
       [display_name || null, category || null, language || null, header_type || null,
        header_text || null, body_text || null, footer_text || null,
        buttons ? JSON.stringify(buttons) : null, variables ? JSON.stringify(variables) : null,
-       event_type || null, meta_template_name || null, status || null, req.params.id]
+       event_type || null, meta_template_name || null, template_id?.trim() || null, status || null, req.params.id]
     );
     if (!r.rows[0]) return void res.status(404).json({ ok: false, message: "Template not found" });
     res.json({ ok: true, template: r.rows[0] });
@@ -166,6 +160,23 @@ router.post("/db-templates/:id/toggle", requireAdmin as any, async (req, res) =>
     );
     if (!r.rows[0]) return void res.status(404).json({ ok: false, message: "Template not found" });
     res.json({ ok: true, enabled: r.rows[0].enabled });
+  } catch (err: any) { res.status(500).json({ ok: false, message: err.message }); }
+});
+
+// POST /api/whatsapp/db-templates/:id/send-template — send via BotBee using stored template_id
+router.post("/db-templates/:id/send-template", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  const { mobile, eventType, bookingId, customerId } = req.body;
+  if (!mobile?.trim()) return void res.status(400).json({ ok: false, message: "mobile is required" });
+  try {
+    const r = await pool.query(`SELECT * FROM wa_templates WHERE id=$1`, [req.params.id]);
+    const tpl = r.rows[0];
+    if (!tpl) return void res.status(404).json({ ok: false, message: "Template not found" });
+    if (!tpl.template_id?.trim()) return void res.status(400).json({ ok: false, message: "This template has no BotBee Template ID configured. Edit the template to add one." });
+    const result = await sendTemplate(mobile.trim(), tpl.template_id, {
+      eventType: eventType || tpl.event_type || "template_send",
+      bookingId: bookingId || undefined, customerId: customerId || undefined,
+    });
+    res.json({ ok: result.ok, provider: result.provider, endpoint: result.endpoint, httpStatus: result.httpStatus, requestPayload: result.requestPayload, responsePayload: result.responsePayload, errorMessage: result.errorMessage, logged: true });
   } catch (err: any) { res.status(500).json({ ok: false, message: err.message }); }
 });
 
@@ -379,13 +390,13 @@ router.post("/retry-all", requireAdmin as any, async (_req, res) => {
     for (const log of jobs) {
       try {
         const reqPayload = log.request_payload as any;
-        const templateName = reqPayload?.template?.name;
+        const templateId = reqPayload?.template_id || reqPayload?.template?.id;
         const message = log.message;
         let result: BotBeeResult;
-        if (templateName) {
-          result = await sendTemplate(log.recipient, templateName, reqPayload?.template?.components || [], { eventType: log.event_type });
+        if (templateId) {
+          result = await sendTemplate(log.recipient, String(templateId), { eventType: log.event_type });
         } else if (message) {
-          result = await sendText(log.recipient, message.replace(/^\[template\] /, ""), { eventType: log.event_type });
+          result = await sendText(log.recipient, message.replace(/^\[template(?:_id)?[^\]]*\] /, ""), { eventType: log.event_type });
         } else { continue; }
         await pool.query(
           `UPDATE notification_logs SET retry_count=retry_count+1, status=$1, provider_response=$2, updated_at=NOW() WHERE id=$3`,
@@ -594,15 +605,14 @@ router.post("/retry/:logId", requireAdmin as any, async (req, res) => {
     // Extract original send details from request_payload or provider_response
     const reqPayload = log.request_payload as any;
     const to = log.recipient;
-    const templateName = reqPayload?.template?.name;
+    const templateId = reqPayload?.template_id || reqPayload?.template?.id;
     const message = log.message;
 
     let result: BotBeeResult;
-    if (templateName) {
-      const comps = reqPayload?.template?.components || [];
-      result = await sendTemplate(to, templateName, comps, { eventType: log.event_type });
+    if (templateId) {
+      result = await sendTemplate(to, String(templateId), { eventType: log.event_type });
     } else if (message) {
-      const cleanMsg = message.replace(/^\[template\] /, "");
+      const cleanMsg = message.replace(/^\[template(?:_id)?[^\]]*\] /, "");
       result = await sendText(to, cleanMsg, { eventType: log.event_type });
     } else {
       return void res.status(400).json({ ok: false, message: "Cannot determine retry payload" });

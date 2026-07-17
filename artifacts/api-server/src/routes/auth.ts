@@ -142,18 +142,14 @@ router.post("/send-otp", async (req, res) => {
   (async () => {
     try {
       const { sendTemplate, sendText } = await import("../lib/botbee.js");
-      // Try approved OTP template first (works outside 24h window)
-      const templateResult = await sendTemplate(
-        cleanMobile,
-        "otp_alburhan",   // approved template name in BotBee/Meta
-        [
-          {
-            type: "body",
-            parameters: [{ type: "text", text: otp }],
-          },
-        ],
-        { eventType: "mobile_otp" }
+      // Look up OTP template_id from DB (template_id-based, works outside 24h window)
+      const tplRow = await pool.query(
+        `SELECT template_id FROM wa_templates WHERE event_type='mobile_otp' AND enabled=true AND template_id IS NOT NULL LIMIT 1`
       );
+      const otpTemplateId = tplRow.rows[0]?.template_id as string | undefined;
+      const templateResult = otpTemplateId
+        ? await sendTemplate(cleanMobile, otpTemplateId, { eventType: "mobile_otp" })
+        : { ok: false as const, errorMessage: "No OTP template_id configured in DB" };
       if (templateResult.ok) {
         console.log(`[OTP-SEND][WhatsApp] Template sent ✓ (outside-window safe)`);
         return;

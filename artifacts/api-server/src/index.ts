@@ -2034,13 +2034,13 @@ async function start() {
             }
 
             const reqPayload = log.request_payload as any;
-            const templateName = reqPayload?.template?.name;
+            const templateId = reqPayload?.template_id || reqPayload?.template?.id;
             const message = log.message;
             let result: any;
-            if (templateName) {
-              result = await sendTemplate(log.recipient, templateName, reqPayload?.template?.components || [], { eventType: log.event_type });
+            if (templateId) {
+              result = await sendTemplate(log.recipient, String(templateId), { eventType: log.event_type });
             } else if (message) {
-              result = await sendText(log.recipient, message.replace(/^\[template\] /, ""), { eventType: log.event_type });
+              result = await sendText(log.recipient, message.replace(/^\[template(?:_id)?[^\]]*\] /, ""), { eventType: log.event_type });
             } else { continue; }
 
             // If this attempt itself returned a permanent error, mark done immediately
