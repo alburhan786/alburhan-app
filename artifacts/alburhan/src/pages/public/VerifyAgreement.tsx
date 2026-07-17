@@ -16,21 +16,37 @@ interface VerifyData {
   isValid: boolean;
 }
 
+interface DebugInfo {
+  searchedToken?: string;
+  totalAgreementsInDB?: number;
+  searchedFields?: string[];
+}
+
 export default function VerifyAgreement() {
   const { token } = useParams<{ token: string }>();
   const [data, setData] = useState<VerifyData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
 
   useEffect(() => {
     if (!token) return;
+    console.log("[VerifyAgreement] Fetching for token:", token);
     fetch(`${API}/api/agreements/verify/${token}`)
       .then(r => r.json())
       .then(d => {
-        if (d.error) setError(d.error);
-        else setData(d);
+        console.log("[VerifyAgreement] API response:", JSON.stringify(d));
+        if (d.error) {
+          setError(d.error);
+          if (d.debug) setDebugInfo(d.debug);
+        } else {
+          setData(d);
+        }
       })
-      .catch(() => setError("Failed to verify agreement"))
+      .catch((err) => {
+        console.error("[VerifyAgreement] Fetch error:", err);
+        setError("Failed to verify agreement — network error");
+      })
       .finally(() => setLoading(false));
   }, [token]);
 
@@ -74,8 +90,29 @@ export default function VerifyAgreement() {
                 <div style={{ fontSize: 48, marginBottom: 16 }}>❌</div>
                 <div style={{ color: "#CC0000", fontWeight: "bold", fontSize: 18, fontFamily: "sans-serif" }}>Verification Failed</div>
                 <div style={{ color: "#888", fontSize: 14, marginTop: 8, fontFamily: "sans-serif" }}>{error}</div>
-                <div style={{ color: "#888", fontSize: 12, marginTop: 16, fontFamily: "sans-serif" }}>
+                <div style={{ color: "#888", fontSize: 12, marginTop: 12, fontFamily: "sans-serif" }}>
                   This agreement may not exist or the verification link may be invalid.
+                </div>
+                {/* Debug info panel — visible when backend returns diagnostic data */}
+                {debugInfo && (
+                  <div style={{ marginTop: 20, background: "#FFF8F0", border: "1px solid #FFCC99", borderRadius: 8, padding: "14px 18px", textAlign: "left" }}>
+                    <div style={{ color: "#7B4700", fontWeight: "bold", fontSize: 12, fontFamily: "sans-serif", marginBottom: 8 }}>🔍 Diagnostic Details</div>
+                    <div style={{ color: "#555", fontSize: 11, fontFamily: "monospace", lineHeight: 1.8 }}>
+                      <div><strong>Token searched:</strong> {debugInfo.searchedToken || token}</div>
+                      <div><strong>Total agreements in DB:</strong> {debugInfo.totalAgreementsInDB ?? "—"}</div>
+                      <div><strong>Fields searched:</strong> {(debugInfo.searchedFields || []).join(", ")}</div>
+                    </div>
+                    {(debugInfo.totalAgreementsInDB ?? 0) === 0 && (
+                      <div style={{ marginTop: 8, color: "#CC0000", fontSize: 11, fontFamily: "sans-serif" }}>
+                        ⚠️ No agreements exist in the database yet. Agreements are auto-generated when a booking is created or approved.
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div style={{ marginTop: 16, background: "#F5F5F5", borderRadius: 6, padding: "10px 14px", textAlign: "left" }}>
+                  <div style={{ color: "#555", fontSize: 11, fontFamily: "monospace" }}>
+                    <strong>URL token:</strong> {token || "(none)"}
+                  </div>
                 </div>
               </div>
             )}

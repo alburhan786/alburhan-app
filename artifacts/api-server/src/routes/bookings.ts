@@ -292,6 +292,11 @@ router.post("/offline", requireAdmin as any, requirePermission("bookings", "crea
       isOffline: true,
     }).catch(console.error);
 
+    // Auto-generate agreement on booking creation (fire-and-forget)
+    autoGenerateAgreement(booking.id).catch(err =>
+      console.error("[create] autoGenerateAgreement failed:", err)
+    );
+
     res.status(201).json(formatBooking(booking));
   } catch (err: any) {
     console.error("[bookings] POST /offline DB error:", err);

@@ -248,18 +248,73 @@ export async function autoGenerateAgreement(bookingId: string): Promise<void> {
   }
 }
 
+// ── UUID validation helper ────────────────────────────────────────────────────
+function isUUID(s: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+}
+
 // ── PUBLIC: QR Verification ───────────────────────────────────────────────────
 router.get("/verify/:token", async (req, res) => {
+  const { token } = req.params;
+  const looksLikeUUID = isUUID(token);
+  console.log(`[AgreementVerify] ▶ Request received | token="${token}" | isUUID=${looksLikeUUID}`);
+
   try {
-    const { token } = req.params;
-    const agRes = await pool.query(
-      `SELECT a.*, b.booking_number, b.customer_name, b.package_name, b.final_amount, b.paid_amount
-       FROM agreements a LEFT JOIN bookings b ON b.id = a.booking_id
-       WHERE a.verification_token = $1`, [token]
-    );
-    if (!agRes.rows.length) return res.status(404).json({ error: "Agreement not found" });
-    const ag = agRes.rows[0];
-    res.json({
+    let ag: any = null;
+    const searched: string[] = [];
+
+    // ── Step 1: verification_token (UUID column — only try if token is valid UUID) ──
+    if (looksLikeUUID) {
+      searched.push("verification_token");
+      console.log(`[AgreementVerify] SQL #1: WHERE verification_token = '${token}'`);
+      const r1 = await pool.query(
+        `SELECT a.*, b.booking_number, b.customer_name, b.package_name, b.final_amount, b.paid_amount
+         FROM agreements a LEFT JOIN bookings b ON b.id = a.booking_id
+         WHERE a.verification_token = $1`, [token]
+      );
+      console.log(`[AgreementVerify] Rows by verification_token: ${r1.rows.length}`);
+      ag = r1.rows[0] || null;
+    }
+
+    // ── Step 2: agreement_number (TEXT — always safe, e.g. ABT-AGR-2026-000001) ──
+    if (!ag) {
+      searched.push("agreement_number");
+      console.log(`[AgreementVerify] SQL #2: WHERE agreement_number = '${token}'`);
+      const r2 = await pool.query(
+        `SELECT a.*, b.booking_number, b.customer_name, b.package_name, b.final_amount, b.paid_amount
+         FROM agreements a LEFT JOIN bookings b ON b.id = a.booking_id
+         WHERE a.agreement_number = $1`, [token]
+      );
+      console.log(`[AgreementVerify] Rows by agreement_number: ${r2.rows.length}`);
+      ag = r2.rows[0] || null;
+    }
+
+    // ── Step 3: internal UUID id (only if token is UUID and not yet found) ──
+    if (!ag && looksLikeUUID) {
+      searched.push("id");
+      console.log(`[AgreementVerify] SQL #3: WHERE id = '${token}'`);
+      const r3 = await pool.query(
+        `SELECT a.*, b.booking_number, b.customer_name, b.package_name, b.final_amount, b.paid_amount
+         FROM agreements a LEFT JOIN bookings b ON b.id = a.booking_id
+         WHERE a.id = $1`, [token]
+      );
+      console.log(`[AgreementVerify] Rows by id: ${r3.rows.length}`);
+      ag = r3.rows[0] || null;
+    }
+
+    if (!ag) {
+      const countRes = await pool.query(`SELECT COUNT(*) FROM agreements`);
+      const totalAgreements = parseInt(countRes.rows[0].count || "0");
+      console.log(`[AgreementVerify] ❌ No match found | total agreements in DB: ${totalAgreements} | searched: ${searched.join(", ")}`);
+      const response = {
+        error: "Agreement not found",
+        debug: { searchedToken: token, totalAgreementsInDB: totalAgreements, searchedFields: searched },
+      };
+      console.log(`[AgreementVerify] Response:`, JSON.stringify(response));
+      return res.status(404).json(response);
+    }
+
+    const response = {
       agreementNumber: ag.agreement_number,
       bookingNumber:   ag.booking_number,
       customerName:    ag.customer_name,
@@ -269,9 +324,13 @@ router.get("/verify/:token", async (req, res) => {
       otpVerified:     ag.otp_verified,
       createdAt:       ag.created_at,
       isValid:         ag.status === "signed",
-    });
+    };
+    console.log(`[AgreementVerify] ✅ Found: ${ag.agreement_number} | status: ${ag.status} | isValid: ${response.isValid}`);
+    console.log(`[AgreementVerify] Full response:`, JSON.stringify(response));
+    res.json(response);
   } catch (err: any) {
-    res.status(500).json({ error: "Verification failed" });
+    console.error(`[AgreementVerify] ❌ Exception:`, err);
+    res.status(500).json({ error: "Verification failed", detail: err?.message || "Unknown error" });
   }
 });
 
