@@ -457,7 +457,7 @@ const ABT_TEMPLATE_EVENTS = new Set<EventType>([
   "ticket_issued", "flight_assigned",
 ]);
 
-async function sendBotBeeEventTemplate(
+export async function sendBotBeeEventTemplate(
   eventType: EventType,
   ctx: NotificationContext,
   bookingId?: string,
@@ -498,6 +498,7 @@ async function sendBotBeeEventTemplate(
         customerName: ctx.customerName,
         packageName: ctx.packageName || "Hajj/Umrah Package",
         bookingId: bookingRef,
+        amount: ctx.finalAmount ?? ctx.amount ?? 0,
         invoiceUrl,
       }, opts);
 
@@ -558,31 +559,32 @@ async function sendBotBeeEventTemplate(
 
 async function sendWhatsAppForEvent(eventType: EventType, ctx: NotificationContext, message: string, bookingId?: string, customerId?: string): Promise<{ status: "sent" | "failed"; providerResponse: unknown }> {
   try {
-    // ── ABT templates DISABLED — BotBee templates contain unresolvable system ──
-    // appointment variables (#!system-appointment-booking-id!#, etc.) that are
-    // only filled by BotBee's internal appointment engine, never by our 4-param
-    // external API call. BotBee still returns ok:true so the fallback never
-    // triggered, leaving customers with raw variable placeholders in messages.
-    // Re-enable once templates are recreated on BotBee dashboard without variables.
-    //
-    // if (ABT_TEMPLATE_EVENTS.has(eventType)) {
-    //   const tplResult = await sendBotBeeEventTemplate(eventType, ctx, bookingId, customerId);
-    //   if (tplResult.ok) { return { status: "sent", providerResponse: tplResult }; }
-    // }
+    // ── Priority 1: Production BotBee templates with Meta {{1}}…{{5}} variables ──
+    // Templates must be created on BotBee dashboard using {{1}}, {{2}} etc.
+    // (NOT #!system-appointment-*!# placeholders which are BotBee-internal).
+    // Variable values are sent via the components/body/parameters array.
+    if (ABT_TEMPLATE_EVENTS.has(eventType)) {
+      const tplResult = await sendBotBeeEventTemplate(eventType, ctx, bookingId, customerId);
+      if (tplResult.ok) {
+        console.log(`[notificationEngine] ABT template sent for ${eventType} → ${ctx.customerMobile}`);
+        return { status: "sent", providerResponse: tplResult };
+      }
+      console.warn(`[notificationEngine] ABT template FAILED for ${eventType} (${ctx.customerMobile}): ${tplResult.errorMessage} — falling back`);
+    }
 
-    // ── Standard path: look up wa_templates table for any other event ─────────
+    // ── Priority 2: look up wa_templates table for the event ─────────────────
     const tpl = await pool.query(
-      `SELECT name, variables FROM wa_templates WHERE event_type=$1 AND enabled=true AND status IN ('approved','local') ORDER BY is_builtin DESC LIMIT 1`,
+      `SELECT name, template_id, variables FROM wa_templates WHERE event_type=$1 AND enabled=true AND status IN ('approved','local') ORDER BY is_builtin DESC LIMIT 1`,
       [eventType]
     );
     if (tpl.rows.length > 0) {
-      const { name, variables } = tpl.rows[0];
+      const { name, template_id: tplId, variables } = tpl.rows[0];
       const varNames: string[] = Array.isArray(variables) ? variables : JSON.parse(variables || "[]");
       const varMap: Record<string, unknown> = {
-        customer_name: ctx.customerName,
-        booking_id:    ctx.bookingNumber,
-        package_name:  ctx.packageName,
-        amount:        ctx.amount != null ? formatINR(ctx.amount) : undefined,
+        customer_name:  ctx.customerName,
+        booking_id:     ctx.bookingNumber,
+        package_name:   ctx.packageName,
+        amount:         ctx.amount != null ? formatINR(ctx.amount) : undefined,
         invoice_number: ctx.invoiceNumber,
         ticket_number:  ctx.invoiceNumber,
         flight_number:  ctx.flightNumber,
@@ -594,11 +596,13 @@ async function sendWhatsAppForEvent(eventType: EventType, ctx: NotificationConte
         invoice_url:    (ctx.invoiceUrl as string | undefined) ||
                         (ctx.bookingNumber ? `https://alburhantravels.com/invoice/${ctx.bookingNumber}` : undefined),
       };
-      const params = varNames.map((v) => ({ type: "text", text: String(varMap[v] ?? "-") }));
-      const components = params.length ? [{ type: "body", parameters: params }] : [];
-      const result = await sendBotBeeTemplate(ctx.customerMobile, name, components, { eventType, bookingId, customerId });
+      const variableValues = varNames.map((v) => String(varMap[v] ?? "-"));
+      const result = await sendBotBeeTemplate(ctx.customerMobile, tplId || name, {
+        eventType, bookingId, customerId,
+        variables: variableValues.length ? variableValues : undefined,
+      });
       if (result.ok) return { status: "sent", providerResponse: result };
-      console.warn(`[notificationEngine] WhatsApp template "${name}" failed for ${eventType}, falling back to session message:`, result.errorMessage);
+      console.warn(`[notificationEngine] wa_template "${name}" failed for ${eventType}, falling back to session message:`, result.errorMessage);
     }
 
     // ── Last-resort: free-form session message (works only inside 24h window) ──

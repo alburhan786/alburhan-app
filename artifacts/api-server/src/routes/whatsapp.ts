@@ -50,6 +50,92 @@ router.post("/test", requireAdmin as any, async (req: AuthenticatedRequest, res)
   res.json({ ok: result.ok, provider: result.provider, endpoint: result.endpoint, httpStatus: result.httpStatus, requestPayload: result.requestPayload, responsePayload: result.responsePayload, errorCode: result.errorCode, errorMessage: result.errorMessage, logged: true });
 });
 
+// POST /api/whatsapp/test-abt-template
+// Send an ABT production template to a mobile number using real booking data.
+// Body: { mobile, eventType, bookingId? }
+// eventType: "new_booking" | "payment_received" | "payment_due" | "booking_approved" |
+//            "departure_reminder" | "visa_ready" | "ticket_issued"
+router.post("/test-abt-template", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  const { mobile, eventType, bookingId } = req.body;
+  if (!mobile?.trim()) return void res.status(400).json({ ok: false, message: "mobile is required" });
+  if (!eventType?.trim()) return void res.status(400).json({ ok: false, message: "eventType is required" });
+
+  try {
+    // Build a NotificationContext from the booking if provided, otherwise use dummy data
+    let ctx: Record<string, unknown> = {
+      customerName: "Test Customer",
+      customerMobile: mobile.trim(),
+      bookingNumber: bookingId || "TEST-001",
+      packageName: "Hajj Economy 2026",
+      amount: 90000,
+      finalAmount: 90000,
+      flightNumber: "AI-141",
+      departureDate: "2026-05-10",
+      departureAirport: "BOM - Mumbai",
+      hotelName: "Dar Al Eiman Royal",
+      reportingTime: "4 hours before departure",
+      invoiceUrl: `https://alburhantravels.com/invoice/${bookingId || "TEST-001"}`,
+    };
+
+    if (bookingId) {
+      const bRow = await pool.query(
+        `SELECT b.*, u.name AS customer_name, u.mobile AS customer_mobile,
+                p.name AS package_name, p.price AS package_price
+         FROM bookings b
+         LEFT JOIN users u ON u.id = b.user_id
+         LEFT JOIN packages p ON p.id = b.package_id
+         WHERE b.id=$1 LIMIT 1`,
+        [bookingId]
+      );
+      if (bRow.rows.length > 0) {
+        const b = bRow.rows[0];
+        ctx = {
+          ...ctx,
+          customerName: b.customer_name || ctx.customerName,
+          customerMobile: mobile.trim(), // override with test mobile for safety
+          bookingNumber: b.booking_number || bookingId,
+          packageName: b.package_name || ctx.packageName,
+          amount: b.total_amount || b.package_price || ctx.amount,
+          finalAmount: b.final_amount || b.total_amount || ctx.finalAmount,
+          flightNumber: b.flight_number || ctx.flightNumber,
+          departureDate: b.departure_date || ctx.departureDate,
+          invoiceUrl: `https://alburhantravels.com/invoice/${b.booking_number || bookingId}`,
+        };
+      }
+    }
+
+    const { sendBotBeeEventTemplate } = await import("../lib/notificationEngine.js") as any;
+    const result = await sendBotBeeEventTemplate(eventType, ctx, bookingId, ctx.customerId as string | undefined);
+
+    const id = `nl_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    await pool.query(
+      `INSERT INTO notification_logs
+       (id, event_type, channel, recipient, message, status, provider_response,
+        provider_name, api_endpoint, http_status, request_payload, error_code, sent_at, retry_count)
+       VALUES ($1,$2,'whatsapp',$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW(),0)`,
+      [id, `abt_test_${eventType}`, mobile.trim(),
+       `[ABT template test] event=${eventType} booking=${bookingId || "DUMMY"}`,
+       result.ok ? "sent" : "failed", JSON.stringify(result),
+       result.provider, result.endpoint, result.httpStatus || null,
+       result.requestPayload ? JSON.stringify(result.requestPayload) : null, result.errorCode || null]
+    ).catch((e: Error) => console.error("[ABT test] log failed:", e.message));
+
+    res.json({
+      ok: result.ok,
+      eventType,
+      bookingId: bookingId || null,
+      sentTo: mobile.trim(),
+      templateVariables: result.requestPayload,
+      provider: result.provider,
+      httpStatus: result.httpStatus,
+      responsePayload: result.responsePayload,
+      errorMessage: result.errorMessage,
+    });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, message: err.message });
+  }
+});
+
 // GET /api/whatsapp/status
 router.get("/status", requireAdmin as any, async (_req, res) => {
   const { getCachedConfig } = await import("../lib/apiSettingsProvider.js");
