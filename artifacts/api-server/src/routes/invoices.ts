@@ -23,10 +23,11 @@ const router = Router();
 
 function round2(n: number) { return Math.round(n * 100) / 100; }
 
-function deriveInvoiceStatus(total: number, paid: number): string {
-  if (paid <= 0) return "pending";
+function deriveInvoiceStatus(total: number, paid: number, dueDate?: string | Date | null): string {
+  const isOverdue = dueDate ? new Date(dueDate) < new Date() : false;
   if (paid >= total - 0.01) return "paid";
-  return "partial";
+  if (paid <= 0) return isOverdue ? "overdue" : "pending";
+  return isOverdue ? "overdue" : "partial";
 }
 
 async function generateInvoiceNumber(year: number): Promise<string> {
@@ -64,13 +65,14 @@ export async function upsertInvoiceForBooking(bookingId: string): Promise<Record
     Math.max(Number(b.paid_amount) || 0, Number(b.advance_amount) || 0)
   );
   const balance     = round2(total - paid);
-  const invoiceStatus = deriveInvoiceStatus(total, paid);
 
-  // due_date = 30 days from today (used by payment reminder cron)
+  // due_date = 30 days from today for new invoices (used by payment reminder cron)
   const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
   if (existing.rows[0]) {
     const inv = existing.rows[0];
+    // Pass the stored due_date so paid-past-due invoices become "overdue"
+    const invoiceStatus = deriveInvoiceStatus(total, paid, inv.due_date);
     await pool.query(
       `UPDATE invoices
        SET subtotal=$1, discount=$2, gst_amount=$3, tcs_amount=$4,
@@ -83,6 +85,8 @@ export async function upsertInvoiceForBooking(bookingId: string): Promise<Record
              total, paid, balance, invoice_status: invoiceStatus, due_date: inv.due_date || dueDate };
   }
 
+  // New invoice — due_date is 30 days from now so cannot be overdue yet
+  const invoiceStatus = deriveInvoiceStatus(total, paid);
   const invoiceNumber = await generateInvoiceNumber(year);
   const id = `inv_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 

@@ -465,20 +465,6 @@ router.post("/", requireAuth as any, async (req: AuthenticatedRequest, res) => {
     isOffline: false,
   }).returning();
 
-  sendBookingSubmissionNotification({
-    mobile: booking.customerMobile,
-    email: booking.customerEmail,
-    customerName: booking.customerName,
-    bookingNumber: booking.bookingNumber,
-    packageName: booking.packageName ?? pkg?.name ?? "Travel Package",
-    numberOfPilgrims: booking.numberOfPilgrims,
-    bookingId: booking.id,
-    pool,
-  }).then(() => {
-    trackNotification({ eventType: "new_booking", channel: "whatsapp", recipient: booking.customerMobile, customerId: booking.customerId ?? undefined, bookingId: booking.id, status: "sent" }).catch(() => {});
-    trackNotification({ eventType: "new_booking", channel: "sms", recipient: booking.customerMobile, customerId: booking.customerId ?? undefined, bookingId: booking.id, status: "sent" }).catch(() => {});
-  }).catch(console.error);
-
   triggerWorkflow("new_booking", {
     bookingId: booking.id, bookingNumber: booking.bookingNumber,
     customerId: booking.customerId ?? undefined, customerName: booking.customerName,
@@ -540,51 +526,6 @@ router.post("/:id/approve", requireAdmin as any, requirePermission("bookings", "
     .set({ status: "approved", updatedAt: new Date() })
     .where(eq(bookingsTable.id, req.params.id))
     .returning();
-
-  // Fire rich confirmation notifications in background — WhatsApp + SMS + Email + Dashboard
-  (async () => {
-    try {
-      const { randomUUID } = await import("crypto");
-      const paidAmt = Number(updated.paidAmount || 0);
-      const totalAmt = Number(updated.finalAmount || updated.totalAmount || 0);
-      const balanceAmt = Math.max(0, totalAmt - paidAmt);
-
-      const result = await sendBookingConfirmationNotification({
-        mobile: updated.customerMobile,
-        email: updated.customerEmail,
-        customerName: updated.customerName,
-        bookingNumber: updated.bookingNumber,
-        packageName: updated.packageName,
-        numberOfPilgrims: updated.numberOfPilgrims,
-        departureDate: updated.preferredDepartureDate,
-        totalAmount: totalAmt,
-        paidAmount: paidAmt,
-        balanceAmount: balanceAmt,
-        customerId: updated.customerId,
-        bookingId: updated.id,
-        pool,
-      });
-
-      const channels: Array<{ channel: string; r: { ok: boolean; errorMessage?: string } }> = [
-        { channel: "whatsapp", r: result.whatsapp },
-        { channel: "sms",      r: result.sms },
-        { channel: "email",    r: result.email },
-        { channel: "rcs",      r: result.rcs },
-        { channel: "dashboard",r: result.dashboard },
-      ];
-      for (const { channel, r } of channels) {
-        await pool.query(
-          `INSERT INTO booking_confirmation_notifications (id, booking_id, channel, status, error_message, sent_at, retry_count)
-           VALUES ($1, $2, $3, $4, $5, NOW(), 0)
-           ON CONFLICT (id) DO NOTHING`,
-          [randomUUID(), updated.id, channel, r.ok ? "sent" : "failed", r.ok ? null : ((r as any).errorMessage || "failed")]
-        ).catch(() => {});
-        trackNotification({ eventType: "booking_approved", channel, recipient: updated.customerMobile, bookingId: updated.id, status: r.ok ? "sent" : "failed" }).catch(() => {});
-      }
-    } catch (err) {
-      console.error("[approve] confirmation notification error:", err);
-    }
-  })();
 
   // Booking approved notification — invoice is NOT generated here.
   // Invoice is generated only after payment (online or offline).

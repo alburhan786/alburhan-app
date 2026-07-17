@@ -1,0 +1,485 @@
+Instead of actual values.
+
+Fix
+
+Before sending any WhatsApp template, resolve every placeholder using the booking database.
+
+Map the placeholders correctly:
+
+* #!system-appointment-booking-id!# → Booking ID
+* #!system-appointment-name!# → Package Name
+* #!system-cart-total-price!# → Package Amount
+* Customer Name → Customer Full Name
+* Booking Date
+* Departure Date
+* Return Date
+* Invoice Number
+* Agreement Number
+* Payment Link
+
+Never send unresolved placeholders.
+
+If any required value is missing, stop sending the template, log the missing field, and notify the admin.
+
+⸻
+
+ISSUE 2 – Duplicate WhatsApp Messages
+
+Customers receive duplicate or incomplete WhatsApp messages.
+
+Create a strict workflow:
+
+Step 1
+
+Booking Submitted
+
+Send ONLY ONE booking confirmation.
+
+Include:
+
+* Customer Name
+* Booking ID
+* Package Name
+* Package Price
+* Booking Date
+
+⸻
+
+Step 2
+
+Admin Approves Booking
+
+Send ONLY ONE approval message.
+
+Include:
+
+* Customer Name
+* Booking ID
+* Package Name
+* Package Amount
+* Secure Razorpay Payment Link
+* Due Date
+
+⸻
+
+Step 3
+
+Payment Successful
+
+Automatically send ONE payment confirmation.
+
+Include:
+
+* Customer Name
+* Booking ID
+* Invoice Number
+* Amount Paid
+* Payment Date
+* Payment Method
+* Payment Status = PAID
+
+⸻
+
+ISSUE 3 – Payment Confirmation Missing
+
+Currently payment confirmation WhatsApp is never sent.
+
+Automatically trigger after successful Razorpay payment.
+
+Workflow:
+
+Payment Success
+
+↓
+
+Verify Payment
+
+↓
+
+Update Database
+
+↓
+
+Update Invoice
+
+↓
+
+Update Booking Status
+
+↓
+
+Generate Invoice PDF
+
+↓
+
+Generate Receipt PDF
+
+↓
+
+Generate Agreement PDF
+
+↓
+
+Send WhatsApp
+
+↓
+
+Send Email
+
+↓
+
+Update Dashboard
+
+⸻
+
+ISSUE 4 – Invoice PDF Not Sent
+
+Currently invoice PDF is generated but never sent.
+
+Automatically attach and send:
+
+Invoice PDF
+
+Receipt PDF
+
+Agreement PDF
+
+using BotBee WhatsApp API.
+
+If BotBee attachment fails
+
+Retry automatically.
+
+If retry fails
+
+Notify Admin.
+
+⸻
+
+ISSUE 5 – Email Automation
+
+Automatically email:
+
+Invoice PDF
+
+Receipt PDF
+
+Agreement PDF
+
+Payment Receipt
+
+Customer should receive all documents automatically.
+
+⸻
+
+ISSUE 6 – Dashboard
+
+Customer Dashboard should instantly update.
+
+Display
+
+Booking Status
+
+Payment Status
+
+Invoice Status
+
+Agreement Status
+
+Receipt Status
+
+Download PDF buttons
+
+Download Invoice
+
+Download Receipt
+
+Download Agreement
+
+⸻
+
+ISSUE 7 – Invoice Status
+
+Current problem:
+
+Invoice always shows Pending.
+
+Fix complete invoice lifecycle.
+
+Statuses:
+
+Draft
+
+Pending
+
+Partially Paid
+
+Paid
+
+Cancelled
+
+Refunded
+
+Overdue
+
+Automatically calculate balance.
+
+When payment completed
+
+Status must become
+
+PAID
+
+Store
+
+Payment Date
+
+Payment Time
+
+Transaction ID
+
+Payment Method
+
+Confirmed By
+
+Audit Trail
+
+⸻
+
+ISSUE 8 – WhatsApp Logging
+
+Log every API request.
+
+Store
+
+Booking ID
+
+Customer
+
+Phone
+
+Template ID
+
+Phone Number ID
+
+Variables Sent
+
+Resolved Variables
+
+API Request
+
+API Response
+
+WhatsApp Message ID
+
+Delivery Status
+
+Read Status
+
+Failure Reason
+
+Retry Count
+
+Timestamp
+
+Never hide errors.
+
+⸻
+
+ISSUE 9 – Validation
+
+Before sending any WhatsApp
+
+Validate
+
+Booking exists
+
+Customer exists
+
+Package exists
+
+Package Amount exists
+
+Invoice exists
+
+Agreement exists
+
+Mobile exists
+
+Template exists
+
+Template ID exists
+
+Phone Number ID exists
+
+API Key exists
+
+If anything is missing
+
+Stop sending
+
+Show exact reason
+
+Log detailed error
+
+⸻
+
+ISSUE 10 – BotBee Integration
+
+BotBee confirmed only four parameters are required.
+
+Always send only:
+
+Phone Number ID
+
+API Key
+
+Customer Phone Number
+
+Template ID
+
+Never send
+
+Template Name
+
+Language
+
+Components
+
+Unused Parameters
+
+⸻
+
+ISSUE 11 – Attachments
+
+Send automatically
+
+Invoice PDF
+
+Receipt PDF
+
+Agreement PDF
+
+Booking Summary PDF
+
+via
+
+WhatsApp
+
+Email
+
+Customer Dashboard
+
+Admin Dashboard
+
+⸻
+
+ISSUE 12 – Complete Automation Flow
+
+Customer submits booking
+
+↓
+
+Booking saved
+
+↓
+
+Generate Booking ID
+
+↓
+
+Generate Agreement ID
+
+↓
+
+Generate Invoice
+
+↓
+
+Send Booking Confirmation WhatsApp
+
+↓
+
+Admin Approves
+
+↓
+
+Send Approval WhatsApp
+
+↓
+
+Customer Pays
+
+↓
+
+Verify Razorpay Payment
+
+↓
+
+Update Payment
+
+↓
+
+Generate PDFs
+
+↓
+
+Send Invoice PDF
+
+↓
+
+Send Receipt PDF
+
+↓
+
+Send Agreement PDF
+
+↓
+
+Send Payment Confirmation WhatsApp
+
+↓
+
+Send Email
+
+↓
+
+Update Customer Dashboard
+
+↓
+
+Update Admin Dashboard
+
+↓
+
+Store Audit Log
+
+⸻
+
+ISSUE 13 – Testing
+
+Test every template.
+
+Verify:
+
+* No unresolved placeholders.
+* No duplicate messages.
+* Correct Booking ID.
+* Correct Package Name.
+* Correct Amount.
+* Correct Customer Name.
+* Payment confirmation sent.
+* Invoice PDF delivered.
+* Receipt PDF delivered.
+* Agreement PDF delivered.
+* Email delivered.
+* Dashboard updated.
+* Logs saved.
+
+⸻
+
+FINAL REQUIREMENT
+
+Do not hardcode any values. Use dynamic database data for all placeholders.
+
+Implement a robust, production-ready solution with proper validation, error handling, retry logic, audit logging, and automatic recovery from failures. Confirm that the full booking, approval, payment, document generation, WhatsApp, email, and dashboard workflow has been tested successfully end-to-end before marking the task as complete.
