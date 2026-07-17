@@ -148,6 +148,26 @@ export default function AgreementSigning() {
     }
   };
 
+  // ─── Collect browser/device metadata ────────────────────────────────────────
+  const getDeviceMeta = () => {
+    const ua = navigator.userAgent;
+    const isIOS = /iPad|iPhone|iPod/.test(ua);
+    const isAndroid = /Android/.test(ua);
+    const isWindows = /Windows/.test(ua);
+    const isMac = /Mac OS X/.test(ua) && !isIOS;
+    const isLinux = /Linux/.test(ua) && !isAndroid;
+    const isMobile = /Mobi|Android|iPhone|iPad/.test(ua);
+    const isChrome = /Chrome\//.test(ua) && !/Edg\//.test(ua);
+    const isFirefox = /Firefox\//.test(ua);
+    const isSafari = /Safari\//.test(ua) && !isChrome;
+    const isEdge = /Edg\//.test(ua);
+    return {
+      signingBrowser: isChrome ? "Chrome" : isFirefox ? "Firefox" : isSafari ? "Safari" : isEdge ? "Edge" : "Unknown",
+      signingDevice: isMobile ? "Mobile" : "Desktop",
+      signingOS: isIOS ? "iOS" : isAndroid ? "Android" : isWindows ? "Windows" : isMac ? "macOS" : isLinux ? "Linux" : "Unknown",
+    };
+  };
+
   // ─── Submit signature ────────────────────────────────────────────────────────
   const submitSignature = async () => {
     if (!hasSig) return toast({ title: "Missing Signature", description: "Please draw your signature", variant: "destructive" });
@@ -156,6 +176,7 @@ export default function AgreementSigning() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const signatureData = canvas.toDataURL("image/png");
+    const deviceMeta = getDeviceMeta();
 
     setSubmitting(true);
     try {
@@ -163,7 +184,7 @@ export default function AgreementSigning() {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ otp, signatureData, termsAccepted: accepted }),
+        body: JSON.stringify({ otp, signatureData, termsAccepted: accepted, ...deviceMeta }),
       });
       const d = await r.json();
       if (d.ok) {
@@ -240,9 +261,9 @@ export default function AgreementSigning() {
             {/* ─── STEP 1: Terms ─── */}
             {step === "terms" && (
               <div>
-                <h2 style={{ fontSize: 18, fontWeight: "bold", color: "#0B3D2E", marginBottom: 8 }}>Terms & Conditions</h2>
+                <h2 style={{ fontSize: 18, fontWeight: "bold", color: "#0B3D2E", marginBottom: 8 }}>Digital Consent & Declarations</h2>
                 <p style={{ color: "#666", fontSize: 13, marginBottom: 20 }}>
-                  Please read each clause carefully and check the box to accept. All clauses must be accepted before signing.
+                  Please read each consent declaration carefully and check the box to accept. All 9 consent categories must be accepted before proceeding to sign.
                 </p>
 
                 {/* Package info summary */}
@@ -282,7 +303,7 @@ export default function AgreementSigning() {
 
                 <div style={{ marginTop: 24, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div style={{ fontSize: 13, color: allAccepted ? "#0B3D2E" : "#CC0000" }}>
-                    {allAccepted ? "✅ All terms accepted" : `⚠️ ${agreement.clauses?.filter(c => !accepted[c.id]).length} clause(s) pending`}
+                    {allAccepted ? "✅ All 9 consent declarations accepted" : `⚠️ ${agreement.clauses?.filter(c => !accepted[c.id]).length} declaration(s) pending`}
                   </div>
                   <button
                     onClick={() => setStep("sign")}
@@ -394,7 +415,7 @@ export default function AgreementSigning() {
 
                 {/* Legal declaration */}
                 <div style={{ background: "#FFF8E7", border: "1px solid #F0CC70", borderRadius: 6, padding: "12px 16px", marginBottom: 20, fontSize: 12, color: "#7B4700", lineHeight: 1.6 }}>
-                  <strong>Declaration:</strong> By clicking "Sign Agreement", I confirm that I have read, understood, and accept all 13 clauses of this Agreement. I understand that this digital signature is legally binding under the Information Technology Act, 2000 (India).
+                  <strong>Declaration:</strong> By clicking "Sign Agreement", I confirm that I have read, understood, and accepted all 9 consent declarations and all legal clauses of this Premium Hajj Agreement. I confirm my mobile number has been verified via OTP. I understand that this digital signature is legally binding under the Information Technology Act, 2000 (India) and is equivalent to a wet-ink signature.
                 </div>
 
                 <div style={{ display: "flex", gap: 12, justifyContent: "space-between" }}>

@@ -3,25 +3,26 @@ import PDFDocument from "pdfkit";
 import { LOGO_BASE64 } from "./logoData.js";
 import QRCode from "qrcode";
 
-// ── Colour & layout constants ────────────────────────────────────────────────
-const LOGO_BUF   = Buffer.from(LOGO_BASE64, "base64");
-const DG         = "#0B3D2E";   // dark green
-const GOLD       = "#C9A23F";
-const LG         = "#EBF5EB";   // light green
-const GOLD_LITE  = "#FFF8E7";
-const GREY_DARK  = "#2C2C2C";
-const GREY_MID   = "#555555";
-const GREY_LITE  = "#F7F7F7";
-const M          = 36;          // page margin (pts)
-const W          = 595;         // A4 width
-const H          = 842;         // A4 height
-const CW         = W - M * 2;  // content width = 523
-const HDR_H      = 92;
-const FTR_H      = 28;
-const CONTENT_Y  = HDR_H + 6;
-const COL_HALF   = (CW - 8) / 2;   // ~257.5
+// ── Colour & layout constants ─────────────────────────────────────────────────
+const LOGO_BUF  = Buffer.from(LOGO_BASE64, "base64");
+const DG        = "#0B3D2E";   // dark emerald green
+const GOLD      = "#C9A23F";
+const LG        = "#EBF5EB";   // light green
+const GOLD_LITE = "#FFF8E7";
+const GREY_DARK = "#2C2C2C";
+const GREY_MID  = "#555555";
+const GREY_LITE = "#F7F7F7";
+const RED_SOFT  = "#FFF0F0";
+const M         = 36;          // page margin (pts)
+const W         = 595;         // A4 width
+const H         = 842;         // A4 height
+const CW        = W - M * 2;   // content width = 523
+const HDR_H     = 92;
+const FTR_H     = 28;
+const CONTENT_Y = HDR_H + 6;
+const COL_HALF  = (CW - 8) / 2;   // ~257.5
 
-// ── Utility ──────────────────────────────────────────────────────────────────
+// ── Utility ───────────────────────────────────────────────────────────────────
 function pdfToBuffer(doc: any): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
@@ -31,87 +32,80 @@ function pdfToBuffer(doc: any): Promise<Buffer> {
     doc.end();
   });
 }
-
 function fmt(v: any, fallback = "—"): string {
   if (v == null || v === "") return fallback;
   return String(v);
 }
-
 function fmtDate(v: any, fallback = "—"): string {
   if (!v) return fallback;
   try { return new Date(v).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }); } catch { return fallback; }
 }
-
 function fmtMoney(v: any): string {
   const n = Number(v || 0);
   return "₹\u00A0" + n.toLocaleString("en-IN");
 }
+function maskAadhaar(v: any): string {
+  if (!v) return "—";
+  const s = String(v).replace(/\s/g, "");
+  return s.length >= 4 ? "XXXX-XXXX-" + s.slice(-4) : "—";
+}
 
-// ── Header / Footer ──────────────────────────────────────────────────────────
-function drawHeader(doc: any, subtitle?: string) {
+// ── Header ────────────────────────────────────────────────────────────────────
+function drawHeader(doc: any, subtitle: string, agreementNum?: string, bookingNum?: string) {
   doc.rect(0, 0, W, HDR_H).fill(DG);
-  // Decorative gold stripe
   doc.rect(0, HDR_H - 4, W, 4).fill(GOLD);
   // Logo
-  try { doc.image(LOGO_BUF, M, 12, { width: 62 }); } catch {}
-  // Company name
-  doc.fill(GOLD).font("Helvetica-Bold").fontSize(16)
-    .text("AL BURHAN TOURS & TRAVELS", M + 70, 14, { width: CW - 70 });
-  doc.fill("white").font("Helvetica").fontSize(7.5)
-    .text("Regd. Hajj & Umrah Travel Agency  |  Est. 2008  |  GSTIN: 23AAVFA3223C1ZW", M + 70, 34, { width: CW - 70 });
-  doc.fill("rgba(255,255,255,0.8)").font("Helvetica").fontSize(7)
-    .text("5/8 Khanka Masjid Complex, Shanwara Road, Burhanpur 450331, M.P.  |  +91 9893989786  |  alburhantravels.com", M + 70, 46, { width: CW - 70 });
-  doc.fill(GOLD).font("Helvetica-Bold").fontSize(11)
-    .text(subtitle || "HAJJ PACKAGE AGREEMENT & DECLARATION", M + 70, 62, { width: CW - 70 });
+  try { doc.image(LOGO_BUF, M, 10, { width: 66 }); } catch {}
+  // Company name & info
+  doc.fill(GOLD).font("Helvetica-Bold").fontSize(15).text("AL BURHAN TOURS & TRAVELS", M + 74, 12, { width: CW - 74 });
+  doc.fill("white").font("Helvetica").fontSize(7).text("Regd. Hajj & Umrah Travel Agency  |  Est. 2008  |  GSTIN: 23AAVFA3223C1ZW", M + 74, 31, { width: CW - 74 });
+  doc.fill("rgba(255,255,255,0.75)").font("Helvetica").fontSize(6.5)
+    .text("5/8 Khanka Masjid Complex, Shanwara Road, Burhanpur 450331, M.P.  |  +91 9893989786  |  alburhantravels.com", M + 74, 42, { width: CW - 74 });
+  doc.fill(GOLD).font("Helvetica-Bold").fontSize(9.5).text(subtitle, M + 74, 56, { width: CW - 74 });
+  if (agreementNum) {
+    doc.fill("rgba(201,162,63,0.7)").font("Helvetica").fontSize(7)
+      .text(`Ref: ${agreementNum}${bookingNum ? "  |  Booking: " + bookingNum : ""}`, M + 74, 70, { width: CW - 74 });
+  }
   doc.fill("black");
 }
 
-function drawFooter(doc: any, pageNum: number, total = 4) {
+// ── Footer ────────────────────────────────────────────────────────────────────
+function drawFooter(doc: any, pageNum: number, total = 6) {
   doc.rect(0, H - FTR_H, W, FTR_H).fill(DG);
   doc.rect(0, H - FTR_H, W, 2).fill(GOLD);
-  doc.fill("white").font("Helvetica").fontSize(7)
-    .text("Al Burhan Tours & Travels  |  Legally binding agreement under IT Act 2000  |  Confidential", M, H - FTR_H + 9, { width: CW / 2 });
-  doc.fill(GOLD).font("Helvetica").fontSize(7)
+  doc.fill("white").font("Helvetica").fontSize(6.5)
+    .text("Al Burhan Tours & Travels  |  Legally binding under IT Act 2000  |  Confidential", M, H - FTR_H + 9, { width: CW / 2 });
+  doc.fill(GOLD).font("Helvetica").fontSize(6.5)
     .text(`Page ${pageNum} of ${total}`, M + CW / 2, H - FTR_H + 9, { width: CW / 2, align: "right" });
   doc.fill("black");
 }
 
-// ── Section header bar ───────────────────────────────────────────────────────
+// ── Section header bar ────────────────────────────────────────────────────────
 function secBar(doc: any, y: number, text: string, bg = DG): number {
   doc.rect(M, y, CW, 20).fill(bg);
-  doc.fill(bg === DG ? "white" : DG).font("Helvetica-Bold").fontSize(8.5)
+  doc.fill(bg === DG ? "white" : (bg === GOLD ? DG : DG)).font("Helvetica-Bold").fontSize(8.5)
     .text(text, M + 8, y + 5, { width: CW - 16 });
   doc.fill("black");
   return y + 24;
 }
 
-// ── Gold separator line ───────────────────────────────────────────────────────
+// ── Gold separator ────────────────────────────────────────────────────────────
 function goldLine(doc: any, y: number): number {
   doc.rect(M, y, CW, 1.5).fill(GOLD);
   return y + 5;
 }
 
-// ── Info cell (label + value in a box) ──────────────────────────────────────
+// ── Info cell ─────────────────────────────────────────────────────────────────
 function infoCell(doc: any, x: number, y: number, w: number, h: number, label: string, value: string, bold = false) {
   doc.rect(x, y, w, h).fill(GREY_LITE).stroke("#E0E0E0");
-  doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text(label, x + 5, y + 4, { width: w - 10 });
-  doc.fill(GREY_DARK).font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(8)
-    .text(fmt(value), x + 5, y + 13, { width: w - 10, ellipsis: true });
+  doc.fill(GREY_MID).font("Helvetica").fontSize(6).text(label, x + 4, y + 3, { width: w - 8 });
+  doc.fill(GREY_DARK).font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(7.5)
+    .text(fmt(value), x + 4, y + 12, { width: w - 8, ellipsis: true });
   doc.fill("black");
 }
 
-// ── Simple KV row ─────────────────────────────────────────────────────────────
-function kv(doc: any, y: number, label: string, value: string, highlight = false, x = M, w = CW): number {
-  const lw = 155;
-  doc.fill("#777").font("Helvetica").fontSize(8).text(label + ":", x, y, { width: lw });
-  doc.fill(highlight ? DG : GREY_DARK).font(highlight ? "Helvetica-Bold" : "Helvetica").fontSize(8)
-    .text(fmt(value), x + lw, y, { width: w - lw });
-  doc.fill("black");
-  return y + 14;
-}
-
-// ── Table row helper ─────────────────────────────────────────────────────────
-function tableRow(doc: any, y: number, cols: string[], colWidths: number[], isHeader = false, evenRow = false) {
+// ── Table row ─────────────────────────────────────────────────────────────────
+function tableRow(doc: any, y: number, cols: string[], colWidths: number[], isHeader = false, evenRow = false): number {
   let x = M;
   const rowH = isHeader ? 18 : 15;
   const bg = isHeader ? DG : (evenRow ? LG : "white");
@@ -119,86 +113,91 @@ function tableRow(doc: any, y: number, cols: string[], colWidths: number[], isHe
   cols.forEach((text, i) => {
     const cw = colWidths[i];
     doc.fill(isHeader ? "white" : GREY_DARK)
-      .font(isHeader ? "Helvetica-Bold" : "Helvetica").fontSize(isHeader ? 7.5 : 8)
-      .text(fmt(text), x + 5, y + (isHeader ? 5 : 4), { width: cw - 10, ellipsis: true });
+      .font(isHeader ? "Helvetica-Bold" : "Helvetica").fontSize(isHeader ? 7 : 7.5)
+      .text(fmt(text), x + 4, y + (isHeader ? 5 : 4), { width: cw - 8, ellipsis: true });
     x += cw;
   });
   doc.fill("black");
   return y + rowH;
 }
 
-// ── Check-box list item ───────────────────────────────────────────────────────
-function checkItem(doc: any, x: number, y: number, w: number, text: string, included = true) {
+// ── Check item ────────────────────────────────────────────────────────────────
+function checkItem(doc: any, x: number, y: number, w: number, text: string, included = true): number {
   const icon = included ? "✓" : "✗";
   const col  = included ? DG : "#CC0000";
   doc.fill(col).font("Helvetica-Bold").fontSize(8).text(icon, x, y, { width: 12 });
-  doc.fill(GREY_DARK).font("Helvetica").fontSize(7.5).text(text, x + 14, y, { width: w - 16 });
+  doc.fill(GREY_DARK).font("Helvetica").fontSize(7).text(text, x + 14, y, { width: w - 16 });
   doc.fill("black");
   return y + 12;
 }
 
-// ── Condensed clause list for Page 3 ─────────────────────────────────────────
+// ── Bullet point ──────────────────────────────────────────────────────────────
+function bullet(doc: any, x: number, y: number, w: number, text: string, color = GREY_DARK): number {
+  doc.fill(GOLD).font("Helvetica-Bold").fontSize(7).text("•", x, y, { width: 10 });
+  doc.fill(color).font("Helvetica").fontSize(7).text(text, x + 12, y, { width: w - 14 });
+  doc.fill("black");
+  return y + 12;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CONSENT CATEGORIES (9 categories — used in signing wizard + Page 5)
+// ─────────────────────────────────────────────────────────────────────────────
+export const CONSENT_CATEGORIES = [
+  { id: "terms_conditions", title: "1. Terms & Conditions",
+    body: "I have read, fully understood, and voluntarily accept all Terms & Conditions of this Agreement including booking, cancellation, agency responsibilities, and customer obligations as detailed in this document." },
+  { id: "payment_policy", title: "2. Payment Policy",
+    body: "I accept the payment schedule: 50% advance at booking, balance 50% due 50 days before departure. I understand that Hajj visa processing and ticket issuance begin only after full payment with official receipt." },
+  { id: "refund_policy", title: "3. Refund & Cancellation Policy",
+    body: "I understand the refund schedule: >90 days: 10% deduction; 60–89 days: 25%; 30–59 days: 50%; 15–29 days: 75%; <15 days or after departure: No refund. Visa, airline and hotel charges are non-refundable in all circumstances." },
+  { id: "privacy_policy", title: "4. Privacy & Data Protection",
+    body: "I consent to collection and processing of my personal data including passport, biometric, medical and payment details for Hajj facilitation and regulatory compliance as required by Saudi Arabian and Indian government authorities." },
+  { id: "medical_declaration", title: "5. Medical Declaration",
+    body: "I declare that I am physically and medically fit to perform all Hajj rites including extensive walking. I have disclosed all existing medical conditions, carry required medications, and have completed all mandatory vaccinations." },
+  { id: "visa_declaration", title: "6. Visa & Passport Declaration",
+    body: "I declare that my passport has 6+ months validity from the return date, all submitted documents are genuine and correct. I understand Saudi visa issuance is solely at the discretion of Saudi authorities and not guaranteed." },
+  { id: "force_majeure", title: "7. Force Majeure",
+    body: "I understand Al Burhan Tours & Travels is not liable for loss or delays arising from war, pandemic, natural disaster, government restrictions, Saudi Ministry decisions, airline cancellations, or any circumstances beyond the company's control." },
+  { id: "airline_disclaimer", title: "8. Airline Disclaimer",
+    body: "I understand that flights are operated by respective airlines and Al Burhan Tours & Travels acts as travel organizer only. The company is not responsible for flight delays, cancellations, diversions, seat changes, or any airline operational decisions." },
+  { id: "baggage_policy", title: "9. Baggage Policy",
+    body: "I accept the baggage allowance per airline rules (up to 25 KG checked + cabin baggage). I understand Al Burhan Tours & Travels is not responsible for lost, delayed, damaged, confiscated or stolen baggage." },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HAJJ LEGAL CLAUSES (13 clauses for Page 3 legal text)
+// ─────────────────────────────────────────────────────────────────────────────
 export const HAJJ_AGREEMENT_CLAUSES = [
   { id: "booking_confirmation", title: "1. BOOKING CONFIRMATION",
     body: "This Agreement confirms the Pilgrim's Hajj package booking with Al Burhan Tours & Travels. A unique Agreement Number is assigned as the official reference. The Agreement becomes legally binding upon digital execution under the IT Act, 2000." },
   { id: "payment_terms", title: "2. PAYMENT TERMS",
-    body: "Full payment due 60 days before departure. Minimum 20% booking amount confirms registration. Official receipts issued for all payments. Payments via Razorpay, NEFT/IMPS or cash with receipt only. Payments to unauthorized persons not recognized." },
+    body: "50% advance payment at booking confirms registration. Remaining 50% due 50 days before departure. Visa processing begins only after full payment. Official receipts issued for all payments. Payments via Razorpay, NEFT/IMPS or cash only. Unauthorized receipts not accepted." },
   { id: "cancellation_policy", title: "3. CANCELLATION & REFUND",
-    body: ">90 days: 10% charge. 60–89 days: 25% deduction. 30–59 days: 50% deduction. 15–29 days: 75% deduction. <15 days / post-departure: No refund. Visa, airline & hotel pre-payment charges are non-refundable in all cases. Refunds processed within 30 working days." },
-  { id: "package_inclusions", title: "4. INCLUSIONS & EXCLUSIONS",
-    body: "Includes: Return airfare, accommodation (Makkah & Madinah), group transport, certified guide, Mina tent, 5L Zamzam, and ID badge. Excludes: Personal expenses, meals, laundry, travel insurance, visa fees, medications and services not explicitly listed." },
-  { id: "visa_documents", title: "5. VISA, PASSPORT & DOCUMENTS",
-    body: "Passport must have 6+ months validity from return date. Agency files Hajj visa via Hajj Committee; approval subject to Saudi authorities — Agency not liable for rejection. Pilgrims must submit all required documents by the communicated deadline." },
-  { id: "health_requirements", title: "6. HEALTH & MEDICAL",
-    body: "Pilgrim warrants physical fitness for all Hajj rites. Mandatory vaccinations (ACWY Meningococcal, COVID-19 as required) must be completed before departure. Medical certificate required for pilgrims above 65 years or those with chronic conditions." },
+    body: ">90 days: 10% charge. 60–89 days: 25% deduction. 30–59 days: 50% deduction. 15–29 days: 75% deduction. <15 days/post-departure: No refund. Visa, airline & hotel charges non-refundable. Refunds within 30 working days." },
+  { id: "passport_visa", title: "4. PASSPORT & VISA",
+    body: "Passport must have 6+ months validity from return date. Agency files Hajj visa via Hajj Committee. Saudi visa approval is at the sole discretion of Saudi authorities — Agency not liable for rejection. All documents must be submitted by deadline." },
+  { id: "health_requirements", title: "5. HEALTH & MEDICAL",
+    body: "Pilgrim warrants physical fitness for all Hajj rites. Mandatory vaccinations (ACWY Meningococcal, COVID-19) must be completed before departure. Medical certificate required for pilgrims above 65 years or with chronic conditions." },
+  { id: "accommodation", title: "6. ACCOMMODATION",
+    body: "Aziziyah ~5 km from Haram. Mina in New Mina Zone Category D. Makkah/Madinah on 5-bed sharing unless additional charge paid. Room upgrades subject to availability. Hotels may be changed to equivalent/higher category due to Saudi allocation." },
   { id: "conduct_discipline", title: "7. CONDUCT & DISCIPLINE",
-    body: "Pilgrim must comply with Saudi law, Agency guide instructions, and group schedule. Independent movement requires prior notification to guide. Serious misconduct may result in arranged return travel at the Pilgrim's expense. Agency not liable for loss of personal property." },
-  { id: "liability_insurance", title: "8. LIABILITY & INSURANCE",
-    body: "Agency's maximum liability is limited to the total amount paid. Agency not liable for delays or failures by third-party providers (airlines, hotels, transport). Comprehensive travel insurance is strongly recommended and available through the Agency." },
+    body: "Pilgrim must comply with Saudi law, Agency guide instructions, and group schedule. Independent movement requires prior notification to guide. Serious misconduct may result in arranged return travel at Pilgrim's expense." },
+  { id: "liability", title: "8. LIABILITY & INSURANCE",
+    body: "Agency's maximum liability is limited to the total amount paid. Not liable for delays or failures by third-party providers (airlines, hotels, transport). Comprehensive travel insurance strongly recommended." },
   { id: "force_majeure", title: "9. FORCE MAJEURE",
-    body: "Neither party liable for failure due to acts of God, pandemic, war, terrorism, government decisions, or actions by Saudi/Indian authorities. Refunds in such events are limited to amounts recoverable from service providers, net of administrative costs." },
-  { id: "privacy_data", title: "10. PRIVACY & DATA PROTECTION",
-    body: "Pilgrim consents to collection and processing of personal data (passport, biometric, medical, payment) for Hajj facilitation and regulatory compliance. Data shared with Hajj authorities, airlines, and hotels as required. Not sold to commercial third parties." },
-  { id: "amendments", title: "11. AMENDMENTS",
-    body: "This Agreement constitutes the entire understanding between parties. Amendments must be in writing and signed by authorized representatives of both parties. Invalid or unenforceable provisions do not affect the remaining terms of this Agreement." },
-  { id: "governing_law", title: "12. DISPUTE RESOLUTION",
-    body: "Good-faith negotiation first (30 days). Unresolved disputes referred to arbitration under Arbitration & Conciliation Act 1996, venue Burhanpur, M.P. Arbitral award is final. Governed by Indian law. Courts at Burhanpur have exclusive jurisdiction." },
+    body: "Neither party liable for failure due to acts of God, pandemic, war, terrorism, government decisions, or actions by Saudi/Indian authorities. Refunds in such events limited to amounts recoverable from service providers." },
+  { id: "flight_baggage", title: "10. FLIGHTS & BAGGAGE",
+    body: "Flights operated by respective airlines. Agency acts as travel organizer only. Not responsible for delays, cancellations, seat changes or airline decisions. Baggage subject to airline policy. Not responsible for lost or damaged baggage." },
+  { id: "privacy_data", title: "11. PRIVACY & DATA",
+    body: "Pilgrim consents to processing of personal data (passport, biometric, medical, payment) for Hajj facilitation and regulatory compliance. Data shared with Hajj authorities, airlines, and hotels as required." },
+  { id: "dispute_resolution", title: "12. DISPUTE RESOLUTION",
+    body: "Good-faith negotiation first (30 days). Unresolved disputes referred to arbitration under Arbitration & Conciliation Act 1996, venue Burhanpur, M.P. Courts at Burhanpur have exclusive jurisdiction. Governed by Indian law." },
   { id: "digital_signature_declaration", title: "13. DIGITAL SIGNATURE",
-    body: "Pilgrim confirms: all information provided is true and accurate; physically and medically fit for Hajj; digital signature is legally equivalent to wet-ink signature under IT Act 2000 §5 and Schedule I; mobile number verified via OTP authentication." },
+    body: "Pilgrim confirms all information provided is true; is physically and medically fit for Hajj; digital signature is legally equivalent to wet-ink signature under IT Act 2000 §5 and Schedule I; mobile verified via OTP authentication." },
 ];
 
-// ── Standard package inclusions / exclusions ─────────────────────────────────
-const HAJJ_INCLUDES = [
-  "Return economy airfare (India ↔ KSA)",
-  "Accommodation in Makkah (near Haram)",
-  "Accommodation in Madinah",
-  "Airport & inter-city transfers",
-  "Mina tent accommodation",
-  "Arafat & Muzdalifah transport",
-  "Certified bilingual Hajj guide",
-  "Zamzam water (5 litres per pilgrim)",
-  "Al Burhan ID badge & documentation",
-  "Saudi Hajj visa processing assistance",
-  "Group meals (where specified in plan)",
-  "24/7 Agency emergency support",
-];
-
-const HAJJ_EXCLUDES = [
-  "Personal / shopping expenses",
-  "Meals beyond specified plan",
-  "Laundry & personal services",
-  "International calls & data",
-  "Comprehensive travel insurance",
-  "Hajj visa government fees (per GOI rates)",
-  "Umrah kit, ihram & personal clothing",
-  "Medications & personal health costs",
-  "Services not listed in this Agreement",
-  "Upgrades not confirmed in writing",
-  "Excess baggage charges",
-  "Upgrades during transit/hotel stay",
-];
-
-// ── Main options interface ────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// MAIN OPTIONS INTERFACE
+// ─────────────────────────────────────────────────────────────────────────────
 export interface AgreementPdfOptions {
   agreementNumber: string;
   bookingNumber: string;
@@ -207,476 +206,863 @@ export interface AgreementPdfOptions {
   agreementDate?: Date | null;
   // Customer KYC
   customerName: string;
+  customerFatherName?: string | null;
   customerMobile: string;
+  customerWhatsApp?: string | null;
   customerEmail?: string | null;
   customerPassport?: string | null;
+  passportIssueDate?: string | null;
+  passportExpiry?: string | null;
   customerAadhaar?: string | null;
   customerPan?: string | null;
   customerDob?: string | null;
-  customerBloodGroup?: string | null;
   customerGender?: string | null;
   customerNationality?: string | null;
+  customerBloodGroup?: string | null;
   customerAddress?: string | null;
+  customerCity?: string | null;
+  customerState?: string | null;
+  customerCountry?: string | null;
+  nominee?: string | null;
+  nomineeRelation?: string | null;
   emergencyContactName?: string | null;
   emergencyContactMobile?: string | null;
   // Package
   packageName?: string | null;
+  packageType?: string | null;
+  packageCategory?: string | null;
+  hajjYear?: string | null;
   numberOfPilgrims?: number | null;
+  bookingDate?: string | null;
   departureDate?: string | null;
   returnDate?: string | null;
+  duration?: string | null;
   groupName?: string | null;
+  groupNumber?: string | null;
   maktabNumber?: string | null;
-  saudiServiceProvider?: string | null;
-  // Hotel
+  bookingStatus?: string | null;
+  // Hotels
   makkahHotel?: string | null;
+  makkahCategory?: string | null;
+  makkahAddress?: string | null;
+  makkahDistance?: string | null;
+  makkahCheckIn?: string | null;
+  makkahCheckOut?: string | null;
   madinahHotel?: string | null;
-  hotelCheckIn?: string | null;
-  hotelCheckOut?: string | null;
+  madinahCategory?: string | null;
+  madinahDistance?: string | null;
+  madinahCheckIn?: string | null;
+  madinahCheckOut?: string | null;
+  aziziyahHotel?: string | null;
+  aziziyahDistance?: string | null;
+  aziziyahCheckIn?: string | null;
+  aziziyahCheckOut?: string | null;
+  minaCategory?: string | null;
+  minaTentNumber?: string | null;
+  minaMaktabNumber?: string | null;
+  minaZone?: string | null;
   roomSharing?: string | null;
-  hotelDistance?: string | null;
-  // Flight
+  // Transport
+  airportTransfer?: string | null;
+  busService?: string | null;
+  guideService?: string | null;
+  internalTransport?: string | null;
+  // Flights
   airline?: string | null;
   flightNumber?: string | null;
+  flightPnr?: string | null;
+  departureAirport?: string | null;
   flightDeparture?: string | null;
   flightArrival?: string | null;
   flightTransit?: string | null;
   baggageAllowance?: string | null;
-  // Payment
+  cabinBaggage?: string | null;
+  returnFlightNumber?: string | null;
+  // Financial
   totalAmount?: number | null;
   paidAmount?: number | null;
   balanceAmount?: number | null;
   discountAmount?: number | null;
-  // Signing
+  gstAmount?: number | null;
+  tcsAmount?: number | null;
+  govtCharges?: number | null;
+  visaCharges?: number | null;
+  dueDate?: string | null;
+  paymentStatus?: string | null;
+  // Signing & verification
   signatureData?: string | null;
   signedAt?: Date | null;
   signedIp?: string | null;
   userAgent?: string | null;
   deviceInfo?: string | null;
+  signingBrowser?: string | null;
+  signingDevice?: string | null;
+  signingOS?: string | null;
+  signingGPS?: string | null;
+  digitalHash?: string | null;
   otpVerified?: boolean;
   otpVerifiedAt?: Date | null;
   verificationUrl?: string;
   termsAccepted?: Record<string, boolean>;
+  auditActions?: Array<{ action: string; details: any; created_at: string }>;
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// PAGE 1 — BOOKING SUMMARY
+// PAGE 1 — CUSTOMER INFORMATION + PACKAGE + FINANCIAL
 // ══════════════════════════════════════════════════════════════════════════════
 function drawPage1(doc: any, o: AgreementPdfOptions, qrBuf: Buffer | null) {
   let y = CONTENT_Y + 2;
 
   // ── Agreement reference banner ────────────────────────────────────────────
-  doc.rect(M, y, CW, 52).fill(LG).stroke(DG);
-  // QR code
+  doc.rect(M, y, CW, 50).fill(LG).stroke(DG);
   if (qrBuf) {
-    try { doc.image(qrBuf, M + CW - 52, y + 2, { width: 48, height: 48 }); } catch {}
+    try { doc.image(qrBuf, M + CW - 50, y + 1, { width: 48, height: 48 }); } catch {}
   }
   const bannerW = qrBuf ? CW - 62 : CW - 16;
-  doc.fill(DG).font("Helvetica-Bold").fontSize(7).text("AGREEMENT REFERENCE", M + 10, y + 6);
-  doc.fill(GREY_DARK).font("Helvetica-Bold").fontSize(14).text(o.agreementNumber, M + 10, y + 16);
-  doc.fill(GREY_MID).font("Helvetica").fontSize(7.5)
-    .text(
-      `Booking: ${o.bookingNumber}  |  Status: ${(o.status || "PENDING SIGNATURE").toUpperCase().replace(/_/g," ")}  |  Date: ${fmtDate(o.agreementDate || new Date())}`,
-      M + 10, y + 36, { width: bannerW }
-    );
+  doc.fill(DG).font("Helvetica-Bold").fontSize(6.5).text("AGREEMENT REFERENCE", M + 10, y + 5);
+  doc.fill(GREY_DARK).font("Helvetica-Bold").fontSize(13).text(o.agreementNumber, M + 10, y + 14);
+  doc.fill(GREY_MID).font("Helvetica").fontSize(7)
+    .text(`Booking: ${o.bookingNumber}  |  Status: ${(o.status || "PENDING SIGNATURE").toUpperCase().replace(/_/g, " ")}  |  Date: ${fmtDate(o.agreementDate || new Date())}`, M + 10, y + 32, { width: bannerW });
   doc.fill("black");
-  y += 58;
+  y += 56;
 
-  // ── Customer information ──────────────────────────────────────────────────
+  // ── Customer Information ──────────────────────────────────────────────────
   y = secBar(doc, y, "PILGRIM / CUSTOMER INFORMATION");
 
-  // Photo placeholder box (left)
-  const photoW = 60;
-  const photoH = 76;
+  const photoW = 62;
+  const photoH = 82;
+  // Photo placeholder
   doc.rect(M, y, photoW, photoH).fill("#E8E8E8").stroke("#C0C0C0");
-  doc.fill("#AAA").font("Helvetica").fontSize(6.5)
-    .text("PILGRIM\nPHOTO", M, y + 28, { width: photoW, align: "center" });
+  doc.fill("#BBB").font("Helvetica").fontSize(6).text("PASSPORT\nPHOTO", M, y + 32, { width: photoW, align: "center" });
   doc.fill("black");
 
-  // Customer info grid (right of photo)
-  const infoX = M + photoW + 6;
-  const infoW = CW - photoW - 6;
-  const cellH = 25;
-  const cellGap = 2;
-  const cHalf = (infoW - cellGap) / 2;
+  const infoX = M + photoW + 5;
+  const infoW = CW - photoW - 5;
+  const cellH = 23;
+  const g = 2;
+  const c3 = (infoW - 2 * g) / 3;
+  const c2 = (infoW - g) / 2;
 
-  // Row 1
-  infoCell(doc, infoX,           y,             cHalf, cellH, "FULL NAME", o.customerName || "—", true);
-  infoCell(doc, infoX + cHalf + cellGap, y,     cHalf, cellH, "MOBILE", o.customerMobile || "—");
-  y += cellH + cellGap;
-  // Row 2
-  infoCell(doc, infoX,           y,             cHalf, cellH, "PASSPORT NO.", o.customerPassport || "—");
-  infoCell(doc, infoX + cHalf + cellGap, y,     cHalf, cellH, "EMAIL", o.customerEmail || "—");
-  y += cellH + cellGap;
-  // Row 3
-  infoCell(doc, infoX,           y,             cHalf, cellH, "AADHAAR NO.", o.customerAadhaar ? `XXXX-XXXX-${String(o.customerAadhaar).slice(-4)}` : "—");
-  infoCell(doc, infoX + cHalf + cellGap, y,     cHalf, cellH, "DATE OF BIRTH", fmtDate(o.customerDob));
-  y += cellH + cellGap;
-  // Row 4 (align with photo bottom)
-  infoCell(doc, infoX,           y,             cHalf, cellH, "PAN NO.", o.customerPan || "—");
-  infoCell(doc, infoX + cHalf + cellGap, y,     cHalf, cellH, "BLOOD GROUP", o.customerBloodGroup || "—");
+  // Row 1: Full Name (2/3) | Father/Husband Name (1/3)
+  infoCell(doc, infoX,          y,       c2, cellH, "FULL NAME", fmt(o.customerName), true);
+  infoCell(doc, infoX+c2+g,     y,       c2, cellH, "FATHER / HUSBAND NAME", fmt(o.customerFatherName));
+  y += cellH + g;
+  // Row 2: DOB | Gender | Nationality
+  infoCell(doc, infoX,          y,       c3, cellH, "DATE OF BIRTH", fmtDate(o.customerDob));
+  infoCell(doc, infoX+c3+g,     y,       c3, cellH, "GENDER", fmt(o.customerGender));
+  infoCell(doc, infoX+2*(c3+g), y,       c3, cellH, "NATIONALITY", fmt(o.customerNationality));
+  y += cellH + g;
+  // Row 3: Passport | Issue Date | Expiry
+  infoCell(doc, infoX,          y,       c3, cellH, "PASSPORT NO.", fmt(o.customerPassport));
+  infoCell(doc, infoX+c3+g,     y,       c3, cellH, "ISSUE DATE", fmtDate(o.passportIssueDate));
+  infoCell(doc, infoX+2*(c3+g), y,       c3, cellH, "EXPIRY DATE", fmtDate(o.passportExpiry));
+  y += cellH + g;
+  // Row 4: Aadhaar | PAN | Blood Group
+  infoCell(doc, infoX,          y,       c3, cellH, "AADHAAR NO.", maskAadhaar(o.customerAadhaar));
+  infoCell(doc, infoX+c3+g,     y,       c3, cellH, "PAN NO.", fmt(o.customerPan));
+  infoCell(doc, infoX+2*(c3+g), y,       c3, cellH, "BLOOD GROUP", fmt(o.customerBloodGroup));
 
-  // Advance y to max of photo bottom or grid bottom
-  y = Math.max(y + cellH, CONTENT_Y + 2 + 58 + 24 + photoH) + 8;
+  // Ensure y advances past photo bottom
+  const photoBottom = (CONTENT_Y + 2) + 56 + 24 + photoH;
+  y = Math.max(y + cellH, photoBottom) + g;
 
-  // Emergency contact bar
+  // Row 5: Mobile | WhatsApp | Email
+  infoCell(doc, M,              y,       c3, cellH, "MOBILE", fmt(o.customerMobile));
+  infoCell(doc, M+c3+g,         y,       c3, cellH, "WHATSAPP", fmt(o.customerWhatsApp || o.customerMobile));
+  infoCell(doc, M+2*(c3+g),     y,       c3, cellH, "EMAIL", fmt(o.customerEmail));
+  y += cellH + g;
+  // Row 6: Address | City | State
+  const addrW = (CW - 2 * g) * 0.45;
+  const cityW = (CW - 2 * g) * 0.28;
+  const stateW = CW - addrW - cityW - 2 * g;
+  infoCell(doc, M,              y,       addrW, cellH, "ADDRESS", fmt(o.customerAddress));
+  infoCell(doc, M+addrW+g,      y,       cityW, cellH, "CITY", fmt(o.customerCity));
+  infoCell(doc, M+addrW+cityW+2*g, y,    stateW, cellH, "STATE / COUNTRY", fmt(o.customerState) + (o.customerCountry ? ", " + o.customerCountry : ""));
+  y += cellH + 4;
+
+  // Emergency + Nominee bars
   doc.rect(M, y, CW, 20).fill(GOLD_LITE).stroke(GOLD);
   doc.fill("#7B4700").font("Helvetica-Bold").fontSize(7).text("EMERGENCY CONTACT:", M + 8, y + 6, { continued: true });
   doc.fill(GREY_DARK).font("Helvetica").fontSize(7)
     .text(`  ${fmt(o.emergencyContactName)}  |  ${fmt(o.emergencyContactMobile)}`, { continued: false });
   doc.fill("black");
-  y += 24;
+  y += 22;
 
-  // ── Package details ───────────────────────────────────────────────────────
-  y = secBar(doc, y, "PACKAGE DETAILS");
+  doc.rect(M, y, CW, 20).fill(GOLD_LITE).stroke(GOLD);
+  doc.fill("#7B4700").font("Helvetica-Bold").fontSize(7).text("NOMINEE:", M + 8, y + 6, { continued: true });
+  doc.fill(GREY_DARK).font("Helvetica").fontSize(7)
+    .text(`  ${fmt(o.nominee, "Not specified")}  |  Relationship: ${fmt(o.nomineeRelation)}`, { continued: false });
+  doc.fill("black");
+  y += 26;
 
-  const pkg = [
-    ["Package", o.packageName || "Hajj Package"],
-    ["Pilgrims", String(o.numberOfPilgrims || 1)],
-    ["Departure", fmtDate(o.departureDate)],
-    ["Return", fmtDate(o.returnDate)],
-    ["Group", o.groupName || "To be notified"],
-    ["Maktab No.", o.maktabNumber || "—"],
+  // ── Package Details ───────────────────────────────────────────────────────
+  y = secBar(doc, y, "PACKAGE INFORMATION");
+
+  const pkgCells = [
+    ["PACKAGE NAME", o.packageName || "Hajj Package"],
+    ["PACKAGE TYPE", o.packageType || "Hajj"],
+    ["HAJJ YEAR", o.hajjYear || new Date().getFullYear().toString()],
+    ["GROUP NO.", o.groupName || o.groupNumber || "To be notified"],
+    ["BOOKING DATE", fmtDate(o.bookingDate)],
+    ["DEPARTURE DATE", fmtDate(o.departureDate)],
+    ["RETURN DATE", fmtDate(o.returnDate)],
+    ["DURATION", fmt(o.duration, "As per schedule")],
+    ["ROOM SHARING", fmt(o.roomSharing, "Standard sharing")],
+    ["PACKAGE CATEGORY", fmt(o.packageCategory, "Standard")],
+    ["MAKTAB NO.", fmt(o.maktabNumber)],
+    ["BOOKING STATUS", fmt(o.bookingStatus || o.status, "Active")],
   ];
-  const pkgCols = Math.ceil(pkg.length / 2);
-  const pkgCellW = (CW - (pkgCols - 1) * 4) / pkgCols;
-  let pkgX = M;
-  let pkgYbase = y;
-  pkg.forEach(([lbl, val], i) => {
+  const pkgCols = 3;
+  const pkgCellW = (CW - (pkgCols - 1) * g) / pkgCols;
+  pkgCells.forEach(([lbl, val], i) => {
     const col = i % pkgCols;
     const row = Math.floor(i / pkgCols);
-    infoCell(doc, M + col * (pkgCellW + 4), pkgYbase + row * 27, pkgCellW, 23, lbl, val);
+    infoCell(doc, M + col * (pkgCellW + g), y + row * (cellH + g), pkgCellW, cellH, lbl, val);
   });
-  y = pkgYbase + Math.ceil(pkg.length / pkgCols) * 27 + 6;
+  y += Math.ceil(pkgCells.length / pkgCols) * (cellH + g) + 4;
 
-  // ── Hotel & Flight (2 columns) ────────────────────────────────────────────
-  y = secBar(doc, y, "ACCOMMODATION & FLIGHTS");
-
-  const colX2 = M + COL_HALF + 8;
-
-  // Hotel column
-  doc.rect(M, y, COL_HALF, 72).fill(LG).stroke(DG);
-  doc.fill(DG).font("Helvetica-Bold").fontSize(7.5).text("MAKKAH ACCOMMODATION", M + 6, y + 5);
-  doc.fill(GREY_DARK).font("Helvetica-Bold").fontSize(8).text(fmt(o.makkahHotel, "To be confirmed"), M + 6, y + 16, { width: COL_HALF - 12 });
-  doc.fill(DG).font("Helvetica-Bold").fontSize(7.5).text("MADINAH ACCOMMODATION", M + 6, y + 32);
-  doc.fill(GREY_DARK).font("Helvetica-Bold").fontSize(8).text(fmt(o.madinahHotel, "To be confirmed"), M + 6, y + 43, { width: COL_HALF - 12 });
-  doc.fill(GREY_MID).font("Helvetica").fontSize(7)
-    .text(`Room Sharing: ${fmt(o.roomSharing, "As allocated")}  |  Dist. from Haram: ${fmt(o.hotelDistance, "—")}`, M + 6, y + 59, { width: COL_HALF - 12 });
-  doc.fill("black");
-
-  // Flight column
-  doc.rect(colX2, y, COL_HALF, 72).fill(GOLD_LITE).stroke(GOLD);
-  doc.fill("#7B4700").font("Helvetica-Bold").fontSize(7.5).text("FLIGHT DETAILS", colX2 + 6, y + 5);
-  doc.fill(GREY_DARK).font("Helvetica-Bold").fontSize(9).text(fmt(o.airline, "To be confirmed"), colX2 + 6, y + 16, { width: COL_HALF - 12 });
-  doc.fill(GREY_MID).font("Helvetica").fontSize(7.5).text(`Flight No: ${fmt(o.flightNumber)}`, colX2 + 6, y + 31);
-  doc.fill(GREY_MID).font("Helvetica").fontSize(7.5).text(`Departure: ${fmt(o.flightDeparture)}`, colX2 + 6, y + 43);
-  doc.fill(GREY_MID).font("Helvetica").fontSize(7.5).text(`Arrival: ${fmt(o.flightArrival)}`, colX2 + 6, y + 55);
-  doc.fill(GREY_MID).font("Helvetica").fontSize(7).text(`Baggage: ${fmt(o.baggageAllowance, "23 kg")}  |  Transit: ${fmt(o.flightTransit, "—")}`, colX2 + 6, y + 65, { width: COL_HALF - 12 });
-  doc.fill("black");
-  y += 78;
-
-  // ── Financial summary ─────────────────────────────────────────────────────
+  // ── Financial Summary ─────────────────────────────────────────────────────
   y = secBar(doc, y, "FINANCIAL SUMMARY");
 
   const total = Number(o.totalAmount || 0);
   const paid  = Number(o.paidAmount || 0);
   const bal   = Number(o.balanceAmount ?? (total - paid));
   const disc  = Number(o.discountAmount || 0);
+  const gst   = Number(o.gstAmount || 0);
+  const tcs   = Number(o.tcsAmount || 0);
+  const govt  = Number(o.govtCharges || 0);
+  const visa  = Number(o.visaCharges || 0);
+
+  const finCW1 = CW * 0.50;
+  const finCW2 = CW * 0.25;
+  const finCW3 = CW - finCW1 - finCW2;
 
   const finRows: [string, string, boolean][] = [
-    ["Gross Package Amount",      fmtMoney(total + disc),  false],
-    ["Less: Discount / Waiver",   disc > 0 ? `-  ${fmtMoney(disc)}` : "—",  false],
-    ["NET PACKAGE AMOUNT",        fmtMoney(total),         true],
-    ["Amount Paid to Date",       fmtMoney(paid),          false],
-    ["OUTSTANDING BALANCE",       fmtMoney(bal),           bal > 0],
+    ["Package Base Amount",       fmtMoney(total + disc - gst - tcs - govt - visa), false],
+    ["GST Applicable",            gst > 0 ? fmtMoney(gst) : "Included",            false],
+    ["TCS Applicable",            tcs > 0 ? fmtMoney(tcs) : "Included",            false],
+    ["Govt. Charges",             govt > 0 ? fmtMoney(govt) : "—",                 false],
+    ["Visa Charges",              visa > 0 ? fmtMoney(visa) : "—",                 false],
+    ["Discount / Waiver",         disc > 0 ? `- ${fmtMoney(disc)}` : "—",          false],
+    ["NET PACKAGE AMOUNT",        fmtMoney(total),                                  true],
+    ["Advance Paid to Date",      fmtMoney(paid),                                   false],
+    ["OUTSTANDING BALANCE",       fmtMoney(bal),                                    bal > 0],
+    ["Due Date",                  fmtDate(o.dueDate),                               false],
+    ["Payment Status",            fmt(o.paymentStatus, paid >= total ? "Paid" : "Partially Paid"), false],
   ];
-  finRows.forEach(([label, value, hl], i) => {
-    const rowY = y + i * 15;
-    if (hl) doc.rect(M, rowY, CW, 14).fill(i === 2 ? LG : "#FFF3CD");
-    doc.fill("#666").font(hl ? "Helvetica-Bold" : "Helvetica").fontSize(8).text(label, M + 8, rowY + 3, { width: 280 });
-    doc.fill(hl ? DG : GREY_DARK).font(hl ? "Helvetica-Bold" : "Helvetica").fontSize(8)
-      .text(value, M + CW - 140, rowY + 3, { width: 132, align: "right" });
-  });
-  y += finRows.length * 15 + 8;
 
-  // ── Validity statement ───────────────────────────────────────────────────
-  doc.rect(M, y, CW, 26).fill(GOLD_LITE).stroke(GOLD);
-  doc.fill("#7B4700").font("Helvetica-Oblique").fontSize(7.5)
-    .text("This Agreement becomes legally binding upon OTP-verified digital signature. It is enforceable under the Information Technology Act, 2000 and the Indian Contract Act, 1872.", M + 10, y + 8, { width: CW - 20 });
+  finRows.forEach(([label, value, hl], i) => {
+    const rowY = y + i * 14;
+    const bgFill = hl && i === 6 ? LG : (hl ? "#FFF3CD" : (i % 2 === 0 ? "white" : "#FAFAFA"));
+    doc.rect(M, rowY, CW, 13).fill(bgFill);
+    doc.fill("#666").font(hl ? "Helvetica-Bold" : "Helvetica").fontSize(7.5).text(label, M + 6, rowY + 3, { width: finCW1 - 6 });
+    doc.fill(hl ? DG : GREY_DARK).font(hl ? "Helvetica-Bold" : "Helvetica").fontSize(7.5)
+      .text(value, M + finCW1, rowY + 3, { width: finCW2 + finCW3 - 6, align: "right" });
+  });
+  y += finRows.length * 14 + 4;
+
+  // Legal note
+  doc.rect(M, y, CW, 22).fill(GOLD_LITE).stroke(GOLD);
+  doc.fill("#7B4700").font("Helvetica-Oblique").fontSize(7)
+    .text("This Agreement is legally binding upon OTP-verified digital execution under the Information Technology Act, 2000 and the Indian Contract Act, 1872. Scan the QR code on Page 6 to verify.", M + 8, y + 7, { width: CW - 16 });
   doc.fill("black");
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// PAGE 2 — SERVICES & CANCELLATION POLICY
+// PAGE 2 — FLIGHTS + HOTELS + TRANSPORT + INCLUDES / EXCLUDES
 // ══════════════════════════════════════════════════════════════════════════════
 function drawPage2(doc: any, o: AgreementPdfOptions) {
   let y = CONTENT_Y + 2;
 
-  // ── Package Inclusions ────────────────────────────────────────────────────
-  y = secBar(doc, y, "WHAT IS INCLUDED IN YOUR HAJJ PACKAGE  ✓");
+  // ── Flight Details ────────────────────────────────────────────────────────
+  y = secBar(doc, y, "FLIGHT DETAILS");
 
-  const incHalf = (CW - 6) / 2;
-  let incY = y;
-  HAJJ_INCLUDES.forEach((item, i) => {
-    const col = i % 2;
-    const row = Math.floor(i / 2);
-    const cx = M + col * (incHalf + 6);
-    if (col === 0) incY = y + row * 13;
-    checkItem(doc, cx, incY, incHalf, item, true);
+  const fH = 70;
+  doc.rect(M, y, CW, fH).fill(GOLD_LITE).stroke(GOLD);
+  // Flight grid
+  const fCells = [
+    ["AIRLINE", fmt(o.airline)], ["FLIGHT NO.", fmt(o.flightNumber)], ["PNR", fmt(o.flightPnr)],
+    ["DEPARTURE AIRPORT", fmt(o.departureAirport)], ["TRANSIT", fmt(o.flightTransit)], ["DEPARTURE", fmt(o.flightDeparture)],
+    ["ARRIVAL", fmt(o.flightArrival)], ["CHECKED BAGGAGE", fmt(o.baggageAllowance, "25 KG")], ["CABIN BAGGAGE", fmt(o.cabinBaggage, "As per airline")],
+  ];
+  const fc3 = (CW - 2 * 2) / 3;
+  const fcH = 20;
+  fCells.forEach(([lbl, val], i) => {
+    const col = i % 3;
+    const row = Math.floor(i / 3);
+    const cx = M + col * (fc3 + 2);
+    const cy = y + row * (fcH + 1);
+    doc.fill("#7B4700").font("Helvetica").fontSize(6).text(lbl, cx + 5, cy + 4, { width: fc3 - 10 });
+    doc.fill(GREY_DARK).font("Helvetica-Bold").fontSize(7.5).text(val, cx + 5, cy + 12, { width: fc3 - 10, ellipsis: true });
   });
-  y = y + Math.ceil(HAJJ_INCLUDES.length / 2) * 13 + 8;
+  doc.fill("black");
+  y += fH + 8;
 
-  // ── Package Exclusions ────────────────────────────────────────────────────
-  y = secBar(doc, y, "WHAT IS NOT INCLUDED (EXCLUSIONS)  ✗");
+  // ── Hotels ────────────────────────────────────────────────────────────────
+  y = secBar(doc, y, "ACCOMMODATION DETAILS");
 
-  let excY = y;
-  HAJJ_EXCLUDES.forEach((item, i) => {
+  const hColW = (CW - 3 * 2) / 4;
+  const hH = 84;
+
+  // Makkah
+  doc.rect(M, y, hColW, hH).fill(LG).stroke(DG);
+  doc.fill(DG).font("Helvetica-Bold").fontSize(7).text("MAKKAH", M + 5, y + 5);
+  doc.fill(GREY_DARK).font("Helvetica-Bold").fontSize(7.5).text(fmt(o.makkahHotel, "To be confirmed"), M + 5, y + 16, { width: hColW - 10 });
+  if (o.makkahCategory) { doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Category: " + o.makkahCategory, M + 5, y + 32, { width: hColW - 10 }); }
+  doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Dist. from Haram: " + fmt(o.makkahDistance, "~500m"), M + 5, y + 42, { width: hColW - 10 });
+  if (o.makkahAddress) { doc.fill(GREY_MID).font("Helvetica").fontSize(6).text(o.makkahAddress, M + 5, y + 52, { width: hColW - 10 }); }
+  doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Check-in: " + fmtDate(o.makkahCheckIn), M + 5, y + 63, { width: hColW - 10 });
+  doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Check-out: " + fmtDate(o.makkahCheckOut), M + 5, y + 73, { width: hColW - 10 });
+  doc.fill("black");
+
+  // Madinah
+  const hX2 = M + hColW + 2;
+  doc.rect(hX2, y, hColW, hH).fill(GOLD_LITE).stroke(GOLD);
+  doc.fill("#7B4700").font("Helvetica-Bold").fontSize(7).text("MADINAH", hX2 + 5, y + 5);
+  doc.fill(GREY_DARK).font("Helvetica-Bold").fontSize(7.5).text(fmt(o.madinahHotel, "To be confirmed"), hX2 + 5, y + 16, { width: hColW - 10 });
+  if (o.madinahCategory) { doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Category: " + o.madinahCategory, hX2 + 5, y + 32, { width: hColW - 10 }); }
+  doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Dist. from Haram: " + fmt(o.madinahDistance, "—"), hX2 + 5, y + 42, { width: hColW - 10 });
+  doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Check-in: " + fmtDate(o.madinahCheckIn), hX2 + 5, y + 63, { width: hColW - 10 });
+  doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Check-out: " + fmtDate(o.madinahCheckOut), hX2 + 5, y + 73, { width: hColW - 10 });
+  doc.fill("black");
+
+  // Aziziyah
+  const hX3 = hX2 + hColW + 2;
+  doc.rect(hX3, y, hColW, hH).fill(LG).stroke(DG);
+  doc.fill(DG).font("Helvetica-Bold").fontSize(7).text("AZIZIYAH", hX3 + 5, y + 5);
+  doc.fill(GREY_DARK).font("Helvetica-Bold").fontSize(7.5).text(fmt(o.aziziyahHotel, "To be confirmed"), hX3 + 5, y + 16, { width: hColW - 10 });
+  doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Dist. from Haram: " + fmt(o.aziziyahDistance, "~5 km"), hX3 + 5, y + 42, { width: hColW - 10 });
+  doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Check-in: " + fmtDate(o.aziziyahCheckIn), hX3 + 5, y + 63, { width: hColW - 10 });
+  doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Check-out: " + fmtDate(o.aziziyahCheckOut), hX3 + 5, y + 73, { width: hColW - 10 });
+  doc.fill("black");
+
+  // Mina
+  const hX4 = hX3 + hColW + 2;
+  doc.rect(hX4, y, hColW, hH).fill(GOLD_LITE).stroke(GOLD);
+  doc.fill("#7B4700").font("Helvetica-Bold").fontSize(7).text("MINA", hX4 + 5, y + 5);
+  doc.fill(GREY_DARK).font("Helvetica-Bold").fontSize(7.5).text("New Mina Zone", hX4 + 5, y + 16, { width: hColW - 10 });
+  doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Tent Category: " + fmt(o.minaCategory, "Category D"), hX4 + 5, y + 32, { width: hColW - 10 });
+  if (o.minaTentNumber) { doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Tent No.: " + o.minaTentNumber, hX4 + 5, y + 42, { width: hColW - 10 }); }
+  doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Maktab No.: " + fmt(o.minaMaktabNumber || o.maktabNumber), hX4 + 5, y + 52, { width: hColW - 10 });
+  doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Zone: " + fmt(o.minaZone, "New Mina Zone"), hX4 + 5, y + 63, { width: hColW - 10 });
+  doc.fill("black");
+
+  y += hH + 4;
+
+  // Room sharing note
+  doc.rect(M, y, CW, 18).fill(GREY_LITE).stroke("#DDD");
+  doc.fill(DG).font("Helvetica-Bold").fontSize(7).text("ROOM SHARING:", M + 8, y + 5, { continued: true });
+  doc.fill(GREY_DARK).font("Helvetica").fontSize(7).text(`  ${fmt(o.roomSharing, "5-bed sharing standard")}  |  Upgrades available at extra charge  |  Subject to availability`, { continued: false });
+  doc.fill("black");
+  y += 22;
+
+  // ── Transportation ────────────────────────────────────────────────────────
+  y = secBar(doc, y, "TRANSPORTATION");
+
+  const transCells = [
+    ["Airport Transfer", fmt(o.airportTransfer, "Included — India & Saudi Arabia")],
+    ["Bus Service", fmt(o.busService, "Group transport included")],
+    ["Hajj Guide", fmt(o.guideService, "Certified bilingual guide")],
+    ["Internal Hajj Transport", fmt(o.internalTransport, "Officially arranged by Hajj authorities")],
+  ];
+  const tW = (CW - 2) / 2;
+  transCells.forEach(([lbl, val], i) => {
     const col = i % 2;
     const row = Math.floor(i / 2);
-    if (col === 0) excY = y + row * 13;
+    const tx = M + col * (tW + 2);
+    const ty = y + row * (cellH + 2);
+    infoCell(doc, tx, ty, tW, cellH, lbl, val);
+  });
+  y += Math.ceil(transCells.length / 2) * (cellH + 2) + 6;
+
+  // ── Package Includes ──────────────────────────────────────────────────────
+  y = secBar(doc, y, "PACKAGE INCLUSIONS  ✓");
+
+  const includes = [
+    "Return Economy Air Ticket (India ↔ KSA)",
+    "Hajj Visa Processing Assistance",
+    "Airport Assistance (India & Saudi Arabia)",
+    "Complete Accommodation (Makkah, Madinah, Aziziyah)",
+    "10 Days Accommodation in Aziziyah (~5 km from Haram)",
+    "5 Days Accommodation in Mina, Arafat & Muzdalifah",
+    "Breakfast, Lunch, Dinner & Tea (where provided)",
+    "Complete Hajj Guidance & Orientation Programme",
+    "Experienced Tour Manager & Religious Guide",
+    "Hajj Travel Kit, ID Card & Luggage Tag",
+    "Emergency Assistance (24/7)",
+    "Internal Hajj Transportation (officially arranged)",
+  ];
+  const incHalf = (CW - 6) / 2;
+  let leftY = y;
+  includes.forEach((item, i) => {
+    const col = i % 2;
+    if (col === 0) leftY = y + Math.floor(i / 2) * 12;
+    checkItem(doc, M + col * (incHalf + 6), leftY, incHalf, item, true);
+  });
+  y += Math.ceil(includes.length / 2) * 12 + 6;
+
+  // ── Package Excludes ──────────────────────────────────────────────────────
+  y = secBar(doc, y, "PACKAGE EXCLUSIONS  ✗");
+
+  const excludes = [
+    "Transportation between Aziziyah and Masjid Al Haram",
+    "Transportation for Tawaf-e-Ziyarat",
+    "Laundry & Personal Services",
+    "Medical Expenses & Personal Shopping",
+    "International Calls & Data",
+    "Travel Insurance (unless specified)",
+    "Extra Meals beyond plan",
+    "Extra Baggage Charges",
+    "Room Upgrades (unless paid)",
+    "Any service not specifically mentioned",
+  ];
+  let excY = y;
+  excludes.forEach((item, i) => {
+    const col = i % 2;
+    if (col === 0) excY = y + Math.floor(i / 2) * 12;
     checkItem(doc, M + col * (incHalf + 6), excY, incHalf, item, false);
   });
-  y = y + Math.ceil(HAJJ_EXCLUDES.length / 2) * 13 + 10;
-  y = goldLine(doc, y);
+  y += Math.ceil(excludes.length / 2) * 12 + 6;
 
-  // ── Payment Policy ────────────────────────────────────────────────────────
-  y = secBar(doc, y, "PAYMENT SCHEDULE & POLICY");
-
-  const payColW = [CW * 0.45, CW * 0.30, CW * 0.25];
-  y = tableRow(doc, y, ["Payment Stage", "Amount / %", "Due Date"], payColW, true);
-  [
-    ["Booking Confirmation (Registration)",    "20% of package", "At time of booking"],
-    ["Second Instalment",                      "30% of package", "60 days prior departure"],
-    ["Final Payment",                          "Balance 50%",    "30 days prior departure"],
-    ["Visa Fee (GOI rates, non-refundable)",   "Actuals",        "As communicated"],
-  ].forEach(([a, b, c], i) => {
-    y = tableRow(doc, y, [a, b, c], payColW, false, i % 2 === 0);
-  });
-  y += 10;
-
-  // ── Cancellation Table ────────────────────────────────────────────────────
-  y = secBar(doc, y, "CANCELLATION & REFUND SCHEDULE");
-
-  const canColW = [CW * 0.42, CW * 0.28, CW * 0.30];
-  y = tableRow(doc, y, ["Cancellation Period Before Departure", "Deduction", "Refund Estimate"], canColW, true);
-  [
-    ["More than 90 days",          "10% admin charge",      "90% refundable"],
-    ["60 to 89 days",              "25% of total paid",     "75% refundable"],
-    ["30 to 59 days",              "50% of total paid",     "50% refundable"],
-    ["15 to 29 days",              "75% of total paid",     "25% refundable"],
-    ["Less than 15 days / After departure", "No refund",   "Non-refundable"],
-  ].forEach(([a, b, c], i) => {
-    y = tableRow(doc, y, [a, b, c], canColW, false, i % 2 === 0);
-  });
-  y += 8;
-
-  // ── Important notes ───────────────────────────────────────────────────────
-  doc.rect(M, y, CW, 46).fill("#FFF3CD").stroke(GOLD);
-  doc.fill("#7B4700").font("Helvetica-Bold").fontSize(7.5).text("IMPORTANT NOTES REGARDING CANCELLATION & REFUNDS", M + 8, y + 5);
-  doc.fill("#7B4700").font("Helvetica").fontSize(7)
-    .text(
-      "• Visa processing fees, government levies, and airline cancellation charges are non-refundable in all circumstances.\n" +
-      "• Refunds are processed within 30 working days via the original payment method. No cash refunds exceeding ₹10,000.\n" +
-      "• All cancellations must be communicated in writing (email to bookings@alburhantravels.com or registered letter). Verbal cancellations are not accepted.\n" +
-      "• In force majeure events, refunds are limited to amounts recoverable from airlines, hotels, and other service providers.",
-      M + 8, y + 18, { width: CW - 16, lineGap: 1 }
-    );
+  // Accommodation policy note
+  doc.rect(M, y, CW, 42).fill(GREY_LITE).stroke("#DDD");
+  doc.fill(DG).font("Helvetica-Bold").fontSize(7.5).text("ACCOMMODATION POLICY", M + 8, y + 5);
+  doc.fill(GREY_DARK).font("Helvetica").fontSize(6.8)
+    .text("• Aziziyah accommodation approximately 5 km from Haram. Mina accommodation in New Mina Zone, Maktab as allocated.\n" +
+      "• Standard accommodation on 5-bed sharing. 3-sharing, 2-sharing or single room requires additional charges.\n" +
+      "• Hotels may be changed to equivalent/higher category due to Saudi Government allocation. No room changes after allocation.",
+      M + 8, y + 17, { width: CW - 16, lineGap: 1 });
   doc.fill("black");
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// PAGE 3 — TERMS & CONDITIONS + DECLARATION
+// PAGE 3 — LEGAL TERMS & CONDITIONS
 // ══════════════════════════════════════════════════════════════════════════════
 function drawPage3(doc: any, o: AgreementPdfOptions) {
   let y = CONTENT_Y + 2;
 
-  y = secBar(doc, y, "TERMS & CONDITIONS — SUMMARY (All 13 Clauses)");
+  y = secBar(doc, y, "LEGAL TERMS & CONDITIONS — ALL CLAUSES");
 
   const clauseW = (CW - 6) / 2;
   let leftY = y;
   let rightY = y;
+
   HAJJ_AGREEMENT_CLAUSES.forEach((clause, i) => {
     const isLeft = i % 2 === 0;
     const cx = isLeft ? M : M + clauseW + 6;
     const cy = isLeft ? leftY : rightY;
 
-    // Clause title bar
     doc.rect(cx, cy, clauseW, 14).fill(isLeft ? DG : "#1A4D35");
-    const accepted = o.termsAccepted ? (o.termsAccepted[clause.id] !== false) : false;
-    const checkTxt = o.signedAt ? (accepted ? " ✓" : " ✗") : "";
-    doc.fill("white").font("Helvetica-Bold").fontSize(7).text(clause.title + checkTxt, cx + 5, cy + 4, { width: clauseW - 10 });
+    doc.fill("white").font("Helvetica-Bold").fontSize(7).text(clause.title, cx + 5, cy + 4, { width: clauseW - 10 });
     doc.fill("black");
 
-    // Body
-    doc.fill(GREY_DARK).font("Helvetica").fontSize(6.8)
+    doc.fill(GREY_DARK).font("Helvetica").fontSize(6.5)
       .text(clause.body, cx + 4, cy + 16, { width: clauseW - 8, lineGap: 0.8 });
 
-    const endY = doc.y + 6;
-    const clauseEnd = endY;
-
+    const endY = doc.y + 5;
     if (isLeft) {
-      leftY = clauseEnd;
+      leftY = endY;
     } else {
-      rightY = clauseEnd;
-      // After each pair, y advances to max of both columns
-      leftY  = Math.max(leftY, rightY);
+      rightY = endY;
+      leftY = Math.max(leftY, rightY);
       rightY = leftY;
     }
   });
 
-  // If odd number of clauses, left may be ahead
   y = Math.max(leftY, rightY) + 6;
-
-  // Horizontal divider
   y = goldLine(doc, y);
 
   // ── Customer Declaration ──────────────────────────────────────────────────
-  y = secBar(doc, y, "CUSTOMER DECLARATION — MANDATORY ACCEPTANCE");
+  y = secBar(doc, y, "CUSTOMER DECLARATION — MANDATORY");
 
   const declarations = [
-    "I have read, fully understood, and voluntarily accept all 13 clauses of this Agreement as summarised above.",
-    "All personal, medical, and travel information provided to the Agency is true, accurate, complete, and not misleading.",
+    "I have read, fully understood, and voluntarily accept all 13 clauses of this Agreement as set out above.",
+    "All personal, medical, and travel information provided to Al Burhan Tours & Travels is true, accurate, complete, and not misleading.",
     "I am physically, medically, and legally competent to undertake the Hajj journey and to enter into this legally binding contract.",
-    "I understand and accept the cancellation and refund policy as detailed in this Agreement.",
-    "I accept full responsibility for my conduct during the journey and for compliance with all Saudi Arabian and Indian laws.",
-    "I accept that my digital signature is legally equivalent to a wet-ink signature under Section 5 of the IT Act, 2000.",
+    "I understand and accept the cancellation and refund policy as detailed in this Agreement and in the Payment Policy section.",
+    "I accept full responsibility for my conduct during the journey and for compliance with all Saudi Arabian and Indian laws and regulations.",
+    "I accept that my digital signature constitutes a legally valid signature under Section 5 of the Information Technology Act, 2000.",
     "I confirm that my mobile number was verified via OTP immediately prior to signing — constituting valid electronic authentication.",
   ];
 
   declarations.forEach((decl, i) => {
     const isAccepted = !!o.signedAt;
-    const bx = M + 3;
-    const by = y + 2;
-    // Checkbox box
-    doc.rect(bx, y, 10, 10).fill(isAccepted ? DG : "#E0E0E0").stroke("#999");
-    if (isAccepted) {
-      doc.fill("white").font("Helvetica-Bold").fontSize(7).text("✓", bx + 1, y + 1);
-    }
-    doc.fill(GREY_DARK).font("Helvetica").fontSize(7.5)
-      .text(`(${i + 1}) ${decl}`, M + 16, y + 1, { width: CW - 16, lineGap: 0.5 });
-    y = doc.y + 7;
+    doc.rect(M + 3, y, 10, 10).fill(isAccepted ? DG : "#E0E0E0").stroke("#999");
+    if (isAccepted) { doc.fill("white").font("Helvetica-Bold").fontSize(7).text("✓", M + 4, y + 1); }
+    doc.fill(GREY_DARK).font("Helvetica").fontSize(7).text(`(${i + 1}) ${decl}`, M + 16, y + 1, { width: CW - 16, lineGap: 0.5 });
+    y = doc.y + 6;
     doc.fill("black");
   });
-
   y += 4;
 
-  // ── Declaration signature line ────────────────────────────────────────────
-  doc.rect(M, y, CW, 30).fill(LG).stroke(DG);
+  doc.rect(M, y, CW, 28).fill(LG).stroke(DG);
   doc.fill(DG).font("Helvetica-Bold").fontSize(7.5)
-    .text("By executing this Agreement digitally (OTP + signature), the Customer/Pilgrim confirms acceptance of all 13 clauses above. This digital execution is valid and enforceable under the Information Technology Act, 2000 (India) and is as binding as a handwritten agreement.", M + 8, y + 5, { width: CW - 16, lineGap: 1 });
+    .text("By executing this Agreement digitally (OTP + digital signature), the Customer/Pilgrim confirms acceptance of all 13 clauses above. This digital execution is valid and enforceable under the Information Technology Act, 2000 and the Indian Contract Act, 1872.", M + 8, y + 8, { width: CW - 16, lineGap: 1 });
   doc.fill("black");
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// PAGE 4 — DIGITAL EXECUTION
+// PAGE 4 — PAYMENT POLICY + REFUND TABLE + MEDICAL + VISA DECLARATION
 // ══════════════════════════════════════════════════════════════════════════════
-function drawPage4(doc: any, o: AgreementPdfOptions, qrBuf: Buffer | null) {
+function drawPage4(doc: any, o: AgreementPdfOptions) {
   let y = CONTENT_Y + 2;
 
-  y = secBar(doc, y, "DIGITAL EXECUTION & SIGNATURES");
+  // ── Payment Policy ────────────────────────────────────────────────────────
+  y = secBar(doc, y, "PAYMENT POLICY & SCHEDULE");
+
+  const payColW = [CW * 0.44, CW * 0.28, CW * 0.28];
+  y = tableRow(doc, y, ["Payment Stage", "Amount / %", "Due Date"], payColW, true);
+  [
+    ["Booking Confirmation (Registration)", "50% of package amount", "At time of booking"],
+    ["Final Payment", "Balance 50%", "50 days before departure"],
+    ["Visa Fee (GOI rates, non-refundable)", "Actuals as communicated", "On demand"],
+  ].forEach(([a, b, c], i) => {
+    y = tableRow(doc, y, [a, b, c], payColW, false, i % 2 === 0);
+  });
+  y += 6;
+
+  doc.rect(M, y, CW, 40).fill(GOLD_LITE).stroke(GOLD);
+  doc.fill("#7B4700").font("Helvetica-Bold").fontSize(7.5).text("IMPORTANT PAYMENT CONDITIONS", M + 8, y + 5);
+  doc.fill("#7B4700").font("Helvetica").fontSize(7)
+    .text(
+      "• Hajj visa processing will NOT begin until full package payment is received.\n" +
+      "• Air tickets will NOT be issued until full payment is received.\n" +
+      "• Official receipt mandatory for every payment. Payments to unauthorized persons will not be recognized.\n" +
+      "• Accepted modes: Razorpay (online), NEFT/IMPS (bank transfer), Cash (with official receipt only).",
+      M + 8, y + 17, { width: CW - 16, lineGap: 1 });
+  doc.fill("black");
+  y += 46;
+
+  // ── Refund Policy ─────────────────────────────────────────────────────────
+  y = secBar(doc, y, "CANCELLATION & REFUND POLICY");
+
+  const canColW = [CW * 0.34, CW * 0.20, CW * 0.20, CW * 0.26];
+  y = tableRow(doc, y, ["Cancellation Period", "Deduction", "Refund", "Notes"], canColW, true);
+  [
+    ["More than 90 days before departure", "10%",  "90%", "Admin charges apply"],
+    ["60 to 89 days before departure",     "25%",  "75%", "Non-refundable fees extra"],
+    ["30 to 59 days before departure",     "50%",  "50%", "Airline charges extra"],
+    ["15 to 29 days before departure",     "75%",  "25%", "Hotel charges extra"],
+    ["Less than 15 days / After departure","100%", "NIL", "No refund applicable"],
+    ["No Show",                            "100%", "NIL", "No refund applicable"],
+    ["Visa Rejection (Saudi Authority)",   "Visa cost", "Balance less charges", "Processing fees retained"],
+    ["Govt. Cancellation / Force Majeure", "Recoverable only", "Subject to recovery", "Best effort basis"],
+    ["Airline Cancellation",               "Airline policy", "Per airline T&C", "Agency assists recovery"],
+    ["Customer Health Emergency",          "Case by case", "Partial at discretion", "Documentation required"],
+  ].forEach(([a, b, c, d], i) => {
+    y = tableRow(doc, y, [a, b, c, d], canColW, false, i % 2 === 0);
+  });
+  y += 5;
+
+  doc.rect(M, y, CW, 30).fill("#FFF3CD").stroke(GOLD);
+  doc.fill("#7B4700").font("Helvetica-Bold").fontSize(7).text("DEDUCTIONS MAY INCLUDE:", M + 8, y + 5);
+  doc.fill("#7B4700").font("Helvetica").fontSize(7)
+    .text("GST & TCS (non-recoverable)  •  Visa processing fees  •  Airline cancellation charges  •  Hotel retention fees  •  Government levies  •  Administrative charges. " +
+      "All refunds processed within 30 working days via original payment method. Written cancellation mandatory (email/letter).", M + 8, y + 15, { width: CW - 16 });
+  doc.fill("black");
+  y += 36;
+
+  // ── Medical Declaration ────────────────────────────────────────────────────
+  y = secBar(doc, y, "MEDICAL DECLARATION");
+
+  const medDecls = [
+    "I declare that I am physically fit and able to undertake all Hajj rites, including extensive walking (average 15–20 km per day during Hajj days).",
+    "I have disclosed all existing medical conditions, chronic illnesses, and disabilities to Al Burhan Tours & Travels at the time of booking.",
+    "I carry all required personal medications and understand that medical expenses during the journey are my personal responsibility.",
+    "I have completed all mandatory vaccinations as required by Saudi Arabian authorities (ACWY Meningococcal, COVID-19 booster, and any other notified vaccines).",
+    "I have obtained and carry my International Vaccination Certificate (Yellow Booklet) and will present it to Saudi authorities on demand.",
+    "I understand that pilgrims above 65 years of age or with serious health conditions may require a medical fitness certificate from a registered physician.",
+  ];
+  medDecls.forEach((decl, i) => {
+    const isAccepted = !!o.signedAt;
+    doc.rect(M + 3, y, 9, 9).fill(isAccepted ? DG : "#E0E0E0").stroke("#999");
+    if (isAccepted) { doc.fill("white").font("Helvetica-Bold").fontSize(6).text("✓", M + 4, y + 1); }
+    doc.fill(GREY_DARK).font("Helvetica").fontSize(7).text(decl, M + 16, y + 1, { width: CW - 16, lineGap: 0.5 });
+    y = doc.y + 5;
+    doc.fill("black");
+  });
+  y += 4;
+
+  // ── Visa Declaration ───────────────────────────────────────────────────────
+  y = secBar(doc, y, "VISA & PASSPORT DECLARATION");
+
+  const visaDecls = [
+    "My passport is valid for at least 6 months beyond the return date of this Hajj package and is in good condition (no tears or damage).",
+    "All documents submitted for Hajj visa and registration are genuine, accurate, and complete. I accept full legal responsibility for any false documents.",
+    "I understand that Saudi Hajj visa issuance is solely at the discretion of Saudi authorities. Al Burhan Tours & Travels cannot guarantee visa approval.",
+    "I will cooperate fully with visa processing requirements including biometrics, interviews, and any additional documentation as requested.",
+  ];
+  visaDecls.forEach((decl, i) => {
+    const isAccepted = !!o.signedAt;
+    doc.rect(M + 3, y, 9, 9).fill(isAccepted ? DG : "#E0E0E0").stroke("#999");
+    if (isAccepted) { doc.fill("white").font("Helvetica-Bold").fontSize(6).text("✓", M + 4, y + 1); }
+    doc.fill(GREY_DARK).font("Helvetica").fontSize(7).text(decl, M + 16, y + 1, { width: CW - 16, lineGap: 0.5 });
+    y = doc.y + 5;
+    doc.fill("black");
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PAGE 5 — DIGITAL CONSENT + OTP + SIGNATURE + AUDIT TRAIL
+// ══════════════════════════════════════════════════════════════════════════════
+function drawPage5(doc: any, o: AgreementPdfOptions, qrBuf: Buffer | null) {
+  let y = CONTENT_Y + 2;
+
+  // ── Digital Consent ───────────────────────────────────────────────────────
+  y = secBar(doc, y, "DIGITAL CONSENT — INDIVIDUAL ACCEPTANCE REQUIRED");
+
+  CONSENT_CATEGORIES.forEach((cat) => {
+    const isAccepted = o.termsAccepted ? !!o.termsAccepted[cat.id] : (!!o.signedAt);
+    doc.rect(M, y, CW, 26).fill(isAccepted ? LG : (o.signedAt ? RED_SOFT : GREY_LITE)).stroke(isAccepted ? DG : "#CCC");
+    doc.rect(M, y, 9, 9).fill(isAccepted ? DG : "#DDD").stroke("#999");
+    if (isAccepted) { doc.fill("white").font("Helvetica-Bold").fontSize(6).text("✓", M + 1, y + 1); }
+    doc.fill(DG).font("Helvetica-Bold").fontSize(7.5).text(cat.title, M + 13, y + 1, { width: CW - 13 });
+    doc.fill(GREY_DARK).font("Helvetica").fontSize(6.5).text(cat.body, M + 13, y + 12, { width: CW - 13, lineGap: 0.3 });
+    doc.fill("black");
+    y += 30;
+  });
+  y += 4;
+
+  // ── Consent Metadata ─────────────────────────────────────────────────────
+  if (o.signedAt) {
+    doc.rect(M, y, CW, 22).fill(GREY_LITE).stroke("#DDD");
+    doc.fill(DG).font("Helvetica-Bold").fontSize(7).text("CONSENT RECORDED AT:", M + 8, y + 5);
+    const meta = [
+      `Date & Time: ${o.signedAt.toLocaleString("en-IN")}`,
+      `IP Address: ${fmt(o.signedIp)}`,
+      `Browser: ${fmt(o.signingBrowser || (o.userAgent || "").substring(0, 40))}`,
+      `Device: ${fmt(o.signingDevice)}`,
+      `OS: ${fmt(o.signingOS)}`,
+      `GPS: ${fmt(o.signingGPS, "Not captured")}`,
+    ].join("  |  ");
+    doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text(meta, M + 8, y + 14, { width: CW - 16, ellipsis: true });
+    doc.fill("black");
+    y += 26;
+  }
+
+  // ── OTP Verification ─────────────────────────────────────────────────────
+  y = secBar(doc, y, "OTP MOBILE VERIFICATION");
+
+  const otpOk = o.otpVerified;
+  doc.rect(M, y, CW, 30).fill(otpOk ? LG : RED_SOFT).stroke(otpOk ? DG : "#CC0000");
+  doc.fill(otpOk ? DG : "#CC0000").font("Helvetica-Bold").fontSize(11)
+    .text(otpOk ? "✓  OTP MOBILE VERIFICATION CONFIRMED" : "✗  OTP MOBILE VERIFICATION PENDING", M + 10, y + 5, { width: CW - 20 });
+  doc.fill(GREY_MID).font("Helvetica").fontSize(7.5)
+    .text(`Mobile: ${o.customerMobile}  |  Verified at: ${o.otpVerifiedAt ? o.otpVerifiedAt.toLocaleString("en-IN") : "—"}  |  Method: SMS OTP (6-digit)`, M + 10, y + 19, { width: CW - 20 });
+  doc.fill("black");
+  y += 36;
+
+  // ── Digital Signatures ────────────────────────────────────────────────────
+  y = secBar(doc, y, "DIGITAL SIGNATURES & EXECUTION");
 
   if (o.signedAt && o.signatureData) {
-    // ── Signature panels ────────────────────────────────────────────────────
-    const panH = 110;
-
+    const panH = 100;
     // Customer signature
     doc.rect(M, y, COL_HALF, panH).fill("#FAFFFE").stroke(DG);
-    doc.fill(DG).font("Helvetica-Bold").fontSize(8).text("CUSTOMER / PILGRIM DIGITAL SIGNATURE", M + 8, y + 7);
+    doc.fill(DG).font("Helvetica-Bold").fontSize(7.5).text("CUSTOMER / PILGRIM SIGNATURE", M + 8, y + 6);
     try {
       const sigBuf = Buffer.from(o.signatureData.replace(/^data:image\/\w+;base64,/, ""), "base64");
-      doc.image(sigBuf, M + 8, y + 22, { width: COL_HALF - 18, height: 58, fit: [COL_HALF - 18, 58] });
+      doc.image(sigBuf, M + 8, y + 20, { width: COL_HALF - 18, height: 50, fit: [COL_HALF - 18, 50] });
     } catch {}
-    doc.fill(DG).font("Helvetica-Bold").fontSize(7.5).text(fmt(o.customerName), M + 8, y + 86);
-    doc.fill(GREY_MID).font("Helvetica").fontSize(7)
-      .text(o.signedAt.toLocaleString("en-IN"), M + 8, y + 98);
+    doc.fill(DG).font("Helvetica-Bold").fontSize(7).text(fmt(o.customerName), M + 8, y + 76);
+    doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text(o.signedAt.toLocaleString("en-IN"), M + 8, y + 88);
     doc.fill("black");
 
-    // Agency authorisation
+    // Agency seal
     const col2X = M + COL_HALF + 8;
     doc.rect(col2X, y, COL_HALF, panH).fill(GOLD_LITE).stroke(GOLD);
-    doc.fill("#7B4700").font("Helvetica-Bold").fontSize(8).text("AGENCY AUTHORISATION", col2X + 8, y + 7);
-    // Agency seal placeholder
-    doc.circle(col2X + COL_HALF / 2, y + 55, 30).fill("#E8D8A0").stroke(GOLD);
-    doc.fill("#7B4700").font("Helvetica-Bold").fontSize(6.5).text("AL BURHAN\nTOURS & TRAVELS\nOFFICIAL SEAL", col2X + COL_HALF / 2 - 28, y + 43, { width: 56, align: "center" });
-    doc.fill("#7B4700").font("Helvetica").fontSize(7).text("Authorised Signatory", col2X + 8, y + 92);
-    doc.fill(GREY_MID).font("Helvetica").fontSize(7).text("Al Burhan Tours & Travels", col2X + 8, y + 102);
+    doc.fill("#7B4700").font("Helvetica-Bold").fontSize(7.5).text("AGENCY AUTHORISATION & SEAL", col2X + 8, y + 6);
+    doc.circle(col2X + COL_HALF / 2, y + 54, 28).fill("#E8D8A0").stroke(GOLD);
+    doc.fill("#7B4700").font("Helvetica-Bold").fontSize(6)
+      .text("AL BURHAN\nTOURS & TRAVELS\nOFFICIAL SEAL", col2X + COL_HALF / 2 - 26, y + 43, { width: 52, align: "center" });
+    doc.fill("#7B4700").font("Helvetica").fontSize(6.5).text("Authorised Signatory", col2X + 8, y + 86);
+    doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Al Burhan Tours & Travels, Burhanpur M.P.", col2X + 8, y + 95);
     doc.fill("black");
-
-    y += panH + 10;
-
-    // OTP verification strip
-    const otpOk = o.otpVerified;
-    doc.rect(M, y, CW, 22).fill(otpOk ? "#E8F5E9" : "#FFF0F0").stroke(otpOk ? DG : "#CC0000");
-    doc.fill(otpOk ? DG : "#CC0000").font("Helvetica-Bold").fontSize(9)
-      .text(otpOk ? "✓  OTP MOBILE VERIFICATION CONFIRMED" : "✗  OTP MOBILE VERIFICATION PENDING", M + 10, y + 6, { continued: true });
-    doc.fill(GREY_MID).font("Helvetica").fontSize(7.5)
-      .text(`  |  Mobile: ${o.customerMobile}  |  Verified at: ${o.otpVerifiedAt ? o.otpVerifiedAt.toLocaleString("en-IN") : "—"}`, { continued: false });
-    doc.fill("black");
-    y += 28;
-
+    y += panH + 8;
   } else {
-    // Unsigned state
     doc.rect(M, y, CW, 50).fill(GOLD_LITE).stroke(GOLD);
     doc.fill("#7B4700").font("Helvetica-Bold").fontSize(10).text("⏳  AWAITING DIGITAL SIGNATURE", M + 10, y + 10, { width: CW - 20 });
-    doc.fill("#7B4700").font("Helvetica-Oblique").fontSize(8.5)
-      .text("This agreement has been sent to the customer for digital signing. Signature, OTP verification, and audit details will appear here once executed.", M + 10, y + 26, { width: CW - 20 });
+    doc.fill("#7B4700").font("Helvetica-Oblique").fontSize(8)
+      .text("This agreement has been sent to the customer for digital signing. Signature and audit details will appear here once executed.", M + 10, y + 28, { width: CW - 20 });
     doc.fill("black");
     y += 58;
   }
 
-  // ── QR Verification ───────────────────────────────────────────────────────
-  y = secBar(doc, y, "QR VERIFICATION CODE");
-
-  if (qrBuf) {
-    const qrSize = 80;
-    try { doc.image(qrBuf, M, y, { width: qrSize, height: qrSize }); } catch {}
-    const qrTx = M + qrSize + 12;
-    doc.fill(DG).font("Helvetica-Bold").fontSize(10).text("Scan to Verify This Agreement", qrTx, y + 6, { width: CW - qrSize - 12 });
-    doc.fill(GREY_MID).font("Helvetica").fontSize(8)
-      .text(`Agreement: ${o.agreementNumber}\nBooking: ${o.bookingNumber}\nCustomer: ${o.customerName}\nStatus: ${(o.status || "PENDING").toUpperCase().replace(/_/g," ")}`, qrTx, y + 24, { lineGap: 2 });
-    doc.fill("#888").font("Helvetica").fontSize(7)
-      .text(`URL: ${o.verificationUrl || "—"}`, qrTx, y + 68, { width: CW - qrSize - 12, ellipsis: true });
-    y += qrSize + 10;
-  } else {
-    y += 10;
-  }
-
-  // ── Audit Trail ───────────────────────────────────────────────────────────
+  // ── Legal Audit Trail ─────────────────────────────────────────────────────
   y = secBar(doc, y, "LEGAL AUDIT TRAIL");
 
+  const auditColW = [CW * 0.27, CW * 0.43, CW * 0.30];
+  y = tableRow(doc, y, ["Event", "Details", "Timestamp"], auditColW, true);
+
+  const auditRows: [string, string, string][] = [
+    ["Agreement Generated", o.agreementNumber, fmtDate(o.agreementDate)],
+    ["OTP Requested", `Mobile: ${o.customerMobile}`, o.otpVerifiedAt ? fmtDate(o.otpVerifiedAt) : "—"],
+    ["OTP Verified", o.otpVerified ? "✓ Mobile ownership confirmed via SMS OTP" : "Pending verification", o.otpVerifiedAt ? o.otpVerifiedAt.toLocaleString("en-IN") : "—"],
+  ];
+
   if (o.signedAt) {
-    const auditRows = [
-      ["Event",                     "Details",                                              "Timestamp"],
-      ["Agreement Generated",       o.agreementNumber,                                      fmtDate(o.agreementDate)],
-      ["OTP Requested",             `Mobile: ${o.customerMobile}`,                          o.otpVerifiedAt ? fmtDate(o.otpVerifiedAt) : "—"],
-      ["OTP Verified",              o.otpVerified ? "✓ Mobile ownership confirmed via SMS" : "Not verified", o.otpVerifiedAt ? o.otpVerifiedAt.toLocaleString("en-IN") : "—"],
-      ["Agreement Signed",          `IP: ${o.signedIp || "Recorded"}`,                      o.signedAt.toLocaleString("en-IN")],
-      ["Device / Platform",         (o.deviceInfo || (o.userAgent || "").substring(0, 60)).substring(0, 70), "—"],
-    ];
-    const auditColW = [CW * 0.28, CW * 0.45, CW * 0.27];
-    auditRows.forEach((row, i) => {
-      y = tableRow(doc, y, row, auditColW, i === 0, i % 2 === 0);
-    });
-    y += 8;
-  } else {
-    doc.fill("#AAA").font("Helvetica-Oblique").fontSize(8)
-      .text("Audit trail will be recorded upon signature completion.", M, y + 4);
-    y += 18;
+    auditRows.push(
+      ["Agreement Signed", `IP: ${fmt(o.signedIp)} | 9 consent categories accepted`, o.signedAt.toLocaleString("en-IN")],
+      ["PDF Generated", `Agreement-${o.agreementNumber}.pdf`, o.signedAt.toLocaleString("en-IN")],
+    );
+    if (o.digitalHash) {
+      auditRows.push(["SHA-256 Hash", o.digitalHash.substring(0, 50) + "…", "—"]);
+    }
   }
 
+  // Add any additional audit entries passed in
+  if (o.auditActions) {
+    o.auditActions.slice(0, 3).forEach(a => {
+      auditRows.push([a.action.replace(/_/g, " ").toUpperCase(), JSON.stringify(a.details).substring(0, 50), fmtDate(a.created_at)]);
+    });
+  }
+
+  auditRows.forEach(([ev, det, ts], i) => {
+    y = tableRow(doc, y, [ev, det, ts], auditColW, false, i % 2 === 0);
+  });
+  y += 8;
+
+  // Force Majeure note
+  doc.rect(M, y, CW, 44).fill(GREY_LITE).stroke("#DDD");
+  doc.fill(DG).font("Helvetica-Bold").fontSize(7.5).text("FORCE MAJEURE NOTICE", M + 8, y + 5);
+  doc.fill(GREY_DARK).font("Helvetica").fontSize(6.8)
+    .text("Al Burhan Tours & Travels shall not be liable for delays or losses arising from: War • Pandemic or Epidemic • Natural Disaster • Flood • Earthquake • Political Disturbance • Civil Unrest • Government Restrictions • Saudi Ministry Decisions • Visa Suspension • Airport Closure • Airline Bankruptcy or Cancellation • Flight Delay • Missed Connection • Air Traffic Restrictions • Technical Problems • Weather • Lockdowns • Immigration or Customs Delays. " +
+      "The company will provide reasonable assistance wherever possible but accepts no liability for circumstances beyond its control.",
+      M + 8, y + 16, { width: CW - 16, lineGap: 0.8 });
+  doc.fill("black");
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PAGE 6 — BAGGAGE + AIRLINE DISCLAIMER + COMPANY ASSISTANCE + DIGITAL EXECUTION
+// ══════════════════════════════════════════════════════════════════════════════
+function drawPage6(doc: any, o: AgreementPdfOptions, qrBuf: Buffer | null) {
+  let y = CONTENT_Y + 2;
+
+  // ── Baggage Policy ────────────────────────────────────────────────────────
+  y = secBar(doc, y, "BAGGAGE POLICY");
+
+  const bagLeft = COL_HALF;
+  const bagRight = CW - COL_HALF - 8;
+
+  doc.rect(M, y, bagLeft, 82).fill(LG).stroke(DG);
+  doc.fill(DG).font("Helvetica-Bold").fontSize(7.5).text("STANDARD ALLOWANCE", M + 8, y + 6);
+  y = bullet(doc, M + 8, y + 18, bagLeft - 16, "Checked Baggage: Up to 25 KG per airline policy", DG);
+  y = bullet(doc, M + 8, y, bagLeft - 16, "Zamzam Water: 5 Litres (if permitted by airline & Saudi regulations)", DG);
+  y = bullet(doc, M + 8, y, bagLeft - 16, "Cabin Baggage: As per airline policy (typically 7 KG)", DG);
+  y = bullet(doc, M + 8, y, bagLeft - 16, "Airlines: Air India • Akasa Air • IndiGo • Saudi Airlines • Flynas • Flyadeal • Oman Air • Gulf Air • Air Arabia", DG);
+  const bagRightX = M + bagLeft + 8;
+  let bagRY = CONTENT_Y + 2 + 24;
+  doc.rect(bagRightX, bagRY, bagRight, 82).fill(GOLD_LITE).stroke(GOLD);
+  doc.fill("#7B4700").font("Helvetica-Bold").fontSize(7.5).text("BAGGAGE DISCLAIMER", bagRightX + 8, bagRY + 6);
+  bagRY += 18;
+  const bagDisc = ["Lost, delayed, damaged or missing baggage", "Excess baggage charges", "Customs or security confiscation", "Theft or airline mishandling", "Any baggage handling issues"];
+  bagDisc.forEach(item => {
+    doc.fill("#CC0000").font("Helvetica-Bold").fontSize(7).text("✗", bagRightX + 8, bagRY, { width: 10 });
+    doc.fill("#7B4700").font("Helvetica").fontSize(7).text(item, bagRightX + 20, bagRY, { width: bagRight - 28 });
+    bagRY += 12;
+  });
+  doc.fill("black");
+  y = Math.max(y, bagRY) + 6;
+
+  // Carry-in note
+  doc.rect(M, y, CW, 18).fill(GREY_LITE).stroke("#DDD");
+  doc.fill(DG).font("Helvetica-Bold").fontSize(7).text("IMPORTANT:", M + 8, y + 5, { continued: true });
+  doc.fill(GREY_DARK).font("Helvetica").fontSize(7)
+    .text("  Carry passport, cash, jewellery, medicines, mobile, electronics, and important documents in CABIN BAGGAGE.", { continued: false });
+  doc.fill("black");
+  y += 22;
+
+  // ── Airline Disclaimer ─────────────────────────────────────────────────────
+  y = secBar(doc, y, "AIRLINE DISCLAIMER");
+
+  doc.rect(M, y, CW, 76).fill(GREY_LITE).stroke("#DDD");
+  doc.fill(GREY_DARK).font("Helvetica").fontSize(7.5)
+    .text("Flights are operated by the respective airlines. Al Burhan Tours & Travels acts solely as a travel organizer and is NOT responsible for:", M + 10, y + 8, { width: CW - 20 });
+  const airDisc = [
+    ["Flight Delay or Cancellation", "Flight Diversion or Re-routing"],
+    ["Missed Connections", "Seat Changes or Downgrades"],
+    ["Schedule Changes", "Boarding Denial"],
+    ["Airport Congestion", "Immigration or Customs Delays"],
+    ["Airline Operational Decisions", "Technical or Weather-Related Issues"],
+  ];
+  let ady = y + 22;
+  airDisc.forEach(([a, b]) => {
+    doc.fill("#CC0000").font("Helvetica-Bold").fontSize(7).text("✗", M + 10, ady, { width: 10 });
+    doc.fill(GREY_DARK).font("Helvetica").fontSize(7).text(a, M + 22, ady, { width: COL_HALF - 22 });
+    doc.fill("#CC0000").font("Helvetica-Bold").fontSize(7).text("✗", M + COL_HALF + 20, ady, { width: 10 });
+    doc.fill(GREY_DARK).font("Helvetica").fontSize(7).text(b, M + COL_HALF + 32, ady, { width: COL_HALF - 22 });
+    ady += 11;
+  });
+  doc.fill("black");
+  y += 82;
+
+  // ── Company Assistance ────────────────────────────────────────────────────
+  y = secBar(doc, y, "COMPANY ASSISTANCE COMMITMENT");
+
+  doc.rect(M, y, CW, 58).fill(LG).stroke(DG);
+  doc.fill(DG).font("Helvetica-Bold").fontSize(7.5)
+    .text("Al Burhan Tours & Travels will make every reasonable effort to assist pilgrims with:", M + 10, y + 6, { width: CW - 20 });
+  const assist = [
+    ["Airline Coordination & Communication", "Lost Baggage Reporting Assistance"],
+    ["Flight Rescheduling Assistance", "Hotel Coordination During Disruptions"],
+    ["Medical Referral to Local Facilities", "Emergency Assistance (24/7 during journey)"],
+    ["Communication with Airlines & Authorities", "Guidance During Unexpected Situations"],
+  ];
+  let asY = y + 18;
+  assist.forEach(([a, b]) => {
+    doc.fill(DG).font("Helvetica-Bold").fontSize(7).text("✓", M + 10, asY, { width: 10 });
+    doc.fill(DG).font("Helvetica").fontSize(7).text(a, M + 22, asY, { width: COL_HALF - 22 });
+    doc.fill(DG).font("Helvetica-Bold").fontSize(7).text("✓", M + COL_HALF + 20, asY, { width: 10 });
+    doc.fill(DG).font("Helvetica").fontSize(7).text(b, M + COL_HALF + 32, asY, { width: COL_HALF - 22 });
+    asY += 11;
+  });
+  doc.fill(GREY_MID).font("Helvetica-Oblique").fontSize(6.5)
+    .text("This assistance does not create liability for matters beyond the company's control.", M + 10, asY, { width: CW - 20 });
+  doc.fill("black");
+  y += 64;
+
+  // ── Digital Execution ─────────────────────────────────────────────────────
+  y = secBar(doc, y, "DIGITAL EXECUTION & VERIFICATION");
+
+  const execH = 80;
+  doc.rect(M, y, CW, execH).fill(GOLD_LITE).stroke(GOLD);
+
+  // QR code
+  if (qrBuf) {
+    const qrSize = 70;
+    try { doc.image(qrBuf, M + CW - qrSize - 4, y + 4, { width: qrSize, height: qrSize }); } catch {}
+  }
+
+  const execW = CW - 82;
+  doc.fill(DG).font("Helvetica-Bold").fontSize(10).text("SCAN TO VERIFY THIS AGREEMENT", M + 10, y + 6, { width: execW });
+  doc.fill(GREY_DARK).font("Helvetica").fontSize(7.5)
+    .text(`Agreement: ${o.agreementNumber}`, M + 10, y + 22);
+  doc.fill(GREY_DARK).font("Helvetica").fontSize(7.5)
+    .text(`Booking: ${o.bookingNumber}  |  Status: ${(o.status || "PENDING").toUpperCase().replace(/_/g, " ")}`, M + 10, y + 34);
+  doc.fill(GREY_DARK).font("Helvetica").fontSize(7.5)
+    .text(`Customer: ${o.customerName}`, M + 10, y + 46);
+  if (o.digitalHash) {
+    doc.fill(GREY_MID).font("Helvetica").fontSize(6).text(`SHA-256: ${o.digitalHash.substring(0, 48)}…`, M + 10, y + 58, { width: execW });
+  }
+  doc.fill(GREY_MID).font("Helvetica").fontSize(6.5)
+    .text(`URL: ${o.verificationUrl || "—"}`, M + 10, y + 70, { width: execW, ellipsis: true });
+  doc.fill("black");
+  y += execH + 8;
+
   // ── Legal footer statement ────────────────────────────────────────────────
-  doc.rect(M, y, CW, 2).fill(GOLD); y += 6;
-  doc.fill(GREY_MID).font("Helvetica-Oblique").fontSize(6.8)
+  doc.rect(M, y, CW, 2).fill(GOLD); y += 5;
+  doc.fill(GREY_MID).font("Helvetica-Oblique").fontSize(6.5)
     .text(
-      "This document constitutes a legally binding agreement executed by way of digital/electronic signature under Section 5 read with Schedule I of the Information Technology Act, 2000 (India), and the Indian Contract Act, 1872. " +
-      "The digital signature affixed herein is as valid and enforceable as a wet-ink signature. Any unauthorised alteration of this document is an offence under applicable law. " +
-      "This agreement was generated by the Al Burhan Tours & Travels automated agreement system and carries the full legal authority of the Agency.",
+      "This document constitutes a legally binding agreement executed by digital/electronic signature under Section 5 read with Schedule I of the Information Technology Act, 2000 (India), and the Indian Contract Act, 1872. " +
+      "The digital signature is as valid and enforceable as a wet-ink signature. Any unauthorised alteration of this document is an offence under applicable law. " +
+      "Generated by Al Burhan Tours & Travels automated agreement system — Revision " + (o.digitalHash ? `${o.digitalHash.substring(0, 8)}` : "1"),
       M, y, { width: CW, lineGap: 1.5 }
     );
   doc.fill("black");
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// MAIN EXPORT
+// MAIN EXPORT — 6-PAGE PREMIUM AGREEMENT
 // ══════════════════════════════════════════════════════════════════════════════
 export async function generateAgreementPdfBuffer(opts: AgreementPdfOptions): Promise<Buffer> {
   let qrBuf: Buffer | null = null;
@@ -687,27 +1073,39 @@ export async function generateAgreementPdfBuffer(opts: AgreementPdfOptions): Pro
   const doc = new PDFDocument({ size: "A4", margin: 0, autoFirstPage: true, bufferPages: true });
 
   // Page 1
-  drawHeader(doc, "DIGITAL HAJJ AGREEMENT");
+  drawHeader(doc, "PREMIUM DIGITAL HAJJ AGREEMENT", opts.agreementNumber, opts.bookingNumber);
   drawPage1(doc, opts, qrBuf);
-  drawFooter(doc, 1, 4);
+  drawFooter(doc, 1, 6);
 
   // Page 2
   doc.addPage();
-  drawHeader(doc, "PACKAGE SERVICES & CANCELLATION POLICY");
+  drawHeader(doc, "FLIGHTS, HOTELS, TRANSPORT & PACKAGE SERVICES", opts.agreementNumber, opts.bookingNumber);
   drawPage2(doc, opts);
-  drawFooter(doc, 2, 4);
+  drawFooter(doc, 2, 6);
 
   // Page 3
   doc.addPage();
-  drawHeader(doc, "TERMS & CONDITIONS — CUSTOMER DECLARATION");
+  drawHeader(doc, "LEGAL TERMS & CONDITIONS", opts.agreementNumber, opts.bookingNumber);
   drawPage3(doc, opts);
-  drawFooter(doc, 3, 4);
+  drawFooter(doc, 3, 6);
 
   // Page 4
   doc.addPage();
-  drawHeader(doc, "DIGITAL EXECUTION & AUDIT TRAIL");
-  drawPage4(doc, opts, qrBuf);
-  drawFooter(doc, 4, 4);
+  drawHeader(doc, "PAYMENT POLICY, REFUND SCHEDULE & DECLARATIONS", opts.agreementNumber, opts.bookingNumber);
+  drawPage4(doc, opts);
+  drawFooter(doc, 4, 6);
+
+  // Page 5
+  doc.addPage();
+  drawHeader(doc, "DIGITAL CONSENT, OTP VERIFICATION & SIGNATURES", opts.agreementNumber, opts.bookingNumber);
+  drawPage5(doc, opts, qrBuf);
+  drawFooter(doc, 5, 6);
+
+  // Page 6
+  doc.addPage();
+  drawHeader(doc, "BAGGAGE POLICY, AIRLINE DISCLAIMER & DIGITAL EXECUTION", opts.agreementNumber, opts.bookingNumber);
+  drawPage6(doc, opts, qrBuf);
+  drawFooter(doc, 6, 6);
 
   return pdfToBuffer(doc);
 }

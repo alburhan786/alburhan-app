@@ -1,0 +1,588 @@
+PROJECT NAME
+
+Al Burhan Tours & Travels – Premium Digital Hajj Agreement & Legal Documentation System
+
+OBJECTIVE
+
+Completely redesign the Hajj Agreement module into a Premium 6-Page Digital Agreement with a luxury Islamic design, professional legal formatting, QR verification, OTP verification, digital signatures, audit trail, PDF generation, PNG/JPEG export, WhatsApp sharing, Email sharing, SMS sharing, and full backend integration.
+
+The agreement should automatically generate from booking data and replace the existing agreement.
+
+The agreement must be legally structured, easy to understand, mobile-friendly, print-ready, and suitable for Hajj, Umrah, Ziyarat, Iraq, Syria, Jordan, and Baitul Muqaddas packages.
+
+⸻
+
+DESIGN
+
+Theme
+
+* Premium Islamic Luxury
+* Dark Emerald Green
+* Gold
+* White
+* Light Grey
+
+Use elegant typography.
+
+Every page should contain
+
+* Company Logo
+* Company Name
+* Agreement ID
+* Booking ID
+* QR Verification Code
+* Page Number
+* Digital Security Badge
+* Footer
+* Website
+* Contact Information
+
+⸻
+
+PAGE 1
+
+Customer Information
+
+Automatically populate
+
+* Passport Photo
+* Pilgrim Photo
+* Full Name
+* Father/Husband Name
+* DOB
+* Age
+* Gender
+* Nationality
+* Passport Number
+* Passport Issue Date
+* Passport Expiry
+* Aadhaar Number
+* PAN Number
+* Blood Group
+* Mobile
+* WhatsApp
+* Email
+* Address
+* City
+* State
+* Country
+* Emergency Contact
+* Nominee
+* Relationship
+
+⸻
+
+Package Information
+
+* Package Name
+* Package Type
+* Hajj Year
+* Group Number
+* Booking Date
+* Departure Date
+* Return Date
+* Duration
+* Room Sharing
+* Package Category
+* Booking Status
+
+⸻
+
+Financial Summary
+
+* Package Cost
+* Discount
+* GST
+* TCS
+* Government Charges
+* Visa Charges
+* Total Amount
+* Advance Paid
+* Pending Amount
+* Due Date
+* Payment Status
+
+⸻
+
+Generate
+
+* QR Code
+* Agreement Verification URL
+* Booking Verification URL
+
+⸻
+
+PAGE 2
+
+Flights
+
+* Airline
+* Flight Number
+* Airport
+* Transit
+* Departure
+* Arrival
+* PNR
+* Baggage
+* Cabin Baggage
+
+⸻
+
+Hotels
+
+Makkah
+
+* Hotel Name
+* Category
+* Address
+* Distance from Haram
+* Google Map
+* Check-in
+* Check-out
+
+Madinah
+
+* Hotel Name
+* Category
+* Distance
+* Check-in
+* Check-out
+
+Aziziyah
+
+* Hotel Name
+* Distance
+* Check-in
+* Check-out
+
+Mina
+
+* Tent Category
+* Tent Number
+* Maktab Number
+* New Mina Zone
+
+⸻
+
+Transportation
+
+* Airport Transfer
+* Bus
+* Guide
+* Internal Transport
+
+⸻
+
+PACKAGE INCLUDES
+
+* Return Economy Air Ticket.
+* Hajj Visa Processing Assistance.
+* Airport Assistance in India and Saudi Arabia.
+* Complete Accommodation.
+* 10 Days Accommodation in Aziziyah (approximately 5 km from Masjid Al Haram) before Hajj.
+* 5 Days Accommodation in Mina, Arafat and Muzdalifah during Hajj.
+* Total stay approximately 15 days (subject to Saudi Government schedule).
+* Breakfast.
+* Lunch.
+* Dinner.
+* Tea (where officially provided).
+* Complete Hajj Guidance.
+* Experienced Tour Manager.
+* Religious Guide.
+* Hajj Orientation Programme.
+* Hajj Travel Kit.
+* ID Card.
+* Luggage Tag.
+* Emergency Assistance.
+* Internal Hajj Transportation as officially arranged.
+* Assistance throughout the journey.
+
+⸻
+
+PACKAGE EXCLUSIONS
+
+* Transportation between Aziziyah and Masjid Al Haram before Hajj.
+* Transportation for Tawaf-e-Ziyarat.
+* Laundry.
+* Medical Expenses.
+* Personal Shopping.
+* International Calls.
+* Insurance unless specifically included.
+* Extra Meals.
+* Extra Baggage Charges.
+* Room Upgrades.
+* Any service not specifically mentioned.
+
+⸻
+
+ACCOMMODATION POLICY
+
+* Aziziyah accommodation approximately 5 km from Haram.
+* During Hajj accommodation in New Mina Zone.
+* Mina Category D (Non-AC Tent) or as allocated by Saudi Authorities.
+* Makkah and Madinah accommodation on 5-bed sharing basis.
+* Pilgrims requesting 3-sharing, 2-sharing, or Single Room must pay additional charges.
+* Room upgrade is subject to availability.
+* Once room allocation is completed, no room changes will be allowed except in exceptional circumstances approved by Al Burhan Tours & Travels.
+* Hotels may be changed with equivalent or higher category due to Saudi Government allocation or operational reasons.
+
+⸻
+
+PAGE 3
+
+LEGAL TERMS & CONDITIONS
+
+Create professional legal wording covering:
+
+* Booking Policy
+* Payment Policy
+* Passport Requirements
+* Visa Processing
+* Saudi Government Regulations
+* Indian Government Regulations
+* Health Requirements
+* Vaccination
+* Customer Responsibilities
+* Agency Responsibilities
+* Hotel Changes
+* Flight Changes
+* Airline Policy
+* Group Discipline
+* Personal Belongings
+* Lost Passport
+* Medical Emergency
+* Force Majeure
+* Privacy Policy
+* Data Protection
+* Digital Signature Validity
+* Electronic Records
+* No Verbal Promise Clause
+* Fraud Clause
+* False Information Clause
+* Entire Agreement
+* Arbitration
+* Jurisdiction
+* Legal Compliance
+
+⸻
+
+PAGE 4
+
+PAYMENT POLICY
+
+Booking
+
+* 50% Advance Payment at Booking.
+* Remaining 50% must be paid 50 days before departure.
+* Visa processing will not begin until full payment is received.
+* Tickets will not be issued until full payment is received.
+* Official Receipt mandatory.
+
+⸻
+
+REFUND POLICY
+
+Create a professional refund table.
+
+Include
+
+* More than 90 Days
+* 60–89 Days
+* 30–59 Days
+* 15–29 Days
+* Less than 15 Days
+* After Departure
+* No Show
+* Visa Rejection
+* Government Cancellation
+* Airline Cancellation
+
+Mention that deductions may include:
+
+* GST
+* TCS
+* Visa Fees
+* Airline Charges
+* Hotel Charges
+* Government Charges
+* Administrative Charges
+
+⸻
+
+MEDICAL DECLARATION
+
+Customer declares
+
+* Medically fit.
+* Understands Hajj requires extensive walking.
+* Carries required medicines.
+* Has disclosed existing medical conditions.
+* Vaccinations completed as required.
+
+⸻
+
+VISA DECLARATION
+
+* Passport valid.
+* Documents correct.
+* Saudi approval is final.
+* Visa issuance is solely subject to Saudi Authorities.
+
+⸻
+
+PAGE 5
+
+DIGITAL CONSENT
+
+Customer must individually accept checkboxes before signing:
+
+* Terms & Conditions
+* Payment Policy
+* Refund Policy
+* Privacy Policy
+* Medical Declaration
+* Visa Declaration
+* Force Majeure
+* Airline Disclaimer
+* Baggage Policy
+
+Store
+
+* Date
+* Time
+* IP Address
+* Browser
+* Device
+* Operating System
+* GPS (if permitted)
+
+⸻
+
+OTP VERIFICATION
+
+Verify
+
+* Mobile OTP
+* Email OTP
+
+Store complete verification history.
+
+⸻
+
+DIGITAL SIGNATURE
+
+Allow
+
+* Signature
+* Thumb Impression
+* OTP Consent
+
+⸻
+
+AUDIT TRAIL
+
+Record
+
+* Agreement Generated
+* Viewed
+* Downloaded
+* Signed
+* OTP Verified
+* Email Sent
+* WhatsApp Sent
+* SMS Sent
+* Printed
+
+⸻
+
+FORCE MAJEURE
+
+Al Burhan Tours & Travels shall not be liable for delays or losses arising from:
+
+* War
+* Pandemic
+* Epidemic
+* Natural Disaster
+* Flood
+* Earthquake
+* Political Disturbance
+* Civil Unrest
+* Government Restrictions
+* Saudi Ministry Decisions
+* Visa Suspension
+* Airport Closure
+* Airline Bankruptcy
+* Flight Cancellation
+* Flight Delay
+* Missed Flight Connection
+* Air Traffic Restrictions
+* Technical Problems
+* Weather Conditions
+* Lockdowns
+* Immigration Delays
+* Customs Delays
+
+The company will provide reasonable assistance wherever possible but accepts no liability for circumstances beyond its control.
+
+⸻
+
+PAGE 6
+
+BAGGAGE POLICY
+
+Standard baggage allowance is subject to airline policy.
+
+Normally:
+
+* Checked Baggage: Up to 25 KG
+* Zam Zam Water: 5 Litres if permitted by airline and Saudi regulations.
+* Cabin Baggage according to airline policy.
+
+Applicable to airlines including but not limited to:
+
+* Air India
+* Akasa Air
+* IndiGo
+* Saudi Airlines
+* Flynas
+* Flyadeal
+* Oman Air
+* Gulf Air
+* Air Arabia
+
+If airline rules change, the latest airline policy shall apply.
+
+⸻
+
+BAGGAGE DISCLAIMER
+
+Al Burhan Tours & Travels is not responsible for:
+
+* Lost baggage
+* Delayed baggage
+* Damaged baggage
+* Missing baggage
+* Excess baggage charges
+* Customs confiscation
+* Security confiscation
+* Theft
+* Airline baggage handling issues
+
+Pilgrims should carry passports, cash, jewellery, medicines, mobile phones, electronics, and important documents in cabin baggage.
+
+The company will assist in filing airline baggage claims but cannot guarantee recovery or compensation.
+
+⸻
+
+AIRLINE DISCLAIMER
+
+Flights are operated by the respective airlines.
+
+Al Burhan Tours & Travels acts solely as a travel organizer.
+
+The company is not responsible for:
+
+* Flight Delay
+* Flight Cancellation
+* Flight Diversion
+* Missed Connection
+* Seat Changes
+* Schedule Changes
+* Boarding Denial
+* Airport Congestion
+* Immigration Delays
+* Airline Operational Decisions
+
+⸻
+
+COMPANY ASSISTANCE
+
+Al Burhan Tours & Travels will make every reasonable effort to assist pilgrims with:
+
+* Airline Coordination
+* Lost Baggage Reporting
+* Flight Rescheduling Assistance
+* Hotel Coordination
+* Medical Referral
+* Emergency Assistance
+* Communication with Airlines
+* Guidance during unexpected situations
+
+This assistance does not create liability for matters beyond the company’s control.
+
+⸻
+
+DIGITAL EXECUTION
+
+Include
+
+* Customer Signature
+* Thumb Impression
+* Company Digital Signature
+* Company Seal
+* QR Verification
+* SHA-256 Digital Hash
+* Agreement Verification URL
+* Booking Verification URL
+* Audit Trail
+* IP Address
+* Browser
+* Device
+* Timestamp
+* Revision Number
+
+⸻
+
+EXPORT OPTIONS
+
+Automatically generate:
+
+* High Quality PDF (A4)
+* PNG (300 DPI)
+* JPEG (300 DPI)
+
+Support:
+
+* Print
+* Download
+* Email
+* WhatsApp
+* Customer Dashboard
+* Admin Dashboard
+
+⸻
+
+ADMIN FEATURES
+
+* Preview Agreement
+* Edit Before Finalizing
+* Regenerate Agreement
+* Version History
+* Download PDF
+* Download PNG
+* Download JPEG
+* Print
+* Void Agreement
+* Reissue Agreement
+* QR Verification
+* Agreement Search
+* Audit Log Viewer
+
+⸻
+
+CUSTOMER FEATURES
+
+* View Agreement
+* Download PDF
+* Download PNG
+* Download JPEG
+* Print Agreement
+* Verify QR Code
+* Track Agreement Status
+* View Payment Summary
+* View Booking Details
+* View Audit History
+
+⸻
+
+The final agreement must have a premium legal appearance, be professionally written in clear English, fully responsive for desktop and mobile, automatically populated from the booking database, and designed to inspire trust while protecting both the pilgrim and Al Burhan Tours & Travels under applicable Indian and Saudi regulations.

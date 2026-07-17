@@ -3,18 +3,37 @@ import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requireAdmin, requireAuth } from "../lib/auth.js";
 import { sendOtpSMS, sendEmail } from "../lib/notifications.js";
-import { generateAgreementPdfBuffer, HAJJ_AGREEMENT_CLAUSES, AgreementPdfOptions } from "../lib/agreementPdf.js";
+import { generateAgreementPdfBuffer, HAJJ_AGREEMENT_CLAUSES, CONSENT_CATEGORIES, AgreementPdfOptions } from "../lib/agreementPdf.js";
+import { createHash } from "crypto";
+import { spawn } from "child_process";
 import { sendPDFDocument } from "../lib/botbee.js";
 import crypto from "crypto";
 
 const router = Router();
 
-// ── Startup migration — add hotel_info / flight_info if not present ───────────
+// ── Startup migration — ensure all columns exist ──────────────────────────────
 ;(async () => {
   try {
     await pool.query(`ALTER TABLE agreements ADD COLUMN IF NOT EXISTS hotel_info  JSONB`);
     await pool.query(`ALTER TABLE agreements ADD COLUMN IF NOT EXISTS flight_info JSONB`);
-    console.log("[Agreement] hotel_info / flight_info columns ensured");
+    await pool.query(`ALTER TABLE agreements ADD COLUMN IF NOT EXISTS signing_metadata JSONB`);
+    await pool.query(`ALTER TABLE agreements ADD COLUMN IF NOT EXISTS digital_hash TEXT`);
+    await pool.query(`ALTER TABLE agreements ADD COLUMN IF NOT EXISTS revision_number INTEGER DEFAULT 1`);
+    await pool.query(`ALTER TABLE agreements ADD COLUMN IF NOT EXISTS void_at TIMESTAMPTZ`);
+    await pool.query(`ALTER TABLE agreements ADD COLUMN IF NOT EXISTS void_reason TEXT`);
+    console.log("[Agreement] agreements columns ensured");
+    // Extended customer_profiles columns (safe — no-ops if already exist)
+    await pool.query(`ALTER TABLE customer_profiles ADD COLUMN IF NOT EXISTS father_name TEXT`);
+    await pool.query(`ALTER TABLE customer_profiles ADD COLUMN IF NOT EXISTS nationality TEXT`);
+    await pool.query(`ALTER TABLE customer_profiles ADD COLUMN IF NOT EXISTS city TEXT`);
+    await pool.query(`ALTER TABLE customer_profiles ADD COLUMN IF NOT EXISTS state TEXT`);
+    await pool.query(`ALTER TABLE customer_profiles ADD COLUMN IF NOT EXISTS country TEXT DEFAULT 'India'`);
+    await pool.query(`ALTER TABLE customer_profiles ADD COLUMN IF NOT EXISTS passport_issue_date DATE`);
+    await pool.query(`ALTER TABLE customer_profiles ADD COLUMN IF NOT EXISTS passport_expiry DATE`);
+    await pool.query(`ALTER TABLE customer_profiles ADD COLUMN IF NOT EXISTS nominee TEXT`);
+    await pool.query(`ALTER TABLE customer_profiles ADD COLUMN IF NOT EXISTS nominee_relation TEXT`);
+    await pool.query(`ALTER TABLE customer_profiles ADD COLUMN IF NOT EXISTS whatsapp_number TEXT`);
+    console.log("[Agreement] customer_profiles extended columns ensured");
   } catch (e) { console.error("[Agreement] Migration error:", e); }
 })();
 
@@ -45,13 +64,18 @@ async function logAgreementAudit(agreementId: string, action: string, details: a
 
 // ── Enriched SQL query fragment ───────────────────────────────────────────────
 const RICH_SELECT = `
-  SELECT a.*, a.hotel_info, a.flight_info,
+  SELECT a.*, a.hotel_info, a.flight_info, a.signing_metadata, a.digital_hash, a.revision_number,
          b.booking_number, b.customer_name, b.customer_mobile, b.customer_email,
          b.package_name, b.final_amount, b.paid_amount, b.number_of_pilgrims,
-         hg.group_name, hg.departure_date,
+         b.created_at AS booking_date, b.status AS booking_status,
+         hg.group_name, hg.group_number, hg.departure_date, hg.return_date,
          u.name AS user_name, u.email AS user_email,
          u.blood_group, u.emergency_contact_name, u.emergency_contact_mobile,
-         cp.passport_number, cp.date_of_birth, cp.gender, cp.aadhar_number AS aadhaar, cp.pan_number AS pan,
+         cp.passport_number, cp.date_of_birth, cp.gender,
+         cp.aadhar_number AS aadhaar, cp.pan_number AS pan,
+         cp.nationality, cp.father_name, cp.city, cp.state, cp.country,
+         cp.passport_issue_date, cp.passport_expiry,
+         cp.nominee, cp.nominee_relation, cp.whatsapp_number,
          cp.photo_url, cp.aadhar_image_url, cp.pan_image_url, cp.passport_image_url
   FROM agreements a
   LEFT JOIN bookings b  ON b.id  = a.booking_id
@@ -64,53 +88,114 @@ const RICH_SELECT = `
 function buildPdfOpts(ag: any, siteBase: string, override: Partial<AgreementPdfOptions> = {}): AgreementPdfOptions {
   const hi  = (ag.hotel_info  && typeof ag.hotel_info  === "object") ? ag.hotel_info  : {};
   const fi  = (ag.flight_info && typeof ag.flight_info === "object") ? ag.flight_info : {};
+  const sm  = (ag.signing_metadata && typeof ag.signing_metadata === "object") ? ag.signing_metadata : {};
   const totalAmt = Number(ag.final_amount || 0);
   const paidAmt  = Number(ag.paid_amount  || 0);
   return {
-    agreementNumber:       ag.agreement_number,
-    bookingNumber:         ag.booking_number,
-    bookingId:             ag.booking_id,
-    customerName:          ag.customer_name || ag.user_name || "",
-    customerMobile:        ag.customer_mobile || "",
-    customerEmail:         ag.customer_email || ag.user_email || null,
-    customerPassport:      ag.passport_number  || null,
-    customerAadhaar:       ag.aadhaar          || null,
-    customerPan:           ag.pan              || null,
-    customerDob:           ag.date_of_birth    || null,
-    customerBloodGroup:    ag.blood_group       || null,
-    customerGender:        ag.gender            || null,
-    emergencyContactName:  ag.emergency_contact_name   || null,
-    emergencyContactMobile:ag.emergency_contact_mobile || null,
-    packageName:           ag.package_name || null,
-    numberOfPilgrims:      ag.number_of_pilgrims || null,
-    departureDate:         ag.departure_date || null,
-    groupName:             ag.group_name || null,
-    makkahHotel:           hi.makkahHotel  || null,
-    madinahHotel:          hi.madinahHotel || null,
-    hotelCheckIn:          hi.checkIn      || null,
-    hotelCheckOut:         hi.checkOut     || null,
-    roomSharing:           hi.roomSharing  || null,
-    hotelDistance:         hi.distance     || null,
-    airline:               fi.airline      || null,
-    flightNumber:          fi.flightNumber || null,
-    flightDeparture:       fi.departure    || null,
-    flightArrival:         fi.arrival      || null,
-    flightTransit:         fi.transit      || null,
-    baggageAllowance:      fi.baggage      || null,
-    totalAmount:           totalAmt,
-    paidAmount:            paidAmt,
-    balanceAmount:         totalAmt - paidAmt,
-    discountAmount:        Number(ag.discount_amount || 0) || undefined,
-    signatureData:         ag.signature_data || null,
-    signedAt:              ag.signed_at ? new Date(ag.signed_at) : null,
-    signedIp:              ag.signed_ip || null,
-    userAgent:             ag.signed_user_agent || null,
-    otpVerified:           !!ag.otp_verified,
-    otpVerifiedAt:         ag.otp_verified_at ? new Date(ag.otp_verified_at) : null,
-    verificationUrl:       `${siteBase}/verify-agreement/${ag.verification_token}`,
-    termsAccepted:         ag.terms_accepted || undefined,
-    status:                ag.status || "pending_signature",
-    agreementDate:         ag.created_at ? new Date(ag.created_at) : null,
+    agreementNumber:        ag.agreement_number,
+    bookingNumber:          ag.booking_number,
+    bookingId:              ag.booking_id,
+    status:                 ag.status || "pending_signature",
+    agreementDate:          ag.created_at ? new Date(ag.created_at) : null,
+    // Customer KYC
+    customerName:           ag.customer_name || ag.user_name || "",
+    customerFatherName:     ag.father_name || null,
+    customerMobile:         ag.customer_mobile || "",
+    customerWhatsApp:       ag.whatsapp_number || ag.customer_mobile || null,
+    customerEmail:          ag.customer_email || ag.user_email || null,
+    customerPassport:       ag.passport_number || null,
+    passportIssueDate:      ag.passport_issue_date || null,
+    passportExpiry:         ag.passport_expiry || null,
+    customerAadhaar:        ag.aadhaar || null,
+    customerPan:            ag.pan || null,
+    customerDob:            ag.date_of_birth || null,
+    customerGender:         ag.gender || null,
+    customerNationality:    ag.nationality || null,
+    customerBloodGroup:     ag.blood_group || null,
+    customerAddress:        ag.customer_address || null,
+    customerCity:           ag.city || null,
+    customerState:          ag.state || null,
+    customerCountry:        ag.country || null,
+    nominee:                ag.nominee || null,
+    nomineeRelation:        ag.nominee_relation || null,
+    emergencyContactName:   ag.emergency_contact_name || null,
+    emergencyContactMobile: ag.emergency_contact_mobile || null,
+    // Package
+    packageName:            ag.package_name || null,
+    packageType:            hi.packageType || null,
+    packageCategory:        hi.packageCategory || null,
+    hajjYear:               hi.hajjYear || String(new Date(ag.departure_date || Date.now()).getFullYear()),
+    numberOfPilgrims:       ag.number_of_pilgrims || null,
+    bookingDate:            ag.booking_date || null,
+    departureDate:          ag.departure_date || null,
+    returnDate:             ag.return_date || null,
+    duration:               hi.duration || null,
+    groupName:              ag.group_name || null,
+    groupNumber:            ag.group_number || null,
+    maktabNumber:           ag.maktab_number || hi.maktabNumber || null,
+    bookingStatus:          ag.booking_status || null,
+    // Hotels
+    makkahHotel:            hi.makkahHotel || null,
+    makkahCategory:         hi.makkahCategory || null,
+    makkahAddress:          hi.makkahAddress || null,
+    makkahDistance:         hi.makkahDistance || null,
+    makkahCheckIn:          hi.makkahCheckIn || null,
+    makkahCheckOut:         hi.makkahCheckOut || null,
+    madinahHotel:           hi.madinahHotel || null,
+    madinahCategory:        hi.madinahCategory || null,
+    madinahDistance:        hi.madinahDistance || null,
+    madinahCheckIn:         hi.madinahCheckIn || null,
+    madinahCheckOut:        hi.madinahCheckOut || null,
+    aziziyahHotel:          hi.aziziyahHotel || null,
+    aziziyahDistance:       hi.aziziyahDistance || null,
+    aziziyahCheckIn:        hi.aziziyahCheckIn || null,
+    aziziyahCheckOut:       hi.aziziyahCheckOut || null,
+    minaCategory:           hi.minaCategory || null,
+    minaTentNumber:         hi.minaTentNumber || null,
+    minaMaktabNumber:       hi.minaMaktabNumber || null,
+    minaZone:               hi.minaZone || null,
+    roomSharing:            hi.roomSharing || null,
+    // Transport
+    airportTransfer:        hi.airportTransfer || null,
+    busService:             hi.busService || null,
+    guideService:           hi.guideService || null,
+    internalTransport:      hi.internalTransport || null,
+    // Flights
+    airline:                fi.airline || null,
+    flightNumber:           fi.flightNumber || null,
+    flightPnr:              fi.pnr || null,
+    departureAirport:       fi.departureAirport || null,
+    flightDeparture:        fi.departure || null,
+    flightArrival:          fi.arrival || null,
+    flightTransit:          fi.transit || null,
+    baggageAllowance:       fi.baggage || null,
+    cabinBaggage:           fi.cabinBaggage || null,
+    returnFlightNumber:     fi.returnFlightNumber || null,
+    // Financial
+    totalAmount:            totalAmt,
+    paidAmount:             paidAmt,
+    balanceAmount:          totalAmt - paidAmt,
+    discountAmount:         Number(ag.discount_amount || 0) || undefined,
+    gstAmount:              Number(ag.gst_amount || hi.gstAmount || 0) || undefined,
+    tcsAmount:              Number(ag.tcs_amount || hi.tcsAmount || 0) || undefined,
+    govtCharges:            Number(hi.govtCharges || 0) || undefined,
+    visaCharges:            Number(hi.visaCharges || 0) || undefined,
+    dueDate:                hi.dueDate || null,
+    paymentStatus:          paidAmt >= totalAmt && totalAmt > 0 ? "Fully Paid" : paidAmt > 0 ? "Partially Paid" : "Pending",
+    // Signing
+    signatureData:          ag.signature_data || null,
+    signedAt:               ag.signed_at ? new Date(ag.signed_at) : null,
+    signedIp:               ag.signed_ip || null,
+    userAgent:              ag.signed_user_agent || null,
+    signingBrowser:         sm.browser || null,
+    signingDevice:          sm.device || null,
+    signingOS:              sm.os || null,
+    signingGPS:             sm.gps || null,
+    digitalHash:            ag.digital_hash || null,
+    otpVerified:            !!ag.otp_verified,
+    otpVerifiedAt:          ag.otp_verified_at ? new Date(ag.otp_verified_at) : null,
+    verificationUrl:        `${siteBase}/verify-agreement/${ag.verification_token}`,
+    termsAccepted:          ag.terms_accepted || undefined,
     ...override,
   };
 }
@@ -213,7 +298,7 @@ router.get("/my/:id", requireAuth, async (req: any, res) => {
     if (!agRes.rows.length) return res.status(404).json({ error: "Not found" });
     const ag = agRes.rows[0];
     ag.verificationUrl = `${getSiteBase()}/verify-agreement/${ag.verification_token}`;
-    ag.clauses = HAJJ_AGREEMENT_CLAUSES.map(c => ({ id: c.id, title: c.title, body: c.body }));
+    ag.clauses = CONSENT_CATEGORIES.map(c => ({ id: c.id, title: c.title, body: c.body }));
     res.json(ag);
   } catch (err) {
     console.error("[Agreement] My detail error:", err);
@@ -275,10 +360,10 @@ router.post("/my/:id/sign", requireAuth, async (req: any, res) => {
       return res.status(400).json({ error: "OTP has expired. Please request a new one." });
     }
 
-    const requiredClauses = HAJJ_AGREEMENT_CLAUSES.map(c => c.id);
-    const unaccepted = requiredClauses.filter(cid => !termsAccepted[cid]);
+    const requiredConsents = CONSENT_CATEGORIES.map(c => c.id);
+    const unaccepted = requiredConsents.filter(cid => !termsAccepted[cid]);
     if (unaccepted.length > 0) {
-      return res.status(400).json({ error: `Please accept all terms. Missing: ${unaccepted.join(", ")}` });
+      return res.status(400).json({ error: `Please accept all consent categories. Missing: ${unaccepted.join(", ")}` });
     }
 
     const ip        = getClientIp(req);
@@ -287,16 +372,33 @@ router.post("/my/:id/sign", requireAuth, async (req: any, res) => {
     const siteBase  = getSiteBase();
     const verificationUrl = `${siteBase}/verify-agreement/${ag.verification_token}`;
 
+    // Parse browser/device metadata from request body
+    const { signingBrowser, signingDevice, signingOS, signingGPS } = req.body;
+    const signingMetadata = {
+      browser: signingBrowser || null,
+      device:  signingDevice  || null,
+      os:      signingOS      || null,
+      gps:     signingGPS     || null,
+      userAgent: userAgent.substring(0, 200),
+      timestamp: now.toISOString(),
+    };
+
+    // Generate SHA-256 hash of the signed content
+    const hashInput = `${id}:${ag.agreement_number}:${signatureData}:${now.toISOString()}:${ip}`;
+    const digitalHash = createHash("sha256").update(hashInput).digest("hex");
+
     await pool.query(
       `UPDATE agreements SET status='signed', signature_data=$1, terms_accepted=$2,
          signed_at=$3, signed_ip=$4, signed_user_agent=$5,
          otp_verified=true, otp_verified_at=$3,
-         signing_otp=NULL, signing_otp_expires_at=NULL, updated_at=NOW()
-       WHERE id=$6`,
-      [signatureData, JSON.stringify(termsAccepted), now, ip, userAgent, id]
+         signing_otp=NULL, signing_otp_expires_at=NULL,
+         signing_metadata=$6, digital_hash=$7,
+         updated_at=NOW()
+       WHERE id=$8`,
+      [signatureData, JSON.stringify(termsAccepted), now, ip, userAgent, JSON.stringify(signingMetadata), digitalHash, id]
     );
 
-    await logAgreementAudit(id, "agreement_signed", { ip, userAgent: userAgent.substring(0, 100), otpVerified: true }, ip, userAgent);
+    await logAgreementAudit(id, "agreement_signed", { ip, userAgent: userAgent.substring(0, 100), otpVerified: true, digitalHash: digitalHash.substring(0, 16) }, ip, userAgent);
 
     // Generate PDF
     let pdfBuffer: Buffer | null = null;
@@ -416,7 +518,7 @@ router.get("/:id", requireAdmin, async (req: any, res) => {
     const logsRes = await pool.query(`SELECT * FROM agreement_audit_logs WHERE agreement_id=$1 ORDER BY created_at ASC`, [id]);
     ag.auditLogs = logsRes.rows;
     ag.verificationUrl = `${getSiteBase()}/verify-agreement/${ag.verification_token}`;
-    ag.clauses = HAJJ_AGREEMENT_CLAUSES.map(c => ({ id: c.id, title: c.title }));
+    ag.clauses = CONSENT_CATEGORIES.map(c => ({ id: c.id, title: c.title, body: c.body }));
     res.json(ag);
   } catch { res.status(500).json({ error: "Failed to load agreement" }); }
 });
@@ -432,24 +534,57 @@ router.post("/generate/:bookingId", requireAdmin, async (req: any, res) => {
   } catch { res.status(500).json({ error: "Generation failed" }); }
 });
 
-// ── ADMIN: Update hotel & flight details ──────────────────────────────────────
+// ── ADMIN: Update hotel & flight details (extended) ───────────────────────────
 router.put("/:id/details", requireAdmin, async (req: any, res) => {
   try {
     const { id } = req.params;
-    const {
-      makkahHotel, madinahHotel, checkIn, checkOut, roomSharing, distance,
-      airline, flightNumber, departure, arrival, transit, baggage,
-    } = req.body;
+    const b = req.body;
 
-    const hotel_info  = { makkahHotel, madinahHotel, checkIn, checkOut, roomSharing, distance };
-    const flight_info = { airline, flightNumber, departure, arrival, transit, baggage };
+    const hotel_info = {
+      // Makkah
+      makkahHotel: b.makkahHotel, makkahCategory: b.makkahCategory,
+      makkahAddress: b.makkahAddress, makkahDistance: b.makkahDistance,
+      makkahCheckIn: b.makkahCheckIn, makkahCheckOut: b.makkahCheckOut,
+      // Madinah
+      madinahHotel: b.madinahHotel, madinahCategory: b.madinahCategory,
+      madinahDistance: b.madinahDistance, madinahCheckIn: b.madinahCheckIn, madinahCheckOut: b.madinahCheckOut,
+      // Aziziyah
+      aziziyahHotel: b.aziziyahHotel, aziziyahDistance: b.aziziyahDistance,
+      aziziyahCheckIn: b.aziziyahCheckIn, aziziyahCheckOut: b.aziziyahCheckOut,
+      // Mina
+      minaCategory: b.minaCategory, minaTentNumber: b.minaTentNumber,
+      minaMaktabNumber: b.minaMaktabNumber, minaZone: b.minaZone,
+      // Room & transport
+      roomSharing: b.roomSharing,
+      airportTransfer: b.airportTransfer, busService: b.busService,
+      guideService: b.guideService, internalTransport: b.internalTransport,
+      // Package extras
+      packageType: b.packageType, packageCategory: b.packageCategory,
+      hajjYear: b.hajjYear, duration: b.duration, maktabNumber: b.maktabNumber,
+      gstAmount: b.gstAmount, tcsAmount: b.tcsAmount,
+      govtCharges: b.govtCharges, visaCharges: b.visaCharges, dueDate: b.dueDate,
+    };
+    const flight_info = {
+      airline: b.airline, flightNumber: b.flightNumber, pnr: b.flightPnr,
+      departureAirport: b.departureAirport, departure: b.flightDeparture,
+      arrival: b.flightArrival, transit: b.flightTransit,
+      baggage: b.baggageAllowance, cabinBaggage: b.cabinBaggage,
+      returnFlightNumber: b.returnFlightNumber,
+    };
+
+    // Get existing then merge to avoid overwriting unset fields
+    const existing = await pool.query(`SELECT hotel_info, flight_info FROM agreements WHERE id=$1`, [id]);
+    const prevHi = (existing.rows[0]?.hotel_info && typeof existing.rows[0].hotel_info === "object") ? existing.rows[0].hotel_info : {};
+    const prevFi = (existing.rows[0]?.flight_info && typeof existing.rows[0].flight_info === "object") ? existing.rows[0].flight_info : {};
+    const mergedHi = { ...prevHi, ...Object.fromEntries(Object.entries(hotel_info).filter(([,v]) => v != null && v !== "")) };
+    const mergedFi = { ...prevFi, ...Object.fromEntries(Object.entries(flight_info).filter(([,v]) => v != null && v !== "")) };
 
     await pool.query(
       `UPDATE agreements SET hotel_info=$1, flight_info=$2, updated_at=NOW() WHERE id=$3`,
-      [JSON.stringify(hotel_info), JSON.stringify(flight_info), id]
+      [JSON.stringify(mergedHi), JSON.stringify(mergedFi), id]
     );
     await logAgreementAudit(id, "details_updated_admin", { adminId: req.user?.id }, getClientIp(req));
-    res.json({ ok: true });
+    res.json({ ok: true, hotel_info: mergedHi, flight_info: mergedFi });
   } catch (err) {
     console.error("[Agreement] Details update error:", err);
     res.status(500).json({ error: "Failed to update details" });
@@ -472,6 +607,112 @@ router.get("/:id/pdf", requireAdmin, async (req: any, res) => {
   } catch (err) {
     console.error("[Agreement] Admin PDF error:", err);
     res.status(500).json({ error: "PDF generation failed" });
+  }
+});
+
+// ── ADMIN: PNG/JPEG export ────────────────────────────────────────────────────
+router.get("/:id/image", requireAdmin, async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const format = String(req.query.format || "jpeg").toLowerCase();
+    if (!["png", "jpeg", "jpg"].includes(format)) return res.status(400).json({ error: "format must be png or jpeg" });
+
+    const agRes = await pool.query(RICH_SELECT + `WHERE a.id = $1`, [id]);
+    if (!agRes.rows.length) return res.status(404).json({ error: "Not found" });
+    const ag = agRes.rows[0];
+    const pdfBuf = await generateAgreementPdfBuffer(buildPdfOpts(ag, getSiteBase()));
+
+    // Attempt GhostScript conversion (gs must be available on VPS)
+    const ext = format === "jpg" ? "jpeg" : format;
+    const mimeType = `image/${ext}`;
+    const gsDevice = format === "png" ? "png16m" : "jpeg";
+
+    await new Promise<void>((resolve, reject) => {
+      const chunks: Buffer[] = [];
+      const gs = spawn("gs", [
+        "-dNOPAUSE", "-dBATCH", "-dSAFER",
+        `-sDEVICE=${gsDevice}`,
+        "-r300", "-dFirstPage=1", "-dLastPage=1",
+        "-sOutputFile=-",
+        "-q", "-"
+      ]);
+      gs.stdin.write(pdfBuf);
+      gs.stdin.end();
+      gs.stdout.on("data", (c: Buffer) => chunks.push(c));
+      gs.on("close", (code) => {
+        if (code === 0 && chunks.length > 0) {
+          const imgBuf = Buffer.concat(chunks);
+          const safeName = ag.agreement_number.replace(/[^A-Za-z0-9-]/g, "-");
+          res.setHeader("Content-Type", mimeType);
+          res.setHeader("Content-Disposition", `attachment; filename="Agreement-${safeName}.${ext}"`);
+          res.send(imgBuf);
+          resolve();
+        } else {
+          reject(new Error(`gs exit ${code}`));
+        }
+      });
+      gs.on("error", reject);
+    });
+    await logAgreementAudit(id, "image_downloaded_admin", { format, adminId: req.user?.id }, getClientIp(req));
+  } catch (err) {
+    console.error("[Agreement] Image export error (gs may not be installed):", err);
+    // Fallback: serve the PDF
+    try {
+      const agRes = await pool.query(RICH_SELECT + `WHERE a.id = $1`, [req.params.id]);
+      if (!agRes.rows.length) return res.status(404).json({ error: "Not found" });
+      const buf = await generateAgreementPdfBuffer(buildPdfOpts(agRes.rows[0], getSiteBase()));
+      const safeName = agRes.rows[0].agreement_number.replace(/[^A-Za-z0-9-]/g, "-");
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="Agreement-${safeName}.pdf"`);
+      res.send(buf);
+    } catch (e2) {
+      res.status(500).json({ error: "Image export failed (GhostScript not available); PDF fallback also failed." });
+    }
+  }
+});
+
+// ── ADMIN: Void agreement (different from cancel) ─────────────────────────────
+router.post("/:id/void", requireAdmin, async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    await pool.query(
+      `UPDATE agreements SET status='void', void_at=NOW(), void_reason=$1, cancelled_reason=$1, updated_at=NOW() WHERE id=$2`,
+      [reason || "Voided by admin", id]
+    );
+    await logAgreementAudit(id, "agreement_voided", { reason, adminId: req.user?.id }, getClientIp(req));
+    res.json({ ok: true });
+  } catch { res.status(500).json({ error: "Failed to void" }); }
+});
+
+// ── ADMIN: Reissue voided/cancelled agreement ─────────────────────────────────
+router.post("/:id/reissue", requireAdmin, async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const agRes = await pool.query(`SELECT * FROM agreements WHERE id=$1`, [id]);
+    if (!agRes.rows.length) return res.status(404).json({ error: "Not found" });
+    const ag = agRes.rows[0];
+
+    const rev = (ag.revision_number || 1) + 1;
+    // Reset to pending_signature, clear signing data, bump revision
+    await pool.query(
+      `UPDATE agreements SET status='pending_signature',
+         signature_data=NULL, terms_accepted=NULL, signed_at=NULL, signed_ip=NULL,
+         signed_user_agent=NULL, otp_verified=false, otp_verified_at=NULL,
+         signing_otp=NULL, signing_otp_expires_at=NULL,
+         signing_metadata=NULL, digital_hash=NULL,
+         revision_number=$1, void_at=NULL, void_reason=NULL,
+         cancelled_at=NULL, cancelled_reason=NULL,
+         updated_at=NOW()
+       WHERE id=$2`,
+      [rev, id]
+    );
+    await logAgreementAudit(id, "agreement_reissued", { revision: rev, adminId: req.user?.id }, getClientIp(req));
+    const newAg = await pool.query(RICH_SELECT + `WHERE a.id=$1`, [id]);
+    res.json({ ok: true, agreement: newAg.rows[0] });
+  } catch (err) {
+    console.error("[Agreement] Reissue error:", err);
+    res.status(500).json({ error: "Failed to reissue" });
   }
 });
 
