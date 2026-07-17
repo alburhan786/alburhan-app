@@ -22,7 +22,7 @@
 - [SMS DLT quick route fallback](sms-dlt-quick-route.md) — sendDLTSMS tries DLT first then quick route; old notify_template_id "211277" invalid, quick route confirmed working
 - [pdfkit must stay external in bundle](pdfkit-bundle-external.md) — pdfkit loads AFM/ICC data files from __dirname at runtime; bundling breaks all PDF endpoints on VPS with HTTP 500
 - [VPS self-update uses process.exit(0)](vps-self-update-exit.md) — spawn("pm2",...) silently fails (not in PATH); process.exit(0) lets PM2 detect crash and restart with new bundle file on disk
-- [BotBee ABT production templates](botbee-abt-templates.md) — 7 approved templates replace broken 333473; each event has dedicated sender function in botbee.ts; notificationEngine routes via ABT_TEMPLATE_EVENTS set
+- [BotBee ABT production templates](botbee-abt-templates.md) — 7 approved templates; ABT_TEMPLATE_EVENTS block DISABLED in sendWhatsAppForEvent — templates contain #!system-appointment-*!# unresolvable vars; free-form sendText is used instead. Re-enable when templates recreated without variables on BotBee dashboard.
 - [Payment notification gate fix](payment-notification-gate.md) — never gate processPaymentSuccessNotifications on newStatus; BotBee upload field is "media_file" not "file"; use native FormData
 - [ts-nocheck route strategy](ts-nocheck-routes.md) — 25+ API route files use // @ts-nocheck due to pervasive Drizzle schema type mismatches; do not remove without rebuilding lib/db types
 - [Notification packageName bug](notification-packagename-bug.md) — every triggerWorkflow() call must include packageName or messages say "your package"

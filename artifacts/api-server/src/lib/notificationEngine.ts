@@ -558,19 +558,17 @@ async function sendBotBeeEventTemplate(
 
 async function sendWhatsAppForEvent(eventType: EventType, ctx: NotificationContext, message: string, bookingId?: string, customerId?: string): Promise<{ status: "sent" | "failed"; providerResponse: unknown }> {
   try {
-    // ── Priority: production BotBee templates (July 2026) ─────────────────────
-    if (ABT_TEMPLATE_EVENTS.has(eventType)) {
-      const tplResult = await sendBotBeeEventTemplate(eventType, ctx, bookingId, customerId);
-      if (tplResult.ok) {
-        console.log(`[notificationEngine] ABT template sent for ${eventType} → ${ctx.customerMobile} (bookingRef=${ctx.bookingNumber || bookingId || "-"})`);
-        return { status: "sent", providerResponse: tplResult };
-      }
-      console.warn(
-        `[notificationEngine] ABT template FAILED for ${eventType} (${ctx.customerMobile}):`,
-        tplResult.errorMessage,
-        "— falling back to wa_templates / free-form",
-      );
-    }
+    // ── ABT templates DISABLED — BotBee templates contain unresolvable system ──
+    // appointment variables (#!system-appointment-booking-id!#, etc.) that are
+    // only filled by BotBee's internal appointment engine, never by our 4-param
+    // external API call. BotBee still returns ok:true so the fallback never
+    // triggered, leaving customers with raw variable placeholders in messages.
+    // Re-enable once templates are recreated on BotBee dashboard without variables.
+    //
+    // if (ABT_TEMPLATE_EVENTS.has(eventType)) {
+    //   const tplResult = await sendBotBeeEventTemplate(eventType, ctx, bookingId, customerId);
+    //   if (tplResult.ok) { return { status: "sent", providerResponse: tplResult }; }
+    // }
 
     // ── Standard path: look up wa_templates table for any other event ─────────
     const tpl = await pool.query(
