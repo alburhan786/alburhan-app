@@ -514,7 +514,7 @@ export async function sendBotBeeEventTemplate(
     (ctx.bookingNumber ? `${siteBase}/invoice/${ctx.bookingNumber}` : `${siteBase}`);
   const paymentUrl = ctx.bookingNumber
     ? `${siteBase}/pay/${ctx.bookingNumber}` : `${siteBase}`;
-  const opts = { eventType, bookingId, customerId, customerName: ctx.customerName, skipFailureLog: true, noInternalLog: true };
+  const opts = { eventType, bookingId, customerId, customerName: ctx.customerName, skipFailureLog: true, noInternalLog: true, forceTemplateApi: true };
 
   switch (eventType) {
     // ── Booking ───────────────────────────────────────────────────────────────

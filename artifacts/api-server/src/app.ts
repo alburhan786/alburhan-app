@@ -343,20 +343,20 @@ app.post("/api/migrate/botbee-diag", async (req, res) => {
         bookingId: "BKG-DIAG-001",
         amount: 50000,
         invoiceUrl: "https://alburhantravels.com/invoice/diag",
-      }),
+      }, { forceTemplateApi: true }),
       sendPaymentReceivedTemplate(testPhone, {
         customerName: "Test User",
         bookingId: "BKG-DIAG-001",
         invoiceNumber: "INV-001",
         amount: 50000,
-      }),
+      }, { forceTemplateApi: true }),
       sendDepartureReminderTemplate(testPhone, {
         customerName: "Test User",
         bookingId: "BKG-DIAG-001",
         departureDate: "25 Jul 2026",
         reportingTime: "4 hours before departure",
         departureAirport: "Mumbai (BOM)",
-      }),
+      }, { forceTemplateApi: true }),
     ]);
     const labels = ["booking_approved (5v)", "payment_received (4v)", "departure_reminde (5v)"];
     results["liveSendTests"] = sends.map((s, i) => ({
@@ -656,6 +656,81 @@ app.post("/api/migrate/botbee-format-test", async (req, res) => {
   }
 
   res.json({ phone, templateId: TEMPLATE_ID, formats: results });
+});
+
+// POST /api/migrate/wa-approval-test — fire booking_approved WhatsApp via template API (forceTemplateApi) and return wamid
+// Usage: POST { key, bookingId?, mobile?, name? }
+// If bookingId is given, looks up real booking data. Otherwise uses name/mobile from body.
+app.post("/api/migrate/wa-approval-test", async (req, res) => {
+  const key = (req.query.key || req.body?.key) as string;
+  if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
+
+  const { pool: waPool } = await import("@workspace/db");
+  const { sendApprovalTemplate } = await import("./lib/botbee.js");
+
+  let mobile: string;
+  let name: string;
+  let bookingId: string;
+  let packageName: string;
+  let amount: number;
+  let invoiceUrl: string;
+
+  const rawBookingId = (req.body?.bookingId || req.query.bookingId || "") as string;
+  if (rawBookingId) {
+    const r = await waPool.query(
+      `SELECT b.*, u.email AS u_email FROM bookings b LEFT JOIN users u ON u.id=b.customer_id WHERE b.id=$1 LIMIT 1`,
+      [rawBookingId]
+    );
+    if (!r.rows.length) return void res.status(404).json({ error: "Booking not found" });
+    const row = r.rows[0];
+    mobile = row.customer_mobile || "";
+    name = row.customer_name || "";
+    bookingId = row.booking_number || row.id;
+    packageName = row.package_name || "Package";
+    amount = Number(row.final_amount || row.paid_amount || 0);
+    invoiceUrl = row.invoice_number ? `https://alburhantravels.com/invoice/${row.invoice_number}` : `https://alburhantravels.com`;
+  } else {
+    mobile = ((req.body?.mobile || req.query.mobile || "") as string).replace(/\D/g, "");
+    if (!mobile) return void res.status(400).json({ error: "Provide bookingId or mobile" });
+    name = (req.body?.name || "Test Customer") as string;
+    bookingId = (req.body?.bookingId || "TEST-001") as string;
+    packageName = (req.body?.packageName || "Hajj Package 2026") as string;
+    amount = Number(req.body?.amount || 50000);
+    invoiceUrl = (req.body?.invoiceUrl || "https://alburhantravels.com/invoice/TEST-001") as string;
+  }
+
+  console.log(`[wa-approval-test] Sending booking_approved to ${mobile} (${name}) forceTemplateApi=true`);
+  const startMs = Date.now();
+  const result = await sendApprovalTemplate(mobile, {
+    customerName: name,
+    packageName,
+    bookingId,
+    amount,
+    invoiceUrl,
+  }, { forceTemplateApi: true });
+  const elapsed = Date.now() - startMs;
+
+  // Pull recent notification logs for this phone
+  const recent = await waPool.query(
+    `SELECT id, channel, event_type, status, wamid, template, http_status, error_code, provider_response, sent_at
+     FROM notification_logs WHERE recipient=$1 ORDER BY sent_at DESC LIMIT 5`,
+    [mobile]
+  );
+
+  res.json({
+    ok: result.ok,
+    elapsed_ms: elapsed,
+    mobile,
+    name,
+    bookingId,
+    wamid: (result.responsePayload as any)?.wa_message_id || null,
+    httpStatus: result.httpStatus,
+    errorMessage: result.errorMessage || null,
+    endpoint: result.endpoint,
+    requestPayload: result.requestPayload,
+    responsePayload: result.responsePayload,
+    recentLogs: recent.rows,
+  });
 });
 
 // POST /api/migrate/botbee-discovery — probe BotBee settings + template create/delete paths using real server-side token

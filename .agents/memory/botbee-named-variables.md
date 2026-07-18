@@ -14,10 +14,25 @@ Evidence:
 - 10 tested API formats (named object, flat array, components, params, numbered object, hash-bang keys, top-level keys, etc.) — ALL accepted (HTTP 200 + real wamid) but NONE substituted variables
 - BotBee's substitution only works via their CRM automation engine (not raw API calls)
 
-## Current Hybrid Fix in sendTemplate()
+## Current sendTemplate() three-way situation (as of 2026-07-18)
 
-1. **Primary path (in-window, <24h since customer last messaged)**: render `mixed_body_text` with real values, send via `/whatsapp/send` (text API). Variables substituted ✅
-2. **Fallback (out-of-window)**: 24h window error → fall through to template API. Delivers but shows `#!Name!#` literally ❌
+### Path A — PRIMARY PATH (text API via /whatsapp/send) — was default before forceTemplateApi fix
+- Renders TEMPLATE_BODIES["409950"] ({{1}} format) locally with real values
+- Sends as plain text message via `/whatsapp/send` (session-based API)
+- Within 24h window: customer sees correct content ✅; but no real wamid (text msg, not template)
+- Outside 24h window: BotBee returns HTTP 200 "ok" but Meta silently drops the message ❌; status="sent" in DB is a LIE
+
+### Path B — FALLBACK (template API via /whatsapp/send/template) — now forced via forceTemplateApi:true
+- Calls BotBee template API with flat-array variables
+- Real wamid returned ✅, message actually delivered ✅
+- But message content shows `#!Name!# #!BookingID!#` etc. literally ❌ (no substitution)
+- wamid stored in notification_logs ✅
+
+### forceTemplateApi fix (deployed 2026-07-18):
+- Added `forceTemplateApi?: boolean` to BotBeeTemplateOpts
+- `sendBotBeeEventTemplate` opts now include `forceTemplateApi: true` → all ERP notification sends go to Path B
+- TRADEOFF: message delivered (wamid proves it), but variables show literally
+- Confirmed: wamid `wamid.HBgMOTE5ODY3MTE0NTYyFQIAERgSMjhCQzlERkJDNjZCNzVDMjQ0AA==` for ABT26582778
 
 ## Permanent Fix Required (admin action)
 
@@ -25,9 +40,9 @@ Admin must go to BotBee dashboard and:
 1. Delete all 15 existing ABT templates (IDs 409950–410040)
 2. Recreate them using `{{1}}`, `{{2}}`, etc. in the body text (Meta's variable format)
 3. Wait for Meta approval (24–48h)
-4. Provide new template IDs for backend update (or update ABT_TEMPLATES in botbee.ts)
+4. The new template IDs will auto-sync (ABT_TEMPLATES patch + syncBotBeeTemplates on startup)
 
-Once recreated correctly with {{1}} variables, the template API will work for out-of-window messages.
+Once recreated correctly with {{1}} variables, Path B (template API) will correctly substitute variables AND deliver with wamid.
 
 ## Double-₹ Bug (fixed 2026-07-18)
 Template bodies already have `₹ #!Amount!#`. fmtAmount() was returning `₹1,89,000` → double rupee.

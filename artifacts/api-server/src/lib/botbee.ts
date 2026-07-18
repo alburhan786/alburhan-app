@@ -22,6 +22,19 @@ export interface BotBeeTemplateOpts {
    */
   noInternalLog?: boolean;
   /**
+   * When true, skip the PRIMARY PATH (WhatsApp text/session API) entirely and go
+   * straight to the BotBee template API (/whatsapp/send/template).
+   *
+   * WHY: The text/session API only works within a 24h window after the customer
+   * messages the business. For ERP-initiated outbound notifications the window is
+   * almost never open, so the text API silently succeeds on BotBee but Meta drops
+   * the message. The template API bypasses the session restriction and returns a
+   * real wamid confirming Meta accepted the delivery.
+   *
+   * Set this for ALL ABT template sends from the notification engine.
+   */
+  forceTemplateApi?: boolean;
+  /**
    * Named variable values keyed by the EXACT BotBee variable name from the
    * template's variable_map (e.g. {Name:"...", BookingID:"...", Amount:"..."}).
    * BotBee maps these keys to {{1}},{{2}},... positions internally and substitutes
@@ -259,7 +272,14 @@ export async function sendTemplate(
   // components) but does NOT substitute #!VarName!# in the delivered message.
   // The real delivery body is mixed_body_text with #!VarName!# placeholders.
   // We render it ourselves and send via /whatsapp/send (text API).
-  if (templateBody) {
+  //
+  // IMPORTANT: This path is DISABLED when opts.forceTemplateApi=true because:
+  // - The text API is session-based (24h window). If the customer hasn't messaged first,
+  //   BotBee may return HTTP 200 "ok" but Meta silently drops the message — no delivery,
+  //   no wamid. The template API (/whatsapp/send/template) bypasses this restriction.
+  // - All ERP-initiated outbound notifications must use forceTemplateApi:true to guarantee
+  //   delivery and a real wamid.
+  if (templateBody && !opts?.forceTemplateApi) {
     const rendered = namedVars ? renderTemplateBody(templateBody, namedVars) : templateBody;
 
     // Sanity check: warn if any placeholders remain unsubstituted (#!Var!# or {{N}})
