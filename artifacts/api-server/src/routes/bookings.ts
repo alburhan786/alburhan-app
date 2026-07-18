@@ -531,7 +531,7 @@ router.post("/:id/approve", requireAdmin as any, requirePermission("bookings", "
   // Invoice is generated only after payment (online or offline).
   (async () => {
     try {
-      await triggerWorkflow("booking_approved", {
+      const ctx = {
         bookingId:      updated.id,
         bookingNumber:  updated.bookingNumber,
         customerName:   (updated.customerName || "").trim(),
@@ -540,9 +540,12 @@ router.post("/:id/approve", requireAdmin as any, requirePermission("bookings", "
         packageName:    (updated as any).packageName ?? undefined,
         finalAmount:    (updated as any).finalAmount ? Number((updated as any).finalAmount) : undefined,
         invoiceUrl:     `https://alburhantravels.com/invoice/${updated.bookingNumber}`,
-      });
+      };
+      console.log(`[PIPELINE:approve-route] ▶ booking_approved triggered | bookingId=${ctx.bookingId} | bookingNumber=${ctx.bookingNumber} | mobile=${ctx.customerMobile} | name="${ctx.customerName}" | package="${ctx.packageName}" | finalAmount=${ctx.finalAmount} | invoiceUrl=${ctx.invoiceUrl}`);
+      await triggerWorkflow("booking_approved", ctx);
+      console.log(`[PIPELINE:approve-route] ✅ triggerWorkflow completed | bookingId=${ctx.bookingId}`);
     } catch (err) {
-      console.error("[approve] booking_approved notification error:", err);
+      console.error("[PIPELINE:approve-route] ❌ booking_approved notification error:", err);
     }
   })();
 

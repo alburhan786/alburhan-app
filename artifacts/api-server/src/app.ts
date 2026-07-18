@@ -402,11 +402,39 @@ app.get("/api/migrate/notification-audit", async (req, res) => {
     GROUP BY channel, event_type, status
     ORDER BY channel, event_type, status`);
 
+  // 4. workflow_rules
+  const rulesQ = await auditPool.query(
+    `SELECT id, name, trigger_type, enabled, group_name, created_at
+     FROM workflow_rules ORDER BY group_name, trigger_type`
+  );
+
+  // 5. workflow_logs (last 20)
+  const wfLogsQ = await auditPool.query(
+    `SELECT id, trigger_type, status, customer_name, booking_id, error_message, execution_time_ms, created_at, completed_at
+     FROM workflow_logs ORDER BY created_at DESC LIMIT 20`
+  );
+
+  // 6. booking_approved specific: last 10 notification logs with wamid
+  const baLogsQ = await auditPool.query(
+    `SELECT nl.id, nl.booking_id, nl.channel, nl.event_type, nl.status,
+            nl.wamid, nl.template, nl.http_status, nl.error_code, nl.sent_at,
+            b.booking_number, b.customer_name, b.customer_mobile,
+            nl.provider_response->>'requestPayload'  AS req_payload,
+            nl.provider_response->>'responsePayload' AS resp_payload
+     FROM notification_logs nl
+     LEFT JOIN bookings b ON b.id = nl.booking_id
+     WHERE nl.event_type = 'booking_approved' AND nl.channel = 'whatsapp'
+     ORDER BY nl.sent_at DESC LIMIT 10`
+  );
+
   res.json({
     generated_at: new Date().toISOString(),
     paid_bookings: paidQ.rows,
     notification_summary: summaryQ.rows,
     recent_logs: logsQ.rows,
+    workflow_rules: rulesQ.rows,
+    workflow_logs: wfLogsQ.rows,
+    booking_approved_whatsapp_logs: baLogsQ.rows,
   });
 });
 
@@ -799,6 +827,200 @@ app.post("/api/migrate/wa-fullpipeline-test", async (req, res) => {
     ctx_sent: ctx,
     notification_logs_after: after.rows,
   });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/migrate/wa-real-approve-test
+// Tests the REAL Admin→Approve→Workflow→NotificationEngine→BotBee→Meta pipeline.
+// Creates a brand-new test booking in DB, then runs the EXACT same business logic
+// as POST /api/bookings/:id/approve (minus HTTP auth middleware).
+// Returns a complete step-by-step trace with: Booking ID, Workflow Event,
+// Notification Trigger, Template ID, Variables, BotBee Request/Response, wamid, Status.
+// Usage: POST { key, phone? }   (phone defaults to 9893225590 — admin test device)
+// ─────────────────────────────────────────────────────────────────────────────
+app.post("/api/migrate/wa-real-approve-test", async (req, res) => {
+  const key = (req.query.key || req.body?.key) as string;
+  if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
+
+  const { pool: testPool } = await import("@workspace/db");
+  const { triggerWorkflow } = await import("./lib/workflowEngine.js");
+  const { randomUUID } = await import("crypto");
+
+  const testPhone = ((req.body?.phone || req.query.phone || "9893225590") as string).replace(/\D/g, "");
+  const testName  = (req.body?.name  || "Test Customer") as string;
+  const tsNow     = Date.now();
+  const testId    = randomUUID();
+  const testNum   = `ABT${String(tsNow).slice(-8)}`;
+
+  const trace: Array<Record<string, unknown>> = [];
+  const step = (name: string, data: Record<string, unknown>) => {
+    const entry = { step: name, ts: new Date().toISOString(), ...data };
+    trace.push(entry);
+    console.log(`[PIPELINE:${name}]`, JSON.stringify(data));
+  };
+
+  try {
+    // ── STEP 1: Create a brand-new test booking in DB ─────────────────────────
+    await testPool.query(
+      `INSERT INTO bookings (id, booking_number, customer_name, customer_mobile, customer_email,
+        package_name, final_amount, number_of_pilgrims, status, is_offline, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,1,'pending',true,NOW(),NOW())`,
+      [testId, testNum, testName, testPhone, "test@alburhantravels.com",
+       "Economy Umrah Package", "75000"]
+    );
+    step("booking_created", {
+      booking_id: testId, booking_number: testNum,
+      customer_name: testName, customer_mobile: testPhone,
+      package_name: "Economy Umrah Package", final_amount: 75000,
+      status: "pending",
+    });
+
+    // ── STEP 2: Update status to "approved" — same as real approve route ───────
+    await testPool.query(
+      `UPDATE bookings SET status='approved', updated_at=NOW() WHERE id=$1`,
+      [testId]
+    );
+    step("booking_approved_in_db", { booking_id: testId, new_status: "approved" });
+
+    // ── STEP 3: Check workflow_rules for booking_approved ─────────────────────
+    const ruleQ = await testPool.query(
+      `SELECT enabled FROM workflow_rules WHERE trigger_type='booking_approved' LIMIT 1`
+    );
+    const ruleEnabled = ruleQ.rows[0] ? ruleQ.rows[0].enabled === true : true;
+    step("workflow_rule_check", {
+      trigger_type: "booking_approved",
+      rule_found: ruleQ.rows.length > 0,
+      enabled: ruleEnabled,
+      note: ruleQ.rows.length === 0 ? "No row in workflow_rules → defaults to true" : undefined,
+    });
+
+    // ── STEP 4: Check dedup — same SQL as fireNotificationEvent ──────────────
+    const dedupQ = await testPool.query(
+      `SELECT id FROM notification_logs
+       WHERE event_type='booking_approved' AND booking_id=$1 AND status='sent'
+       AND sent_at > NOW() - INTERVAL '12 hours' LIMIT 1`,
+      [testId]
+    );
+    const dedupBlocked = dedupQ.rows.length > 0;
+    step("dedup_check", {
+      event_type: "booking_approved",
+      booking_id: testId,
+      window_hours: 12,
+      dedup_blocked: dedupBlocked,
+      reason: dedupBlocked ? `Prior sent log id=${dedupQ.rows[0].id} within 12h` : "No prior sent log — notification will fire",
+    });
+
+    if (dedupBlocked) {
+      await testPool.query(`UPDATE bookings SET status='cancelled', updated_at=NOW() WHERE id=$1`, [testId]);
+      step("cleanup", { booking_id: testId, final_status: "cancelled" });
+      return res.json({ ok: false, dedup_blocked: true, trace });
+    }
+
+    // ── STEP 5: Build ctx — IDENTICAL to bookings.ts approve route ───────────
+    const ctx = {
+      bookingId:      testId,
+      bookingNumber:  testNum,
+      customerName:   testName.trim(),
+      customerMobile: testPhone,
+      customerEmail:  "test@alburhantravels.com",
+      packageName:    "Economy Umrah Package",
+      finalAmount:    75000,
+      invoiceUrl:     `https://alburhantravels.com/invoice/${testNum}`,
+    };
+    step("triggerWorkflow_called", {
+      trigger: "booking_approved",
+      ctx_keys: Object.keys(ctx),
+      customer_name: ctx.customerName,
+      customer_mobile: ctx.customerMobile,
+      package_name: ctx.packageName,
+      final_amount: ctx.finalAmount,
+      booking_number: ctx.bookingNumber,
+      invoice_url: ctx.invoiceUrl,
+    });
+
+    // ── STEP 6: Call triggerWorkflow — EXACT same call as approve route ───────
+    const wfStart = Date.now();
+    await triggerWorkflow("booking_approved", ctx);
+    const wfMs = Date.now() - wfStart;
+    step("triggerWorkflow_returned", { elapsed_ms: wfMs });
+
+    // ── STEP 7: Wait briefly for async DB writes then query results ───────────
+    await new Promise(r => setTimeout(r, 1800));
+
+    const wfLog = await testPool.query(
+      `SELECT id, trigger_type, status, error_message, execution_time_ms, created_at, completed_at
+       FROM workflow_logs WHERE booking_id=$1 ORDER BY created_at DESC LIMIT 3`,
+      [testId]
+    );
+
+    const nlRows = await testPool.query(
+      `SELECT id, event_type, channel, status, wamid, template, http_status, error_code, sent_at,
+              provider_response->>'requestPayload'  AS req_payload,
+              provider_response->>'responsePayload' AS resp_payload
+       FROM notification_logs WHERE booking_id=$1 ORDER BY sent_at DESC LIMIT 10`,
+      [testId]
+    );
+
+    const waRow = nlRows.rows.find((r: any) => r.channel === "whatsapp" && r.event_type === "booking_approved");
+
+    // Parse BotBee request/response for the WhatsApp row
+    let botbeeRequest: unknown  = null;
+    let botbeeResponse: unknown = null;
+    let variables: unknown      = null;
+    let templateId: string | null = null;
+    if (waRow) {
+      try { botbeeRequest  = typeof waRow.req_payload  === "string" ? JSON.parse(waRow.req_payload)  : waRow.req_payload;  } catch {}
+      try { botbeeResponse = typeof waRow.resp_payload === "string" ? JSON.parse(waRow.resp_payload) : waRow.resp_payload; } catch {}
+      variables  = (botbeeRequest as any)?.variables  || null;
+      templateId = (botbeeRequest as any)?.template_id?.toString() || waRow.template || null;
+    }
+
+    step("results", {
+      workflow_logs_found: wfLog.rows.length,
+      notification_logs_found: nlRows.rows.length,
+      whatsapp_status: waRow?.status || "NO_LOG",
+      wamid: waRow?.wamid || null,
+      template_id: templateId,
+      variables,
+      botbee_response_message: (botbeeResponse as any)?.message || null,
+    });
+
+    // ── STEP 8: Clean up — mark test booking cancelled ────────────────────────
+    await testPool.query(
+      `UPDATE bookings SET status='cancelled', updated_at=NOW() WHERE id=$1`,
+      [testId]
+    );
+    step("cleanup", { booking_id: testId, final_status: "cancelled", note: "Test booking created purely for pipeline verification" });
+
+    return res.json({
+      ok: true,
+      summary: {
+        booking_id:            testId,
+        booking_number:        testNum,
+        customer:              testName,
+        phone:                 testPhone,
+        workflow_event:        "booking_approved",
+        notification_trigger:  "fireNotificationEvent(booking_approved)",
+        template_id:           templateId,
+        variables,
+        botbee_request:        botbeeRequest,
+        botbee_response:       botbeeResponse,
+        wamid:                 waRow?.wamid || null,
+        whatsapp_status:       waRow?.status || "not_found",
+        dedup_blocked:         false,
+        workflow_log_status:   wfLog.rows[0]?.status || "not_found",
+        workflow_elapsed_ms:   wfLog.rows[0]?.execution_time_ms || wfMs,
+      },
+      trace,
+      workflow_logs:        wfLog.rows,
+      all_notification_logs: nlRows.rows,
+    });
+  } catch (err: any) {
+    console.error("[wa-real-approve-test] ERROR:", err);
+    // Clean up on error
+    try { await testPool.query(`DELETE FROM bookings WHERE id=$1`, [testId]); } catch {}
+    return res.status(500).json({ ok: false, error: err.message, trace });
+  }
 });
 
 // POST /api/migrate/botbee-discovery — probe BotBee settings + template create/delete paths using real server-side token
