@@ -493,7 +493,7 @@ app.post("/api/migrate/trigger-test-notification", async (req, res) => {
   }
 });
 
-// GET /api/migrate/botbee-tpl-probe — fetch ALL ABT template bodies to discover exact variable names
+// GET /api/migrate/botbee-tpl-probe — fetch ALL ABT template raw objects (full JSON dump)
 app.get("/api/migrate/botbee-tpl-probe", async (req, res) => {
   const key = (req.query.key || req.body?.key) as string;
   if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
@@ -509,8 +509,9 @@ app.get("/api/migrate/botbee-tpl-probe", async (req, res) => {
 
   const results: Record<string, any> = { apiTokenPresent: !!apiToken, phone_number_id };
 
-  // Fetch ALL pages of the template list until we find all ABT templates
-  const found: Array<{id: number; name: string; body: string; vars: string[]}> = [];
+  // Fetch ALL pages — return the COMPLETE raw template object so we can see every field
+  const found: Array<{id: number; name: string; body: string; vars_hash_bang: string[]; vars_double_brace: string[]; fullRawObject: any}> = [];
+  const firstPageRaw: any[] = [];
   try {
     let page = 1;
     let keepGoing = true;
@@ -523,12 +524,20 @@ app.get("/api/migrate/botbee-tpl-probe", async (req, res) => {
       if (data?.status !== "1" && data?.status !== 1) { results.listError = data; break; }
       const items: any[] = Array.isArray(data.message) ? data.message : [];
       if (!items.length) break;
+      if (page === 1) firstPageRaw.push(...items.slice(0, 3)); // first 3 raw objects for inspection
       for (const t of items) {
         if (TARGET_IDS.has(String(t.id))) {
-          const body: string = t.body_content || t.template_body || "";
-          // Extract #!VarName!# patterns
-          const vars = [...body.matchAll(/#!([^!]+)!#/g)].map(m => m[1]);
-          found.push({ id: t.id, name: t.template_name, body, vars });
+          const body: string = t.body_content || t.template_body || t.message || "";
+          const vars_hash_bang = [...body.matchAll(/#!([^!]+)!#/g)].map(m => m[1]);
+          const vars_double_brace = [...body.matchAll(/\{\{(\d+)\}\}/g)].map(m => m[1]);
+          found.push({
+            id: t.id,
+            name: t.template_name || t.name,
+            body,
+            vars_hash_bang,
+            vars_double_brace,
+            fullRawObject: t,   // ← complete raw BotBee object, all fields visible
+          });
         }
       }
       if (found.length >= TARGET_IDS.size) break;
@@ -538,36 +547,115 @@ app.get("/api/migrate/botbee-tpl-probe", async (req, res) => {
     results.abtTemplates = found;
     results.foundCount = found.length;
     results.totalTargets = TARGET_IDS.size;
+    results.firstPageSample = firstPageRaw; // first 3 non-ABT objects so we can compare field structure
   } catch (e: any) {
     results.listFetchError = e.message;
   }
 
-  // Also show the stored request_payload so we can compare what was sent vs what's needed
+  // Also try POST /whatsapp/template/list which may return different fields
+  try {
+    const r2 = await fetch(`${BASE}/whatsapp/template/list`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ apiToken, phone_number_id }),
+      signal: AbortSignal.timeout(12000),
+    });
+    const d2 = await r2.json() as any;
+    const items2: any[] = Array.isArray(d2?.message) ? d2.message : Array.isArray(d2?.data) ? d2.data : [];
+    // Find our first ABT template via POST
+    const postAbt = items2.find((t: any) => TARGET_IDS.has(String(t.id)));
+    results.postListFirstAbt = postAbt || null;
+    results.postListResponseKeys = d2 ? Object.keys(d2) : null;
+  } catch (e: any) {
+    results.postListError = (e as Error).message;
+  }
+
+  // Also show the stored request_payload
   try {
     const { pool: p } = await import("@workspace/db");
     const logs = await p.query(`
       SELECT event_type, request_payload, provider_response
       FROM notification_logs
       WHERE channel='whatsapp' AND request_payload IS NOT NULL
-      ORDER BY sent_at DESC LIMIT 15`);
+      ORDER BY sent_at DESC LIMIT 8`);
     results.sentPayloads = logs.rows.map((r: any) => {
       const rp = typeof r.request_payload === 'string' ? JSON.parse(r.request_payload) : r.request_payload;
       const resp = typeof r.provider_response === 'string' ? JSON.parse(r.provider_response) : r.provider_response;
-      return {
-        event: r.event_type,
-        template_id: rp?.template_id,
-        variables: rp?.variables || null,
-        components: rp?.components || null,
-        language: rp?.language || null,
-        waMessageId: resp?.responsePayload?.wa_message_id || resp?.wa_message_id,
-        fullRequestPayload: rp,
-      };
+      return { event: r.event_type, fullRequestPayload: rp, waMessageId: resp?.responsePayload?.wa_message_id || resp?.wa_message_id };
     });
   } catch (e: any) {
     results.dbError = e.message;
   }
 
   res.json(results);
+});
+
+// POST /api/migrate/botbee-format-test — send same template 3 ways to find which substitutes {{1}} vars
+app.post("/api/migrate/botbee-format-test", async (req, res) => {
+  const key = (req.query.key || req.body?.key) as string;
+  if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
+
+  const { getCachedConfig } = await import("./lib/apiSettingsProvider.js");
+  const bbCfg = getCachedConfig("botbee");
+  const apiToken = (bbCfg.apiKey || process.env.BOTBEE_API_KEY || "").trim();
+  const phone_number_id = (bbCfg.extra?.phone_number_id || process.env.BOTBEE_PHONE_NUMBER_ID || "").trim();
+  const BASE = "https://app.botbee.io/api/v1";
+
+  // Use booking_approved (409950) — 5 vars: name, bookingId, package, amount, invoiceUrl
+  const phone = (req.body?.phone as string) || "919867114562";
+  const TEMPLATE_ID = 409950;
+  const VALS = ["Mohammed Altaf TEST", "ABT26582778", "Ramadan Umrah Package", "189000", "https://alburhantravels.com/invoice/ABT26582778"];
+
+  // Known variable names from user report (#!Name!# #!BookingID!# #!Package!# #!Amount!# #!Paymenturllink!#)
+  const NAMED: Record<string, string> = {
+    Name: VALS[0], BookingID: VALS[1], Package: VALS[2], Amount: VALS[3], Paymenturllink: VALS[4],
+  };
+
+  const formats: Array<{ label: string; payload: object }> = [
+    {
+      label: "A_named_object",
+      payload: { apiToken, phone_number_id, phone_number: phone, template_id: TEMPLATE_ID, variables: NAMED },
+    },
+    {
+      label: "B_flat_array",
+      payload: { apiToken, phone_number_id, phone_number: phone, template_id: TEMPLATE_ID, variables: VALS },
+    },
+    {
+      label: "C_components",
+      payload: {
+        apiToken, phone_number_id, phone_number: phone, template_id: TEMPLATE_ID, language: "en",
+        components: [{ type: "body", parameters: VALS.map(v => ({ type: "text", text: v })) }],
+      },
+    },
+    {
+      label: "D_params_object",
+      payload: { apiToken, phone_number_id, phone_number: phone, template_id: TEMPLATE_ID, params: NAMED },
+    },
+    {
+      label: "E_numbered_object",
+      payload: { apiToken, phone_number_id, phone_number: phone, template_id: TEMPLATE_ID, variables: {"1": VALS[0], "2": VALS[1], "3": VALS[2], "4": VALS[3], "5": VALS[4]} },
+    },
+  ];
+
+  const results: any[] = [];
+  for (const fmt of formats) {
+    try {
+      const r = await fetch(`${BASE}/whatsapp/send/template`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(fmt.payload),
+        signal: AbortSignal.timeout(12000),
+      });
+      const data = await r.json() as any;
+      results.push({ label: fmt.label, httpStatus: r.status, response: data, sentPayload: fmt.payload });
+    } catch (e: any) {
+      results.push({ label: fmt.label, error: (e as Error).message, sentPayload: fmt.payload });
+    }
+    // small delay between sends
+    await new Promise(x => setTimeout(x, 800));
+  }
+
+  res.json({ phone, templateId: TEMPLATE_ID, formats: results });
 });
 
 // POST /api/migrate/botbee-send-test — send one template with real booking data, return full payload
