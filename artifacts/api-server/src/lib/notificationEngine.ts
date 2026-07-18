@@ -350,19 +350,27 @@ export async function trackNotification(data: {
     const httpStatus = pr?.httpStatus || null;
     const requestPayload = pr?.requestPayload ? JSON.stringify(pr.requestPayload) : null;
     const errorCode = pr?.errorCode || null;
+    // Extract wamid and template_id from the BotBee response payload
+    const innerRp = pr?.responsePayload as Record<string, unknown> | null | undefined;
+    const msgArr = Array.isArray(innerRp?.messages) ? (innerRp!.messages as Array<Record<string, unknown>>) : null;
+    const wamid = (innerRp?.wa_message_id || innerRp?.msg_id || innerRp?.wamid || msgArr?.[0]?.id || null) as string | null;
+    const templateId = (pr?.requestPayload?.template_id?.toString() || pr?.requestPayload?.template_name || null) as string | null;
+    if (wamid) console.log(`[trackNotification] ${data.eventType} → wamid=${wamid} template=${templateId}`);
     await pool.query(
       `INSERT INTO notification_logs
        (id, event_type, customer_id, booking_id, customer_name, booking_number,
         channel, recipient, message, status,
         provider_response, provider_name, api_endpoint, http_status, request_payload, error_code,
+        wamid, template,
         sent_at, retry_count)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,NOW(),0)`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,NOW(),0)`,
       [
         id, data.eventType, data.customerId || null, data.bookingId || null,
         data.customerName || null, data.bookingNumber || null,
         data.channel, data.recipient, data.message || null, data.status,
         data.providerResponse ? JSON.stringify(data.providerResponse) : null,
         providerName, apiEndpoint, httpStatus, requestPayload, errorCode,
+        wamid, templateId,
       ]
     );
     // ── Enqueue non-WhatsApp failures into the generic retry queue ──────────
@@ -506,7 +514,7 @@ export async function sendBotBeeEventTemplate(
     (ctx.bookingNumber ? `${siteBase}/invoice/${ctx.bookingNumber}` : `${siteBase}`);
   const paymentUrl = ctx.bookingNumber
     ? `${siteBase}/pay/${ctx.bookingNumber}` : `${siteBase}`;
-  const opts = { eventType, bookingId, customerId, customerName: ctx.customerName, skipFailureLog: true };
+  const opts = { eventType, bookingId, customerId, customerName: ctx.customerName, skipFailureLog: true, noInternalLog: true };
 
   switch (eventType) {
     // ── Booking ───────────────────────────────────────────────────────────────
@@ -694,18 +702,21 @@ export async function sendBotBeeEventTemplate(
 }
 
 async function sendWhatsAppForEvent(eventType: EventType, ctx: NotificationContext, message: string, bookingId?: string, customerId?: string): Promise<{ status: "sent" | "failed"; providerResponse: unknown }> {
+  console.log(`[notifEngine] sendWhatsAppForEvent: ${eventType} → ${ctx.customerMobile} | isABTTemplate=${ABT_TEMPLATE_EVENTS.has(eventType)}`);
   try {
     // ── Priority 1: Production BotBee templates with Meta {{1}}…{{5}} variables ──
     // Templates must be created on BotBee dashboard using {{1}}, {{2}} etc.
     // (NOT #!system-appointment-*!# placeholders which are BotBee-internal).
     // Variable values are sent via the components/body/parameters array.
     if (ABT_TEMPLATE_EVENTS.has(eventType)) {
+      console.log(`[notifEngine] ${eventType}: calling sendBotBeeEventTemplate…`);
       const tplResult = await sendBotBeeEventTemplate(eventType, ctx, bookingId, customerId);
       if (tplResult.ok) {
-        console.log(`[notificationEngine] ABT template sent for ${eventType} → ${ctx.customerMobile}`);
+        const wamid = (tplResult.responsePayload as any)?.wa_message_id || "n/a";
+        console.log(`[notifEngine] ✅ ABT template OK: ${eventType} → ${ctx.customerMobile} | wamid=${wamid}`);
         return { status: "sent", providerResponse: tplResult };
       }
-      console.warn(`[notificationEngine] ABT template FAILED for ${eventType} (${ctx.customerMobile}): ${tplResult.errorMessage} — falling back`);
+      console.warn(`[notifEngine] ❌ ABT template FAILED: ${eventType} → ${ctx.customerMobile} | error="${tplResult.errorMessage}" | httpStatus=${(tplResult as any).httpStatus} — falling back`);
     }
 
     // ── Priority 2: look up wa_templates table for the event ─────────────────
@@ -852,6 +863,8 @@ export async function fireNotificationEvent(
   ctx: NotificationContext,
   opts: { dedupWindowHours?: number } = {}
 ): Promise<void> {
+  console.log(`[notifEngine] ▶ fireNotificationEvent: ${eventType} | mobile=${ctx.customerMobile} | customer=${ctx.customerName} | booking=${ctx.bookingId || "none"}`);
+
   // ── IDEMPOTENCY: skip if this exact event+booking was sent recently ─────────
   const dedupWindow = opts.dedupWindowHours ?? defaultDedupWindow(eventType);
   if (dedupWindow > 0 && ctx.bookingId) {
@@ -866,20 +879,29 @@ export async function fireNotificationEvent(
         [eventType, ctx.bookingId, String(dedupWindow)]
       );
       if (recent.rows.length > 0) {
-        console.log(`[notificationEngine] ${eventType} for booking ${ctx.bookingId} — SKIPPED (already sent within ${dedupWindow}h)`);
+        console.log(`[notifEngine] ⏭ DEDUP-BLOCKED: ${eventType} already sent within ${dedupWindow}h for booking ${ctx.bookingId} (log=${recent.rows[0].id})`);
         return;
       }
+      console.log(`[notifEngine] ✓ Dedup OK: no recent ${eventType} send for booking ${ctx.bookingId} (window=${dedupWindow}h)`);
     } catch (dedupErr: any) {
-      console.warn(`[notificationEngine] dedup check failed (non-fatal):`, dedupErr?.message);
+      console.warn(`[notifEngine] ⚠ dedup check failed (non-fatal):`, dedupErr?.message);
     }
   }
 
   const enabled = await getEnabledChannels(eventType);
   const orderedChannels = CHANNEL_PRIORITY.filter(c => enabled.includes(c));
+  console.log(`[notifEngine] ${eventType}: enabled channels = [${orderedChannels.join(", ")}] (of [${enabled.join(", ")}])`);
+
+  if (orderedChannels.length === 0) {
+    console.warn(`[notifEngine] ⚠ ${eventType}: NO channels enabled — notification will not be sent. Check notification_settings table.`);
+    return;
+  }
+
   const templateBody = await getTemplate(eventType, orderedChannels[0] ?? "whatsapp");
   const message = templateBody ? applyTemplate(templateBody, ctx) : buildDefaultMessage(eventType, ctx);
 
   // ── BROADCAST MODE: fire ALL enabled channels in parallel ──────────────────
+  console.log(`[notifEngine] ${eventType}: dispatching to ${orderedChannels.length} channel(s)…`);
   const results = await Promise.allSettled(
     orderedChannels.map(channel => sendOnChannelWithType(channel, eventType, ctx, message))
   );

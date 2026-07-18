@@ -1423,11 +1423,12 @@ async function runMigrations() {
     await pool.query(`CREATE INDEX IF NOT EXISTS nl_booking_number_idx ON notification_logs(booking_number)`);
     console.log("[Migration] notification_logs customer_name/booking_number ensured");
   } catch (err) { console.error("[Migration] notification_logs customer_name/booking_number failed:", err); }
-  // ── notification_logs: wamid column ────────────────────────────────────────
+  // ── notification_logs: wamid + template columns ─────────────────────────────
   try {
     await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS wamid TEXT`);
-    console.log("[Migration] notification_logs wamid ensured");
-  } catch (err) { console.error("[Migration] notification_logs wamid failed:", err); }
+    await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS template TEXT`);
+    console.log("[Migration] notification_logs wamid+template ensured");
+  } catch (err) { console.error("[Migration] notification_logs wamid+template failed:", err); }
   // ── notification_auto_settings table ───────────────────────────────────────
   try {
     await pool.query(`

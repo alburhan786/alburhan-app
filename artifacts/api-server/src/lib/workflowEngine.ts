@@ -266,9 +266,11 @@ export async function triggerWorkflow(
   ctx: WorkflowContext
 ): Promise<void> {
   const start = Date.now();
+  console.log(`[workflow] ▶ triggerWorkflow: ${triggerType} | mobile=${ctx.customerMobile || "MISSING"} | booking=${ctx.bookingNumber || ctx.bookingId || "none"} | customer=${ctx.customerName || "?"}`);
 
   const enabled = await getRuleEnabled(triggerType);
   if (!enabled) {
+    console.log(`[workflow] ⏭ ${triggerType}: RULE DISABLED in workflow_rules — skipping`);
     await logWorkflow({ triggerType, bookingId: ctx.bookingId, customerId: ctx.customerId, customerName: ctx.customerName, status: "skipped" });
     return;
   }
@@ -285,7 +287,10 @@ export async function triggerWorkflow(
   try {
     const eventType = TRIGGER_TO_EVENT[triggerType];
     if (eventType && ctx.customerMobile) {
+      console.log(`[workflow] ${triggerType} → mapped event="${eventType}" | calling fireNotificationEvent`);
       await fireNotificationEvent(eventType as any, ctx as any);
+    } else {
+      console.warn(`[workflow] ⚠ ${triggerType}: SKIPPED notification (eventType="${eventType}" mobile="${ctx.customerMobile || "MISSING"}")`);
     }
 
     const ms = Date.now() - start;

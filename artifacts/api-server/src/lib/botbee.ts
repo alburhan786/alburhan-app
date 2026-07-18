@@ -16,6 +16,12 @@ export interface BotBeeTemplateOpts {
    *  only the final outcome (text ok/fail) appears in the logs. */
   skipFailureLog?: boolean;
   /**
+   * When true, suppress ALL internal logToDb calls from sendTemplate.
+   * Use this when the caller (e.g. notificationEngine trackNotification) will
+   * write the log entry itself so we don't create duplicate notification_logs rows.
+   */
+  noInternalLog?: boolean;
+  /**
    * Named variable values keyed by the EXACT BotBee variable name from the
    * template's variable_map (e.g. {Name:"...", BookingID:"...", Amount:"..."}).
    * BotBee maps these keys to {{1}},{{2}},... positions internally and substitutes
@@ -282,9 +288,9 @@ export async function sendTemplate(
       skipLog: true,  // sendTemplate owns the log; suppress intermediate text-send log
     });
 
-    // If text send succeeded — log it and return.
+    // If text send succeeded — log it and return (unless noInternalLog suppresses it).
     if (textResult.ok) {
-      if (opts?.eventType) {
+      if (opts?.eventType && !opts?.noInternalLog) {
         await logToDb({ eventType: opts.eventType, channel: "whatsapp", recipient: to, bookingId: opts.bookingId, customerId: opts.customerId, customerName: opts.customerName, templateId, message: `[tpl:${templateId}] ${rendered.substring(0, 250)}`, status: "sent", result: textResult });
       }
       return textResult;
@@ -316,7 +322,7 @@ export async function sendTemplate(
     phone = toBotBeePhone(to);
   } catch (err: any) {
     const result: BotBeeResult = { ok: false, provider: "BotBee", endpoint, errorMessage: err?.message || "Invalid mobile number" };
-    if (opts?.eventType) {
+    if (opts?.eventType && !opts?.noInternalLog) {
       await logToDb({ eventType: opts.eventType, channel: "whatsapp", recipient: to || "unknown", bookingId: opts.bookingId, customerId: opts.customerId, customerName: opts.customerName, templateId, message: `Template ID: ${templateId}`, status: "failed", result });
     }
     return result;
@@ -357,7 +363,7 @@ export async function sendTemplate(
     console.error("[BotBee] sendTemplate ERROR:", JSON.stringify({ templateId, error: err.message, response: resp?.data }));
   }
 
-  if (opts?.eventType) {
+  if (opts?.eventType && !opts?.noInternalLog) {
     if (result.ok || !opts.skipFailureLog) {
       await logToDb({ eventType: opts.eventType, channel: "whatsapp", recipient: to, bookingId: opts.bookingId, customerId: opts.customerId, customerName: opts.customerName, templateId, message: `Template ID: ${templateId}`, status: result.ok ? "sent" : "failed", result });
     }
