@@ -143,16 +143,18 @@ export default function VerifyAgreement() {
                 {/* Details */}
                 <div style={{ borderTop: "1px solid #EEE", paddingTop: 20 }}>
                   {[
-                    { label: "Agreement ID", value: data.agreementNumber },
-                    { label: "Booking Reference", value: data.bookingNumber },
-                    { label: "Customer Name", value: data.customerName },
-                    { label: "Package", value: data.packageName },
-                    { label: "Date Signed", value: data.signedAt ? new Date(data.signedAt).toLocaleString("en-IN") : "Not yet signed" },
-                    { label: "Agreement Created", value: new Date(data.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" }) },
+                    { label: "Agreement ID",       value: data.agreementNumber },
+                    { label: "Booking ID",          value: data.bookingNumber },
+                    { label: "Customer Name",       value: data.customerName },
+                    { label: "Package",             value: data.packageName },
+                    { label: "Status",              value: statusLabel(data.status) },
+                    { label: "Date Signed",         value: data.signedAt ? new Date(data.signedAt).toLocaleString("en-IN") : "Not yet signed" },
+                    { label: "Agreement Created",   value: new Date(data.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" }) },
+                    { label: "Digital Signature",   value: data.otpVerified && data.isValid ? "✓ OTP Verified — Legally Signed" : data.isValid ? "Signed (no OTP record)" : "Pending Customer Signature" },
                   ].map(({ label, value }) => (
                     <div key={label} style={{ display: "flex", padding: "10px 0", borderBottom: "1px solid #F5F5F5", fontFamily: "sans-serif" }}>
                       <div style={{ width: 160, color: "#666", fontSize: 13, flexShrink: 0 }}>{label}</div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "#111", wordBreak: "break-all" }}>{value || "—"}</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: label === "Status" ? statusColor(data.status) : label === "Digital Signature" && (data.otpVerified && data.isValid) ? "#0B3D2E" : "#111", wordBreak: "break-all" }}>{value || "—"}</div>
                     </div>
                   ))}
                 </div>
