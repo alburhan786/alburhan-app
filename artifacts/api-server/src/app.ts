@@ -493,6 +493,337 @@ app.post("/api/migrate/trigger-test-notification", async (req, res) => {
   }
 });
 
+// POST /api/migrate/e2e-verify — comprehensive end-to-end production verification
+app.post("/api/migrate/e2e-verify", async (req, res) => {
+  const key = (req.query.key || req.body?.key) as string;
+  if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
+
+  const { pool: p } = await import("@workspace/db");
+  const {
+    sendApprovalTemplate, sendPaymentReceivedTemplate, sendInvoiceReadyTemplate,
+    sendAgreementReadyTemplate, sendAgreementSignedTemplate,
+  } = await import("./lib/botbee.js");
+  const { sendDLTSMS } = await import("./lib/notifications.js");
+  const { upsertInvoiceForBooking } = await import("./routes/invoices.js");
+  const { generateInvoicePdfBuffer } = await import("./lib/paymentDocs.js");
+  const { generateAgreementPdfBuffer } = await import("./lib/agreementPdf.js");
+
+  const steps: Array<{
+    step: number; name: string; ok: boolean | null;
+    detail: string; waMessageId?: string; elapsed?: number;
+  }> = [];
+
+  function step(n: number, name: string, ok: boolean | null, detail: string, waMessageId?: string, elapsed?: number) {
+    steps.push({ step: n, name, ok, detail, waMessageId, elapsed });
+    console.log(`[e2e-verify] step ${n} ${ok ? '✅' : ok === null ? '⚠️' : '❌'} ${name}: ${detail}`);
+  }
+
+  // ── Pick booking ────────────────────────────────────────────────────────────
+  const preferredId = (req.body?.bookingId as string) || null;
+  let bRow: any;
+  if (preferredId) {
+    const r = await p.query(`SELECT * FROM bookings WHERE id=$1 LIMIT 1`, [preferredId]);
+    bRow = r.rows[0];
+  }
+  if (!bRow) {
+    // Pick most recent approved booking with a real mobile (not test numbers)
+    const r = await p.query(`
+      SELECT b.*, u.email AS user_email
+      FROM bookings b
+      LEFT JOIN users u ON u.id = b.customer_id
+      WHERE b.status IN ('approved','confirmed')
+        AND b.customer_mobile NOT LIKE '999%'
+        AND b.is_deleted IS NOT DISTINCT FROM false
+      ORDER BY b.updated_at DESC
+      LIMIT 1`);
+    bRow = r.rows[0];
+  }
+  if (!bRow) return void res.status(404).json({ error: "No suitable booking found", steps });
+
+  const booking = {
+    id:           bRow.id,
+    num:          bRow.booking_number,
+    name:         bRow.customer_name,
+    mobile:       bRow.customer_mobile,
+    email:        bRow.customer_email || bRow.user_email || null,
+    customerId:   bRow.customer_id,
+    packageName:  bRow.package_name || "Hajj/Umrah Package",
+    paid:         Number(bRow.paid_amount || 0),
+    total:        Number(bRow.final_amount || bRow.total_amount || 0),
+    status:       bRow.status,
+  };
+  const invoiceUrl = `https://alburhantravels.com/invoice/${booking.num}`;
+
+  step(0, "Booking selected", true,
+    `${booking.num} · ${booking.name} · ${booking.mobile} · status=${booking.status}`);
+
+  // ── STEP 1: booking_approved WhatsApp ────────────────────────────────────────
+  {
+    const t0 = Date.now();
+    const r = await sendApprovalTemplate(booking.mobile, {
+      customerName: booking.name,
+      packageName:  booking.packageName,
+      bookingId:    booking.num,
+      amount:       booking.total,
+      invoiceUrl,
+    }, { eventType: "booking_approved", bookingId: booking.id, customerId: booking.customerId });
+    step(1, "booking_approved WhatsApp", r.ok,
+      r.ok ? "Template sent" : (r.errorMessage || "failed"),
+      (r.responsePayload as any)?.wa_message_id, Date.now() - t0);
+  }
+
+  // ── STEP 2: booking_approved SMS ─────────────────────────────────────────────
+  {
+    const t0 = Date.now();
+    const msgSMS = `Dear ${booking.name}, your Hajj/Umrah booking ${booking.num} has been confirmed by Al Burhan Tours & Travels. For details visit alburhantravels.com`;
+    const ok = await sendDLTSMS(booking.mobile, msgSMS);
+    step(2, "booking_approved SMS", ok, ok ? "SMS dispatched" : "SMS failed", undefined, Date.now() - t0);
+  }
+
+  // ── STEP 3: Invoice — upsert ─────────────────────────────────────────────────
+  let invoice: any = null;
+  {
+    const t0 = Date.now();
+    try {
+      invoice = await upsertInvoiceForBooking(booking.id);
+      step(3, "Invoice upsert", !!invoice,
+        invoice ? `${invoice.invoice_number} · paid=${invoice.paid} / total=${invoice.total} · status=${invoice.invoice_status}` : "upsert returned null",
+        undefined, Date.now() - t0);
+    } catch (err: any) {
+      step(3, "Invoice upsert", false, err.message, undefined, Date.now() - t0);
+    }
+  }
+
+  // ── STEP 4: Invoice PDF generation ──────────────────────────────────────────
+  let invoicePdfBytes = 0;
+  if (invoice) {
+    const t0 = Date.now();
+    try {
+      const invRow = await p.query(`
+        SELECT i.*, b.booking_number, b.customer_name, b.customer_mobile,
+               b.package_name, b.number_of_pilgrims, b.preferred_departure_date,
+               b.customer_email, b.status as booking_status
+        FROM invoices i JOIN bookings b ON b.id = i.booking_id
+        WHERE i.id = $1 LIMIT 1`, [invoice.id]);
+      if (invRow.rows[0]) {
+        const buf = await generateInvoicePdfBuffer(invRow.rows[0]);
+        invoicePdfBytes = buf.length;
+        step(4, "Invoice PDF generation", buf.length > 5000,
+          `${buf.length} bytes`, undefined, Date.now() - t0);
+      } else {
+        step(4, "Invoice PDF generation", false, "Invoice row not found after upsert");
+      }
+    } catch (err: any) {
+      step(4, "Invoice PDF generation", false, err.message, undefined, Date.now() - t0);
+    }
+  } else {
+    step(4, "Invoice PDF generation", null, "Skipped — no invoice");
+  }
+
+  // ── STEP 5: invoice_ready WhatsApp ───────────────────────────────────────────
+  if (invoice && booking.paid > 0) {
+    const t0 = Date.now();
+    const r = await sendInvoiceReadyTemplate(booking.mobile, {
+      customerName:  booking.name,
+      bookingId:     booking.num,
+      invoiceNumber: invoice.invoice_number,
+      amount:        invoice.paid,
+      invoiceUrl,
+    }, { eventType: "invoice_generated", bookingId: booking.id, customerId: booking.customerId });
+    step(5, "invoice_ready WhatsApp", r.ok,
+      r.ok ? "Template sent" : (r.errorMessage || "failed"),
+      (r.responsePayload as any)?.wa_message_id, Date.now() - t0);
+  } else {
+    step(5, "invoice_ready WhatsApp", null,
+      invoice ? "Skipped — paid_amount=0 (template rule: never send if unpaid)" : "Skipped — no invoice");
+  }
+
+  // ── STEP 6: Invoice SMS ──────────────────────────────────────────────────────
+  if (invoice) {
+    const t0 = Date.now();
+    const msgSMS = `Dear ${booking.name}, your invoice ${invoice.invoice_number} for booking ${booking.num} is ready. Paid: Rs.${invoice.paid}. View: alburhantravels.com`;
+    const ok = await sendDLTSMS(booking.mobile, msgSMS);
+    step(6, "Invoice SMS", ok, ok ? "SMS dispatched" : "SMS failed", undefined, Date.now() - t0);
+  } else {
+    step(6, "Invoice SMS", null, "Skipped — no invoice");
+  }
+
+  // ── STEP 7: Agreement — check or auto-generate ───────────────────────────────
+  let agreement: any = null;
+  {
+    const t0 = Date.now();
+    try {
+      const agRes = await p.query(
+        `SELECT * FROM agreements WHERE booking_id=$1 AND (void_at IS NULL OR void_at > NOW()) ORDER BY created_at DESC LIMIT 1`,
+        [booking.id]);
+      if (agRes.rows[0]) {
+        agreement = agRes.rows[0];
+        step(7, "Agreement check", true,
+          `${agreement.agreement_number} · status=${agreement.status} · signed=${!!agreement.signed_at}`,
+          undefined, Date.now() - t0);
+      } else {
+        // Try auto-generate
+        const { autoGenerateAgreement } = await import("./routes/agreements.js");
+        const newAg = await autoGenerateAgreement(booking.id);
+        const rechk = await p.query(
+          `SELECT * FROM agreements WHERE booking_id=$1 ORDER BY created_at DESC LIMIT 1`,
+          [booking.id]);
+        agreement = rechk.rows[0] || null;
+        step(7, "Agreement auto-generate", !!agreement,
+          agreement ? `Created ${agreement.agreement_number}` : "autoGenerateAgreement returned but DB row missing",
+          undefined, Date.now() - t0);
+      }
+    } catch (err: any) {
+      step(7, "Agreement check/generate", false, err.message, undefined, Date.now() - t0);
+    }
+  }
+
+  // ── STEP 8: Agreement PDF generation ────────────────────────────────────────
+  if (agreement) {
+    const t0 = Date.now();
+    try {
+      const fullAg = await p.query(`
+        SELECT ag.*, b.customer_name, b.customer_mobile, b.booking_number,
+               b.package_name, b.number_of_pilgrims, b.preferred_departure_date,
+               b.final_amount, b.paid_amount
+        FROM agreements ag JOIN bookings b ON b.id = ag.booking_id
+        WHERE ag.id=$1 LIMIT 1`, [agreement.id]);
+      if (fullAg.rows[0]) {
+        const row = fullAg.rows[0];
+        const buf = await generateAgreementPdfBuffer({
+          agreementNumber:  row.agreement_number,
+          customerName:     row.customer_name,
+          customerMobile:   row.customer_mobile,
+          bookingNumber:    row.booking_number,
+          packageName:      row.package_name || "Hajj/Umrah Package",
+          numberOfPilgrims: row.number_of_pilgrims || 1,
+          totalAmount:      Number(row.final_amount || 0),
+          paidAmount:       Number(row.paid_amount || 0),
+          departureDateStr: row.preferred_departure_date,
+          clauses:          [],
+        } as any);
+        step(8, "Agreement PDF generation", buf.length > 5000,
+          `${buf.length} bytes`, undefined, Date.now() - t0);
+      } else {
+        step(8, "Agreement PDF generation", false, "Agreement row not found");
+      }
+    } catch (err: any) {
+      step(8, "Agreement PDF generation", false, err.message, undefined, Date.now() - t0);
+    }
+  } else {
+    step(8, "Agreement PDF generation", null, "Skipped — no agreement");
+  }
+
+  // ── STEP 9: agreement_ready WhatsApp ─────────────────────────────────────────
+  if (agreement) {
+    const t0 = Date.now();
+    const agUrl = `https://alburhantravels.com/agreement/${agreement.agreement_number}`;
+    const r = await sendAgreementReadyTemplate(booking.mobile, {
+      customerName:    booking.name,
+      bookingId:       booking.num,
+      agreementNumber: agreement.agreement_number,
+      agreementUrl:    agUrl,
+    }, { eventType: "agreement_ready", bookingId: booking.id, customerId: booking.customerId });
+    step(9, "agreement_ready WhatsApp", r.ok,
+      r.ok ? "Template sent" : (r.errorMessage || "failed"),
+      (r.responsePayload as any)?.wa_message_id, Date.now() - t0);
+  } else {
+    step(9, "agreement_ready WhatsApp", null, "Skipped — no agreement");
+  }
+
+  // ── STEP 10: agreement_ready SMS ─────────────────────────────────────────────
+  if (agreement) {
+    const t0 = Date.now();
+    const agUrl = `https://alburhantravels.com/agreement/${agreement.agreement_number}`;
+    const msgSMS = `Dear ${booking.name}, your Hajj/Umrah agreement ${agreement.agreement_number} is ready. Please sign at: ${agUrl}`;
+    const ok = await sendDLTSMS(booking.mobile, msgSMS);
+    step(10, "Agreement SMS", ok, ok ? "SMS dispatched" : "SMS failed", undefined, Date.now() - t0);
+  } else {
+    step(10, "Agreement SMS", null, "Skipped — no agreement");
+  }
+
+  // ── STEP 11: Simulate agreement signing OTP ──────────────────────────────────
+  if (agreement && !agreement.signed_at) {
+    const t0 = Date.now();
+    try {
+      // Generate OTP and store it
+      const otp = String(Math.floor(100000 + Math.random() * 900000));
+      await p.query(`UPDATE agreements SET signing_otp=$1 WHERE id=$2`, [otp, agreement.id]);
+      const msgSMS = `Your Al Burhan agreement signing OTP is ${otp}. Valid for 10 minutes.`;
+      const ok = await sendDLTSMS(booking.mobile, msgSMS);
+      step(11, "Agreement signing OTP SMS", ok,
+        ok ? `OTP generated & SMS sent (OTP not logged for security)` : "OTP SMS failed",
+        undefined, Date.now() - t0);
+    } catch (err: any) {
+      step(11, "Agreement signing OTP SMS", false, err.message, undefined, Date.now() - t0);
+    }
+  } else if (agreement?.signed_at) {
+    step(11, "Agreement signing OTP SMS", null,
+      `Skipped — agreement already signed at ${agreement.signed_at}`);
+  } else {
+    step(11, "Agreement signing OTP SMS", null, "Skipped — no agreement");
+  }
+
+  // ── STEP 12: agreement_signed WhatsApp (post-signing confirmation) ────────────
+  if (agreement) {
+    const t0 = Date.now();
+    const r = await sendAgreementSignedTemplate(booking.mobile, {
+      customerName: booking.name,
+      bookingId:    booking.num,
+    }, { eventType: "agreement_signed", bookingId: booking.id, customerId: booking.customerId });
+    step(12, "agreement_signed WhatsApp", r.ok,
+      r.ok ? "Template sent" : (r.errorMessage || "failed"),
+      (r.responsePayload as any)?.wa_message_id, Date.now() - t0);
+  } else {
+    step(12, "agreement_signed WhatsApp", null, "Skipped — no agreement");
+  }
+
+  // ── STEP 13: payment_received WhatsApp ───────────────────────────────────────
+  if (booking.paid > 0) {
+    const t0 = Date.now();
+    const r = await sendPaymentReceivedTemplate(booking.mobile, {
+      customerName:  booking.name,
+      bookingId:     booking.num,
+      invoiceNumber: invoice?.invoice_number || booking.num,
+      amount:        booking.paid,
+    }, { eventType: "payment_received", bookingId: booking.id, customerId: booking.customerId });
+    step(13, "payment_received WhatsApp", r.ok,
+      r.ok ? "Template sent" : (r.errorMessage || "failed"),
+      (r.responsePayload as any)?.wa_message_id, Date.now() - t0);
+  } else {
+    step(13, "payment_received WhatsApp", null, "Skipped — paid_amount=0");
+  }
+
+  // ── STEP 14: Payment SMS ─────────────────────────────────────────────────────
+  if (booking.paid > 0) {
+    const t0 = Date.now();
+    const msgSMS = `Dear ${booking.name}, payment of Rs.${booking.paid} received for booking ${booking.num}. Thank you - Al Burhan Tours & Travels`;
+    const ok = await sendDLTSMS(booking.mobile, msgSMS);
+    step(14, "Payment received SMS", ok, ok ? "SMS dispatched" : "SMS failed", undefined, Date.now() - t0);
+  } else {
+    step(14, "Payment received SMS", null, "Skipped — paid_amount=0");
+  }
+
+  // ── Pull fresh notification logs ──────────────────────────────────────────────
+  await new Promise(r => setTimeout(r, 2000));
+  const freshLogs = await p.query(`
+    SELECT channel, event_type, status, http_status, error_code, sent_at
+    FROM notification_logs
+    WHERE booking_id=$1
+    ORDER BY sent_at DESC LIMIT 30`, [booking.id]);
+
+  const passed  = steps.filter(s => s.ok === true).length;
+  const failed  = steps.filter(s => s.ok === false).length;
+  const skipped = steps.filter(s => s.ok === null).length;
+
+  res.json({
+    booking: { id: booking.id, number: booking.num, name: booking.name, mobile: booking.mobile, status: booking.status },
+    summary: { total: steps.length, passed, failed, skipped, allPassed: failed === 0 },
+    steps,
+    recentNotificationLogs: freshLogs.rows,
+  });
+});
+
 // POST /api/migrate/test-approval-template — fire booking_approved WhatsApp template (no auth)
 app.post("/api/migrate/test-approval-template", async (req, res) => {
   const key = (req.query.key || req.body?.key) as string;

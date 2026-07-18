@@ -473,6 +473,8 @@ function drawPage1(doc: any, o: AgreementPdfOptions, qrBuf: Buffer | null) {
 // ══════════════════════════════════════════════════════════════════════════════
 function drawPage2(doc: any, o: AgreementPdfOptions) {
   let y = CONTENT_Y + 2;
+  const cellH = 23;
+  const g = 2;
 
   // ── Flight Details ────────────────────────────────────────────────────────
   y = secBar(doc, y, "FLIGHT DETAILS");
