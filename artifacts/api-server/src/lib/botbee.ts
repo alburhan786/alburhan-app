@@ -154,27 +154,28 @@ export async function sendText(
   return result;
 }
 
-// ── Template body store (from BotBee raw_data.mixed_body_text, fetched 2026-07-18) ────────────
-// BotBee's send/template API does NOT substitute #!VarName!# placeholders regardless of
-// the variables format used (named object, flat array, components — all accepted, none substituted).
-// The actual delivery content is mixed_body_text with #!Name!# literal placeholders.
-// Fix: render the body locally, then send via sendText() (/whatsapp/send).
+// ── Template body store (from BotBee body_content / template_json, fetched 2026-07-18) ────────────
+// These are the EXACT bodies registered on Meta ({{1}}, {{2}}, … positional variables).
+// PRIMARY PATH: renderTemplateBody() substitutes {{N}} with Object.values(vars) → sendText().
+// FALLBACK PATH (outside 24h window): BotBee template API receives variables as flat positional
+// array (Object.values(namedVars)) so BotBee maps index 0→{{1}}, index 1→{{2}} correctly on Meta.
+// variable_map.body (BotBee): {"1":"#!Name!#","2":"#!BookingID!#",...} — insertion order matches sender function variable order.
 const TEMPLATE_BODIES: Record<string, string> = {
-  "409950": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh  #!Name!#\r\nAlhamdulillah! ✅\r\n\r\nYour booking has been APPROVED.\r\n\r\n📋 Booking ID:  #!BookingID!# \r\n📦 Package: #!PackageContent!# \r\n💰 Amount: ₹ #!Amount!#\r\n\r\nPlease complete your payment using the link below.\r\n\r\n🔗   #!Paymenturllink!#\r\n\r\n📞 +91 9893225590\r\n\r\nJazak Allah Khair.\r\nAl Burhan Tours & Travels",
-  "409953": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh  #!Name!#\r\n\r\nAlhamdulillah! 🎉\r\n\r\nWe have successfully received your payment.\r\n\r\n📋 Booking ID:#!BookingID!# \r\n🧾 Invoice No:  #!Invoice!#\r\n💰 Amount Received: ₹ #!Amount!#\r\n\r\nYour booking is confirmed.\r\n\r\nJazak Allah Khair.\r\n\r\nAl Burhan Tours & Travels",
-  "409956": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh #!Name!#\r\n\r\nYour invoice has been generated.\r\n\r\n📋 Booking ID:#!BookingID!# \r\n🧾 Invoice No:#!Invoice!# \r\n💰 Amount: ₹ #!Amount!#\r\nDownload your invoice below.\r\n\r\n🔗  #!Paymenturllink!#\r\n\r\nThank you for choosing Al Burhan Tours & Travels.",
-  "409958": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh  #!Name!#\r\n\r\nYour Hajj/Umrah Agreement is ready.\r\n\r\n📋 Booking ID: #!BookingID!#\r\n📄 Agreement No: #!Agreement!# \r\n\r\nDownload your agreement below.\r\n\r\n🔗 #!Download!# \r\n\r\nPlease review and complete the digital signature if required.\r\n\r\nAl Burhan Tours & Travels",
-  "409965": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh   #!Name!#\r\n\r\nAlhamdulillah!\r\n\r\nYour agreement has been successfully signed.\r\n\r\n📄 Agreement ID: #!Agreement!# \r\n\r\nThank you for completing the documentation.\r\n\r\nAl Burhan Tours & Travels",
-  "409991": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh   #!Name!#\r\n\r\nCongratulations!\r\n\r\nYour visa has been issued successfully.\r\n\r\n📋 Booking ID:#!BookingID!# \r\n🛂 Visa Number:  #!Visano!# \r\nDownload Visa:    #!Download!#\r\n \r\n\r\nMay Allah accept your journey.\r\n\r\nAl Burhan Tours & Travels",
-  "409994": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh  #!Name!#\r\n\r\nYour flight ticket has been issued.\r\n\r\n📋 Booking ID:#!BookingID!# \r\n✈ PNR:#!Flightnumber!# \r\n\r\nDownload Ticket:#!Download!#\r\n \r\n\r\nSafe Travels.\r\n\r\nAl Burhan Tours & Travels",
-  "409999": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh  #!Name!#\r\n\r\nThis is a reminder for your upcoming journey.\r\n\r\n📋 Booking ID:#!BookingID!# \r\n🕌 Package:  #!PackageContent!#\r\n\r\n✈ Flight:#!Flightnumber!# \r\n📅 Departure Date:  #!Departuredate!#\r\n🕒 Reporting Time #!Reportingtime!#\r\n🏢 Airport #!Airport!#\r\n\r\nKindly report at the airport at least 4 hours before departure with your original passport and required travel documents.\r\n\r\nMay Allah (SWT) accept your Hajj/Umrah and grant you a safe journey.\r\n\r\nAl Burhan Tours & Travels",
-  "410000": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh  #!Name!#\r\n\r\nThis is a reminder for your return journey.\r\n\r\n📋 Booking ID:  #!BookingID!#\r\n\r\n✈ Flight: #!Flightnumber!# \r\n📅 Return Date:  #!Departuredate!#\r\n🕒 Reporting Time: #!Reportingtime!# \r\n🏢 Airport:#!Airport!# \r\n\r\nPlease arrive at the airport well before your reporting time.\r\n\r\nMay Allah (SWT) accept all your prayers and grant you a safe journey home.\r\n\r\nAl Burhan Tours & Travels",
-  "410008": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh  #!Name!#\r\nYour accommodation details are ready.\r\n\r\n📋 Booking ID:   #!BookingID!#\r\n\r\n🏨 Hotel:  #!Hotel!#\r\n🚪 Room No:#!Roomnumber!# \r\n\r\nPlease keep these details for your reference during your stay.\r\n\r\nMay Allah (SWT) make your stay comfortable and blessed.\r\n\r\nAl Burhan Tours & Travels",
-  "410022": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh  #!Name!#\r\n\r\nYou are invited to attend the Hajj/Umrah Orientation Programme.\r\n\r\n📅 Date:  #!date!#\r\n🕒 Time: #!Time!# \r\n📍 Venue:  #!Hussainhall!#\r\n\r\nYour attendance is highly recommended to understand travel procedures, rituals, and important guidelines.\r\n\r\nJazak Allah Khair.\r\n\r\nAl Burhan Tours & Travels",
-  "410026": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh  #!Name!#\r\n\r\nYour departure date is approaching.\r\n\r\n📋 Booking ID:  #!BookingID!#\r\n📅 Departure:#!Departuredate!# \r\n🛄 Reporting Time:  #!Reportingtime!# \r\n🏢 Airport #!T2!# \r\n\r\nPlease carry your Passport, Visa, Flight Ticket, ID Card, and other required documents.\r\n\r\nMay Allah (SWT) bless your journey.\r\n\r\nAl Burhan Tours & Travels",
-  "410030": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh  #!Name!#\r\n\r\nWelcome to the Kingdom of Saudi Arabia.\r\n\r\nAlhamdulillah, we pray that your Hajj/Umrah journey is filled with peace, blessings, and acceptance.\r\n\r\nIf you require any assistance during your stay, please contact our team.\r\n\r\nJazak Allah Khair.\r\n\r\nAl Burhan Tours & Travels",
-  "410031": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh  #!Name!#\r\n\r\nAlhamdulillah!\r\n\r\nWelcome back to India.\r\n\r\nWe pray that Allah (SWT) accepts your Hajj/Umrah, forgives your sins, and grants you countless blessings.\r\n\r\nThank you for travelling with Al Burhan Tours & Travels.\r\n\r\nJazak Allah Khair.",
-  "410040": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh #!Name!#\r\n\r\n🕌 Hajj  #!2027!# Bookings Are Now Open!\r\n\r\nBook your Hajj journey with Al Burhan Tours & Travels.\r\n\r\n✅ Government Approved Services\r\n✅ Comfortable Accommodation\r\n✅ Experienced Tour Guides\r\n✅ Complete Visa & Travel Assistance\r\n\r\n📞 Contact: +91 9893225590\r\n🌐 www.alburhantravels.com\r\n\r\nReserve your seat today and begin your sacred journey with confidence.\r\n\r\nJazak Allah Khair.\r\n\r\nAl Burhan Tours & Travels",
+  "409950": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {{1}}\nAlhamdulillah! ✅\n\nYour booking has been APPROVED.\n\n📋 Booking ID: {{2}}\n📦 Package: {{3}}\n💰 Amount: ₹ {{4}}\n\nPlease complete your payment using the link below.\n\n🔗 {{5}}\n\n📞 +91 9893225590\n\nJazak Allah Khair.\nAl Burhan Tours & Travels",
+  "409953": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {{1}}\n\nAlhamdulillah! 🎉\n\nWe have successfully received your payment.\n\n📋 Booking ID:{{2}}\n🧾 Invoice No: {{3}}\n💰 Amount Received: ₹ {{4}}\n\nYour booking is confirmed.\n\nJazak Allah Khair.\n\nAl Burhan Tours & Travels",
+  "409956": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {{1}}\n\nYour invoice has been generated.\n\n📋 Booking ID:{{2}}\n🧾 Invoice No:{{3}}\n💰 Amount: ₹ {{4}}\nDownload your invoice below.\n\n🔗 {{5}}\n\nThank you for choosing Al Burhan Tours & Travels.",
+  "409958": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {{1}}\n\nYour Hajj/Umrah Agreement is ready.\n\n📋 Booking ID: {{2}}\n📄 Agreement No: {{3}}\n\nDownload your agreement below.\n\n🔗 {{4}}\n\nPlease review and complete the digital signature if required.\n\nAl Burhan Tours & Travels",
+  "409965": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {{1}}\n\nAlhamdulillah!\n\nYour agreement has been successfully signed.\n\n📄 Agreement ID: {{2}}\n\nThank you for completing the documentation.\n\nAl Burhan Tours & Travels",
+  "409991": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {{1}}\n\nCongratulations!\n\nYour visa has been issued successfully.\n\n📋 Booking ID:{{2}}\n🛂 Visa Number: {{3}}\nDownload Visa: {{4}}\n\n\nMay Allah accept your journey.\n\nAl Burhan Tours & Travels",
+  "409994": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {{1}}\n\nYour flight ticket has been issued.\n\n📋 Booking ID:{{2}}\n✈ PNR:{{3}}\n\nDownload Ticket:{{4}}\n\n\nSafe Travels.\n\nAl Burhan Tours & Travels",
+  "409999": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {{1}}\n\nThis is a reminder for your upcoming journey.\n\n📋 Booking ID:{{2}}\n🕌 Package: {{3}}\n\n✈ Flight:{{4}}\n📅 Departure Date: {{5}}\n🕒 Reporting Time {{6}}\n🏢 Airport {{7}}\n\nKindly report at the airport at least 4 hours before departure with your original passport and required travel documents.\n\nMay Allah (SWT) accept your Hajj/Umrah and grant you a safe journey.\n\nAl Burhan Tours & Travels",
+  "410000": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {{1}}\n\nThis is a reminder for your return journey.\n\n📋 Booking ID: {{2}}\n\n✈ Flight: {{3}}\n📅 Return Date: {{4}}\n🕒 Reporting Time: {{5}}\n🏢 Airport:{{6}}\n\nPlease arrive at the airport well before your reporting time.\n\nMay Allah (SWT) accept all your prayers and grant you a safe journey home.\n\nAl Burhan Tours & Travels",
+  "410008": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {{1}}\nYour accommodation details are ready.\n\n📋 Booking ID: {{2}}\n\n🏨 Hotel: {{3}}\n🚪 Room No:{{4}}\n\nPlease keep these details for your reference during your stay.\n\nMay Allah (SWT) make your stay comfortable and blessed.\n\nAl Burhan Tours & Travels",
+  "410022": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {{1}}\n\nYou are invited to attend the Hajj/Umrah Orientation Programme.\n\n📅 Date: {{2}}\n🕒 Time: {{3}}\n📍 Venue: {{4}}\n\nYour attendance is highly recommended to understand travel procedures, rituals, and important guidelines.\n\nJazak Allah Khair.\n\nAl Burhan Tours & Travels",
+  "410026": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {{1}}\n\nYour departure date is approaching.\n\n📋 Booking ID: {{2}}\n📅 Departure:{{3}}\n🛄 Reporting Time: {{4}}\n🏢 Airport {{5}}\n\nPlease carry your Passport, Visa, Flight Ticket, ID Card, and other required documents.\n\nMay Allah (SWT) bless your journey.\n\nAl Burhan Tours & Travels",
+  "410030": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {{1}}\n\nWelcome to the Kingdom of Saudi Arabia.\n\nAlhamdulillah, we pray that your Hajj/Umrah journey is filled with peace, blessings, and acceptance.\n\nIf you require any assistance during your stay, please contact our team.\n\nJazak Allah Khair.\n\nAl Burhan Tours & Travels",
+  "410031": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {{1}}\n\nAlhamdulillah!\n\nWelcome back to India.\n\nWe pray that Allah (SWT) accepts your Hajj/Umrah, forgives your sins, and grants you countless blessings.\n\nThank you for travelling with Al Burhan Tours & Travels.\n\nJazak Allah Khair.",
+  "410040": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {{1}}\n\n🕌 Hajj {{2}} Bookings Are Now Open!\n\nBook your Hajj journey with Al Burhan Tours & Travels.\n\n✅ Government Approved Services\n✅ Comfortable Accommodation\n✅ Experienced Tour Guides\n✅ Complete Visa & Travel Assistance\n\n📞 Contact: +91 9893225590\n🌐 www.alburhantravels.com\n\nReserve your seat today and begin your sacred journey with confidence.\n\nJazak Allah Khair.\n\nAl Burhan Tours & Travels",
 };
 
 /**
@@ -245,8 +246,11 @@ export async function sendTemplate(
   if (templateBody) {
     const rendered = namedVars ? renderTemplateBody(templateBody, namedVars) : templateBody;
 
-    // Sanity check: warn if any #!...!# placeholders remain unsubstituted
-    const remaining = [...rendered.matchAll(/#![^!]+!#/g)].map(m => m[0]);
+    // Sanity check: warn if any placeholders remain unsubstituted (#!Var!# or {{N}})
+    const remaining = [
+      ...[...rendered.matchAll(/#![^!]+!#/g)].map(m => m[0]),
+      ...[...rendered.matchAll(/\{\{\d+\}\}/g)].map(m => m[0]),
+    ];
     if (remaining.length) {
       console.warn("[BotBee] sendTemplate: unsubstituted placeholders after render:", remaining, "vars keys:", namedVars ? Object.keys(namedVars) : "none");
     }
@@ -269,13 +273,12 @@ export async function sendTemplate(
     if (textResult.ok) return textResult;
 
     // Text API rejected (most likely "outside 24 hour window").
-    // Fall through to the template API below as a last resort.
-    // The template will be delivered WITHOUT variable substitution (shows #!Name!# literally)
-    // until the BotBee templates are recreated with Meta {{1}} variable format.
+    // Fall through to the template API below — BotBee receives variables as a flat positional
+    // array so it can map index 0 → {{1}}, index 1 → {{2}} on Meta (which has {{N}} registered).
     const errMsg = textResult.errorMessage || "";
     const is24hBlock = /24.hour|window|template message/i.test(errMsg);
     if (is24hBlock) {
-      console.warn("[BotBee] sendTemplate: 24h window blocked text send, falling through to template API (no variable substitution):", to, errMsg);
+      console.warn("[BotBee] sendTemplate: 24h window blocked text send, falling through to template API (flat positional variables):", to, errMsg);
     } else {
       console.warn("[BotBee] sendTemplate: text send failed, falling through to template API:", to, errMsg);
     }
@@ -301,16 +304,20 @@ export async function sendTemplate(
     return result;
   }
 
+  // Pass variables as a flat positional array so BotBee maps index 0 → {{1}}, index 1 → {{2}}.
+  // Sender functions build the variable object in exact insertion order matching variable_map positions.
+  const positionalVars = namedVars ? Object.values(namedVars) : undefined;
+
   const payload: Record<string, unknown> = {
     apiToken, phone_number_id, phone_number: phone,
     ...(isNumericId ? { template_id: Number(templateId) } : { template_name: templateId }),
-    ...(namedVars ? { variables: namedVars } : {}),
+    ...(positionalVars ? { variables: positionalVars } : {}),
   };
 
   const reqPayload: Record<string, unknown> = {
     phone_number_id, phone_number: phone,
     ...(isNumericId ? { template_id: Number(templateId) } : { template_name: templateId }),
-    ...(namedVars ? { variables: namedVars } : {}),
+    ...(positionalVars ? { variables: positionalVars } : {}),
   };
 
   console.log("[BotBee] sendTemplate REQUEST →", JSON.stringify(reqPayload));

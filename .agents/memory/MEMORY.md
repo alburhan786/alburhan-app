@@ -1,4 +1,4 @@
-- [BotBee template recreation plan](botbee-template-recreation-plan.md) — BotBee API has NO template CRUD; dashboard-only; activate-new-templates endpoint + applyTemplateOverrides() ready for when admin recreates 15 templates with {{1}} format
+- [BotBee TEMPLATE_BODIES must match body_content](botbee-template-bodies-fix.md) — TEMPLATE_BODIES must use exact body_content ({{N}} format) from BotBee, NOT mixed_body_text (#!Name!#); fallback must pass Object.values(vars) flat array, not named object
 - [VPS deployment path](vps-deployment-path.md) — VPS has full monorepo; server reads static files from artifacts/alburhan/dist/public, NOT from public/ or dist/public/
 - [Family management schema](family-schema.md) — familyId/familyHead/familyRelation fields on pilgrims, use QrImg (img.qrserver.com) NOT QRCodeCanvas for print-safe QR codes.
 - [VPS drizzle db.execute quirk](vps-drizzle-pool-query.md) — drizzle db.execute() returns non-iterable QueryResult in bundled CJS; always use pool.query() for raw SQL on VPS
