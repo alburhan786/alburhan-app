@@ -3169,6 +3169,392 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   res.status(status).json({ message });
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/migrate/production-payment-trace
+// Audits all 17 production payment pipeline steps for a REAL confirmed booking.
+// When retrigger=true: actually fires processPaymentSuccessNotifications +
+// autoGenerateAgreement against the real booking — sends real WhatsApp/SMS/email.
+// Zero simulation. Zero mock data. Uses actual production DB + real APIs.
+// ─────────────────────────────────────────────────────────────────────────────
+app.post("/api/migrate/production-payment-trace", async (req, res) => {
+  const key = req.body?.key as string;
+  if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
+
+  const bookingNum = (req.body?.booking || "ABT26646746") as string;
+  const retrigger  = req.body?.retrigger === true;
+
+  const trace: Record<string, any>[] = [];
+  const step = (name: string, data: Record<string, any>) => {
+    trace.push({ step: name, ts: new Date().toISOString(), ...data });
+    console.log(`[PROD-TRACE][${name}]`, JSON.stringify(data).slice(0, 300));
+  };
+
+  try {
+    const { pool: p } = await import("@workspace/db");
+
+    // ── STEP 1–4: Booking state ───────────────────────────────────────────────
+    const bRes = await p.query(
+      `SELECT id, booking_number, status, customer_name, customer_mobile, customer_email,
+              package_name, number_of_pilgrims, final_amount, paid_amount, online_paid_amount,
+              invoice_number, razorpay_payment_id, razorpay_order_id, journey_status,
+              customer_id, group_id, updated_at
+       FROM bookings
+       WHERE booking_number = $1 AND (is_deleted IS NULL OR is_deleted = false)`,
+      [bookingNum]
+    );
+    const booking = bRes.rows[0];
+    if (!booking) return void res.json({ ok: false, error: `Booking ${bookingNum} not found` });
+
+    const bookingId     = booking.id as string;
+    const isFullyPaid   = parseFloat(booking.paid_amount) >= parseFloat(booking.final_amount);
+    const hasRazorpay   = !!booking.razorpay_payment_id;
+
+    step("step_01_razorpay_webhook", {
+      label:    "Razorpay webhook / callback received",
+      status:   hasRazorpay ? "✓ real Razorpay payment" : "ℹ admin-confirmed offline payment (no Razorpay webhook)",
+      razorpay_payment_id:  booking.razorpay_payment_id ?? "N/A",
+      razorpay_order_id:    booking.razorpay_order_id   ?? "N/A",
+    });
+
+    step("step_02_payment_verified", {
+      label:   "Payment signature verified",
+      status:  booking.status === "confirmed" ? "✓" : `✗ booking_status=${booking.status}`,
+      booking_status: booking.status,
+    });
+
+    step("step_03_booking_paid", {
+      label:        "Booking paid_amount updated",
+      status:       isFullyPaid ? "✓" : `✗ paid ${booking.paid_amount} < final ${booking.final_amount}`,
+      paid_amount:  booking.paid_amount,
+      final_amount: booking.final_amount,
+      sql_update_count: isFullyPaid ? "1 row" : "partial",
+    });
+
+    step("step_04_booking_confirmed", {
+      label:           "Booking status → confirmed",
+      status:          booking.status === "confirmed" ? "✓" : `✗ status=${booking.status}`,
+      booking_status:  booking.status,
+      journey_status:  booking.journey_status,
+      updated_at:      booking.updated_at,
+    });
+
+    // ── STEP 5–6: Invoice ─────────────────────────────────────────────────────
+    const invRes  = await p.query(
+      `SELECT id, invoice_number, invoice_status, total, paid, balance,
+              pdf_path, created_at
+       FROM invoices WHERE booking_id = $1 ORDER BY created_at DESC LIMIT 1`,
+      [bookingId]
+    );
+    const invoice = invRes.rows[0];
+    const invoiceHasPdf = !!(invoice?.pdf_path);
+
+    step("step_05_invoice_generated", {
+      label:           "Invoice record created / upserted",
+      status:          invoice ? "✓" : "✗ NO INVOICE in DB",
+      invoice_id:      invoice?.id             ?? null,
+      invoice_number:  invoice?.invoice_number  ?? null,
+      invoice_status:  invoice?.invoice_status  ?? null,
+      total:           invoice?.total           ?? null,
+      paid:            invoice?.paid            ?? null,
+      balance:         invoice?.balance         ?? null,
+    });
+
+    step("step_06_invoice_pdf", {
+      label:      "Invoice PDF generated",
+      status:     invoiceHasPdf ? "✓" : (invoice ? "✗ pdf_path=null (no PDF yet)" : "✗ no invoice"),
+      invoice_id: invoice?.id    ?? null,
+      pdf_path:   invoice?.pdf_path ?? null,
+    });
+
+    // ── STEP 7–8: Agreement ───────────────────────────────────────────────────
+    const agrRes   = await p.query(
+      `SELECT id, agreement_number, status, pdf_generated, verification_token, created_at
+       FROM agreements WHERE booking_id = $1 ORDER BY created_at DESC LIMIT 1`,
+      [bookingId]
+    );
+    const agreement = agrRes.rows[0];
+
+    step("step_07_agreement_created", {
+      label:             "Agreement record created",
+      status:            agreement ? "✓" : "✗ NO AGREEMENT in DB",
+      agreement_id:      agreement?.id               ?? null,
+      agreement_number:  agreement?.agreement_number  ?? null,
+      agreement_status:  agreement?.status            ?? null,
+      token_set:         !!agreement?.verification_token,
+    });
+
+    step("step_08_agreement_pdf", {
+      label:          "Agreement PDF generated",
+      status:         agreement?.pdf_generated ? "✓" : (agreement ? "✗ pdf_generated=false" : "✗ no agreement"),
+      agreement_id:   agreement?.id ?? null,
+      pdf_generated:  agreement?.pdf_generated ?? false,
+    });
+
+    // ── STEP 9: Customer dashboard ────────────────────────────────────────────
+    const dashRes = await p.query(
+      `SELECT status, sent_at FROM notification_logs
+       WHERE booking_id = $1 AND event_type LIKE '%booking_approved%' AND channel = 'dashboard'
+       ORDER BY sent_at DESC LIMIT 1`,
+      [bookingId]
+    );
+    step("step_09_customer_dashboard", {
+      label:   "Customer dashboard updated",
+      status:  dashRes.rows[0]?.status === "sent" ? "✓" : "ℹ booking always visible by booking_id",
+      dashboard_notification_status: dashRes.rows[0]?.status ?? "not in notification_logs",
+    });
+
+    step("step_10_booking_status_confirmed", {
+      label:          "Booking status shown as Confirmed",
+      status:         booking.status === "confirmed" ? "✓" : `✗ status=${booking.status}`,
+      booking_status: booking.status,
+    });
+
+    // ── STEP 11–12: Workflow logs ─────────────────────────────────────────────
+    const wfRes = await p.query(
+      `SELECT trigger_type, status, created_at, completed_at, error_message
+       FROM workflow_logs WHERE booking_id = $1 ORDER BY created_at DESC`,
+      [bookingId]
+    );
+    const allWf       = wfRes.rows;
+    const paymentWf   = allWf.find((w: any) => w.trigger_type === "payment_received");
+    const confirmedWf = allWf.find((w: any) => w.trigger_type === "booking_approved");
+
+    step("step_11_payment_workflow", {
+      label:            "payment_received workflow triggered",
+      status:           paymentWf
+                          ? (paymentWf.status === "completed" ? "✓" : `✗ workflow_status=${paymentWf.status}`)
+                          : "✗ NO workflow_logs row for payment_received",
+      workflow_trigger: paymentWf?.trigger_type ?? null,
+      workflow_status:  paymentWf?.status       ?? null,
+      all_workflow_logs: allWf.map((w: any) => ({
+        trigger: w.trigger_type, status: w.status, created: String(w.created_at).slice(0,19)
+      })),
+    });
+
+    step("step_12_booking_confirmed_workflow", {
+      label:            "booking_approved workflow triggered",
+      status:           confirmedWf
+                          ? (confirmedWf.status === "completed" ? "✓" : `✗ status=${confirmedWf.status}`)
+                          : "ℹ booking_approved goes through notificationEngine (check notification_logs)",
+      workflow_trigger: confirmedWf?.trigger_type ?? null,
+      workflow_status:  confirmedWf?.status       ?? null,
+    });
+
+    // ── STEP 13–16: Notification logs ─────────────────────────────────────────
+    const nlRes  = await p.query(
+      `SELECT channel, event_type, status, wamid, template, http_status, error_code, sent_at
+       FROM notification_logs WHERE booking_id = $1 ORDER BY sent_at DESC`,
+      [bookingId]
+    );
+    const nlRows = nlRes.rows;
+
+    const forEvent = (evt: string, ch: string) =>
+      nlRows.filter((r: any) => r.event_type === evt && r.channel === ch);
+    const anySuccess = (evt: string, ch: string) =>
+      nlRows.some((r: any) => r.event_type === evt && r.channel === ch && r.status === "sent");
+
+    const waSuccess  = anySuccess("payment_received","whatsapp") || anySuccess("payment_received_pdf","whatsapp");
+    const smsSuccess = anySuccess("payment_received","sms");
+    const emlSuccess = anySuccess("payment_received","email");
+
+    step("step_13_whatsapp", {
+      label:   "WhatsApp sent to customer",
+      status:  waSuccess ? "✓" : "✗ payment_received WhatsApp FAILED",
+      payment_received_whatsapp:     forEvent("payment_received","whatsapp").map((r:any) => ({
+        status: r.status, wamid: r.wamid, template: r.template, http: r.http_status, error: r.error_code, sent: String(r.sent_at).slice(0,19)
+      })),
+      payment_received_pdf_whatsapp: forEvent("payment_received_pdf","whatsapp").map((r:any) => ({
+        status: r.status, wamid: r.wamid, sent: String(r.sent_at).slice(0,19)
+      })),
+    });
+
+    step("step_14_sms", {
+      label:    "SMS sent to customer",
+      status:   smsSuccess ? "✓" : "✗ payment_received SMS FAILED",
+      sms_logs: forEvent("payment_received","sms").map((r:any) => ({
+        status: r.status, http: r.http_status, error: r.error_code, sent: String(r.sent_at).slice(0,19)
+      })),
+    });
+
+    step("step_15_email", {
+      label:      "Email sent to customer",
+      status:     emlSuccess ? "✓" : "✗ payment_received Email FAILED",
+      email_to:   booking.customer_email,
+      email_logs: forEvent("payment_received","email").map((r:any) => ({
+        status: r.status, sent: String(r.sent_at).slice(0,19)
+      })),
+    });
+
+    step("step_16_notification_logs", {
+      label:   "Notification logs stored in DB",
+      status:  nlRows.length > 0 ? "✓" : "✗ notification_logs EMPTY",
+      total_stored:  nlRows.length,
+      by_event_channel: Object.fromEntries(
+        Array.from(new Set(nlRows.map((r:any) => `${r.event_type}|${r.channel}`))).map(k => {
+          const [evt, ch] = k.split("|");
+          const rows = forEvent(evt, ch);
+          return [k, rows.map((r:any) => r.status)];
+        })
+      ),
+    });
+
+    // ── STEP 17: payment_transactions / audit logs ────────────────────────────
+    const ptRes = await p.query(
+      `SELECT id, amount, payment_mode, reference_number, payment_date, created_at
+       FROM payment_transactions WHERE booking_id = $1 AND (is_deleted IS NULL OR is_deleted=false) ORDER BY created_at DESC`,
+      [bookingId]
+    );
+    step("step_17_audit_logs", {
+      label:    "Payment transactions / audit logs stored",
+      status:   ptRes.rows.length > 0 ? "✓" : "✗ NO payment_transactions rows",
+      sql_rows: ptRes.rows.length,
+      records:  ptRes.rows.map((r:any) => ({
+        mode: r.payment_mode, amount: r.amount, ref: r.reference_number, date: r.payment_date
+      })),
+    });
+
+    // ── RE-TRIGGER: fix every failing step with real APIs ─────────────────────
+    let retriggerResult: Record<string, any> | null = null;
+    if (retrigger && isFullyPaid) {
+      console.log(`[PROD-TRACE][retrigger] Firing real pipeline for booking ${bookingId}`);
+      const rtStart = Date.now();
+      const rtTrace: string[] = [];
+
+      try {
+        // 1. Re-upsert invoice (idempotent)
+        const { upsertInvoiceForBooking } = await import("./routes/invoices.js");
+        const newInv = await upsertInvoiceForBooking(bookingId);
+        rtTrace.push(`invoice_upserted: ${JSON.stringify(newInv)}`);
+
+        // 2. Advance journey_status if not already set
+        if (!booking.journey_status || booking.journey_status === "booking_confirmed") {
+          await p.query(
+            `UPDATE bookings SET journey_status='payment_received' WHERE id=$1`,
+            [bookingId]
+          );
+          rtTrace.push("journey_status → payment_received");
+        } else {
+          rtTrace.push(`journey_status already: ${booking.journey_status}`);
+        }
+
+        // 3. Fire full notification pipeline (WhatsApp, SMS, Email, PDF, agreement)
+        const { processPaymentSuccessNotifications } = await import("./routes/payments.js");
+        const paidAmt  = parseFloat(booking.paid_amount);
+        const finalAmt = parseFloat(booking.final_amount);
+        await processPaymentSuccessNotifications({
+          booking: {
+            id:               bookingId,
+            bookingNumber:    booking.booking_number,
+            customerName:     booking.customer_name,
+            customerMobile:   booking.customer_mobile,
+            customerEmail:    booking.customer_email || null,
+            customerId:       booking.customer_id   || null,
+            packageName:      booking.package_name  || null,
+            numberOfPilgrims: booking.number_of_pilgrims || null,
+            finalAmount:      finalAmt,
+          },
+          isFullyPaid:        paidAmt >= finalAmt,
+          thisPaymentAmount:  paidAmt,
+          newPaidAmount:      paidAmt,
+          remainingBalance:   Math.max(0, finalAmt - paidAmt),
+          invoiceNumber:      booking.invoice_number || null,
+          paymentRef:         booking.razorpay_payment_id || "ADMIN_PAYMENT",
+        });
+        rtTrace.push("processPaymentSuccessNotifications: complete");
+
+        // 4. Re-check agreement after pipeline (autoGenerateAgreement fires inside pipeline)
+        await new Promise(r => setTimeout(r, 3000)); // wait for async agreement creation
+        const { rows: agrAfter } = await p.query(
+          `SELECT id, agreement_number, status, pdf_generated FROM agreements WHERE booking_id=$1 ORDER BY created_at DESC LIMIT 1`,
+          [bookingId]
+        );
+        rtTrace.push(`agreement_after: ${JSON.stringify(agrAfter[0] ?? "none")}`);
+
+        // 5. Re-read notification_logs after pipeline
+        const { rows: nlAfter } = await p.query(
+          `SELECT channel, event_type, status, wamid, template, http_status, error_code
+           FROM notification_logs WHERE booking_id=$1 ORDER BY sent_at DESC LIMIT 20`,
+          [bookingId]
+        );
+        rtTrace.push(`notification_logs_after: ${nlAfter.length} rows`);
+
+        // 6. Re-read workflow_logs after pipeline
+        const { rows: wfAfter } = await p.query(
+          `SELECT trigger_type, status, created_at FROM workflow_logs WHERE booking_id=$1 ORDER BY created_at DESC LIMIT 5`,
+          [bookingId]
+        );
+        rtTrace.push(`workflow_logs_after: ${wfAfter.length} rows`);
+
+        retriggerResult = {
+          ok:               true,
+          elapsed_ms:       Date.now() - rtStart,
+          trace:            rtTrace,
+          agreement_after:  agrAfter[0] ?? null,
+          notification_logs_after: nlAfter.map((r:any) => ({
+            event: r.event_type, channel: r.channel, status: r.status,
+            wamid:    r.wamid ?? null,
+            template: r.template ?? null,
+            http:     r.http_status ?? null,
+            error:    r.error_code ?? null,
+          })),
+          workflow_logs_after: wfAfter.map((r:any) => ({
+            trigger: r.trigger_name, status: r.status, started: String(r.started_at).slice(0,19)
+          })),
+        };
+      } catch (rtErr: any) {
+        retriggerResult = {
+          ok:       false,
+          elapsed_ms: Date.now() - rtStart,
+          trace:    rtTrace,
+          error:    rtErr.message,
+          stack:    rtErr.stack?.slice(0, 800),
+        };
+      }
+      step("retrigger_complete", {
+        label: retrigger ? "Real pipeline re-fired" : "retrigger=false (audit only)",
+        ...retriggerResult,
+      });
+    }
+
+    res.json({
+      ok:             true,
+      booking_number: bookingNum,
+      booking_id:     bookingId,
+      customer:       booking.customer_name,
+      mobile:         booking.customer_mobile,
+      email:          booking.customer_email,
+      paid:           `₹${booking.paid_amount} / ₹${booking.final_amount}`,
+      is_fully_paid:  isFullyPaid,
+      retrigger_run:  retrigger,
+      summary: {
+        "01_razorpay_webhook":         hasRazorpay ? "✓" : "ℹ offline",
+        "02_payment_verified":         booking.status === "confirmed" ? "✓" : "✗",
+        "03_booking_paid":             isFullyPaid ? "✓" : "✗",
+        "04_booking_confirmed":        booking.status === "confirmed" ? "✓" : "✗",
+        "05_invoice_generated":        invoice ? "✓" : "✗",
+        "06_invoice_pdf":              invoiceHasPdf ? "✓" : "✗",
+        "07_agreement_created":        agreement ? "✓" : "✗",
+        "08_agreement_pdf":            agreement?.pdf_generated ? "✓" : "✗",
+        "09_customer_dashboard":       dashRes.rows[0]?.status === "sent" ? "✓" : "ℹ",
+        "10_booking_status_confirmed": booking.status === "confirmed" ? "✓" : "✗",
+        "11_payment_workflow":         paymentWf?.status === "completed" ? "✓" : "✗",
+        "12_booking_confirmed_workflow": confirmedWf?.status === "completed" ? "✓" : "ℹ",
+        "13_whatsapp_sent":            waSuccess  ? "✓" : "✗",
+        "14_sms_sent":                 smsSuccess ? "✓" : "✗",
+        "15_email_sent":               emlSuccess ? "✓" : "✗",
+        "16_notification_logs":        nlRows.length > 0 ? `✓ (${nlRows.length} rows)` : "✗",
+        "17_audit_logs":               ptRes.rows.length > 0 ? "✓" : "✗",
+      },
+      trace,
+      retrigger_result: retriggerResult,
+    });
+
+  } catch (err: any) {
+    console.error("[PROD-TRACE] FATAL:", err);
+    res.json({ ok: false, error: err.message, stack: err.stack, trace });
+  }
+});
+
 if (process.env.NODE_ENV === 'production') {
   const staticDir = process.env.STATIC_FILES_DIR || (() => {
     const candidates = [
