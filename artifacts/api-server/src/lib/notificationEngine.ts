@@ -506,7 +506,7 @@ export async function sendBotBeeEventTemplate(
     (ctx.bookingNumber ? `${siteBase}/invoice/${ctx.bookingNumber}` : `${siteBase}`);
   const paymentUrl = ctx.bookingNumber
     ? `${siteBase}/pay/${ctx.bookingNumber}` : `${siteBase}`;
-  const opts = { eventType, bookingId, customerId, skipFailureLog: true };
+  const opts = { eventType, bookingId, customerId, customerName: ctx.customerName, skipFailureLog: true };
 
   switch (eventType) {
     // ── Booking ───────────────────────────────────────────────────────────────

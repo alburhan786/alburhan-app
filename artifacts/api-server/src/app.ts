@@ -1991,8 +1991,7 @@ app.get("/api/migrate/notif-trace", async (req, res) => {
       ).catch((e: any) => ({ rows: [], error: e.message }));
       out.workflow_logs = (wl as any).rows ?? wl;
       const nl = await tracePool.query(
-        `SELECT id, channel, event_type, recipient, status, error_code, http_status, sent_at, retry_count, created_at, provider_response
-         FROM notification_logs WHERE booking_id = $1 ORDER BY created_at DESC LIMIT 20`, [bookingId]
+        `SELECT * FROM notification_logs WHERE booking_id = $1 ORDER BY created_at DESC LIMIT 20`, [bookingId]
       ).catch((e: any) => ({ rows: [], error: e.message }));
       out.notification_logs = (nl as any).rows ?? nl;
       const rq = await tracePool.query(

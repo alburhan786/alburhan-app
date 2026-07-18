@@ -21,9 +21,11 @@ const CHANNEL_META: Record<string, { icon: any; label: string; color: string; bg
 };
 
 const STATUS_META: Record<string, { icon: any; label: string; color: string; bg: string }> = {
-  sent:    { icon: CheckCircle2, label: "Delivered", color: "text-green-700",  bg: "bg-green-100" },
-  failed:  { icon: XCircle,     label: "Failed",    color: "text-red-700",    bg: "bg-red-100" },
-  pending: { icon: Clock,       label: "Pending",   color: "text-yellow-700", bg: "bg-yellow-100" },
+  sent:               { icon: CheckCircle2, label: "Delivered",       color: "text-green-700",  bg: "bg-green-100" },
+  failed:             { icon: XCircle,     label: "Failed",           color: "text-red-700",    bg: "bg-red-100" },
+  pending:            { icon: Clock,       label: "Pending",          color: "text-yellow-700", bg: "bg-yellow-100" },
+  permanently_failed: { icon: XCircle,     label: "Perm. Failed",     color: "text-red-700",    bg: "bg-red-100" },
+  retrying:           { icon: Clock,       label: "Retrying",         color: "text-orange-700", bg: "bg-orange-100" },
 };
 
 function fmt(iso: string | null) {
@@ -55,6 +57,8 @@ interface LogRow {
   customer_id: string | null;
   customer_name?: string | null;
   booking_number?: string | null;
+  wamid?: string | null;
+  template?: string | null;
 }
 
 interface Stats {
@@ -219,6 +223,8 @@ export default function NotificationLogs() {
             <option value="sent">Delivered</option>
             <option value="failed">Failed</option>
             <option value="pending">Pending</option>
+            <option value="permanently_failed">Perm. Failed</option>
+            <option value="retrying">Retrying</option>
           </select>
           <select value={filterEvent} onChange={e => { setFilterEvent(e.target.value); setPage(0); }} className="h-9 border rounded-lg px-2 text-sm bg-white min-w-40">
             <option value="">All Events</option>
@@ -346,9 +352,17 @@ export default function NotificationLogs() {
                               </div>
                             )}
                             <div className="flex flex-wrap gap-4 text-xs text-gray-500">
+                              {log.wamid && (
+                                <span className="flex items-center gap-1">
+                                  <span className="font-semibold text-green-700">wamid:</span>
+                                  <code className="text-green-700 bg-green-50 px-1.5 py-0.5 rounded select-all">{log.wamid}</code>
+                                </span>
+                              )}
+                              {log.template && <span>Template ID: <code className="text-gray-700">{log.template}</code></span>}
                               {log.api_endpoint && <span>Endpoint: <code className="text-gray-700">{log.api_endpoint}</code></span>}
                               {log.error_code && <span className="text-red-600">Error Code: {log.error_code}</span>}
                               {log.booking_id && <span>Booking ID: <code className="text-gray-700">{log.booking_id}</code></span>}
+                              {log.customer_name && <span>Customer: <code className="text-gray-700">{log.customer_name}</code></span>}
                               <span>Log ID: <code className="text-gray-700">{log.id}</code></span>
                             </div>
                           </div>

@@ -9,6 +9,7 @@ export interface BotBeeTemplateOpts {
   eventType?: string;
   bookingId?: string;
   customerId?: string;
+  customerName?: string;
   language?: string;
   /** When true, a template send failure is NOT written to notification_logs.
    *  Use this when the caller will fall back to a plain-text message so that
@@ -73,26 +74,35 @@ async function withRetry<T>(fn: () => Promise<T>, attempts = 3, delayMs = 1500):
 
 async function logToDb(data: {
   eventType: string; channel: string; recipient: string;
-  bookingId?: string; customerId?: string; message?: string;
+  bookingId?: string; customerId?: string; customerName?: string;
+  templateId?: string; message?: string;
   status: "sent" | "failed"; result: BotBeeResult;
 }) {
   try {
     const id = `nl_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const rp = data.result.responsePayload as Record<string, unknown> | null | undefined;
+    const msgArr = Array.isArray(rp?.messages) ? (rp!.messages as Array<Record<string, unknown>>) : null;
+    // BotBee template API returns wa_message_id; text API may return msg_id; Meta direct returns messages[0].id
+    const wamid = (rp?.wa_message_id || rp?.msg_id || rp?.message_id || rp?.wamid || msgArr?.[0]?.id || null) as string | null;
     await pool.query(
       `INSERT INTO notification_logs
-       (id, event_type, customer_id, booking_id, channel, recipient, message, status,
-        provider_response, provider_name, api_endpoint, http_status, request_payload, error_code,
-        sent_at, retry_count)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,NOW(),0)`,
+       (id, event_type, customer_id, booking_id, customer_name, channel, recipient, message, status,
+        template, provider_response, provider_name, api_endpoint, http_status, request_payload, error_code,
+        wamid, sent_at, retry_count)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,NOW(),0)`,
       [
         id, data.eventType, data.customerId || null, data.bookingId || null,
+        data.customerName || null,
         data.channel, data.recipient, data.message || null, data.status,
+        data.templateId || null,
         JSON.stringify(data.result),
         data.result.provider, data.result.endpoint, data.result.httpStatus || null,
         data.result.requestPayload ? JSON.stringify(data.result.requestPayload) : null,
         data.result.errorCode || null,
+        wamid,
       ]
     );
+    if (wamid) console.log(`[BotBee] logToDb: wamid=${wamid} event=${data.eventType} recipient=${data.recipient}`);
   } catch (err) {
     console.error("[BotBee] logToDb failed:", err);
   }
@@ -102,7 +112,7 @@ async function logToDb(data: {
 
 export async function sendText(
   to: string, message: string,
-  opts?: { eventType?: string; bookingId?: string; customerId?: string; logMessage?: string }
+  opts?: { eventType?: string; bookingId?: string; customerId?: string; customerName?: string; templateId?: string; logMessage?: string; skipLog?: boolean }
 ): Promise<BotBeeResult> {
   const { apiToken, phone_number_id, enabled, baseUrl } = getCredentials();
   const endpoint = `${baseUrl}/whatsapp/send`;
@@ -114,8 +124,8 @@ export async function sendText(
     phone = toBotBeePhone(to);
   } catch (err: any) {
     const result: BotBeeResult = { ok: false, provider: "BotBee", endpoint, errorMessage: err?.message || "Invalid mobile number" };
-    if (opts?.eventType) {
-      await logToDb({ eventType: opts.eventType, channel: "whatsapp", recipient: to || "unknown", bookingId: opts.bookingId, customerId: opts.customerId, message: opts.logMessage || message.substring(0, 300), status: "failed", result });
+    if (opts?.eventType && !opts.skipLog) {
+      await logToDb({ eventType: opts.eventType, channel: "whatsapp", recipient: to || "unknown", bookingId: opts.bookingId, customerId: opts.customerId, customerName: opts.customerName, templateId: opts.templateId, message: opts.logMessage || message.substring(0, 300), status: "failed", result });
     }
     return result;
   }
@@ -148,8 +158,8 @@ export async function sendText(
     };
   }
 
-  if (opts?.eventType) {
-    await logToDb({ eventType: opts.eventType, channel: "whatsapp", recipient: to, bookingId: opts.bookingId, customerId: opts.customerId, message: opts.logMessage || message.substring(0, 300), status: result.ok ? "sent" : "failed", result });
+  if (opts?.eventType && !opts.skipLog) {
+    await logToDb({ eventType: opts.eventType, channel: "whatsapp", recipient: to, bookingId: opts.bookingId, customerId: opts.customerId, customerName: opts.customerName, templateId: opts.templateId, message: opts.logMessage || message.substring(0, 300), status: result.ok ? "sent" : "failed", result });
   }
   return result;
 }
@@ -266,11 +276,19 @@ export async function sendTemplate(
       eventType: opts?.eventType,
       bookingId: opts?.bookingId,
       customerId: opts?.customerId,
+      customerName: opts?.customerName,
+      templateId,
       logMessage: `[tpl:${templateId}] ${rendered.substring(0, 250)}`,
+      skipLog: true,  // sendTemplate owns the log; suppress intermediate text-send log
     });
 
-    // If text send succeeded — done. Return immediately.
-    if (textResult.ok) return textResult;
+    // If text send succeeded — log it and return.
+    if (textResult.ok) {
+      if (opts?.eventType) {
+        await logToDb({ eventType: opts.eventType, channel: "whatsapp", recipient: to, bookingId: opts.bookingId, customerId: opts.customerId, customerName: opts.customerName, templateId, message: `[tpl:${templateId}] ${rendered.substring(0, 250)}`, status: "sent", result: textResult });
+      }
+      return textResult;
+    }
 
     // Text API rejected (most likely "outside 24 hour window").
     // Fall through to the template API below — BotBee receives variables as a flat positional
@@ -299,7 +317,7 @@ export async function sendTemplate(
   } catch (err: any) {
     const result: BotBeeResult = { ok: false, provider: "BotBee", endpoint, errorMessage: err?.message || "Invalid mobile number" };
     if (opts?.eventType) {
-      await logToDb({ eventType: opts.eventType, channel: "whatsapp", recipient: to || "unknown", bookingId: opts.bookingId, customerId: opts.customerId, message: `Template ID: ${templateId}`, status: "failed", result });
+      await logToDb({ eventType: opts.eventType, channel: "whatsapp", recipient: to || "unknown", bookingId: opts.bookingId, customerId: opts.customerId, customerName: opts.customerName, templateId, message: `Template ID: ${templateId}`, status: "failed", result });
     }
     return result;
   }
@@ -341,7 +359,7 @@ export async function sendTemplate(
 
   if (opts?.eventType) {
     if (result.ok || !opts.skipFailureLog) {
-      await logToDb({ eventType: opts.eventType, channel: "whatsapp", recipient: to, bookingId: opts.bookingId, customerId: opts.customerId, message: `Template ID: ${templateId}`, status: result.ok ? "sent" : "failed", result });
+      await logToDb({ eventType: opts.eventType, channel: "whatsapp", recipient: to, bookingId: opts.bookingId, customerId: opts.customerId, customerName: opts.customerName, templateId, message: `Template ID: ${templateId}`, status: result.ok ? "sent" : "failed", result });
     }
   }
   return result;
