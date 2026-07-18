@@ -154,13 +154,100 @@ export async function sendText(
   return result;
 }
 
+// ── Template body store (from BotBee raw_data.mixed_body_text, fetched 2026-07-18) ────────────
+// BotBee's send/template API does NOT substitute #!VarName!# placeholders regardless of
+// the variables format used (named object, flat array, components — all accepted, none substituted).
+// The actual delivery content is mixed_body_text with #!Name!# literal placeholders.
+// Fix: render the body locally, then send via sendText() (/whatsapp/send).
+const TEMPLATE_BODIES: Record<string, string> = {
+  "409950": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh  #!Name!#\r\nAlhamdulillah! ✅\r\n\r\nYour booking has been APPROVED.\r\n\r\n📋 Booking ID:  #!BookingID!# \r\n📦 Package: #!PackageContent!# \r\n💰 Amount: ₹ #!Amount!#\r\n\r\nPlease complete your payment using the link below.\r\n\r\n🔗   #!Paymenturllink!#\r\n\r\n📞 +91 9893225590\r\n\r\nJazak Allah Khair.\r\nAl Burhan Tours & Travels",
+  "409953": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh  #!Name!#\r\n\r\nAlhamdulillah! 🎉\r\n\r\nWe have successfully received your payment.\r\n\r\n📋 Booking ID:#!BookingID!# \r\n🧾 Invoice No:  #!Invoice!#\r\n💰 Amount Received: ₹ #!Amount!#\r\n\r\nYour booking is confirmed.\r\n\r\nJazak Allah Khair.\r\n\r\nAl Burhan Tours & Travels",
+  "409956": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh #!Name!#\r\n\r\nYour invoice has been generated.\r\n\r\n📋 Booking ID:#!BookingID!# \r\n🧾 Invoice No:#!Invoice!# \r\n💰 Amount: ₹ #!Amount!#\r\nDownload your invoice below.\r\n\r\n🔗  #!Paymenturllink!#\r\n\r\nThank you for choosing Al Burhan Tours & Travels.",
+  "409958": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh  #!Name!#\r\n\r\nYour Hajj/Umrah Agreement is ready.\r\n\r\n📋 Booking ID: #!BookingID!#\r\n📄 Agreement No: #!Agreement!# \r\n\r\nDownload your agreement below.\r\n\r\n🔗 #!Download!# \r\n\r\nPlease review and complete the digital signature if required.\r\n\r\nAl Burhan Tours & Travels",
+  "409965": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh   #!Name!#\r\n\r\nAlhamdulillah!\r\n\r\nYour agreement has been successfully signed.\r\n\r\n📄 Agreement ID: #!Agreement!# \r\n\r\nThank you for completing the documentation.\r\n\r\nAl Burhan Tours & Travels",
+  "409991": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh   #!Name!#\r\n\r\nCongratulations!\r\n\r\nYour visa has been issued successfully.\r\n\r\n📋 Booking ID:#!BookingID!# \r\n🛂 Visa Number:  #!Visano!# \r\nDownload Visa:    #!Download!#\r\n \r\n\r\nMay Allah accept your journey.\r\n\r\nAl Burhan Tours & Travels",
+  "409994": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh  #!Name!#\r\n\r\nYour flight ticket has been issued.\r\n\r\n📋 Booking ID:#!BookingID!# \r\n✈ PNR:#!Flightnumber!# \r\n\r\nDownload Ticket:#!Download!#\r\n \r\n\r\nSafe Travels.\r\n\r\nAl Burhan Tours & Travels",
+  "409999": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh  #!Name!#\r\n\r\nThis is a reminder for your upcoming journey.\r\n\r\n📋 Booking ID:#!BookingID!# \r\n🕌 Package:  #!PackageContent!#\r\n\r\n✈ Flight:#!Flightnumber!# \r\n📅 Departure Date:  #!Departuredate!#\r\n🕒 Reporting Time #!Reportingtime!#\r\n🏢 Airport #!Airport!#\r\n\r\nKindly report at the airport at least 4 hours before departure with your original passport and required travel documents.\r\n\r\nMay Allah (SWT) accept your Hajj/Umrah and grant you a safe journey.\r\n\r\nAl Burhan Tours & Travels",
+  "410000": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh  #!Name!#\r\n\r\nThis is a reminder for your return journey.\r\n\r\n📋 Booking ID:  #!BookingID!#\r\n\r\n✈ Flight: #!Flightnumber!# \r\n📅 Return Date:  #!Departuredate!#\r\n🕒 Reporting Time: #!Reportingtime!# \r\n🏢 Airport:#!Airport!# \r\n\r\nPlease arrive at the airport well before your reporting time.\r\n\r\nMay Allah (SWT) accept all your prayers and grant you a safe journey home.\r\n\r\nAl Burhan Tours & Travels",
+  "410008": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh  #!Name!#\r\nYour accommodation details are ready.\r\n\r\n📋 Booking ID:   #!BookingID!#\r\n\r\n🏨 Hotel:  #!Hotel!#\r\n🚪 Room No:#!Roomnumber!# \r\n\r\nPlease keep these details for your reference during your stay.\r\n\r\nMay Allah (SWT) make your stay comfortable and blessed.\r\n\r\nAl Burhan Tours & Travels",
+  "410022": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh  #!Name!#\r\n\r\nYou are invited to attend the Hajj/Umrah Orientation Programme.\r\n\r\n📅 Date:  #!date!#\r\n🕒 Time: #!Time!# \r\n📍 Venue:  #!Hussainhall!#\r\n\r\nYour attendance is highly recommended to understand travel procedures, rituals, and important guidelines.\r\n\r\nJazak Allah Khair.\r\n\r\nAl Burhan Tours & Travels",
+  "410026": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh  #!Name!#\r\n\r\nYour departure date is approaching.\r\n\r\n📋 Booking ID:  #!BookingID!#\r\n📅 Departure:#!Departuredate!# \r\n🛄 Reporting Time:  #!Reportingtime!# \r\n🏢 Airport #!T2!# \r\n\r\nPlease carry your Passport, Visa, Flight Ticket, ID Card, and other required documents.\r\n\r\nMay Allah (SWT) bless your journey.\r\n\r\nAl Burhan Tours & Travels",
+  "410030": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh  #!Name!#\r\n\r\nWelcome to the Kingdom of Saudi Arabia.\r\n\r\nAlhamdulillah, we pray that your Hajj/Umrah journey is filled with peace, blessings, and acceptance.\r\n\r\nIf you require any assistance during your stay, please contact our team.\r\n\r\nJazak Allah Khair.\r\n\r\nAl Burhan Tours & Travels",
+  "410031": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh  #!Name!#\r\n\r\nAlhamdulillah!\r\n\r\nWelcome back to India.\r\n\r\nWe pray that Allah (SWT) accepts your Hajj/Umrah, forgives your sins, and grants you countless blessings.\r\n\r\nThank you for travelling with Al Burhan Tours & Travels.\r\n\r\nJazak Allah Khair.",
+  "410040": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh #!Name!#\r\n\r\n🕌 Hajj  #!2027!# Bookings Are Now Open!\r\n\r\nBook your Hajj journey with Al Burhan Tours & Travels.\r\n\r\n✅ Government Approved Services\r\n✅ Comfortable Accommodation\r\n✅ Experienced Tour Guides\r\n✅ Complete Visa & Travel Assistance\r\n\r\n📞 Contact: +91 9893225590\r\n🌐 www.alburhantravels.com\r\n\r\nReserve your seat today and begin your sacred journey with confidence.\r\n\r\nJazak Allah Khair.\r\n\r\nAl Burhan Tours & Travels",
+};
+
+/** Replace all #!VarName!# placeholders in the template body with actual values. */
+function renderTemplateBody(body: string, vars: Record<string, string>): string {
+  let result = body;
+  for (const [key, value] of Object.entries(vars)) {
+    const placeholder = `#!${key}!#`;
+    result = result.split(placeholder).join(String(value ?? "-"));
+  }
+  return result;
+}
+
 export async function sendTemplate(
   to: string, templateId: string,
   opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
-  const { apiToken, phone_number_id, enabled, baseUrl } = getCredentials();
+  const { enabled } = getCredentials();
+  if (!enabled) return { ok: false, provider: "BotBee", endpoint: "disabled", errorMessage: "WhatsApp disabled in API Settings" };
+
+  const isNumericId = /^\d+$/.test((templateId || "").trim());
+  const templateBody = isNumericId ? TEMPLATE_BODIES[templateId.trim()] : null;
+  const namedVars = opts?.variables && Object.keys(opts.variables).length > 0 ? opts.variables : undefined;
+
+  // ── PRIMARY PATH: manual substitution + sendText ─────────────────────────
+  // BotBee's send/template API accepts all variable formats (named object, flat array,
+  // components) but does NOT substitute #!VarName!# in the delivered message.
+  // The real delivery body is mixed_body_text with #!VarName!# placeholders.
+  // We render it ourselves and send via /whatsapp/send (text API).
+  if (templateBody) {
+    const rendered = namedVars ? renderTemplateBody(templateBody, namedVars) : templateBody;
+
+    // Sanity check: warn if any #!...!# placeholders remain unsubstituted
+    const remaining = [...rendered.matchAll(/#![^!]+!#/g)].map(m => m[0]);
+    if (remaining.length) {
+      console.warn("[BotBee] sendTemplate: unsubstituted placeholders after render:", remaining, "vars keys:", namedVars ? Object.keys(namedVars) : "none");
+    }
+
+    console.log("[BotBee] sendTemplate RENDER →", JSON.stringify({
+      templateId, to,
+      vars: namedVars ? Object.fromEntries(Object.entries(namedVars).map(([k,v]) => [k, String(v).substring(0, 40)])) : null,
+      preview: rendered.substring(0, 120).replace(/\r\n/g, "↵"),
+      unsubstituted: remaining,
+    }));
+
+    const textResult = await sendText(to, rendered, {
+      eventType: opts?.eventType,
+      bookingId: opts?.bookingId,
+      customerId: opts?.customerId,
+      logMessage: `[tpl:${templateId}] ${rendered.substring(0, 250)}`,
+    });
+
+    // If text send succeeded — done. Return immediately.
+    if (textResult.ok) return textResult;
+
+    // Text API rejected (most likely "outside 24 hour window").
+    // Fall through to the template API below as a last resort.
+    // The template will be delivered WITHOUT variable substitution (shows #!Name!# literally)
+    // until the BotBee templates are recreated with Meta {{1}} variable format.
+    const errMsg = textResult.errorMessage || "";
+    const is24hBlock = /24.hour|window|template message/i.test(errMsg);
+    if (is24hBlock) {
+      console.warn("[BotBee] sendTemplate: 24h window blocked text send, falling through to template API (no variable substitution):", to, errMsg);
+    } else {
+      console.warn("[BotBee] sendTemplate: text send failed, falling through to template API:", to, errMsg);
+    }
+  }
+
+  // ── FALLBACK PATH: use BotBee template API (for templates not in local store,
+  //    or when the 24h window blocks the text send for known templates) ──
+  // NOTE: BotBee's template API does NOT substitute variables for known ABT templates.
+  // This path only fires for template IDs not in TEMPLATE_BODIES above.
+  const { apiToken, phone_number_id, baseUrl } = getCredentials();
   const endpoint = `${baseUrl}/whatsapp/send/template`;
-  if (!enabled) return { ok: false, provider: "BotBee", endpoint, errorMessage: "WhatsApp disabled in API Settings" };
   if (!apiToken || !phone_number_id) return { ok: false, provider: "BotBee", endpoint, errorMessage: "BotBee credentials not configured" };
   if (!templateId?.trim()) return { ok: false, provider: "BotBee", endpoint, errorMessage: "Template ID is required" };
 
@@ -174,20 +261,6 @@ export async function sendTemplate(
     }
     return result;
   }
-
-  // Route by identifier type:
-  //   pure digits  → template_id  (BotBee numeric ID — preferred, confirmed working)
-  //   any other    → template_name (slug fallback for env-var overrides)
-  const isNumericId = /^\d+$/.test(templateId.trim());
-
-  // BotBee variable substitution: send variables as a NAMED OBJECT keyed by the exact
-  // BotBee variable name from the template's variable_map (e.g. {Name:"...", BookingID:"..."}).
-  // BotBee maps these names to {{1}},{{2}},... positions internally and substitutes before sending.
-  //
-  // A flat array is accepted (HTTP 200 + wamid) but NOT substituted.
-  // Meta components format is also accepted but NOT substituted by BotBee.
-  // Named object is the ONLY format that causes actual variable substitution.
-  const namedVars = opts?.variables && Object.keys(opts.variables).length > 0 ? opts.variables : undefined;
 
   const payload: Record<string, unknown> = {
     apiToken, phone_number_id, phone_number: phone,
@@ -558,8 +631,10 @@ function bodyParams(texts: (string | null | undefined)[]): object[] {
 
 const SITE = "https://alburhantravels.com";
 function fmtAmount(v: string | number | undefined | null): string {
+  // Return the raw number WITHOUT ₹ symbol — template bodies already have "₹ #!Amount!#"
+  // so including ₹ here would produce "₹ ₹1,89,000" (double rupee).
   const n = Number(v);
-  return isNaN(n) || n === 0 ? "-" : `₹${n.toLocaleString("en-IN")}`;
+  return isNaN(n) || n === 0 ? "-" : n.toLocaleString("en-IN");
 }
 
 // Helper: resolve template identifier — prefer id when numeric, fall through to name slug
