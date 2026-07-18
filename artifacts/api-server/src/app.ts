@@ -733,6 +733,74 @@ app.post("/api/migrate/wa-approval-test", async (req, res) => {
   });
 });
 
+// POST /api/migrate/wa-fullpipeline-test — fire booking_approved through full triggerWorkflow pipeline (dedup + notificationEngine + BotBee)
+// Unlike wa-approval-test (calls sendApprovalTemplate directly), this runs the exact same code path as approving a booking in the ERP.
+// Usage: POST { key, bookingId } — bookingId must have no recent booking_approved WhatsApp log (12h dedup window)
+app.post("/api/migrate/wa-fullpipeline-test", async (req, res) => {
+  const key = (req.query.key || req.body?.key) as string;
+  if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
+
+  const bookingId = (req.body?.bookingId || req.query.bookingId || "") as string;
+  if (!bookingId) return void res.status(400).json({ error: "bookingId required" });
+
+  const { pool: waPool } = await import("@workspace/db");
+  const { triggerWorkflow } = await import("./lib/workflowEngine.js");
+
+  const r = await waPool.query(
+    `SELECT b.*, p.name AS package_name FROM bookings b LEFT JOIN packages p ON p.id = b.package_id WHERE b.id = $1 LIMIT 1`,
+    [bookingId]
+  );
+  if (!r.rows.length) return void res.status(404).json({ error: "Booking not found" });
+  const row = r.rows[0];
+
+  // Check existing notification_logs for this booking (to warn if dedup will block)
+  const dedupCheck = await waPool.query(
+    `SELECT id, event_type, channel, status, wamid, sent_at FROM notification_logs
+     WHERE booking_id = $1 AND event_type = 'booking_approved' AND channel = 'whatsapp' AND status = 'sent'
+     AND sent_at > NOW() - INTERVAL '12 hours' ORDER BY sent_at DESC LIMIT 3`,
+    [bookingId]
+  );
+  const dedupBlocked = dedupCheck.rows.length > 0;
+
+  console.log(`[wa-fullpipeline-test] bookingId=${bookingId} dedupBlocked=${dedupBlocked}`);
+
+  const ctx = {
+    bookingId: row.id,
+    bookingNumber: row.booking_number,
+    customerName: (row.customer_name || "").trim(),
+    customerMobile: row.customer_mobile,
+    customerEmail: row.customer_email,
+    packageName: row.package_name || row.package_name || "Hajj/Umrah Package",
+    finalAmount: row.final_amount ? Number(row.final_amount) : undefined,
+    invoiceUrl: `https://alburhantravels.com/invoice/${row.booking_number}`,
+  };
+
+  const beforeMs = Date.now();
+  await triggerWorkflow("booking_approved", ctx);
+  const elapsed = Date.now() - beforeMs;
+
+  // Wait briefly for async DB writes
+  await new Promise(x => setTimeout(x, 1500));
+
+  // Pull notification_logs for this booking post-trigger
+  const after = await waPool.query(
+    `SELECT id, channel, event_type, status, wamid, template, http_status, error_code, sent_at,
+            provider_response->>'requestPayload' AS req_payload,
+            provider_response->>'responsePayload' AS resp_payload
+     FROM notification_logs WHERE booking_id = $1 ORDER BY sent_at DESC LIMIT 10`,
+    [bookingId]
+  );
+
+  res.json({
+    ok: true,
+    elapsed_ms: elapsed,
+    dedup_blocked: dedupBlocked,
+    dedup_existing: dedupCheck.rows,
+    ctx_sent: ctx,
+    notification_logs_after: after.rows,
+  });
+});
+
 // POST /api/migrate/botbee-discovery — probe BotBee settings + template create/delete paths using real server-side token
 app.post("/api/migrate/botbee-discovery", async (req, res) => {
   const key = (req.query.key || req.body?.key) as string;

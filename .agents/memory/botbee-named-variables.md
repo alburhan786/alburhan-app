@@ -1,68 +1,79 @@
 ---
-name: BotBee template variable substitution — definitive root cause
-description: Why #!Name!# appears literally and what the hybrid fix does
+name: BotBee template variable substitution — definitive root cause and fix
+description: Why messages weren't delivered and what the confirmed working payload looks like
 ---
 
-## Root Cause (DEFINITIVE — verified 2026-07-18)
+## Root Cause (DEFINITIVE — confirmed 2026-07-18)
 
-BotBee templates were created in BotBee's UI using their `#!Name!#` CRM variable syntax.
-When BotBee submitted these to Meta for approval, Meta received `#!Name!#` as LITERAL TEXT (not Meta's {{1}} format). Meta approved all 15 templates as **static text** with no variable slots.
+BotBee templates (IDs 409950–410040) have:
+- `body_content` with `{{1}}-{{N}}` (Meta's format) — Meta substitutes these ✅
+- `variable_map.body`: `{"1":"#!Name!#", "2":"#!BookingID!#", ...}` — BotBee CRM internal
+- `raw_data.mixed_body_text` with `#!Name!#` — BotBee's OWN CRM substitution layer (NOT what Meta sees)
 
-Evidence:
-- `raw_data.mixed_body_text` = actual delivery body, contains `#!Name!#` literally
-- `template_json.components[0].text` shows `{{1}}` — this is what BotBee stored internally but it does NOT reflect what Meta has registered
-- 10 tested API formats (named object, flat array, components, params, numbered object, hash-bang keys, top-level keys, etc.) — ALL accepted (HTTP 200 + real wamid) but NONE substituted variables
-- BotBee's substitution only works via their CRM automation engine (not raw API calls)
+Meta DID register the templates with `{{1}}-{{5}}`. Sending flat array via template API DOES substitute correctly. My earlier memory note that "NONE substituted variables" was WRONG — it was based on speculation, not physical verification of received messages.
 
-## Current sendTemplate() three-way situation (as of 2026-07-18)
+## What Was Actually Broken
 
-### Path A — PRIMARY PATH (text API via /whatsapp/send) — was default before forceTemplateApi fix
-- Renders TEMPLATE_BODIES["409950"] ({{1}} format) locally with real values
-- Sends as plain text message via `/whatsapp/send` (session-based API)
-- Within 24h window: customer sees correct content ✅; but no real wamid (text msg, not template)
-- Outside 24h window: BotBee returns HTTP 200 "ok" but Meta silently drops the message ❌; status="sent" in DB is a LIE
+THREE separate bugs prevented correct WhatsApp delivery:
 
-### Path B — FALLBACK (template API via /whatsapp/send/template) — now forced via forceTemplateApi:true
-- Calls BotBee template API with flat-array variables
-- Real wamid returned ✅, message actually delivered ✅
-- But message content shows `#!Name!# #!BookingID!#` etc. literally ❌ (no substitution)
-- wamid stored in notification_logs ✅
+### Bug 1: PRIMARY PATH (text API) was silently dropping messages
+- `sendTemplate()` took the PRIMARY PATH because `TEMPLATE_BODIES["409950"]` existed
+- PRIMARY PATH: sends rendered text via `/whatsapp/send` (session-based, 24h window required)
+- Outside 24h window: BotBee returns HTTP 200 with `status: "0"`, `"outside 24 hour window"` → `ok: false`
+- FALLBACK fires → template API → returns wamid → but wamid column in DB was null (Bug 2)
+- **Fix: `forceTemplateApi: true` in `sendBotBeeEventTemplate` opts — bypasses PRIMARY PATH entirely**
 
-### forceTemplateApi fix (deployed 2026-07-18):
-- Added `forceTemplateApi?: boolean` to BotBeeTemplateOpts
-- `sendBotBeeEventTemplate` opts now include `forceTemplateApi: true` → all ERP notification sends go to Path B
-- TRADEOFF: message delivered (wamid proves it), but variables show literally
-- Confirmed: wamid `wamid.HBgMOTE5ODY3MTE0NTYyFQIAERgSMjhCQzlERkJDNjZCNzVDMjQ0AA==` for ABT26582778
+### Bug 2: wamid not extracted from responsePayload
+- `trackNotification` INSERT had wamid as `null` — `innerRp?.wa_message_id` was not being extracted
+- **Fix: trackNotification now extracts wamid from `responsePayload.wa_message_id`**
 
-## Permanent Fix Required (admin action)
+### Bug 3: finalAmount not passed to triggerWorkflow
+- `bookings.ts` approval route called `triggerWorkflow("booking_approved", ctx)` without `finalAmount` or `amount`
+- `notificationEngine` computed `ctx.finalAmount ?? ctx.amount ?? 0` → `0` → customer saw `₹ 0`
+- **Fix: Add `finalAmount: Number((updated as any).finalAmount)` to triggerWorkflow call**
 
-Admin must go to BotBee dashboard and:
-1. Delete all 15 existing ABT templates (IDs 409950–410040)
-2. Recreate them using `{{1}}`, `{{2}}`, etc. in the body text (Meta's variable format)
-3. Wait for Meta approval (24–48h)
-4. The new template IDs will auto-sync (ABT_TEMPLATES patch + syncBotBeeTemplates on startup)
+### Bug 4: customerName had trailing whitespace  
+- DB stored `"mohammed altaf "` (trailing space) → WhatsApp showed `"mohammed altaf "`
+- **Fix: `.trim()` in both `bookings.ts` triggerWorkflow call AND `notificationEngine` booking_approved case**
 
-Once recreated correctly with {{1}} variables, Path B (template API) will correctly substitute variables AND deliver with wamid.
+## Confirmed Working Payload (verified 2026-07-18, booking ABT26752405)
 
-## Double-₹ Bug (fixed 2026-07-18)
-Template bodies already have `₹ #!Amount!#`. fmtAmount() was returning `₹1,89,000` → double rupee.
-Fix: fmtAmount() now returns just `1,89,000` (no ₹ prefix).
-
-## Variable key names by template (from variable_map, use in sendTemplate variables object)
 ```
-409950 booking_approved:      Name, BookingID, PackageContent, Amount, Paymenturllink
-409953 payment_received:      Name, BookingID, Invoice, Amount
-409956 invoice_ready:         Name, BookingID, Invoice, Amount, Paymenturllink
-409958 agreement_ready:       Name, BookingID, Agreement, Download
-409965 agreement_signed:      Name, Agreement
-409991 visa_issued:            Name, BookingID, Visano, Download
-409994 ticket_issued:          Name, BookingID, Flightnumber, Download
-409999 flight_reminder:        Name, BookingID, PackageContent, Flightnumber, Departuredate, Reportingtime, Airport
-410000 return_flight_reminder: Name, BookingID, Flightnumber, Departuredate, Reportingtime, Airport
-410008 room_allocation:        Name, BookingID, Hotel, Roomnumber
-410022 group_orientation:      Name, date, Time, Hussainhall
-410026 departure_reminde:      Name, BookingID, Departuredate, Reportingtime, T2
-410030 welcome_saudi:          Name
-410031 arrival_india:          Name
-410040 hajj_package_launch:    Name, 2027
+POST /whatsapp/send/template
+{
+  "template_id": 409950,
+  "phone_number_id": "965912196611113",
+  "phone_number": "919867114562",
+  "variables": ["mohammed altaf", "ABT26752405", "Economy Umrah Package", "94,500", "https://alburhantravels.com/invoice/ABT26752405"]
+}
+→ wamid.HBgMOTE5ODY3MTE0NTYyFQIAERgSQzQ3RTI4OTgyNDk4MzdGNDc5AA==
 ```
+
+All 5 variable formats (named object, flat array, components, numbered object, params) return valid wamids. BotBee maps flat array position 0→{{1}}, position 1→{{2}}, etc. Meta substitutes correctly.
+
+## Variable key names by template (from variable_map, positions 1→N)
+
+```
+409950 booking_approved:      1=Name, 2=BookingID, 3=PackageContent, 4=Amount, 5=Paymenturllink
+409953 payment_received:      1=Name, 2=BookingID, 3=Invoice, 4=Amount
+409956 invoice_ready:         1=Name, 2=BookingID, 3=Invoice, 4=Amount, 5=Paymenturllink
+409958 agreement_ready:       1=Name, 2=BookingID, 3=Agreement, 4=Download
+409965 agreement_signed:      1=Name, 2=Agreement
+409991 visa_issued:           1=Name, 2=BookingID, 3=Visano, 4=Download
+409994 ticket_issued:         1=Name, 2=BookingID, 3=Flightnumber, 4=Download
+409999 flight_reminder:       1=Name, 2=BookingID, 3=PackageContent, 4=Flightnumber, 5=Departuredate, 6=Reportingtime, 7=Airport
+410000 return_flight_reminder: 1=Name, 2=BookingID, 3=Flightnumber, 4=Departuredate, 5=Reportingtime, 6=Airport
+410008 room_allocation:       1=Name, 2=BookingID, 3=Hotel, 4=Roomnumber
+410022 group_orientation:     1=Name, 2=date, 3=Time, 4=Hussainhall
+410026 departure_reminde:     1=Name, 2=BookingID, 3=Departuredate, 4=Reportingtime, 5=T2
+410030 welcome_saudi:         1=Name
+410031 arrival_india:         1=Name
+410040 hajj_package_launch:   1=Name, 2=2027
+```
+
+## Diagnostic Endpoints (on VPS)
+
+- `POST /api/migrate/wa-approval-test {key, bookingId}` — calls `sendApprovalTemplate` DIRECTLY, bypasses dedup
+- `POST /api/migrate/wa-fullpipeline-test {key, bookingId}` — calls `triggerWorkflow` end-to-end (includes dedup check, full notificationEngine path)
+- `POST /api/migrate/botbee-format-test {key, phone}` — tests all 5 variable formats, all return wamid
+- `GET /api/migrate/notification-audit?key=...` — shows recent notification_logs with provider_response

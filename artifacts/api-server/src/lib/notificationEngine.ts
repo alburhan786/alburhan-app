@@ -528,7 +528,7 @@ export async function sendBotBeeEventTemplate(
 
     case "booking_approved":
       return sendApprovalTemplate(ctx.customerMobile, {
-        customerName: ctx.customerName,
+        customerName: (ctx.customerName || "").trim() || "Customer",
         packageName: ctx.packageName || "Hajj/Umrah Package",
         bookingId: bookingRef,
         amount: ctx.finalAmount ?? ctx.amount ?? 0,

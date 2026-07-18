@@ -534,10 +534,11 @@ router.post("/:id/approve", requireAdmin as any, requirePermission("bookings", "
       await triggerWorkflow("booking_approved", {
         bookingId:      updated.id,
         bookingNumber:  updated.bookingNumber,
-        customerName:   updated.customerName,
+        customerName:   (updated.customerName || "").trim(),
         customerMobile: updated.customerMobile,
         customerEmail:  updated.customerEmail ?? undefined,
         packageName:    (updated as any).packageName ?? undefined,
+        finalAmount:    (updated as any).finalAmount ? Number((updated as any).finalAmount) : undefined,
         invoiceUrl:     `https://alburhantravels.com/invoice/${updated.bookingNumber}`,
       });
     } catch (err) {
