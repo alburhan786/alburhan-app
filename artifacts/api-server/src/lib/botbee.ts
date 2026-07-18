@@ -995,7 +995,7 @@ export async function sendHajjPackageLaunchTemplate(
   ctx: { customerName: string; packageName?: string; launchUrl?: string },
   opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
-  const year = ctx.packageName?.match(/\d{4}/)?.[0] || new Date().getFullYear().toString();
+  const year = ctx.packageName?.match(/\d{4}/)?.[0] || "2027";
   return sendTemplate(to, tplId("hajj_package_launch"), {
     ...opts,
     variables: { Name: ctx.customerName, "2027": year },

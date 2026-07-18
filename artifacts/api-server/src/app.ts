@@ -859,6 +859,352 @@ app.post("/api/migrate/botbee-send-test", async (req, res) => {
   });
 });
 
+// GET /api/migrate/payload-audit — for every WhatsApp event: load real DB data, build exact
+// variable payload each sender function would produce, flag nulls/empty/TBA values.
+app.get("/api/migrate/payload-audit", async (req, res) => {
+  const key = (req.query.key as string) || "";
+  if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
+
+  const bookingNum = ((req.query.booking as string) || "ABT26582778").trim().toUpperCase();
+  const { pool: p } = await import("@workspace/db");
+  const { TEMPLATE_BODIES } = await import("./lib/botbee.js");
+  const SITE = "https://alburhantravels.com";
+
+  // ── Load all relevant booking data from DB ──────────────────────────────────
+  // Each query is wrapped individually so a missing column/table never aborts the whole audit.
+  let bk: Record<string, any> = {};
+  const dbErrors: string[] = [];
+
+  // 1. Core booking row (SELECT * — avoids column-name guessing)
+  try {
+    const br = await p.query(`SELECT * FROM bookings WHERE booking_number=$1 LIMIT 1`, [bookingNum]);
+    if (!br.rows.length) return void res.status(404).json({ error: `Booking ${bookingNum} not found` });
+    bk = { ...br.rows[0] };
+  } catch (e: any) {
+    return void res.status(500).json({ error: "Failed to load booking", detail: e.message });
+  }
+
+  // 2. User row
+  try {
+    const ur = await p.query(`SELECT * FROM users WHERE id=$1 LIMIT 1`, [bk.customer_id]);
+    if (ur.rows[0]) {
+      const u = ur.rows[0];
+      bk.customer_name   = u.name   || u.full_name   || null;
+      bk.customer_mobile = u.mobile || u.phone       || u.mobile_number || bk.customer_mobile || null;
+      bk.customer_email  = u.email  || null;
+    }
+  } catch (e: any) { dbErrors.push("users: " + e.message); }
+
+  // 3. Package name
+  if (bk.package_id) {
+    try {
+      const pkr = await p.query(`SELECT name FROM packages WHERE id=$1 LIMIT 1`, [bk.package_id]);
+      bk.package_name = pkr.rows[0]?.name ?? bk.package_name ?? null;
+    } catch (e: any) { dbErrors.push("packages: " + e.message); }
+  }
+
+  // 4. Invoice number
+  try {
+    const ir = await p.query(`SELECT invoice_number FROM invoices WHERE booking_id=$1 ORDER BY created_at DESC LIMIT 1`, [bk.id]);
+    bk.invoice_number = ir.rows[0]?.invoice_number ?? null;
+  } catch (e: any) { dbErrors.push("invoices: " + e.message); }
+
+  // 5. Agreement
+  try {
+    const ar = await p.query(`SELECT id, agreement_number FROM agreements WHERE booking_id=$1 ORDER BY created_at DESC LIMIT 1`, [bk.id]);
+    bk.agreement_id     = ar.rows[0]?.id               ?? null;
+    bk.agreement_number = ar.rows[0]?.agreement_number ?? null;
+  } catch (e: any) { dbErrors.push("agreements: " + e.message); }
+
+  // 6. Pilgrim (visa)
+  try {
+    const pr2 = await p.query(`SELECT * FROM pilgrims WHERE booking_id=$1 LIMIT 1`, [bk.id]);
+    bk.pilgrim_id  = pr2.rows[0]?.id         ?? null;
+    bk.visa_number = pr2.rows[0]?.visa_number ?? null;
+  } catch (e: any) { dbErrors.push("pilgrims: " + e.message); }
+
+  // 7. Flight (via pilgrim_flights → flights)
+  if (bk.pilgrim_id) {
+    try {
+      const fr = await p.query(`
+        SELECT f.*
+        FROM pilgrim_flights pf
+        JOIN flights f ON f.id = pf.flight_id
+        WHERE pf.pilgrim_id = $1 ORDER BY f.departure_date ASC LIMIT 1`, [bk.pilgrim_id]);
+      if (fr.rows[0]) {
+        const f = fr.rows[0];
+        bk.flight_number     = f.flight_number      ?? null;
+        bk.departure_airport = f.departure_airport  ?? null;
+        bk.return_airport    = f.arrival_airport    ?? null;
+        bk.flight_dep_date   = f.departure_date     ?? null;
+        bk.reporting_time    = f.reporting_time     ?? null;
+        bk.return_flight     = f.return_flight_number ?? null;
+        bk.return_date       = f.return_date        ?? null;
+      }
+    } catch (e: any) { dbErrors.push("pilgrim_flights: " + e.message); }
+  }
+
+  // 8. Hotel / room (via pilgrim_rooms → hotels)
+  if (bk.pilgrim_id) {
+    try {
+      const hr = await p.query(`
+        SELECT h.name AS hotel_name, pr.*
+        FROM pilgrim_rooms pr
+        LEFT JOIN hotels h ON h.id = pr.hotel_id
+        WHERE pr.pilgrim_id = $1 LIMIT 1`, [bk.pilgrim_id]);
+      bk.hotel_name  = hr.rows[0]?.hotel_name  ?? null;
+      bk.room_number = hr.rows[0]?.room_number ?? null;
+    } catch (e: any) { dbErrors.push("pilgrim_rooms: " + e.message); }
+  }
+
+  // 9. Group orientation
+  if (bk.pilgrim_id) {
+    try {
+      const gr = await p.query(`
+        SELECT hg.*
+        FROM pilgrim_groups pg
+        JOIN hajj_groups hg ON hg.id = pg.group_id
+        WHERE pg.pilgrim_id = $1 LIMIT 1`, [bk.pilgrim_id]);
+      if (gr.rows[0]) {
+        bk.orientation_date  = gr.rows[0].orientation_date  ?? null;
+        bk.orientation_time  = gr.rows[0].orientation_time  ?? null;
+        bk.orientation_venue = gr.rows[0].orientation_venue ?? null;
+        bk.group_name        = gr.rows[0].group_name        ?? null;
+      }
+    } catch (e: any) { dbErrors.push("hajj_groups: " + e.message); }
+  }
+
+  // ── Helpers ─────────────────────────────────────────────────────────────────
+  function fmtAmt(v: any): string {
+    const n = Number(v);
+    return isNaN(n) || n === 0 ? "-" : n.toLocaleString("en-IN");
+  }
+  function countVars(body: string): number {
+    return Math.max(0, ...([...body.matchAll(/\{\{(\d+)\}\}/g)].map(m => parseInt(m[1]))));
+  }
+  function renderBody(body: string, vars: Record<string, string>): string {
+    const vals = Object.values(vars);
+    return body.replace(/\{\{(\d+)\}\}/g, (_, n) => {
+      const idx = parseInt(n) - 1;
+      return idx >= 0 && idx < vals.length ? String(vals[idx] ?? "-") : `{{${n}}}`;
+    });
+  }
+  type VarStatus = "ok" | "fallback" | "empty" | "null_db";
+  function vv(val: any, fallback?: string): { value: string; status: VarStatus } {
+    if (val === null || val === undefined) {
+      if (fallback !== undefined) return { value: fallback, status: "fallback" };
+      return { value: "-", status: "null_db" };
+    }
+    const s = String(val).trim();
+    if (s === "") {
+      if (fallback !== undefined) return { value: fallback, status: "fallback" };
+      return { value: "-", status: "empty" };
+    }
+    return { value: s, status: "ok" };
+  }
+
+  const invoiceUrl  = bk.invoice_number
+    ? `${SITE}/invoice/${bookingNum}` : `${SITE}/invoice/${bookingNum}`;
+  const agreementUrl = bk.agreement_id
+    ? `${SITE}/agreement/${bookingNum}` : `${SITE}/agreement/${bookingNum}`;
+  const depDate = bk.flight_dep_date
+    ? new Date(bk.flight_dep_date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+    : (bk.preferred_departure_date
+      ? new Date(bk.preferred_departure_date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+      : null);
+
+  // ── Build one entry per event ────────────────────────────────────────────────
+  interface PayloadEntry {
+    event: string;
+    templateId: string;
+    templateBody: string;
+    expectedVarCount: number;
+    variables: Array<{ position: string; label: string; value: string; status: VarStatus }>;
+    actualVarCount: number;
+    countMatch: boolean;
+    hasProblems: boolean;
+    renderedPreview: string;
+    dbValuesLoaded: Record<string, string | null>;
+  }
+
+  function entry(
+    event: string, id: string,
+    vars: Array<{ label: string; v: { value: string; status: VarStatus } }>
+  ): PayloadEntry {
+    const body = TEMPLATE_BODIES[id] || "";
+    const expectedCount = countVars(body);
+    const varMap: Record<string, string> = {};
+    vars.forEach(({ label, v }, i) => { varMap[`_${i}`] = v.value; });
+    const rendered = renderBody(body, Object.fromEntries(vars.map(({ v }, i) => [String(i), v.value])));
+    // rebuild for renderBody which uses Object.values positionally
+    const posVarMap: Record<string, string> = {};
+    vars.forEach(({ label, v }, i) => { posVarMap[label] = v.value; });
+    const renderedFinal = (() => {
+      const vals = vars.map(x => x.v.value);
+      return body.replace(/\{\{(\d+)\}\}/g, (_, n) => {
+        const idx = parseInt(n) - 1;
+        return idx >= 0 && idx < vals.length ? vals[idx] : `{{${n}}}`;
+      });
+    })();
+    const hasProblems = vars.some(x => x.v.status === "null_db" || x.v.status === "empty")
+      || vars.length !== expectedCount;
+    return {
+      event, templateId: id, templateBody: body, expectedVarCount: expectedCount,
+      variables: vars.map(({ label, v }, i) => ({
+        position: `{{${i+1}}}`, label, value: v.value, status: v.status,
+      })),
+      actualVarCount: vars.length,
+      countMatch: vars.length === expectedCount,
+      hasProblems,
+      renderedPreview: renderedFinal,
+      dbValuesLoaded: {
+        customer_name:      bk.customer_name    ?? null,
+        customer_mobile:    bk.customer_mobile  ?? null,
+        package_name:       bk.package_name     ?? null,
+        total_amount:       bk.total_amount     ?? null,
+        paid_amount:        bk.paid_amount      ?? null,
+        balance_amount:     bk.balance_amount   ?? null,
+        invoice_number:     bk.invoice_number   ?? null,
+        agreement_id:       bk.agreement_id     ?? null,
+        agreement_number:   bk.agreement_number ?? null,
+        visa_number:        bk.visa_number      ?? null,
+        flight_number:      bk.flight_number    ?? null,
+        departure_airport:  bk.departure_airport ?? null,
+        reporting_time:     bk.reporting_time   ?? null,
+        departure_date:     depDate             ?? null,
+        return_date:        bk.return_date      ?? null,
+        return_flight:      bk.return_flight    ?? null,
+        hotel_name:         bk.hotel_name       ?? null,
+        room_number:        bk.room_number      ?? null,
+        orientation_date:   bk.orientation_date ?? null,
+        orientation_time:   bk.orientation_time ?? null,
+        orientation_venue:  bk.orientation_venue ?? null,
+      },
+    };
+  }
+
+  // Mirror the sender: extract 4-digit year from package name, else default to "2027"
+  const year = (bk.package_name as string | null)?.match(/\d{4}/)?.[0] || "2027";
+
+  const report: PayloadEntry[] = [
+    // 1 — booking_approved (5 vars)
+    entry("booking_approved", "409950", [
+      { label: "Name",            v: vv(bk.customer_name) },
+      { label: "BookingID",       v: vv(bookingNum) },
+      { label: "PackageContent",  v: vv(bk.package_name, "Hajj/Umrah Package") },
+      { label: "Amount",          v: vv(fmtAmt(bk.total_amount)) },
+      { label: "Paymenturllink",  v: vv(invoiceUrl) },
+    ]),
+    // 2 — payment_received (4 vars)
+    entry("payment_received", "409953", [
+      { label: "Name",       v: vv(bk.customer_name) },
+      { label: "BookingID",  v: vv(bookingNum) },
+      { label: "Invoice",    v: vv(bk.invoice_number, bookingNum) },
+      { label: "Amount",     v: vv(fmtAmt(bk.paid_amount || bk.total_amount)) },
+    ]),
+    // 3 — invoice_ready (5 vars)
+    entry("invoice_ready", "409956", [
+      { label: "Name",            v: vv(bk.customer_name) },
+      { label: "BookingID",       v: vv(bookingNum) },
+      { label: "Invoice",         v: vv(bk.invoice_number, bookingNum) },
+      { label: "Amount",          v: vv(fmtAmt(bk.total_amount)) },
+      { label: "Paymenturllink",  v: vv(invoiceUrl) },
+    ]),
+    // 4 — agreement_ready (4 vars)
+    entry("agreement_ready", "409958", [
+      { label: "Name",       v: vv(bk.customer_name) },
+      { label: "BookingID",  v: vv(bookingNum) },
+      { label: "Agreement",  v: vv(bk.agreement_number, bookingNum) },
+      { label: "Download",   v: vv(agreementUrl) },
+    ]),
+    // 5 — agreement_signed (2 vars)
+    entry("agreement_signed", "409965", [
+      { label: "Name",       v: vv(bk.customer_name) },
+      { label: "Agreement",  v: vv(bookingNum) },
+    ]),
+    // 6 — visa_issued (4 vars)
+    entry("visa_issued", "409991", [
+      { label: "Name",       v: vv(bk.customer_name) },
+      { label: "BookingID",  v: vv(bookingNum) },
+      { label: "Visano",     v: vv(bk.visa_number, "-") },
+      { label: "Download",   v: vv(invoiceUrl) },
+    ]),
+    // 7 — ticket_issued (4 vars)
+    entry("ticket_issued", "409994", [
+      { label: "Name",          v: vv(bk.customer_name) },
+      { label: "BookingID",     v: vv(bookingNum) },
+      { label: "Flightnumber",  v: vv(bk.flight_number, "TBA") },
+      { label: "Download",      v: vv(invoiceUrl) },
+    ]),
+    // 8 — flight_reminder (7 vars)
+    entry("flight_reminder", "409999", [
+      { label: "Name",           v: vv(bk.customer_name) },
+      { label: "BookingID",      v: vv(bookingNum) },
+      { label: "PackageContent", v: vv(bk.package_name, "Hajj/Umrah Package") },
+      { label: "Flightnumber",   v: vv(bk.flight_number, "TBA") },
+      { label: "Departuredate",  v: vv(depDate, "TBA") },
+      { label: "Reportingtime",  v: vv(bk.reporting_time, "3 hours before departure") },
+      { label: "Airport",        v: vv(bk.departure_airport, "TBA") },
+    ]),
+    // 9 — return_flight_reminder (6 vars)
+    entry("return_flight_reminder", "410000", [
+      { label: "Name",           v: vv(bk.customer_name) },
+      { label: "BookingID",      v: vv(bookingNum) },
+      { label: "Flightnumber",   v: vv(bk.return_flight || bk.flight_number, "TBA") },
+      { label: "Departuredate",  v: vv(bk.return_date ? new Date(bk.return_date).toLocaleDateString("en-IN") : null, "TBA") },
+      { label: "Reportingtime",  v: vv(bk.reporting_time, "3 hours before departure") },
+      { label: "Airport",        v: vv(bk.return_airport || bk.departure_airport, "TBA") },
+    ]),
+    // 10 — departure_reminder (5 vars)
+    entry("departure_reminder", "410026", [
+      { label: "Name",           v: vv(bk.customer_name) },
+      { label: "BookingID",      v: vv(bookingNum) },
+      { label: "Departuredate",  v: vv(depDate, "TBA") },
+      { label: "Reportingtime",  v: vv(bk.reporting_time, "4 hours before departure") },
+      { label: "T2",             v: vv(bk.departure_airport, "TBA") },
+    ]),
+    // 11 — room_allocation (4 vars)
+    entry("room_allocation", "410008", [
+      { label: "Name",        v: vv(bk.customer_name) },
+      { label: "BookingID",   v: vv(bookingNum) },
+      { label: "Hotel",       v: vv(bk.hotel_name, "Hotel TBA") },
+      { label: "Roomnumber",  v: vv(bk.room_number, "TBA") },
+    ]),
+    // 12 — group_orientation (4 vars)
+    entry("group_orientation", "410022", [
+      { label: "Name",        v: vv(bk.customer_name) },
+      { label: "date",        v: vv(bk.orientation_date, "TBA") },
+      { label: "Time",        v: vv(bk.orientation_time, "TBA") },
+      { label: "Hussainhall", v: vv(bk.orientation_venue, "Al Burhan Office") },
+    ]),
+    // 13 — welcome_saudi (1 var)
+    entry("welcome_saudi", "410030", [
+      { label: "Name", v: vv(bk.customer_name) },
+    ]),
+    // 14 — arrival_india (1 var)
+    entry("arrival_india", "410031", [
+      { label: "Name", v: vv(bk.customer_name) },
+    ]),
+    // 15 — hajj_package_launch (2 vars)
+    entry("hajj_package_launch", "410040", [
+      { label: "Name", v: vv(bk.customer_name) },
+      { label: "2027", v: vv(year) },
+    ]),
+  ];
+
+  const passing  = report.filter(r => !r.hasProblems).length;
+  const failing  = report.filter(r => r.hasProblems).length;
+  const warnings = report.filter(r => !r.hasProblems && r.variables.some(v => v.status === "fallback")).length;
+
+  res.json({
+    bookingNumber: bookingNum,
+    generatedAt: new Date().toISOString(),
+    totalTemplates: report.length,
+    passing, failing, warnings,
+    report,
+  });
+});
+
 // GET /api/migrate/botbee-audit — live per-event audit: fetches every template from BotBee API,
 // verifies body_content uses {{N}} Meta format, checks variable_map positions, renders preview.
 app.get("/api/migrate/botbee-audit", async (req, res) => {
