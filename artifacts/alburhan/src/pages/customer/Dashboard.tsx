@@ -246,6 +246,18 @@ function MyAgreementsSection({
                     size="sm"
                     variant="outline"
                     className="font-semibold text-xs border-gray-300 text-gray-600 hover:bg-gray-50"
+                    onClick={() => {
+                      const tok = ag.verification_token || ag.agreement_number;
+                      const verifyUrl = `https://alburhantravels.com/verify-agreement/${tok}`;
+                      window.open(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&data=${encodeURIComponent(verifyUrl)}`, "_blank");
+                    }}
+                  >
+                    📷 QR Code
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="font-semibold text-xs border-gray-300 text-gray-600 hover:bg-gray-50"
                     onClick={() => handleShare(ag)}
                   >
                     {copiedId === ag.id
@@ -2453,6 +2465,19 @@ export default function CustomerDashboard() {
                                 onClick={() => window.open((import.meta.env.BASE_URL || "/") + "verify-agreement/" + (ag.verification_token || ag.agreement_number), "_blank")}
                               >
                                 🔍 Verify
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="font-semibold text-xs"
+                                style={{ borderColor: "#9ca3af", color: "#4b5563" }}
+                                onClick={() => {
+                                  const tok = ag.verification_token || ag.agreement_number;
+                                  const verifyUrl = `https://alburhantravels.com/verify-agreement/${tok}`;
+                                  window.open(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&data=${encodeURIComponent(verifyUrl)}`, "_blank");
+                                }}
+                              >
+                                📷 QR
                               </Button>
                               <Button
                                 size="sm"

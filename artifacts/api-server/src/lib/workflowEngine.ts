@@ -715,3 +715,67 @@ export function startZiyaratReminderCron() {
   scheduleEvening();
   console.log("[ZiyaratReminder] Cron scheduled: daily at 20:30 IST");
 }
+
+// ── Agreement Integrity Cron (nightly 02:00 IST = 20:30 UTC prev day) ────────
+export function startAgreementIntegrityCron() {
+  const run = async () => {
+    try {
+      // Backfill any NULL verification_tokens (permanent safety net)
+      const fixed = await pool.query(
+        `UPDATE agreements
+           SET verification_token = gen_random_uuid(), updated_at = NOW()
+         WHERE verification_token IS NULL
+         RETURNING agreement_number`
+      );
+      if (fixed.rowCount && fixed.rowCount > 0) {
+        console.log(`[AgreementIntegrity] ✅ Fixed ${fixed.rowCount} NULL verification_token(s):`);
+        fixed.rows.forEach((r: any) => console.log(`  → ${r.agreement_number}`));
+      }
+
+      // Report orphaned agreements (no booking)
+      const orphaned = await pool.query(
+        `SELECT a.agreement_number FROM agreements a
+           LEFT JOIN bookings b ON b.id = a.booking_id
+          WHERE b.id IS NULL AND a.status != 'cancelled'`
+      );
+      if (orphaned.rows.length > 0) {
+        console.log(`[AgreementIntegrity] ⚠️ ${orphaned.rows.length} orphaned agreement(s) (no booking):`);
+        orphaned.rows.forEach((r: any) => console.log(`  • ${r.agreement_number}`));
+      }
+
+      // Report approved bookings missing an agreement
+      const missing = await pool.query(
+        `SELECT b.booking_number FROM bookings b
+          WHERE b.status IN ('approved','confirmed','partially_paid')
+            AND NOT EXISTS (
+              SELECT 1 FROM agreements a WHERE a.booking_id = b.id AND a.status != 'cancelled'
+            )`
+      );
+      if (missing.rows.length > 0) {
+        console.log(`[AgreementIntegrity] ⚠️ ${missing.rows.length} approved booking(s) missing agreement:`);
+        missing.rows.forEach((r: any) => console.log(`  • ${r.booking_number}`));
+      }
+
+      const total = await pool.query(`SELECT COUNT(*) FROM agreements WHERE status != 'cancelled'`);
+      const fixed0 = fixed.rowCount || 0;
+      const issues = orphaned.rows.length + missing.rows.length;
+      if (issues === 0 && fixed0 === 0) {
+        console.log(`[AgreementIntegrity] ✅ All ${total.rows[0].count} active agreements OK`);
+      }
+    } catch (err: any) {
+      console.error("[AgreementIntegrity] Cron error:", err?.message);
+    }
+  };
+
+  const scheduleNightly = () => {
+    const now = new Date();
+    const next = new Date(now);
+    next.setUTCHours(20, 30, 0, 0); // 02:00 IST
+    if (next <= now) next.setUTCDate(next.getUTCDate() + 1);
+    setTimeout(() => { run().catch(() => {}); scheduleNightly(); }, next.getTime() - now.getTime());
+  };
+
+  run().catch(() => {}); // Run immediately on startup to fix any existing issues
+  scheduleNightly();
+  console.log("[AgreementIntegrity] Cron scheduled: daily at 02:00 IST + immediate startup check");
+}

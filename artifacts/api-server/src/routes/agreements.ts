@@ -23,6 +23,19 @@ const router = Router();
     await pool.query(`ALTER TABLE agreements ADD COLUMN IF NOT EXISTS void_at TIMESTAMPTZ`);
     await pool.query(`ALTER TABLE agreements ADD COLUMN IF NOT EXISTS void_reason TEXT`);
     console.log("[Agreement] agreements columns ensured");
+    // ── PERMANENT FIX: ensure verification_token is never NULL ─────────────
+    // 1. Backfill any existing NULL tokens
+    const backfill = await pool.query(
+      `UPDATE agreements SET verification_token = gen_random_uuid(), updated_at = NOW()
+       WHERE verification_token IS NULL RETURNING agreement_number`
+    );
+    if (backfill.rowCount && backfill.rowCount > 0) {
+      console.log(`[Agreement] ✅ Backfilled ${backfill.rowCount} NULL verification_token(s):`);
+      backfill.rows.forEach((r: any) => console.log(`  → ${r.agreement_number}`));
+    }
+    // 2. Set column DEFAULT so all future INSERTs that omit the field get a UUID automatically
+    await pool.query(`ALTER TABLE agreements ALTER COLUMN verification_token SET DEFAULT gen_random_uuid()`);
+    console.log("[Agreement] verification_token DEFAULT gen_random_uuid() enforced");
     // Extended customer_profiles columns (safe — no-ops if already exist)
     await pool.query(`ALTER TABLE customer_profiles ADD COLUMN IF NOT EXISTS father_name TEXT`);
     await pool.query(`ALTER TABLE customer_profiles ADD COLUMN IF NOT EXISTS nationality TEXT`);
@@ -374,7 +387,7 @@ router.get("/my/:id", requireAuth, async (req: any, res) => {
     );
     if (!agRes.rows.length) return res.status(404).json({ error: "Not found" });
     const ag = agRes.rows[0];
-    ag.verificationUrl = `${getSiteBase()}/verify-agreement/${ag.verification_token}`;
+    ag.verificationUrl = `${getSiteBase()}/verify-agreement/${ag.verification_token || ag.agreement_number}`;
     ag.clauses = CONSENT_CATEGORIES.map(c => ({ id: c.id, title: c.title, body: c.body }));
     res.json(ag);
   } catch (err) {
@@ -605,7 +618,7 @@ router.get("/:id", requireAdmin, async (req: any, res) => {
     const ag = agRes.rows[0];
     const logsRes = await pool.query(`SELECT * FROM agreement_audit_logs WHERE agreement_id=$1 ORDER BY created_at ASC`, [id]);
     ag.auditLogs = logsRes.rows;
-    ag.verificationUrl = `${getSiteBase()}/verify-agreement/${ag.verification_token}`;
+    ag.verificationUrl = `${getSiteBase()}/verify-agreement/${ag.verification_token || ag.agreement_number}`;
     ag.clauses = CONSENT_CATEGORIES.map(c => ({ id: c.id, title: c.title, body: c.body }));
     res.json(ag);
   } catch { res.status(500).json({ error: "Failed to load agreement" }); }
@@ -957,3 +970,64 @@ router.post("/ensure/:bookingId", requireAdmin, async (req: any, res) => {
 });
 
 export default router;
+
+// ── Agreement Integrity Check (called by nightly cron) ────────────────────────
+export async function runAgreementIntegrityCheck(): Promise<{ checked: number; fixed: number; issues: string[] }> {
+  const issues: string[] = [];
+  let fixed = 0;
+  try {
+    // Fix 1: backfill any NULL verification_tokens
+    const nullRes = await pool.query(
+      `UPDATE agreements
+         SET verification_token = gen_random_uuid(), updated_at = NOW()
+       WHERE verification_token IS NULL
+       RETURNING id, agreement_number`
+    );
+    if (nullRes.rowCount && nullRes.rowCount > 0) {
+      for (const r of nullRes.rows) {
+        issues.push(`Fixed NULL verification_token: ${r.agreement_number}`);
+        fixed++;
+      }
+    }
+
+    // Check 2: agreements with no linked booking (orphaned)
+    const orphaned = await pool.query(
+      `SELECT a.agreement_number
+         FROM agreements a
+         LEFT JOIN bookings b ON b.id = a.booking_id
+        WHERE b.id IS NULL AND a.status != 'cancelled'`
+    );
+    for (const r of orphaned.rows) {
+      issues.push(`Orphaned agreement (no booking): ${r.agreement_number}`);
+    }
+
+    // Check 3: active bookings that approved/confirmed but have no agreement
+    const missing = await pool.query(
+      `SELECT b.booking_number
+         FROM bookings b
+        WHERE b.status IN ('approved','confirmed','partially_paid')
+          AND NOT EXISTS (
+            SELECT 1 FROM agreements a
+             WHERE a.booking_id = b.id AND a.status != 'cancelled'
+          )`
+    );
+    for (const r of missing.rows) {
+      issues.push(`No agreement for booking: ${r.booking_number}`);
+    }
+
+    const totalRes = await pool.query(`SELECT COUNT(*) FROM agreements WHERE status != 'cancelled'`);
+    const checked = parseInt(totalRes.rows[0].count || "0");
+
+    if (issues.length > 0) {
+      console.log(`[AgreementIntegrity] ⚠️ ${checked} agreements checked | fixed: ${fixed} | issues: ${issues.length}`);
+      issues.forEach(i => console.log(`  • ${i}`));
+    } else {
+      console.log(`[AgreementIntegrity] ✅ All ${checked} active agreements OK`);
+    }
+    return { checked, fixed, issues };
+  } catch (err: any) {
+    const msg = `Integrity check error: ${err?.message}`;
+    console.error("[AgreementIntegrity]", msg);
+    return { checked: 0, fixed: 0, issues: [msg] };
+  }
+}

@@ -83,7 +83,7 @@ import { inArray, sql } from "drizzle-orm";
 import { ADMIN_MOBILES } from "./routes/auth.js";
 import { startPaymentReminderCron } from "./jobs/paymentReminder.js";
 import { startFeedbackReminderCron } from "./jobs/feedbackReminder.js";
-import { startDepartureReminderCron, startDocumentExpiryCron, startReturnAndFeedbackCron, startBalanceReminderCron, startDocumentReminderCron, startZiyaratReminderCron } from "./lib/workflowEngine.js";
+import { startDepartureReminderCron, startDocumentExpiryCron, startReturnAndFeedbackCron, startBalanceReminderCron, startDocumentReminderCron, startZiyaratReminderCron, startAgreementIntegrityCron } from "./lib/workflowEngine.js";
 import { DEFAULT_RULES } from "./routes/workflows.js";
 
 async function runMigrations() {
@@ -1890,6 +1890,7 @@ async function start() {
     startBalanceReminderCron();
     startDocumentReminderCron();
     startZiyaratReminderCron();
+    startAgreementIntegrityCron();
     const scheduleAuditRetention = () => {
       const now = new Date();
       const nextRun = new Date(now);

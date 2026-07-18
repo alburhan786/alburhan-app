@@ -166,6 +166,23 @@ export default function VerifyAgreement() {
                   </div>
                 </div>
 
+                {/* QR Code for physical / print verification */}
+                <div style={{ marginTop: 24, paddingTop: 20, borderTop: "1px solid #EEE", textAlign: "center" }}>
+                  <div style={{ color: "#666", fontSize: 12, fontFamily: "sans-serif", marginBottom: 10 }}>
+                    Scan QR to verify this agreement on any device
+                  </div>
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=6&data=${encodeURIComponent(window.location.href)}`}
+                    alt="Verification QR Code"
+                    style={{ border: "1px solid #DDD", borderRadius: 8, padding: 4 }}
+                    width={160}
+                    height={160}
+                  />
+                  <div style={{ color: "#AAA", fontSize: 10, marginTop: 8, fontFamily: "monospace", wordBreak: "break-all", padding: "0 16px" }}>
+                    {window.location.href}
+                  </div>
+                </div>
+
                 {/* Footer */}
                 <div style={{ textAlign: "center", marginTop: 24, color: "#999", fontSize: 11, fontFamily: "sans-serif" }}>
                   Al Burhan Tours & Travels | 5/8 Khanka Masjid Complex, Burhanpur 450331 M.P. | +91 9893989786
