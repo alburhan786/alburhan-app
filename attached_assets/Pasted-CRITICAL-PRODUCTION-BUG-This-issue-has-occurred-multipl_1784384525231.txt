@@ -1,0 +1,134 @@
+CRITICAL PRODUCTION BUG
+
+This issue has occurred multiple times and must be permanently fixed. Do not apply a temporary workaround. Perform a complete root cause analysis and fix the entire notification workflow.
+
+Problem:
+
+Today I created a REAL booking for the "Ramadan Umrah Full Month Package" (₹180,000).
+
+The booking was completed and payment was made successfully.
+
+Expected behavior:
+1. Booking should be confirmed.
+2. Booking confirmation WhatsApp should be sent automatically.
+3. Booking confirmation SMS should be sent automatically.
+4. Payment received WhatsApp should be sent automatically.
+5. Payment received SMS should be sent automatically.
+6. Invoice PDF should be generated automatically.
+7. Invoice PDF should be attached or its download URL sent through WhatsApp.
+8. Invoice PDF or download link should also be sent through SMS (where applicable).
+9. Customer Dashboard should immediately show booking confirmation, invoice, payment status, and communication history.
+10. Admin panel should record every notification attempt.
+
+Actual behavior:
+- Booking was created.
+- Payment was completed.
+- NO booking confirmation WhatsApp.
+- NO booking confirmation SMS.
+- NO payment received WhatsApp.
+- NO payment received SMS.
+- NO invoice PDF received.
+- NO invoice download URL received.
+- No communication history for these events.
+
+This has happened repeatedly and must be permanently resolved.
+
+Tasks:
+
+1. Trace the complete workflow:
+Booking Created
+→ Payment Successful
+→ Invoice Generated
+→ Notification Engine
+→ BotBee WhatsApp
+→ SMS Provider
+→ Email
+→ Customer Timeline
+→ Admin Logs
+
+2. Verify every trigger fires correctly.
+
+3. Verify payment success actually triggers:
+- booking_receive
+- booking_approved (if applicable)
+- payment_received
+- invoice_ready
+- invoice PDF generation
+
+4. Verify invoice generation completes before sending notifications.
+
+5. Verify PDF generation never silently fails.
+
+6. Verify WhatsApp API receives the correct template name and variables.
+
+7. Verify BotBee API responses.
+
+8. Verify SMS provider integration and responses.
+
+9. Verify notification queue is running.
+
+10. Verify no background job is failing silently.
+
+11. Verify retry logic executes correctly.
+
+12. Verify environment variables:
+- BotBee API Key
+- BotBee Workspace
+- WhatsApp credentials
+- SMS credentials
+- PDF storage
+- Public file URLs
+
+13. Add detailed logging for every step:
+- Trigger received
+- Template selected
+- Variables mapped
+- API request
+- API response
+- Delivery result
+- Retry attempts
+- Final status
+
+14. Create an Admin Notification Debug page showing:
+- Booking ID
+- Customer
+- Event
+- Trigger status
+- WhatsApp status
+- SMS status
+- Email status
+- PDF generation status
+- Error details
+- Retry button
+
+15. Add a "Resend All Notifications" button that sends:
+- Booking Confirmation
+- Payment Received
+- Invoice PDF
+- Agreement
+- Visa
+- Ticket
+(as applicable)
+
+16. Perform a real end-to-end test using my actual booking and confirm:
+✓ Booking Confirmation WhatsApp delivered
+✓ Booking Confirmation SMS delivered
+✓ Payment Received WhatsApp delivered
+✓ Payment Received SMS delivered
+✓ Invoice PDF generated
+✓ Invoice PDF URL delivered
+✓ Customer Dashboard updated
+✓ Admin logs updated
+
+17. Produce a final report including:
+- Root cause
+- Files modified
+- Bugs fixed
+- Tests performed
+- Test results
+- Remaining issues (if any)
+
+IMPORTANT:
+Do NOT mark this task complete until every notification is successfully delivered during a real end-to-end production test.
+
+This must be production-ready and reliable because this system will be used for live Hajj and Umrah bookings.

@@ -354,6 +354,13 @@ router.get("/my", requireAuth, async (req: any, res) => {
        WHERE a.customer_id = $1 AND a.status != 'cancelled'
        ORDER BY a.created_at DESC`, [req.user.id]
     );
+    // Backfill any agreements that are missing a verification_token (legacy records)
+    const needsToken = result.rows.filter((r: any) => !r.verification_token);
+    for (const row of needsToken) {
+      const newToken = crypto.randomUUID();
+      await pool.query(`UPDATE agreements SET verification_token=$1, updated_at=NOW() WHERE id=$2`, [newToken, row.id]);
+      row.verification_token = newToken;
+    }
     res.json({ agreements: result.rows });
   } catch { res.status(500).json({ error: "Failed to load agreements" }); }
 });

@@ -59,7 +59,8 @@ function MyAgreementsSection({
   const BASE = import.meta.env.BASE_URL || "/";
 
   const handleShare = (ag: any) => {
-    const url = `https://alburhantravels.com/verify-agreement/${ag.verification_token}`;
+    const verifyToken = ag.verification_token || ag.agreement_number;
+    const url = `https://alburhantravels.com/verify-agreement/${verifyToken}`;
     if (navigator.share) {
       navigator.share({ title: `Hajj Agreement ${ag.agreement_number}`, text: `Al Burhan Tours & Travels — ${ag.agreement_number}`, url }).catch(() => {});
     } else {
@@ -237,7 +238,7 @@ function MyAgreementsSection({
                     size="sm"
                     variant="outline"
                     className="font-semibold text-xs border-gray-300 text-gray-600 hover:bg-gray-50"
-                    onClick={() => window.open(BASE + "verify-agreement/" + ag.verification_token, "_blank")}
+                    onClick={() => window.open(BASE + "verify-agreement/" + (ag.verification_token || ag.agreement_number), "_blank")}
                   >
                     🔍 Verify Agreement
                   </Button>
@@ -2449,7 +2450,7 @@ export default function CustomerDashboard() {
                                 variant="outline"
                                 className="font-semibold text-xs"
                                 style={{ borderColor: "#9ca3af", color: "#4b5563" }}
-                                onClick={() => window.open((import.meta.env.BASE_URL || "/") + "verify-agreement/" + ag.verification_token, "_blank")}
+                                onClick={() => window.open((import.meta.env.BASE_URL || "/") + "verify-agreement/" + (ag.verification_token || ag.agreement_number), "_blank")}
                               >
                                 🔍 Verify
                               </Button>
@@ -2459,7 +2460,7 @@ export default function CustomerDashboard() {
                                 className="font-semibold text-xs"
                                 style={{ borderColor: "#9ca3af", color: "#4b5563" }}
                                 onClick={() => {
-                                  const url = `https://alburhantravels.com/verify-agreement/${ag.verification_token}`;
+                                  const url = `https://alburhantravels.com/verify-agreement/${ag.verification_token || ag.agreement_number}`;
                                   navigator.clipboard?.writeText(url).catch(() => {});
                                 }}
                               >
