@@ -1940,6 +1940,23 @@ async function start() {
     setInterval(syncBotBeeTemplates, 10 * 60 * 1000);
     console.log("[BotBee] Template auto-sync scheduled every 10 minutes");
 
+    // ── Load any stored template ID overrides from api_settings ─────────────
+    // Admin calls POST /api/migrate/activate-new-templates after recreating templates
+    // in BotBee dashboard with proper {{1}} Meta variable format. Overrides are
+    // persisted here and applied on every server restart without a code redeploy.
+    pool.query(`SELECT value FROM api_settings WHERE key='botbee_template_overrides' LIMIT 1`)
+      .then(async r => {
+        if (!r.rows[0]?.value) return;
+        try {
+          const overrides = JSON.parse(r.rows[0].value) as Record<string, { id: string; body: string }>;
+          const { applyTemplateOverrides } = await import("./lib/botbee.js");
+          applyTemplateOverrides(overrides);
+        } catch (e: any) {
+          console.warn("[BotBee] Failed to load template overrides from DB:", e.message);
+        }
+      })
+      .catch(() => {});
+
     // ── WhatsApp template startup validation ─────────────────────────────────
     // Logs every configured template name + failure rate from notification_logs.
     // A template with 0 successes or >80% failures triggers a clear error log.

@@ -658,6 +658,151 @@ app.post("/api/migrate/botbee-format-test", async (req, res) => {
   res.json({ phone, templateId: TEMPLATE_ID, formats: results });
 });
 
+// POST /api/migrate/botbee-discovery — probe BotBee settings + template create/delete paths using real server-side token
+app.post("/api/migrate/botbee-discovery", async (req, res) => {
+  const key = (req.query.key || req.body?.key) as string;
+  if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
+
+  const { getCachedConfig } = await import("./lib/apiSettingsProvider.js");
+  const bbCfg = getCachedConfig("botbee");
+  const apiToken = (bbCfg.apiKey || process.env.BOTBEE_API_KEY || "").trim();
+  const phone_number_id = (bbCfg.extra?.phone_number_id || process.env.BOTBEE_PHONE_NUMBER_ID || "").trim();
+  const BASE = "https://app.botbee.io/api/v1";
+
+  const probe = async (method: string, path: string, body?: object) => {
+    try {
+      const url = `${BASE}${path}`;
+      const opts: RequestInit = {
+        method,
+        headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(8000),
+        ...(body ? { body: JSON.stringify({ apiToken, ...body }) } : {}),
+      };
+      const r = await fetch(url, opts);
+      const text = await r.text();
+      let json: any = null;
+      try { json = JSON.parse(text); } catch {}
+      const is404 = r.status === 404 || text.includes("Not Found : 404");
+      return { path, method, status: r.status, is404, json: is404 ? null : (json || text.substring(0, 400)) };
+    } catch (e: any) {
+      return { path, method, status: -1, is404: false, error: e.message };
+    }
+  };
+
+  // ── 1. Settings / account probes (looking for Meta access token) ──────────
+  const settingsProbes = await Promise.all([
+    probe("GET", `/account?apiToken=${apiToken}`),
+    probe("GET", `/profile?apiToken=${apiToken}`),
+    probe("GET", `/settings?apiToken=${apiToken}`),
+    probe("GET", `/whatsapp/settings?apiToken=${apiToken}`),
+    probe("GET", `/whatsapp/account?apiToken=${apiToken}`),
+    probe("GET", `/whatsapp/config?apiToken=${apiToken}`),
+    probe("GET", `/integration?apiToken=${apiToken}`),
+    probe("GET", `/business?apiToken=${apiToken}`),
+    probe("GET", `/whatsapp/number?apiToken=${apiToken}`),
+    probe("GET", `/whatsapp/phone?apiToken=${apiToken}`),
+  ]);
+
+  // ── 2. Template CRUD probes ────────────────────────────────────────────────
+  const minimalTpl = {
+    template_name: "abt_probe_delete_me",
+    locale: "en_US",
+    mixed_template_category: "UTILITY",
+    mixed_header_type: "none",
+    mixed_body_text: "Test {{1}}",
+    whatsapp_bot_id: "334520",
+    phone_number_id,
+  };
+  const tplProbes = await Promise.all([
+    probe("POST", "/whatsapp/template/create", minimalTpl),
+    probe("POST", "/whatsapp/template/save", minimalTpl),
+    probe("POST", "/whatsapp/template/store", minimalTpl),
+    probe("POST", "/whatsapp/template/submit", minimalTpl),
+    probe("POST", "/whatsapp/template", minimalTpl),
+    probe("POST", "/mixed-template/save", minimalTpl),
+    probe("POST", "/mixed-template/create", minimalTpl),
+    probe("POST", "/whatsapp/mixed-template/save", minimalTpl),
+    probe("POST", "/whatsapp/mixed-template/create", minimalTpl),
+    probe("POST", `/whatsapp/bot/334520/template/create`, minimalTpl),
+    probe("POST", "/template/save", minimalTpl),
+    probe("POST", "/template/create", minimalTpl),
+    probe("PUT",  "/whatsapp/template/create", minimalTpl),
+  ]);
+
+  // ── 3. Delete probes ───────────────────────────────────────────────────────
+  const delProbes = await Promise.all([
+    probe("DELETE", `/whatsapp/template/409950?apiToken=${apiToken}`),
+    probe("POST", "/whatsapp/template/delete", { id: 409950 }),
+    probe("POST", "/whatsapp/template/destroy", { id: 409950 }),
+    probe("POST", "/whatsapp/template/remove", { id: 409950 }),
+  ]);
+
+  const alive = (arr: any[]) => arr.filter(x => !x.is404 && x.status !== 404);
+
+  res.json({
+    tokenPresent: apiToken.length > 0,
+    settingsAlive: alive(settingsProbes),
+    tplCreateAlive: alive(tplProbes),
+    deleteAlive: alive(delProbes),
+    allSettings: settingsProbes,
+    allTplCreate: tplProbes,
+    allDelete: delProbes,
+  });
+});
+
+// POST /api/migrate/activate-new-templates — called by admin after new templates are approved on Meta
+// Accepts new BotBee template IDs + bodies (with {{1}} Meta vars), persists to DB, applies immediately.
+// On every subsequent server restart the overrides are automatically reloaded from DB.
+app.post("/api/migrate/activate-new-templates", async (req, res) => {
+  const key = (req.query.key || req.body?.key) as string;
+  if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
+
+  const templates = req.body?.templates as Record<string, { id: string; body: string }> | undefined;
+  if (!templates || typeof templates !== "object" || !Object.keys(templates).length) {
+    return void res.status(400).json({
+      error: "Missing 'templates' object. Expected: { booking_approved: { id: 'NEW_ID', body: '...{{1}}...' }, ... }",
+    });
+  }
+
+  // Validate each entry
+  const errors: string[] = [];
+  for (const [slug, val] of Object.entries(templates)) {
+    if (!val?.id || typeof val.id !== "string") errors.push(`${slug}: missing or invalid 'id'`);
+    if (!val?.body || typeof val.body !== "string") errors.push(`${slug}: missing or invalid 'body'`);
+  }
+  if (errors.length) return void res.status(400).json({ error: "Validation failed", errors });
+
+  const { pool: p } = await import("@workspace/db");
+  const { applyTemplateOverrides } = await import("./lib/botbee.js");
+
+  // Load existing overrides from DB (to merge, not replace)
+  let existing: Record<string, { id: string; body: string }> = {};
+  try {
+    const r = await p.query(`SELECT value FROM api_settings WHERE key='botbee_template_overrides' LIMIT 1`);
+    if (r.rows[0]?.value) existing = JSON.parse(r.rows[0].value);
+  } catch {}
+
+  const merged = { ...existing, ...templates };
+
+  // Persist merged overrides to DB
+  await p.query(
+    `INSERT INTO api_settings (key, value, is_encrypted, is_enabled, created_at, updated_at)
+     VALUES ('botbee_template_overrides', $1, false, true, NOW(), NOW())
+     ON CONFLICT (key) DO UPDATE SET value=$1, updated_at=NOW()`,
+    [JSON.stringify(merged)]
+  );
+
+  // Apply immediately in-memory (no restart needed)
+  applyTemplateOverrides(merged);
+
+  res.json({
+    ok: true,
+    activated: Object.keys(templates),
+    totalOverrides: Object.keys(merged).length,
+    message: "Templates activated immediately. IDs are also persisted — they reload automatically on every server restart.",
+  });
+});
+
 // POST /api/migrate/botbee-send-test — send one template with real booking data, return full payload
 app.post("/api/migrate/botbee-send-test", async (req, res) => {
   const key = (req.query.key || req.body?.key) as string;

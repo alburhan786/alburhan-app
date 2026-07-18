@@ -177,13 +177,52 @@ const TEMPLATE_BODIES: Record<string, string> = {
   "410040": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh #!Name!#\r\n\r\n🕌 Hajj  #!2027!# Bookings Are Now Open!\r\n\r\nBook your Hajj journey with Al Burhan Tours & Travels.\r\n\r\n✅ Government Approved Services\r\n✅ Comfortable Accommodation\r\n✅ Experienced Tour Guides\r\n✅ Complete Visa & Travel Assistance\r\n\r\n📞 Contact: +91 9893225590\r\n🌐 www.alburhantravels.com\r\n\r\nReserve your seat today and begin your sacred journey with confidence.\r\n\r\nJazak Allah Khair.\r\n\r\nAl Burhan Tours & Travels",
 };
 
-/** Replace all #!VarName!# placeholders in the template body with actual values. */
+/**
+ * Apply runtime template ID + body overrides loaded from api_settings.
+ * Call once at startup (from index.ts) to hot-patch TEMPLATE_BODIES + ABT_TEMPLATES
+ * without a code redeploy — used when admin recreates templates with proper {{1}} Meta vars.
+ *
+ * overrides format: { "booking_approved": { id: "NEW_ID", body: "...{{1}}..." }, ... }
+ */
+export function applyTemplateOverrides(overrides: Record<string, { id: string; body: string }>) {
+  let count = 0;
+  for (const [slug, { id, body }] of Object.entries(overrides)) {
+    if (!id || !body) continue;
+    if (ABT_TEMPLATES[slug]) {
+      const oldId = ABT_TEMPLATES[slug].id;
+      if (oldId && TEMPLATE_BODIES[oldId] !== undefined) delete TEMPLATE_BODIES[oldId];
+      ABT_TEMPLATES[slug].id = id;
+    }
+    TEMPLATE_BODIES[id] = body;
+    count++;
+  }
+  console.log(`[BotBee] applyTemplateOverrides: activated ${count} template overrides`);
+}
+
+/**
+ * Replace template placeholders with actual values.
+ * Handles TWO formats:
+ *   #!VarName!#  — old BotBee CRM format (current templates, approved as static text)
+ *   {{N}}        — Meta variable format (new templates being recreated with proper {{1}},{{2}} slots)
+ *
+ * For {{N}} templates, variables are substituted positionally: {{1}} → vars[0], {{2}} → vars[1], etc.
+ * (Object.values preserves insertion order, so sender functions must pass vars in template order.)
+ */
 function renderTemplateBody(body: string, vars: Record<string, string>): string {
   let result = body;
+
+  // 1. Replace #!VarName!# (named CRM variable format)
   for (const [key, value] of Object.entries(vars)) {
-    const placeholder = `#!${key}!#`;
-    result = result.split(placeholder).join(String(value ?? "-"));
+    result = result.split(`#!${key}!#`).join(String(value ?? "-"));
   }
+
+  // 2. Replace {{N}} (Meta positional variable format)
+  const values = Object.values(vars);
+  result = result.replace(/\{\{(\d+)\}\}/g, (match, n) => {
+    const idx = parseInt(n, 10) - 1; // {{1}} → index 0
+    return idx >= 0 && idx < values.length ? String(values[idx] ?? "-") : match;
+  });
+
   return result;
 }
 
