@@ -496,7 +496,7 @@ export const ABT_TEMPLATES: Record<string, { id: string; name: string }> = {
   booking_submitted:     { id: "", name: (process.env.BOTBEE_BOOKING_RECEIVE_TEMPLATE       || "booking_receive").trim() },
   booking_approved:      { id: "", name: (process.env.BOTBEE_BOOKING_APPROVED_TEMPLATE      || "booking_approved").trim() },
   payment_received:      { id: "", name: (process.env.BOTBEE_PAYMENT_RECEIVED_TEMPLATE      || "payment_received").trim() },
-  pending_payment:       { id: "", name: (process.env.BOTBEE_PENDING_PAYMENT_TEMPLATE       || "payment_received").trim() },
+  pending_payment:       { id: "", name: (process.env.BOTBEE_PENDING_PAYMENT_TEMPLATE       || "pending_payment_reminder").trim() },
   // ── Documents ─────────────────────────────────────────────────────────────
   invoice_ready:         { id: "", name: (process.env.BOTBEE_INVOICE_READY_TEMPLATE         || "invoice_ready").trim() },
   agreement_ready:       { id: "", name: (process.env.BOTBEE_AGREEMENT_READY_TEMPLATE       || "agreement_ready").trim() },
