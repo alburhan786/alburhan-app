@@ -10,11 +10,15 @@ export type WorkflowTrigger =
   | "balance_reminder_3" | "balance_reminder_1" | "balance_overdue"
   | "passport_uploaded" | "document_reminder"
   | "visa_approved" | "visa_rejected"
-  | "flight_assigned" | "hotel_assigned" | "bus_assigned"
+  | "invoice_generated" | "agreement_generated" | "agreement_signed"
+  | "ticket_issued" | "flight_assigned" | "hotel_assigned" | "bus_assigned"
+  | "room_allocation" | "group_orientation"
   | "ziyarat_reminder"
   | "departure_reminder_7d" | "departure_reminder_3d" | "departure_reminder_2d"
   | "departure_reminder_1d" | "departure_reminder_12h" | "departure_reminder_6h"
   | "departure_reminder_3h"
+  | "flight_reminder" | "return_flight_reminder"
+  | "welcome_saudi" | "arrival_india" | "hajj_mubarak" | "hajj_package_launch"
   | "return_reminder" | "feedback_request"
   | "document_expiry_90" | "document_expiry_60"
   | "document_expiry_30" | "document_expiry_7"
@@ -50,45 +54,68 @@ export interface WorkflowContext extends Omit<NotificationContext, "customerName
 }
 
 const TRIGGER_TO_EVENT: Record<string, string> = {
-  new_booking: "new_booking",
-  booking_approved: "booking_approved",
-  booking_rejected: "booking_cancelled",
-  booking_completed: "booking_completed",
-  payment_received: "payment_received",
+  // Booking
+  new_booking:              "new_booking",
+  booking_approved:         "booking_approved",
+  booking_rejected:         "booking_cancelled",
+  booking_completed:        "booking_completed",
+  // Payments
+  payment_received:         "payment_received",
   partial_payment_received: "partial_payment",
-  payment_reminder_30: "balance_reminder",
-  payment_reminder_15: "balance_reminder",
-  payment_reminder_7: "balance_reminder",
-  payment_reminder_3: "balance_reminder",
-  payment_reminder_1: "balance_reminder",
-  balance_reminder_30: "balance_reminder",
-  balance_reminder_15: "balance_reminder",
-  balance_reminder_7: "balance_reminder",
-  balance_reminder_3: "balance_reminder",
-  balance_reminder_1: "balance_reminder",
-  balance_overdue: "payment_due",
-  passport_uploaded: "passport_uploaded",
-  document_reminder: "passport_uploaded",
-  visa_approved: "visa_approved",
-  visa_rejected: "visa_rejected",
-  flight_assigned: "flight_assigned",
-  hotel_assigned: "room_assigned",
-  bus_assigned: "bus_assigned",
-  ziyarat_reminder: "departure_reminder",
-  departure_reminder_7d: "departure_reminder",
-  departure_reminder_3d: "departure_reminder",
-  departure_reminder_2d: "departure_reminder",
-  departure_reminder_1d: "departure_reminder",
-  departure_reminder_12h: "departure_reminder",
-  departure_reminder_6h: "departure_reminder",
-  departure_reminder_3h: "departure_reminder",
-  return_reminder: "return_reminder",
-  feedback_request: "feedback_request",
-  document_expiry_90: "passport_expiry",
-  document_expiry_60: "passport_expiry",
-  document_expiry_30: "passport_expiry",
-  document_expiry_7: "passport_expiry",
-  medical_emergency: "medical_emergency",
+  payment_reminder_30:      "balance_reminder",
+  payment_reminder_15:      "balance_reminder",
+  payment_reminder_7:       "balance_reminder",
+  payment_reminder_3:       "balance_reminder",
+  payment_reminder_1:       "balance_reminder",
+  balance_reminder_30:      "balance_reminder",
+  balance_reminder_15:      "balance_reminder",
+  balance_reminder_7:       "balance_reminder",
+  balance_reminder_3:       "balance_reminder",
+  balance_reminder_1:       "balance_reminder",
+  balance_overdue:          "payment_due",
+  // Documents
+  passport_uploaded:        "passport_uploaded",
+  document_reminder:        "passport_uploaded",
+  invoice_generated:        "invoice_ready",
+  agreement_generated:      "agreement_ready",
+  agreement_signed:         "agreement_signed",
+  // Visa & Travel
+  visa_approved:            "visa_issued",
+  visa_rejected:            "visa_rejected",
+  ticket_issued:            "ticket_issued",
+  flight_assigned:          "flight_reminder",
+  // Accommodation
+  hotel_assigned:           "room_allocation",
+  room_allocation:          "room_allocation",
+  // Groups
+  group_orientation:        "group_orientation",
+  // Transport
+  bus_assigned:             "bus_assigned",
+  // Departure timeline
+  ziyarat_reminder:         "departure_reminder",
+  departure_reminder_7d:    "departure_reminder",
+  departure_reminder_3d:    "departure_reminder",
+  departure_reminder_2d:    "departure_reminder",
+  departure_reminder_1d:    "departure_reminder",
+  departure_reminder_12h:   "departure_reminder",
+  departure_reminder_6h:    "departure_reminder",
+  departure_reminder_3h:    "departure_reminder",
+  // Return & post-journey
+  flight_reminder:          "flight_reminder",
+  return_flight_reminder:   "return_flight_reminder",
+  return_reminder:          "return_flight_reminder",
+  // On-ground Saudi/India
+  welcome_saudi:            "welcome_saudi",
+  arrival_india:            "arrival_india",
+  hajj_mubarak:             "hajj_mubarak",
+  hajj_package_launch:      "hajj_package_launch",
+  // General
+  feedback_request:         "feedback_request",
+  document_expiry_90:       "passport_expiry",
+  document_expiry_60:       "passport_expiry",
+  document_expiry_30:       "passport_expiry",
+  document_expiry_7:        "passport_expiry",
+  medical_emergency:        "medical_emergency",
 };
 
 const ADMIN_EVENT_TRIGGERS = new Set([

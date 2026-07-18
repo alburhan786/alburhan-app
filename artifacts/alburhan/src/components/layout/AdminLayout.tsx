@@ -8,7 +8,7 @@ import {
   TrendingDown, Calculator, Plane, Activity, Home, CreditCard, Trash2,
   Building2, Bus, Heart, FileCheck, Sparkles, UserCheck, BookMarked, Truck,
   Scale, Users2, Package, ClipboardList, KeyRound, HeartPulse, Settings2, BellRing, Zap,
-  MapPin, Tent, Tag, Bot, Award, Smartphone, Layers, Mail, Globe, FileText, TestTube2
+  MapPin, Tent, Tag, Bot, Award, Smartphone, Layers, Mail, Globe, FileText, TestTube2, History
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePermissions, type Module, type Action } from "@/hooks/use-permissions";
@@ -116,6 +116,7 @@ function buildMenu(openComplaints: number): MenuSection[] {
         { icon: BellRing,       label: "Communication Center",   href: "/admin/communication-center",  require: ["customers", "edit"] as [any,any] },
         { icon: Zap,            label: "Workflow Center",         href: "/admin/workflow-center",        require: ["bookings", "edit"]  as [any,any] },
         { icon: Bot,            label: "BotBee Dashboard",        href: "/admin/botbee-dashboard",       require: ["settings", "view"]  as [any,any] },
+        { icon: History,        label: "WhatsApp History",         href: "/admin/whatsapp-history",       require: ["settings", "view"]  as [any,any] },
         { icon: MessageSquare,  label: "WhatsApp Templates",      href: "/admin/whatsapp-templates",     require: ["settings", "view"]  as [any,any] },
         { icon: Smartphone,     label: "SMS Templates",           href: "/admin/sms-templates",          require: ["settings", "view"]  as [any,any] },
         { icon: Layers,         label: "RCS Templates",           href: "/admin/rcs-templates",          require: ["settings", "view"]  as [any,any] },

@@ -171,11 +171,17 @@ export async function sendTemplate(
     return result;
   }
 
-  // Core 4 fields always required
-  const payload: Record<string, unknown> = { apiToken, phone_number_id, phone_number: phone, template_id: templateId };
+  // Route by identifier type:
+  //   pure digits  → template_id  (legacy numeric BotBee template ID)
+  //   any other    → template_name (approved slug on BotBee / Meta dashboard)
+  const isNumericId = /^\d+$/.test(templateId.trim());
+  const payload: Record<string, unknown> = {
+    apiToken, phone_number_id, phone_number: phone,
+    ...(isNumericId ? { template_id: templateId } : { template_name: templateId }),
+  };
 
-  // When caller supplies variable values, attach Meta-standard body components so
-  // BotBee can substitute {{1}}, {{2}} … placeholders in the approved template.
+  // Attach Meta-standard body components when variable values are provided so
+  // BotBee substitutes {{1}}, {{2}} … in the approved template body.
   if (opts?.variables?.length) {
     payload.components = [
       {
@@ -185,7 +191,10 @@ export async function sendTemplate(
     ];
   }
 
-  const reqPayload: Record<string, unknown> = { phone_number_id, phone_number: phone, template_id: templateId };
+  const reqPayload: Record<string, unknown> = {
+    phone_number_id, phone_number: phone,
+    ...(isNumericId ? { template_id: templateId } : { template_name: templateId }),
+  };
   if (opts?.variables?.length) reqPayload.variables = opts.variables;
 
   console.log("[BotBee] sendTemplate REQUEST →", JSON.stringify(reqPayload));
@@ -478,14 +487,34 @@ export async function sendConfirmationTemplate(
 // Central config: src/lib/templateConfig.ts
 // Fallback defaults are used only when the env var is not set.
 
+// ── Approved BotBee production templates ──────────────────────────────────────
+// Each entry maps an internal key to the exact template slug approved on BotBee.
+// Non-numeric names are sent via template_name field; numeric IDs via template_id.
+// Env-var overrides allow changing slugs on VPS without redeploying.
 export const ABT_TEMPLATES: Record<string, { id: string; name: string }> = {
-  booking_submitted:  { id: "407645", name: (process.env.BOTBEE_BOOKING_SUBMITTED_TEMPLATE  || "bookingsubmitted").trim() },
-  payment_received:   { id: "407646", name: (process.env.BOTBEE_PAYMENT_RECEIVED_TEMPLATE   || "paymentreceived").trim() },
-  pending_payment:    { id: "407648", name: (process.env.BOTBEE_PENDING_PAYMENT_TEMPLATE    || "pending_payment_reminder").trim() },
-  booking_approved:   { id: "407642", name: (process.env.BOTBEE_BOOKING_APPROVED_TEMPLATE   || "approve").trim() },
-  departure_reminder: { id: "407664", name: (process.env.BOTBEE_DEPARTURE_REMINDER_TEMPLATE || "departure_reminder").trim() },
-  visa_issued:        { id: "407667", name: (process.env.BOTBEE_VISA_ISSUED_TEMPLATE        || "visa_issued").trim() },
-  flight_issued:      { id: "361654", name: (process.env.BOTBEE_FLIGHT_ISSUED_TEMPLATE      || "flight").trim() },
+  // ── Core booking & payment (approved 2025 batch) ───────────────────────────
+  booking_submitted:     { id: "", name: (process.env.BOTBEE_BOOKING_RECEIVE_TEMPLATE       || "booking_receive").trim() },
+  booking_approved:      { id: "", name: (process.env.BOTBEE_BOOKING_APPROVED_TEMPLATE      || "booking_approved").trim() },
+  payment_received:      { id: "", name: (process.env.BOTBEE_PAYMENT_RECEIVED_TEMPLATE      || "payment_received").trim() },
+  pending_payment:       { id: "", name: (process.env.BOTBEE_PENDING_PAYMENT_TEMPLATE       || "payment_received").trim() },
+  // ── Documents ─────────────────────────────────────────────────────────────
+  invoice_ready:         { id: "", name: (process.env.BOTBEE_INVOICE_READY_TEMPLATE         || "invoice_ready").trim() },
+  agreement_ready:       { id: "", name: (process.env.BOTBEE_AGREEMENT_READY_TEMPLATE       || "agreement_ready").trim() },
+  agreement_signed:      { id: "", name: (process.env.BOTBEE_AGREEMENT_SIGNED_TEMPLATE      || "agreement_signed").trim() },
+  visa_issued:           { id: "", name: (process.env.BOTBEE_VISA_ISSUED_TEMPLATE           || "visa_issued").trim() },
+  ticket_issued:         { id: "", name: (process.env.BOTBEE_TICKET_ISSUED_TEMPLATE         || "ticket_issued").trim() },
+  // ── Travel reminders ──────────────────────────────────────────────────────
+  flight_reminder:       { id: "", name: (process.env.BOTBEE_FLIGHT_REMINDER_TEMPLATE       || "flight_reminder").trim() },
+  return_flight_reminder:{ id: "", name: (process.env.BOTBEE_RETURN_FLIGHT_TEMPLATE         || "return_flight_reminder").trim() },
+  departure_reminder:    { id: "", name: (process.env.BOTBEE_DEPARTURE_REMINDER_TEMPLATE    || "departure_reminder").trim() },
+  // ── On-ground ─────────────────────────────────────────────────────────────
+  room_allocation:       { id: "", name: (process.env.BOTBEE_ROOM_ALLOCATION_TEMPLATE       || "room_allocation").trim() },
+  group_orientation:     { id: "", name: (process.env.BOTBEE_GROUP_ORIENTATION_TEMPLATE     || "group_orientation").trim() },
+  welcome_saudi:         { id: "", name: (process.env.BOTBEE_WELCOME_SAUDI_TEMPLATE         || "welcome_saudi").trim() },
+  arrival_india:         { id: "", name: (process.env.BOTBEE_ARRIVAL_INDIA_TEMPLATE         || "arrival_india").trim() },
+  // ── Special ───────────────────────────────────────────────────────────────
+  hajj_mubarak:          { id: "", name: (process.env.BOTBEE_HAJJ_MUBARAK_TEMPLATE          || "hajj_mubarak").trim() },
+  hajj_package_launch:   { id: "", name: (process.env.BOTBEE_HAJJ_PACKAGE_LAUNCH_TEMPLATE   || "hajj_package_launch").trim() },
 };
 
 function bodyParams(texts: (string | null | undefined)[]): object[] {
@@ -528,13 +557,19 @@ function fmtAmount(v: string | number | undefined | null): string {
   return isNaN(n) || n === 0 ? "-" : `₹${n.toLocaleString("en-IN")}`;
 }
 
-/** Template 407645 — fires when a new booking is submitted */
+// Helper: resolve template identifier — prefer id when numeric, fall through to name slug
+function tplId(key: keyof typeof ABT_TEMPLATES): string {
+  const t = ABT_TEMPLATES[key];
+  return t.id || t.name;
+}
+
+/** booking_receive — fires when a new booking is submitted */
 export async function sendBookingSubmittedTemplate(
   to: string,
   ctx: { customerName: string; packageName: string; bookingId: string; invoiceUrl?: string },
   opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
-  return sendTemplate(to, ABT_TEMPLATES.booking_submitted.id, {
+  return sendTemplate(to, tplId("booking_submitted"), {
     ...opts,
     variables: [
       ctx.customerName,
@@ -546,13 +581,13 @@ export async function sendBookingSubmittedTemplate(
   });
 }
 
-/** Template 407646 — fires on full/partial payment */
+/** payment_received — fires on full/partial payment */
 export async function sendPaymentReceivedTemplate(
   to: string,
   ctx: { customerName: string; packageName: string; bookingId: string; amount?: string | number; invoiceUrl?: string },
   opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
-  return sendTemplate(to, ABT_TEMPLATES.payment_received.id, {
+  return sendTemplate(to, tplId("payment_received"), {
     ...opts,
     variables: [
       ctx.customerName,
@@ -564,13 +599,13 @@ export async function sendPaymentReceivedTemplate(
   });
 }
 
-/** Template 407648 — fires for unpaid bookings at 3d/7d/15d */
+/** payment_received (pending variant) — fires for unpaid bookings at 3d/7d/15d */
 export async function sendPendingPaymentTemplate(
   to: string,
   ctx: { customerName: string; packageName: string; bookingId: string; balance?: string | number; paymentUrl?: string },
   opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
-  return sendTemplate(to, ABT_TEMPLATES.pending_payment.id, {
+  return sendTemplate(to, tplId("pending_payment"), {
     ...opts,
     variables: [
       ctx.customerName,
@@ -582,13 +617,13 @@ export async function sendPendingPaymentTemplate(
   });
 }
 
-/** Template 407642 — fires when admin approves a booking */
+/** booking_approved — fires when admin approves a booking */
 export async function sendApprovalTemplate(
   to: string,
   ctx: { customerName: string; packageName: string; bookingId: string; amount?: string | number; invoiceUrl?: string },
   opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
-  return sendTemplate(to, ABT_TEMPLATES.booking_approved.id, {
+  return sendTemplate(to, tplId("booking_approved"), {
     ...opts,
     variables: [
       ctx.customerName,
@@ -600,7 +635,7 @@ export async function sendApprovalTemplate(
   });
 }
 
-/** Template 407664 — fires 7d/3d/2d/1d/12h/6h/3h before departure */
+/** departure_reminder — fires 7d/3d/2d/1d/12h/6h/3h before departure */
 export async function sendDepartureReminderTemplate(
   to: string,
   ctx: {
@@ -610,7 +645,7 @@ export async function sendDepartureReminderTemplate(
   },
   opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
-  return sendTemplate(to, ABT_TEMPLATES.departure_reminder.id, {
+  return sendTemplate(to, tplId("departure_reminder"), {
     ...opts,
     variables: [
       ctx.customerName,
@@ -622,13 +657,13 @@ export async function sendDepartureReminderTemplate(
   });
 }
 
-/** Template 407667 — fires when visa is uploaded/approved */
+/** visa_issued — fires when visa is uploaded/approved */
 export async function sendVisaIssuedTemplate(
   to: string,
   ctx: { customerName: string; bookingId: string; packageName?: string; visaNumber?: string; visaUrl?: string },
   opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
-  return sendTemplate(to, ABT_TEMPLATES.visa_issued.id, {
+  return sendTemplate(to, tplId("visa_issued"), {
     ...opts,
     variables: [
       ctx.customerName,
@@ -640,13 +675,13 @@ export async function sendVisaIssuedTemplate(
   });
 }
 
-/** Template 361654 — fires when flight ticket is issued */
+/** ticket_issued — fires when flight ticket is issued */
 export async function sendFlightTemplate(
   to: string,
   ctx: { customerName: string; bookingId: string; flightNumber?: string; departureDate?: string; ticketNumber?: string; ticketUrl?: string },
   opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
-  return sendTemplate(to, ABT_TEMPLATES.flight_issued.id, {
+  return sendTemplate(to, tplId("ticket_issued"), {
     ...opts,
     variables: [
       ctx.customerName,
@@ -654,6 +689,188 @@ export async function sendFlightTemplate(
       ctx.flightNumber || "TBA",
       ctx.departureDate || "TBA",
       ctx.ticketUrl || `${SITE}/invoice/${ctx.bookingId}`,
+    ],
+  });
+}
+
+/** invoice_ready — fires when invoice is generated */
+export async function sendInvoiceReadyTemplate(
+  to: string,
+  ctx: { customerName: string; bookingId: string; packageName?: string; invoiceNumber?: string; amount?: string | number; invoiceUrl?: string },
+  opts?: BotBeeTemplateOpts
+): Promise<BotBeeResult> {
+  return sendTemplate(to, tplId("invoice_ready"), {
+    ...opts,
+    variables: [
+      ctx.customerName,
+      ctx.bookingId,
+      ctx.invoiceNumber || ctx.bookingId,
+      fmtAmount(ctx.amount),
+      ctx.invoiceUrl || `${SITE}/invoice/${ctx.bookingId}`,
+    ],
+  });
+}
+
+/** agreement_ready — fires when agreement is ready for signing */
+export async function sendAgreementReadyTemplate(
+  to: string,
+  ctx: { customerName: string; bookingId: string; packageName?: string; agreementUrl?: string },
+  opts?: BotBeeTemplateOpts
+): Promise<BotBeeResult> {
+  return sendTemplate(to, tplId("agreement_ready"), {
+    ...opts,
+    variables: [
+      ctx.customerName,
+      ctx.bookingId,
+      ctx.packageName || "Hajj/Umrah Package",
+      ctx.agreementUrl || `${SITE}/agreement/${ctx.bookingId}`,
+    ],
+  });
+}
+
+/** agreement_signed — fires when customer signs the agreement */
+export async function sendAgreementSignedTemplate(
+  to: string,
+  ctx: { customerName: string; bookingId: string; signedDate?: string },
+  opts?: BotBeeTemplateOpts
+): Promise<BotBeeResult> {
+  return sendTemplate(to, tplId("agreement_signed"), {
+    ...opts,
+    variables: [
+      ctx.customerName,
+      ctx.bookingId,
+      ctx.signedDate || new Date().toLocaleDateString("en-IN"),
+    ],
+  });
+}
+
+/** flight_reminder — fires when a flight is assigned to pilgrim */
+export async function sendFlightReminderTemplate(
+  to: string,
+  ctx: { customerName: string; bookingId: string; flightNumber?: string; departureDate?: string; departureAirport?: string; reportingTime?: string },
+  opts?: BotBeeTemplateOpts
+): Promise<BotBeeResult> {
+  return sendTemplate(to, tplId("flight_reminder"), {
+    ...opts,
+    variables: [
+      ctx.customerName,
+      ctx.flightNumber || "TBA",
+      ctx.departureDate || "TBA",
+      ctx.departureAirport || "TBA",
+      ctx.reportingTime || "3 hours before departure",
+    ],
+  });
+}
+
+/** return_flight_reminder — fires before return journey */
+export async function sendReturnFlightReminderTemplate(
+  to: string,
+  ctx: { customerName: string; bookingId: string; flightNumber?: string; returnDate?: string; returnAirport?: string; reportingTime?: string },
+  opts?: BotBeeTemplateOpts
+): Promise<BotBeeResult> {
+  return sendTemplate(to, tplId("return_flight_reminder"), {
+    ...opts,
+    variables: [
+      ctx.customerName,
+      ctx.flightNumber || "TBA",
+      ctx.returnDate || "TBA",
+      ctx.returnAirport || "TBA",
+      ctx.reportingTime || "3 hours before departure",
+    ],
+  });
+}
+
+/** room_allocation — fires when hotel room is assigned */
+export async function sendRoomAllocationTemplate(
+  to: string,
+  ctx: { customerName: string; bookingId: string; hotelName?: string; roomNumber?: string; checkInDate?: string },
+  opts?: BotBeeTemplateOpts
+): Promise<BotBeeResult> {
+  return sendTemplate(to, tplId("room_allocation"), {
+    ...opts,
+    variables: [
+      ctx.customerName,
+      ctx.hotelName || "Hotel TBA",
+      ctx.roomNumber || "TBA",
+      ctx.checkInDate || "TBA",
+    ],
+  });
+}
+
+/** group_orientation — fires when group orientation is scheduled */
+export async function sendGroupOrientationTemplate(
+  to: string,
+  ctx: { customerName: string; bookingId: string; groupName?: string; orientationDate?: string; orientationTime?: string; location?: string },
+  opts?: BotBeeTemplateOpts
+): Promise<BotBeeResult> {
+  return sendTemplate(to, tplId("group_orientation"), {
+    ...opts,
+    variables: [
+      ctx.customerName,
+      ctx.groupName || "Your Group",
+      ctx.orientationDate || "TBA",
+      ctx.orientationTime || "TBA",
+      ctx.location || "Al Burhan Office",
+    ],
+  });
+}
+
+/** welcome_saudi — fires on arrival in Saudi Arabia */
+export async function sendWelcomeSaudiTemplate(
+  to: string,
+  ctx: { customerName: string; bookingId: string; hotelName?: string; groupName?: string },
+  opts?: BotBeeTemplateOpts
+): Promise<BotBeeResult> {
+  return sendTemplate(to, tplId("welcome_saudi"), {
+    ...opts,
+    variables: [
+      ctx.customerName,
+      ctx.hotelName || "Your Hotel",
+      ctx.groupName || "Your Group",
+    ],
+  });
+}
+
+/** arrival_india — fires when pilgrim arrives back in India */
+export async function sendArrivalIndiaTemplate(
+  to: string,
+  ctx: { customerName: string; bookingId: string; flightNumber?: string; arrivalDate?: string },
+  opts?: BotBeeTemplateOpts
+): Promise<BotBeeResult> {
+  return sendTemplate(to, tplId("arrival_india"), {
+    ...opts,
+    variables: [
+      ctx.customerName,
+      ctx.flightNumber || "TBA",
+      ctx.arrivalDate || "TBA",
+    ],
+  });
+}
+
+/** hajj_mubarak — sent after Hajj completion */
+export async function sendHajjMubarakTemplate(
+  to: string,
+  ctx: { customerName: string; bookingId: string },
+  opts?: BotBeeTemplateOpts
+): Promise<BotBeeResult> {
+  return sendTemplate(to, tplId("hajj_mubarak"), {
+    ...opts,
+    variables: [ctx.customerName],
+  });
+}
+
+/** hajj_package_launch — bulk broadcast for new package announcements */
+export async function sendHajjPackageLaunchTemplate(
+  to: string,
+  ctx: { customerName: string; packageName?: string; launchUrl?: string },
+  opts?: BotBeeTemplateOpts
+): Promise<BotBeeResult> {
+  return sendTemplate(to, tplId("hajj_package_launch"), {
+    ...opts,
+    variables: [
+      ctx.customerName,
+      ctx.packageName || "Hajj Package 2026",
+      ctx.launchUrl || SITE,
     ],
   });
 }

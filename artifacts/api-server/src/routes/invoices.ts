@@ -5,6 +5,7 @@ import { requireAdmin, requireAuth, type AuthenticatedRequest } from "../lib/aut
 import { generateInvoicePdfBuffer } from "../lib/paymentDocs.js";
 import { sendInvoiceEmail, sendPaymentReceipt } from "../services/emailService.js";
 import { uploadToGCS } from "../lib/gcsUpload.js";
+import { triggerWorkflow } from "../lib/workflowEngine.js";
 
 // Fire-and-forget: upload PDF to GCS/disk and save pdf_path in invoices table.
 // Non-blocking — the HTTP response is sent first, this runs in the background.
@@ -379,6 +380,40 @@ router.get("/by-booking/:bookingId", requireAdmin as any, async (req: Authentica
     res.json({ invoice: result.rows[0] });
   } catch (err) {
     res.status(500).json({ message: "Failed to get invoice" });
+  }
+});
+
+// ── Send invoice WhatsApp — POST /api/invoices/:bookingId/send-whatsapp ────────
+// Admin-triggered: sends the invoice_ready template to the customer's WhatsApp.
+router.post("/:bookingId/send-whatsapp", requireAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { bookingId } = req.params;
+    const bRes = await pool.query(
+      `SELECT b.*, i.invoice_number AS inv_num, i.total, i.paid, i.balance
+       FROM bookings b
+       LEFT JOIN invoices i ON i.booking_id = b.id
+       WHERE b.id = $1 LIMIT 1`,
+      [bookingId]
+    );
+    const b = bRes.rows[0];
+    if (!b) return void res.status(404).json({ message: "Booking not found" });
+
+    const inv = await upsertInvoiceForBooking(bookingId);
+    const invoiceUrl = `https://alburhantravels.com/invoice/${b.booking_number}`;
+
+    await triggerWorkflow("invoice_generated", {
+      customerName: b.customer_name,
+      customerMobile: b.mobile_india || b.customer_mobile,
+      bookingNumber: b.booking_number,
+      packageName: b.package_name,
+      finalAmount: Number(b.final_amount) || 0,
+      invoiceNumber: (inv as any)?.invoice_number || b.inv_num,
+      invoiceUrl,
+    }, b.id, b.customer_id);
+
+    res.json({ ok: true, message: "Invoice WhatsApp sent" });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, message: err.message });
   }
 });
 

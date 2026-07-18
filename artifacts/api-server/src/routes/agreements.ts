@@ -3,6 +3,7 @@ import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requireAdmin, requireAuth } from "../lib/auth.js";
 import { sendOtpSMS, sendEmail } from "../lib/notifications.js";
+import { triggerWorkflow } from "../lib/workflowEngine.js";
 import { generateAgreementPdfBuffer, HAJJ_AGREEMENT_CLAUSES, CONSENT_CATEGORIES, AgreementPdfOptions } from "../lib/agreementPdf.js";
 import { createHash } from "crypto";
 import { spawn } from "child_process";
@@ -243,6 +244,16 @@ export async function autoGenerateAgreement(bookingId: string): Promise<void> {
       triggeredBy: "payment_confirmed",
     });
     console.log(`[Agreement] Auto-generated ${agreementNumber} for booking ${booking.booking_number}`);
+
+    // Notify customer via WhatsApp — agreement_ready template (fire-and-forget)
+    const signingUrl = `https://alburhantravels.com/sign-agreement/${verificationToken}`;
+    triggerWorkflow("agreement_generated", {
+      customerName: booking.customer_name || booking.customer_name_user,
+      customerMobile: booking.mobile_india,
+      bookingNumber: booking.booking_number,
+      packageName: booking.package_name,
+      agreementUrl: signingUrl,
+    }, booking.id, booking.customer_id).catch(e => console.error("[Agreement] auto-notify failed:", e));
   } catch (err) {
     console.error("[Agreement] autoGenerateAgreement error:", err);
   }
@@ -458,6 +469,17 @@ router.post("/my/:id/sign", requireAuth, async (req: any, res) => {
     );
 
     await logAgreementAudit(id, "agreement_signed", { ip, userAgent: userAgent.substring(0, 100), otpVerified: true, digitalHash: digitalHash.substring(0, 16) }, ip, userAgent);
+
+    // Notify via agreement_signed template (fire-and-forget)
+    if (ag.customer_mobile) {
+      triggerWorkflow("agreement_signed", {
+        customerName: ag.customer_name || "Valued Customer",
+        customerMobile: ag.customer_mobile,
+        bookingNumber: ag.booking_number,
+        packageName: ag.package_name,
+        signedDate: new Date().toLocaleDateString("en-IN"),
+      }, ag.booking_id, ag.customer_id).catch(e => console.error("[Agreement] signed-notify failed:", e));
+    }
 
     // Generate PDF
     let pdfBuffer: Buffer | null = null;

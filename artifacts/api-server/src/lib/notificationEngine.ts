@@ -17,22 +17,24 @@ export type EventType =
   | "offline_payment_submitted" | "payment_verified" | "payment_rejected"
   | "balance_reminder_30d" | "balance_reminder_15d" | "balance_reminder_7d" | "balance_reminder_3d" | "balance_overdue"
   // Invoices
-  | "invoice_generated" | "receipt_generated" | "invoice_paid" | "invoice_cancelled"
+  | "invoice_generated" | "invoice_ready" | "receipt_generated" | "invoice_paid" | "invoice_cancelled"
+  // Agreements
+  | "agreement_ready" | "agreement_signed"
   // Pilgrims & Documents
-  | "passport_uploaded" | "passport_received" | "passport_expiry" | "passport_reminder" | "visa_approved" | "visa_rejected" | "visa_ready"
-  // Flights
-  | "ticket_issued" | "flight_assigned" | "flight_changed" | "flight_cancelled"
-  // Hotels
-  | "hotel_assigned" | "room_assigned" | "room_changed"
+  | "passport_uploaded" | "passport_received" | "passport_expiry" | "passport_reminder" | "visa_approved" | "visa_rejected" | "visa_ready" | "visa_issued"
+  // Flights & Tickets
+  | "ticket_issued" | "flight_assigned" | "flight_changed" | "flight_cancelled" | "flight_reminder" | "return_flight_reminder"
+  // Hotels & Groups
+  | "hotel_assigned" | "room_assigned" | "room_changed" | "room_allocation" | "group_orientation"
   // Transport
   | "bus_assigned" | "seat_changed"
-  // Travel
+  // Travel & Journey
   | "departure_reminder" | "airport_reporting_reminder" | "arrival_reminder" | "return_reminder" | "ziyarat_schedule"
+  | "welcome_saudi" | "arrival_india" | "hajj_mubarak"
   // Attendance & Safety
   | "airport_checkin" | "missing_pilgrim" | "medical_emergency" | "emergency_alert"
-  // Content
-  | "hajj_guide_update"
-  // Promotions & Campaigns
+  // Content & Promotions
+  | "hajj_guide_update" | "hajj_package_launch"
   | "hajj_updates" | "umrah_promotions" | "eid_greeting" | "custom_admin"
   // General
   | "feedback_request";
@@ -451,10 +453,24 @@ async function sendOnChannel(channel: Channel, ctx: NotificationContext, message
 // If the BotBee template fails, fall through to wa_templates table lookup,
 // then last-resort free-form session message.
 
+// All 17 approved BotBee template event types. Events in this set are tried
+// via sendBotBeeEventTemplate() FIRST before falling through to wa_templates or free-form.
 const ABT_TEMPLATE_EVENTS = new Set<EventType>([
-  "new_booking", "payment_received", "partial_payment", "payment_due", "balance_reminder",
-  "booking_approved", "departure_reminder", "visa_ready", "visa_approved",
+  // Booking & payment
+  "new_booking", "booking_approved",
+  "payment_received", "partial_payment", "payment_due", "balance_reminder",
+  // Documents
+  "invoice_generated", "invoice_ready",
+  "agreement_ready", "agreement_signed",
+  "visa_approved", "visa_ready", "visa_issued",
   "ticket_issued", "flight_assigned",
+  // Travel
+  "departure_reminder", "flight_reminder", "return_flight_reminder", "return_reminder",
+  // On-ground
+  "room_assigned", "room_allocation", "group_orientation",
+  "welcome_saudi", "arrival_india", "hajj_mubarak",
+  // Promotions
+  "hajj_package_launch",
 ]);
 
 export async function sendBotBeeEventTemplate(
@@ -471,6 +487,17 @@ export async function sendBotBeeEventTemplate(
     sendDepartureReminderTemplate,
     sendVisaIssuedTemplate,
     sendFlightTemplate,
+    sendInvoiceReadyTemplate,
+    sendAgreementReadyTemplate,
+    sendAgreementSignedTemplate,
+    sendFlightReminderTemplate,
+    sendReturnFlightReminderTemplate,
+    sendRoomAllocationTemplate,
+    sendGroupOrientationTemplate,
+    sendWelcomeSaudiTemplate,
+    sendArrivalIndiaTemplate,
+    sendHajjMubarakTemplate,
+    sendHajjPackageLaunchTemplate,
   } = await import("./botbee.js");
 
   const siteBase = "https://alburhantravels.com";
@@ -479,11 +506,10 @@ export async function sendBotBeeEventTemplate(
     (ctx.bookingNumber ? `${siteBase}/invoice/${ctx.bookingNumber}` : `${siteBase}`);
   const paymentUrl = ctx.bookingNumber
     ? `${siteBase}/pay/${ctx.bookingNumber}` : `${siteBase}`;
-  // skipFailureLog: true — template failures are expected while BotBee WABA is misconfigured;
-  // suppress them from notification_logs so text fallback is the only logged outcome.
   const opts = { eventType, bookingId, customerId, skipFailureLog: true };
 
   switch (eventType) {
+    // ── Booking ───────────────────────────────────────────────────────────────
     case "new_booking":
       return sendBookingSubmittedTemplate(ctx.customerMobile, {
         customerName: ctx.customerName,
@@ -492,6 +518,16 @@ export async function sendBotBeeEventTemplate(
         invoiceUrl,
       }, opts);
 
+    case "booking_approved":
+      return sendApprovalTemplate(ctx.customerMobile, {
+        customerName: ctx.customerName,
+        packageName: ctx.packageName || "Hajj/Umrah Package",
+        bookingId: bookingRef,
+        amount: ctx.finalAmount ?? ctx.amount ?? 0,
+        invoiceUrl,
+      }, opts);
+
+    // ── Payments ──────────────────────────────────────────────────────────────
     case "payment_received":
     case "partial_payment":
       return sendPaymentReceivedTemplate(ctx.customerMobile, {
@@ -511,15 +547,68 @@ export async function sendBotBeeEventTemplate(
         paymentUrl,
       }, opts);
 
-    case "booking_approved":
-      return sendApprovalTemplate(ctx.customerMobile, {
+    // ── Invoice ───────────────────────────────────────────────────────────────
+    case "invoice_generated":
+    case "invoice_ready":
+      return sendInvoiceReadyTemplate(ctx.customerMobile, {
         customerName: ctx.customerName,
-        packageName: ctx.packageName || "Hajj/Umrah Package",
         bookingId: bookingRef,
+        packageName: ctx.packageName,
+        invoiceNumber: (ctx as any).invoiceNumber,
         amount: ctx.finalAmount ?? ctx.amount ?? 0,
         invoiceUrl,
       }, opts);
 
+    // ── Agreements ────────────────────────────────────────────────────────────
+    case "agreement_ready":
+      return sendAgreementReadyTemplate(ctx.customerMobile, {
+        customerName: ctx.customerName,
+        bookingId: bookingRef,
+        packageName: ctx.packageName,
+        agreementUrl: (ctx as any).agreementUrl || invoiceUrl,
+      }, opts);
+
+    case "agreement_signed":
+      return sendAgreementSignedTemplate(ctx.customerMobile, {
+        customerName: ctx.customerName,
+        bookingId: bookingRef,
+        signedDate: (ctx as any).signedDate || new Date().toLocaleDateString("en-IN"),
+      }, opts);
+
+    // ── Visa ──────────────────────────────────────────────────────────────────
+    case "visa_ready":
+    case "visa_approved":
+    case "visa_issued":
+      return sendVisaIssuedTemplate(ctx.customerMobile, {
+        customerName: ctx.customerName,
+        bookingId: bookingRef,
+        packageName: ctx.packageName,
+        visaNumber: ctx.visaNumber as string | undefined,
+        visaUrl: (ctx as any).visaUrl || invoiceUrl,
+      }, opts);
+
+    // ── Ticket / Flight ───────────────────────────────────────────────────────
+    case "ticket_issued":
+      return sendFlightTemplate(ctx.customerMobile, {
+        customerName: ctx.customerName,
+        bookingId: bookingRef,
+        flightNumber: ctx.flightNumber,
+        departureDate: ctx.departureDate,
+        ticketUrl: (ctx as any).ticketUrl || invoiceUrl,
+      }, opts);
+
+    case "flight_assigned":
+    case "flight_reminder":
+      return sendFlightReminderTemplate(ctx.customerMobile, {
+        customerName: ctx.customerName,
+        bookingId: bookingRef,
+        flightNumber: ctx.flightNumber,
+        departureDate: ctx.departureDate,
+        departureAirport: (ctx as any).departureAirport,
+        reportingTime: (ctx as any).reportingTime,
+      }, opts);
+
+    // ── Departure reminder ────────────────────────────────────────────────────
     case "departure_reminder":
       return sendDepartureReminderTemplate(ctx.customerMobile, {
         customerName: ctx.customerName,
@@ -533,23 +622,69 @@ export async function sendBotBeeEventTemplate(
         emergencyContact: (ctx as any).emergencyContact || "+91 9893225590",
       }, opts);
 
-    case "visa_ready":
-    case "visa_approved":
-      return sendVisaIssuedTemplate(ctx.customerMobile, {
-        customerName: ctx.customerName,
-        bookingId: bookingRef,
-        packageName: ctx.packageName,
-        visaUrl: (ctx as any).visaUrl || invoiceUrl,
-      }, opts);
-
-    case "ticket_issued":
-    case "flight_assigned":
-      return sendFlightTemplate(ctx.customerMobile, {
+    // ── Return journey ────────────────────────────────────────────────────────
+    case "return_flight_reminder":
+    case "return_reminder":
+      return sendReturnFlightReminderTemplate(ctx.customerMobile, {
         customerName: ctx.customerName,
         bookingId: bookingRef,
         flightNumber: ctx.flightNumber,
-        departureDate: ctx.departureDate,
-        ticketUrl: (ctx as any).ticketUrl || invoiceUrl,
+        returnDate: ctx.departureDate,
+        returnAirport: (ctx as any).returnAirport || (ctx as any).departureAirport,
+        reportingTime: (ctx as any).reportingTime,
+      }, opts);
+
+    // ── Room / Hotel ──────────────────────────────────────────────────────────
+    case "room_assigned":
+    case "room_allocation":
+      return sendRoomAllocationTemplate(ctx.customerMobile, {
+        customerName: ctx.customerName,
+        bookingId: bookingRef,
+        hotelName: ctx.hotelName,
+        roomNumber: ctx.roomNumber,
+        checkInDate: (ctx as any).checkInDate,
+      }, opts);
+
+    // ── Group ─────────────────────────────────────────────────────────────────
+    case "group_orientation":
+      return sendGroupOrientationTemplate(ctx.customerMobile, {
+        customerName: ctx.customerName,
+        bookingId: bookingRef,
+        groupName: (ctx as any).groupName,
+        orientationDate: (ctx as any).orientationDate,
+        orientationTime: (ctx as any).orientationTime,
+        location: (ctx as any).location,
+      }, opts);
+
+    // ── On-ground ─────────────────────────────────────────────────────────────
+    case "welcome_saudi":
+      return sendWelcomeSaudiTemplate(ctx.customerMobile, {
+        customerName: ctx.customerName,
+        bookingId: bookingRef,
+        hotelName: ctx.hotelName,
+        groupName: (ctx as any).groupName,
+      }, opts);
+
+    case "arrival_india":
+      return sendArrivalIndiaTemplate(ctx.customerMobile, {
+        customerName: ctx.customerName,
+        bookingId: bookingRef,
+        flightNumber: ctx.flightNumber,
+        arrivalDate: ctx.departureDate,
+      }, opts);
+
+    case "hajj_mubarak":
+      return sendHajjMubarakTemplate(ctx.customerMobile, {
+        customerName: ctx.customerName,
+        bookingId: bookingRef,
+      }, opts);
+
+    // ── Promotions ────────────────────────────────────────────────────────────
+    case "hajj_package_launch":
+      return sendHajjPackageLaunchTemplate(ctx.customerMobile, {
+        customerName: ctx.customerName,
+        packageName: ctx.packageName,
+        launchUrl: (ctx as any).launchUrl || siteBase,
       }, opts);
 
     default:

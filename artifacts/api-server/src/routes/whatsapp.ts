@@ -2,6 +2,7 @@ import { Router } from "express";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendText, sendTemplate, sendInteractiveButtons, fetchTemplates, type BotBeeResult } from "../lib/botbee.js";
 import { pool } from "@workspace/db";
+import { triggerWorkflow } from "../lib/workflowEngine.js";
 
 // Ensure wa_templates has the template_id column
 ;(async () => {
@@ -673,6 +674,40 @@ router.post("/template-test/:templateKey", requireAdmin as any, async (req: Auth
       errorMessage:   result.errorMessage,
       responsePayload: result.responsePayload,
     });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, message: err.message });
+  }
+});
+
+// POST /api/whatsapp/resend-booking-template
+// Admin: manually send/resend any approved template for a booking
+router.post("/resend-booking-template", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  const { bookingId, trigger } = req.body;
+  if (!bookingId || !trigger) return void res.status(400).json({ ok: false, message: "bookingId and trigger required" });
+
+  try {
+    const bRes = await pool.query(
+      `SELECT b.*, u.name AS customer_name_user, u.mobile AS mobile_user
+       FROM bookings b LEFT JOIN users u ON u.id = b.customer_id
+       WHERE b.id = $1 LIMIT 1`,
+      [bookingId]
+    );
+    const b = bRes.rows[0];
+    if (!b) return void res.status(404).json({ ok: false, message: "Booking not found" });
+
+    const mobile = b.mobile_india || b.customer_mobile || b.mobile_user;
+    const name   = b.customer_name || b.customer_name_user;
+    const ctx: Record<string, any> = {
+      customerName:   name,
+      customerMobile: mobile,
+      bookingNumber:  b.booking_number,
+      packageName:    b.package_name,
+      finalAmount:    Number(b.final_amount) || 0,
+      trigger,
+    };
+
+    await triggerWorkflow(trigger as any, ctx, b.id, b.customer_id);
+    res.json({ ok: true, message: `${trigger} sent to ${mobile}` });
   } catch (err: any) {
     res.status(500).json({ ok: false, message: err.message });
   }
