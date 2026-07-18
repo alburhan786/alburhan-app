@@ -175,21 +175,31 @@ export async function sendTemplate(
   //   pure digits  → template_id  (BotBee numeric ID — preferred, confirmed working)
   //   any other    → template_name (slug fallback for env-var overrides)
   const isNumericId = /^\d+$/.test(templateId.trim());
+
+  // BotBee templates use {{1}}, {{2}}, … Meta Cloud API positional placeholders.
+  // Variable substitution requires Meta-style components format (NOT a flat variables[] array).
+  // A flat variables[] array is accepted by BotBee but variables are NOT substituted.
+  const components: unknown[] = [];
+  if (opts?.variables?.length) {
+    components.push({
+      type: "body",
+      parameters: opts.variables.map(v => ({ type: "text", text: String(v ?? "-") })),
+    });
+  }
+
   const payload: Record<string, unknown> = {
     apiToken, phone_number_id, phone_number: phone,
-    ...(isNumericId ? { template_id: templateId } : { template_name: templateId }),
+    language: opts?.language || "en",
+    ...(isNumericId ? { template_id: Number(templateId) } : { template_name: templateId }),
+    ...(components.length ? { components } : {}),
   };
-
-  // BotBee uses a flat variables[] array for substitution (not Meta components format).
-  if (opts?.variables?.length) {
-    payload.variables = opts.variables.map(v => String(v ?? "-"));
-  }
 
   const reqPayload: Record<string, unknown> = {
     phone_number_id, phone_number: phone,
-    ...(isNumericId ? { template_id: templateId } : { template_name: templateId }),
+    language: opts?.language || "en",
+    ...(isNumericId ? { template_id: Number(templateId) } : { template_name: templateId }),
+    ...(components.length ? { components } : {}),
   };
-  if (opts?.variables?.length) reqPayload.variables = opts.variables;
 
   console.log("[BotBee] sendTemplate REQUEST →", JSON.stringify(reqPayload));
 
@@ -522,33 +532,29 @@ function bodyParams(texts: (string | null | undefined)[]): object[] {
 }
 
 // ── Variable mapping for all ABT templates ────────────────────────────────────
-// Each BotBee template must be created on the BotBee dashboard using Meta-style
-// {{1}}, {{2}}, {{3}}, {{4}}, {{5}} placeholders (NOT #!system-*!# appointment
-// variables which are BotBee-internal and cannot be resolved via external API).
+// ALL BotBee ABT templates use Meta WhatsApp Cloud API {{1}},{{2}},… positional
+// placeholders in body_content.  Variable substitution REQUIRES the Meta-style
+// components format (type:"body", parameters:[{type:"text",text:"..."}]).
 //
-// Standard 5-variable layout used by booking/payment/approval templates:
-//   {{1}} → Customer Name
-//   {{2}} → Booking ID
-//   {{3}} → Package Name
-//   {{4}} → Total Amount (₹-formatted) or Balance
-//   {{5}} → Invoice / Payment URL
+// Sending a flat variables:[] array is silently accepted (HTTP 200 + wamid) but
+// variables are NOT substituted — recipient sees the raw #!Name!# display labels.
 //
-// Variable maps (confirmed from live BotBee API 2026-07-18):
-//   booking_approved     : name, bookingId, package, amount, invoiceUrl          (5)
-//   payment_received     : name, bookingId, invoiceNo, amount                     (4)
-//   departure_reminde    : name, bookingId, depDate, reportingTime, airport        (5)
-//   visa_issued          : name, bookingId, visaNo, visaUrl                       (4)
-//   ticket_issued        : name, bookingId, pnr, ticketUrl                        (4)
-//   invoice_ready        : name, bookingId, invoiceNo, amount, invoiceUrl         (5)
-//   agreement_ready      : name, bookingId, agreementNo, agreementUrl             (4)
-//   agreement_signed     : name, bookingId                                        (2)
-//   flight_reminder      : name, bookingId, package, flight, depDate, repTime, airport (7)
-//   return_flight_reminder: name, bookingId, flight, returnDate, repTime, airport (6)
-//   room_allocation      : name, bookingId, hotel, roomNo                         (4)
-//   group_orientation    : name, date, time, venue                                (4)
-//   welcome_saudi        : name                                                   (1)
-//   arrival_india        : name                                                   (1)
-//   hajj_package_launch  : name, year                                             (2)
+// Confirmed bodies from GET /api/v1/whatsapp/template/list — 2026-07-18:
+//   409950 booking_approved     : {{1}}=name {{2}}=bookingId {{3}}=package {{4}}=amount {{5}}=invoiceUrl  (5)
+//   409953 payment_received     : {{1}}=name {{2}}=bookingId {{3}}=invoiceNo {{4}}=amount                 (4)
+//   409956 invoice_ready        : {{1}}=name {{2}}=bookingId {{3}}=invoiceNo {{4}}=amount {{5}}=invoiceUrl(5)
+//   409958 agreement_ready      : {{1}}=name {{2}}=bookingId {{3}}=agreementNo {{4}}=agreementUrl         (4)
+//   409965 agreement_signed     : {{1}}=name {{2}}=agreementId                                            (2)
+//   409991 visa_issued          : {{1}}=name {{2}}=bookingId {{3}}=visaNo {{4}}=visaUrl                   (4)
+//   409994 ticket_issued        : {{1}}=name {{2}}=bookingId {{3}}=pnr {{4}}=ticketUrl                    (4)
+//   409999 flight_reminder      : {{1}}=name {{2}}=bookingId {{3}}=package {{4}}=flight {{5}}=depDate {{6}}=repTime {{7}}=airport (7)
+//   410000 return_flight_reminder: {{1}}=name {{2}}=bookingId {{3}}=flight {{4}}=returnDate {{5}}=repTime {{6}}=airport (6)
+//   410008 room_allocation      : {{1}}=name {{2}}=bookingId {{3}}=hotel {{4}}=roomNo                     (4)
+//   410022 group_orientation    : {{1}}=name {{2}}=date {{3}}=time {{4}}=venue                            (4)
+//   410026 departure_reminde    : {{1}}=name {{2}}=bookingId {{3}}=depDate {{4}}=repTime {{5}}=airport     (5)
+//   410030 welcome_saudi        : {{1}}=name                                                              (1)
+//   410031 arrival_india        : {{1}}=name                                                              (1)
+//   410040 hajj_package_launch  : {{1}}=name {{2}}=year                                                  (2)
 
 const SITE = "https://alburhantravels.com";
 function fmtAmount(v: string | number | undefined | null): string {

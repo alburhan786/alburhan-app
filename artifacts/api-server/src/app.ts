@@ -493,6 +493,139 @@ app.post("/api/migrate/trigger-test-notification", async (req, res) => {
   }
 });
 
+// GET /api/migrate/botbee-tpl-probe — fetch ALL ABT template bodies to discover exact variable names
+app.get("/api/migrate/botbee-tpl-probe", async (req, res) => {
+  const key = (req.query.key || req.body?.key) as string;
+  if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
+
+  const { getCachedConfig } = await import("./lib/apiSettingsProvider.js");
+  const bbCfg = getCachedConfig("botbee");
+  const apiToken = (bbCfg.apiKey || process.env.BOTBEE_API_KEY || "").trim();
+  const phone_number_id = (bbCfg.extra?.phone_number_id || process.env.BOTBEE_PHONE_NUMBER_ID || "").trim();
+  const BASE = "https://app.botbee.io/api/v1";
+
+  const TARGET_IDS = new Set(["409950","409953","409956","409958","409965","409991","409994",
+    "409999","410000","410008","410022","410026","410030","410031","410040"]);
+
+  const results: Record<string, any> = { apiTokenPresent: !!apiToken, phone_number_id };
+
+  // Fetch ALL pages of the template list until we find all ABT templates
+  const found: Array<{id: number; name: string; body: string; vars: string[]}> = [];
+  try {
+    let page = 1;
+    let keepGoing = true;
+    while (keepGoing && page <= 10) {
+      const r = await fetch(
+        `${BASE}/whatsapp/template/list?apiToken=${apiToken}&phone_number_id=${phone_number_id}&page=${page}&limit=50`,
+        { signal: AbortSignal.timeout(12000) }
+      );
+      const data = await r.json() as any;
+      if (data?.status !== "1" && data?.status !== 1) { results.listError = data; break; }
+      const items: any[] = Array.isArray(data.message) ? data.message : [];
+      if (!items.length) break;
+      for (const t of items) {
+        if (TARGET_IDS.has(String(t.id))) {
+          const body: string = t.body_content || t.template_body || "";
+          // Extract #!VarName!# patterns
+          const vars = [...body.matchAll(/#!([^!]+)!#/g)].map(m => m[1]);
+          found.push({ id: t.id, name: t.template_name, body, vars });
+        }
+      }
+      if (found.length >= TARGET_IDS.size) break;
+      page++;
+      keepGoing = items.length === 50;
+    }
+    results.abtTemplates = found;
+    results.foundCount = found.length;
+    results.totalTargets = TARGET_IDS.size;
+  } catch (e: any) {
+    results.listFetchError = e.message;
+  }
+
+  // Also show the stored request_payload so we can compare what was sent vs what's needed
+  try {
+    const { pool: p } = await import("@workspace/db");
+    const logs = await p.query(`
+      SELECT event_type, request_payload, provider_response
+      FROM notification_logs
+      WHERE channel='whatsapp' AND request_payload IS NOT NULL
+      ORDER BY sent_at DESC LIMIT 15`);
+    results.sentPayloads = logs.rows.map((r: any) => {
+      const rp = typeof r.request_payload === 'string' ? JSON.parse(r.request_payload) : r.request_payload;
+      const resp = typeof r.provider_response === 'string' ? JSON.parse(r.provider_response) : r.provider_response;
+      return {
+        event: r.event_type,
+        template_id: rp?.template_id,
+        variables: rp?.variables || null,
+        components: rp?.components || null,
+        language: rp?.language || null,
+        waMessageId: resp?.responsePayload?.wa_message_id || resp?.wa_message_id,
+        fullRequestPayload: rp,
+      };
+    });
+  } catch (e: any) {
+    results.dbError = e.message;
+  }
+
+  res.json(results);
+});
+
+// POST /api/migrate/botbee-send-test — send one template with real booking data, return full payload
+app.post("/api/migrate/botbee-send-test", async (req, res) => {
+  const key = (req.query.key || req.body?.key) as string;
+  if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
+
+  const { pool: p } = await import("@workspace/db");
+  const { sendApprovalTemplate, sendInvoiceReadyTemplate } = await import("./lib/botbee.js");
+
+  const bookingId = req.body?.bookingId as string | undefined;
+  const templateKey = (req.body?.template as string) || "booking_approved";
+
+  let bRow: any;
+  if (bookingId) {
+    const r = await p.query(`SELECT * FROM bookings WHERE id=$1 OR booking_number=$1 LIMIT 1`, [bookingId]);
+    bRow = r.rows[0];
+  }
+  if (!bRow) {
+    const r = await p.query(`SELECT * FROM bookings WHERE status IN ('approved','confirmed','partially_paid') AND is_deleted IS NOT DISTINCT FROM false ORDER BY updated_at DESC LIMIT 1`);
+    bRow = r.rows[0];
+  }
+  if (!bRow) return void res.status(404).json({ error: "No booking found" });
+
+  const inv = await p.query(`SELECT * FROM invoices WHERE booking_id=$1 ORDER BY created_at DESC LIMIT 1`, [bRow.id]);
+  const invoiceRow = inv.rows[0];
+  const bookingNum = bRow.booking_number;
+  const name = bRow.customer_name;
+  const mobile = bRow.customer_mobile;
+  const pkg = bRow.package_name || "Hajj/Umrah Package";
+  const total = Number(bRow.final_amount || bRow.total_amount || 0);
+  const paid = Number(bRow.paid_amount || 0);
+  const invoiceNo = invoiceRow?.invoice_number || bookingNum;
+  const invoiceUrl = `https://alburhantravels.com/invoice/${bookingNum}`;
+
+  let result: any;
+  if (templateKey === "invoice_ready") {
+    result = await sendInvoiceReadyTemplate(mobile, { customerName: name, bookingId: bookingNum, invoiceNumber: invoiceNo, amount: paid || total, invoiceUrl }, { eventType: "invoice_generated", bookingId: bRow.id, customerId: bRow.customer_id });
+  } else {
+    result = await sendApprovalTemplate(mobile, { customerName: name, packageName: pkg, bookingId: bookingNum, amount: total, invoiceUrl }, { eventType: "booking_approved", bookingId: bRow.id, customerId: bRow.customer_id });
+  }
+
+  // Return full stored payload from DB
+  await new Promise(r => setTimeout(r, 1500));
+  const log = await p.query(`SELECT request_payload, provider_response FROM notification_logs WHERE booking_id=$1 AND channel='whatsapp' ORDER BY sent_at DESC LIMIT 1`, [bRow.id]);
+  const rp = log.rows[0]?.request_payload;
+  const storedPayload = typeof rp === 'string' ? JSON.parse(rp) : rp;
+
+  res.json({
+    booking: { id: bRow.id, number: bookingNum, name, mobile, pkg, total, paid },
+    templateKey,
+    ok: result.ok,
+    waMessageId: (result.responsePayload as any)?.wa_message_id,
+    storedRequestPayload: storedPayload,
+    fullResult: result,
+  });
+});
+
 // POST /api/migrate/e2e-verify — comprehensive end-to-end production verification
 app.post("/api/migrate/e2e-verify", async (req, res) => {
   const key = (req.query.key || req.body?.key) as string;

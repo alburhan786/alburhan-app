@@ -1,0 +1,103 @@
+🚨 CRITICAL PRODUCTION BUG – BOTBEE VARIABLE MAPPING
+
+WhatsApp messages are being delivered successfully, but NONE of the dynamic variables are being replaced.
+
+Current message received:
+
+Assalamu Alaikum wa Rahmatullahi wa Barakatuh #!Name!#
+
+📋 Booking ID: #!BookingID!#
+🧾 Invoice No: #!Invoice!#
+💰 Amount: ₹ #!Amount!#
+
+This proves BotBee is sending the template, but the payload does not contain the required variable values.
+
+Fix this permanently.
+
+Tasks:
+
+1. Audit every WhatsApp template and every workflow trigger.
+
+2. Find the exact variable names expected by BotBee.
+
+3. Verify the backend sends all variables in the correct order and format.
+
+4. Log the complete outgoing payload before every WhatsApp API call.
+
+5. Verify every variable is populated from the database.
+
+The payload must contain real values for:
+
+Customer Name
+Booking ID
+Agreement ID
+Invoice Number
+Package Name
+Package Duration
+Departure Date
+Return Date
+Hotel Name
+Room Type
+Flight Details
+Total Amount
+Paid Amount
+Pending Amount
+Payment Link
+Invoice URL
+Agreement URL
+Visa Number
+Ticket Number
+Support Number
+
+6. If any variable is NULL or undefined:
+- Log the exact reason.
+- Do not send the template until the value is available.
+
+7. Remove all old placeholder formats such as:
+#!Name!#
+#!BookingID!#
+#!Amount!#
+
+Use only the variable format required by the current BotBee API.
+
+8. Test with my real booking:
+- Booking ID: ABT26582778
+- Package: Ramadan Umrah Full Month Package
+- Amount: ₹180000
+
+Expected WhatsApp:
+
+Assalamu Alaikum wa Rahmatullahi wa Barakatuh Mohammed Altaf,
+
+Your invoice has been generated.
+
+📋 Booking ID: ABT26582778
+🧾 Invoice No: INV-2026-000032
+📦 Package: Ramadan Umrah Full Month Package
+💰 Amount: ₹180000
+
+Download your invoice:
+https://...
+
+9. Test ALL WhatsApp templates:
+- Booking Received
+- Booking Approved
+- Payment Received
+- Pending Payment
+- Invoice Ready
+- Agreement Ready
+- Agreement Signed
+- Visa Issued
+- Ticket Issued
+- Flight Reminder
+- Return Flight Reminder
+- Room Allocation
+- Group Orientation
+- Departure Reminder
+- Welcome Saudi
+- Arrival India
+- Hajj Mubarak
+
+10. Provide the complete API request payload and the final WhatsApp message for each template to confirm every variable is being replaced correctly.
+
+Do not close this task until every WhatsApp message displays the actual booking details instead of placeholder text.
