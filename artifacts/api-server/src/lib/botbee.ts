@@ -172,23 +172,17 @@ export async function sendTemplate(
   }
 
   // Route by identifier type:
-  //   pure digits  → template_id  (legacy numeric BotBee template ID)
-  //   any other    → template_name (approved slug on BotBee / Meta dashboard)
+  //   pure digits  → template_id  (BotBee numeric ID — preferred, confirmed working)
+  //   any other    → template_name (slug fallback for env-var overrides)
   const isNumericId = /^\d+$/.test(templateId.trim());
   const payload: Record<string, unknown> = {
     apiToken, phone_number_id, phone_number: phone,
     ...(isNumericId ? { template_id: templateId } : { template_name: templateId }),
   };
 
-  // Attach Meta-standard body components when variable values are provided so
-  // BotBee substitutes {{1}}, {{2}} … in the approved template body.
+  // BotBee uses a flat variables[] array for substitution (not Meta components format).
   if (opts?.variables?.length) {
-    payload.components = [
-      {
-        type: "body",
-        parameters: opts.variables.map(text => ({ type: "text", text: String(text ?? "-") })),
-      },
-    ];
+    payload.variables = opts.variables.map(v => String(v ?? "-"));
   }
 
   const reqPayload: Record<string, unknown> = {
@@ -492,29 +486,31 @@ export async function sendConfirmationTemplate(
 // Non-numeric names are sent via template_name field; numeric IDs via template_id.
 // Env-var overrides allow changing slugs on VPS without redeploying.
 export const ABT_TEMPLATES: Record<string, { id: string; name: string }> = {
-  // ── Core booking & payment (approved 2025 batch) ───────────────────────────
-  booking_submitted:     { id: "", name: (process.env.BOTBEE_BOOKING_RECEIVE_TEMPLATE       || "booking_receive").trim() },
-  booking_approved:      { id: "", name: (process.env.BOTBEE_BOOKING_APPROVED_TEMPLATE      || "booking_approved").trim() },
-  payment_received:      { id: "", name: (process.env.BOTBEE_PAYMENT_RECEIVED_TEMPLATE      || "payment_received").trim() },
-  pending_payment:       { id: "", name: (process.env.BOTBEE_PENDING_PAYMENT_TEMPLATE       || "pending_payment_reminder").trim() },
+  // ── Core booking & payment ─────────────────────────────────────────────────
+  // IDs confirmed from live BotBee API 2026-07-18 — used as template_id in sends
+  // id="" means NOT in BotBee → graceful no-op fallback
+  booking_submitted:     { id: "",       name: (process.env.BOTBEE_BOOKING_RECEIVE_TEMPLATE       || "booking_receive").trim() },
+  booking_approved:      { id: "409950", name: (process.env.BOTBEE_BOOKING_APPROVED_TEMPLATE      || "booking_approved").trim() },
+  payment_received:      { id: "409953", name: (process.env.BOTBEE_PAYMENT_RECEIVED_TEMPLATE      || "payment_received").trim() },
+  pending_payment:       { id: "",       name: (process.env.BOTBEE_PENDING_PAYMENT_TEMPLATE       || "pending_payment_reminder").trim() },
   // ── Documents ─────────────────────────────────────────────────────────────
-  invoice_ready:         { id: "", name: (process.env.BOTBEE_INVOICE_READY_TEMPLATE         || "invoice_ready").trim() },
-  agreement_ready:       { id: "", name: (process.env.BOTBEE_AGREEMENT_READY_TEMPLATE       || "agreement_ready").trim() },
-  agreement_signed:      { id: "", name: (process.env.BOTBEE_AGREEMENT_SIGNED_TEMPLATE      || "agreement_signed").trim() },
-  visa_issued:           { id: "", name: (process.env.BOTBEE_VISA_ISSUED_TEMPLATE           || "visa_issued").trim() },
-  ticket_issued:         { id: "", name: (process.env.BOTBEE_TICKET_ISSUED_TEMPLATE         || "ticket_issued").trim() },
+  invoice_ready:         { id: "409956", name: (process.env.BOTBEE_INVOICE_READY_TEMPLATE         || "invoice_ready").trim() },
+  agreement_ready:       { id: "409958", name: (process.env.BOTBEE_AGREEMENT_READY_TEMPLATE       || "agreement_ready").trim() },
+  agreement_signed:      { id: "409965", name: (process.env.BOTBEE_AGREEMENT_SIGNED_TEMPLATE      || "agreement_signed").trim() },
+  visa_issued:           { id: "409991", name: (process.env.BOTBEE_VISA_ISSUED_TEMPLATE           || "visa_issued").trim() },
+  ticket_issued:         { id: "409994", name: (process.env.BOTBEE_TICKET_ISSUED_TEMPLATE         || "ticket_issued").trim() },
   // ── Travel reminders ──────────────────────────────────────────────────────
-  flight_reminder:       { id: "", name: (process.env.BOTBEE_FLIGHT_REMINDER_TEMPLATE       || "flight_reminder").trim() },
-  return_flight_reminder:{ id: "", name: (process.env.BOTBEE_RETURN_FLIGHT_TEMPLATE         || "return_flight_reminder").trim() },
-  departure_reminder:    { id: "", name: (process.env.BOTBEE_DEPARTURE_REMINDER_TEMPLATE    || "departure_reminder").trim() },
+  flight_reminder:       { id: "409999", name: (process.env.BOTBEE_FLIGHT_REMINDER_TEMPLATE       || "flight_reminder").trim() },
+  return_flight_reminder:{ id: "410000", name: (process.env.BOTBEE_RETURN_FLIGHT_TEMPLATE         || "return_flight_reminder").trim() },
+  departure_reminder:    { id: "410026", name: (process.env.BOTBEE_DEPARTURE_REMINDER_TEMPLATE    || "departure_reminde").trim() },
   // ── On-ground ─────────────────────────────────────────────────────────────
-  room_allocation:       { id: "", name: (process.env.BOTBEE_ROOM_ALLOCATION_TEMPLATE       || "room_allocation").trim() },
-  group_orientation:     { id: "", name: (process.env.BOTBEE_GROUP_ORIENTATION_TEMPLATE     || "group_orientation").trim() },
-  welcome_saudi:         { id: "", name: (process.env.BOTBEE_WELCOME_SAUDI_TEMPLATE         || "welcome_saudi").trim() },
-  arrival_india:         { id: "", name: (process.env.BOTBEE_ARRIVAL_INDIA_TEMPLATE         || "arrival_india").trim() },
+  room_allocation:       { id: "410008", name: (process.env.BOTBEE_ROOM_ALLOCATION_TEMPLATE       || "room_allocation").trim() },
+  group_orientation:     { id: "410022", name: (process.env.BOTBEE_GROUP_ORIENTATION_TEMPLATE     || "group_orientation").trim() },
+  welcome_saudi:         { id: "410030", name: (process.env.BOTBEE_WELCOME_SAUDI_TEMPLATE         || "welcome_saudi").trim() },
+  arrival_india:         { id: "410031", name: (process.env.BOTBEE_ARRIVAL_INDIA_TEMPLATE         || "arrival_india").trim() },
   // ── Special ───────────────────────────────────────────────────────────────
-  hajj_mubarak:          { id: "", name: (process.env.BOTBEE_HAJJ_MUBARAK_TEMPLATE          || "hajj_mubarak").trim() },
-  hajj_package_launch:   { id: "", name: (process.env.BOTBEE_HAJJ_PACKAGE_LAUNCH_TEMPLATE   || "hajj_package_launch").trim() },
+  hajj_mubarak:          { id: "",       name: (process.env.BOTBEE_HAJJ_MUBARAK_TEMPLATE          || "hajj_mubarak").trim() },
+  hajj_package_launch:   { id: "410040", name: (process.env.BOTBEE_HAJJ_PACKAGE_LAUNCH_TEMPLATE   || "hajj_package_launch").trim() },
 };
 
 function bodyParams(texts: (string | null | undefined)[]): object[] {
@@ -537,19 +533,22 @@ function bodyParams(texts: (string | null | undefined)[]): object[] {
 //   {{4}} → Total Amount (₹-formatted) or Balance
 //   {{5}} → Invoice / Payment URL
 //
-// Departure reminder uses flight-specific variables:
-//   {{1}} → Customer Name
-//   {{2}} → Flight Number
-//   {{3}} → Departure Date
-//   {{4}} → Departure Airport
-//   {{5}} → Reporting Time
-//
-// Visa / Flight issued use:
-//   {{1}} → Customer Name
-//   {{2}} → Booking ID
-//   {{3}} → Package Name
-//   {{4}} → Visa/Ticket Number (or "-")
-//   {{5}} → Document / Ticket URL
+// Variable maps (confirmed from live BotBee API 2026-07-18):
+//   booking_approved     : name, bookingId, package, amount, invoiceUrl          (5)
+//   payment_received     : name, bookingId, invoiceNo, amount                     (4)
+//   departure_reminde    : name, bookingId, depDate, reportingTime, airport        (5)
+//   visa_issued          : name, bookingId, visaNo, visaUrl                       (4)
+//   ticket_issued        : name, bookingId, pnr, ticketUrl                        (4)
+//   invoice_ready        : name, bookingId, invoiceNo, amount, invoiceUrl         (5)
+//   agreement_ready      : name, bookingId, agreementNo, agreementUrl             (4)
+//   agreement_signed     : name, bookingId                                        (2)
+//   flight_reminder      : name, bookingId, package, flight, depDate, repTime, airport (7)
+//   return_flight_reminder: name, bookingId, flight, returnDate, repTime, airport (6)
+//   room_allocation      : name, bookingId, hotel, roomNo                         (4)
+//   group_orientation    : name, date, time, venue                                (4)
+//   welcome_saudi        : name                                                   (1)
+//   arrival_india        : name                                                   (1)
+//   hajj_package_launch  : name, year                                             (2)
 
 const SITE = "https://alburhantravels.com";
 function fmtAmount(v: string | number | undefined | null): string {
@@ -566,7 +565,7 @@ function tplId(key: keyof typeof ABT_TEMPLATES): string {
 /** booking_receive — fires when a new booking is submitted */
 export async function sendBookingSubmittedTemplate(
   to: string,
-  ctx: { customerName: string; packageName: string; bookingId: string; invoiceUrl?: string },
+  ctx: { customerName: string; packageName: string; bookingId: string; amount?: string | number; invoiceUrl?: string },
   opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
   return sendTemplate(to, tplId("booking_submitted"), {
@@ -575,16 +574,17 @@ export async function sendBookingSubmittedTemplate(
       ctx.customerName,
       ctx.bookingId,
       ctx.packageName || "Hajj/Umrah Package",
-      "-",
-      ctx.invoiceUrl || `${SITE}/invoice/${ctx.bookingId}`,
+      ctx.amount ? fmtAmount(ctx.amount) : "-",
     ],
   });
 }
 
-/** payment_received — fires on full/partial payment */
+/** payment_received — fires on full/partial payment
+ *  Template vars: {{1}}=name {{2}}=bookingId {{3}}=invoiceNo {{4}}=amount
+ */
 export async function sendPaymentReceivedTemplate(
   to: string,
-  ctx: { customerName: string; packageName: string; bookingId: string; amount?: string | number; invoiceUrl?: string },
+  ctx: { customerName: string; packageName?: string; bookingId: string; invoiceNumber?: string; amount?: string | number; invoiceUrl?: string },
   opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
   return sendTemplate(to, tplId("payment_received"), {
@@ -592,9 +592,8 @@ export async function sendPaymentReceivedTemplate(
     variables: [
       ctx.customerName,
       ctx.bookingId,
-      ctx.packageName || "Hajj/Umrah Package",
+      ctx.invoiceNumber || ctx.bookingId,
       fmtAmount(ctx.amount),
-      ctx.invoiceUrl || `${SITE}/invoice/${ctx.bookingId}`,
     ],
   });
 }
@@ -635,11 +634,14 @@ export async function sendApprovalTemplate(
   });
 }
 
-/** departure_reminder — fires 7d/3d/2d/1d/12h/6h/3h before departure */
+/** departure_reminde — fires 7d/3d/2d/1d/12h/6h/3h before departure
+ *  Template vars: {{1}}=name {{2}}=bookingId {{3}}=departureDate {{4}}=reportingTime {{5}}=airport
+ *  Note: template name in BotBee is "departure_reminde" (15-char limit truncated)
+ */
 export async function sendDepartureReminderTemplate(
   to: string,
   ctx: {
-    customerName: string; packageName: string; bookingId: string;
+    customerName: string; packageName?: string; bookingId: string;
     flightNumber?: string; departureDate?: string; reportingTime?: string;
     departureAirport?: string; hotelName?: string; emergencyContact?: string;
   },
@@ -649,15 +651,17 @@ export async function sendDepartureReminderTemplate(
     ...opts,
     variables: [
       ctx.customerName,
-      ctx.flightNumber || "TBA",
+      ctx.bookingId,
       ctx.departureDate || "TBA",
-      ctx.departureAirport || "TBA",
       ctx.reportingTime || "4 hours before departure",
+      ctx.departureAirport || "TBA",
     ],
   });
 }
 
-/** visa_issued — fires when visa is uploaded/approved */
+/** visa_issued — fires when visa is uploaded/approved
+ *  Template vars: {{1}}=name {{2}}=bookingId {{3}}=visaNo {{4}}=visaUrl
+ */
 export async function sendVisaIssuedTemplate(
   to: string,
   ctx: { customerName: string; bookingId: string; packageName?: string; visaNumber?: string; visaUrl?: string },
@@ -668,14 +672,15 @@ export async function sendVisaIssuedTemplate(
     variables: [
       ctx.customerName,
       ctx.bookingId,
-      ctx.packageName || "Hajj/Umrah Package",
       ctx.visaNumber || "-",
       ctx.visaUrl || `${SITE}/invoice/${ctx.bookingId}`,
     ],
   });
 }
 
-/** ticket_issued — fires when flight ticket is issued */
+/** ticket_issued — fires when flight ticket is issued
+ *  Template vars: {{1}}=name {{2}}=bookingId {{3}}=pnr {{4}}=ticketUrl
+ */
 export async function sendFlightTemplate(
   to: string,
   ctx: { customerName: string; bookingId: string; flightNumber?: string; departureDate?: string; ticketNumber?: string; ticketUrl?: string },
@@ -686,8 +691,7 @@ export async function sendFlightTemplate(
     variables: [
       ctx.customerName,
       ctx.bookingId,
-      ctx.flightNumber || "TBA",
-      ctx.departureDate || "TBA",
+      ctx.ticketNumber || ctx.flightNumber || "TBA",
       ctx.ticketUrl || `${SITE}/invoice/${ctx.bookingId}`,
     ],
   });
@@ -711,10 +715,12 @@ export async function sendInvoiceReadyTemplate(
   });
 }
 
-/** agreement_ready — fires when agreement is ready for signing */
+/** agreement_ready — fires when agreement is ready for signing
+ *  Template vars: {{1}}=name {{2}}=bookingId {{3}}=agreementNo {{4}}=agreementUrl
+ */
 export async function sendAgreementReadyTemplate(
   to: string,
-  ctx: { customerName: string; bookingId: string; packageName?: string; agreementUrl?: string },
+  ctx: { customerName: string; bookingId: string; packageName?: string; agreementNumber?: string; agreementUrl?: string },
   opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
   return sendTemplate(to, tplId("agreement_ready"), {
@@ -722,13 +728,15 @@ export async function sendAgreementReadyTemplate(
     variables: [
       ctx.customerName,
       ctx.bookingId,
-      ctx.packageName || "Hajj/Umrah Package",
+      ctx.agreementNumber || ctx.bookingId,
       ctx.agreementUrl || `${SITE}/agreement/${ctx.bookingId}`,
     ],
   });
 }
 
-/** agreement_signed — fires when customer signs the agreement */
+/** agreement_signed — fires when customer signs the agreement
+ *  Template vars: {{1}}=name {{2}}=agreementId
+ */
 export async function sendAgreementSignedTemplate(
   to: string,
   ctx: { customerName: string; bookingId: string; signedDate?: string },
@@ -739,30 +747,35 @@ export async function sendAgreementSignedTemplate(
     variables: [
       ctx.customerName,
       ctx.bookingId,
-      ctx.signedDate || new Date().toLocaleDateString("en-IN"),
     ],
   });
 }
 
-/** flight_reminder — fires when a flight is assigned to pilgrim */
+/** flight_reminder — fires when a flight is assigned to pilgrim
+ *  Template vars: {{1}}=name {{2}}=bookingId {{3}}=package {{4}}=flight {{5}}=depDate {{6}}=reportingTime {{7}}=airport
+ */
 export async function sendFlightReminderTemplate(
   to: string,
-  ctx: { customerName: string; bookingId: string; flightNumber?: string; departureDate?: string; departureAirport?: string; reportingTime?: string },
+  ctx: { customerName: string; bookingId: string; packageName?: string; flightNumber?: string; departureDate?: string; departureAirport?: string; reportingTime?: string },
   opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
   return sendTemplate(to, tplId("flight_reminder"), {
     ...opts,
     variables: [
       ctx.customerName,
+      ctx.bookingId,
+      ctx.packageName || "Hajj/Umrah Package",
       ctx.flightNumber || "TBA",
       ctx.departureDate || "TBA",
-      ctx.departureAirport || "TBA",
       ctx.reportingTime || "3 hours before departure",
+      ctx.departureAirport || "TBA",
     ],
   });
 }
 
-/** return_flight_reminder — fires before return journey */
+/** return_flight_reminder — fires before return journey
+ *  Template vars: {{1}}=name {{2}}=bookingId {{3}}=flight {{4}}=returnDate {{5}}=reportingTime {{6}}=airport
+ */
 export async function sendReturnFlightReminderTemplate(
   to: string,
   ctx: { customerName: string; bookingId: string; flightNumber?: string; returnDate?: string; returnAirport?: string; reportingTime?: string },
@@ -772,15 +785,18 @@ export async function sendReturnFlightReminderTemplate(
     ...opts,
     variables: [
       ctx.customerName,
+      ctx.bookingId,
       ctx.flightNumber || "TBA",
       ctx.returnDate || "TBA",
-      ctx.returnAirport || "TBA",
       ctx.reportingTime || "3 hours before departure",
+      ctx.returnAirport || "TBA",
     ],
   });
 }
 
-/** room_allocation — fires when hotel room is assigned */
+/** room_allocation — fires when hotel room is assigned
+ *  Template vars: {{1}}=name {{2}}=bookingId {{3}}=hotel {{4}}=roomNo
+ */
 export async function sendRoomAllocationTemplate(
   to: string,
   ctx: { customerName: string; bookingId: string; hotelName?: string; roomNumber?: string; checkInDate?: string },
@@ -790,14 +806,16 @@ export async function sendRoomAllocationTemplate(
     ...opts,
     variables: [
       ctx.customerName,
+      ctx.bookingId,
       ctx.hotelName || "Hotel TBA",
       ctx.roomNumber || "TBA",
-      ctx.checkInDate || "TBA",
     ],
   });
 }
 
-/** group_orientation — fires when group orientation is scheduled */
+/** group_orientation — fires when group orientation is scheduled
+ *  Template vars: {{1}}=name {{2}}=date {{3}}=time {{4}}=venue
+ */
 export async function sendGroupOrientationTemplate(
   to: string,
   ctx: { customerName: string; bookingId: string; groupName?: string; orientationDate?: string; orientationTime?: string; location?: string },
@@ -807,7 +825,6 @@ export async function sendGroupOrientationTemplate(
     ...opts,
     variables: [
       ctx.customerName,
-      ctx.groupName || "Your Group",
       ctx.orientationDate || "TBA",
       ctx.orientationTime || "TBA",
       ctx.location || "Al Burhan Office",
@@ -815,7 +832,9 @@ export async function sendGroupOrientationTemplate(
   });
 }
 
-/** welcome_saudi — fires on arrival in Saudi Arabia */
+/** welcome_saudi — fires on arrival in Saudi Arabia
+ *  Template vars: {{1}}=name  (static body, no other vars)
+ */
 export async function sendWelcomeSaudiTemplate(
   to: string,
   ctx: { customerName: string; bookingId: string; hotelName?: string; groupName?: string },
@@ -823,15 +842,13 @@ export async function sendWelcomeSaudiTemplate(
 ): Promise<BotBeeResult> {
   return sendTemplate(to, tplId("welcome_saudi"), {
     ...opts,
-    variables: [
-      ctx.customerName,
-      ctx.hotelName || "Your Hotel",
-      ctx.groupName || "Your Group",
-    ],
+    variables: [ctx.customerName],
   });
 }
 
-/** arrival_india — fires when pilgrim arrives back in India */
+/** arrival_india — fires when pilgrim arrives back in India
+ *  Template vars: {{1}}=name  (static body, no other vars)
+ */
 export async function sendArrivalIndiaTemplate(
   to: string,
   ctx: { customerName: string; bookingId: string; flightNumber?: string; arrivalDate?: string },
@@ -839,11 +856,7 @@ export async function sendArrivalIndiaTemplate(
 ): Promise<BotBeeResult> {
   return sendTemplate(to, tplId("arrival_india"), {
     ...opts,
-    variables: [
-      ctx.customerName,
-      ctx.flightNumber || "TBA",
-      ctx.arrivalDate || "TBA",
-    ],
+    variables: [ctx.customerName],
   });
 }
 
@@ -859,18 +872,20 @@ export async function sendHajjMubarakTemplate(
   });
 }
 
-/** hajj_package_launch — bulk broadcast for new package announcements */
+/** hajj_package_launch — bulk broadcast for new package announcements
+ *  Template vars: {{1}}=name {{2}}=year
+ */
 export async function sendHajjPackageLaunchTemplate(
   to: string,
   ctx: { customerName: string; packageName?: string; launchUrl?: string },
   opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
+  const year = ctx.packageName?.match(/\d{4}/)?.[0] || new Date().getFullYear().toString();
   return sendTemplate(to, tplId("hajj_package_launch"), {
     ...opts,
     variables: [
       ctx.customerName,
-      ctx.packageName || "Hajj Package 2026",
-      ctx.launchUrl || SITE,
+      year,
     ],
   });
 }

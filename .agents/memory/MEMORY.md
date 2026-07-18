@@ -7,7 +7,7 @@
 - [Frontend JSX convention](frontend-jsx.md) — project uses React (className=, not class=); preact/hooks imports will break Vite build
 - [Journey status + profile columns](journey-status-schema.md) — journey_status TEXT on bookings (pool.query only, not Drizzle); blood_group/emergency_contact_name/emergency_contact_mobile on users; POST /api/bookings/:id/journey-status auto-notifies customer
 - [Offline bank transfer module](offline-payments-schema.md) — bank_settings + offline_payments tables; POST /api/offline-payments (multipart); approve/reject fire notifications; BankTransferSection is self-contained customer component
-- [BotBee Template API — 4-param ID-only send](botbee-template-api.md) — sendTemplate() uses only {apiToken, phone_number_id, phone_number, template_id}; no template name, language, or components ever.
+- [BotBee Template API — numeric ID + flat variables](botbee-template-api.md) — sendTemplate() uses template_id (numeric BotBee ID) + flat variables[] array; NOT Meta components format. Confirmed working 2026-07-18.
 - [SMS DLT return type](sms-dlt-return-type.md) — sendDLTSMS() in notifications.ts returns Promise<boolean>; do NOT treat as {ok:boolean}
 - [JSX class vs className](jsx-classname.md) — AutomationCenter.tsx and LoyaltyManager.tsx had class= instead of className=; style= must be object not string
 - [Document delivery module](document-delivery.md) — lib/documentDelivery.ts: sendDocumentToCustomer fetches buffer from GCS/disk and sends PDF via BotBee upload, image via uploadMedia+sendFile, fallback to text; POST /api/documents/:id/resend for admin one-click resend
@@ -22,7 +22,7 @@
 - [SMS DLT quick route fallback](sms-dlt-quick-route.md) — sendDLTSMS tries DLT first then quick route; old notify_template_id "211277" invalid, quick route confirmed working
 - [pdfkit must stay external in bundle](pdfkit-bundle-external.md) — pdfkit loads AFM/ICC data files from __dirname at runtime; bundling breaks all PDF endpoints on VPS with HTTP 500
 - [VPS self-update uses process.exit(0)](vps-self-update-exit.md) — spawn("pm2",...) silently fails (not in PATH); process.exit(0) lets PM2 detect crash and restart with new bundle file on disk
-- [BotBee ABT production templates](botbee-abt-templates.md) — sendTemplate() now sends Meta components array ({{1}}…{{5}}) via opts.variables; all 7 ABT senders pass real ctx values; ABT_TEMPLATE_EVENTS block ACTIVE. BotBee dashboard templates MUST use {{1}} etc., not #!system-appointment-*!# variables.
+- [BotBee ABT production templates](botbee-abt-templates.md) — 15 templates with confirmed numeric BotBee IDs (409950–410040); 3 absent (booking_submitted/cancelled/pending_payment) are graceful no-ops; all var counts verified 2026-07-18.
 - [Payment notification gate fix](payment-notification-gate.md) — never gate processPaymentSuccessNotifications on newStatus; BotBee upload field is "media_file" not "file"; use native FormData
 - [ts-nocheck route strategy](ts-nocheck-routes.md) — 25+ API route files use // @ts-nocheck due to pervasive Drizzle schema type mismatches; do not remove without rebuilding lib/db types
 - [Notification packageName bug](notification-packagename-bug.md) — every triggerWorkflow() call must include packageName or messages say "your package"

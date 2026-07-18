@@ -254,6 +254,121 @@ app.get("/api/migrate/db-check", async (req, res) => {
   res.json({ node: process.version, env: process.env.NODE_ENV, checks });
 });
 
+// POST /api/migrate/botbee-diag — probe BotBee to discover correct phone_number_id + test templates
+app.post("/api/migrate/botbee-diag", async (req, res) => {
+  const key = (req.query.key || req.body?.key) as string;
+  if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
+
+  const axios = (await import("axios")).default;
+  const { getCachedConfig } = await import("./lib/apiSettingsProvider.js");
+  const bbCfg = getCachedConfig("botbee");
+  const apiToken = (bbCfg.apiKey || process.env.BOTBEE_API_KEY || "").trim();
+  const currentPhoneId = (bbCfg.extra?.phone_number_id || process.env.BOTBEE_PHONE_NUMBER_ID || "").trim();
+  const businessId = (bbCfg.extra?.business_id || process.env.BOTBEE_BUSINESS_ID || "").trim();
+  const BASE = "https://app.botbee.io/api/v1";
+
+  const results: Record<string, unknown> = {
+    configSummary: {
+      currentPhoneNumberId: currentPhoneId,
+      businessId: businessId,
+      apiKeyPresent: !!apiToken,
+      apiKeyPrefix: apiToken ? `${apiToken.slice(0, 6)}...${apiToken.slice(-4)}` : null,
+    }
+  };
+
+  // Helper: try a POST and return status + data
+  async function probe(label: string, url: string, body: Record<string, unknown>) {
+    try {
+      const r = await axios.post(url, body, { headers: { "Content-Type": "application/json" }, timeout: 12000 });
+      results[label] = { status: r.status, data: r.data };
+    } catch (e: any) {
+      results[label] = { status: e?.response?.status, error: e?.response?.data || e.message };
+    }
+  }
+  async function probeGet(label: string, url: string, params?: Record<string, string>) {
+    try {
+      const r = await axios.get(url, { params: { apiToken, ...params }, headers: { "Content-Type": "application/json" }, timeout: 12000 });
+      results[label] = { status: r.status, data: r.data };
+    } catch (e: any) {
+      results[label] = { status: e?.response?.status, error: e?.response?.data || e.message };
+    }
+  }
+
+  // 1. Template list with current phone_number_id
+  await probe("templateList_current", `${BASE}/whatsapp/template/list`,
+    { apiToken, phone_number_id: currentPhoneId, business_id: businessId });
+
+  // 2. Template list WITHOUT phone_number_id (just apiToken + business_id)
+  await probe("templateList_noPhoneId", `${BASE}/whatsapp/template/list`,
+    { apiToken, business_id: businessId });
+
+  // 3. Template list with just apiToken
+  await probe("templateList_tokenOnly", `${BASE}/whatsapp/template/list`,
+    { apiToken });
+
+  // 4. Account/profile endpoint
+  await probe("account", `${BASE}/account`, { apiToken });
+  await probeGet("accountGet", `${BASE}/account`);
+
+  // 5. Phone numbers list
+  await probe("phoneNumbers", `${BASE}/whatsapp/phone-numbers`, { apiToken });
+  await probe("phoneNumbersBiz", `${BASE}/whatsapp/phone-numbers`, { apiToken, business_id: businessId });
+
+  // 6. WABA info
+  await probe("wabaInfo", `${BASE}/whatsapp/waba`, { apiToken });
+
+  // 7. Business accounts
+  await probe("businesses", `${BASE}/businesses`, { apiToken });
+  await probe("whatsappAccounts", `${BASE}/whatsapp/accounts`, { apiToken });
+
+  // 8. Try template list with business_id as phone_number_id
+  if (businessId && businessId !== currentPhoneId) {
+    await probe("templateList_bizAsPhone", `${BASE}/whatsapp/template/list`,
+      { apiToken, phone_number_id: businessId });
+  }
+
+  // 9. Try sending a simple text without phone_number_id
+  await probe("textSend_noPhoneId", `${BASE}/whatsapp/send`,
+    { apiToken, phone_number: "919999999999", message: "diag test" });
+
+  // 10. Live template send test (only if testPhone is provided)
+  const testPhone = (req.body?.testPhone as string || "").replace(/\D/g, "");
+  if (testPhone) {
+    const { sendApprovalTemplate, sendPaymentReceivedTemplate, sendDepartureReminderTemplate } =
+      await import("./lib/botbee.js");
+    const sends = await Promise.allSettled([
+      sendApprovalTemplate(testPhone, {
+        customerName: "Test User",
+        packageName: "Hajj Package 2026",
+        bookingId: "BKG-DIAG-001",
+        amount: 50000,
+        invoiceUrl: "https://alburhantravels.com/invoice/diag",
+      }),
+      sendPaymentReceivedTemplate(testPhone, {
+        customerName: "Test User",
+        bookingId: "BKG-DIAG-001",
+        invoiceNumber: "INV-001",
+        amount: 50000,
+      }),
+      sendDepartureReminderTemplate(testPhone, {
+        customerName: "Test User",
+        bookingId: "BKG-DIAG-001",
+        departureDate: "25 Jul 2026",
+        reportingTime: "4 hours before departure",
+        departureAirport: "Mumbai (BOM)",
+      }),
+    ]);
+    const labels = ["booking_approved (5v)", "payment_received (4v)", "departure_reminde (5v)"];
+    results["liveSendTests"] = sends.map((s, i) => ({
+      template: labels[i],
+      ok: s.status === "fulfilled" && (s.value as any).ok,
+      response: s.status === "fulfilled" ? (s.value as any) : s.reason?.message,
+    }));
+  }
+
+  res.json(results);
+});
+
 // GET /api/migrate/notification-audit — real production notification log dump + optional resend trigger
 app.get("/api/migrate/notification-audit", async (req, res) => {
   const key = req.query.key as string;

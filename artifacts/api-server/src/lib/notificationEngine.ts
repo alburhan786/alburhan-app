@@ -565,6 +565,7 @@ export async function sendBotBeeEventTemplate(
         customerName: ctx.customerName,
         bookingId: bookingRef,
         packageName: ctx.packageName,
+        agreementNumber: (ctx as any).agreementNumber || bookingRef,
         agreementUrl: (ctx as any).agreementUrl || invoiceUrl,
       }, opts);
 
