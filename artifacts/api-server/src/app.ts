@@ -859,6 +859,190 @@ app.post("/api/migrate/botbee-send-test", async (req, res) => {
   });
 });
 
+// GET /api/migrate/botbee-audit — live per-event audit: fetches every template from BotBee API,
+// verifies body_content uses {{N}} Meta format, checks variable_map positions, renders preview.
+app.get("/api/migrate/botbee-audit", async (req, res) => {
+  const key = (req.query.key as string) || "";
+  if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
+
+  const { getCachedConfig } = await import("./lib/apiSettingsProvider.js");
+  const { ABT_TEMPLATES, TEMPLATE_BODIES } = await import("./lib/botbee.js");
+
+  const bbCfg = getCachedConfig("botbee");
+  const apiToken = (bbCfg.apiKey || process.env.BOTBEE_API_KEY || "").trim();
+  const BASE = "https://app.botbee.io/api/v1";
+
+  // ── Fetch ALL templates live from BotBee (same pagination as tpl-probe) ────
+  const phone_number_id = (bbCfg.extra?.phone_number_id || process.env.BOTBEE_PHONE_NUMBER_ID || "").trim();
+  let botbeeTemplates: any[] = [];
+  try {
+    let page = 1;
+    while (page <= 10) {
+      const r = await fetch(
+        `${BASE}/whatsapp/template/list?apiToken=${apiToken}&phone_number_id=${phone_number_id}&page=${page}&limit=50`,
+        { signal: AbortSignal.timeout(12000) }
+      );
+      const raw = await r.json() as any;
+      if (raw?.status !== "1" && raw?.status !== 1) break;
+      const items: any[] = Array.isArray(raw.message) ? raw.message : [];
+      if (!items.length) break;
+      botbeeTemplates.push(...items);
+      if (items.length < 50) break;
+      page++;
+    }
+  } catch (e: any) {
+    return void res.status(502).json({ error: "BotBee API unreachable", detail: e.message });
+  }
+
+  const byId: Record<string, any> = {};
+  const byName: Record<string, any> = {};
+  for (const t of botbeeTemplates) {
+    if (t.id)            byId[String(t.id)] = t;
+    if (t.template_name) byName[t.template_name] = t;
+  }
+
+  // ── Variable keys sent by each sender function (positional order = {{1}},{{2}},…) ──
+  const VARS_PER_EVENT: Record<string, string[]> = {
+    booking_submitted:      [],
+    booking_approved:       ["Name","BookingID","PackageContent","Amount","Paymenturllink"],
+    payment_received:       ["Name","BookingID","Invoice","Amount"],
+    pending_payment:        ["Name","BookingID","PackageContent","Amount","Paymenturllink"],
+    invoice_ready:          ["Name","BookingID","Invoice","Amount","Paymenturllink"],
+    agreement_ready:        ["Name","BookingID","Agreement","Download"],
+    agreement_signed:       ["Name","Agreement"],
+    visa_issued:            ["Name","BookingID","Visano","Download"],
+    ticket_issued:          ["Name","BookingID","Flightnumber","Download"],
+    flight_reminder:        ["Name","BookingID","PackageContent","Flightnumber","Departuredate","Reportingtime","Airport"],
+    return_flight_reminder: ["Name","BookingID","Flightnumber","Departuredate","Reportingtime","Airport"],
+    departure_reminder:     ["Name","BookingID","Departuredate","Reportingtime","T2"],
+    room_allocation:        ["Name","BookingID","Hotel","Roomnumber"],
+    group_orientation:      ["Name","date","Time","Hussainhall"],
+    welcome_saudi:          ["Name"],
+    arrival_india:          ["Name"],
+    hajj_mubarak:           ["Name"],
+    hajj_package_launch:    ["Name","2027"],
+  };
+
+  const SAMPLE: Record<string, string> = {
+    Name: "Mohammed Altaf", BookingID: "ABT26582778",
+    PackageContent: "Ramadan Umrah Full Month Package", Amount: "1,89,000",
+    Invoice: "INV-26582778",
+    Paymenturllink: "https://alburhantravels.com/invoice/ABT26582778",
+    Agreement: "AGR-26582778", Download: "https://alburhantravels.com/agreement/ABT26582778",
+    Visano: "SA-VIS-12345", Flightnumber: "IX-141",
+    Departuredate: "2027-01-15", Reportingtime: "04:00 AM",
+    Airport: "CSIA Terminal 2, Mumbai", T2: "CSIA Terminal 2, Mumbai",
+    Hotel: "Al Massa Hotel, Makkah", Roomnumber: "305",
+    date: "2026-12-01", Time: "10:00 AM",
+    Hussainhall: "Al Burhan Office, Bhopal", "2027": "2027",
+  };
+
+  const renderBody = (body: string, keys: string[]) => {
+    let r = body;
+    r = r.replace(/\{\{(\d+)\}\}/g, (_m, n) => {
+      const idx = parseInt(n, 10) - 1;
+      return (idx >= 0 && idx < keys.length) ? (SAMPLE[keys[idx]] ?? `[${keys[idx]}]`) : _m;
+    });
+    for (const k of keys) r = r.split(`#!${k}!#`).join(SAMPLE[k] ?? `[${k}]`);
+    return r;
+  };
+
+  const report: any[] = [];
+
+  for (const [event, cfg] of Object.entries(ABT_TEMPLATES)) {
+    const { id, name: cfgName } = cfg;
+    const varKeys = VARS_PER_EVENT[event] || [];
+
+    if (!id) {
+      report.push({ event, templateName: cfgName, templateId: null,
+        metaStatus: "N/A", bodyCheck: "SKIP — no template configured",
+        templateBodyFromBotBee: null, variablesSent: varKeys,
+        renderedPreview: null, unsubstitutedAfterRender: "N/A",
+        variableMapFromBotBee: null, variableMapCheck: "N/A" });
+      continue;
+    }
+
+    const live = byId[id] || byName[cfgName];
+    if (!live) {
+      report.push({ event, templateName: cfgName, templateId: id,
+        metaStatus: "NOT FOUND IN BOTBEE LIVE LIST",
+        bodyCheck: "❌ ERROR — not in BotBee response",
+        templateBodyFromBotBee: null, variablesSent: varKeys,
+        renderedPreview: null, unsubstitutedAfterRender: "UNKNOWN",
+        variableMapFromBotBee: null, variableMapCheck: "UNKNOWN" });
+      continue;
+    }
+
+    const bodyContent: string = live.body_content || "";
+    let vmap: Record<string, string> = {};
+    try {
+      const raw = live.variable_map || "{}";
+      const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+      vmap = parsed.body || parsed;
+    } catch {}
+
+    const hasMetaVars  = /\{\{\d+\}\}/.test(bodyContent);
+    const hasLegacyVars = /#![^!]+!#/.test(bodyContent);
+
+    let bodyCheck: string;
+    if (hasMetaVars && !hasLegacyVars)   bodyCheck = "✅ Meta {{N}} format — correct";
+    else if (hasLegacyVars)              bodyCheck = "❌ Still has #!VarName!# — old format";
+    else if (!bodyContent.trim())        bodyCheck = "⚠️ Body empty";
+    else                                 bodyCheck = "⚠️ No variable slots found";
+
+    // Verify variable_map positions match our keys order
+    const mapIssues: string[] = [];
+    for (const [pos, crmVar] of Object.entries(vmap)) {
+      const expectedKey = String(crmVar).replace(/^#!|!#$/g, "");
+      const idx = parseInt(pos, 10) - 1;
+      const ourKey = varKeys[idx];
+      if (ourKey !== expectedKey)
+        mapIssues.push(`pos={{${pos}}}: BotBee expects "${expectedKey}", we send "${ourKey ?? "(none)"}"`);
+    }
+
+    // Local TEMPLATE_BODIES entry (what the server currently uses for text-path rendering)
+    const localBody = (TEMPLATE_BODIES as Record<string,string>)[id] || bodyContent;
+    const bodiesMatch = bodyContent.replace(/\r\n/g, "\n") === localBody.replace(/\r\n/g, "\n");
+
+    const rendered = renderBody(localBody, varKeys);
+    const unsubstituted = [...rendered.matchAll(/\{\{\d+\}\}|#![^!]+!#/g)].map(m => m[0]);
+
+    report.push({
+      event,
+      templateName: live.template_name,
+      templateId: String(live.id),
+      botbeeIdInCode: id,
+      idMatch: String(live.id) === String(id) ? "✅ MATCH" : `❌ MISMATCH code=${id} BotBee=${live.id}`,
+      metaStatus: live.status || "?",
+      bodyCheck,
+      hasMetaVars,
+      hasLegacyVars,
+      bodiesMatch: bodiesMatch ? "✅ Local body = BotBee body_content" : "⚠️ Local body differs from BotBee body_content",
+      variableMapFromBotBee: vmap,
+      variableMapCheck: mapIssues.length > 0 ? mapIssues : "✅ All positions match",
+      variablesSent: varKeys,
+      templateBodyFromBotBee: bodyContent,
+      renderedPreview: rendered,
+      unsubstitutedAfterRender: unsubstituted.length > 0 ? unsubstituted : "NONE ✅",
+    });
+  }
+
+  const passing = report.filter(r => r.bodyCheck?.startsWith("✅") && r.unsubstitutedAfterRender === "NONE ✅");
+  const failing  = report.filter(r => !r.bodyCheck?.startsWith("✅") || r.unsubstitutedAfterRender !== "NONE ✅");
+  const skipped  = report.filter(r => r.bodyCheck === "SKIP — no template configured");
+
+  res.json({
+    generatedAt: new Date().toISOString(),
+    source: "Live BotBee API",
+    botbeeTemplateLiveCount: botbeeTemplates.length,
+    totalEvents: report.length,
+    passing: passing.length,
+    failing: failing.length,
+    skipped: skipped.length,
+    report,
+  });
+});
+
 // POST /api/migrate/e2e-verify — comprehensive end-to-end production verification
 app.post("/api/migrate/e2e-verify", async (req, res) => {
   const key = (req.query.key || req.body?.key) as string;

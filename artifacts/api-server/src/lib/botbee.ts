@@ -160,7 +160,7 @@ export async function sendText(
 // FALLBACK PATH (outside 24h window): BotBee template API receives variables as flat positional
 // array (Object.values(namedVars)) so BotBee maps index 0→{{1}}, index 1→{{2}} correctly on Meta.
 // variable_map.body (BotBee): {"1":"#!Name!#","2":"#!BookingID!#",...} — insertion order matches sender function variable order.
-const TEMPLATE_BODIES: Record<string, string> = {
+export const TEMPLATE_BODIES: Record<string, string> = {
   "409950": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {{1}}\nAlhamdulillah! ✅\n\nYour booking has been APPROVED.\n\n📋 Booking ID: {{2}}\n📦 Package: {{3}}\n💰 Amount: ₹ {{4}}\n\nPlease complete your payment using the link below.\n\n🔗 {{5}}\n\n📞 +91 9893225590\n\nJazak Allah Khair.\nAl Burhan Tours & Travels",
   "409953": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {{1}}\n\nAlhamdulillah! 🎉\n\nWe have successfully received your payment.\n\n📋 Booking ID:{{2}}\n🧾 Invoice No: {{3}}\n💰 Amount Received: ₹ {{4}}\n\nYour booking is confirmed.\n\nJazak Allah Khair.\n\nAl Burhan Tours & Travels",
   "409956": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {{1}}\n\nYour invoice has been generated.\n\n📋 Booking ID:{{2}}\n🧾 Invoice No:{{3}}\n💰 Amount: ₹ {{4}}\nDownload your invoice below.\n\n🔗 {{5}}\n\nThank you for choosing Al Burhan Tours & Travels.",
