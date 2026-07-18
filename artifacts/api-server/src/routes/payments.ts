@@ -1263,14 +1263,19 @@ window.onload = function() {
 
 router.post("/verify-public", async (req, res) => {
   const { razorpay_order_id, razorpay_payment_id, razorpay_signature, bookingId } = req.body;
+  const logPfx = "[verify-public]";
+
+  console.log(`${logPfx} ▶ bookingId=${bookingId} orderId=${razorpay_order_id?.slice(-8)} paymentId=${razorpay_payment_id?.slice(-8)}`);
 
   if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !bookingId) {
+    console.error(`${logPfx} ❌ Missing fields — orderId:${!!razorpay_order_id} paymentId:${!!razorpay_payment_id} sig:${!!razorpay_signature} bookingId:${!!bookingId}`);
     res.status(400).json({ success: false, message: "Missing required fields" });
     return;
   }
 
   const secret = process.env.RAZORPAY_SECRET;
   if (!secret) {
+    console.error(`${logPfx} ❌ RAZORPAY_SECRET not configured`);
     res.status(500).json({ success: false, message: "Payment gateway not configured" });
     return;
   }
@@ -1279,27 +1284,32 @@ router.post("/verify-public", async (req, res) => {
   const booking = existingBookings[0];
 
   if (!booking) {
+    console.error(`${logPfx} ❌ Booking not found: ${bookingId}`);
     res.status(404).json({ success: false, message: "Booking not found" });
     return;
   }
 
+  console.log(`${logPfx} Booking: ${booking.bookingNumber} | status=${booking.status} | paid=${booking.paidAmount}/${booking.finalAmount}`);
+
+  // Idempotency: already confirmed with same payment
   if (
     booking.status === "confirmed" &&
     booking.razorpayOrderId === razorpay_order_id &&
     booking.razorpayPaymentId === razorpay_payment_id
   ) {
+    console.log(`${logPfx} ✅ Already confirmed (idempotent): ${booking.bookingNumber}`);
     res.json({ success: true, status: "confirmed", idempotent: true });
     return;
   }
 
   if (booking.status !== "approved" && booking.status !== "partially_paid") {
-    console.error("[verify-public] Booking status not payable:", booking.status, "bookingId:", bookingId);
+    console.error(`${logPfx} ❌ Not payable status: ${booking.status} for ${booking.bookingNumber}`);
     res.status(400).json({ success: false, message: "This booking is not in a payable state" });
     return;
   }
 
   if (booking.razorpayOrderId !== razorpay_order_id) {
-    console.error("[verify-public] Order ID mismatch — booking:", booking.razorpayOrderId, "request:", razorpay_order_id);
+    console.error(`${logPfx} ❌ Order ID mismatch — booking: ${booking.razorpayOrderId} | request: ${razorpay_order_id}`);
     res.status(400).json({ success: false, message: "Order ID does not match this booking" });
     return;
   }
@@ -1310,9 +1320,12 @@ router.post("/verify-public", async (req, res) => {
     .digest("hex");
 
   if (generated !== razorpay_signature) {
+    console.error(`${logPfx} ❌ Signature mismatch for payment: ${razorpay_payment_id}`);
     res.status(400).json({ success: false, message: "Invalid payment signature" });
     return;
   }
+
+  console.log(`${logPfx} ✅ Signature verified for ${booking.bookingNumber}`);
 
   const finalAmount = Number(booking.finalAmount ?? 0);
   const existingPaid = Number(booking.paidAmount ?? 0);
@@ -1323,23 +1336,102 @@ router.post("/verify-public", async (req, res) => {
     const payment = await rzp.payments.fetch(razorpay_payment_id) as any;
     if (payment.amount && payment.order_id === razorpay_order_id) {
       chargeAmount = Number(payment.amount) / 100;
+      console.log(`${logPfx} Razorpay confirmed charge: ₹${chargeAmount}`);
     }
-  } catch {}
+  } catch (fetchErr: any) {
+    console.warn(`${logPfx} Could not fetch Razorpay payment (using calculated ₹${chargeAmount}): ${fetchErr?.message}`);
+  }
 
   const newPaidAmount = existingPaid + chargeAmount;
   const newOnlinePaidAmount = Number(booking.onlinePaidAmount ?? 0) + chargeAmount;
-  const remainingBalance = finalAmount - newPaidAmount;
-  const newStatus = remainingBalance <= 0 ? "confirmed" : "partially_paid";
+  const remainingBalance = Math.max(0, finalAmount - newPaidAmount);
+  const isFullyPaid = remainingBalance <= 0;
+  const newStatus = isFullyPaid ? "confirmed" : "partially_paid";
+  const invoiceNumber = isFullyPaid
+    ? (booking.invoiceNumber || `INV${Date.now().toString().slice(-8)}`)
+    : booking.invoiceNumber;
 
-  await db.update(bookingsTable).set({
+  console.log(`${logPfx} ₹${chargeAmount} paid | total ₹${newPaidAmount}/${finalAmount} | isFullyPaid=${isFullyPaid} | newStatus=${newStatus}`);
+
+  const [updated] = await db.update(bookingsTable).set({
     status: newStatus,
     razorpayPaymentId: razorpay_payment_id,
     paidAmount: String(newPaidAmount),
     onlinePaidAmount: String(newOnlinePaidAmount),
+    invoiceNumber: invoiceNumber ?? undefined,
     updatedAt: new Date(),
-  }).where(eq(bookingsTable.id, bookingId));
+  }).where(eq(bookingsTable.id, bookingId)).returning();
 
-  res.json({ success: true, status: newStatus });
+  console.log(`${logPfx} ✅ DB updated: ${updated.bookingNumber} → ${newStatus}`);
+
+  const siteBase = process.env.SITE_URL || "https://alburhantravels.com";
+  const invoiceUrl = invoiceNumber ? `${siteBase}/invoice/${booking.bookingNumber}` : null;
+
+  // Respond immediately — customer sees success without waiting for pipeline
+  res.json({
+    success: true,
+    status: newStatus,
+    isFullyPaid,
+    invoiceUrl,
+    invoiceNumber: invoiceNumber || null,
+    booking: {
+      id: updated.id,
+      bookingNumber: updated.bookingNumber,
+      status: newStatus,
+      paidAmount: newPaidAmount,
+      remainingBalance,
+    },
+  });
+
+  // ── Full post-payment pipeline (fire-and-forget after response) ─────────────
+  // Runs the same pipeline as /verify: invoice upsert, journey_status advance,
+  // PDF generation, WhatsApp/SMS/Email, agreement auto-generation, audit logs.
+  (async () => {
+    try {
+      console.log(`${logPfx} ▶ [PIPELINE] Starting post-payment pipeline for ${updated.bookingNumber}`);
+
+      // Step 1: Upsert invoice record in DB
+      let finalInvoiceNumber = invoiceNumber;
+      try {
+        const upserted = await upsertInvoiceForBooking(bookingId);
+        if (upserted?.invoice_number) {
+          finalInvoiceNumber = upserted.invoice_number as string;
+          await pool.query(
+            `UPDATE bookings SET invoice_number=$1, updated_at=NOW() WHERE id=$2 AND (invoice_number IS NULL OR invoice_number='')`,
+            [finalInvoiceNumber, bookingId]
+          );
+          console.log(`${logPfx} ✅ [PIPELINE] Invoice upserted: ${finalInvoiceNumber}`);
+        }
+      } catch (invErr: any) {
+        console.error(`${logPfx} ❌ [PIPELINE] upsertInvoice failed:`, invErr?.message);
+      }
+
+      // Step 2: Advance journey_status to payment_received
+      pool.query(
+        `UPDATE bookings SET journey_status = 'payment_received', updated_at = NOW()
+         WHERE id = $1
+           AND journey_status IN ('booking_requested','documents_pending','documents_received','admin_verification','payment_pending')`,
+        [bookingId]
+      ).then(() => console.log(`${logPfx} ✅ [PIPELINE] journey_status → payment_received`))
+       .catch((err: any) => console.error(`${logPfx} ❌ [PIPELINE] journey_status advance failed:`, err?.message));
+
+      // Step 3: Full notification pipeline — PDFs, WhatsApp, SMS, Email, notification_logs
+      console.log(`${logPfx} ▶ [PIPELINE] Calling processPaymentSuccessNotifications (isFullyPaid=${isFullyPaid})`);
+      await processPaymentSuccessNotifications({
+        booking: updated,
+        isFullyPaid,
+        thisPaymentAmount: chargeAmount,
+        newPaidAmount,
+        remainingBalance,
+        invoiceNumber: finalInvoiceNumber,
+        paymentRef: razorpay_payment_id,
+      });
+
+      console.log(`${logPfx} ✅ [PIPELINE] Complete for ${updated.bookingNumber} — invoice=${finalInvoiceNumber} status=${newStatus}`);
+    } catch (pipelineErr: any) {
+      console.error(`${logPfx} ❌ [PIPELINE] Failed for ${booking.bookingNumber}:`, pipelineErr?.message, pipelineErr?.stack);
+    }
+  })();
 });
 
 router.post("/:bookingId/send-reminder", requireAdmin as any, async (req: AuthenticatedRequest, res) => {

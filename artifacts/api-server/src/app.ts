@@ -2815,6 +2815,250 @@ app.post("/api/migrate/retrigger-payment", async (req, res) => {
   res.json({ ok: true, booking: bookingNumber, steps });
 });
 
+// POST /api/migrate/payment-pipeline-e2e — simulate a full payment through verify-public pipeline
+// Creates real booking, runs the EXACT processPaymentSuccessNotifications + autoGenerateAgreement path,
+// returns a step-by-step trace, then cleans up. Proves the pipeline without needing real Razorpay.
+app.post("/api/migrate/payment-pipeline-e2e", async (req, res) => {
+  const key = req.body?.key as string;
+  if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
+
+  const customerName = (req.body?.name as string) || "Payment Pipeline Test";
+  const customerMobile = (req.body?.phone as string) || "9893225590";
+  const finalAmount = Number(req.body?.amount || 50000);
+
+  const { pool: ePool } = await import("@workspace/db");
+  const trace: any[] = [];
+  const ts = () => new Date().toISOString();
+  let bookingId: string | null = null;
+
+  const t = (step: string, data: any) => trace.push({ step, ts: ts(), ...data });
+
+  try {
+    // ── Step 1: Create test booking ─────────────────────────────────────────────
+    const bookingNumber = `PIPTEST${Date.now().toString().slice(-7)}`;
+    const bId = crypto.randomUUID();
+    bookingId = bId;
+    await ePool.query(
+      `INSERT INTO bookings
+         (id, booking_number, customer_name, customer_mobile, customer_email, package_name,
+          number_of_pilgrims, total_amount, final_amount, paid_amount, status, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,1,$7,$7,0,'approved',NOW(),NOW())`,
+      [bId, bookingNumber, customerName, customerMobile, "test@alburhantravels.com",
+       "Economy Umrah Package", String(finalAmount)]
+    );
+    t("booking_created", { booking_id: bId, booking_number: bookingNumber, final_amount: finalAmount, status: "approved" });
+
+    // ── Step 2: Simulate full Razorpay payment (update booking exactly as verify-public does) ──
+    const fakePaymentId = `pay_TEST_${Date.now()}`;
+    const fakeOrderId = `order_TEST_${Date.now()}`;
+    const newPaidAmount = finalAmount;
+    await ePool.query(
+      `UPDATE bookings SET status='confirmed', razorpay_payment_id=$1, razorpay_order_id=$2,
+              paid_amount=$3, online_paid_amount=$3, invoice_number=NULL, updated_at=NOW()
+       WHERE id=$4`,
+      [fakePaymentId, fakeOrderId, String(newPaidAmount), bId]
+    );
+    t("booking_payment_confirmed", { fake_payment_id: fakePaymentId, new_status: "confirmed", new_paid: newPaidAmount });
+
+    // ── Step 3: Call upsertInvoiceForBooking ────────────────────────────────────
+    let invoiceNumber: string | null = null;
+    try {
+      const { upsertInvoiceForBooking } = await import("./routes/invoices.js");
+      const inv = await upsertInvoiceForBooking(bId);
+      invoiceNumber = inv?.invoice_number as string || null;
+      t("invoice_upserted", { invoice_number: invoiceNumber, ok: !!invoiceNumber });
+    } catch (err: any) { t("invoice_upserted", { ok: false, error: err?.message }); }
+
+    // ── Step 4: Advance journey_status ─────────────────────────────────────────
+    await ePool.query(
+      `UPDATE bookings SET journey_status='payment_received', updated_at=NOW()
+       WHERE id=$1 AND (journey_status IS NULL OR journey_status IN ('booking_requested','payment_pending'))`,
+      [bId]
+    );
+    t("journey_status_advanced", { journey_status: "payment_received" });
+
+    // ── Step 5: Call processPaymentSuccessNotifications ─────────────────────────
+    const startNotif = Date.now();
+    try {
+      const { processPaymentSuccessNotifications } = await import("./routes/payments.js");
+      await processPaymentSuccessNotifications({
+        booking: {
+          id: bId, bookingNumber, customerName, customerMobile,
+          customerEmail: "test@alburhantravels.com",
+          packageName: "Economy Umrah Package",
+          finalAmount: String(finalAmount),
+        },
+        isFullyPaid: true,
+        thisPaymentAmount: finalAmount,
+        newPaidAmount,
+        remainingBalance: 0,
+        invoiceNumber,
+        paymentRef: fakePaymentId,
+      });
+      t("processPaymentSuccessNotifications", { ok: true, elapsed_ms: Date.now() - startNotif });
+    } catch (err: any) {
+      t("processPaymentSuccessNotifications", { ok: false, error: err?.message, elapsed_ms: Date.now() - startNotif });
+    }
+
+    // ── Step 6: Verify autoGenerateAgreement was triggered ─────────────────────
+    await new Promise(r => setTimeout(r, 2000)); // let fire-and-forget settle
+    const agRes = await ePool.query(
+      `SELECT id, agreement_number, status, verification_token FROM agreements WHERE booking_id=$1`, [bId]
+    );
+    t("agreement_check", {
+      found: agRes.rows.length > 0,
+      agreement_number: agRes.rows[0]?.agreement_number || null,
+      status: agRes.rows[0]?.status || null,
+      token_set: !!agRes.rows[0]?.verification_token,
+    });
+
+    // ── Step 7: Check notification_logs ────────────────────────────────────────
+    const nlRes = await ePool.query(
+      `SELECT channel, event_type, status, wamid, template, http_status
+       FROM notification_logs WHERE booking_id=$1 ORDER BY sent_at DESC LIMIT 15`, [bId]
+    );
+    t("notification_logs", { count: nlRes.rows.length, logs: nlRes.rows });
+
+    // ── Step 8: Check workflow_logs ─────────────────────────────────────────────
+    const wlRes = await ePool.query(
+      `SELECT trigger_type, status, execution_time_ms, error_message
+       FROM workflow_logs WHERE booking_id=$1 ORDER BY created_at DESC LIMIT 10`, [bId]
+    );
+    t("workflow_logs", { count: wlRes.rows.length, logs: wlRes.rows });
+
+    // ── Step 9: Verify final invoice PDF status ─────────────────────────────────
+    const invFinal = await ePool.query(
+      `SELECT invoice_number, invoice_status, paid, balance, has_pdf
+       FROM (SELECT invoice_number, invoice_status, paid, balance, pdf_path IS NOT NULL AS has_pdf FROM invoices WHERE booking_id=$1) x`, [bId]
+    );
+    t("invoice_final", { rows: invFinal.rows });
+
+    // ── Cleanup ─────────────────────────────────────────────────────────────────
+    await ePool.query(`DELETE FROM notification_logs WHERE booking_id=$1`, [bId]);
+    await ePool.query(`DELETE FROM workflow_logs WHERE booking_id=$1`, [bId]);
+    await ePool.query(`DELETE FROM agreement_audit_logs WHERE agreement_id IN (SELECT id FROM agreements WHERE booking_id=$1)`, [bId]);
+    await ePool.query(`DELETE FROM agreements WHERE booking_id=$1`, [bId]);
+    await ePool.query(`DELETE FROM invoices WHERE booking_id=$1`, [bId]);
+    await ePool.query(`DELETE FROM bookings WHERE id=$1`, [bId]);
+    t("cleanup", { booking_id: bId, cleaned: true });
+
+    // ── Summary ─────────────────────────────────────────────────────────────────
+    const notifSent = nlRes.rows.filter((r: any) => r.status === "sent");
+    const waNotif = notifSent.find((r: any) => r.channel === "whatsapp");
+    const wfCompleted = wlRes.rows.filter((r: any) => r.status === "completed");
+
+    res.json({
+      ok: true,
+      trace,
+      summary: {
+        booking_number: bookingNumber,
+        invoice_created: !!invoiceNumber,
+        invoice_number: invoiceNumber,
+        agreement_created: agRes.rows.length > 0,
+        agreement_number: agRes.rows[0]?.agreement_number || null,
+        notifications_sent: notifSent.length,
+        whatsapp_sent: !!waNotif,
+        whatsapp_wamid: waNotif?.wamid || null,
+        whatsapp_template: waNotif?.template || null,
+        workflows_completed: wfCompleted.length,
+        pipeline_status: (!!invoiceNumber && wfCompleted.length > 0 && notifSent.length > 0) ? "✅ FULLY FUNCTIONAL" : "⚠️ PARTIAL — check trace for details",
+      },
+    });
+  } catch (err: any) {
+    // Emergency cleanup
+    if (bookingId) {
+      try {
+        await ePool.query(`DELETE FROM notification_logs WHERE booking_id=$1`, [bookingId]);
+        await ePool.query(`DELETE FROM workflow_logs WHERE booking_id=$1`, [bookingId]);
+        await ePool.query(`DELETE FROM agreements WHERE booking_id=$1`, [bookingId]);
+        await ePool.query(`DELETE FROM invoices WHERE booking_id=$1`, [bookingId]);
+        await ePool.query(`DELETE FROM bookings WHERE id=$1`, [bookingId]);
+      } catch {}
+    }
+    res.status(500).json({ ok: false, error: err?.message, stack: err?.stack?.slice(0, 600), trace });
+  }
+});
+
+// POST /api/migrate/payment-pipeline-diag — full payment pipeline diagnostic for any booking
+app.post("/api/migrate/payment-pipeline-diag", async (req, res) => {
+  const key = req.body?.key as string;
+  if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
+  const bookingNumber = req.body?.booking as string;
+  if (!bookingNumber) return void res.status(400).json({ error: "booking required" });
+
+  const { pool: dPool } = await import("@workspace/db");
+  const report: Record<string, any> = { booking: bookingNumber, ts: new Date().toISOString(), steps: [] };
+  const step = (name: string, data: any) => { report.steps.push({ step: name, ...data }); };
+
+  try {
+    // 1. Booking row
+    const bRes = await dPool.query(
+      `SELECT id, booking_number, status, journey_status, customer_name, customer_mobile, customer_email,
+              final_amount, paid_amount, online_paid_amount, invoice_number, package_name,
+              razorpay_order_id, razorpay_payment_id, created_at, updated_at
+       FROM bookings WHERE booking_number=$1 AND (is_deleted IS NULL OR is_deleted=false)`, [bookingNumber]
+    );
+    const b = bRes.rows[0];
+    if (!b) { res.status(404).json({ error: "Booking not found", booking: bookingNumber }); return; }
+    const isFullyPaid = Number(b.paid_amount) >= Number(b.final_amount) && Number(b.final_amount) > 0;
+    step("booking", {
+      id: b.id, status: b.status, journey_status: b.journey_status,
+      customer_name: b.customer_name, customer_mobile: b.customer_mobile ? b.customer_mobile.slice(-4).padStart(b.customer_mobile.length, "*") : null,
+      paid: `${b.paid_amount}/${b.final_amount}`, isFullyPaid,
+      invoice_number: b.invoice_number, razorpay_order_id: b.razorpay_order_id, razorpay_payment_id: b.razorpay_payment_id,
+      updated_at: b.updated_at,
+    });
+
+    // 2. Invoices
+    const invRes = await dPool.query(
+      `SELECT id, invoice_number, invoice_status, total, paid, balance, pdf_path, created_at FROM invoices WHERE booking_id=$1`, [b.id]
+    );
+    step("invoices", { count: invRes.rows.length, rows: invRes.rows.map(r => ({ invoice_number: r.invoice_number, status: r.invoice_status, total: r.total, paid: r.paid, has_pdf: !!r.pdf_path })) });
+
+    // 3. Agreements
+    const agRes = await dPool.query(
+      `SELECT id, agreement_number, status, verification_token, signed_at, created_at FROM agreements WHERE booking_id=$1 AND status NOT IN ('cancelled')`, [b.id]
+    );
+    step("agreements", { count: agRes.rows.length, rows: agRes.rows.map(r => ({ agreement_number: r.agreement_number, status: r.status, signed: !!r.signed_at, token_set: !!r.verification_token })) });
+
+    // 4. Payment notifications (last 10)
+    const nlRes = await dPool.query(
+      `SELECT channel, event_type, status, sent_at, wamid, template, http_status, error_code
+       FROM notification_logs WHERE booking_id=$1 AND event_type IN ('payment_received','partial_payment_received','partial_payment','agreement_generated')
+       ORDER BY sent_at DESC LIMIT 10`, [b.id]
+    );
+    step("payment_notifications", { count: nlRes.rows.length, logs: nlRes.rows });
+
+    // 5. Workflow logs
+    const wlRes = await dPool.query(
+      `SELECT trigger_type, status, execution_time_ms, error_message, created_at
+       FROM workflow_logs WHERE booking_id=$1 AND trigger_type IN ('payment_received','partial_payment_received','agreement_generated')
+       ORDER BY created_at DESC LIMIT 10`, [b.id]
+    );
+    step("workflow_logs", { count: wlRes.rows.length, logs: wlRes.rows });
+
+    // 6. All notification logs count
+    const allNlRes = await dPool.query(
+      `SELECT event_type, channel, status, COUNT(*) AS cnt FROM notification_logs WHERE booking_id=$1 GROUP BY event_type, channel, status ORDER BY event_type, channel`, [b.id]
+    );
+    step("all_notifications_summary", { groups: allNlRes.rows });
+
+    // 7. Diagnosis
+    const issues: string[] = [];
+    if (b.status !== "confirmed" && isFullyPaid) issues.push("CRITICAL: paid_amount >= final_amount but status is NOT confirmed");
+    if (invRes.rows.length === 0) issues.push("MISSING: No invoice record for this booking");
+    if (agRes.rows.length === 0 && isFullyPaid) issues.push("MISSING: No agreement record (expected since fully paid)");
+    if (!b.customer_mobile) issues.push("WARNING: customer_mobile is null — WhatsApp notifications will fail");
+    if (nlRes.rows.filter((r: any) => r.status === "sent" && r.channel === "whatsapp").length === 0 && Number(b.paid_amount) > 0) issues.push("WARNING: No payment WhatsApp notification sent");
+    if (wlRes.rows.filter((r: any) => r.status === "completed").length === 0 && Number(b.paid_amount) > 0) issues.push("WARNING: No completed payment workflow log");
+    report.issues = issues;
+    report.diagnosis = issues.length === 0 ? "Pipeline appears healthy" : `${issues.length} issue(s) detected`;
+    res.json(report);
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message, stack: err?.stack?.slice(0, 500) });
+  }
+});
+
 // GET /api/migrate/dump.sql — serves DB dump (if file exists)
 app.get("/api/migrate/dump.sql", (req, res) => {
   const key = req.query.key as string;

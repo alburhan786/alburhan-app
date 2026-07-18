@@ -260,13 +260,15 @@ export async function autoGenerateAgreement(bookingId: string): Promise<void> {
 
     // Notify customer via WhatsApp — agreement_ready template (fire-and-forget)
     const signingUrl = `https://alburhantravels.com/sign-agreement/${verificationToken}`;
+    const notifyMobile = booking.customer_mobile || booking.whatsapp_number || booking.mobile_india;
+    console.log(`[Agreement] Triggering agreement_generated workflow for ${booking.booking_number} | mobile=${notifyMobile ? notifyMobile.slice(-4).padStart(notifyMobile.length, "*") : "MISSING"}`);
     triggerWorkflow("agreement_generated", {
       customerName: booking.customer_name || booking.customer_name_user,
-      customerMobile: booking.mobile_india,
+      customerMobile: notifyMobile,
       bookingNumber: booking.booking_number,
       packageName: booking.package_name,
       agreementUrl: signingUrl,
-    }, booking.id, booking.customer_id).catch(e => console.error("[Agreement] auto-notify failed:", e));
+    }).catch(e => console.error("[Agreement] auto-notify failed:", e));
   } catch (err) {
     console.error("[Agreement] autoGenerateAgreement error:", err);
   }
