@@ -33,6 +33,85 @@ const MANDATORY_DOCS = [
 
 const BASE_API = import.meta.env.VITE_API_URL || "";
 
+// ── Weather + Currency Widget ───────────────────────────────────────────────────
+function WeatherCurrencyWidget() {
+  const [weather, setWeather] = useState<{ temp: number; code: number; wind: number } | null>(null);
+  const [rate, setRate] = useState<number | null>(null);
+
+  useEffect(() => {
+    // Makkah coordinates: lat=21.3891, lon=39.8579
+    fetch("https://api.open-meteo.com/v1/forecast?latitude=21.3891&longitude=39.8579&current=temperature_2m,weather_code,wind_speed_10m&timezone=auto")
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d?.current) {
+          setWeather({ temp: Math.round(d.current.temperature_2m), code: d.current.weather_code, wind: Math.round(d.current.wind_speed_10m) });
+        }
+      })
+      .catch(() => {});
+
+    // SAR to INR via frankfurter.app (free, no key)
+    fetch("https://api.frankfurter.app/latest?from=SAR&to=INR")
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.rates?.INR) setRate(Number(d.rates.INR.toFixed(2))); })
+      .catch(() => {});
+  }, []);
+
+  function weatherEmoji(code: number) {
+    if (code === 0) return "☀️";
+    if (code <= 3) return "🌤️";
+    if (code <= 49) return "🌫️";
+    if (code <= 69) return "🌧️";
+    if (code <= 79) return "🌨️";
+    if (code <= 99) return "⛈️";
+    return "🌡️";
+  }
+
+  return (
+    <div className="rounded-2xl border border-border bg-gradient-to-br from-sky-50 to-background overflow-hidden">
+      {/* Makkah Weather */}
+      <div className="px-4 py-3 border-b border-border/60">
+        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">🕌 Makkah Weather</p>
+        {weather ? (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">{weatherEmoji(weather.code)}</span>
+              <div>
+                <p className="text-xl font-bold font-mono leading-none">{weather.temp}°C</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Wind {weather.wind} km/h</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] text-muted-foreground">Saudi Arabia</p>
+              <p className="text-xs font-semibold text-sky-700">Live</p>
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">Loading…</p>
+        )}
+      </div>
+
+      {/* SAR → INR Rate */}
+      <div className="px-4 py-3">
+        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">💱 Currency Rate</p>
+        {rate ? (
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-bold">1 SAR = <span className="text-primary font-mono">₹{rate}</span></p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">Saudi Riyal → Indian Rupee</p>
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] text-muted-foreground">Via Frankfurter</p>
+              <p className="text-xs font-semibold text-emerald-700">Live</p>
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">Loading…</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Departure Countdown Card ────────────────────────────────────────────────────
 function DepartureCountdownCard({ departureDate, bookingId }: { departureDate?: string; bookingId: string }) {
   const [countdown, setCountdown] = useState<{ days: number; hours: number; minutes: number; seconds: number } | null>(null);
@@ -2648,6 +2727,8 @@ export default function CustomerDashboard() {
                 </Card>
               );
             })()}
+
+            <WeatherCurrencyWidget />
 
             <Card className="p-5 shadow-sm border-border/50 rounded-2xl bg-accent/10">
               <h4 className="font-semibold text-sm text-primary mb-3">Need Help?</h4>

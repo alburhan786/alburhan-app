@@ -521,6 +521,67 @@ router.get("/reports/pending-visas", requireAdmin as any, async (_req: Authentic
   }
 });
 
+// ── Business Intelligence ─────────────────────────────────────────────────────
+router.get("/bi", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
+  try {
+    const [monthlyRes, statusRes, packageRes, stateRes, cityRes, summaryRes] = await Promise.all([
+      pool.query(`
+        SELECT
+          TO_CHAR(created_at, 'Mon YY') AS month,
+          TO_CHAR(created_at, 'YYYY-MM') AS sort_key,
+          COUNT(*)::int AS bookings,
+          COUNT(*) FILTER (WHERE status = 'confirmed')::int AS confirmed,
+          COALESCE(SUM(CASE WHEN status = 'confirmed'
+            THEN NULLIF(TRIM(final_amount::text),'')::numeric ELSE 0 END), 0)::float AS revenue
+        FROM bookings
+        WHERE created_at >= NOW() - INTERVAL '12 months'
+        GROUP BY month, sort_key
+        ORDER BY sort_key
+      `),
+      pool.query(`SELECT status::text AS status, COUNT(*)::int AS count FROM bookings GROUP BY status ORDER BY count DESC`),
+      pool.query(`
+        SELECT
+          COALESCE(package_name, 'Unknown') AS package,
+          COUNT(*)::int AS bookings,
+          COALESCE(SUM(CASE WHEN status='confirmed' THEN NULLIF(TRIM(final_amount::text),'')::numeric ELSE 0 END),0)::float AS revenue
+        FROM bookings
+        WHERE package_name IS NOT NULL AND package_name != ''
+        GROUP BY package_name
+        ORDER BY bookings DESC
+        LIMIT 10
+      `),
+      pool.query(`
+        SELECT COALESCE(state,'Unknown') AS state, COUNT(*)::int AS customers
+        FROM users WHERE role='customer' AND state IS NOT NULL AND state != ''
+        GROUP BY state ORDER BY customers DESC LIMIT 10
+      `),
+      pool.query(`
+        SELECT COALESCE(city,'Unknown') AS city, COUNT(*)::int AS customers
+        FROM users WHERE role='customer' AND city IS NOT NULL AND city != ''
+        GROUP BY city ORDER BY customers DESC LIMIT 10
+      `),
+      pool.query(`
+        SELECT
+          (SELECT COUNT(*)::int FROM bookings WHERE status='confirmed' AND NULLIF(TRIM(final_amount::text),'')::numeric > 0) AS total_bookings,
+          (SELECT COALESCE(SUM(NULLIF(TRIM(final_amount::text),'')::numeric),0)::float FROM bookings WHERE status='confirmed') AS total_revenue,
+          (SELECT COUNT(*)::int FROM users WHERE role='customer') AS total_customers,
+          (SELECT COUNT(*)::int FROM packages) AS total_packages
+      `),
+    ]);
+
+    res.json({
+      revenueByMonth: monthlyRes.rows.map((r: any) => ({ month: r.month, bookings: r.bookings, revenue: r.revenue })),
+      bookingsByStatus: statusRes.rows,
+      packagePopularity: packageRes.rows,
+      customersByState: stateRes.rows,
+      customersByCity: cityRes.rows,
+      summary: summaryRes.rows[0] || {},
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 function generateBookingNumber(): string {
   const now = new Date();
   const yy = now.getFullYear().toString().slice(-2);

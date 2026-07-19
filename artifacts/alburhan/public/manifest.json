@@ -1,0 +1,25 @@
+{
+  "name": "Al Burhan Tours & Travels",
+  "short_name": "Al Burhan",
+  "description": "Hajj & Umrah Management — Booking, Visa, Documents & Journey Tracker",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#0B3D2E",
+  "lang": "en-IN",
+  "categories": ["travel", "business"],
+  "icons": [
+    { "src": "/images/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/images/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/opengraph.jpg", "sizes": "1200x630", "type": "image/jpeg" }
+  ],
+  "screenshots": [
+    { "src": "/opengraph.jpg", "sizes": "1200x630", "type": "image/jpeg", "form_factor": "wide" }
+  ],
+  "shortcuts": [
+    { "name": "My Dashboard", "url": "/customer/dashboard", "description": "View your booking status" },
+    { "name": "Support", "url": "/customer/support", "description": "Contact support" }
+  ]
+}

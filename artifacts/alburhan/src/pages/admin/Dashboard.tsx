@@ -64,6 +64,9 @@ const MODULE_CARDS = [
   { icon: TrendingUp, label: "Super Dashboard", desc: "Live KPIs, notifications & alerts", href: "/admin/super", color: "bg-rose-50 text-rose-700", border: "border-rose-200" },
   { icon: BarChart2, label: "Pilgrim Reports", desc: "Export pilgrim, visa & flight lists", href: "/admin/pilgrim-reports", color: "bg-teal-50 text-teal-700", border: "border-teal-200" },
   { icon: MessageSquare, label: "Support Center", desc: "Customer support tickets", href: "/admin/support", color: "bg-blue-50 text-blue-700", border: "border-blue-200" },
+  { icon: PieChart, label: "Business Intelligence", desc: "Revenue & booking analytics charts", href: "/admin/bi", color: "bg-violet-50 text-violet-700", border: "border-violet-200" },
+  { icon: CheckCircle, label: "Certificates", desc: "Generate Hajj & Umrah certificates", href: "/admin/certificates", color: "bg-amber-50 text-amber-700", border: "border-amber-200" },
+  { icon: UsersRound, label: "Guide Panel", desc: "Group pilgrim list & attendance", href: "/admin/guide-panel", color: "bg-emerald-50 text-emerald-700", border: "border-emerald-200" },
 ];
 
 function getStatusBadge(status: string) {

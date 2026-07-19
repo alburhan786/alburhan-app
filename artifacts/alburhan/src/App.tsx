@@ -23,6 +23,9 @@ import SupportCenter from "@/pages/customer/SupportCenter";
 import SupportManager from "@/pages/admin/SupportManager";
 import SuperDashboard from "@/pages/admin/SuperDashboard";
 import PilgrimReports from "@/pages/admin/PilgrimReports";
+import BusinessIntelligence from "@/pages/admin/BusinessIntelligence";
+import CertificateCenter from "@/pages/admin/CertificateCenter";
+import GuidePanel from "@/pages/admin/GuidePanel";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import PackagesManager from "@/pages/admin/PackagesManager";
 import BookingsManager from "@/pages/admin/BookingsManager";
@@ -249,6 +252,9 @@ function Router() {
       <Route path="/admin/support" component={() => <AdminRoute component={SupportManager} />} />
       <Route path="/admin/super" component={() => <AdminRoute component={SuperDashboard} />} />
       <Route path="/admin/pilgrim-reports" component={() => <AdminRoute component={PilgrimReports} />} />
+      <Route path="/admin/bi" component={() => <AdminRoute component={BusinessIntelligence} />} />
+      <Route path="/admin/certificates" component={() => <AdminRoute component={CertificateCenter} />} />
+      <Route path="/admin/guide-panel" component={() => <AdminRoute component={GuidePanel} />} />
       <Route path="/admin/agreements" component={() => <AdminRoute component={AgreementCenter} />} />
       <Route path="/admin/audit-logs" component={() => <AdminRoute component={AuditLogs} />} />
       <Route path="/admin/system-health" component={() => <AdminRoute component={SystemHealth} />} />
