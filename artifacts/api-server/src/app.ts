@@ -71,6 +71,30 @@ app.use(session({
   },
 }));
 
+// ── DEV-ONLY auto-login for screenshot testing ────────────────────────────────
+// Only active in Replit dev environment (REPLIT_DEV_DOMAIN is set).
+// GET /dev-login?key=dev-screenshot-2026&next=/admin/dashboard
+if (process.env.NODE_ENV !== 'production') {
+  app.get("/api/dev-login", async (req: any, res: any) => {
+    if (req.query.key !== "dev-screenshot-2026") return res.status(403).send("Forbidden");
+    const role = (req.query.role as string) || "admin";
+    const next = (req.query.next as string) || (role === "customer" ? "/customer/dashboard" : "/admin/dashboard");
+    try {
+      const { pool } = await import("@workspace/db");
+      const r = await pool.query(
+        `SELECT id, name, mobile, email, role FROM users WHERE role=$1 ORDER BY created_at LIMIT 1`,
+        [role]
+      );
+      if (r.rows.length) {
+        const u = r.rows[0];
+        req.session.user = { id: u.id, name: u.name, mobile: u.mobile, email: u.email || "", role: u.role };
+        await new Promise<void>((resolve, reject) => req.session.save((err: any) => err ? reject(err) : resolve()));
+      }
+    } catch (e) { /* ignore */ }
+    res.redirect(next);
+  });
+}
+
 // ── Migration / diagnostic routes (key-protected, no session required) ────────
 // MUST be registered BEFORE app.use("/api", router) so they work in production
 // mode where the router's catch-all 404 handler would otherwise intercept them.
