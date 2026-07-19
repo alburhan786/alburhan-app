@@ -17,7 +17,8 @@ export interface AuthenticatedRequest extends Request {
 export async function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   // Idempotent — skip DB lookup if already resolved (e.g. when used as router.use + per-route middleware)
   if (req.user) { next(); return; }
-  const userId = (req.session as any)?.userId;
+  // Support both session.userId (OTP login) and session.user.id (dev-login / legacy)
+  const userId = (req.session as any)?.userId || (req.session as any)?.user?.id;
   if (!userId) {
     res.status(401).json({ message: "Unauthorized. Please login first." });
     return;

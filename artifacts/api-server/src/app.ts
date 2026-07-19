@@ -72,13 +72,14 @@ app.use(session({
 }));
 
 // ── DEV-ONLY auto-login for screenshot testing ────────────────────────────────
-// Only active in Replit dev environment (REPLIT_DEV_DOMAIN is set).
-// GET /dev-login?key=dev-screenshot-2026&next=/admin/dashboard
+// Uses localStorage injection so session cookie cross-domain issues don't block Playwright.
+// GET /api/dev-login?key=dev-screenshot-2026&next=/admin/dashboard
 if (process.env.NODE_ENV !== 'production') {
   app.get("/api/dev-login", async (req: any, res: any) => {
     if (req.query.key !== "dev-screenshot-2026") return res.status(403).send("Forbidden");
     const role = (req.query.role as string) || "admin";
     const next = (req.query.next as string) || (role === "customer" ? "/customer/dashboard" : "/admin/dashboard");
+    let userJson = "null";
     try {
       const { pool } = await import("@workspace/db");
       const r = await pool.query(
@@ -87,11 +88,23 @@ if (process.env.NODE_ENV !== 'production') {
       );
       if (r.rows.length) {
         const u = r.rows[0];
+        // Also set session cookie as before (belt-and-suspenders)
         req.session.user = { id: u.id, name: u.name, mobile: u.mobile, email: u.email || "", role: u.role };
+        (req.session as any).userId = u.id;
         await new Promise<void>((resolve, reject) => req.session.save((err: any) => err ? reject(err) : resolve()));
+        userJson = JSON.stringify({ id: u.id, name: u.name, mobile: u.mobile, email: u.email || "", role: u.role });
       }
     } catch (e) { /* ignore */ }
-    res.redirect(next);
+    // Return HTML that stores user in localStorage AND sets a plain cookie, then redirects.
+    // The plain cookie (__dev_auth__) is readable by the API middleware for data calls.
+    const escaped = next.replace(/['"<>]/g, "");
+    const encoded = encodeURIComponent(userJson);
+    res.setHeader("Content-Type", "text/html");
+    res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"></head><body><script>
+try { localStorage.setItem('__dev_user__', ${JSON.stringify(userJson)}); } catch(e){}
+document.cookie = '__dev_auth__=' + ${JSON.stringify(encoded)} + '; path=/; SameSite=Lax; max-age=3600';
+window.location.replace(${JSON.stringify(escaped)});
+</script><noscript>Redirecting...</noscript></body></html>`);
   });
 }
 

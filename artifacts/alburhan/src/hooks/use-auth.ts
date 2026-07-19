@@ -5,17 +5,37 @@ import { useToast } from "@/hooks/use-toast";
 
 const BASE_URL = import.meta.env.BASE_URL ?? "/";
 
+// DEV-ONLY: Read localStorage token injected by /api/dev-login for Playwright testing.
+// Never runs in production (import.meta.env.DEV is false in prod builds).
+function getDevUser(): User | null {
+  if (!import.meta.env.DEV) return null;
+  try {
+    const raw = localStorage.getItem("__dev_user__");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && parsed.id && parsed.role) return parsed as User;
+  } catch { /* ignore */ }
+  return null;
+}
+
 export function useAuth() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const { data: user, isLoading, error } = useGetMe({
+  const devUser = getDevUser();
+
+  const { data: apiUser, isLoading, error } = useGetMe({
     query: {
       retry: false,
       staleTime: 1000 * 60 * 5,
+      // If dev-login injected a user, skip the API call entirely
+      enabled: !devUser,
+      initialData: devUser || undefined,
     } as any
   });
+
+  const user = devUser || apiUser;
 
   const sendOtpMutation = useSendOtp();
 
@@ -53,6 +73,8 @@ export function useAuth() {
   const logoutMutation = useLogout({
     mutation: {
       onSuccess: () => {
+        // Clear dev token on logout too
+        try { localStorage.removeItem("__dev_user__"); } catch { /* ignore */ }
         queryClient.setQueryData(['/api/auth/me'], null);
         queryClient.clear();
         setLocation("/");
@@ -84,7 +106,7 @@ export function useAuth() {
 
   return {
     user: user as User | undefined,
-    isLoading,
+    isLoading: devUser ? false : isLoading,
     isAuthenticated: !!user,
     isAdmin: user?.role === 'admin',
     sendOtp: sendOtpMutation.mutateAsync,
