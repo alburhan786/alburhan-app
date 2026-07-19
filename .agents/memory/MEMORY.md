@@ -53,3 +53,4 @@
 - [ZIP download with archiver](zip-download-archiver.md) — archiver pkg installed; GET /api/documents/zip/:bookingId streams ZIP; dynamic import("archiver") at request time (not top-level); archiver must stay external to bundle
 - [Portal login roles](portal-login-roles.md) — branch_manager/agent/staff roles; OTP assigns role from cross-table lookup; portal at /api/portal/*
 - [Bundle external deps VPS crash](bundle-external-deps-crash.md) — any new npm package must be added to allowlist in build.ts; VPS has no node_modules, external require = PM2 crash loop; prefer Node built-ins (crypto/util) over new packages
+- [Branch/Agent portal features](portal-features.md) — bookings use customer_id (not user_id); portal.ts fully owns all portal routes; agent doc upload uses uploaded_by='admin'
