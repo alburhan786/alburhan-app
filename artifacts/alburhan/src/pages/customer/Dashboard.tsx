@@ -222,7 +222,7 @@ function MyAgreementsSection({
                       style={{ background: "#059669" }}
                       onClick={() => window.open(BASE + "agreement/" + ag.id + "/sign", "_blank")}
                     >
-                      <Eye className="w-3.5 h-3.5 mr-1.5" /> View Agreement
+                      <Eye className="w-3.5 h-3.5 mr-1.5" /> View Signed Agreement
                     </Button>
                   )}
                   <Button
@@ -2445,7 +2445,7 @@ export default function CustomerDashboard() {
                                   style={{ background: "#059669" }}
                                   onClick={() => window.open((import.meta.env.BASE_URL || "/") + "agreement/" + ag.id + "/sign", "_blank")}
                                 >
-                                  <Eye className="w-3.5 h-3.5 mr-1" /> View Agreement
+                                  <Eye className="w-3.5 h-3.5 mr-1" /> View Signed Agreement
                                 </Button>
                               )}
                               <Button
