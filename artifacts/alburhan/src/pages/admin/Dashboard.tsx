@@ -14,7 +14,7 @@ import {
   IndianRupee, Users, Package as PackageIcon, Clock, Send, FileText,
   CheckCircle, XCircle, ScanLine, Printer, ClipboardPlus, BarChart2,
   BookOpen, UsersRound, MessageSquare, ImageIcon, Wallet, TrendingUp,
-  ShieldCheck, Megaphone, PieChart, Bell, Plane
+  ShieldCheck, Megaphone, PieChart, Bell, Plane, ListTodo, UserPlus, Building2
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -67,6 +67,10 @@ const MODULE_CARDS = [
   { icon: PieChart, label: "Business Intelligence", desc: "Revenue & booking analytics charts", href: "/admin/bi", color: "bg-violet-50 text-violet-700", border: "border-violet-200" },
   { icon: CheckCircle, label: "Certificates", desc: "Generate Hajj & Umrah certificates", href: "/admin/certificates", color: "bg-amber-50 text-amber-700", border: "border-amber-200" },
   { icon: UsersRound, label: "Guide Panel", desc: "Group pilgrim list & attendance", href: "/admin/guide-panel", color: "bg-emerald-50 text-emerald-700", border: "border-emerald-200" },
+  { icon: ListTodo, label: "Task Manager", desc: "Assign & track team tasks", href: "/admin/tasks", color: "bg-violet-50 text-violet-700", border: "border-violet-200" },
+  { icon: Megaphone, label: "Marketing Center", desc: "Segment campaigns via WhatsApp & SMS", href: "/admin/marketing", color: "bg-rose-50 text-rose-700", border: "border-rose-200" },
+  { icon: UserPlus, label: "Lead Manager", desc: "Enquiries, follow-ups & conversions", href: "/admin/leads", color: "bg-sky-50 text-sky-700", border: "border-sky-200" },
+  { icon: Building2, label: "Supplier Manager", desc: "Hotels, airlines, transport & visas", href: "/admin/suppliers", color: "bg-amber-50 text-amber-700", border: "border-amber-200" },
 ];
 
 function getStatusBadge(status: string) {

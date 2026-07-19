@@ -1881,6 +1881,95 @@ async function runMigrations() {
       }
     }
   } catch (err) { console.error("[Migration] SMTP auto-config failed:", err); }
+
+  // ── Enterprise: tasks, marketing_campaigns, leads, suppliers ─────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS tasks (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        description TEXT,
+        priority TEXT NOT NULL DEFAULT 'medium',
+        status TEXT NOT NULL DEFAULT 'pending',
+        assigned_to TEXT,
+        assigned_name TEXT,
+        due_date DATE,
+        category TEXT DEFAULT 'general',
+        booking_id TEXT,
+        created_by TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        completed_at TIMESTAMPTZ
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS tasks_status_idx ON tasks(status)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS tasks_due_idx ON tasks(due_date)`);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS marketing_campaigns (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        message TEXT NOT NULL,
+        channel TEXT NOT NULL,
+        segment TEXT NOT NULL,
+        subject TEXT,
+        status TEXT NOT NULL DEFAULT 'draft',
+        total_recipients INT DEFAULT 0,
+        sent_count INT DEFAULT 0,
+        failed_count INT DEFAULT 0,
+        created_by TEXT,
+        sent_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS leads (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        mobile TEXT,
+        email TEXT,
+        source TEXT DEFAULT 'website',
+        status TEXT DEFAULT 'new',
+        message TEXT,
+        package_interest TEXT,
+        budget TEXT,
+        assigned_to TEXT,
+        assigned_name TEXT,
+        follow_up_date DATE,
+        notes TEXT,
+        conversion_booking_id TEXT,
+        converted_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS leads_status_idx ON leads(status)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS leads_source_idx ON leads(source)`);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS suppliers (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL,
+        contact_name TEXT,
+        contact_mobile TEXT,
+        contact_email TEXT,
+        address TEXT,
+        city TEXT,
+        country TEXT,
+        gst_number TEXT,
+        payment_terms TEXT,
+        notes TEXT,
+        contract_expiry DATE,
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS suppliers_type_idx ON suppliers(type)`);
+    console.log("[Migration] Enterprise tables (tasks, marketing_campaigns, leads, suppliers) ensured");
+  } catch (err) { console.error("[Migration] Enterprise tables failed:", err); }
 }
 
 const rawPort = process.env["PORT"];

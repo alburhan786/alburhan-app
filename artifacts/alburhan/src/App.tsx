@@ -26,6 +26,10 @@ import PilgrimReports from "@/pages/admin/PilgrimReports";
 import BusinessIntelligence from "@/pages/admin/BusinessIntelligence";
 import CertificateCenter from "@/pages/admin/CertificateCenter";
 import GuidePanel from "@/pages/admin/GuidePanel";
+import TaskManager from "@/pages/admin/TaskManager";
+import MarketingCenter from "@/pages/admin/MarketingCenter";
+import LeadManager from "@/pages/admin/LeadManager";
+import SupplierManager from "@/pages/admin/SupplierManager";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import PackagesManager from "@/pages/admin/PackagesManager";
 import BookingsManager from "@/pages/admin/BookingsManager";
@@ -255,6 +259,10 @@ function Router() {
       <Route path="/admin/bi" component={() => <AdminRoute component={BusinessIntelligence} />} />
       <Route path="/admin/certificates" component={() => <AdminRoute component={CertificateCenter} />} />
       <Route path="/admin/guide-panel" component={() => <AdminRoute component={GuidePanel} />} />
+      <Route path="/admin/tasks" component={() => <AdminRoute component={TaskManager} />} />
+      <Route path="/admin/marketing" component={() => <AdminRoute component={MarketingCenter} />} />
+      <Route path="/admin/leads" component={() => <AdminRoute component={LeadManager} />} />
+      <Route path="/admin/suppliers" component={() => <AdminRoute component={SupplierManager} />} />
       <Route path="/admin/agreements" component={() => <AdminRoute component={AgreementCenter} />} />
       <Route path="/admin/audit-logs" component={() => <AdminRoute component={AuditLogs} />} />
       <Route path="/admin/system-health" component={() => <AdminRoute component={SystemHealth} />} />
