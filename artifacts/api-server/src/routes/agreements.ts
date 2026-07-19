@@ -82,7 +82,7 @@ const RICH_SELECT = `
          b.booking_number, b.customer_name, b.customer_mobile, b.customer_email,
          b.package_name, b.final_amount, b.paid_amount, b.number_of_pilgrims,
          b.created_at AS booking_date, b.status AS booking_status,
-         hg.group_name, hg.group_number, hg.departure_date, hg.return_date,
+         hg.group_name, hg.departure_date, hg.return_date,
          u.name AS user_name, u.email AS user_email,
          u.blood_group, u.emergency_contact_name, u.emergency_contact_mobile,
          cp.passport_number, cp.date_of_birth, cp.gender,
@@ -382,37 +382,100 @@ router.get("/my", requireAuth, async (req: any, res) => {
 
 // ── CUSTOMER: Get agreement detail ────────────────────────────────────────────
 router.get("/my/:id", requireAuth, async (req: any, res) => {
+  const { id } = req.params;
+  const customerId = req.user?.id;
+  console.log(`[Agreement/my/:id] ▶ id=${id} customer_id=${customerId}`);
   try {
-    const { id } = req.params;
-    const agRes = await pool.query(
-      RICH_SELECT + `WHERE a.id = $1 AND a.customer_id = $2`, [id, req.user.id]
+    let agRes = await pool.query(
+      RICH_SELECT + `WHERE a.id = $1 AND a.customer_id = $2`, [id, customerId]
     );
-    if (!agRes.rows.length) return res.status(404).json({ error: "Not found" });
+
+    // ── Auto-regenerate: if not found, try to find / create for this customer's booking ──
+    if (!agRes.rows.length) {
+      console.warn(`[Agreement/my/:id] ⚠ Not found by id=${id} customer=${customerId} — checking for confirmed booking…`);
+
+      // Try: maybe id is actually a booking_id (defensive)
+      const byBooking = await pool.query(
+        RICH_SELECT + `WHERE (a.booking_id = $1 OR b.booking_number = $1) AND a.customer_id = $2
+                       AND a.status != 'cancelled' ORDER BY a.created_at DESC LIMIT 1`,
+        [id, customerId]
+      );
+      if (byBooking.rows.length) {
+        agRes = byBooking;
+        console.log(`[Agreement/my/:id] ✅ Found via booking_id fallback — agreement=${agRes.rows[0].agreement_number}`);
+      } else {
+        // Auto-regenerate: find a confirmed booking for this customer that has no active agreement
+        const bRes = await pool.query(
+          `SELECT b.id AS booking_id FROM bookings b
+           WHERE b.customer_id = $1 AND b.status = 'confirmed'
+             AND NOT EXISTS (
+               SELECT 1 FROM agreements a2
+               WHERE a2.booking_id = b.id AND a2.status != 'cancelled'
+             )
+           ORDER BY b.created_at DESC LIMIT 1`,
+          [customerId]
+        );
+        if (bRes.rows.length) {
+          const missingBookingId = bRes.rows[0].booking_id;
+          console.log(`[Agreement/my/:id] 🔄 Auto-generating missing agreement for booking=${missingBookingId}`);
+          await autoGenerateAgreement(missingBookingId);
+          // Re-query (use customer's latest agreement after generation)
+          agRes = await pool.query(
+            RICH_SELECT + `WHERE a.customer_id = $1 AND a.status != 'cancelled'
+                           ORDER BY a.created_at DESC LIMIT 1`,
+            [customerId]
+          );
+        }
+        if (!agRes.rows.length) {
+          console.warn(`[Agreement/my/:id] ❌ No agreement found or generated for customer=${customerId}`);
+          return res.status(404).json({
+            error: "Agreement not found",
+            detail: "No active agreement exists for your booking. Please contact support if this persists.",
+          });
+        }
+      }
+    }
+
     const ag = agRes.rows[0];
+    console.log(`[Agreement/my/:id] ✅ Returning agreement=${ag.agreement_number} status=${ag.status} booking=${ag.booking_number} token=${ag.verification_token?.slice(0, 8)}… mobile=${ag.customer_mobile}`);
     ag.verificationUrl = `${getSiteBase()}/verify-agreement/${ag.verification_token || ag.agreement_number}`;
     ag.clauses = CONSENT_CATEGORIES.map(c => ({ id: c.id, title: c.title, body: c.body }));
     res.json(ag);
-  } catch (err) {
-    console.error("[Agreement] My detail error:", err);
-    res.status(500).json({ error: "Failed to load agreement" });
+  } catch (err: any) {
+    console.error("[Agreement/my/:id] ❌ Error:", err?.message, "\n", err?.stack?.slice(0, 600));
+    res.status(500).json({ error: "Failed to load agreement", detail: err?.message });
   }
 });
 
 // ── CUSTOMER: Request OTP ─────────────────────────────────────────────────────
 router.post("/my/:id/request-otp", requireAuth, async (req: any, res) => {
+  const { id } = req.params;
+  const customerId = req.user?.id;
+  console.log(`[Agreement/OTP] ▶ request-otp agreement_id=${id} customer_id=${customerId}`);
   try {
-    const { id } = req.params;
     const agRes = await pool.query(
-      `SELECT a.*, b.customer_name, b.customer_mobile
+      `SELECT a.id, a.agreement_number, a.booking_id, a.status, a.verification_token,
+              b.customer_name, b.customer_mobile, b.booking_number
        FROM agreements a LEFT JOIN bookings b ON b.id = a.booking_id
-       WHERE a.id = $1 AND a.customer_id = $2`, [id, req.user.id]
+       WHERE a.id = $1 AND a.customer_id = $2`, [id, customerId]
     );
-    if (!agRes.rows.length) return res.status(404).json({ error: "Agreement not found" });
+    if (!agRes.rows.length) {
+      console.warn(`[Agreement/OTP] ❌ Not found — agreement_id=${id} customer_id=${customerId}`);
+      return res.status(404).json({ error: "Agreement not found" });
+    }
     const ag = agRes.rows[0];
-    if (ag.status === "signed") return res.status(400).json({ error: "Agreement already signed" });
+    console.log(`[Agreement/OTP] agreement=${ag.agreement_number} booking=${ag.booking_number} status=${ag.status} booking_id=${ag.booking_id} token=${ag.verification_token?.slice(0, 8)}…`);
+
+    if (ag.status === "signed") {
+      console.log(`[Agreement/OTP] Already signed — no OTP needed`);
+      return res.status(400).json({ error: "Agreement already signed" });
+    }
 
     const mobile = ag.customer_mobile || req.user.mobile;
-    if (!mobile) return res.status(400).json({ error: "No mobile number on record" });
+    if (!mobile) {
+      console.warn(`[Agreement/OTP] ❌ No mobile number — customer_name=${ag.customer_name}`);
+      return res.status(400).json({ error: "No mobile number on record" });
+    }
 
     const otp    = String(Math.floor(100000 + Math.random() * 900000));
     const expiry = new Date(Date.now() + 5 * 60 * 1000);
@@ -421,30 +484,48 @@ router.post("/my/:id/request-otp", requireAuth, async (req: any, res) => {
       `UPDATE agreements SET signing_otp=$1, signing_otp_expires_at=$2, updated_at=NOW() WHERE id=$3`,
       [otp, expiry, id]
     );
-    await sendOtpSMS(mobile, otp);
-    await logAgreementAudit(id, "otp_requested", { mobile: mobile.slice(-4).padStart(mobile.length, "*") }, getClientIp(req), req.headers["user-agent"]);
+    console.log(`[Agreement/OTP] OTP stored in DB — sending SMS to mobile=***${mobile.slice(-4)} expiry=${expiry.toISOString()}`);
+
+    const smsOk = await sendOtpSMS(mobile, otp);
+    console.log(`[Agreement/OTP] SMS result: ${smsOk ? "✅ sent" : "⚠ failed"} | agreement=${ag.agreement_number} booking=${ag.booking_number}`);
+
+    await logAgreementAudit(id, "otp_requested", {
+      mobile: mobile.slice(-4).padStart(mobile.length, "*"),
+      sms_sent: smsOk,
+      agreement_id: id,
+      booking_id: ag.booking_id,
+      verification_token: ag.verification_token,
+    }, getClientIp(req), req.headers["user-agent"] as string);
+
     res.json({ ok: true, message: "OTP sent to your registered mobile number" });
-  } catch (err) {
-    console.error("[Agreement] OTP request error:", err);
+  } catch (err: any) {
+    console.error("[Agreement/OTP] ❌ Error:", err?.message, err?.stack?.slice(0, 400));
     res.status(500).json({ error: "Failed to send OTP" });
   }
 });
 
 // ── CUSTOMER: Sign agreement ──────────────────────────────────────────────────
 router.post("/my/:id/sign", requireAuth, async (req: any, res) => {
+  const { id } = req.params;
+  const customerId = req.user?.id;
+  console.log(`[Agreement/Sign] ▶ sign agreement_id=${id} customer_id=${customerId}`);
   try {
-    const { id } = req.params;
     const { otp, signatureData, termsAccepted } = req.body;
 
     if (!otp || !signatureData || !termsAccepted) {
+      console.warn(`[Agreement/Sign] ❌ Missing fields — otp=${!!otp} sig=${!!signatureData} terms=${!!termsAccepted}`);
       return res.status(400).json({ error: "OTP, signature, and terms acceptance required" });
     }
 
     const agRes = await pool.query(
-      RICH_SELECT + `WHERE a.id = $1 AND a.customer_id = $2`, [id, req.user.id]
+      RICH_SELECT + `WHERE a.id = $1 AND a.customer_id = $2`, [id, customerId]
     );
-    if (!agRes.rows.length) return res.status(404).json({ error: "Not found" });
+    if (!agRes.rows.length) {
+      console.warn(`[Agreement/Sign] ❌ Not found — agreement_id=${id} customer_id=${customerId}`);
+      return res.status(404).json({ error: "Not found" });
+    }
     const ag = agRes.rows[0];
+    console.log(`[Agreement/Sign] agreement=${ag.agreement_number} booking=${ag.booking_number} booking_id=${ag.booking_id} status=${ag.status} mobile=${ag.customer_mobile} token=${ag.verification_token?.slice(0, 8)}…`);
 
     if (ag.status === "signed") return res.status(400).json({ error: "Already signed" });
     if (!ag.signing_otp || ag.signing_otp !== String(otp)) return res.status(400).json({ error: "Invalid OTP" });
@@ -504,6 +585,7 @@ router.post("/my/:id/sign", requireAuth, async (req: any, res) => {
     }
 
     // Generate PDF
+    console.log(`[Agreement/Sign] 📄 Generating PDF — agreement=${ag.agreement_number} booking=${ag.booking_number}`);
     let pdfBuffer: Buffer | null = null;
     try {
       pdfBuffer = await generateAgreementPdfBuffer(buildPdfOpts(ag, siteBase, {
@@ -519,10 +601,14 @@ router.post("/my/:id/sign", requireAuth, async (req: any, res) => {
       }));
       await pool.query(`UPDATE agreements SET pdf_generated=true, updated_at=NOW() WHERE id=$1`, [id]);
       await logAgreementAudit(id, "pdf_generated", { size: pdfBuffer.length }, ip, userAgent);
-    } catch (pdfErr) { console.error("[Agreement] PDF generation failed:", pdfErr); }
+      console.log(`[Agreement/Sign] ✅ PDF generated — ${Math.round(pdfBuffer.length / 1024)} KB`);
+    } catch (pdfErr: any) {
+      console.error("[Agreement/Sign] ❌ PDF generation failed:", pdfErr?.message, pdfErr?.stack?.slice(0, 300));
+    }
 
     // Email
     const emailAddr = ag.customer_email || ag.user_email;
+    console.log(`[Agreement/Sign] 📧 Email step — to=${emailAddr || "MISSING"} pdf=${!!pdfBuffer}`);
     if (emailAddr && pdfBuffer) {
       try {
         const htmlBody = `<p>As-salamu Alaykum <strong>${ag.customer_name || "Valued Customer"}</strong>,</p><p>Alhumdulillah! Your Hajj Agreement has been signed successfully.</p><p><strong>Agreement ID:</strong> ${ag.agreement_number}<br/><strong>Booking ID:</strong> ${ag.booking_number}</p><p>Please find your signed agreement attached. Verify at: <a href="${verificationUrl}">${verificationUrl}</a></p><p>May Allah accept your Hajj. Ameen.<br/>— Al Burhan Tours & Travels</p>`;
@@ -531,24 +617,32 @@ router.post("/my/:id/sign", requireAuth, async (req: any, res) => {
           [{ filename: `Agreement-${ag.agreement_number}.pdf`, content: pdfBuffer, contentType: "application/pdf" }]
         );
         await logAgreementAudit(id, "email_sent", { to: emailAddr });
-      } catch (e) { console.error("[Agreement] Email send failed:", e); }
+        console.log(`[Agreement/Sign] ✅ Email sent to ${emailAddr}`);
+      } catch (e: any) {
+        console.error("[Agreement/Sign] ❌ Email send failed:", e?.message);
+      }
     }
 
     // WhatsApp
+    console.log(`[Agreement/Sign] 📱 WhatsApp step — mobile=${ag.customer_mobile || "MISSING"} pdf=${!!pdfBuffer}`);
     try {
       if (ag.customer_mobile) {
         await sendPDFDocument(ag.customer_mobile, pdfBuffer, `Agreement-${ag.agreement_number}.pdf`,
           `As-salamu Alaykum ${ag.customer_name}! Your Hajj Agreement (${ag.agreement_number}) has been signed. Booking: ${ag.booking_number}. Verify: ${verificationUrl}`
         );
         await logAgreementAudit(id, "whatsapp_sent", { mobile: ag.customer_mobile.slice(-4).padStart(ag.customer_mobile.length, "*") });
+        console.log(`[Agreement/Sign] ✅ WhatsApp PDF sent to ***${ag.customer_mobile.slice(-4)}`);
       }
-    } catch (e) { console.error("[Agreement] WhatsApp send failed:", e); }
+    } catch (e: any) {
+      console.error("[Agreement/Sign] ❌ WhatsApp send failed:", e?.message);
+    }
 
+    console.log(`[Agreement/Sign] ✅ COMPLETE — agreement=${ag.agreement_number} booking=${ag.booking_number} pdf=${!!pdfBuffer}`);
     const payload: any = { ok: true, agreementNumber: ag.agreement_number, message: "Agreement signed successfully." };
     if (pdfBuffer) payload.pdfBase64 = pdfBuffer.toString("base64");
     res.json(payload);
-  } catch (err) {
-    console.error("[Agreement] Sign error:", err);
+  } catch (err: any) {
+    console.error("[Agreement/Sign] ❌ Fatal error:", err?.message, err?.stack?.slice(0, 400));
     res.status(500).json({ error: "Failed to sign agreement" });
   }
 });
