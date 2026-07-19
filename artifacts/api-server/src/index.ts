@@ -1970,6 +1970,23 @@ async function runMigrations() {
     await pool.query(`CREATE INDEX IF NOT EXISTS suppliers_type_idx ON suppliers(type)`);
     console.log("[Migration] Enterprise tables (tasks, marketing_campaigns, leads, suppliers) ensured");
   } catch (err) { console.error("[Migration] Enterprise tables failed:", err); }
+
+  // ── Group live tracking ───────────────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS group_tracking (
+        group_id TEXT PRIMARY KEY,
+        current_city TEXT,
+        current_activity TEXT,
+        next_activity TEXT,
+        notes TEXT,
+        meeting_point TEXT,
+        updated_by TEXT,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    console.log("[Migration] group_tracking table ensured");
+  } catch (err) { console.error("[Migration] group_tracking failed:", err); }
 }
 
 const rawPort = process.env["PORT"];

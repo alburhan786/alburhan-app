@@ -308,4 +308,84 @@ router.delete("/suppliers/:id", requireAdmin as any, async (req: AuthenticatedRe
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
+// ════════════════════════════════════════════════════════════════════
+//  GROUP LIVE TRACKING
+// ════════════════════════════════════════════════════════════════════
+
+router.get("/group-tracking", requireAdmin as any, async (_req, res) => {
+  try {
+    const r = await pool.query("SELECT * FROM group_tracking ORDER BY updated_at DESC");
+    res.json(r.rows);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.get("/group-tracking/:groupId", async (req, res) => {
+  try {
+    const r = await pool.query("SELECT * FROM group_tracking WHERE group_id = $1", [req.params.groupId]);
+    res.json(r.rows[0] || null);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.patch("/group-tracking/:groupId", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { currentCity, currentActivity, nextActivity, notes, meetingPoint } = req.body;
+    const r = await pool.query(
+      `INSERT INTO group_tracking (group_id, current_city, current_activity, next_activity, notes, meeting_point, updated_by, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
+       ON CONFLICT (group_id) DO UPDATE SET
+         current_city = EXCLUDED.current_city,
+         current_activity = EXCLUDED.current_activity,
+         next_activity = EXCLUDED.next_activity,
+         notes = EXCLUDED.notes,
+         meeting_point = EXCLUDED.meeting_point,
+         updated_by = EXCLUDED.updated_by,
+         updated_at = NOW()
+       RETURNING *`,
+      [req.params.groupId, currentCity || null, currentActivity || null,
+       nextActivity || null, notes || null, meetingPoint || null, req.user?.id || null]
+    );
+    res.json(r.rows[0]);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// Public endpoint — customer reads their group status
+router.get("/my-group-status/:bookingId", async (req: AuthenticatedRequest, res) => {
+  try {
+    // Get booking → group_id
+    const bk = await pool.query("SELECT group_id FROM bookings WHERE id = $1", [req.params.bookingId]);
+    if (!bk.rows[0]?.group_id) return void res.json(null);
+    const groupId = bk.rows[0].group_id;
+    const tr = await pool.query("SELECT * FROM group_tracking WHERE group_id = $1", [groupId]);
+    const gr = await pool.query("SELECT group_name, departure_date, return_date FROM hajj_groups WHERE id = $1", [groupId]);
+    res.json({ tracking: tr.rows[0] || null, group: gr.rows[0] || null });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ════════════════════════════════════════════════════════════════════
+//  EMERGENCY SOS
+// ════════════════════════════════════════════════════════════════════
+
+router.post("/sos", async (req: AuthenticatedRequest, res) => {
+  try {
+    const { bookingId, customerName, customerMobile, message } = req.body;
+    if (!bookingId) return void res.status(400).json({ error: "bookingId required" });
+
+    const sosMsg = `🆘 EMERGENCY SOS\nCustomer: ${customerName || "Unknown"}\nMobile: ${customerMobile || "—"}\nBooking: ${bookingId}\nMessage: ${message || "Emergency assistance needed"}\nTime: ${new Date().toLocaleString("en-IN")}`;
+
+    // Get admin mobiles to alert
+    const admins = await pool.query("SELECT mobile FROM users WHERE role IN ('admin','super_admin') AND mobile IS NOT NULL LIMIT 5");
+    await Promise.allSettled(admins.rows.map((a: any) => sendWhatsApp(a.mobile, sosMsg)));
+
+    // Log the SOS
+    try {
+      await pool.query(
+        `INSERT INTO notification_logs (id, channel, recipient, status, message, created_at) VALUES (gen_random_uuid()::text,'whatsapp',$1,'sent',$2,NOW())`,
+        [customerMobile || "sos", `SOS from ${customerName} (${bookingId})`]
+      );
+    } catch {}
+
+    res.json({ ok: true, message: "SOS alert sent to emergency team" });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
 export default router;

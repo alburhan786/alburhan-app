@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { CreditCard, FileText, Download, Clock, Upload, Trash2, CheckCircle, AlertCircle, X, Eye, ShieldAlert, IndianRupee, Plane, Stamp, Hotel, Bus, Printer, Share2, Copy, Bell, BellRing, CheckCheck, Megaphone, ClipboardList, MessageSquare, Send, User, XCircle, Building2, Banknote, RefreshCcw, Syringe, MapPin, Bed, ChevronRight } from "lucide-react";
+import { CreditCard, FileText, Download, Clock, Upload, Trash2, CheckCircle, AlertCircle, X, Eye, ShieldAlert, IndianRupee, Plane, Stamp, Hotel, Bus, Printer, Share2, Copy, Bell, BellRing, CheckCheck, Megaphone, ClipboardList, MessageSquare, Send, User, XCircle, Building2, Banknote, RefreshCcw, Syringe, MapPin, Bed, ChevronRight, AlertTriangle, PhoneCall, Activity } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -2339,6 +2339,108 @@ function BankTransferSection({ booking }: { booking: any }) {
   );
 }
 
+// ── Group Status Card ────────────────────────────────────────────────────────
+const BASE_API_CUST = import.meta.env.VITE_API_URL || "";
+
+function GroupStatusCard({ bookingId }: { bookingId: string }) {
+  const [data, setData] = React.useState<any>(null);
+  const [loading, setLoading] = React.useState(true);
+
+  useEffect(() => {
+    fetch(`${BASE_API_CUST}/api/enterprise/my-group-status/${bookingId}`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setData(d); })
+      .finally(() => setLoading(false));
+  }, [bookingId]);
+
+  if (loading || !data?.tracking) return null;
+  const t = data.tracking;
+  const g = data.group;
+
+  return (
+    <div className="rounded-2xl border border-teal-200 bg-teal-50/50 p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="w-8 h-8 rounded-xl bg-teal-100 flex items-center justify-center"><Activity size={16} className="text-teal-700" /></div>
+        <div>
+          <p className="font-bold text-sm text-teal-800">Live Group Update</p>
+          {g?.group_name && <p className="text-xs text-teal-600">{g.group_name}</p>}
+        </div>
+        <span className="ml-auto flex items-center gap-1 text-xs text-teal-700 font-semibold bg-teal-100 px-2 py-0.5 rounded-lg">
+          <MapPin size={11} /> {t.current_city}
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-2 text-xs">
+        {t.current_activity && (
+          <div className="bg-white/70 rounded-xl px-3 py-2">
+            <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">Now</p>
+            <p className="font-semibold text-sm mt-0.5">{t.current_activity}</p>
+          </div>
+        )}
+        {t.next_activity && (
+          <div className="bg-white/70 rounded-xl px-3 py-2">
+            <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">Next</p>
+            <p className="font-semibold text-sm mt-0.5">{t.next_activity}</p>
+          </div>
+        )}
+        {t.meeting_point && (
+          <div className="bg-white/70 rounded-xl px-3 py-2 col-span-2">
+            <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">Meeting Point</p>
+            <p className="font-semibold text-sm mt-0.5">📍 {t.meeting_point}</p>
+          </div>
+        )}
+      </div>
+      {t.notes && <p className="mt-2 text-xs text-teal-700 bg-teal-100/50 rounded-xl px-3 py-1.5 italic">📢 {t.notes}</p>}
+      {t.updated_at && <p className="mt-1.5 text-[10px] text-muted-foreground">Updated {new Date(t.updated_at).toLocaleString("en-IN")}</p>}
+    </div>
+  );
+}
+
+// ── SOS Emergency Button ─────────────────────────────────────────────────────
+function SOSButton({ bookingId, customerName, customerMobile }: { bookingId: string; customerName?: string; customerMobile?: string }) {
+  const { toast } = useToast();
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  const handleSOS = async () => {
+    if (!confirm("⚠️ This will alert the Al Burhan emergency team immediately. Confirm?")) return;
+    setSending(true);
+    try {
+      const r = await fetch(`${BASE_API_CUST}/api/enterprise/sos`, {
+        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingId, customerName, customerMobile, message: "Customer pressed SOS — needs immediate assistance" }),
+      });
+      if (r.ok) {
+        setSent(true);
+        toast({ title: "🆘 SOS sent! Emergency team has been alerted. Stay calm.", description: "You will be contacted shortly." });
+      } else toast({ title: "Failed to send SOS", variant: "destructive" });
+    } catch { toast({ title: "Error sending SOS", variant: "destructive" }); }
+    setSending(false);
+  };
+
+  if (sent) {
+    return (
+      <div className="rounded-2xl bg-red-50 border-2 border-red-300 p-4 text-center">
+        <p className="text-red-700 font-bold text-sm">🆘 SOS Sent</p>
+        <p className="text-xs text-red-600 mt-1">Emergency team has been alerted. Stay calm and wait for a call.</p>
+      </div>
+    );
+  }
+
+  return (
+    <button onClick={handleSOS} disabled={sending}
+      className="w-full rounded-2xl border-2 border-red-300 bg-red-50 hover:bg-red-100 active:bg-red-200 transition-colors p-4 flex items-center gap-3 group">
+      <div className="w-10 h-10 rounded-xl bg-red-100 group-hover:bg-red-200 flex items-center justify-center flex-shrink-0">
+        {sending ? <RefreshCcw size={18} className="text-red-700 animate-spin" /> : <AlertTriangle size={18} className="text-red-700" />}
+      </div>
+      <div className="text-left">
+        <p className="font-bold text-sm text-red-700">Emergency SOS</p>
+        <p className="text-xs text-red-500">Press to alert Al Burhan emergency team immediately</p>
+      </div>
+      <span className="ml-auto text-red-600 font-bold text-xs">🆘 SOS</span>
+    </button>
+  );
+}
+
 export default function CustomerDashboard() {
   const { user } = useAuth();
   const { data } = useListBookings();
@@ -2888,6 +2990,7 @@ export default function CustomerDashboard() {
                           departureDate={booking.preferredDepartureDate || booking.preferred_departure_date}
                         />
                         <JourneyStatusCard bookingId={booking.id} />
+                        <GroupStatusCard bookingId={booking.id} />
                         <TravelDetailsCard bookingId={booking.id} initialStatus={booking.travellerDetailsStatus || "not_submitted"} />
                         <MandatoryDocumentsCard bookingId={booking.id} onOpenUpload={() => setUploadBookingId(booking.id)} />
                         <TravelDocumentsCard
@@ -2921,6 +3024,25 @@ export default function CustomerDashboard() {
                           </span>
                           <span className="text-xs text-blue-500 font-medium">View →</span>
                         </a>
+
+                        {/* Knowledge Center quick link */}
+                        <a
+                          href={(import.meta.env.BASE_URL || "/") + "knowledge"}
+                          className="flex items-center justify-between w-full px-4 py-3 rounded-2xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 transition-colors group"
+                        >
+                          <span className="flex items-center gap-2.5 text-sm font-semibold text-emerald-700">
+                            <span className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center text-xl group-hover:bg-emerald-200 transition-colors">🕋</span>
+                            Hajj & Umrah Knowledge Center
+                          </span>
+                          <span className="text-xs text-emerald-500 font-medium">Open →</span>
+                        </a>
+
+                        {/* Emergency SOS */}
+                        <SOSButton
+                          bookingId={booking.id}
+                          customerName={booking.customerName || booking.customer_name}
+                          customerMobile={booking.customerMobile || booking.customer_mobile}
+                        />
                       </div>
                     )}
 

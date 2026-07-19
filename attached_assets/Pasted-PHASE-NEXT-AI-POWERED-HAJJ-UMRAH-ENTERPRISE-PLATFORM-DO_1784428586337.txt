@@ -1,0 +1,413 @@
+PHASE NEXT – AI POWERED HAJJ & UMRAH ENTERPRISE PLATFORM (DO NOT BREAK ANY EXISTING FEATURES)
+
+The current production system is stable. Preserve every existing feature, endpoint, database schema, notification workflow, agreement flow, payment flow, reports, and dashboards.
+
+Implement the following new enterprise modules with full backend, frontend, database migrations, APIs, audit logs, permissions, responsive UI, and production deployment.
+
+====================================================
+1. FLIGHT MANAGEMENT CENTER
+====================================================
+
+Create a Flight Management module.
+
+Features:
+• Airline master
+• Flight schedules
+• PNR
+• Ticket numbers
+• Seat allocation
+• Boarding gate
+• Terminal
+• Baggage allowance
+• Airport reporting time
+• Flight delay/cancellation updates
+• Passenger manifests
+
+Automatically notify customers through:
+• WhatsApp
+• SMS
+• Email
+• Customer Dashboard
+
+====================================================
+2. HOTEL & ROOM MANAGEMENT
+====================================================
+
+Create a Hotel Operations Center.
+
+Features:
+• Hotel inventory
+• Room inventory
+• Room allocation
+• Occupancy status
+• Check-in/out
+• Room sharing
+• Building/Floor
+• Distance from Haram
+• Hotel images
+• Hotel contracts
+
+Customers can see hotel details from dashboard.
+
+====================================================
+3. TRANSPORT MANAGEMENT
+====================================================
+
+Manage:
+
+• Airport pickup
+• Airport drop
+• Makkah transport
+• Madinah transport
+• Ziyarat buses
+• Driver assignment
+• Vehicle tracking
+• Pickup timing
+
+Automatically notify pilgrims.
+
+====================================================
+4. GUIDE MANAGEMENT
+====================================================
+
+Each group should have:
+
+Guide
+
+Assistant Guide
+
+Coordinator
+
+Driver
+
+Emergency Contact
+
+Live phone numbers
+
+Customers can directly call or WhatsApp their guide.
+
+====================================================
+5. LIVE GROUP TRACKING
+====================================================
+
+Create group tracking.
+
+Show:
+
+Current city
+
+Current activity
+
+Next activity
+
+Remaining schedule
+
+Prayer schedule
+
+Meeting points
+
+====================================================
+6. SMART PILGRIM PROFILE
+====================================================
+
+Store:
+
+Passport
+
+Visa
+
+Medical
+
+Vaccination
+
+Blood Group
+
+Emergency Contact
+
+Insurance
+
+Mahram
+
+Relationship
+
+Languages
+
+Food Preferences
+
+Wheelchair
+
+Special Assistance
+
+====================================================
+7. DIGITAL ID CARD
+====================================================
+
+Generate QR-based digital ID card.
+
+Include:
+
+Photo
+
+Booking ID
+
+Agreement ID
+
+Passport
+
+Visa
+
+Hotel
+
+Guide
+
+Emergency Contacts
+
+QR Verification
+
+Download PDF
+
+Apple Wallet style design.
+
+====================================================
+8. MOBILE NOTIFICATIONS
+====================================================
+
+Support:
+
+Push Notifications
+
+WhatsApp
+
+SMS
+
+Email
+
+Dashboard
+
+Notification History
+
+Read Status
+
+====================================================
+9. LIVE LOCATION SHARING
+====================================================
+
+Allow pilgrims to share live location with guide during travel.
+
+Emergency SOS button.
+
+====================================================
+10. AI CUSTOMER ASSISTANT
+====================================================
+
+AI should answer:
+
+Booking
+
+Payments
+
+Agreement
+
+Visa
+
+Ticket
+
+Hotel
+
+Flight
+
+Guide
+
+Prayer
+
+Weather
+
+Currency
+
+Frequently Asked Questions
+
+Support Tickets
+
+====================================================
+11. HAJJ & UMRAH KNOWLEDGE CENTER
+====================================================
+
+Include:
+
+Videos
+
+PDF Guides
+
+Duas
+
+Manasik
+
+Maps
+
+Emergency Numbers
+
+Important Instructions
+
+Offline Access
+
+====================================================
+12. CUSTOMER LOYALTY PROGRAM
+====================================================
+
+Reward:
+
+Repeat Umrah
+
+Repeat Hajj
+
+Family Referrals
+
+Agent Referrals
+
+Coupons
+
+Discount Codes
+
+Gift Vouchers
+
+====================================================
+13. ADMIN MOBILE APP
+====================================================
+
+Responsive Admin Dashboard.
+
+Approve bookings.
+
+Upload visas.
+
+Upload tickets.
+
+Assign rooms.
+
+Send notifications.
+
+View reports.
+
+Resolve support tickets.
+
+====================================================
+14. CUSTOMER MOBILE EXPERIENCE
+====================================================
+
+Add:
+
+Home Screen Widgets
+
+Dark Mode
+
+Offline Cache
+
+Quick Login
+
+Biometric Login
+
+Face ID
+
+Fingerprint
+
+====================================================
+15. ENTERPRISE REPORTS
+====================================================
+
+Generate:
+
+Revenue
+
+Bookings
+
+Payments
+
+Visa Status
+
+Hotel Occupancy
+
+Flight Reports
+
+Pilgrim Reports
+
+Guide Reports
+
+Support Reports
+
+Marketing Reports
+
+Excel
+
+CSV
+
+PDF
+
+====================================================
+16. PERFORMANCE
+====================================================
+
+Improve:
+
+Caching
+
+Image Optimization
+
+Database Indexing
+
+API Performance
+
+Lazy Loading
+
+Compression
+
+Security Headers
+
+====================================================
+17. FINAL PRODUCTION TEST
+====================================================
+
+Run a complete end-to-end production verification.
+
+Verify every:
+
+Booking
+
+Payment
+
+Invoice
+
+Agreement
+
+OTP
+
+Digital Signature
+
+Visa
+
+Ticket
+
+Hotel
+
+Transport
+
+Guide
+
+Reports
+
+Support
+
+CRM
+
+Marketing
+
+Notifications
+
+Downloads
+
+APIs
+
+PWA
+
+Security
+
+Generate a deployment report confirming every module is production-ready with zero critical errors.
