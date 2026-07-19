@@ -125,7 +125,14 @@ function Card({ icon, label, value, color }: { icon: React.ReactNode; label: str
 
 export default function AgentPortal() {
   const { user, logout } = useAuth();
-  const [section, setSection] = useState<Section>("dashboard");
+  const [section, setSection] = useState<Section>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const s = params.get("section") as Section;
+    const valid: Section[] = ["dashboard","bookings","new-booking","customers","commission","earnings","payment-status","documents","upload-docs","invoices","visa","tickets","notifications","profile","settings"];
+    return (s && valid.includes(s)) ? s : "dashboard";
+  });
+  const navRef = useRef<HTMLElement>(null);
+  const activeNavRef = useRef<HTMLButtonElement>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [toast, setToast] = useState({ msg: "", type: "ok" as "ok" | "err" });
 
@@ -152,6 +159,13 @@ export default function AgentPortal() {
   }, []);
 
   useEffect(() => { loadDash(); }, [loadDash]);
+
+  // Auto-scroll active sidebar item into view when section changes
+  useEffect(() => {
+    if (activeNavRef.current && navRef.current) {
+      activeNavRef.current.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }, [section]);
 
   // ── Bookings data ────────────────────────────────────────────────────────────
   const [bookings, setBookings] = useState<any[]>([]);
@@ -466,7 +480,7 @@ export default function AgentPortal() {
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 overflow-y-auto py-2">
+        <nav ref={navRef} className="flex-1 overflow-y-auto py-2">
           {MENU_GROUPS.map(group => (
             <div key={group.label} className="mb-1">
               <p className="px-4 py-1.5 text-xs font-bold text-muted-foreground uppercase tracking-wider">{group.label}</p>
@@ -476,6 +490,7 @@ export default function AgentPortal() {
                 return (
                   <button
                     key={item.key}
+                    ref={active ? activeNavRef : undefined}
                     onClick={() => nav(item.key)}
                     className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors
                       ${active

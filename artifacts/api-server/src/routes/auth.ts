@@ -36,8 +36,9 @@ function rejectMobile(mobile: string): string | null {
   return null;
 }
 
-// Rate limit: max 5 OTP requests per phone per 30 minutes
+// Rate limit: max 5 OTP requests per phone per 30 minutes (skipped in dev)
 async function checkOtpRateLimit(mobile: string): Promise<boolean> {
+  if (process.env.NODE_ENV !== "production") return true;
   const cutoff = new Date(Date.now() - 30 * 60 * 1000);
   const result = await pool.query(
     `SELECT COUNT(*) as cnt FROM otps WHERE mobile=$1 AND created_at > $2`,
@@ -513,6 +514,38 @@ router.get("/me", requireAuth as any, async (req: AuthenticatedRequest, res) => 
   } catch (err: any) {
     console.error(`[Profile] /me failed for user ${req.user?.id}:`, err.message);
     res.status(500).json({ message: "Could not load your profile. Please refresh and try again." });
+  }
+});
+
+// ── DEV ONLY: destroy session (for clean login page screenshots) ─────────────
+router.get("/dev/logout", (req, res) => {
+  if (process.env.NODE_ENV === "production") { res.status(404).end(); return; }
+  req.session.destroy(() => {
+    res.redirect(302, "/agent/dashboard");
+  });
+});
+
+// ── DEV ONLY: auto-login as a specific mobile for screenshot/e2e testing ────
+router.get("/dev/agent-login", async (req, res) => {
+  if (process.env.NODE_ENV === "production") { res.status(404).end(); return; }
+  try {
+    const mobile = (req.query.mobile as string) || "9700000001";
+    const users = await db.select().from(usersTable).where(eq(usersTable.mobile, mobile)).limit(1);
+    const user = users[0];
+    if (!user) { res.status(404).json({ error: "User not found" }); return; }
+    let entityId: string | null = null;
+    if (user.role === "agent") {
+      const r = await pool.query(`SELECT id FROM agents WHERE mobile=$1 LIMIT 1`, [mobile]);
+      entityId = r.rows[0]?.id ?? null;
+    }
+    (req.session as any).userId = user.id;
+    if (entityId) (req.session as any).entityId = entityId;
+    await new Promise<void>((resolve, reject) => req.session.save(err => err ? reject(err) : resolve()));
+    const section = (req.query.section as string) || "";
+    const redirectUrl = section ? `/agent/dashboard?section=${encodeURIComponent(section)}` : "/agent/dashboard";
+    res.redirect(302, redirectUrl);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });
 
