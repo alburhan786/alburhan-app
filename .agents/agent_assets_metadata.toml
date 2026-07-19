@@ -107,3 +107,21 @@ id = "MtEKzqAVlp-9krhCDI_xb"
 uri = "file://AlBurhan-Full-Backup-2026-07-19.zip"
 type = "unspecified"
 title = "AlBurhan-Full-Backup-2026-07-19.zip — Complete Production Backup (102 MB)"
+
+[[outputs]]
+id = "XAmC3sI-iz9q2mkmNU5_u"
+uri = "file://screenshots/01-login-page.jpg"
+type = "image"
+title = "01 — Homepage (Sign In entry point)"
+
+[[outputs]]
+id = "EOi05jrl8WMtfBGKpNb3W"
+uri = "file://screenshots/02-login-form.jpg"
+type = "image"
+title = "02 — Login Page (OTP flow)"
+
+[[outputs]]
+id = "5d1kNbSj_IpkBuHpZm3H2"
+uri = "file://screenshots/03-branch-dashboard-unauthenticated.jpg"
+type = "image"
+title = "03 — /branch/dashboard without session (correct auth redirect)"
