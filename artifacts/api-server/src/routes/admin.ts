@@ -1001,4 +1001,279 @@ router.get("/clear-test-bookings", requireAdmin as any, async (req: Authenticate
   }
 });
 
+// ════════════════════════════════════════════════════════════════════
+//  AI OPERATIONS CENTER
+// ════════════════════════════════════════════════════════════════════
+
+router.get("/ai-ops", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const in6months = new Date(Date.now() + 180 * 86400000).toISOString().slice(0, 10);
+    const in14days = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
+    const in30days = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+
+    const [
+      pendingVisas, expiringPassports, overduePayments, unsignedAgreements,
+      staleBookings, missingDocs, upcomingFlights, pendingKyc, openTickets,
+      leadsNoFollowUp, suppliersExpiringContracts,
+    ] = await Promise.all([
+      pool.query(`SELECT b.id, b.customer_name, b.customer_mobile, b.booking_number FROM bookings b LEFT JOIN pilgrims p ON p.booking_id = b.id WHERE b.status = 'confirmed' AND (p.visa_number IS NULL OR p.visa_number = '') AND b.preferred_departure_date::date <= $1 GROUP BY b.id ORDER BY b.preferred_departure_date LIMIT 20`, [in30days]),
+      pool.query(`SELECT p.name, p.passport_number, p.passport_expiry, b.customer_name, b.booking_number FROM pilgrims p JOIN bookings b ON b.id = p.booking_id WHERE b.status = 'confirmed' AND p.passport_expiry IS NOT NULL AND p.passport_expiry::date BETWEEN $1 AND $2 LIMIT 20`, [today, in6months]),
+      pool.query(`SELECT id, customer_name, customer_mobile, booking_number, final_amount, paid_amount FROM bookings WHERE status = 'approved' AND COALESCE(paid_amount,0) = 0 AND created_at < NOW() - INTERVAL '7 days' ORDER BY created_at LIMIT 20`),
+      pool.query(`SELECT a.id, a.booking_id, b.customer_name, b.booking_number FROM agreements a JOIN bookings b ON b.id = a.booking_id WHERE a.status = 'pending_signature' AND a.created_at < NOW() - INTERVAL '3 days' ORDER BY a.created_at LIMIT 20`),
+      pool.query(`SELECT id, customer_name, booking_number, status, created_at FROM bookings WHERE status = 'pending' AND created_at < NOW() - INTERVAL '48 hours' ORDER BY created_at LIMIT 20`),
+      pool.query(`SELECT b.id, b.customer_name, b.booking_number, COUNT(p.id)::int AS pilgrim_count, COUNT(p.id) FILTER (WHERE p.passport_number IS NULL OR p.passport_number = '')::int AS missing_passport FROM bookings b JOIN pilgrims p ON p.booking_id = b.id WHERE b.status IN ('confirmed','approved') GROUP BY b.id HAVING COUNT(p.id) FILTER (WHERE p.passport_number IS NULL OR p.passport_number = '') > 0 LIMIT 20`),
+      pool.query(`SELECT f.flight_number, f.departure_date, f.airline, f.route FROM flights f WHERE f.departure_date::date BETWEEN $1 AND $2 ORDER BY f.departure_date LIMIT 10`, [today, in14days]),
+      pool.query(`SELECT COUNT(*)::int AS cnt FROM users WHERE role = 'customer' AND kyc_status = 'pending'`),
+      pool.query(`SELECT COUNT(*)::int AS cnt FROM support_tickets WHERE status IN ('open','in_progress')`),
+      pool.query(`SELECT COUNT(*)::int AS cnt FROM leads WHERE follow_up_date::date <= $1 AND status NOT IN ('converted','lost')`, [today]),
+      pool.query(`SELECT name, type, contract_expiry FROM suppliers WHERE is_active = true AND contract_expiry IS NOT NULL AND contract_expiry::date BETWEEN $1 AND $2 ORDER BY contract_expiry LIMIT 10`, [today, in30days]),
+    ]);
+
+    const alerts: any[] = [];
+    let totalAffected = 0;
+
+    if (pendingVisas.rows.length > 0) {
+      alerts.push({
+        id: "pending_visas",
+        category: "visa",
+        severity: "critical",
+        title: `${pendingVisas.rows.length} Confirmed Bookings Missing Visa`,
+        detail: `These pilgrims have confirmed bookings departing within 30 days but no visa number recorded. Immediate action required.`,
+        count: pendingVisas.rows.length,
+        action: "Manage Visas",
+        actionHref: "/admin/visa",
+        items: pendingVisas.rows.map((r: any) => ({ label: `${r.customer_name} (${r.booking_number})`, value: r.customer_mobile || "—" })),
+      });
+      totalAffected += pendingVisas.rows.length;
+    }
+
+    if (staleBookings.rows.length > 0) {
+      alerts.push({
+        id: "stale_bookings",
+        category: "booking",
+        severity: "high",
+        title: `${staleBookings.rows.length} Bookings Pending for 48+ Hours`,
+        detail: "These bookings have been waiting for admin review for more than 2 days. Customers may be losing interest.",
+        count: staleBookings.rows.length,
+        action: "Review Bookings",
+        actionHref: "/admin/bookings",
+        items: staleBookings.rows.map((r: any) => ({ label: `${r.customer_name} (${r.booking_number})`, value: new Date(r.created_at).toLocaleDateString("en-IN") })),
+      });
+      totalAffected += staleBookings.rows.length;
+    }
+
+    if (overduePayments.rows.length > 0) {
+      alerts.push({
+        id: "overdue_payments",
+        category: "payment",
+        severity: "high",
+        title: `${overduePayments.rows.length} Approved Bookings with No Payment (7+ Days)`,
+        detail: "Customers whose bookings were approved over a week ago but have not made any payment. Send follow-up reminders.",
+        count: overduePayments.rows.length,
+        action: "Payment Analytics",
+        actionHref: "/admin/payment-analytics",
+        items: overduePayments.rows.map((r: any) => ({ label: `${r.customer_name} (${r.booking_number})`, value: `₹${Number(r.final_amount || 0).toLocaleString("en-IN")}` })),
+      });
+      totalAffected += overduePayments.rows.length;
+    }
+
+    if (unsignedAgreements.rows.length > 0) {
+      alerts.push({
+        id: "unsigned_agreements",
+        category: "agreement",
+        severity: "medium",
+        title: `${unsignedAgreements.rows.length} Agreements Unsigned for 3+ Days`,
+        detail: "Customers have been sent agreements but have not signed them yet. A reminder may help.",
+        count: unsignedAgreements.rows.length,
+        action: "Manage Agreements",
+        actionHref: "/admin/agreements",
+        items: unsignedAgreements.rows.map((r: any) => ({ label: `${r.customer_name} (${r.booking_number})`, value: "Pending Signature" })),
+      });
+      totalAffected += unsignedAgreements.rows.length;
+    }
+
+    if (expiringPassports.rows.length > 0) {
+      alerts.push({
+        id: "expiring_passports",
+        category: "passport",
+        severity: "high",
+        title: `${expiringPassports.rows.length} Passports Expiring Within 6 Months`,
+        detail: "Saudi Arabia requires passports to be valid for at least 6 months from travel date. These pilgrims need to renew urgently.",
+        count: expiringPassports.rows.length,
+        action: "View Pilgrims",
+        actionHref: "/admin/pilgrim-reports",
+        items: expiringPassports.rows.map((r: any) => ({ label: `${r.name} — ${r.customer_name}`, value: r.passport_expiry ? new Date(r.passport_expiry).toLocaleDateString("en-IN") : "—" })),
+      });
+      totalAffected += expiringPassports.rows.length;
+    }
+
+    if (missingDocs.rows.length > 0) {
+      alerts.push({
+        id: "missing_passports",
+        category: "document",
+        severity: "high",
+        title: `${missingDocs.rows.length} Bookings with Pilgrims Missing Passport Numbers`,
+        detail: "Passport data is required for visa processing and flight manifests. Complete all pilgrim profiles.",
+        count: missingDocs.rows.length,
+        action: "Pilgrim Reports",
+        actionHref: "/admin/pilgrim-reports",
+        items: missingDocs.rows.map((r: any) => ({ label: r.customer_name, value: `${r.missing_passport} of ${r.pilgrim_count} missing` })),
+      });
+      totalAffected += missingDocs.rows.length;
+    }
+
+    if ((pendingKyc.rows[0]?.cnt || 0) > 0) {
+      alerts.push({
+        id: "pending_kyc",
+        category: "document",
+        severity: "medium",
+        title: `${pendingKyc.rows[0].cnt} Customers Awaiting KYC Verification`,
+        detail: "Customer identity documents uploaded but not yet verified by admin.",
+        count: pendingKyc.rows[0].cnt,
+        action: "Review KYC",
+        actionHref: "/admin/kyc",
+      });
+      totalAffected += pendingKyc.rows[0].cnt;
+    }
+
+    if ((openTickets.rows[0]?.cnt || 0) > 0) {
+      alerts.push({
+        id: "open_tickets",
+        category: "booking",
+        severity: openTickets.rows[0].cnt > 5 ? "high" : "medium",
+        title: `${openTickets.rows[0].cnt} Open Support Tickets`,
+        detail: "Customer support tickets that need attention from admin team.",
+        count: openTickets.rows[0].cnt,
+        action: "Support Center",
+        actionHref: "/admin/support",
+      });
+      totalAffected += openTickets.rows[0].cnt;
+    }
+
+    if ((leadsNoFollowUp.rows[0]?.cnt || 0) > 0) {
+      alerts.push({
+        id: "leads_overdue",
+        category: "booking",
+        severity: "low",
+        title: `${leadsNoFollowUp.rows[0].cnt} Leads with Overdue Follow-up`,
+        detail: "Leads that have a follow-up date in the past but are still not converted or marked lost.",
+        count: leadsNoFollowUp.rows[0].cnt,
+        action: "Lead Manager",
+        actionHref: "/admin/leads",
+      });
+      totalAffected += leadsNoFollowUp.rows[0].cnt;
+    }
+
+    if (suppliersExpiringContracts.rows.length > 0) {
+      alerts.push({
+        id: "supplier_contracts",
+        category: "document",
+        severity: "low",
+        title: `${suppliersExpiringContracts.rows.length} Supplier Contracts Expiring in 30 Days`,
+        detail: "Renew contracts before expiry to avoid service disruption.",
+        count: suppliersExpiringContracts.rows.length,
+        action: "Suppliers",
+        actionHref: "/admin/suppliers",
+        items: suppliersExpiringContracts.rows.map((r: any) => ({ label: `${r.name} (${r.type})`, value: r.contract_expiry ? new Date(r.contract_expiry).toLocaleDateString("en-IN") : "—" })),
+      });
+      totalAffected += suppliersExpiringContracts.rows.length;
+    }
+
+    if (upcomingFlights.rows.length > 0) {
+      alerts.push({
+        id: "upcoming_flights",
+        category: "flight",
+        severity: "low",
+        title: `${upcomingFlights.rows.length} Flights Departing in Next 14 Days`,
+        detail: "Ensure all passengers have boarding passes, airport reporting times shared, and transport arranged.",
+        count: upcomingFlights.rows.length,
+        action: "Flight Manager",
+        actionHref: "/admin/flights",
+        items: upcomingFlights.rows.map((r: any) => ({ label: `${r.flight_number} — ${r.route || r.airline}`, value: r.departure_date ? new Date(r.departure_date).toLocaleDateString("en-IN") : "—" })),
+      });
+    }
+
+    // Sort: critical → high → medium → low
+    const ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
+    alerts.sort((a, b) => (ORDER[a.severity as keyof typeof ORDER] || 3) - (ORDER[b.severity as keyof typeof ORDER] || 3));
+
+    res.json({ alerts, summary: { totalAlerts: alerts.length, totalAffected } });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ════════════════════════════════════════════════════════════════════
+//  EXECUTIVE DASHBOARD
+// ════════════════════════════════════════════════════════════════════
+
+router.get("/executive", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
+    const lastMonthStart = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1).toISOString().slice(0, 10);
+    const lastMonthEnd = new Date(new Date().getFullYear(), new Date().getMonth(), 0).toISOString().slice(0, 10);
+    const in7days = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+
+    const [
+      todayPay, monthPay, lastMonthPay, totalPay,
+      bookingCounts, customerCount,
+      pendingVisa, unsignedAg, pendingKyc, openTickets, upcomingDep, leadsFollowUp,
+      notifStats, ticketStats, recentBookings, outstandingRes,
+    ] = await Promise.all([
+      pool.query(`SELECT COUNT(*)::int AS cnt, COALESCE(SUM(amount),0)::float AS total FROM payments WHERE DATE(created_at) = $1 AND status IN ('completed','success','captured')`, [today]),
+      pool.query(`SELECT COALESCE(SUM(amount),0)::float AS total FROM payments WHERE created_at >= $1 AND status IN ('completed','success','captured')`, [monthStart]),
+      pool.query(`SELECT COALESCE(SUM(amount),0)::float AS total FROM payments WHERE created_at BETWEEN $1 AND $2 AND status IN ('completed','success','captured')`, [lastMonthStart, lastMonthEnd]),
+      pool.query(`SELECT COALESCE(SUM(amount),0)::float AS total FROM payments WHERE status IN ('completed','success','captured')`),
+      pool.query(`SELECT COUNT(*) FILTER (WHERE status='pending')::int AS pending, COUNT(*) FILTER (WHERE status='approved')::int AS approved, COUNT(*) FILTER (WHERE status='confirmed')::int AS confirmed FROM bookings`),
+      pool.query(`SELECT COUNT(*)::int AS total FROM users WHERE role='customer'`),
+      pool.query(`SELECT COUNT(*)::int AS cnt FROM pilgrims p JOIN bookings b ON b.id=p.booking_id WHERE b.status='confirmed' AND (p.visa_number IS NULL OR p.visa_number='')`),
+      pool.query(`SELECT COUNT(*)::int AS cnt FROM agreements WHERE status='pending_signature'`),
+      pool.query(`SELECT COUNT(*)::int AS cnt FROM users WHERE role='customer' AND kyc_status='pending'`),
+      pool.query(`SELECT COUNT(*)::int AS cnt FROM support_tickets WHERE status IN ('open','in_progress')`),
+      pool.query(`SELECT COUNT(*)::int AS cnt FROM bookings WHERE preferred_departure_date::date BETWEEN $1 AND $2 AND status='confirmed'`, [today, in7days]),
+      pool.query(`SELECT COUNT(*)::int AS cnt FROM leads WHERE follow_up_date::date <= $1 AND status NOT IN ('converted','lost')`, [today]),
+      pool.query(`SELECT COUNT(*) FILTER (WHERE status='sent')::int AS sent, COUNT(*)::int AS total FROM notification_logs WHERE created_at >= NOW() - INTERVAL '30 days'`),
+      pool.query(`SELECT COUNT(*) FILTER (WHERE status='resolved')::int AS resolved, COUNT(*)::int AS total FROM support_tickets`),
+      pool.query(`SELECT customer_name, customer_mobile, package_name, final_amount, paid_amount, status FROM bookings WHERE DATE(created_at) = $1 ORDER BY created_at DESC LIMIT 5`, [today]),
+      pool.query(`SELECT COALESCE(SUM(NULLIF(TRIM(final_amount::text),'')::numeric - COALESCE(paid_amount,0)),0)::float AS outstanding, COUNT(*)::int AS cnt FROM bookings WHERE status IN ('approved','confirmed') AND COALESCE(paid_amount,0) < NULLIF(TRIM(final_amount::text),'')::numeric`),
+    ]);
+
+    const totalNotif = notifStats.rows[0]?.total || 0;
+    const sentNotif = notifStats.rows[0]?.sent || 0;
+    const resolvedT = ticketStats.rows[0]?.resolved || 0;
+    const totalT = ticketStats.rows[0]?.total || 0;
+
+    // Conversion rate: confirmed / (confirmed + pending + approved)
+    const bc = bookingCounts.rows[0] || {};
+    const totalB = (bc.pending || 0) + (bc.approved || 0) + (bc.confirmed || 0);
+    const convRate = totalB > 0 ? Math.round(((bc.confirmed || 0) / totalB) * 100) : 0;
+
+    res.json({
+      todayRevenue: todayPay.rows[0]?.total || 0,
+      todayPayments: todayPay.rows[0]?.cnt || 0,
+      monthRevenue: monthPay.rows[0]?.total || 0,
+      lastMonthRevenue: lastMonthPay.rows[0]?.total || 0,
+      totalCollected: totalPay.rows[0]?.total || 0,
+      outstanding: outstandingRes.rows[0]?.outstanding || 0,
+      outstandingBookings: outstandingRes.rows[0]?.cnt || 0,
+      pendingBookings: bc.pending || 0,
+      approvedBookings: bc.approved || 0,
+      confirmedBookings: bc.confirmed || 0,
+      totalCustomers: customerCount.rows[0]?.total || 0,
+      pendingVisas: pendingVisa.rows[0]?.cnt || 0,
+      unsignedAgreements: unsignedAg.rows[0]?.cnt || 0,
+      pendingKyc: pendingKyc.rows[0]?.cnt || 0,
+      openTickets: openTickets.rows[0]?.cnt || 0,
+      upcomingDepartures: upcomingDep.rows[0]?.cnt || 0,
+      leadsFollowUpDue: leadsFollowUp.rows[0]?.cnt || 0,
+      conversionRate: convRate,
+      notifSuccessRate: totalNotif > 0 ? Math.round((sentNotif / totalNotif) * 100) : 0,
+      ticketResolutionRate: totalT > 0 ? Math.round((resolvedT / totalT) * 100) : 0,
+      resolvedTickets: resolvedT,
+      totalTickets: totalT,
+      recentBookings: recentBookings.rows,
+    });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
 export default router;

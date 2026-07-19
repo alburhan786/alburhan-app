@@ -32,6 +32,8 @@ import LeadManager from "@/pages/admin/LeadManager";
 import SupplierManager from "@/pages/admin/SupplierManager";
 import GroupTracking from "@/pages/admin/GroupTracking";
 import KnowledgeCenter from "@/pages/public/KnowledgeCenter";
+import AIOperationsCenter from "@/pages/admin/AIOperationsCenter";
+import ExecutiveDashboard from "@/pages/admin/ExecutiveDashboard";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import PackagesManager from "@/pages/admin/PackagesManager";
 import BookingsManager from "@/pages/admin/BookingsManager";
@@ -266,6 +268,8 @@ function Router() {
       <Route path="/admin/leads" component={() => <AdminRoute component={LeadManager} />} />
       <Route path="/admin/suppliers" component={() => <AdminRoute component={SupplierManager} />} />
       <Route path="/admin/group-tracking" component={() => <AdminRoute component={GroupTracking} />} />
+      <Route path="/admin/ai-ops" component={() => <AdminRoute component={AIOperationsCenter} />} />
+      <Route path="/admin/executive" component={() => <AdminRoute component={ExecutiveDashboard} />} />
       <Route path="/knowledge" component={KnowledgeCenter} />
       <Route path="/admin/agreements" component={() => <AdminRoute component={AgreementCenter} />} />
       <Route path="/admin/audit-logs" component={() => <AdminRoute component={AuditLogs} />} />

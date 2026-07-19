@@ -1,0 +1,386 @@
+PHASE FINAL – WORLD CLASS HAJJ & UMRAH ERP (ENTERPRISE EDITION)
+
+IMPORTANT
+
+Do NOT modify or break any existing feature.
+
+Preserve all APIs, database tables, payment flow, agreement flow, notification system, support system, reports, CRM, dashboards, marketing, supplier management, guide panel, knowledge center, SOS, group tracking and customer portal.
+
+Only extend the platform.
+
+======================================================
+1. AI OPERATION CENTER
+======================================================
+
+Create an AI Operations Dashboard.
+
+AI automatically detects:
+
+• Pending visas
+• Missing passports
+• Expiring passports
+• Customers with incomplete documents
+• Pending payments
+• Pending agreements
+• Customers not responding
+• Delayed supplier confirmations
+
+AI should recommend actions.
+
+======================================================
+2. SMART FINANCE CENTER
+======================================================
+
+Complete accounting system.
+
+Include:
+
+Income
+
+Expense
+
+Ledger
+
+Cash Book
+
+Bank Book
+
+Journal
+
+Profit & Loss
+
+Balance Sheet
+
+GST Reports
+
+Commission Reports
+
+Vendor Payments
+
+Refund Management
+
+Automatic Invoice Numbers
+
+Automatic Receipt Numbers
+
+======================================================
+3. STAFF MANAGEMENT
+======================================================
+
+Complete HR module.
+
+Attendance
+
+Leave
+
+Salary
+
+Commission
+
+Departments
+
+Roles
+
+Performance
+
+Daily Tasks
+
+Payroll
+
+======================================================
+4. AGENT PORTAL
+======================================================
+
+Travel agents can:
+
+Login
+
+Create enquiries
+
+Book packages
+
+Upload documents
+
+Track commission
+
+View customer status
+
+Download invoices
+
+======================================================
+5. SUPPLIER PORTAL
+======================================================
+
+Hotels
+
+Airlines
+
+Transport
+
+Visa Providers
+
+Can login and update:
+
+Availability
+
+Booking confirmations
+
+Invoices
+
+Documents
+
+======================================================
+6. MOBILE APP API
+======================================================
+
+Prepare production APIs for:
+
+Android
+
+iPhone
+
+Flutter
+
+React Native
+
+Offline Sync
+
+Push Notifications
+
+======================================================
+7. AI SALES CRM
+======================================================
+
+Lead Scoring
+
+Automatic Follow-up
+
+Call Reminder
+
+WhatsApp Reminder
+
+Email Campaign
+
+Conversion Prediction
+
+Lost Lead Analysis
+
+======================================================
+8. BUSINESS AUTOMATION
+======================================================
+
+Automatically:
+
+Generate invoices
+
+Generate receipts
+
+Generate agreements
+
+Generate certificates
+
+Generate vouchers
+
+Generate reports
+
+Generate daily backups
+
+======================================================
+9. EXECUTIVE DASHBOARD
+======================================================
+
+Owner Dashboard showing:
+
+Today's Revenue
+
+Monthly Revenue
+
+Profit
+
+Pending Payments
+
+Upcoming Flights
+
+Pending Visas
+
+Pending Agreements
+
+Customer Satisfaction
+
+Support Tickets
+
+Marketing ROI
+
+======================================================
+10. DOCUMENT AI
+======================================================
+
+Upload Passport
+
+OCR extracts:
+
+Passport Number
+
+Expiry
+
+Nationality
+
+DOB
+
+Name
+
+Gender
+
+Automatically populate booking.
+
+======================================================
+11. MULTI-BRANCH SYSTEM
+======================================================
+
+Support:
+
+Hyderabad
+
+Mumbai
+
+Delhi
+
+Bangalore
+
+Branch-wise reports
+
+Branch-wise staff
+
+Branch-wise revenue
+
+======================================================
+12. API INTEGRATIONS
+======================================================
+
+Prepare integrations for:
+
+Google Calendar
+
+Google Maps
+
+Google Drive
+
+Meta WhatsApp
+
+Fast2SMS
+
+Email
+
+Razorpay
+
+BotBee
+
+======================================================
+13. SECURITY
+======================================================
+
+Enterprise security.
+
+2FA
+
+Role permissions
+
+Audit logs
+
+Device history
+
+Login history
+
+IP restrictions
+
+Encrypted documents
+
+======================================================
+14. PERFORMANCE
+======================================================
+
+Optimize:
+
+Database
+
+Caching
+
+Queries
+
+Images
+
+Lazy loading
+
+CDN
+
+Compression
+
+API speed
+
+======================================================
+15. FINAL QA
+======================================================
+
+Run complete production acceptance testing.
+
+Verify every feature.
+
+Booking
+
+CRM
+
+Lead
+
+Payment
+
+Agreement
+
+OTP
+
+Digital Signature
+
+Invoice
+
+Receipt
+
+Support
+
+Visa
+
+Ticket
+
+Flight
+
+Hotel
+
+Supplier
+
+Guide
+
+SOS
+
+Knowledge Center
+
+Reports
+
+BI Dashboard
+
+Finance
+
+HR
+
+Marketing
+
+Customer Dashboard
+
+Admin Dashboard
+
+Notifications
+
+WhatsApp
+
+SMS
+
+Email
+
+Generate a final enterprise deployment report confirming all modules are production-ready with zero critical errors and no regression in existing functionality.
