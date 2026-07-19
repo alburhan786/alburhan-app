@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { CreditCard, FileText, Download, Clock, Upload, Trash2, CheckCircle, AlertCircle, X, Eye, ShieldAlert, IndianRupee, Plane, Stamp, Hotel, Bus, Printer, Share2, Copy, Bell, BellRing, CheckCheck, Megaphone, ClipboardList, MessageSquare, Send, User, XCircle, Building2, Banknote, RefreshCcw, Syringe } from "lucide-react";
+import { CreditCard, FileText, Download, Clock, Upload, Trash2, CheckCircle, AlertCircle, X, Eye, ShieldAlert, IndianRupee, Plane, Stamp, Hotel, Bus, Printer, Share2, Copy, Bell, BellRing, CheckCheck, Megaphone, ClipboardList, MessageSquare, Send, User, XCircle, Building2, Banknote, RefreshCcw, Syringe, MapPin, Bed, ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -32,6 +32,164 @@ const MANDATORY_DOCS = [
 ];
 
 const BASE_API = import.meta.env.VITE_API_URL || "";
+
+// ── Journey Status Card (Visa / Flight / Hotel) ────────────────────────────────
+function JourneyStatusCard({ bookingId }: { bookingId: string }) {
+  const [data, setData] = useState<any | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!bookingId) return;
+    fetch(`${BASE_API}/api/customer/journey/${bookingId}`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { setData(d); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [bookingId]);
+
+  if (loading || !data || !data.hasPilgrimData) return null;
+
+  const pilgrim = data.pilgrims?.[0];
+  const flight = data.flights?.[0];
+  const hotel = data.hotels?.[0];
+  const visaStatus = pilgrim?.visaStatus || "not_applied";
+
+  const VISA_COLOR: Record<string, string> = {
+    not_applied: "bg-gray-100 text-gray-600",
+    applied: "bg-blue-100 text-blue-800",
+    received: "bg-emerald-100 text-emerald-800",
+    rejected: "bg-red-100 text-red-700",
+    processing: "bg-amber-100 text-amber-800",
+  };
+  const VISA_LABEL: Record<string, string> = {
+    not_applied: "Not Applied",
+    applied: "Visa Applied",
+    received: "Visa Received ✓",
+    rejected: "Visa Rejected",
+    processing: "Processing",
+  };
+
+  return (
+    <div className="rounded-2xl border border-border bg-background overflow-hidden">
+      <button
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/30 transition-colors"
+        onClick={() => setOpen(o => !o)}
+      >
+        <span className="flex items-center gap-2.5 font-semibold text-sm">
+          <span className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center text-lg">✈️</span>
+          Journey Status
+        </span>
+        <div className="flex items-center gap-2">
+          {pilgrim && (
+            <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${VISA_COLOR[visaStatus] || VISA_COLOR.not_applied}`}>
+              {VISA_LABEL[visaStatus] || visaStatus}
+            </span>
+          )}
+          <ChevronRight size={16} className={`text-muted-foreground transition-transform ${open ? "rotate-90" : ""}`} />
+        </div>
+      </button>
+
+      {open && (
+        <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
+          {/* Visa */}
+          {pilgrim && (
+            <div className="rounded-xl bg-muted/30 p-3 space-y-1.5">
+              <div className="flex items-center gap-2 font-semibold text-xs text-muted-foreground uppercase tracking-wide">
+                <Stamp size={13} /> Visa
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">{pilgrim.pilgrimName}</span>
+                <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${VISA_COLOR[visaStatus] || VISA_COLOR.not_applied}`}>
+                  {VISA_LABEL[visaStatus] || visaStatus}
+                </span>
+              </div>
+              {pilgrim.visaNumber && (
+                <p className="text-xs text-muted-foreground">Visa No: <span className="font-mono text-foreground">{pilgrim.visaNumber}</span></p>
+              )}
+              {pilgrim.visaType && (
+                <p className="text-xs text-muted-foreground">Type: {pilgrim.visaType}</p>
+              )}
+              {pilgrim.visaAppliedDate && (
+                <p className="text-xs text-muted-foreground">Applied: {new Date(pilgrim.visaAppliedDate).toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" })}</p>
+              )}
+              {pilgrim.visaReceivedDate && (
+                <p className="text-xs text-emerald-700 font-medium">Received: {new Date(pilgrim.visaReceivedDate).toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" })}</p>
+              )}
+              {data.pilgrims.length > 1 && (
+                <p className="text-[11px] text-primary mt-1">+{data.pilgrims.length - 1} more pilgrim(s)</p>
+              )}
+            </div>
+          )}
+
+          {/* Flight */}
+          {flight ? (
+            <div className="rounded-xl bg-blue-50 border border-blue-100 p-3 space-y-1.5">
+              <div className="flex items-center gap-2 font-semibold text-xs text-blue-700 uppercase tracking-wide">
+                <Plane size={13} /> Flight — {flight.flight_type === "departure" ? "Departure" : flight.flight_type === "return" ? "Return" : flight.flight_type || "Flight"}
+              </div>
+              <p className="text-sm font-medium">{flight.airline} {flight.flight_number}</p>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span>{flight.departure_airport}</span>
+                <span>→</span>
+                <span>{flight.arrival_airport}</span>
+              </div>
+              {flight.departure_date && (
+                <p className="text-xs text-blue-700 font-medium">
+                  {new Date(flight.departure_date).toLocaleDateString("en-IN", { weekday:"short", day:"2-digit", month:"short", year:"numeric" })}
+                  {flight.departure_time ? ` at ${flight.departure_time}` : ""}
+                </p>
+              )}
+              {flight.pnr && (
+                <p className="text-xs text-muted-foreground">PNR: <span className="font-mono text-foreground font-semibold">{flight.pnr}</span></p>
+              )}
+              {data.flights.length > 1 && (
+                <p className="text-[11px] text-blue-600 mt-1">+{data.flights.length - 1} more flight(s)</p>
+              )}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-border p-3 text-center text-xs text-muted-foreground">
+              <Plane size={16} className="mx-auto mb-1 opacity-40" />
+              Flight not yet assigned
+            </div>
+          )}
+
+          {/* Hotel */}
+          {hotel ? (
+            <div className="rounded-xl bg-amber-50 border border-amber-100 p-3 space-y-1.5">
+              <div className="flex items-center gap-2 font-semibold text-xs text-amber-700 uppercase tracking-wide">
+                <Hotel size={13} /> Hotel — {hotel.hotelCity}
+              </div>
+              <p className="text-sm font-medium">{hotel.hotelName}</p>
+              {hotel.hotelAddress && (
+                <p className="text-xs text-muted-foreground flex items-start gap-1">
+                  <MapPin size={11} className="mt-0.5 shrink-0" />
+                  {hotel.hotelAddress}
+                </p>
+              )}
+              {hotel.roomNumber && (
+                <p className="text-xs text-amber-800 font-medium flex items-center gap-1">
+                  <Bed size={12} /> Room {hotel.roomNumber}{hotel.floor ? `, Floor ${hotel.floor}` : ""}
+                </p>
+              )}
+              {(hotel.checkInDate || hotel.checkOutDate) && (
+                <p className="text-xs text-muted-foreground">
+                  {hotel.checkInDate ? `Check-in: ${new Date(hotel.checkInDate).toLocaleDateString("en-IN", { day:"2-digit", month:"short" })}` : ""}
+                  {hotel.checkInDate && hotel.checkOutDate ? " · " : ""}
+                  {hotel.checkOutDate ? `Check-out: ${new Date(hotel.checkOutDate).toLocaleDateString("en-IN", { day:"2-digit", month:"short" })}` : ""}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-border p-3 text-center text-xs text-muted-foreground">
+              <Hotel size={16} className="mx-auto mb-1 opacity-40" />
+              Hotel not yet assigned
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function DocWarningBadge({ bookingId }: { bookingId: string }) {
   const { data: docs } = useListDocuments(bookingId);
@@ -2493,6 +2651,7 @@ export default function CustomerDashboard() {
 
                     {(booking.status === 'approved' || booking.status === 'confirmed' || booking.status === 'partially_paid') && (
                       <div className="mx-5 mb-4 space-y-4">
+                        <JourneyStatusCard bookingId={booking.id} />
                         <TravelDetailsCard bookingId={booking.id} initialStatus={booking.travellerDetailsStatus || "not_submitted"} />
                         <MandatoryDocumentsCard bookingId={booking.id} onOpenUpload={() => setUploadBookingId(booking.id)} />
                         <TravelDocumentsCard
@@ -2513,6 +2672,18 @@ export default function CustomerDashboard() {
                             My Documents — All in One Place
                           </span>
                           <span className="text-xs text-primary/70 font-medium">View All →</span>
+                        </a>
+
+                        {/* Support Center quick link */}
+                        <a
+                          href={(import.meta.env.BASE_URL || "/") + "customer/support"}
+                          className="flex items-center justify-between w-full px-4 py-3 rounded-2xl border border-blue-200 bg-blue-50 hover:bg-blue-100 transition-colors group"
+                        >
+                          <span className="flex items-center gap-2.5 text-sm font-semibold text-blue-700">
+                            <span className="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center text-xl group-hover:bg-blue-200 transition-colors">💬</span>
+                            Support Center — Get Help
+                          </span>
+                          <span className="text-xs text-blue-500 font-medium">View →</span>
                         </a>
                       </div>
                     )}

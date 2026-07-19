@@ -365,6 +365,93 @@ router.post("/:id/resend", requireAuth as any, async (req: AuthenticatedRequest,
   }
 });
 
+// ── ZIP download: all travel documents for a booking ──────────────────────────
+// GET /api/documents/zip/:bookingId — customer downloads all their admin-uploaded docs as ZIP
+router.get("/zip/:bookingId", requireAuth as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { bookingId } = req.params;
+
+    // Verify ownership
+    const bRes = await pool.query(
+      `SELECT id, customer_id, booking_number FROM bookings WHERE id = $1 LIMIT 1`,
+      [bookingId]
+    );
+    const booking = bRes.rows[0];
+    if (!booking) return void res.status(404).json({ error: "Booking not found" });
+    if (booking.customer_id !== req.user?.id && req.user?.role !== "admin") {
+      return void res.status(403).json({ error: "Forbidden" });
+    }
+
+    // Get all visible docs for this booking
+    const docRes = await pool.query(
+      `SELECT id, file_name, file_url, file_key, mime_type, document_type, uploaded_by
+       FROM documents
+       WHERE booking_id = $1 AND is_visible_to_customer = true AND is_revoked = false
+       ORDER BY document_type, created_at`,
+      [bookingId]
+    );
+    const docs = docRes.rows;
+    if (docs.length === 0) return void res.status(404).json({ error: "No documents available for download" });
+
+    const archiver = await import("archiver");
+    const https = await import("https");
+    const http = await import("http");
+    const stream = await import("stream");
+
+    const archive = archiver.default("zip", { zlib: { level: 6 } });
+
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="documents-${booking.booking_number || bookingId}.zip"`
+    );
+    archive.pipe(res);
+
+    archive.on("error", (err: Error) => {
+      console.error("[Documents/ZIP] archiver error:", err);
+    });
+
+    const fetchBuffer = (url: string): Promise<Buffer> => {
+      return new Promise((resolve, reject) => {
+        const mod = url.startsWith("https") ? https.default : http.default;
+        mod.get(url, (resp) => {
+          const chunks: Buffer[] = [];
+          resp.on("data", (c: Buffer) => chunks.push(c));
+          resp.on("end", () => resolve(Buffer.concat(chunks)));
+          resp.on("error", reject);
+        }).on("error", reject);
+      });
+    };
+
+    for (const doc of docs) {
+      try {
+        const fileUrl = doc.file_url?.startsWith("http")
+          ? doc.file_url
+          : `${req.protocol}://${req.get("host")}${doc.file_url}`;
+
+        const buf = await fetchBuffer(fileUrl);
+        const entryName = `${doc.document_type}/${doc.file_name || doc.id}`;
+        archive.append(buf, { name: entryName });
+      } catch (err) {
+        console.error(`[Documents/ZIP] Failed to fetch doc ${doc.id}:`, err);
+      }
+    }
+
+    // Log downloads
+    for (const doc of docs) {
+      pool.query(
+        `UPDATE documents SET download_count = COALESCE(download_count, 0) + 1, last_downloaded_at = NOW() WHERE id = $1`,
+        [doc.id]
+      ).catch(() => {});
+    }
+
+    await archive.finalize();
+  } catch (err: any) {
+    console.error("[Documents/ZIP] error:", err);
+    if (!res.headersSent) res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Delete a document ─────────────────────────────────────────────────────────
 router.delete("/:id", requireAuth as any, async (req: AuthenticatedRequest, res) => {
   const { rows } = await pool.query(`SELECT * FROM documents WHERE id = $1`, [req.params.id]);

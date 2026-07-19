@@ -1,0 +1,460 @@
+Build the next production-ready phase of the Al Burhan Tours & Travels Hajj & Umrah ERP/CRM system. Implement all features completely with production-quality code, responsive UI, secure backend APIs, database migrations (if required), audit logs, notifications, and end-to-end testing. Do not create placeholders or mock data. Integrate everything with the existing booking, payment, agreement, notification, and customer dashboard modules.
+
+========================================
+1. VISA MANAGEMENT MODULE
+========================================
+
+Create a complete Visa Management system.
+
+Features:
+• Admin can upload Visa PDF or image.
+• Generate Visa ID.
+• Store issue date and expiry date.
+• Track visa status (Pending, Processing, Approved, Rejected, Issued).
+• Automatically notify customer via:
+  - WhatsApp (BotBee)
+  - SMS (Fast2SMS)
+  - Email
+• Customer dashboard must immediately display:
+  - Visa status
+  - Visa number
+  - Issue date
+  - Expiry date
+  - Download Visa button
+• Add Visa Issued event to booking timeline.
+• Log every notification and download.
+
+========================================
+2. FLIGHT TICKET MANAGEMENT
+========================================
+
+Create a Flight Ticket module.
+
+Features:
+• Upload ticket PDF.
+• Store airline, PNR, flight number, departure, arrival, baggage allowance.
+• Generate Ticket ID.
+• Automatically send ticket via:
+  - WhatsApp
+  - SMS
+  - Email
+• Customer dashboard:
+  - View Ticket
+  - Download Ticket
+• Automatic reminders:
+  - 72 hours before departure
+  - 24 hours before departure
+  - 6 hours before departure
+• Log all reminders.
+
+========================================
+3. HOTEL & ROOM MANAGEMENT
+========================================
+
+Create Hotel Allocation module.
+
+Features:
+• Hotel Name
+• Room Number
+• Building
+• Floor
+• Sharing Type
+• Room Type
+• Check-in Date
+• Check-out Date
+• Google Maps link
+• Hotel voucher PDF
+
+Automatically send room allocation through:
+• WhatsApp
+• SMS
+• Email
+
+Customer dashboard must show:
+• Hotel
+• Room
+• Sharing
+• Download Voucher
+
+Add Hotel Assigned event to timeline.
+
+========================================
+4. CUSTOMER DOCUMENT CENTER
+========================================
+
+Create one secure page where customers can download every document.
+
+Include:
+
+• Booking Confirmation
+• Tax Invoice
+• Payment Receipt
+• Agreement
+• Signed Agreement
+• Visa
+• Flight Ticket
+• Hotel Voucher
+• ID Card
+• Luggage Tag
+• Passport Copy
+• Aadhaar Copy
+• PAN Copy
+• Vaccination Certificate
+• Transport Voucher
+• Travel Insurance
+• Any uploaded document
+
+Features:
+• Download Individual
+• Download All as ZIP
+• View Online
+• QR Verification
+• Audit Log
+
+========================================
+5. NOTIFICATION CENTER
+========================================
+
+Create complete Notification Center.
+
+Track:
+
+• WhatsApp
+• SMS
+• Email
+
+Show:
+
+• Sent
+• Delivered
+• Read
+• Failed
+• Pending
+• Retry
+
+Include:
+
+• Notification history
+• Search
+• Filters
+• Retry failed notifications
+• Delivery timestamps
+• BotBee Message ID
+• SMS Response
+• Email Response
+
+========================================
+6. COMPLETE CUSTOMER TIMELINE
+========================================
+
+Create graphical booking timeline.
+
+Steps:
+
+Booking Submitted
+↓
+
+Booking Approved
+↓
+
+Payment Received
+↓
+
+Invoice Generated
+↓
+
+Agreement Generated
+↓
+
+Agreement Signed
+↓
+
+Visa Processing
+↓
+
+Visa Issued
+↓
+
+Flight Ticket Issued
+↓
+
+Hotel Assigned
+↓
+
+Room Allocated
+↓
+
+Journey Started
+↓
+
+Journey Completed
+
+Each event must include:
+
+• Date
+• Time
+• Status
+• User
+• Notification sent
+• Download link (if applicable)
+
+========================================
+7. SMART REMINDER ENGINE
+========================================
+
+Automatically send reminders for:
+
+Pending Payment
+• After 24 hours
+• After 3 days
+• Weekly until paid
+
+Pending Agreement
+• After 24 hours
+• Every 48 hours until signed
+
+Pending Passport Upload
+
+Pending Aadhaar Upload
+
+Pending PAN Upload
+
+Pending Vaccination
+
+Visa Issued
+
+Ticket Issued
+
+Hotel Assigned
+
+Flight Reminder
+
+Return Flight Reminder
+
+Journey Completion Thank You
+
+Every reminder must support:
+
+• WhatsApp
+• SMS
+• Email
+
+========================================
+8. CUSTOMER SUPPORT CENTER
+========================================
+
+Build Support Ticket System.
+
+Customer can:
+
+• Raise Ticket
+• Upload Images
+• Upload PDF
+• Chat with Admin
+• Track Ticket
+• Receive Replies
+
+Admin can:
+
+• Assign Ticket
+• Change Status
+• Internal Notes
+• Close Ticket
+
+Statuses:
+
+Open
+Pending
+Resolved
+Closed
+
+========================================
+9. QR VERIFICATION SYSTEM
+========================================
+
+Every document must include QR Code.
+
+Supported documents:
+
+Invoice
+Agreement
+Signed Agreement
+Visa
+Ticket
+Receipt
+Hotel Voucher
+ID Card
+
+QR opens secure verification page.
+
+Verification page displays:
+
+Company Logo
+
+Booking ID
+
+Agreement ID
+
+Invoice ID
+
+Visa ID
+
+Customer Name
+
+Package
+
+Status
+
+Verification Timestamp
+
+Green Verified Badge
+
+========================================
+10. ADMIN ERP DASHBOARD
+========================================
+
+Create enterprise dashboard.
+
+Show:
+
+Today's Bookings
+
+Today's Payments
+
+Pending Payments
+
+Pending Agreements
+
+Pending Visas
+
+Pending Tickets
+
+Pending Hotels
+
+Today's Departures
+
+Today's Arrivals
+
+Total Customers
+
+Revenue
+
+Monthly Revenue
+
+Package Sales
+
+Notification Statistics
+
+WhatsApp Statistics
+
+SMS Statistics
+
+Email Statistics
+
+Support Tickets
+
+Reports
+
+Exports (Excel/PDF)
+
+========================================
+11. SECURITY
+========================================
+
+Implement:
+
+Role-based permissions
+
+JWT Authentication
+
+Audit Logs
+
+Download Logs
+
+Notification Logs
+
+Activity Logs
+
+IP Tracking
+
+Device Tracking
+
+OTP Verification
+
+Rate Limiting
+
+========================================
+12. PERFORMANCE
+========================================
+
+Optimize:
+
+Database queries
+
+API performance
+
+Background jobs
+
+Notification queues
+
+PDF generation
+
+File downloads
+
+Lazy loading
+
+Caching
+
+========================================
+13. TESTING
+========================================
+
+Run complete production acceptance tests.
+
+Verify:
+
+✓ Booking Flow
+
+✓ Payment Flow
+
+✓ Invoice
+
+✓ Receipt
+
+✓ Agreement
+
+✓ Digital Signature
+
+✓ OTP
+
+✓ Visa
+
+✓ Ticket
+
+✓ Hotel
+
+✓ Timeline
+
+✓ Notifications
+
+✓ Dashboard
+
+✓ QR Verification
+
+✓ Document Center
+
+✓ Support Center
+
+✓ Reminder Engine
+
+✓ Admin Dashboard
+
+Fix every issue automatically until all tests pass.
+
+Finally:
+• Build production bundle.
+• Run database migrations if needed.
+• Deploy to VPS.
+• Restart services safely.
+• Verify every endpoint.
+• Produce a final deployment report showing all features are working successfully with zero critical errors.

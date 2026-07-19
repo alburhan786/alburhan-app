@@ -84,6 +84,7 @@ import { ADMIN_MOBILES } from "./routes/auth.js";
 import { startPaymentReminderCron } from "./jobs/paymentReminder.js";
 import { startFeedbackReminderCron } from "./jobs/feedbackReminder.js";
 import { startAgreementReminderCron } from "./jobs/agreementReminder.js";
+import { startTicketDepartureReminderCron } from "./jobs/ticketDepartureReminder.js";
 import { startDepartureReminderCron, startDocumentExpiryCron, startReturnAndFeedbackCron, startBalanceReminderCron, startDocumentReminderCron, startZiyaratReminderCron, startAgreementIntegrityCron } from "./lib/workflowEngine.js";
 import { DEFAULT_RULES } from "./routes/workflows.js";
 
@@ -1668,6 +1669,44 @@ async function runMigrations() {
     console.log("[Migration] documents tracking columns + download_logs ensured");
   } catch (err) { console.error("[Migration] documents tracking migration failed:", err); }
 
+  // ── Support Center tables ────────────────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS support_tickets (
+        id TEXT PRIMARY KEY,
+        ticket_number TEXT NOT NULL UNIQUE,
+        customer_id TEXT NOT NULL,
+        booking_id TEXT,
+        subject TEXT NOT NULL,
+        category TEXT NOT NULL DEFAULT 'general',
+        status TEXT NOT NULL DEFAULT 'open',
+        priority TEXT NOT NULL DEFAULT 'normal',
+        assigned_to TEXT,
+        resolved_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS st_customer_idx ON support_tickets(customer_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS st_status_idx ON support_tickets(status)`);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS support_messages (
+        id TEXT PRIMARY KEY,
+        ticket_id TEXT NOT NULL REFERENCES support_tickets(id) ON DELETE CASCADE,
+        sender_type TEXT NOT NULL CHECK (sender_type IN ('customer','admin')),
+        sender_id TEXT NOT NULL,
+        sender_name TEXT,
+        message TEXT NOT NULL,
+        attachment_url TEXT,
+        is_internal BOOLEAN NOT NULL DEFAULT false,
+        read_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS sm_ticket_idx ON support_messages(ticket_id)`);
+    console.log("[Migration] support_tickets + support_messages tables ensured");
+  } catch (err) { console.error("[Migration] support tables failed:", err); }
+
   // ── documents: extend enum + full lifecycle columns ─────────────────────────
   try {
     const newDocTypes = [
@@ -1899,6 +1938,7 @@ async function start() {
     startZiyaratReminderCron();
     startAgreementIntegrityCron();
     startAgreementReminderCron();
+    startTicketDepartureReminderCron();
     const scheduleAuditRetention = () => {
       const now = new Date();
       const nextRun = new Date(now);

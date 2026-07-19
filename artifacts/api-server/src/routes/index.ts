@@ -55,6 +55,8 @@ import whatsappRouter from "./whatsapp.js";
 import communicationRouter from "./communication.js";
 import autoNotificationsRouter from "./autoNotifications.js";
 import agreementsRouter from "./agreements.js";
+import customerJourneyRouter from "./customer-journey.js";
+import supportRouter from "./support.js";
 import { requireAdmin } from "../lib/auth.js";
 
 const router: IRouter = Router();
@@ -326,6 +328,8 @@ router.use("/whatsapp", whatsappRouter);
 router.use("/communication", communicationRouter);
 router.use("/auto-notifications", autoNotificationsRouter);
 router.use("/agreements", agreementsRouter);
+router.use("/customer/journey", customerJourneyRouter);
+router.use("/support", supportRouter);
 router.use("/webhook", webhooksRouter);
 router.use(storageRouter);
 

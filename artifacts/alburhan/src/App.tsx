@@ -19,6 +19,8 @@ import PaymentPage from "@/pages/public/PaymentPage";
 import Login from "@/pages/auth/Login";
 import CustomerDashboard from "@/pages/customer/Dashboard";
 import DocumentCenter from "@/pages/customer/DocumentCenter";
+import SupportCenter from "@/pages/customer/SupportCenter";
+import SupportManager from "@/pages/admin/SupportManager";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import PackagesManager from "@/pages/admin/PackagesManager";
 import BookingsManager from "@/pages/admin/BookingsManager";
@@ -175,6 +177,7 @@ function Router() {
       {/* Customer Routes */}
       <Route path="/customer/dashboard" component={() => <CustomerRoute component={CustomerDashboard} />} />
       <Route path="/customer/documents" component={() => <CustomerRoute component={DocumentCenter} />} />
+      <Route path="/customer/support" component={() => <CustomerRoute component={SupportCenter} />} />
       <Route path="/kyc" component={() => <CustomerRoute component={KYCPage} />} />
       <Route path="/agreement/:id/sign" component={() => <CustomerRoute component={AgreementSigning} />} />
 
@@ -241,6 +244,7 @@ function Router() {
       <Route path="/admin/gst-reports" component={() => <AdminRoute component={GSTReports} />} />
       <Route path="/admin/payroll" component={() => <AdminRoute component={PayrollManager} />} />
       <Route path="/admin/assets" component={() => <AdminRoute component={AssetManager} />} />
+      <Route path="/admin/support" component={() => <AdminRoute component={SupportManager} />} />
       <Route path="/admin/agreements" component={() => <AdminRoute component={AgreementCenter} />} />
       <Route path="/admin/audit-logs" component={() => <AdminRoute component={AuditLogs} />} />
       <Route path="/admin/system-health" component={() => <AdminRoute component={SystemHealth} />} />
