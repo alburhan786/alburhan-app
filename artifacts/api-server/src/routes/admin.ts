@@ -2093,4 +2093,75 @@ router.post("/chat", requireAdmin as any, async (req: AuthenticatedRequest, res)
   } catch (err: any) { res.status(500).json({ reply: `Error: ${err.message}`, data: [] }); }
 });
 
+// ════════════════════════════════════════════════════════════════════
+//  PILGRIM OPERATIONS CENTER
+// ════════════════════════════════════════════════════════════════════
+
+router.get("/pilgrim-ops", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const packageFilter = req.query.package as string | undefined;
+    const dateFilter    = req.query.date    as string | undefined;
+    const today         = new Date().toISOString().slice(0, 10);
+    const in7days       = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+    const in30days      = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+
+    const pkgWhere = packageFilter ? `AND b.package_name = $1` : "";
+    const dateWhere = dateFilter ? `AND b.preferred_departure_date::date = '${dateFilter}'::date` : "";
+    const pkgArgs  = packageFilter ? [packageFilter] : [];
+
+    const [
+      total, confirmed, pendingPay, pendingAgr, visaPend, ticketPend,
+      passExpiring, hotelAlloc, roomAlloc, transAlloc,
+      deptToday, returnToday, weekDep, pilgrims, pkgs,
+    ] = await Promise.all([
+      pool.query(`SELECT COUNT(*)::int AS cnt FROM bookings b WHERE 1=1 ${pkgWhere} ${dateWhere}`, pkgArgs),
+      pool.query(`SELECT COUNT(DISTINCT p.id)::int AS cnt FROM pilgrims p JOIN bookings b ON b.id=p.booking_id WHERE b.status='confirmed' ${pkgWhere} ${dateWhere}`, pkgArgs),
+      pool.query(`SELECT COUNT(*)::int AS cnt FROM bookings b WHERE b.status='approved' AND COALESCE(b.paid_amount,0)=0 ${pkgWhere} ${dateWhere}`, pkgArgs),
+      pool.query(`SELECT COUNT(*)::int AS cnt FROM agreements a JOIN bookings b ON b.id=a.booking_id WHERE a.status='pending_signature' ${pkgWhere} ${dateWhere}`, pkgArgs),
+      pool.query(`SELECT COUNT(DISTINCT b.id)::int AS cnt FROM bookings b LEFT JOIN pilgrims p ON p.booking_id=b.id WHERE b.status='confirmed' AND (p.visa_number IS NULL OR p.visa_number='') ${pkgWhere} ${dateWhere}`, pkgArgs),
+      pool.query(`SELECT COUNT(DISTINCT b.id)::int AS cnt FROM bookings b LEFT JOIN pilgrims p ON p.booking_id=b.id WHERE b.status='confirmed' AND (p.ticket_number IS NULL OR p.ticket_number='') ${pkgWhere} ${dateWhere}`, pkgArgs).catch(()=>({rows:[{cnt:0}]})),
+      pool.query(`SELECT COUNT(*)::int AS cnt FROM pilgrims p JOIN bookings b ON b.id=p.booking_id WHERE b.status='confirmed' AND p.passport_expiry_date IS NOT NULL AND p.passport_expiry_date::date BETWEEN $1 AND $2 ${packageFilter ? `AND b.package_name=$3` : ""}`, packageFilter ? [today, in30days, packageFilter] : [today, in30days]),
+      pool.query(`SELECT COUNT(*)::int AS cnt FROM pilgrims p JOIN bookings b ON b.id=p.booking_id WHERE b.status='confirmed' AND (p.hotel_name IS NULL OR p.hotel_name='') ${pkgWhere} ${dateWhere}`, pkgArgs).catch(()=>({rows:[{cnt:0}]})),
+      pool.query(`SELECT COUNT(*)::int AS cnt FROM room_allocations ra JOIN bookings b ON b.id=ra.booking_id WHERE b.status='confirmed' AND (ra.room_number IS NULL OR ra.room_number='') ${pkgWhere} ${dateWhere}`, pkgArgs).catch(()=>({rows:[{cnt:0}]})),
+      pool.query(`SELECT COUNT(*)::int AS cnt FROM pilgrims p JOIN bookings b ON b.id=p.booking_id WHERE b.status='confirmed' AND (p.bus_number IS NULL OR p.bus_number='') ${pkgWhere} ${dateWhere}`, pkgArgs).catch(()=>({rows:[{cnt:0}]})),
+      pool.query(`SELECT customer_name, booking_number, package_name, customer_mobile, preferred_departure_date::text FROM bookings WHERE status='confirmed' AND preferred_departure_date::date=$1 ${pkgWhere}`, packageFilter ? [today, packageFilter] : [today]),
+      pool.query(`SELECT customer_name, booking_number, package_name, customer_mobile, return_date::text FROM bookings WHERE status='confirmed' AND return_date::date=$1 ${pkgWhere}`, packageFilter ? [today, packageFilter] : [today]).catch(()=>({rows:[]})),
+      pool.query(`SELECT customer_name, booking_number, package_name, customer_mobile, preferred_departure_date::text FROM bookings WHERE status='confirmed' AND preferred_departure_date::date BETWEEN $1 AND $2 ${pkgWhere}`, packageFilter ? [today, in7days, packageFilter] : [today, in7days]),
+      pool.query(`
+        SELECT p.name AS pilgrim_name, p.passport_number, p.visa_number,
+               b.booking_number, b.package_name, b.customer_mobile,
+               b.preferred_departure_date::text AS departure_date,
+               (p.passport_number IS NOT NULL AND p.passport_number != '') AS has_passport,
+               (p.visa_number IS NOT NULL AND p.visa_number != '') AS has_visa
+        FROM pilgrims p JOIN bookings b ON b.id=p.booking_id
+        WHERE b.status IN ('confirmed','approved') ${pkgWhere} ${dateWhere}
+        ORDER BY b.preferred_departure_date, p.name
+        LIMIT 200
+      `, pkgArgs),
+      pool.query(`SELECT DISTINCT package_name FROM bookings WHERE package_name IS NOT NULL AND package_name != '' ORDER BY package_name`),
+    ]);
+
+    res.json({
+      kpis: {
+        totalBookings:      total.rows[0]?.cnt        || 0,
+        confirmedPilgrims:  confirmed.rows[0]?.cnt    || 0,
+        pendingPayments:    pendingPay.rows[0]?.cnt   || 0,
+        pendingAgreements:  pendingAgr.rows[0]?.cnt   || 0,
+        visaPending:        visaPend.rows[0]?.cnt     || 0,
+        ticketPending:      ticketPend.rows[0]?.cnt   || 0,
+        passportExpiring:   passExpiring.rows[0]?.cnt || 0,
+        hotelAlloc:         hotelAlloc.rows[0]?.cnt   || 0,
+        roomAlloc:          roomAlloc.rows[0]?.cnt    || 0,
+        transportAlloc:     transAlloc.rows[0]?.cnt   || 0,
+        departureToday:     deptToday.rows.length     || 0,
+        returnToday:        returnToday.rows.length   || 0,
+        todayDepartures:    deptToday.rows,
+        weekDepartures:     weekDep.rows,
+      },
+      pilgrims: pilgrims.rows,
+      packages: pkgs.rows.map((r: any) => r.package_name),
+    });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
 export default router;

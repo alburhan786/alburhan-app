@@ -41,6 +41,7 @@ import BusinessSettings from "@/pages/admin/BusinessSettings";
 import ProductionReport from "@/pages/admin/ProductionReport";
 import FinanceHub from "@/pages/admin/FinanceHub";
 import AdminChat from "@/pages/admin/AdminChat";
+import PilgrimOpsCenter from "@/pages/admin/PilgrimOpsCenter";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import PackagesManager from "@/pages/admin/PackagesManager";
 import BookingsManager from "@/pages/admin/BookingsManager";
@@ -284,6 +285,7 @@ function Router() {
       <Route path="/admin/production-report" component={() => <AdminRoute component={ProductionReport} />} />
       <Route path="/admin/finance" component={() => <AdminRoute component={FinanceHub} />} />
       <Route path="/admin/chat" component={() => <AdminRoute component={AdminChat} />} />
+      <Route path="/admin/pilgrim-ops" component={() => <AdminRoute component={PilgrimOpsCenter} />} />
       <Route path="/knowledge" component={KnowledgeCenter} />
       <Route path="/admin/agreements" component={() => <AdminRoute component={AgreementCenter} />} />
       <Route path="/admin/audit-logs" component={() => <AdminRoute component={AuditLogs} />} />

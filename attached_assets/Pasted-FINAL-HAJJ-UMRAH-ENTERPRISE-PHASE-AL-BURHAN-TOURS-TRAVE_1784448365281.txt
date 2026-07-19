@@ -1,0 +1,225 @@
+FINAL HAJJ & UMRAH ENTERPRISE PHASE
+(AL BURHAN TOURS & TRAVELS)
+
+Do NOT remove, modify, or break any existing functionality.
+
+All current modules must continue working exactly as they do today.
+
+====================================================
+1. PILGRIM OPERATIONS CENTER
+====================================================
+
+Create one unified operations dashboard showing:
+
+• Total Bookings
+• Confirmed Pilgrims
+• Pending Payments
+• Pending Agreements
+• Visa Pending
+• Ticket Pending
+• Passport Expiring
+• Hotel Allocation Pending
+• Room Allocation Pending
+• Transport Allocation Pending
+• Departure Today
+• Return Today
+
+Allow filtering by:
+
+• Package
+• Group
+• Flight
+• Departure Date
+• City
+• Branch
+
+====================================================
+2. LIVE HAJJ GROUP MANAGEMENT
+====================================================
+
+Admin can update:
+
+• Current City
+• Current Hotel
+• Current Activity
+• Departure Time
+• Bus Number
+• Guide Name
+• Emergency Contact
+
+Customers automatically see updates in their dashboard.
+
+Send updates through:
+
+• WhatsApp
+• SMS
+• Email
+• Push Notification
+
+====================================================
+3. FLIGHT & HOTEL OPERATIONS
+====================================================
+
+Create operational dashboards for:
+
+Flights
+• Seat Allocation
+• Boarding Status
+• PNR Status
+• Delays
+• Check-in
+
+Hotels
+• Occupancy
+• Vacant Rooms
+• Room Changes
+• Check-in
+• Check-out
+
+Transport
+• Bus Allocation
+• Driver
+• Vehicle
+• Pickup Time
+
+====================================================
+4. DIGITAL DOCUMENT VAULT
+====================================================
+
+One secure page where customers can download:
+
+Passport Copy
+Visa
+Air Ticket
+Invoice
+Receipt
+Agreement
+ID Card
+Medical Documents
+Travel Insurance
+Hotel Voucher
+Transport Details
+Certificates
+
+Support:
+PDF
+PNG
+JPG
+ZIP download
+
+====================================================
+5. GUIDE MOBILE PANEL
+====================================================
+
+Guide can:
+
+Mark Attendance
+Upload Group Photos
+Send Group Messages
+Report Emergencies
+Update Location
+Confirm Hotel Check-in
+Confirm Departure
+
+====================================================
+6. CUSTOMER TRAVEL ASSISTANT
+====================================================
+
+Show in customer dashboard:
+
+Today's Schedule
+Prayer Times
+Weather
+Currency Rate
+Group Status
+Hotel Information
+Room Number
+Flight Details
+Transport Details
+Emergency Numbers
+Knowledge Center
+Packing Checklist
+Important Duas
+Manasik Guide
+
+====================================================
+7. EXECUTIVE ANALYTICS
+====================================================
+
+Owner Dashboard showing:
+
+Revenue
+Profit
+Expenses
+Outstanding Amount
+Cash Flow
+Visa Completion %
+Agreement Completion %
+Ticket Completion %
+Customer Satisfaction
+Staff Productivity
+Marketing Conversion
+Monthly Growth
+
+====================================================
+8. FINAL SYSTEM VALIDATION
+====================================================
+
+Run a complete production audit.
+
+Verify:
+
+Bookings
+Payments
+Invoices
+Documents
+Digital Agreements
+WhatsApp
+SMS
+Email
+Notifications
+Finance
+Reports
+Support
+Knowledge Center
+AI Operations
+Executive Dashboard
+Customer Dashboard
+Admin Dashboard
+Guide Panel
+PWA
+Security
+Performance
+Cron Jobs
+Database Integrity
+
+====================================================
+FINAL REPORT
+====================================================
+
+Generate a Production Readiness Report including:
+
+✔ Total Modules
+✔ Total API Endpoints
+✔ Total Database Tables
+✔ Total Dashboards
+✔ Total Reports
+✔ Total AI Features
+✔ Total Notification Templates
+✔ Total Scheduled Jobs
+✔ Total Documents
+✔ Total Finance Modules
+✔ Total Customer Features
+✔ Total Admin Features
+✔ Security Score
+✔ Performance Score
+✔ Database Health
+✔ Notification Health
+✔ Backup Status
+✔ Mobile Readiness
+✔ ERP Completion %
+✔ Production Readiness %
+
+If any issue is found, automatically fix it before generating the final report.
+
+Do not finish until all builds pass, all tests pass, all deployments succeed, and no existing functionality is broken.
