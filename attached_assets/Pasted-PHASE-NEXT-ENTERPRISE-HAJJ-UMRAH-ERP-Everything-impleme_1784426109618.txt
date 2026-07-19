@@ -1,0 +1,419 @@
+PHASE NEXT – ENTERPRISE HAJJ & UMRAH ERP
+
+Everything implemented previously must continue working. Do not break any existing functionality. Build all new features with production-quality code, responsive UI, secure APIs, audit logs, background jobs, database migrations (if required), and end-to-end testing.
+
+==================================================
+1. PILGRIM MANAGEMENT
+==================================================
+
+Create a complete Pilgrim Management module.
+
+Store:
+
+• Passport
+• Visa
+• Aadhaar
+• PAN
+• Blood Group
+• Medical Information
+• Emergency Contact
+• Mahram Details
+• Luggage Number
+• Group Number
+• Seat Number
+• Flight Details
+• Hotel Details
+• Room Number
+
+Generate a Pilgrim ID Card with QR Code.
+
+==================================================
+2. GROUP MANAGEMENT
+==================================================
+
+Allow admin to:
+
+• Create Groups
+• Assign Group Leader
+• Assign Guide
+• Assign Bus
+• Assign Hotel
+• Assign Room
+• Assign Pilgrims
+
+Dashboard should display:
+
+Total Pilgrims
+
+Total Groups
+
+Room Occupancy
+
+Flights
+
+Hotels
+
+==================================================
+3. BUS & TRANSPORT MANAGEMENT
+==================================================
+
+Manage:
+
+Airport Pickup
+
+Airport Drop
+
+Makkah Transport
+
+Madinah Transport
+
+Ziyarat Bus
+
+Driver
+
+Vehicle
+
+Seat Assignment
+
+Pickup Time
+
+Live Status
+
+Send updates through:
+
+WhatsApp
+
+SMS
+
+Email
+
+==================================================
+4. LIVE HAJJ DASHBOARD
+==================================================
+
+Customer Dashboard should show:
+
+Current Booking Status
+
+Payment Status
+
+Agreement Status
+
+Visa Status
+
+Ticket Status
+
+Hotel
+
+Room
+
+Bus
+
+Guide
+
+Departure Countdown
+
+Flight Countdown
+
+Weather (optional)
+
+Prayer Timings
+
+Emergency Contacts
+
+==================================================
+5. DIGITAL ID CARD
+==================================================
+
+Generate Smart ID Card.
+
+Include:
+
+Company Logo
+
+Photo
+
+QR Code
+
+Booking ID
+
+Pilgrim ID
+
+Passport
+
+Visa Number
+
+Blood Group
+
+Emergency Contact
+
+Package
+
+Group Number
+
+Room Number
+
+==================================================
+6. SMART ADMIN REPORTS
+==================================================
+
+Generate reports:
+
+Revenue
+
+Pending Payments
+
+Pending Visas
+
+Pending Tickets
+
+Pending Agreements
+
+Hotel Occupancy
+
+Pilgrim List
+
+Flight List
+
+Departure List
+
+Arrival List
+
+Download:
+
+Excel
+
+PDF
+
+CSV
+
+==================================================
+7. MOBILE NOTIFICATION CENTER
+==================================================
+
+Create notification center.
+
+Show:
+
+WhatsApp
+
+SMS
+
+Email
+
+Push Notifications
+
+Delivered
+
+Read
+
+Failed
+
+Retry
+
+==================================================
+8. EMPLOYEE MANAGEMENT
+==================================================
+
+Manage:
+
+Staff
+
+Guide
+
+Driver
+
+Manager
+
+Accounts
+
+Operations
+
+Assign Roles & Permissions.
+
+==================================================
+9. AI CUSTOMER ASSISTANT
+==================================================
+
+Train chatbot using website data.
+
+Allow customers to ask:
+
+Booking Status
+
+Payment Status
+
+Visa Status
+
+Agreement Status
+
+Hotel
+
+Flight
+
+Package
+
+Documents
+
+Support
+
+==================================================
+10. SUPER ADMIN DASHBOARD
+==================================================
+
+Display:
+
+Today's Revenue
+
+Today's Bookings
+
+Pending Payments
+
+Pending Agreements
+
+Pending Visas
+
+Pending Tickets
+
+Pending Hotels
+
+Support Tickets
+
+Notification Statistics
+
+WhatsApp Delivery Rate
+
+SMS Delivery Rate
+
+Email Delivery Rate
+
+Customer Satisfaction
+
+==================================================
+11. AUTOMATIC DOCUMENT GENERATION
+==================================================
+
+Automatically generate:
+
+Invoice
+
+Receipt
+
+Agreement
+
+Signed Agreement
+
+Visa Letter
+
+Travel Voucher
+
+Hotel Voucher
+
+Transport Voucher
+
+ID Card
+
+Luggage Tag
+
+Journey Summary
+
+Completion Certificate
+
+==================================================
+12. COMPLETE AUDIT SYSTEM
+==================================================
+
+Track every action:
+
+Admin
+
+Staff
+
+Customer
+
+Login
+
+Payments
+
+Notifications
+
+Agreement
+
+Documents
+
+Downloads
+
+Edits
+
+Deletes
+
+IP Address
+
+Device
+
+Browser
+
+==================================================
+13. FINAL QUALITY ASSURANCE
+==================================================
+
+Run complete production testing.
+
+Verify:
+
+✓ Booking
+
+✓ Payment
+
+✓ Invoice
+
+✓ Receipt
+
+✓ Agreement
+
+✓ OTP
+
+✓ Digital Signature
+
+✓ Visa
+
+✓ Ticket
+
+✓ Hotel
+
+✓ Room
+
+✓ Bus
+
+✓ Notifications
+
+✓ Timeline
+
+✓ Support
+
+✓ Reports
+
+✓ QR Verification
+
+✓ ZIP Download
+
+✓ Customer Dashboard
+
+✓ Admin Dashboard
+
+✓ Security
+
+✓ Performance
+
+Fix any issue automatically until all tests pass.
+
+Finally:
+
+• Build production bundle.
+• Run database migrations.
+• Deploy to VPS.
+• Restart services safely.
+• Verify every API.
+• Verify every notification channel.
+• Verify all dashboard pages.
+• Produce a final production deployment report with zero critical errors.

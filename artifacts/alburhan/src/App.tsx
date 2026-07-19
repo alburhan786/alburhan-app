@@ -21,6 +21,8 @@ import CustomerDashboard from "@/pages/customer/Dashboard";
 import DocumentCenter from "@/pages/customer/DocumentCenter";
 import SupportCenter from "@/pages/customer/SupportCenter";
 import SupportManager from "@/pages/admin/SupportManager";
+import SuperDashboard from "@/pages/admin/SuperDashboard";
+import PilgrimReports from "@/pages/admin/PilgrimReports";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import PackagesManager from "@/pages/admin/PackagesManager";
 import BookingsManager from "@/pages/admin/BookingsManager";
@@ -245,6 +247,8 @@ function Router() {
       <Route path="/admin/payroll" component={() => <AdminRoute component={PayrollManager} />} />
       <Route path="/admin/assets" component={() => <AdminRoute component={AssetManager} />} />
       <Route path="/admin/support" component={() => <AdminRoute component={SupportManager} />} />
+      <Route path="/admin/super" component={() => <AdminRoute component={SuperDashboard} />} />
+      <Route path="/admin/pilgrim-reports" component={() => <AdminRoute component={PilgrimReports} />} />
       <Route path="/admin/agreements" component={() => <AdminRoute component={AgreementCenter} />} />
       <Route path="/admin/audit-logs" component={() => <AdminRoute component={AuditLogs} />} />
       <Route path="/admin/system-health" component={() => <AdminRoute component={SystemHealth} />} />

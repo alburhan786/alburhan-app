@@ -61,6 +61,9 @@ const MODULE_CARDS = [
   { icon: ImageIcon, label: "Gallery", desc: "Homepage banner images", href: "/admin/gallery", color: "bg-lime-50 text-lime-700", border: "border-lime-200" },
   { icon: ShieldCheck, label: "KYC Management", desc: "Review & verify documents", href: "/admin/kyc", color: "bg-indigo-50 text-indigo-700", border: "border-indigo-200" },
   { icon: Megaphone, label: "Broadcast Messages", desc: "Send SMS & WhatsApp blasts", href: "/admin/broadcast", color: "bg-cyan-50 text-cyan-700", border: "border-cyan-200" },
+  { icon: TrendingUp, label: "Super Dashboard", desc: "Live KPIs, notifications & alerts", href: "/admin/super", color: "bg-rose-50 text-rose-700", border: "border-rose-200" },
+  { icon: BarChart2, label: "Pilgrim Reports", desc: "Export pilgrim, visa & flight lists", href: "/admin/pilgrim-reports", color: "bg-teal-50 text-teal-700", border: "border-teal-200" },
+  { icon: MessageSquare, label: "Support Center", desc: "Customer support tickets", href: "/admin/support", color: "bg-blue-50 text-blue-700", border: "border-blue-200" },
 ];
 
 function getStatusBadge(status: string) {

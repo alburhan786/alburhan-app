@@ -264,6 +264,263 @@ router.get("/reports/payments", requireAdmin as any, async (_req: AuthenticatedR
   })));
 });
 
+// ── Super Admin Dashboard Stats ───────────────────────────────────────────────
+router.get("/super-stats", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
+  try {
+    const [
+      todayRes, pendingRes, agreementRes, pilgrimRes, notifRes, supportRes, feedbackRes, flightRes, hotelRes,
+    ] = await Promise.all([
+      // Today's revenue + bookings
+      pool.query(`
+        SELECT
+          COALESCE(SUM(pt.amount), 0)::float AS today_revenue,
+          COUNT(DISTINCT b.id) FILTER (WHERE b.created_at::date = CURRENT_DATE)::int AS today_bookings,
+          COUNT(DISTINCT pt.id) FILTER (WHERE pt.created_at::date = CURRENT_DATE)::int AS today_payments
+        FROM bookings b
+        LEFT JOIN payment_transactions pt ON pt.booking_id = b.id AND pt.status = 'completed' AND pt.created_at::date = CURRENT_DATE
+      `),
+      // Pending counts
+      pool.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE status IN ('approved','pending'))::int AS pending_approvals,
+          COUNT(*) FILTER (WHERE status = 'confirmed' AND COALESCE(paid_amount,0) < COALESCE(final_amount,0))::int AS pending_payments,
+          COUNT(*)::int AS total_confirmed
+        FROM bookings
+      `),
+      // Pending agreements
+      pool.query(`SELECT COUNT(*)::int AS pending FROM agreements WHERE status = 'pending_signature'`).catch(() => ({ rows: [{ pending: 0 }] })),
+      // Pilgrims: pending visas
+      pool.query(`
+        SELECT
+          COUNT(*)::int AS total_pilgrims,
+          COUNT(*) FILTER (WHERE visa_status IS NULL OR visa_status = 'not_applied')::int AS pending_visas,
+          COUNT(*) FILTER (WHERE visa_status = 'applied' OR visa_status = 'processing')::int AS processing_visas,
+          COUNT(*) FILTER (WHERE visa_status = 'received')::int AS received_visas
+        FROM pilgrims
+      `),
+      // Notification delivery rates (last 7 days)
+      pool.query(`
+        SELECT
+          channel,
+          COUNT(*)::int AS total,
+          COUNT(*) FILTER (WHERE status = 'sent' OR status = 'delivered')::int AS delivered,
+          COUNT(*) FILTER (WHERE status = 'failed')::int AS failed
+        FROM notification_logs
+        WHERE created_at > NOW() - INTERVAL '7 days'
+        GROUP BY channel
+      `).catch(() => ({ rows: [] })),
+      // Support tickets
+      pool.query(`
+        SELECT
+          COUNT(*)::int AS total,
+          COUNT(*) FILTER (WHERE status = 'open')::int AS open_count,
+          COUNT(*) FILTER (WHERE status = 'pending')::int AS pending_count
+        FROM support_tickets
+      `).catch(() => ({ rows: [{ total: 0, open_count: 0, pending_count: 0 }] })),
+      // Customer feedback/satisfaction
+      pool.query(`
+        SELECT
+          COUNT(*)::int AS total_reviews,
+          ROUND(AVG(rating), 1)::float AS avg_rating
+        FROM feedback
+        WHERE rating IS NOT NULL
+      `).catch(() => ({ rows: [{ total_reviews: 0, avg_rating: null }] })),
+      // Flights
+      pool.query(`
+        SELECT COUNT(*)::int AS total_flights,
+        COUNT(*) FILTER (WHERE departure_date >= CURRENT_DATE AND departure_date <= CURRENT_DATE + 7)::int AS departures_next_7d
+        FROM group_flights WHERE status != 'cancelled'
+      `).catch(() => ({ rows: [{ total_flights: 0, departures_next_7d: 0 }] })),
+      // Hotels
+      pool.query(`SELECT COUNT(*)::int AS total_hotels, COUNT(*) FILTER (WHERE is_deleted = false)::int AS active_hotels FROM hotels`).catch(() => ({ rows: [{ total_hotels: 0, active_hotels: 0 }] })),
+    ]);
+
+    const today = todayRes.rows[0] || {};
+    const pending = pendingRes.rows[0] || {};
+    const agreement = agreementRes.rows[0] || {};
+    const pilgrim = pilgrimRes.rows[0] || {};
+    const support = supportRes.rows[0] || {};
+    const feedback = feedbackRes.rows[0] || {};
+    const flights = flightRes.rows[0] || {};
+    const hotels = hotelRes.rows[0] || {};
+
+    // Build notification rates by channel
+    const notifByChannel: Record<string, { total: number; delivered: number; failed: number; rate: number }> = {};
+    for (const row of notifRes.rows) {
+      const rate = row.total > 0 ? Math.round((row.delivered / row.total) * 100) : 0;
+      notifByChannel[row.channel] = { total: row.total, delivered: row.delivered, failed: row.failed, rate };
+    }
+
+    res.json({
+      today: {
+        revenue: Number(today.today_revenue || 0),
+        bookings: Number(today.today_bookings || 0),
+        payments: Number(today.today_payments || 0),
+      },
+      pending: {
+        approvals: Number(pending.pending_approvals || 0),
+        payments: Number(pending.pending_payments || 0),
+        agreements: Number(agreement.pending || 0),
+        visas: Number(pilgrim.pending_visas || 0),
+        processingVisas: Number(pilgrim.processing_visas || 0),
+        supportTickets: Number(support.open_count || 0) + Number(support.pending_count || 0),
+      },
+      pilgrims: {
+        total: Number(pilgrim.total_pilgrims || 0),
+        pendingVisas: Number(pilgrim.pending_visas || 0),
+        processingVisas: Number(pilgrim.processing_visas || 0),
+        receivedVisas: Number(pilgrim.received_visas || 0),
+      },
+      notifications: notifByChannel,
+      support: {
+        total: Number(support.total || 0),
+        open: Number(support.open_count || 0),
+        pending: Number(support.pending_count || 0),
+      },
+      satisfaction: {
+        totalReviews: Number(feedback.total_reviews || 0),
+        avgRating: feedback.avg_rating ? Number(feedback.avg_rating) : null,
+      },
+      flights: {
+        total: Number(flights.total_flights || 0),
+        next7Days: Number(flights.departures_next_7d || 0),
+      },
+      hotels: {
+        total: Number(hotels.total_hotels || 0),
+        active: Number(hotels.active_hotels || 0),
+      },
+    });
+  } catch (err: any) {
+    console.error("[super-stats] error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Reports: Pilgrim List ─────────────────────────────────────────────────────
+router.get("/reports/pilgrims", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { groupId, visaStatus, format } = req.query as Record<string, string>;
+    const conds: string[] = [];
+    const params: any[] = [];
+
+    if (groupId) { params.push(groupId); conds.push(`p.group_id = $${params.length}`); }
+    if (visaStatus) { params.push(visaStatus); conds.push(`p.visa_status = $${params.length}`); }
+
+    const where = conds.length ? "WHERE " + conds.join(" AND ") : "";
+    const result = await pool.query(
+      `SELECT
+        p.serial_number, p.full_name, p.mobile_india, p.mobile_saudi,
+        p.passport_number, p.passport_expiry_date, p.nationality,
+        p.date_of_birth, p.gender, p.blood_group,
+        p.visa_status, p.visa_number, p.visa_type, p.visa_applied_date, p.visa_received_date,
+        p.medical_notes, p.medical_fitness,
+        p.emergency_contact_name, p.emergency_contact_phone, p.mahram_name, p.mahram_relation,
+        p.luggage_number, p.seat_number,
+        hg.group_name AS group_name,
+        b.booking_number, b.package_name,
+        u.email AS customer_email
+       FROM pilgrims p
+       LEFT JOIN hajj_groups hg ON hg.id = p.group_id
+       LEFT JOIN bookings b ON b.customer_mobile = p.mobile_india
+       LEFT JOIN users u ON u.mobile = p.mobile_india
+       ${where}
+       ORDER BY p.serial_number`,
+      params
+    );
+    res.json(result.rows);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Reports: Hotel Occupancy ──────────────────────────────────────────────────
+router.get("/reports/hotel-occupancy", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        h.id, h.name, h.city, h.stars, h.total_rooms,
+        h.check_in_date, h.check_out_date,
+        COUNT(pra.id)::int AS occupied_rooms,
+        COUNT(DISTINCT pra.pilgrim_id)::int AS assigned_pilgrims,
+        h.total_rooms - COUNT(DISTINCT pra.room_id)::int AS vacant_rooms
+      FROM hotels h
+      LEFT JOIN pilgrim_room_assignments pra ON pra.hotel_id = h.id
+      WHERE h.is_deleted = false
+      GROUP BY h.id
+      ORDER BY h.city, h.name
+    `);
+    res.json(result.rows);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Reports: Departure List ───────────────────────────────────────────────────
+router.get("/reports/departure-list", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { from, to } = req.query as Record<string, string>;
+    const params: any[] = [];
+    const conds: string[] = ["gf.flight_type = 'departure' OR gf.flight_type IS NULL"];
+    if (from) { params.push(from); conds.push(`gf.departure_date >= $${params.length}`); }
+    if (to) { params.push(to); conds.push(`gf.departure_date <= $${params.length}`); }
+    const where = "WHERE " + conds.join(" AND ");
+
+    const flightRes = await pool.query(
+      `SELECT gf.id, gf.flight_number, gf.airline, gf.pnr,
+              gf.departure_airport, gf.arrival_airport,
+              gf.departure_date, gf.departure_time,
+              gf.arrival_date, gf.arrival_time,
+              gf.pilgrims_assigned, gf.baggage_allowance,
+              hg.group_name
+       FROM group_flights gf
+       LEFT JOIN hajj_groups hg ON hg.id = gf.group_id
+       ${where}
+       ORDER BY gf.departure_date, gf.departure_time`,
+      params
+    );
+
+    // Enrich with pilgrim details
+    const rows = [];
+    for (const flight of flightRes.rows) {
+      const pilgrimIds: string[] = Array.isArray(flight.pilgrims_assigned) ? flight.pilgrims_assigned : [];
+      let pilgrims: any[] = [];
+      if (pilgrimIds.length > 0) {
+        const pr = await pool.query(
+          `SELECT serial_number, full_name, passport_number, mobile_india, seat_number, visa_number
+           FROM pilgrims WHERE id = ANY($1) ORDER BY serial_number`,
+          [pilgrimIds]
+        );
+        pilgrims = pr.rows;
+      }
+      rows.push({ ...flight, pilgrims });
+    }
+    res.json(rows);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Reports: Pending Visas ────────────────────────────────────────────────────
+router.get("/reports/pending-visas", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        p.serial_number, p.full_name, p.mobile_india, p.passport_number,
+        p.passport_expiry_date, p.nationality, p.date_of_birth, p.gender,
+        p.visa_status, p.visa_applied_date, p.medical_fitness,
+        hg.group_name, b.booking_number, b.package_name
+      FROM pilgrims p
+      LEFT JOIN hajj_groups hg ON hg.id = p.group_id
+      LEFT JOIN bookings b ON b.customer_mobile = p.mobile_india
+      WHERE p.visa_status IS NULL OR p.visa_status IN ('not_applied', 'applied', 'processing', 'rejected')
+      ORDER BY p.visa_status NULLS FIRST, p.serial_number
+    `);
+    res.json(result.rows);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 function generateBookingNumber(): string {
   const now = new Date();
   const yy = now.getFullYear().toString().slice(-2);

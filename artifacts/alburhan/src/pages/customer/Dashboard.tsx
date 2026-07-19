@@ -33,6 +33,157 @@ const MANDATORY_DOCS = [
 
 const BASE_API = import.meta.env.VITE_API_URL || "";
 
+// ── Departure Countdown Card ────────────────────────────────────────────────────
+function DepartureCountdownCard({ departureDate, bookingId }: { departureDate?: string; bookingId: string }) {
+  const [countdown, setCountdown] = useState<{ days: number; hours: number; minutes: number; seconds: number } | null>(null);
+  const [flightDate, setFlightDate] = useState<Date | null>(null);
+  const [prayers, setPrayers] = useState<any | null>(null);
+  const [loadingPrayers, setLoadingPrayers] = useState(false);
+
+  // Resolve actual flight departure from journey API, fallback to booking date
+  useEffect(() => {
+    if (!bookingId) return;
+    fetch(`${BASE_API}/api/customer/journey/${bookingId}`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        const fl = d?.flights?.[0];
+        if (fl?.departure_date) {
+          const dt = new Date(fl.departure_date);
+          if (fl.departure_time) {
+            const [h, m] = fl.departure_time.split(":");
+            dt.setHours(parseInt(h || "0"), parseInt(m || "0"), 0, 0);
+          }
+          setFlightDate(dt);
+        } else if (departureDate) {
+          setFlightDate(new Date(departureDate));
+        }
+      })
+      .catch(() => { if (departureDate) setFlightDate(new Date(departureDate)); });
+  }, [bookingId, departureDate]);
+
+  // Live countdown ticker
+  useEffect(() => {
+    if (!flightDate) return;
+    const tick = () => {
+      const diff = flightDate.getTime() - Date.now();
+      if (diff <= 0) { setCountdown({ days: 0, hours: 0, minutes: 0, seconds: 0 }); return; }
+      setCountdown({
+        days: Math.floor(diff / 86400000),
+        hours: Math.floor((diff % 86400000) / 3600000),
+        minutes: Math.floor((diff % 3600000) / 60000),
+        seconds: Math.floor((diff % 60000) / 1000),
+      });
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [flightDate]);
+
+  // Prayer timings (Makkah)
+  useEffect(() => {
+    setLoadingPrayers(true);
+    fetch("https://api.aladhan.com/v1/timingsByCity?city=Makkah&country=SA&method=4", { mode: "cors" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.data?.timings) setPrayers(d.data.timings); })
+      .catch(() => {})
+      .finally(() => setLoadingPrayers(false));
+  }, []);
+
+  if (!flightDate || !countdown) return null;
+  const departed = countdown.days === 0 && countdown.hours === 0 && countdown.minutes === 0;
+
+  const PRAYER_KEYS = [
+    { key: "Fajr", label: "Fajr" },
+    { key: "Dhuhr", label: "Dhuhr" },
+    { key: "Asr", label: "Asr" },
+    { key: "Maghrib", label: "Maghrib" },
+    { key: "Isha", label: "Isha" },
+  ];
+
+  // Detect next prayer
+  const now = new Date();
+  const nowMins = now.getHours() * 60 + now.getMinutes();
+  let nextPrayer: string | null = null;
+  if (prayers) {
+    for (const p of PRAYER_KEYS) {
+      const [h, m] = (prayers[p.key] || "").split(":").map(Number);
+      if (!isNaN(h) && h * 60 + m > nowMins) { nextPrayer = p.key; break; }
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border border-border bg-gradient-to-br from-primary/5 to-background overflow-hidden">
+      {/* Header */}
+      <div className="px-4 pt-4 pb-3 border-b border-border/60">
+        <div className="flex items-center gap-2.5 mb-3">
+          <span className="text-xl">✈️</span>
+          <p className="font-bold text-sm">
+            {departed ? "Flight Departed!" : "Departure Countdown"}
+          </p>
+        </div>
+        {/* Countdown tiles */}
+        {!departed ? (
+          <div className="grid grid-cols-4 gap-2">
+            {[
+              { val: countdown.days, label: "Days" },
+              { val: countdown.hours, label: "Hours" },
+              { val: countdown.minutes, label: "Mins" },
+              { val: countdown.seconds, label: "Secs" },
+            ].map(t => (
+              <div key={t.label} className="rounded-xl bg-primary/10 border border-primary/20 py-2 text-center">
+                <p className="text-2xl font-bold font-mono text-primary leading-none">
+                  {String(t.val).padStart(2, "0")}
+                </p>
+                <p className="text-[10px] text-muted-foreground mt-0.5 font-medium">{t.label}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-2">
+            <p className="text-emerald-700 font-semibold text-sm">Bon Voyage! 🌙</p>
+          </div>
+        )}
+        <p className="text-xs text-muted-foreground mt-2 text-center">
+          {flightDate.toLocaleDateString("en-IN", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}
+        </p>
+      </div>
+
+      {/* Prayer Timings (Makkah) */}
+      <div className="px-4 py-3">
+        <div className="flex items-center gap-1.5 mb-2">
+          <span className="text-sm">🕌</span>
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Prayer Timings — Makkah</p>
+        </div>
+        {loadingPrayers ? (
+          <p className="text-xs text-muted-foreground">Loading prayer times…</p>
+        ) : prayers ? (
+          <div className="grid grid-cols-5 gap-1.5">
+            {PRAYER_KEYS.map(p => (
+              <div
+                key={p.key}
+                className={`rounded-lg p-1.5 text-center border transition-all ${
+                  nextPrayer === p.key
+                    ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                    : "bg-muted/40 border-border/50"
+                }`}
+              >
+                <p className={`text-[10px] font-semibold ${nextPrayer === p.key ? "text-primary-foreground" : "text-muted-foreground"}`}>
+                  {p.label}
+                </p>
+                <p className={`text-[11px] font-bold font-mono mt-0.5 ${nextPrayer === p.key ? "text-primary-foreground" : "text-foreground"}`}>
+                  {prayers[p.key] || "--"}
+                </p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">Prayer times unavailable</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Journey Status Card (Visa / Flight / Hotel) ────────────────────────────────
 function JourneyStatusCard({ bookingId }: { bookingId: string }) {
   const [data, setData] = useState<any | null>(null);
@@ -2651,6 +2802,10 @@ export default function CustomerDashboard() {
 
                     {(booking.status === 'approved' || booking.status === 'confirmed' || booking.status === 'partially_paid') && (
                       <div className="mx-5 mb-4 space-y-4">
+                        <DepartureCountdownCard
+                          bookingId={booking.id}
+                          departureDate={booking.preferredDepartureDate || booking.preferred_departure_date}
+                        />
                         <JourneyStatusCard bookingId={booking.id} />
                         <TravelDetailsCard bookingId={booking.id} initialStatus={booking.travellerDetailsStatus || "not_submitted"} />
                         <MandatoryDocumentsCard bookingId={booking.id} onOpenUpload={() => setUploadBookingId(booking.id)} />
