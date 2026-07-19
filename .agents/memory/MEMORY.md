@@ -51,3 +51,4 @@
 - [Support center module](support-center.md) — support_tickets + support_messages tables (migration on startup); routes at /api/support/*; customer page at /customer/support; admin at /admin/support; no Drizzle schema — pool.query only
 - [Customer journey API](customer-journey-api.md) — GET /api/customer/journey/:bookingId; links booking.customer_mobile (last 9 digits) → pilgrims.mobile_india; returns visa/flight/hotel per pilgrim; JourneyStatusCard in Dashboard.tsx (collapsible)
 - [ZIP download with archiver](zip-download-archiver.md) — archiver pkg installed; GET /api/documents/zip/:bookingId streams ZIP; dynamic import("archiver") at request time (not top-level); archiver must stay external to bundle
+- [Portal login roles](portal-login-roles.md) — branch_manager/agent/staff roles; OTP assigns role from cross-table lookup; portal at /api/portal/*

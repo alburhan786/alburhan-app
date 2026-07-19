@@ -83,7 +83,22 @@ router.post("/send-otp", async (req, res) => {
   const isNewUser = !existing[0];
 
   if (isNewUser) {
-    await db.insert(usersTable).values({ mobile: cleanMobile, role: ADMIN_MOBILES.includes(cleanMobile) ? "admin" : "customer" });
+    // Detect if this mobile belongs to a branch manager, agent, or staff member
+    let portalRole: "admin" | "customer" | "branch_manager" | "agent" | "staff" =
+      ADMIN_MOBILES.includes(cleanMobile) ? "admin" : "customer";
+
+    if (portalRole === "customer") {
+      const [branchRow, agentRow, staffRow] = await Promise.all([
+        pool.query(`SELECT id FROM branches WHERE manager_mobile=$1 AND is_active=true LIMIT 1`, [cleanMobile]),
+        pool.query(`SELECT id FROM agents WHERE mobile=$1 AND is_active=true LIMIT 1`, [cleanMobile]),
+        pool.query(`SELECT id FROM staff WHERE mobile_india=$1 AND status='active' LIMIT 1`, [cleanMobile]),
+      ]);
+      if (branchRow.rows[0]) portalRole = "branch_manager";
+      else if (agentRow.rows[0]) portalRole = "agent";
+      else if (staffRow.rows[0]) portalRole = "staff";
+    }
+
+    await db.insert(usersTable).values({ mobile: cleanMobile, role: portalRole as any });
   }
 
   const otp = generateOtp();
@@ -277,6 +292,20 @@ router.post("/verify-otp", async (req, res) => {
   const isNewUser = !user.name;
   (req.session as any).userId = user.id;
 
+  // Resolve entityId for portal roles (branch_manager / agent / staff)
+  let entityId: string | null = null;
+  if (user.role === "branch_manager") {
+    const r = await pool.query(`SELECT id FROM branches WHERE manager_mobile=$1 LIMIT 1`, [cleanMobile]);
+    entityId = r.rows[0]?.id ?? null;
+  } else if (user.role === "agent") {
+    const r = await pool.query(`SELECT id FROM agents WHERE mobile=$1 LIMIT 1`, [cleanMobile]);
+    entityId = r.rows[0]?.id ?? null;
+  } else if (user.role === "staff") {
+    const r = await pool.query(`SELECT id FROM staff WHERE mobile_india=$1 LIMIT 1`, [cleanMobile]);
+    entityId = r.rows[0]?.id ?? null;
+  }
+  if (entityId) (req.session as any).entityId = entityId;
+
   if (isNewUser) {
     sendWhatsApp(
       cleanMobile,
@@ -333,6 +362,7 @@ router.post("/verify-otp", async (req, res) => {
       role: user.role,
       createdAt: user.createdAt,
     },
+    entityId,
   });
 });
 

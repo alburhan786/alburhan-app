@@ -143,6 +143,9 @@ import ScanPilgrim from "@/pages/public/ScanPilgrim";
 import AgreementCenter from "@/pages/admin/AgreementCenter";
 import AgreementSigning from "@/pages/customer/AgreementSigning";
 import VerifyAgreement from "@/pages/public/VerifyAgreement";
+import BranchPortal from "@/pages/portal/BranchPortal";
+import AgentPortal from "@/pages/portal/AgentPortal";
+import StaffPortal from "@/pages/portal/StaffPortal";
 import NotFound from "@/pages/not-found";
 import { useAuth } from "@/hooks/use-auth";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -152,19 +155,52 @@ const queryClient = new QueryClient();
 
 // Protected Route Wrapper for Customers
 function CustomerRoute({ component: Component }: { component: React.ComponentType }) {
-  const { isAuthenticated, isLoading, isAdmin } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   if (isLoading) return <MainLayout><div className="py-20 text-center">Loading...</div></MainLayout>;
   if (!isAuthenticated) return <Redirect to="/login" />;
-  if (isAdmin) return <Redirect to="/admin/dashboard" />;
+  if (user?.role === 'admin') return <Redirect to="/admin/dashboard" />;
+  if (user?.role === 'branch_manager') return <Redirect to="/branch/dashboard" />;
+  if (user?.role === 'agent') return <Redirect to="/agent/dashboard" />;
+  if (user?.role === 'staff') return <Redirect to="/staff/dashboard" />;
   return <Component />;
 }
 
 // Protected Route Wrapper for Admins
 function AdminRoute({ component: Component }: { component: React.ComponentType }) {
-  const { isAuthenticated, isLoading, isAdmin } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   if (isLoading) return <div className="py-20 text-center">Loading...</div>;
   if (!isAuthenticated) return <Redirect to="/login" />;
-  if (!isAdmin) return <Redirect to="/customer/dashboard" />;
+  if (user?.role === 'branch_manager') return <Redirect to="/branch/dashboard" />;
+  if (user?.role === 'agent') return <Redirect to="/agent/dashboard" />;
+  if (user?.role === 'staff') return <Redirect to="/staff/dashboard" />;
+  if (user?.role !== 'admin') return <Redirect to="/customer/dashboard" />;
+  return <Component />;
+}
+
+// Protected Route Wrapper for Branch Managers
+function BranchRoute({ component: Component }: { component: React.ComponentType }) {
+  const { isAuthenticated, isLoading, user } = useAuth();
+  if (isLoading) return <MainLayout><div className="py-20 text-center">Loading...</div></MainLayout>;
+  if (!isAuthenticated) return <Redirect to="/login" />;
+  if (user?.role !== 'branch_manager') return <Redirect to={user?.role === 'admin' ? '/admin/dashboard' : user?.role === 'agent' ? '/agent/dashboard' : user?.role === 'staff' ? '/staff/dashboard' : '/customer/dashboard'} />;
+  return <Component />;
+}
+
+// Protected Route Wrapper for Agents
+function AgentRoute({ component: Component }: { component: React.ComponentType }) {
+  const { isAuthenticated, isLoading, user } = useAuth();
+  if (isLoading) return <MainLayout><div className="py-20 text-center">Loading...</div></MainLayout>;
+  if (!isAuthenticated) return <Redirect to="/login" />;
+  if (user?.role !== 'agent') return <Redirect to={user?.role === 'admin' ? '/admin/dashboard' : user?.role === 'branch_manager' ? '/branch/dashboard' : user?.role === 'staff' ? '/staff/dashboard' : '/customer/dashboard'} />;
+  return <Component />;
+}
+
+// Protected Route Wrapper for Staff
+function StaffRoute({ component: Component }: { component: React.ComponentType }) {
+  const { isAuthenticated, isLoading, user } = useAuth();
+  if (isLoading) return <MainLayout><div className="py-20 text-center">Loading...</div></MainLayout>;
+  if (!isAuthenticated) return <Redirect to="/login" />;
+  if (user?.role !== 'staff') return <Redirect to={user?.role === 'admin' ? '/admin/dashboard' : user?.role === 'branch_manager' ? '/branch/dashboard' : user?.role === 'agent' ? '/agent/dashboard' : '/customer/dashboard'} />;
   return <Component />;
 }
 
@@ -198,6 +234,11 @@ function Router() {
 
       {/* Public Agreement Verification */}
       <Route path="/verify-agreement/:token" component={VerifyAgreement} />
+
+      {/* Portal Routes — Branch Manager, Agent, Staff */}
+      <Route path="/branch/dashboard" component={() => <BranchRoute component={BranchPortal} />} />
+      <Route path="/agent/dashboard" component={() => <AgentRoute component={AgentPortal} />} />
+      <Route path="/staff/dashboard" component={() => <StaffRoute component={StaffPortal} />} />
 
       {/* Customer Routes */}
       <Route path="/customer/dashboard" component={() => <CustomerRoute component={CustomerDashboard} />} />

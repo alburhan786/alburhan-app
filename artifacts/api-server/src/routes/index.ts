@@ -58,6 +58,7 @@ import agreementsRouter from "./agreements.js";
 import customerJourneyRouter from "./customer-journey.js";
 import supportRouter from "./support.js";
 import enterpriseRouter from "./enterprise.js";
+import portalRouter from "./portal.js";
 import { requireAdmin } from "../lib/auth.js";
 
 const router: IRouter = Router();
@@ -332,6 +333,7 @@ router.use("/agreements", agreementsRouter);
 router.use("/customer/journey", customerJourneyRouter);
 router.use("/support", supportRouter);
 router.use("/enterprise", enterpriseRouter);
+router.use("/portal", portalRouter);
 router.use("/webhook", webhooksRouter);
 router.use(storageRouter);
 

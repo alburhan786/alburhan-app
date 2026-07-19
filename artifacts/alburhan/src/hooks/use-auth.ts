@@ -53,6 +53,12 @@ export function useAuth() {
         });
         if (data.user.role === 'admin') {
           setLocation("/admin/dashboard");
+        } else if (data.user.role === 'branch_manager') {
+          setLocation("/branch/dashboard");
+        } else if (data.user.role === 'agent') {
+          setLocation("/agent/dashboard");
+        } else if (data.user.role === 'staff') {
+          setLocation("/staff/dashboard");
         } else {
           const params = new URLSearchParams(window.location.search);
           const rawReturn = params.get("returnUrl");
