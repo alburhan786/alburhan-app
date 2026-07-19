@@ -212,6 +212,24 @@ async function runMigrations() {
         sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
+    // Ensure id column is TEXT (was previously SERIAL/INTEGER in some deploys)
+    await pool.query(`
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'reminder_logs' AND column_name = 'id'
+            AND data_type IN ('integer','bigint','smallint')
+        ) THEN
+          ALTER TABLE reminder_logs DROP CONSTRAINT IF EXISTS reminder_logs_pkey;
+          ALTER TABLE reminder_logs ADD COLUMN IF NOT EXISTS id_text TEXT;
+          UPDATE reminder_logs SET id_text = id::TEXT WHERE id_text IS NULL;
+          ALTER TABLE reminder_logs DROP COLUMN id;
+          ALTER TABLE reminder_logs RENAME COLUMN id_text TO id;
+          ALTER TABLE reminder_logs ADD PRIMARY KEY (id);
+        END IF;
+      END $$
+    `);
     console.log("[Migration] reminder_logs table ensured");
   } catch (err) {
     console.error("[Migration] reminder_logs failed:", err);

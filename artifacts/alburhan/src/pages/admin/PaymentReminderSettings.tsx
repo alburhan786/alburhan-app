@@ -5,8 +5,9 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  Bell, BellOff, Play, RefreshCw, CheckCircle, XCircle,
-  CalendarClock, Users, Clock, IndianRupee, Send, Loader2, AlarmCheck, History
+  Bell, Play, RefreshCw, CheckCircle, XCircle,
+  CalendarClock, Users, Clock, IndianRupee, Send, Loader2, AlarmCheck, History,
+  TrendingDown, AlertTriangle, Activity
 } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -59,8 +60,13 @@ interface UpcomingDueDate {
 interface Stats {
   enabled: boolean;
   total: number;
+  totalFailed: number;
+  successRate: number;
   lastSent: string | null;
+  lastActivity: string | null;
   eligibleCount: number;
+  todayCount: number;
+  overdueAmount: number;
   recentLogs: ReminderLog[];
   upcomingDueDates: UpcomingDueDate[];
   schedule: Array<{ label: string; key: string }>;
@@ -208,12 +214,16 @@ export default function PaymentReminderSettings() {
               </div>
             </Card>
 
-            {/* Stats Row */}
+            {/* Stats Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {[
-                { label: "Total Reminders Sent", value: stats?.total ?? 0, icon: Send, color: "text-blue-600", bg: "bg-blue-100" },
-                { label: "Eligible Bookings", value: stats?.eligibleCount ?? 0, icon: Users, color: "text-orange-600", bg: "bg-orange-100" },
-                { label: "Last Reminder Sent", value: stats?.lastSent ? relDate(stats.lastSent) : "—", icon: Clock, color: "text-emerald-600", bg: "bg-emerald-100" },
+                { label: "Total Sent", value: stats?.total ?? 0, icon: Send, color: "text-blue-600", bg: "bg-blue-100" },
+                { label: "Today's Reminders", value: stats?.todayCount ?? 0, icon: Activity, color: "text-indigo-600", bg: "bg-indigo-100" },
+                { label: "Pending Payments", value: stats?.eligibleCount ?? 0, icon: Users, color: "text-orange-600", bg: "bg-orange-100" },
+                { label: "Amount Overdue", value: stats ? fmt(stats.overdueAmount) : "—", icon: IndianRupee, color: "text-red-600", bg: "bg-red-100" },
+                { label: "Failed Reminders", value: stats?.totalFailed ?? 0, icon: AlertTriangle, color: "text-rose-600", bg: "bg-rose-100" },
+                { label: "Success Rate", value: stats ? `${stats.successRate}%` : "—", icon: TrendingDown, color: "text-emerald-600", bg: "bg-emerald-100" },
+                { label: "Last Successful", value: stats?.lastSent ? relDate(stats.lastSent) : "—", icon: CheckCircle, color: "text-teal-600", bg: "bg-teal-100" },
                 { label: "Upcoming Due Dates", value: stats?.upcomingDueDates?.length ?? 0, icon: CalendarClock, color: "text-purple-600", bg: "bg-purple-100" },
               ].map(({ label, value, icon: Icon, color, bg }) => (
                 <Card key={label} className="p-4 rounded-2xl border border-border">

@@ -1476,38 +1476,69 @@ router.get("/reminders/status", requireAdmin as any, async (req: AuthenticatedRe
 
 router.get("/reminders/stats", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
-    const [totalRes, lastRes, eligRes, logsRes, upcomingRes] = await Promise.all([
-      pool.query(`SELECT COUNT(*) AS count FROM reminder_logs WHERE status = 'sent'`),
-      pool.query(`SELECT MAX(sent_at) AS last_sent FROM reminder_logs WHERE status = 'sent'`),
-      pool.query(`
-        SELECT COUNT(*) AS count FROM bookings
-        WHERE status = ANY($1)
-          AND CAST(COALESCE(final_amount,'0') AS numeric) - CAST(COALESCE(paid_amount,'0') AS numeric) > 0
-      `, [["pending","approved","partially_paid"]]),
+    const ELIGIBLE = ["pending","approved","partially_paid"];
+    const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+
+    const [totalRes, failedRes, lastRes, lastSuccessRes, eligRes, logsRes, upcomingRes, todayRes, overdueRes] = await Promise.all([
+      pool.query(`SELECT COUNT(*) AS count FROM reminder_logs WHERE status = 'sent'`).catch(() => ({ rows: [{ count: 0 }] })),
+      pool.query(`SELECT COUNT(*) AS count FROM reminder_logs WHERE status = 'failed'`).catch(() => ({ rows: [{ count: 0 }] })),
+      pool.query(`SELECT MAX(sent_at) AS last_sent FROM reminder_logs`).catch(() => ({ rows: [{ last_sent: null }] })),
+      pool.query(`SELECT MAX(sent_at) AS last_sent FROM reminder_logs WHERE status = 'sent'`).catch(() => ({ rows: [{ last_sent: null }] })),
+      pool.query(
+        `SELECT COUNT(*) AS count FROM bookings
+         WHERE status = ANY($1)
+           AND CAST(COALESCE(final_amount,'0') AS numeric) - CAST(COALESCE(paid_amount,'0') AS numeric) > 0`,
+        [ELIGIBLE]
+      ).catch(() => ({ rows: [{ count: 0 }] })),
       pool.query(`
         SELECT rl.id, rl.booking_id, rl.channel, rl.status, rl.triggered_by, rl.notes,
                rl.sent_at, b.customer_name, b.booking_number, b.customer_mobile,
                CAST(COALESCE(b.final_amount,'0') AS numeric) - CAST(COALESCE(b.paid_amount,'0') AS numeric) AS balance
         FROM reminder_logs rl
         LEFT JOIN bookings b ON rl.booking_id = b.id
-        ORDER BY rl.sent_at DESC LIMIT 30
-      `),
-      pool.query(`
-        SELECT id, booking_number, customer_name, customer_mobile, due_date,
-               CAST(COALESCE(final_amount,'0') AS numeric) - CAST(COALESCE(paid_amount,'0') AS numeric) AS balance
-        FROM bookings
-        WHERE status = ANY($1)
-          AND due_date IS NOT NULL
-          AND CAST(COALESCE(final_amount,'0') AS numeric) - CAST(COALESCE(paid_amount,'0') AS numeric) > 0
-        ORDER BY due_date ASC LIMIT 10
-      `, [["pending","approved","partially_paid"]]),
+        ORDER BY rl.sent_at DESC LIMIT 50
+      `).catch(() => ({ rows: [] })),
+      pool.query(
+        `SELECT id, booking_number, customer_name, customer_mobile,
+                preferred_departure_date AS due_date,
+                CAST(COALESCE(final_amount,'0') AS numeric) - CAST(COALESCE(paid_amount,'0') AS numeric) AS balance
+         FROM bookings
+         WHERE status = ANY($1)
+           AND preferred_departure_date IS NOT NULL
+           AND CAST(COALESCE(final_amount,'0') AS numeric) - CAST(COALESCE(paid_amount,'0') AS numeric) > 0
+         ORDER BY preferred_departure_date ASC LIMIT 15`,
+        [ELIGIBLE]
+      ).catch(() => ({ rows: [] })),
+      pool.query(
+        `SELECT COUNT(*) AS count FROM reminder_logs WHERE sent_at >= $1`,
+        [todayStart]
+      ).catch(() => ({ rows: [{ count: 0 }] })),
+      pool.query(
+        `SELECT COALESCE(SUM(CAST(COALESCE(final_amount,'0') AS numeric) - CAST(COALESCE(paid_amount,'0') AS numeric)),0) AS total
+         FROM bookings
+         WHERE status = ANY($1)
+           AND preferred_departure_date IS NOT NULL
+           AND preferred_departure_date < NOW()
+           AND CAST(COALESCE(final_amount,'0') AS numeric) - CAST(COALESCE(paid_amount,'0') AS numeric) > 0`,
+        [ELIGIBLE]
+      ).catch(() => ({ rows: [{ total: 0 }] })),
     ]);
+
+    const totalSent   = parseInt(String(totalRes.rows[0].count), 10) || 0;
+    const totalFailed = parseInt(String(failedRes.rows[0].count), 10) || 0;
+    const totalAll    = totalSent + totalFailed;
+    const successRate = totalAll > 0 ? Math.round((totalSent / totalAll) * 100) : 100;
 
     res.json({
       enabled: isRemindersEnabled(),
-      total: parseInt(totalRes.rows[0].count, 10),
-      lastSent: lastRes.rows[0].last_sent,
-      eligibleCount: parseInt(eligRes.rows[0].count, 10),
+      total: totalSent,
+      totalFailed,
+      successRate,
+      lastSent: lastSuccessRes.rows[0].last_sent,
+      lastActivity: lastRes.rows[0].last_sent,
+      eligibleCount: parseInt(String(eligRes.rows[0].count), 10) || 0,
+      todayCount: parseInt(String(todayRes.rows[0].count), 10) || 0,
+      overdueAmount: Number(overdueRes.rows[0].total) || 0,
       recentLogs: logsRes.rows,
       upcomingDueDates: upcomingRes.rows,
       schedule: [
