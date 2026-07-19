@@ -1,0 +1,99 @@
+The Payment Reminder module is not working in production.
+
+Current issue:
+
+- Payment Reminder Settings page opens successfully.
+- Dashboard cards remain empty.
+- Red error message appears:
+  "Failed to load reminder stats"
+
+Investigate and fix the complete Payment Reminder system.
+
+Tasks:
+
+1. Check all Payment Reminder API endpoints.
+   - Verify every endpoint returns HTTP 200 after authentication.
+   - Check for SQL errors.
+   - Check missing tables.
+   - Check null values.
+   - Check server logs.
+
+2. Verify reminder statistics API.
+   It must correctly calculate:
+   • Total reminders sent
+   • Eligible bookings
+   • Last reminder sent
+   • Upcoming due dates
+
+3. Verify Automatic Reminder Settings.
+   - Enable/Disable toggle must save correctly.
+   - Settings must persist after refresh.
+
+4. Verify scheduler (Cron Job).
+   The scheduler must automatically send reminders:
+   • 7 days before due date
+   • 3 days before due date
+   • 1 day before due date
+   • Due date
+   • Every 3 days after due date until payment is completed
+
+5. Verify notification delivery.
+
+Reminders must be sent through:
+✓ WhatsApp
+✓ SMS
+✓ Email
+✓ RCS (if enabled)
+
+6. Verify payment links.
+
+Every reminder should include:
+• Booking ID
+• Customer Name
+• Package Name
+• Due Amount
+• Due Date
+• Secure payment link
+
+7. Create Notification Logs.
+
+Every reminder must be recorded with:
+• Booking ID
+• Customer
+• Channel
+• Template
+• Status
+• Timestamp
+• Delivery Result
+
+8. Add Retry Logic.
+
+If sending fails:
+• Retry automatically.
+• Log the failure.
+• Show failure reason.
+
+9. Improve Dashboard.
+
+Display:
+• Today's reminders
+• Pending payments
+• Amount overdue
+• Success rate
+• Failed reminders
+• Next scheduled reminder
+• Last successful reminder
+
+10. Test with real booking data.
+
+Verify:
+✓ Statistics load correctly.
+✓ No "Failed to load reminder stats" error.
+✓ Cron executes correctly.
+✓ Reminder logs are created.
+✓ WhatsApp/SMS/Email notifications are delivered.
+✓ Payment status updates automatically after payment.
+✓ Dashboard refreshes correctly.
+✓ Deploy to VPS and verify production.
+
+Do not mark this task complete until the Payment Reminder system is fully functional in production and all APIs return valid data.

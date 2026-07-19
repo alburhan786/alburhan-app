@@ -82,6 +82,8 @@ const MODULE_CARDS = [
   { icon: IndianRupee, label: "Finance Hub", desc: "Unified finance center — revenue, P&L, GST", href: "/admin/finance", color: "bg-emerald-50 text-emerald-700", border: "border-emerald-200" },
   { icon: Sparkles, label: "Admin AI Chat", desc: "Ask about operations, payments, visas…", href: "/admin/chat", color: "bg-violet-50 text-violet-700", border: "border-violet-200" },
   { icon: MapPin, label: "Pilgrim Ops Center", desc: "Live ops — visa, passport, payments, flights", href: "/admin/pilgrim-ops", color: "bg-sky-50 text-sky-700", border: "border-sky-200" },
+  { icon: Building2, label: "Branch Management", desc: "Manage offices, branches and managers", href: "/admin/branches", color: "bg-orange-50 text-orange-700", border: "border-orange-200" },
+  { icon: UserPlus, label: "Agent Management", desc: "Track agents, commissions and bookings", href: "/admin/agents", color: "bg-teal-50 text-teal-700", border: "border-teal-200" },
 ];
 
 function getStatusBadge(status: string) {

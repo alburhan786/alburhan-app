@@ -1987,6 +1987,42 @@ async function runMigrations() {
     `);
     console.log("[Migration] group_tracking table ensured");
   } catch (err) { console.error("[Migration] group_tracking failed:", err); }
+
+  // Branches + Agents
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS branches (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name TEXT NOT NULL,
+        city TEXT,
+        address TEXT,
+        manager_name TEXT,
+        manager_mobile TEXT,
+        manager_email TEXT,
+        is_active BOOLEAN NOT NULL DEFAULT true,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS agents (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name TEXT NOT NULL,
+        mobile TEXT,
+        email TEXT,
+        city TEXT,
+        branch_id UUID REFERENCES branches(id) ON DELETE SET NULL,
+        commission_rate NUMERIC(5,2) NOT NULL DEFAULT 0,
+        is_active BOOLEAN NOT NULL DEFAULT true,
+        notes TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ
+      )
+    `);
+    await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS branch_id UUID`);
+    await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS agent_id UUID`);
+    console.log("[Migration] branches + agents tables ensured");
+  } catch (err) { console.error("[Migration] branches/agents failed:", err); }
 }
 
 const rawPort = process.env["PORT"];

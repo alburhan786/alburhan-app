@@ -270,15 +270,17 @@ router.get("/super-stats", requireAdmin as any, async (_req: AuthenticatedReques
     const [
       todayRes, pendingRes, agreementRes, pilgrimRes, notifRes, supportRes, feedbackRes, flightRes, hotelRes,
     ] = await Promise.all([
-      // Today's revenue + bookings
+      // Today's revenue + bookings — use payment_transactions (no status col) + online payments
       pool.query(`
         SELECT
-          COALESCE(SUM(pt.amount), 0)::float AS today_revenue,
-          COUNT(DISTINCT b.id) FILTER (WHERE b.created_at::date = CURRENT_DATE)::int AS today_bookings,
-          COUNT(DISTINCT pt.id) FILTER (WHERE pt.created_at::date = CURRENT_DATE)::int AS today_payments
-        FROM bookings b
-        LEFT JOIN payment_transactions pt ON pt.booking_id = b.id AND pt.status = 'completed' AND pt.created_at::date = CURRENT_DATE
-      `),
+          COALESCE(
+            (SELECT SUM(amount) FROM payment_transactions WHERE payment_date::date = CURRENT_DATE),
+            0
+          )::float AS today_revenue,
+          COUNT(DISTINCT id) FILTER (WHERE created_at::date = CURRENT_DATE)::int AS today_bookings,
+          (SELECT COUNT(*)::int FROM payment_transactions WHERE payment_date::date = CURRENT_DATE) AS today_payments
+        FROM bookings
+      `).catch(() => ({ rows: [{ today_revenue: 0, today_bookings: 0, today_payments: 0 }] })),
       // Pending counts
       pool.query(`
         SELECT
@@ -286,7 +288,7 @@ router.get("/super-stats", requireAdmin as any, async (_req: AuthenticatedReques
           COUNT(*) FILTER (WHERE status = 'confirmed' AND COALESCE(paid_amount,0) < COALESCE(final_amount,0))::int AS pending_payments,
           COUNT(*)::int AS total_confirmed
         FROM bookings
-      `),
+      `).catch(() => ({ rows: [{ pending_approvals: 0, pending_payments: 0, total_confirmed: 0 }] })),
       // Pending agreements
       pool.query(`SELECT COUNT(*)::int AS pending FROM agreements WHERE status = 'pending_signature'`).catch(() => ({ rows: [{ pending: 0 }] })),
       // Pilgrims: pending visas
@@ -2176,6 +2178,127 @@ router.post("/chat", requireAdmin as any, async (req: AuthenticatedRequest, res)
     });
 
   } catch (err: any) { res.status(500).json({ reply: `Error: ${err.message}`, data: [] }); }
+});
+
+// ════════════════════════════════════════════════════════════════════
+//  BRANCH MANAGEMENT
+// ════════════════════════════════════════════════════════════════════
+
+router.get("/branches", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT b.*, 
+        COUNT(DISTINCT bk.id)::int AS total_bookings,
+        COALESCE(SUM(bk.paid_amount),0)::float AS total_collected
+      FROM branches b
+      LEFT JOIN bookings bk ON bk.branch_id = b.id
+      GROUP BY b.id
+      ORDER BY b.created_at DESC
+    `);
+    res.json(r.rows);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.post("/branches", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { name, city, address, manager_name, manager_mobile, manager_email, is_active = true } = req.body;
+    if (!name) return res.status(400).json({ error: "Branch name required" });
+    const r = await pool.query(
+      `INSERT INTO branches (id, name, city, address, manager_name, manager_mobile, manager_email, is_active, created_at)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, NOW()) RETURNING *`,
+      [name, city||null, address||null, manager_name||null, manager_mobile||null, manager_email||null, is_active]
+    );
+    res.json(r.rows[0]);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.put("/branches/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { name, city, address, manager_name, manager_mobile, manager_email, is_active } = req.body;
+    const r = await pool.query(
+      `UPDATE branches SET name=$1, city=$2, address=$3, manager_name=$4, manager_mobile=$5, manager_email=$6, is_active=$7, updated_at=NOW()
+       WHERE id=$8 RETURNING *`,
+      [name, city||null, address||null, manager_name||null, manager_mobile||null, manager_email||null, is_active, req.params.id]
+    );
+    if (!r.rows[0]) return res.status(404).json({ error: "Branch not found" });
+    res.json(r.rows[0]);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.delete("/branches/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    await pool.query(`DELETE FROM branches WHERE id=$1`, [req.params.id]);
+    res.json({ ok: true });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.get("/branches/:id/stats", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const id = req.params.id;
+    const [branch, bookings, agents, revenue] = await Promise.all([
+      pool.query(`SELECT * FROM branches WHERE id=$1`, [id]),
+      pool.query(`SELECT status, COUNT(*)::int AS cnt FROM bookings WHERE branch_id=$1 GROUP BY status`, [id]).catch(() => ({ rows: [] })),
+      pool.query(`SELECT COUNT(*)::int AS cnt FROM agents WHERE branch_id=$1 AND is_active=true`, [id]).catch(() => ({ rows: [{ cnt: 0 }] })),
+      pool.query(`SELECT COALESCE(SUM(amount),0)::float AS total FROM payment_transactions pt JOIN bookings b ON b.id=pt.booking_id WHERE b.branch_id=$1`, [id]).catch(() => ({ rows: [{ total: 0 }] })),
+    ]);
+    if (!branch.rows[0]) return res.status(404).json({ error: "Branch not found" });
+    const statusMap: Record<string, number> = {};
+    for (const r of bookings.rows) statusMap[r.status] = r.cnt;
+    res.json({ branch: branch.rows[0], statusMap, activeAgents: agents.rows[0]?.cnt || 0, totalRevenue: revenue.rows[0]?.total || 0 });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ════════════════════════════════════════════════════════════════════
+//  AGENT MANAGEMENT
+// ════════════════════════════════════════════════════════════════════
+
+router.get("/agents", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT a.*, b.name AS branch_name,
+        COUNT(DISTINCT bk.id)::int AS total_bookings,
+        COALESCE(SUM(bk.paid_amount),0)::float AS total_collected
+      FROM agents a
+      LEFT JOIN branches b ON b.id = a.branch_id
+      LEFT JOIN bookings bk ON bk.agent_id = a.id
+      GROUP BY a.id, b.name
+      ORDER BY a.created_at DESC
+    `);
+    res.json(r.rows);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.post("/agents", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { name, mobile, email, city, branch_id, commission_rate = 0, is_active = true, notes } = req.body;
+    if (!name) return res.status(400).json({ error: "Agent name required" });
+    const r = await pool.query(
+      `INSERT INTO agents (id, name, mobile, email, city, branch_id, commission_rate, is_active, notes, created_at)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, NOW()) RETURNING *`,
+      [name, mobile||null, email||null, city||null, branch_id||null, commission_rate, is_active, notes||null]
+    );
+    res.json(r.rows[0]);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.put("/agents/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { name, mobile, email, city, branch_id, commission_rate, is_active, notes } = req.body;
+    const r = await pool.query(
+      `UPDATE agents SET name=$1, mobile=$2, email=$3, city=$4, branch_id=$5, commission_rate=$6, is_active=$7, notes=$8, updated_at=NOW()
+       WHERE id=$9 RETURNING *`,
+      [name, mobile||null, email||null, city||null, branch_id||null, commission_rate||0, is_active, notes||null, req.params.id]
+    );
+    if (!r.rows[0]) return res.status(404).json({ error: "Agent not found" });
+    res.json(r.rows[0]);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.delete("/agents/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    await pool.query(`DELETE FROM agents WHERE id=$1`, [req.params.id]);
+    res.json({ ok: true });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
 // ════════════════════════════════════════════════════════════════════

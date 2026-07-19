@@ -42,6 +42,10 @@ import ProductionReport from "@/pages/admin/ProductionReport";
 import FinanceHub from "@/pages/admin/FinanceHub";
 import AdminChat from "@/pages/admin/AdminChat";
 import PilgrimOpsCenter from "@/pages/admin/PilgrimOpsCenter";
+import BranchManager from "@/pages/admin/BranchManager";
+import BranchDashboard from "@/pages/admin/BranchDashboard";
+import AgentManager from "@/pages/admin/AgentManager";
+import AgentDashboard from "@/pages/admin/AgentDashboard";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import PackagesManager from "@/pages/admin/PackagesManager";
 import BookingsManager from "@/pages/admin/BookingsManager";
@@ -286,6 +290,10 @@ function Router() {
       <Route path="/admin/finance" component={() => <AdminRoute component={FinanceHub} />} />
       <Route path="/admin/chat" component={() => <AdminRoute component={AdminChat} />} />
       <Route path="/admin/pilgrim-ops" component={() => <AdminRoute component={PilgrimOpsCenter} />} />
+      <Route path="/admin/branches" component={() => <AdminRoute component={BranchManager} />} />
+      <Route path="/admin/branch-dashboard/:id" component={() => <AdminRoute component={BranchDashboard} />} />
+      <Route path="/admin/agents" component={() => <AdminRoute component={AgentManager} />} />
+      <Route path="/admin/agent-dashboard" component={() => <AdminRoute component={AgentDashboard} />} />
       <Route path="/knowledge" component={KnowledgeCenter} />
       <Route path="/admin/agreements" component={() => <AdminRoute component={AgreementCenter} />} />
       <Route path="/admin/audit-logs" component={() => <AdminRoute component={AuditLogs} />} />
