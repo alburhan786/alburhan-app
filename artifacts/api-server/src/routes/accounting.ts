@@ -767,14 +767,23 @@ router.get("/customer-ledger/search", requireAdmin as any, async (req: Authentic
     const { q: query } = req.query as Record<string, string>;
     if (!query || (query as string).trim().length < 2) return void res.json([]);
     const term = `%${(query as string).trim()}%`;
+    // Search by name, mobile, booking number (ABT-xxxx), or passport number
     const rows = await q(
-      `SELECT u.id, u.mobile, u.name, u.email,
-        COUNT(b.id)::int AS booking_count,
-        COALESCE(SUM(b.final_amount::numeric),0)::numeric AS total_billed,
-        COALESCE(SUM(b.paid_amount::numeric),0)::numeric AS total_paid
+      `SELECT DISTINCT u.id, u.mobile, u.name, u.email,
+          COUNT(DISTINCT b.id)::int AS booking_count,
+          COALESCE(SUM(b.final_amount::numeric),0)::numeric AS total_billed,
+          COALESCE(SUM(b.paid_amount::numeric),0)::numeric AS total_paid
        FROM users u
        LEFT JOIN bookings b ON b.customer_mobile=u.mobile AND (b.is_deleted IS NULL OR b.is_deleted=false)
-       WHERE u.role='customer' AND (u.mobile ILIKE $1 OR u.name ILIKE $1)
+       LEFT JOIN pilgrims p ON p.group_id = b.group_id AND b.group_id IS NOT NULL
+       WHERE u.role='customer'
+         AND (
+           u.mobile ILIKE $1
+           OR u.name ILIKE $1
+           OR b.booking_number ILIKE $1
+           OR p.passport_number ILIKE $1
+           OR p.full_name ILIKE $1
+         )
        GROUP BY u.id, u.mobile, u.name, u.email
        ORDER BY u.name
        LIMIT 20`,
@@ -798,7 +807,7 @@ async function buildCustomerLedger(mobile: string, from?: string, to?: string) {
                 b.paid_amount, b.advance_amount,
                 b.invoice_number, b.created_at, b.notes, b.preferred_departure_date,
                 b.number_of_pilgrims, b.room_type,
-                g.name AS group_name
+                g.group_name
              FROM bookings b
              LEFT JOIN hajj_groups g ON g.id=b.group_id
              WHERE b.customer_mobile=$1 AND (b.is_deleted IS NULL OR b.is_deleted=false)`;
@@ -812,7 +821,7 @@ async function buildCustomerLedger(mobile: string, from?: string, to?: string) {
   let payments: any[] = [];
   if (bookingIds.length > 0) {
     payments = await q(
-      `SELECT pt.booking_id, pt.id, pt.amount, pt.mode, pt.payment_date,
+      `SELECT pt.booking_id, pt.id, pt.amount, pt."mode" AS mode, pt.payment_date,
               pt.received_by, pt.bank_name, pt.notes
        FROM payment_transactions pt
        WHERE pt.booking_id=ANY($1::text[]) AND (pt.is_deleted IS NULL OR pt.is_deleted=false)
@@ -922,13 +931,13 @@ router.get("/hajji-ledger/search", requireAdmin as any, async (req: Authenticate
       `SELECT DISTINCT b.id, b.booking_number, b.customer_name, b.customer_mobile,
               b.package_name, b.status, b.final_amount, b.paid_amount, b.created_at
        FROM bookings b
-       LEFT JOIN pilgrims p ON p.booking_id = b.id
+       LEFT JOIN pilgrims p ON p.group_id = b.group_id AND b.group_id IS NOT NULL
        WHERE (b.is_deleted IS NULL OR b.is_deleted=false)
          AND (b.booking_number ILIKE $1
               OR b.customer_name ILIKE $1
               OR b.customer_mobile ILIKE $1
               OR p.passport_number ILIKE $1
-              OR p.name ILIKE $1)
+              OR p.full_name ILIKE $1)
        ORDER BY b.created_at DESC
        LIMIT 20`,
       [term]
@@ -944,13 +953,17 @@ router.get("/hajji-ledger/passport/:passportNumber", requireAdmin as any, async 
   try {
     const { passportNumber } = req.params;
     const pilgrim = await q1(
-      `SELECT booking_id FROM pilgrims WHERE LOWER(passport_number)=LOWER($1) LIMIT 1`,
+      `SELECT b.id AS booking_id
+       FROM pilgrims p
+       JOIN bookings b ON b.group_id = p.group_id AND (b.is_deleted IS NULL OR b.is_deleted=false)
+       WHERE LOWER(p.passport_number)=LOWER($1)
+       LIMIT 1`,
       [passportNumber.trim()]
     );
     if (!pilgrim) return void res.status(404).json({ error: "No booking found for this passport number" });
     // Delegate to same query as bookingId endpoint
     const booking = await q1(
-      `SELECT b.*, g.name AS group_name
+      `SELECT b.*, g.group_name
        FROM bookings b
        LEFT JOIN hajj_groups g ON g.id=b.group_id
        WHERE b.id=$1 AND (b.is_deleted IS NULL OR b.is_deleted=false)`,
@@ -969,7 +982,7 @@ router.get("/hajji-ledger/:bookingId", requireAdmin as any, async (req: Authenti
     const { bookingId } = req.params;
 
     const booking = await q1(
-      `SELECT b.*, g.name AS group_name
+      `SELECT b.*, g.group_name
        FROM bookings b
        LEFT JOIN hajj_groups g ON g.id=b.group_id
        WHERE b.id=$1 AND (b.is_deleted IS NULL OR b.is_deleted=false)`,
@@ -978,7 +991,7 @@ router.get("/hajji-ledger/:bookingId", requireAdmin as any, async (req: Authenti
     if (!booking) return void res.status(404).json({ error: "Booking not found" });
 
     const payments = await q(
-      `SELECT pt.id, pt.amount, pt.mode, pt.payment_date, pt.received_by,
+      `SELECT pt.id, pt.amount, pt."mode" AS mode, pt.payment_date, pt.received_by,
               pt.bank_name, pt.notes, pt.invoice_number, pt.is_deleted
        FROM payment_transactions pt
        WHERE pt.booking_id=$1 AND (pt.is_deleted IS NULL OR pt.is_deleted=false)
@@ -987,8 +1000,10 @@ router.get("/hajji-ledger/:bookingId", requireAdmin as any, async (req: Authenti
     );
 
     const pilgrims = await q(
-      `SELECT id, name, mobile, passport_number, barcode_id
-       FROM pilgrims WHERE booking_id=$1 ORDER BY name`,
+      `SELECT p.id, p.full_name AS name, p.mobile_india AS mobile, p.passport_number, p.barcode_id
+       FROM pilgrims p
+       WHERE p.group_id = (SELECT group_id FROM bookings WHERE id=$1 LIMIT 1)
+       ORDER BY p.full_name`,
       [bookingId]
     );
 
