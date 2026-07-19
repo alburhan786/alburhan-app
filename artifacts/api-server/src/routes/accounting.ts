@@ -741,6 +741,27 @@ router.get("/cash-flow", requireAdmin as any, async (req: AuthenticatedRequest, 
 
 // ── CUSTOMER LEDGER ──────────────────────────────────────────────────────────
 
+router.get("/customer-ledger/recent", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
+  try {
+    const rows = await q(
+      `SELECT u.id, u.mobile, u.name, u.email,
+          COUNT(b.id)::int AS booking_count,
+          COALESCE(SUM(b.final_amount::numeric),0)::numeric AS total_billed,
+          COALESCE(SUM(b.paid_amount::numeric),0)::numeric AS total_paid
+       FROM users u
+       LEFT JOIN bookings b ON b.customer_mobile=u.mobile AND (b.is_deleted IS NULL OR b.is_deleted=false)
+       WHERE u.role='customer'
+       GROUP BY u.id, u.mobile, u.name, u.email
+       ORDER BY MAX(b.created_at) DESC NULLS LAST, u.name
+       LIMIT 20`
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("[accounting] customer-ledger/recent:", err);
+    res.status(500).json({ error: "Failed to fetch recent customers" });
+  }
+});
+
 router.get("/customer-ledger/search", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
     const { q: query } = req.query as Record<string, string>;
@@ -872,6 +893,25 @@ router.get("/customer-ledger/:mobile", requireAdmin as any, async (req: Authenti
 });
 
 // ── HAJJI PAYMENT LEDGER ─────────────────────────────────────────────────────
+
+router.get("/hajji-ledger/recent", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
+  try {
+    const rows = await q(
+      `SELECT b.id, b.booking_number, b.customer_name, b.customer_mobile,
+              b.package_name, b.status, b.final_amount, b.paid_amount, b.created_at,
+              g.group_name
+       FROM bookings b
+       LEFT JOIN hajj_groups g ON g.id = b.group_id
+       WHERE (b.is_deleted IS NULL OR b.is_deleted=false)
+       ORDER BY b.created_at DESC
+       LIMIT 20`
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("[accounting] hajji-ledger/recent:", err);
+    res.status(500).json({ error: "Failed to fetch recent bookings" });
+  }
+});
 
 router.get("/hajji-ledger/search", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {

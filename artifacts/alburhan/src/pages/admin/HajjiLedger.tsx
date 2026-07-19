@@ -1,9 +1,12 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Search, Download, FileText, Users, CreditCard, CheckCircle, Clock } from "lucide-react";
+import {
+  Search, Download, FileText, Users, CreditCard, CheckCircle,
+  Clock, ArrowLeft, RefreshCw, AlertCircle
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -27,6 +30,7 @@ const STATUS_COLOR: Record<string, string> = {
   confirmed: "bg-green-100 text-green-800",
   partially_paid: "bg-orange-100 text-orange-800",
   rejected: "bg-red-100 text-red-800",
+  cancelled: "bg-gray-100 text-gray-700",
 };
 
 const MODE_COLORS: Record<string, string> = {
@@ -43,38 +47,101 @@ const MODE_COLORS: Record<string, string> = {
 
 export default function HajjiLedger() {
   const { toast } = useToast();
+
+  // List view state
+  const [recentBookings, setRecentBookings] = useState<any[]>([]);
+  const [displayList, setDisplayList] = useState<any[]>([]);
+  const [listLoading, setListLoading] = useState(true);
+  const [listError, setListError] = useState("");
+
+  // Search state
   const [query, setQuery] = useState("");
-  const [suggestions, setSuggestions] = useState<any[]>([]);
-  const [ledger, setLedger] = useState<any>(null);
-  const [loadingLedger, setLoadingLedger] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  async function search(val: string) {
+  // Detail view state
+  const [ledger, setLedger] = useState<any>(null);
+  const [loadingLedger, setLoadingLedger] = useState(false);
+
+  // Load recent bookings on mount
+  const loadRecent = useCallback(async () => {
+    setListLoading(true);
+    setListError("");
+    try {
+      const r = await fetch(`${API}/api/accounting/hajji-ledger/recent`, { credentials: "include" });
+      if (!r.ok) {
+        const body = await r.json().catch(() => ({}));
+        setListError(body.error || "Failed to load payment records");
+        setListLoading(false);
+        return;
+      }
+      const data = await r.json();
+      setRecentBookings(Array.isArray(data) ? data : []);
+      setDisplayList(Array.isArray(data) ? data : []);
+    } catch {
+      setListError("Network error — could not load payment records");
+    }
+    setListLoading(false);
+  }, []);
+
+  useEffect(() => { loadRecent(); }, [loadRecent]);
+
+  // Search handler
+  function handleSearch(val: string) {
     setQuery(val);
     clearTimeout(debounceRef.current);
-    if (val.trim().length < 2) { setSuggestions([]); return; }
+
+    if (val.trim().length === 0) {
+      setDisplayList(recentBookings);
+      return;
+    }
+
+    if (val.trim().length < 2) {
+      // Client-side filter
+      const term = val.trim().toLowerCase();
+      setDisplayList(recentBookings.filter(b =>
+        (b.booking_number || "").toLowerCase().includes(term) ||
+        (b.customer_name || "").toLowerCase().includes(term) ||
+        (b.customer_mobile || "").includes(term) ||
+        (b.package_name || "").toLowerCase().includes(term)
+      ));
+      return;
+    }
+
+    // Debounced server search
     debounceRef.current = setTimeout(async () => {
       try {
         const r = await fetch(`${API}/api/accounting/hajji-ledger/search?q=${encodeURIComponent(val)}`, { credentials: "include" });
-        const data = await r.json();
-        setSuggestions(Array.isArray(data) ? data : []);
+        if (r.ok) {
+          const data = await r.json();
+          setDisplayList(Array.isArray(data) ? data : []);
+        }
       } catch {}
     }, 300);
   }
 
   async function loadLedger(booking: any) {
-    setSuggestions([]);
-    setQuery(booking.booking_number || booking.customer_name);
+    setLedger(null);
     setLoadingLedger(true);
     try {
       const r = await fetch(`${API}/api/accounting/hajji-ledger/${booking.id}`, { credentials: "include" });
+      if (!r.ok) {
+        const body = await r.json().catch(() => ({}));
+        toast({ title: "Error", description: body.error || "Failed to load ledger", variant: "destructive" });
+        setLoadingLedger(false);
+        return;
+      }
       const data = await r.json();
       setLedger(data);
     } catch {
       toast({ title: "Error", description: "Failed to load ledger", variant: "destructive" });
-    } finally {
-      setLoadingLedger(false);
     }
+    setLoadingLedger(false);
+  }
+
+  function goBack() {
+    setLedger(null);
+    setQuery("");
+    setDisplayList(recentBookings);
   }
 
   function exportPDF() {
@@ -82,85 +149,41 @@ export default function HajjiLedger() {
     const { booking, statement, pilgrims, summary } = ledger;
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
     const today = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" });
-
-    // Company header
-    doc.setFontSize(16);
-    doc.setFont("helvetica", "bold");
-    doc.text(COMPANY, 14, 16);
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(100);
-    doc.text(COMPANY_ADDRESS, 14, 21);
-    doc.setTextColor(0);
-    doc.setFontSize(13);
-    doc.setFont("helvetica", "bold");
-    doc.text("Hajji Payment Statement", 14, 30);
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Generated: ${today}`, 14, 35);
-
-    // Booking details
-    doc.setFillColor(245, 247, 250);
-    doc.roundedRect(14, 39, 182, 18, 2, 2, "F");
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.text(booking.customer_name, 18, 47);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
+    doc.setFontSize(16); doc.setFont("helvetica", "bold"); doc.text(COMPANY, 14, 16);
+    doc.setFontSize(8); doc.setFont("helvetica", "normal"); doc.setTextColor(100); doc.text(COMPANY_ADDRESS, 14, 21); doc.setTextColor(0);
+    doc.setFontSize(13); doc.setFont("helvetica", "bold"); doc.text("Hajji Payment Statement", 14, 30);
+    doc.setFontSize(8); doc.setFont("helvetica", "normal"); doc.text(`Generated: ${today}`, 14, 35);
+    doc.setFillColor(245, 247, 250); doc.roundedRect(14, 39, 182, 18, 2, 2, "F");
+    doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.text(booking.customer_name, 18, 47);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8);
     doc.text(`Mobile: ${booking.customer_mobile}`, 18, 52);
     doc.text(`Booking #: ${booking.booking_number}  |  Package: ${booking.package_name || booking.group_name || "—"}`, 70, 47);
     doc.text(`Status: ${(booking.status || "").replace(/_/g, " ")}`, 70, 52);
-
-    // Pilgrims
     if (pilgrims.length > 0) {
-      doc.setFontSize(8);
-      doc.setFont("helvetica", "bold");
-      doc.text("Pilgrims:", 14, 62);
+      doc.setFontSize(8); doc.setFont("helvetica", "bold"); doc.text("Pilgrims:", 14, 62);
       doc.setFont("helvetica", "normal");
-      const pilgrimText = pilgrims.map((p: any) => p.name + (p.passport_number ? ` (${p.passport_number})` : "")).join(", ");
-      doc.text(doc.splitTextToSize(pilgrimText, 160), 38, 62);
+      doc.text(doc.splitTextToSize(pilgrims.map((p: any) => p.name + (p.passport_number ? ` (${p.passport_number})` : "")).join(", "), 160), 38, 62);
     }
-
-    // Summary row
     autoTable(doc, {
       startY: 68,
       head: [["Total Billed", "Total Paid", "Installments", "Balance"]],
-      body: [[
-        fmtCurr(summary.totalBilled),
-        fmtCurr(summary.totalPaid),
-        String(summary.totalInstallments),
-        fmtCurr(summary.balance),
-      ]],
+      body: [[fmtCurr(summary.totalBilled), fmtCurr(summary.totalPaid), String(summary.totalInstallments), fmtCurr(summary.balance)]],
       headStyles: { fillColor: [30, 58, 95], textColor: 255, fontSize: 8, fontStyle: "bold" },
       bodyStyles: { fontSize: 9, fontStyle: "bold" },
       columnStyles: { 3: { textColor: summary.balance > 0 ? [200, 0, 0] : [0, 150, 0] } },
       margin: { left: 14, right: 14 },
     });
-
-    // Payment statement
-    const stmtRows = statement.map((p: any, i: number) => [
-      String(i + 1), fmtDate(p.payment_date), p.mode || "—",
-      p.bank_name || p.notes || "—", p.received_by || "—",
-      fmtCurr(p.amount), fmtCurr(p.running_balance), fmtCurr(p.balance_remaining),
-    ]);
-
     autoTable(doc, {
       startY: (doc as any).lastAutoTable.finalY + 6,
       head: [["#", "Date", "Mode", "Reference", "Received By", "Amount", "Running", "Balance Left"]],
-      body: stmtRows,
+      body: statement.map((p: any, i: number) => [String(i + 1), fmtDate(p.payment_date), p.mode || "—", p.bank_name || p.notes || "—", p.received_by || "—", fmtCurr(p.amount), fmtCurr(p.running_balance), fmtCurr(p.balance_remaining)]),
       headStyles: { fillColor: [80, 100, 130], textColor: 255, fontSize: 7.5 },
       bodyStyles: { fontSize: 7.5 },
-      columnStyles: {
-        5: { halign: "right" }, 6: { halign: "right" }, 7: { halign: "right" },
-      },
+      columnStyles: { 5: { halign: "right" }, 6: { halign: "right" }, 7: { halign: "right" } },
       margin: { left: 14, right: 14 },
       theme: "striped",
     });
-
-    // Mode breakdown
-    const modeRows = Object.entries(summary.modeBreakdown).map(([mode, amt]: [string, any]) => [
-      mode.toUpperCase(), fmtCurr(amt),
-    ]);
+    const modeRows = Object.entries(summary.modeBreakdown).map(([mode, amt]: [string, any]) => [mode.toUpperCase(), fmtCurr(amt)]);
     if (modeRows.length > 0) {
       autoTable(doc, {
         startY: (doc as any).lastAutoTable.finalY + 6,
@@ -171,7 +194,6 @@ export default function HajjiLedger() {
         margin: { left: 14, right: 100 },
       });
     }
-
     doc.save(`hajji-payment-statement-${booking.booking_number}.pdf`);
   }
 
@@ -179,98 +201,180 @@ export default function HajjiLedger() {
     if (!ledger) return;
     const { booking, statement, pilgrims, summary } = ledger;
     const wb = XLSX.utils.book_new();
-
-    // Statement sheet
     const rows: any[][] = [
-      [COMPANY],
-      ["Hajji Payment Statement"],
-      ["Generated:", new Date().toLocaleDateString("en-IN")],
-      [],
+      [COMPANY], ["Hajji Payment Statement"], ["Generated:", new Date().toLocaleDateString("en-IN")], [],
       ["Customer:", booking.customer_name, "", "Mobile:", booking.customer_mobile],
       ["Booking #:", booking.booking_number, "", "Package:", booking.package_name || booking.group_name || ""],
-      ["Status:", (booking.status || "").replace(/_/g, " ")],
-      [],
-      ["Pilgrims:", pilgrims.map((p: any) => p.name + (p.passport_number ? ` (${p.passport_number})` : "")).join(", ")],
-      [],
-      ["PAYMENT SUMMARY"],
-      ["Total Billed:", summary.totalBilled],
-      ["Total Paid:", summary.totalPaid],
-      ["Total Installments:", summary.totalInstallments],
-      ["Balance Due:", summary.balance],
-      [],
+      ["Status:", (booking.status || "").replace(/_/g, " ")], [],
+      ["Pilgrims:", pilgrims.map((p: any) => p.name + (p.passport_number ? ` (${p.passport_number})` : "")).join(", ")], [],
+      ["PAYMENT SUMMARY"], ["Total Billed:", summary.totalBilled], ["Total Paid:", summary.totalPaid],
+      ["Total Installments:", summary.totalInstallments], ["Balance Due:", summary.balance], [],
       ["#", "Date", "Mode", "Reference / Notes", "Received By", "Amount", "Running Total", "Balance Remaining"],
     ];
     for (const p of statement) {
-      rows.push([
-        statement.indexOf(p) + 1, p.payment_date, p.mode || "", p.bank_name || p.notes || "",
-        p.received_by || "", Number(p.amount), Number(p.running_balance), Number(p.balance_remaining),
-      ]);
+      rows.push([statement.indexOf(p) + 1, p.payment_date, p.mode || "", p.bank_name || p.notes || "", p.received_by || "", Number(p.amount), Number(p.running_balance), Number(p.balance_remaining)]);
     }
-    rows.push([]);
-    rows.push(["", "", "", "", "MODE BREAKDOWN"]);
+    rows.push([], ["", "", "", "", "MODE BREAKDOWN"]);
     for (const [mode, amt] of Object.entries(summary.modeBreakdown)) {
       rows.push(["", "", "", "", mode.toUpperCase(), amt]);
     }
-
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    XLSX.utils.book_append_sheet(wb, ws, "Payment Statement");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), "Payment Statement");
     XLSX.writeFile(wb, `hajji-statement-${booking.booking_number}.xlsx`);
   }
 
+  const showDetail = ledger && !loadingLedger;
+
   return (
     <AdminLayout>
-      <div className="max-w-5xl mx-auto space-y-6 print:p-0">
+      <div className="max-w-5xl mx-auto space-y-5 print:p-0">
+
+        {/* Header */}
         <div className="flex items-center justify-between print:hidden">
-          <div>
-            <h1 className="text-2xl font-bold text-primary">Hajji Payment Ledger</h1>
-            <p className="text-muted-foreground text-sm">Complete payment timeline — search by booking, name, mobile or passport</p>
-          </div>
-          {ledger && (
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={exportExcel}><Download size={15} className="mr-1" /> Excel</Button>
-              <Button variant="outline" size="sm" onClick={exportPDF}><FileText size={15} className="mr-1" /> PDF</Button>
+          <div className="flex items-center gap-3">
+            {showDetail && (
+              <button onClick={goBack} className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
+                <ArrowLeft size={18} />
+              </button>
+            )}
+            <div>
+              <h1 className="text-2xl font-bold text-primary">Hajji Payment Ledger</h1>
+              <p className="text-muted-foreground text-sm">
+                {showDetail
+                  ? `${ledger.booking.customer_name} — ${ledger.booking.booking_number}`
+                  : "Complete payment timeline — search by booking, name, mobile or passport"}
+              </p>
             </div>
-          )}
+          </div>
+          <div className="flex gap-2">
+            {showDetail && (
+              <>
+                <Button variant="outline" size="sm" onClick={exportExcel}><Download size={15} className="mr-1" /> Excel</Button>
+                <Button variant="outline" size="sm" onClick={exportPDF}><FileText size={15} className="mr-1" /> PDF</Button>
+              </>
+            )}
+            {!showDetail && (
+              <Button variant="outline" size="sm" onClick={loadRecent} disabled={listLoading} className="gap-1.5">
+                <RefreshCw size={13} className={listLoading ? "animate-spin" : ""} /> Refresh
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Search */}
-        <div className="relative print:hidden">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            className="pl-9"
-            placeholder="Search by booking #, customer name, mobile or passport number..."
-            value={query}
-            onChange={e => search(e.target.value)}
-          />
-          {suggestions.length > 0 && (
-            <div className="absolute z-50 top-full mt-1 w-full bg-white border rounded-xl shadow-lg max-h-72 overflow-y-auto">
-              {suggestions.map((s: any) => (
-                <button
-                  key={s.id}
-                  className="w-full text-left px-4 py-3 hover:bg-muted/50 flex items-center justify-between gap-3 border-b last:border-b-0"
-                  onClick={() => loadLedger(s)}
-                >
-                  <div>
-                    <div className="font-medium text-sm">{s.customer_name}</div>
-                    <div className="text-xs text-muted-foreground">{s.booking_number} · {s.customer_mobile}</div>
-                  </div>
-                  <div className="text-right text-xs">
-                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${STATUS_COLOR[s.status] || "bg-gray-100"}`}>
-                      {s.status?.replace(/_/g, " ")}
-                    </span>
-                    <div className="text-orange-600 font-medium mt-0.5">
-                      Bal: {fmtCurr(Math.max(0, Number(s.final_amount) - Number(s.paid_amount)))}
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        {!showDetail && (
+          <div className="relative print:hidden">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="pl-9"
+              placeholder="Search by booking #, customer name, mobile or passport number…"
+              value={query}
+              onChange={e => handleSearch(e.target.value)}
+              autoComplete="off"
+            />
+          </div>
+        )}
 
-        {loadingLedger && <div className="text-center py-12 text-muted-foreground">Loading ledger…</div>}
+        {/* Loading ledger */}
+        {loadingLedger && (
+          <div className="text-center py-16 text-muted-foreground">
+            <RefreshCw size={28} className="animate-spin mx-auto mb-3 opacity-40" />
+            <p>Loading payment ledger…</p>
+          </div>
+        )}
 
-        {ledger && !loadingLedger && (
+        {/* ── LIST VIEW ── */}
+        {!ledger && !loadingLedger && (
+          <>
+            {listLoading && (
+              <div className="text-center py-16 text-muted-foreground">
+                <RefreshCw size={28} className="animate-spin mx-auto mb-3 opacity-40" />
+                <p>Loading payment records…</p>
+              </div>
+            )}
+
+            {listError && !listLoading && (
+              <Card>
+                <CardContent className="py-10 text-center">
+                  <AlertCircle size={32} className="text-red-400 mx-auto mb-3" />
+                  <p className="text-red-500 font-medium">{listError}</p>
+                  <Button variant="outline" size="sm" className="mt-4" onClick={loadRecent}>Try Again</Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {!listLoading && !listError && displayList.length === 0 && (
+              <Card>
+                <CardContent className="py-14 text-center">
+                  <Clock size={36} className="text-muted-foreground mx-auto mb-3 opacity-30" />
+                  <p className="font-medium text-muted-foreground">
+                    {query.trim().length > 0 ? `No bookings found matching "${query}"` : "No payment records found."}
+                  </p>
+                  {query.trim().length > 0 && (
+                    <p className="text-sm text-muted-foreground mt-1">Try booking number, name, mobile, or passport number.</p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {!listLoading && !listError && displayList.length > 0 && (
+              <Card>
+                <div className="px-4 py-3 border-b bg-muted/20 flex items-center justify-between">
+                  <span className="text-sm font-semibold text-muted-foreground">
+                    {query.trim().length > 0 ? `${displayList.length} result${displayList.length !== 1 ? "s" : ""}` : `Recent ${displayList.length} bookings`}
+                  </span>
+                  <span className="text-xs text-muted-foreground">Click a row to view full payment ledger</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/10">
+                        <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Booking #</th>
+                        <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Customer</th>
+                        <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Package</th>
+                        <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Status</th>
+                        <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Billed</th>
+                        <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Paid</th>
+                        <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Balance</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {displayList.map((b: any) => {
+                        const balance = Math.max(0, Number(b.final_amount) - Number(b.paid_amount));
+                        return (
+                          <tr
+                            key={b.id}
+                            className="border-b last:border-0 hover:bg-primary/5 cursor-pointer transition-colors"
+                            onClick={() => loadLedger(b)}
+                          >
+                            <td className="px-4 py-3 font-mono text-xs font-semibold">{b.booking_number}</td>
+                            <td className="px-4 py-3">
+                              <p className="font-medium">{b.customer_name || "—"}</p>
+                              <p className="text-xs text-muted-foreground">{b.customer_mobile}</p>
+                            </td>
+                            <td className="px-4 py-3 text-muted-foreground text-sm">{b.package_name || b.group_name || "—"}</td>
+                            <td className="px-4 py-3">
+                              <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${STATUS_COLOR[b.status] || "bg-gray-100 text-gray-700"}`}>
+                                {(b.status || "").replace(/_/g, " ")}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono">{fmtCurr(Number(b.final_amount))}</td>
+                            <td className="px-4 py-3 text-right font-mono text-green-600">{fmtCurr(Number(b.paid_amount))}</td>
+                            <td className="px-4 py-3 text-right font-mono font-semibold">
+                              <span className={balance > 0 ? "text-red-600" : "text-green-600"}>{fmtCurr(balance)}</span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            )}
+          </>
+        )}
+
+        {/* ── DETAIL VIEW ── */}
+        {showDetail && (
           <>
             {/* Booking summary */}
             <Card className="print:shadow-none">
@@ -293,20 +397,16 @@ export default function HajjiLedger() {
                     </span>
                   </div>
                   <div className="ml-auto flex gap-6 text-center">
-                    <div>
-                      <div className="text-xs text-muted-foreground uppercase tracking-wide">Total Billed</div>
-                      <div className="text-xl font-bold text-primary">{fmtCurr(ledger.summary.totalBilled)}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-muted-foreground uppercase tracking-wide">Total Paid</div>
-                      <div className="text-xl font-bold text-green-600">{fmtCurr(ledger.summary.totalPaid)}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-muted-foreground uppercase tracking-wide">Balance</div>
-                      <div className={`text-xl font-bold ${ledger.summary.balance > 0 ? "text-red-600" : "text-green-600"}`}>
-                        {fmtCurr(ledger.summary.balance)}
+                    {[
+                      { label: "Total Billed", val: ledger.summary.totalBilled, cls: "text-primary" },
+                      { label: "Total Paid", val: ledger.summary.totalPaid, cls: "text-green-600" },
+                      { label: "Balance", val: ledger.summary.balance, cls: ledger.summary.balance > 0 ? "text-red-600" : "text-green-600" },
+                    ].map((item: any) => (
+                      <div key={item.label}>
+                        <div className="text-xs text-muted-foreground uppercase tracking-wide">{item.label}</div>
+                        <div className={`text-xl font-bold ${item.cls}`}>{fmtCurr(item.val)}</div>
                       </div>
-                    </div>
+                    ))}
                   </div>
                 </div>
               </CardContent>
@@ -348,7 +448,9 @@ export default function HajjiLedger() {
             <Card className="print:shadow-none">
               <div className="px-4 py-3 border-b flex items-center gap-2">
                 <CreditCard size={15} className="text-muted-foreground" />
-                <span className="text-sm font-semibold">Payment Statement ({ledger.summary.totalInstallments} installment{ledger.summary.totalInstallments !== 1 ? "s" : ""})</span>
+                <span className="text-sm font-semibold">
+                  Payment Statement ({ledger.summary.totalInstallments} installment{ledger.summary.totalInstallments !== 1 ? "s" : ""})
+                </span>
               </div>
               <CardContent className="p-0">
                 {ledger.statement.length === 0 ? (
@@ -405,13 +507,6 @@ export default function HajjiLedger() {
               </CardContent>
             </Card>
           </>
-        )}
-
-        {!ledger && !loadingLedger && (
-          <div className="text-center py-16 text-muted-foreground">
-            <Clock size={40} className="mx-auto mb-3 opacity-30" />
-            <p>Search by booking number, customer name, mobile or passport number</p>
-          </div>
         )}
       </div>
     </AdminLayout>
