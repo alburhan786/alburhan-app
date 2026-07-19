@@ -36,6 +36,9 @@ import AIOperationsCenter from "@/pages/admin/AIOperationsCenter";
 import ExecutiveDashboard from "@/pages/admin/ExecutiveDashboard";
 import DocumentExpiryCenter from "@/pages/admin/DocumentExpiryCenter";
 import GlobalSearch from "@/pages/admin/GlobalSearch";
+import NotificationHealth from "@/pages/admin/NotificationHealth";
+import BusinessSettings from "@/pages/admin/BusinessSettings";
+import ProductionReport from "@/pages/admin/ProductionReport";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import PackagesManager from "@/pages/admin/PackagesManager";
 import BookingsManager from "@/pages/admin/BookingsManager";
@@ -274,6 +277,9 @@ function Router() {
       <Route path="/admin/executive" component={() => <AdminRoute component={ExecutiveDashboard} />} />
       <Route path="/admin/document-expiry" component={() => <AdminRoute component={DocumentExpiryCenter} />} />
       <Route path="/admin/search" component={() => <AdminRoute component={GlobalSearch} />} />
+      <Route path="/admin/notification-health" component={() => <AdminRoute component={NotificationHealth} />} />
+      <Route path="/admin/settings" component={() => <AdminRoute component={BusinessSettings} />} />
+      <Route path="/admin/production-report" component={() => <AdminRoute component={ProductionReport} />} />
       <Route path="/knowledge" component={KnowledgeCenter} />
       <Route path="/admin/agreements" component={() => <AdminRoute component={AgreementCenter} />} />
       <Route path="/admin/audit-logs" component={() => <AdminRoute component={AuditLogs} />} />

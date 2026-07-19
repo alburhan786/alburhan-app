@@ -14,7 +14,7 @@ import {
   IndianRupee, Users, Package as PackageIcon, Clock, Send, FileText,
   CheckCircle, XCircle, ScanLine, Printer, ClipboardPlus, BarChart2,
   BookOpen, UsersRound, MessageSquare, ImageIcon, Wallet, TrendingUp,
-  ShieldCheck, Megaphone, PieChart, Bell, Plane, ListTodo, UserPlus, Building2, MapPin, Brain, Search
+  ShieldCheck, Megaphone, PieChart, Bell, Plane, ListTodo, UserPlus, Building2, MapPin, Brain, Search, Activity, Settings
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -76,6 +76,9 @@ const MODULE_CARDS = [
   { icon: TrendingUp, label: "Executive Dashboard", desc: "Owner KPIs — revenue, pipeline, metrics", href: "/admin/executive", color: "bg-amber-50 text-amber-700", border: "border-amber-200" },
   { icon: Clock, label: "Document Expiry", desc: "Passport, visa & medical expiry alerts", href: "/admin/document-expiry", color: "bg-red-50 text-red-700", border: "border-red-200" },
   { icon: Search, label: "Global Search", desc: "Search bookings, pilgrims, passports, visas", href: "/admin/search", color: "bg-slate-50 text-slate-700", border: "border-slate-200" },
+  { icon: Activity, label: "Notification Health", desc: "WhatsApp, SMS & email delivery stats", href: "/admin/notification-health", color: "bg-blue-50 text-blue-700", border: "border-blue-200" },
+  { icon: Settings, label: "Business Settings", desc: "Company, prefixes, branding & templates", href: "/admin/settings", color: "bg-primary/5 text-primary", border: "border-primary/20" },
+  { icon: ShieldCheck, label: "Production Report", desc: "Full system QA & readiness score", href: "/admin/production-report", color: "bg-emerald-50 text-emerald-700", border: "border-emerald-200" },
 ];
 
 function getStatusBadge(status: string) {
