@@ -1590,6 +1590,16 @@ async function runMigrations() {
     console.log("[Migration] journey_status + user profile columns ensured");
   } catch (err) { console.error("[Migration] journey_status/profile migration failed:", err); }
 
+  // ── BI analytics columns ───────────────────────────────────────────────────
+  try {
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS state TEXT`);
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS city TEXT`);
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS country TEXT`);
+    await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS ticket_status TEXT`);
+    await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS max_pilgrims INTEGER`);
+    console.log("[Migration] BI analytics columns ensured");
+  } catch (err) { console.error("[Migration] BI analytics columns failed:", err); }
+
   // ── bank_settings + offline_payments ──────────────────────────────────────
   try {
     await pool.query(`

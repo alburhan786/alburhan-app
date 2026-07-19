@@ -524,62 +524,339 @@ router.get("/reports/pending-visas", requireAdmin as any, async (_req: Authentic
 });
 
 // ── Business Intelligence ─────────────────────────────────────────────────────
-router.get("/bi", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
+router.get("/bi", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
-    const [monthlyRes, statusRes, packageRes, stateRes, cityRes, summaryRes] = await Promise.all([
+    const period   = (req.query.period as string) || "month";
+    const fromDate = req.query.from   as string | undefined;
+    const toDate   = req.query.to     as string | undefined;
+    const branchId = req.query.branch as string | undefined;
+    const agentId  = req.query.agent  as string | undefined;
+    const pkgName  = req.query.package as string | undefined;
+    const bkType   = req.query.type   as string | undefined; // hajj | umrah | all
+
+    // Build the time interval for period-filtered queries
+    const intervalMap: Record<string, string> = {
+      today: "1 day", week: "7 days", month: "30 days", year: "365 days",
+    };
+    const periodInterval = intervalMap[period] || "30 days";
+
+    // Dynamic WHERE clauses for bookings (period-filtered)
+    const periodFilters: string[] = [];
+    const periodParams: any[] = [];
+    if (fromDate && toDate) {
+      periodParams.push(fromDate, toDate);
+      periodFilters.push(`b.created_at >= $${periodParams.length - 1}::date`);
+      periodFilters.push(`b.created_at < $${periodParams.length}::date + interval '1 day'`);
+    } else {
+      periodFilters.push(`b.created_at >= NOW() - INTERVAL '${periodInterval}'`);
+    }
+    if (branchId) { periodParams.push(branchId); periodFilters.push(`b.branch_id = $${periodParams.length}`); }
+    if (agentId)  { periodParams.push(agentId);  periodFilters.push(`b.agent_id  = $${periodParams.length}`); }
+    if (pkgName)  { periodParams.push(pkgName);  periodFilters.push(`b.package_name = $${periodParams.length}`); }
+    if (bkType === "hajj")  periodFilters.push(`LOWER(b.package_name) LIKE '%hajj%'`);
+    if (bkType === "umrah") periodFilters.push(`LOWER(b.package_name) LIKE '%umrah%'`);
+    const pWhere = periodFilters.length ? "WHERE " + periodFilters.join(" AND ") : "";
+
+    const safe = (col: string) => `COALESCE(${col}, 0)::float`;
+    const safeSum = (col: string) => `COALESCE(SUM(${col}), 0)::float`;
+
+    const [
+      summaryRes, monthlyRes, weeklyRes, statusRes, typeRes,
+      packageRes, stateRes, cityRes, branchRes,
+      flightRes, hotelRes, expenseRes,
+      customerNewRes, customerRepeatRes, ratingRes,
+      agreementRes, visaRes, ticketRes, journeyRes,
+      agentCommRes, branchRevRes,
+    ] = await Promise.all([
+
+      // 1. SUMMARY — all-time + period KPIs
+      pool.query(`
+        SELECT
+          ${safe('(SELECT SUM(paid_amount) FROM bookings WHERE paid_amount > 0)')} AS total_revenue,
+          ${safe('(SELECT SUM(paid_amount) FROM bookings WHERE created_at::date = CURRENT_DATE)')} AS today_revenue,
+          ${safe('(SELECT SUM(paid_amount) FROM bookings WHERE created_at >= NOW()-INTERVAL \'7 days\')')} AS week_revenue,
+          ${safe('(SELECT SUM(paid_amount) FROM bookings WHERE created_at >= NOW()-INTERVAL \'30 days\')')} AS month_revenue,
+          ${safe('(SELECT SUM(final_amount - paid_amount) FROM bookings WHERE status IN (\'confirmed\',\'approved\') AND final_amount > paid_amount)')} AS pending_payments,
+          ${safe('(SELECT SUM(paid_amount) FROM bookings WHERE status=\'confirmed\' AND paid_amount > 0)')} AS paid_payments,
+          (SELECT COUNT(*)::int FROM bookings) AS total_bookings,
+          (SELECT COUNT(*)::int FROM bookings WHERE created_at >= NOW()-INTERVAL '${periodInterval}') AS period_bookings,
+          (SELECT COUNT(*)::int FROM bookings WHERE status='pending') AS pending_count,
+          (SELECT COUNT(*)::int FROM bookings WHERE status='approved') AS approved_count,
+          (SELECT COUNT(*)::int FROM bookings WHERE status='confirmed') AS confirmed_count,
+          (SELECT COUNT(*)::int FROM bookings WHERE status IN ('rejected','cancelled')) AS cancelled_count,
+          (SELECT COUNT(*)::int FROM users WHERE role='customer') AS total_customers,
+          (SELECT COUNT(*)::int FROM packages) AS total_packages
+      `).catch(() => ({ rows: [{}] })),
+
+      // 2. Monthly revenue & bookings — last 12 months
       pool.query(`
         SELECT
           TO_CHAR(created_at, 'Mon YY') AS month,
           TO_CHAR(created_at, 'YYYY-MM') AS sort_key,
           COUNT(*)::int AS bookings,
-          COUNT(*) FILTER (WHERE status = 'confirmed')::int AS confirmed,
-          COALESCE(SUM(CASE WHEN status = 'confirmed'
-            THEN NULLIF(TRIM(final_amount::text),'')::numeric ELSE 0 END), 0)::float AS revenue
+          COUNT(*) FILTER (WHERE status='confirmed')::int AS confirmed,
+          ${safeSum('CASE WHEN status=\'confirmed\' THEN paid_amount ELSE 0 END')} AS revenue
         FROM bookings
         WHERE created_at >= NOW() - INTERVAL '12 months'
-        GROUP BY month, sort_key
-        ORDER BY sort_key
-      `),
-      pool.query(`SELECT status::text AS status, COUNT(*)::int AS count FROM bookings GROUP BY status ORDER BY count DESC`),
+        GROUP BY TO_CHAR(created_at,'Mon YY'), TO_CHAR(created_at,'YYYY-MM')
+        ORDER BY TO_CHAR(created_at,'YYYY-MM')
+      `).catch(() => ({ rows: [] })),
+
+      // 3. Weekly daily breakdown (last 7 days)
       pool.query(`
         SELECT
-          COALESCE(package_name, 'Unknown') AS package,
+          TO_CHAR(created_at,'Dy DD Mon') AS day,
+          TO_CHAR(created_at,'YYYY-MM-DD') AS sort_key,
           COUNT(*)::int AS bookings,
-          COALESCE(SUM(CASE WHEN status='confirmed' THEN NULLIF(TRIM(final_amount::text),'')::numeric ELSE 0 END),0)::float AS revenue
+          ${safeSum('paid_amount')} AS revenue
         FROM bookings
+        WHERE created_at >= NOW() - INTERVAL '7 days'
+        GROUP BY TO_CHAR(created_at,'Dy DD Mon'), TO_CHAR(created_at,'YYYY-MM-DD')
+        ORDER BY TO_CHAR(created_at,'YYYY-MM-DD')
+      `).catch(() => ({ rows: [] })),
+
+      // 4. Bookings by status
+      pool.query(`SELECT status::text, COUNT(*)::int AS count FROM bookings GROUP BY status ORDER BY count DESC`
+      ).catch(() => ({ rows: [] })),
+
+      // 5. Bookings by type (Hajj vs Umrah vs Other)
+      pool.query(`
+        SELECT
+          CASE
+            WHEN LOWER(package_name) LIKE '%hajj%' THEN 'Hajj'
+            WHEN LOWER(package_name) LIKE '%umrah%' THEN 'Umrah'
+            ELSE 'Other'
+          END AS type,
+          COUNT(*)::int AS count,
+          ${safeSum('paid_amount')} AS revenue
+        FROM bookings
+        GROUP BY 1 ORDER BY count DESC
+      `).catch(() => ({ rows: [] })),
+
+      // 6. Package popularity
+      pool.query(`
+        SELECT
+          COALESCE(package_name,'Unknown') AS package,
+          COUNT(*)::int AS bookings,
+          ${safeSum('paid_amount')} AS revenue,
+          MAX(b.max_pilgrims) AS capacity,
+          COUNT(*) FILTER (WHERE status='confirmed')::int AS confirmed
+        FROM bookings b
         WHERE package_name IS NOT NULL AND package_name != ''
         GROUP BY package_name
-        ORDER BY bookings DESC
-        LIMIT 10
-      `),
+        ORDER BY bookings DESC LIMIT 10
+      `).catch(() => ({ rows: [] })),
+
+      // 7. Customers by state
       pool.query(`
         SELECT COALESCE(state,'Unknown') AS state, COUNT(*)::int AS customers
         FROM users WHERE role='customer' AND state IS NOT NULL AND state != ''
         GROUP BY state ORDER BY customers DESC LIMIT 10
-      `),
+      `).catch(() => ({ rows: [] })),
+
+      // 8. Customers by city
       pool.query(`
         SELECT COALESCE(city,'Unknown') AS city, COUNT(*)::int AS customers
         FROM users WHERE role='customer' AND city IS NOT NULL AND city != ''
         GROUP BY city ORDER BY customers DESC LIMIT 10
-      `),
+      `).catch(() => ({ rows: [] })),
+
+      // 9. Customers by branch
+      pool.query(`
+        SELECT COALESCE(br.name, 'Direct') AS branch, COUNT(DISTINCT b.customer_id)::int AS customers,
+          COUNT(b.id)::int AS bookings, ${safeSum('b.paid_amount')} AS revenue
+        FROM bookings b
+        LEFT JOIN branches br ON br.id = b.branch_id
+        GROUP BY COALESCE(br.name,'Direct') ORDER BY bookings DESC LIMIT 10
+      `).catch(() => ({ rows: [] })),
+
+      // 10. Flight stats
       pool.query(`
         SELECT
-          (SELECT COUNT(*)::int FROM bookings WHERE status='confirmed' AND NULLIF(TRIM(final_amount::text),'')::numeric > 0) AS total_bookings,
-          (SELECT COALESCE(SUM(NULLIF(TRIM(final_amount::text),'')::numeric),0)::float FROM bookings WHERE status='confirmed') AS total_revenue,
-          (SELECT COUNT(*)::int FROM users WHERE role='customer') AS total_customers,
-          (SELECT COUNT(*)::int FROM packages) AS total_packages
-      `),
+          COUNT(*)::int AS total_flights,
+          COALESCE(SUM(total_seats),0)::int AS total_seats,
+          COALESCE(SUM(booked_seats),0)::int AS booked_seats,
+          COUNT(*) FILTER (WHERE departure_date BETWEEN CURRENT_DATE AND CURRENT_DATE+30)::int AS upcoming_30d,
+          COUNT(*) FILTER (WHERE departure_date BETWEEN CURRENT_DATE AND CURRENT_DATE+7)::int AS upcoming_7d
+        FROM group_flights WHERE status != 'cancelled'
+      `).catch(() => ({ rows: [{ total_flights: 0, total_seats: 0, booked_seats: 0, upcoming_30d: 0, upcoming_7d: 0 }] })),
+
+      // 11. Hotel stats
+      pool.query(`
+        SELECT
+          COUNT(DISTINCT h.id)::int AS total_hotels,
+          COALESCE(SUM(hr.total_beds),0)::int AS total_rooms,
+          (SELECT COUNT(*)::int FROM pilgrim_room_assignments) AS occupied_rooms
+        FROM hotels h
+        LEFT JOIN hotel_rooms hr ON hr.hotel_id = h.id
+        WHERE h.is_deleted = false
+      `).catch(() => ({ rows: [{ total_hotels: 0, total_rooms: 0, occupied_rooms: 0 }] })),
+
+      // 12. Expenses & finance
+      pool.query(`
+        SELECT
+          ${safe('(SELECT SUM(amount) FROM expenses WHERE status != \'rejected\')')} AS total_expenses,
+          ${safe('(SELECT SUM(amount) FROM expenses WHERE status=\'approved\')')} AS approved_expenses,
+          ${safe('(SELECT SUM(paid_amount) FROM bookings WHERE paid_amount > 0)')} AS gross_revenue,
+          ${safe('(SELECT SUM(final_amount - paid_amount) FROM bookings WHERE status IN (\'confirmed\',\'approved\') AND final_amount > paid_amount)')} AS outstanding
+      `).catch(() => ({ rows: [{}] })),
+
+      // 13. New customers (created in period)
+      pool.query(`
+        SELECT COUNT(*)::int AS count FROM users
+        WHERE role='customer' AND created_at >= NOW() - INTERVAL '${periodInterval}'
+      `).catch(() => ({ rows: [{ count: 0 }] })),
+
+      // 14. Repeat customers (more than 1 booking)
+      pool.query(`
+        SELECT COUNT(*)::int AS count FROM (
+          SELECT customer_id FROM bookings WHERE customer_id IS NOT NULL
+          GROUP BY customer_id HAVING COUNT(*) > 1
+        ) sub
+      `).catch(() => ({ rows: [{ count: 0 }] })),
+
+      // 15. Average satisfaction rating
+      pool.query(`
+        SELECT ROUND(AVG(rating),1)::float AS avg_rating, COUNT(*)::int AS total_reviews
+        FROM feedback WHERE rating IS NOT NULL
+      `).catch(() => ({ rows: [{ avg_rating: null, total_reviews: 0 }] })),
+
+      // 16. Agreement completion
+      pool.query(`
+        SELECT
+          COUNT(*)::int AS total,
+          COUNT(*) FILTER (WHERE status='signed')::int AS signed
+        FROM agreements
+      `).catch(() => ({ rows: [{ total: 0, signed: 0 }] })),
+
+      // 17. Visa completion
+      pool.query(`
+        SELECT
+          COUNT(*)::int AS total,
+          COUNT(*) FILTER (WHERE visa_status='received')::int AS received
+        FROM pilgrims
+      `).catch(() => ({ rows: [{ total: 0, received: 0 }] })),
+
+      // 18. Tickets issued
+      pool.query(`
+        SELECT COUNT(*)::int AS count FROM bookings WHERE ticket_status='issued' OR journey_status='departed'
+      `).catch(() => ({ rows: [{ count: 0 }] })),
+
+      // 19. Journey completed
+      pool.query(`
+        SELECT COUNT(*)::int AS count FROM bookings WHERE journey_status='returned'
+      `).catch(() => ({ rows: [{ count: 0 }] })),
+
+      // 20. Agent commissions
+      pool.query(`
+        SELECT a.name AS agent, COUNT(b.id)::int AS bookings,
+          ${safeSum('b.paid_amount')} AS revenue,
+          ${safeSum('a.commission_rate * b.paid_amount / 100')} AS commission
+        FROM agents a
+        LEFT JOIN bookings b ON b.agent_id = a.id
+        GROUP BY a.id, a.name ORDER BY revenue DESC LIMIT 10
+      `).catch(() => ({ rows: [] })),
+
+      // 21. Branch revenue
+      pool.query(`
+        SELECT COALESCE(br.name,'Direct') AS branch,
+          COUNT(b.id)::int AS bookings,
+          ${safeSum('b.paid_amount')} AS revenue
+        FROM bookings b
+        LEFT JOIN branches br ON br.id = b.branch_id
+        GROUP BY COALESCE(br.name,'Direct') ORDER BY revenue DESC LIMIT 10
+      `).catch(() => ({ rows: [] })),
     ]);
 
+    const s = summaryRes.rows[0] || {};
+    const e = expenseRes.rows[0] || {};
+    const fl = flightRes.rows[0] || {};
+    const ht = hotelRes.rows[0] || {};
+    const agr = agreementRes.rows[0] || {};
+    const vis = visaRes.rows[0] || {};
+    const rat = ratingRes.rows[0] || {};
+    const newCust = customerNewRes.rows[0] || {};
+    const repCust = customerRepeatRes.rows[0] || {};
+    const ticketCount = ticketRes.rows[0] || {};
+    const journeyCount = journeyRes.rows[0] || {};
+
+    const grossRevenue = Number(e.gross_revenue || 0);
+    const totalExpenses = Number(e.total_expenses || 0);
+
     res.json({
-      revenueByMonth: monthlyRes.rows.map((r: any) => ({ month: r.month, bookings: r.bookings, revenue: r.revenue })),
-      bookingsByStatus: statusRes.rows,
-      packagePopularity: packageRes.rows,
-      customersByState: stateRes.rows,
-      customersByCity: cityRes.rows,
-      summary: summaryRes.rows[0] || {},
+      summary: {
+        totalRevenue:     Number(s.total_revenue   || 0),
+        todayRevenue:     Number(s.today_revenue   || 0),
+        weekRevenue:      Number(s.week_revenue    || 0),
+        monthRevenue:     Number(s.month_revenue   || 0),
+        pendingPayments:  Number(s.pending_payments || 0),
+        paidPayments:     Number(s.paid_payments   || 0),
+        totalBookings:    Number(s.total_bookings  || 0),
+        periodBookings:   Number(s.period_bookings || 0),
+        pendingCount:     Number(s.pending_count   || 0),
+        approvedCount:    Number(s.approved_count  || 0),
+        confirmedCount:   Number(s.confirmed_count || 0),
+        cancelledCount:   Number(s.cancelled_count || 0),
+        totalCustomers:   Number(s.total_customers || 0),
+        totalPackages:    Number(s.total_packages  || 0),
+      },
+      revenueByMonth:   monthlyRes.rows.map((r: any) => ({ month: r.month, bookings: Number(r.bookings), revenue: Number(r.revenue) })),
+      revenueByWeek:    weeklyRes.rows.map((r: any) => ({ day: r.day, bookings: Number(r.bookings), revenue: Number(r.revenue) })),
+      bookingsByStatus: statusRes.rows.map((r: any) => ({ status: r.status, count: Number(r.count) })),
+      bookingsByType:   typeRes.rows.map((r: any) => ({ type: r.type, count: Number(r.count), revenue: Number(r.revenue) })),
+      packagePopularity: packageRes.rows.map((r: any) => ({
+        package: r.package, bookings: Number(r.bookings), revenue: Number(r.revenue),
+        confirmed: Number(r.confirmed),
+        occupancy: r.capacity > 0 ? Math.round((Number(r.confirmed) / Number(r.capacity)) * 100) : null,
+      })),
+      customersByState:  stateRes.rows,
+      customersByCity:   cityRes.rows,
+      customersByBranch: branchRes.rows,
+      flights: {
+        total:      Number(fl.total_flights  || 0),
+        totalSeats: Number(fl.total_seats    || 0),
+        bookedSeats:Number(fl.booked_seats   || 0),
+        upcoming7d: Number(fl.upcoming_7d    || 0),
+        upcoming30d:Number(fl.upcoming_30d   || 0),
+        occupancy:  fl.total_seats > 0 ? Math.round((Number(fl.booked_seats) / Number(fl.total_seats)) * 100) : 0,
+      },
+      hotels: {
+        total:       Number(ht.total_hotels  || 0),
+        totalRooms:  Number(ht.total_rooms   || 0),
+        occupiedRooms:Number(ht.occupied_rooms || 0),
+        occupancy:   ht.total_rooms > 0 ? Math.round((Number(ht.occupied_rooms) / Number(ht.total_rooms)) * 100) : 0,
+      },
+      finance: {
+        totalExpenses:  totalExpenses,
+        approvedExpenses: Number(e.approved_expenses || 0),
+        grossRevenue:   grossRevenue,
+        profit:         grossRevenue - totalExpenses,
+        outstanding:    Number(e.outstanding   || 0),
+      },
+      customerAnalytics: {
+        newCustomers:        Number(newCust.count || 0),
+        repeatCustomers:     Number(repCust.count || 0),
+        avgRating:           rat.avg_rating ? Number(rat.avg_rating) : null,
+        totalReviews:        Number(rat.total_reviews || 0),
+        agreementTotal:      Number(agr.total || 0),
+        agreementSigned:     Number(agr.signed || 0),
+        agreementCompletion: agr.total > 0 ? Math.round((Number(agr.signed) / Number(agr.total)) * 100) : 0,
+        visaTotal:           Number(vis.total || 0),
+        visaReceived:        Number(vis.received || 0),
+        visaCompletion:      vis.total > 0 ? Math.round((Number(vis.received) / Number(vis.total)) * 100) : 0,
+        ticketsIssued:       Number(ticketCount.count || 0),
+        journeyCompleted:    Number(journeyCount.count || 0),
+      },
+      agentCommissions: agentCommRes.rows.map((r: any) => ({
+        agent: r.agent, bookings: Number(r.bookings),
+        revenue: Number(r.revenue), commission: Number(r.commission),
+      })),
+      branchRevenue: branchRevRes.rows.map((r: any) => ({
+        branch: r.branch, bookings: Number(r.bookings), revenue: Number(r.revenue),
+      })),
     });
   } catch (err: any) {
+    console.error("[BI] error:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
