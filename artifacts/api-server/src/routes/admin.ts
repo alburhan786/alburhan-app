@@ -299,7 +299,7 @@ router.get("/super-stats", requireAdmin as any, async (_req: AuthenticatedReques
           COUNT(*) FILTER (WHERE visa_status = 'applied' OR visa_status = 'processing')::int AS processing_visas,
           COUNT(*) FILTER (WHERE visa_status = 'received')::int AS received_visas
         FROM pilgrims
-      `),
+      `).catch(() => ({ rows: [{ total_pilgrims: 0, pending_visas: 0, processing_visas: 0, received_visas: 0 }] })),
       // Notification delivery rates (last 7 days)
       pool.query(`
         SELECT
@@ -2370,6 +2370,59 @@ router.get("/pilgrim-ops", requireAdmin as any, async (req: AuthenticatedRequest
       packages: pkgs.rows.map((r: any) => r.package_name),
     });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ════════════════════════════════════════════════════════════════════
+//  ACCEPTANCE TEST — authenticated endpoint to verify all key tables
+// ════════════════════════════════════════════════════════════════════
+router.get("/acceptance-test", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
+  const checks: Array<{ name: string; status: "ok" | "error"; count?: number; error?: string }> = [];
+
+  const test = async (name: string, sql: string, params: any[] = []) => {
+    try {
+      const r = await pool.query(sql, params);
+      const count = parseInt(String(r.rows[0]?.count ?? r.rows[0]?.cnt ?? r.rows.length), 10) || 0;
+      checks.push({ name, status: "ok", count });
+    } catch (err: any) {
+      checks.push({ name, status: "error", error: err?.message?.slice(0, 120) });
+    }
+  };
+
+  await Promise.all([
+    test("bookings",          `SELECT COUNT(*)::int AS count FROM bookings`),
+    test("users",             `SELECT COUNT(*)::int AS count FROM users`),
+    test("pilgrims",          `SELECT COUNT(*)::int AS count FROM pilgrims`),
+    test("payment_transactions", `SELECT COUNT(*)::int AS count FROM payment_transactions`),
+    test("invoices",          `SELECT COUNT(*)::int AS count FROM invoices`),
+    test("packages",          `SELECT COUNT(*)::int AS count FROM packages`),
+    test("notification_logs", `SELECT COUNT(*)::int AS count FROM notification_logs`),
+    test("agreements",        `SELECT COUNT(*)::int AS count FROM agreements`),
+    test("reminder_logs",     `SELECT COUNT(*)::int AS count FROM reminder_logs`),
+    test("branches",          `SELECT COUNT(*)::int AS count FROM branches`),
+    test("agents",            `SELECT COUNT(*)::int AS count FROM agents`),
+    test("employees",         `SELECT COUNT(*)::int AS count FROM employees`),
+    test("tasks",             `SELECT COUNT(*)::int AS count FROM tasks`),
+    test("support_tickets",   `SELECT COUNT(*)::int AS count FROM support_tickets`),
+    test("hotels",            `SELECT COUNT(*)::int AS count FROM hotels`),
+    test("group_flights",     `SELECT COUNT(*)::int AS count FROM group_flights`),
+    test("offline_payments",  `SELECT COUNT(*)::int AS count FROM offline_payments`),
+    test("expenses",          `SELECT COUNT(*)::int AS count FROM expenses`),
+    test("feedback",          `SELECT COUNT(*)::int AS count FROM feedback`),
+    test("leads",             `SELECT COUNT(*)::int AS count FROM leads`),
+    test("super_stats_today_revenue", `SELECT COALESCE(SUM(amount),0)::float AS count FROM payment_transactions WHERE payment_date::date = CURRENT_DATE`),
+    test("super_stats_pending_bookings", `SELECT COUNT(*)::int AS count FROM bookings WHERE status IN ('approved','pending')`),
+    test("super_stats_pilgrims_visa", `SELECT COUNT(*)::int AS count FROM pilgrims WHERE visa_status IS NULL OR visa_status='not_applied'`),
+    test("reminder_logs_id_type", `SELECT data_type AS count FROM information_schema.columns WHERE table_name='reminder_logs' AND column_name='id'`),
+  ]);
+
+  const ok = checks.filter(c => c.status === "ok").length;
+  const failed = checks.filter(c => c.status === "error").length;
+
+  res.json({
+    timestamp: new Date().toISOString(),
+    summary: { total: checks.length, ok, failed },
+    checks,
+  });
 });
 
 export default router;

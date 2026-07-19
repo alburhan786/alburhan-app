@@ -1,0 +1,158 @@
+Stop verifying endpoints using unauthenticated (401) responses only.
+
+A 401 Unauthorized response only proves the route exists. It does NOT prove the feature works.
+
+From now on perform a complete production acceptance test using an authenticated Super Admin account.
+
+Fix every broken production feature before adding any new features.
+
+Priority 1
+
+SUPER ADMIN DASHBOARD
+
+Current production issue:
+The page loads but cards fail to load correctly.
+
+Tasks:
+
+• Login as Super Admin.
+• Open /admin/super.
+• Verify every KPI card loads real data.
+• Verify charts render.
+• Verify revenue.
+• Verify bookings.
+• Verify pending approvals.
+• Verify pending payments.
+• Verify pending agreements.
+• Verify visas.
+• Verify notification statistics.
+• Verify hotel occupancy.
+• Verify flight summary.
+• Verify customer satisfaction.
+
+If any SQL query fails:
+• Fix it.
+• Return HTTP 200.
+• Never return null.
+• Add safe defaults.
+
+------------------------------------------------
+
+Priority 2
+
+PAYMENT REMINDER MODULE
+
+Current production error:
+
+"Failed to load reminder stats"
+
+Fix completely.
+
+Verify:
+
+• Reminder statistics load.
+• Total reminders.
+• Eligible bookings.
+• Last reminder.
+• Upcoming due dates.
+• Toggle saves correctly.
+• Cron job works.
+• WhatsApp reminders.
+• SMS reminders.
+• Email reminders.
+• Notification logs.
+• Retry system.
+
+------------------------------------------------
+
+Priority 3
+
+BRANCH MANAGEMENT
+
+Create full Branch Management.
+
+Features:
+
+• Branch CRUD
+• Branch Dashboard
+• Branch Manager Login
+• Branch Permissions
+• Branch Revenue
+• Branch Staff
+• Branch Reports
+• Branch Bookings
+
+------------------------------------------------
+
+Priority 4
+
+AGENT MANAGEMENT
+
+Create complete Agent Portal.
+
+Features:
+
+• Agent Login
+• Agent Dashboard
+• Agent Booking
+• Agent Commission
+• Agent Wallet
+• Agent Ledger
+• Agent Customers
+• Agent Reports
+• Agent Performance
+
+------------------------------------------------
+
+Priority 5
+
+STAFF MANAGEMENT
+
+• Staff Login
+• Role Permissions
+• Attendance
+• Tasks
+• Leave
+• Salary
+• Activity Logs
+
+------------------------------------------------
+
+Priority 6
+
+Acceptance Test
+
+Do NOT stop after getting 401.
+
+Login and verify:
+
+✓ Super Admin
+✓ Admin
+✓ Branch Manager
+✓ Agent
+✓ Staff
+✓ Customer
+
+Verify every page loads correctly.
+
+Verify every API returns HTTP 200 after authentication.
+
+Verify all frontend cards display real database data.
+
+Verify no React errors.
+
+Verify no SQL errors.
+
+Verify no console errors.
+
+Verify VPS production.
+
+Finally provide:
+
+✓ Number of working modules
+✓ Number of working APIs
+✓ Number of dashboards
+✓ Number of login portals
+✓ Number of remaining issues
+
+Do not mark this task complete until every production module is working correctly with real authenticated data.

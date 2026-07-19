@@ -84,6 +84,8 @@ const MODULE_CARDS = [
   { icon: MapPin, label: "Pilgrim Ops Center", desc: "Live ops — visa, passport, payments, flights", href: "/admin/pilgrim-ops", color: "bg-sky-50 text-sky-700", border: "border-sky-200" },
   { icon: Building2, label: "Branch Management", desc: "Manage offices, branches and managers", href: "/admin/branches", color: "bg-orange-50 text-orange-700", border: "border-orange-200" },
   { icon: UserPlus, label: "Agent Management", desc: "Track agents, commissions and bookings", href: "/admin/agents", color: "bg-teal-50 text-teal-700", border: "border-teal-200" },
+  { icon: Users, label: "Staff Management", desc: "ID cards, roles & staff records", href: "/admin/staff", color: "bg-slate-50 text-slate-700", border: "border-slate-200" },
+  { icon: IndianRupee, label: "Payroll Manager", desc: "Salaries, payslips & attendance", href: "/admin/payroll", color: "bg-lime-50 text-lime-700", border: "border-lime-200" },
 ];
 
 function getStatusBadge(status: string) {
