@@ -2594,30 +2594,100 @@ echo "[5] Deploying frontend..."
 curl -fsSL "\$DEV/api/migrate/frontend.tar.gz?key=\$KEY" | tar -xzf - -C /var/www/alburhan
 echo "    ✓ Frontend deployed"
 
-# Step 6: Restart PM2 — force with explicit script path
+# Step 6: Source .env then restart PM2 — always use canonical FALLBACK path
 echo ""
 echo "[6] Restarting PM2..."
-pm2 stop "\$PM2_APP" 2>/dev/null || true
-pm2 start "\$PM2_SCRIPT" --name "\$PM2_APP" --interpreter node
-sleep 5
+
+# Load .env so DATABASE_URL and SESSION_SECRET are in environment before PM2 starts
+for ENV_FILE in /var/www/alburhan/.env /var/www/alburhan/artifacts/api-server/.env; do
+  if [ -f "\$ENV_FILE" ]; then
+    set -a
+    source "\$ENV_FILE"
+    set +a
+    echo "    Loaded env from: \$ENV_FILE"
+    break
+  fi
+done
+[ -z "\$DATABASE_URL" ] && echo "    WARNING: DATABASE_URL not found in any .env file — server may fail DB connect"
+
+# Delete stale PM2 entry (removes any wrong script path or interpreter config)
+pm2 delete "\$PM2_APP" 2>/dev/null || true
+
+# Always start from the canonical fallback path (the CJS bundle, NOT TypeScript source)
+pm2 start "\$FALLBACK" --name "\$PM2_APP" --interpreter node
+pm2 save
+echo "    PM2 started: \$FALLBACK"
+sleep 6
 pm2 status "\$PM2_APP"
 
 # Step 7: Verify
 echo ""
 echo "[7] Verifying..."
-sleep 2
-HEALTH=\$(curl -sf --max-time 8 "https://alburhantravels.com/api/health" 2>/dev/null || echo "timeout")
+sleep 3
+HEALTH=\$(curl -sf --max-time 10 "https://alburhantravels.com/api/health" 2>/dev/null || echo "timeout")
 echo "    Health: \$HEALTH"
 DB_CHK=\$(curl -sf --max-time 12 "https://alburhantravels.com/api/migrate/db-check?key=\$KEY" 2>/dev/null | head -c 150 || echo "endpoint not accessible")
 echo "    DB:     \$DB_CHK"
+OTP_CHK=\$(curl -sf -X POST --max-time 8 "https://alburhantravels.com/api/auth/send-otp" -H "Content-Type: application/json" -d '{"mobile":"0000000000"}' 2>/dev/null | head -c 100 || echo "no response")
+echo "    OTP:    \$OTP_CHK"
 
 echo ""
-echo "=== Done. If DB shows endpoint not accessible, migration endpoints are still blocked."
-echo "=== Share the pm2 describe output to diagnose further."
+echo "=== Done."
+echo "=== If health shows timeout: pm2 logs \$PM2_APP --lines 50"
+echo "=== If DATABASE_URL error:   add it to /var/www/alburhan/.env and rerun step 6 manually:"
+echo "===   source /var/www/alburhan/.env && pm2 delete \$PM2_APP && pm2 start \$FALLBACK --name \$PM2_APP --interpreter node && pm2 save"
 `;
 
   res.setHeader("Content-Type", "text/plain; charset=utf-8");
   res.setHeader("Content-Disposition", "attachment; filename=fixdeploy.sh");
+  res.send(script);
+});
+
+// GET /api/migrate/pm2-restart.sh — emergency PM2 restart-only script (no download)
+app.get("/api/migrate/pm2-restart.sh", (req, res) => {
+  const key = req.query.key as string;
+  if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
+
+  const script = `#!/bin/bash
+# Al Burhan — Emergency PM2 restart (no download, just restarts with correct config)
+set -e
+PM2_APP="alburhan-api"
+BUNDLE="/var/www/alburhan/artifacts/api-server/dist/index.cjs"
+
+echo "=== Al Burhan Emergency PM2 Restart ==="
+echo ""
+
+if [ ! -f "\$BUNDLE" ]; then
+  echo "ERROR: Bundle not found at \$BUNDLE"
+  echo "Run fixdeploy.sh first to download the bundle."
+  exit 1
+fi
+
+# Source .env for DATABASE_URL
+for ENV_FILE in /var/www/alburhan/.env /var/www/alburhan/artifacts/api-server/.env; do
+  if [ -f "\$ENV_FILE" ]; then
+    set -a; source "\$ENV_FILE"; set +a
+    echo "Loaded env from: \$ENV_FILE"
+    break
+  fi
+done
+[ -z "\$DATABASE_URL" ] && echo "WARNING: DATABASE_URL not found — server will fail DB connect"
+
+# Force-delete stale PM2 entry and recreate
+pm2 delete "\$PM2_APP" 2>/dev/null || true
+pm2 start "\$BUNDLE" --name "\$PM2_APP" --interpreter node
+pm2 save
+echo ""
+sleep 6
+pm2 status "\$PM2_APP"
+echo ""
+echo "Checking health..."
+sleep 3
+curl -sf --max-time 10 "https://alburhantravels.com/api/health" && echo "" || echo "Health check timeout — check: pm2 logs \$PM2_APP --lines 50"
+`;
+
+  res.setHeader("Content-Type", "text/plain; charset=utf-8");
+  res.setHeader("Content-Disposition", "attachment; filename=pm2-restart.sh");
   res.send(script);
 });
 

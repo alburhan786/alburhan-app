@@ -55,7 +55,8 @@ async function runDepartureReminders() {
                 gf.pnr, gf.departure_airport, gf.arrival_airport, gf.pilgrims_assigned
          FROM group_flights gf
          WHERE gf.departure_date IS NOT NULL
-           AND (gf.departure_date::timestamp + COALESCE(gf.departure_time::time, '00:00'::time))
+           AND gf.departure_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
+           AND (gf.departure_date::date + COALESCE(gf.departure_time::time, '00:00'::time))
                BETWEEN NOW() + INTERVAL '${minHours} hours' AND NOW() + INTERVAL '${maxHours} hours'
            AND gf.status != 'cancelled'`
       );
