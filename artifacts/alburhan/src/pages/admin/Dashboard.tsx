@@ -14,7 +14,7 @@ import {
   IndianRupee, Users, Package as PackageIcon, Clock, Send, FileText,
   CheckCircle, XCircle, ScanLine, Printer, ClipboardPlus, BarChart2,
   BookOpen, UsersRound, MessageSquare, ImageIcon, Wallet, TrendingUp,
-  ShieldCheck, Megaphone, PieChart, Bell, Plane, ListTodo, UserPlus, Building2, MapPin, Brain
+  ShieldCheck, Megaphone, PieChart, Bell, Plane, ListTodo, UserPlus, Building2, MapPin, Brain, Search
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -74,6 +74,8 @@ const MODULE_CARDS = [
   { icon: MapPin, label: "Group Tracking", desc: "Live group city & activity updates", href: "/admin/group-tracking", color: "bg-teal-50 text-teal-700", border: "border-teal-200" },
   { icon: Brain, label: "AI Operations", desc: "Smart alerts — visas, passports, payments", href: "/admin/ai-ops", color: "bg-violet-50 text-violet-700", border: "border-violet-200" },
   { icon: TrendingUp, label: "Executive Dashboard", desc: "Owner KPIs — revenue, pipeline, metrics", href: "/admin/executive", color: "bg-amber-50 text-amber-700", border: "border-amber-200" },
+  { icon: Clock, label: "Document Expiry", desc: "Passport, visa & medical expiry alerts", href: "/admin/document-expiry", color: "bg-red-50 text-red-700", border: "border-red-200" },
+  { icon: Search, label: "Global Search", desc: "Search bookings, pilgrims, passports, visas", href: "/admin/search", color: "bg-slate-50 text-slate-700", border: "border-slate-200" },
 ];
 
 function getStatusBadge(status: string) {

@@ -1,0 +1,336 @@
+FINAL PHASE – AL BURHAN TOURS & TRAVELS WORLD-CLASS ERP
+
+IMPORTANT
+
+Do NOT modify or break any existing functionality.
+
+Keep all current modules fully operational:
+• Booking
+• Payments
+• Agreements
+• OTP & Digital Signature
+• CRM
+• Support Center
+• Marketing
+• AI Operations
+• Executive Dashboard
+• Reports
+• Guide Panel
+• Supplier Management
+• Flight Management
+• Hotel Management
+• WhatsApp/SMS/Email Automation
+• Knowledge Center
+• SOS
+• PWA
+• Customer Dashboard
+
+Only extend the system.
+
+====================================================
+
+1. MULTI-LANGUAGE SYSTEM
+
+Support:
+
+• English
+• Urdu
+• Hindi
+• Arabic
+
+Translate:
+
+Customer Dashboard
+
+Admin Panel
+
+Booking Pages
+
+Agreements
+
+Notifications
+
+Knowledge Center
+
+Emails
+
+WhatsApp Templates
+
+SMS
+
+====================================================
+
+2. DOCUMENT EXPIRY CENTER
+
+Automatically monitor:
+
+Passport Expiry
+
+Visa Expiry
+
+Medical Expiry
+
+Vaccination Expiry
+
+Generate reminders:
+
+180 days
+
+90 days
+
+30 days
+
+7 days
+
+via WhatsApp, SMS, Email and Dashboard.
+
+====================================================
+
+3. COMPLETE AUDIT CENTER
+
+Record every action.
+
+Booking changes
+
+Payment updates
+
+Agreement signatures
+
+Document uploads
+
+Admin login
+
+Customer login
+
+Role changes
+
+Notification delivery
+
+IP Address
+
+Browser
+
+Device
+
+Timestamp
+
+====================================================
+
+4. CUSTOMER FEEDBACK SYSTEM
+
+After journey completion:
+
+Collect ratings for:
+
+Hotel
+
+Transport
+
+Guide
+
+Food
+
+Overall Experience
+
+Generate analytics and charts.
+
+====================================================
+
+5. REFERRAL PROGRAM
+
+Unique referral code.
+
+Track:
+
+Customers referred
+
+Bookings
+
+Rewards
+
+Commission
+
+====================================================
+
+6. ADVANCED SEARCH
+
+Global search for:
+
+Booking ID
+
+Agreement ID
+
+Passport
+
+Visa
+
+Customer Name
+
+Phone
+
+Email
+
+Ticket
+
+PNR
+
+Hotel
+
+Guide
+
+====================================================
+
+7. BACKUP CENTER
+
+Automatic backups:
+
+Daily
+
+Weekly
+
+Monthly
+
+Restore point
+
+Download backup
+
+====================================================
+
+8. SYSTEM HEALTH CENTER
+
+Monitor:
+
+Server
+
+Database
+
+Storage
+
+CPU
+
+Memory
+
+Notification Queue
+
+WhatsApp API
+
+SMS API
+
+Email API
+
+Cron Jobs
+
+Display live health dashboard.
+
+====================================================
+
+9. ADMIN ACTIVITY TIMELINE
+
+Show every admin activity.
+
+Filter by:
+
+User
+
+Date
+
+Action
+
+Branch
+
+====================================================
+
+10. FINAL OPTIMIZATION
+
+Improve:
+
+API speed
+
+SQL queries
+
+Frontend loading
+
+Image optimization
+
+Caching
+
+Security headers
+
+Compression
+
+Accessibility
+
+SEO
+
+====================================================
+
+11. FINAL PRODUCTION ACCEPTANCE TEST
+
+Run a complete regression test.
+
+Verify:
+
+Bookings
+
+Payments
+
+Invoices
+
+Receipts
+
+Agreements
+
+OTP
+
+Digital Signatures
+
+WhatsApp
+
+SMS
+
+Email
+
+Reports
+
+Finance
+
+CRM
+
+Support
+
+Marketing
+
+Supplier
+
+Flights
+
+Hotels
+
+Guides
+
+SOS
+
+Knowledge Center
+
+AI Operations
+
+Executive Dashboard
+
+Customer Dashboard
+
+Admin Dashboard
+
+PWA
+
+Security
+
+Generate a FINAL ENTERPRISE REPORT confirming:
+
+• Zero critical bugs
+• Zero broken routes
+• Zero failed APIs
+• Zero database migration issues
+• All notifications working
+• All dashboards working
+• Production deployment successful
+• Platform ready for live Hajj & Umrah operations.

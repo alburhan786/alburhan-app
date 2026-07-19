@@ -1276,4 +1276,229 @@ router.get("/executive", requireAdmin as any, async (_req: AuthenticatedRequest,
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
+// ════════════════════════════════════════════════════════════════════
+//  DOCUMENT EXPIRY CENTER
+// ════════════════════════════════════════════════════════════════════
+
+router.get("/document-expiry", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const days = parseInt((req.query.days as string) || "90", 10);
+    const type = (req.query.type as string) || "passport";
+    const cutoff = new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
+    const today = new Date().toISOString().slice(0, 10);
+
+    // Summary counts for all 4 windows
+    const [s7, s30, s90, s180] = await Promise.all([
+      pool.query(`SELECT COUNT(*)::int AS cnt FROM pilgrims p JOIN bookings b ON b.id=p.booking_id WHERE b.status IN ('confirmed','approved') AND p.passport_expiry_date::date BETWEEN $1 AND $2`, [today, new Date(Date.now()+7*86400000).toISOString().slice(0,10)]),
+      pool.query(`SELECT COUNT(*)::int AS cnt FROM pilgrims p JOIN bookings b ON b.id=p.booking_id WHERE b.status IN ('confirmed','approved') AND p.passport_expiry_date::date BETWEEN $1 AND $2`, [today, new Date(Date.now()+30*86400000).toISOString().slice(0,10)]),
+      pool.query(`SELECT COUNT(*)::int AS cnt FROM pilgrims p JOIN bookings b ON b.id=p.booking_id WHERE b.status IN ('confirmed','approved') AND p.passport_expiry_date::date BETWEEN $1 AND $2`, [today, new Date(Date.now()+90*86400000).toISOString().slice(0,10)]),
+      pool.query(`SELECT COUNT(*)::int AS cnt FROM pilgrims p JOIN bookings b ON b.id=p.booking_id WHERE b.status IN ('confirmed','approved') AND p.passport_expiry_date::date BETWEEN $1 AND $2`, [today, new Date(Date.now()+180*86400000).toISOString().slice(0,10)]),
+    ]);
+
+    let records: any[] = [];
+    if (type === "passport") {
+      const r = await pool.query(`
+        SELECT p.id AS pilgrim_id, p.name AS pilgrim_name, p.passport_number, p.passport_expiry_date,
+               b.id AS booking_id, b.customer_name, b.customer_mobile, b.booking_number
+        FROM pilgrims p
+        JOIN bookings b ON b.id = p.booking_id
+        WHERE b.status IN ('confirmed','approved')
+          AND p.passport_expiry_date IS NOT NULL
+          AND p.passport_expiry_date::date BETWEEN $1 AND $2
+        ORDER BY p.passport_expiry_date
+        LIMIT 100
+      `, [today, cutoff]);
+      records = r.rows;
+    } else if (type === "visa") {
+      const r = await pool.query(`
+        SELECT p.id AS pilgrim_id, p.name AS pilgrim_name, p.visa_number,
+               p.visa_applied_date AS visa_expiry_date,
+               b.id AS booking_id, b.customer_name, b.customer_mobile, b.booking_number
+        FROM pilgrims p
+        JOIN bookings b ON b.id = p.booking_id
+        WHERE b.status IN ('confirmed','approved')
+          AND p.visa_applied_date IS NOT NULL
+          AND p.visa_applied_date::date <= $1
+        ORDER BY p.visa_applied_date
+        LIMIT 100
+      `, [cutoff]);
+      records = r.rows;
+    } else if (type === "medical") {
+      const r = await pool.query(`
+        SELECT p.id AS pilgrim_id, p.name AS pilgrim_name, p.medical_fitness,
+               NULL AS medical_expiry_date,
+               b.id AS booking_id, b.customer_name, b.customer_mobile, b.booking_number
+        FROM pilgrims p
+        JOIN bookings b ON b.id = p.booking_id
+        WHERE b.status IN ('confirmed','approved')
+          AND (p.medical_fitness IS NULL OR p.medical_fitness = '' OR p.medical_fitness = 'pending')
+        ORDER BY b.created_at
+        LIMIT 100
+      `, []);
+      records = r.rows;
+    }
+
+    res.json({
+      records,
+      summary: {
+        d7: s7.rows[0]?.cnt || 0,
+        d30: s30.rows[0]?.cnt || 0,
+        d90: s90.rows[0]?.cnt || 0,
+        d180: s180.rows[0]?.cnt || 0,
+      }
+    });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.post("/document-expiry/remind", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { pilgrimId, bookingId, type, channel } = req.body;
+    if (!pilgrimId || !bookingId || !channel) return res.status(400).json({ ok: false, error: "Missing fields" });
+
+    const pilgrimRes = await pool.query(`
+      SELECT p.name, p.passport_expiry_date, b.customer_name, b.customer_mobile, b.booking_number
+      FROM pilgrims p JOIN bookings b ON b.id = p.booking_id
+      WHERE p.id = $1 AND b.id = $2
+    `, [pilgrimId, bookingId]);
+
+    if (!pilgrimRes.rows.length) return res.status(404).json({ ok: false, error: "Record not found" });
+    const rec = pilgrimRes.rows[0];
+    const expiryDate = rec.passport_expiry_date ? new Date(rec.passport_expiry_date).toLocaleDateString("en-IN") : "soon";
+    const daysLeft = rec.passport_expiry_date ? Math.ceil((new Date(rec.passport_expiry_date).getTime() - Date.now()) / 86400000) : null;
+
+    const msg = `Dear ${rec.customer_name}, this is a reminder that the passport of pilgrim ${rec.name} (Booking: ${rec.booking_number}) expires on ${expiryDate}${daysLeft !== null ? ` (${daysLeft} days remaining)` : ""}. Please renew it immediately to ensure smooth Hajj/Umrah processing. - Al Burhan Tours & Travels`;
+
+    let sent = false;
+    if (channel === "whatsapp" && rec.customer_mobile) {
+      const { sendWhatsApp } = await import("../lib/notifications.js");
+      await sendWhatsApp(rec.customer_mobile, msg);
+      sent = true;
+    } else if (channel === "sms" && rec.customer_mobile) {
+      const { sendDLTSMS } = await import("../lib/notifications.js");
+      await sendDLTSMS(rec.customer_mobile, msg);
+      sent = true;
+    }
+
+    res.json({ ok: sent, message: sent ? `Reminder sent via ${channel}` : "Channel not available" });
+  } catch (err: any) { res.status(500).json({ ok: false, error: err.message }); }
+});
+
+// ════════════════════════════════════════════════════════════════════
+//  GLOBAL SEARCH
+// ════════════════════════════════════════════════════════════════════
+
+router.get("/global-search", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const q = ((req.query.q as string) || "").trim();
+    if (q.length < 2) return res.json({ results: [], total: 0 });
+
+    const like = `%${q}%`;
+    const ilike = `%${q.toLowerCase()}%`;
+
+    const [bookings, pilgrims, agreements, tickets, customers, flights] = await Promise.all([
+      pool.query(`
+        SELECT 'booking' AS category, id::text, booking_number, customer_name, customer_mobile, customer_email, package_name, status, final_amount
+        FROM bookings
+        WHERE booking_number ILIKE $1 OR customer_name ILIKE $1 OR customer_mobile ILIKE $1 OR customer_email ILIKE $1
+        LIMIT 10
+      `, [like]),
+      pool.query(`
+        SELECT 'pilgrim' AS category, p.id::text, p.name, p.passport_number, p.visa_number, b.customer_name, b.booking_number, b.id AS booking_id
+        FROM pilgrims p JOIN bookings b ON b.id = p.booking_id
+        WHERE p.name ILIKE $1 OR p.passport_number ILIKE $1 OR p.visa_number ILIKE $1
+        LIMIT 10
+      `, [like]),
+      pool.query(`
+        SELECT 'agreement' AS category, a.id::text, a.agreement_number, b.customer_name, b.booking_number, a.status
+        FROM agreements a JOIN bookings b ON b.id = a.booking_id
+        WHERE a.agreement_number ILIKE $1 OR b.customer_name ILIKE $1 OR b.booking_number ILIKE $1
+        LIMIT 10
+      `, [like]),
+      pool.query(`
+        SELECT 'ticket' AS category, t.id::text, t.ticket_number, t.subject, t.status, u.name AS customer_name, u.mobile AS customer_mobile
+        FROM support_tickets t LEFT JOIN users u ON u.id::text = t.customer_id::text
+        WHERE t.ticket_number ILIKE $1 OR t.subject ILIKE $1 OR u.name ILIKE $1 OR u.mobile ILIKE $1
+        LIMIT 10
+      `, [like]),
+      pool.query(`
+        SELECT 'customer' AS category, id::text, name, mobile, email, kyc_status
+        FROM users
+        WHERE role = 'customer' AND (name ILIKE $1 OR mobile ILIKE $1 OR email ILIKE $1)
+        LIMIT 10
+      `, [like]),
+      pool.query(`
+        SELECT 'flight' AS category, id::text, flight_number, airline, route, pnr, departure_date::text
+        FROM flights
+        WHERE flight_number ILIKE $1 OR airline ILIKE $1 OR pnr ILIKE $1 OR route ILIKE $1
+        LIMIT 10
+      `, [like]).catch(() => ({ rows: [] })),
+    ]);
+
+    const results: any[] = [];
+
+    for (const row of bookings.rows) {
+      results.push({
+        category: "booking",
+        id: row.id,
+        title: `${row.customer_name} — ${row.booking_number}`,
+        subtitle: `${row.package_name || "—"} · ${row.customer_mobile}`,
+        meta: `₹${Number(row.final_amount || 0).toLocaleString("en-IN")} · ${row.status}`,
+        raw: row,
+      });
+    }
+    for (const row of pilgrims.rows) {
+      results.push({
+        category: "pilgrim",
+        id: row.id,
+        title: `${row.name} (Pilgrim)`,
+        subtitle: `Booking ${row.booking_number} · ${row.customer_name}`,
+        meta: row.passport_number || row.visa_number || "—",
+        raw: row,
+      });
+    }
+    for (const row of agreements.rows) {
+      results.push({
+        category: "agreement",
+        id: row.id,
+        title: `Agreement ${row.agreement_number || row.id.slice(0,8)}`,
+        subtitle: `${row.customer_name} · Booking ${row.booking_number}`,
+        meta: row.status,
+        raw: row,
+      });
+    }
+    for (const row of tickets.rows) {
+      results.push({
+        category: "ticket",
+        id: row.id,
+        title: `${row.ticket_number || row.id.slice(0,8)} — ${row.subject}`,
+        subtitle: `${row.customer_name || "—"} · ${row.customer_mobile || "—"}`,
+        meta: row.status,
+        raw: row,
+      });
+    }
+    for (const row of customers.rows) {
+      results.push({
+        category: "customer",
+        id: row.id,
+        title: row.name,
+        subtitle: `${row.mobile} · ${row.email || "—"}`,
+        meta: row.kyc_status || "—",
+        raw: row,
+      });
+    }
+    for (const row of flights.rows) {
+      results.push({
+        category: "flight",
+        id: row.id,
+        title: `${row.flight_number} — ${row.airline}`,
+        subtitle: `${row.route || "—"} · PNR: ${row.pnr || "—"}`,
+        meta: row.departure_date ? new Date(row.departure_date).toLocaleDateString("en-IN") : "—",
+        raw: row,
+      });
+    }
+
+    res.json({ results, total: results.length });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
 export default router;
