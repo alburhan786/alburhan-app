@@ -101,3 +101,9 @@ id = "mn6u2C_1bVTYdw-Ti_Y3H"
 uri = "file://alburhan-config-docs-2026-07-19.zip"
 type = "unspecified"
 title = "⑤ Config + Docs (Nginx, PM2, .env.example, README, API Docs) — 17 KB"
+
+[[outputs]]
+id = "MtEKzqAVlp-9krhCDI_xb"
+uri = "file://AlBurhan-Full-Backup-2026-07-19.zip"
+type = "unspecified"
+title = "AlBurhan-Full-Backup-2026-07-19.zip — Complete Production Backup (102 MB)"

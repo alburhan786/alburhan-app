@@ -2,3 +2,4 @@ artifacts/alburhan/public/frontend-dist.tar.gz filter=lfs diff=lfs merge=lfs -te
 frontend-dist.tar.gz filter=lfs diff=lfs merge=lfs -text
 artifacts/api-server/src/alburhan-frontend.tar.gz filter=lfs diff=lfs merge=lfs -text
 alburhan-backend-src-2026-07-19.zip filter=lfs diff=lfs merge=lfs -text
+AlBurhan-Full-Backup-2026-07-19.zip filter=lfs diff=lfs merge=lfs -text
