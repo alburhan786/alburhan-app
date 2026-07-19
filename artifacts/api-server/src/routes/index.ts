@@ -63,8 +63,14 @@ import { requireAdmin } from "../lib/auth.js";
 
 const router: IRouter = Router();
 
+// ── Root health probe — Replit deployment healthcheck hits GET /api ───────────
+// Must be the FIRST route so it responds immediately, even before other middleware loads.
+router.get("/", (_req, res) => {
+  res.json({ status: "ok", service: "Al Burhan API", pid: process.pid, time: new Date().toISOString() });
+});
+
 // ── Build fingerprint — confirms which bundle is running on VPS (no auth needed) ──
-const BUILD_STAMP = "2026-07-14-v20.5";
+const BUILD_STAMP = "2026-07-19-v21.0";
 router.get("/version", (_req, res) => {
   res.json({
     build: BUILD_STAMP,
