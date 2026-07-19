@@ -821,7 +821,7 @@ async function buildCustomerLedger(mobile: string, from?: string, to?: string) {
   let payments: any[] = [];
   if (bookingIds.length > 0) {
     payments = await q(
-      `SELECT pt.booking_id, pt.id, pt.amount, pt."mode" AS mode, pt.payment_date,
+      `SELECT pt.booking_id, pt.id, pt.amount, pt.payment_mode AS mode, pt.payment_date,
               pt.received_by, pt.bank_name, pt.notes
        FROM payment_transactions pt
        WHERE pt.booking_id=ANY($1::text[]) AND (pt.is_deleted IS NULL OR pt.is_deleted=false)
@@ -991,8 +991,8 @@ router.get("/hajji-ledger/:bookingId", requireAdmin as any, async (req: Authenti
     if (!booking) return void res.status(404).json({ error: "Booking not found" });
 
     const payments = await q(
-      `SELECT pt.id, pt.amount, pt."mode" AS mode, pt.payment_date, pt.received_by,
-              pt.bank_name, pt.notes, pt.invoice_number, pt.is_deleted
+      `SELECT pt.id, pt.amount, pt.payment_mode AS mode, pt.payment_date, pt.received_by,
+              pt.bank_name, pt.notes, pt.is_deleted
        FROM payment_transactions pt
        WHERE pt.booking_id=$1 AND (pt.is_deleted IS NULL OR pt.is_deleted=false)
        ORDER BY pt.payment_date ASC, pt.created_at ASC`,

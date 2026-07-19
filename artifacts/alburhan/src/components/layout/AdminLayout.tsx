@@ -88,6 +88,8 @@ function buildMenu(openComplaints: number): MenuSection[] {
       items: [
         { icon: Users, label: "Customers", href: "/admin/customers", require: ["customers", "view"] },
         { icon: ShieldCheck, label: "KYC Management", href: "/admin/kyc", require: ["customers", "view"] },
+        { icon: UserCheck, label: "Agent Management", href: "/admin/agents", require: ["customers", "view"] },
+        { icon: Building2, label: "Branch Management", href: "/admin/branches", require: ["customers", "view"] },
         { icon: Star, label: "Feedback", href: "/admin/feedback", badge: openComplaints, require: ["customers", "view"] },
         { icon: Inbox, label: "Package Requests", href: "/admin/requests", require: ["customers", "view"] },
         { icon: MessageSquare, label: "Inquiries", href: "/admin/inquiries", require: ["customers", "view"] },
