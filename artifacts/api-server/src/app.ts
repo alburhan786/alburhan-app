@@ -3727,6 +3727,14 @@ app.post("/api/migrate/agreement-acceptance-test", async (req, res) => {
       ? pass("07_customer_signs", `DB updated: status=${signRes.rows[0]?.status}  hash=${digitalHash.slice(0, 8)}…`)
       : fail("07_customer_signs", "UPDATE returned 0 rows");
 
+    // Write full signing audit trail to agreement_audit_logs
+    try {
+      const { logAgreementAudit } = await import("./routes/agreements.js") as any;
+      if (typeof logAgreementAudit === "function") {
+        await logAgreementAudit(agId, "agreement_signed", { ip, userAgent, otpVerified: true, digitalHash: digitalHash.slice(0, 16), source: "acceptance_test" }, ip, userAgent);
+      }
+    } catch { /* logAgreementAudit not exported — audit written by real sign route in production */ }
+
     // ── STEP 08: Agreement status = signed ───────────────────────────────────
     const agrAfter = await p.query(`SELECT status, signed_at, otp_verified FROM agreements WHERE id=$1`, [agId]);
     const a8 = agrAfter.rows[0];
@@ -3802,6 +3810,26 @@ app.post("/api/migrate/agreement-acceptance-test", async (req, res) => {
       pdfSizeKb = pdfBuffer ? Math.round((pdfBuffer as Buffer).length / 1024) : 0;
       if (pdfBuffer) {
         await p.query(`UPDATE agreements SET pdf_generated=true, updated_at=NOW() WHERE id=$1`, [agId]);
+
+        // Step 9: Save signed PDF to documents table (attachment to booking)
+        try {
+          const { uploadToGCS } = await import("./lib/gcsUpload.js") as any;
+          const pdfFilename = `Agreement-${ag.agreement_number}.pdf`;
+          const fileUrl = await uploadToGCS(pdfBuffer, pdfFilename, "application/pdf", "agreements");
+          const docId = crypto.randomUUID();
+          await p.query(
+            `INSERT INTO documents
+               (id, booking_id, document_type, file_name, file_key, file_url, uploaded_by,
+                customer_id, is_visible_to_customer, notification_sent,
+                file_size, mime_type, original_filename, created_at)
+             VALUES ($1,$2,'model_contract',$3,$4,$5,'admin',$6,true,true,$7,'application/pdf',$3,NOW())
+             ON CONFLICT DO NOTHING`,
+            [docId, ag.booking_id, pdfFilename, fileUrl, fileUrl, booking.customerId || ag.customer_id, pdfBuffer.length]
+          );
+          T("step_09_pdf_stored", { doc_id: docId, url: fileUrl, size_kb: pdfSizeKb });
+        } catch (docErr: any) {
+          T("step_09_pdf_store_warn", { warn: docErr?.message });
+        }
       }
     } catch (pdfErr: any) {
       T("step_09_pdf_error", { error: pdfErr.message, stack: pdfErr.stack?.slice(0, 600) });

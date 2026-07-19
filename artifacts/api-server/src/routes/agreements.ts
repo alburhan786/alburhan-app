@@ -3,6 +3,7 @@ import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requireAdmin, requireAuth } from "../lib/auth.js";
 import { sendOtpSMS, sendEmail } from "../lib/notifications.js";
+import { uploadToGCS } from "../lib/gcsUpload.js";
 import { triggerWorkflow } from "../lib/workflowEngine.js";
 import { generateAgreementPdfBuffer, HAJJ_AGREEMENT_CLAUSES, CONSENT_CATEGORIES, AgreementPdfOptions } from "../lib/agreementPdf.js";
 import { createHash } from "crypto";
@@ -66,7 +67,7 @@ async function generateAgreementNumber(): Promise<string> {
   return `ABT-AGR-${year}-${String(seq).padStart(6, "0")}`;
 }
 
-async function logAgreementAudit(agreementId: string, action: string, details: any, ip?: string, userAgent?: string) {
+export async function logAgreementAudit(agreementId: string, action: string, details: any, ip?: string, userAgent?: string) {
   try {
     await pool.query(
       `INSERT INTO agreement_audit_logs (id, agreement_id, action, details, ip_address, user_agent, created_at)
@@ -497,6 +498,19 @@ router.post("/my/:id/request-otp", requireAuth, async (req: any, res) => {
       verification_token: ag.verification_token,
     }, getClientIp(req), req.headers["user-agent"] as string);
 
+    // Log OTP SMS to notification_logs for audit trail (step 3/14)
+    try {
+      await pool.query(
+        `INSERT INTO notification_logs
+           (id, event_type, customer_id, booking_id, channel, recipient, status,
+            http_status, provider_name, sent_at, created_at, updated_at, customer_name, booking_number)
+         VALUES (gen_random_uuid(),'otp_sent',$1,$2,'sms',$3,$4,$5,'fast2sms',NOW(),NOW(),NOW(),$6,$7)`,
+        [customerId, ag.booking_id, mobile, smsOk ? "sent" : "failed", smsOk ? 200 : null, ag.customer_name, ag.booking_number]
+      );
+    } catch (logErr: any) {
+      console.warn(`[Agreement/OTP] notification_logs insert skipped: ${logErr?.message}`);
+    }
+
     res.json({ ok: true, message: "OTP sent to your registered mobile number" });
   } catch (err: any) {
     console.error("[Agreement/OTP] ❌ Error:", err?.message, err?.stack?.slice(0, 400));
@@ -602,6 +616,26 @@ router.post("/my/:id/sign", requireAuth, async (req: any, res) => {
       await pool.query(`UPDATE agreements SET pdf_generated=true, updated_at=NOW() WHERE id=$1`, [id]);
       await logAgreementAudit(id, "pdf_generated", { size: pdfBuffer.length }, ip, userAgent);
       console.log(`[Agreement/Sign] ✅ PDF generated — ${Math.round(pdfBuffer.length / 1024)} KB`);
+
+      // ── Step 9: Save signed PDF to documents table so it's attached to the booking ──
+      try {
+        const pdfFilename = `Agreement-${ag.agreement_number}.pdf`;
+        const fileUrl = await uploadToGCS(pdfBuffer, pdfFilename, "application/pdf", "agreements");
+        const docId = crypto.randomUUID();
+        await pool.query(
+          `INSERT INTO documents
+             (id, booking_id, document_type, file_name, file_key, file_url, uploaded_by,
+              customer_id, is_visible_to_customer, notification_sent,
+              file_size, mime_type, original_filename, created_at)
+           VALUES ($1,$2,'model_contract',$3,$4,$5,'admin',$6,true,true,$7,'application/pdf',$3,NOW())
+           ON CONFLICT DO NOTHING`,
+          [docId, ag.booking_id, pdfFilename, fileUrl, fileUrl, customerId, pdfBuffer.length]
+        );
+        console.log(`[Agreement/Sign] ✅ PDF saved to documents table — id=${docId} url=${fileUrl}`);
+        await logAgreementAudit(id, "pdf_stored", { doc_id: docId, url: fileUrl, size: pdfBuffer.length }, ip, userAgent);
+      } catch (docErr: any) {
+        console.warn(`[Agreement/Sign] ⚠ documents table insert skipped: ${docErr?.message}`);
+      }
     } catch (pdfErr: any) {
       console.error("[Agreement/Sign] ❌ PDF generation failed:", pdfErr?.message, pdfErr?.stack?.slice(0, 300));
     }
