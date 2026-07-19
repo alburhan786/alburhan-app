@@ -71,3 +71,33 @@ id = "sds6LY1_ktNhLGYVdqCjs"
 uri = "file://artifacts/alburhan/whatsapp-integration-report.md"
 type = "text"
 title = "WhatsApp Integration Verification Report"
+
+[[outputs]]
+id = "3bu7EJfqx7DlBfdNgI8Wl"
+uri = "file://alburhan-frontend-src-2026-07-19.zip"
+type = "unspecified"
+title = "① Frontend Source Code (React + Vite) — 7.7 MB"
+
+[[outputs]]
+id = "q77y3AYAHad-4qx03F4VZ"
+uri = "file://alburhan-backend-src-2026-07-19.zip"
+type = "unspecified"
+title = "② Backend Source Code (API Server + Libs + Scripts) — 77 MB"
+
+[[outputs]]
+id = "42vqHVQyHy3liezY01SM6"
+uri = "file://alburhan-database-2026-07-19.zip"
+type = "unspecified"
+title = "③ Database Export (Full Dump + Schema + Migrations) — 6.2 MB"
+
+[[outputs]]
+id = "-JrA86Q_4p-eLFs9GSj0I"
+uri = "file://alburhan-uploads-2026-07-19.zip"
+type = "unspecified"
+title = "④ Uploaded Files (Customer Documents & Media) — 12 MB"
+
+[[outputs]]
+id = "mn6u2C_1bVTYdw-Ti_Y3H"
+uri = "file://alburhan-config-docs-2026-07-19.zip"
+type = "unspecified"
+title = "⑤ Config + Docs (Nginx, PM2, .env.example, README, API Docs) — 17 KB"
