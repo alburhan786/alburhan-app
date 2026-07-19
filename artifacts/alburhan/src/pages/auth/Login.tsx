@@ -254,10 +254,11 @@ export default function Login() {
                         placeholder="9XXXXXXXXX"
                         value={mobile}
                         onChange={handleMobileChange}
-                        type="tel"
+                        type="text"
+                        inputMode="numeric"
                         autoFocus
                         maxLength={10}
-                        inputMode="numeric"
+                        autoComplete="tel-national"
                       />
                     </div>
                     {mobileError && (
