@@ -1740,4 +1740,357 @@ router.get("/production-report", requireAdmin as any, async (_req: Authenticated
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
+// ════════════════════════════════════════════════════════════════════
+//  FINANCE HUB
+// ════════════════════════════════════════════════════════════════════
+
+router.get("/finance-hub", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
+
+    const [totalPay, monthPay, todayPay, outstanding, expenses, invoices, payroll, staff, monthly, byPackage] = await Promise.all([
+      pool.query(`SELECT COALESCE(SUM(amount),0)::float AS total FROM payments WHERE status IN ('completed','success','captured')`),
+      pool.query(`SELECT COUNT(*)::int AS cnt, COALESCE(SUM(amount),0)::float AS total FROM payments WHERE created_at >= $1 AND status IN ('completed','success','captured')`, [monthStart]),
+      pool.query(`SELECT COUNT(*)::int AS cnt, COALESCE(SUM(amount),0)::float AS total FROM payments WHERE DATE(created_at)=$1 AND status IN ('completed','success','captured')`, [today]),
+      pool.query(`SELECT COALESCE(SUM(NULLIF(TRIM(final_amount::text),'')::numeric - COALESCE(paid_amount,0)),0)::float AS amt, COUNT(*)::int AS cnt FROM bookings WHERE status IN ('approved','confirmed') AND COALESCE(paid_amount,0) < NULLIF(TRIM(final_amount::text),'')::numeric`),
+      pool.query(`SELECT COALESCE(SUM(amount),0)::float AS total FROM expenses`).catch(() => ({ rows: [{ total: 0 }] })),
+      pool.query(`SELECT COUNT(*) FILTER (WHERE status='sent')::int AS pending FROM invoices WHERE status NOT IN ('paid','cancelled')`).catch(() => ({ rows: [{ pending: 0 }] })),
+      pool.query(`SELECT COALESCE(SUM(net_pay),0)::float AS total FROM payroll WHERE EXTRACT(YEAR FROM pay_date)=EXTRACT(YEAR FROM NOW()) AND EXTRACT(MONTH FROM pay_date)=EXTRACT(MONTH FROM NOW())`).catch(() => ({ rows: [{ total: 0 }] })),
+      pool.query(`SELECT COUNT(*)::int AS cnt FROM users WHERE role='staff'`).catch(() => ({ rows: [{ cnt: 0 }] })),
+      pool.query(`
+        SELECT TO_CHAR(p.created_at,'Mon YY') AS month, TO_CHAR(p.created_at,'YYYY-MM') AS sort_key,
+               COALESCE(SUM(p.amount),0)::float AS revenue
+        FROM payments p WHERE p.status IN ('completed','success','captured') AND p.created_at >= NOW()-INTERVAL '6 months'
+        GROUP BY month, sort_key ORDER BY sort_key
+      `),
+      pool.query(`
+        SELECT COALESCE(b.package_name,'Unknown') AS package,
+               COUNT(*)::int AS count,
+               COALESCE(SUM(NULLIF(TRIM(b.final_amount::text),'')::numeric - COALESCE(b.paid_amount,0)),0)::float AS outstanding
+        FROM bookings b WHERE b.status IN ('approved','confirmed') AND COALESCE(b.paid_amount,0) < NULLIF(TRIM(b.final_amount::text),'')::numeric
+        GROUP BY b.package_name ORDER BY outstanding DESC LIMIT 6
+      `),
+    ]);
+
+    const totalExpenses = expenses.rows[0]?.total || 0;
+    const totalCollected = totalPay.rows[0]?.total || 0;
+
+    // Build monthly with expenses (approximate)
+    const monthlyData = monthly.rows.map((r: any) => ({
+      month: r.month,
+      revenue: r.revenue,
+      expenses: totalExpenses / Math.max(monthly.rows.length, 1),
+    }));
+
+    res.json({
+      totalCollected,
+      monthRevenue: monthPay.rows[0]?.total || 0,
+      monthPayments: monthPay.rows[0]?.cnt || 0,
+      todayRevenue: todayPay.rows[0]?.total || 0,
+      todayPayments: todayPay.rows[0]?.cnt || 0,
+      outstanding: outstanding.rows[0]?.amt || 0,
+      outstandingCount: outstanding.rows[0]?.cnt || 0,
+      totalExpenses,
+      netProfit: totalCollected - totalExpenses,
+      pendingInvoices: invoices.rows[0]?.pending || 0,
+      monthPayroll: payroll.rows[0]?.total || 0,
+      staffCount: staff.rows[0]?.cnt || 0,
+      monthly: monthlyData,
+      outstandingByPackage: byPackage.rows,
+    });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ════════════════════════════════════════════════════════════════════
+//  ADMIN SMART CHAT ASSISTANT
+// ════════════════════════════════════════════════════════════════════
+
+router.post("/chat", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { query } = req.body;
+    if (!query?.trim()) return res.json({ reply: "Please ask a question.", data: [] });
+
+    const q = query.toLowerCase().trim();
+    const today = new Date().toISOString().slice(0, 10);
+    const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
+    const in7days = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+    const in30days = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+
+    // Intent matching
+    const matches = (terms: string[]) => terms.some(t => q.includes(t));
+
+    // PENDING VISAS
+    if (matches(["pending visa", "missing visa", "visa pending", "no visa"])) {
+      const r = await pool.query(`
+        SELECT b.customer_name, b.booking_number, b.customer_mobile, b.preferred_departure_date::text
+        FROM bookings b LEFT JOIN pilgrims p ON p.booking_id = b.id
+        WHERE b.status = 'confirmed' AND (p.visa_number IS NULL OR p.visa_number = '')
+        GROUP BY b.id ORDER BY b.preferred_departure_date LIMIT 20
+      `);
+      return res.json({
+        reply: r.rows.length === 0
+          ? "✅ No pending visa issues found. All confirmed bookings have visa numbers recorded."
+          : `Found ${r.rows.length} confirmed booking(s) with pilgrims missing visa numbers. Earliest departure first:`,
+        data: r.rows,
+        dataType: "visa",
+      });
+    }
+
+    // OVERDUE PAYMENTS
+    if (matches(["overdue payment", "outstanding payment", "pending payment", "not paid", "unpaid", "outstanding amount"])) {
+      const r = await pool.query(`
+        SELECT customer_name, booking_number, customer_mobile,
+               final_amount::text, paid_amount::text,
+               (NULLIF(TRIM(final_amount::text),'')::numeric - COALESCE(paid_amount,0))::text AS balance_due,
+               status, created_at::text
+        FROM bookings
+        WHERE status IN ('approved','confirmed')
+          AND COALESCE(paid_amount,0) < NULLIF(TRIM(final_amount::text),'')::numeric
+        ORDER BY (NULLIF(TRIM(final_amount::text),'')::numeric - COALESCE(paid_amount,0)) DESC
+        LIMIT 20
+      `);
+      const total = r.rows.reduce((s: number, row: any) => s + Number(row.balance_due || 0), 0);
+      return res.json({
+        reply: r.rows.length === 0
+          ? "✅ No outstanding payments. All confirmed bookings are fully paid."
+          : `Found ${r.rows.length} booking(s) with outstanding balance totalling ₹${total.toLocaleString("en-IN")}:`,
+        data: r.rows,
+        dataType: "payment",
+      });
+    }
+
+    // TODAY'S DEPARTURES
+    if (matches(["today departure", "today's departure", "departing today", "flight today", "leaving today"])) {
+      const r = await pool.query(`
+        SELECT b.customer_name, b.booking_number, b.customer_mobile, b.package_name,
+               b.preferred_departure_date::text, b.status
+        FROM bookings b
+        WHERE b.preferred_departure_date::date = $1 AND b.status = 'confirmed'
+        ORDER BY b.customer_name
+      `, [today]);
+      return res.json({
+        reply: r.rows.length === 0
+          ? "No confirmed departures scheduled for today."
+          : `${r.rows.length} pilgrim group(s) departing today (${new Date().toLocaleDateString("en-IN")}):`,
+        data: r.rows,
+        dataType: "departure",
+      });
+    }
+
+    // UPCOMING DEPARTURES / THIS WEEK
+    if (matches(["upcoming departure", "this week departure", "departure this week", "depart soon", "departing this week", "upcoming flight"])) {
+      const r = await pool.query(`
+        SELECT b.customer_name, b.booking_number, b.customer_mobile, b.package_name,
+               b.preferred_departure_date::text, b.status
+        FROM bookings b
+        WHERE b.preferred_departure_date::date BETWEEN $1 AND $2 AND b.status = 'confirmed'
+        ORDER BY b.preferred_departure_date
+      `, [today, in7days]);
+      return res.json({
+        reply: r.rows.length === 0
+          ? "No confirmed departures scheduled in the next 7 days."
+          : `${r.rows.length} departure(s) in the next 7 days:`,
+        data: r.rows,
+        dataType: "departure",
+      });
+    }
+
+    // MISSING PASSPORTS
+    if (matches(["missing passport", "no passport", "passport missing", "without passport"])) {
+      const r = await pool.query(`
+        SELECT b.customer_name, b.booking_number, p.name AS pilgrim_name,
+               b.customer_mobile, b.status
+        FROM pilgrims p JOIN bookings b ON b.id = p.booking_id
+        WHERE b.status IN ('confirmed','approved')
+          AND (p.passport_number IS NULL OR p.passport_number = '')
+        ORDER BY b.customer_name LIMIT 20
+      `);
+      return res.json({
+        reply: r.rows.length === 0
+          ? "✅ All pilgrims in active bookings have passport numbers recorded."
+          : `${r.rows.length} pilgrim(s) in active bookings are missing passport numbers:`,
+        data: r.rows,
+        dataType: "passport",
+      });
+    }
+
+    // EXPIRING PASSPORTS
+    if (matches(["expiring passport", "passport expir", "passport expire"])) {
+      const r = await pool.query(`
+        SELECT p.name AS pilgrim_name, p.passport_number, p.passport_expiry_date::text,
+               b.customer_name, b.booking_number
+        FROM pilgrims p JOIN bookings b ON b.id = p.booking_id
+        WHERE b.status IN ('confirmed','approved')
+          AND p.passport_expiry_date IS NOT NULL
+          AND p.passport_expiry_date::date BETWEEN $1 AND $2
+        ORDER BY p.passport_expiry_date
+      `, [today, in30days]);
+      return res.json({
+        reply: r.rows.length === 0
+          ? "✅ No passports expiring within 30 days for active bookings."
+          : `${r.rows.length} passport(s) expiring within 30 days:`,
+        data: r.rows,
+        dataType: "passport",
+      });
+    }
+
+    // UNSIGNED AGREEMENTS
+    if (matches(["unsigned agreement", "agreement not signed", "pending agreement", "agreement pending", "sign"])) {
+      const r = await pool.query(`
+        SELECT a.agreement_number, b.customer_name, b.booking_number, b.customer_mobile, a.status, a.created_at::text
+        FROM agreements a JOIN bookings b ON b.id = a.booking_id
+        WHERE a.status = 'pending_signature'
+        ORDER BY a.created_at DESC LIMIT 20
+      `);
+      return res.json({
+        reply: r.rows.length === 0
+          ? "✅ No unsigned agreements pending."
+          : `${r.rows.length} agreement(s) awaiting customer signature:`,
+        data: r.rows,
+        dataType: "agreement",
+      });
+    }
+
+    // OPEN TICKETS
+    if (matches(["open ticket", "support ticket", "pending ticket", "unresolved ticket", "open support"])) {
+      const r = await pool.query(`
+        SELECT t.ticket_number, t.subject, t.status, t.priority,
+               u.name AS customer_name, u.mobile AS customer_mobile,
+               t.created_at::text
+        FROM support_tickets t LEFT JOIN users u ON u.id::text = t.customer_id::text
+        WHERE t.status IN ('open','in_progress')
+        ORDER BY t.created_at DESC LIMIT 20
+      `);
+      return res.json({
+        reply: r.rows.length === 0
+          ? "✅ No open support tickets."
+          : `${r.rows.length} open support ticket(s):`,
+        data: r.rows,
+        dataType: "ticket",
+      });
+    }
+
+    // REVENUE THIS MONTH / TODAY
+    if (matches(["revenue this month", "monthly revenue", "this month revenue", "collection this month"])) {
+      const [month, today_pay, total] = await Promise.all([
+        pool.query(`SELECT COALESCE(SUM(amount),0)::float AS total, COUNT(*)::int AS cnt FROM payments WHERE created_at >= $1 AND status IN ('completed','success','captured')`, [monthStart]),
+        pool.query(`SELECT COALESCE(SUM(amount),0)::float AS total, COUNT(*)::int AS cnt FROM payments WHERE DATE(created_at)=$1 AND status IN ('completed','success','captured')`, [today]),
+        pool.query(`SELECT COALESCE(SUM(amount),0)::float AS total FROM payments WHERE status IN ('completed','success','captured')`),
+      ]);
+      return res.json({
+        reply: `📊 **Financial Summary:**\n• Today's collection: ₹${(today_pay.rows[0]?.total || 0).toLocaleString("en-IN")} (${today_pay.rows[0]?.cnt || 0} payments)\n• This month: ₹${(month.rows[0]?.total || 0).toLocaleString("en-IN")} (${month.rows[0]?.cnt || 0} payments)\n• All-time total: ₹${(total.rows[0]?.total || 0).toLocaleString("en-IN")}`,
+        data: [],
+      });
+    }
+
+    // TODAY'S REVENUE
+    if (matches(["today revenue", "today collection", "today payment", "today earning"])) {
+      const r = await pool.query(`
+        SELECT customer_name, booking_number, amount::text, payment_method, created_at::text
+        FROM payments WHERE DATE(created_at)=$1 AND status IN ('completed','success','captured')
+        ORDER BY created_at DESC
+      `, [today]);
+      const total = r.rows.reduce((s: number, row: any) => s + Number(row.amount || 0), 0);
+      return res.json({
+        reply: r.rows.length === 0
+          ? "No payments received today yet."
+          : `${r.rows.length} payment(s) received today totalling ₹${total.toLocaleString("en-IN")}:`,
+        data: r.rows,
+        dataType: "payment",
+      });
+    }
+
+    // PENDING BOOKINGS
+    if (matches(["pending booking", "new booking", "booking review", "review booking"])) {
+      const r = await pool.query(`
+        SELECT customer_name, booking_number, customer_mobile, package_name,
+               final_amount::text, created_at::text
+        FROM bookings WHERE status = 'pending'
+        ORDER BY created_at DESC LIMIT 20
+      `);
+      return res.json({
+        reply: r.rows.length === 0
+          ? "✅ No pending bookings awaiting review."
+          : `${r.rows.length} booking(s) pending admin review:`,
+        data: r.rows,
+        dataType: "booking",
+      });
+    }
+
+    // TOTAL BOOKINGS / CUSTOMERS
+    if (matches(["total booking", "total customer", "how many booking", "how many customer", "booking count", "customer count"])) {
+      const [bookings, customers] = await Promise.all([
+        pool.query(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE status='pending')::int AS pending, COUNT(*) FILTER (WHERE status='confirmed')::int AS confirmed FROM bookings`),
+        pool.query(`SELECT COUNT(*)::int AS total FROM users WHERE role='customer'`),
+      ]);
+      const b = bookings.rows[0] || {};
+      return res.json({
+        reply: `📋 **Booking & Customer Summary:**\n• Total bookings: ${b.total || 0}\n• Confirmed: ${b.confirmed || 0}\n• Pending review: ${b.pending || 0}\n• Total registered customers: ${customers.rows[0]?.total || 0}`,
+        data: [],
+      });
+    }
+
+    // LEADS DUE
+    if (matches(["lead follow", "overdue lead", "lead due", "follow up due", "pending lead"])) {
+      const r = await pool.query(`
+        SELECT name, mobile, email, source, follow_up_date::text, status, notes
+        FROM leads WHERE follow_up_date::date <= $1 AND status NOT IN ('converted','lost')
+        ORDER BY follow_up_date LIMIT 20
+      `, [today]);
+      return res.json({
+        reply: r.rows.length === 0
+          ? "✅ No overdue lead follow-ups."
+          : `${r.rows.length} lead(s) with overdue follow-up:`,
+        data: r.rows,
+        dataType: "lead",
+      });
+    }
+
+    // TOP PACKAGES
+    if (matches(["top package", "popular package", "best package", "most booking"])) {
+      const r = await pool.query(`
+        SELECT COALESCE(package_name,'Unknown') AS package_name,
+               COUNT(*)::int AS bookings,
+               COUNT(*) FILTER (WHERE status='confirmed')::int AS confirmed,
+               COALESCE(SUM(CASE WHEN status='confirmed' THEN NULLIF(TRIM(final_amount::text),'')::numeric ELSE 0 END),0)::float AS revenue
+        FROM bookings GROUP BY package_name ORDER BY bookings DESC LIMIT 10
+      `);
+      return res.json({
+        reply: `Top ${r.rows.length} packages by booking count:`,
+        data: r.rows,
+        dataType: "package",
+      });
+    }
+
+    // STAFF / HR
+    if (matches(["total staff", "staff count", "how many staff", "staff list"])) {
+      const r = await pool.query(`
+        SELECT name, designation, department, mobile, status
+        FROM staff ORDER BY name LIMIT 20
+      `).catch(() => pool.query(`SELECT name, role, mobile, created_at::text FROM users WHERE role='staff' LIMIT 20`));
+      return res.json({
+        reply: `${r.rows.length} staff member(s) found:`,
+        data: r.rows,
+        dataType: "staff",
+      });
+    }
+
+    // HELP / WHAT CAN YOU DO
+    if (matches(["help", "what can you do", "what can i ask", "example", "commands", "queries"])) {
+      return res.json({
+        reply: `I can answer questions about your ERP data. Try asking:\n\n📋 **Bookings**\n• "Show pending bookings"\n• "Total bookings and customers"\n• "Top packages by booking"\n\n💰 **Payments**\n• "Revenue this month"\n• "Today's collection"\n• "Show overdue payments"\n\n🛂 **Visa & Documents**\n• "Show pending visas"\n• "Missing passports"\n• "Expiring passports"\n\n✈️ **Departures**\n• "Today's departures"\n• "Upcoming flights this week"\n\n📝 **Agreements**\n• "Unsigned agreements"\n\n🎯 **Leads & Support**\n• "Lead follow-ups due"\n• "Open support tickets"`,
+        data: [],
+      });
+    }
+
+    // DEFAULT — unknown query
+    return res.json({
+      reply: `I didn't quite understand that query. Try asking about:\n• "pending visas" · "overdue payments" · "today's departures"\n• "missing passports" · "unsigned agreements" · "revenue this month"\n• "pending bookings" · "open tickets" · "lead follow-ups"\n\nOr type "help" for the full list of supported queries.`,
+      data: [],
+    });
+
+  } catch (err: any) { res.status(500).json({ reply: `Error: ${err.message}`, data: [] }); }
+});
+
 export default router;

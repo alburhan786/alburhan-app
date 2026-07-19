@@ -14,7 +14,7 @@ import {
   IndianRupee, Users, Package as PackageIcon, Clock, Send, FileText,
   CheckCircle, XCircle, ScanLine, Printer, ClipboardPlus, BarChart2,
   BookOpen, UsersRound, MessageSquare, ImageIcon, Wallet, TrendingUp,
-  ShieldCheck, Megaphone, PieChart, Bell, Plane, ListTodo, UserPlus, Building2, MapPin, Brain, Search, Activity, Settings
+  ShieldCheck, Megaphone, PieChart, Bell, Plane, ListTodo, UserPlus, Building2, MapPin, Brain, Search, Activity, Settings, Sparkles
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -79,6 +79,8 @@ const MODULE_CARDS = [
   { icon: Activity, label: "Notification Health", desc: "WhatsApp, SMS & email delivery stats", href: "/admin/notification-health", color: "bg-blue-50 text-blue-700", border: "border-blue-200" },
   { icon: Settings, label: "Business Settings", desc: "Company, prefixes, branding & templates", href: "/admin/settings", color: "bg-primary/5 text-primary", border: "border-primary/20" },
   { icon: ShieldCheck, label: "Production Report", desc: "Full system QA & readiness score", href: "/admin/production-report", color: "bg-emerald-50 text-emerald-700", border: "border-emerald-200" },
+  { icon: IndianRupee, label: "Finance Hub", desc: "Unified finance center — revenue, P&L, GST", href: "/admin/finance", color: "bg-emerald-50 text-emerald-700", border: "border-emerald-200" },
+  { icon: Sparkles, label: "Admin AI Chat", desc: "Ask about operations, payments, visas…", href: "/admin/chat", color: "bg-violet-50 text-violet-700", border: "border-violet-200" },
 ];
 
 function getStatusBadge(status: string) {
