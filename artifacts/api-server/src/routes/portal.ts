@@ -445,6 +445,183 @@ router.post("/agent/documents/:bookingId", requireAuth as any, upload.single("fi
   }
 });
 
+// ── Agent Portal — All Bookings ───────────────────────────────────────────────
+router.get("/agent/bookings", requireAuth as any, async (req: any, res) => {
+  if (!agentGuard(req, res)) return;
+  try {
+    const agent = await getAgentForUser(req.user.mobile);
+    if (!agent) return void res.status(404).json({ message: "Agent profile not found" });
+    const r = await pool.query(
+      `SELECT b.id, b.booking_number, b.status, b.total_amount, b.paid_amount,
+              b.customer_name, b.customer_mobile, b.customer_email,
+              pk.name AS package_name, b.preferred_departure_date, b.created_at,
+              b.number_of_pilgrims, b.journey_status, b.ticket_status
+       FROM bookings b
+       LEFT JOIN packages pk ON pk.id = b.package_id
+       WHERE b.agent_id=$1 AND b.deleted_at IS NULL
+       ORDER BY b.created_at DESC`,
+      [agent.id]
+    );
+    res.json({ bookings: r.rows });
+  } catch (err: any) {
+    res.status(500).json({ message: "Failed to load bookings" });
+  }
+});
+
+// ── Agent Portal — My Customers ────────────────────────────────────────────────
+router.get("/agent/customers", requireAuth as any, async (req: any, res) => {
+  if (!agentGuard(req, res)) return;
+  try {
+    const agent = await getAgentForUser(req.user.mobile);
+    if (!agent) return void res.status(404).json({ message: "Agent profile not found" });
+    const r = await pool.query(
+      `SELECT customer_id AS id, customer_name AS name, customer_mobile AS mobile,
+              customer_email AS email, COUNT(*)::int AS booking_count,
+              MAX(created_at) AS last_booking_at
+       FROM bookings
+       WHERE agent_id=$1 AND deleted_at IS NULL AND customer_id IS NOT NULL
+       GROUP BY customer_id, customer_name, customer_mobile, customer_email
+       ORDER BY MAX(created_at) DESC`,
+      [agent.id]
+    );
+    res.json({ customers: r.rows });
+  } catch (err: any) {
+    res.status(500).json({ message: "Failed to load customers" });
+  }
+});
+
+// ── Agent Portal — Payment Status ─────────────────────────────────────────────
+router.get("/agent/payment-status", requireAuth as any, async (req: any, res) => {
+  if (!agentGuard(req, res)) return;
+  try {
+    const agent = await getAgentForUser(req.user.mobile);
+    if (!agent) return void res.status(404).json({ message: "Agent profile not found" });
+    const r = await pool.query(
+      `SELECT b.id, b.booking_number, b.status, b.customer_name, b.customer_mobile,
+              b.total_amount, COALESCE(b.paid_amount,0)::numeric AS paid_amount,
+              (COALESCE(b.total_amount,0) - COALESCE(b.paid_amount,0))::numeric AS balance_due,
+              b.preferred_departure_date, b.created_at
+       FROM bookings b
+       WHERE b.agent_id=$1 AND b.deleted_at IS NULL
+       ORDER BY b.created_at DESC`,
+      [agent.id]
+    );
+    res.json({ bookings: r.rows });
+  } catch (err: any) {
+    res.status(500).json({ message: "Failed to load payment status" });
+  }
+});
+
+// ── Agent Portal — Invoices ────────────────────────────────────────────────────
+router.get("/agent/invoices", requireAuth as any, async (req: any, res) => {
+  if (!agentGuard(req, res)) return;
+  try {
+    const agent = await getAgentForUser(req.user.mobile);
+    if (!agent) return void res.status(404).json({ message: "Agent profile not found" });
+    const r = await pool.query(
+      `SELECT i.id, i.invoice_number, i.booking_id, i.invoice_date,
+              i.total, i.paid, i.balance, i.invoice_status,
+              b.booking_number, b.customer_name, b.customer_mobile
+       FROM invoices i
+       JOIN bookings b ON b.id = i.booking_id
+       WHERE b.agent_id=$1 AND b.deleted_at IS NULL
+       ORDER BY i.created_at DESC`,
+      [agent.id]
+    );
+    res.json({ invoices: r.rows });
+  } catch (err: any) {
+    res.status(500).json({ message: "Failed to load invoices" });
+  }
+});
+
+// ── Agent Portal — Visa Status ─────────────────────────────────────────────────
+router.get("/agent/visa", requireAuth as any, async (req: any, res) => {
+  if (!agentGuard(req, res)) return;
+  try {
+    const agent = await getAgentForUser(req.user.mobile);
+    if (!agent) return void res.status(404).json({ message: "Agent profile not found" });
+    const r = await pool.query(
+      `SELECT b.id AS booking_id, b.booking_number, b.customer_name, b.customer_mobile,
+              b.status, b.preferred_departure_date,
+              d.id AS doc_id, d.file_name, d.file_url, d.created_at AS visa_uploaded_at
+       FROM bookings b
+       LEFT JOIN documents d ON d.booking_id = b.id
+         AND d.document_type = 'visa' AND d.is_revoked = false
+       WHERE b.agent_id=$1 AND b.deleted_at IS NULL
+       ORDER BY b.created_at DESC`,
+      [agent.id]
+    );
+    res.json({ bookings: r.rows });
+  } catch (err: any) {
+    res.status(500).json({ message: "Failed to load visa status" });
+  }
+});
+
+// ── Agent Portal — Ticket Status ───────────────────────────────────────────────
+router.get("/agent/tickets", requireAuth as any, async (req: any, res) => {
+  if (!agentGuard(req, res)) return;
+  try {
+    const agent = await getAgentForUser(req.user.mobile);
+    if (!agent) return void res.status(404).json({ message: "Agent profile not found" });
+    const r = await pool.query(
+      `SELECT b.id, b.booking_number, b.customer_name, b.customer_mobile,
+              b.status, b.ticket_status, b.preferred_departure_date,
+              d.id AS doc_id, d.file_name, d.file_url, d.created_at AS ticket_uploaded_at
+       FROM bookings b
+       LEFT JOIN documents d ON d.booking_id = b.id
+         AND d.document_type = 'flight_ticket' AND d.is_revoked = false
+       WHERE b.agent_id=$1 AND b.deleted_at IS NULL
+       ORDER BY b.created_at DESC`,
+      [agent.id]
+    );
+    res.json({ bookings: r.rows });
+  } catch (err: any) {
+    res.status(500).json({ message: "Failed to load ticket status" });
+  }
+});
+
+// ── Agent Portal — Notifications ──────────────────────────────────────────────
+router.get("/agent/notifications", requireAuth as any, async (req: any, res) => {
+  if (!agentGuard(req, res)) return;
+  try {
+    const agent = await getAgentForUser(req.user.mobile);
+    if (!agent) return void res.status(404).json({ message: "Agent profile not found" });
+    const r = await pool.query(
+      `SELECT nl.id, nl.event_type, nl.channel, nl.status, nl.sent_at, nl.created_at,
+              nl.booking_id, b.booking_number, b.customer_name
+       FROM notification_logs nl
+       JOIN bookings b ON b.id = nl.booking_id
+       WHERE b.agent_id=$1
+       ORDER BY nl.created_at DESC LIMIT 50`,
+      [agent.id]
+    );
+    res.json({ notifications: r.rows });
+  } catch (err: any) {
+    res.status(500).json({ message: "Failed to load notifications" });
+  }
+});
+
+// ── Agent Portal — Profile Update ─────────────────────────────────────────────
+router.put("/agent/profile", requireAuth as any, async (req: any, res) => {
+  if (!agentGuard(req, res)) return;
+  try {
+    const agent = await getAgentForUser(req.user.mobile);
+    if (!agent) return void res.status(404).json({ message: "Agent profile not found" });
+    const { email, city } = req.body;
+    await pool.query(
+      `UPDATE agents SET email=$1, city=$2, updated_at=now() WHERE id=$3`,
+      [email || null, city || null, agent.id]
+    );
+    await pool.query(
+      `UPDATE users SET email=$1 WHERE mobile=$2`,
+      [email || null, req.user.mobile]
+    );
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ message: "Failed to update profile" });
+  }
+});
+
 // ── Staff Portal ──────────────────────────────────────────────────────────────
 router.get("/staff", requireAuth as any, async (req: any, res) => {
   if (req.user?.role !== "staff") {

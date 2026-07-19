@@ -82,8 +82,8 @@
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
-    "@vitejs/plugin-react": "catalog:",
+    "@vitejs/plugin-react": "^6.0.3",
     "tailwindcss": "catalog:",
-    "vite": "catalog:"
+    "vite": "^8.1.5"
   }
 }
