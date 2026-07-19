@@ -873,7 +873,9 @@ async function runMigrations() {
   // ── Guide group assignment column ──────────────────────────────────────────
   try {
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS assigned_group_ids TEXT[] NOT NULL DEFAULT '{}'`);
-    console.log("[Migration] users.assigned_group_ids column ensured");
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT`);
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true`);
+    console.log("[Migration] users.assigned_group_ids / password_hash / is_active columns ensured");
   } catch (err) {
     console.error("[Migration] users.assigned_group_ids failed:", err);
   }

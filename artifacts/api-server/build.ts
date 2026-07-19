@@ -15,6 +15,7 @@ const allowlist = [
   "@google/generative-ai",
   "adm-zip",
   "axios",
+  "bcryptjs",
   "compression",
   "connect-pg-simple",
   "cookie-parser",

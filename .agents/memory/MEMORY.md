@@ -52,3 +52,4 @@
 - [Customer journey API](customer-journey-api.md) — GET /api/customer/journey/:bookingId; links booking.customer_mobile (last 9 digits) → pilgrims.mobile_india; returns visa/flight/hotel per pilgrim; JourneyStatusCard in Dashboard.tsx (collapsible)
 - [ZIP download with archiver](zip-download-archiver.md) — archiver pkg installed; GET /api/documents/zip/:bookingId streams ZIP; dynamic import("archiver") at request time (not top-level); archiver must stay external to bundle
 - [Portal login roles](portal-login-roles.md) — branch_manager/agent/staff roles; OTP assigns role from cross-table lookup; portal at /api/portal/*
+- [Bundle external deps VPS crash](bundle-external-deps-crash.md) — any new npm package must be added to allowlist in build.ts; VPS has no node_modules, external require = PM2 crash loop; prefer Node built-ins (crypto/util) over new packages
