@@ -2691,6 +2691,101 @@ curl -sf --max-time 10 "https://alburhantravels.com/api/health" && echo "" || ec
   res.send(script);
 });
 
+// GET /api/migrate/port-fix.sh — diagnose & fix Nginx↔Node port mismatch on VPS
+app.get("/api/migrate/port-fix.sh", (req, res) => {
+  const key = req.query.key as string;
+  if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
+
+  const script = `#!/bin/bash
+# Al Burhan — VPS Port Diagnosis & Auto-Fix
+# Finds what port Nginx proxies to, restarts PM2 on that port
+set -e
+PM2_APP="alburhan-api"
+BUNDLE="/var/www/alburhan/artifacts/api-server/dist/index.cjs"
+
+echo "=== VPS Port Diagnosis & Fix ==="
+echo ""
+
+# 1. Detect Nginx upstream port
+NGINX_PORT=\$(grep -rh "proxy_pass" /etc/nginx/sites-enabled/ /etc/nginx/conf.d/ /etc/nginx/nginx.conf 2>/dev/null \\
+  | grep -oE 'localhost:[0-9]+|127\\.0\\.0\\.1:[0-9]+' | grep -oE '[0-9]{3,5}$' | sort -u | head -1)
+echo "Nginx proxy_pass port: \${NGINX_PORT:-NOT FOUND (check /etc/nginx manually)}"
+
+# 2. Detect Node process current port
+NODE_PORT=\$(ss -tlnp 2>/dev/null | grep node | grep -oP '(?<=:)[0-9]+' | head -1)
+if [ -z "\$NODE_PORT" ]; then
+  NODE_PORT=\$(netstat -tlnp 2>/dev/null | grep node | grep -oE ':[0-9]+' | tr -d ':' | head -1)
+fi
+echo "Node listening on port : \${NODE_PORT:-NOT RUNNING}"
+echo ""
+
+# 3. PM2 status
+echo "--- PM2 Status ---"
+pm2 status "\$PM2_APP" 2>/dev/null || echo "PM2 app '\$PM2_APP' not found"
+echo ""
+
+# 4. Last 20 PM2 log lines
+echo "--- Last PM2 Logs ---"
+pm2 logs "\$PM2_APP" --lines 20 --nostream 2>/dev/null || true
+echo ""
+
+# 5. Source .env
+for ENV_FILE in /var/www/alburhan/.env /var/www/alburhan/artifacts/api-server/.env; do
+  if [ -f "\$ENV_FILE" ]; then
+    set -a; source "\$ENV_FILE"; set +a
+    echo "Loaded env: \$ENV_FILE"
+    break
+  fi
+done
+[ -z "\$DATABASE_URL" ] && echo "WARNING: DATABASE_URL not in .env"
+
+# 6. Decide target port
+if [ -n "\$NGINX_PORT" ]; then
+  TARGET_PORT="\$NGINX_PORT"
+elif [ -n "\$PORT" ]; then
+  TARGET_PORT="\$PORT"
+else
+  TARGET_PORT="3000"
+  echo "Could not detect Nginx port — defaulting to 3000. Check nginx config if 502 persists."
+fi
+echo "Will start Node on port: \$TARGET_PORT"
+export PORT="\$TARGET_PORT"
+
+# 7. Write PORT to .env so future restarts use it
+sed -i '/^PORT=/d' /var/www/alburhan/.env 2>/dev/null || true
+echo "PORT=\$TARGET_PORT" >> /var/www/alburhan/.env
+echo "Wrote PORT=\$TARGET_PORT to /var/www/alburhan/.env"
+
+# 8. Restart PM2 on correct port
+echo ""
+echo "--- Restarting PM2 on port \$TARGET_PORT ---"
+pm2 delete "\$PM2_APP" 2>/dev/null || true
+pm2 start "\$BUNDLE" --name "\$PM2_APP" --interpreter node
+pm2 save
+sleep 7
+
+# 9. Verify
+echo ""
+echo "--- Verifying ---"
+pm2 status "\$PM2_APP"
+echo ""
+echo "Testing http://127.0.0.1:\$TARGET_PORT/api/health ..."
+curl -sf --max-time 8 "http://127.0.0.1:\$TARGET_PORT/api/health" \\
+  && echo "" || echo "FAIL — check: pm2 logs \$PM2_APP --lines 50"
+
+echo ""
+echo "Testing https://alburhantravels.com/api/health ..."
+curl -sf --max-time 10 "https://alburhantravels.com/api/health" \\
+  && echo "" || echo "FAIL — Nginx still cannot reach Node on port \$TARGET_PORT"
+echo ""
+echo "=== Done. If still 502: paste the Nginx config block so the correct port can be confirmed ==="
+`;
+
+  res.setHeader("Content-Type", "text/plain; charset=utf-8");
+  res.setHeader("Content-Disposition", "attachment; filename=port-fix.sh");
+  res.send(script);
+});
+
 // GET /api/migrate/fast2sms-diag — show Fast2SMS key state (masked) on VPS
 app.get("/api/migrate/fast2sms-diag", async (req, res) => {
   const key = req.query.key as string;
