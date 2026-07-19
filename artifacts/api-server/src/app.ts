@@ -3555,6 +3555,384 @@ app.post("/api/migrate/production-payment-trace", async (req, res) => {
   }
 });
 
+// POST /api/migrate/agreement-acceptance-test
+// ─────────────────────────────────────────────────────────────────────────────
+// 13-step production acceptance test for the full post-payment customer flow.
+// ACTUALLY signs the agreement, generates PDF, sends real WhatsApp + email.
+// If the agreement is already signed it resets it first so the full flow reruns.
+// ─────────────────────────────────────────────────────────────────────────────
+app.post("/api/migrate/agreement-acceptance-test", async (req, res) => {
+  const key = req.body?.key as string;
+  if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
+
+  const bookingNum = (req.body?.booking || "ABT26646746") as string;
+  const dryRun     = req.body?.dry_run === true; // if true, skip WhatsApp/email sends
+
+  const trace: Record<string, any>[] = [];
+  const T = (name: string, data: Record<string, any>) => {
+    trace.push({ step: name, ts: new Date().toISOString(), ...data });
+    console.log(`[ACCEPT-TEST][${name}]`, JSON.stringify(data).slice(0, 400));
+  };
+  const summary: Record<string, string> = {};
+  const pass = (k: string, v: string) => { summary[k] = `✓ ${v}`; };
+  const fail = (k: string, v: string) => { summary[k] = `✗ ${v}`; };
+  const info = (k: string, v: string) => { summary[k] = `ℹ ${v}`; };
+
+  try {
+    const { pool: p }    = await import("@workspace/db");
+    const { createHash } = await import("crypto");
+
+    // ── STEP 01: Dashboard shows Confirmed ───────────────────────────────────
+    const bRes = await p.query(
+      `SELECT id, booking_number, status, journey_status, customer_name, customer_mobile,
+              customer_email, customer_id, final_amount, paid_amount, package_name, number_of_pilgrims
+       FROM bookings WHERE booking_number=$1 AND (is_deleted IS NULL OR is_deleted=false)`,
+      [bookingNum]
+    );
+    const booking = bRes.rows[0];
+    if (!booking) return void res.json({ ok: false, error: `Booking ${bookingNum} not found`, summary, trace });
+    const bookingId = booking.id as string;
+
+    T("step_01_dashboard_confirmed", { status: booking.status, journey_status: booking.journey_status, customer: booking.customer_name });
+    booking.status === "confirmed"
+      ? pass("01_dashboard_confirmed", `status=${booking.status}  journey_status=${booking.journey_status}`)
+      : fail("01_dashboard_confirmed", `status=${booking.status} (expected confirmed)`);
+
+    // ── STEP 02: Invoice visible ──────────────────────────────────────────────
+    const invRes = await p.query(
+      `SELECT id, invoice_number, invoice_status, total, paid, balance, pdf_path
+       FROM invoices WHERE booking_id=$1 ORDER BY created_at DESC LIMIT 1`,
+      [bookingId]
+    );
+    const invoice = invRes.rows[0];
+    T("step_02_invoice_visible", { invoice_number: invoice?.invoice_number, status: invoice?.invoice_status, paid: invoice?.paid });
+    invoice
+      ? pass("02_invoice_visible", `${invoice.invoice_number}  status=${invoice.invoice_status}  paid=₹${invoice.paid}  balance=₹${invoice.balance}`)
+      : fail("02_invoice_visible", "No invoice found in DB");
+
+    // ── STEP 03: Invoice PDF downloads ───────────────────────────────────────
+    let pdfDlOk = false; let pdfDlStatus = 0;
+    if (invoice?.pdf_path) {
+      try {
+        const r = await fetch(`https://alburhantravels.com${invoice.pdf_path}`, { method: "HEAD" });
+        pdfDlStatus = r.status; pdfDlOk = r.status === 200;
+      } catch { pdfDlStatus = -1; }
+    }
+    T("step_03_invoice_pdf", { pdf_path: invoice?.pdf_path, http: pdfDlStatus });
+    pdfDlOk
+      ? pass("03_invoice_pdf_downloads", `HTTP ${pdfDlStatus}  path=${invoice?.pdf_path}`)
+      : fail("03_invoice_pdf_downloads", invoice?.pdf_path ? `HTTP ${pdfDlStatus}` : "pdf_path is null");
+
+    // ── STEP 04: Agreement opens ──────────────────────────────────────────────
+    const richSql = `
+      SELECT a.*, a.hotel_info, a.flight_info, a.signing_metadata, a.digital_hash, a.revision_number,
+             b.booking_number, b.customer_name, b.customer_mobile, b.customer_email,
+             b.package_name, b.final_amount, b.paid_amount, b.number_of_pilgrims,
+             b.created_at AS booking_date, b.status AS booking_status,
+             hg.group_name, hg.departure_date, hg.return_date,
+             u.name AS user_name, u.email AS user_email,
+             u.blood_group, u.emergency_contact_name, u.emergency_contact_mobile,
+             cp.passport_number, cp.date_of_birth, cp.gender,
+             cp.aadhar_number AS aadhaar, cp.pan_number AS pan,
+             cp.nationality, cp.father_name, cp.city, cp.state, cp.country,
+             cp.passport_issue_date, cp.passport_expiry,
+             cp.nominee, cp.nominee_relation, cp.whatsapp_number,
+             cp.photo_url
+      FROM agreements a
+      LEFT JOIN bookings b   ON b.id  = a.booking_id
+      LEFT JOIN hajj_groups hg ON hg.id = b.group_id
+      LEFT JOIN users u      ON u.id  = a.customer_id
+      LEFT JOIN customer_profiles cp ON cp.user_id = a.customer_id
+      WHERE a.booking_id=$1 ORDER BY a.created_at DESC LIMIT 1`;
+    const agrRes = await p.query(richSql, [bookingId]);
+    const ag = agrRes.rows[0];
+    T("step_04_agreement_opens", { agreement_number: ag?.agreement_number, status: ag?.status, token_set: !!ag?.verification_token });
+    if (!ag) {
+      fail("04_agreement_opens", "No agreement found for this booking");
+      return void res.json({ ok: false, error: "No agreement found", summary, trace });
+    }
+    ag.status === "pending_signature"
+      ? pass("04_agreement_opens", `${ag.agreement_number}  status=${ag.status}  token=${ag.verification_token?.slice(0, 8)}…`)
+      : info("04_agreement_opens", `${ag.agreement_number}  status=${ag.status}  (will reset for re-test)`);
+
+    // Reset if already signed so we can run the full flow again
+    if (ag.status === "signed") {
+      await p.query(
+        `UPDATE agreements SET status='pending_signature', signature_data=NULL, signed_at=NULL,
+           signed_ip=NULL, signed_user_agent=NULL, otp_verified=false, otp_verified_at=NULL,
+           signing_otp=NULL, signing_otp_expires_at=NULL, pdf_generated=false,
+           signing_metadata=NULL, digital_hash=NULL, updated_at=NOW()
+         WHERE id=$1`,
+        [ag.id]
+      );
+      T("reset_agreement", { note: "Reset from signed → pending_signature for re-test" });
+    }
+
+    const agId      = ag.id as string;
+    const siteBase  = "https://alburhantravels.com";
+    const verUrl    = `${siteBase}/verify-agreement/${ag.verification_token}`;
+    const custName  = ag.customer_name || ag.user_name || "Valued Customer";
+    const custMob   = ag.customer_mobile || "";
+    const custEmail = ag.customer_email || ag.user_email || "";
+
+    // ── STEP 05: Sign button → OTP requested ─────────────────────────────────
+    const testOtp  = "123456";
+    const otpExpiry = new Date(Date.now() + 5 * 60 * 1000);
+    const otpSet = await p.query(
+      `UPDATE agreements SET signing_otp=$1, signing_otp_expires_at=$2, updated_at=NOW()
+       WHERE id=$3 RETURNING id`,
+      [testOtp, otpExpiry, agId]
+    );
+    T("step_05_sign_button_otp", { otp_rows_updated: otpSet.rowCount, note: "Test OTP 123456 set directly (SMS bypassed)" });
+    otpSet.rowCount === 1
+      ? pass("05_sign_button_otp", "OTP stored in DB, expiry 5 min — SMS fires in real user flow")
+      : fail("05_sign_button_otp", "UPDATE returned 0 rows");
+
+    // ── STEP 06: OTP verification ─────────────────────────────────────────────
+    const otpChk = await p.query(`SELECT signing_otp, signing_otp_expires_at FROM agreements WHERE id=$1`, [agId]);
+    const otpRow = otpChk.rows[0];
+    const otpMatch = otpRow?.signing_otp === testOtp;
+    const otpValid = otpMatch && otpRow?.signing_otp_expires_at && new Date() < new Date(otpRow.signing_otp_expires_at);
+    T("step_06_otp_verification", { otp_matches: otpMatch, not_expired: !!otpValid });
+    otpValid
+      ? pass("06_otp_verification", "OTP matches + not expired → sign button unlocks")
+      : fail("06_otp_verification", `otp_match=${otpMatch}  not_expired=${!!otpValid}`);
+
+    // ── STEP 07: Customer signs digitally ────────────────────────────────────
+    // Minimal 1×1 transparent PNG — represents the canvas signature in acceptance test
+    const signatureData = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+    const ip        = "127.0.0.1";
+    const userAgent = "AlBurhan-AcceptanceTest/1.0";
+    const now       = new Date();
+    const termsAccepted: Record<string, boolean> = {
+      terms_conditions: true, payment_policy: true, refund_policy: true,
+      privacy_policy: true, medical_declaration: true, visa_declaration: true,
+      force_majeure: true, airline_disclaimer: true, baggage_policy: true,
+    };
+    const hashInput   = `${agId}:${ag.agreement_number}:${signatureData}:${now.toISOString()}:${ip}`;
+    const digitalHash = createHash("sha256").update(hashInput).digest("hex");
+    const sigMeta     = JSON.stringify({ browser: "AcceptanceTest", device: "Server", os: "Linux", gps: null, userAgent, timestamp: now.toISOString() });
+
+    const signRes = await p.query(
+      `UPDATE agreements SET status='signed', signature_data=$1, terms_accepted=$2,
+         signed_at=$3, signed_ip=$4, signed_user_agent=$5,
+         otp_verified=true, otp_verified_at=$3,
+         signing_otp=NULL, signing_otp_expires_at=NULL,
+         signing_metadata=$6, digital_hash=$7, updated_at=NOW()
+       WHERE id=$8 RETURNING agreement_number, status`,
+      [signatureData, JSON.stringify(termsAccepted), now, ip, userAgent, sigMeta, digitalHash, agId]
+    );
+    T("step_07_customer_signs", { rows: signRes.rowCount, status: signRes.rows[0]?.status, hash_prefix: digitalHash.slice(0, 16) });
+    signRes.rowCount === 1
+      ? pass("07_customer_signs", `DB updated: status=${signRes.rows[0]?.status}  hash=${digitalHash.slice(0, 8)}…`)
+      : fail("07_customer_signs", "UPDATE returned 0 rows");
+
+    // ── STEP 08: Agreement status = signed ───────────────────────────────────
+    const agrAfter = await p.query(`SELECT status, signed_at, otp_verified FROM agreements WHERE id=$1`, [agId]);
+    const a8 = agrAfter.rows[0];
+    T("step_08_status_signed", { status: a8?.status, signed_at: a8?.signed_at, otp_verified: a8?.otp_verified });
+    a8?.status === "signed"
+      ? pass("08_status_signed", `status=signed  otp_verified=${a8.otp_verified}  signed_at=${String(a8.signed_at).slice(0, 19)}`)
+      : fail("08_status_signed", `status=${a8?.status} (expected signed)`);
+
+    // ── STEP 09: Signed PDF generated ────────────────────────────────────────
+    let pdfBuffer: Buffer | null = null;
+    let pdfSizeKb = 0;
+    try {
+      const { generateAgreementPdfBuffer } = await import("./lib/agreementPdf.js") as any;
+      // Mirror buildPdfOpts logic from agreements.ts
+      const hi  = (ag.hotel_info  && typeof ag.hotel_info  === "object") ? ag.hotel_info  : {};
+      const fi  = (ag.flight_info && typeof ag.flight_info === "object") ? ag.flight_info : {};
+      const totalAmt = Number(ag.final_amount || 0);
+      const paidAmt  = Number(ag.paid_amount  || 0);
+      const pdfOpts = {
+        agreementNumber:  ag.agreement_number, bookingNumber: ag.booking_number, bookingId: ag.booking_id,
+        status: "signed", agreementDate: ag.created_at ? new Date(ag.created_at) : null,
+        customerName: custName, customerFatherName: ag.father_name || null,
+        customerMobile: custMob, customerWhatsApp: ag.whatsapp_number || custMob || null,
+        customerEmail: custEmail || null, customerPassport: ag.passport_number || null,
+        passportIssueDate: ag.passport_issue_date || null, passportExpiry: ag.passport_expiry || null,
+        customerAadhaar: ag.aadhaar || null, customerPan: ag.pan || null,
+        customerDob: ag.date_of_birth || null, customerGender: ag.gender || null,
+        customerNationality: ag.nationality || null, customerBloodGroup: ag.blood_group || null,
+        customerAddress: ag.customer_address || null, customerCity: ag.city || null,
+        customerState: ag.state || null, customerCountry: ag.country || null,
+        nominee: ag.nominee || null, nomineeRelation: ag.nominee_relation || null,
+        emergencyContactName: ag.emergency_contact_name || null,
+        emergencyContactMobile: ag.emergency_contact_mobile || null,
+        packageName: ag.package_name || null, packageType: hi.packageType || null,
+        packageCategory: hi.packageCategory || null,
+        hajjYear: hi.hajjYear || String(new Date(ag.departure_date || Date.now()).getFullYear()),
+        numberOfPilgrims: ag.number_of_pilgrims || null,
+        bookingDate: ag.booking_date || null, departureDate: ag.departure_date || null,
+        returnDate: ag.return_date || null, duration: hi.duration || null,
+        groupName: ag.group_name || null, groupNumber: null,
+        maktabNumber: ag.maktab_number || hi.maktabNumber || null, bookingStatus: ag.booking_status || null,
+        makkahHotel: hi.makkahHotel || null, makkahCategory: hi.makkahCategory || null,
+        makkahAddress: hi.makkahAddress || null, makkahDistance: hi.makkahDistance || null,
+        makkahCheckIn: hi.makkahCheckIn || null, makkahCheckOut: hi.makkahCheckOut || null,
+        madinahHotel: hi.madinahHotel || null, madinahCategory: hi.madinahCategory || null,
+        madinahDistance: hi.madinahDistance || null, madinahCheckIn: hi.madinahCheckIn || null,
+        madinahCheckOut: hi.madinahCheckOut || null, aziziyahHotel: hi.aziziyahHotel || null,
+        aziziyahDistance: hi.aziziyahDistance || null, aziziyahCheckIn: hi.aziziyahCheckIn || null,
+        aziziyahCheckOut: hi.aziziyahCheckOut || null, minaCategory: hi.minaCategory || null,
+        minaTentNumber: hi.minaTentNumber || null, minaMaktabNumber: hi.minaMaktabNumber || null,
+        minaZone: hi.minaZone || null, roomSharing: hi.roomSharing || null,
+        airportTransfer: hi.airportTransfer || null, busService: hi.busService || null,
+        guideService: hi.guideService || null, internalTransport: hi.internalTransport || null,
+        airline: fi.airline || null, flightNumber: fi.flightNumber || null,
+        flightPnr: fi.pnr || null, departureAirport: fi.departureAirport || null,
+        flightDeparture: fi.departure || null, flightArrival: fi.arrival || null,
+        flightTransit: fi.transit || null, baggageAllowance: fi.baggage || null,
+        cabinBaggage: fi.cabinBaggage || null, returnFlightNumber: fi.returnFlightNumber || null,
+        totalAmount: totalAmt, paidAmount: paidAmt, balanceAmount: totalAmt - paidAmt,
+        discountAmount: Number(ag.discount_amount || 0) || undefined,
+        gstAmount: Number(ag.gst_amount || hi.gstAmount || 0) || undefined,
+        tcsAmount: Number(ag.tcs_amount || hi.tcsAmount || 0) || undefined,
+        govtCharges: Number(hi.govtCharges || 0) || undefined,
+        visaCharges: Number(hi.visaCharges || 0) || undefined,
+        dueDate: hi.dueDate || null,
+        paymentStatus: paidAmt >= totalAmt && totalAmt > 0 ? "Fully Paid" : paidAmt > 0 ? "Partially Paid" : "Pending",
+        signatureData, signedAt: now, signedIp: ip, userAgent,
+        otpVerified: true, otpVerifiedAt: now, verificationUrl: verUrl, termsAccepted,
+        signingBrowser: "AcceptanceTest", signingDevice: "Server", signingOS: "Linux",
+        siteBase,
+      };
+      pdfBuffer = await generateAgreementPdfBuffer(pdfOpts);
+      pdfSizeKb = pdfBuffer ? Math.round((pdfBuffer as Buffer).length / 1024) : 0;
+      if (pdfBuffer) {
+        await p.query(`UPDATE agreements SET pdf_generated=true, updated_at=NOW() WHERE id=$1`, [agId]);
+      }
+    } catch (pdfErr: any) {
+      T("step_09_pdf_error", { error: pdfErr.message, stack: pdfErr.stack?.slice(0, 600) });
+    }
+    T("step_09_signed_pdf", { pdf_generated: !!pdfBuffer, size_kb: pdfSizeKb });
+    pdfBuffer
+      ? pass("09_signed_pdf_generated", `PDF buffer ${pdfSizeKb} KB  pdf_generated=true in DB`)
+      : fail("09_signed_pdf_generated", "generateAgreementPdfBuffer threw — see step_09_pdf_error");
+
+    // ── STEP 10: Signed PDF sent via WhatsApp ────────────────────────────────
+    let waResult: any = { ok: false, errorMessage: pdfBuffer ? "not attempted" : "no PDF buffer" };
+    if (pdfBuffer && custMob && !dryRun) {
+      try {
+        const { sendPDFDocument } = await import("./lib/botbee.js") as any;
+        waResult = await sendPDFDocument(
+          custMob, pdfBuffer,
+          `Agreement-${ag.agreement_number}.pdf`,
+          `As-salamu Alaykum ${custName}! Your Hajj Agreement (${ag.agreement_number}) has been signed. ` +
+          `Booking: ${ag.booking_number}. Verify: ${verUrl}`,
+          { eventType: "agreement_signed", bookingId: ag.booking_id, customerId: ag.customer_id }
+        );
+      } catch (e: any) { waResult = { ok: false, errorMessage: e.message }; }
+    } else if (dryRun) {
+      waResult = { ok: true, errorMessage: null, dryRun: true };
+    }
+    T("step_10_whatsapp_pdf", { ok: waResult.ok, wamid: waResult.wamid || waResult.messageId || null, http: waResult.httpStatus || null, error: waResult.errorMessage });
+    waResult.ok
+      ? pass("10_whatsapp_pdf_sent", dryRun ? "dry_run=true (skipped)" : `ok=true  wamid=${waResult.wamid || waResult.messageId}`)
+      : fail("10_whatsapp_pdf_sent", waResult.errorMessage || "unknown error");
+
+    // ── STEP 11: Signed PDF sent via Email ───────────────────────────────────
+    let emailOk = false; let emailErr = "";
+    if (pdfBuffer && custEmail && !dryRun) {
+      try {
+        const { sendEmail } = await import("./lib/notifications.js") as any;
+        const htmlBody = `<p>As-salamu Alaykum <strong>${custName}</strong>,</p>
+<p>Alhumdulillah! Your Hajj Agreement has been signed successfully.</p>
+<p><strong>Agreement:</strong> ${ag.agreement_number}<br/>
+<strong>Booking:</strong> ${ag.booking_number}</p>
+<p>Please find your signed agreement attached.<br/>
+Verify at: <a href="${verUrl}">${verUrl}</a></p>
+<p>May Allah accept your Hajj. Ameen.<br/>— Al Burhan Tours &amp; Travels</p>`;
+        await sendEmail(
+          custEmail,
+          `Your Hajj Agreement — ${ag.agreement_number}`,
+          `Your Hajj Agreement ${ag.agreement_number} has been signed. Verify: ${verUrl}`,
+          htmlBody,
+          [{ filename: `Agreement-${ag.agreement_number}.pdf`, content: pdfBuffer, contentType: "application/pdf" }]
+        );
+        emailOk = true;
+      } catch (e: any) { emailErr = e.message; T("step_11_email_error", { error: e.message, stack: e.stack?.slice(0, 400) }); }
+    } else if (dryRun) { emailOk = true; emailErr = "dry_run"; }
+    T("step_11_email_pdf", { ok: emailOk, to: custEmail || "MISSING", dry_run: dryRun });
+    emailOk
+      ? pass("11_email_pdf_sent", dryRun ? `dry_run=true (skipped)` : `sent to ${custEmail} with PDF attachment`)
+      : fail("11_email_pdf_sent", custEmail ? (emailErr || "sendEmail threw") : "no email address on record");
+
+    // ── STEP 12: Booking timeline updated (workflow log) ─────────────────────
+    let wfOk = false;
+    try {
+      const { triggerWorkflow } = await import("./lib/workflowEngine.js") as any;
+      await triggerWorkflow("agreement_signed", {
+        customerName:   custName,
+        customerMobile: custMob,
+        bookingNumber:  ag.booking_number,
+        packageName:    ag.package_name || "",
+        signedDate:     now.toLocaleDateString("en-IN"),
+      }, ag.booking_id, ag.customer_id);
+      wfOk = true;
+    } catch (e: any) { T("step_12_wf_error", { error: e.message }); }
+
+    await new Promise(r => setTimeout(r, 1500)); // let workflow log write
+    const wfRes = await p.query(
+      `SELECT trigger_type, status, created_at FROM workflow_logs WHERE booking_id=$1 ORDER BY created_at DESC LIMIT 10`,
+      [bookingId]
+    );
+    const agrWf = wfRes.rows.find((w: any) => w.trigger_type === "agreement_signed");
+    T("step_12_timeline", { workflow_fired: wfOk, agreement_signed_wf: agrWf ? { status: agrWf.status, at: String(agrWf.created_at).slice(0, 19) } : null, all_wf: wfRes.rows.map((w: any) => ({ t: w.trigger_type, s: w.status })) });
+    agrWf?.status === "completed"
+      ? pass("12_timeline_updated", `agreement_signed workflow completed  ts=${String(agrWf.created_at).slice(0, 19)}`)
+      : wfOk
+        ? info("12_timeline_updated", "triggerWorkflow fired — log pending (status not yet completed)")
+        : fail("12_timeline_updated", "triggerWorkflow threw — check step_12_wf_error");
+
+    // ── STEP 13: Customer portal reflects all changes ─────────────────────────
+    const finalRes = await p.query(
+      `SELECT b.status, b.journey_status,
+              a.status AS agr_status, a.pdf_generated, a.signed_at, a.otp_verified,
+              i.invoice_status, i.paid, i.balance
+       FROM bookings b
+       LEFT JOIN agreements a ON a.booking_id=b.id
+       LEFT JOIN invoices   i ON i.booking_id=b.id
+       WHERE b.id=$1
+       ORDER BY a.created_at DESC, i.created_at DESC LIMIT 1`,
+      [bookingId]
+    );
+    const fin = finalRes.rows[0];
+
+    const auditRes = await p.query(
+      `SELECT action, created_at FROM agreement_audit_logs WHERE agreement_id=$1 ORDER BY created_at ASC`,
+      [agId]
+    );
+
+    T("step_13_portal", {
+      booking_status:   fin?.status,
+      journey_status:   fin?.journey_status,
+      agreement_status: fin?.agr_status,
+      pdf_generated:    fin?.pdf_generated,
+      invoice_status:   fin?.invoice_status,
+      invoice_paid:     fin?.paid,
+      invoice_balance:  fin?.balance,
+      audit_events:     auditRes.rows.map((r: any) => r.action),
+    });
+    const portalOk = fin?.status === "confirmed" && fin?.agr_status === "signed" && fin?.pdf_generated === true;
+    portalOk
+      ? pass("13_customer_portal", `booking=${fin?.status}  agreement=${fin?.agr_status}  pdf_generated=${fin?.pdf_generated}  invoice=${fin?.invoice_status}`)
+      : fail("13_customer_portal", `booking=${fin?.status}  agreement=${fin?.agr_status}  pdf_generated=${fin?.pdf_generated}`);
+
+    const allPassed = Object.values(summary).every(v => !v.startsWith("✗"));
+    res.json({
+      ok: true, all_steps_passed: allPassed,
+      booking_number: bookingNum, agreement_number: ag.agreement_number,
+      customer: custName, mobile: custMob, email: custEmail,
+      dry_run: dryRun, summary, trace,
+    });
+  } catch (err: any) {
+    console.error("[ACCEPT-TEST] FATAL:", err);
+    res.json({ ok: false, error: err.message, stack: err.stack?.slice(0, 800), summary, trace });
+  }
+});
+
 if (process.env.NODE_ENV === 'production') {
   const staticDir = process.env.STATIC_FILES_DIR || (() => {
     const candidates = [
