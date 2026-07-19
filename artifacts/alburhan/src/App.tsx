@@ -18,6 +18,7 @@ import Invoice from "@/pages/public/Invoice";
 import PaymentPage from "@/pages/public/PaymentPage";
 import Login from "@/pages/auth/Login";
 import CustomerDashboard from "@/pages/customer/Dashboard";
+import DocumentCenter from "@/pages/customer/DocumentCenter";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import PackagesManager from "@/pages/admin/PackagesManager";
 import BookingsManager from "@/pages/admin/BookingsManager";
@@ -173,6 +174,7 @@ function Router() {
 
       {/* Customer Routes */}
       <Route path="/customer/dashboard" component={() => <CustomerRoute component={CustomerDashboard} />} />
+      <Route path="/customer/documents" component={() => <CustomerRoute component={DocumentCenter} />} />
       <Route path="/kyc" component={() => <CustomerRoute component={KYCPage} />} />
       <Route path="/agreement/:id/sign" component={() => <CustomerRoute component={AgreementSigning} />} />
 

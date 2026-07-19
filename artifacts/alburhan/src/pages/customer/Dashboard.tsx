@@ -1172,6 +1172,132 @@ function BookingJourneyTimeline({ journeyStatus }: { journeyStatus: string }) {
   );
 }
 
+function PremiumTimeline({ bookingId, journeyStatus }: { bookingId: string; journeyStatus: string }) {
+  const [events, setEvents] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+
+  useEffect(() => {
+    if (!showHistory) return;
+    setLoading(true);
+    fetch(`${BASE_API}/api/bookings/${bookingId}/timeline`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : { events: [] })
+      .then(data => setEvents(data.events || []))
+      .catch(() => setEvents([]))
+      .finally(() => setLoading(false));
+  }, [bookingId, showHistory]);
+
+  const currentIdx = JOURNEY_STAGES.findIndex(s => s.key === journeyStatus);
+  const effectiveIdx = currentIdx < 0 ? 0 : currentIdx;
+
+  return (
+    <div className="border-t border-border">
+      {/* Compact journey stepper */}
+      <div className="bg-gradient-to-b from-primary/5 to-transparent">
+        <div className="px-5 pt-3 pb-1">
+          <p className="text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-1.5 mb-3">
+            <span>🗺️</span> Journey — Step {effectiveIdx + 1} of {JOURNEY_STAGES.length}
+          </p>
+        </div>
+        <div className="overflow-x-auto px-5 pb-3">
+          <div className="flex items-start gap-0" style={{ minWidth: `${JOURNEY_STAGES.length * 68}px` }}>
+            {JOURNEY_STAGES.map((stage, idx) => {
+              const done = idx < effectiveIdx;
+              const active = idx === effectiveIdx;
+              return (
+                <div key={stage.key} className="flex flex-col items-center relative flex-1">
+                  {idx > 0 && (
+                    <div className={`absolute h-0.5 top-4 ${done ? "bg-emerald-400" : active ? "bg-primary/40" : "bg-gray-200"}`}
+                      style={{ left: "calc(-50%)", right: "calc(50%)", width: "100%" }} />
+                  )}
+                  <div className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center text-sm border-2 transition-all select-none ${
+                    done   ? "bg-emerald-500 border-emerald-500 text-white shadow-sm" :
+                    active ? "bg-primary border-primary text-white shadow-lg ring-4 ring-primary/25 scale-110" :
+                             "bg-white border-gray-200 text-gray-300"
+                  }`}>
+                    {done ? "✓" : stage.emoji}
+                  </div>
+                  <p className={`mt-1.5 text-center leading-tight px-0.5 ${
+                    active ? "text-primary font-bold" : done ? "text-emerald-700 font-medium" : "text-gray-400"
+                  }`} style={{ fontSize: "9px", maxWidth: "60px" }}>
+                    {stage.label}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        <div className="px-5 pb-3 flex items-center justify-between">
+          <span className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary px-2.5 py-1 rounded-full font-semibold">
+            📍 Currently: {JOURNEY_STAGES[effectiveIdx]?.label}
+          </span>
+        </div>
+      </div>
+
+      {/* Premium full activity history (collapsible) */}
+      <button
+        className="w-full px-5 py-2.5 flex items-center justify-between text-xs font-semibold text-primary border-t border-border hover:bg-primary/5 transition-colors"
+        onClick={() => setShowHistory(!showHistory)}
+      >
+        <span className="flex items-center gap-1.5">
+          📋 Full Activity Log
+          {events.length > 0 && (
+            <span className="ml-1 bg-primary text-white rounded-full px-1.5 py-0.5 text-[10px]">{events.length}</span>
+          )}
+        </span>
+        <span>{showHistory ? "▲" : "▼"}</span>
+      </button>
+
+      {showHistory && (
+        <div className="px-5 pb-5 border-t border-border">
+          {loading ? (
+            <div className="flex items-center justify-center py-6">
+              <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+            </div>
+          ) : events.length === 0 ? (
+            <div className="flex flex-col items-center py-6 text-sm text-muted-foreground border border-dashed rounded-xl mt-3">
+              <span className="text-2xl mb-2">📋</span>
+              <span>No activity recorded yet.</span>
+              <span className="text-xs mt-1 text-muted-foreground/70">Events will appear as your journey progresses.</span>
+            </div>
+          ) : (
+            <div className="relative mt-3">
+              <div className="absolute left-4 top-1 bottom-1 w-px bg-gradient-to-b from-primary/40 via-primary/20 to-primary/5" />
+              <div className="space-y-3">
+                {events.map((ev: any, i: number) => (
+                  <div key={ev.id || i} className="relative pl-10">
+                    <div className="absolute left-1.5 top-1.5 w-5 h-5 rounded-full bg-white border-2 border-primary/40 flex items-center justify-center text-xs shadow-sm">
+                      {ev.icon || "📌"}
+                    </div>
+                    <div className="bg-gradient-to-r from-muted/40 to-transparent rounded-xl p-3 border border-border/50 hover:border-primary/20 transition-colors">
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="text-sm font-semibold text-foreground leading-tight capitalize">
+                          {ev.title
+                            ? ev.title.replace(/_/g, " ")
+                            : (ev.event_type || "").replace(/_/g, " ")}
+                        </span>
+                        <time className="text-[11px] text-muted-foreground whitespace-nowrap shrink-0 mt-0.5">
+                          {new Date(ev.created_at).toLocaleString("en-IN", {
+                            day: "numeric", month: "short", year: "numeric",
+                            hour: "2-digit", minute: "2-digit",
+                          })}
+                        </time>
+                      </div>
+                      {ev.description && (
+                        <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{ev.description}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const NOTIF_TYPE_EMOJI: Record<string, string> = {
   mina_update: "🕌", tawaf_update: "🕋", madinah_update: "🟢",
   flight_update: "✈️", bus_update: "🚌", food_update: "🍽️",
@@ -2291,8 +2417,8 @@ export default function CustomerDashboard() {
                       </div>
                     )}
 
-                    {/* Journey Timeline */}
-                    <BookingJourneyTimeline journeyStatus={booking.journeyStatus || "booking_requested"} />
+                    {/* Premium Journey Timeline */}
+                    <PremiumTimeline bookingId={booking.id} journeyStatus={booking.journeyStatus || "booking_requested"} />
 
                     {/* Core details */}
                     <div className="p-5 grid grid-cols-2 sm:grid-cols-3 gap-4">
@@ -2376,6 +2502,18 @@ export default function CustomerDashboard() {
                           bookingStatus={booking.status}
                           paidAmount={booking.paidAmount}
                         />
+
+                        {/* Document Center quick link */}
+                        <a
+                          href={(import.meta.env.BASE_URL || "/") + "customer/documents"}
+                          className="flex items-center justify-between w-full px-4 py-3 rounded-2xl border border-primary/20 bg-primary/5 hover:bg-primary/10 transition-colors group"
+                        >
+                          <span className="flex items-center gap-2.5 text-sm font-semibold text-primary">
+                            <span className="w-9 h-9 rounded-xl bg-primary/15 flex items-center justify-center text-xl group-hover:bg-primary/25 transition-colors">📁</span>
+                            My Documents — All in One Place
+                          </span>
+                          <span className="text-xs text-primary/70 font-medium">View All →</span>
+                        </a>
                       </div>
                     )}
 

@@ -44,3 +44,7 @@
 - [Invoice overdue status](invoice-overdue-status.md) — deriveInvoiceStatus now accepts dueDate; returns "overdue" when paid<total AND due_date has passed; existing invoices pass inv.due_date, new invoices never overdue (due_date=+30d).
 - [Agreement RICH_SELECT fix](agreement-rich-select-fix.md) — hg.group_number does not exist in production; RICH_SELECT must only use hg.group_name/departure_date/return_date
 - [Agreement signing E2E verified](agreement-e2e-verified.md) — all 15 steps pass; signed PDF saved to documents table; OTP SMS logged to notification_logs
+- [Agreement reminder cron](agreement-reminder-cron.md) — jobs/agreementReminder.ts: hourly at :45 UTC; 24h/48h/72h slots; 5h window per slot; logs to reminder_logs with notes=type:agr_24h; fires fireNotificationEvent("agreement_ready"); 10s startup delay
+- [triggerWorkflow ctx missing bookingId fix](triggerworkflow-ctx-bookingid.md) — always include bookingId+customerId inside ctx object; extra positional args are silently ignored; customer_timeline gets NULL if these are missing
+- [Customer document center](customer-document-center.md) — page at /customer/documents; route added to App.tsx; fetchs /api/bookings then /api/documents/:bookingId; groups into Travel/Official/Personal; bookmark from booking card "My Documents" link
+- [Premium booking timeline](premium-booking-timeline.md) — PremiumTimeline component in Dashboard.tsx; fetches GET /api/bookings/:id/timeline (requireAuth); collapsible event log below journey stepper; endpoint added to routes/bookings.ts

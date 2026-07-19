@@ -590,12 +590,14 @@ router.post("/my/:id/sign", requireAuth, async (req: any, res) => {
     // Notify via agreement_signed template (fire-and-forget)
     if (ag.customer_mobile) {
       triggerWorkflow("agreement_signed", {
-        customerName: ag.customer_name || "Valued Customer",
+        customerName:   ag.customer_name   || "Valued Customer",
         customerMobile: ag.customer_mobile,
-        bookingNumber: ag.booking_number,
-        packageName: ag.package_name,
-        signedDate: new Date().toLocaleDateString("en-IN"),
-      }, ag.booking_id, ag.customer_id).catch(e => console.error("[Agreement] signed-notify failed:", e));
+        bookingNumber:  ag.booking_number,
+        packageName:    ag.package_name,
+        signedDate:     new Date().toLocaleDateString("en-IN"),
+        bookingId:      ag.booking_id,
+        customerId:     ag.customer_id,
+      }).catch(e => console.error("[Agreement] signed-notify failed:", e));
     }
 
     // Generate PDF

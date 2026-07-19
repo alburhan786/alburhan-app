@@ -1,0 +1,415 @@
+You are the senior architect for the Al Burhan Tours & Travels ERP/CRM. Upgrade the platform to enterprise production quality. Do not create mock implementations. Integrate everything with the existing booking, payment, agreement, invoice, notification, and customer dashboard modules.
+
+GOAL:
+Build a complete automated customer journey from booking until journey completion.
+
+====================================================
+1. AUTOMATIC PAYMENT REMINDERS
+====================================================
+
+If payment is pending:
+
+• Automatically send reminders at:
+  - 24 hours after booking
+  - 3 days before due date
+  - Due date
+  - Every 2 days after due date until paid
+
+Send reminders through:
+✓ WhatsApp
+✓ SMS
+✓ Email
+✓ Customer Dashboard Notification
+
+Each reminder must include:
+• Customer Name
+• Booking ID
+• Package Name
+• Pending Amount
+• Due Date
+• Secure Payment Link
+• Contact Support button
+
+Stop reminders immediately after successful payment.
+
+Log every reminder in notification_logs.
+
+====================================================
+2. AGREEMENT REMINDER AUTOMATION
+====================================================
+
+If payment is complete but agreement is still unsigned:
+
+Automatically remind after:
+
+• 24 hours
+• 48 hours
+• 72 hours
+
+Send through:
+
+✓ WhatsApp
+✓ SMS
+✓ Email
+✓ Dashboard Notification
+
+Message includes:
+
+• Agreement ID
+• Booking ID
+• Secure Agreement Link
+• OTP information
+• Digital Signature reminder
+
+Stop reminders immediately after agreement is signed.
+
+====================================================
+3. AUTOMATIC JOURNEY UPDATES
+====================================================
+
+Whenever Admin uploads:
+
+✓ Visa
+✓ Flight Ticket
+✓ Hotel Voucher
+✓ Transport Details
+✓ Ziyarat Schedule
+✓ Room Allocation
+✓ Group Number
+✓ Departure Letter
+✓ Luggage Tags
+✓ ID Card
+
+Automatically:
+
+Generate PDF if needed.
+
+Store in Documents.
+
+Send to customer via:
+
+✓ WhatsApp
+✓ SMS
+✓ Email
+
+Show download button inside Customer Dashboard.
+
+Every upload generates a notification.
+
+====================================================
+4. BOOKING TIMELINE
+====================================================
+
+Create a premium timeline in Customer Dashboard.
+
+Example:
+
+✓ Booking Submitted
+
+↓
+
+✓ Booking Approved
+
+↓
+
+✓ Payment Pending
+
+↓
+
+✓ Payment Received
+
+↓
+
+✓ Invoice Generated
+
+↓
+
+✓ Agreement Generated
+
+↓
+
+✓ Agreement Signed
+
+↓
+
+✓ Visa Issued
+
+↓
+
+✓ Ticket Issued
+
+↓
+
+✓ Hotel Confirmed
+
+↓
+
+✓ Room Allocated
+
+↓
+
+✓ Flight Reminder
+
+↓
+
+✓ Departure
+
+↓
+
+✓ Arrived Makkah
+
+↓
+
+✓ Arrived Madinah
+
+↓
+
+✓ Journey Completed
+
+Each item should display:
+
+✓ Date
+
+✓ Time
+
+✓ Status
+
+✓ Admin remarks
+
+✓ Supporting documents
+
+Timeline updates automatically.
+
+====================================================
+5. DOCUMENT CENTER
+====================================================
+
+Create a complete Documents page.
+
+Customer can download:
+
+Invoice
+
+Receipt
+
+Agreement
+
+Signed Agreement
+
+Visa
+
+Air Ticket
+
+Hotel Voucher
+
+Transport Voucher
+
+Departure Letter
+
+Luggage Tag
+
+ID Card
+
+Medical Certificate
+
+Vaccination Certificate
+
+Passport Copy
+
+PAN
+
+Aadhaar
+
+Photos
+
+Other uploaded files
+
+Provide:
+
+Download
+
+Preview
+
+Share
+
+Print
+
+Document verification
+
+QR Code
+
+Version history
+
+====================================================
+6. SMART NOTIFICATION ENGINE
+====================================================
+
+Every notification must support:
+
+WhatsApp
+
+SMS
+
+Email
+
+Dashboard
+
+Push Notification
+
+Allow Admin to enable or disable each channel individually.
+
+Retry failed notifications automatically.
+
+Record:
+
+Date
+
+Time
+
+Status
+
+Response
+
+HTTP Code
+
+WAMID
+
+SMS ID
+
+Email Message ID
+
+IP Address
+
+Device
+
+====================================================
+7. ADMIN NOTIFICATION CENTER
+====================================================
+
+Create Notification Center.
+
+Show:
+
+Pending
+
+Delivered
+
+Failed
+
+Retry Queue
+
+Manual Resend
+
+Bulk Send
+
+Notification History
+
+Search
+
+Filter
+
+Export CSV
+
+====================================================
+8. CUSTOMER SELF SERVICE
+====================================================
+
+Customer can:
+
+View Booking
+
+Download Documents
+
+Pay Balance
+
+Sign Agreement
+
+Track Timeline
+
+View Notifications
+
+View Payment History
+
+Download Receipts
+
+Raise Support Ticket
+
+Chat with Admin
+
+====================================================
+9. SECURITY
+====================================================
+
+Every document:
+
+Unique Document ID
+
+Booking ID
+
+Agreement ID
+
+QR Code Verification
+
+Digital Signature Hash
+
+Timestamp
+
+IP Address
+
+Device Information
+
+OTP Verification Log
+
+Audit Trail
+
+====================================================
+10. AUTOMATIC TESTING
+====================================================
+
+After implementation:
+
+Run a real end-to-end production test.
+
+Verify:
+
+✓ Booking
+
+✓ Payment
+
+✓ Invoice
+
+✓ Receipt
+
+✓ WhatsApp
+
+✓ SMS
+
+✓ Email
+
+✓ Agreement
+
+✓ OTP
+
+✓ Digital Signature
+
+✓ Signed PDF
+
+✓ Timeline
+
+✓ Documents
+
+✓ Dashboard
+
+✓ QR Verification
+
+✓ Admin Panel
+
+✓ Customer Panel
+
+Do not stop at the first failure.
+
+Automatically trace every failure, fix it, redeploy, and test again.
+
+Repeat until every production feature passes.
+
+Return SUCCESS only after the entire customer journey works perfectly without manual intervention.

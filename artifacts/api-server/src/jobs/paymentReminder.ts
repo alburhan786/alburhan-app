@@ -23,11 +23,19 @@ function fmt(n: number): string {
 
 // Schedule: which days relative to due_date trigger a reminder
 // negative = N days before; 0 = on due date; positive = N days after
-// After due date: every 3 days (3, 6, 9, 12…)
-function getReminderType(dueDate: Date | null): string | null {
+// After due date: every 2 days (2, 4, 6, 8…) per spec
+// Extra: 24 h after booking creation (first-touch reminder)
+function getReminderType(dueDate: Date | null, createdAt?: Date | null): string | null {
+  const now = new Date();
+
+  // ── 24 h after booking created (first-touch) ─────────────────────────────
+  if (createdAt) {
+    const hoursOld = (now.getTime() - createdAt.getTime()) / 3600_000;
+    if (hoursOld >= 20 && hoursOld <= 32) return "24h";
+  }
+
   if (!dueDate) return null;
 
-  const now = new Date();
   // Work in IST (UTC+5:30) to align with 9 AM IST cron
   const istOffset = 5.5 * 60 * 60 * 1000;
   const todayIST = new Date(now.getTime() + istOffset);
@@ -38,12 +46,11 @@ function getReminderType(dueDate: Date | null): string | null {
 
   const diffDays = Math.round((dueMidnight - todayMidnight) / (24 * 60 * 60 * 1000));
 
-  if (diffDays === 7)  return "7d";
   if (diffDays === 3)  return "3d";
   if (diffDays === 1)  return "1d";
   if (diffDays === 0)  return "due";
-  // After due date: fire every 3 days (day 3, 6, 9…)
-  if (diffDays < 0 && (-diffDays) % 3 === 0) return `post${-diffDays}d`;
+  // After due date: fire every 2 days (day 2, 4, 6…) per spec
+  if (diffDays < 0 && (-diffDays) % 2 === 0) return `post${-diffDays}d`;
 
   return null; // not a scheduled day
 }
@@ -152,7 +159,8 @@ export async function sendReminderForBookingId(
 async function getEligibleBookingsWithBalance() {
   const res = await pool.query(`
     SELECT id, booking_number, customer_name, customer_mobile, customer_email,
-           final_amount, paid_amount, preferred_departure_date AS due_date
+           final_amount, paid_amount, preferred_departure_date AS due_date,
+           created_at
     FROM bookings
     WHERE status = ANY($1)
       AND CAST(COALESCE(final_amount,'0') AS numeric) > 0
@@ -161,7 +169,8 @@ async function getEligibleBookingsWithBalance() {
   `, [ELIGIBLE_STATUSES]);
   return res.rows as Array<{
     id: string; booking_number: string; customer_name: string; customer_mobile: string;
-    customer_email: string | null; final_amount: string; paid_amount: string; due_date: string | null;
+    customer_email: string | null; final_amount: string; paid_amount: string;
+    due_date: string | null; created_at: string | null;
   }>;
 }
 
@@ -182,8 +191,9 @@ export async function runDailyReminders(): Promise<void> {
     let sentCount = 0, failCount = 0, skippedCount = 0;
 
     for (const booking of eligible) {
-      const dueDate      = booking.due_date ? new Date(booking.due_date) : null;
-      const reminderType = getReminderType(dueDate);
+      const dueDate      = booking.due_date   ? new Date(booking.due_date)   : null;
+      const createdAt    = booking.created_at ? new Date(booking.created_at) : null;
+      const reminderType = getReminderType(dueDate, createdAt);
 
       // Not a scheduled reminder day for this booking
       if (!reminderType) { skippedCount++; continue; }
