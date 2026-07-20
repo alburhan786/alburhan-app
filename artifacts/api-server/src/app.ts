@@ -268,6 +268,152 @@ app.get("/api/migrate/frontend.tar.gz", (req, res) => {
   req.on("close", () => tar.kill());
 });
 
+// GET /api/migrate/net-diag — deep network + DB connectivity diagnostic (no auth bypass)
+app.get("/api/migrate/net-diag", async (req, res) => {
+  const key = req.query.key as string;
+  if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
+
+  const dns  = await import("dns");
+  const net  = await import("net");
+  const pg   = await import("pg");
+
+  const report: Record<string, unknown> = {
+    ts: new Date().toISOString(),
+    node: process.version,
+    cwd: process.cwd(),
+    pid: process.pid,
+  };
+
+  // ── 1. DATABASE_URL presence + safe hostname extraction ───────────────────
+  const dbUrl = process.env.DATABASE_URL || "";
+  if (!dbUrl) {
+    report.db_url = "NOT SET";
+  } else {
+    try {
+      const u = new URL(dbUrl);
+      report.db_url_host     = u.hostname;
+      report.db_url_port     = u.port || "5432";
+      report.db_url_database = u.pathname.replace(/^\//, "") || "(root)";
+      report.db_url_user     = u.username || "(not set)";
+      report.db_url_ssl      = u.searchParams.get("sslmode") || "(not specified)";
+      report.db_url_length   = dbUrl.length;
+    } catch {
+      report.db_url = `PARSE ERROR — value length=${dbUrl.length}`;
+    }
+  }
+
+  // ── 2. DNS resolution of DB host ─────────────────────────────────────────
+  const dbHost = (report.db_url_host as string) || "";
+  if (dbHost) {
+    await new Promise<void>((resolve) => {
+      const t0 = Date.now();
+      dns.default.lookup(dbHost, (err, addr) => {
+        report.dns_lookup = err
+          ? `FAIL — ${err.code}: ${err.message}`
+          : `OK — resolved to ${addr} in ${Date.now() - t0}ms`;
+        resolve();
+      });
+    });
+  } else {
+    report.dns_lookup = "SKIP — no host parsed";
+  }
+
+  // ── 3. TCP connection to DB host:port ────────────────────────────────────
+  const dbPort = parseInt((report.db_url_port as string) || "5432", 10);
+  if (dbHost) {
+    await new Promise<void>((resolve) => {
+      const t0   = Date.now();
+      const sock = new net.default.Socket();
+      sock.setTimeout(6000);
+      sock.connect(dbPort, dbHost, () => {
+        report.tcp_connect = `OK — connected ${dbHost}:${dbPort} in ${Date.now() - t0}ms`;
+        sock.destroy();
+        resolve();
+      });
+      sock.on("error", (e) => {
+        report.tcp_connect = `FAIL — ${(e as NodeJS.ErrnoException).code || e.message}`;
+        resolve();
+      });
+      sock.on("timeout", () => {
+        report.tcp_connect = `FAIL — timeout after 6000ms`;
+        sock.destroy();
+        resolve();
+      });
+    });
+  } else {
+    report.tcp_connect = "SKIP — no host parsed";
+  }
+
+  // ── 4. Full pg.Client connection + simple query ──────────────────────────
+  if (dbUrl) {
+    const client = new pg.default.Client({ connectionString: dbUrl, connectionTimeoutMillis: 8000 });
+    try {
+      const t0 = Date.now();
+      await client.connect();
+      const r = await client.query("SELECT COUNT(*) AS n FROM users");
+      report.pg_connect   = `OK — connected in ${Date.now() - t0}ms`;
+      report.pg_query     = `OK — users table has ${r.rows[0]?.n} rows`;
+      await client.end();
+    } catch (e: any) {
+      report.pg_connect = `FAIL — ${e.message}`;
+      try { await client.end(); } catch {}
+    }
+  } else {
+    report.pg_connect = "SKIP — DATABASE_URL not set";
+  }
+
+  // ── 5. Fast2SMS connectivity ──────────────────────────────────────────────
+  {
+    const axios = (await import("axios")).default;
+    const apiKey = process.env.FAST2SMS_API_KEY || "";
+    report.fast2sms_key_present = !!apiKey;
+    report.fast2sms_key_prefix  = apiKey ? `${apiKey.slice(0, 6)}...${apiKey.slice(-4)} (len=${apiKey.length})` : "NOT SET";
+    try {
+      const t0 = Date.now();
+      // Wallet check — no SMS sent, just auth
+      const r = await axios.get("https://www.fast2sms.com/dev/wallet", {
+        headers: { authorization: apiKey },
+        timeout: 8000,
+      });
+      report.fast2sms_api = `OK HTTP ${r.status} — wallet: ${JSON.stringify(r.data).slice(0, 120)} (${Date.now()-t0}ms)`;
+    } catch (e: any) {
+      report.fast2sms_api = `FAIL — ${e.code || ""} ${e.message?.slice(0, 200) || ""}`;
+    }
+  }
+
+  // ── 6. BotBee connectivity ────────────────────────────────────────────────
+  {
+    const axios = (await import("axios")).default;
+    const bbKey = process.env.BOTBEE_API_KEY || "";
+    report.botbee_key_present = !!bbKey;
+    report.botbee_key_prefix  = bbKey ? `${bbKey.slice(0, 6)}...${bbKey.slice(-4)}` : "NOT SET";
+    try {
+      const t0 = Date.now();
+      const r = await axios.post("https://app.botbee.io/api/v1/account",
+        { apiToken: bbKey }, { timeout: 8000 });
+      report.botbee_api = `OK HTTP ${r.status} (${Date.now()-t0}ms)`;
+    } catch (e: any) {
+      report.botbee_api = `FAIL HTTP ${e?.response?.status || ""} — ${e.message?.slice(0, 200) || ""}`;
+    }
+  }
+
+  // ── 7. Generic outbound DNS (can VPS reach internet at all?) ─────────────
+  await new Promise<void>((resolve) => {
+    dns.default.lookup("www.google.com", (err, addr) => {
+      report.internet_dns = err ? `FAIL — ${err.code}` : `OK — google.com → ${addr}`;
+      resolve();
+    });
+  });
+  await new Promise<void>((resolve) => {
+    dns.default.lookup("www.fast2sms.com", (err, addr) => {
+      report.fast2sms_dns = err ? `FAIL — ${err.code}` : `OK — fast2sms.com → ${addr}`;
+      resolve();
+    });
+  });
+
+  res.json(report);
+});
+
 // GET /api/migrate/db-check — checks DB tables/columns on VPS
 app.get("/api/migrate/db-check", async (req, res) => {
   const key = req.query.key as string;
