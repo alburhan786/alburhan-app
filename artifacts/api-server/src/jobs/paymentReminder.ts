@@ -46,6 +46,8 @@ function getReminderType(dueDate: Date | null, createdAt?: Date | null): string 
 
   const diffDays = Math.round((dueMidnight - todayMidnight) / (24 * 60 * 60 * 1000));
 
+  if (diffDays === 30) return "30d";
+  if (diffDays === 15) return "15d";
   if (diffDays === 7)  return "7d";
   if (diffDays === 3)  return "3d";
   if (diffDays === 1)  return "1d";

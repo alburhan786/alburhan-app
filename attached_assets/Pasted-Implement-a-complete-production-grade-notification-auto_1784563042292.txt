@@ -1,0 +1,374 @@
+Implement a complete production-grade notification automation system for Al Burhan Tours & Travels.
+
+Current issue:
+Customers can book packages and make payments, but they do NOT automatically receive confirmations through WhatsApp, SMS, or Email.
+
+Required workflow:
+
+========================
+1. Booking Confirmation
+========================
+
+Immediately after a booking is successfully created:
+
+Automatically send:
+
+✅ WhatsApp
+✅ SMS
+✅ Email
+
+Include:
+
+- Customer Name
+- Booking ID
+- Agreement ID
+- Package Name
+- Departure Date
+- Total Amount
+- Amount Paid
+- Balance Amount
+- Payment Due Date
+- Booking Status
+- Customer Dashboard Link
+
+Email subject:
+Booking Confirmation – Al Burhan Tours & Travels
+
+========================
+2. Agreement
+========================
+
+After booking:
+
+Generate Agreement PDF automatically.
+
+Send:
+
+✅ WhatsApp PDF
+✅ Email attachment
+✅ SMS with secure PDF URL
+
+========================
+3. Invoice
+========================
+
+Generate Invoice PDF automatically.
+
+Send:
+
+✅ WhatsApp PDF
+✅ Email attachment
+✅ SMS with invoice download URL
+
+========================
+4. Payment Confirmation
+========================
+
+Whenever any payment is received:
+
+Automatically send:
+
+WhatsApp
+SMS
+Email
+
+Include:
+
+- Booking ID
+- Receipt Number
+- Amount Received
+- Balance Amount
+- Payment Date
+
+Generate payment receipt PDF.
+
+Send automatically.
+
+========================
+5. Remaining Balance Reminder
+========================
+
+Automatically send reminders:
+
+30 days before due date
+
+15 days before due date
+
+7 days before due date
+
+3 days before due date
+
+1 day before due date
+
+Through:
+
+WhatsApp
+SMS
+Email
+
+Stop reminders automatically after full payment.
+
+========================
+6. Visa Issued
+========================
+
+When visa status becomes Issued:
+
+Automatically send:
+
+WhatsApp
+SMS
+Email
+
+Attach Visa PDF.
+
+========================
+7. Air Ticket
+========================
+
+When ticket is uploaded:
+
+Automatically send:
+
+WhatsApp
+SMS
+Email
+
+Attach Ticket PDF.
+
+========================
+8. Hotel Voucher
+========================
+
+Automatically send:
+
+WhatsApp
+SMS
+Email
+
+Attach Hotel Voucher PDF.
+
+========================
+9. Room Allocation
+========================
+
+When room is allocated:
+
+Automatically send:
+
+Room Number
+
+Hotel
+
+Roommates
+
+Check-in Date
+
+via
+
+WhatsApp
+SMS
+Email
+
+========================
+10. Flight Reminder
+========================
+
+Automatically send:
+
+7 days before
+
+3 days before
+
+24 hours before
+
+Include:
+
+Airport
+
+Reporting Time
+
+Flight Number
+
+Terminal
+
+Luggage
+
+========================
+11. Hajj / Umrah Orientation
+========================
+
+Automatically notify all booked pilgrims.
+
+Send through:
+
+WhatsApp
+
+SMS
+
+Email
+
+========================
+12. Customer Dashboard
+========================
+
+Every customer dashboard must display:
+
+Booking
+
+Payments
+
+Agreement PDF
+
+Invoice PDF
+
+Payment Receipt
+
+Visa
+
+Ticket
+
+Hotel Voucher
+
+Room Allocation
+
+Notifications
+
+Download buttons
+
+========================
+13. Notification Center
+========================
+
+Create a notification queue with retry support.
+
+Store:
+
+Notification ID
+
+Booking ID
+
+Customer ID
+
+Channel
+
+Status
+
+Delivered
+
+Failed
+
+Read
+
+Provider Response
+
+Retry Count
+
+Timestamp
+
+========================
+14. Admin Dashboard
+========================
+
+Create Notification Management.
+
+Show:
+
+Total Sent
+
+Delivered
+
+Failed
+
+Pending
+
+Retry Failed
+
+Manual Resend
+
+Filter by:
+
+Customer
+
+Booking
+
+Channel
+
+Date
+
+========================
+15. Providers
+========================
+
+WhatsApp:
+BotBee + Meta WhatsApp Cloud API
+
+SMS:
+Fast2SMS DLT
+
+Email:
+SMTP
+
+All providers must have automatic retry.
+
+========================
+16. Event Driven Automation
+========================
+
+Notifications must automatically trigger on:
+
+Booking Created
+
+Payment Received
+
+Balance Pending
+
+Agreement Generated
+
+Invoice Generated
+
+Visa Issued
+
+Ticket Uploaded
+
+Voucher Uploaded
+
+Room Allocated
+
+Orientation Scheduled
+
+Flight Updated
+
+Travel Completed
+
+Refund Processed
+
+No manual intervention should be required.
+
+========================
+17. Final Acceptance Tests
+========================
+
+Verify:
+
+✅ Booking automatically sends WhatsApp, SMS and Email.
+
+✅ Invoice PDF delivered through WhatsApp and Email.
+
+✅ Agreement PDF delivered automatically.
+
+✅ Payment receipt delivered automatically.
+
+✅ Visa delivered automatically.
+
+✅ Ticket delivered automatically.
+
+✅ Hotel voucher delivered automatically.
+
+✅ Reminder schedule works.
+
+✅ Admin can resend any failed notification.
+
+✅ Notification logs stored permanently.
+
+Provide a complete deployment report confirming every notification channel is working in production.

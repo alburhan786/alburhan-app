@@ -4,6 +4,7 @@ import { eq, and, ne, desc, asc, count, max, inArray, sql } from "drizzle-orm";
 import { requireAdmin, requireModuleAccess, requirePermission, type AuthenticatedRequest } from "../lib/auth.js";
 import { auditLog } from "../lib/audit.js";
 import { sendWhatsApp } from "../lib/notifications.js";
+import { triggerWorkflow } from "../lib/workflowEngine.js";
 import multer from "multer";
 import { uploadToGCS, deleteFromGCS } from "../lib/gcsUpload.js";
 import { objectStorageClient } from "../lib/objectStorage.js";
@@ -963,6 +964,20 @@ router.post("/:groupId/rooms/auto-allocate", requireAdmin as any, async (req, re
       unassigned: unassignedCount,
       rooms: updatedRooms.map(r => ({ ...fmtRoom(r), occupiedBeds: countMap2.get(`${r.roomNumber}::${r.hotel}`) || 0 })),
     });
+    // Fire room allocation notifications (fire-and-forget, rate-limited)
+    setImmediate(async () => {
+      for (const a of assignments) {
+        const p = pilgrims.find(pl => pl.id === a.pilgrimId);
+        if (!p?.mobileIndia) continue;
+        triggerWorkflow("room_allocation", {
+          customerName: p.fullName || "Pilgrim",
+          customerMobile: p.mobileIndia,
+          roomNumber: a.roomNumber,
+          hotelName: a.roomHotel || "Hotel",
+        }).catch(() => {});
+        await new Promise(r => setTimeout(r, 150));
+      }
+    });
   } catch (err: any) {
     console.error("[groups] auto-allocate error:", err);
     res.status(500).json({ message: err?.message || "Failed to auto-allocate rooms" });
@@ -1847,6 +1862,7 @@ router.post("/:groupId/families/auto-allocate-rooms", requireAdmin as any, async
     const results: { familyId: string; head: string; size: number; rooms: string[]; roomType: string; roomRange: string | null }[] = [];
     let assignedCount = 0;
     let skippedCount = 0;
+    const roomNotifs: { name: string; mobile: string; room: string; hotel: string }[] = [];
 
     for (const [familyId, members] of sortedFamilies) {
       const head = members.find(m => m.familyHead) || members[0];
@@ -1881,6 +1897,7 @@ router.post("/:groupId/families/auto-allocate-rooms", requireAdmin as any, async
 
       for (const m of members) {
         await db.update(pilgrimsTable).set(updates).where(eq(pilgrimsTable.id, m.id));
+        if (m.mobileIndia) roomNotifs.push({ name: m.fullName || "Pilgrim", mobile: m.mobileIndia, room: primaryRoom, hotel: hotel || "Hotel" });
       }
 
       results.push({ familyId, head: head?.fullName || familyId, size, rooms: assignedRooms, roomType, roomRange });
@@ -1888,6 +1905,12 @@ router.post("/:groupId/families/auto-allocate-rooms", requireAdmin as any, async
     }
 
     res.json({ assigned: assignedCount, skipped: skippedCount, families: results, nextRoom: currentRoom });
+    setImmediate(async () => {
+      for (const n of roomNotifs) {
+        triggerWorkflow("room_allocation", { customerName: n.name, customerMobile: n.mobile, roomNumber: n.room, hotelName: n.hotel }).catch(() => {});
+        await new Promise(r => setTimeout(r, 150));
+      }
+    });
   } catch (err: any) {
     res.status(500).json({ message: err?.message || "Auto-allocation failed" });
   }
@@ -2169,6 +2192,14 @@ router.post("/:groupId/families/:familyId/change-room-number", requireAdmin as a
       .set({ roomNumber: newRoomNumber, updatedAt: new Date() })
       .where(and(eq(pilgrimsTable.groupId, groupId), eq(pilgrimsTable.familyId, familyId)));
     res.json({ updated: members.length, familyId, newRoomNumber });
+    setImmediate(async () => {
+      const hotelName = members.find(m => m.roomHotel)?.roomHotel || "Hotel";
+      for (const m of members) {
+        if (!m.mobileIndia) continue;
+        triggerWorkflow("room_allocation", { customerName: m.fullName || "Pilgrim", customerMobile: m.mobileIndia, roomNumber: newRoomNumber, hotelName }).catch(() => {});
+        await new Promise(r => setTimeout(r, 150));
+      }
+    });
   } catch (err: any) {
     res.status(500).json({ message: err?.message || "Failed to update room number" });
   }
@@ -2310,6 +2341,20 @@ router.post("/:groupId/families/auto-allocate", requireAdmin as any, async (req,
     });
 
     res.json({ assigned: assignedCount, unassigned: unassignedCount });
+    // Fire room allocation notifications (fire-and-forget, rate-limited)
+    setImmediate(async () => {
+      for (const a of assignments) {
+        const p = pilgrims.find(pl => pl.id === a.pilgrimId);
+        if (!p?.mobileIndia) continue;
+        triggerWorkflow("room_allocation", {
+          customerName: p.fullName || "Pilgrim",
+          customerMobile: p.mobileIndia,
+          roomNumber: a.roomNumber,
+          hotelName: a.roomHotel || "Hotel",
+        }).catch(() => {});
+        await new Promise(r => setTimeout(r, 150));
+      }
+    });
   } catch (err: any) {
     console.error("[groups] family auto-allocate error:", err);
     res.status(500).json({ message: err?.message || "Failed to auto-allocate rooms by family" });
@@ -2335,6 +2380,17 @@ router.post("/:groupId/families/:familyId/assign-room", requireAdmin as any, asy
       .set({ roomNumber, roomHotel, roomId: roomId || null, updatedAt: new Date() })
       .where(and(eq(pilgrimsTable.groupId, groupId), eq(pilgrimsTable.familyId, familyId)));
     res.json({ message: "Family assigned to room" });
+    if (roomNumber) {
+      setImmediate(async () => {
+        const familyMembers = await db.select().from(pilgrimsTable)
+          .where(and(eq(pilgrimsTable.groupId, groupId), eq(pilgrimsTable.familyId, familyId)));
+        for (const m of familyMembers) {
+          if (!m.mobileIndia) continue;
+          triggerWorkflow("room_allocation", { customerName: m.fullName || "Pilgrim", customerMobile: m.mobileIndia, roomNumber: roomNumber!, hotelName: roomHotel || "Hotel" }).catch(() => {});
+          await new Promise(r => setTimeout(r, 150));
+        }
+      });
+    }
   } catch (err: any) {
     res.status(500).json({ message: err?.message || "Failed to assign family to room" });
   }

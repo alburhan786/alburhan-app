@@ -9,9 +9,10 @@ import { fireNotificationEvent } from "../lib/notificationEngine.js";
 // ─────────────────────────────────────────────────────────────────────────────
 
 const SLOTS = [
-  { hours: 72, label: "tdep_72h", message: "72 hours" },
-  { hours: 24, label: "tdep_24h", message: "24 hours" },
-  { hours: 6,  label: "tdep_6h",  message: "6 hours" },
+  { hours: 168, label: "tdep_7d",  message: "7 days" },
+  { hours: 72,  label: "tdep_72h", message: "72 hours" },
+  { hours: 24,  label: "tdep_24h", message: "24 hours" },
+  { hours: 6,   label: "tdep_6h",  message: "6 hours" },
 ] as const;
 
 const SLOT_WINDOW_HOURS = 2;
