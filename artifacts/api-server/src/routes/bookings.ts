@@ -49,6 +49,7 @@ import {
 import { trackNotification, fireNotificationEvent } from "../lib/notificationEngine.js";
 import { triggerWorkflow } from "../lib/workflowEngine.js";
 import { sendInvoiceEmail } from "../services/emailService.js";
+import { broadcastCustomerJourneyUpdate } from "./customer-journey.js";
 
 const router = Router();
 
@@ -952,6 +953,7 @@ router.post("/:id/journey-status", requireAdmin as any, requirePermission("booki
     }).catch(() => {});
 
     auditLog({ req, action: "journey_status_changed", entityTable: "bookings", entityId: booking.id, newValue: { journey_status } }).catch(() => {});
+    broadcastCustomerJourneyUpdate(booking.id, journey_status);
     res.json({ ok: true, journey_status, booking: formatBooking(booking) });
   } catch (err: any) {
     console.error("[bookings] POST /:id/journey-status error:", err);

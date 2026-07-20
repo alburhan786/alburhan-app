@@ -1491,258 +1491,365 @@ function getStatusMessage(status: string) {
   }
 }
 
-const JOURNEY_STAGES = [
-  { key: "booking_requested",  label: "Submitted",   emoji: "🕌" },
-  { key: "documents_pending",  label: "Docs Needed", emoji: "📄" },
-  { key: "documents_received", label: "Docs In",     emoji: "📋" },
-  { key: "admin_verification", label: "Verifying",   emoji: "🔍" },
-  { key: "payment_pending",    label: "Pay Now",     emoji: "💰" },
-  { key: "payment_received",   label: "Paid",        emoji: "✅" },
-  { key: "invoice_generated",  label: "Invoice",     emoji: "🧾" },
-  { key: "visa_processing",    label: "Visa",        emoji: "🛂" },
-  { key: "visa_approved",      label: "Visa ✓",      emoji: "🎉" },
-  { key: "flight_confirmed",   label: "Flight",      emoji: "✈️" },
-  { key: "hotel_confirmed",    label: "Hotel",       emoji: "🏨" },
-  { key: "bus_allocated",      label: "Bus",         emoji: "🚌" },
-  { key: "room_allocated",     label: "Room",        emoji: "🛏️" },
-  { key: "departure_ready",    label: "Ready!",      emoji: "🧳" },
-  { key: "journey_started",    label: "Departed",    emoji: "🛫" },
-  { key: "reached_makkah",     label: "Makkah",      emoji: "🕋" },
-  { key: "reached_madinah",    label: "Madinah",     emoji: "🕌" },
-  { key: "return_flight",      label: "Returning",   emoji: "🛫" },
-  { key: "journey_completed",  label: "Home ♥",      emoji: "🏠" },
+// ── Journey Tracker — 17-step real-time progress tracker ──────────────────────
+
+type StepState = "completed" | "current" | "upcoming" | "locked";
+
+interface JourneyStepDef {
+  key: string;
+  label: string;
+  icon: string;
+  desc: string;
+  virtual?: boolean;
+}
+
+interface JourneyStepDisplay extends JourneyStepDef {
+  state: StepState;
+  completedAt: string | null;
+  updatedBy: string | null;
+  notes: string | null;
+}
+
+const JOURNEY_STEP_DEFS: JourneyStepDef[] = [
+  { key: "booking_requested",  label: "Booking Created",    icon: "🕌", desc: "Your booking has been submitted and confirmed" },
+  { key: "documents_received", label: "Documents Uploaded", icon: "📋", desc: "Your travel documents have been received" },
+  { key: "admin_verification", label: "Documents Verified", icon: "🔍", desc: "Your documents are verified by our team" },
+  { key: "payment_received",   label: "Payment Received",   icon: "💳", desc: "Your payment has been confirmed" },
+  { key: "invoice_generated",  label: "Invoice Generated",  icon: "🧾", desc: "Your official invoice has been issued" },
+  { key: "agreement_signed",   label: "Agreement Signed",   icon: "✍️",  desc: "Your travel agreement has been signed", virtual: true },
+  { key: "visa_processing",    label: "Visa Processing",    icon: "🛂", desc: "Your visa application is being processed" },
+  { key: "visa_approved",      label: "Visa Approved",      icon: "🎉", desc: "Your visa has been approved" },
+  { key: "flight_confirmed",   label: "Flight Confirmed",   icon: "✈️",  desc: "Your flight tickets have been confirmed" },
+  { key: "hotel_confirmed",    label: "Hotel Confirmed",    icon: "🏨", desc: "Your hotel accommodation is confirmed" },
+  { key: "room_allocated",     label: "Room Allocated",     icon: "🛏️",  desc: "Your room has been assigned" },
+  { key: "departure_ready",    label: "Departure Ready",    icon: "🧳", desc: "All preparations for departure are complete" },
+  { key: "journey_started",    label: "Journey Started",    icon: "🛫", desc: "You have departed on your sacred journey" },
+  { key: "reached_makkah",     label: "Reached Makkah",     icon: "🕋", desc: "You have arrived in Makkah Al-Mukarramah" },
+  { key: "reached_madinah",    label: "Reached Madinah",    icon: "🕌", desc: "You have arrived in Madinah Al-Munawwarah" },
+  { key: "return_flight",      label: "Return Flight",      icon: "✈️",  desc: "Returning home from the holy land" },
+  { key: "journey_completed",  label: "Journey Completed",  icon: "🏠", desc: "Welcome home! Your blessed journey is complete" },
 ];
 
-function BookingJourneyTimeline({ journeyStatus }: { journeyStatus: string }) {
-  const currentIdx = JOURNEY_STAGES.findIndex(s => s.key === journeyStatus);
-  const effectiveIdx = currentIdx < 0 ? 0 : currentIdx;
-  return (
-    <div className="border-t border-border bg-gradient-to-b from-primary/5 to-transparent">
-      <div className="px-5 pt-3 pb-1">
-        <p className="text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-1.5 mb-3">
-          <span>🗺️</span> Booking Journey — Step {effectiveIdx + 1} of {JOURNEY_STAGES.length}
-        </p>
+// Maps DB journey_status → display step index in JOURNEY_STEP_DEFS (0-indexed, virtual step at 5)
+const DB_TO_DISPLAY_IDX: Record<string, number> = {
+  "booking_requested": 0, "documents_pending": 0,
+  "documents_received": 1,
+  "admin_verification": 2, "payment_pending": 2,
+  "payment_received": 3,
+  "invoice_generated": 4,
+  // 5 = agreement_signed (virtual — no DB status)
+  "visa_processing": 6, "visa_approved": 7,
+  "flight_confirmed": 8, "hotel_confirmed": 9,
+  "bus_allocated": 10, "room_allocated": 10,
+  "departure_ready": 11, "journey_started": 12,
+  "reached_makkah": 13, "reached_madinah": 14,
+  "return_flight": 15, "journey_completed": 16,
+};
+
+function computeJourneySteps(
+  journeyStatus: string,
+  agreementSigned: boolean,
+  stepData: Record<string, any>
+): JourneyStepDisplay[] {
+  const currentIdx = DB_TO_DISPLAY_IDX[journeyStatus] ?? 0;
+  const allDone = journeyStatus === "journey_completed";
+
+  return JOURNEY_STEP_DEFS.map((def, i) => {
+    let state: StepState;
+
+    if (allDone) {
+      state = "completed";
+    } else if (def.virtual && def.key === "agreement_signed") {
+      const agDone = agreementSigned || currentIdx >= 6;
+      if (agDone) state = "completed";
+      else if (currentIdx >= 4) state = "upcoming";
+      else if (currentIdx >= 2) state = "upcoming";
+      else state = "locked";
+    } else {
+      if (i < currentIdx) state = "completed";
+      else if (i === currentIdx) state = "current";
+      else if (i <= currentIdx + 2) state = "upcoming";
+      else state = "locked";
+    }
+
+    const d = stepData[def.key] || {};
+    return {
+      ...def,
+      state,
+      completedAt: state === "completed" ? (d.completedAt ?? null) : null,
+      updatedBy: d.updatedBy ?? null,
+      notes: d.notes ?? null,
+    };
+  });
+}
+
+function StepIconBadge({ state, icon }: { state: StepState; icon: string }) {
+  if (state === "completed") {
+    return (
+      <div className="w-9 h-9 rounded-full bg-emerald-500 flex items-center justify-center shadow-sm flex-shrink-0">
+        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
       </div>
-      <div className="overflow-x-auto px-5 pb-4">
-        <div className="flex items-start gap-0" style={{ minWidth: `${JOURNEY_STAGES.length * 68}px` }}>
-          {JOURNEY_STAGES.map((stage, idx) => {
-            const done = idx < effectiveIdx;
-            const active = idx === effectiveIdx;
-            return (
-              <div key={stage.key} className="flex flex-col items-center relative flex-1">
-                {idx > 0 && (
-                  <div className={`absolute h-0.5 top-4 ${done ? "bg-emerald-400" : active ? "bg-primary/40" : "bg-gray-200"}`}
-                    style={{ left: "calc(-50%)", right: "calc(50%)", width: "100%", transform: "translateX(0)" }} />
-                )}
-                <div className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center text-sm border-2 transition-all select-none ${
-                  done   ? "bg-emerald-500 border-emerald-500 text-white shadow-sm" :
-                  active ? "bg-primary border-primary text-white shadow-lg ring-4 ring-primary/25 scale-110" :
-                           "bg-white border-gray-200 text-gray-300"
-                }`}>
-                  {done ? "✓" : stage.emoji}
-                </div>
-                <p className={`mt-1.5 text-center leading-tight px-0.5 ${
-                  active ? "text-primary font-bold" : done ? "text-emerald-700 font-medium" : "text-gray-400"
-                }`} style={{ fontSize: "9px", maxWidth: "60px" }}>
-                  {stage.label}
-                </p>
-              </div>
-            );
-          })}
+    );
+  }
+  if (state === "current") {
+    return (
+      <div className="relative flex-shrink-0 w-9 h-9">
+        <div className="absolute inset-0 rounded-full bg-primary/25 animate-ping" style={{ animationDuration: "1.5s" }} />
+        <div className="relative w-9 h-9 rounded-full bg-primary flex items-center justify-center shadow-lg ring-4 ring-primary/20">
+          <span className="text-base leading-none">{icon}</span>
         </div>
       </div>
-      <div className="px-5 pb-3">
-        <span className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary px-2.5 py-1 rounded-full font-semibold">
-          📍 Currently: {JOURNEY_STAGES[effectiveIdx]?.label}
-        </span>
+    );
+  }
+  if (state === "locked") {
+    return (
+      <div className="w-9 h-9 rounded-full bg-gray-50 border-2 border-dashed border-gray-200 flex items-center justify-center flex-shrink-0">
+        <svg className="w-4 h-4 text-gray-300" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+        </svg>
       </div>
+    );
+  }
+  // upcoming
+  return (
+    <div className="w-9 h-9 rounded-full bg-gray-100 border-2 border-gray-200 flex items-center justify-center flex-shrink-0">
+      <span className="text-base leading-none opacity-40">{icon}</span>
     </div>
   );
 }
 
-// ── Booking Progress Checklist (12 steps) ─────────────────────────────────
-function BookingProgressChecklist({ booking, agreement }: {
-  booking: any;
+function JourneyTracker({
+  bookingId,
+  initialJourneyStatus,
+  agreement,
+}: {
+  bookingId: string;
+  initialJourneyStatus: string;
   agreement?: any;
 }) {
-  const paid = Number(booking.paidAmount || 0) > 0;
-  const fullPaid = booking.status === "confirmed";
-  const approved = ["approved", "partially_paid", "confirmed"].includes(booking.status);
-  const journeyIdx = JOURNEY_STAGES.findIndex((s: any) => s.key === (booking.journeyStatus || "booking_requested"));
-  const jIdx = journeyIdx < 0 ? 0 : journeyIdx;
-  const hasAgreement = !!agreement;
-  const agreementSigned = agreement?.status === "signed";
-  const hasInvoice = !!booking.invoiceNumber;
-  const hasVisa = jIdx >= JOURNEY_STAGES.findIndex((s: any) => s.key === "visa_approved");
-  const hasTicket = jIdx >= JOURNEY_STAGES.findIndex((s: any) => s.key === "flight_confirmed");
-  const hasHotel = jIdx >= JOURNEY_STAGES.findIndex((s: any) => s.key === "hotel_confirmed");
-  const departed = jIdx >= JOURNEY_STAGES.findIndex((s: any) => s.key === "journey_started");
-  const returned = booking.journeyStatus === "journey_completed";
+  const [journeyStatus, setJourneyStatus] = useState(initialJourneyStatus);
+  const [agreementSigned, setAgreementSigned] = useState(agreement?.status === "signed");
+  const [stepData, setStepData] = useState<Record<string, any>>({});
+  const [loading, setLoading] = useState(true);
+  const [selectedStep, setSelectedStep] = useState<string | null>(null);
+  const [liveAt, setLiveAt] = useState<string | null>(null);
 
-  const steps = [
-    { label: "Booking Submitted",  done: true,          icon: "🕌" },
-    { label: "Booking Approved",   done: approved,      icon: "✅" },
-    { label: "Payment Received",   done: paid,          icon: "💳" },
-    { label: "Agreement Ready",    done: hasAgreement,  icon: "📜" },
-    { label: "Agreement Signed",   done: agreementSigned, icon: "✍️" },
-    { label: "Invoice Generated",  done: hasInvoice,    icon: "🧾" },
-    { label: "Visa Approved",      done: hasVisa,       icon: "🛂" },
-    { label: "Flight Ticket",      done: hasTicket,     icon: "✈️" },
-    { label: "Hotel Confirmed",    done: hasHotel,      icon: "🏨" },
-    { label: "Departure Ready",    done: departed,      icon: "🧳" },
-    { label: "Journey Started",    done: departed,      icon: "🛫" },
-    { label: "Journey Complete",   done: returned,      icon: "🏠" },
-  ];
-
-  const doneCount = steps.filter(s => s.done).length;
-
-  return (
-    <div className="px-5 py-4 border-b border-border bg-gradient-to-r from-primary/3 to-transparent">
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-xs font-bold text-primary uppercase tracking-wider">Booking Progress</p>
-        <span className="text-xs bg-primary/10 text-primary rounded-full px-2.5 py-0.5 font-bold">
-          {doneCount} / {steps.length} complete
-        </span>
-      </div>
-      <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-        {steps.map((step, i) => (
-          <div key={i} className={`flex flex-col items-center gap-1 p-1.5 rounded-lg transition-all ${step.done ? "bg-emerald-50 border border-emerald-200" : "bg-gray-50 border border-gray-100"}`}>
-            <span className={`text-base ${step.done ? "" : "grayscale opacity-40"}`}>{step.icon}</span>
-            <p className={`text-center leading-tight font-medium ${step.done ? "text-emerald-700" : "text-gray-400"}`} style={{ fontSize: "9px" }}>
-              {step.done ? "✓ " : ""}{step.label}
-            </p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function PremiumTimeline({ bookingId, journeyStatus }: { bookingId: string; journeyStatus: string }) {
-  const [events, setEvents] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
+  const loadSteps = useCallback(async () => {
+    try {
+      const r = await fetch(`${BASE_API}/api/customer/journey/${bookingId}/steps`, { credentials: "include" });
+      if (!r.ok) return;
+      const data = await r.json();
+      if (data.journeyStatus) setJourneyStatus(data.journeyStatus);
+      if (data.agreementStatus) setAgreementSigned(data.agreementStatus === "signed");
+      if (data.stepData) setStepData(data.stepData);
+    } catch {}
+    finally { setLoading(false); }
+  }, [bookingId]);
 
   useEffect(() => {
-    if (!showHistory) return;
-    setLoading(true);
-    fetch(`${BASE_API}/api/bookings/${bookingId}/timeline`, { credentials: "include" })
-      .then(r => r.ok ? r.json() : { events: [] })
-      .then(data => setEvents(data.events || []))
-      .catch(() => setEvents([]))
-      .finally(() => setLoading(false));
-  }, [bookingId, showHistory]);
+    loadSteps();
 
-  const currentIdx = JOURNEY_STAGES.findIndex(s => s.key === journeyStatus);
-  const effectiveIdx = currentIdx < 0 ? 0 : currentIdx;
+    const es = new EventSource(`${BASE_API}/api/customer/journey/${bookingId}/stream`, { withCredentials: true });
+    es.addEventListener("journey_update", (e: MessageEvent) => {
+      try {
+        const d = JSON.parse(e.data);
+        if (d.journeyStatus) setJourneyStatus(d.journeyStatus);
+        setLiveAt(new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }));
+        loadSteps();
+      } catch {}
+    });
+    es.onerror = () => {};
+    return () => es.close();
+  }, [bookingId, loadSteps]);
+
+  const steps = computeJourneySteps(journeyStatus, agreementSigned, stepData);
+  const completedCount = steps.filter(s => s.state === "completed").length;
+  const currentStep = steps.find(s => s.state === "current");
+  const progressPct = Math.round((completedCount / steps.length) * 100);
+
+  if (loading) {
+    return (
+      <div className="border-t border-border py-8 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+        <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+        Loading journey progress…
+      </div>
+    );
+  }
 
   return (
     <div className="border-t border-border">
-      {/* Compact journey stepper */}
-      <div className="bg-gradient-to-b from-primary/5 to-transparent">
-        <div className="px-5 pt-3 pb-1">
-          <p className="text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-1.5 mb-3">
-            <span>🗺️</span> Journey — Step {effectiveIdx + 1} of {JOURNEY_STAGES.length}
-          </p>
-        </div>
-        <div className="overflow-x-auto px-5 pb-3">
-          <div className="flex items-start gap-0" style={{ minWidth: `${JOURNEY_STAGES.length * 68}px` }}>
-            {JOURNEY_STAGES.map((stage, idx) => {
-              const done = idx < effectiveIdx;
-              const active = idx === effectiveIdx;
-              return (
-                <div key={stage.key} className="flex flex-col items-center relative flex-1">
-                  {idx > 0 && (
-                    <div className={`absolute h-0.5 top-4 ${done ? "bg-emerald-400" : active ? "bg-primary/40" : "bg-gray-200"}`}
-                      style={{ left: "calc(-50%)", right: "calc(50%)", width: "100%" }} />
-                  )}
-                  <div className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center text-sm border-2 transition-all select-none ${
-                    done   ? "bg-emerald-500 border-emerald-500 text-white shadow-sm" :
-                    active ? "bg-primary border-primary text-white shadow-lg ring-4 ring-primary/25 scale-110" :
-                             "bg-white border-gray-200 text-gray-300"
-                  }`}>
-                    {done ? "✓" : stage.emoji}
-                  </div>
-                  <p className={`mt-1.5 text-center leading-tight px-0.5 ${
-                    active ? "text-primary font-bold" : done ? "text-emerald-700 font-medium" : "text-gray-400"
-                  }`} style={{ fontSize: "9px", maxWidth: "60px" }}>
-                    {stage.label}
-                  </p>
-                </div>
-              );
-            })}
+      {/* Header + Progress bar */}
+      <div className="px-5 pt-4 pb-3 bg-gradient-to-b from-primary/5 to-transparent">
+        <div className="flex items-start justify-between mb-3">
+          <div>
+            <p className="text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-1.5">
+              🗺️ Journey Progress
+            </p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              {completedCount} of {steps.length} steps complete
+            </p>
+          </div>
+          <div className="text-right">
+            <span className="text-3xl font-black text-primary leading-none">{progressPct}%</span>
+            {liveAt && (
+              <p className="text-[10px] text-emerald-600 flex items-center justify-end gap-1 mt-0.5">
+                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full inline-block animate-pulse" />
+                Live · {liveAt}
+              </p>
+            )}
           </div>
         </div>
-        <div className="px-5 pb-3 flex items-center justify-between">
-          <span className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary px-2.5 py-1 rounded-full font-semibold">
-            📍 Currently: {JOURNEY_STAGES[effectiveIdx]?.label}
-          </span>
+
+        {/* Gradient progress bar */}
+        <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
+          <div
+            className="h-2.5 rounded-full bg-gradient-to-r from-primary via-blue-500 to-emerald-500 transition-all duration-700 ease-out"
+            style={{ width: `${progressPct}%` }}
+          />
         </div>
+
+        {/* Current step badge */}
+        {currentStep && (
+          <div className="mt-2.5 inline-flex items-center gap-1.5 text-xs bg-primary/10 text-primary px-3 py-1 rounded-full font-semibold">
+            <span className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
+            Now: {currentStep.label}
+          </div>
+        )}
+        {!currentStep && progressPct === 100 && (
+          <div className="mt-2.5 inline-flex items-center gap-1.5 text-xs bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full font-semibold">
+            🎉 Journey Completed — Alhamdulillah!
+          </div>
+        )}
       </div>
 
-      {/* Premium full activity history (collapsible) */}
-      <button
-        className="w-full px-5 py-2.5 flex items-center justify-between text-xs font-semibold text-primary border-t border-border hover:bg-primary/5 transition-colors"
-        onClick={() => setShowHistory(!showHistory)}
-      >
-        <span className="flex items-center gap-1.5">
-          📋 Full Activity Log
-          {events.length > 0 && (
-            <span className="ml-1 bg-primary text-white rounded-full px-1.5 py-0.5 text-[10px]">{events.length}</span>
-          )}
-        </span>
-        <span>{showHistory ? "▲" : "▼"}</span>
-      </button>
+      {/* Steps list */}
+      <div className="px-4 pb-4">
+        {steps.map((step, idx) => {
+          const isLast = idx === steps.length - 1;
+          const isSelected = selectedStep === step.key;
+          const canExpand = step.state === "completed" || step.state === "current";
 
-      {showHistory && (
-        <div className="px-5 pb-5 border-t border-border">
-          {loading ? (
-            <div className="flex items-center justify-center py-6">
-              <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-            </div>
-          ) : events.length === 0 ? (
-            <div className="flex flex-col items-center py-6 text-sm text-muted-foreground border border-dashed rounded-xl mt-3">
-              <span className="text-2xl mb-2">📋</span>
-              <span>No activity recorded yet.</span>
-              <span className="text-xs mt-1 text-muted-foreground/70">Events will appear as your journey progresses.</span>
-            </div>
-          ) : (
-            <div className="relative mt-3">
-              <div className="absolute left-4 top-1 bottom-1 w-px bg-gradient-to-b from-primary/40 via-primary/20 to-primary/5" />
-              <div className="space-y-3">
-                {events.map((ev: any, i: number) => (
-                  <div key={ev.id || i} className="relative pl-10">
-                    <div className="absolute left-1.5 top-1.5 w-5 h-5 rounded-full bg-white border-2 border-primary/40 flex items-center justify-center text-xs shadow-sm">
-                      {ev.icon || "📌"}
-                    </div>
-                    <div className="bg-gradient-to-r from-muted/40 to-transparent rounded-xl p-3 border border-border/50 hover:border-primary/20 transition-colors">
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="text-sm font-semibold text-foreground leading-tight capitalize">
-                          {ev.title
-                            ? ev.title.replace(/_/g, " ")
-                            : (ev.event_type || "").replace(/_/g, " ")}
-                        </span>
-                        <time className="text-[11px] text-muted-foreground whitespace-nowrap shrink-0 mt-0.5">
-                          {new Date(ev.created_at).toLocaleString("en-IN", {
-                            day: "numeric", month: "short", year: "numeric",
-                            hour: "2-digit", minute: "2-digit",
-                          })}
-                        </time>
-                      </div>
-                      {ev.description && (
-                        <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{ev.description}</p>
+          return (
+            <div key={step.key}>
+              <button
+                className={`w-full flex items-start gap-3 py-2.5 text-left ${canExpand ? "cursor-pointer" : "cursor-default"}`}
+                onClick={() => canExpand && setSelectedStep(isSelected ? null : step.key)}
+                disabled={!canExpand}
+              >
+                {/* Icon + vertical connector */}
+                <div className="flex flex-col items-center flex-shrink-0" style={{ marginTop: "2px" }}>
+                  <StepIconBadge state={step.state} icon={step.icon} />
+                  {!isLast && (
+                    <div
+                      className="w-0.5 rounded-full mt-1 transition-all duration-500"
+                      style={{
+                        height: "20px",
+                        background: step.state === "completed"
+                          ? "linear-gradient(to bottom, #10b981, #6ee7b7)"
+                          : step.state === "current"
+                          ? "linear-gradient(to bottom, #3b82f6, #e0e7ff)"
+                          : "#f3f4f6",
+                      }}
+                    />
+                  )}
+                </div>
+
+                {/* Text content */}
+                <div className="flex-1 pb-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className={`text-sm font-semibold leading-tight truncate ${
+                      step.state === "completed" ? "text-emerald-700" :
+                      step.state === "current"   ? "text-primary" :
+                      step.state === "upcoming"  ? "text-gray-700" : "text-gray-400"
+                    }`}>
+                      {step.label}
+                    </p>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {step.state === "completed" && (
+                        <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium whitespace-nowrap">✓ Done</span>
+                      )}
+                      {step.state === "current" && (
+                        <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium whitespace-nowrap" style={{ animation: "pulse 2s infinite" }}>Active</span>
+                      )}
+                      {canExpand && (
+                        <svg
+                          className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-200 ${isSelected ? "rotate-180" : ""}`}
+                          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
                       )}
                     </div>
                   </div>
-                ))}
-              </div>
+
+                  <p className={`text-[11px] mt-0.5 leading-snug ${
+                    step.state === "locked"   ? "text-gray-300" :
+                    step.state === "upcoming" ? "text-gray-400" : "text-muted-foreground"
+                  }`}>
+                    {step.state === "locked" ? "Upcoming — will be available soon" : step.desc}
+                  </p>
+
+                  {step.completedAt && (
+                    <p className="text-[10px] text-emerald-600 mt-0.5 font-medium">
+                      {new Date(step.completedAt).toLocaleString("en-IN", {
+                        day: "numeric", month: "short", year: "numeric",
+                        hour: "2-digit", minute: "2-digit"
+                      })}
+                    </p>
+                  )}
+                </div>
+              </button>
+
+              {/* Expandable details panel */}
+              {isSelected && (
+                <div className="ml-12 mb-2 mr-1 bg-gray-50 rounded-xl border border-gray-200 p-3 space-y-2">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Step Details</p>
+                  {step.completedAt ? (
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px]">
+                      <div>
+                        <p className="text-gray-400 mb-0.5">Date & Time</p>
+                        <p className="font-medium text-gray-700">
+                          {new Date(step.completedAt).toLocaleString("en-IN", {
+                            dateStyle: "medium", timeStyle: "short"
+                          })}
+                        </p>
+                      </div>
+                      {step.updatedBy && (
+                        <div>
+                          <p className="text-gray-400 mb-0.5">Updated by</p>
+                          <p className="font-medium text-gray-700">{step.updatedBy}</p>
+                        </div>
+                      )}
+                    </div>
+                  ) : null}
+                  {step.notes ? (
+                    <div className="text-[11px]">
+                      <p className="text-gray-400 mb-0.5">Notes</p>
+                      <p className="text-gray-700 leading-snug">{step.notes}</p>
+                    </div>
+                  ) : null}
+                  {!step.completedAt && !step.notes && step.state === "current" && (
+                    <p className="text-[11px] text-gray-400 italic">This step is currently in progress. You will be notified when it advances.</p>
+                  )}
+                  {step.state === "current" && (
+                    <div className="flex items-center gap-1.5 text-[10px] text-primary/70 border-t border-gray-200 pt-2 mt-1">
+                      <span className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
+                      You will receive a WhatsApp, SMS and Email notification when this step advances.
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      )}
+          );
+        })}
+      </div>
     </div>
   );
 }
+
+
 
 const NOTIF_TYPE_EMOJI: Record<string, string> = {
   mina_update: "🕌", tawaf_update: "🕋", madinah_update: "🟢",
@@ -3016,14 +3123,12 @@ export default function CustomerDashboard() {
                       </div>
                     )}
 
-                    {/* Booking Progress Checklist */}
-                    <BookingProgressChecklist
-                      booking={booking}
+                    {/* Journey Tracker — 17-step real-time progress tracker */}
+                    <JourneyTracker
+                      bookingId={booking.id}
+                      initialJourneyStatus={booking.journeyStatus || "booking_requested"}
                       agreement={agreementsByBooking[booking.id]}
                     />
-
-                    {/* Premium Journey Timeline */}
-                    <PremiumTimeline bookingId={booking.id} journeyStatus={booking.journeyStatus || "booking_requested"} />
 
                     {/* Core details */}
                     <div className="p-5 grid grid-cols-2 sm:grid-cols-3 gap-4">
