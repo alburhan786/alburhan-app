@@ -6,52 +6,6 @@ import { rm, readFile } from "fs/promises";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// server deps to bundle to reduce openat(2) syscalls
-// which helps cold start times without risking some
-// packages that are not bundle compatible
-const allowlist = [
-  "@anthropic-ai/sdk",
-  "@google-cloud/storage",
-  "@google/generative-ai",
-  "adm-zip",
-  "axios",
-  "bcryptjs",
-  "compression",
-  "connect-pg-simple",
-  "cookie-parser",
-  "cors",
-  "date-fns",
-  "dotenv",
-  "drizzle-orm",
-  "drizzle-zod",
-  "express",
-  "express-rate-limit",
-  "express-session",
-  "google-auth-library",
-  "helmet",
-  "jsonwebtoken",
-  "memorystore",
-  "multer",
-  "nanoid",
-  "node-cron",
-  "nodemailer",
-  "openai",
-  "passport",
-  "passport-local",
-  // "pdfkit" intentionally excluded — pdfkit loads AFM/ICC data files from
-  // disk at runtime using __dirname, which breaks when bundled by esbuild.
-  // Keep pdfkit external so VPS node_modules/pdfkit has all its data/ files.
-  "pg",
-  "qrcode",
-  "razorpay",
-  "stripe",
-  "uuid",
-  "ws",
-  "xlsx",
-  "zod",
-  "zod-validation-error",
-];
-
 async function buildAll() {
   const distDir = path.resolve(__dirname, "dist");
   await rm(distDir, { recursive: true, force: true });
@@ -59,20 +13,56 @@ async function buildAll() {
   console.log("building server...");
   const pkgPath = path.resolve(__dirname, "package.json");
   const pkg = JSON.parse(await readFile(pkgPath, "utf-8"));
-  const allDeps = [
-    ...Object.keys(pkg.dependencies || {}),
-    ...Object.keys(pkg.devDependencies || {}),
-  ];
-  const externals = allDeps.filter(
+
+  const runtimeDeps = Object.keys(pkg.dependencies || {});
+  const devDeps = Object.keys(pkg.devDependencies || {});
+
+  // ── External list: devDependencies (build tools / type stubs — never needed
+  // at runtime) + workspace packages + pdfkit (the ONE runtime exception).
+  //
+  // pdfkit loads AFM/ICC font data from __dirname at runtime and MUST remain
+  // external so the VPS node_modules/pdfkit keeps those data files intact.
+  //
+  // Every other runtime dependency (pkg.dependencies) is BUNDLED into the CJS
+  // output so the VPS needs NO node_modules directory at all.  Adding a new
+  // dependency to package.json is therefore sufficient — no allowlist to update.
+  const RUNTIME_EXTERNAL = new Set(["pdfkit"]);
+
+  const externals: string[] = [
+    // devDependencies — only needed during the build, not at runtime
+    ...devDeps,
+    // pdfkit — intentionally external (reads font files from disk at runtime)
+    "pdfkit",
+  ].filter((dep) => !(pkg.dependencies?.[dep]?.startsWith("workspace:")));
+
+  // Validation: log every runtime dep that would be external (should be none
+  // except pdfkit) so CI / the build output catches regressions immediately.
+  const unexpectedExternals = runtimeDeps.filter(
     (dep) =>
-      !allowlist.includes(dep) &&
-      !(pkg.dependencies?.[dep]?.startsWith("workspace:")),
+      externals.includes(dep) &&
+      !RUNTIME_EXTERNAL.has(dep) &&
+      !pkg.dependencies?.[dep]?.startsWith("workspace:"),
   );
+  if (unexpectedExternals.length > 0) {
+    console.error(
+      `  ❌ BUILD ERROR: the following runtime deps are marked external and will\n` +
+      `     cause MODULE_NOT_FOUND on the VPS (no node_modules):\n` +
+      unexpectedExternals.map((d) => `       - ${d}`).join("\n") + "\n" +
+      `     Fix: remove them from devDependencies or add them to dependencies only.`,
+    );
+    process.exit(1);
+  }
+
+  // Summary
+  const bundledRuntime = runtimeDeps.filter(
+    (d) => !externals.includes(d) && !d.startsWith("@workspace/"),
+  );
+  console.log(`  📦 Bundling ${bundledRuntime.length} runtime deps into CJS`);
+  console.log(`  🔗 External (devDeps + pdfkit): ${externals.filter(d => !d.startsWith("@types/")).length} packages`);
 
   // Inject messaging secrets from Replit build environment into the bundle.
-  // This means the VPS does NOT need these in its .env file — they are baked
-  // in at build time. DATABASE_URL, SESSION_SECRET etc. are intentionally
-  // excluded because those are VPS-specific and must stay in the VPS .env.
+  // The VPS does NOT need these in its .env — they are baked in at build time.
+  // DATABASE_URL and SESSION_SECRET are intentionally excluded (VPS-specific).
   const messagingDefines: Record<string, string> = {};
   const injectKeys = [
     "FAST2SMS_API_KEY",
@@ -82,7 +72,6 @@ async function buildAll() {
     "BOTBEE_BUSINESS_ID",
     "RAZORPAY_KEY_ID",
     "RAZORPAY_SECRET",
-    // SMTP — baked in so VPS doesn't need .env for email
     "SMTP_HOST",
     "SMTP_PORT",
     "SMTP_USER",
