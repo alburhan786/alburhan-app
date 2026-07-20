@@ -2130,6 +2130,30 @@ async function start() {
     }).catch(err => console.error("[Startup] Journal sync failed (non-fatal):", err));
   }).catch(() => {});
 
+  // ── user_role enum: add portal roles missing from original Drizzle migration ─
+  try {
+    for (const val of ["branch_manager", "agent", "staff", "super_admin"]) {
+      try {
+        await pool.query(`ALTER TYPE user_role ADD VALUE IF NOT EXISTS '${val}'`);
+      } catch (_) {}
+    }
+    console.log("[Migration] user_role enum values ensured (branch_manager, agent, staff, super_admin)");
+  } catch (err) { console.error("[Migration] user_role enum extension failed:", err); }
+
+  // ── otps table: ensure attempts column ─────────────────────────────────────
+  try {
+    await pool.query(`ALTER TABLE otps ADD COLUMN IF NOT EXISTS attempts INTEGER NOT NULL DEFAULT 0`);
+    console.log("[Migration] otps.attempts column ensured");
+  } catch (err) { console.error("[Migration] otps.attempts failed:", err); }
+
+  // ── users table: ensure all columns used by auth code ─────────────────────
+  try {
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active'`);
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN NOT NULL DEFAULT false`);
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS branch_id TEXT`);
+    console.log("[Migration] users: status, is_verified, branch_id columns ensured");
+  } catch (err) { console.error("[Migration] users extra columns failed:", err); }
+
   // ── feedback table ─────────────────────────────────────────────────────────
   try {
     await pool.query(`

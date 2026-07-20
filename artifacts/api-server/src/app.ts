@@ -766,6 +766,36 @@ app.get("/api/migrate/read-otp", async (req, res) => {
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
+// GET /api/migrate/schema-dump — dumps live column definitions from information_schema
+app.get("/api/migrate/schema-dump", async (req, res) => {
+  const key = req.query.key as string;
+  if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
+  const tables = ((req.query.tables as string) || "users,otps").split(",").map(t => t.trim()).slice(0, 10);
+  const { pool: diagPool } = await import("@workspace/db");
+  const result: Record<string, any> = {};
+  for (const t of tables) {
+    try {
+      const cols = await diagPool.query(
+        `SELECT column_name, data_type, udt_name, column_default, is_nullable, character_maximum_length
+         FROM information_schema.columns WHERE table_name=$1 AND table_schema='public' ORDER BY ordinal_position`,
+        [t]
+      );
+      const enums = await diagPool.query(
+        `SELECT e.enumlabel FROM pg_enum e JOIN pg_type t ON t.oid=e.enumtypid WHERE t.typname IN (
+           SELECT udt_name FROM information_schema.columns WHERE table_name=$1 AND table_schema='public'
+         ) ORDER BY e.enumsortorder`,
+        [t]
+      );
+      const constraints = await diagPool.query(
+        `SELECT constraint_type, constraint_name FROM information_schema.table_constraints
+         WHERE table_name=$1 AND table_schema='public'`, [t]
+      );
+      result[t] = { columns: cols.rows, enum_values: enums.rows, constraints: constraints.rows };
+    } catch (e: any) { result[t] = { error: e.message }; }
+  }
+  res.json(result);
+});
+
 // GET /api/migrate/db-check — checks DB tables/columns on VPS
 app.get("/api/migrate/db-check", async (req, res) => {
   const key = req.query.key as string;
