@@ -74,7 +74,7 @@ router.post("/report-summary", requireAdmin as any, async (req, res) => {
       const [group, pilgrims, payments] = await Promise.all([
         pool.query(`SELECT group_name, year, departure_date, return_date, flight_number, maktab_number FROM hajj_groups WHERE id=$1`, [groupId]),
         pool.query(`SELECT COUNT(*)::int as total, COUNT(*) FILTER (WHERE gender='Male')::int as male, COUNT(*) FILTER (WHERE gender='Female')::int as female, COUNT(*) FILTER (WHERE visa_status='received')::int as visa_received, COUNT(*) FILTER (WHERE bus_number IS NOT NULL)::int as bus_assigned FROM pilgrims WHERE group_id=$1`, [groupId]),
-        pool.query(`SELECT COUNT(*)::int as payments, COALESCE(SUM(amount),0)::numeric as total_collected FROM payments WHERE booking_id IN (SELECT id FROM bookings WHERE group_id=$1 OR customer_id IN (SELECT DISTINCT id FROM users WHERE id IN (SELECT customer_id FROM bookings)))`, [groupId]).catch(() => ({ rows: [{}] })),
+        pool.query(`SELECT COUNT(*)::int as payments, COALESCE(SUM(amount),0)::numeric as total_collected FROM payment_transactions WHERE booking_id IN (SELECT id FROM bookings WHERE group_id=$1 OR customer_id IN (SELECT DISTINCT id FROM users WHERE id IN (SELECT customer_id FROM bookings)))`, [groupId]).catch(() => ({ rows: [{}] })),
       ]);
       const g = group.rows[0] || {};
       const p = pilgrims.rows[0] || {};

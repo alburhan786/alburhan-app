@@ -442,12 +442,11 @@ router.get("/reports/pilgrims", requireAdmin as any, async (req: AuthenticatedRe
     const result = await pool.query(
       `SELECT
         p.serial_number, p.full_name, p.mobile_india, p.mobile_saudi,
-        p.passport_number, p.passport_expiry_date, p.nationality,
+        p.passport_number, p.passport_expiry_date,
         p.date_of_birth, p.gender, p.blood_group,
         p.visa_status, p.visa_number, p.visa_type, p.visa_applied_date, p.visa_received_date,
-        p.medical_notes, p.medical_fitness,
-        p.emergency_contact_name, p.emergency_contact_phone, p.mahram_name, p.mahram_relation,
-        p.luggage_number, p.seat_number,
+        p.medical_condition AS medical_notes,
+        p.seat_number,
         hg.group_name AS group_name,
         b.booking_number, b.package_name,
         u.email AS customer_email
@@ -538,8 +537,8 @@ router.get("/reports/pending-visas", requireAdmin as any, async (_req: Authentic
     const result = await pool.query(`
       SELECT
         p.serial_number, p.full_name, p.mobile_india, p.passport_number,
-        p.passport_expiry_date, p.nationality, p.date_of_birth, p.gender,
-        p.visa_status, p.visa_applied_date, p.medical_fitness,
+        p.passport_expiry_date, p.date_of_birth, p.gender,
+        p.visa_status, p.visa_applied_date, p.medical_condition AS medical_fitness,
         hg.group_name, b.booking_number, b.package_name
       FROM pilgrims p
       LEFT JOIN hajj_groups hg ON hg.id = p.group_id
@@ -1529,13 +1528,13 @@ router.get("/executive", requireAdmin as any, async (_req: AuthenticatedRequest,
       pendingVisa, unsignedAg, pendingKyc, openTickets, upcomingDep, leadsFollowUp,
       notifStats, ticketStats, recentBookings, outstandingRes,
     ] = await Promise.all([
-      pool.query(`SELECT COUNT(*)::int AS cnt, COALESCE(SUM(amount),0)::float AS total FROM payments WHERE DATE(created_at) = $1 AND status IN ('completed','success','captured')`, [today]),
-      pool.query(`SELECT COALESCE(SUM(amount),0)::float AS total FROM payments WHERE created_at >= $1 AND status IN ('completed','success','captured')`, [monthStart]),
-      pool.query(`SELECT COALESCE(SUM(amount),0)::float AS total FROM payments WHERE created_at BETWEEN $1 AND $2 AND status IN ('completed','success','captured')`, [lastMonthStart, lastMonthEnd]),
-      pool.query(`SELECT COALESCE(SUM(amount),0)::float AS total FROM payments WHERE status IN ('completed','success','captured')`),
+      pool.query(`SELECT COUNT(*)::int AS cnt, COALESCE(SUM(amount),0)::float AS total FROM payment_transactions WHERE DATE(created_at) = $1`, [today]),
+      pool.query(`SELECT COALESCE(SUM(amount),0)::float AS total FROM payment_transactions WHERE created_at >= $1`, [monthStart]),
+      pool.query(`SELECT COALESCE(SUM(amount),0)::float AS total FROM payment_transactions WHERE created_at BETWEEN $1 AND $2`, [lastMonthStart, lastMonthEnd]),
+      pool.query(`SELECT COALESCE(SUM(amount),0)::float AS total FROM payment_transactions`),
       pool.query(`SELECT COUNT(*) FILTER (WHERE status='pending')::int AS pending, COUNT(*) FILTER (WHERE status='approved')::int AS approved, COUNT(*) FILTER (WHERE status='confirmed')::int AS confirmed FROM bookings`),
       pool.query(`SELECT COUNT(*)::int AS total FROM users WHERE role='customer'`),
-      pool.query(`SELECT COUNT(*)::int AS cnt FROM pilgrims p JOIN bookings b ON b.id=p.booking_id WHERE b.status='confirmed' AND (p.visa_number IS NULL OR p.visa_number='')`),
+      pool.query(`SELECT COUNT(*)::int AS cnt FROM pilgrims p WHERE (p.visa_number IS NULL OR p.visa_number='')`),
       pool.query(`SELECT COUNT(*)::int AS cnt FROM agreements WHERE status='pending_signature'`),
       pool.query(`SELECT COUNT(*)::int AS cnt FROM users WHERE role='customer' AND kyc_status='pending'`),
       pool.query(`SELECT COUNT(*)::int AS cnt FROM support_tickets WHERE status IN ('open','in_progress')`),
@@ -1598,21 +1597,21 @@ router.get("/document-expiry", requireAdmin as any, async (req: AuthenticatedReq
 
     // Summary counts for all 4 windows
     const [s7, s30, s90, s180] = await Promise.all([
-      pool.query(`SELECT COUNT(*)::int AS cnt FROM pilgrims p JOIN bookings b ON b.id=p.booking_id WHERE b.status IN ('confirmed','approved') AND p.passport_expiry_date::date BETWEEN $1 AND $2`, [today, new Date(Date.now()+7*86400000).toISOString().slice(0,10)]),
-      pool.query(`SELECT COUNT(*)::int AS cnt FROM pilgrims p JOIN bookings b ON b.id=p.booking_id WHERE b.status IN ('confirmed','approved') AND p.passport_expiry_date::date BETWEEN $1 AND $2`, [today, new Date(Date.now()+30*86400000).toISOString().slice(0,10)]),
-      pool.query(`SELECT COUNT(*)::int AS cnt FROM pilgrims p JOIN bookings b ON b.id=p.booking_id WHERE b.status IN ('confirmed','approved') AND p.passport_expiry_date::date BETWEEN $1 AND $2`, [today, new Date(Date.now()+90*86400000).toISOString().slice(0,10)]),
-      pool.query(`SELECT COUNT(*)::int AS cnt FROM pilgrims p JOIN bookings b ON b.id=p.booking_id WHERE b.status IN ('confirmed','approved') AND p.passport_expiry_date::date BETWEEN $1 AND $2`, [today, new Date(Date.now()+180*86400000).toISOString().slice(0,10)]),
+      pool.query(`SELECT COUNT(*)::int AS cnt FROM pilgrims p WHERE p.passport_expiry_date IS NOT NULL AND p.passport_expiry_date ~ '^\\d{4}-\\d{2}-\\d{2}' AND p.passport_expiry_date::date BETWEEN $1 AND $2`, [today, new Date(Date.now()+7*86400000).toISOString().slice(0,10)]),
+      pool.query(`SELECT COUNT(*)::int AS cnt FROM pilgrims p WHERE p.passport_expiry_date IS NOT NULL AND p.passport_expiry_date ~ '^\\d{4}-\\d{2}-\\d{2}' AND p.passport_expiry_date::date BETWEEN $1 AND $2`, [today, new Date(Date.now()+30*86400000).toISOString().slice(0,10)]),
+      pool.query(`SELECT COUNT(*)::int AS cnt FROM pilgrims p WHERE p.passport_expiry_date IS NOT NULL AND p.passport_expiry_date ~ '^\\d{4}-\\d{2}-\\d{2}' AND p.passport_expiry_date::date BETWEEN $1 AND $2`, [today, new Date(Date.now()+90*86400000).toISOString().slice(0,10)]),
+      pool.query(`SELECT COUNT(*)::int AS cnt FROM pilgrims p WHERE p.passport_expiry_date IS NOT NULL AND p.passport_expiry_date ~ '^\\d{4}-\\d{2}-\\d{2}' AND p.passport_expiry_date::date BETWEEN $1 AND $2`, [today, new Date(Date.now()+180*86400000).toISOString().slice(0,10)]),
     ]);
 
     let records: any[] = [];
     if (type === "passport") {
       const r = await pool.query(`
-        SELECT p.id AS pilgrim_id, p.name AS pilgrim_name, p.passport_number, p.passport_expiry_date,
-               b.id AS booking_id, b.customer_name, b.customer_mobile, b.booking_number
+        SELECT p.id AS pilgrim_id, p.full_name AS pilgrim_name, p.passport_number, p.passport_expiry_date,
+               hg.id AS booking_id, hg.group_name AS booking_number, p.mobile_india AS customer_mobile, hg.group_name AS customer_name
         FROM pilgrims p
-        JOIN bookings b ON b.id = p.booking_id
-        WHERE b.status IN ('confirmed','approved')
-          AND p.passport_expiry_date IS NOT NULL
+        LEFT JOIN hajj_groups hg ON hg.id = p.group_id
+        WHERE p.passport_expiry_date IS NOT NULL
+          AND p.passport_expiry_date ~ '^\d{4}-\d{2}-\d{2}'
           AND p.passport_expiry_date::date BETWEEN $1 AND $2
         ORDER BY p.passport_expiry_date
         LIMIT 100
@@ -1620,13 +1619,12 @@ router.get("/document-expiry", requireAdmin as any, async (req: AuthenticatedReq
       records = r.rows;
     } else if (type === "visa") {
       const r = await pool.query(`
-        SELECT p.id AS pilgrim_id, p.name AS pilgrim_name, p.visa_number,
+        SELECT p.id AS pilgrim_id, p.full_name AS pilgrim_name, p.visa_number,
                p.visa_applied_date AS visa_expiry_date,
-               b.id AS booking_id, b.customer_name, b.customer_mobile, b.booking_number
+               hg.id AS booking_id, hg.group_name AS booking_number, p.mobile_india AS customer_mobile, hg.group_name AS customer_name
         FROM pilgrims p
-        JOIN bookings b ON b.id = p.booking_id
-        WHERE b.status IN ('confirmed','approved')
-          AND p.visa_applied_date IS NOT NULL
+        LEFT JOIN hajj_groups hg ON hg.id = p.group_id
+        WHERE p.visa_applied_date IS NOT NULL
           AND p.visa_applied_date::date <= $1
         ORDER BY p.visa_applied_date
         LIMIT 100
@@ -1634,14 +1632,13 @@ router.get("/document-expiry", requireAdmin as any, async (req: AuthenticatedReq
       records = r.rows;
     } else if (type === "medical") {
       const r = await pool.query(`
-        SELECT p.id AS pilgrim_id, p.name AS pilgrim_name, p.medical_fitness,
+        SELECT p.id AS pilgrim_id, p.full_name AS pilgrim_name, p.medical_condition AS medical_fitness,
                NULL AS medical_expiry_date,
-               b.id AS booking_id, b.customer_name, b.customer_mobile, b.booking_number
+               hg.id AS booking_id, hg.group_name AS booking_number, p.mobile_india AS customer_mobile, hg.group_name AS customer_name
         FROM pilgrims p
-        JOIN bookings b ON b.id = p.booking_id
-        WHERE b.status IN ('confirmed','approved')
-          AND (p.medical_fitness IS NULL OR p.medical_fitness = '' OR p.medical_fitness = 'pending')
-        ORDER BY b.created_at
+        LEFT JOIN hajj_groups hg ON hg.id = p.group_id
+        WHERE (p.medical_condition IS NULL OR p.medical_condition = '' OR p.medical_condition = 'pending')
+        ORDER BY p.created_at
         LIMIT 100
       `, []);
       records = r.rows;
@@ -1665,10 +1662,11 @@ router.post("/document-expiry/remind", requireAdmin as any, async (req: Authenti
     if (!pilgrimId || !bookingId || !channel) return res.status(400).json({ ok: false, error: "Missing fields" });
 
     const pilgrimRes = await pool.query(`
-      SELECT p.name, p.passport_expiry_date, b.customer_name, b.customer_mobile, b.booking_number
-      FROM pilgrims p JOIN bookings b ON b.id = p.booking_id
-      WHERE p.id = $1 AND b.id = $2
-    `, [pilgrimId, bookingId]);
+      SELECT p.full_name AS name, p.passport_expiry_date, p.mobile_india AS customer_mobile,
+             hg.group_name AS customer_name, hg.group_name AS booking_number
+      FROM pilgrims p LEFT JOIN hajj_groups hg ON hg.id = p.group_id
+      WHERE p.id = $1
+    `, [pilgrimId]);
 
     if (!pilgrimRes.rows.length) return res.status(404).json({ ok: false, error: "Record not found" });
     const rec = pilgrimRes.rows[0];
@@ -1712,9 +1710,10 @@ router.get("/global-search", requireAdmin as any, async (req: AuthenticatedReque
         LIMIT 10
       `, [like]),
       pool.query(`
-        SELECT 'pilgrim' AS category, p.id::text, p.name, p.passport_number, p.visa_number, b.customer_name, b.booking_number, b.id AS booking_id
-        FROM pilgrims p JOIN bookings b ON b.id = p.booking_id
-        WHERE p.name ILIKE $1 OR p.passport_number ILIKE $1 OR p.visa_number ILIKE $1
+        SELECT 'pilgrim' AS category, p.id::text, p.full_name AS name, p.passport_number, p.visa_number,
+               hg.group_name AS customer_name, hg.group_name AS booking_number, NULL AS booking_id
+        FROM pilgrims p LEFT JOIN hajj_groups hg ON hg.id = p.group_id
+        WHERE p.full_name ILIKE $1 OR p.passport_number ILIKE $1 OR p.visa_number ILIKE $1
         LIMIT 10
       `, [like]),
       pool.query(`
@@ -1930,7 +1929,7 @@ router.put("/business-settings", requireAdmin as any, async (req: AuthenticatedR
 router.get("/production-report", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
   try {
     const tableChecks = [
-      "users","bookings","payments","pilgrims","packages","agreements","invoices",
+      "users","bookings","payment_transactions","pilgrims","packages","agreements","invoices",
       "support_tickets","notification_logs","audit_logs","hajj_groups","flights",
       "hotels","leads","suppliers","tasks","marketing_campaigns","group_tracking",
       "api_settings","business_settings","expenses","payroll","room_allocations",
@@ -2144,9 +2143,9 @@ router.get("/finance-hub", requireAdmin as any, async (_req: AuthenticatedReques
     const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
 
     const [totalPay, monthPay, todayPay, outstanding, expenses, invoices, payroll, staff, monthly, byPackage] = await Promise.all([
-      pool.query(`SELECT COALESCE(SUM(amount),0)::float AS total FROM payments WHERE status IN ('completed','success','captured')`),
-      pool.query(`SELECT COUNT(*)::int AS cnt, COALESCE(SUM(amount),0)::float AS total FROM payments WHERE created_at >= $1 AND status IN ('completed','success','captured')`, [monthStart]),
-      pool.query(`SELECT COUNT(*)::int AS cnt, COALESCE(SUM(amount),0)::float AS total FROM payments WHERE DATE(created_at)=$1 AND status IN ('completed','success','captured')`, [today]),
+      pool.query(`SELECT COALESCE(SUM(amount),0)::float AS total FROM payment_transactions`),
+      pool.query(`SELECT COUNT(*)::int AS cnt, COALESCE(SUM(amount),0)::float AS total FROM payment_transactions WHERE created_at >= $1`, [monthStart]),
+      pool.query(`SELECT COUNT(*)::int AS cnt, COALESCE(SUM(amount),0)::float AS total FROM payment_transactions WHERE DATE(created_at)=$1`, [today]),
       pool.query(`SELECT COALESCE(SUM(NULLIF(TRIM(final_amount::text),'')::numeric - COALESCE(paid_amount,0)),0)::float AS amt, COUNT(*)::int AS cnt FROM bookings WHERE status IN ('approved','confirmed') AND COALESCE(paid_amount,0) < NULLIF(TRIM(final_amount::text),'')::numeric`),
       pool.query(`SELECT COALESCE(SUM(amount),0)::float AS total FROM expenses`).catch(() => ({ rows: [{ total: 0 }] })),
       pool.query(`SELECT COUNT(*) FILTER (WHERE status='sent')::int AS pending FROM invoices WHERE status NOT IN ('paid','cancelled')`).catch(() => ({ rows: [{ pending: 0 }] })),
@@ -2155,7 +2154,7 @@ router.get("/finance-hub", requireAdmin as any, async (_req: AuthenticatedReques
       pool.query(`
         SELECT TO_CHAR(p.created_at,'Mon YY') AS month, TO_CHAR(p.created_at,'YYYY-MM') AS sort_key,
                COALESCE(SUM(p.amount),0)::float AS revenue
-        FROM payments p WHERE p.status IN ('completed','success','captured') AND p.created_at >= NOW()-INTERVAL '6 months'
+        FROM payment_transactions p WHERE p.created_at >= NOW()-INTERVAL '6 months'
         GROUP BY month, sort_key ORDER BY sort_key
       `),
       pool.query(`
@@ -2368,9 +2367,9 @@ router.post("/chat", requireAdmin as any, async (req: AuthenticatedRequest, res)
     // REVENUE THIS MONTH / TODAY
     if (matches(["revenue this month", "monthly revenue", "this month revenue", "collection this month"])) {
       const [month, today_pay, total] = await Promise.all([
-        pool.query(`SELECT COALESCE(SUM(amount),0)::float AS total, COUNT(*)::int AS cnt FROM payments WHERE created_at >= $1 AND status IN ('completed','success','captured')`, [monthStart]),
-        pool.query(`SELECT COALESCE(SUM(amount),0)::float AS total, COUNT(*)::int AS cnt FROM payments WHERE DATE(created_at)=$1 AND status IN ('completed','success','captured')`, [today]),
-        pool.query(`SELECT COALESCE(SUM(amount),0)::float AS total FROM payments WHERE status IN ('completed','success','captured')`),
+        pool.query(`SELECT COALESCE(SUM(amount),0)::float AS total, COUNT(*)::int AS cnt FROM payment_transactions WHERE created_at >= $1`, [monthStart]),
+        pool.query(`SELECT COALESCE(SUM(amount),0)::float AS total, COUNT(*)::int AS cnt FROM payment_transactions WHERE DATE(created_at)=$1`, [today]),
+        pool.query(`SELECT COALESCE(SUM(amount),0)::float AS total FROM payment_transactions`),
       ]);
       return res.json({
         reply: `📊 **Financial Summary:**\n• Today's collection: ₹${(today_pay.rows[0]?.total || 0).toLocaleString("en-IN")} (${today_pay.rows[0]?.cnt || 0} payments)\n• This month: ₹${(month.rows[0]?.total || 0).toLocaleString("en-IN")} (${month.rows[0]?.cnt || 0} payments)\n• All-time total: ₹${(total.rows[0]?.total || 0).toLocaleString("en-IN")}`,
@@ -2381,8 +2380,8 @@ router.post("/chat", requireAdmin as any, async (req: AuthenticatedRequest, res)
     // TODAY'S REVENUE
     if (matches(["today revenue", "today collection", "today payment", "today earning"])) {
       const r = await pool.query(`
-        SELECT customer_name, booking_number, amount::text, payment_method, created_at::text
-        FROM payments WHERE DATE(created_at)=$1 AND status IN ('completed','success','captured')
+        SELECT NULL AS customer_name, NULL AS booking_number, amount::text, payment_mode AS payment_method, created_at::text
+        FROM payment_transactions WHERE DATE(created_at)=$1
         ORDER BY created_at DESC
       `, [today]);
       const total = r.rows.reduce((s: number, row: any) => s + Number(row.amount || 0), 0);

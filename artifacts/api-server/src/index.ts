@@ -1598,6 +1598,7 @@ async function runMigrations() {
 
   // ── BI analytics columns ───────────────────────────────────────────────────
   try {
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_status TEXT NOT NULL DEFAULT 'pending'`);
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS state TEXT`);
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS city TEXT`);
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS country TEXT`);
@@ -2128,6 +2129,47 @@ async function start() {
         console.log("[Startup] Journal sync: all entries already up to date");
     }).catch(err => console.error("[Startup] Journal sync failed (non-fatal):", err));
   }).catch(() => {});
+
+  // ── feedback table ─────────────────────────────────────────────────────────
+  try {
+    await pool.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'feedback_status') THEN
+          CREATE TYPE feedback_status AS ENUM ('open','in_review','resolved','closed');
+        END IF;
+      END $$;
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS feedback (
+        id TEXT PRIMARY KEY,
+        pilgrim_mobile TEXT NOT NULL,
+        pilgrim_name TEXT,
+        booking_id TEXT,
+        company_id TEXT,
+        group_id TEXT,
+        group_name TEXT,
+        rating_overall INTEGER,
+        rating_accommodation_makkah1 INTEGER,
+        rating_accommodation_makkah2 INTEGER,
+        rating_accommodation_madinah INTEGER,
+        rating_transportation INTEGER,
+        rating_food INTEGER,
+        rating_guide INTEGER,
+        rating_visa_documentation INTEGER,
+        comment TEXT,
+        what_did_you_like TEXT,
+        suggestions TEXT,
+        would_recommend TEXT,
+        is_complaint BOOLEAN NOT NULL DEFAULT false,
+        status feedback_status NOT NULL DEFAULT 'open',
+        assigned_to TEXT,
+        internal_notes TEXT,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+    console.log("[Migration] feedback table ensured");
+  } catch (err) { console.error("[Migration] feedback table failed:", err); }
 
   // ── Startup route confirmation ──────────────────────────────────────────────
   // Express 5 initialises the router lazily (no _router until first request),

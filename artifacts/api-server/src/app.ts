@@ -749,6 +749,23 @@ echo "╚═══════════════════════�
   res.send(script);
 });
 
+// GET /api/migrate/read-otp — reads latest OTP for a mobile (QA/testing only, key-protected)
+app.get("/api/migrate/read-otp", async (req, res) => {
+  const key = req.query.key as string;
+  if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
+  const mobile = (req.query.mobile as string || "").replace(/\D/g, "").slice(-10);
+  if (!mobile || mobile.length !== 10) return void res.status(400).json({ error: "mobile required (10 digits)" });
+  const { pool: diagPool } = await import("@workspace/db");
+  try {
+    const r = await diagPool.query(
+      `SELECT otp, expires_at, used FROM otps WHERE mobile=$1 AND used=false AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1`,
+      [mobile]
+    );
+    if (!r.rows[0]) return void res.json({ found: false });
+    res.json({ found: true, otp: r.rows[0].otp, expires_at: r.rows[0].expires_at });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
 // GET /api/migrate/db-check — checks DB tables/columns on VPS
 app.get("/api/migrate/db-check", async (req, res) => {
   const key = req.query.key as string;

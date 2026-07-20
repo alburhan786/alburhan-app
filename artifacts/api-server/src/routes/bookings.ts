@@ -1570,15 +1570,18 @@ router.post("/:id/duplicate", requireAdmin as any, requirePermission("bookings",
 // ── Customer: timeline for a specific booking ─────────────────────────────────
 router.get("/:id/timeline", requireAuth as any, async (req, res) => {
   const bookingId = req.params.id;
-  const userId = (req as any).user?.id;
+  const user = (req as any).user;
+  const userId = user?.id;
   try {
-    // Verify the booking belongs to this customer
-    const check = await pool.query(
-      `SELECT id FROM bookings WHERE id = $1 AND customer_id = $2 LIMIT 1`,
-      [bookingId, userId]
-    );
-    if (check.rows.length === 0) {
-      return res.status(403).json({ message: "Access denied" });
+    // Admins can see any booking's timeline; customers only their own
+    if (user?.role !== "admin" && user?.role !== "super_admin") {
+      const check = await pool.query(
+        `SELECT id FROM bookings WHERE id = $1 AND customer_id = $2 LIMIT 1`,
+        [bookingId, userId]
+      );
+      if (check.rows.length === 0) {
+        return res.status(403).json({ message: "Access denied" });
+      }
     }
     // Return timeline events
     const rows = await pool.query(
