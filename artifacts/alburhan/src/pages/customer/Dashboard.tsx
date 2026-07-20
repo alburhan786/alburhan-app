@@ -2460,6 +2460,11 @@ export default function CustomerDashboard() {
   const prevUnreadRef = React.useRef(0);
   const [agreementsByBooking, setAgreementsByBooking] = useState<Record<string, any>>({});
 
+  const [paymentHistory, setPaymentHistory] = useState<Record<string, any[]>>({});
+  const [historyLoading, setHistoryLoading] = useState<Record<string, boolean>>({});
+  const [showPayHistory, setShowPayHistory] = useState<Record<string, boolean>>({});
+  const [downloadingReceipt, setDownloadingReceipt] = useState<Record<string, boolean>>({});
+
   const [profileExt, setProfileExt] = useState<{ blood_group?: string; emergency_contact_name?: string; emergency_contact_mobile?: string }>({});
   const [showProfileEdit, setShowProfileEdit] = useState(false);
   const emptyProfileForm = {
@@ -2616,6 +2621,50 @@ export default function CustomerDashboard() {
     } catch {
       toast({ title: "Error", description: "Could not download invoice. Please try again.", variant: "destructive" });
     }
+  };
+
+  const handleDownloadReceipt = async (bookingId: string, bookingNumber?: string) => {
+    setDownloadingReceipt(prev => ({ ...prev, [bookingId]: true }));
+    try {
+      const res = await fetch(`${BASE_API}/api/payments/receipt-pdf/${bookingId}`, { credentials: "include" });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.message || `HTTP ${res.status}`);
+      }
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objectUrl;
+      a.download = `Receipt-${bookingNumber || bookingId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(objectUrl);
+    } catch (err: any) {
+      toast({ title: "Error", description: err?.message || "Could not download receipt. Please try again.", variant: "destructive" });
+    } finally {
+      setDownloadingReceipt(prev => ({ ...prev, [bookingId]: false }));
+    }
+  };
+
+  const loadPaymentHistory = async (bookingId: string) => {
+    if (paymentHistory[bookingId] !== undefined || historyLoading[bookingId]) return;
+    setHistoryLoading(prev => ({ ...prev, [bookingId]: true }));
+    try {
+      const res = await fetch(`${BASE_API}/api/payments/my-payments/${bookingId}`, { credentials: "include" });
+      if (res.ok) {
+        const d = await res.json();
+        setPaymentHistory(prev => ({ ...prev, [bookingId]: d.payments || [] }));
+      }
+    } catch { /* silent */ } finally {
+      setHistoryLoading(prev => ({ ...prev, [bookingId]: false }));
+    }
+  };
+
+  const togglePayHistory = (bookingId: string) => {
+    const nowShown = !showPayHistory[bookingId];
+    setShowPayHistory(prev => ({ ...prev, [bookingId]: nowShown }));
+    if (nowShown) loadPaymentHistory(bookingId);
   };
 
   return (
@@ -3196,7 +3245,7 @@ export default function CustomerDashboard() {
                               )}
                             </div>
                           </div>
-                          <div className="flex gap-2">
+                          <div className="flex gap-2 flex-wrap">
                             <Button
                               size="sm"
                               className="flex-1 bg-emerald-700 hover:bg-emerald-800 text-white font-semibold"
@@ -3207,11 +3256,53 @@ export default function CustomerDashboard() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="flex-1 border-emerald-500 text-emerald-700 hover:bg-emerald-50 font-semibold"
+                              className="flex-1 border-emerald-600 text-emerald-700 hover:bg-emerald-50 font-semibold"
+                              disabled={downloadingReceipt[booking.id]}
+                              onClick={() => handleDownloadReceipt(booking.id, booking.bookingNumber)}
+                            >
+                              <Download className="w-3.5 h-3.5 mr-1.5" />
+                              {downloadingReceipt[booking.id] ? "..." : "Receipt PDF"}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-emerald-500 text-emerald-700 hover:bg-emerald-50 font-semibold"
                               onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(`Assalamu Alaikum! My Hajj/Umrah booking with Al Burhan Tours & Travels.\n\nInvoice No: ${booking.invoiceNumber}\nBooking: #${booking.bookingNumber}\n\nView Invoice: https://alburhantravels.com/invoice/${booking.bookingNumber}`)}`, "_blank")}
                             >
                               <Share2 className="w-3.5 h-3.5 mr-1.5" /> Share
                             </Button>
+                          </div>
+
+                          {/* Payment History toggle */}
+                          <div className="mt-3 border-t border-emerald-200 pt-3">
+                            <button
+                              className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 hover:text-emerald-900 transition-colors"
+                              onClick={() => togglePayHistory(booking.id)}
+                            >
+                              <IndianRupee className="w-3.5 h-3.5" />
+                              {showPayHistory[booking.id] ? "Hide" : "View"} Payment History
+                              <ChevronRight className={`w-3.5 h-3.5 transition-transform ${showPayHistory[booking.id] ? "rotate-90" : ""}`} />
+                            </button>
+                            {showPayHistory[booking.id] && (
+                              <div className="mt-2 space-y-1.5">
+                                {historyLoading[booking.id] ? (
+                                  <p className="text-xs text-emerald-600 py-2 text-center">Loading…</p>
+                                ) : (paymentHistory[booking.id] || []).length === 0 ? (
+                                  <p className="text-xs text-emerald-600 py-2 text-center">No payment records found.</p>
+                                ) : (paymentHistory[booking.id] || []).map((pay: any, idx: number) => (
+                                  <div key={pay.id || idx} className="flex justify-between items-center bg-emerald-50/80 rounded-lg px-3 py-2 text-xs border border-emerald-100">
+                                    <div>
+                                      <span className="font-semibold text-emerald-900">
+                                        {pay.paymentDate ? new Date(pay.paymentDate).toLocaleDateString("en-IN", { dateStyle: "medium" }) : "—"}
+                                      </span>
+                                      <span className="ml-2 text-emerald-600 capitalize">{(pay.paymentMode || "online").replace(/_/g, " ")}</span>
+                                      {pay.referenceNumber && <span className="ml-2 text-emerald-500 font-mono">#{pay.referenceNumber}</span>}
+                                    </div>
+                                    <span className="font-bold text-emerald-800">{formatCurrency(pay.amount)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>

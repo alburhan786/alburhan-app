@@ -42,6 +42,56 @@ interface RazorpayWithPaymentLink extends Razorpay {
 }
 
 /**
+ * Map a snake_case pool.query booking row to the camelCase shape used by
+ * processPaymentSuccessNotifications and the rest of this file.
+ * All 4 Razorpay payment routes use pool.query (not db.update().returning())
+ * to avoid the VPS bundled-CJS Drizzle issue where db.execute/update returns
+ * a non-iterable QueryResult without writing to the DB.
+ */
+function mapBookingRow(r: any) {
+  return {
+    id:                r.id,
+    bookingNumber:     r.booking_number,
+    customerName:      r.customer_name,
+    customerMobile:    r.customer_mobile,
+    customerEmail:     r.customer_email     ?? null,
+    customerId:        r.customer_id        ?? null,
+    packageName:       r.package_name       ?? null,
+    numberOfPilgrims:  r.number_of_pilgrims ?? null,
+    totalAmount:       r.total_amount       ?? null,
+    gstAmount:         r.gst_amount         ?? null,
+    finalAmount:       r.final_amount       ?? null,
+    discountAmount:    r.discount_amount    ?? null,
+    advanceAmount:     r.advance_amount     ?? null,
+    paidAmount:        r.paid_amount        ?? null,
+    onlinePaidAmount:  r.online_paid_amount ?? null,
+    status:            r.status,
+    razorpayOrderId:   r.razorpay_order_id  ?? null,
+    razorpayPaymentId: r.razorpay_payment_id ?? null,
+    invoiceNumber:     r.invoice_number     ?? null,
+    journeyStatus:     r.journey_status     ?? null,
+    createdAt:         r.created_at         ?? null,
+    updatedAt:         r.updated_at         ?? null,
+  };
+}
+
+/**
+ * Insert an online Razorpay payment into payment_transactions for the audit
+ * trail (deduped by reference_number + booking_id). Fire-and-forget.
+ */
+function recordOnlinePaymentTransaction(bookingId: string, amount: number, razorpayPaymentId: string, note = "Online payment via Razorpay") {
+  const today = new Date().toISOString().slice(0, 10);
+  pool.query(
+    `INSERT INTO payment_transactions (id, booking_id, amount, payment_date, payment_mode, reference_number, notes)
+     SELECT $1,$2,$3,$4,'online',$5,$6
+     WHERE NOT EXISTS (
+       SELECT 1 FROM payment_transactions WHERE reference_number=$5 AND booking_id=$2
+     )`,
+    [crypto.randomUUID(), bookingId, String(amount), today, razorpayPaymentId, note]
+  ).catch(e => console.error("[payments] payment_transactions insert failed:", e?.message));
+}
+
+/**
  * Single, awaited path that fires after ANY successful payment (full or
  * partial), via /verify, /sync-payment, or the Razorpay webhook. Replaces
  * the old ad-hoc fire-and-forget notification calls that silently swallowed
@@ -397,19 +447,26 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
     ? (existingBooking.invoiceNumber || `INV${Date.now().toString().slice(-8)}`)
     : existingBooking.invoiceNumber;
 
-  const [booking] = await db
-    .update(bookingsTable)
-    .set({
-      status: newStatus as any,
-      razorpayOrderId,
-      razorpayPaymentId: isFullyPaid ? razorpayPaymentId : existingBooking.razorpayPaymentId,
-      paidAmount: String(newPaidAmount),
-      onlinePaidAmount: String(newOnlinePaidAmount),
-      invoiceNumber: invoiceNumber ?? undefined,
-      updatedAt: new Date(),
-    })
-    .where(eq(bookingsTable.id, bookingId))
-    .returning();
+  // Use pool.query (not db.update().returning()) — avoids VPS bundled-CJS Drizzle bug
+  await pool.query(
+    `UPDATE bookings SET
+       status=$1, razorpay_order_id=$2, razorpay_payment_id=$3,
+       paid_amount=$4, online_paid_amount=$5,
+       invoice_number=COALESCE(NULLIF($6,''), invoice_number),
+       updated_at=NOW()
+     WHERE id=$7`,
+    [
+      newStatus, razorpayOrderId,
+      isFullyPaid ? razorpayPaymentId : (existingBooking.razorpayPaymentId || null),
+      String(newPaidAmount), String(newOnlinePaidAmount),
+      invoiceNumber || null, bookingId,
+    ]
+  );
+  const _verifyBkRes = await pool.query(`SELECT * FROM bookings WHERE id=$1 LIMIT 1`, [bookingId]);
+  const booking = mapBookingRow(_verifyBkRes.rows[0]);
+
+  // Record in payment_transactions for complete audit trail
+  recordOnlinePaymentTransaction(bookingId, thisPayment, razorpayPaymentId);
 
   console.log("[verify] Payment verified:", razorpayPaymentId, "→ Booking", booking.bookingNumber, newStatus);
 
@@ -535,18 +592,27 @@ router.post("/sync-payment", requireAuth as any, async (req: AuthenticatedReques
     ? (booking.invoiceNumber || `INV${Date.now().toString().slice(-8)}`)
     : booking.invoiceNumber;
 
-  const [updated] = await db
-    .update(bookingsTable)
-    .set({
-      status: newStatus as any,
-      razorpayPaymentId: capturedPayment?.id || booking.razorpayPaymentId,
-      paidAmount: String(newPaidAmount),
-      onlinePaidAmount: String(newOnlinePaidAmount),
-      invoiceNumber: invoiceNumber ?? undefined,
-      updatedAt: new Date(),
-    })
-    .where(eq(bookingsTable.id, booking.id))
-    .returning();
+  // Use pool.query (not db.update().returning()) — avoids VPS bundled-CJS Drizzle bug
+  await pool.query(
+    `UPDATE bookings SET
+       status=$1, razorpay_payment_id=$2,
+       paid_amount=$3, online_paid_amount=$4,
+       invoice_number=COALESCE(NULLIF($5,''), invoice_number),
+       updated_at=NOW()
+     WHERE id=$6`,
+    [
+      newStatus, capturedPayment?.id || (booking.razorpayPaymentId || null),
+      String(newPaidAmount), String(newOnlinePaidAmount),
+      invoiceNumber || null, booking.id,
+    ]
+  );
+  const _syncBkRes = await pool.query(`SELECT * FROM bookings WHERE id=$1 LIMIT 1`, [booking.id]);
+  const updated = mapBookingRow(_syncBkRes.rows[0]);
+
+  // Record in payment_transactions for complete audit trail
+  if (capturedPayment?.id) {
+    recordOnlinePaymentTransaction(booking.id, thisPayment, capturedPayment.id, "Online payment via Razorpay (synced)");
+  }
 
   console.log("[sync-payment] Synced booking:", updated.bookingNumber, "→", newStatus);
 
@@ -707,18 +773,34 @@ router.post("/webhook", async (req: any, res) => {
       ? (booking.invoiceNumber || `INV${Date.now().toString().slice(-8)}`)
       : booking.invoiceNumber;
 
-    const [updated] = await db
-      .update(bookingsTable)
-      .set({
-        status: newStatus as any,
-        razorpayPaymentId: paymentId || booking.razorpayPaymentId,
-        paidAmount: String(newPaidAmount),
-        onlinePaidAmount: String(newOnlinePaidAmount),
-        invoiceNumber: invoiceNumber ?? undefined,
-        updatedAt: new Date(),
-      })
-      .where(eq(bookingsTable.id, booking.id))
-      .returning();
+    // Use pool.query (not db.update().returning()) — avoids VPS bundled-CJS Drizzle bug
+    await pool.query(
+      `UPDATE bookings SET
+         status=$1, razorpay_payment_id=$2,
+         paid_amount=$3, online_paid_amount=$4,
+         invoice_number=COALESCE(NULLIF($5,''), invoice_number),
+         updated_at=NOW()
+       WHERE id=$6`,
+      [
+        newStatus, paymentId || (booking.razorpayPaymentId || null),
+        String(newPaidAmount), String(newOnlinePaidAmount),
+        invoiceNumber || null, booking.id,
+      ]
+    );
+    const _wbBkRes = await pool.query(`SELECT * FROM bookings WHERE id=$1 LIMIT 1`, [booking.id]);
+    const updated = mapBookingRow(_wbBkRes.rows[0]);
+
+    // Record in payment_transactions for complete audit trail
+    if (paymentId) {
+      recordOnlinePaymentTransaction(booking.id, thisPayment, paymentId, "Online payment via Razorpay (webhook)");
+    }
+
+    // Upsert invoice so it reflects the new paid amount
+    try {
+      await upsertInvoiceForBooking(booking.id);
+    } catch (invErr: any) {
+      console.error("[Webhook] upsertInvoice failed:", invErr?.message);
+    }
 
     console.log("[Webhook] Booking updated:", updated.bookingNumber, "→", newStatus);
 
@@ -1353,14 +1435,25 @@ router.post("/verify-public", async (req, res) => {
 
   console.log(`${logPfx} ₹${chargeAmount} paid | total ₹${newPaidAmount}/${finalAmount} | isFullyPaid=${isFullyPaid} | newStatus=${newStatus}`);
 
-  const [updated] = await db.update(bookingsTable).set({
-    status: newStatus,
-    razorpayPaymentId: razorpay_payment_id,
-    paidAmount: String(newPaidAmount),
-    onlinePaidAmount: String(newOnlinePaidAmount),
-    invoiceNumber: invoiceNumber ?? undefined,
-    updatedAt: new Date(),
-  }).where(eq(bookingsTable.id, bookingId)).returning();
+  // Use pool.query (not db.update().returning()) — avoids VPS bundled-CJS Drizzle bug
+  await pool.query(
+    `UPDATE bookings SET
+       status=$1, razorpay_payment_id=$2,
+       paid_amount=$3, online_paid_amount=$4,
+       invoice_number=COALESCE(NULLIF($5,''), invoice_number),
+       updated_at=NOW()
+     WHERE id=$6`,
+    [
+      newStatus, razorpay_payment_id,
+      String(newPaidAmount), String(newOnlinePaidAmount),
+      invoiceNumber || null, bookingId,
+    ]
+  );
+  const _vpBkRes = await pool.query(`SELECT * FROM bookings WHERE id=$1 LIMIT 1`, [bookingId]);
+  const updated = mapBookingRow(_vpBkRes.rows[0]);
+
+  // Record in payment_transactions for complete audit trail
+  recordOnlinePaymentTransaction(bookingId, chargeAmount, razorpay_payment_id, "Online payment via Razorpay (public)");
 
   console.log(`${logPfx} ✅ DB updated: ${updated.bookingNumber} → ${newStatus}`);
 
@@ -1639,6 +1732,96 @@ router.post("/resend-notification/:bookingId", requireAdmin as any, async (req: 
   } catch (err: any) {
     console.error("[resend-notification] failed:", err?.message);
     res.status(500).json({ success: false, message: err?.message || "Failed to resend notification" });
+  }
+});
+
+// ── Customer: payment history for own booking ────────────────────────────────
+// Returns all payment_transactions rows for the booking.
+// Accessible by the booking owner OR admin.
+router.get("/my-payments/:bookingId", requireAuth as any, async (req: AuthenticatedRequest, res) => {
+  const { bookingId } = req.params;
+  try {
+    const bRes = await pool.query(
+      `SELECT id, customer_mobile, status FROM bookings WHERE id=$1 LIMIT 1`,
+      [bookingId]
+    );
+    const bk = bRes.rows[0];
+    if (!bk) { res.status(404).json({ message: "Booking not found" }); return; }
+    if (req.user?.role !== "admin" && bk.customer_mobile !== req.user?.mobile) {
+      res.status(403).json({ message: "Access denied" }); return;
+    }
+    const txRes = await pool.query(
+      `SELECT id, amount, payment_date, payment_mode, reference_number, notes, created_at
+       FROM payment_transactions
+       WHERE booking_id=$1 AND (is_deleted IS NULL OR is_deleted=false)
+       ORDER BY payment_date ASC, created_at ASC`,
+      [bookingId]
+    );
+    res.json({ payments: txRes.rows.map((r: any) => ({
+      id:              r.id,
+      amount:          Number(r.amount),
+      paymentDate:     r.payment_date,
+      paymentMode:     r.payment_mode,
+      referenceNumber: r.reference_number,
+      notes:           r.notes,
+      createdAt:       r.created_at,
+    })) });
+  } catch (err: any) {
+    console.error("[my-payments] error:", err?.message);
+    res.status(500).json({ message: "Failed to load payment history" });
+  }
+});
+
+// ── Customer: on-demand receipt PDF ─────────────────────────────────────────
+// Generates a receipt PDF for the booking on demand.
+// Accessible by the booking owner OR admin.
+router.get("/receipt-pdf/:bookingId", requireAuth as any, async (req: AuthenticatedRequest, res) => {
+  const { bookingId } = req.params;
+  try {
+    const bRes = await pool.query(
+      `SELECT b.*, i.invoice_number AS inv_num, i.invoice_status
+       FROM bookings b LEFT JOIN invoices i ON i.booking_id=b.id
+       WHERE b.id=$1 LIMIT 1`,
+      [bookingId]
+    );
+    const row = bRes.rows[0];
+    if (!row) { res.status(404).json({ message: "Booking not found" }); return; }
+    if (req.user?.role !== "admin" && row.customer_mobile !== req.user?.mobile) {
+      res.status(403).json({ message: "Access denied" }); return;
+    }
+    const paidAmount = Number(row.paid_amount || 0);
+    if (paidAmount <= 0) {
+      res.status(402).json({ message: "No payment recorded — receipt not available yet" });
+      return;
+    }
+    const finalAmount   = Number(row.final_amount || 0);
+    const remainingBal  = Math.max(0, finalAmount - paidAmount);
+    const invoiceNumber = row.inv_num || row.invoice_number || null;
+
+    const buf = await generateReceiptPdfBuffer({
+      bookingNumber:   row.booking_number,
+      customerName:    row.customer_name,
+      customerMobile:  row.customer_mobile,
+      customerEmail:   row.customer_email,
+      packageName:     row.package_name,
+      numberOfPilgrims: row.number_of_pilgrims,
+      totalAmount:     finalAmount,
+      finalAmount,
+      paidAmount,
+      balanceAmount:   remainingBal,
+      invoiceNumber,
+      paymentAmount:   paidAmount,
+      paymentRef:      row.razorpay_payment_id || undefined,
+    });
+    res.set({
+      "Content-Type":        "application/pdf",
+      "Content-Disposition": `attachment; filename="Receipt-${row.booking_number}.pdf"`,
+      "Content-Length":      String(buf.length),
+    });
+    res.send(buf);
+  } catch (err: any) {
+    console.error("[receipt-pdf] error:", err?.message);
+    res.status(500).json({ message: "Failed to generate receipt" });
   }
 });
 
