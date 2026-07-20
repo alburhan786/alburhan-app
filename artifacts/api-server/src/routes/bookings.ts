@@ -407,9 +407,25 @@ router.get("/", requireAuth as any, async (req: AuthenticatedRequest, res) => {
     .from(bookingsTable)
     .where(and(...conditions));
 
+  // Supplement lastPaymentDate from pool.query (not in Drizzle schema — added via ALTER TABLE migration)
+  const bookingIds = rows.map(r => r.booking.id);
+  let lastPaymentDates: Record<string, string | null> = {};
+  if (bookingIds.length > 0) {
+    try {
+      const lpdRes = await pool.query(
+        `SELECT id, last_payment_date FROM bookings WHERE id = ANY($1)`,
+        [bookingIds]
+      );
+      lpdRes.rows.forEach((r: any) => {
+        lastPaymentDates[r.id] = r.last_payment_date ? new Date(r.last_payment_date).toISOString() : null;
+      });
+    } catch (_) { /* column may not exist yet on first deploy */ }
+  }
+
   res.json({
     bookings: rows.map(({ booking, package: pkg }) => ({
       ...formatBooking(booking),
+      lastPaymentDate: lastPaymentDates[booking.id] ?? null,
       packageDetails: pkg ? {
         duration: pkg.duration,
         includes: pkg.includes,

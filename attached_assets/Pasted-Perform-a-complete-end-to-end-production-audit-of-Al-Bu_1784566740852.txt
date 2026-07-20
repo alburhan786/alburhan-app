@@ -1,0 +1,132 @@
+Perform a complete end-to-end production audit of Al Burhan Tours & Travels.
+
+Do not only verify the build. Verify every real business workflow.
+
+Booking
+✓ Customer books a package.
+✓ Booking ID created.
+✓ Agreement ID created.
+✓ Booking stored correctly.
+✓ Booking appears in Admin Dashboard.
+✓ Booking appears in Customer Dashboard.
+
+Notifications after booking
+Immediately send:
+• WhatsApp
+• SMS
+• Email
+
+Include:
+- Booking confirmation
+- Booking ID
+- Agreement ID
+- Package details
+
+Payment
+✓ Manual payment
+✓ Online payment
+✓ Partial payment
+✓ Full payment
+
+Verify:
+- Invoice status updates
+- Received amount updates
+- Balance updates
+- Dashboard refreshes instantly
+- Payment history saved
+- Receipt generated
+
+Documents
+Automatically generate and send:
+• Agreement PDF
+• Invoice PDF
+• Receipt PDF
+
+Send via:
+- WhatsApp
+- Email
+- SMS (secure download link)
+
+Visa
+When Visa is issued:
+✓ Generate Visa PDF
+✓ Send WhatsApp
+✓ Send Email
+✓ Send SMS
+
+Flight Ticket
+When Ticket is uploaded:
+✓ Generate Ticket PDF
+✓ Send WhatsApp
+✓ Send Email
+✓ Send SMS
+
+Hotel Voucher
+✓ Generate voucher
+✓ Send through all channels
+
+Room Allocation
+✓ Notify customer automatically
+✓ Show in dashboard
+
+OTP
+Verify:
+✓ SMS OTP
+✓ Email OTP
+✓ WhatsApp OTP
+✓ Existing customer login
+✓ New customer registration
+
+Reminder Automation
+Automatically send:
+• Payment reminders
+• Flight reminders
+• Orientation reminders
+• Departure reminders
+
+through:
+- WhatsApp
+- SMS
+- Email
+
+Admin Dashboard
+Verify:
+✓ Payment History
+✓ Notification Logs
+✓ Failed Notifications
+✓ Retry Notification
+✓ Audit Log
+✓ Download Invoice
+✓ Download Receipt
+
+Customer Dashboard
+Verify:
+✓ Booking Status
+✓ Invoice Status
+✓ Payment Status
+✓ Payment History
+✓ Agreement PDF
+✓ Invoice PDF
+✓ Receipt PDF
+✓ Visa
+✓ Ticket
+✓ Hotel Voucher
+
+Notification Queue
+Verify every notification is logged with:
+- Status
+- Provider response
+- Retry count
+- Timestamp
+
+If any workflow fails:
+1. Identify the exact root cause.
+2. Fix it automatically.
+3. Redeploy.
+4. Retest until every workflow passes.
+
+Finally provide a production report listing each feature as:
+✅ PASS
+❌ FAIL
+
+The system should only be marked production-ready when every workflow passes successfully.

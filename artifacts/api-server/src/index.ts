@@ -407,6 +407,29 @@ async function runMigrations() {
     console.error("[Migration] bookings soft-delete columns failed:", err);
   }
   try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS payment_transactions (
+        id TEXT PRIMARY KEY,
+        booking_id TEXT NOT NULL,
+        amount NUMERIC(12,2) NOT NULL,
+        payment_mode TEXT NOT NULL DEFAULT 'cash',
+        payment_date TEXT,
+        reference_number TEXT,
+        notes TEXT,
+        recorded_by TEXT,
+        is_deleted BOOLEAN NOT NULL DEFAULT false,
+        deleted_at TIMESTAMPTZ,
+        deletion_reason TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS pt_booking_idx ON payment_transactions(booking_id)`);
+    console.log("[Migration] payment_transactions table ensured");
+  } catch (err) {
+    console.error("[Migration] payment_transactions table create failed:", err);
+  }
+  try {
     await pool.query(`ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS bank_name TEXT`);
     await pool.query(`ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS received_by TEXT`);
     await pool.query(`ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS edited_at TIMESTAMPTZ`);

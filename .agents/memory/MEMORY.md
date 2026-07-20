@@ -59,3 +59,4 @@
 - [Bundle external deps VPS crash](bundle-external-deps-crash.md) — any new npm package must be added to allowlist in build.ts; VPS has no node_modules, external require = PM2 crash loop; prefer Node built-ins (crypto/util) over new packages
 - [Branch/Agent portal features](portal-features.md) — bookings use customer_id (not user_id); portal.ts fully owns all portal routes; agent doc upload uses uploaded_by='admin'
 - [API bundle external strategy](build-external-strategy.md) — bundle ALL runtime deps; externalize only devDeps+pdfkit; allowlist strategy was the MODULE_NOT_FOUND root cause
+- [Payment audit complete](payment-audit-complete.md) — July 2026 full lifecycle audit; lastPaymentDate pool.query supplement in GET/; payment_transactions CREATE TABLE in runMigrations
