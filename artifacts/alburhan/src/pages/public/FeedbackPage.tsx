@@ -96,7 +96,8 @@ export default function FeedbackPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mobile: cleaned }),
       });
-      const data = await r.json();
+      let data: any;
+      try { data = await r.json(); } catch { throw new Error("We couldn't connect to the server. Please try again."); }
       if (!r.ok) throw new Error(data.message || "Failed to send OTP");
       setStep("otp");
       setResendTimer(60);
@@ -121,7 +122,8 @@ export default function FeedbackPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mobile: cleanMobile(mobile), otp: otpVal }),
       });
-      const data = await r.json();
+      let data: any;
+      try { data = await r.json(); } catch { throw new Error("We couldn't connect to the server. Please try again."); }
       if (!r.ok || !data.verified) throw new Error(data.message || "Invalid OTP");
       setPilgrimInfo(data);
       if (bookingIdParam && !data.bookingId) {

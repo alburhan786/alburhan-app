@@ -14,13 +14,28 @@ const RESEND_COOLDOWN = 30;
 const MAX_RESENDS = 5;
 
 async function postJson(url: string, body: object) {
-  const res = await fetch(`${API_BASE}${url}`, {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const data = await res.json();
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${url}`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new Error("We couldn't connect to the server. Please try again.");
+  }
+  let data: any;
+  try {
+    data = await res.json();
+  } catch {
+    // Server returned HTML (e.g. 502 Bad Gateway) instead of JSON
+    throw new Error(
+      res.status >= 500
+        ? "We couldn't connect to the server. Please try again."
+        : `Unexpected server response (HTTP ${res.status}). Please try again.`
+    );
+  }
   if (!res.ok) throw new Error(data?.message || `HTTP ${res.status}`);
   return data;
 }
@@ -180,7 +195,12 @@ export default function Login() {
           title: "Welcome back!",
           description: `Assalamu Alaikum${result.user?.name ? `, ${result.user.name}` : ""}! You have logged in.`,
         });
-        setLocation(result.user?.role === "admin" ? "/admin/dashboard" : (returnUrl || "/customer/dashboard"));
+        const role = result.user?.role;
+        if (role === "admin")           setLocation("/admin/dashboard");
+        else if (role === "branch_manager") setLocation("/branch/dashboard");
+        else if (role === "agent")      setLocation("/agent/dashboard");
+        else if (role === "staff")      setLocation("/staff/dashboard");
+        else                            setLocation(returnUrl || "/customer/dashboard");
       }
     } catch (err: any) {
       const msg = err?.message || "Invalid OTP. Please try again.";

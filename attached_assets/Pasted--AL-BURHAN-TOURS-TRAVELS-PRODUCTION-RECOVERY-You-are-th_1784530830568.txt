@@ -1,0 +1,612 @@
+# AL BURHAN TOURS & TRAVELS - PRODUCTION RECOVERY
+
+You are the lead senior software engineer responsible for the live production system.
+
+Website:
+https://alburhantravels.com
+
+This is a LIVE production server.
+
+DO NOT rebuild the project.
+DO NOT change the architecture.
+DO NOT remove any existing feature.
+DO NOT delete production data.
+DO NOT delete bookings.
+DO NOT delete customers.
+DO NOT delete payments.
+DO NOT delete invoices.
+DO NOT delete agreements.
+DO NOT delete uploaded documents.
+DO NOT delete branches.
+DO NOT delete agents.
+DO NOT delete staff.
+DO NOT reset the database.
+
+Your job is ONLY to diagnose, repair, verify and stabilize the existing production application.
+
+==================================================
+PHASE 1
+CREATE BACKUP
+==================================================
+
+Before making any change:
+
+• Backup database
+• Backup .env
+• Backup PM2 configuration
+• Backup Nginx configuration
+• Backup frontend build
+• Backup backend build
+
+Do not continue until backups complete.
+
+==================================================
+PHASE 2
+FIND ROOT CAUSE
+==================================================
+
+Current problems:
+
+• OTP not working
+• Login not working
+• Error:
+"The string did not match the expected pattern."
+
+Investigate ALL of these:
+
+Frontend
+
+Backend
+
+Nginx
+
+PM2
+
+Database
+
+Environment variables
+
+Fast2SMS
+
+BotBee
+
+WhatsApp
+
+Authentication
+
+Browser console
+
+Network requests
+
+Production logs
+
+==================================================
+PHASE 3
+FIX FRONTEND
+==================================================
+
+Verify
+
+API Base URL
+
+No invalid fetch()
+
+No malformed URL
+
+No undefined endpoint
+
+No duplicated /api/api/
+
+No localhost URL
+
+No Replit dev URL
+
+Use production URL only
+
+/api/auth/send-otp
+
+/api/auth/verify-otp
+
+Return proper JSON.
+
+Never crash on HTML response.
+
+Replace
+
+"The string did not match the expected pattern"
+
+with
+
+"We couldn't connect to the server. Please try again."
+
+==================================================
+PHASE 4
+FIX OTP
+==================================================
+
+Verify
+
+Send OTP
+
+Verify OTP
+
+Resend OTP
+
+OTP expiry
+
+OTP cooldown
+
+OTP hashing
+
+OTP database
+
+OTP SMS
+
+OTP provider
+
+OTP verification
+
+OTP session
+
+OTP login
+
+OTP redirect
+
+Support
+
+9893989786
+
+919893989786
+
++919893989786
+
+Normalize correctly.
+
+==================================================
+PHASE 5
+VERIFY FAST2SMS
+==================================================
+
+Check
+
+API key
+
+Route
+
+Sender ID
+
+DLT Template
+
+Response
+
+Delivery
+
+Errors
+
+Retry
+
+Never expose API key.
+
+==================================================
+PHASE 6
+VERIFY DATABASE
+==================================================
+
+Verify
+
+DATABASE_URL
+
+Connection
+
+Pool
+
+Tables
+
+Migration
+
+Sessions
+
+OTP table
+
+Bookings
+
+Customers
+
+Payments
+
+Invoices
+
+Agreements
+
+Documents
+
+No missing tables.
+
+No timestamp errors.
+
+No DateTimeParseError.
+
+==================================================
+PHASE 7
+VERIFY PM2
+==================================================
+
+Check
+
+pm2 status
+
+pm2 logs
+
+pm2 env
+
+pm2 describe
+
+Correct process
+
+Correct entry point
+
+Correct PORT
+
+No crash loop.
+
+==================================================
+PHASE 8
+VERIFY NGINX
+==================================================
+
+Check
+
+proxy_pass
+
+SSL
+
+HTTPS
+
+/api proxy
+
+gzip
+
+headers
+
+CORS
+
+Cookies
+
+Nginx must point to the correct Node port.
+
+==================================================
+PHASE 9
+VERIFY SERVER
+==================================================
+
+Check
+
+/api/health
+
+/api/version
+
+/api/auth/send-otp
+
+/api/auth/verify-otp
+
+All must return HTTP 200.
+
+==================================================
+PHASE 10
+VERIFY LOGIN
+==================================================
+
+Test
+
+Super Admin
+
+Admin
+
+Branch
+
+Agent
+
+Staff
+
+Customer
+
+Guide
+
+Accountant
+
+Sales
+
+Operations
+
+Automatically redirect after OTP.
+
+Never ask role manually.
+
+==================================================
+PHASE 11
+VERIFY DASHBOARDS
+==================================================
+
+Verify every dashboard.
+
+No blank page.
+
+No React errors.
+
+No console errors.
+
+No loading forever.
+
+==================================================
+PHASE 12
+VERIFY MODULES
+==================================================
+
+Bookings
+
+Offline Bookings
+
+Payments
+
+Invoices
+
+Agreements
+
+Documents
+
+Passport Upload
+
+Visa
+
+Tickets
+
+Hotels
+
+Flights
+
+Packages
+
+Customers
+
+Branches
+
+Agents
+
+Staff
+
+Reports
+
+WhatsApp
+
+SMS
+
+Email
+
+Notifications
+
+Payment Reminder
+
+Agreement Reminder
+
+Visa Reminder
+
+Flight Reminder
+
+Return Reminder
+
+==================================================
+PHASE 13
+VERIFY FILES
+==================================================
+
+Agreement PDF
+
+Invoice PDF
+
+Ticket PDF
+
+Visa PDF
+
+Hotel Voucher
+
+Receipt
+
+Download works.
+
+==================================================
+PHASE 14
+VERIFY SECURITY
+==================================================
+
+Sessions
+
+JWT
+
+Cookies
+
+CSRF
+
+Authentication
+
+Authorization
+
+Role permissions
+
+Audit logs
+
+==================================================
+PHASE 15
+VERIFY PERFORMANCE
+==================================================
+
+Frontend build
+
+Backend build
+
+Database query
+
+Memory
+
+CPU
+
+PM2
+
+Response time
+
+Nginx
+
+==================================================
+PHASE 16
+VERIFY PRODUCTION
+==================================================
+
+NO
+
+500
+
+502
+
+503
+
+504
+
+No missing modules
+
+No missing dependencies
+
+No invalid timestamps
+
+No missing DATABASE_URL
+
+No missing package
+
+No module resolution errors
+
+==================================================
+PHASE 17
+TEST EVERYTHING
+==================================================
+
+Create a REAL production test.
+
+Generate OTP.
+
+Receive SMS.
+
+Verify OTP.
+
+Login.
+
+Create booking.
+
+Create payment.
+
+Generate invoice.
+
+Generate agreement.
+
+Download PDF.
+
+Send WhatsApp.
+
+Send Email.
+
+Logout.
+
+Login again.
+
+==================================================
+FINAL REPORT
+==================================================
+
+Do NOT simply say "Fixed."
+
+Provide
+
+1 Root Cause
+
+2 Files Changed
+
+3 Environment Changes
+
+4 Database Changes
+
+5 PM2 Status
+
+6 Nginx Status
+
+7 OTP Result
+
+8 Login Result
+
+9 Dashboard Result
+
+10 WhatsApp Result
+
+11 SMS Result
+
+12 Email Result
+
+13 Remaining Issues
+
+14 Rollback Steps
+
+15 Deployment Time
+
+16 Git Commit
+
+17 Production Health
+
+18 Performance Summary
+
+==================================================
+SUCCESS CRITERIA
+==================================================
+
+✅ Website loads
+
+✅ Login works
+
+✅ OTP SMS received
+
+✅ OTP verifies
+
+✅ Session works
+
+✅ Super Admin dashboard works
+
+✅ Branch dashboard works
+
+✅ Agent dashboard works
+
+✅ Customer dashboard works
+
+✅ Booking works
+
+✅ Payment works
+
+✅ Agreement works
+
+✅ Invoice works
+
+✅ PDF works
+
+✅ WhatsApp works
+
+✅ Email works
+
+✅ SMS works
+
+✅ PM2 stable
+
+✅ Nginx stable
+
+✅ Database stable
+
+✅ No console errors
+
+✅ No API errors
+
+✅ No production errors
+
+Do NOT stop until every item above is verified.

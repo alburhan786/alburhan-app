@@ -52,7 +52,7 @@ export default function AgreementSigning() {
   useEffect(() => {
     if (!id) return;
     fetch(`${API}/api/agreements/my/${id}`, { credentials: "include" })
-      .then(r => r.json())
+      .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
       .then(d => {
         if (d.id) setAgreement(d);
         if (d.status === "signed") setStep("complete");
@@ -134,15 +134,16 @@ export default function AgreementSigning() {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
       });
-      const d = await r.json();
+      let d: any;
+      try { d = await r.json(); } catch { throw new Error("We couldn't connect to the server. Please try again."); }
       if (d.ok) {
         setOtpSent(true);
         toast({ title: "OTP Sent", description: "OTP sent to your registered mobile number" });
       } else {
         toast({ title: "Error", description: d.error || "Failed to send OTP", variant: "destructive" });
       }
-    } catch {
-      toast({ title: "Error", description: "Network error", variant: "destructive" });
+    } catch (err: any) {
+      toast({ title: "Error", description: err?.message || "Network error", variant: "destructive" });
     } finally {
       setOtpLoading(false);
     }
@@ -186,7 +187,8 @@ export default function AgreementSigning() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ otp, signatureData, termsAccepted: accepted, ...deviceMeta }),
       });
-      const d = await r.json();
+      let d: any;
+      try { d = await r.json(); } catch { throw new Error("We couldn't connect to the server. Please try again."); }
       if (d.ok) {
         toast({ title: "Agreement Signed!", description: "Your agreement has been signed and sent to your email and WhatsApp." });
         if (d.pdfBase64) {

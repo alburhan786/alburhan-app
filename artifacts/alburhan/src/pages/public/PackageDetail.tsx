@@ -786,7 +786,7 @@ export default function PackageDetail() {
               <div className="space-y-3">
                 <Input {...register("customerName")} placeholder="Full name" defaultValue={user?.name || ''} />
                 {errors.customerName && <p className="text-xs text-destructive">{errors.customerName.message}</p>}
-                <Input {...register("customerMobile")} placeholder="Mobile number" type="tel" defaultValue={user?.mobile || ''} />
+                <Input {...register("customerMobile")} placeholder="Mobile number" type="text" inputMode="numeric" maxLength={13} autoComplete="tel-national" defaultValue={user?.mobile || ''} />
                 {errors.customerMobile && <p className="text-xs text-destructive">{errors.customerMobile.message}</p>}
                 <Input {...register("customerEmail")} placeholder="Email (optional)" type="email" defaultValue={user?.email || ''} />
               </div>

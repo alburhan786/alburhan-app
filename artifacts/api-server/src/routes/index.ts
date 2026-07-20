@@ -70,7 +70,7 @@ router.get("/", (_req, res) => {
 });
 
 // ── Build fingerprint — confirms which bundle is running on VPS (no auth needed) ──
-const BUILD_STAMP = "2026-07-19-v22.0";
+const BUILD_STAMP = "2026-07-19-v23.0";
 router.get("/version", (_req, res) => {
   res.json({
     build: BUILD_STAMP,
