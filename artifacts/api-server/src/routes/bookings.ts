@@ -482,13 +482,15 @@ router.post("/", requireAuth as any, async (req: AuthenticatedRequest, res) => {
     isOffline: false,
   }).returning();
 
+  // ── Customer notifications: WhatsApp → SMS → Email via notification engine ─
+  // triggerWorkflow → fireNotificationEvent logs to notification_logs (admin-visible)
   triggerWorkflow("new_booking", {
     bookingId: booking.id, bookingNumber: booking.bookingNumber,
     customerId: booking.customerId ?? undefined, customerName: booking.customerName,
     customerMobile: booking.customerMobile, customerEmail: booking.customerEmail ?? undefined,
     packageName: booking.packageName ?? pkg?.name ?? "Travel Package",
     amount: booking.finalAmount ? Number(booking.finalAmount) : undefined,
-  }).catch(() => {});
+  }).catch(console.error);
 
   notifyNewBooking({
     bookingId: booking.id,

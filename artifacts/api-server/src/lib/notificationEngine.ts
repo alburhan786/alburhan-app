@@ -818,9 +818,15 @@ async function sendOnChannelWithType(channel: Channel, eventType: EventType, ctx
         };
         let result: import("./sms.js").SMSResult;
         switch (eventType) {
-          case "new_booking":
+          case "new_booking": {
             result = await smsLib.sendBookingCreated(smsCtx);
+            if (!result.ok) {
+              // DLT template failed — fall back to quick route via sendDLTSMS
+              const qrOk = await sendDLTSMS(ctx.customerMobile, ctx.customerName, ctx.bookingNumber || "", "");
+              return { status: qrOk ? "sent" : "failed", providerResponse: { ok: qrOk, provider: "Fast2SMS", endpoint: "quick-route", templateId: result.templateId } };
+            }
             break;
+          }
           case "booking_approved":
             result = await smsLib.sendBookingConfirmed(smsCtx);
             break;
