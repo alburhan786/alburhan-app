@@ -1,0 +1,130 @@
+Fix the production OTP login form immediately.
+
+Current production error on Safari/macOS:
+
+“The string did not match the expected pattern.”
+
+The mobile number entered is a valid Indian number, but clicking Get OTP fails before OTP is sent.
+
+Do not only test the development preview. Fix, build, deploy, and verify the actual production website alburhantravels.com.
+
+Required fixes:
+
+1. Inspect every mobile-number input used by:
+   - Admin login
+   - Customer login
+   - Agent login
+   - Branch Manager login
+   - Staff login
+
+2. Remove all problematic browser validation:
+   - Remove pattern attributes from mobile inputs
+   - Remove JavaScript calls to setCustomValidity()
+   - Do not use type="tel" if Safari pattern validation still causes the error
+   - Use:
+     type="text"
+     inputMode="numeric"
+     autoComplete="tel"
+     maxLength={10}
+
+3. Before submitting, normalize the number in JavaScript:
+   - Remove spaces, hyphens, brackets and non-digits
+   - Remove leading +91
+   - Remove leading 91 when 12 digits
+   - Remove leading 0 when 11 digits
+   - Final value must be exactly 10 digits
+
+4. Accept all these formats:
+   - 9893989786
+   - 09893989786
+   - 919893989786
+   - +919893989786
+   - +91 98939 89786
+
+5. Show a friendly validation message only when the final normalized number is not 10 digits:
+   “Please enter a valid 10-digit mobile number.”
+
+6. Prevent the browser from showing:
+   “The string did not match the expected pattern.”
+
+7. Add noValidate to the login form so browser-native pattern validation cannot block submission.
+
+8. Make the Get OTP button call exactly:
+   POST /api/auth/send-otp
+
+   JSON body:
+   {
+     "mobile": "9893989786"
+   }
+
+9. Safely read the API response:
+   - Check response.ok
+   - Check content-type before calling response.json()
+   - If HTML, 502, or non-JSON is returned, display the real server status and response text
+   - Never blindly call response.json()
+
+10. Add temporary browser console diagnostics:
+    - normalized mobile number
+    - final request URL
+    - HTTP status
+    - response content-type
+    - response body
+    Never log the OTP value.
+
+11. Verify the production API first:
+    GET /api/health
+    GET /api/version
+    POST /api/auth/send-otp
+
+12. Verify the POST endpoint returns JSON such as:
+    {
+      "success": true,
+      "message": "OTP sent successfully",
+      "smsSent": true
+    }
+
+13. If the API returns 502:
+    - inspect PM2 status
+    - inspect PM2 error logs
+    - confirm Node is listening on the same port configured in Nginx proxy_pass
+    - confirm DATABASE_URL is valid
+    - confirm every required Node dependency exists
+
+14. Rebuild and deploy the production frontend, not only the Replit preview.
+
+15. Clear old frontend files and browser-cache problems:
+    - deploy the newly generated dist files
+    - ensure index.html references the latest hashed JS bundle
+    - add a visible build version on the login page
+    - configure index.html with no-cache headers
+
+16. Perform real browser testing on:
+    - Safari desktop
+    - Safari iPhone
+    - Chrome desktop
+
+17. Final acceptance test:
+    - Open https://alburhantravels.com in a private browser window
+    - Enter 9893989786
+    - Click Get OTP
+    - No pattern error appears
+    - OTP request reaches the production backend
+    - SMS is delivered
+    - OTP verification succeeds
+    - User is redirected according to role:
+      super_admin/admin -> /admin/dashboard
+      branch_manager -> /branch/dashboard
+      agent -> /agent/dashboard
+      staff -> /staff/dashboard
+      customer -> /customer/dashboard
+
+Do not claim success based only on source-code review or local testing.
+
+Provide final evidence:
+- production build version
+- screenshot of production OTP step
+- POST /api/auth/send-otp HTTP status
+- sanitized API response
+- PM2 status
+- SMS provider delivery status
+- successful role redirect
