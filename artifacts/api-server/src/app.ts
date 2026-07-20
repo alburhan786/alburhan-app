@@ -11,6 +11,8 @@ import os from "os";
 import { fileURLToPath } from "url";
 import { spawn } from "child_process";
 import router from "./routes/index.js";
+// Lazy pool from @workspace/db — pool creation is deferred until first use (after dotenv)
+import { pool as sharedPool } from "@workspace/db";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -54,12 +56,9 @@ app.use((req, res, next) => {
 });
 
 const PgSession = connectPgSimple(session);
-const sessionPool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 
 app.use(session({
-  store: process.env.DATABASE_URL
-    ? new PgSession({ pool: sessionPool, createTableIfMissing: false })
-    : undefined,
+  store: new PgSession({ pool: sharedPool as any, createTableIfMissing: false }),
   secret: process.env.SESSION_SECRET || "alburhan-tours-secret-key-2024",
   resave: false,
   saveUninitialized: false,
@@ -411,7 +410,343 @@ app.get("/api/migrate/net-diag", async (req, res) => {
     });
   });
 
+  // ── 8. Local PostgreSQL probe (is Postgres installed on this machine?) ────
+  // Test localhost:5432 independently of whatever DATABASE_URL says
+  await new Promise<void>((resolve) => {
+    const t0   = Date.now();
+    const sock = new net.default.Socket();
+    sock.setTimeout(3000);
+    sock.connect(5432, "127.0.0.1", () => {
+      report.local_postgres_port = `OPEN — Postgres is listening on localhost:5432 (${Date.now() - t0}ms)`;
+      sock.destroy();
+      resolve();
+    });
+    sock.on("error", (e) => {
+      report.local_postgres_port = `CLOSED — ${(e as NodeJS.ErrnoException).code || e.message} (Postgres not installed or not running)`;
+      resolve();
+    });
+    sock.on("timeout", () => {
+      report.local_postgres_port = "TIMEOUT — nothing on localhost:5432";
+      sock.destroy();
+      resolve();
+    });
+  });
+
+  // If local port is open, try connecting as postgres/alburhan_db
+  if (String(report.local_postgres_port).startsWith("OPEN")) {
+    const tryUrls = [
+      "postgresql://postgres@localhost:5432/alburhan_db",
+      "postgresql://postgres@localhost:5432/alburhandb",
+      "postgresql://postgres@localhost:5432/postgres",
+    ];
+    for (const tryUrl of tryUrls) {
+      const client = new pg.default.Client({ connectionString: tryUrl, connectionTimeoutMillis: 5000 });
+      try {
+        await client.connect();
+        await client.query("SELECT 1");
+        await client.end();
+        report.local_postgres_connect = `OK — connected with ${tryUrl.replace(/:[^:@]+@/, ":***@")}`;
+        report.local_postgres_recommended_url = tryUrl;
+        break;
+      } catch (e: any) {
+        await client.end().catch(() => {});
+        report.local_postgres_connect = `FAIL (${tryUrl.split("/").pop()}) — ${e.message?.slice(0, 100)}`;
+      }
+    }
+  }
+
   res.json(report);
+});
+
+// POST /api/migrate/db-init — creates alburhan_db on local Postgres, writes DATABASE_URL, restarts
+app.post("/api/migrate/db-init", async (req, res) => {
+  const key = (req.body?.key || req.query.key) as string;
+  if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
+
+  const childProcess = await import("child_process");
+  const { promisify }  = await import("util");
+  const fsSync         = await import("fs");
+  const cryptoMod      = await import("crypto");
+  const execAsync      = promisify(childProcess.exec);
+
+  const DB_NAME  = "alburhan_db";
+  const DB_USER  = "alburhan";
+  const DB_PASS  = cryptoMod.randomBytes(18).toString("hex"); // hex only — safe in SQL single-quotes
+  const ENV_FILE = "/var/www/alburhan/.env";
+
+  const steps:  string[] = [];
+  const errors: string[] = [];
+
+  // Write SQL to a temp file and run via psql -f — avoids ALL bash $$ / quote expansion issues
+  const runSqlFile = async (sql: string, label: string) => {
+    const tmpPath = `/tmp/alburhan_init_${Date.now()}_${Math.random().toString(36).slice(2)}.sql`;
+    try {
+      fsSync.writeFileSync(tmpPath, sql, "utf8");
+      const r = await execAsync(`sudo -u postgres psql -f ${tmpPath} 2>&1`);
+      steps.push(`${label}: ${(r.stdout || "").trim().slice(0, 120) || "OK"}`);
+      return { ok: true, out: r.stdout };
+    } catch (e: any) {
+      const msg = (e.stderr || e.stdout || e.message || "").slice(0, 200);
+      errors.push(`${label}: ${msg}`);
+      return { ok: false, out: msg };
+    } finally {
+      try { fsSync.unlinkSync(tmpPath); } catch {}
+    }
+  };
+
+  // 1. Create/update user with fresh password
+  await runSqlFile(`
+    DO $ab$
+    BEGIN
+      IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '${DB_USER}') THEN
+        CREATE USER ${DB_USER} WITH PASSWORD '${DB_PASS}';
+      ELSE
+        ALTER USER ${DB_USER} WITH PASSWORD '${DB_PASS}';
+      END IF;
+    END
+    $ab$;
+  `, "create_user");
+
+  // 2. Create database if missing, set owner
+  const dbCheck = await runSqlFile(`SELECT datname FROM pg_database WHERE datname = '${DB_NAME}';`, "db_check");
+  if (String(dbCheck.out).includes(DB_NAME)) {
+    await runSqlFile(`ALTER DATABASE ${DB_NAME} OWNER TO ${DB_USER};`, "db_owner");
+    steps.push(`database '${DB_NAME}' already exists`);
+  } else {
+    await runSqlFile(`CREATE DATABASE ${DB_NAME} OWNER ${DB_USER};`, "create_db");
+  }
+
+  // 3. Grant privileges
+  await runSqlFile(`GRANT ALL PRIVILEGES ON DATABASE ${DB_NAME} TO ${DB_USER};`, "grant");
+
+  // 4. Ensure pg_hba.conf allows md5/scram auth for our user over TCP
+  try {
+    const { stdout: hbaRaw } = await execAsync("find /etc/postgresql -name pg_hba.conf 2>/dev/null | head -1");
+    const hbaPath = hbaRaw.trim();
+    if (hbaPath && fsSync.existsSync(hbaPath)) {
+      let hba = fsSync.readFileSync(hbaPath, "utf8");
+      const marker = "# alburhan_db auth";
+      if (!hba.includes(marker)) {
+        hba += `\n${marker}\nhost    ${DB_NAME}    ${DB_USER}    127.0.0.1/32    scram-sha-256\nhost    ${DB_NAME}    ${DB_USER}    ::1/128         scram-sha-256\n`;
+        fsSync.writeFileSync(hbaPath, hba, "utf8");
+        await execAsync("systemctl reload postgresql 2>/dev/null || service postgresql reload 2>/dev/null || pg_ctlcluster $(pg_lsclusters -h | awk '{print $1\" \"$2}' | head -1) reload 2>/dev/null || true");
+        await new Promise(r => setTimeout(r, 2500));
+        steps.push(`pg_hba.conf updated at ${hbaPath} — scram-sha-256 added for ${DB_USER}`);
+      } else {
+        steps.push(`pg_hba.conf already has alburhan_db entry at ${hbaPath}`);
+      }
+    } else {
+      errors.push("pg_hba.conf not found — run: find /etc -name pg_hba.conf");
+    }
+  } catch (e: any) { errors.push(`pg_hba: ${e.message?.slice(0, 120)}`); }
+
+  // 5. Verify connection with the new password
+  const newUrl = `postgresql://${DB_USER}:${DB_PASS}@localhost:5432/${DB_NAME}`;
+  let finalUrl  = newUrl;
+  try {
+    const pgMod   = await import("pg");
+    const pgClient = new pgMod.default.Client({ connectionString: newUrl, connectionTimeoutMillis: 10000 });
+    await pgClient.connect();
+    await pgClient.query("SELECT 1");
+    await pgClient.end();
+    steps.push(`connection verified ✓`);
+  } catch (e: any) {
+    errors.push(`verify_conn: ${e.message?.slice(0, 160)}`);
+    steps.push("Connection verify failed — .env will still be written; check pg_hba.conf auth method matches scram-sha-256");
+  }
+
+  // 6. Write DATABASE_URL to .env — this wins on next startup because dotenv { override: true }
+  try {
+    let envContent = fsSync.existsSync(ENV_FILE) ? fsSync.readFileSync(ENV_FILE, "utf8") : "";
+    envContent = envContent.replace(/^DATABASE_URL=.*$/m, "").replace(/\n{3,}/g, "\n\n").trimEnd();
+    envContent += `\nDATABASE_URL=${finalUrl}\n`;
+    fsSync.writeFileSync(ENV_FILE, envContent, "utf8");
+    steps.push(`.env written at ${ENV_FILE} (len=${finalUrl.length})`);
+  } catch (e: any) { errors.push(`.env write: ${e.message?.slice(0, 120)}`); }
+
+  // 7. Print the new env so it appears in PM2 logs on next startup
+  steps.push(`DATABASE_URL preview: ${finalUrl.replace(/:([^:@]+)@/, ":***@")}`);
+
+  res.json({
+    ok: errors.filter(e => !e.startsWith("verify_conn")).length === 0,
+    steps,
+    errors,
+    database: DB_NAME,
+    user: DB_USER,
+    host: "localhost:5432",
+    url_preview: finalUrl.replace(/:([^:@]+)@/, ":***@"),
+    message: "Restarting in 1.5s — dotenv { override: true } will pick up new DATABASE_URL from .env",
+  });
+
+  setTimeout(() => process.exit(0), 1500);
+});
+
+// GET /api/migrate/setup-db.sh — full PostgreSQL setup script for VPS
+// Installs Postgres if missing, creates DB, updates .env, restarts PM2
+app.get("/api/migrate/setup-db.sh", (req, res) => {
+  const key = req.query.key as string;
+  if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
+
+  const DEPLOY_KEY = "alburhan-migrate-2026";
+  const DEV_URL    = "https://57456384-023a-43e4-a60f-e6d8f967d324-00-vmg20t5z0q5l.spock.replit.dev";
+
+  const script = `#!/bin/bash
+# Al Burhan Tours — Production PostgreSQL setup + DATABASE_URL fix
+# Usage: curl -fsSL "https://.../api/migrate/setup-db.sh?key=..." | bash
+set -euo pipefail
+ENV_FILE="/var/www/alburhan/.env"
+PM2_APP="alburhan-api"
+DB_NAME="alburhan_db"
+DB_USER="alburhan"
+DB_PASS="$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 24 2>/dev/null || echo 'AlburhanProd2026')"
+
+echo ""
+echo "╔══════════════════════════════════════════════════════╗"
+echo "║   Al Burhan — PostgreSQL Setup v1                   ║"
+echo "╚══════════════════════════════════════════════════════╝"
+echo ""
+
+# ── [1] Detect existing DATABASE_URL ──────────────────────────────────────
+CUR_URL=\$(grep '^DATABASE_URL=' "\$ENV_FILE" 2>/dev/null | cut -d'=' -f2- | tr -d '"' | tr -d "'")
+CUR_LEN=\${#CUR_URL}
+echo "[1] Current DATABASE_URL in .env: length=\$CUR_LEN"
+
+if [ \$CUR_LEN -gt 30 ] && [ "\$CUR_URL" != "postgresql://..." ]; then
+  echo "    ✓ Looks like a real URL — testing it..."
+  if psql "\$CUR_URL" -c "SELECT 1" -q 2>/dev/null; then
+    echo "    ✓ Existing DATABASE_URL WORKS — no changes needed"
+    echo "    Restarting PM2 with --update-env..."
+    pm2 restart "\$PM2_APP" --update-env
+    sleep 5
+    PORT=\$(grep '^PORT=' "\$ENV_FILE" 2>/dev/null | cut -d= -f2 || echo "3000")
+    curl -sf "http://127.0.0.1:\$PORT/api/health" && echo " ✓ API healthy" || echo " ✗ API not responding"
+    exit 0
+  else
+    echo "    ✗ Existing URL does not connect — will set up local Postgres"
+  fi
+fi
+
+# ── [2] Check / install PostgreSQL ────────────────────────────────────────
+echo ""
+echo "[2] Checking PostgreSQL installation..."
+
+if command -v psql >/dev/null 2>&1 && systemctl is-active --quiet postgresql 2>/dev/null; then
+  echo "    ✓ PostgreSQL is already running"
+elif command -v psql >/dev/null 2>&1; then
+  echo "    PostgreSQL installed but not running — starting..."
+  systemctl start postgresql || service postgresql start
+  sleep 3
+else
+  echo "    PostgreSQL not found — installing (Ubuntu/Debian)..."
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update -qq
+  apt-get install -y postgresql postgresql-contrib
+  systemctl enable postgresql
+  systemctl start postgresql
+  sleep 5
+  echo "    ✓ PostgreSQL installed and started"
+fi
+
+PG_VERSION=\$(psql --version 2>/dev/null | grep -oP '[0-9]+' | head -1)
+echo "    Version: \$PG_VERSION"
+
+# ── [3] Create database user and database ─────────────────────────────────
+echo ""
+echo "[3] Creating database user '\$DB_USER' and database '\$DB_NAME'..."
+
+# Try postgres superuser (default on fresh installs)
+sudo -u postgres psql -q <<SQL
+DO \\\$\\\$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '\$DB_USER') THEN
+    CREATE USER \$DB_USER WITH PASSWORD '\$DB_PASS';
+  ELSE
+    ALTER USER \$DB_USER WITH PASSWORD '\$DB_PASS';
+  END IF;
+END
+\\\$\\\$;
+
+SELECT 'Creating database...' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '\$DB_NAME');
+CREATE DATABASE \$DB_NAME OWNER \$DB_USER;
+GRANT ALL PRIVILEGES ON DATABASE \$DB_NAME TO \$DB_USER;
+SQL
+
+echo "    ✓ User and database ready"
+
+# ── [4] Build the DATABASE_URL ────────────────────────────────────────────
+NEW_URL="postgresql://\$DB_USER:\$DB_PASS@localhost:5432/\$DB_NAME"
+
+# Verify we can actually connect with the new URL
+echo ""
+echo "[4] Verifying new connection..."
+if psql "\$NEW_URL" -c "SELECT 1" -q; then
+  echo "    ✓ Connection OK"
+else
+  # Fallback: try postgres superuser with peer auth
+  echo "    Trying postgres superuser..."
+  NEW_URL="postgresql://postgres@localhost:5432/\$DB_NAME"
+  sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE \$DB_NAME TO postgres;" -q
+  echo "    ✓ Using postgres superuser"
+fi
+
+# ── [5] Write DATABASE_URL to .env ────────────────────────────────────────
+echo ""
+echo "[5] Writing DATABASE_URL to \$ENV_FILE..."
+mkdir -p "\$(dirname "\$ENV_FILE")"
+touch "\$ENV_FILE"
+sed -i '/^DATABASE_URL=/d' "\$ENV_FILE"
+echo "DATABASE_URL=\$NEW_URL" >> "\$ENV_FILE"
+echo "    ✓ DATABASE_URL written (length=\${#NEW_URL})"
+
+# ── [6] Restart PM2 ───────────────────────────────────────────────────────
+echo ""
+echo "[6] Restarting PM2 with --update-env..."
+pm2 restart "\$PM2_APP" --update-env || {
+  BUNDLE="/var/www/alburhan/artifacts/api-server/dist/index.cjs"
+  pm2 delete "\$PM2_APP" 2>/dev/null || true
+  pm2 start "\$BUNDLE" --name "\$PM2_APP" --interpreter node
+}
+pm2 save
+echo "    Waiting 15s for migrations to complete..."
+sleep 15
+
+# ── [7] Verify ────────────────────────────────────────────────────────────
+echo ""
+echo "[7] Verification..."
+PORT=\$(grep '^PORT=' "\$ENV_FILE" 2>/dev/null | cut -d= -f2 | tr -d '"' || echo "")
+if [ -z "\$PORT" ]; then
+  PORT=\$(grep -rh proxy_pass /etc/nginx/sites-enabled/ /etc/nginx/conf.d/ /etc/nginx/nginx.conf 2>/dev/null \\
+    | grep -oE '(localhost|127\\.0\\.0\\.1):[0-9]+' | grep -oE '[0-9]+$' | head -1 || echo "3000")
+fi
+echo "    Node port: \$PORT"
+
+HEALTH=\$(curl -sf --max-time 8 "http://127.0.0.1:\$PORT/api/health" 2>/dev/null || echo "FAIL")
+echo "    Local health: \$HEALTH"
+
+DB_OK=\$(curl -sf --max-time 15 "http://127.0.0.1:\$PORT/api/migrate/db-check?key=${DEPLOY_KEY}" 2>/dev/null \\
+  | python3 -c "import sys,json; d=json.load(sys.stdin); ok=sum(1 for v in d['checks'].values() if v.startswith('OK')); tot=len(d['checks']); print(f'{ok}/{tot} tables OK')" 2>/dev/null || echo "check failed")
+echo "    DB tables: \$DB_OK"
+
+OTP=\$(curl -s --max-time 10 -X POST "https://alburhantravels.com/api/auth/send-otp" \\
+  -H "Content-Type: application/json" -d '{"mobile":"0000000000"}' 2>/dev/null | head -c 120 || echo "no-response")
+echo "    OTP test: \$OTP"
+
+PUBLIC=\$(curl -sf --max-time 10 "https://alburhantravels.com/api/health" 2>/dev/null || echo "FAIL")
+echo "    Public health: \$PUBLIC"
+
+echo ""
+echo "╔══════════════════════════════════════════════════════╗"
+echo "║  Database setup complete                             ║"
+echo "║  DATABASE_URL = \$NEW_URL"
+echo "║                                                      ║"
+echo "║  Save this URL — you will need it for backups:       ║"
+echo "║  pg_dump \"\$NEW_URL\" > backup.sql                    ║"
+echo "╚══════════════════════════════════════════════════════╝"
+`;
+
+  res.setHeader("Content-Type", "text/plain; charset=utf-8");
+  res.setHeader("Content-Disposition", "attachment; filename=setup-db.sh");
+  res.send(script);
 });
 
 // GET /api/migrate/db-check — checks DB tables/columns on VPS

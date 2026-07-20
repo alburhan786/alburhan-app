@@ -14,15 +14,19 @@ const ENV_CANDIDATES = [
 let loadedEnvPath: string | null = null;
 for (const p of ENV_CANDIDATES) {
   if (fs.existsSync(p)) {
-    const result = dotenvConfig({ path: p });
+    // override: true — ensure .env file always wins over PM2's baked-in env
+    const result = dotenvConfig({ path: p, override: true });
     if (!result.error) {
       loadedEnvPath = p;
       break;
     }
   }
 }
-// Always also try CWD fallback
-dotenvConfig();
+// Only fall back to CWD .env if no candidate was found — prevents /root/.env
+// from overriding a good /var/www/alburhan/.env with stale values
+if (!loadedEnvPath) {
+  dotenvConfig({ override: true });
+}
 
 // ── Startup diagnostic: print immediately so it appears in pm2 logs ──────────
 console.log("=".repeat(60));
@@ -2053,6 +2057,39 @@ async function runMigrations() {
     await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS agent_id UUID`);
     console.log("[Migration] branches + agents tables ensured");
   } catch (err) { console.error("[Migration] branches/agents failed:", err); }
+
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS staff (
+        id TEXT PRIMARY KEY,
+        staff_id TEXT,
+        company_id TEXT NOT NULL DEFAULT 'alburhan',
+        full_name TEXT NOT NULL,
+        designation TEXT,
+        department TEXT,
+        role TEXT NOT NULL DEFAULT 'airport_staff',
+        employee_code TEXT,
+        mobile_india TEXT,
+        blood_group TEXT,
+        date_of_birth TEXT,
+        address TEXT,
+        emergency_contact TEXT,
+        emergency_mobile TEXT,
+        joining_date TEXT,
+        valid_upto TEXT,
+        photo_url TEXT,
+        qr_token TEXT,
+        status TEXT NOT NULL DEFAULT 'active',
+        notes TEXT,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        group_id TEXT,
+        father_name TEXT,
+        aadhaar_last_4 TEXT
+      )
+    `);
+    console.log("[Migration] staff table ensured");
+  } catch (err) { console.error("[Migration] staff table failed:", err); }
 }
 
 const rawPort = process.env["PORT"];
