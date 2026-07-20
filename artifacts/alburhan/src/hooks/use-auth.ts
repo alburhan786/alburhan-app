@@ -114,7 +114,7 @@ export function useAuth() {
     user: user as User | undefined,
     isLoading: devUser ? false : isLoading,
     isAuthenticated: !!user,
-    isAdmin: user?.role === 'admin',
+    isAdmin: ['admin', 'super_admin', 'branch_manager', 'agent', 'staff'].includes(user?.role ?? ''),
     sendOtp: sendOtpMutation.mutateAsync,
     isSendingOtp: sendOtpMutation.isPending,
     verifyOtp: verifyOtpMutation.mutateAsync,

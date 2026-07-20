@@ -61,8 +61,10 @@ function validateMobile(mobile: string): string {
   return "";
 }
 
+const FRONTEND_BUILD = "v24.0 · 2026-07-20";
+
 export default function Login() {
-  const { updateProfile, isAuthenticated, isAdmin } = useAuth();
+  const { updateProfile, isAuthenticated, user } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [mobile, setMobile] = useState("");
@@ -90,10 +92,15 @@ export default function Login() {
   const returnUrl = rawReturnUrl && rawReturnUrl.startsWith("/") && !rawReturnUrl.startsWith("//") ? rawReturnUrl : null;
 
   useEffect(() => {
-    if (isAuthenticated) {
-      setLocation(isAdmin ? "/admin/dashboard" : (returnUrl || "/customer/dashboard"));
+    if (isAuthenticated && user) {
+      const role = user.role;
+      if (role === "admin" || role === "super_admin") setLocation("/admin/dashboard");
+      else if (role === "branch_manager") setLocation("/branch/dashboard");
+      else if (role === "agent") setLocation("/agent/dashboard");
+      else if (role === "staff") setLocation("/staff/dashboard");
+      else setLocation(returnUrl || "/customer/dashboard");
     }
-  }, [isAuthenticated, isAdmin, setLocation]);
+  }, [isAuthenticated, user, setLocation]);
 
   useEffect(() => {
     return () => { if (cooldownRef.current) clearInterval(cooldownRef.current); };
@@ -436,6 +443,9 @@ export default function Login() {
               </>
             )}
           </motion.div>
+          <p className="text-center text-[10px] text-muted-foreground mt-4 opacity-60 select-none">
+            Al Burhan Tours &amp; Travels &nbsp;·&nbsp; Build {FRONTEND_BUILD}
+          </p>
         </Card>
       </div>
     </div>

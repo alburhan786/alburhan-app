@@ -98,6 +98,36 @@ router.get("/inquiries", requireAdmin as any, async (_req: AuthenticatedRequest,
   })));
 });
 
+router.get("/otp-diagnostics", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        o.id,
+        CONCAT(SUBSTRING(o.mobile, 1, 3), 'XXXXXXX') AS masked_mobile,
+        o.created_at AS request_time,
+        o.expires_at,
+        o.used,
+        o.attempts,
+        CASE WHEN o.used THEN 'verified' WHEN o.expires_at < NOW() THEN 'expired' ELSE 'pending' END AS otp_status,
+        nl.channel AS sms_channel,
+        nl.status AS sms_status,
+        nl.error_code AS sms_error,
+        nl.sent_at AS sms_sent_at
+      FROM otps o
+      LEFT JOIN notification_logs nl
+        ON nl.mobile = o.mobile
+        AND nl.channel IN ('sms','whatsapp')
+        AND nl.sent_at >= o.created_at - INTERVAL '5 seconds'
+        AND nl.sent_at <= o.created_at + INTERVAL '60 seconds'
+      ORDER BY o.created_at DESC
+      LIMIT 50
+    `);
+    res.json({ ok: true, records: result.rows });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 router.patch("/inquiries/:id/read", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   const { id } = req.params;
   await db.update(inquiriesTable).set({ isRead: true }).where(eq(inquiriesTable.id, id));

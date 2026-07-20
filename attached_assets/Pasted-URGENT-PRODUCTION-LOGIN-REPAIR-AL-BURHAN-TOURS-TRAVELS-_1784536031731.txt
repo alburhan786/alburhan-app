@@ -1,0 +1,345 @@
+URGENT PRODUCTION LOGIN REPAIR — AL BURHAN TOURS & TRAVELS
+
+The production login page at alburhantravels.com is still not working.
+
+Current visible error after pressing Get OTP:
+
+"The string did not match the expected pattern."
+
+OTP is not received, login does not continue, and therefore Super Admin, Admin, Branch Manager, Agent, Staff and Customer portals cannot open.
+
+Do not only test the development server. Diagnose and repair the real production website and VPS deployment.
+
+IMPORTANT RULES
+
+1. Do not delete existing customers, bookings, payments, agreements, documents, branches, agents or production data.
+2. Take a database backup before making migrations.
+3. Do not expose OTP codes, API keys, database credentials or secrets in browser responses or logs.
+4. Do not claim success from a 401 response alone.
+5. Do not claim success until a real browser login works on alburhantravels.com.
+6. Do not use temporary dev-login or authentication bypasses in production.
+7. Fix the root cause, rebuild, deploy and test production end to end.
+
+PHASE 1 — REPRODUCE THE EXACT BROWSER ERROR
+
+Open the production login page in Safari-compatible browser testing.
+
+Enter mobile number:
+
+9893989786
+
+Click Get OTP.
+
+Capture and report:
+
+- Browser console error
+- Network request URL
+- Request method
+- Request payload
+- Response status
+- Response content-type
+- Response body
+- Current frontend API base URL
+- Current production build/version stamp
+
+Determine whether the browser is attempting an invalid URL such as:
+
+- undefined/api/auth/send-otp
+- null/api/auth/send-otp
+- duplicated domain
+- malformed protocol
+- missing slash
+- wrong VITE_API_URL
+- localhost URL
+- Replit development URL
+- stale production JavaScript bundle
+
+PHASE 2 — FIX API URL CONSTRUCTION
+
+Create one central API helper used by the entire frontend.
+
+Production behavior must be:
+
+- Use same-origin relative URLs such as `/api/auth/send-otp`
+- Do not depend on a Replit development hostname in production
+- Do not concatenate undefined environment variables
+- Do not call new URL() with an invalid or empty base
+- Do not create double `/api/api/` paths
+- Do not use localhost in production
+
+Recommended behavior:
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL?.trim() || "";
+
+For same-origin production requests:
+
+fetch(`${API_BASE}/api/auth/send-otp`, ...)
+
+If API_BASE is empty, the final URL must remain:
+
+/api/auth/send-otp
+
+Create a safe helper that validates URLs and gives a clear user message instead of:
+
+"The string did not match the expected pattern."
+
+Search the full frontend for:
+
+- new URL(
+- VITE_API_URL
+- VITE_API_BASE_URL
+- API_BASE_URL
+- localhost
+- replit.dev
+- spock.replit.dev
+- fetch(
+- axios.create
+- response.json()
+
+Repair every inconsistent API call.
+
+PHASE 3 — FIX OTP REQUEST HANDLING
+
+The Get OTP button must:
+
+1. Normalize Indian mobile numbers correctly.
+2. Accept:
+   - 9893989786
+   - 919893989786
+   - +919893989786
+3. Convert all formats to one canonical value.
+4. Prevent duplicate +91 prefixes.
+5. Validate exactly 10 Indian mobile digits after normalization.
+6. Disable the button while sending.
+7. Prevent repeated double-click requests.
+8. Show a proper countdown before resend.
+9. Handle non-JSON and HTML error responses safely.
+10. Never call response.json() blindly.
+
+Use safe response parsing:
+
+- inspect content-type
+- parse JSON only when content-type includes application/json
+- otherwise read response.text()
+- show a clear friendly error
+- log diagnostic details only on the server
+
+PHASE 4 — VERIFY BACKEND ROUTE
+
+Confirm the production backend registers:
+
+POST /api/auth/send-otp
+
+The endpoint must:
+
+- return JSON for success and failure
+- never return an Nginx HTML page
+- validate and normalize mobile
+- create/store OTP securely
+- send through the configured SMS provider
+- return a request/reference ID
+- apply rate limiting
+- expire OTP
+- log masked mobile only
+- not expose the OTP in production
+
+Test directly on the VPS and through the public domain:
+
+curl -i -X POST http://127.0.0.1:<actual-node-port>/api/auth/send-otp \
+  -H "Content-Type: application/json" \
+  -d '{"mobile":"9893989786"}'
+
+curl -i -X POST https://alburhantravels.com/api/auth/send-otp \
+  -H "Content-Type: application/json" \
+  -d '{"mobile":"9893989786"}'
+
+Both must return valid JSON.
+
+PHASE 5 — VERIFY NGINX AND PORTS
+
+Check:
+
+- actual Node listening port
+- PM2 environment
+- Nginx proxy_pass port
+- DATABASE_URL
+- frontend static build path
+- API upstream connectivity
+- SSL
+- request body forwarding
+- proxy headers
+
+Run and report:
+
+pm2 status
+pm2 describe alburhan-api
+pm2 env <correct-process-id>
+ss -tlnp
+nginx -t
+grep -R "proxy_pass" /etc/nginx/sites-enabled /etc/nginx/conf.d
+curl -i http://127.0.0.1:<node-port>/api/health
+curl -i https://alburhantravels.com/api/health
+
+The Node port and Nginx proxy_pass port must match.
+
+PHASE 6 — CHECK SMS DELIVERY
+
+Only after the public OTP endpoint works, verify the SMS provider.
+
+Check:
+
+- API key exists in the running PM2 environment
+- correct DLT route
+- approved sender ID
+- approved template ID
+- exact DLT message text
+- correct mobile format
+- provider HTTP response
+- provider message/reference ID
+- balance and account status
+
+Do not print the complete API key.
+
+Create an admin-only OTP diagnostics page showing:
+
+- request time
+- masked mobile
+- endpoint reached
+- OTP stored
+- SMS provider contacted
+- provider response status
+- provider message ID
+- delivery status
+- failure reason
+
+Never display the OTP itself.
+
+PHASE 7 — VERIFY OTP LOGIN AND ROLE REDIRECTION
+
+Complete a real login test for every role:
+
+- Super Admin
+- Admin
+- Branch Manager
+- Agent
+- Staff
+- Customer
+
+Expected flow:
+
+1. Enter registered mobile.
+2. Receive real OTP.
+3. Enter OTP.
+4. Verify session cookie is created.
+5. Call `/api/auth/me`.
+6. Read the role from the backend.
+7. Redirect correctly:
+
+super_admin -> /admin/dashboard
+admin -> /admin/dashboard
+branch_manager -> /branch/dashboard
+agent -> /agent/dashboard
+staff -> /staff/dashboard
+customer -> /customer/dashboard
+
+Do not rely only on frontend role data.
+
+Verify unauthorized cross-role access returns 403.
+
+PHASE 8 — ADMIN PAGE REPAIR
+
+After login, verify the Super Admin portal loads fully.
+
+Test:
+
+- Dashboard
+- Bookings
+- Customers
+- Packages
+- Payments
+- Invoices
+- Agreements
+- Branch Management
+- Agent Management
+- Staff Management
+- User Roles
+- Payment Reminders
+- Business Intelligence
+- Customer Ledger
+- Hajji Payment Ledger
+- Settings
+- Notifications
+- Documents
+
+Confirm:
+
+- no blank page
+- no endless loading
+- no failed-to-load toast
+- no browser console exception
+- no API 404
+- no API 500
+- real production data appears
+- sidebar scroll works
+- mobile and desktop layout work
+
+PHASE 9 — BUILD AND DEPLOY
+
+After fixing:
+
+1. Run TypeScript checks.
+2. Run frontend build.
+3. Run backend build.
+4. Run automated tests.
+5. Deploy the latest frontend.
+6. Deploy the latest backend.
+7. restart PM2 with updated environment.
+8. save PM2 process list.
+9. test Nginx.
+10. reload Nginx.
+11. clear stale frontend cache correctly.
+12. add a visible build/version stamp to the login page.
+
+Use safe deployment with rollback capability.
+
+PHASE 10 — FINAL PRODUCTION ACCEPTANCE TEST
+
+Do not finish until these checks pass on the public domain:
+
+[ ] GET /api/health returns 200 JSON
+[ ] POST /api/auth/send-otp returns valid JSON
+[ ] No malformed URL browser error
+[ ] OTP is actually delivered to a real phone
+[ ] OTP verification succeeds
+[ ] Session persists after refresh
+[ ] Super Admin redirects correctly
+[ ] Admin dashboard loads
+[ ] Branch login works
+[ ] Agent login works
+[ ] Staff login works
+[ ] Customer login works
+[ ] Role isolation works
+[ ] Logout works
+[ ] No 404, 502 or 500 errors
+[ ] No blank screens
+[ ] No sensitive data appears in logs or browser responses
+
+FINAL REPORT REQUIRED
+
+Provide:
+
+1. Exact root cause
+2. Files changed
+3. Environment variables corrected, with secrets masked
+4. Nginx upstream port
+5. Node listening port
+6. Public OTP endpoint status
+7. SMS provider response status
+8. Real OTP delivery confirmation
+9. Login result for every role
+10. Screenshot of successful OTP screen
+11. Screenshot of Super Admin dashboard
+12. Production build/version stamp
+13. Rollback instructions
+
+Do not mark the task complete merely because builds pass or endpoints return 401. Completion requires a real successful OTP login on alburhantravels.com.
