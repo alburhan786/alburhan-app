@@ -145,15 +145,14 @@ export async function processPaymentSuccessNotifications(opts: {
     paymentRef,
   };
 
+  // ── Attach ONLY the Tax Invoice PDF (single PDF source for all channels) ──
   const attachments: EmailAttachment[] = [];
-  try {
-    const receiptBuf = await generateReceiptPdfBuffer(docOpts);
-    attachments.push({ filename: `Receipt-${booking.bookingNumber}.pdf`, content: receiptBuf, contentType: "application/pdf" });
-    if (invoiceNumber) {
-      const invBuf = await generateInvoicePdfBuffer(docOpts);
+  if (invoiceNumber) {
+    try {
       const safeInvNum = invoiceNumber.replace(/\//g, "-");
-      attachments.push({ filename: `Invoice-${safeInvNum}.pdf`, content: invBuf, contentType: "application/pdf" });
-      // Save invoice PDF to object storage and persist URL so downloads are instant
+      const invBuf = await generateInvoicePdfBuffer(docOpts);
+      attachments.push({ filename: `TaxInvoice-${safeInvNum}.pdf`, content: invBuf, contentType: "application/pdf" });
+      // Save to object storage so /invoice/:bookingNumber/pdf serves instantly
       uploadToGCS(invBuf, `Invoice-${safeInvNum}.pdf`, "application/pdf", "invoices")
         .then((pdfUrl) =>
           pool.query(
@@ -162,15 +161,14 @@ export async function processPaymentSuccessNotifications(opts: {
           )
         )
         .catch((err) => console.error("[payments] Failed to save invoice PDF to storage:", err));
+    } catch (err) {
+      console.error("[payments] Tax Invoice PDF generation failed (notifications will still send):", err);
     }
-  } catch (err) {
-    console.error("[payments] PDF generation failed (notifications will still send without attachments):", err);
   }
 
-  // ── Auto-send PDFs via WhatsApp document (fire-and-forget, after template message) ──
-  // attachments[0] = Receipt PDF, attachments[1] = Invoice PDF (only when invoiceNumber exists)
+  // ── Auto-send Tax Invoice PDF via WhatsApp (fire-and-forget) ──────────────
   if (attachments.length > 0) {
-    const _pdfAttachments = [...attachments]; // capture before async gap
+    const _invAttachment  = attachments[0];
     const _bookingMobile  = booking.customerMobile;
     const _bookingNumber  = booking.bookingNumber;
     const _bookingId      = booking.id;
@@ -179,30 +177,16 @@ export async function processPaymentSuccessNotifications(opts: {
       try {
         const { sendPDFDocument } = await import("../lib/botbee.js");
         const waOpts = { eventType: "payment_received", bookingId: _bookingId, customerId: _customerId };
-        // Send Receipt first (index 0)
-        if (_pdfAttachments[0]) {
-          const r = await sendPDFDocument(
-            _bookingMobile,
-            _pdfAttachments[0].content as Buffer,
-            _pdfAttachments[0].filename,
-            `Your Payment Receipt – Al Burhan Tours & Travels (Booking: ${_bookingNumber})`,
-            waOpts,
-          );
-          console.log(`[payments] WhatsApp Receipt PDF for ${_bookingNumber}: ${r.ok ? "✅ sent" : "❌ " + r.errorMessage}`);
-        }
-        // Send Invoice PDF (index 1 — only present if invoiceNumber exists)
-        if (_pdfAttachments[1]) {
-          const r = await sendPDFDocument(
-            _bookingMobile,
-            _pdfAttachments[1].content as Buffer,
-            _pdfAttachments[1].filename,
-            `Your Tax Invoice – Al Burhan Tours & Travels (Booking: ${_bookingNumber})`,
-            waOpts,
-          );
-          console.log(`[payments] WhatsApp Invoice PDF for ${_bookingNumber}: ${r.ok ? "✅ sent" : "❌ " + r.errorMessage}`);
-        }
+        const r = await sendPDFDocument(
+          _bookingMobile,
+          _invAttachment.content as Buffer,
+          _invAttachment.filename,
+          `Your Tax Invoice – Al Burhan Tours & Travels (Booking: ${_bookingNumber})`,
+          waOpts,
+        );
+        console.log(`[payments] WhatsApp Tax Invoice PDF for ${_bookingNumber}: ${r.ok ? "✅ sent" : "❌ " + r.errorMessage}`);
       } catch (pdfWaErr: any) {
-        console.error("[payments] WhatsApp PDF auto-delivery failed (non-fatal):", pdfWaErr?.message);
+        console.error("[payments] WhatsApp Tax Invoice PDF delivery failed (non-fatal):", pdfWaErr?.message);
       }
     })();
   }
@@ -630,9 +614,20 @@ router.post("/sync-payment", requireAuth as any, async (req: AuthenticatedReques
 
   console.log("[sync-payment] Synced booking:", updated.bookingNumber, "→", newStatus);
 
-  const baseUrl = process.env.REPLIT_DEV_DOMAIN
-    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-    : (process.env.SITE_URL || "https://alburhantravels.com");
+  // Upsert invoice and capture real invoice number (covers partial payments too)
+  let finalInvoiceNumber = invoiceNumber;
+  try {
+    const upserted = await upsertInvoiceForBooking(booking.id);
+    if (upserted?.invoice_number) {
+      finalInvoiceNumber = upserted.invoice_number as string;
+      await pool.query(
+        `UPDATE bookings SET invoice_number=$1, updated_at=NOW() WHERE id=$2 AND (invoice_number IS NULL OR invoice_number='')`,
+        [finalInvoiceNumber, booking.id]
+      );
+    }
+  } catch (err) {
+    console.error("[sync-payment] upsertInvoice failed:", err);
+  }
 
   const remainingBalance = Math.max(0, finalAmount - newPaidAmount);
   try {
@@ -642,7 +637,7 @@ router.post("/sync-payment", requireAuth as any, async (req: AuthenticatedReques
       thisPaymentAmount: thisPayment,
       newPaidAmount,
       remainingBalance,
-      invoiceNumber,
+      invoiceNumber: finalInvoiceNumber,
       paymentRef: capturedPayment?.id,
       paymentMode: "online",
       paymentDate: new Date(),
@@ -825,18 +820,22 @@ router.post("/webhook", async (req: any, res) => {
       recordOnlinePaymentTransaction(booking.id, thisPayment, paymentId, "Online payment via Razorpay (webhook)");
     }
 
-    // Upsert invoice so it reflects the new paid amount
+    // Upsert invoice and capture real invoice number (covers partial payments too)
+    let finalInvoiceNumber = invoiceNumber;
     try {
-      await upsertInvoiceForBooking(booking.id);
+      const upserted = await upsertInvoiceForBooking(booking.id);
+      if (upserted?.invoice_number) {
+        finalInvoiceNumber = upserted.invoice_number as string;
+        await pool.query(
+          `UPDATE bookings SET invoice_number=$1, updated_at=NOW() WHERE id=$2 AND (invoice_number IS NULL OR invoice_number='')`,
+          [finalInvoiceNumber, booking.id]
+        );
+      }
     } catch (invErr: any) {
       console.error("[Webhook] upsertInvoice failed:", invErr?.message);
     }
 
     console.log("[Webhook] Booking updated:", updated.bookingNumber, "→", newStatus);
-
-    const baseUrl = process.env.REPLIT_DEV_DOMAIN
-      ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-      : (process.env.SITE_URL || "https://alburhantravels.com");
 
     const remainingBalance = Math.max(0, finalAmount - newPaidAmount);
     try {
@@ -846,7 +845,7 @@ router.post("/webhook", async (req: any, res) => {
         thisPaymentAmount: thisPayment,
         newPaidAmount,
         remainingBalance,
-        invoiceNumber,
+        invoiceNumber: finalInvoiceNumber,
         paymentRef: paymentId,
         paymentMode: "online",
         paymentDate: new Date(),

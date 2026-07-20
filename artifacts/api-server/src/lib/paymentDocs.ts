@@ -62,33 +62,52 @@ function drawKV(doc: PDFKit.PDFDocument, y: number, rows: [string, string][]) {
 
 export async function generateInvoicePdfBuffer(opts: DocOpts): Promise<Buffer> {
   const doc = new PDFDocument({ size: "A4", margin: 0 });
-  let y = drawHeader(doc, `INVOICE — ${opts.invoiceNumber || opts.bookingNumber}`);
+  let y = drawHeader(doc, `TAX INVOICE — ${opts.invoiceNumber || opts.bookingNumber}`);
   y += 10;
+
+  const MARGIN = 40;
+  const PAGE_W = doc.page.width;
+
+  const total   = Number(opts.totalAmount ?? opts.finalAmount ?? 0);
+  const paid    = Number(opts.paidAmount ?? 0);
+  const balance = Number(opts.balanceAmount ?? Math.max(0, total - paid));
+
+  // ── Payment status badge ────────────────────────────────────────────────────
+  const isFullyPaid   = balance <= 0.01;
+  const isPartialPaid = paid > 0 && !isFullyPaid;
+  const statusLabel   = isFullyPaid ? "PAID IN FULL" : isPartialPaid ? "PARTIALLY PAID" : "PENDING PAYMENT";
+  const statusColor   = isFullyPaid ? "#065f46" : isPartialPaid ? "#92400e" : "#6b7280";
+  const statusBg      = isFullyPaid ? "#d1fae5" : isPartialPaid ? "#fef3c7" : "#f3f4f6";
+  const badgeW = 140;
+  const badgeH = 24;
+  const badgeX = PAGE_W - MARGIN - badgeW;
+  doc.rect(badgeX, y, badgeW, badgeH).fill(statusBg);
+  doc.fill(statusColor).font("Helvetica-Bold").fontSize(10)
+     .text(statusLabel, badgeX, y + 6, { width: badgeW, align: "center" });
+  doc.fill("black");
+  y += badgeH + 8;
+
   y = drawKV(doc, y, [
     ["Booking No.", opts.bookingNumber],
     ["Invoice No.", opts.invoiceNumber || "—"],
-    ["Customer", opts.customerName],
-    ["Mobile", opts.customerMobile],
-    ["Email", opts.customerEmail || "—"],
-    ["Package", opts.packageName || "—"],
-    ["Pilgrims", String(opts.numberOfPilgrims ?? "—")],
-    ["Date", (opts.paymentDate || new Date()).toLocaleDateString("en-IN")],
+    ["Customer",    opts.customerName],
+    ["Mobile",      opts.customerMobile],
+    ["Email",       opts.customerEmail || "—"],
+    ["Package",     opts.packageName || "—"],
+    ["Pilgrims",    String(opts.numberOfPilgrims ?? "—")],
+    ["Date",        (opts.paymentDate || new Date()).toLocaleDateString("en-IN")],
   ]);
   y += 15;
-  const MARGIN = 40;
-  const PAGE_W = doc.page.width;
+
   doc.rect(MARGIN, y, PAGE_W - MARGIN * 2, 26).fill(DARK_GREEN);
   doc.fill("white").font("Helvetica-Bold").fontSize(10).text("Description", MARGIN + 10, y + 8, { width: 300 });
   doc.text("Amount (₹)", MARGIN + 320, y + 8, { width: 150, align: "right" });
   y += 26;
   doc.fill("#111").font("Helvetica").fontSize(10);
-  const total = Number(opts.totalAmount ?? opts.finalAmount ?? 0);
-  const paid = Number(opts.paidAmount ?? 0);
-  const balance = Number(opts.balanceAmount ?? Math.max(0, total - paid));
-  const lines: [string, number][] = [
+  const lineItems: [string, number][] = [
     [`${opts.packageName || "Hajj/Umrah Package"} (${opts.numberOfPilgrims ?? 1} pilgrim(s))`, total],
   ];
-  for (const [label, amt] of lines) {
+  for (const [label, amt] of lineItems) {
     doc.rect(MARGIN, y, PAGE_W - MARGIN * 2, 24).stroke("#e5e7eb");
     doc.text(label, MARGIN + 10, y + 6, { width: 300 });
     doc.text(amt.toLocaleString("en-IN"), MARGIN + 320, y + 6, { width: 150, align: "right" });
@@ -97,11 +116,12 @@ export async function generateInvoicePdfBuffer(opts: DocOpts): Promise<Buffer> {
   y += 10;
   y = drawKV(doc, y, [
     ["Total Amount", `Rs. ${total.toLocaleString("en-IN")}`],
-    ["Amount Paid", `Rs. ${paid.toLocaleString("en-IN")}`],
-    ["Balance Due", `Rs. ${balance.toLocaleString("en-IN")}`],
+    ["Amount Paid",  `Rs. ${paid.toLocaleString("en-IN")}`],
+    ["Balance Due",  `Rs. ${balance.toLocaleString("en-IN")}`],
+    ["Status",       statusLabel],
   ]);
   doc.fontSize(9).fill("#888").text(
-    "This is a system-generated invoice. For queries, contact +91 9893989786 / info@alburhantravels.com",
+    "This is a system-generated Tax Invoice. For queries, contact +91 9893989786 / info@alburhantravels.com",
     MARGIN, doc.page.height - 60, { width: PAGE_W - MARGIN * 2, align: "center" }
   );
   return pdfToBuffer(doc);
