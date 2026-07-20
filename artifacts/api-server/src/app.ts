@@ -2515,7 +2515,7 @@ echo "╚═══════════════════════�
   res.send(script);
 });
 
-// GET /api/migrate/fixdeploy.sh — smarter deploy that auto-detects PM2 script path
+// GET /api/migrate/fixdeploy.sh — port-aware deploy: detects Nginx port, starts Node on matching port
 app.get("/api/migrate/fixdeploy.sh", (req, res) => {
   const key = req.query.key as string;
   if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
@@ -2524,118 +2524,174 @@ app.get("/api/migrate/fixdeploy.sh", (req, res) => {
   const DEPLOY_KEY   = "alburhan-migrate-2026";
 
   const script = `#!/bin/bash
-# Al Burhan Tours — VPS Fix Deploy (auto-detects PM2 script path)
+# Al Burhan Tours — VPS Fix Deploy v24 (port-aware, self-healing)
+# Usage: curl -fsSL "https://...fixdeploy.sh?key=..." | bash
 set -e
 DEV="${DEV_URL_HERE}"
 KEY="${DEPLOY_KEY}"
 PM2_APP="alburhan-api"
 FALLBACK="/var/www/alburhan/artifacts/api-server/dist/index.cjs"
+ENV_FILE="/var/www/alburhan/.env"
 
 echo ""
-echo "=== Al Burhan VPS Fix Deploy ==="
+echo "=== Al Burhan VPS Fix Deploy v24 ==="
+date
 echo ""
 
-# Step 1: Find PM2's actual script path
-echo "[1] Finding PM2 script path..."
+# ── [1] Detect existing PM2 script path ──────────────────────────────────────
+echo "[1] Detecting PM2 script path..."
 PM2_SCRIPT=\$(pm2 describe "\$PM2_APP" 2>/dev/null | grep -E "script path|exec file" | grep -oP '(?<=│ )/.+' | head -1 | tr -d ' ')
-if [ -z "\$PM2_SCRIPT" ]; then
-  PM2_SCRIPT=\$(pm2 show "\$PM2_APP" 2>/dev/null | grep "script" | grep "/" | grep -oP '/[^ ]+' | head -1)
-fi
-if [ -z "\$PM2_SCRIPT" ]; then
-  # Try parsing pm2 list output
-  PM2_SCRIPT=\$(pm2 show "\$PM2_APP" 2>&1 | grep -i "exec file" | sed 's/.*│ //' | sed 's/ │.*//' | tr -d ' ')
-fi
-if [ -z "\$PM2_SCRIPT" ]; then
-  PM2_SCRIPT="\$FALLBACK"
-  echo "    Could not detect PM2 path, using fallback: \$FALLBACK"
-else
-  echo "    PM2 is running: \$PM2_SCRIPT"
-fi
+[ -z "\$PM2_SCRIPT" ] && PM2_SCRIPT=\$(pm2 show "\$PM2_APP" 2>/dev/null | grep "script" | grep "/" | grep -oP '/[^ ]+' | head -1)
+[ -z "\$PM2_SCRIPT" ] && PM2_SCRIPT=\$(pm2 show "\$PM2_APP" 2>&1 | grep -i "exec file" | sed 's/.*│ //' | sed 's/ │.*//' | tr -d ' ')
+[ -z "\$PM2_SCRIPT" ] && PM2_SCRIPT="\$FALLBACK" && echo "    PM2 path not found — using fallback"
+echo "    Script: \$PM2_SCRIPT"
 
-# Step 2: Download new bundle
+# ── [2] Download bundle ───────────────────────────────────────────────────────
 echo ""
-echo "[2] Downloading new bundle (~6MB from Replit dev)..."
-curl -fsSL --progress-bar "\$DEV/api/migrate/server.cjs?key=\$KEY" -o /tmp/new_bundle.cjs
+echo "[2] Downloading bundle v24.0 (~6 MB)..."
+curl -fsSL "\$DEV/api/migrate/server.cjs?key=\$KEY" -o /tmp/new_bundle.cjs
 BSIZE=\$(stat -c%s /tmp/new_bundle.cjs 2>/dev/null || stat -f%z /tmp/new_bundle.cjs)
 echo "    Downloaded: \$BSIZE bytes"
-[ "\$BSIZE" -lt 5000000 ] && { echo "ERROR: Bundle too small"; exit 1; }
+[ "\$BSIZE" -lt 5000000 ] && { echo "ERROR: Bundle too small (\$BSIZE) — aborting"; exit 1; }
 
-# Step 3: Install bundle to BOTH the detected path and the standard fallback
+# ── [3] Install bundle ────────────────────────────────────────────────────────
 echo ""
 echo "[3] Installing bundle..."
-mkdir -p "\$(dirname "\$PM2_SCRIPT")"
-mkdir -p "\$(dirname "\$FALLBACK")"
-
-# Backup and install
+mkdir -p "\$(dirname "\$PM2_SCRIPT")" "\$(dirname "\$FALLBACK")"
 [ -f "\$PM2_SCRIPT" ] && cp "\$PM2_SCRIPT" "\$PM2_SCRIPT.bak.\$(date +%Y%m%d_%H%M%S)"
 cp /tmp/new_bundle.cjs "\$PM2_SCRIPT"
-echo "    Installed to PM2 path: \$PM2_SCRIPT"
-
+echo "    → \$PM2_SCRIPT"
 if [ "\$PM2_SCRIPT" != "\$FALLBACK" ]; then
-  [ -f "\$FALLBACK" ] && cp "\$FALLBACK" "\$FALLBACK.bak.\$(date +%Y%m%d_%H%M%S)"
   cp /tmp/new_bundle.cjs "\$FALLBACK"
-  echo "    Also installed to: \$FALLBACK"
+  echo "    → \$FALLBACK (canonical fallback)"
 fi
 
-# Step 4: Run SQL migration
+# ── [4] SQL migration ─────────────────────────────────────────────────────────
 echo ""
 echo "[4] Running database migration..."
 curl -fsSL "\$DEV/api/migrate/vps-update.sql?key=\$KEY" -o /tmp/vps-update.sql
 if [ -z "\$DATABASE_URL" ]; then
-  for f in /var/www/alburhan/.env /var/www/alburhan/artifacts/api-server/.env; do
+  for f in "\$ENV_FILE" /var/www/alburhan/artifacts/api-server/.env; do
     [ -f "\$f" ] && DB_LINE=\$(grep '^DATABASE_URL=' "\$f" 2>/dev/null | head -1) && [ -n "\$DB_LINE" ] && export \$DB_LINE && break
   done
 fi
-[ -n "\$DATABASE_URL" ] && psql "\$DATABASE_URL" -f /tmp/vps-update.sql -q && echo "    ✓ Migration complete" || echo "    ⚠ Run manually: psql DB_URL -f /tmp/vps-update.sql"
+if [ -n "\$DATABASE_URL" ]; then
+  psql "\$DATABASE_URL" -f /tmp/vps-update.sql -q && echo "    ✓ Migration done" || echo "    ⚠ Migration failed — run: psql \$DATABASE_URL -f /tmp/vps-update.sql"
+else
+  echo "    ⚠ DATABASE_URL not found — skipping migration"
+fi
 
-# Step 5: Deploy frontend
+# ── [5] Deploy frontend ───────────────────────────────────────────────────────
 echo ""
-echo "[5] Deploying frontend..."
+echo "[5] Deploying frontend (~132 MB)..."
 curl -fsSL "\$DEV/api/migrate/frontend.tar.gz?key=\$KEY" | tar -xzf - -C /var/www/alburhan
 echo "    ✓ Frontend deployed"
 
-# Step 6: Source .env then restart PM2 — always use canonical FALLBACK path
+# ── [6] Load .env ─────────────────────────────────────────────────────────────
 echo ""
-echo "[6] Restarting PM2..."
-
-# Load .env so DATABASE_URL and SESSION_SECRET are in environment before PM2 starts
-for ENV_FILE in /var/www/alburhan/.env /var/www/alburhan/artifacts/api-server/.env; do
-  if [ -f "\$ENV_FILE" ]; then
-    set -a
-    source "\$ENV_FILE"
-    set +a
-    echo "    Loaded env from: \$ENV_FILE"
+echo "[6] Loading environment..."
+for f in "\$ENV_FILE" /var/www/alburhan/artifacts/api-server/.env; do
+  if [ -f "\$f" ]; then
+    set -a; source "\$f"; set +a
+    echo "    Loaded: \$f"
     break
   fi
 done
-[ -z "\$DATABASE_URL" ] && echo "    WARNING: DATABASE_URL not found in any .env file — server may fail DB connect"
+[ -z "\$DATABASE_URL" ] && echo "    WARNING: DATABASE_URL missing — DB connect will fail"
+[ -z "\$SESSION_SECRET" ] && echo "    WARNING: SESSION_SECRET missing — sessions will fail"
 
-# Delete stale PM2 entry (removes any wrong script path or interpreter config)
+# ── [6b] Detect Nginx proxy_pass port → set PORT to match ────────────────────
+NGINX_PORT=\$(grep -rh "proxy_pass" /etc/nginx/sites-enabled/ /etc/nginx/conf.d/ /etc/nginx/nginx.conf 2>/dev/null \\
+  | grep -oE '(localhost|127\\.0\\.0\\.1):[0-9]+' | grep -oE '[0-9]{3,5}\$' | sort -u | head -1)
+
+if [ -n "\$NGINX_PORT" ]; then
+  export PORT="\$NGINX_PORT"
+  echo "    Nginx proxy_pass → port \$NGINX_PORT → exporting PORT=\$NGINX_PORT"
+elif [ -n "\$PORT" ]; then
+  echo "    Using PORT=\$PORT from .env"
+else
+  export PORT="3000"
+  echo "    WARNING: Could not detect Nginx port — defaulting PORT=3000"
+  echo "    If 502 persists: grep proxy_pass /etc/nginx/sites-enabled/* and set PORT accordingly"
+fi
+
+# Persist PORT into .env so PM2 restarts always use the same port
+sed -i '/^PORT=/d' "\$ENV_FILE" 2>/dev/null || true
+echo "PORT=\$PORT" >> "\$ENV_FILE"
+echo "    PORT=\$PORT written to \$ENV_FILE"
+
+# ── [7] Restart PM2 ──────────────────────────────────────────────────────────
+echo ""
+echo "[7] Starting PM2 on port \$PORT..."
 pm2 delete "\$PM2_APP" 2>/dev/null || true
-
-# Always start from the canonical fallback path (the CJS bundle, NOT TypeScript source)
 pm2 start "\$FALLBACK" --name "\$PM2_APP" --interpreter node
 pm2 save
-echo "    PM2 started: \$FALLBACK"
-sleep 6
+echo "    PM2 started"
+sleep 7
 pm2 status "\$PM2_APP"
 
-# Step 7: Verify
+# ── [8] Local health check (direct to Node port — bypasses Nginx) ─────────────
 echo ""
-echo "[7] Verifying..."
+echo "[8] Verifying (local → port \$PORT, then public → nginx)..."
 sleep 3
-HEALTH=\$(curl -sf --max-time 10 "https://alburhantravels.com/api/health" 2>/dev/null || echo "timeout")
-echo "    Health: \$HEALTH"
-DB_CHK=\$(curl -sf --max-time 12 "https://alburhantravels.com/api/migrate/db-check?key=\$KEY" 2>/dev/null | head -c 150 || echo "endpoint not accessible")
-echo "    DB:     \$DB_CHK"
-OTP_CHK=\$(curl -sf -X POST --max-time 8 "https://alburhantravels.com/api/auth/send-otp" -H "Content-Type: application/json" -d '{"mobile":"0000000000"}' 2>/dev/null | head -c 100 || echo "no response")
-echo "    OTP:    \$OTP_CHK"
+
+LOCAL=\$(curl -sf --max-time 8 "http://127.0.0.1:\$PORT/api/health" 2>/dev/null || echo "FAIL")
+echo "    Local  ::\$PORT  → \$LOCAL"
+
+if [ "\$LOCAL" = "FAIL" ]; then
+  echo ""
+  echo "  ✗ Node is NOT answering on port \$PORT"
+  echo "  ─ PM2 logs (last 60 lines):"
+  pm2 logs "\$PM2_APP" --lines 60 --nostream 2>/dev/null || true
+  echo ""
+  echo "  ─ Ports currently open:"
+  ss -tlnp 2>/dev/null | grep -E "LISTEN|State" || netstat -tlnp 2>/dev/null | head -15
+  echo ""
+  echo "  ─ Possible causes:"
+  echo "    1. DATABASE_URL is wrong/missing → DB connect fails → process exits"
+  echo "    2. SESSION_SECRET missing → session init fails"
+  echo "    3. Port already in use → try: kill -9 \$(lsof -ti:\$PORT)"
+  echo "    → Fix .env, then: source \$ENV_FILE && pm2 delete \$PM2_APP && pm2 start \$FALLBACK --name \$PM2_APP --interpreter node && pm2 save"
+else
+  echo "  ✓ Node is UP locally"
+
+  # Version confirmation
+  VER=\$(curl -sf --max-time 5 "http://127.0.0.1:\$PORT/api/version" 2>/dev/null | grep -o '"build":"[^"]*"' | head -1 || echo "n/a")
+  echo "    Version: \$VER"
+
+  # Public via Nginx
+  PUBLIC=\$(curl -sf --max-time 10 "https://alburhantravels.com/api/health" 2>/dev/null || echo "FAIL")
+  echo "    Public (nginx) → \$PUBLIC"
+
+  if [ "\$PUBLIC" = "FAIL" ]; then
+    echo ""
+    echo "  ✗ Public domain still 502 — Nginx cannot reach Node on port \$PORT"
+    echo "  ─ Current Nginx proxy_pass lines:"
+    grep -rh "proxy_pass" /etc/nginx/sites-enabled/ /etc/nginx/conf.d/ 2>/dev/null | head -5
+    echo ""
+    echo "  ─ Ports Node is listening on:"
+    ss -tlnp 2>/dev/null | grep node || echo "    (none found)"
+    echo ""
+    echo "  → Edit Nginx to use proxy_pass http://127.0.0.1:\$PORT; then:"
+    echo "    nginx -t && systemctl reload nginx"
+  else
+    echo "  ✓ Public domain is UP"
+    PUBVER=\$(curl -sf --max-time 5 "https://alburhantravels.com/api/version" 2>/dev/null | grep -o '"build":"[^"]*"' | head -1 || echo "n/a")
+    echo "    Public version: \$PUBVER"
+
+    OTP=\$(curl -s -X POST --max-time 8 "https://alburhantravels.com/api/auth/send-otp" \\
+      -H "Content-Type: application/json" -d '{"mobile":"0000000000"}' 2>/dev/null | head -c 120 || echo "no-response")
+    echo "    OTP test (dummy): \$OTP"
+
+    echo ""
+    echo "  ════════════════════════════════════════"
+    echo "  ✓ PRODUCTION IS ONLINE — v24.0 deployed"
+    echo "  ════════════════════════════════════════"
+  fi
+fi
 
 echo ""
-echo "=== Done."
-echo "=== If health shows timeout: pm2 logs \$PM2_APP --lines 50"
-echo "=== If DATABASE_URL error:   add it to /var/www/alburhan/.env and rerun step 6 manually:"
-echo "===   source /var/www/alburhan/.env && pm2 delete \$PM2_APP && pm2 start \$FALLBACK --name \$PM2_APP --interpreter node && pm2 save"
+echo "=== Fix Deploy complete. ==="
 `;
 
   res.setHeader("Content-Type", "text/plain; charset=utf-8");
