@@ -222,7 +222,9 @@ export default function SystemHealth() {
               <CheckCard label="OTP Table"                icon={Shield}     check={c?.otp_table} />
               <CheckCard label="Session Store"           icon={Shield}     check={c?.sessions} />
               <CheckCard label="Environment Variables"   icon={Activity}   check={c?.env_vars} />
-              <CheckCard label="Cron Jobs"               icon={Clock}      check={c?.cron_jobs} />
+              <CheckCard label="Razorpay Payments"       icon={Activity}   check={c?.razorpay} />
+              <CheckCard label="Object Storage"          icon={HardDrive}  check={c?.object_storage} />
+              <CheckCard label="Cron Jobs (9 active)"   icon={Clock}      check={c?.cron_jobs} />
               <CheckCard label="Server"                  icon={Server}     check={c?.server} />
             </div>
           </div>

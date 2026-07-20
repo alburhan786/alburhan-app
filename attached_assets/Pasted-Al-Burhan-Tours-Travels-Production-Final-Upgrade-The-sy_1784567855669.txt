@@ -1,0 +1,131 @@
+Al Burhan Tours & Travels Production Final Upgrade
+
+The system is already production-ready. Now perform the final enterprise upgrade.
+
+1. Notification Reliability
+- Add automatic retry for failed WhatsApp, Email and SMS.
+- Retry after 1 minute, 5 minutes, 30 minutes and 2 hours.
+- Maximum 5 retries.
+- Store every retry in notification_logs.
+
+2. Notification Dashboard
+Create an Admin Notification Center showing:
+- Total Sent
+- Delivered
+- Failed
+- Pending
+- Retry Queue
+- WhatsApp
+- SMS
+- Email
+- Push Notifications
+
+Allow filtering by:
+- Booking ID
+- Customer Name
+- Mobile
+- Date
+- Status
+- Notification Type
+
+3. Hotel Voucher SMS
+Integrate DLT approved SMS template.
+If DLT template is unavailable:
+- automatically send WhatsApp
+- automatically send Email
+- keep SMS in retry queue until approved template exists.
+
+4. Payment Workflow
+Whenever payment is successful:
+- Update booking status
+- Update invoice status
+- Update payment history
+- Generate Receipt PDF
+- Generate Invoice PDF
+- Generate Ledger Entry
+- Send WhatsApp
+- Send Email
+- Send SMS with secure PDF link
+- Send Push Notification
+
+5. Booking Workflow
+Immediately after booking:
+Generate:
+- Booking ID
+- Agreement ID
+- Invoice
+- Agreement PDF
+
+Automatically send:
+- WhatsApp
+- Email
+- SMS
+- Push Notification
+
+6. Admin Timeline
+Show every activity:
+- Booking Created
+- Payment Received
+- Invoice Generated
+- Agreement Signed
+- Visa Uploaded
+- Ticket Uploaded
+- Hotel Voucher Uploaded
+- Reminder Sent
+- Notification Delivered
+
+7. Customer Timeline
+Customer Dashboard should show:
+✓ Booking Submitted
+✓ Booking Approved
+✓ Payment Pending
+✓ Payment Received
+✓ Agreement
+✓ Invoice
+✓ Receipt
+✓ Visa
+✓ Flight Ticket
+✓ Hotel Voucher
+✓ Departure Reminder
+✓ Return Reminder
+
+8. Health Monitor
+Create a live system monitor for:
+- Database
+- WhatsApp API
+- Email Server
+- SMS Gateway
+- Razorpay
+- Firebase
+- Storage
+- Cron Jobs
+
+If any service fails:
+- Notify admin immediately
+- Log the error
+- Retry automatically
+
+9. Daily Scheduled Jobs
+Automatically run:
+08:00 AM
+- Payment reminders
+
+10:00 AM
+- Flight reminders
+
+12:00 PM
+- Orientation reminders
+
+06:00 PM
+- Visa reminder
+
+09:00 PM
+- Daily admin report
+
+10. Final Verification
+Run another complete production audit.
+
+Target:
+36/36 PASS
+
+Only mark COMPLETE if every workflow is verified on the live VPS.

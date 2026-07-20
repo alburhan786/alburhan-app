@@ -1560,6 +1560,64 @@ function BookingJourneyTimeline({ journeyStatus }: { journeyStatus: string }) {
   );
 }
 
+// ── Booking Progress Checklist (12 steps) ─────────────────────────────────
+function BookingProgressChecklist({ booking, agreement }: {
+  booking: any;
+  agreement?: any;
+}) {
+  const paid = Number(booking.paidAmount || 0) > 0;
+  const fullPaid = booking.status === "confirmed";
+  const approved = ["approved", "partially_paid", "confirmed"].includes(booking.status);
+  const journeyIdx = JOURNEY_STAGES.findIndex((s: any) => s.key === (booking.journeyStatus || "booking_requested"));
+  const jIdx = journeyIdx < 0 ? 0 : journeyIdx;
+  const hasAgreement = !!agreement;
+  const agreementSigned = agreement?.status === "signed";
+  const hasInvoice = !!booking.invoiceNumber;
+  const hasVisa = jIdx >= JOURNEY_STAGES.findIndex((s: any) => s.key === "visa_approved");
+  const hasTicket = jIdx >= JOURNEY_STAGES.findIndex((s: any) => s.key === "flight_confirmed");
+  const hasHotel = jIdx >= JOURNEY_STAGES.findIndex((s: any) => s.key === "hotel_confirmed");
+  const departed = jIdx >= JOURNEY_STAGES.findIndex((s: any) => s.key === "journey_started");
+  const returned = booking.journeyStatus === "journey_completed";
+
+  const steps = [
+    { label: "Booking Submitted",  done: true,          icon: "🕌" },
+    { label: "Booking Approved",   done: approved,      icon: "✅" },
+    { label: "Payment Received",   done: paid,          icon: "💳" },
+    { label: "Agreement Ready",    done: hasAgreement,  icon: "📜" },
+    { label: "Agreement Signed",   done: agreementSigned, icon: "✍️" },
+    { label: "Invoice Generated",  done: hasInvoice,    icon: "🧾" },
+    { label: "Visa Approved",      done: hasVisa,       icon: "🛂" },
+    { label: "Flight Ticket",      done: hasTicket,     icon: "✈️" },
+    { label: "Hotel Confirmed",    done: hasHotel,      icon: "🏨" },
+    { label: "Departure Ready",    done: departed,      icon: "🧳" },
+    { label: "Journey Started",    done: departed,      icon: "🛫" },
+    { label: "Journey Complete",   done: returned,      icon: "🏠" },
+  ];
+
+  const doneCount = steps.filter(s => s.done).length;
+
+  return (
+    <div className="px-5 py-4 border-b border-border bg-gradient-to-r from-primary/3 to-transparent">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-xs font-bold text-primary uppercase tracking-wider">Booking Progress</p>
+        <span className="text-xs bg-primary/10 text-primary rounded-full px-2.5 py-0.5 font-bold">
+          {doneCount} / {steps.length} complete
+        </span>
+      </div>
+      <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+        {steps.map((step, i) => (
+          <div key={i} className={`flex flex-col items-center gap-1 p-1.5 rounded-lg transition-all ${step.done ? "bg-emerald-50 border border-emerald-200" : "bg-gray-50 border border-gray-100"}`}>
+            <span className={`text-base ${step.done ? "" : "grayscale opacity-40"}`}>{step.icon}</span>
+            <p className={`text-center leading-tight font-medium ${step.done ? "text-emerald-700" : "text-gray-400"}`} style={{ fontSize: "9px" }}>
+              {step.done ? "✓ " : ""}{step.label}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function PremiumTimeline({ bookingId, journeyStatus }: { bookingId: string; journeyStatus: string }) {
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -2957,6 +3015,12 @@ export default function CustomerDashboard() {
                         {getStatusMessage(booking.status)}
                       </div>
                     )}
+
+                    {/* Booking Progress Checklist */}
+                    <BookingProgressChecklist
+                      booking={booking}
+                      agreement={agreementsByBooking[booking.id]}
+                    />
 
                     {/* Premium Journey Timeline */}
                     <PremiumTimeline bookingId={booking.id} journeyStatus={booking.journeyStatus || "booking_requested"} />

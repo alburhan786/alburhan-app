@@ -153,7 +153,7 @@ export const EVENT_GROUPS: Record<string, EventType[]> = {
 export const EVENT_TYPES: EventType[] = Object.values(EVENT_GROUPS).flat();
 export const CHANNELS: Channel[] = ["whatsapp", "sms", "rcs", "email", "push"];
 export const CHANNEL_PRIORITY: Channel[] = ["whatsapp", "sms", "rcs", "email", "push"];
-export const MAX_RETRY = 3;
+export const MAX_RETRY = 5;
 
 function formatINR(n: number) {
   return new Intl.NumberFormat("en-IN").format(Math.round(n));

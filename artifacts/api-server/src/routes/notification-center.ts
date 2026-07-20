@@ -55,18 +55,35 @@ router.get("/logs/:id", requireAdmin as any, async (req: AuthenticatedRequest, r
   }
 });
 
+router.get("/retry-queue-count", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
+  try {
+    const r = await pool.query(`SELECT COUNT(*) FROM notification_retry_queue WHERE status='pending'`);
+    res.json({ count: Number(r.rows[0]?.count ?? 0) });
+  } catch (err) {
+    res.json({ count: 0 });
+  }
+});
+
 router.get("/logs", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
-    const { status, channel, event_type, limit = "100", offset = "0", search, booking_number } = req.query as any;
+    const { status, channel, event_type, search, booking_number, date } = req.query as any;
+    const pageParam  = Number(req.query.page  || 1);
+    const limitParam = Number(req.query.limit || req.query.limit || 30);
+    const offsetParam = Number(req.query.offset || (pageParam - 1) * limitParam);
+
     const conditions: string[] = [];
     const params: unknown[] = [];
     let idx = 1;
 
-    if (status) { conditions.push(`nl.status=$${idx++}`); params.push(status); }
-    if (channel) { conditions.push(`nl.channel=$${idx++}`); params.push(channel); }
+    if (status)   { conditions.push(`nl.status=$${idx++}`); params.push(status); }
+    if (channel)  { conditions.push(`nl.channel=$${idx++}`); params.push(channel); }
     if (event_type) { conditions.push(`nl.event_type=$${idx++}`); params.push(event_type); }
+    if (date) {
+      conditions.push(`DATE(nl.created_at AT TIME ZONE 'Asia/Kolkata') = $${idx++}`);
+      params.push(date);
+    }
     if (search) {
-      conditions.push(`(nl.recipient ILIKE $${idx} OR nl.message ILIKE $${idx} OR nl.booking_id ILIKE $${idx} OR b.booking_number ILIKE $${idx})`);
+      conditions.push(`(nl.recipient ILIKE $${idx} OR nl.message ILIKE $${idx} OR nl.booking_id ILIKE $${idx} OR b.booking_number ILIKE $${idx} OR b.customer_name ILIKE $${idx})`);
       params.push(`%${search}%`); idx++;
     }
     if (booking_number) {
@@ -75,18 +92,22 @@ router.get("/logs", requireAdmin as any, async (req: AuthenticatedRequest, res) 
     }
 
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-    const result = await pool.query(
-      `SELECT nl.*, b.booking_number, b.customer_name
-       FROM notification_logs nl
-       LEFT JOIN bookings b ON b.id = nl.booking_id
-       ${where} ORDER BY nl.created_at DESC LIMIT $${idx} OFFSET $${idx + 1}`,
-      [...params, Number(limit), Number(offset)]
-    );
-    const countRes = await pool.query(
-      `SELECT COUNT(*) FROM notification_logs nl LEFT JOIN bookings b ON b.id = nl.booking_id ${where}`,
-      params
-    );
-    res.json({ logs: result.rows, total: Number(countRes.rows[0]?.count ?? 0) });
+    const [result, countRes] = await Promise.all([
+      pool.query(
+        `SELECT nl.*, b.booking_number, b.customer_name
+         FROM notification_logs nl
+         LEFT JOIN bookings b ON b.id = nl.booking_id
+         ${where} ORDER BY nl.created_at DESC LIMIT $${idx} OFFSET $${idx + 1}`,
+        [...params, limitParam, offsetParam]
+      ),
+      pool.query(
+        `SELECT COUNT(*) FROM notification_logs nl LEFT JOIN bookings b ON b.id = nl.booking_id ${where}`,
+        params
+      ),
+    ]);
+    const total = Number(countRes.rows[0]?.count ?? 0);
+    const pages = Math.ceil(total / limitParam) || 1;
+    res.json({ logs: result.rows, total, page: pageParam, pages });
   } catch (err) {
     console.error("[notification-center] GET /logs:", err);
     res.status(500).json({ message: "Failed to get logs" });

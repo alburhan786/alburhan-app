@@ -612,12 +612,12 @@ export function startBalanceReminderCron() {
   const scheduleDaily = () => {
     const now = new Date();
     const next = new Date(now);
-    next.setUTCHours(3, 0, 0, 0); // 08:30 IST
+    next.setUTCHours(2, 30, 0, 0); // 08:00 IST
     if (next <= now) next.setUTCDate(next.getUTCDate() + 1);
     setTimeout(() => { run().catch(() => {}); scheduleDaily(); }, next.getTime() - now.getTime());
   };
   scheduleDaily();
-  console.log("[BalanceReminder] Cron scheduled: daily at 08:30 IST");
+  console.log("[BalanceReminder] Cron scheduled: daily at 08:00 IST");
 }
 
 // ── Document Reminder Cron ──────────────────────────────────────────────────
@@ -783,4 +783,123 @@ export function startAgreementIntegrityCron() {
   run().catch(() => {}); // Run immediately on startup to fix any existing issues
   scheduleNightly();
   console.log("[AgreementIntegrity] Cron scheduled: daily at 02:00 IST + immediate startup check");
+}
+
+// ── Visa Expiry Reminder Cron — daily at 18:00 IST (12:30 UTC) ────────────
+export function startVisaReminderCron() {
+  const run = async () => {
+    try {
+      const upcoming = await pool.query(
+        `SELECT b.id, b.booking_number, b.customer_name, b.customer_mobile, b.customer_email,
+                p.name AS package_name,
+                b.preferred_departure_date
+         FROM bookings b
+         LEFT JOIN packages p ON p.id = b.package_id
+         WHERE b.status IN ('approved','partially_paid','confirmed')
+           AND b.deleted_at IS NULL
+           AND b.preferred_departure_date IS NOT NULL
+           AND b.preferred_departure_date::date BETWEEN CURRENT_DATE + INTERVAL '3 days'
+                                                    AND CURRENT_DATE + INTERVAL '30 days'
+           AND NOT EXISTS (
+             SELECT 1 FROM documents d
+             WHERE d.booking_id = b.id
+               AND d.doc_type = 'visa'
+               AND d.deleted_at IS NULL
+           )`
+      );
+      for (const row of upcoming.rows) {
+        const daysLeft = Math.ceil((new Date(row.preferred_departure_date).getTime() - Date.now()) / 86400000);
+        await triggerWorkflow("visa_reminder" as any, row.id, {
+          customerName: row.customer_name,
+          customerMobile: row.customer_mobile,
+          customerEmail: row.customer_email,
+          bookingNumber: row.booking_number,
+          packageName: row.package_name || "Hajj/Umrah Package",
+          daysLeft: String(daysLeft),
+        }).catch(() => {});
+      }
+      if (upcoming.rowCount) console.log(`[VisaReminder] Sent reminders to ${upcoming.rowCount} bookings without visa`);
+    } catch (err: any) {
+      console.error("[VisaReminder] Cron error:", err?.message);
+    }
+  };
+
+  const schedule = () => {
+    const now = new Date();
+    const next = new Date(now);
+    next.setUTCHours(12, 30, 0, 0); // 18:00 IST
+    if (next <= now) next.setUTCDate(next.getUTCDate() + 1);
+    setTimeout(() => { run().catch(() => {}); schedule(); }, next.getTime() - now.getTime());
+  };
+  schedule();
+  console.log("[VisaReminder] Cron scheduled: daily at 18:00 IST");
+}
+
+// ── Daily Admin Report Cron — daily at 21:00 IST (15:30 UTC) ─────────────
+export function startDailyAdminReportCron() {
+  const run = async () => {
+    try {
+      const today = new Date().toISOString().split("T")[0];
+      const [bookings, payments, notifs, retryQueue, failed] = await Promise.all([
+        pool.query(`SELECT COUNT(*) FROM bookings WHERE DATE(created_at) = $1 AND deleted_at IS NULL`, [today]),
+        pool.query(`SELECT COALESCE(SUM(amount),0) AS total, COUNT(*) AS count FROM payment_transactions WHERE DATE(created_at) = $1 AND is_deleted=false`, [today]),
+        pool.query(`SELECT COUNT(*) FILTER(WHERE status='sent') AS sent, COUNT(*) FILTER(WHERE status='failed') AS failed, COUNT(*) AS total FROM notification_logs WHERE DATE(created_at) = $1`, [today]),
+        pool.query(`SELECT COUNT(*) FROM notification_retry_queue WHERE status='pending'`),
+        pool.query(`SELECT COUNT(*) FROM notification_retry_queue WHERE status='failed' AND DATE(updated_at) = $1`, [today]),
+      ]);
+
+      const b = bookings.rows[0];
+      const p = payments.rows[0];
+      const n = notifs.rows[0];
+      const rq = retryQueue.rows[0];
+      const f = failed.rows[0];
+
+      const report = `📊 *Al Burhan Daily Report — ${today}*\n\n` +
+        `📋 *Bookings Today:* ${b.count}\n` +
+        `💳 *Payments Today:* ₹${Number(p.total).toLocaleString("en-IN")} (${p.count} transactions)\n\n` +
+        `📣 *Notifications:*\n` +
+        `  ✅ Sent: ${n.sent}\n` +
+        `  ❌ Failed: ${n.failed}\n` +
+        `  📨 Total: ${n.total}\n` +
+        `  🔄 Retry Queue: ${rq.count} pending\n` +
+        `  ⚠️ Permanently failed today: ${f.count}\n\n` +
+        `_Report generated at 21:00 IST | Al Burhan Tours & Travels_`;
+
+      // Send to admin mobile (config from api_settings or env)
+      const adminRes = await pool.query(
+        `SELECT value FROM api_settings WHERE service='admin' AND key='report_mobile' LIMIT 1`
+      ).catch(() => ({ rows: [] }));
+      const adminMobile = adminRes.rows[0]?.value || process.env.ADMIN_REPORT_MOBILE;
+
+      if (adminMobile) {
+        const { sendText } = await import("./botbee.js");
+        await sendText(adminMobile, report, { eventType: "daily_admin_report" }).catch(() => {});
+      }
+
+      // Also send email to admin
+      const adminEmailRes = await pool.query(
+        `SELECT value FROM api_settings WHERE service='admin' AND key='report_email' LIMIT 1`
+      ).catch(() => ({ rows: [] }));
+      const adminEmail = adminEmailRes.rows[0]?.value || process.env.ADMIN_REPORT_EMAIL;
+
+      if (adminEmail) {
+        const { sendEmail } = await import("./notifications.js");
+        await sendEmail(adminEmail, `Al Burhan Daily Report — ${today}`, report.replace(/\n/g, "<br>")).catch(() => {});
+      }
+
+      console.log(`[DailyReport] Report sent for ${today}: ${b.count} bookings, ₹${p.total} payments`);
+    } catch (err: any) {
+      console.error("[DailyReport] Cron error:", err?.message);
+    }
+  };
+
+  const schedule = () => {
+    const now = new Date();
+    const next = new Date(now);
+    next.setUTCHours(15, 30, 0, 0); // 21:00 IST
+    if (next <= now) next.setUTCDate(next.getUTCDate() + 1);
+    setTimeout(() => { run().catch(() => {}); schedule(); }, next.getTime() - now.getTime());
+  };
+  schedule();
+  console.log("[DailyReport] Cron scheduled: daily at 21:00 IST");
 }

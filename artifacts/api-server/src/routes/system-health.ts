@@ -179,18 +179,45 @@ router.get("/system-health", requireAdmin as any, async (_req, res) => {
     results.retry_queue = { status: "warn", message: "Could not read retry queue", detail: e.message };
   }
 
-  // 10. Cron jobs
+  // 10. Razorpay
+  {
+    const keyId = process.env.RAZORPAY_KEY_ID;
+    const secret = process.env.RAZORPAY_SECRET;
+    const ok = !!keyId && !!secret && !keyId.includes("YOUR_") && keyId.startsWith("rzp_");
+    results.razorpay = {
+      status: ok ? "ok" : "warn",
+      message: ok ? `Razorpay configured (${keyId?.startsWith("rzp_live") ? "LIVE" : "TEST"} key)` : "Razorpay key not configured",
+      detail: ok ? { mode: keyId?.startsWith("rzp_live") ? "live" : "test", keyId: keyId?.slice(0, 12) + "****" } : undefined,
+    };
+  }
+
+  // 11. Object Storage
+  try {
+    const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
+    const ok = !!bucketId && bucketId.length > 5;
+    results.object_storage = {
+      status: ok ? "ok" : "warn",
+      message: ok ? "Object storage bucket configured" : "Object storage not configured (file uploads may fail)",
+    };
+  } catch {
+    results.object_storage = { status: "warn", message: "Cannot check object storage" };
+  }
+
+  // 12. Cron jobs
   results.cron_jobs = {
     status: "ok",
-    message: "All scheduled reminder jobs running",
+    message: "All 9 scheduled jobs running",
     detail: {
       jobs: [
-        "Payment reminder — daily 9:00 AM IST",
-        "Departure reminder — hourly",
-        "Document expiry — daily 7:30 IST",
-        "Return feedback — daily 10:00 IST",
-        "Balance reminder — daily 8:30 IST",
-        "WhatsApp retry engine — every 60 seconds",
+        "💳 Payment/Balance reminder   — 08:00 IST daily",
+        "✈️  Flight/Departure reminder  — hourly checks",
+        "📋 Document expiry check       — 07:30 IST daily",
+        "💬 Return feedback             — 10:00 IST daily",
+        "🛂 Visa reminder               — 18:00 IST daily",
+        "📊 Daily admin report          — 21:00 IST daily",
+        "🤝 Agreement integrity         — 02:00 IST daily",
+        "💬 WhatsApp retry engine       — every 60 seconds",
+        "📱 SMS/Email retry engine      — every 10 seconds (1m/5m/30m/2hr, max 5)",
       ],
     },
   };

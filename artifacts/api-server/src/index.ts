@@ -89,7 +89,7 @@ import { startPaymentReminderCron } from "./jobs/paymentReminder.js";
 import { startFeedbackReminderCron } from "./jobs/feedbackReminder.js";
 import { startAgreementReminderCron } from "./jobs/agreementReminder.js";
 import { startTicketDepartureReminderCron } from "./jobs/ticketDepartureReminder.js";
-import { startDepartureReminderCron, startDocumentExpiryCron, startReturnAndFeedbackCron, startBalanceReminderCron, startDocumentReminderCron, startZiyaratReminderCron, startAgreementIntegrityCron } from "./lib/workflowEngine.js";
+import { startDepartureReminderCron, startDocumentExpiryCron, startReturnAndFeedbackCron, startBalanceReminderCron, startDocumentReminderCron, startZiyaratReminderCron, startAgreementIntegrityCron, startVisaReminderCron, startDailyAdminReportCron } from "./lib/workflowEngine.js";
 import { DEFAULT_RULES } from "./routes/workflows.js";
 
 async function runMigrations() {
@@ -2242,6 +2242,8 @@ async function start() {
     startZiyaratReminderCron();
     startAgreementIntegrityCron();
     startAgreementReminderCron();
+    startVisaReminderCron();
+    startDailyAdminReportCron();
     startTicketDepartureReminderCron();
     const scheduleAuditRetention = () => {
       const now = new Date();
@@ -2434,13 +2436,13 @@ async function start() {
     setInterval(runRetryEngine, 60 * 1000); // every 60s instead of every 15s
     console.log("[RetryEngine] WhatsApp retry engine scheduled every 60 seconds (exponential backoff, max 5 retries)");
 
-    // ── Generic cross-channel retry engine (SMS/RCS/Email/Push) — 30s backoff, max 3 ──
-    const RETRY_DELAYS_SEC = [30, 30, 30];
+    // ── Generic cross-channel retry engine (SMS/RCS/Email/Push) — 1min/5min/30min/2hr/2hr, max 5 ──
+    const RETRY_DELAYS_SEC = [60, 300, 1800, 7200, 7200];
     const runGenericRetryEngine = async () => {
       try {
         const due = await pool.query(
           `SELECT * FROM notification_retry_queue
-           WHERE status='pending' AND retry_count < 3 AND next_retry_at <= NOW()
+           WHERE status='pending' AND retry_count < 5 AND next_retry_at <= NOW()
            ORDER BY next_retry_at ASC LIMIT 20`
         );
         if (!due.rowCount) return;
@@ -2478,10 +2480,10 @@ async function start() {
               [newRetryCount, item.notification_log_id]
             ).catch(() => {});
             console.log(`[GenericRetryEngine] ${item.channel} → SENT on retry #${newRetryCount} (${item.recipient})`);
-          } else if (newRetryCount >= 3) {
+          } else if (newRetryCount >= 5) {
             await pool.query(
               `UPDATE notification_retry_queue SET status='failed', retry_count=$1, last_error=$2, updated_at=NOW() WHERE id=$3`,
-              [newRetryCount, errorMessage || "Max retries reached", item.id]
+              [newRetryCount, errorMessage || "Max retries (5) reached", item.id]
             );
             await pool.query(
               `UPDATE notification_logs SET retry_count=$1 WHERE id=$2`,
@@ -2503,7 +2505,7 @@ async function start() {
       }
     };
     setInterval(runGenericRetryEngine, 10 * 1000);
-    console.log("[GenericRetryEngine] SMS/RCS/Email retry engine scheduled every 10 seconds (30s backoff, max 3 retries)");
+    console.log("[GenericRetryEngine] SMS/RCS/Email retry engine: 1m/5m/30m/2h/2h backoff, max 5 retries");
   });
 }
 
