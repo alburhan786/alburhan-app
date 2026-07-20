@@ -22,7 +22,15 @@ export type WorkflowTrigger =
   | "return_reminder" | "feedback_request"
   | "document_expiry_90" | "document_expiry_60"
   | "document_expiry_30" | "document_expiry_7"
-  | "medical_emergency";
+  | "medical_emergency"
+  // Journey status transitions (set by admin on booking detail page)
+  | "booking_requested" | "booking_submitted"
+  | "documents_pending" | "documents_received" | "admin_verification"
+  | "payment_pending" | "visa_processing"
+  | "flight_confirmed" | "hotel_confirmed" | "bus_allocated" | "room_allocated"
+  | "departure_ready" | "journey_started"
+  | "reached_makkah" | "reached_madinah"
+  | "return_flight" | "journey_completed";
 
 export interface WorkflowContext extends Omit<NotificationContext, "customerName"> {
   bookingId?: string;
@@ -111,6 +119,24 @@ const TRIGGER_TO_EVENT: Record<string, string> = {
   hajj_package_launch:      "hajj_package_launch",
   // General
   feedback_request:         "feedback_request",
+  // Journey status transitions (admin sets via booking detail page)
+  booking_requested:        "new_booking",
+  booking_submitted:        "new_booking",
+  documents_pending:        "journey_status_changed",
+  documents_received:       "journey_status_changed",
+  admin_verification:       "journey_status_changed",
+  payment_pending:          "balance_reminder",
+  visa_processing:          "journey_status_changed",
+  flight_confirmed:         "flight_assigned",
+  hotel_confirmed:          "room_allocation",
+  bus_allocated:            "bus_assigned",
+  room_allocated:           "room_allocation",
+  departure_ready:          "departure_reminder",
+  journey_started:          "journey_status_changed",
+  reached_makkah:           "welcome_saudi",
+  reached_madinah:          "journey_status_changed",
+  return_flight:            "return_flight_reminder",
+  journey_completed:        "arrival_india",
   document_expiry_90:       "passport_expiry",
   document_expiry_60:       "passport_expiry",
   document_expiry_30:       "passport_expiry",
@@ -150,6 +176,24 @@ const TIMELINE_LABELS: Record<string, { icon: string; title: string }> = {
   departure_reminder_3h: { icon: "🔔", title: "Departure in 3 Hours" },
   return_reminder: { icon: "🏠", title: "Return Journey Details" },
   feedback_request: { icon: "⭐", title: "Feedback Requested" },
+  // Journey status transitions
+  booking_requested:  { icon: "📋", title: "Booking Submitted" },
+  booking_submitted:  { icon: "📋", title: "Booking Submitted" },
+  documents_pending:  { icon: "📄", title: "Documents Required" },
+  documents_received: { icon: "📁", title: "Documents Received" },
+  admin_verification: { icon: "🔍", title: "Under Verification" },
+  payment_pending:    { icon: "💳", title: "Payment Pending" },
+  visa_processing:    { icon: "🛂", title: "Visa Processing" },
+  flight_confirmed:   { icon: "✈️", title: "Flight Confirmed" },
+  hotel_confirmed:    { icon: "🏨", title: "Hotel Confirmed" },
+  bus_allocated:      { icon: "🚌", title: "Bus Allocated" },
+  room_allocated:     { icon: "🚪", title: "Room Allocated" },
+  departure_ready:    { icon: "🛫", title: "Departure Ready" },
+  journey_started:    { icon: "🌙", title: "Journey Started" },
+  reached_makkah:     { icon: "🕋", title: "Reached Makkah" },
+  reached_madinah:    { icon: "🕌", title: "Reached Madinah" },
+  return_flight:      { icon: "🛬", title: "Return Journey" },
+  journey_completed:  { icon: "🏠", title: "Journey Completed" },
   document_expiry_90: { icon: "📅", title: "Document Expiry (90 Days)" },
   document_expiry_60: { icon: "📅", title: "Document Expiry (60 Days)" },
   document_expiry_30: { icon: "📅", title: "Document Expiry (30 Days)" },

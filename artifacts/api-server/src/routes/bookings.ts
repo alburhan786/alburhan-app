@@ -944,6 +944,9 @@ router.post("/:id/journey-status", requireAdmin as any, requirePermission("booki
       bookingId: booking.id, bookingNumber: booking.booking_number,
       customerName: booking.customer_name, customerMobile: booking.customer_mobile,
       customerEmail: booking.customer_email ?? undefined,
+      customerId: booking.customer_id ?? undefined,
+      packageName: booking.package_name ?? undefined,
+      journeyStatus: journey_status,
     }).catch(() => {});
 
     auditLog({ req, action: "journey_status_changed", entityTable: "bookings", entityId: booking.id, newValue: { journey_status } }).catch(() => {});

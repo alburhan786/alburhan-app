@@ -1,0 +1,491 @@
+You are now acting as a Senior Software Architect and Production Debugging Engineer.
+
+DO NOT perform another audit only.
+
+DO NOT only tell me what is wrong.
+
+I want you to FIND, FIX, TEST and VERIFY every issue until the complete booking workflow works in production.
+
+Current production:
+
+https://alburhantravels.com
+
+This is a LIVE production system.
+
+==================================================
+
+MISSION
+
+Every booking must automatically complete the following workflow without manual intervention.
+
+Customer books package
+
+↓
+
+Booking created
+
+↓
+
+Booking confirmation
+
+↓
+
+Invoice generated
+
+↓
+
+Agreement generated
+
+↓
+
+Payment link generated
+
+↓
+
+Customer pays
+
+↓
+
+Payment verified
+
+↓
+
+Invoice status updated
+
+↓
+
+Booking status updated
+
+↓
+
+Customer dashboard updated
+
+↓
+
+Notification sent
+
+↓
+
+Admin notification logged
+
+==================================================
+
+REQUIRED FIXES
+
+1.
+
+Customer pays through Razorpay.
+
+Immediately after successful payment:
+
+• Payment transaction saved
+
+• Booking updated
+
+• Invoice updated
+
+• Receipt generated
+
+• Ledger updated
+
+• Customer dashboard updated
+
+• Admin dashboard updated
+
+NO manual refresh.
+
+NO pending invoice.
+
+NO stale cache.
+
+2.
+
+Invoice Status
+
+Current bug:
+
+Customer pays
+
+Invoice still shows PENDING.
+
+Fix logic.
+
+Invoice must become:
+
+PARTIALLY PAID
+
+or
+
+PAID
+
+according to received amount.
+
+Balance calculation must be accurate.
+
+3.
+
+Customer Dashboard
+
+Customer must instantly see:
+
+Booking
+
+Invoice
+
+Receipt
+
+Agreement
+
+Payment
+
+Journey Status
+
+Documents
+
+without logout/login.
+
+4.
+
+Notification Center
+
+Every event must create ONE notification record.
+
+No duplicates.
+
+Every notification must show:
+
+Pending
+
+Processing
+
+Sent
+
+Delivered
+
+Failed
+
+Permanent Failed
+
+Retry Count
+
+Error Message
+
+Provider Response
+
+Timestamp
+
+5.
+
+Journey Status
+
+Whenever admin changes:
+
+Booking Submitted
+
+Documents Required
+
+Documents Received
+
+Under Verification
+
+Payment Pending
+
+Payment Received
+
+Invoice Generated
+
+Visa Processing
+
+Visa Approved
+
+Flight Confirmed
+
+Hotel Confirmed
+
+Bus Allocated
+
+Room Allocated
+
+Departure Ready
+
+Journey Started
+
+Reached Makkah
+
+Reached Madinah
+
+Return Flight
+
+Journey Completed
+
+the customer must immediately receive:
+
+WhatsApp
+
+SMS
+
+Email
+
+Dashboard notification
+
+Notification history
+
+6.
+
+Buttons
+
+Verify these buttons:
+
+Send Payment Link
+
+Send Reminder
+
+WhatsApp
+
+SMS
+
+Email
+
+Invoice PDF
+
+Receipt PDF
+
+Resend All
+
+All buttons must actually perform their action.
+
+No placeholder.
+
+No stub.
+
+7.
+
+WhatsApp
+
+Current logs show:
+
+permanently_failed
+
+Find exact cause.
+
+Possible reasons:
+
+Wrong template
+
+Wrong variable count
+
+Wrong language
+
+Wrong template name
+
+Wrong namespace
+
+Wrong phone formatting
+
+API authentication
+
+24-hour restriction
+
+Media upload failure
+
+Fix permanently.
+
+Verify by sending real production message.
+
+8.
+
+SMS
+
+Current logs show Failed.
+
+Investigate:
+
+Provider response
+
+DLT template
+
+Sender ID
+
+API credentials
+
+Phone formatting
+
+Retry logic
+
+Fix completely.
+
+9.
+
+Email
+
+Verify:
+
+Booking Confirmation
+
+Invoice
+
+Receipt
+
+Agreement
+
+Payment Reminder
+
+Payment Received
+
+Journey Status
+
+Visa
+
+Ticket
+
+Hotel Voucher
+
+All emails must send successfully.
+
+10.
+
+Payment Link
+
+Current button not working.
+
+Generate Razorpay payment link.
+
+Save link.
+
+Send by:
+
+WhatsApp
+
+SMS
+
+Email
+
+Dashboard
+
+11.
+
+Reminder
+
+Send Reminder button must send:
+
+Payment reminder
+
+Balance reminder
+
+Departure reminder
+
+Document reminder
+
+through:
+
+WhatsApp
+
+SMS
+
+Email
+
+12.
+
+Notification Queue
+
+Implement reliable queue.
+
+Retry transient failures.
+
+Do NOT retry permanent failures forever.
+
+Log every provider response.
+
+13.
+
+Admin Dashboard
+
+Real-time updates:
+
+Booking
+
+Payments
+
+Invoices
+
+Notifications
+
+Journey Status
+
+14.
+
+Customer Dashboard
+
+Real-time updates after every backend event.
+
+15.
+
+End-to-End Test
+
+Create one test booking.
+
+Verify:
+
+Booking
+
+Invoice
+
+Agreement
+
+Payment
+
+Receipt
+
+Journey Status
+
+Documents
+
+Customer Dashboard
+
+Admin Dashboard
+
+SMS
+
+WhatsApp
+
+Email
+
+Payment Link
+
+Reminder
+
+Everything must work automatically.
+
+==================================================
+
+IMPORTANT
+
+Do NOT stop after finding problems.
+
+Continue fixing until every production workflow passes.
+
+Provide screenshots and logs proving:
+
+✓ Booking works
+
+✓ Payment works
+
+✓ Invoice updates
+
+✓ Customer dashboard updates
+
+✓ WhatsApp sent
+
+✓ SMS sent
+
+✓ Email sent
+
+✓ Journey status sent
+
+✓ Reminder works
+
+✓ Payment link works
+
+✓ Notification center works
+
+The task is complete ONLY when a real customer can book, pay, receive notifications, and see correct information without any manual intervention.

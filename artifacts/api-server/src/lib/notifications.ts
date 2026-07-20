@@ -961,6 +961,7 @@ export async function sendJourneyStatusNotification(opts: {
 
   await Promise.allSettled([
     sendWhatsApp(opts.mobile, message),
+    sendDLTSMS(opts.mobile, opts.customerName, opts.bookingNumber, opts.journeyStatus),
     opts.email
       ? import("../services/emailService.js").then(({ sendBookingStatusEmail }) =>
           sendBookingStatusEmail(opts.email!, {

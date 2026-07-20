@@ -37,7 +37,9 @@ export type EventType =
   | "hajj_guide_update" | "hajj_package_launch"
   | "hajj_updates" | "umrah_promotions" | "eid_greeting" | "custom_admin"
   // General
-  | "feedback_request";
+  | "feedback_request"
+  // Journey status generic (documents_pending, visa_processing, reached_madinah, etc.)
+  | "journey_status_changed";
 
 export type Channel = "whatsapp" | "sms" | "rcs" | "email" | "push";
 
@@ -132,6 +134,7 @@ export const EVENT_LABELS: Record<EventType, string> = {
   eid_greeting: "Eid Greeting",
   custom_admin: "Custom Admin Notification",
   feedback_request: "Feedback Request",
+  journey_status_changed: "Journey Status Update",
 };
 
 export const EVENT_GROUPS: Record<string, EventType[]> = {
@@ -147,7 +150,7 @@ export const EVENT_GROUPS: Record<string, EventType[]> = {
   "Attendance & Safety": ["airport_checkin","missing_pilgrim","medical_emergency","emergency_alert"],
   "Content": ["hajj_guide_update"],
   "Promotions & Campaigns": ["hajj_updates","umrah_promotions","eid_greeting","custom_admin"],
-  "General": ["feedback_request"],
+  "General": ["feedback_request", "journey_status_changed"],
 };
 
 export const EVENT_TYPES: EventType[] = Object.values(EVENT_GROUPS).flat();
@@ -277,6 +280,19 @@ export function buildDefaultMessage(eventType: EventType, ctx: NotificationConte
       return `Assalamu Alaikum ${name},\n\nA medical case has been recorded${ctx.severity ? ` (${ctx.severity})` : ""}${ctx.description ? `: ${ctx.description}` : ""}. Our team is providing assistance.\n\nEmergency: +91 9893225590\n\nAl Burhan Tours & Travels`;
     case "feedback_request":
       return `Assalamu Alaikum ${name},\n\nJazakAllah for choosing Al Burhan Tours & Travels for ${pkg}! We'd love your feedback.\n\nRate us: https://alburhantravels.com/feedback/${ctx.bookingNumber || ""}\n\nAl Burhan Tours & Travels`;
+    case "journey_status_changed": {
+      const statusLabels: Record<string, string> = {
+        documents_pending:  "Documents Required — Please submit your passport and required documents.",
+        documents_received: "Documents Received — We have received your documents. Thank you.",
+        admin_verification: "Under Verification — Your documents are being verified by our team.",
+        visa_processing:    "Visa Processing — Your visa application is being processed.",
+        journey_started:    "Journey Started — Your sacred journey has begun. May Allah bless you.",
+        reached_madinah:    "Reached Madinah — Alhamdulillah! You have reached Madinah Al-Munawwarah. May Allah grant you the honour of Salawat at Masjid Al-Nabawi.",
+      };
+      const journeyStatus = (ctx as any).journeyStatus || "";
+      const statusMsg = statusLabels[journeyStatus] || `Status updated to: ${journeyStatus.replace(/_/g, " ")}`;
+      return `Assalamu Alaikum ${name},\n\n📋 Journey Update — Booking ${booking}\n\n${statusMsg}\n\nFor queries: +91 9893225590\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
+    }
     default:
       return `Assalamu Alaikum ${name},\n\nImportant update regarding your booking ${booking}.\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
   }
@@ -696,6 +712,10 @@ export async function sendBotBeeEventTemplate(
         launchUrl: (ctx as any).launchUrl || siteBase,
       }, opts);
 
+    // ── Journey status updates (no dedicated WhatsApp template — fall back to text) ─
+    case "journey_status_changed":
+      return { ok: false, provider: "BotBee", endpoint: "", errorMessage: "No WhatsApp template for journey_status_changed — SMS/email used" };
+
     default:
       return { ok: false, provider: "BotBee", endpoint: "", errorMessage: `No ABT template for event: ${eventType}` };
   }
@@ -994,6 +1014,9 @@ function defaultDedupWindow(eventType: EventType): number {
     case "passport_uploaded":
     case "passport_expiry":
       return 72;
+    // Journey status — each change is a distinct event, no dedup (admin controls frequency)
+    case "journey_status_changed":
+      return 0;
 
     // No dedup for high-urgency or campaign events
     case "medical_emergency":

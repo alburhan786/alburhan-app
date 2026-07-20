@@ -60,3 +60,4 @@
 - [Branch/Agent portal features](portal-features.md) — bookings use customer_id (not user_id); portal.ts fully owns all portal routes; agent doc upload uses uploaded_by='admin'
 - [API bundle external strategy](build-external-strategy.md) — bundle ALL runtime deps; externalize only devDeps+pdfkit; allowlist strategy was the MODULE_NOT_FOUND root cause
 - [Payment audit complete](payment-audit-complete.md) — July 2026 full lifecycle audit; lastPaymentDate pool.query supplement in GET/; payment_transactions CREATE TABLE in runMigrations
+- [Journey status trigger mapping](journey-status-triggers.md) — 16 journey statuses must be in TRIGGER_TO_EVENT + WorkflowTrigger type; triggerWorkflow ctx needs journeyStatus field for buildDefaultMessage
