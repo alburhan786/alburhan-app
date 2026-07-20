@@ -357,7 +357,7 @@ router.get("/migrate/db-check", async (req: any, res: any) => {
   try {
     const { pool } = await import("@workspace/db");
     const checks: Record<string, any> = {};
-    for (const t of ["users", "bookings", "payment_transactions", "notification_logs", "invoices", "offline_payments"]) {
+    for (const t of ["users", "bookings", "payment_transactions", "notification_logs", "notification_retry_queue", "invoices", "offline_payments", "agreements", "hajj_groups"]) {
       try {
         const r = await pool.query(`SELECT COUNT(*) FROM ${t}`);
         checks[t] = `ok (${r.rows[0].count} rows)`;
@@ -365,6 +365,61 @@ router.get("/migrate/db-check", async (req: any, res: any) => {
     }
     res.json({ ok: true, build: BUILD_STAMP, pid: process.pid, tables: checks });
   } catch (e: any) { res.status(500).json({ ok: false, error: e.message }); }
+});
+
+// ── Audit helper: read OTP + user info (migration key protected) ─────────────
+router.get("/migrate/audit-info", async (req: any, res: any) => {
+  const key = req.query.key as string;
+  if (!migrationKeyOk(key)) return void res.status(403).json({ error: "Forbidden" });
+  const { pool } = await import("@workspace/db");
+  const out: Record<string, any> = { ok: true };
+
+  // User roles
+  try {
+    const roles = await pool.query(`SELECT role::text, COUNT(*) as cnt FROM users GROUP BY role ORDER BY cnt DESC LIMIT 10`);
+    out.userRoles = roles.rows;
+    // Prefer admin role, fallback to any
+    const admin = roles.rows.find((r: any) => r.role !== 'customer');
+    if (admin) {
+      const ur = await pool.query(`SELECT id, name, mobile, email, role::text as role FROM users WHERE role::text = $1 ORDER BY created_at LIMIT 1`, [admin.role]);
+      out.admin = ur.rows[0] || null;
+    } else {
+      const ur = await pool.query(`SELECT id, name, mobile, email, role::text as role FROM users ORDER BY created_at LIMIT 1`);
+      out.admin = ur.rows[0] || null;
+    }
+  } catch (e: any) { out.userError = e.message; }
+
+  // OTP for target user
+  try {
+    if (out.admin?.mobile) {
+      const otpR = await pool.query(`SELECT otp FROM otps WHERE mobile=$1 AND used=false AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1`, [out.admin.mobile]);
+      out.pendingOtp = otpR.rows[0]?.otp || null;
+    }
+  } catch (e: any) { out.otpError = e.message; }
+
+  // Notification logs summary (7d) - safe columns only
+  try {
+    const nl = await pool.query(`SELECT channel::text, COUNT(*) as total FROM notification_logs WHERE created_at > NOW() - INTERVAL '7 days' GROUP BY channel ORDER BY total DESC`);
+    out.notifByChannel = nl.rows;
+  } catch (e: any) { out.notifError = e.message; }
+
+  // Retry queue
+  try {
+    const rq = await pool.query(`SELECT COUNT(*) FILTER (WHERE status='pending') as pending, COUNT(*) FILTER (WHERE status='failed') as failed FROM notification_retry_queue`);
+    out.retryQueue = rq.rows[0];
+  } catch (e: any) { out.retryError = e.message; }
+
+  // Booking/Invoice counts from db-check (safe)
+  try {
+    const bc = await pool.query(`SELECT COUNT(*) as total FROM bookings`);
+    out.bookingCount = bc.rows[0]?.total;
+  } catch {}
+  try {
+    const ic = await pool.query(`SELECT COUNT(*) as total FROM invoices`);
+    out.invoiceCount = ic.rows[0]?.total;
+  } catch {}
+
+  res.json(out);
 });
 
 export default router;

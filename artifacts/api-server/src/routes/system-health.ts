@@ -309,6 +309,29 @@ router.get("/otp-debug", requireAdmin as any, (_req, res) => {
   res.json({ count: log.length, entries: log });
 });
 
+// POST /api/admin/test-whatsapp — fire a real BotBee WhatsApp message and return result
+router.post("/test-whatsapp", requireAdmin as any, async (req, res) => {
+  const phone = String(req.body?.mobile || req.body?.phone || "").replace(/\D/g, "");
+  if (phone.length !== 10) {
+    res.status(400).json({ ok: false, error: "Provide a valid 10-digit phone number in body: { mobile: '9XXXXXXXXX' }" });
+    return;
+  }
+  try {
+    const { sendWhatsApp } = await import("../lib/notifications.js");
+    const msg = `Al Burhan Test: WhatsApp delivery confirmed at ${new Date().toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata" })} IST. System health check.`;
+    const result = await sendWhatsApp(phone, msg);
+    res.json({
+      ok: result.ok,
+      provider: result.provider || "BotBee",
+      mobile: phone,
+      message: msg,
+      error: result.ok ? undefined : result.errorMessage,
+    });
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
 // POST /api/admin/test-sms — fire a real SMS and return full diagnostics
 router.post("/test-sms", requireAdmin as any, async (req, res) => {
   const phone = String(req.body?.phone || "").replace(/\D/g, "");

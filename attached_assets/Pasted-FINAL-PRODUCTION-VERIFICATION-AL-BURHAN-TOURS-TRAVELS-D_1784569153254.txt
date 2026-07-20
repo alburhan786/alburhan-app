@@ -1,0 +1,161 @@
+FINAL PRODUCTION VERIFICATION – AL BURHAN TOURS & TRAVELS
+
+Do not rely only on audit scripts.
+
+Run a real end-to-end production verification using live integrations and confirm actual delivery.
+
+Verify every workflow below:
+
+1. Authentication
+
+- Mobile OTP
+
+- Email OTP
+
+- WhatsApp OTP
+
+- Existing customer login
+
+- New customer registration
+
+2. Booking
+
+When a customer books a package:
+
+- Booking saved
+
+- Booking ID generated
+
+- Agreement ID generated
+
+- Invoice generated
+
+- Customer dashboard updated
+
+- Admin dashboard updated
+
+Automatically send:
+
+- WhatsApp confirmation
+
+- SMS confirmation
+
+- Email confirmation
+
+- Push notification
+
+3. Payment
+
+For Razorpay, Bank Transfer, Cash and Manual Admin payment:
+
+- Payment recorded
+
+- Invoice changes to Paid or Partially Paid
+
+- Payment history updated
+
+- Receipt generated
+
+- Invoice regenerated if required
+
+Automatically send:
+
+- WhatsApp receipt
+
+- SMS confirmation
+
+- Email confirmation
+
+- Receipt PDF link
+
+4. Documents
+
+Verify customer receives:
+
+- Agreement PDF
+
+- Invoice PDF
+
+- Receipt PDF
+
+- Visa
+
+- Flight Ticket
+
+- Hotel Voucher
+
+through dashboard, email and WhatsApp.
+
+5. Reminder Engine
+
+Verify scheduled reminders:
+
+- Payment reminder
+
+- Visa reminder
+
+- Flight reminder
+
+- Orientation reminder
+
+- Departure reminder
+
+- Return reminder
+
+6. Notification Verification
+
+Actually send one test notification through:
+
+- Fast2SMS
+
+- BotBee WhatsApp
+
+- Email SMTP
+
+Confirm delivery status instead of only confirming queue insertion.
+
+7. Dashboard Verification
+
+Admin:
+
+- Notification logs
+
+- Retry queue
+
+- Failed notifications
+
+- Booking timeline
+
+- Payment timeline
+
+Customer:
+
+- Booking status
+
+- Payment status
+
+- Invoice status
+
+- Agreement
+
+- Receipt
+
+- Visa
+
+- Ticket
+
+- Hotel Voucher
+
+8. Final Report
+
+For every workflow report:
+
+PASS
+
+FAIL
+
+REQUIRES CONFIGURATION
+
+If any notification fails because of provider configuration (SMTP, BotBee, Fast2SMS, Meta templates, DLT, etc.), clearly identify the configuration issue instead of reporting a code failure.
+
+Only declare the system production-ready after all business workflows have been verified using real API calls.
