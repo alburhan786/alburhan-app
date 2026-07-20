@@ -165,6 +165,7 @@ function formatBooking(b: any) {
     advanceAmount: (() => { const v = get("advanceAmount","advance_amount"); return v ? Number(v) : null; })(),
     paidAmount: (() => { const v = get("paidAmount","paid_amount"); return v ? Number(v) : null; })(),
     onlinePaidAmount: (() => { const v = get("onlinePaidAmount","online_paid_amount"); return v ? Number(v) : null; })(),
+    lastPaymentDate: (() => { const v = get("lastPaymentDate","last_payment_date"); return v?.toISOString?.() ?? v ?? null; })(),
     journeyStatus: get("journeyStatus", "journey_status") ?? "booking_requested",
     createdAt: (() => { const v = get("createdAt","created_at"); return v?.toISOString?.() ?? v; })(),
     updatedAt: (() => { const v = get("updatedAt","updated_at"); return v?.toISOString?.() ?? v; })(),

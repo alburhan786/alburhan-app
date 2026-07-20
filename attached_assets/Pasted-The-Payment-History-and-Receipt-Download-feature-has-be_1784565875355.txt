@@ -1,0 +1,107 @@
+The Payment History and Receipt Download feature has been deployed. Now perform a complete production audit of the entire payment lifecycle and fix any remaining issues.
+
+Requirements:
+
+1. Payment Processing
+- Every successful payment must immediately update:
+  • Booking Status
+  • Invoice Status
+  • Payment Status
+  • Received Amount
+  • Remaining Balance
+  • Payment History
+  • Customer Dashboard
+  • Admin Dashboard
+
+2. Invoice Status Rules
+- ₹0 Paid → PENDING
+- Partial Payment → PARTIALLY PAID
+- Full Payment → PAID
+- Fully Paid invoices must never remain PENDING.
+
+3. Receipt Generation
+Automatically generate:
+- Payment Receipt PDF
+- Updated Invoice PDF
+
+Store both securely and make them downloadable from:
+- Customer Dashboard
+- Admin Dashboard
+
+4. Automatic Notifications
+Immediately after payment:
+- Send WhatsApp confirmation
+- Send SMS confirmation
+- Send Email confirmation
+
+Include:
+- Customer Name
+- Booking ID
+- Invoice Number
+- Receipt Number
+- Amount Paid
+- Balance Amount
+- Payment Date
+- Payment Method
+
+Attach:
+- Receipt PDF
+- Updated Invoice PDF (WhatsApp and Email)
+- Secure download links in SMS
+
+5. Customer Dashboard
+Display:
+- Payment History
+- Download Receipt
+- Download Invoice
+- Amount Paid
+- Balance Amount
+- Payment Status
+- Invoice Status
+- Last Payment Date
+
+Refresh automatically without requiring the user to log out or reload the page.
+
+6. Admin Dashboard
+Display:
+- Total Package Amount
+- Total Received
+- Balance
+- Payment Timeline
+- Payment History
+- Payment Method
+- Receipt Download
+- Resend Receipt
+- Resend Invoice
+
+7. Payment Audit Log
+Save:
+- Transaction ID
+- Booking ID
+- Invoice ID
+- Customer ID
+- Amount
+- GST
+- Payment Method
+- Payment Gateway Reference
+- Status
+- Timestamp
+- User
+
+8. Acceptance Tests
+Verify:
+✓ Partial payment
+✓ Multiple partial payments
+✓ Full payment
+✓ Manual payment
+✓ Online payment
+✓ Duplicate payment protection
+✓ Dashboard updates instantly
+✓ Invoice status updates correctly
+✓ Receipt PDF generated
+✓ Invoice PDF updated
+✓ WhatsApp delivered
+✓ SMS delivered
+✓ Email delivered
+
+Finally provide a production verification report confirming the payment workflow is fully operational end-to-end with no pending issues.

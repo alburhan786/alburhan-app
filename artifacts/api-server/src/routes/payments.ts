@@ -119,8 +119,10 @@ export async function processPaymentSuccessNotifications(opts: {
   remainingBalance: number;
   invoiceNumber?: string | null;
   paymentRef?: string;
+  paymentMode?: string;
+  paymentDate?: Date;
 }) {
-  const { booking, isFullyPaid, thisPaymentAmount, newPaidAmount, remainingBalance, invoiceNumber, paymentRef } = opts;
+  const { booking, isFullyPaid, thisPaymentAmount, newPaidAmount, remainingBalance, invoiceNumber, paymentRef, paymentMode, paymentDate } = opts;
   const finalAmountNum = Number(booking.finalAmount || 0);
   const siteBase = process.env.REPLIT_DEV_DOMAIN
     ? `https://${process.env.REPLIT_DEV_DOMAIN}`
@@ -207,6 +209,10 @@ export async function processPaymentSuccessNotifications(opts: {
 
   const trigger = isFullyPaid ? "payment_received" : "partial_payment_received";
   const displayAmount = (isFullyPaid ? finalAmountNum : thisPaymentAmount).toLocaleString("en-IN");
+  const paymentDateStr = (paymentDate || new Date()).toLocaleDateString("en-IN", { dateStyle: "medium" });
+  const paymentModeLabel = paymentMode
+    ? paymentMode.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())
+    : "Online";
 
   const results = await Promise.allSettled([
     triggerWorkflow(trigger as any, {
@@ -219,9 +225,13 @@ export async function processPaymentSuccessNotifications(opts: {
       packageName:    booking.packageName   ?? undefined,
       amount:         isFullyPaid ? finalAmountNum : thisPaymentAmount,
       paidAmount:     thisPaymentAmount,
+      totalPaid:      newPaidAmount,
       balanceAmount:  remainingBalance,
       invoiceNumber:  invoiceNumber         ?? undefined,
       invoiceUrl,
+      paymentRef:     paymentRef            ?? undefined,
+      paymentMode:    paymentModeLabel,
+      paymentDate:    paymentDateStr,
       attachments,
     } as any),
     sendAdminPaymentAlert({
@@ -453,6 +463,7 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
        status=$1, razorpay_order_id=$2, razorpay_payment_id=$3,
        paid_amount=$4, online_paid_amount=$5,
        invoice_number=COALESCE(NULLIF($6,''), invoice_number),
+       last_payment_date=NOW(),
        updated_at=NOW()
      WHERE id=$7`,
     [
@@ -505,6 +516,8 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
       remainingBalance,
       invoiceNumber: finalInvoiceNumber,
       paymentRef: razorpayPaymentId,
+      paymentMode: "online",
+      paymentDate: new Date(),
     });
   } catch (err) {
     console.error("[verify] processPaymentSuccessNotifications failed:", err);
@@ -598,6 +611,7 @@ router.post("/sync-payment", requireAuth as any, async (req: AuthenticatedReques
        status=$1, razorpay_payment_id=$2,
        paid_amount=$3, online_paid_amount=$4,
        invoice_number=COALESCE(NULLIF($5,''), invoice_number),
+       last_payment_date=NOW(),
        updated_at=NOW()
      WHERE id=$6`,
     [
@@ -630,6 +644,8 @@ router.post("/sync-payment", requireAuth as any, async (req: AuthenticatedReques
       remainingBalance,
       invoiceNumber,
       paymentRef: capturedPayment?.id,
+      paymentMode: "online",
+      paymentDate: new Date(),
     });
   } catch (err) {
     console.error("[sync-payment] processPaymentSuccessNotifications failed:", err);
@@ -762,6 +778,19 @@ router.post("/webhook", async (req: any, res) => {
       return;
     }
 
+    // Idempotency guard: skip if this paymentId was already recorded in payment_transactions
+    if (paymentId) {
+      const dupCheck = await pool.query(
+        `SELECT 1 FROM payment_transactions WHERE reference_number=$1 AND booking_id=$2 LIMIT 1`,
+        [paymentId, booking.id]
+      );
+      if (dupCheck.rows.length > 0) {
+        console.log(`[Webhook] Duplicate paymentId ${paymentId} for booking ${booking.bookingNumber} — skipping`);
+        res.json({ message: "Already processed" });
+        return;
+      }
+    }
+
     const finalAmount = Number(booking.finalAmount || 0);
     const previouslyPaid = Number(booking.paidAmount || 0);
     const thisPayment = amountPaise ? amountPaise / 100 : (finalAmount - previouslyPaid);
@@ -779,6 +808,7 @@ router.post("/webhook", async (req: any, res) => {
          status=$1, razorpay_payment_id=$2,
          paid_amount=$3, online_paid_amount=$4,
          invoice_number=COALESCE(NULLIF($5,''), invoice_number),
+         last_payment_date=NOW(),
          updated_at=NOW()
        WHERE id=$6`,
       [
@@ -818,6 +848,8 @@ router.post("/webhook", async (req: any, res) => {
         remainingBalance,
         invoiceNumber,
         paymentRef: paymentId,
+        paymentMode: "online",
+        paymentDate: new Date(),
       });
     } catch (err) {
       console.error("[Webhook] processPaymentSuccessNotifications failed:", err);
@@ -1441,6 +1473,7 @@ router.post("/verify-public", async (req, res) => {
        status=$1, razorpay_payment_id=$2,
        paid_amount=$3, online_paid_amount=$4,
        invoice_number=COALESCE(NULLIF($5,''), invoice_number),
+       last_payment_date=NOW(),
        updated_at=NOW()
      WHERE id=$6`,
     [
@@ -1518,6 +1551,8 @@ router.post("/verify-public", async (req, res) => {
         remainingBalance,
         invoiceNumber: finalInvoiceNumber,
         paymentRef: razorpay_payment_id,
+        paymentMode: "online",
+        paymentDate: new Date(),
       });
 
       console.log(`${logPfx} ✅ [PIPELINE] Complete for ${updated.bookingNumber} — invoice=${finalInvoiceNumber} status=${newStatus}`);

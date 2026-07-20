@@ -60,7 +60,7 @@ async function recalculateBookingPayment(_tx: DbOrTx, bookingId: string) {
   }
 
   await pool.query(
-    `UPDATE bookings SET paid_amount=$1, online_paid_amount=$2, status=$3, invoice_number=$4, updated_at=NOW() WHERE id=$5`,
+    `UPDATE bookings SET paid_amount=$1, online_paid_amount=$2, status=$3, invoice_number=$4, last_payment_date=NOW(), updated_at=NOW() WHERE id=$5`,
     [String(totalPaid), String(onlinePaidAmount), newStatus, invoiceNumber, bookingId]
   );
 
@@ -290,6 +290,8 @@ router.post("/:id/payments", requireAdmin as RequestHandler, async (req: Authent
       remainingBalance,
       invoiceNumber: finalInvoiceNumber,
       paymentRef: typeof referenceNumber === "string" ? referenceNumber : undefined,
+      paymentMode: typeof paymentMode === "string" ? paymentMode : "cash",
+      paymentDate: typeof paymentDate === "string" ? new Date(paymentDate) : new Date(),
     }).catch((err) => console.error("[admin-payments] processPaymentSuccessNotifications failed:", err));
 
     return void res.status(201).json({

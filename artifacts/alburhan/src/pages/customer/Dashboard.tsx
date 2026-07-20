@@ -3224,12 +3224,31 @@ export default function CustomerDashboard() {
                           <CheckCircle className="w-4 h-4 text-emerald-600 ml-auto" />
                         </div>
                         <div className="p-4">
-                          <div className="flex justify-between items-center mb-4">
+                          <div className="flex justify-between items-center mb-3">
                             <div>
                               <p className="text-xs text-emerald-600 uppercase tracking-wide mb-0.5">Invoice No.</p>
                               <p className="font-mono font-bold text-emerald-900 text-base">{booking.invoiceNumber}</p>
                             </div>
                             <div className="text-right">
+                              {(() => {
+                                const paid = Number(booking.paidAmount || 0);
+                                const total = Number(booking.finalAmount || 0);
+                                const isFullPaid = total > 0 && paid >= total;
+                                const isPartial = paid > 0 && !isFullPaid;
+                                return (
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide ${
+                                    isFullPaid ? "bg-emerald-600 text-white" :
+                                    isPartial  ? "bg-amber-100 text-amber-800" :
+                                                 "bg-gray-100 text-gray-600"
+                                  }`}>
+                                    {isFullPaid ? "✓ Paid" : isPartial ? "Partially Paid" : "Pending"}
+                                  </span>
+                                );
+                              })()}
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3 mb-3">
+                            <div>
                               <p className="text-xs text-emerald-600 uppercase tracking-wide mb-0.5">
                                 {booking.status === 'partially_paid' ? 'Amount Paid' : 'Total Amount'}
                               </p>
@@ -3244,6 +3263,14 @@ export default function CustomerDashboard() {
                                 </p>
                               )}
                             </div>
+                            {(booking as any).lastPaymentDate && (
+                              <div>
+                                <p className="text-xs text-emerald-600 uppercase tracking-wide mb-0.5">Last Payment</p>
+                                <p className="text-sm font-semibold text-emerald-900">
+                                  {new Date((booking as any).lastPaymentDate).toLocaleDateString("en-IN", { dateStyle: "medium" })}
+                                </p>
+                              </div>
+                            )}
                           </div>
                           <div className="flex gap-2 flex-wrap">
                             <Button

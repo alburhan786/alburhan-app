@@ -324,9 +324,29 @@ router.post("/:id/approve", requireAdmin as any, async (req: AuthenticatedReques
     const newStatus = isFullyPaid ? "confirmed" : "partially_paid";
 
     await pool.query(
-      `UPDATE bookings SET paid_amount=$1, status=$2, updated_at=NOW() WHERE id=$3`,
+      `UPDATE bookings SET paid_amount=$1, status=$2, last_payment_date=NOW(), updated_at=NOW() WHERE id=$3`,
       [String(newPaid), newStatus, op.booking_id]
     );
+
+    // Record in payment_transactions so offline payments appear in customer payment history
+    try {
+      const txId = `ptx_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      await pool.query(
+        `INSERT INTO payment_transactions
+           (id, booking_id, amount, payment_date, payment_mode, reference_number, notes, recorded_by)
+         VALUES ($1,$2,$3,NOW(),$4,$5,$6,$7)
+         ON CONFLICT DO NOTHING`,
+        [
+          txId, op.booking_id, String(op.amount_paid),
+          op.payment_method || "bank_transfer",
+          op.utr_number || op.payment_reference || null,
+          `Offline bank transfer approved by ${adminName}`,
+          req.user?.id || null,
+        ]
+      );
+    } catch (txErr: any) {
+      console.error("[offline-payments] payment_transactions insert failed:", txErr?.message);
+    }
 
     // Upsert invoice
     await upsertInvoiceForBooking(op.booking_id);
@@ -355,6 +375,8 @@ router.post("/:id/approve", requireAdmin as any, async (req: AuthenticatedReques
       remainingBalance:  balance,
       invoiceNumber,
       paymentRef:        op.utr_number || op.payment_reference,
+      paymentMode:       op.payment_method || "bank_transfer",
+      paymentDate:       new Date(),
     }).catch(err => console.error("[offline-payments] processPaymentSuccessNotifications failed:", err));
 
     auditLog({ req, action: "approved", entityTable: "offline_payments", entityId: op.id, newValue: { approvedBy: adminName, bookingId: op.booking_id, balance } }).catch(() => {});
