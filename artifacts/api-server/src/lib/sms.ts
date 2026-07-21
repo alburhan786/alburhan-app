@@ -87,6 +87,80 @@ async function getApprovedSenderIds(): Promise<string[]> {
 /** Bust the sender ID cache (called after DB updates) */
 export function bustSenderIdCache() { _senderIdCache = null; }
 
+// ── DB-backed DLT template ID cache ──────────────────────────────────────────
+// notification_templates (channel='sms') overrides api_settings.extra tid values.
+// Admin saves a template → cache is busted → next send picks up new tid instantly.
+
+let _dbTplCache: { data: Record<string, { tid: string; sender: string }>; ts: number } | null = null;
+const DB_TPL_TTL = 60_000;
+
+async function getDBTemplates(): Promise<Record<string, { tid: string; sender: string }>> {
+  if (_dbTplCache && Date.now() - _dbTplCache.ts < DB_TPL_TTL) return _dbTplCache.data;
+  try {
+    const r = await pool.query(
+      `SELECT event_type, dlt_template_id, sender_id FROM notification_templates
+       WHERE channel='sms' AND enabled=true AND dlt_template_id IS NOT NULL AND dlt_template_id <> ''`
+    );
+    const data: Record<string, { tid: string; sender: string }> = {};
+    for (const row of r.rows) {
+      if (row.event_type) data[row.event_type] = { tid: row.dlt_template_id, sender: row.sender_id || "" };
+    }
+    _dbTplCache = { data, ts: Date.now() };
+    return data;
+  } catch {
+    return {};
+  }
+}
+
+/** Bust the DB template cache (called when admin saves a template or after test) */
+export function bustDBTemplateCache() { _dbTplCache = null; }
+
+// Merge api_settings.extra tids/senders with DB-backed overrides (DB wins when set).
+async function resolveConfig() {
+  const base = getConfig();
+  const db = await getDBTemplates();
+  const gs = base.sender_id;
+
+  const t = (dbKey: string, baseKey: keyof typeof base.tids) =>
+    db[dbKey]?.tid || base.tids[baseKey] || "";
+  const s = (dbKey: string, baseKey: keyof typeof base.senders) =>
+    db[dbKey]?.sender || base.senders[baseKey] || gs;
+
+  return {
+    ...base,
+    tids: {
+      ...base.tids,
+      booking_created:    t("new_booking",        "booking_created"),
+      booking_confirmed:  t("booking_approved",   "booking_confirmed"),
+      booking_rejected:   t("booking_rejected",   "booking_rejected"),
+      payment_received:   t("payment_received",   "payment_received"),
+      partial_payment:    t("partial_payment",    "partial_payment"),
+      pending_payment:    t("pending_payment",    "pending_payment"),
+      invoice_created:    t("invoice_generated",  "invoice_created"),
+      ticket_issued:      t("ticket_issued",      "ticket_issued"),
+      departure_reminder: t("departure_reminder", "departure_reminder"),
+      visa_issued:        t("visa_approved",      "visa_issued"),
+      hotel_voucher:      t("hotel_assigned",     "hotel_voucher"),
+      arrival_reminder:   t("arrival_reminder",   "arrival_reminder"),
+    },
+    senders: {
+      ...base.senders,
+      booking_created:    s("new_booking",        "booking_created"),
+      booking_confirmed:  s("booking_approved",   "booking_confirmed"),
+      booking_rejected:   s("booking_rejected",   "booking_rejected"),
+      payment_received:   s("payment_received",   "payment_received"),
+      partial_payment:    s("partial_payment",    "partial_payment"),
+      pending_payment:    s("pending_payment",    "pending_payment"),
+      invoice_created:    s("invoice_generated",  "invoice_created"),
+      ticket_issued:      s("ticket_issued",      "ticket_issued"),
+      departure_reminder: s("departure_reminder", "departure_reminder"),
+      visa_issued:        s("visa_approved",      "visa_issued"),
+      hotel_voucher:      s("hotel_assigned",     "hotel_voucher"),
+      arrival_reminder:   s("arrival_reminder",   "arrival_reminder"),
+    },
+  };
+}
+
 function toPhone(mobile: string): string {
   const clean = mobile.replace(/\D/g, "");
   if (clean.startsWith("91") && clean.length === 12) return clean.slice(2);
@@ -451,7 +525,7 @@ export interface BookingCtx {
 }
 
 export async function sendBookingCreated(ctx: BookingCtx): Promise<SMSResult> {
-  const { tids, senders } = getConfig();
+  const { tids, senders } = await resolveConfig();
   return sendDLT(
     ctx.mobile, tids.booking_created,
     [ctx.customerName, ctx.bookingNumber, ctx.packageName || "Hajj/Umrah"],
@@ -460,7 +534,7 @@ export async function sendBookingCreated(ctx: BookingCtx): Promise<SMSResult> {
 }
 
 export async function sendBookingConfirmed(ctx: BookingCtx): Promise<SMSResult> {
-  const { tids, senders } = getConfig();
+  const { tids, senders } = await resolveConfig();
   return sendDLT(
     ctx.mobile, tids.booking_confirmed,
     [ctx.customerName, ctx.bookingNumber, ctx.packageName || "Hajj/Umrah"],
@@ -469,7 +543,7 @@ export async function sendBookingConfirmed(ctx: BookingCtx): Promise<SMSResult> 
 }
 
 export async function sendBookingRejected(ctx: BookingCtx & { reason?: string }): Promise<SMSResult> {
-  const { tids, senders } = getConfig();
+  const { tids, senders } = await resolveConfig();
   return sendDLT(
     ctx.mobile, tids.booking_rejected,
     [ctx.customerName, ctx.bookingNumber, ctx.reason || "Please contact us for details"],
@@ -478,8 +552,8 @@ export async function sendBookingRejected(ctx: BookingCtx & { reason?: string })
 }
 
 export async function sendPaymentReceived(ctx: BookingCtx & { amount: string; invoiceNumber?: string; invoiceUrl?: string }): Promise<SMSResult> {
-  const { tids, ex, senders } = getConfig();
-  const vars: string[] = [ctx.customerName, ctx.bookingNumber, ctx.amount];
+  const { tids, ex, senders } = await resolveConfig();
+  const vars: string[] = [ctx.customerName, ctx.bookingNumber, ctx.invoiceNumber || ctx.bookingNumber, ctx.amount];
   if (ctx.invoiceUrl && ex.payment_url_in_sms === "1") vars.push(ctx.invoiceUrl);
   return sendDLT(
     ctx.mobile, tids.payment_received,
@@ -489,7 +563,7 @@ export async function sendPaymentReceived(ctx: BookingCtx & { amount: string; in
 }
 
 export async function sendPartialPaymentReceived(ctx: BookingCtx & { paidAmount: string; balanceAmount: string; invoiceUrl?: string }): Promise<SMSResult> {
-  const { tids, ex, senders } = getConfig();
+  const { tids, ex, senders } = await resolveConfig();
   const vars: string[] = [ctx.customerName, ctx.bookingNumber, ctx.packageName || "your package", ctx.paidAmount, ctx.balanceAmount];
   if (ctx.invoiceUrl && ex.payment_url_in_sms === "1") vars.push(ctx.invoiceUrl);
   return sendDLT(
@@ -500,34 +574,34 @@ export async function sendPartialPaymentReceived(ctx: BookingCtx & { paidAmount:
 }
 
 export async function sendPendingPaymentReminder(ctx: BookingCtx & { balance: string; dueDate?: string }): Promise<SMSResult> {
-  const { tids, senders } = getConfig();
+  const { tids, senders } = await resolveConfig();
   return sendDLT(
     ctx.mobile, tids.pending_payment,
-    [ctx.customerName, ctx.bookingNumber, ctx.balance],
+    [ctx.customerName, ctx.balance, ctx.bookingNumber],
     { eventType: "balance_reminder", message: `Balance ₹${ctx.balance} due for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.pending_payment }
   );
 }
 
 export async function sendInvoiceCreated(ctx: BookingCtx & { invoiceNumber?: string; amount?: string }): Promise<SMSResult> {
-  const { tids, senders } = getConfig();
+  const { tids, senders } = await resolveConfig();
   return sendDLT(
     ctx.mobile, tids.invoice_created,
-    [ctx.customerName, ctx.bookingNumber, ctx.invoiceNumber || ctx.bookingNumber],
+    [ctx.customerName, ctx.invoiceNumber || ctx.bookingNumber, ctx.amount || ""],
     { eventType: "invoice_generated", message: `Invoice for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.invoice_created }
   );
 }
 
 export async function sendFlightTicketIssued(ctx: BookingCtx & { flightNumber?: string; departureDate?: string }): Promise<SMSResult> {
-  const { tids, senders } = getConfig();
+  const { tids, senders } = await resolveConfig();
   return sendDLT(
     ctx.mobile, tids.ticket_issued,
-    [ctx.customerName, ctx.bookingNumber, ctx.flightNumber || "TBA"],
+    [ctx.customerName],
     { eventType: "ticket_issued", message: `Ticket issued for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.ticket_issued }
   );
 }
 
 export async function sendVisaIssued(ctx: BookingCtx & { visaNumber?: string }): Promise<SMSResult> {
-  const { tids, senders } = getConfig();
+  const { tids, senders } = await resolveConfig();
   return sendDLT(
     ctx.mobile, tids.visa_issued,
     [ctx.customerName, ctx.bookingNumber, ctx.visaNumber || "Approved"],
@@ -535,17 +609,17 @@ export async function sendVisaIssued(ctx: BookingCtx & { visaNumber?: string }):
   );
 }
 
-export async function sendDepartureReminder(ctx: BookingCtx & { departureDate: string; flightNumber?: string }): Promise<SMSResult> {
-  const { tids, senders } = getConfig();
+export async function sendDepartureReminder(ctx: BookingCtx & { departureDate: string; flightNumber?: string; daysRemaining?: string }): Promise<SMSResult> {
+  const { tids, senders } = await resolveConfig();
   return sendDLT(
     ctx.mobile, tids.departure_reminder,
-    [ctx.customerName, ctx.bookingNumber, ctx.departureDate],
+    [ctx.customerName, ctx.daysRemaining || ctx.departureDate],
     { eventType: "departure_reminder", message: `Departure reminder for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.departure_reminder }
   );
 }
 
 export async function sendHotelVoucherIssued(ctx: BookingCtx & { hotelName?: string }): Promise<SMSResult> {
-  const { tids, senders } = getConfig();
+  const { tids, senders } = await resolveConfig();
   return sendDLT(
     ctx.mobile, tids.hotel_voucher,
     [ctx.customerName, ctx.bookingNumber, ctx.hotelName || "Your Hotel"],
@@ -554,7 +628,7 @@ export async function sendHotelVoucherIssued(ctx: BookingCtx & { hotelName?: str
 }
 
 export async function sendArrivalReminder(ctx: BookingCtx & { arrivalDate?: string; destination?: string }): Promise<SMSResult> {
-  const { tids, senders } = getConfig();
+  const { tids, senders } = await resolveConfig();
   return sendDLT(
     ctx.mobile, tids.arrival_reminder,
     [ctx.customerName, ctx.bookingNumber, ctx.arrivalDate || "As scheduled"],
@@ -563,7 +637,7 @@ export async function sendArrivalReminder(ctx: BookingCtx & { arrivalDate?: stri
 }
 
 export async function sendEidGreeting(ctx: { mobile: string; customerName: string; customerId?: string }): Promise<SMSResult> {
-  const { tids, senders } = getConfig();
+  const { tids, senders } = await resolveConfig();
   return sendDLT(
     ctx.mobile, tids.eid_greeting,
     [ctx.customerName, "Al Burhan Tours & Travels", ""],

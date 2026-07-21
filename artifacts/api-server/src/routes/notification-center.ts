@@ -7,6 +7,48 @@ import { randomUUID } from "crypto";
 
 const router = Router();
 
+// ── Startup: migrate new columns + seed DLT templates ────────────────────────
+const SMS_SEED = [
+  { id: "tpl_seed_new_booking",     name: "Booking Created",       event_type: "new_booking",       body: "Assalamu Alaikum {#var#}, Your Hajj booking {#var#} for {#var#} has been received. We will review and confirm shortly. Al Burhan Tours & Travels +91 9893225590",                        dlt_template_id: "219801", variable_count: 3, variable_mapping: '["customer_name","booking_number","package_name"]' },
+  { id: "tpl_seed_booking_approved",name: "Booking Approved",      event_type: "booking_approved",  body: "Assalamu Alaikum {#var#}, Your booking {#var#} for {#var#} is APPROVED. Total: Rs {#var#}. Jazak Allah Khair. Al Burhan Tours & Travels +91 9893225590",                              dlt_template_id: "219802", variable_count: 4, variable_mapping: '["customer_name","booking_number","package_name","total_amount"]' },
+  { id: "tpl_seed_payment_received",name: "Payment Received",      event_type: "payment_received",  body: "Assalamu Alaikum {#var#} Payment Received. Booking ID: {#var#} Invoice No: {#var#} Amount: Rs {#var#} Jazak Allah Khair. Al Burhan Tours & Travels +91 9893225590",                   dlt_template_id: "219803", variable_count: 4, variable_mapping: '["customer_name","booking_number","invoice_number","amount"]' },
+  { id: "tpl_seed_balance_reminder",name: "Balance Reminder",      event_type: "balance_reminder",  body: "Assalamu Alaikum {#var#}, Your booking {#var#} for {#var#} has outstanding balance of Rs {#var#}. Please make payment at the earliest. Al Burhan Tours & Travels",                  dlt_template_id: "219804", variable_count: 4, variable_mapping: '["customer_name","booking_number","package_name","outstanding_amount"]' },
+  { id: "tpl_seed_invoice_generated",name:"Invoice Generated",     event_type: "invoice_generated", body: "Dear {#var#}, Invoice {#var#} for Rs {#var#} has been generated. Please make payment. Al Burhan Tours & Travels +91 9893225590",                                                       dlt_template_id: "219805", variable_count: 3, variable_mapping: '["customer_name","invoice_number","total_amount"]' },
+  { id: "tpl_seed_pending_payment", name: "Payment Pending",       event_type: "pending_payment",   body: "Dear {#var#}, Payment of Rs {#var#} is pending for your booking {#var#}. Please pay now to confirm your Hajj seat. Al Burhan Tours & Travels",                                        dlt_template_id: "214148", variable_count: 3, variable_mapping: '["customer_name","amount","booking_number"]' },
+  { id: "tpl_seed_departure_remind",name: "Departure Reminder",    event_type: "departure_reminder",body: "Assalamu Alaikum {#var#}, Your Hajj departure is in {#var#} days. Please ensure all documents are ready. May Allah accept your Hajj. Al Burhan Tours & Travels",                      dlt_template_id: "214143", variable_count: 2, variable_mapping: '["customer_name","days_remaining"]' },
+  { id: "tpl_seed_flight_assigned", name: "Flight Confirmed",      event_type: "flight_assigned",   body: "Assalamu Alaikum {#var#}, Flight {#var#} from {#var#} to {#var#} on {#var#} at {#var#} is confirmed. Please report 3 hrs early. Al Burhan Tours & Travels",                         dlt_template_id: "214144", variable_count: 6, variable_mapping: '["customer_name","flight_number","from_airport","to_airport","departure_date","departure_time"]' },
+  { id: "tpl_seed_ticket_issued",   name: "Ticket Issued",         event_type: "ticket_issued",     body: "Dear {#var#}, Your Hajj air ticket has been issued. Please check all documents. Wishing you a blessed journey. Al Burhan Tours & Travels +91 9893225590",                             dlt_template_id: "214142", variable_count: 1, variable_mapping: '["customer_name"]' },
+];
+
+async function seedSMSTemplates() {
+  const ex = await pool.query(`SELECT COUNT(*) FROM notification_templates WHERE channel='sms'`);
+  if (Number(ex.rows[0]?.count) > 0) return;
+  for (const t of SMS_SEED) {
+    await pool.query(
+      `INSERT INTO notification_templates
+         (id, name, event_type, channel, body, dlt_template_id, sender_id, provider,
+          variable_count, variable_mapping, priority, enabled, created_at, updated_at)
+       VALUES ($1,$2,$3,'sms',$4,$5,'ABURHA','fast2sms',$6,$7::jsonb,0,true,NOW(),NOW())
+       ON CONFLICT (id) DO NOTHING`,
+      [t.id, t.name, t.event_type, t.body, t.dlt_template_id, t.variable_count, t.variable_mapping]
+    ).catch((e: any) => console.error("[sms-seed]", t.id, e.message));
+  }
+  console.log("[notification-center] seeded", SMS_SEED.length, "DLT templates");
+}
+
+(async () => {
+  try {
+    await pool.query(`
+      ALTER TABLE notification_templates ADD COLUMN IF NOT EXISTS variable_count INT DEFAULT 0;
+      ALTER TABLE notification_templates ADD COLUMN IF NOT EXISTS variable_mapping JSONB DEFAULT '[]'::jsonb;
+      ALTER TABLE notification_templates ADD COLUMN IF NOT EXISTS last_success_at TIMESTAMPTZ;
+      ALTER TABLE notification_templates ADD COLUMN IF NOT EXISTS last_failure_at TIMESTAMPTZ;
+      ALTER TABLE notification_templates ADD COLUMN IF NOT EXISTS last_failure_reason TEXT;
+    `);
+    await seedSMSTemplates();
+  } catch (e) { console.error("[notification-center] init:", e); }
+})();
+
 // ── Stats ─────────────────────────────────────────────────────────────────────
 router.get("/stats", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
   try {
@@ -235,6 +277,63 @@ router.delete("/templates/:id", requireAdmin as any, async (req: AuthenticatedRe
     res.json({ message: "Template deleted" });
   } catch (err) {
     res.status(500).json({ message: "Failed to delete template" });
+  }
+});
+
+// ── Per-template DLT test ─────────────────────────────────────────────────────
+router.post("/templates/:id/test", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const tplRow = await pool.query(`SELECT * FROM notification_templates WHERE id=$1`, [req.params.id]);
+    if (!tplRow.rows[0]) return void res.status(404).json({ ok: false, message: "Template not found" });
+    const tpl = tplRow.rows[0];
+
+    if (tpl.channel !== "sms") return void res.status(400).json({ ok: false, message: "Only SMS/DLT templates can be tested here" });
+    if (!tpl.dlt_template_id) return void res.status(400).json({ ok: false, message: "No DLT Template ID set — edit template and add one first" });
+
+    const { mobile, variables } = req.body;
+    if (!mobile) return void res.status(400).json({ ok: false, message: "mobile is required" });
+    const phone = String(mobile).replace(/\D/g, "").slice(-10);
+    if (phone.length !== 10) return void res.status(400).json({ ok: false, message: "Invalid mobile number — must be 10 digits" });
+
+    const { getCachedConfig } = await import("../lib/apiSettingsProvider.js");
+    const f2s = getCachedConfig("fast2sms");
+    const apiKey = (f2s.apiKey as string) || process.env.FAST2SMS_API_KEY || "";
+    if (!apiKey) return void res.status(400).json({ ok: false, message: "Fast2SMS API key not configured in API Settings" });
+
+    const senderId = tpl.sender_id || "ABURHA";
+    const varsArr: string[] = Array.isArray(variables) && variables.length ? variables.map(String) : ["Al Burhan", "Test", "123"];
+    const varsEncoded = encodeURIComponent(varsArr.join("|") + "|");
+    const endpoint = "https://www.fast2sms.com/dev/bulkV2";
+    const url = `${endpoint}?authorization=${apiKey}&route=dlt&sender_id=${senderId}&message=${tpl.dlt_template_id}&variables_values=${varsEncoded}&numbers=${phone}&flash=0`;
+    const maskedUrl = url.replace(apiKey, `${apiKey.slice(0, 6)}***`);
+
+    const { default: axios } = await import("axios");
+    const startMs = Date.now();
+    let ok = false;
+    let apiResponse: any;
+    try {
+      const resp = await axios.get(url, { timeout: 15000 });
+      ok = resp.data?.return === true;
+      apiResponse = resp.data;
+    } catch (e: any) {
+      apiResponse = e?.response?.data || { error: e.message };
+    }
+    const durationMs = Date.now() - startMs;
+
+    if (ok) {
+      await pool.query(`UPDATE notification_templates SET last_success_at=NOW() WHERE id=$1`, [req.params.id]).catch(() => {});
+    } else {
+      const errMsg = Array.isArray(apiResponse?.message) ? apiResponse.message.join("; ") : (apiResponse?.message || "DLT send failed");
+      await pool.query(`UPDATE notification_templates SET last_failure_at=NOW(), last_failure_reason=$1 WHERE id=$2`, [errMsg, req.params.id]).catch(() => {});
+    }
+
+    // Bust the sms.ts template cache so any tid changes take effect immediately
+    import("../lib/sms.js").then(m => m.bustDBTemplateCache?.()).catch(() => {});
+
+    res.json({ ok, dltTemplateId: tpl.dlt_template_id, senderId, mobile: phone, requestUrl: maskedUrl, durationMs, apiResponse, variablesSent: varsArr });
+  } catch (err: any) {
+    console.error("[notification-center] POST /templates/:id/test:", err);
+    res.status(500).json({ ok: false, message: err.message || "Test failed" });
   }
 });
 

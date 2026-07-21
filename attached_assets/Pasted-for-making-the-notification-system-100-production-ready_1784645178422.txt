@@ -1,0 +1,640 @@
+for making the notification system 100% production-ready.
+
+The application already has:
+
+* PostgreSQL
+* Hostinger VPS
+* PM2
+* Razorpay Live
+* Fast2SMS
+* BotBee WhatsApp
+* SMTP Email
+* Customer Dashboard
+* Admin Dashboard
+* Agreement PDF
+* Invoice PDF
+* Booking System
+
+Your task is to implement a complete notification engine.
+
+⸻
+
+1. Create a Notification Center
+
+Create a centralized notification service.
+
+All notifications must be sent only through this service.
+
+Supported channels:
+
+* SMS (Fast2SMS)
+* WhatsApp (BotBee)
+* Email (SMTP)
+
+Every business event must call the Notification Center.
+
+⸻
+
+2. Fast2SMS DLT Integration
+
+Support all approved DLT Templates.
+
+Do NOT hardcode Template IDs.
+
+Create a database table:
+
+sms_templates
+
+Fields:
+
+* Event Name
+* DLT Template ID
+* Template Name
+* Sender ID
+* Route
+* Variable Count
+* Status
+* Created Date
+* Updated Date
+
+⸻
+
+3. Fast2SMS Variable Mapping
+
+Support dynamic variables exactly as required.
+
+Example:
+
+Variable 1
+
+Customer Name
+
+Variable 2
+
+Package / Year / Amount / Flight Number
+
+Variable 3
+
+Booking ID / Invoice Number / Receipt Number
+
+Automatically generate:
+
+variables_values=
+
+Exactly matching the approved DLT template.
+
+⸻
+
+4. Admin SMS Template Manager
+
+Create:
+
+Admin
+
+↓
+
+Settings
+
+↓
+
+SMS Templates
+
+Display:
+
+* Event Name
+* Template ID
+* Sender ID
+* Variable Count
+* Variable Mapping
+* Active / Inactive
+* Last Success
+* Last Failure
+* Edit
+* Test
+
+⸻
+
+5. Test SMS
+
+Each template must have:
+
+Send Test SMS
+
+Admin enters:
+
+Customer Name
+
+Package
+
+Booking ID
+
+Invoice
+
+Amount
+
+Phone Number
+
+Click:
+
+Send
+
+Show:
+
+✓ Success
+
+or
+
+✗ Failure
+
+Display:
+
+HTTP Status
+
+Fast2SMS Response
+
+Request URL
+
+Request Payload
+
+Provider Error
+
+⸻
+
+6. WhatsApp Templates
+
+Create same structure.
+
+Store:
+
+BotBee API Key
+
+Phone Number ID
+
+Phone Number
+
+Template ID
+
+Language
+
+Status
+
+Event Name
+
+Support variables.
+
+⸻
+
+7. Email Templates
+
+Store:
+
+Subject
+
+Body
+
+Variables
+
+Attachments
+
+Logo
+
+Footer
+
+⸻
+
+8. Business Event Mapping
+
+Automatically send notifications for:
+
+Booking Created
+
+Booking Approved
+
+Invoice Generated
+
+Agreement Generated
+
+Payment Pending
+
+Payment Received
+
+Receipt Generated
+
+Visa Approved
+
+Visa Rejected
+
+Ticket Issued
+
+Flight Changed
+
+Journey Reminder
+
+Departure Reminder
+
+Hotel Allocated
+
+Room Allocated
+
+Mina Camp Updated
+
+Agreement Signed
+
+Customer Registered
+
+OTP
+
+Password Reset
+
+⸻
+
+9. Agreement Auto Update
+
+Agreement PDF must never display:
+
+To be confirmed
+
+—
+
+Empty
+
+Instead load live booking data.
+
+Automatically populate:
+
+Package
+
+Package Type
+
+Departure
+
+Return
+
+Duration
+
+Room Sharing
+
+⸻
+
+Flight
+
+Airline
+
+Flight Number
+
+PNR
+
+Departure Airport
+
+Arrival Airport
+
+Departure Date
+
+Departure Time
+
+Arrival Time
+
+Transit
+
+Checked Baggage
+
+Cabin Baggage
+
+⸻
+
+Accommodation
+
+Makkah Hotel
+
+Distance
+
+Check-in
+
+Check-out
+
+Madinah Hotel
+
+Distance
+
+Check-in
+
+Check-out
+
+Aziziyah Hotel
+
+Distance
+
+Check-in
+
+Check-out
+
+⸻
+
+Mina
+
+Zone
+
+Category
+
+Maktab
+
+Sector
+
+Camp
+
+For our Hajj packages use default values until final allocation:
+
+Zone:
+New Mina Zone 5
+
+Category:
+D
+
+Maktab:
+Admin editable
+
+Sector:
+Admin editable
+
+Camp:
+Admin editable
+
+⸻
+
+Customer Details
+
+City
+
+State
+
+Country
+
+Nationality
+
+Blood Group
+
+Passport Issue Date
+
+Passport Expiry Date
+
+Emergency Contact
+
+⸻
+
+Status
+
+Visa
+
+Ticket
+
+Hotel
+
+Flight
+
+Agreement
+
+Payment
+
+Maktab
+
+⸻
+
+10. Customer Dashboard
+
+Whenever admin updates anything:
+
+Immediately update:
+
+Agreement
+
+Invoice
+
+Dashboard
+
+Timeline
+
+Documents
+
+Booking Status
+
+⸻
+
+11. Automatic Notifications
+
+Whenever admin clicks Save:
+
+Send SMS
+
+Send WhatsApp
+
+Send Email
+
+Automatically.
+
+⸻
+
+12. Notification Logs
+
+Save EVERYTHING.
+
+SMS
+
+WhatsApp
+
+Email
+
+Fields:
+
+Booking ID
+
+Customer
+
+Phone
+
+Email
+
+Channel
+
+Template ID
+
+Variables
+
+Provider Request
+
+Provider Response
+
+HTTP Code
+
+Status
+
+Delivery Status
+
+Created Date
+
+Retry Count
+
+⸻
+
+13. Retry System
+
+If provider fails:
+
+Retry automatically.
+
+Retry:
+
+3 Times
+
+5 Minutes
+
+15 Minutes
+
+30 Minutes
+
+After third failure:
+
+Show in Admin Dashboard:
+
+Notification Failed
+
+⸻
+
+14. Admin Notification Dashboard
+
+Display:
+
+Pending
+
+Queued
+
+Sending
+
+Delivered
+
+Failed
+
+Retrying
+
+Cancelled
+
+Filters:
+
+Customer
+
+Booking
+
+Date
+
+Channel
+
+Status
+
+Search
+
+Export CSV
+
+⸻
+
+15. Production Validation
+
+Before sending:
+
+Validate:
+
+Phone Number
+
+Email
+
+Template Exists
+
+Variables Count
+
+API Key
+
+Sender ID
+
+Template ID
+
+Phone Number ID
+
+BotBee API
+
+Fast2SMS API
+
+SMTP
+
+If validation fails:
+
+Never crash.
+
+Show exact error.
+
+⸻
+
+16. API Trace
+
+Store:
+
+Full Request URL
+
+Headers
+
+Payload
+
+Response
+
+Provider Message
+
+Latency
+
+Timestamp
+
+This helps production debugging.
+
+⸻
+
+17. Final Production Test
+
+Perform end-to-end testing for:
+
+✓ Customer Registration
+
+✓ Booking
+
+✓ Agreement
+
+✓ Invoice
+
+✓ Payment Pending
+
+✓ Payment Received
+
+✓ Receipt
+
+✓ Visa
+
+✓ Ticket
+
+✓ Flight Update
+
+✓ Hotel Update
+
+✓ Mina Update
+
+✓ Dashboard Update
+
+✓ SMS Delivery
+
+✓ WhatsApp Delivery
+
+✓ Email Delivery
+
+✓ Agreement PDF Update
+
+✓ Invoice PDF Update
+
+✓ Notification Logs
+
+Generate a final production report showing the status of every integration. Do not mark the task complete until every notification channel is verified with live data and all notification logs are recorded correctly.
+
+This prompt will guide Replit to build a robust notification system with centralized management, dynamic agreement updates, automatic SMS/WhatsApp/email delivery, and detailed logging suitable for your Al Burhan Tours & Travels booking platform.
