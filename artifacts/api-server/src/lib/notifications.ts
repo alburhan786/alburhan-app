@@ -1,5 +1,6 @@
 import axios from "axios";
 import nodemailer from "nodemailer";
+import { pool } from "@workspace/db";
 import { getCachedConfig } from "./apiSettingsProvider.js";
 import { isPlaceholderKey } from "./keyValidation.js";
 import {
@@ -58,10 +59,15 @@ function getFast2SMSKey(): string | undefined {
 
 function getFast2SMSExtra() {
   const dbCfg = getCachedConfig("fast2sms");
+  const ex = dbCfg.extra || {};
+  const globalSender = ex.sender_id || "ABURHA";
   return {
-    sender_id: dbCfg.extra.sender_id || "ABURHA",
-    otp_template_id: dbCfg.extra.otp_template_id || "164844",
-    notify_template_id: dbCfg.extra.notify_template_id || "211277",
+    sender_id: globalSender,
+    // Per-event OTP sender — falls back to global sender_id
+    otp_sender: ex.otp_sender || globalSender,
+    // No hardcoded fallbacks — empty string means "not configured"
+    otp_template_id:    ex.otp_template_id    || "",
+    notify_template_id: ex.notify_template_id  || "",
   };
 }
 
@@ -172,13 +178,53 @@ export async function sendOtpSMS(mobile: string, otp: string): Promise<SmsResult
   const apiKeyPresent = !!apiKey;
   const apiKeyMasked = apiKey ? `${apiKey.slice(0, 8)}...${apiKey.slice(-4)}` : "NOT_FOUND";
 
+  // ── Pre-flight: API key ───────────────────────────────────────────────────
   if (!apiKey) {
     const msg = "Fast2SMS API Key is not configured.";
-    console.error(`[OTP-SMS] ❌ ${msg} (checked DB api_settings.fast2sms and FAST2SMS_API_KEY env — both missing or placeholder)`);
+    console.error(`[OTP-SMS] ❌ ${msg}`);
     const logEntry: SmsAttemptLog = {
       id, ts: new Date().toISOString(), mobileMasked: maskMobile(mobile), otp,
       finalSuccess: false, attempts: [], totalDurationMs: 0,
       apiKeyPresent: false, apiKeyMasked: "NOT_FOUND",
+    };
+    pushSmsLog(logEntry);
+    return { sent: false, error: msg, logId: id };
+  }
+
+  const f2sExtra = getFast2SMSExtra();
+
+  // ── Pre-flight: OTP DLT template must be configured ───────────────────────
+  if (!f2sExtra.otp_template_id) {
+    const msg = "OTP DLT Template is not configured. Go to Admin → API Settings → Fast2SMS and set the otp_template_id field with your TRAI-registered DLT template ID.";
+    console.error(`[OTP-SMS] ❌ ${msg}`);
+    const logEntry: SmsAttemptLog = {
+      id, ts: new Date().toISOString(), mobileMasked: maskMobile(mobile), otp,
+      finalSuccess: false, attempts: [], totalDurationMs: Date.now() - overallStart,
+      apiKeyPresent, apiKeyMasked,
+    };
+    pushSmsLog(logEntry);
+    return { sent: false, error: msg, logId: id };
+  }
+
+  // ── Pre-flight: sender ID must be in the approved DLT list ───────────────
+  const effectiveSender = f2sExtra.otp_sender;
+  let approvedSenderIds: string[] = [];
+  try {
+    const r = await pool.query(
+      `SELECT sender_id FROM sender_ids WHERE status = 'active' ORDER BY default_sender DESC`
+    );
+    approvedSenderIds = r.rows.map((row: any) => row.sender_id as string);
+  } catch {
+    // Table may not exist yet — fall back to known approved list
+    approvedSenderIds = ["ABURHA", "ALBURH", "ALBUR", "ABTUMR", "ABTTHJ"];
+  }
+  if (!approvedSenderIds.includes(effectiveSender)) {
+    const msg = `OTP SMS BLOCKED — Sender ID "${effectiveSender}" is not in the approved DLT list [${approvedSenderIds.join(", ")}]. Go to Admin → SMS Settings → Sender ID Management.`;
+    console.error(`[OTP-SMS] ❌ ${msg}`);
+    const logEntry: SmsAttemptLog = {
+      id, ts: new Date().toISOString(), mobileMasked: maskMobile(mobile), otp,
+      finalSuccess: false, attempts: [], totalDurationMs: Date.now() - overallStart,
+      apiKeyPresent, apiKeyMasked,
     };
     pushSmsLog(logEntry);
     return { sent: false, error: msg, logId: id };
@@ -192,36 +238,44 @@ export async function sendOtpSMS(mobile: string, otp: string): Promise<SmsResult
   // If DLT fails, OTP delivery fails — WhatsApp OTP is the secondary channel (fire-and-forget).
   // Set otp_template_id in API Settings → Fast2SMS to enable OTP via DLT.
 
-  const f2sExtra = getFast2SMSExtra();
+  console.log(`[OTP-SMS] Pre-flight passed — sender=${effectiveSender} template=${f2sExtra.otp_template_id} route=dlt mobile=${phone}`);
+
   // ── DLT route (registered Sender ID + Template) — ONLY permitted route ────
   {
     const t0 = Date.now();
     const variables = encodeURIComponent(`${otp}|`);
-    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=dlt&sender_id=${f2sExtra.sender_id}&message=${f2sExtra.otp_template_id}&variables_values=${variables}&numbers=${phone}&flash=0`;
+    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=dlt&sender_id=${effectiveSender}&message=${f2sExtra.otp_template_id}&variables_values=${variables}&numbers=${phone}&flash=0`;
     const maskedUrl = url.replace(apiKey, apiKeyMasked);
-    console.log(`[OTP-SMS][dlt] → ${maskedUrl}`);
+    console.log(`[OTP-SMS][dlt] Sending → sender=${effectiveSender} template=${f2sExtra.otp_template_id} mobile=${phone}`);
+    console.log(`[OTP-SMS][dlt] Request URL (masked): ${maskedUrl}`);
     try {
       const r = await axios.get(url, { timeout: 12000 });
       const durationMs = Date.now() - t0;
       const { code, message } = extractF2sError(r.data);
       const success = r.data?.return === true;
-      console.log(`[OTP-SMS][dlt] ← HTTP ${r.status} | return=${r.data?.return} | ${message} (${durationMs}ms)`);
+      console.log(`[OTP-SMS][dlt] Response — HTTP ${r.status} | return=${r.data?.return} | code=${code || "none"} | message="${message}" | duration=${durationMs}ms`);
+      if (success) {
+        console.log(`[OTP-SMS][dlt] ✅ DELIVERED — sender=${effectiveSender} template=${f2sExtra.otp_template_id} → ${phone}`);
+      } else {
+        console.error(`[OTP-SMS][dlt] ❌ REJECTED by Fast2SMS — code=${code} message="${message}" sender=${effectiveSender} template=${f2sExtra.otp_template_id}`);
+        console.error(`[OTP-SMS][dlt] Full Fast2SMS response: ${JSON.stringify(r.data)}`);
+      }
       attempts.push({ route: "dlt", requestUrl: maskedUrl, httpStatus: r.status, responseBody: r.data, success, errorCode: code, errorMessage: success ? undefined : message, durationMs });
       const log: SmsAttemptLog = { id, ts: new Date().toISOString(), mobileMasked: maskMobile(mobile), otp, finalSuccess: success, finalRoute: success ? "dlt" : undefined, attempts, totalDurationMs: Date.now() - overallStart, apiKeyPresent, apiKeyMasked };
       pushSmsLog(log);
       if (success) return { sent: true, providerResponse: r.data, route: "dlt", urlUsed: maskedUrl, logId: id };
       // DLT failed — no Quick/Promotional fallback permitted
-      console.error(`[OTP-SMS] ⛔ DLT failed for ${phone} — Quick route is blocked. WhatsApp OTP is secondary channel. Error: ${message}`);
-      errors.push(`dlt: ${message}`);
-      return { sent: false, route: "dlt_failed", providerResponse: r.data, error: errors.join(" | "), logId: id };
+      const rejectionReason = message || "Fast2SMS rejected the request — check sender ID and template ID configuration";
+      errors.push(`DLT rejected: ${rejectionReason}`);
+      return { sent: false, route: "dlt_failed", providerResponse: r.data, error: rejectionReason, logId: id };
     } catch (err: any) {
       const durationMs = Date.now() - t0;
       const errBody = err?.response?.data;
       const errMsg = errBody ? extractF2sError(errBody).message : (err?.message || String(err));
-      console.error(`[OTP-SMS][dlt] ✗ ${errMsg} (${durationMs}ms)`);
-      console.error(`[OTP-SMS] ⛔ DLT error for ${phone} — Quick route is blocked per DLT policy.`);
+      console.error(`[OTP-SMS][dlt] ✗ Network/timeout error: ${errMsg} (${durationMs}ms)`);
+      console.error(`[OTP-SMS][dlt] Full error: ${JSON.stringify(errBody || err?.message)}`);
       attempts.push({ route: "dlt", requestUrl: maskedUrl, httpStatus: err?.response?.status, responseBody: errBody, success: false, errorMessage: errMsg, durationMs });
-      errors.push(`dlt: ${errMsg}`);
+      errors.push(`DLT error: ${errMsg}`);
       const log: SmsAttemptLog = { id, ts: new Date().toISOString(), mobileMasked: maskMobile(mobile), otp, finalSuccess: false, attempts, totalDurationMs: Date.now() - overallStart, apiKeyPresent, apiKeyMasked };
       pushSmsLog(log);
       return { sent: false, error: errors.join(" | "), logId: id };

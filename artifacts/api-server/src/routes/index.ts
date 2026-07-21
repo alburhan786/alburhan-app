@@ -424,4 +424,125 @@ router.get("/migrate/audit-info", async (req: any, res: any) => {
   res.json(out);
 });
 
+// ── Fast2SMS DLT template list (migration key protected) ──────────────────
+router.get("/migrate/fast2sms-templates", async (req: any, res: any) => {
+  const key = req.query.key as string;
+  if (!migrationKeyOk(key)) return void res.status(403).json({ error: "Forbidden" });
+  try {
+    const { pool } = await import("@workspace/db");
+    const { decrypt } = await import("../lib/encryption.js");
+    const axios = (await import("axios")).default;
+
+    // Read encrypted fields directly (same pattern as api-settings.ts)
+    const settingsRow = await pool.query(
+      `SELECT api_key_encrypted, enabled, extra_fields_encrypted FROM api_settings WHERE provider = 'fast2sms' LIMIT 1`
+    );
+    const dbRow = settingsRow.rows[0];
+    const isEnabled = dbRow?.enabled !== false;
+
+    // Decrypt API key
+    let apiKey: string | undefined;
+    try {
+      if (dbRow?.api_key_encrypted) apiKey = decrypt(dbRow.api_key_encrypted) || undefined;
+    } catch {}
+    // Env fallback
+    if (!apiKey) apiKey = process.env.FAST2SMS_API_KEY || process.env.FAST2SMS_XXL_API_KEY;
+
+    // Decrypt extra fields
+    let currentExtra: Record<string, any> = {};
+    try {
+      if (dbRow?.extra_fields_encrypted) currentExtra = JSON.parse(decrypt(dbRow.extra_fields_encrypted));
+    } catch {}
+
+    if (!apiKey || !isEnabled) {
+      return void res.status(400).json({
+        ok: false,
+        error: apiKey ? "Fast2SMS is disabled in api_settings" : "Fast2SMS API key not found in DB or env",
+        dbRowExists: !!dbRow,
+        isEnabled,
+        currentOtpTemplateId: currentExtra.otp_template_id || null,
+        currentSenderId: currentExtra.sender_id || "ABURHA",
+      });
+    }
+
+    const maskedKey = `${apiKey.slice(0, 8)}...${apiKey.slice(-4)}`;
+
+    // Fetch DLT templates from Fast2SMS
+    const url = `https://www.fast2sms.com/dev/template?authorization=${apiKey}`;
+    let templates: any = null;
+    let templateError: any = null;
+    try {
+      const r = await axios.get(url, { timeout: 15000 });
+      templates = r.data;
+    } catch (te: any) {
+      templateError = te?.response?.data || te?.message;
+    }
+
+    res.json({
+      ok: true,
+      maskedKey,
+      currentOtpTemplateId: currentExtra.otp_template_id || null,
+      currentSenderId: currentExtra.sender_id || "ABURHA",
+      currentOtpSender: currentExtra.otp_sender || null,
+      dbRowExists: !!dbRow,
+      isEnabled,
+      fast2smsTemplateResponse: templates,
+      fast2smsTemplateError: templateError,
+    });
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// ── Configure OTP template ID + sender (migration key protected) ──────────
+router.post("/migrate/configure-otp-template", async (req: any, res: any) => {
+  const { key, otp_template_id, otp_sender } = req.body || {};
+  if (!migrationKeyOk(key)) return void res.status(403).json({ error: "Forbidden" });
+  if (!otp_template_id || typeof otp_template_id !== "string") {
+    return void res.status(400).json({ error: "otp_template_id is required" });
+  }
+  try {
+    const { pool } = await import("@workspace/db");
+    const { decrypt, encrypt } = await import("../lib/encryption.js");
+
+    // Read current encrypted extra
+    const row = await pool.query(
+      `SELECT extra_fields_encrypted FROM api_settings WHERE provider = 'fast2sms' LIMIT 1`
+    );
+    if (!row.rows.length) return void res.status(404).json({ error: "fast2sms api_settings row not found" });
+
+    let extra: Record<string, any> = {};
+    try {
+      if (row.rows[0].extra_fields_encrypted) {
+        extra = JSON.parse(decrypt(row.rows[0].extra_fields_encrypted));
+      }
+    } catch {}
+
+    // Merge new values
+    extra.otp_template_id = otp_template_id.trim();
+    if (otp_sender && typeof otp_sender === "string") {
+      extra.otp_sender = otp_sender.trim();
+    }
+
+    // Re-encrypt and save
+    const extraEncrypted = encrypt(JSON.stringify(extra));
+    await pool.query(
+      `UPDATE api_settings SET extra_fields_encrypted = $1, updated_at = NOW() WHERE provider = 'fast2sms'`,
+      [extraEncrypted]
+    );
+
+    // Invalidate cache so next OTP call picks up new value immediately
+    const { invalidateCache } = await import("../lib/apiSettingsProvider.js");
+    invalidateCache();
+
+    res.json({
+      ok: true,
+      message: `otp_template_id set to "${extra.otp_template_id}"${otp_sender ? `, otp_sender set to "${extra.otp_sender}"` : ""}`,
+      savedExtra: extra,
+    });
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
 export default router;
