@@ -318,24 +318,15 @@ export async function sendTemplate(
       skipLog: true,  // sendTemplate owns the log; suppress intermediate text-send log
     });
 
-    // If text send succeeded — log it and return (unless noInternalLog suppresses it).
-    if (textResult.ok) {
-      if (opts?.eventType && !opts?.noInternalLog) {
-        await logToDb({ eventType: opts.eventType, channel: "whatsapp", recipient: to, bookingId: opts.bookingId, customerId: opts.customerId, customerName: opts.customerName, templateId, message: `[tpl:${templateId}] ${rendered.substring(0, 250)}`, status: "sent", result: textResult });
-      }
-      return textResult;
+    // Log the result and return regardless of ok/fail.
+    // NOTE: BotBee's /send/template endpoint returns "WhatsApp account not found" for
+    // this account — it is non-functional. Do NOT fall through to it.
+    // When /whatsapp/send returns "outside 24h window", that is a Meta session policy
+    // restriction, not an error we can work around via /send/template.
+    if (opts?.eventType && !opts?.noInternalLog) {
+      await logToDb({ eventType: opts.eventType, channel: "whatsapp", recipient: to, bookingId: opts.bookingId, customerId: opts.customerId, customerName: opts.customerName, templateId, message: `[tpl:${templateId}] ${rendered.substring(0, 250)}`, status: textResult.ok ? "sent" : "failed", result: textResult });
     }
-
-    // Text API rejected (most likely "outside 24 hour window").
-    // Fall through to the template API below — BotBee receives variables as a flat positional
-    // array so it can map index 0 → {{1}}, index 1 → {{2}} on Meta (which has {{N}} registered).
-    const errMsg = textResult.errorMessage || "";
-    const is24hBlock = /24.hour|window|template message/i.test(errMsg);
-    if (is24hBlock) {
-      console.warn("[BotBee] sendTemplate: 24h window blocked text send, falling through to template API (flat positional variables):", to, errMsg);
-    } else {
-      console.warn("[BotBee] sendTemplate: text send failed, falling through to template API:", to, errMsg);
-    }
+    return textResult;
   }
 
   // ── FALLBACK PATH: use BotBee template API (for templates not in local store,

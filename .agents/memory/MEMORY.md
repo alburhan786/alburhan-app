@@ -11,7 +11,7 @@
 - [Frontend JSX convention](frontend-jsx.md) — project uses React (className=, not class=); preact/hooks imports will break Vite build
 - [Journey status + profile columns](journey-status-schema.md) — journey_status TEXT on bookings (pool.query only, not Drizzle); blood_group/emergency_contact_name/emergency_contact_mobile on users; POST /api/bookings/:id/journey-status auto-notifies customer
 - [Offline bank transfer module](offline-payments-schema.md) — bank_settings + offline_payments tables; POST /api/offline-payments (multipart); approve/reject fire notifications; BankTransferSection is self-contained customer component
-- [BotBee Template API — numeric ID + flat variables](botbee-template-api.md) — sendTemplate() uses template_id (numeric BotBee ID) + flat variables[] array; NOT Meta components format. Confirmed working 2026-07-18.
+- [BotBee send/template endpoint broken](botbee-send-template-broken.md) — /send/template always "WhatsApp account not found"; only /whatsapp/send works. CORRECT_PHONE_NUMBER_ID hardcoded in botbee.ts, excluded from build.ts injectKeys.
 - [SMS DLT return type](sms-dlt-return-type.md) — sendDLTSMS() in notifications.ts returns Promise<boolean>; do NOT treat as {ok:boolean}
 - [JSX class vs className](jsx-classname.md) — AutomationCenter.tsx and LoyaltyManager.tsx had class= instead of className=; style= must be object not string
 - [Document delivery module](document-delivery.md) — lib/documentDelivery.ts: sendDocumentToCustomer fetches buffer from GCS/disk and sends PDF via BotBee upload, image via uploadMedia+sendFile, fallback to text; POST /api/documents/:id/resend for admin one-click resend

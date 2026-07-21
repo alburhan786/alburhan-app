@@ -164,7 +164,7 @@ router.post("/send-otp", async (req, res) => {
       );
       const otpTemplateId = tplRow.rows[0]?.template_id as string | undefined;
       const templateResult = otpTemplateId
-        ? await sendTemplate(cleanMobile, otpTemplateId, { eventType: "mobile_otp", forceTemplateApi: true, variables: { "1": otp } })
+        ? await sendTemplate(cleanMobile, otpTemplateId, { eventType: "mobile_otp" })
         : { ok: false as const, errorMessage: "No OTP template_id configured in DB" };
       if (templateResult.ok) {
         console.log(`[OTP-SEND][WhatsApp] Template sent ✓ (outside-window safe)`);

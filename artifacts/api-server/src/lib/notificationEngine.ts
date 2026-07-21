@@ -530,7 +530,10 @@ export async function sendBotBeeEventTemplate(
     (ctx.bookingNumber ? `${siteBase}/invoice/${ctx.bookingNumber}` : `${siteBase}`);
   const paymentUrl = ctx.bookingNumber
     ? `${siteBase}/pay/${ctx.bookingNumber}` : `${siteBase}`;
-  const opts = { eventType, bookingId, customerId, customerName: ctx.customerName, skipFailureLog: true, noInternalLog: true, forceTemplateApi: true };
+  // Do NOT use forceTemplateApi:true — BotBee's /send/template endpoint returns
+  // "WhatsApp account not found" for this account. The text endpoint /whatsapp/send
+  // works correctly; sendTemplate() renders TEMPLATE_BODIES locally and sends via that path.
+  const opts = { eventType, bookingId, customerId, customerName: ctx.customerName, skipFailureLog: true, noInternalLog: true };
 
   switch (eventType) {
     // ── Booking ───────────────────────────────────────────────────────────────

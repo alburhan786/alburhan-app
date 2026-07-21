@@ -908,20 +908,20 @@ app.post("/api/migrate/botbee-diag", async (req, res) => {
         bookingId: "BKG-DIAG-001",
         amount: 50000,
         invoiceUrl: "https://alburhantravels.com/invoice/diag",
-      }, { forceTemplateApi: true }),
+      }, {}),
       sendPaymentReceivedTemplate(testPhone, {
         customerName: "Test User",
         bookingId: "BKG-DIAG-001",
         invoiceNumber: "INV-001",
         amount: 50000,
-      }, { forceTemplateApi: true }),
+      }, {}),
       sendDepartureReminderTemplate(testPhone, {
         customerName: "Test User",
         bookingId: "BKG-DIAG-001",
         departureDate: "25 Jul 2026",
         reportingTime: "4 hours before departure",
         departureAirport: "Mumbai (BOM)",
-      }, { forceTemplateApi: true }),
+      }, {}),
     ]);
     const labels = ["booking_approved (5v)", "payment_received (4v)", "departure_reminde (5v)"];
     results["liveSendTests"] = sends.map((s, i) => ({
@@ -1373,7 +1373,7 @@ app.post("/api/migrate/wa-approval-test", async (req, res) => {
     invoiceUrl = (req.body?.invoiceUrl || "https://alburhantravels.com/invoice/TEST-001") as string;
   }
 
-  console.log(`[wa-approval-test] Sending booking_approved to ${mobile} (${name}) forceTemplateApi=true`);
+  console.log(`[wa-approval-test] Sending booking_approved to ${mobile} (${name})`);
   const startMs = Date.now();
   const result = await sendApprovalTemplate(mobile, {
     customerName: name,
@@ -1381,7 +1381,7 @@ app.post("/api/migrate/wa-approval-test", async (req, res) => {
     bookingId,
     amount,
     invoiceUrl,
-  }, { forceTemplateApi: true });
+  }, {});
   const elapsed = Date.now() - startMs;
 
   // Pull recent notification logs for this phone
