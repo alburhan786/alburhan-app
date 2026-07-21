@@ -665,7 +665,7 @@ export const ABT_TEMPLATES: Record<string, { id: string; name: string }> = {
   // ── Core booking & payment ─────────────────────────────────────────────────
   // IDs confirmed from live BotBee API 2026-07-18 — used as template_id in sends
   // id="" means NOT in BotBee → graceful no-op fallback
-  booking_submitted:     { id: "",       name: (process.env.BOTBEE_BOOKING_RECEIVE_TEMPLATE       || "booking_receive").trim() },
+  booking_submitted:     { id: "409897", name: (process.env.BOTBEE_BOOKING_RECEIVE_TEMPLATE       || "booking_receive").trim() },
   booking_approved:      { id: "409950", name: (process.env.BOTBEE_BOOKING_APPROVED_TEMPLATE      || "booking_approved").trim() },
   payment_received:      { id: "409953", name: (process.env.BOTBEE_PAYMENT_RECEIVED_TEMPLATE      || "payment_received").trim() },
   pending_payment:       { id: "",       name: (process.env.BOTBEE_PENDING_PAYMENT_TEMPLATE       || "pending_payment_reminder").trim() },
