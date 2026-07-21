@@ -249,6 +249,78 @@ router.post("/test-send", async (req: AuthenticatedRequest, res) => {
   }
 });
 
+// ── GET /api/sms-settings/emergency-fallback ─────────────────────────────────
+router.get("/emergency-fallback", async (_req: AuthenticatedRequest, res) => {
+  try {
+    const f2s = getCachedConfig("fast2sms");
+    const extra = f2s.extra || {};
+    const enabled = extra.emergency_sms_fallback_enabled === "1";
+    res.json({
+      ok: true,
+      enabled,
+      reason: extra.emergency_reason || null,
+      enabledAt: extra.emergency_enabled_at || null,
+      enabledBy: extra.emergency_enabled_by || null,
+    });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ── POST /api/sms-settings/emergency-fallback ─────────────────────────────────
+// Enable or disable emergency quick-route fallback
+router.post("/emergency-fallback", async (req: AuthenticatedRequest, res) => {
+  const { enabled, reason } = req.body || {};
+  if (typeof enabled !== "boolean") {
+    return void res.status(400).json({ ok: false, error: "enabled (boolean) is required" });
+  }
+  if (enabled && !reason?.trim()) {
+    return void res.status(400).json({ ok: false, error: "reason is required when enabling emergency fallback" });
+  }
+  try {
+    const { decrypt, encrypt } = await import("../lib/encryption.js");
+    const row = await pool.query(`SELECT extra_fields_encrypted FROM api_settings WHERE provider='fast2sms' LIMIT 1`);
+    let extra: Record<string, any> = {};
+    try { if (row.rows[0]?.extra_fields_encrypted) extra = JSON.parse(decrypt(row.rows[0].extra_fields_encrypted)); } catch {}
+    const adminName = (req as any).user?.name || (req as any).user?.email || "admin";
+    if (enabled) {
+      extra.emergency_sms_fallback_enabled = "1";
+      extra.emergency_reason = reason.trim();
+      extra.emergency_enabled_at = new Date().toISOString();
+      extra.emergency_enabled_by = adminName;
+    } else {
+      extra.emergency_sms_fallback_enabled = "0";
+      extra.emergency_disabled_at = new Date().toISOString();
+      extra.emergency_disabled_by = adminName;
+    }
+    const enc = encrypt(JSON.stringify(extra));
+    await pool.query(`UPDATE api_settings SET extra_fields_encrypted=$1, updated_at=NOW() WHERE provider='fast2sms'`, [enc]);
+    const { invalidateCache } = await import("../lib/apiSettingsProvider.js");
+    invalidateCache();
+    // Also log to audit_logs if table exists
+    await pool.query(
+      `INSERT INTO audit_logs (id, action, entity_type, entity_id, admin_id, admin_name, changes, created_at)
+       VALUES ($1, $2, 'sms_settings', 'emergency_fallback', $3, $4, $5, NOW())`,
+      [
+        `ems_${Date.now()}`,
+        enabled ? "EMERGENCY_SMS_ENABLED" : "EMERGENCY_SMS_DISABLED",
+        (req as any).user?.id || null,
+        adminName,
+        JSON.stringify({ enabled, reason: reason || null }),
+      ]
+    ).catch(() => {}); // Non-fatal if audit_logs has different schema
+    res.json({
+      ok: true,
+      enabled,
+      message: enabled
+        ? `Emergency SMS fallback ENABLED. Reason: ${reason}. WhatsApp and Email will continue normally. This is a temporary measure — configure DLT templates to disable it.`
+        : "Emergency SMS fallback DISABLED. DLT templates are now required for all SMS.",
+    });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 // ── GET /api/sms-settings/verification ───────────────────────────────────────
 // Live check: all 11 events — sender ID loaded, template ID configured, route=DLT
 router.get("/verification", async (_req: AuthenticatedRequest, res) => {

@@ -1,0 +1,394 @@
+We need a permanent production-grade notification system for Al Burhan Tours & Travels.
+
+Current situation:
+
+• Booking notifications are inconsistent.
+• Payment notifications sometimes fail.
+• WhatsApp, Email and SMS are not always triggered.
+• OTP occasionally fails.
+• Invoice status and Agreement synchronization have had issues.
+• SMS currently works only because Quick Route fallback was restored.
+
+This is NOT the desired production architecture.
+
+=========================
+PRODUCTION REQUIREMENTS
+=========================
+
+Implement one centralized Notification Service.
+
+Every event must pass through one notification pipeline.
+
+Booking Created
+        ↓
+Notification Service
+        ↓
+SMS
+WhatsApp
+Email
+Push Notification
+Audit Log
+
+No module should send SMS, WhatsApp or Email directly.
+
+---------------------------------
+SUPPORTED EVENTS
+---------------------------------
+
+Booking Received
+
+Booking Approved
+
+Partial Payment Received
+
+Full Payment Received
+
+Invoice Generated
+
+Agreement Signed
+
+Visa Processing
+
+Visa Issued
+
+Flight Ticket Issued
+
+Hotel Voucher Ready
+
+Room Allocation
+
+Departure Reminder
+
+Journey Completed
+
+OTP Login
+
+OTP Registration
+
+OTP Password Reset
+
+---------------------------------
+SMS REQUIREMENTS
+---------------------------------
+
+Primary Route:
+Fast2SMS DLT Route
+
+Sender IDs available:
+
+ABURHA
+ALBURH
+ALBUR
+ABTUMR
+ABTTHJ
+
+Allow Admin to choose which Sender ID is used for every notification type.
+
+Example
+
+OTP
+→ ALBURH
+
+Booking
+→ ABURHA
+
+Payment
+→ ABURHA
+
+Reminder
+→ ALBUR
+
+Marketing
+→ ABTUMR
+
+Store mapping in database.
+
+---------------------------------
+DLT TEMPLATE MANAGEMENT
+---------------------------------
+
+Every notification must store
+
+Event
+
+Sender ID
+
+Template ID
+
+Route
+
+Status
+
+Example
+
+booking_received
+
+Sender:
+ABURHA
+
+Template:
+219801
+
+Route:
+DLT
+
+Status:
+Active
+
+Before sending SMS verify
+
+Sender exists
+
+Sender Active
+
+Template exists
+
+Template Active
+
+DLT Route available
+
+If all pass
+
+Send DLT SMS.
+
+---------------------------------
+DLT FAILURE
+---------------------------------
+
+If DLT rejects because
+
+Template missing
+
+Invalid Template
+
+Inactive Template
+
+Wrong Sender
+
+Do NOT silently fail.
+
+Log the reason.
+
+Continue WhatsApp + Email.
+
+---------------------------------
+QUICK ROUTE
+---------------------------------
+
+Quick Route must NOT be the default.
+
+Allow Quick Route only if the Admin explicitly enables
+
+Emergency SMS Fallback
+
+When enabled
+
+Reason must be logged
+
+Booking ID
+
+Notification
+
+Reason
+
+Time
+
+User
+
+Dashboard should clearly display
+
+Emergency Quick Route Used
+
+Otherwise Quick Route must remain disabled.
+
+---------------------------------
+OTP
+---------------------------------
+
+OTP must work 100%.
+
+Use configured Sender ID.
+
+Use approved OTP Template.
+
+Use DLT Route.
+
+If DLT unavailable
+
+Use Emergency Quick Route ONLY if Admin enabled it.
+
+Otherwise show
+
+OTP delivery failed.
+
+---------------------------------
+EMAIL
+---------------------------------
+
+Booking confirmation
+
+Payment receipt
+
+Invoice
+
+Agreement PDF
+
+Visa
+
+Flight Ticket
+
+Hotel Voucher
+
+Departure Reminder
+
+must always send automatically.
+
+Retry failures.
+
+---------------------------------
+WHATSAPP
+---------------------------------
+
+Automatically send
+
+Booking Confirmation
+
+Invoice PDF
+
+Receipt PDF
+
+Agreement PDF
+
+Visa
+
+Ticket
+
+Voucher
+
+Reminder
+
+Use approved Meta templates.
+
+Retry failures.
+
+---------------------------------
+NOTIFICATION LOG
+---------------------------------
+
+Create Notification Center.
+
+Show
+
+Booking ID
+
+Customer
+
+Event
+
+SMS
+
+WhatsApp
+
+Email
+
+Push
+
+Status
+
+Delivered
+
+Failed
+
+Retrying
+
+Skipped
+
+Failure Reason
+
+Provider Response
+
+Date
+
+---------------------------------
+ADMIN TEST PANEL
+---------------------------------
+
+Create Test Notification page.
+
+Allow Admin to send
+
+Test SMS
+
+Test WhatsApp
+
+Test Email
+
+Test Push
+
+Display raw provider response.
+
+---------------------------------
+PRODUCTION VALIDATION
+---------------------------------
+
+Run live production tests.
+
+Booking
+
+Approval
+
+Partial Payment
+
+Full Payment
+
+Invoice
+
+Agreement
+
+OTP
+
+Visa
+
+Ticket
+
+Voucher
+
+Departure
+
+For each verify
+
+SMS Delivered
+
+WhatsApp Delivered
+
+Email Delivered
+
+Notification Logged
+
+Journey Updated
+
+Dashboard Updated
+
+Invoice Updated
+
+Agreement Updated
+
+Do not deploy until every production notification channel works correctly.
+
+Provide a final verification report showing:
+
+✓ SMS (DLT)
+✓ WhatsApp
+✓ Email
+✓ OTP
+✓ Booking
+✓ Payment
+✓ Invoice
+✓ Agreement
+✓ Visa
+✓ Ticket
+✓ Voucher
+✓ Journey Timeline
+✓ Notification Log
+✓ Retry Queue
+✓ Emergency Fallback

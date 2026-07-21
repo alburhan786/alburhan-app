@@ -285,6 +285,22 @@ export default function NotificationLogs() {
                         <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold ${ch.bg} ${ch.color}`}>
                           <ChIcon className="w-3 h-3" /> {ch.label}
                         </span>
+                        {log.channel === "sms" && (
+                          (() => {
+                            const tid = provResp?.templateId;
+                            if (tid === "quick_route_emergency") return (
+                              <div className="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 bg-red-100 border border-red-300 text-red-700 text-[10px] font-bold rounded">
+                                <AlertTriangle className="w-2.5 h-2.5" /> Emergency Route
+                              </div>
+                            );
+                            if (tid === "not_configured") return (
+                              <div className="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-100 border border-amber-200 text-amber-700 text-[10px] rounded">
+                                No DLT Template
+                              </div>
+                            );
+                            return null;
+                          })()
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <div className="font-medium text-gray-800">{log.recipient}</div>

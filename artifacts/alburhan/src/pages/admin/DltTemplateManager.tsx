@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { useToast } from "@/hooks/use-toast";
-import { Save, RefreshCw, CheckCircle2, XCircle, AlertTriangle, Info, Smartphone } from "lucide-react";
+import { Save, RefreshCw, CheckCircle2, XCircle, AlertTriangle, Info, Smartphone, ShieldAlert, ShieldCheck, ToggleLeft, ToggleRight, Clock } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -31,6 +31,13 @@ const DLT_FIELDS: DltField[] = [
 
 interface SenderIdRow { id: string; sender_id: string; status: string; default_sender: boolean; }
 
+interface EmergencyState {
+  enabled: boolean;
+  reason: string | null;
+  enabledAt: string | null;
+  enabledBy: string | null;
+}
+
 export default function DltTemplateManager() {
   const { toast } = useToast();
   const [values, setValues] = useState<Record<string, string>>({});
@@ -40,15 +47,23 @@ export default function DltTemplateManager() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  // Emergency fallback state
+  const [emergency, setEmergency] = useState<EmergencyState>({ enabled: false, reason: null, enabledAt: null, enabledBy: null });
+  const [emergencyReason, setEmergencyReason] = useState("");
+  const [emergencySaving, setEmergencySaving] = useState(false);
+  const [showEmergencyConfirm, setShowEmergencyConfirm] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [settR, sidR] = await Promise.all([
+      const [settR, sidR, emR] = await Promise.all([
         fetch(`${API}/api/api-settings/fast2sms`, { credentials: "include" }),
         fetch(`${API}/api/sms-settings/sender-ids`, { credentials: "include" }),
+        fetch(`${API}/api/sms-settings/emergency-fallback`, { credentials: "include" }),
       ]);
       const settD = await settR.json();
       const sidD = await sidR.json();
+      const emD = await emR.json().catch(() => ({}));
 
       const extra: Record<string, string> = settD.extraFields || {};
       setValues(extra);
@@ -56,6 +71,7 @@ export default function DltTemplateManager() {
       setGlobalSender(extra.sender_id || "ABURHA");
 
       if (sidD.ok) setSenderIds(sidD.senderIds || []);
+      if (emD.ok !== undefined) setEmergency(emD);
     } catch {
       toast({ title: "Failed to load settings", variant: "destructive" });
     } finally {
@@ -90,6 +106,40 @@ export default function DltTemplateManager() {
       toast({ title: "Save failed", description: e.message, variant: "destructive" });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleEmergencyToggle = async (enable: boolean) => {
+    if (enable && !emergencyReason.trim()) {
+      toast({ title: "Reason required", description: "Please enter a reason for enabling emergency fallback.", variant: "destructive" });
+      return;
+    }
+    setEmergencySaving(true);
+    try {
+      const r = await fetch(`${API}/api/sms-settings/emergency-fallback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ enabled: enable, reason: enable ? emergencyReason.trim() : undefined }),
+      });
+      const d = await r.json();
+      if (!d.ok) throw new Error(d.error || "Failed");
+      toast({
+        title: enable ? "⚠ Emergency fallback ENABLED" : "Emergency fallback disabled",
+        description: enable
+          ? `SMS will use Quick Route until DLT templates are configured or this is disabled.`
+          : "SMS now requires DLT templates for all events.",
+        variant: enable ? "destructive" : "default",
+      });
+      setShowEmergencyConfirm(false);
+      setEmergencyReason("");
+      const emR = await fetch(`${API}/api/sms-settings/emergency-fallback`, { credentials: "include" });
+      const emD = await emR.json();
+      if (emD.ok !== undefined) setEmergency(emD);
+    } catch (e: any) {
+      toast({ title: "Failed", description: e.message, variant: "destructive" });
+    } finally {
+      setEmergencySaving(false);
     }
   };
 
@@ -267,6 +317,114 @@ export default function DltTemplateManager() {
             </button>
           </div>
         )}
+
+        {/* ── Emergency SMS Fallback ─────────────────────────────────────────── */}
+        <div className={`rounded-xl border-2 p-5 space-y-4 ${emergency.enabled ? "border-red-400 bg-red-50" : "border-gray-200 bg-white"}`}>
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              {emergency.enabled
+                ? <ShieldAlert className="w-6 h-6 text-red-600 mt-0.5 shrink-0" />
+                : <ShieldCheck className="w-6 h-6 text-gray-400 mt-0.5 shrink-0" />}
+              <div>
+                <h2 className={`text-base font-bold ${emergency.enabled ? "text-red-800" : "text-gray-800"}`}>
+                  Emergency SMS Fallback
+                  {emergency.enabled && (
+                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-red-600 text-white animate-pulse">
+                      ACTIVE
+                    </span>
+                  )}
+                </h2>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  When enabled, SMS events without a DLT template will use <strong>Quick Route</strong> (unregistered message, may not be TRAI-compliant).
+                  Use only as a temporary measure while DLT templates are being approved.
+                </p>
+              </div>
+            </div>
+            {/* Toggle button — only show if not in confirm mode */}
+            {!showEmergencyConfirm && (
+              <button
+                onClick={() => emergency.enabled ? handleEmergencyToggle(false) : setShowEmergencyConfirm(true)}
+                disabled={emergencySaving}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 shrink-0 ${
+                  emergency.enabled
+                    ? "bg-green-600 hover:bg-green-700 text-white"
+                    : "bg-red-600 hover:bg-red-700 text-white"
+                }`}
+              >
+                {emergencySaving
+                  ? <RefreshCw className="w-4 h-4 animate-spin" />
+                  : emergency.enabled ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
+                {emergencySaving ? "Saving…" : emergency.enabled ? "Disable Fallback" : "Enable Emergency Fallback"}
+              </button>
+            )}
+          </div>
+
+          {/* Active state info */}
+          {emergency.enabled && emergency.reason && (
+            <div className="flex flex-wrap gap-4 text-sm text-red-700 bg-red-100 rounded-lg px-4 py-3 border border-red-200">
+              <span className="flex items-center gap-1.5">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <strong>Reason:</strong> {emergency.reason}
+              </span>
+              {emergency.enabledBy && (
+                <span className="flex items-center gap-1.5">
+                  <Info className="w-3.5 h-3.5 shrink-0" />
+                  <strong>By:</strong> {emergency.enabledBy}
+                </span>
+              )}
+              {emergency.enabledAt && (
+                <span className="flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 shrink-0" />
+                  {new Date(emergency.enabledAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Enable confirmation form */}
+          {showEmergencyConfirm && !emergency.enabled && (
+            <div className="space-y-3 border border-red-200 bg-red-50/60 rounded-lg p-4">
+              <p className="text-sm font-semibold text-red-700 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                You are about to enable Quick Route as emergency fallback. This sends unregistered SMS and may breach DLT compliance. Proceed only if DLT templates are temporarily unavailable.
+              </p>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Reason <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  value={emergencyReason}
+                  onChange={e => setEmergencyReason(e.target.value)}
+                  placeholder="e.g. DLT templates under re-approval, critical customer comms needed"
+                  className="w-full border border-red-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleEmergencyToggle(true)}
+                  disabled={emergencySaving || !emergencyReason.trim()}
+                  className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors"
+                >
+                  {emergencySaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <ShieldAlert className="w-3.5 h-3.5" />}
+                  Confirm — Enable Emergency Fallback
+                </button>
+                <button
+                  onClick={() => { setShowEmergencyConfirm(false); setEmergencyReason(""); }}
+                  className="px-4 py-2 rounded-lg text-sm font-semibold border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Normal (disabled) info */}
+          {!emergency.enabled && !showEmergencyConfirm && (
+            <p className="text-xs text-gray-400 flex items-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5 text-green-500 shrink-0" />
+              DLT-only mode is active. SMS events without a configured template will <strong>fail silently</strong> (not use Quick Route).
+            </p>
+          )}
+        </div>
       </div>
     </AdminLayout>
   );
