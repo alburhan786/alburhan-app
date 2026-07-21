@@ -3416,6 +3416,47 @@ app.post("/api/migrate/resync-fast2sms", async (req, res) => {
   }
 });
 
+// POST /api/migrate/update-sms-sender — update sender_id in DB to ABURHA and set per-event template IDs
+app.post("/api/migrate/update-sms-sender", async (req, res) => {
+  const key = (req.query.key || req.body?.key) as string;
+  if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
+  try {
+    const { pool: dPool } = await import("@workspace/db");
+    const { decrypt, encrypt } = await import("./lib/encryption.js");
+    const { getCachedConfig, invalidateCache } = await import("./lib/apiSettingsProvider.js");
+    // Read current fast2sms extra fields (encrypted)
+    const row = await dPool.query(`SELECT extra_fields_encrypted FROM api_settings WHERE provider='fast2sms' LIMIT 1`);
+    if (!row.rows.length) return void res.json({ ok: false, reason: "fast2sms row not found in api_settings" });
+    // Decrypt current extra fields
+    let extra: Record<string, string> = {};
+    if (row.rows[0].extra_fields_encrypted) {
+      try { extra = JSON.parse(decrypt(row.rows[0].extra_fields_encrypted)); } catch {}
+    }
+    // Merge in ABURHA sender_id + any template IDs from request body
+    const { templateIds = {} } = req.body || {};
+    const updatedExtra = {
+      ...extra,
+      sender_id: "ABURHA",
+      ...Object.fromEntries(
+        Object.entries(templateIds as Record<string, string>)
+          .filter(([k, v]) => typeof k === "string" && typeof v === "string" && v.trim())
+      ),
+    };
+    // Re-encrypt and save
+    const encryptedExtra = encrypt(JSON.stringify(updatedExtra));
+    await dPool.query(
+      `UPDATE api_settings SET extra_fields_encrypted=$1, updated_at=NOW(), updated_by='migrate-update-sms-sender' WHERE provider='fast2sms'`,
+      [encryptedExtra]
+    );
+    invalidateCache();
+    await new Promise(r => setTimeout(r, 200)); // allow cache refresh
+    const fresh = getCachedConfig("fast2sms");
+    res.json({ ok: true, sender_id: fresh.extra?.sender_id, extra: fresh.extra });
+  } catch (e: any) {
+    res.status(500).json({ ok: false, reason: e.message });
+  }
+});
+
 // GET /api/migrate/deploy-status — lightweight deploy health check for monitoring
 app.get("/api/migrate/deploy-status", async (req, res) => {
   const key = req.query.key as string;

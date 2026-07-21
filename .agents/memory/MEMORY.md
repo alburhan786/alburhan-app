@@ -41,6 +41,7 @@
 - [Notification engine bug patterns](notification-engine-bugs.md) — sendDLTSMS returns boolean (not object); TRIGGER_TO_EVENT must use valid EventType values; Razorpay order route needs same amount cap as payment links
 - [Invoice visibility rules](invoice-visibility-rules.md) — never serve invoice PDF if paid_amount<=0; both /by-number/:num/pdf (public) and /:id/pdf (auth) enforce 403 PAYMENT_REQUIRED; frontend checks paidAmount>0 in addition to status
 - [Notification dedup fix](notification-dedup-fix.md) — payment_received dedup must be 0 (not 12h); BotBee /whatsapp/templates 404 is harmless (different from /whatsapp/send/template); admin resend at POST /api/payments/resend-notification/:bookingId
+- [DLT SMS per-event templates](dlt-sms-per-event-templates.md) — sms.ts has 10 per-event tids; sender_id=ABURHA (DB updated); no Quick SMS fallback; admin must enter template IDs in API Settings → Fast2SMS
 - [payment_transactions schema](payment-transactions-schema.md) — column is payment_mode (NOT mode); pt.mode causes PostgreSQL aggregate error; NO invoice_number column
 - [pilgrims table schema](pilgrims-table-schema.md) — FK is group_id (NOT booking_id); full_name (NOT name); mobile_india (NOT mobile)
 - [verify-public pipeline fix](verify-public-pipeline-fix.md) — PaymentPage.tsx (public WhatsApp link) calls verify-public; previously skipped entire pipeline (invoice/agreement/notifications); use-payment.ts calls /verify (auth); both now run identical pipeline

@@ -1,0 +1,255 @@
+FINAL PRODUCTION DLT SMS + EMAIL + WHATSAPP AUTOMATION
+
+Integrate ALL approved Fast2SMS DLT templates into the Al Burhan Tours & Travels production system.
+
+Use:
+Route: DLT SMS
+Sender ID: ABURHA
+
+Never use Quick SMS for production notifications.
+Use Quick SMS only if DLT service is unavailable.
+
+==========================================
+BOOKING FLOW
+==========================================
+
+1. Booking Received
+Trigger:
+Customer submits booking.
+
+Send:
+• DLT SMS
+• WhatsApp
+• Email
+
+Variables:
+Customer Name
+Booking ID
+Package
+
+==========================================
+
+2. Booking Approved
+Trigger:
+Admin approves booking.
+
+Send:
+• DLT SMS
+• WhatsApp
+• Email
+
+Variables:
+Customer Name
+Booking ID
+Package
+Amount
+
+==========================================
+
+3. Payment Received
+Trigger:
+Successful payment.
+
+Update automatically:
+• Booking Status = Paid
+• Invoice Status = Paid
+• Payment Status = Paid
+• Customer Dashboard
+• Admin Dashboard
+
+Generate:
+
+✓ Official Tax Invoice PDF
+✓ Payment Receipt PDF
+
+Send:
+
+• DLT SMS
+• WhatsApp
+• Email
+
+Attach:
+Official Tax Invoice PDF
+Payment Receipt PDF
+
+==========================================
+
+4. Invoice Ready
+Trigger:
+Tax Invoice generated.
+
+Generate official TAX INVOICE PDF.
+
+Dashboard:
+Customer Documents
+Invoices
+Downloads
+
+Send:
+
+• DLT SMS
+• WhatsApp
+• Email
+
+Attach:
+Tax Invoice PDF
+
+==========================================
+
+5. Payment Reminder
+Trigger:
+Pending payment.
+
+Send:
+• DLT SMS
+• WhatsApp
+• Email
+
+==========================================
+
+6. Flight Ticket Issued
+Trigger:
+Ticket uploaded.
+
+Dashboard:
+Flight Ticket
+
+Send:
+
+• DLT SMS
+• WhatsApp
+• Email
+
+Attach:
+Flight Ticket PDF
+
+==========================================
+
+7. Flight Reminder
+Trigger:
+24 hours before departure.
+
+Send:
+• DLT SMS
+• WhatsApp
+• Email
+
+==========================================
+
+8. Visa Ready
+Trigger:
+Visa uploaded.
+
+Dashboard:
+Visa
+
+Send:
+
+• DLT SMS
+• WhatsApp
+• Email
+
+Attach:
+Visa PDF
+
+==========================================
+
+CUSTOMER DASHBOARD
+
+Show only official documents.
+
+Booking
+Agreement
+Tax Invoice
+Payment Receipt
+Visa
+Flight Ticket
+Hotel Voucher
+
+Invoice Status
+
+Pending
+Paid
+Cancelled
+Refunded
+
+If payment succeeds:
+
+Immediately update everywhere to:
+
+PAID
+
+Never show Pending after successful payment.
+
+==========================================
+
+EMAIL
+
+Replace current invoice attachment.
+
+Instead attach ONLY:
+
+Official Tax Invoice PDF
+
+matching the website tax invoice design.
+
+The PDF must include:
+
+Al Burhan Tours & Travels branding
+GSTIN
+Invoice Number
+Booking Number
+Customer Details
+Package
+GST
+Payment Details
+Status
+
+If payment completed:
+
+Display green PAID badge.
+
+Do NOT email pending invoices after payment.
+
+==========================================
+
+WHATSAPP
+
+Send:
+
+Booking Confirmation
+
+Booking Approved
+
+Payment Received
+
+Invoice Ready
+
+Visa Ready
+
+Ticket Ready
+
+Flight Reminder
+
+Attach PDFs where applicable.
+
+==========================================
+
+LIVE TEST
+
+Perform real production testing.
+
+Verify:
+
+✓ DLT SMS delivered
+✓ WhatsApp delivered
+✓ Email delivered
+✓ Official Tax Invoice PDF attached
+✓ Dashboard updated
+✓ Invoice Status = Paid
+✓ Payment Receipt generated
+✓ Customer can download PDFs
+✓ Admin dashboard synced
+✓ No Pending invoice after successful payment
+
+Deploy only after every workflow passes successfully.

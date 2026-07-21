@@ -13,22 +13,23 @@ function getConfig() {
     apiKey,
     enabled,
     ex,
-    sender_id: ex.sender_id || "ALBURH",
+    sender_id: ex.sender_id || "ABURHA",
     // Per-event template IDs — fall back to generic notify_template_id
-    notify_tid: ex.notify_template_id || "211277",
+    notify_tid: ex.notify_template_id || "",
     tids: {
-      booking_created:    ex.booking_created_tid    || ex.notify_template_id || "211277",
-      booking_confirmed:  ex.booking_confirmed_tid  || ex.notify_template_id || "211277",
-      payment_received:   ex.payment_received_tid   || ex.notify_template_id || "211277",
-      partial_payment:    ex.partial_payment_tid    || ex.payment_received_tid || ex.notify_template_id || "211277",
-      pending_payment:    ex.pending_payment_tid    || ex.notify_template_id || "211277",
-      invoice_created:    ex.invoice_created_tid    || ex.notify_template_id || "211277",
-      ticket_issued:      ex.ticket_issued_tid      || ex.notify_template_id || "211277",
-      visa_issued:        ex.visa_issued_tid        || ex.notify_template_id || "211277",
-      departure_reminder: ex.departure_reminder_tid || ex.notify_template_id || "211277",
-      arrival_reminder:   ex.arrival_reminder_tid   || ex.notify_template_id || "211277",
-      eid_greeting:       ex.eid_greeting_tid       || ex.notify_template_id || "211277",
-      custom:             ex.custom_tid             || ex.notify_template_id || "211277",
+      booking_created:    ex.booking_created_tid    || ex.notify_template_id || "",
+      booking_confirmed:  ex.booking_confirmed_tid  || ex.notify_template_id || "",
+      booking_rejected:   ex.booking_rejected_tid   || ex.notify_template_id || "",
+      payment_received:   ex.payment_received_tid   || ex.notify_template_id || "",
+      partial_payment:    ex.partial_payment_tid    || ex.payment_received_tid || ex.notify_template_id || "",
+      pending_payment:    ex.pending_payment_tid    || ex.notify_template_id || "",
+      invoice_created:    ex.invoice_created_tid    || ex.notify_template_id || "",
+      ticket_issued:      ex.ticket_issued_tid      || ex.notify_template_id || "",
+      visa_issued:        ex.visa_issued_tid        || ex.notify_template_id || "",
+      departure_reminder: ex.departure_reminder_tid || ex.notify_template_id || "",
+      arrival_reminder:   ex.arrival_reminder_tid   || ex.notify_template_id || "",
+      eid_greeting:       ex.eid_greeting_tid       || ex.notify_template_id || "",
+      custom:             ex.custom_tid             || ex.notify_template_id || "",
     },
   };
 }
@@ -127,6 +128,11 @@ async function sendDLT(
     return { ok: false, provider: "Fast2SMS", templateId, mobile, errorMessage: "Fast2SMS API key not configured" };
   }
 
+  if (!templateId) {
+    console.warn(`[SMS][${opts.eventType}] ⚠ No DLT template ID configured for this event — SMS skipped. Set ${opts.eventType}_tid in API Settings → Fast2SMS.`);
+    return { ok: false, provider: "Fast2SMS", templateId: "not_configured", mobile, errorMessage: `No DLT template ID configured for ${opts.eventType}` };
+  }
+
   const phone = toPhone(mobile);
   const vars = encodeURIComponent(variables.map(v => {
     const s = String(v);
@@ -203,6 +209,15 @@ export async function sendBookingConfirmed(ctx: BookingCtx): Promise<SMSResult> 
     ctx.mobile, tids.booking_confirmed,
     [ctx.customerName, ctx.bookingNumber, ctx.packageName || "Hajj/Umrah"],
     { eventType: "booking_approved", message: `Booking #${ctx.bookingNumber} confirmed`, bookingId: ctx.bookingId, customerId: ctx.customerId }
+  );
+}
+
+export async function sendBookingRejected(ctx: BookingCtx & { reason?: string }): Promise<SMSResult> {
+  const { tids } = getConfig();
+  return sendDLT(
+    ctx.mobile, tids.booking_rejected,
+    [ctx.customerName, ctx.bookingNumber, ctx.reason || "Please contact us for details"],
+    { eventType: "booking_rejected", message: `Booking #${ctx.bookingNumber} rejected`, bookingId: ctx.bookingId, customerId: ctx.customerId }
   );
 }
 

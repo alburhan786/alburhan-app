@@ -5,11 +5,14 @@ import { isPlaceholderKey } from "./keyValidation.js";
 import {
   sendBookingCreated as smsSendBookingCreated,
   sendBookingConfirmed as smsSendBookingConfirmed,
+  sendBookingRejected as smsSendBookingRejected,
   sendPaymentReceived as smsSendPaymentReceived,
+  sendPartialPaymentReceived as smsSendPartialPaymentReceived,
   sendPendingPaymentReminder as smsSendPendingPayment,
   sendInvoiceCreated as smsSendInvoiceCreated,
   sendFlightTicketIssued as smsSendTicket,
   sendVisaIssued as smsSendVisa,
+  sendDepartureReminder as smsSendDepartureReminder,
 } from "./sms.js";
 
 export interface SendResult {
@@ -55,7 +58,7 @@ function getFast2SMSKey(): string | undefined {
 function getFast2SMSExtra() {
   const dbCfg = getCachedConfig("fast2sms");
   return {
-    sender_id: dbCfg.extra.sender_id || "ALBURH",
+    sender_id: dbCfg.extra.sender_id || "ABURHA",
     otp_template_id: dbCfg.extra.otp_template_id || "164844",
     notify_template_id: dbCfg.extra.notify_template_id || "211277",
   };
@@ -340,25 +343,10 @@ export async function sendDLTSMS(
     console.log("[SMS-DLT] No notify_template_id configured — skipping DLT, using quick route");
   }
 
-  // ── Route 2: Quick (plain text fallback, no DLT registration needed) ─────
-  try {
-    const plainMsg = encodeURIComponent(
-      `Dear ${var1}, your booking ${var2} is confirmed. Thank you for choosing Al Burhan Tours & Travels.`
-    );
-    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=q&message=${plainMsg}&flash=0&numbers=${phone}`;
-    const response = await withRetry(() => axios.get(url));
-    const data = response.data;
-    if (data?.return === false || data?.status_code >= 400) {
-      console.error(`[SMS-Quick] Failed for ${mobile}:`, JSON.stringify(data));
-      return false;
-    }
-    console.log("[SMS-Quick] Sent via quick route to", mobile, data);
-    return true;
-  } catch (err: any) {
-    const errData = err?.response?.data || err.message;
-    console.error("[SMS-Quick] Error for", mobile, ":", JSON.stringify(errData));
-    return false;
-  }
+  // Quick SMS route is DISABLED for production — only DLT is used for India regulatory compliance.
+  // For manual/custom messages use sendCustomSMS() in sms.ts which explicitly uses Quick route.
+  console.warn("[SMS-DLT] DLT failed and Quick route is disabled for production. SMS not sent to", mobile);
+  return false;
 }
 
 export async function sendWhatsApp(mobile: string | null | undefined, message: string): Promise<SendResult> {
@@ -648,10 +636,8 @@ export async function sendBookingSubmissionNotification(opts: {
 
   const [waRes, smsRes, emailRes, rcsRes] = await Promise.allSettled([
     sendWhatsApp(opts.mobile, customerMsg),
-    sendDLTSMS(opts.mobile, opts.customerName, opts.bookingNumber, "CONFIRMED")
-      .then((ok): SendResult => ok
-        ? { ok: true, provider: "Fast2SMS", endpoint: "sms-dlt", responsePayload: { sent: true } }
-        : { ok: false, provider: "Fast2SMS", endpoint: "sms-dlt", errorMessage: "DLT SMS failed" })
+    smsSendBookingCreated({ mobile: opts.mobile, customerName: opts.customerName, bookingNumber: opts.bookingNumber, packageName: opts.packageName, bookingId: opts.bookingId || undefined })
+      .then((r): SendResult => ({ ok: r.ok, provider: r.provider, endpoint: "sms-dlt", responsePayload: r.responsePayload, errorMessage: r.errorMessage }))
       .catch((e: any): SendResult => ({ ok: false, provider: "Fast2SMS", endpoint: "sms-dlt", errorMessage: e?.message || "SMS error" })),
     opts.email ? sendEmail(opts.email, "Booking Submitted – Al Burhan Tours & Travels", customerMsg) : Promise.resolve({ ok: false, provider: "SMTP", endpoint: "smtp", errorMessage: "No email" } as SendResult),
     sendRCS(opts.mobile, opts.customerName, customerMsg),
@@ -718,7 +704,7 @@ export async function sendBookingRejectionNotification(opts: {
   const reasonText = opts.reason ? `\n\nReason: ${opts.reason}` : "";
   const message = `Assalamu Alaikum ${opts.customerName},\n\nWe regret that your booking #${opts.bookingNumber} could not be processed.${reasonText}\n\nPlease contact us:\n+91 8989701701\n+91 9893989786`;
   await Promise.allSettled([
-    sendDLTSMS(opts.mobile, opts.customerName, opts.bookingNumber, "REJECTED"),  // no dedicated event type; use generic
+    smsSendBookingRejected({ mobile: opts.mobile, customerName: opts.customerName, bookingNumber: opts.bookingNumber, reason: opts.reason || undefined }),
     sendWhatsApp(opts.mobile, message),
     opts.email ? sendEmail(opts.email, "Booking Update – Al Burhan Tours & Travels", message) : Promise.resolve(),
   ]);
@@ -802,7 +788,7 @@ export async function sendPartialPaymentNotification(opts: {
 }) {
   const message = `Assalamu Alaikum ${opts.customerName},\n\nPartial payment of Rs.${opts.paidAmount} received for booking #${opts.bookingNumber}.\n\nBalance remaining: Rs.${opts.remainingAmount}\n\nPlease login to pay the remaining amount.\n\nAl Burhan Tours & Travels\n+91 8989701701`;
   await Promise.allSettled([
-    smsSendPendingPayment({ mobile: opts.mobile, customerName: opts.customerName, bookingNumber: opts.bookingNumber, balance: opts.remainingAmount }),
+    smsSendPartialPaymentReceived({ mobile: opts.mobile, customerName: opts.customerName, bookingNumber: opts.bookingNumber, paidAmount: opts.paidAmount, balanceAmount: opts.remainingAmount }),
     sendWhatsApp(opts.mobile, message),
     opts.email ? sendEmail(opts.email, "Partial Payment Received – Al Burhan Tours & Travels", message) : Promise.resolve(),
   ]);
@@ -959,9 +945,14 @@ export async function sendJourneyStatusNotification(opts: {
   if (!entry) return;
   const message = entry.body(opts.customerName, opts.bookingNumber);
 
+  // Journey status DLT SMS: route to the closest matching approved template
+  const departureStatuses = ["departed", "flight_departed", "in_flight", "checked_in"];
+  const isDeparture = departureStatuses.includes((opts.journeyStatus || "").toLowerCase());
   await Promise.allSettled([
     sendWhatsApp(opts.mobile, message),
-    sendDLTSMS(opts.mobile, opts.customerName, opts.bookingNumber, opts.journeyStatus),
+    isDeparture
+      ? smsSendDepartureReminder({ mobile: opts.mobile, customerName: opts.customerName, bookingNumber: opts.bookingNumber, departureDate: "As scheduled" })
+      : Promise.resolve(),
     opts.email
       ? import("../services/emailService.js").then(({ sendBookingStatusEmail }) =>
           sendBookingStatusEmail(opts.email!, {
@@ -1163,11 +1154,9 @@ Support:
     // ── WhatsApp ──────────────────────────────────────────────────────────────
     sendWhatsApp(opts.mobile, waMsg),
 
-    // ── SMS (DLT) — wrap boolean return to SendResult ─────────────────────────
-    sendDLTSMS(opts.mobile, opts.customerName, opts.bookingNumber, "CONFIRMED")
-      .then((ok): SendResult => ok
-        ? { ok: true, provider: "Fast2SMS", endpoint: "sms-dlt", responsePayload: { sent: true } }
-        : { ok: false, provider: "Fast2SMS", endpoint: "sms-dlt", errorMessage: "DLT SMS delivery failed" })
+    // ── SMS (DLT) — uses booking_confirmed template via sms.ts ───────────────
+    smsSendBookingConfirmed({ mobile: opts.mobile, customerName: opts.customerName, bookingNumber: opts.bookingNumber, packageName: opts.packageName ?? undefined, bookingId: opts.bookingId ?? undefined, customerId: opts.customerId ?? undefined })
+      .then((r): SendResult => ({ ok: r.ok, provider: r.provider, endpoint: "sms-dlt", responsePayload: r.responsePayload, errorMessage: r.errorMessage }))
       .catch((err: any): SendResult => ({ ok: false, provider: "Fast2SMS", endpoint: "sms-dlt", errorMessage: err?.message || "SMS error" })),
 
     // ── Email — use sendEmail() helper so from-address matches SMTP auth user ─
