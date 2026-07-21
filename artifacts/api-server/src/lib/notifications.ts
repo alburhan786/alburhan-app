@@ -267,7 +267,7 @@ export async function sendOtpSMS(mobile: string, otp: string): Promise<SmsResult
       // DLT failed — no Quick/Promotional fallback permitted
       const rejectionReason = message || "Fast2SMS rejected the request — check sender ID and template ID configuration";
       errors.push(`DLT rejected: ${rejectionReason}`);
-      return { sent: false, route: "dlt_failed", providerResponse: r.data, error: rejectionReason, logId: id };
+      return { sent: false, route: "dlt_failed", providerResponse: r.data, urlUsed: maskedUrl, error: rejectionReason, logId: id };
     } catch (err: any) {
       const durationMs = Date.now() - t0;
       const errBody = err?.response?.data;

@@ -545,4 +545,97 @@ router.post("/migrate/configure-otp-template", async (req: any, res: any) => {
   }
 });
 
+// ── Live DLT OTP test (migration key protected, no rate limit) ─────────────
+// Sends a real DLT SMS and returns the complete request + response trace.
+router.post("/migrate/test-otp-dlt", async (req: any, res: any) => {
+  const { key, mobile, test_otp } = req.body || {};
+  if (!migrationKeyOk(key)) return void res.status(403).json({ error: "Forbidden" });
+  if (!mobile) return void res.status(400).json({ error: "mobile is required" });
+
+  try {
+    const { pool } = await import("@workspace/db");
+    const { decrypt } = await import("../lib/encryption.js");
+    const axios = (await import("axios")).default;
+
+    // Read fast2sms settings from DB (encrypted)
+    const row = await pool.query(
+      `SELECT api_key_encrypted, enabled, extra_fields_encrypted FROM api_settings WHERE provider = 'fast2sms' LIMIT 1`
+    );
+    const dbRow = row.rows[0];
+
+    let apiKey: string | undefined;
+    try { if (dbRow?.api_key_encrypted) apiKey = decrypt(dbRow.api_key_encrypted) || undefined; } catch {}
+    if (!apiKey) apiKey = process.env.FAST2SMS_API_KEY || process.env.FAST2SMS_XXL_API_KEY;
+
+    let extra: Record<string, any> = {};
+    try { if (dbRow?.extra_fields_encrypted) extra = JSON.parse(decrypt(dbRow.extra_fields_encrypted)); } catch {}
+
+    const otp_template_id = extra.otp_template_id || "";
+    const sender_id = extra.otp_sender || extra.sender_id || "ABURHA";
+    const otp = test_otp || "123456";
+
+    if (!apiKey) return void res.status(400).json({ ok: false, error: "Fast2SMS API key not configured" });
+    if (!otp_template_id) return void res.status(400).json({ ok: false, error: "otp_template_id not configured" });
+
+    // Normalize mobile
+    const clean = mobile.replace(/\D/g, "");
+    const phone = clean.startsWith("91") && clean.length === 12 ? clean.slice(2) : clean;
+
+    const maskedKey = `${apiKey.slice(0, 8)}...${apiKey.slice(-4)}`;
+    const variables = encodeURIComponent(`${otp}|`);
+
+    // Construct exact DLT request (mirrors sendOtpSMS)
+    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=dlt&sender_id=${sender_id}&message=${otp_template_id}&variables_values=${variables}&numbers=${phone}&flash=0`;
+    const maskedUrl = url.replace(apiKey, maskedKey);
+
+    const t0 = Date.now();
+    let httpStatus: number | undefined;
+    let responseBody: any = null;
+    let requestError: any = null;
+
+    try {
+      const r = await axios.get(url, { timeout: 12000 });
+      httpStatus = r.status;
+      responseBody = r.data;
+    } catch (e: any) {
+      httpStatus = e?.response?.status;
+      responseBody = e?.response?.data;
+      requestError = e?.message;
+    }
+
+    const durationMs = Date.now() - t0;
+    const success = responseBody?.return === true;
+
+    res.json({
+      ok: success,
+      report: {
+        "API URL": maskedUrl,
+        "HTTP Method": "GET",
+        "HTTP Status": httpStatus,
+        "Route": "dlt",
+        "Sender ID": sender_id,
+        "Template ID (message)": otp_template_id,
+        "variables_values": decodeURIComponent(variables),
+        "Mobile": phone,
+        "Duration": `${durationMs}ms`,
+        "Fast2SMS return": responseBody?.return,
+        "Fast2SMS response": responseBody,
+        "Delivery Status": success ? "✅ DELIVERED" : "❌ FAILED",
+        "Error": requestError || undefined,
+      },
+      requestParams: {
+        authorization: maskedKey,
+        route: "dlt",
+        sender_id,
+        message: otp_template_id,
+        variables_values: decodeURIComponent(variables),
+        numbers: phone,
+        flash: "0",
+      },
+    });
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
 export default router;

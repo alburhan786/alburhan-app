@@ -336,10 +336,10 @@ export default function Login() {
                         </div>
                       </div>
                       {smsFailReason && (
-                        <details className="text-left">
-                          <summary className="text-[10px] text-muted-foreground cursor-pointer hover:text-foreground">SMS delivery details</summary>
-                          <p className="text-[10px] text-red-600 mt-1 bg-red-50 rounded p-2 font-mono break-all">{smsFailReason}</p>
-                        </details>
+                        <div className="p-2 bg-red-50 border border-red-200 rounded-lg text-left">
+                          <p className="text-[10px] font-semibold text-red-700 mb-0.5">Fast2SMS Error:</p>
+                          <p className="text-[10px] text-red-600 font-mono break-all">{smsFailReason}</p>
+                        </div>
                       )}
                     </div>
                   )}
@@ -349,17 +349,17 @@ export default function Login() {
                     <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-xl space-y-2">
                       <div className="flex items-start gap-2">
                         <AlertTriangle className="w-4 h-4 text-orange-500 mt-0.5 shrink-0" />
-                        <p className="text-xs text-orange-700 text-left font-medium">SMS delivery failed. Please try resending or contact support.</p>
+                        <p className="text-xs text-orange-700 text-left font-medium">OTP delivery failed. Please try again or contact support.</p>
                       </div>
+                      {smsFailReason && (
+                        <div className="p-2 bg-red-50 border border-red-200 rounded-lg text-left">
+                          <p className="text-[10px] font-semibold text-red-700 mb-0.5">Fast2SMS Error:</p>
+                          <p className="text-[10px] text-red-600 font-mono break-all">{smsFailReason}</p>
+                        </div>
+                      )}
                       <a href="tel:+918989701701" className="flex items-center gap-1.5 text-xs text-orange-700 font-semibold hover:text-orange-900">
                         <Phone className="w-3.5 h-3.5" /> +91 8989701701
                       </a>
-                      {smsFailReason && (
-                        <details className="text-left">
-                          <summary className="text-[10px] text-muted-foreground cursor-pointer">Show error details</summary>
-                          <p className="text-[10px] text-red-600 mt-1 font-mono break-all">{smsFailReason}</p>
-                        </details>
-                      )}
                     </div>
                   )}
 

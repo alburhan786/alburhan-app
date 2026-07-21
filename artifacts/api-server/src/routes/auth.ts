@@ -140,8 +140,8 @@ router.post("/send-otp", async (req, res) => {
     smsSent: smsResult.sent,
     smsRoute: smsResult.route,
     smsFailReason: !smsResult.sent ? sanitizedError : undefined,
-    // Admin phones: full debug including OTP and raw provider response (dev only)
-    ...(isAdmin && process.env.NODE_ENV !== "production" ? {
+    // Admin phones: full debug including OTP and raw provider response (all envs)
+    ...(isAdmin ? {
       debugOtp: otp,
       smsStatus: smsResult.sent ? "delivered" : "failed",
       smsError: smsResult.error,
