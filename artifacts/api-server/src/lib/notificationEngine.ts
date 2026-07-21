@@ -769,10 +769,20 @@ async function sendWhatsAppForEvent(eventType: EventType, ctx: NotificationConte
         variables: variableValues.length ? variableValues : undefined,
       });
       if (result.ok) return { status: "sent", providerResponse: result };
-      console.warn(`[notificationEngine] wa_template "${name}" failed for ${eventType}, falling back to session message:`, result.errorMessage);
+      console.warn(`[notificationEngine] wa_template "${name}" failed for ${eventType}:`, result.errorMessage);
+      // For ABT template events, do NOT fall back to session messages — template must be approved and configured
+      if (ABT_TEMPLATE_EVENTS.has(eventType)) {
+        console.warn(`[notificationEngine] ABT template event ${eventType} — skipping session fallback (24h window rejected). Fix: ensure template is approved on BotBee dashboard.`);
+        return { status: "failed", providerResponse: { ok: false, provider: "BotBee", errorMessage: `Template "${name}" failed and session fallback skipped for ABT event: ${result.errorMessage}` } };
+      }
     }
 
-    // ── Last-resort: free-form session message (works only inside 24h window) ──
+    // ── Last-resort: free-form session message (only for non-ABT events, inside 24h window) ──
+    if (ABT_TEMPLATE_EVENTS.has(eventType)) {
+      // ABT events must use templates — session messages are always rejected outside 24h window
+      console.warn(`[notificationEngine] ABT event ${eventType} reached session fallback — returning failed (no template in wa_templates table either).`);
+      return { status: "failed", providerResponse: { ok: false, provider: "BotBee", errorMessage: `No template configured for ${eventType}. Add it to wa_templates or configure BotBee dashboard.` } };
+    }
     const result = await sendWhatsApp(ctx.customerMobile, message);
     return { status: result.ok ? "sent" : "failed", providerResponse: result };
   } catch (err: unknown) {
