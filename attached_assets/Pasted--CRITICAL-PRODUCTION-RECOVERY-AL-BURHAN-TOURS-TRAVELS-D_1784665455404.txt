@@ -1,0 +1,283 @@
+🚨 CRITICAL PRODUCTION RECOVERY – AL BURHAN TOURS & TRAVELS
+
+DO NOT CREATE A NEW DASHBOARD.
+DO NOT REPLACE EXISTING DATA.
+DO NOT USE DUMMY OR PLACEHOLDER DATA.
+
+My production Admin Portal has lost important modules after recent changes. I need the ORIGINAL production system restored exactly as it was.
+
+=========================
+RECOVERY OBJECTIVES
+=========================
+
+1. Restore the COMPLETE Super Admin Dashboard.
+
+2. Restore the COMPLETE Branch Management module.
+
+3. Restore the COMPLETE Agent Management module.
+
+4. Restore every missing menu, page, permission, widget, route, API and database connection.
+
+=========================
+SUPER ADMIN DASHBOARD
+=========================
+
+Restore the original dashboard with:
+
+• Total Bookings
+• Today's Bookings
+• Total Revenue
+• Pending Payments
+• Completed Payments
+• Customers
+• Pilgrims
+• Hajj Groups
+• Umrah Groups
+• Branch Statistics
+• Agent Statistics
+• Staff Statistics
+• Recent Bookings
+• Recent Payments
+• Recent Activities
+• Notifications
+• Payment Analytics
+• Revenue Charts
+• Monthly Reports
+• Quick Actions
+• System Health
+• WhatsApp Status
+• SMS Status
+• Email Status
+• QR Statistics
+• Document Statistics
+
+=========================
+BRANCH MANAGEMENT
+=========================
+
+Restore full Branch Management.
+
+Each branch must support:
+
+• Create Branch
+• Edit Branch
+• Delete Branch
+• Branch Code
+• Branch Name
+• Address
+• City
+• State
+• Country
+• GST Number
+• Contact Person
+• Mobile
+• Email
+• Status
+• Branch Dashboard
+• Branch Revenue
+• Branch Bookings
+• Branch Staff
+• Branch Agents
+• Branch Customers
+• Branch Reports
+• Branch Permissions
+
+=========================
+AGENT MANAGEMENT
+=========================
+
+Restore complete Agent Management.
+
+Each agent should support:
+
+• Agent Registration
+• Agent Login
+• Agent Dashboard
+• Agent Code
+• Commission
+• Assigned Branch
+• Assigned Customers
+• Assigned Bookings
+• Assigned Payments
+• Assigned Pilgrims
+• Performance Report
+• Commission Report
+• Active/Inactive Status
+• Login History
+• Audit Log
+
+=========================
+ROLE & PERMISSION SYSTEM
+=========================
+
+Restore RBAC exactly.
+
+Roles:
+
+• Super Admin
+• Admin
+• Branch Manager
+• Branch Staff
+• Agent
+• Accountant
+• Customer
+
+Every role must only access its own modules.
+
+=========================
+DATABASE
+=========================
+
+Verify ALL tables exist.
+
+Restore relationships.
+
+Verify:
+
+Users
+
+Branches
+
+Agents
+
+Customers
+
+Pilgrims
+
+Groups
+
+Packages
+
+Invoices
+
+Payments
+
+Receipts
+
+Documents
+
+Flights
+
+Hotels
+
+Notifications
+
+Activity Logs
+
+Audit Logs
+
+=========================
+AUTHENTICATION
+=========================
+
+Verify login works for:
+
+Super Admin
+
+Admin
+
+Branch Manager
+
+Agent
+
+Customer
+
+OTP
+
+Password
+
+Session
+
+JWT
+
+Refresh Token
+
+=========================
+SYSTEM VERIFICATION
+=========================
+
+Test every module.
+
+Bookings
+
+Payments
+
+Invoices
+
+QR
+
+Reports
+
+WhatsApp
+
+SMS
+
+Email
+
+Dashboard
+
+Permissions
+
+Search
+
+Filters
+
+Export
+
+Print
+
+=========================
+GIT RECOVERY
+=========================
+
+Compare the current branch with the previous production branch.
+
+Recover every deleted file.
+
+Recover overwritten dashboard components.
+
+Recover routes.
+
+Recover APIs.
+
+Recover layouts.
+
+Recover permissions.
+
+Recover configuration.
+
+Recover environment variables.
+
+If Git history contains the original production dashboard, restore it.
+
+=========================
+FINAL REPORT
+=========================
+
+Provide a complete report showing:
+
+✔ Restored dashboard widgets
+
+✔ Restored Branch module
+
+✔ Restored Agent module
+
+✔ Restored APIs
+
+✔ Restored Routes
+
+✔ Restored Components
+
+✔ Restored Database
+
+✔ Restored Permissions
+
+✔ Restored Authentication
+
+✔ Restored Reports
+
+✔ Production Build Status
+
+✔ Production Test Results
+
+The project must be returned to the last fully working production state without losing any customer, booking, payment, invoice, pilgrim, branch, or agent data.
