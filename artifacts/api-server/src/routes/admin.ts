@@ -1681,8 +1681,10 @@ router.post("/document-expiry/remind", requireAdmin as any, async (req: Authenti
       await sendWhatsApp(rec.customer_mobile, msg);
       sent = true;
     } else if (channel === "sms" && rec.customer_mobile) {
+      // Passport expiry reminder via DLT SMS — uses sendDLTSMS with generic notify_template_id
       const { sendDLTSMS } = await import("../lib/notifications.js");
-      await sendDLTSMS(rec.customer_mobile, msg);
+      // sendDLTSMS signature: (mobile, var1, var2, var3) — pass rec.customer_name as var1
+      await sendDLTSMS(rec.customer_mobile, rec.customer_name || "Pilgrim", rec.booking_number || "", "");
       sent = true;
     }
 

@@ -188,12 +188,12 @@ export async function sendOtpSMS(mobile: string, otp: string): Promise<SmsResult
   const attempts: SmsRouteAttempt[] = [];
   const errors: string[] = [];
 
-  // NOTE: Fast2SMS route=otp requires website verification (status_code 996).
-  // That step has not been completed on this account, so we skip it entirely
-  // and go straight to DLT (registered template) → Quick fallback.
+  // ⛔ POLICY: DLT route ONLY. Quick/Promotional routes are not permitted.
+  // If DLT fails, OTP delivery fails — WhatsApp OTP is the secondary channel (fire-and-forget).
+  // Set otp_template_id in API Settings → Fast2SMS to enable OTP via DLT.
 
   const f2sExtra = getFast2SMSExtra();
-  // ── Route 1: DLT route (registered Sender ID + Template) ─────────────────
+  // ── DLT route (registered Sender ID + Template) — ONLY permitted route ────
   {
     const t0 = Date.now();
     const variables = encodeURIComponent(`${otp}|`);
@@ -207,48 +207,21 @@ export async function sendOtpSMS(mobile: string, otp: string): Promise<SmsResult
       const success = r.data?.return === true;
       console.log(`[OTP-SMS][dlt] ← HTTP ${r.status} | return=${r.data?.return} | ${message} (${durationMs}ms)`);
       attempts.push({ route: "dlt", requestUrl: maskedUrl, httpStatus: r.status, responseBody: r.data, success, errorCode: code, errorMessage: success ? undefined : message, durationMs });
-      if (success) {
-        const log: SmsAttemptLog = { id, ts: new Date().toISOString(), mobileMasked: maskMobile(mobile), otp, finalSuccess: true, finalRoute: "dlt", attempts, totalDurationMs: Date.now() - overallStart, apiKeyPresent, apiKeyMasked };
-        pushSmsLog(log);
-        return { sent: true, providerResponse: r.data, route: "dlt", urlUsed: maskedUrl, logId: id };
-      }
+      const log: SmsAttemptLog = { id, ts: new Date().toISOString(), mobileMasked: maskMobile(mobile), otp, finalSuccess: success, finalRoute: success ? "dlt" : undefined, attempts, totalDurationMs: Date.now() - overallStart, apiKeyPresent, apiKeyMasked };
+      pushSmsLog(log);
+      if (success) return { sent: true, providerResponse: r.data, route: "dlt", urlUsed: maskedUrl, logId: id };
+      // DLT failed — no Quick/Promotional fallback permitted
+      console.error(`[OTP-SMS] ⛔ DLT failed for ${phone} — Quick route is blocked. WhatsApp OTP is secondary channel. Error: ${message}`);
       errors.push(`dlt: ${message}`);
+      return { sent: false, route: "dlt_failed", providerResponse: r.data, error: errors.join(" | "), logId: id };
     } catch (err: any) {
       const durationMs = Date.now() - t0;
       const errBody = err?.response?.data;
       const errMsg = errBody ? extractF2sError(errBody).message : (err?.message || String(err));
       console.error(`[OTP-SMS][dlt] ✗ ${errMsg} (${durationMs}ms)`);
+      console.error(`[OTP-SMS] ⛔ DLT error for ${phone} — Quick route is blocked per DLT policy.`);
       attempts.push({ route: "dlt", requestUrl: maskedUrl, httpStatus: err?.response?.status, responseBody: errBody, success: false, errorMessage: errMsg, durationMs });
       errors.push(`dlt: ${errMsg}`);
-    }
-  }
-
-  // ── Route 3: Quick route fallback ─────────────────────────────────────────
-  {
-    const t0 = Date.now();
-    const msg = encodeURIComponent(`Your Al Burhan Tours OTP is ${otp}. Valid 5 mins. Do not share.`);
-    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=q&message=${msg}&numbers=${phone}&flash=0`;
-    const maskedUrl = url.replace(apiKey, apiKeyMasked);
-    console.log(`[OTP-SMS][quick] → ${maskedUrl}`);
-    try {
-      const r = await axios.get(url, { timeout: 12000 });
-      const durationMs = Date.now() - t0;
-      const { code, message } = extractF2sError(r.data);
-      const success = r.data?.return === true;
-      console.log(`[OTP-SMS][quick] ← HTTP ${r.status} | return=${r.data?.return} | ${message} (${durationMs}ms)`);
-      attempts.push({ route: "quick", requestUrl: maskedUrl, httpStatus: r.status, responseBody: r.data, success, errorCode: code, errorMessage: success ? undefined : message, durationMs });
-      const log: SmsAttemptLog = { id, ts: new Date().toISOString(), mobileMasked: maskMobile(mobile), otp, finalSuccess: success, finalRoute: success ? "quick" : undefined, attempts, totalDurationMs: Date.now() - overallStart, apiKeyPresent, apiKeyMasked };
-      pushSmsLog(log);
-      if (success) return { sent: true, providerResponse: r.data, route: "quick", urlUsed: maskedUrl, logId: id };
-      errors.push(`quick: ${message}`);
-      return { sent: false, route: "all_failed", providerResponse: r.data, error: errors.join(" | "), logId: id };
-    } catch (err: any) {
-      const durationMs = Date.now() - t0;
-      const errBody = err?.response?.data;
-      const errMsg = errBody ? extractF2sError(errBody).message : (err?.message || String(err));
-      console.error(`[OTP-SMS][quick] ✗ ${errMsg} (${durationMs}ms)`);
-      attempts.push({ route: "quick", requestUrl: maskedUrl, httpStatus: err?.response?.status, responseBody: errBody, success: false, errorMessage: errMsg, durationMs });
-      errors.push(`quick: ${errMsg}`);
       const log: SmsAttemptLog = { id, ts: new Date().toISOString(), mobileMasked: maskMobile(mobile), otp, finalSuccess: false, attempts, totalDurationMs: Date.now() - overallStart, apiKeyPresent, apiKeyMasked };
       pushSmsLog(log);
       return { sent: false, error: errors.join(" | "), logId: id };
@@ -291,16 +264,8 @@ export async function testSmsDiagnostics(phone: string, otp: string): Promise<Re
     diag.dlt = { error: e?.response?.data || e?.message };
   }
 
-  // Quick route
-  try {
-    const t0 = Date.now();
-    const msg = encodeURIComponent(`Test OTP: ${otp}. Al Burhan Tours.`);
-    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=q&message=${msg}&numbers=${cleanPhone}&flash=0`;
-    const r = await axios.get(url, { timeout: 12000 });
-    diag.quick = { status: r.status, body: r.data, durationMs: Date.now() - t0 };
-  } catch (e: any) {
-    diag.quick = { error: e?.response?.data || e?.message };
-  }
+  // Quick route — BLOCKED per India DLT compliance policy
+  diag.quick = { skipped: true, reason: "route=q (Quick/Promotional) is blocked. Only DLT route is permitted for production SMS." };
 
   return diag;
 }
@@ -332,21 +297,20 @@ export async function sendDLTSMS(
       const data = response.data;
       // Fast2SMS returns HTTP 200 even on failure — must check body
       if (data?.return === false || data?.status_code >= 400) {
-        console.error(`[SMS-DLT] DLT failed for ${mobile}:`, JSON.stringify(data), "— falling back to quick route");
+        console.error(`[SMS-DLT] ⛔ SMS BLOCKED — DLT delivery failed for ${mobile}:`, JSON.stringify(data), "Reason: DLT API returned error. Quick/Promotional routes are not permitted. Continuing with Email/WhatsApp.");
       } else {
-        console.log("[SMS-DLT] Sent via DLT to", mobile, data);
+        console.log("[SMS-DLT] ✅ Sent via DLT to", mobile, data);
         return true;
       }
     } catch (err: any) {
-      console.error(`[SMS-DLT] DLT error for ${mobile}:`, err?.message, "— falling back to quick route");
+      console.error(`[SMS-DLT] ⛔ SMS BLOCKED — DLT request error for ${mobile}:`, err?.message, "Quick/Promotional routes are not permitted. Continuing with Email/WhatsApp.");
     }
   } else {
-    console.log("[SMS-DLT] No notify_template_id configured — skipping DLT, using quick route");
+    console.warn("[SMS-DLT] ⛔ SMS BLOCKED — No DLT template ID (notify_template_id) configured in API Settings → Fast2SMS. Quick/Promotional routes are not permitted.");
   }
 
-  // Quick SMS route is DISABLED for production — only DLT is used for India regulatory compliance.
-  // For manual/custom messages use sendCustomSMS() in sms.ts which explicitly uses Quick route.
-  console.warn("[SMS-DLT] DLT failed and Quick route is disabled for production. SMS not sent to", mobile);
+  // ⛔ FINAL BLOCK: No fallback routes permitted. India DLT compliance requires approved template.
+  // Continuing Email/WhatsApp channels.
   return false;
 }
 

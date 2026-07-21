@@ -73,6 +73,8 @@ async function sendOneChannel(
       return { channel, status: r.ok ? "sent" : "failed", provider: "BotBee", httpStatus: r.httpStatus, errorMessage: r.ok ? undefined : (r.errorMessage || "WhatsApp failed"), responsePayload: r.responsePayload };
     }
     if (channel === "sms") {
+      // sendCustomSMS routes through DLT validation — Quick/Promotional routes are blocked.
+      // Will return ok:false with "SMS BLOCKED" if no DLT template is configured.
       const r = await sendCustomSMS({ mobile: ctx.customerMobile, message }).catch((e: any) => ({ ok: false as const, provider: "Fast2SMS" as const, endpoint: "", errorMessage: e?.message || "SMS error" }));
       return { channel, status: r.ok ? "sent" : "failed", provider: "Fast2SMS", errorMessage: r.ok ? undefined : ((r as any).errorMessage || "SMS failed"), responsePayload: r };
     }

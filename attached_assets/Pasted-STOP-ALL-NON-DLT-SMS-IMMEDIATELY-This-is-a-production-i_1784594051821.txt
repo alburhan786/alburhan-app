@@ -1,0 +1,124 @@
+STOP ALL NON-DLT SMS IMMEDIATELY
+
+This is a production issue.
+
+Even after deploying the DLT Template Manager, I am still receiving legacy SMS messages.
+
+This means one or more SMS sending paths are bypassing the DLT validation.
+
+Perform a complete production audit.
+
+Requirements:
+
+1. Search the ENTIRE production codebase for every Fast2SMS API call.
+
+Search for:
+- axios
+- fetch
+- sendSMS
+- sendFast2SMS
+- bulkV2
+- quick_sms
+- quickSMS
+- smsService
+- partial_payment
+- payment_received
+- booking_received
+- booking_approved
+- invoice_ready
+- payment_reminder
+- visa_ready
+- flight_ticket_issued
+- hotel_voucher_ready
+- departure_reminder
+
+2. There must be ONLY ONE SMS sending service.
+
+Every notification must pass through:
+
+DLT Validation Service
+
+No exceptions.
+
+3. Before sending SMS verify:
+
+✓ Sender ID = ABURHA
+✓ Route = DLT
+✓ Approved Template ID exists
+✓ Template is Active
+
+If ANY validation fails:
+
+• BLOCK the SMS
+• DO NOT use Quick SMS
+• DO NOT use Promotional Route
+• DO NOT use any fallback Sender ID
+• DO NOT retry using another route
+
+Instead:
+
+Log:
+
+SMS BLOCKED
+Reason:
+<validation failure>
+
+Continue:
+✓ Email
+✓ WhatsApp
+✓ Customer Dashboard
+
+4. Remove every legacy SMS sender from production.
+
+No old notification service may call Fast2SMS directly.
+
+5. Production verification must list:
+
+Total SMS sending functions found:
+
+Total removed:
+
+Remaining active:
+
+Remaining DLT only:
+
+Remaining Quick SMS:
+
+Remaining Promotional:
+
+Remaining bypasses:
+
+6. Perform a real production payment test.
+
+Expected result:
+
+If DLT Template ID is NOT configured:
+
+NO SMS is delivered.
+
+Only:
+
+✓ Email
+✓ WhatsApp
+✓ Dashboard
+
+If DLT Template ID IS configured:
+
+Sender ID:
+ABURHA
+
+Route:
+DLT SMS
+
+Approved Template ID:
+Loaded from Admin DLT Template Management
+
+7. Do not mark this task complete until production confirms:
+
+ZERO Quick SMS calls.
+
+ZERO Promotional Route calls.
+
+ZERO fallback Sender IDs.
+
+100% of SMS notifications are sent ONLY through the ABURHA Sender ID using approved DLT Templates.

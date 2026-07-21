@@ -820,11 +820,7 @@ async function sendOnChannelWithType(channel: Channel, eventType: EventType, ctx
         switch (eventType) {
           case "new_booking": {
             result = await smsLib.sendBookingCreated(smsCtx);
-            if (!result.ok) {
-              // DLT template failed — fall back to quick route via sendDLTSMS
-              const qrOk = await sendDLTSMS(ctx.customerMobile, ctx.customerName, ctx.bookingNumber || "", "");
-              return { status: qrOk ? "sent" : "failed", providerResponse: { ok: qrOk, provider: "Fast2SMS", endpoint: "quick-route", templateId: result.templateId } };
-            }
+            // No fallback to Quick route — if DLT template missing, SMS is blocked per DLT policy
             break;
           }
           case "booking_approved":
@@ -852,15 +848,15 @@ async function sendOnChannelWithType(channel: Channel, eventType: EventType, ctx
           case "balance_reminder_3d":
           case "balance_reminder_30d":
           case "balance_reminder_15d": {
-            // Payment reminder: var1=customer name, var2=pending balance (per DLT template)
+            // Payment reminder — routed through sms.ts DLT validation (uses pending_payment_tid)
             const balStr = ctx.balanceAmount != null ? String(Math.round(Number(ctx.balanceAmount))) : "0";
-            const smsOk = await sendDLTSMS(ctx.customerMobile, ctx.customerName, balStr, "");
-            return { status: smsOk ? "sent" : "failed", providerResponse: { ok: smsOk, provider: "Fast2SMS" } };
+            result = await smsLib.sendPendingPaymentReminder({ ...smsCtx, balance: balStr });
+            break;
           }
           default: {
-            // All other events: use generic notify template
-            const defaultSmsOk = await sendDLTSMS(ctx.customerMobile, ctx.customerName, ctx.bookingNumber || "", ctx.invoiceNumber || "");
-            return { status: defaultSmsOk ? "sent" : "failed", providerResponse: { ok: defaultSmsOk, provider: "Fast2SMS", endpoint: "https://www.fast2sms.com/dev/bulkV2" } };
+            // All other events: use generic DLT notify template (no Quick route fallback)
+            const smsOk = await sendDLTSMS(ctx.customerMobile, ctx.customerName, ctx.bookingNumber || "", ctx.invoiceNumber || "");
+            return { status: smsOk ? "sent" : "failed", providerResponse: { ok: smsOk, provider: "Fast2SMS", endpoint: "https://www.fast2sms.com/dev/bulkV2" } };
           }
         }
         return { status: result.ok ? "sent" : "failed", providerResponse: result };

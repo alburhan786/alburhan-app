@@ -29,19 +29,12 @@ function applyVariables(text: string, r: Recipient): string {
     .replace(/\{hotel\}/gi, r.hotel || "");
 }
 
-async function sendBroadcastSMS(mobile: string, message: string): Promise<boolean> {
-  if (!FAST2SMS_API_KEY) return false;
-  try {
-    const phone = mobile.replace(/\D/g, "").replace(/^91/, "").slice(-10);
-    const encoded = encodeURIComponent(message);
-    const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${FAST2SMS_API_KEY}&route=q&message=${encoded}&language=english&flash=0&numbers=${phone}`;
-    const res = await axios.get(url, { timeout: 10000 });
-    console.log("[Broadcast-SMS] Sent to", mobile, res.data);
-    return true;
-  } catch (err: any) {
-    console.error("[Broadcast-SMS] Error for", mobile, err?.response?.data || err.message);
-    return false;
-  }
+async function sendBroadcastSMS(_mobile: string, _message: string): Promise<boolean> {
+  // ⛔ SMS BLOCKED — India DLT regulations prohibit free-form (non-template) SMS.
+  // Bulk custom messages cannot be sent via Quick or Promotional routes.
+  // Use WhatsApp or Email for custom broadcast messages instead.
+  console.error("[Broadcast-SMS] ⛔ BLOCKED — Non-DLT SMS broadcasts are prohibited. Route=q/promotional routes are not permitted. Use WhatsApp or Email for custom messages.");
+  return false;
 }
 
 async function getRecipients(audience: string): Promise<Recipient[]> {

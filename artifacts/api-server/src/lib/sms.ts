@@ -355,49 +355,30 @@ export async function sendCustomSMS(ctx: {
   bookingId?: string;
   customerId?: string;
 }): Promise<SMSResult> {
-  const { tids, apiKey, sender_id, enabled } = getConfig();
+  // ⛔ POLICY: Quick/Promotional routes are BLOCKED. India DLT requires a pre-registered template.
+  // If a templateId is provided, route through DLT. Otherwise block.
+  const { tids } = getConfig();
+  const tid = ctx.templateId || tids.custom;
 
-  if (!enabled) return { ok: false, provider: "Fast2SMS", templateId: ctx.templateId || "custom", mobile: ctx.mobile, errorMessage: "Fast2SMS disabled" };
-  if (!apiKey) return { ok: false, provider: "Fast2SMS", templateId: ctx.templateId || "custom", mobile: ctx.mobile, errorMessage: "Fast2SMS API key not configured" };
-
-  // Custom SMS uses Quick route so free-form message is supported without a DLT template
-  const phone = toPhone(ctx.mobile);
-  const endpoint = "https://www.fast2sms.com/dev/bulkV2";
-  const url = `${endpoint}?authorization=${apiKey}&route=q&message=${encodeURIComponent(ctx.message)}&numbers=${phone}&flash=0`;
-
-  let httpStatus = 0;
-  let responsePayload: unknown;
-
-  try {
-    const resp = await withRetry(() => axios.get(url, { timeout: 12000 }), 3, 1500);
-    httpStatus = resp.status;
-    responsePayload = resp.data;
-    const ok = resp.data?.return === true;
-
+  if (!tid) {
+    const msg = `SMS BLOCKED — No DLT template ID configured for custom_sms to ${ctx.mobile}. Set custom_tid (or notify_template_id as fallback) in API Settings → Fast2SMS. Quick/Promotional routes are not permitted.`;
+    console.error(`[SMS][custom_sms] ⛔ ${msg}`);
     await logSMS({
-      eventType: "custom_sms", mobile: ctx.mobile, templateId: ctx.templateId || "quick",
-      message: ctx.message.substring(0, 200), status: ok ? "sent" : "failed",
-      httpStatus, responsePayload,
-      errorMessage: ok ? undefined : (resp.data?.message || "Delivery failed"),
+      eventType: "custom_sms", mobile: ctx.mobile, templateId: "not_configured",
+      message: ctx.message.substring(0, 200), status: "failed", errorMessage: msg,
       bookingId: ctx.bookingId, customerId: ctx.customerId,
     });
-
-    return { ok, provider: "Fast2SMS", templateId: ctx.templateId || "quick", mobile: ctx.mobile, httpStatus, responsePayload };
-  } catch (err: any) {
-    const resp = err?.response;
-    httpStatus = resp?.status || 0;
-    responsePayload = resp?.data || { error: err.message };
-    const errorMessage = resp?.data?.message || err.message;
-
-    await logSMS({
-      eventType: "custom_sms", mobile: ctx.mobile, templateId: ctx.templateId || "quick",
-      message: ctx.message.substring(0, 200), status: "failed",
-      httpStatus, responsePayload, errorMessage,
-      bookingId: ctx.bookingId, customerId: ctx.customerId, retryCount: 2,
-    });
-
-    return { ok: false, provider: "Fast2SMS", templateId: ctx.templateId || "quick", mobile: ctx.mobile, httpStatus, responsePayload, errorMessage };
+    return { ok: false, provider: "Fast2SMS", templateId: "not_configured", mobile: ctx.mobile, errorMessage: msg };
   }
+
+  // Route through DLT with the configured template ID
+  const vars = ctx.variables?.length ? ctx.variables : [ctx.message.substring(0, 50)];
+  return sendDLT(ctx.mobile, tid, vars, {
+    eventType: "custom_sms",
+    message: ctx.message,
+    bookingId: ctx.bookingId,
+    customerId: ctx.customerId,
+  });
 }
 
 // ── Convenience: fire-and-forget with WhatsApp+Email fallback ─────────────────

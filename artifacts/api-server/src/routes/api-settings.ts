@@ -406,17 +406,13 @@ router.post("/:provider/send-test", requireAdmin as any, requireSuperAdmin, asyn
         const senderId = extra.sender_id || "ALBURH";
         const templateId = extra.notify_template_id || "211277";
         const endpoint = `https://www.fast2sms.com/dev/bulkV2`;
-        // Try DLT route first, fall back to Quick
+        // DLT only — Quick/Promotional routes are blocked per India DLT compliance policy
         const dltUrl = `${endpoint}?authorization=${apiKey}&route=dlt&sender_id=${senderId}&message=${templateId}&variables_values=${encodeURIComponent("Al Burhan|Test|Success|")}&numbers=${phone}&flash=0`;
-        const quickUrl = `${endpoint}?authorization=${apiKey}&route=q&message=${encodeURIComponent(testMsg)}&numbers=${phone}&flash=0`;
-        const reqPayload = { route: "dlt→quick", sender_id: senderId, template_id: templateId, numbers: phone };
+        const reqPayload = { route: "dlt", sender_id: senderId, template_id: templateId, numbers: phone };
         let httpStatus = 0; let respData: any = {};
         try {
-          let resp = await axios.get(dltUrl, { timeout: 10000 }).catch(async (e: any) => {
-            // DLT failed — try Quick route
-            return axios.get(quickUrl, { timeout: 10000 }).catch(() => e?.response || { data: { error: e.message }, status: 0 });
-          });
-          httpStatus = resp.status || resp.status; respData = resp.data;
+          const resp = await axios.get(dltUrl, { timeout: 10000 });
+          httpStatus = resp.status; respData = resp.data;
           const ok = respData?.return === true;
           result = { ok, provider: "Fast2SMS", endpoint, httpStatus, requestPayload: reqPayload, responsePayload: respData, messageId: respData?.request_id, errorMessage: ok ? undefined : (Array.isArray(respData?.message) ? respData.message.join("; ") : respData?.message || "SMS delivery failed") };
         } catch (e: any) {

@@ -1124,7 +1124,9 @@ export async function fetchTemplates(): Promise<{ ok: boolean; templates?: WaTem
 async function smsFallback(to: string, bookingId?: string, customerId?: string) {
   try {
     const { sendDLTSMS } = await import("./notifications.js");
-    await sendDLTSMS(to, to, bookingId || "", "notification");
+    // sendDLTSMS signature: (mobile, var1=customerName, var2=bookingNumber, var3)
+    // Only mobile is available in this context; DLT will block if notify_template_id not set
+    await sendDLTSMS(to, "Customer", bookingId || "", "");
     console.log("[BotBee] SMS fallback sent to", to);
     await pool.query(
       `INSERT INTO notification_logs
