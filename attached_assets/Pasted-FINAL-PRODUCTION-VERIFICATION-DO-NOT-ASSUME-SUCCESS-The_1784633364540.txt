@@ -1,0 +1,170 @@
+FINAL PRODUCTION VERIFICATION – DO NOT ASSUME SUCCESS
+
+The API and frontend have been deployed successfully.
+
+A successful deployment is NOT sufficient to mark the notification system as working.
+
+I need proof that the production notification system works with real customer data.
+
+Perform the following verification using a real booking.
+
+========================================
+BOOKING TEST
+========================================
+
+Create or use a live booking.
+
+Verify that all of these are automatically sent:
+
+• SMS (Fast2SMS Primary DLT Route only)
+• WhatsApp (BotBee/Meta)
+• Email (SMTP)
+
+Record:
+
+• Booking ID
+• Notification Time
+• Provider Response
+• Request ID
+• Message ID
+• Delivery Status
+
+========================================
+PAYMENT TEST
+========================================
+
+Record a REAL payment.
+
+Verify automatically:
+
+• Payment SMS
+• Payment WhatsApp
+• Payment Email
+
+Verify:
+
+• Invoice updates
+• Payment status updates
+• Amount Paid updates
+• Balance updates
+• Dashboard refreshes
+
+========================================
+AGREEMENT TEST
+========================================
+
+Sign the Agreement.
+
+Verify:
+
+• Agreement Saved
+• Signature Saved
+• IP Saved
+• Device Saved
+• PDF regenerated
+
+Send automatically:
+
+• SMS
+• WhatsApp
+• Email
+
+========================================
+DOCUMENT TEST
+========================================
+
+Upload:
+
+Passport
+
+PAN
+
+Aadhaar
+
+Verify approval workflow.
+
+If approved:
+
+Dashboard must show VERIFIED.
+
+========================================
+SMS
+========================================
+
+Use ONLY:
+
+Fast2SMS Primary DLT Route
+
+Do NOT use:
+
+Quick SMS
+
+Emergency Route
+
+Fallback Route
+
+Secondary Route
+
+Every SMS must use:
+
+Approved Sender ID
+
+Approved Template ID
+
+Approved Entity ID
+
+Approved DLT Route
+
+========================================
+PRODUCTION REPORT
+========================================
+
+Generate a report showing:
+
+SMS
+
+✓ Delivered
+✓ Failed
+✓ Pending
+
+WhatsApp
+
+✓ Delivered
+✓ Failed
+
+Email
+
+✓ Delivered
+✓ Failed
+
+Provider Responses
+
+Request IDs
+
+Message IDs
+
+Booking IDs
+
+========================================
+DO NOT MARK COMPLETE
+========================================
+
+Do NOT say "working" unless ALL of these are true:
+
+✓ Customer actually receives SMS.
+
+✓ Customer actually receives WhatsApp.
+
+✓ Customer actually receives Email.
+
+✓ Invoice updates automatically.
+
+✓ Dashboard updates automatically.
+
+✓ Payment status changes automatically.
+
+✓ Agreement PDF updates automatically.
+
+✓ Notification logs contain the Fast2SMS Request ID, Message ID, Sender ID, Template ID, Entity ID, and Provider Response.
+
+If any notification fails, identify the exact root cause, fix it, redeploy, and rerun the production test until all channels work successfully.
