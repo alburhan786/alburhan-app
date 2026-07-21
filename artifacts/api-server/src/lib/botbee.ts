@@ -59,14 +59,15 @@ export interface BotBeeResult {
   messageId?: string;
 }
 
-function getCredentials() {
+export function getCredentials() {
   const bbCfg = getCachedConfig("botbee");
   const apiToken = (bbCfg.apiKey || process.env.BOTBEE_API_KEY || "").trim();
   const phone_number_id = (bbCfg.extra?.phone_number_id || process.env.BOTBEE_PHONE_NUMBER_ID || "").trim();
+  const business_id = (bbCfg.extra?.business_id || process.env.BOTBEE_BUSINESS_ID || "").trim();
   const enabled = bbCfg.enabled !== false;
   const rawUrl = bbCfg.apiUrl || BOTBEE_BASE;
   const baseUrl = rawUrl.replace(/\/whatsapp\/?$/, "");
-  return { apiToken, phone_number_id, enabled, baseUrl };
+  return { apiToken, phone_number_id, business_id, enabled, baseUrl };
 }
 
 function toBotBeePhone(mobile: string | null | undefined): string {
@@ -332,7 +333,7 @@ export async function sendTemplate(
   //    or when the 24h window blocks the text send for known templates) ──
   // NOTE: BotBee's template API does NOT substitute variables for known ABT templates.
   // This path only fires for template IDs not in TEMPLATE_BODIES above.
-  const { apiToken, phone_number_id, baseUrl } = getCredentials();
+  const { apiToken, phone_number_id, business_id, baseUrl } = getCredentials();
   const endpoint = `${baseUrl}/whatsapp/send/template`;
   if (!apiToken || !phone_number_id) return { ok: false, provider: "BotBee", endpoint, errorMessage: "BotBee credentials not configured" };
   if (!templateId?.trim()) return { ok: false, provider: "BotBee", endpoint, errorMessage: "Template ID is required" };
@@ -354,12 +355,14 @@ export async function sendTemplate(
 
   const payload: Record<string, unknown> = {
     apiToken, phone_number_id, phone_number: phone,
+    ...(business_id ? { business_id } : {}),
     ...(isNumericId ? { template_id: Number(templateId) } : { template_name: templateId }),
     ...(positionalVars ? { variables: positionalVars } : {}),
   };
 
   const reqPayload: Record<string, unknown> = {
     phone_number_id, phone_number: phone,
+    ...(business_id ? { business_id } : {}),
     ...(isNumericId ? { template_id: Number(templateId) } : { template_name: templateId }),
     ...(positionalVars ? { variables: positionalVars } : {}),
   };

@@ -150,6 +150,63 @@ export interface SMSResult {
   logId?: string;
 }
 
+function buildQuickMessage(eventType: string, variables: string[], fallback?: string): string {
+  const name = variables[0] || "Customer";
+  const booking = variables[1] || "";
+  const pkg = variables[2] || "Hajj/Umrah";
+  const amount = variables[3] || "";
+  const balance = variables[4] || "";
+  switch (eventType) {
+    case "partial_payment":
+      return `Dear ${name}, we have received Rs.${amount} for your booking ${booking} (${pkg}). Balance Rs.${balance} is pending. Contact us for any queries. - Al Burhan Travels`;
+    case "payment_received":
+      return `Dear ${name}, your payment of Rs.${amount} for booking ${booking} (${pkg}) has been received. Thank you! - Al Burhan Travels`;
+    case "new_booking":
+      return `Dear ${name}, your booking ${booking} for ${pkg} has been created. Our team will contact you shortly. - Al Burhan Travels`;
+    case "booking_approved":
+      return `Dear ${name}, your booking ${booking} for ${pkg} is confirmed! We look forward to serving you. - Al Burhan Travels`;
+    case "booking_rejected":
+      return `Dear ${name}, we regret that booking ${booking} for ${pkg} could not be processed. Please contact us. - Al Burhan Travels`;
+    case "balance_reminder":
+    case "pending_payment":
+      return `Dear ${name}, your balance of Rs.${balance} is pending for booking ${booking}. Please clear it at the earliest. - Al Burhan Travels`;
+    default:
+      return fallback || `Dear ${name}, a notification regarding your booking ${booking}. - Al Burhan Travels`;
+  }
+}
+
+async function sendQuickRoute(
+  mobile: string,
+  message: string,
+  opts: { eventType: string; message?: string; bookingId?: string; customerId?: string }
+): Promise<SMSResult> {
+  const { apiKey, enabled } = getConfig();
+  if (!enabled || !apiKey) {
+    return { ok: false, provider: "Fast2SMS", templateId: "quick_route", mobile, errorMessage: "Fast2SMS disabled or API key missing" };
+  }
+  const phone = toPhone(mobile);
+  const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=q&message=${encodeURIComponent(message)}&numbers=${phone}&flash=0`;
+  try {
+    const resp = await withRetry(() => axios.get(url, { timeout: 12000 }), 2, 1500);
+    const ok = resp.data?.return === true;
+    const respMsg: string = resp.data?.message || "";
+    if (ok) console.log(`[SMS][${opts.eventType}] ✅ Delivered via quick route → ${phone}`);
+    else console.error(`[SMS][${opts.eventType}] ❌ Quick route failed: ${respMsg}`);
+    await logSMS({
+      eventType: opts.eventType, mobile, templateId: "quick_route", message,
+      status: ok ? "sent" : "failed", httpStatus: resp.status,
+      responsePayload: resp.data, errorMessage: ok ? undefined : respMsg,
+      bookingId: opts.bookingId, customerId: opts.customerId,
+    });
+    return { ok, provider: "Fast2SMS", templateId: "quick_route", mobile, httpStatus: resp.status, responsePayload: resp.data, errorMessage: ok ? undefined : respMsg };
+  } catch (err: any) {
+    const errorMessage = err?.response?.data?.message || err.message;
+    console.error(`[SMS][${opts.eventType}] ❌ Quick route error:`, errorMessage);
+    await logSMS({ eventType: opts.eventType, mobile, templateId: "quick_route", message, status: "failed", errorMessage, bookingId: opts.bookingId, customerId: opts.customerId });
+    return { ok: false, provider: "Fast2SMS", templateId: "quick_route", mobile, errorMessage };
+  }
+}
+
 async function sendDLT(
   mobile: string,
   templateId: string,
@@ -186,12 +243,11 @@ async function sendDLT(
   }
   // 2. Route must be DLT (hardcoded — this guard catches any future drift)
   const ROUTE = "dlt";
-  // 3. DLT template ID must be configured
+  // 3. DLT template ID must be configured — if missing, fall back to quick route
   if (!templateId) {
-    const msg = `DLT template missing for event "${opts.eventType}". Set ${opts.eventType}_tid in Admin → SMS Settings → DLT Templates.`;
-    console.warn(`[SMS][${opts.eventType}] ⚠ ${msg}`);
-    await logSMS({ eventType: opts.eventType, mobile, templateId: "not_configured", status: "failed", errorMessage: msg, bookingId: opts.bookingId, customerId: opts.customerId });
-    return { ok: false, provider: "Fast2SMS", templateId: "not_configured", mobile, errorMessage: msg };
+    console.warn(`[SMS][${opts.eventType}] ⚠ DLT template not configured — falling back to Fast2SMS quick route`);
+    const qMsg = buildQuickMessage(opts.eventType, variables, opts.message);
+    return sendQuickRoute(mobile, qMsg, opts);
   }
   console.log(`[SMS][${opts.eventType}] ✔ Validation passed — sender=${effectiveSenderId} route=DLT template=${templateId} → ${mobile}`);
 
@@ -225,8 +281,22 @@ async function sendDLT(
       : isTemplateError ? `Template not approved — ${respMsg}`
       : (respMsg || "DLT delivery failed");
 
-    if (!ok) console.error(`[SMS][${opts.eventType}] ❌ ${isTemplateError ? "Template not approved" : "Delivery failed"} — ${respMsg}`);
-    else console.log(`[SMS][${opts.eventType}] ✅ Delivered via ${effectiveSenderId}/DLT → ${maskedUrl.slice(0, 80)}`);
+    if (ok) {
+      console.log(`[SMS][${opts.eventType}] ✅ Delivered via ${effectiveSenderId}/DLT → ${maskedUrl.slice(0, 80)}`);
+    } else if (isTemplateError) {
+      // DLT template rejected — log the DLT failure then retry via quick route
+      console.warn(`[SMS][${opts.eventType}] ⚠ DLT template rejected (${respMsg}) — falling back to quick route`);
+      await logSMS({
+        eventType: opts.eventType, mobile, templateId,
+        message: opts.message, status: "failed",
+        httpStatus, responsePayload, errorMessage: `DLT failed: ${respMsg} — retrying via quick route`,
+        bookingId: opts.bookingId, customerId: opts.customerId,
+      });
+      const qMsg = buildQuickMessage(opts.eventType, variables, opts.message);
+      return sendQuickRoute(mobile, qMsg, opts);
+    } else {
+      console.error(`[SMS][${opts.eventType}] ❌ Delivery failed — ${respMsg}`);
+    }
 
     await logSMS({
       eventType: opts.eventType, mobile, templateId,

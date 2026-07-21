@@ -638,4 +638,235 @@ router.post("/migrate/test-otp-dlt", async (req: any, res: any) => {
   }
 });
 
+// ── Booking diagnostic (migration key protected) ──────────────────────────────
+// Shows full state of a booking: status, invoice, journey, notification logs
+router.get("/migrate/booking-diagnostic/:ref", async (req: any, res: any) => {
+  const { ref } = req.params;
+  const { key } = req.query;
+  if (!migrationKeyOk(key as string)) return void res.status(403).json({ error: "Forbidden" });
+  try {
+    const { pool } = await import("@workspace/db");
+    const bRes = await pool.query(
+      `SELECT b.id, b.booking_number, b.customer_name, b.customer_mobile, b.customer_email,
+              b.package_name, b.final_amount, b.paid_amount, b.status, b.journey_status,
+              b.invoice_number, b.last_payment_date, b.created_at, b.updated_at
+       FROM bookings b
+       WHERE b.booking_number = $1 OR b.id::text = $1
+       LIMIT 1`,
+      [ref]
+    );
+    const booking = bRes.rows[0] || null;
+    if (!booking) return void res.status(404).json({ error: "Booking not found", ref });
+
+    const [invRes, agRes, wfRes, nlRes, ptRes] = await Promise.all([
+      pool.query(`SELECT invoice_number, invoice_status, total, paid, balance, due_date, updated_at FROM invoices WHERE booking_id=$1 LIMIT 1`, [booking.id]),
+      pool.query(`SELECT agreement_number, status, signed_at, created_at FROM agreements WHERE booking_id=$1 AND status!='cancelled' ORDER BY created_at DESC LIMIT 1`, [booking.id]),
+      pool.query(`SELECT trigger_type, status, error_message, created_at FROM workflow_logs WHERE booking_id=$1 ORDER BY created_at DESC LIMIT 20`, [booking.id]),
+      pool.query(`SELECT event_type, channel, status, recipient, error_code, provider_response, sent_at FROM notification_logs WHERE booking_id=$1 ORDER BY sent_at DESC LIMIT 20`, [booking.id]),
+      pool.query(`SELECT amount, payment_mode, payment_date, reference_number, is_deleted FROM payment_transactions WHERE booking_id=$1 AND is_deleted=false ORDER BY payment_date DESC`, [booking.id]),
+    ]);
+
+    const invoice = invRes.rows[0] || null;
+    const agreement = agRes.rows[0] || null;
+    const finalAmt = Number(booking.final_amount || 0);
+    const paidAmt  = Number(booking.paid_amount  || 0);
+
+    res.json({
+      booking: {
+        ...booking,
+        final_amount: finalAmt,
+        paid_amount:  paidAmt,
+        balance:      finalAmt - paidAmt,
+        paymentStatus: paidAmt >= finalAmt && finalAmt > 0 ? "Fully Paid" : paidAmt > 0 ? "Partially Paid" : "Pending",
+      },
+      invoice,
+      agreement,
+      paymentTransactions: ptRes.rows,
+      workflowLogs:     wfRes.rows,
+      notificationLogs: nlRes.rows.map((n: any) => ({
+        ...n,
+        provider_response: n.provider_response
+          ? (typeof n.provider_response === "string" ? n.provider_response : JSON.stringify(n.provider_response)).slice(0, 300)
+          : null,
+      })),
+    });
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// ── BotBee WhatsApp direct test (migration key protected) ─────────────────────
+// Tests a BotBee template send to a given mobile number and returns raw API response
+router.post("/migrate/test-botbee-template", async (req: any, res: any) => {
+  const { key, mobile, templateId, variables } = req.body || {};
+  if (!migrationKeyOk(key)) return void res.status(403).json({ error: "Forbidden" });
+  if (!mobile) return void res.status(400).json({ error: "mobile is required" });
+
+  try {
+    // Use production getCredentials() to get the exact same creds the app uses
+    const { getCredentials } = await import("../lib/botbee.js") as any;
+    const creds = getCredentials();
+    const { apiToken, phone_number_id, business_id, baseUrl, enabled } = creds;
+
+    const tplId = templateId || "409953";
+    const clean = mobile.replace(/\D/g, "");
+    const phone = clean.length === 10 ? `91${clean}` : clean;
+    const vars = variables || ["Test Customer", "ABT-TEST-001", "ABT/TEST/001", "1"];
+    const payload: any = { apiToken, phone_number_id, phone_number: phone, template_id: Number(tplId), variables: vars };
+    if (business_id) payload.business_id = business_id;
+    const safePayload = { ...payload, apiToken: apiToken ? "***redacted***" : "MISSING", enabled, business_id: business_id ? "***set***" : "MISSING" };
+
+    const tryFetch = async (label: string, url: string, contentType: string, body: string) => {
+      try {
+        const r = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": contentType },
+          body,
+          signal: AbortSignal.timeout(15000),
+        });
+        const text = await r.text();
+        let parsed: any = null;
+        try { parsed = JSON.parse(text); } catch {}
+        return { label, httpStatus: r.status, rawBody: text.slice(0, 600), parsed };
+      } catch (err: any) {
+        return { label, httpStatus: null, error: err.message, rawBody: null };
+      }
+    };
+
+    const templateUrl = `${baseUrl}/whatsapp/send/template`;
+    const textUrl = `${baseUrl}/whatsapp/send`;
+    const textParams = new URLSearchParams({ apiToken, phone_number_id, phone_number: phone, message: "BotBee connectivity test" });
+
+    // Strip + prefix — maybe template API needs numeric-only phone_number_id
+    const pnid_noplus = phone_number_id.replace(/^\+/, "");
+    // Just 10 digits
+    const pnid_10 = phone_number_id.replace(/\D/g, "").slice(-10);
+
+    const results = await Promise.all([
+      // Variant A: current format (full payload with business_id)
+      tryFetch("template_json_current", templateUrl, "application/json", JSON.stringify(payload)),
+      // Variant B: phone_number_id without + sign
+      tryFetch("template_noplus", templateUrl, "application/json",
+        JSON.stringify({ ...payload, phone_number_id: pnid_noplus })),
+      // Variant C: template_name instead of template_id
+      tryFetch("template_by_name", templateUrl, "application/json",
+        JSON.stringify({ apiToken, phone_number_id, phone_number: phone, ...(business_id ? { business_id } : {}), template_name: "payment_received", variables: vars })),
+      // Variant D: text_connectivity (known working)
+      tryFetch("text_connectivity", textUrl, "application/x-www-form-urlencoded", textParams.toString()),
+    ]);
+
+    res.json({ credentials: safePayload, templateUrl, textUrl, results });
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// ── Configure all SMS DLT template IDs (migration key protected) ──────────────
+// Merges the provided template IDs into the fast2sms extra_fields_encrypted,
+// preserving existing fields (otp_template_id, otp_sender, etc).
+router.post("/migrate/configure-sms-templates", async (req: any, res: any) => {
+  const { key, ...tids } = req.body || {};
+  if (!migrationKeyOk(key)) return void res.status(403).json({ error: "Forbidden" });
+  const ALLOWED_KEYS = [
+    "notify_template_id", "booking_created_tid", "booking_confirmed_tid",
+    "booking_rejected_tid", "payment_received_tid", "partial_payment_tid",
+    "pending_payment_tid", "invoice_created_tid", "ticket_issued_tid",
+    "visa_issued_tid", "hotel_voucher_issued_tid", "departure_reminder_tid",
+    "arrival_reminder_tid", "eid_greeting_tid", "custom_tid",
+    "sender_id", "otp_sender",
+  ];
+  const updates: Record<string, string> = {};
+  for (const k of ALLOWED_KEYS) {
+    if (tids[k] !== undefined && typeof tids[k] === "string" && tids[k].trim()) {
+      updates[k] = tids[k].trim();
+    }
+  }
+  if (Object.keys(updates).length === 0) {
+    return void res.status(400).json({ error: "No valid template ID fields provided", allowed: ALLOWED_KEYS });
+  }
+  try {
+    const { pool } = await import("@workspace/db");
+    const { decrypt, encrypt } = await import("../lib/encryption.js");
+    const row = await pool.query(`SELECT extra_fields_encrypted FROM api_settings WHERE provider='fast2sms' LIMIT 1`);
+    if (!row.rows[0]) return void res.status(404).json({ error: "fast2sms settings not found in DB" });
+    let extra: Record<string, any> = {};
+    try { if (row.rows[0].extra_fields_encrypted) extra = JSON.parse(decrypt(row.rows[0].extra_fields_encrypted)); } catch {}
+    const merged = { ...extra, ...updates };
+    const enc = encrypt(JSON.stringify(merged));
+    await pool.query(`UPDATE api_settings SET extra_fields_encrypted=$1, updated_at=NOW() WHERE provider='fast2sms'`, [enc]);
+    const { invalidateCache } = await import("../lib/apiSettingsProvider.js");
+    invalidateCache();
+    res.json({ ok: true, message: `Updated ${Object.keys(updates).length} field(s)`, updated: Object.keys(updates), merged });
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+router.post("/migrate/test-sms", async (req: any, res: any) => {
+  const { key, mobile, eventType = "partial_payment", bookingNumber = "TEST001", customerName = "Test Customer", amount = "5000", balance = "10000" } = req.body || {};
+  if (!migrationKeyOk(key)) return void res.status(403).json({ error: "Forbidden" });
+  try {
+    const { sendPartialPaymentReceived, sendPaymentReceived, sendBookingCreated } = await import("../lib/sms.js");
+    let result: any;
+    if (eventType === "partial_payment") {
+      result = await sendPartialPaymentReceived({ mobile, customerName, bookingNumber, paidAmount: amount, balanceAmount: balance, packageName: "Umrah 2026" });
+    } else if (eventType === "payment_received") {
+      result = await sendPaymentReceived({ mobile, customerName, bookingNumber, amount, packageName: "Umrah 2026" });
+    } else {
+      result = await sendBookingCreated({ mobile, customerName, bookingNumber, packageName: "Umrah 2026" });
+    }
+    res.json({ ok: result.ok, eventType, result });
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+router.get("/migrate/inspect-sms-config", async (req: any, res: any) => {
+  const key = req.query.key as string;
+  if (!migrationKeyOk(key)) return void res.status(403).json({ error: "Forbidden" });
+  try {
+    const { pool } = await import("@workspace/db");
+    const { decrypt } = await import("../lib/encryption.js");
+    const row = await pool.query(`SELECT api_key_encrypted, extra_fields_encrypted, enabled FROM api_settings WHERE provider='fast2sms' LIMIT 1`);
+    if (!row.rows[0]) return void res.status(404).json({ error: "fast2sms settings not found in DB" });
+    const r = row.rows[0];
+    let extra: Record<string, any> = {};
+    try { if (r.extra_fields_encrypted) extra = JSON.parse(decrypt(r.extra_fields_encrypted)); } catch {}
+    let apiKeyOk = false;
+    try { const k = decrypt(r.api_key_encrypted); apiKeyOk = k.length > 5; } catch {}
+    const senderRow = await pool.query(`SELECT sender_id, status, default_sender FROM sender_ids ORDER BY default_sender DESC, sender_id LIMIT 20`).catch(() => ({ rows: [] }));
+    res.json({
+      ok: true,
+      fast2sms: {
+        enabled: r.enabled,
+        api_key_configured: apiKeyOk,
+        sender_id: extra.sender_id || "(not set — using default ABURHA)",
+        template_ids: {
+          notify_template_id: extra.notify_template_id || "(empty)",
+          booking_created_tid: extra.booking_created_tid || "(empty)",
+          booking_confirmed_tid: extra.booking_confirmed_tid || "(empty)",
+          booking_rejected_tid: extra.booking_rejected_tid || "(empty)",
+          payment_received_tid: extra.payment_received_tid || "(empty)",
+          partial_payment_tid: extra.partial_payment_tid || "(empty)",
+          pending_payment_tid: extra.pending_payment_tid || "(empty)",
+          invoice_created_tid: extra.invoice_created_tid || "(empty)",
+          ticket_issued_tid: extra.ticket_issued_tid || "(empty)",
+          visa_issued_tid: extra.visa_issued_tid || "(empty)",
+          departure_reminder_tid: extra.departure_reminder_tid || "(empty)",
+          custom_tid: extra.custom_tid || "(empty)",
+        },
+        effective_chains: {
+          partial_payment: extra.partial_payment_tid || extra.payment_received_tid || extra.notify_template_id || "(none — will use quick route)",
+          payment_received: extra.payment_received_tid || extra.notify_template_id || "(none — will use quick route)",
+          new_booking: extra.booking_created_tid || extra.notify_template_id || "(none — will use quick route)",
+          booking_approved: extra.booking_confirmed_tid || extra.notify_template_id || "(none — will use quick route)",
+        },
+      },
+      sender_ids: senderRow.rows,
+    });
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
 export default router;

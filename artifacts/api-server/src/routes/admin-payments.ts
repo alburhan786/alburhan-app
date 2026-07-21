@@ -8,6 +8,7 @@ import { upsertPilgrimFromProfile } from "../lib/pilgrimUtils.js";
 import { postPaymentJournal, voidJournalEntry } from "../lib/journalHelper.js";
 import { upsertInvoiceForBooking } from "./invoices.js";
 import { processPaymentSuccessNotifications } from "./payments.js";
+import { broadcastCustomerJourneyUpdate } from "./customer-journey.js";
 
 type BookingStatus = "pending" | "approved" | "rejected" | "confirmed" | "cancelled" | "partially_paid";
 type PaymentMode = "cash" | "neft" | "upi" | "cheque" | "online" | "bank_transfer" | "imps" | "rtgs" | "dd";
@@ -264,13 +265,21 @@ router.post("/:id/payments", requireAdmin as RequestHandler, async (req: Authent
       console.error("[admin-payments] upsertInvoice failed:", err);
     }
 
-    // Advance journey_status to payment_received if still at a pre-payment stage
+    // Advance journey_status based on whether this is a partial or full payment.
+    // Includes booking_approved and partial_payment_received in the allowed-from set
+    // so admin-recorded payments always move the timeline forward.
+    const newJourneyStatus = isFullyPaid ? "payment_received" : "partial_payment_received";
+    const journeyAllowedFrom = isFullyPaid
+      ? "('booking_requested','documents_pending','documents_received','admin_verification','payment_pending','booking_approved','partial_payment_received')"
+      : "('booking_requested','documents_pending','documents_received','admin_verification','payment_pending','booking_approved')";
     pool.query(
-      `UPDATE bookings SET journey_status = 'payment_received', updated_at = NOW()
-       WHERE id = $1
-         AND journey_status IN ('booking_requested','documents_pending','documents_received','admin_verification','payment_pending')`,
-      [bookingId]
-    ).catch((err: any) => console.error("[admin-payments] journey_status advance failed:", err?.message));
+      `UPDATE bookings SET journey_status = $1, updated_at = NOW()
+       WHERE id = $2 AND journey_status IN ${journeyAllowedFrom}`,
+      [newJourneyStatus, bookingId]
+    ).then(() => {
+      console.log(`[admin-payments] journey_status → ${newJourneyStatus} for booking ${bookingId}`);
+      broadcastCustomerJourneyUpdate(bookingId, newJourneyStatus);
+    }).catch((err: any) => console.error("[admin-payments] journey_status advance failed:", err?.message));
 
     console.log(`[admin-payments] Firing payment notification: booking=${result.booking.bookingNumber} amount=${amount} newStatus=${result.updated?.newStatus} newPaid=${newPaidAmount} remaining=${remainingBalance} invoice=${finalInvoiceNumber}`);
     processPaymentSuccessNotifications({

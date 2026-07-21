@@ -439,9 +439,31 @@ router.get("/my/:id", requireAuth, async (req: any, res) => {
 
     const ag = agRes.rows[0];
     console.log(`[Agreement/my/:id] ✅ Returning agreement=${ag.agreement_number} status=${ag.status} booking=${ag.booking_number} token=${ag.verification_token?.slice(0, 8)}… mobile=${ag.customer_mobile}`);
-    ag.verificationUrl = `${getSiteBase()}/verify-agreement/${ag.verification_token || ag.agreement_number}`;
-    ag.clauses = CONSENT_CATEGORIES.map(c => ({ id: c.id, title: c.title, body: c.body }));
-    res.json(ag);
+    const verificationUrl = `${getSiteBase()}/verify-agreement/${ag.verification_token || ag.agreement_number}`;
+    const clauses = CONSENT_CATEGORIES.map(c => ({ id: c.id, title: c.title, body: c.body }));
+
+    const finalAmt   = Number(ag.final_amount  || 0);
+    const paidAmt    = Number(ag.paid_amount    || 0);
+    const balanceAmt = Math.max(0, finalAmt - paidAmt);
+
+    // Return both snake_case (raw DB) and camelCase aliases so the frontend
+    // AgreementSigning.tsx component can read the fields it expects.
+    res.json({
+      ...ag,
+      // camelCase aliases for the frontend
+      agreementNumber:  ag.agreement_number,
+      bookingNumber:    ag.booking_number,
+      packageName:      ag.package_name      || "",
+      customerName:     ag.customer_name     || ag.user_name   || "",
+      customerMobile:   ag.customer_mobile   || "",
+      customerEmail:    ag.customer_email    || ag.user_email  || "",
+      finalAmount:      finalAmt,
+      paidAmount:       paidAmt,
+      balanceAmount:    balanceAmt,
+      signedAt:         ag.signed_at         || null,
+      verificationUrl,
+      clauses,
+    });
   } catch (err: any) {
     console.error("[Agreement/my/:id] ❌ Error:", err?.message, "\n", err?.stack?.slice(0, 600));
     res.status(500).json({ error: "Failed to load agreement", detail: err?.message });

@@ -23,7 +23,7 @@
 - [Per-route auth pattern](per-route-auth-pattern.md) — this codebase applies requireAdmin/requireAuth per-route, not at router.use() mount; audits that only check mount-level auth will false-positive as "unprotected".
 - [triggerWorkflow/fireNotificationEvent arg bug](smtp-workflow-arg-bug.md) — wrong-arity call silently dropped ctx (name/email/amount/attachments) on all triggerWorkflow-routed notifications; fixed, but pattern worth re-checking if fields go blank again.
 - [Invoice E2E deploy patterns](invoice-e2e-deploy.md) — upsertInvoice call sites, PDF endpoint, BotBee template API removed, VPS deploy
-- [SMS DLT quick route fallback](sms-dlt-quick-route.md) — sendDLTSMS tries DLT first then quick route; old notify_template_id "211277" invalid, quick route confirmed working
+- [SMS DLT quick route fallback](sms-dlt-quick-route.md) — sendDLT() falls back to quick route when (a) templateId empty or (b) DLT returns isTemplateError; buildQuickMessage() renders event-specific text; confirmed working July 2026
 - [pdfkit must stay external in bundle](pdfkit-bundle-external.md) — pdfkit loads AFM/ICC data files from __dirname at runtime; bundling breaks all PDF endpoints on VPS with HTTP 500
 - [VPS self-update uses process.exit(0)](vps-self-update-exit.md) — spawn("pm2",...) silently fails (not in PATH); process.exit(0) lets PM2 detect crash and restart with new bundle file on disk
 - [BotBee ABT production templates](botbee-abt-templates.md) — 15 templates (409950–410040) confirmed; 3 absent are graceful no-ops; all var counts verified from template list API 2026-07-18.
@@ -42,7 +42,7 @@
 - [Notification engine bug patterns](notification-engine-bugs.md) — sendDLTSMS returns boolean (not object); TRIGGER_TO_EVENT must use valid EventType values; Razorpay order route needs same amount cap as payment links
 - [Invoice visibility rules](invoice-visibility-rules.md) — never serve invoice PDF if paid_amount<=0; both /by-number/:num/pdf (public) and /:id/pdf (auth) enforce 403 PAYMENT_REQUIRED; frontend checks paidAmount>0 in addition to status
 - [Notification dedup fix](notification-dedup-fix.md) — payment_received dedup must be 0 (not 12h); BotBee /whatsapp/templates 404 is harmless (different from /whatsapp/send/template); admin resend at POST /api/payments/resend-notification/:bookingId
-- [DLT SMS per-event templates](dlt-sms-per-event-templates.md) — sms.ts has 10 per-event tids; sender_id=ABURHA (DB updated); no Quick SMS fallback; admin must enter template IDs in API Settings → Fast2SMS
+- [DLT SMS per-event templates](dlt-sms-per-event-templates.md) — sms.ts has 10 per-event tids; sender_id=ABURHA; ALL tids empty in production (July 2026) → quick route fallback fires; admin must configure via /api/migrate/configure-sms-templates
 - [payment_transactions schema](payment-transactions-schema.md) — column is payment_mode (NOT mode); pt.mode causes PostgreSQL aggregate error; NO invoice_number column
 - [pilgrims table schema](pilgrims-table-schema.md) — FK is group_id (NOT booking_id); full_name (NOT name); mobile_india (NOT mobile)
 - [verify-public pipeline fix](verify-public-pipeline-fix.md) — PaymentPage.tsx (public WhatsApp link) calls verify-public; previously skipped entire pipeline (invoice/agreement/notifications); use-payment.ts calls /verify (auth); both now run identical pipeline

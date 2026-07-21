@@ -1,0 +1,554 @@
+MASTER PRODUCTION FIX – Agreement, Payment, Invoice, Journey Timeline & Notification Automation
+
+This is a production-critical issue. The booking workflow is still incomplete and must be fixed end-to-end.
+
+Current Issues:
+
+• Agreement page loads but Package Summary is blank.
+• Customer Name is blank.
+• Package Name is blank.
+• Total Amount shows ₹0.
+• Balance Due shows ₹0.
+• Invoice remains PENDING after successful payment.
+• Customer Dashboard is not updating.
+• Journey Timeline remains on Submitted after payment.
+• Booking confirmation SMS is not sent.
+• Booking confirmation WhatsApp is not sent.
+• Booking confirmation Email is not sent.
+• Payment confirmation SMS is not sent.
+• Payment confirmation WhatsApp is not sent.
+• Payment confirmation Email is not sent.
+• Invoice PDF is not updated correctly.
+• Agreement PDF uses placeholder values instead of live booking data.
+
+This entire workflow must be fixed before deployment.
+
+====================================================
+1. AGREEMENT PAGE
+====================================================
+
+When opening the Agreement page:
+
+• Read Booking ID or Agreement ID from the URL.
+• Fetch the complete booking from the production database.
+• Never use placeholder or default values.
+
+Populate the Agreement with:
+
+✓ Booking ID
+✓ Agreement ID
+✓ Customer Name
+✓ Package Name
+✓ Package Type
+✓ Total Amount
+✓ GST
+✓ Amount Paid
+✓ Balance Due
+✓ Payment Status
+✓ Departure Date
+✓ Number of Pilgrims
+
+Calculations:
+
+Total Amount = Package Price + GST
+
+Amount Paid = Sum of all successful payments
+
+Balance Due = Total Amount − Amount Paid
+
+Example:
+
+Total Amount:
+₹12,07,500
+
+Amount Paid:
+₹1
+
+Balance Due:
+₹12,07,499
+
+Never display:
+
+₹0
+
+Blank Package
+
+Blank Customer
+
+Blank Balance
+
+unless the booking actually has zero value.
+
+====================================================
+2. AGREEMENT SIGNING
+====================================================
+
+After customer signs:
+
+Save:
+
+✓ Agreement Signed
+✓ Date & Time
+✓ IP Address
+✓ Device
+✓ Browser
+✓ Digital Signature
+✓ Booking Status
+
+Immediately regenerate the Agreement PDF using live production data.
+
+====================================================
+3. INVOICE
+====================================================
+
+After payment:
+
+Automatically update:
+
+✓ Amount Paid
+✓ Balance Due
+✓ Payment History
+✓ Invoice Status
+✓ Invoice PDF
+
+Rules:
+
+Partial Payment
+
+Invoice Status:
+
+PARTIALLY PAID
+
+Full Payment
+
+Invoice Status:
+
+PAID
+
+Never leave Invoice as:
+
+PENDING
+
+after payment has been successfully recorded.
+
+Invoice PDF
+
+Customer Dashboard
+
+Admin Dashboard
+
+must all display identical values.
+
+====================================================
+4. BOOKING STATUS
+====================================================
+
+Automatically update:
+
+Submitted
+
+↓
+
+Booking Approved
+
+↓
+
+Partial Payment Received
+
+↓
+
+Fully Paid
+
+↓
+
+Agreement Signed
+
+↓
+
+Visa Processing
+
+↓
+
+Visa Issued
+
+↓
+
+Flight Ticket Issued
+
+↓
+
+Hotel Voucher Issued
+
+↓
+
+Journey Completed
+
+====================================================
+5. JOURNEY TIMELINE
+====================================================
+
+Update automatically without page refresh.
+
+Show:
+
+✓ Current Step Highlighted
+
+✓ Completed Steps Green
+
+✓ Future Steps Grey
+
+After advance payment:
+
+Current Step:
+
+Partial Payment Received
+
+After full payment:
+
+Current Step:
+
+Fully Paid
+
+====================================================
+6. CUSTOMER DASHBOARD
+====================================================
+
+Immediately update:
+
+✓ Invoice Status
+
+✓ Payment Status
+
+✓ Amount Paid
+
+✓ Balance Due
+
+✓ Journey Timeline
+
+✓ Agreement Status
+
+✓ Visa Status
+
+✓ Ticket Status
+
+✓ Hotel Voucher Status
+
+No manual refresh required.
+
+====================================================
+7. NOTIFICATION AUTOMATION
+====================================================
+
+Automatically send notifications for every workflow.
+
+Booking Submitted
+
+Send:
+
+✓ SMS
+
+✓ WhatsApp
+
+✓ Email
+
+Booking Approved
+
+Send:
+
+✓ SMS
+
+✓ WhatsApp
+
+✓ Email
+
+Partial Payment Received
+
+Send:
+
+✓ SMS
+
+✓ WhatsApp
+
+✓ Email
+
+Attach:
+
+Invoice PDF
+
+Receipt PDF
+
+Full Payment Received
+
+Send:
+
+✓ SMS
+
+✓ WhatsApp
+
+✓ Email
+
+Attach:
+
+Invoice PDF
+
+Receipt PDF
+
+Agreement Ready
+
+Send:
+
+✓ SMS
+
+✓ WhatsApp
+
+✓ Email
+
+Attach:
+
+Agreement PDF
+
+Visa Issued
+
+Send:
+
+✓ SMS
+
+✓ WhatsApp
+
+✓ Email
+
+Attach:
+
+Visa PDF
+
+Flight Ticket Issued
+
+Send:
+
+✓ SMS
+
+✓ WhatsApp
+
+✓ Email
+
+Attach:
+
+Ticket PDF
+
+Hotel Voucher Ready
+
+Send:
+
+✓ SMS
+
+✓ WhatsApp
+
+✓ Email
+
+Attach:
+
+Hotel Voucher PDF
+
+Departure Reminder
+
+Send:
+
+✓ SMS
+
+✓ WhatsApp
+
+✓ Email
+
+====================================================
+8. SMS (DLT ONLY)
+====================================================
+
+Use only approved DLT SMS.
+
+Never use:
+
+Quick SMS
+
+Promotional Route
+
+Fallback SMS
+
+Default Sender
+
+Validate before sending:
+
+✓ Sender ID Approved
+
+✓ DLT Route
+
+✓ Approved Template
+
+✓ Template Active
+
+If validation fails:
+
+Do NOT send SMS.
+
+Log exact reason.
+
+Continue WhatsApp and Email.
+
+====================================================
+9. WHATSAPP
+====================================================
+
+Verify:
+
+✓ Approved Template
+
+✓ Variables
+
+✓ Media Attachment
+
+✓ Invoice PDF
+
+✓ Receipt PDF
+
+✓ Agreement PDF
+
+✓ Delivery Status
+
+Retry on failure.
+
+====================================================
+10. EMAIL
+====================================================
+
+Verify SMTP.
+
+Automatically attach:
+
+Invoice PDF
+
+Receipt PDF
+
+Agreement PDF
+
+Visa PDF
+
+Ticket PDF
+
+Hotel Voucher PDF
+
+Log:
+
+Queued
+
+Sent
+
+Delivered
+
+Failed
+
+====================================================
+11. DELIVERY LOGS
+====================================================
+
+Admin Notification Log must show:
+
+✓ Booking ID
+
+✓ Customer
+
+✓ Event
+
+✓ SMS Status
+
+✓ WhatsApp Status
+
+✓ Email Status
+
+✓ Queued
+
+✓ Sent
+
+✓ Delivered
+
+✓ Failed
+
+✓ Provider Response
+
+✓ Retry Count
+
+✓ Timestamp
+
+====================================================
+12. LIVE PRODUCTION TEST
+====================================================
+
+Run a complete end-to-end production test using Booking ID ABT26458441 (or another live booking).
+
+Verify:
+
+✓ Agreement loads live booking data
+
+✓ Customer Name
+
+✓ Package Name
+
+✓ Total Amount
+
+✓ Amount Paid
+
+✓ Balance Due
+
+✓ Payment Status
+
+✓ Invoice updates correctly
+
+✓ Dashboard updates instantly
+
+✓ Journey Timeline updates automatically
+
+✓ Agreement PDF regenerated
+
+✓ Invoice PDF regenerated
+
+✓ Booking confirmation SMS delivered
+
+✓ Booking confirmation WhatsApp delivered
+
+✓ Booking confirmation Email delivered
+
+✓ Payment confirmation SMS delivered
+
+✓ Payment confirmation WhatsApp delivered
+
+✓ Payment confirmation Email delivered
+
+✓ Invoice PDF attached
+
+✓ Receipt PDF attached
+
+✓ Agreement PDF attached
+
+====================================================
+13. DEPLOYMENT RULE
+====================================================
+
+Do NOT deploy or mark this task complete until every item above has been verified on the live production server.
+
+Provide a final production verification report showing:
+
+✓ Agreement populated with live data
+
+✓ Invoice status updated correctly
+
+✓ Dashboard synchronized
+
+✓ Journey Timeline updated
+
+✓ SMS delivered
+
+✓ WhatsApp delivered
+
+✓ Email delivered
+
+✓ PDFs generated and attached
+
+✓ Delivery logs confirming successful execution for every notification channel.
