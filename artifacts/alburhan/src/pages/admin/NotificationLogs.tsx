@@ -50,6 +50,7 @@ interface LogRow {
   api_endpoint: string | null;
   http_status: number | null;
   provider_response: string | null;
+  request_payload: string | null;
   error_code: string | null;
   sent_at: string | null;
   retry_count: number;
@@ -280,6 +281,30 @@ export default function NotificationLogs() {
                   const StIcon = st.icon;
                   const isExpanded = expanded === log.id;
                   const provResp = log.provider_response ? (() => { try { return JSON.parse(log.provider_response); } catch { return log.provider_response; } })() : null;
+                  const reqPayload = log.request_payload ? (() => { try { return JSON.parse(log.request_payload); } catch { return log.request_payload; } })() : null;
+
+                  // Extract the human-readable failure reason from whatever the provider returned
+                  const failureReason: string | null = (() => {
+                    if (log.status !== "failed") return null;
+                    if (log.channel === "sms") {
+                      return provResp?.providerError
+                        || provResp?.errorMessage
+                        || (typeof provResp?.rawResponse?.message === "string" ? provResp.rawResponse.message : null)
+                        || (Array.isArray(provResp?.rawResponse?.message) ? (provResp.rawResponse.message as string[]).join("; ") : null)
+                        || null;
+                    }
+                    // whatsapp / email
+                    return provResp?.errorMessage
+                      || (typeof provResp?.responsePayload?.message === "string" ? provResp.responsePayload.message : null)
+                      || (typeof provResp?.message === "string" ? provResp.message : null)
+                      || null;
+                  })();
+
+                  // For SMS: the raw Fast2SMS response body
+                  const smsRawResponse = provResp?.rawResponse ?? null;
+                  // For WhatsApp: the raw BotBee response body
+                  const waRawResponse = provResp?.responsePayload ?? null;
+
                   return [
                     <tr key={log.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3">
@@ -351,55 +376,139 @@ export default function NotificationLogs() {
                       </td>
                     </tr>,
                     isExpanded && (
-                      <tr key={`${log.id}-expanded`} className="bg-blue-50/40 border-b">
-                        <td colSpan={8} className="px-4 py-3">
-                          <div className="space-y-2">
+                      <tr key={`${log.id}-expanded`} className="bg-slate-50 border-b border-slate-200">
+                        <td colSpan={8} className="px-4 py-4">
+                          <div className="space-y-3">
+
+                            {/* ── FAILURE REASON ─────────────────────────────── */}
+                            {failureReason && (
+                              <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                                <XCircle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
+                                <div>
+                                  <p className="text-xs font-bold text-red-700 uppercase tracking-wide mb-0.5">Provider Rejection Reason</p>
+                                  <p className="text-sm text-red-800 font-medium">{failureReason}</p>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* ── HTTP STATUS + SUCCESS IDs ───────────────────── */}
+                            <div className="flex flex-wrap gap-3 items-center">
+                              {log.http_status != null && (
+                                <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border ${
+                                  log.http_status >= 200 && log.http_status < 300
+                                    ? "bg-green-50 border-green-200 text-green-700"
+                                    : log.http_status >= 400
+                                    ? "bg-red-50 border-red-200 text-red-700"
+                                    : "bg-yellow-50 border-yellow-200 text-yellow-700"
+                                }`}>
+                                  HTTP {log.http_status}
+                                  <span className="font-normal opacity-70">
+                                    {log.http_status === 200 ? "OK" : log.http_status === 400 ? "Bad Request" : log.http_status === 401 ? "Unauthorized" : log.http_status === 403 ? "Forbidden" : log.http_status === 404 ? "Not Found" : log.http_status === 429 ? "Rate Limited" : log.http_status === 500 ? "Server Error" : ""}
+                                  </span>
+                                </div>
+                              )}
+                              {/* WhatsApp WAMID */}
+                              {log.channel === "whatsapp" && log.wamid && (
+                                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-green-50 border border-green-200 text-green-700">
+                                  WAMID: <code className="select-all font-mono">{log.wamid}</code>
+                                </div>
+                              )}
+                              {/* SMS: Sender ID + Fast2SMS Request ID */}
+                              {log.channel === "sms" && log.sender_id && (
+                                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-50 border border-blue-200 text-blue-700">
+                                  Sender ID: <code className="select-all font-mono">{log.sender_id}</code>
+                                </div>
+                              )}
+                              {log.channel === "sms" && log.wamid && (
+                                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-50 border border-blue-200 text-blue-700">
+                                  Fast2SMS ID: <code className="select-all font-mono">{log.wamid}</code>
+                                </div>
+                              )}
+                              {log.error_code && (
+                                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-red-50 border border-red-200 text-red-700">
+                                  Error Code: {log.error_code}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* ── TWO-COLUMN TRACE: REQUEST | RESPONSE ────────── */}
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+
+                              {/* REQUEST */}
+                              {(reqPayload || log.api_endpoint) && (
+                                <div className="rounded-lg border border-slate-200 overflow-hidden">
+                                  <div className="flex items-center gap-2 px-3 py-2 bg-slate-800 text-slate-200">
+                                    <Send className="w-3 h-3 text-slate-400" />
+                                    <span className="text-[11px] font-bold uppercase tracking-wider">
+                                      {log.channel === "sms" ? "GET" : "POST"} Request → {log.provider_name || "Provider"}
+                                    </span>
+                                  </div>
+                                  {/* URL bar for SMS */}
+                                  {log.channel === "sms" && reqPayload?.url && (
+                                    <div className="px-3 py-2 bg-slate-700 border-b border-slate-600">
+                                      <p className="text-[10px] text-slate-400 mb-0.5 uppercase">URL</p>
+                                      <code className="text-[10px] text-amber-300 break-all select-all">{reqPayload.url}</code>
+                                    </div>
+                                  )}
+                                  {/* Endpoint for WhatsApp */}
+                                  {log.channel !== "sms" && log.api_endpoint && (
+                                    <div className="px-3 py-2 bg-slate-700 border-b border-slate-600">
+                                      <p className="text-[10px] text-slate-400 mb-0.5 uppercase">Endpoint</p>
+                                      <code className="text-[10px] text-amber-300 break-all select-all">{log.api_endpoint}</code>
+                                    </div>
+                                  )}
+                                  {/* Request body / params */}
+                                  <pre className="bg-slate-900 text-slate-300 text-[10px] font-mono p-3 overflow-auto max-h-48 whitespace-pre-wrap break-all">
+                                    {reqPayload
+                                      ? JSON.stringify(
+                                          log.channel === "sms" ? (reqPayload.params ?? reqPayload) : reqPayload,
+                                          null, 2
+                                        )
+                                      : log.api_endpoint}
+                                  </pre>
+                                </div>
+                              )}
+
+                              {/* RESPONSE */}
+                              {(smsRawResponse || waRawResponse || provResp) && (
+                                <div className="rounded-lg border border-slate-200 overflow-hidden">
+                                  <div className={`flex items-center gap-2 px-3 py-2 ${log.status === "failed" ? "bg-red-900" : "bg-green-900"} text-white`}>
+                                    {log.status === "failed"
+                                      ? <XCircle className="w-3 h-3 text-red-300" />
+                                      : <CheckCircle2 className="w-3 h-3 text-green-300" />
+                                    }
+                                    <span className="text-[11px] font-bold uppercase tracking-wider">
+                                      Response ← {log.provider_name || "Provider"}
+                                      {log.http_status != null && <span className="ml-2 opacity-70">HTTP {log.http_status}</span>}
+                                    </span>
+                                  </div>
+                                  <pre className={`text-[10px] font-mono p-3 overflow-auto max-h-48 whitespace-pre-wrap break-all ${log.status === "failed" ? "bg-red-950 text-red-200" : "bg-green-950 text-green-200"}`}>
+                                    {JSON.stringify(
+                                      log.channel === "sms" ? (smsRawResponse ?? provResp) : (waRawResponse ?? provResp),
+                                      null, 2
+                                    )}
+                                  </pre>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* ── MESSAGE TEXT ────────────────────────────────── */}
                             {log.message && (
                               <div>
-                                <span className="text-xs font-semibold text-gray-500 uppercase">Message</span>
-                                <p className="mt-1 text-sm text-gray-700 whitespace-pre-wrap bg-white rounded-lg border p-3">{log.message}</p>
+                                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Message Text Sent</p>
+                                <p className="text-sm text-gray-700 whitespace-pre-wrap bg-white rounded-lg border border-slate-200 p-3">{log.message}</p>
                               </div>
                             )}
-                            {provResp && (
-                              <div>
-                                <span className="text-xs font-semibold text-gray-500 uppercase">Provider Response</span>
-                                <pre className="mt-1 bg-gray-900 text-green-300 text-[10px] font-mono rounded-lg p-3 overflow-auto max-h-40 whitespace-pre-wrap break-all">
-                                  {typeof provResp === "string" ? provResp : JSON.stringify(provResp, null, 2)}
-                                </pre>
-                              </div>
-                            )}
-                            {/* SMS-specific: Sender ID + Fast2SMS Request ID */}
-                            {log.channel === "sms" && (log.sender_id || log.wamid) && (
-                              <div className="grid grid-cols-2 gap-2 p-3 bg-blue-50 rounded-lg border border-blue-100">
-                                {log.sender_id && (
-                                  <div>
-                                    <p className="text-[10px] font-semibold text-blue-600 uppercase tracking-wide">DLT Sender ID</p>
-                                    <code className="text-sm font-bold text-blue-800 select-all">{log.sender_id}</code>
-                                  </div>
-                                )}
-                                {log.wamid && (
-                                  <div>
-                                    <p className="text-[10px] font-semibold text-blue-600 uppercase tracking-wide">Fast2SMS Request ID</p>
-                                    <code className="text-sm font-bold text-blue-800 select-all">{log.wamid}</code>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                            {/* WhatsApp WAMID */}
-                            {log.channel === "whatsapp" && log.wamid && (
-                              <div className="p-3 bg-green-50 rounded-lg border border-green-100">
-                                <p className="text-[10px] font-semibold text-green-600 uppercase tracking-wide">WhatsApp Message ID (WAMID)</p>
-                                <code className="text-sm font-bold text-green-800 select-all">{log.wamid}</code>
-                              </div>
-                            )}
-                            <div className="flex flex-wrap gap-4 text-xs text-gray-500">
-                              {log.template && <span>DLT Template ID: <code className="text-gray-700">{log.template}</code></span>}
-                              {log.api_endpoint && <span>Endpoint: <code className="text-gray-700">{log.api_endpoint}</code></span>}
-                              {log.error_code && <span className="text-red-600">Error Code: {log.error_code}</span>}
-                              {log.booking_id && <span>Booking ID: <code className="text-gray-700">{log.booking_id}</code></span>}
+
+                            {/* ── METADATA ROW ────────────────────────────────── */}
+                            <div className="flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-gray-500 border-t border-slate-100 pt-2">
+                              {log.template && <span>Template: <code className="text-gray-700 select-all">{log.template}</code></span>}
                               {log.customer_name && <span>Customer: <code className="text-gray-700">{log.customer_name}</code></span>}
-                              <span>Log ID: <code className="text-gray-700">{log.id}</code></span>
+                              {log.booking_id && <span>Booking: <code className="text-gray-700 select-all">{log.booking_id}</code></span>}
+                              {log.booking_number && <span>Booking #: <code className="text-gray-700">{log.booking_number}</code></span>}
+                              <span>Log ID: <code className="text-gray-500 select-all">{log.id}</code></span>
                             </div>
+
                           </div>
                         </td>
                       </tr>

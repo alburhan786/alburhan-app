@@ -118,6 +118,8 @@ async function logSMS(data: {
   responsePayload?: unknown;
   errorMessage?: string;
   messageId?: string | null;
+  requestUrl?: string | null;         // masked GET URL sent to Fast2SMS
+  variablesCount?: number;            // how many variable substitutions were sent
   bookingId?: string;
   customerId?: string;
   customerName?: string;
@@ -126,6 +128,14 @@ async function logSMS(data: {
 }) {
   try {
     const id = `sms_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
+    // Extract the exact provider error from the raw response for quick diagnosis
+    const rawResp = data.responsePayload as Record<string, unknown> | null | undefined;
+    const providerErrorMsg: string =
+      (Array.isArray(rawResp?.message) ? rawResp!.message.join("; ") : rawResp?.message as string)
+      || (rawResp?.status_code ? `Status code: ${rawResp.status_code}` : "")
+      || data.errorMessage || "";
+
     await pool.query(
       `INSERT INTO notification_logs
        (id, event_type, customer_id, booking_id, channel, recipient, message, status,
@@ -140,9 +150,29 @@ async function logSMS(data: {
         data.mobile,
         data.message || null,
         data.status,
-        JSON.stringify({ ok: data.status === "sent", templateId: data.templateId, senderId: data.senderId, response: data.responsePayload, error: data.errorMessage }),
+        // provider_response: full trace — raw provider response + error extraction
+        JSON.stringify({
+          ok: data.status === "sent",
+          templateId: data.templateId,
+          senderId: data.senderId,
+          httpStatus: data.httpStatus || null,
+          providerError: providerErrorMsg || null,
+          errorMessage: data.errorMessage || null,
+          rawResponse: data.responsePayload,
+        }),
         data.httpStatus || null,
-        JSON.stringify({ mobile: data.mobile, template_id: data.templateId, sender_id: data.senderId, route: "dlt" }),
+        // request_payload: exact request that was sent to Fast2SMS
+        JSON.stringify({
+          method: "GET",
+          url: data.requestUrl || `https://www.fast2sms.com/dev/bulkV2 (URL not captured at this stage)`,
+          params: {
+            route: "dlt",
+            sender_id: data.senderId || null,
+            message: data.templateId,
+            numbers: data.mobile,
+            variables_values: data.variablesCount != null ? `<${data.variablesCount} variables>` : null,
+          },
+        }),
         data.retryCount ?? 0,
         data.senderId || null,
         data.messageId || null,
@@ -362,6 +392,8 @@ async function sendDLT(
         message: opts.message, status: "failed",
         httpStatus, responsePayload,
         errorMessage: dltFailMsg,
+        requestUrl: maskedUrl,
+        variablesCount: variables.length,
         bookingId: opts.bookingId, customerId: opts.customerId,
         customerName: opts.customerName, bookingNumber: opts.bookingNumber,
       });
@@ -377,6 +409,8 @@ async function sendDLT(
       eventType: opts.eventType, mobile, templateId, senderId: effectiveSenderId,
       message: opts.message, status: ok ? "sent" : "failed",
       httpStatus, responsePayload, errorMessage, messageId,
+      requestUrl: maskedUrl,
+      variablesCount: variables.length,
       bookingId: opts.bookingId, customerId: opts.customerId,
       customerName: opts.customerName, bookingNumber: opts.bookingNumber,
     });
@@ -394,6 +428,8 @@ async function sendDLT(
       eventType: opts.eventType, mobile, templateId, senderId: effectiveSenderId,
       message: opts.message, status: "failed",
       httpStatus, responsePayload, errorMessage,
+      requestUrl: maskedUrl,
+      variablesCount: variables.length,
       bookingId: opts.bookingId, customerId: opts.customerId,
       customerName: opts.customerName, bookingNumber: opts.bookingNumber,
       retryCount: 2,
