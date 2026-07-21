@@ -4,7 +4,7 @@ import {
   RefreshCw, CheckCircle, XCircle, AlertTriangle, ShieldCheck, ShieldAlert,
   Smartphone, MessageSquare, Mail, Clock, User, Globe, Monitor,
   Activity, Zap, FileText, Download, Play, PlayCircle, ChevronDown, ChevronUp,
-  MessageCircle, Hash, Loader2
+  MessageCircle, Hash, Loader2, Wifi, WifiOff
 } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -41,6 +41,15 @@ interface TestResult {
   httpStatus: number; providerResponse: any; providerMessage: string;
   requestUrl: string; logId: string; reason?: string;
   validations?: { templateConfigured: boolean; senderIdSet: boolean; routeDlt: boolean; noFallback: boolean; apiKeyPresent: boolean };
+}
+
+interface ConnProvider {
+  ok: boolean; provider: string; latencyMs: number; error: string | null;
+  walletBalance?: string | null; host?: string | null; user?: string | null; route?: string;
+}
+interface ConnectivityData {
+  ok: boolean; testedAt: string;
+  providers: { fast2sms: ConnProvider; botbee: ConnProvider; smtp: ConnProvider };
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -223,6 +232,10 @@ export default function SmsProductionReport() {
   const [tab, setTab] = useState<"report" | "test">("report");
   const [showEventDetail, setShowEventDetail] = useState(false);
 
+  // Connectivity state
+  const [connectivity, setConnectivity] = useState<ConnectivityData | null>(null);
+  const [connLoading, setConnLoading] = useState(false);
+
   // Test panel state
   const [testMobile, setTestMobile] = useState("");
   const [testResults, setTestResults] = useState<Record<string, TestResult>>({});
@@ -237,6 +250,16 @@ export default function SmsProductionReport() {
       setData(await r.json());
     } catch (e: any) { setError(e.message); }
     finally { setLoading(false); }
+  }, []);
+
+  const runConnectivityTest = useCallback(async () => {
+    setConnLoading(true);
+    try {
+      const r = await fetch(`${API}/api/sms-settings/connectivity`, { credentials: "include" });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      setConnectivity(await r.json());
+    } catch (e: any) { console.error("Connectivity check failed:", e.message); }
+    finally { setConnLoading(false); }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -341,6 +364,35 @@ export default function SmsProductionReport() {
         `  Events Failed     : ${failed}`,
       ] : []),
       `  Production Ready  : ${data.productionReady ? "YES" : "NO"}`,
+      "",
+      ...(connectivity ? [
+        "LIVE PROVIDER CONNECTIVITY",
+        `  Fast2SMS DLT  : ${connectivity.providers.fast2sms.ok ? "PASS" : "FAIL"}  (${connectivity.providers.fast2sms.latencyMs}ms)${connectivity.providers.fast2sms.walletBalance ? `  Wallet: ₹${connectivity.providers.fast2sms.walletBalance}` : ""}${connectivity.providers.fast2sms.error ? `  Error: ${connectivity.providers.fast2sms.error}` : ""}`,
+        `  WhatsApp/BotBee: ${connectivity.providers.botbee.ok ? "PASS" : "FAIL"}  (${connectivity.providers.botbee.latencyMs}ms)${connectivity.providers.botbee.error ? `  Error: ${connectivity.providers.botbee.error}` : ""}`,
+        `  SMTP Email    : ${connectivity.providers.smtp.ok ? "PASS" : "FAIL"}  (${connectivity.providers.smtp.latencyMs}ms)${connectivity.providers.smtp.host ? `  Host: ${connectivity.providers.smtp.host}` : ""}${connectivity.providers.smtp.error ? `  Error: ${connectivity.providers.smtp.error}` : ""}`,
+        `  Tested At     : ${new Date(connectivity.testedAt).toLocaleString("en-IN")}`,
+        "",
+      ] : []),
+      hr,
+      "  FINAL PRODUCTION REPORT — AL BURHAN TOURS & TRAVELS",
+      hr,
+      `  Overall Status        : ${data.productionReady && (connectivity?.ok ?? true) ? "PASS" : "FAIL"}`,
+      `  SMS Status            : ${data.smsConfig.apiKeyConfigured ? (connectivity ? (connectivity.providers.fast2sms.ok ? "Active" : "Connectivity Error") : "Active") : "Inactive"}`,
+      `  WhatsApp Status       : ${data.channels.whatsapp.enabled ? (connectivity ? (connectivity.providers.botbee.ok ? "Active" : "Connectivity Error") : "Active") : "Inactive"}`,
+      `  Email Status          : ${data.channels.email.enabled ? (connectivity ? (connectivity.providers.smtp.ok ? "Active" : "Connectivity Error") : "Active") : "Inactive"}`,
+      `  Sender IDs            : ${data.smsConfig.approvedSenderIds.join(" · ") || "None configured"}`,
+      `  DLT Templates         : ${data.smsConfig.templatesCoverage.configured}/${data.smsConfig.templatesCoverage.total} events configured`,
+      ...(tested.length > 0 ? [
+        `  Events Tested         : ${tested.length}`,
+        `  Events Passed         : ${passed}`,
+        `  Events Failed         : ${failed}`,
+      ] : [
+        "  Events Tested         : Not yet tested — use Production Test panel",
+      ]),
+      `  Fast2SMS Connectivity : ${connectivity ? (connectivity.providers.fast2sms.ok ? "PASS" : "FAIL") : "Not tested"}`,
+      `  WhatsApp Connectivity : ${connectivity ? (connectivity.providers.botbee.ok ? "PASS" : "FAIL") : "Not tested"}`,
+      `  SMTP Connectivity     : ${connectivity ? (connectivity.providers.smtp.ok ? "PASS" : "FAIL") : "Not tested"}`,
+      `  Production Ready      : ${data.productionReady ? "YES" : "NO"}`,
       hr,
     ];
     const blob = new Blob([lines.join("\n")], { type: "text/plain" });
@@ -349,7 +401,7 @@ export default function SmsProductionReport() {
     a.download = `production-verification-report-${new Date().toISOString().slice(0, 10)}.txt`;
     a.click();
     URL.revokeObjectURL(a.href);
-  }, [data, testResults, testMobile]);
+  }, [data, testResults, testMobile, connectivity]);
 
   return (
     <AdminLayout>
@@ -587,6 +639,135 @@ export default function SmsProductionReport() {
                     </div>
                   )}
                 </div>
+
+                {/* ── Live Provider Connectivity ─────────────────────────── */}
+                <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
+                  <div className="px-4 py-3 bg-gray-50 border-b flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Wifi className="w-4 h-4 text-gray-500" />
+                      <h3 className="text-sm font-semibold text-gray-700">Live Provider Connectivity</h3>
+                      {connectivity && (
+                        <span className="text-[10px] text-gray-400">
+                          tested {new Date(connectivity.testedAt).toLocaleString("en-IN", { timeStyle: "short" })}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={runConnectivityTest}
+                      disabled={connLoading}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {connLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wifi className="w-3.5 h-3.5" />}
+                      {connLoading ? "Testing…" : "Run Connectivity Test"}
+                    </button>
+                  </div>
+                  {!connectivity && !connLoading && (
+                    <div className="px-4 py-6 text-center text-sm text-gray-400">
+                      Click "Run Connectivity Test" to check Fast2SMS, BotBee, and SMTP live connectivity
+                    </div>
+                  )}
+                  {connLoading && (
+                    <div className="px-4 py-6 text-center text-sm text-gray-400 flex items-center justify-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" /> Pinging providers…
+                    </div>
+                  )}
+                  {connectivity && (
+                    <div className="divide-y">
+                      {[
+                        {
+                          key: "fast2sms",
+                          p: connectivity.providers.fast2sms,
+                          label: "Fast2SMS DLT",
+                          icon: Smartphone,
+                          extra: connectivity.providers.fast2sms.walletBalance
+                            ? `Wallet: ₹${connectivity.providers.fast2sms.walletBalance}`
+                            : null,
+                        },
+                        {
+                          key: "botbee",
+                          p: connectivity.providers.botbee,
+                          label: "BotBee WhatsApp",
+                          icon: MessageSquare,
+                          extra: null,
+                        },
+                        {
+                          key: "smtp",
+                          p: connectivity.providers.smtp,
+                          label: "SMTP Email",
+                          icon: Mail,
+                          extra: connectivity.providers.smtp.host
+                            ? `${connectivity.providers.smtp.host} · ${connectivity.providers.smtp.user || ""}`
+                            : null,
+                        },
+                      ].map(({ key, p, label, icon: Icon, extra }) => (
+                        <div key={key} className={`flex items-center gap-3 px-4 py-3 ${p.ok ? "" : "bg-red-50/40"}`}>
+                          {p.ok
+                            ? <Wifi className="w-4 h-4 text-green-600 shrink-0" />
+                            : <WifiOff className="w-4 h-4 text-red-600 shrink-0" />}
+                          <Icon className="w-4 h-4 text-gray-400 shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-800">{label}</p>
+                            {p.error && <p className="text-xs text-red-600 mt-0.5 truncate">{p.error}</p>}
+                            {extra && !p.error && <p className="text-xs text-gray-500 mt-0.5">{extra}</p>}
+                          </div>
+                          <span className="text-xs text-gray-400 font-mono">{p.latencyMs}ms</span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${p.ok ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                            {p.ok ? "PASS" : "FAIL"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* ── Final Production Report ───────────────────────────────── */}
+                {data && (() => {
+                  const tested = Object.values(testResults);
+                  const passed = tested.filter(r => r.ok).length;
+                  const failed = tested.filter(r => !r.ok && r.status !== "SKIPPED").length;
+                  const overallOk = data.productionReady && (connectivity ? connectivity.ok : true);
+                  return (
+                    <div className={`rounded-xl border-2 overflow-hidden ${overallOk ? "border-green-300" : "border-amber-300"}`}>
+                      <div className={`px-4 py-3 flex items-center gap-2 ${overallOk ? "bg-green-600" : "bg-amber-500"}`}>
+                        <ShieldCheck className="w-4 h-4 text-white" />
+                        <h3 className="text-sm font-bold text-white">FINAL PRODUCTION REPORT — Al Burhan Tours &amp; Travels</h3>
+                      </div>
+                      <div className="bg-white divide-y text-sm font-mono">
+                        {[
+                          { label: "Overall Status", value: overallOk ? "PASS" : "FAIL", ok: overallOk },
+                          { label: "SMS Status", value: data.smsConfig.apiKeyConfigured ? (connectivity ? (connectivity.providers.fast2sms.ok ? "Active" : "Connectivity Error") : "Active") : "Inactive", ok: data.smsConfig.apiKeyConfigured },
+                          { label: "WhatsApp Status", value: data.channels.whatsapp.enabled ? (connectivity ? (connectivity.providers.botbee.ok ? "Active" : "Connectivity Error") : "Active") : "Inactive", ok: data.channels.whatsapp.enabled },
+                          { label: "Email Status", value: data.channels.email.enabled ? (connectivity ? (connectivity.providers.smtp.ok ? "Active" : "Connectivity Error") : "Active") : "Inactive", ok: data.channels.email.enabled },
+                          { label: "Sender IDs", value: data.smsConfig.approvedSenderIds.length > 0 ? data.smsConfig.approvedSenderIds.join(" · ") : "None configured", ok: data.smsConfig.approvedSenderIds.length > 0 },
+                          { label: "DLT Templates", value: `${data.smsConfig.templatesCoverage.configured} / ${data.smsConfig.templatesCoverage.total} events configured`, ok: data.smsConfig.templatesCoverage.configured === data.smsConfig.templatesCoverage.total },
+                          { label: "Events Tested", value: tested.length > 0 ? String(tested.length) : "Not yet tested", ok: tested.length > 0 },
+                          { label: "Events Passed", value: tested.length > 0 ? String(passed) : "—", ok: tested.length > 0 && passed === tested.length },
+                          { label: "Events Failed", value: tested.length > 0 ? String(failed) : "—", ok: failed === 0 },
+                          { label: "Fast2SMS Connectivity", value: connectivity ? (connectivity.providers.fast2sms.ok ? "PASS" : `FAIL — ${connectivity.providers.fast2sms.error}`) : "Not tested", ok: connectivity ? connectivity.providers.fast2sms.ok : null },
+                          { label: "WhatsApp Connectivity", value: connectivity ? (connectivity.providers.botbee.ok ? "PASS" : `FAIL — ${connectivity.providers.botbee.error}`) : "Not tested", ok: connectivity ? connectivity.providers.botbee.ok : null },
+                          { label: "SMTP Connectivity", value: connectivity ? (connectivity.providers.smtp.ok ? "PASS" : `FAIL — ${connectivity.providers.smtp.error}`) : "Not tested", ok: connectivity ? connectivity.providers.smtp.ok : null },
+                          { label: "Production Ready", value: data.productionReady ? "YES" : "NO", ok: data.productionReady },
+                        ].map(row => (
+                          <div key={row.label} className="flex items-center gap-2 px-4 py-2">
+                            {row.ok === true ? <CheckCircle className="w-3.5 h-3.5 text-green-600 shrink-0" /> :
+                             row.ok === false ? <XCircle className="w-3.5 h-3.5 text-red-600 shrink-0" /> :
+                             <div className="w-3.5 h-3.5 rounded-full border border-gray-300 shrink-0" />}
+                            <span className="w-52 text-gray-500 text-xs shrink-0">{row.label}</span>
+                            <span className={`text-xs ${row.ok === false ? "text-red-700 font-semibold" : row.ok === true ? "text-gray-800" : "text-gray-400"}`}>{row.value}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="px-4 py-3 bg-gray-50 border-t text-xs text-gray-400 flex items-center justify-between">
+                        <span>Generated: {new Date().toLocaleString("en-IN")}</span>
+                        {!overallOk && (
+                          <span className="text-amber-600 font-semibold">
+                            Complete connectivity test + production tests to mark as ready
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Quick links */}
                 <div className="flex flex-wrap gap-2">

@@ -399,7 +399,7 @@ router.get("/delivery-logs", requireAdmin as any, async (req, res) => {
       pool.query(
         `SELECT id, event_type, channel, recipient, message, status, sent_at, delivered_at,
                 retry_count, error_code, provider_name, http_status, request_payload, provider_response,
-                booking_id, booking_number, customer_name
+                booking_id, booking_number, customer_name, sender_id, wamid
          FROM notification_logs WHERE ${where}
          ORDER BY sent_at DESC LIMIT ${limit} OFFSET ${offset}`,
         params

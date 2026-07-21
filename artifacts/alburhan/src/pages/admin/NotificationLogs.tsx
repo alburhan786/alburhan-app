@@ -58,6 +58,7 @@ interface LogRow {
   customer_name?: string | null;
   booking_number?: string | null;
   wamid?: string | null;
+  sender_id?: string | null;
   template?: string | null;
 }
 
@@ -367,14 +368,32 @@ export default function NotificationLogs() {
                                 </pre>
                               </div>
                             )}
+                            {/* SMS-specific: Sender ID + Fast2SMS Request ID */}
+                            {log.channel === "sms" && (log.sender_id || log.wamid) && (
+                              <div className="grid grid-cols-2 gap-2 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                                {log.sender_id && (
+                                  <div>
+                                    <p className="text-[10px] font-semibold text-blue-600 uppercase tracking-wide">DLT Sender ID</p>
+                                    <code className="text-sm font-bold text-blue-800 select-all">{log.sender_id}</code>
+                                  </div>
+                                )}
+                                {log.wamid && (
+                                  <div>
+                                    <p className="text-[10px] font-semibold text-blue-600 uppercase tracking-wide">Fast2SMS Request ID</p>
+                                    <code className="text-sm font-bold text-blue-800 select-all">{log.wamid}</code>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            {/* WhatsApp WAMID */}
+                            {log.channel === "whatsapp" && log.wamid && (
+                              <div className="p-3 bg-green-50 rounded-lg border border-green-100">
+                                <p className="text-[10px] font-semibold text-green-600 uppercase tracking-wide">WhatsApp Message ID (WAMID)</p>
+                                <code className="text-sm font-bold text-green-800 select-all">{log.wamid}</code>
+                              </div>
+                            )}
                             <div className="flex flex-wrap gap-4 text-xs text-gray-500">
-                              {log.wamid && (
-                                <span className="flex items-center gap-1">
-                                  <span className="font-semibold text-green-700">wamid:</span>
-                                  <code className="text-green-700 bg-green-50 px-1.5 py-0.5 rounded select-all">{log.wamid}</code>
-                                </span>
-                              )}
-                              {log.template && <span>Template ID: <code className="text-gray-700">{log.template}</code></span>}
+                              {log.template && <span>DLT Template ID: <code className="text-gray-700">{log.template}</code></span>}
                               {log.api_endpoint && <span>Endpoint: <code className="text-gray-700">{log.api_endpoint}</code></span>}
                               {log.error_code && <span className="text-red-600">Error Code: {log.error_code}</span>}
                               {log.booking_id && <span>Booking ID: <code className="text-gray-700">{log.booking_id}</code></span>}

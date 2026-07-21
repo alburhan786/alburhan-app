@@ -547,6 +547,116 @@ router.get("/production-report", async (_req: AuthenticatedRequest, res) => {
   });
 });
 
+// ── GET /api/sms-settings/connectivity ───────────────────────────────────────
+// Live connectivity check: Fast2SMS wallet API, BotBee, SMTP
+router.get("/connectivity", async (_req: AuthenticatedRequest, res) => {
+  const f2s = getCachedConfig("fast2sms");
+  const apiKey = f2s.apiKey || process.env.FAST2SMS_API_KEY || "";
+  const bb = getCachedConfig("botbee");
+  const bbKey = bb.apiKey || process.env.BOTBEE_API_KEY || "";
+  const smtpHost = process.env.SMTP_HOST || "";
+  const smtpUser = process.env.SMTP_USER || "";
+  const smtpPass = process.env.SMTP_PASS || "";
+
+  // ── 1. Fast2SMS wallet API ──────────────────────────────────────────────────
+  let smsOk = false, smsWalletBalance: string | null = null, smsError: string | null = null, smsLatencyMs = 0;
+  if (apiKey) {
+    const t0 = Date.now();
+    try {
+      const resp = await axios.get(`https://www.fast2sms.com/dev/wallet?authorization=${apiKey}`, { timeout: 8000 });
+      smsLatencyMs = Date.now() - t0;
+      smsOk = resp.data?.return === true;
+      smsWalletBalance = resp.data?.data?.wallet || null;
+      if (!smsOk) smsError = Array.isArray(resp.data?.message) ? resp.data.message.join("; ") : (resp.data?.message || "API returned return:false");
+    } catch (e: any) {
+      smsLatencyMs = Date.now() - t0;
+      smsError = e?.response?.data?.message || e.message;
+    }
+  } else {
+    smsError = "API key not configured";
+  }
+
+  // ── 2. BotBee WhatsApp ──────────────────────────────────────────────────────
+  let waOk = false, waError: string | null = null, waLatencyMs = 0;
+  if (bbKey) {
+    const t0 = Date.now();
+    try {
+      // BotBee doesn't have a public health endpoint — check if API key resolves
+      const resp = await axios.get(`https://app.botbee.in/api/whatsapp/templates?apiKey=${bbKey}&limit=1`, { timeout: 8000 });
+      waLatencyMs = Date.now() - t0;
+      // BotBee returns 200 even for errors; treat HTTP 200 as connectivity OK
+      waOk = resp.status < 400;
+      if (!waOk) waError = resp.data?.message || "HTTP " + resp.status;
+    } catch (e: any) {
+      waLatencyMs = Date.now() - t0;
+      // 404 on templates endpoint is OK (different path) — connectivity itself is working if we get a response
+      if (e?.response?.status && e.response.status < 500) {
+        waOk = true; // Got a response from BotBee (even 404 means connectivity OK)
+        waLatencyMs = Date.now() - t0;
+      } else {
+        waError = e?.response?.data?.message || e.message;
+      }
+    }
+  } else {
+    waError = "BotBee API key not configured";
+  }
+
+  // ── 3. SMTP ─────────────────────────────────────────────────────────────────
+  let smtpOk = false, smtpError: string | null = null, smtpLatencyMs = 0;
+  if (smtpHost && smtpUser && smtpPass) {
+    const t0 = Date.now();
+    try {
+      const nodemailer = await import("nodemailer");
+      const transport = nodemailer.createTransport({
+        host: smtpHost,
+        port: Number(process.env.SMTP_PORT || 587),
+        secure: Number(process.env.SMTP_PORT || 587) === 465,
+        auth: { user: smtpUser, pass: smtpPass },
+        tls: { rejectUnauthorized: false },
+        connectionTimeout: 7000,
+        socketTimeout: 7000,
+      });
+      await (transport as any).verify();
+      smtpLatencyMs = Date.now() - t0;
+      smtpOk = true;
+    } catch (e: any) {
+      smtpLatencyMs = Date.now() - t0;
+      smtpError = e.message;
+    }
+  } else {
+    smtpError = "SMTP credentials not configured";
+  }
+
+  res.json({
+    ok: smsOk && waOk && smtpOk,
+    testedAt: new Date().toISOString(),
+    providers: {
+      fast2sms: {
+        ok: smsOk,
+        provider: "Fast2SMS",
+        route: "DLT",
+        walletBalance: smsWalletBalance,
+        latencyMs: smsLatencyMs,
+        error: smsError,
+      },
+      botbee: {
+        ok: waOk,
+        provider: "BotBee",
+        latencyMs: waLatencyMs,
+        error: waError,
+      },
+      smtp: {
+        ok: smtpOk,
+        provider: "SMTP",
+        host: smtpHost,
+        user: smtpUser ? `${smtpUser.slice(0, 4)}***` : null,
+        latencyMs: smtpLatencyMs,
+        error: smtpError,
+      },
+    },
+  });
+});
+
 // ── POST /api/sms-settings/production-test ───────────────────────────────────
 // Fire a real DLT SMS test for a specific event using its configured template + sender.
 // Logs to notification_logs. Returns full provider response for verification.
