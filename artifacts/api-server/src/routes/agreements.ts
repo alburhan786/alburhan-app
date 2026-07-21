@@ -831,8 +831,26 @@ router.put("/:id/details", requireAdmin, async (req: any, res) => {
     const existing = await pool.query(`SELECT hotel_info, flight_info FROM agreements WHERE id=$1`, [id]);
     const prevHi = (existing.rows[0]?.hotel_info && typeof existing.rows[0].hotel_info === "object") ? existing.rows[0].hotel_info : {};
     const prevFi = (existing.rows[0]?.flight_info && typeof existing.rows[0].flight_info === "object") ? existing.rows[0].flight_info : {};
-    const mergedHi = { ...prevHi, ...Object.fromEntries(Object.entries(hotel_info).filter(([,v]) => v != null && v !== "")) };
-    const mergedFi = { ...prevFi, ...Object.fromEntries(Object.entries(flight_info).filter(([,v]) => v != null && v !== "")) };
+    // Apply Hajj defaults for Mina fields — these go in first so explicit values override them
+    const hajjDefaults: Record<string,string> = {
+      minaZone:     "Zone 5 (New Mina)",
+      minaCategory: "Category D",
+      maktabNumber: "To Be Assigned",
+    };
+    const mergedHi = {
+      ...hajjDefaults,
+      ...prevHi,
+      ...Object.fromEntries(Object.entries(hotel_info).filter(([,v]) => v != null && v !== "")),
+    };
+    const flightDefaults: Record<string,string> = {
+      airline:      "Any Airline",
+      flightNumber: "To Be Confirmed",
+    };
+    const mergedFi = {
+      ...flightDefaults,
+      ...prevFi,
+      ...Object.fromEntries(Object.entries(flight_info).filter(([,v]) => v != null && v !== "")),
+    };
 
     await pool.query(
       `UPDATE agreements SET hotel_info=$1, flight_info=$2, updated_at=NOW() WHERE id=$3`,

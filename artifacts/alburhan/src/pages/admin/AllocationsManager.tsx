@@ -295,10 +295,9 @@ export default function AllocationsManager() {
                     <tr key={a.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3">
                         <div className="flex flex-col">
-                          {a.tent_number && <span className="flex items-center gap-1 font-semibold"><Tent size={13} className={cfg.color} />Tent: {a.tent_number}</span>}
-                          {a.camp_number && <span className="text-xs text-muted-foreground">Camp: {a.camp_number}</span>}
-                          {a.area && <span className="text-xs text-muted-foreground">Area: {a.area}</span>}
-                          {!a.tent_number && !a.camp_number && !a.area && <span className="text-muted-foreground">—</span>}
+                          {a.tent_number ? <span className="flex items-center gap-1 font-semibold"><Tent size={13} className={cfg.color} />Tent: {a.tent_number}</span> : <span className="text-[11px] text-amber-600 font-medium">Tent: To Be Assigned</span>}
+                          {a.camp_number ? <span className="text-xs text-muted-foreground">Camp: {a.camp_number}</span> : <span className="text-[11px] text-muted-foreground">Camp: To Be Assigned</span>}
+                          {a.area ? <span className="text-xs text-muted-foreground">Area: {a.area}</span> : null}
                         </div>
                       </td>
                       <td className="px-4 py-3">

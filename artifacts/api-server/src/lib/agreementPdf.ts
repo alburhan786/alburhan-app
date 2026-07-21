@@ -542,11 +542,11 @@ function drawPage2(doc: any, o: AgreementPdfOptions) {
   const hX4 = hX3 + hColW + 2;
   doc.rect(hX4, y, hColW, hH).fill(GOLD_LITE).stroke(GOLD);
   doc.fill("#7B4700").font("Helvetica-Bold").fontSize(7).text("MINA", hX4 + 5, y + 5);
-  doc.fill(GREY_DARK).font("Helvetica-Bold").fontSize(7.5).text("New Mina Zone", hX4 + 5, y + 16, { width: hColW - 10 });
+  doc.fill(GREY_DARK).font("Helvetica-Bold").fontSize(7.5).text("Zone 5 (New Mina)", hX4 + 5, y + 16, { width: hColW - 10 });
   doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Tent Category: " + fmt(o.minaCategory, "Category D"), hX4 + 5, y + 32, { width: hColW - 10 });
   if (o.minaTentNumber) { doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Tent No.: " + o.minaTentNumber, hX4 + 5, y + 42, { width: hColW - 10 }); }
-  doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Maktab No.: " + fmt(o.minaMaktabNumber || o.maktabNumber), hX4 + 5, y + 52, { width: hColW - 10 });
-  doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Zone: " + fmt(o.minaZone, "New Mina Zone"), hX4 + 5, y + 63, { width: hColW - 10 });
+  doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Maktab No.: " + fmt(o.minaMaktabNumber || o.maktabNumber, "To Be Assigned"), hX4 + 5, y + 52, { width: hColW - 10 });
+  doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Zone: " + fmt(o.minaZone, "Zone 5 (New Mina)"), hX4 + 5, y + 63, { width: hColW - 10 });
   doc.fill("black");
 
   y += hH + 4;

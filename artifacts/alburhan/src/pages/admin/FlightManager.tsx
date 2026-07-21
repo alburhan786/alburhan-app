@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plus, Plane, Pencil, Trash2, ChevronDown, ChevronRight, ArrowRight, Users } from "lucide-react";
+import { Plus, Plane, Pencil, Trash2, ChevronDown, ChevronRight, ArrowRight, Users, CheckCircle2, Bell } from "lucide-react";
 import { useParams } from "wouter";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -17,12 +17,16 @@ const FLIGHT_TYPES = [
 ];
 
 const STATUSES = [
-  { value: "scheduled", label: "Scheduled", color: "bg-blue-100 text-blue-800" },
-  { value: "delayed",   label: "Delayed",   color: "bg-amber-100 text-amber-800" },
-  { value: "departed",  label: "Departed",  color: "bg-purple-100 text-purple-800" },
-  { value: "landed",    label: "Landed",    color: "bg-green-100 text-green-800" },
-  { value: "cancelled", label: "Cancelled", color: "bg-red-100 text-red-800" },
+  { value: "scheduled",  label: "Scheduled",  color: "bg-blue-100 text-blue-800" },
+  { value: "confirmed",  label: "Confirmed",  color: "bg-emerald-100 text-emerald-800" },
+  { value: "delayed",    label: "Delayed",    color: "bg-amber-100 text-amber-800" },
+  { value: "departed",   label: "Departed",   color: "bg-purple-100 text-purple-800" },
+  { value: "landed",     label: "Landed",     color: "bg-green-100 text-green-800" },
+  { value: "cancelled",  label: "Cancelled",  color: "bg-red-100 text-red-800" },
 ];
+
+const PLACEHOLDER_AIRLINE = "Any Airline";
+const PLACEHOLDER_FLIGHT  = "To Be Confirmed";
 
 const MEAL_TYPES = ["Standard","Vegetarian","Vegan","Halal","Kosher","Child Meal","Diabetic","Low Fat"];
 
@@ -56,11 +60,15 @@ interface Group {
 }
 
 const EMPTY_FORM = {
-  flightType: "outbound", airline: "", flightNumber: "", pnr: "",
+  flightType: "outbound", airline: PLACEHOLDER_AIRLINE, flightNumber: PLACEHOLDER_FLIGHT, pnr: PLACEHOLDER_FLIGHT,
   departureAirport: "", arrivalAirport: "", departureDate: "", departureTime: "",
-  arrivalDate: "", arrivalTime: "", baggageAllowance: "23 kg", mealType: "Halal",
+  arrivalDate: "", arrivalTime: "", baggageAllowance: "25 KG", mealType: "Halal",
   status: "scheduled", notes: "",
 };
+
+function isPlaceholder(val?: string | null): boolean {
+  return !val || val === PLACEHOLDER_AIRLINE || val === PLACEHOLDER_FLIGHT;
+}
 
 const typeMap = Object.fromEntries(FLIGHT_TYPES.map(t => [t.value, t]));
 const statusMap = Object.fromEntries(STATUSES.map(s => [s.value, s]));
@@ -81,6 +89,7 @@ export default function FlightManager() {
   const [saving, setSaving] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [groupNameMap, setGroupNameMap] = useState<Record<string, string>>({});
+  const [confirming, setConfirming] = useState<string | null>(null);
 
   async function loadGroups() {
     try {
@@ -185,6 +194,27 @@ export default function FlightManager() {
     await load();
   }
 
+  async function confirmFlight(f: Flight) {
+    if (!confirm(`Confirm flight ${f.flightNumber || "—"} and notify all pilgrims in this group?\n\nThis will:\n• Update flight info on all agreements in the group\n• Send WhatsApp, SMS, and Email notifications to pilgrims`)) return;
+    setConfirming(f.id);
+    try {
+      const r = await fetch(`${API}/api/flights/${f.id}/confirm`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || "Failed to confirm flight");
+      toast({
+        title: "✈️ Flight Confirmed",
+        description: `${data.agreementsUpdated ?? 0} agreements updated · ${data.notificationsSent ?? 0} notifications sent`,
+      });
+      await load();
+    } catch (e: any) {
+      toast({ title: "Failed to confirm", description: e.message, variant: "destructive" });
+    }
+    setConfirming(null);
+  }
+
   function toggleExpand(id: string) {
     setExpanded(prev => {
       const n = new Set(prev);
@@ -256,10 +286,26 @@ export default function FlightManager() {
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-bold text-base">{f.airline || "—"}</span>
-                        {f.flightNumber && <span className="text-sm text-muted-foreground">· {f.flightNumber}</span>}
-                        {f.pnr && <Badge variant="outline" className="text-[10px] font-mono">PNR: {f.pnr}</Badge>}
+                        <span className={`font-bold text-base ${isPlaceholder(f.airline) ? "text-amber-600" : ""}`}>
+                          {f.airline || "—"}
+                        </span>
+                        {f.flightNumber && (
+                          <span className={`text-sm ${isPlaceholder(f.flightNumber) ? "text-amber-500 italic" : "text-muted-foreground"}`}>
+                            · {f.flightNumber}
+                          </span>
+                        )}
+                        {f.pnr && !isPlaceholder(f.pnr) && (
+                          <Badge variant="outline" className="text-[10px] font-mono">PNR: {f.pnr}</Badge>
+                        )}
                         <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${st?.color || "bg-gray-100"}`}>{st?.label || f.status}</span>
+                        {isPlaceholder(f.airline) && f.status !== "confirmed" && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">Pending Confirmation</span>
+                        )}
+                        {f.status === "confirmed" && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium flex items-center gap-1">
+                            <CheckCircle2 size={9} /> Notified
+                          </span>
+                        )}
                         {!urlGroupId && groupNameMap[f.groupId] && (
                           <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#0d5040]/10 text-[#0d5040] font-medium flex items-center gap-1">
                             <Users size={9} /> {groupNameMap[f.groupId]}
@@ -285,7 +331,23 @@ export default function FlightManager() {
                       )}
                     </div>
 
-                    <div className="flex items-center gap-1 shrink-0">
+                    <div className="flex items-center gap-1 shrink-0 flex-col sm:flex-row">
+                      {f.status !== "confirmed" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 px-2 text-[11px] border-emerald-300 text-emerald-700 hover:bg-emerald-50 gap-1"
+                          disabled={confirming === f.id}
+                          onClick={() => confirmFlight(f)}
+                          title="Confirm flight & notify all pilgrims in this group"
+                        >
+                          {confirming === f.id ? (
+                            <span className="animate-pulse">Confirming…</span>
+                          ) : (
+                            <><Bell size={11} />Confirm & Notify</>
+                          )}
+                        </Button>
+                      )}
                       <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => toggleExpand(f.id)}>
                         {isExp ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                       </Button>

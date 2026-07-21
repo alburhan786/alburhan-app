@@ -394,6 +394,7 @@ export default function GroupsManager() {
                 <div className="space-y-1 text-sm text-muted-foreground mb-3">
                   {g.flightNumber && <p>Flight: {g.flightNumber}</p>}
                   {g.departureDate && <p>Departure: {g.departureDate}</p>}
+                  <p>Maktab: <span className={g.maktabNumber ? "text-foreground font-medium" : "text-amber-600"}>{g.maktabNumber || "To Be Assigned"}</span></p>
                   {g.hotels?.aziziah?.name && <p>Makkah 1: {g.hotels.aziziah.name}</p>}
                   {g.hotels?.makkah?.name && <p>Makkah 2: {g.hotels.makkah.name}</p>}
                   {g.hotels?.madinah?.name && <p>Madinah: {g.hotels.madinah.name}</p>}
