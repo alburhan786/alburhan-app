@@ -16,6 +16,7 @@ import { sendReminderForBookingId, getReminderHistory, runDailyReminders, isRemi
 import { upsertInvoiceForBooking } from "./invoices.js";
 import { autoGenerateAgreement } from "./agreements.js";
 import { uploadToGCS } from "../lib/gcsUpload.js";
+import { broadcastCustomerJourneyUpdate } from "./customer-journey.js";
 
 const router = Router();
 
@@ -496,14 +497,19 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
     console.error("[verify] upsertInvoice failed:", err);
   }
 
-  // Advance journey_status to payment_received if still at a pre-payment stage
+  // Advance journey_status based on partial vs full payment
+  const newJourneyStatus = isFullyPaid ? "payment_received" : "partial_payment_received";
+  const journeyAllowedFrom = isFullyPaid
+    ? "('booking_requested','documents_pending','documents_received','admin_verification','payment_pending','booking_approved','partial_payment_received')"
+    : "('booking_requested','documents_pending','documents_received','admin_verification','payment_pending','booking_approved')";
   pool.query(
-    `UPDATE bookings SET journey_status = 'payment_received', updated_at = NOW()
-     WHERE id = $1
-       AND journey_status IN ('booking_requested','documents_pending','documents_received','admin_verification','payment_pending')`,
-    [bookingId]
-  ).then(() => console.log("[verify] journey_status advanced to payment_received for", booking.bookingNumber))
-   .catch((err: any) => console.error("[verify] journey_status advance failed:", err?.message));
+    `UPDATE bookings SET journey_status = $1, updated_at = NOW()
+     WHERE id = $2 AND journey_status IN ${journeyAllowedFrom}`,
+    [newJourneyStatus, bookingId]
+  ).then(() => {
+    console.log(`[verify] journey_status → ${newJourneyStatus} for`, booking.bookingNumber);
+    broadcastCustomerJourneyUpdate(bookingId, newJourneyStatus);
+  }).catch((err: any) => console.error("[verify] journey_status advance failed:", err?.message));
 
   const remainingBalance = Math.max(0, finalAmount - newPaidAmount);
   try {
@@ -1546,14 +1552,19 @@ router.post("/verify-public", async (req, res) => {
         console.error(`${logPfx} ❌ [PIPELINE] upsertInvoice failed:`, invErr?.message);
       }
 
-      // Step 2: Advance journey_status to payment_received
+      // Step 2: Advance journey_status based on partial vs full payment
+      const pipelineJourneyStatus = isFullyPaid ? "payment_received" : "partial_payment_received";
+      const pipelineAllowedFrom = isFullyPaid
+        ? "('booking_requested','documents_pending','documents_received','admin_verification','payment_pending','booking_approved','partial_payment_received')"
+        : "('booking_requested','documents_pending','documents_received','admin_verification','payment_pending','booking_approved')";
       pool.query(
-        `UPDATE bookings SET journey_status = 'payment_received', updated_at = NOW()
-         WHERE id = $1
-           AND journey_status IN ('booking_requested','documents_pending','documents_received','admin_verification','payment_pending')`,
-        [bookingId]
-      ).then(() => console.log(`${logPfx} ✅ [PIPELINE] journey_status → payment_received`))
-       .catch((err: any) => console.error(`${logPfx} ❌ [PIPELINE] journey_status advance failed:`, err?.message));
+        `UPDATE bookings SET journey_status = $1, updated_at = NOW()
+         WHERE id = $2 AND journey_status IN ${pipelineAllowedFrom}`,
+        [pipelineJourneyStatus, bookingId]
+      ).then(() => {
+        console.log(`${logPfx} ✅ [PIPELINE] journey_status → ${pipelineJourneyStatus}`);
+        broadcastCustomerJourneyUpdate(bookingId, pipelineJourneyStatus);
+      }).catch((err: any) => console.error(`${logPfx} ❌ [PIPELINE] journey_status advance failed:`, err?.message));
 
       // Step 3: Full notification pipeline — PDFs, WhatsApp, SMS, Email, notification_logs
       console.log(`${logPfx} ▶ [PIPELINE] Calling processPaymentSuccessNotifications (isFullyPaid=${isFullyPaid})`);

@@ -123,7 +123,7 @@ function buildMenu(openComplaints: number): MenuSection[] {
         { icon: Smartphone,     label: "SMS Templates",           href: "/admin/sms-templates",          require: ["settings", "view"]  as [any,any] },
         { icon: Layers,         label: "RCS Templates",           href: "/admin/rcs-templates",          require: ["settings", "view"]  as [any,any] },
         { icon: Mail,           label: "Email Templates",         href: "/admin/email-templates",        require: ["settings", "view"]  as [any,any] },
-        { icon: FileText,       label: "DLT Template Manager",    href: "/admin/sms-templates",          require: ["settings", "view"]  as [any,any] },
+        { icon: FileText,       label: "DLT Template Manager",    href: "/admin/dlt-templates",          require: ["settings", "view"]  as [any,any] },
         { icon: Globe,          label: "Meta WhatsApp Manager",   href: "/admin/whatsapp-templates",     require: ["settings", "view"]  as [any,any] },
         { icon: Bot,            label: "BotBee Settings",         href: "/admin/api-settings",           require: ["settings", "view"]  as [any,any] },
         { icon: Smartphone,     label: "Fast2SMS Settings",       href: "/admin/api-settings",           require: ["settings", "view"]  as [any,any] },

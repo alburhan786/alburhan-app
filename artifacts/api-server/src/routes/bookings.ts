@@ -583,6 +583,17 @@ router.post("/:id/approve", requireAdmin as any, requirePermission("bookings", "
     console.error("[approve] autoGenerateAgreement failed:", err)
   );
 
+  // Advance journey_status to booking_approved (only if still at a pre-approval stage)
+  pool.query(
+    `UPDATE bookings SET journey_status = 'booking_approved', updated_at = NOW()
+     WHERE id = $1
+       AND journey_status IN ('booking_requested','documents_pending','documents_received','admin_verification','payment_pending')`,
+    [updated.id]
+  ).then(() => {
+    console.log(`[approve] journey_status → booking_approved for ${updated.bookingNumber}`);
+    broadcastCustomerJourneyUpdate(updated.id, "booking_approved");
+  }).catch(err => console.error("[approve] journey_status advance failed:", err?.message));
+
   res.json(formatBooking(updated));
 });
 
@@ -917,7 +928,8 @@ router.post("/:id/journey-status", requireAdmin as any, requirePermission("booki
   }
   const VALID_JOURNEY_STATUSES = [
     "booking_requested","documents_pending","documents_received","admin_verification",
-    "payment_pending","payment_received","invoice_generated","visa_processing",
+    "booking_approved","payment_pending","partial_payment_received",
+    "payment_received","invoice_generated","visa_processing",
     "visa_approved","flight_confirmed","hotel_confirmed","bus_allocated",
     "room_allocated","departure_ready","journey_started","reached_makkah",
     "reached_madinah","return_flight","journey_completed",

@@ -124,6 +124,7 @@ import WhatsAppTemplateManager from "@/pages/admin/WhatsAppTemplateManager";
 import BotBeeDashboard from "@/pages/admin/BotBeeDashboard";
 import WhatsAppHistory from "@/pages/admin/WhatsAppHistory";
 import SMSTemplateManager from "@/pages/admin/SMSTemplateManager";
+import DltTemplateManager from "@/pages/admin/DltTemplateManager";
 import RCSTemplateManager from "@/pages/admin/RCSTemplateManager";
 import EmailTemplateManager from "@/pages/admin/EmailTemplateManager";
 import TestNotifications from "@/pages/admin/TestNotifications";
@@ -353,6 +354,7 @@ function Router() {
       <Route path="/admin/whatsapp-templates" component={() => <AdminRoute component={WhatsAppTemplateManager} />} />
       <Route path="/admin/whatsapp-history" component={() => <AdminRoute component={WhatsAppHistory} />} />
       <Route path="/admin/sms-templates" component={() => <AdminRoute component={SMSTemplateManager} />} />
+      <Route path="/admin/dlt-templates" component={() => <AdminRoute component={DltTemplateManager} />} />
       <Route path="/admin/rcs-templates" component={() => <AdminRoute component={RCSTemplateManager} />} />
       <Route path="/admin/email-templates" component={() => <AdminRoute component={EmailTemplateManager} />} />
       <Route path="/admin/test-notifications" component={() => <AdminRoute component={TestNotifications} />} />

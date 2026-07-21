@@ -198,9 +198,10 @@ router.get("/:bookingId/steps", requireAuth as any, async (req: AuthenticatedReq
       stepData["agreement_signed"] = { completedAt: null, updatedBy: null, notes: null };
     }
 
-    // All other step keys
+    // All other step keys (19-step journey)
     const otherKeys = [
-      "documents_received", "admin_verification", "payment_received", "invoice_generated",
+      "documents_received", "admin_verification", "booking_approved",
+      "partial_payment_received", "payment_received", "invoice_generated",
       "visa_processing", "visa_approved", "flight_confirmed", "hotel_confirmed",
       "room_allocated", "departure_ready", "journey_started",
       "reached_makkah", "reached_madinah", "return_flight", "journey_completed",

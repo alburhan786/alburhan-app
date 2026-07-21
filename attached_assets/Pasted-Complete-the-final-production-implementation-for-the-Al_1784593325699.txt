@@ -1,0 +1,336 @@
+Complete the final production implementation for the Al Burhan Tours & Travels CRM. This is a production-only task. Implement, deploy, and verify every feature end-to-end. Do not leave any placeholder logic, fallback behavior, or incomplete configuration.
+
+====================================================================
+PART 1 – DLT SMS PRODUCTION CONFIGURATION
+====================================================================
+
+The DLT infrastructure is already connected.
+
+Implement the following production rules:
+
+1. Use ONLY:
+   • Sender ID: ABURHA
+   • Route: DLT SMS
+
+2. Never send SMS through:
+   • Quick SMS
+   • Promotional Route
+   • Transactional fallback
+   • Default Sender ID
+   • Any Sender ID except ABURHA
+
+3. Build an Admin → DLT Template Management page.
+
+For every SMS event, allow configuration of:
+
+• Event Name
+• Fast2SMS Approved DLT Template ID
+• Sender ID
+• Route
+• Status
+
+Supported events:
+
+• booking_received
+• booking_approved
+• partial_payment
+• payment_received
+• invoice_ready
+• payment_reminder
+• visa_ready
+• flight_ticket_issued
+• hotel_voucher_ready
+• departure_reminder
+
+4. Store all Template IDs in the production database.
+
+Example only:
+
+booking_received = 219801
+booking_approved = 219802
+payment_received = 219803
+
+(The actual Fast2SMS approved Template IDs will be entered by the admin.)
+
+5. Before sending every SMS perform validation:
+
+✓ Sender ID = ABURHA
+✓ Route = DLT SMS
+✓ Template ID exists
+✓ Template is Active
+
+If ANY validation fails:
+
+• DO NOT send SMS.
+• DO NOT fall back to Quick SMS.
+• DO NOT use another Sender ID.
+• Write the failure reason to logs.
+• Continue Email notifications.
+• Continue WhatsApp notifications.
+• Continue Dashboard notifications.
+
+6. Admin Dashboard must display:
+
+✓ Event Name
+✓ DLT Template ID
+✓ Sender ID
+✓ Route
+✓ Active/Inactive
+✓ Configured/Missing
+
+Missing configuration must be highlighted in RED.
+
+7. Production verification must confirm:
+
+✓ Sender ID = ABURHA
+✓ Route = DLT SMS
+✓ Correct Approved Template ID loaded
+✓ SMS delivered successfully
+
+If a Template ID is missing, clearly log:
+
+"No DLT Template configured for <event_name>"
+
+without sending any SMS.
+
+====================================================================
+PART 2 – CUSTOMER JOURNEY TIMELINE
+====================================================================
+
+Current production issue:
+
+• Banner shows:
+  "Partial payment received."
+
+• Payment is saved.
+
+• Invoice generated.
+
+BUT
+
+Journey Timeline still shows:
+
+Current Status:
+Submitted
+
+Journey:
+Step 1 of 19
+
+This is incorrect.
+
+====================================================================
+Fix Requirements
+====================================================================
+
+The Journey Timeline must update automatically after every booking event.
+
+No manual refresh.
+
+No cache delay.
+
+No stale frontend data.
+
+Realtime update after backend status changes.
+
+====================================================================
+Journey Milestones
+====================================================================
+
+1. Submitted
+2. Documents Received
+3. Documents Verified
+4. Booking Approved
+5. Partial Payment Received
+6. Fully Paid
+7. Invoice Generated
+8. Agreement Signed
+9. Visa Processing
+10. Visa Issued
+11. Flight Ticket Issued
+12. Hotel Voucher Issued
+13. Room Allocated
+14. Departure Reminder
+15. Departed
+16. Arrived Makkah
+17. Arrived Madinah
+18. Return Flight
+19. Journey Completed
+
+====================================================================
+UI Behaviour
+====================================================================
+
+Completed step:
+
+✓ Green Check
+
+Current step:
+
+✓ Highlighted
+✓ "Currently: <Current Stage>"
+
+Future steps:
+
+✓ Grey
+
+Progress bar updates automatically.
+
+====================================================================
+Status Logic
+====================================================================
+
+Booking Submitted
+
+→ Current = Submitted
+
+Booking Approved
+
+→ Current = Booking Approved
+
+Advance Payment Received
+
+→ Current = Partial Payment Received
+
+DO NOT remain on Submitted.
+
+Full Payment Received
+
+→ Current = Fully Paid
+
+Unlock:
+
+✓ Invoice
+✓ Agreement
+
+Invoice Generated
+
+→ Current = Invoice Generated
+
+Agreement Signed
+
+→ Current = Agreement Signed
+
+Visa Issued
+
+→ Current = Visa Issued
+
+Flight Ticket Issued
+
+→ Current = Flight Ticket Issued
+
+Hotel Voucher Generated
+
+→ Current = Hotel Voucher Issued
+
+Departure
+
+→ Current = Departed
+
+Arrival
+
+→ Update accordingly
+
+Return
+
+→ Journey Completed
+
+====================================================================
+PART 3 – CUSTOMER DASHBOARD
+====================================================================
+
+Synchronize the following everywhere:
+
+• Journey Timeline
+• Current Status Badge
+• Payment Status
+• Invoice Status
+• Agreement Status
+• Visa Status
+• Flight Status
+• Hotel Status
+• Progress Percentage
+
+No conflicting statuses anywhere.
+
+====================================================================
+PART 4 – PDF & EMAIL
+====================================================================
+
+When payment is received:
+
+Generate a Paid Tax Invoice PDF.
+
+The PDF must include:
+
+✓ PAID badge
+✓ Payment Date
+✓ Invoice Number
+✓ Booking ID
+✓ Customer Name
+✓ Package Name
+✓ Amount Paid
+✓ Balance Amount
+✓ Payment Method
+✓ QR Code
+✓ Company Details
+
+Automatically:
+
+• Save PDF
+• Show PDF in Customer Dashboard
+• Email PDF to Customer
+• Allow Customer Download
+• Allow Admin Download
+
+====================================================================
+PART 5 – LIVE PRODUCTION VERIFICATION
+====================================================================
+
+Run an end-to-end production test using a real booking.
+
+Verify:
+
+✓ Booking Received
+✓ Booking Approved
+✓ Partial Payment
+✓ Full Payment
+✓ Invoice Generated
+✓ Agreement
+✓ Visa
+✓ Flight
+✓ Hotel
+✓ Journey Timeline
+✓ Dashboard Status
+✓ Email
+✓ PDF
+✓ SMS
+✓ WhatsApp
+
+For every SMS verify:
+
+✓ Sender ID = ABURHA
+✓ Route = DLT SMS
+✓ Correct Template ID
+✓ Delivered
+
+If any DLT Template is missing:
+
+DO NOT send SMS.
+
+Log the exact event causing the failure.
+
+Continue all other notification channels.
+
+====================================================================
+DEPLOYMENT
+====================================================================
+
+Deploy to the production VPS only after:
+
+✓ Journey Timeline updates correctly.
+✓ Customer Dashboard reflects live status.
+✓ Paid Invoice PDF is generated and visible everywhere.
+✓ Email includes the Paid Invoice PDF attachment.
+✓ DLT SMS uses only Sender ID ABURHA and the DLT route.
+✓ No Quick SMS fallback exists.
+✓ All production tests pass successfully.

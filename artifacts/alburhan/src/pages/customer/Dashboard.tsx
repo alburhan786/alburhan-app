@@ -1511,39 +1511,43 @@ interface JourneyStepDisplay extends JourneyStepDef {
 }
 
 const JOURNEY_STEP_DEFS: JourneyStepDef[] = [
-  { key: "booking_requested",  label: "Booking Created",    icon: "🕌", desc: "Your booking has been submitted and confirmed" },
-  { key: "documents_received", label: "Documents Uploaded", icon: "📋", desc: "Your travel documents have been received" },
-  { key: "admin_verification", label: "Documents Verified", icon: "🔍", desc: "Your documents are verified by our team" },
-  { key: "payment_received",   label: "Payment Received",   icon: "💳", desc: "Your payment has been confirmed" },
-  { key: "invoice_generated",  label: "Invoice Generated",  icon: "🧾", desc: "Your official invoice has been issued" },
-  { key: "agreement_signed",   label: "Agreement Signed",   icon: "✍️",  desc: "Your travel agreement has been signed", virtual: true },
-  { key: "visa_processing",    label: "Visa Processing",    icon: "🛂", desc: "Your visa application is being processed" },
-  { key: "visa_approved",      label: "Visa Approved",      icon: "🎉", desc: "Your visa has been approved" },
-  { key: "flight_confirmed",   label: "Flight Confirmed",   icon: "✈️",  desc: "Your flight tickets have been confirmed" },
-  { key: "hotel_confirmed",    label: "Hotel Confirmed",    icon: "🏨", desc: "Your hotel accommodation is confirmed" },
-  { key: "room_allocated",     label: "Room Allocated",     icon: "🛏️",  desc: "Your room has been assigned" },
-  { key: "departure_ready",    label: "Departure Ready",    icon: "🧳", desc: "All preparations for departure are complete" },
-  { key: "journey_started",    label: "Journey Started",    icon: "🛫", desc: "You have departed on your sacred journey" },
-  { key: "reached_makkah",     label: "Reached Makkah",     icon: "🕋", desc: "You have arrived in Makkah Al-Mukarramah" },
-  { key: "reached_madinah",    label: "Reached Madinah",    icon: "🕌", desc: "You have arrived in Madinah Al-Munawwarah" },
-  { key: "return_flight",      label: "Return Flight",      icon: "✈️",  desc: "Returning home from the holy land" },
-  { key: "journey_completed",  label: "Journey Completed",  icon: "🏠", desc: "Welcome home! Your blessed journey is complete" },
+  { key: "booking_requested",       label: "Submitted",                icon: "🕌", desc: "Your booking has been submitted successfully" },
+  { key: "documents_received",      label: "Documents Received",       icon: "📋", desc: "Your travel documents have been received" },
+  { key: "admin_verification",      label: "Documents Verified",       icon: "🔍", desc: "Your documents are verified by our team" },
+  { key: "booking_approved",        label: "Booking Approved",         icon: "✅", desc: "Your booking has been approved by our team" },
+  { key: "partial_payment_received",label: "Partial Payment Received", icon: "💰", desc: "Advance payment received — please pay the balance to confirm" },
+  { key: "payment_received",        label: "Fully Paid",               icon: "💳", desc: "Full payment confirmed — your seat is reserved" },
+  { key: "invoice_generated",       label: "Invoice Generated",        icon: "🧾", desc: "Your official tax invoice has been issued" },
+  { key: "agreement_signed",        label: "Agreement Signed",         icon: "✍️",  desc: "Your travel agreement has been signed", virtual: true },
+  { key: "visa_processing",         label: "Visa Processing",          icon: "🛂", desc: "Your visa application is being processed" },
+  { key: "visa_approved",           label: "Visa Issued",              icon: "🎉", desc: "Alhamdulillah! Your visa has been approved" },
+  { key: "flight_confirmed",        label: "Flight Ticket Issued",     icon: "✈️",  desc: "Your flight tickets have been confirmed" },
+  { key: "hotel_confirmed",         label: "Hotel Voucher Issued",     icon: "🏨", desc: "Your hotel accommodation voucher is ready" },
+  { key: "room_allocated",          label: "Room Allocated",           icon: "🛏️",  desc: "Your room has been assigned" },
+  { key: "departure_ready",         label: "Departure Reminder",       icon: "🧳", desc: "All preparations for departure are complete" },
+  { key: "journey_started",         label: "Departed",                 icon: "🛫", desc: "Bismillah! You have departed on your sacred journey" },
+  { key: "reached_makkah",          label: "Arrived Makkah",           icon: "🕋", desc: "Alhamdulillah! You have arrived in Makkah Al-Mukarramah" },
+  { key: "reached_madinah",         label: "Arrived Madinah",          icon: "🕌", desc: "Alhamdulillah! You have arrived in Madinah Al-Munawwarah" },
+  { key: "return_flight",           label: "Return Flight",            icon: "✈️",  desc: "May Allah accept your ibadah — returning home" },
+  { key: "journey_completed",       label: "Journey Completed",        icon: "🏠", desc: "Welcome home! Your blessed journey is complete" },
 ];
 
-// Maps DB journey_status → display step index in JOURNEY_STEP_DEFS (0-indexed, virtual step at 5)
+// Maps DB journey_status → display step index in JOURNEY_STEP_DEFS (0-indexed, virtual at index 7)
 const DB_TO_DISPLAY_IDX: Record<string, number> = {
-  "booking_requested": 0, "documents_pending": 0,
+  "booking_requested": 0,  "documents_pending": 0,
   "documents_received": 1,
   "admin_verification": 2, "payment_pending": 2,
-  "payment_received": 3,
-  "invoice_generated": 4,
-  // 5 = agreement_signed (virtual — no DB status)
-  "visa_processing": 6, "visa_approved": 7,
-  "flight_confirmed": 8, "hotel_confirmed": 9,
-  "bus_allocated": 10, "room_allocated": 10,
-  "departure_ready": 11, "journey_started": 12,
-  "reached_makkah": 13, "reached_madinah": 14,
-  "return_flight": 15, "journey_completed": 16,
+  "booking_approved": 3,
+  "partial_payment_received": 4,
+  "payment_received": 5,
+  "invoice_generated": 6,
+  // index 7 = agreement_signed (virtual — no DB status)
+  "visa_processing": 8,    "visa_approved": 9,
+  "flight_confirmed": 10,  "hotel_confirmed": 11,
+  "bus_allocated": 12,     "room_allocated": 12,
+  "departure_ready": 13,   "journey_started": 14,
+  "reached_makkah": 15,    "reached_madinah": 16,
+  "return_flight": 17,     "journey_completed": 18,
 };
 
 function computeJourneySteps(
@@ -1560,10 +1564,11 @@ function computeJourneySteps(
     if (allDone) {
       state = "completed";
     } else if (def.virtual && def.key === "agreement_signed") {
-      const agDone = agreementSigned || currentIdx >= 6;
+      // Virtual step at index 7; auto-complete once past invoice_generated (idx 6)
+      const agDone = agreementSigned || currentIdx >= 8;
       if (agDone) state = "completed";
-      else if (currentIdx >= 4) state = "upcoming";
-      else if (currentIdx >= 2) state = "upcoming";
+      else if (currentIdx >= 6) state = "current";
+      else if (currentIdx >= 3) state = "upcoming";
       else state = "locked";
     } else {
       if (i < currentIdx) state = "completed";
