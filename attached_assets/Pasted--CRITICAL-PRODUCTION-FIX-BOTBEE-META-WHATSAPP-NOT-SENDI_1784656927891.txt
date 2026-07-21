@@ -1,0 +1,479 @@
+# 🚨 CRITICAL PRODUCTION FIX – BOTBEE META WHATSAPP NOT SENDING MESSAGES
+
+Project: Al Burhan Tours & Travels CRM
+Priority: P0 – Production Blocking
+
+Do NOT perform an audit only. I need you to identify the root cause, implement the fix, deploy it to the VPS, and prove it with live production evidence.
+
+## Current Status
+
+✅ PostgreSQL Working
+✅ Customer Dashboard Working
+✅ Booking System Working
+✅ Razorpay Live Working
+✅ Fast2SMS Working
+✅ SMTP Email Working
+✅ Invoice PDF Working
+✅ Agreement PDF Working
+✅ Notification Logs Working
+✅ BotBee Account Connected
+✅ Meta WhatsApp Business Connected
+✅ Approved WhatsApp Templates Available
+
+❌ WhatsApp Template Messages are NOT being delivered to customers.
+
+This is a production issue. Find the exact cause and fix it permanently.
+
+--------------------------------------------------
+STEP 1 – VERIFY BOTBEE CONFIGURATION
+--------------------------------------------------
+
+Verify all BotBee configuration:
+
+- API Key
+- API Token
+- User ID
+- Phone Number ID
+- WhatsApp Business Account ID
+- Access Token
+- Connected WhatsApp Number
+- Webhook URL
+- Bot Status
+
+Return masked values only.
+
+--------------------------------------------------
+STEP 2 – VERIFY META CLOUD API
+--------------------------------------------------
+
+Verify:
+
+- Business Verification
+- Phone Number Status
+- Quality Rating
+- Messaging Limit
+- Access Token
+- Token Expiry
+- Permanent Token
+- App Status
+- Phone Number ID
+- WABA ID
+
+If any value is incorrect, fix it.
+
+--------------------------------------------------
+STEP 3 – VERIFY ENVIRONMENT VARIABLES
+--------------------------------------------------
+
+Verify production VPS environment variables:
+
+BOTBEE_API_KEY
+BOTBEE_API_TOKEN
+BOTBEE_PHONE_NUMBER_ID
+BOTBEE_ACCOUNT_ID
+BOTBEE_USER_ID
+META_ACCESS_TOKEN
+META_WABA_ID
+
+Ensure production uses the correct values.
+
+--------------------------------------------------
+STEP 4 – VERIFY DATABASE
+--------------------------------------------------
+
+Check notification_templates table.
+
+Verify:
+
+✔ template_name
+✔ event_type
+✔ enabled
+✔ provider
+✔ template_id
+✔ language
+✔ variables
+
+Ensure every production template exists.
+
+--------------------------------------------------
+STEP 5 – VERIFY EVENT MAPPING
+--------------------------------------------------
+
+Each business event must trigger exactly one WhatsApp template.
+
+Booking Created
+→ booking_receive
+
+Booking Approved
+→ booking_approved
+
+Payment Received
+→ payment_received
+
+Invoice Ready
+→ invoice_ready
+
+Agreement Ready
+→ agreement_ready
+
+Agreement Signed
+→ agreement_signed
+
+Visa Issued
+→ visa_issued
+
+Flight Assigned
+→ flight_assigned
+
+Ticket Issued
+→ ticket_issued
+
+Departure Reminder
+→ departure_reminder
+
+Balance Reminder
+→ balance_reminder
+
+Fix any incorrect mapping.
+
+--------------------------------------------------
+STEP 6 – VERIFY TEMPLATE NAMES
+--------------------------------------------------
+
+Compare template names in:
+
+• Meta
+• BotBee
+• Database
+• Backend Code
+
+No spelling mismatch allowed.
+
+Examples:
+
+booking_receive
+booking_approved
+payment_received
+invoice_ready
+agreement_ready
+agreement_signed
+visa_issued
+flight_assigned
+ticket_issued
+departure_reminder
+balance_reminder
+
+--------------------------------------------------
+STEP 7 – VERIFY VARIABLES
+--------------------------------------------------
+
+Verify every variable.
+
+Ensure
+
+{{1}}
+{{2}}
+{{3}}
+{{4}}
+
+matches exactly with Meta.
+
+Check:
+
+Variable count
+
+Variable order
+
+Variable values
+
+Language
+
+Header
+
+Body
+
+Footer
+
+Buttons
+
+--------------------------------------------------
+STEP 8 – VERIFY API PAYLOAD
+--------------------------------------------------
+
+Log the COMPLETE payload before sending.
+
+Verify:
+
+phone_number
+
+template_name
+
+language
+
+components
+
+parameters
+
+header
+
+body
+
+buttons
+
+Return payload.
+
+--------------------------------------------------
+STEP 9 – VERIFY PHONE FORMAT
+--------------------------------------------------
+
+Ensure customer phone numbers are sent correctly.
+
+Example:
+
+919898970170
+
+or
+
++919898970170
+
+according to BotBee documentation.
+
+Reject invalid numbers.
+
+--------------------------------------------------
+STEP 10 – VERIFY MESSAGE TYPE
+--------------------------------------------------
+
+Ensure production notifications use:
+
+Template Messages
+
+NOT Session Messages.
+
+Fix if incorrect.
+
+--------------------------------------------------
+STEP 11 – VERIFY BOTBEE RESPONSE
+--------------------------------------------------
+
+Capture:
+
+HTTP Status
+
+JSON Response
+
+BotBee Response
+
+Meta Response
+
+wa_message_id
+
+message_status
+
+--------------------------------------------------
+STEP 12 – VERIFY NOTIFICATION QUEUE
+--------------------------------------------------
+
+Check:
+
+Queue Worker
+
+Retry Queue
+
+Cron Jobs
+
+Dead Queue
+
+Failed Queue
+
+Fix stuck jobs.
+
+Automatically retry failures.
+
+--------------------------------------------------
+STEP 13 – VERIFY NOTIFICATION LOGS
+--------------------------------------------------
+
+Store:
+
+Booking ID
+
+Customer ID
+
+Customer Name
+
+Phone Number
+
+Template
+
+Payload
+
+BotBee Response
+
+Meta Response
+
+wa_message_id
+
+HTTP Status
+
+Retry Count
+
+Timestamp
+
+Error Code
+
+Error Message
+
+--------------------------------------------------
+STEP 14 – CHECK COMMON FAILURES
+--------------------------------------------------
+
+Automatically detect and fix:
+
+401 Unauthorized
+
+403 Forbidden
+
+404 Template Not Found
+
+470 Outside 24 Hour Window
+
+131000 Meta Errors
+
+Invalid Access Token
+
+Expired Token
+
+Wrong Phone Number ID
+
+Wrong WABA ID
+
+Variable Count Mismatch
+
+Language Mismatch
+
+Template Disabled
+
+Phone Not Registered
+
+Rate Limit
+
+Permission Errors
+
+--------------------------------------------------
+STEP 15 – LIVE PRODUCTION TEST
+--------------------------------------------------
+
+Create one REAL booking.
+
+Trigger:
+
+Booking Created
+
+Booking Approved
+
+Payment Received
+
+Invoice Ready
+
+Agreement Ready
+
+Agreement Signed
+
+Visa Issued
+
+Flight Assigned
+
+Ticket Issued
+
+Departure Reminder
+
+Balance Reminder
+
+Verify every WhatsApp notification reaches the customer's phone.
+
+--------------------------------------------------
+STEP 16 – AUTO RETRY
+--------------------------------------------------
+
+If WhatsApp sending fails:
+
+Retry automatically.
+
+If retry fails:
+
+Log exact Meta/BotBee error.
+
+Never fail silently.
+
+--------------------------------------------------
+STEP 17 – VPS DEPLOYMENT
+--------------------------------------------------
+
+Deploy to production VPS.
+
+Restart PM2.
+
+Reload environment variables.
+
+Clear cache if required.
+
+Verify production endpoints.
+
+Run live production tests again.
+
+--------------------------------------------------
+STEP 18 – FINAL PRODUCTION REPORT
+--------------------------------------------------
+
+Do NOT simply write PASS.
+
+Provide evidence:
+
+✅ API Request
+
+✅ API Response
+
+✅ HTTP Status
+
+✅ BotBee Response
+
+✅ Meta Response
+
+✅ wa_message_id
+
+✅ Notification Log
+
+✅ Database Record
+
+✅ Queue Status
+
+✅ VPS Deployment Status
+
+✅ Customer Delivery Confirmation
+
+Include screenshots and logs proving successful WhatsApp delivery.
+
+--------------------------------------------------
+SUCCESS CRITERIA
+--------------------------------------------------
+
+The task is complete ONLY if:
+
+✅ Real customers receive WhatsApp template messages.
+
+✅ Every approved Meta template sends successfully.
+
+✅ All business events trigger WhatsApp automatically.
+
+✅ Notification logs capture full request and response.
+
+✅ wa_message_id is stored.
+
+✅ No unexplained permanently_failed errors remain.
+
+✅ VPS deployment is complete.
+
+✅ End-to-end production testing is successful with evidence.
+
+Do NOT stop until the issue is fixed, deployed, verified, and proven with live production evidence.
