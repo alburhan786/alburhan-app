@@ -384,9 +384,18 @@ export default function DltTemplateManager() {
           {/* Enable confirmation form */}
           {showEmergencyConfirm && !emergency.enabled && (
             <div className="space-y-3 border border-red-200 bg-red-50/60 rounded-lg p-4">
-              <p className="text-sm font-semibold text-red-700 flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 shrink-0" />
-                You are about to enable Quick Route as emergency fallback. This sends unregistered SMS and may breach DLT compliance. Proceed only if DLT templates are temporarily unavailable.
+              <div className="flex items-start gap-2.5 p-3 bg-red-700 text-white rounded-lg">
+                <ShieldAlert className="w-5 h-5 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-bold uppercase tracking-wide">⚠ WARNING</p>
+                  <p className="text-sm mt-0.5">
+                    You are switching from the approved DLT route to Emergency SMS.
+                    This should only be used during provider outages.
+                  </p>
+                </div>
+              </div>
+              <p className="text-xs text-gray-600">
+                Your name, IP address, device, date, time and reason will be recorded. This action is audited.
               </p>
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">Reason <span className="text-red-500">*</span></label>

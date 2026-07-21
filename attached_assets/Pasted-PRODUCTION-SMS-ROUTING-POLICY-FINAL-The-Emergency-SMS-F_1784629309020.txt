@@ -1,0 +1,221 @@
+PRODUCTION SMS ROUTING POLICY (FINAL)
+
+The Emergency SMS Fallback feature has been added successfully.
+
+Now update the notification system so it follows these production rules.
+
+====================================================
+PRIMARY SMS ROUTE
+====================================================
+
+Fast2SMS DLT Route is the ONLY production SMS route.
+
+Always use:
+
+• Approved DLT Sender ID
+• Approved DLT Template
+• DLT API
+• DLT Route
+
+Quick SMS must NEVER be selected automatically.
+
+====================================================
+EMERGENCY FALLBACK
+====================================================
+
+Emergency SMS Fallback must remain OFF by default.
+
+Only Super Admin can enable it manually.
+
+Settings →
+
+SMS Configuration →
+
+Emergency SMS Fallback
+
+Default:
+
+OFF
+
+When OFF
+
+Every notification must use ONLY:
+
+✓ Fast2SMS DLT Route
+
+If DLT fails:
+
+• Do NOT automatically switch to Quick SMS.
+• Continue sending WhatsApp and Email.
+• Record the failure in Notification Logs.
+• Show the exact provider error.
+
+====================================================
+WHEN EMERGENCY MODE IS ENABLED
+====================================================
+
+Quick SMS may be used ONLY after a Super Admin manually enables Emergency Mode.
+
+Before enabling, display:
+
+WARNING
+
+You are switching from the approved DLT route to Emergency SMS.
+
+This should only be used during provider outages.
+
+Require confirmation.
+
+Store:
+
+Admin Name
+
+Date
+
+Time
+
+Reason
+
+IP Address
+
+Device
+
+====================================================
+EMERGENCY AUDIT LOG
+====================================================
+
+Whenever Quick SMS is used, save:
+
+Booking ID
+
+Customer
+
+Notification Type
+
+Sender ID
+
+Primary Route Failed
+
+Failure Reason
+
+Emergency Enabled By
+
+Emergency Start Time
+
+Emergency End Time
+
+SMS Provider Response
+
+Delivery Status
+
+====================================================
+NOTIFICATION EVENTS
+====================================================
+
+The following must always use Primary DLT Route:
+
+OTP Login
+
+OTP Registration
+
+OTP Password Reset
+
+Booking Created
+
+Booking Approved
+
+Payment Received
+
+Partial Payment
+
+Invoice Generated
+
+Agreement Signed
+
+Visa Ready
+
+Flight Ticket
+
+Hotel Voucher
+
+Departure Reminder
+
+Arrival Reminder
+
+====================================================
+PRODUCTION VALIDATION
+====================================================
+
+Run live tests for:
+
+✓ OTP
+
+✓ Booking Confirmation
+
+✓ Payment Confirmation
+
+✓ Invoice
+
+✓ Agreement
+
+✓ Visa
+
+✓ Ticket
+
+✓ Hotel Voucher
+
+Verify:
+
+✓ SMS sent through Fast2SMS DLT
+
+✓ Correct Sender ID used
+
+✓ Correct Template ID used
+
+✓ WhatsApp delivered
+
+✓ Email delivered
+
+✓ Notification logged
+
+====================================================
+DEPLOYMENT RULE
+====================================================
+
+Do not deploy until:
+
+✓ Fast2SMS DLT is the default production route.
+
+✓ Emergency Fallback is OFF by default.
+
+✓ Quick SMS is never used automatically.
+
+✓ Only Super Admin can enable Emergency Mode.
+
+✓ All notification events work correctly.
+
+Generate a final Production Verification Report confirming:
+
+✓ Primary DLT Route Active
+
+✓ Emergency Mode Disabled by Default
+
+✓ Sender IDs Configured
+
+✓ DLT Templates Configured
+
+✓ OTP Working
+
+✓ Booking SMS Working
+
+✓ Payment SMS Working
+
+✓ Invoice SMS Working
+
+✓ WhatsApp Working
+
+✓ Email Working
+
+✓ Notification Logs Working
+
+✓ Production Ready

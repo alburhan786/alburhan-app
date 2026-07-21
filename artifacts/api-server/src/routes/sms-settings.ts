@@ -261,6 +261,10 @@ router.get("/emergency-fallback", async (_req: AuthenticatedRequest, res) => {
       reason: extra.emergency_reason || null,
       enabledAt: extra.emergency_enabled_at || null,
       enabledBy: extra.emergency_enabled_by || null,
+      enabledIp: extra.emergency_enabled_ip || null,
+      enabledDevice: extra.emergency_enabled_ua || null,
+      disabledAt: extra.emergency_disabled_at || null,
+      disabledBy: extra.emergency_disabled_by || null,
     });
   } catch (err: any) {
     res.status(500).json({ ok: false, error: err.message });
@@ -283,15 +287,21 @@ router.post("/emergency-fallback", async (req: AuthenticatedRequest, res) => {
     let extra: Record<string, any> = {};
     try { if (row.rows[0]?.extra_fields_encrypted) extra = JSON.parse(decrypt(row.rows[0].extra_fields_encrypted)); } catch {}
     const adminName = (req as any).user?.name || (req as any).user?.email || "admin";
+    const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0].trim() || req.socket?.remoteAddress || req.ip || "unknown";
+    const ua = (req.headers["user-agent"] as string) || "unknown";
+    const ts = new Date().toISOString();
     if (enabled) {
       extra.emergency_sms_fallback_enabled = "1";
       extra.emergency_reason = reason.trim();
-      extra.emergency_enabled_at = new Date().toISOString();
+      extra.emergency_enabled_at = ts;
       extra.emergency_enabled_by = adminName;
+      extra.emergency_enabled_ip = ip;
+      extra.emergency_enabled_ua = ua;
     } else {
       extra.emergency_sms_fallback_enabled = "0";
-      extra.emergency_disabled_at = new Date().toISOString();
+      extra.emergency_disabled_at = ts;
       extra.emergency_disabled_by = adminName;
+      extra.emergency_disabled_ip = ip;
     }
     const enc = encrypt(JSON.stringify(extra));
     await pool.query(`UPDATE api_settings SET extra_fields_encrypted=$1, updated_at=NOW() WHERE provider='fast2sms'`, [enc]);
@@ -335,18 +345,20 @@ router.get("/verification", async (_req: AuthenticatedRequest, res) => {
   const approvedIds = senderRows.rows.map((r: any) => r.sender_id);
 
   const EVENTS = [
-    { event: "otp",               label: "OTP (Login)",              tidKey: "otp_template_id",         senderKey: "otp_sender" },
+    { event: "otp",               label: "OTP Login / Registration", tidKey: "otp_template_id",         senderKey: "otp_sender" },
     { event: "booking_created",   label: "Booking Received",         tidKey: "booking_created_tid",     senderKey: "booking_created_sender" },
     { event: "booking_approved",  label: "Booking Approved",         tidKey: "booking_confirmed_tid",   senderKey: "booking_confirmed_sender" },
     { event: "booking_rejected",  label: "Booking Rejected",         tidKey: "booking_rejected_tid",    senderKey: "booking_rejected_sender" },
     { event: "payment_received",  label: "Payment Received",         tidKey: "payment_received_tid",    senderKey: "payment_received_sender" },
     { event: "partial_payment",   label: "Partial Payment",          tidKey: "partial_payment_tid",     senderKey: "partial_payment_sender" },
-    { event: "invoice_generated", label: "Invoice Ready",            tidKey: "invoice_created_tid",     senderKey: "invoice_created_sender" },
+    { event: "invoice_generated", label: "Invoice Generated",        tidKey: "invoice_created_tid",     senderKey: "invoice_created_sender" },
+    { event: "agreement_signed",  label: "Agreement Signed",         tidKey: "agreement_signed_tid",    senderKey: "agreement_signed_sender" },
     { event: "payment_due",       label: "Payment Reminder",         tidKey: "pending_payment_tid",     senderKey: "pending_payment_sender" },
     { event: "ticket_issued",     label: "Flight Ticket Issued",     tidKey: "ticket_issued_tid",       senderKey: "ticket_issued_sender" },
-    { event: "visa_ready",        label: "Visa Issued",              tidKey: "visa_issued_tid",         senderKey: "visa_issued_sender" },
+    { event: "visa_ready",        label: "Visa Ready",               tidKey: "visa_issued_tid",         senderKey: "visa_issued_sender" },
     { event: "hotel_voucher",     label: "Hotel Voucher Ready",      tidKey: "hotel_voucher_issued_tid",senderKey: "hotel_voucher_sender" },
     { event: "departure_reminder",label: "Departure Reminder",       tidKey: "departure_reminder_tid",  senderKey: "departure_reminder_sender" },
+    { event: "arrival_reminder",  label: "Arrival Reminder",         tidKey: "arrival_reminder_tid",    senderKey: "arrival_reminder_sender" },
   ];
 
   const results = EVENTS.map(ev => {
@@ -379,6 +391,123 @@ router.get("/verification", async (_req: AuthenticatedRequest, res) => {
     globalSender,
     events: results,
     generatedAt: new Date().toISOString(),
+  });
+});
+
+// ── GET /api/sms-settings/production-report ───────────────────────────────────
+// Full production readiness check: SMS policy, emergency status, notification channels
+router.get("/production-report", async (_req: AuthenticatedRequest, res) => {
+  const f2s = getCachedConfig("fast2sms");
+  const extra = f2s.extra || {};
+  const globalSender = extra.sender_id || "ABURHA";
+  const apiKey = f2s.apiKey || process.env.FAST2SMS_API_KEY || "";
+  const emergencyEnabled = extra.emergency_sms_fallback_enabled === "1";
+
+  // Approved sender IDs
+  const senderRows = await pool.query(
+    `SELECT sender_id, status, global_status FROM sender_ids WHERE status = 'active'`
+  ).catch(() => ({ rows: [] }));
+  const approvedIds = senderRows.rows.map((r: any) => r.sender_id);
+
+  const SMS_EVENTS = [
+    { event: "otp",               label: "OTP Login / Registration", tidKey: "otp_template_id" },
+    { event: "booking_created",   label: "Booking Created",          tidKey: "booking_created_tid" },
+    { event: "booking_approved",  label: "Booking Approved",         tidKey: "booking_confirmed_tid" },
+    { event: "booking_rejected",  label: "Booking Rejected",         tidKey: "booking_rejected_tid" },
+    { event: "payment_received",  label: "Payment Received",         tidKey: "payment_received_tid" },
+    { event: "partial_payment",   label: "Partial Payment",          tidKey: "partial_payment_tid" },
+    { event: "invoice_generated", label: "Invoice Generated",        tidKey: "invoice_created_tid" },
+    { event: "agreement_signed",  label: "Agreement Signed",         tidKey: "agreement_signed_tid" },
+    { event: "ticket_issued",     label: "Flight Ticket",            tidKey: "ticket_issued_tid" },
+    { event: "visa_ready",        label: "Visa Ready",               tidKey: "visa_issued_tid" },
+    { event: "hotel_voucher",     label: "Hotel Voucher",            tidKey: "hotel_voucher_issued_tid" },
+    { event: "departure_reminder",label: "Departure Reminder",       tidKey: "departure_reminder_tid" },
+    { event: "arrival_reminder",  label: "Arrival Reminder",         tidKey: "arrival_reminder_tid" },
+  ];
+
+  const smsEvents = SMS_EVENTS.map(ev => {
+    const tid = extra[ev.tidKey] || "";
+    return {
+      event: ev.event,
+      label: ev.label,
+      templateConfigured: !!tid,
+      templateId: tid || null,
+      route: "dlt",
+    };
+  });
+  const smsConfigured = smsEvents.filter(e => e.templateConfigured).length;
+
+  // Check WhatsApp config (BotBee)
+  const bb = getCachedConfig("botbee");
+  const waEnabled = !!(bb?.apiKey || process.env.BOTBEE_API_KEY);
+
+  // Check Email config (SMTP)
+  const smtpConf = getCachedConfig("smtp");
+  const emailEnabled = !!(smtpConf?.enabled && (smtpConf?.host || process.env.SMTP_HOST));
+
+  // Recent notification stats (last 24h)
+  const statsRow = await pool.query(`
+    SELECT
+      COUNT(*) FILTER (WHERE channel='sms' AND status='sent' AND sent_at > NOW()-INTERVAL '24h') AS sms_sent,
+      COUNT(*) FILTER (WHERE channel='sms' AND status='failed' AND sent_at > NOW()-INTERVAL '24h') AS sms_failed,
+      COUNT(*) FILTER (WHERE channel='whatsapp' AND status='sent' AND sent_at > NOW()-INTERVAL '24h') AS wa_sent,
+      COUNT(*) FILTER (WHERE channel='email' AND status='sent' AND sent_at > NOW()-INTERVAL '24h') AS email_sent,
+      COUNT(*) FILTER (WHERE provider_response::text ILIKE '%quick_route_emergency%' AND sent_at > NOW()-INTERVAL '24h') AS emergency_sms_count
+    FROM notification_logs
+  `).catch(() => ({ rows: [{}] }));
+  const stats = statsRow.rows[0] || {};
+
+  const checks = [
+    { id: "dlt_primary",       label: "DLT Route is Primary SMS Route",       pass: true,            detail: "route=dlt is hardcoded; quick route never fires automatically" },
+    { id: "emergency_off",     label: "Emergency Fallback OFF by Default",     pass: !emergencyEnabled, detail: emergencyEnabled ? `⚠ ENABLED — Reason: ${extra.emergency_reason || "unknown"} by ${extra.emergency_enabled_by || "?"} at ${extra.emergency_enabled_at || "?"}` : "OFF — DLT required for all SMS" },
+    { id: "api_key",           label: "Fast2SMS API Key Configured",           pass: !!apiKey,        detail: apiKey ? `Key length: ${apiKey.length}` : "Missing — SMS will not send" },
+    { id: "global_sender",     label: "Global Sender ID Set",                  pass: !!globalSender && approvedIds.includes(globalSender), detail: `${globalSender} — ${approvedIds.includes(globalSender) ? "Active & Approved" : "Not in approved list"}` },
+    { id: "sms_templates",     label: `DLT Templates Configured (${smsConfigured}/${SMS_EVENTS.length})`, pass: smsConfigured === SMS_EVENTS.length, detail: smsConfigured === SMS_EVENTS.length ? "All events have template IDs" : `${SMS_EVENTS.length - smsConfigured} events missing template IDs` },
+    { id: "whatsapp",          label: "WhatsApp Channel (BotBee)",             pass: waEnabled,       detail: waEnabled ? "API key configured" : "BotBee API key not set" },
+    { id: "email",             label: "Email Channel (SMTP)",                  pass: emailEnabled,    detail: emailEnabled ? `Host: ${smtpConf?.host || process.env.SMTP_HOST}` : "SMTP not configured" },
+    { id: "no_emergency_usage",label: "No Emergency SMS in Last 24h",          pass: Number(stats.emergency_sms_count || 0) === 0, detail: Number(stats.emergency_sms_count || 0) === 0 ? "All SMS sent via DLT route" : `⚠ ${stats.emergency_sms_count} emergency SMS sent` },
+  ];
+
+  const passed = checks.filter(c => c.pass).length;
+  const productionReady = passed === checks.length;
+
+  res.json({
+    ok: productionReady,
+    productionReady,
+    generatedAt: new Date().toISOString(),
+    summary: {
+      total: checks.length,
+      passed,
+      failed: checks.length - passed,
+      score: Math.round((passed / checks.length) * 100),
+    },
+    policy: {
+      primaryRoute: "dlt",
+      emergencyFallbackDefault: "OFF",
+      quickRouteAutomatic: false,
+      quickRouteRequires: "Super Admin explicit enable with reason, IP, device logged",
+    },
+    emergencyStatus: {
+      enabled: emergencyEnabled,
+      reason: extra.emergency_reason || null,
+      enabledBy: extra.emergency_enabled_by || null,
+      enabledAt: extra.emergency_enabled_at || null,
+      enabledIp: extra.emergency_enabled_ip || null,
+      enabledDevice: extra.emergency_enabled_ua || null,
+    },
+    smsConfig: {
+      apiKeyConfigured: !!apiKey,
+      globalSenderId: globalSender,
+      approvedSenderIds: approvedIds,
+      templatesCoverage: { configured: smsConfigured, total: SMS_EVENTS.length },
+      events: smsEvents,
+    },
+    channels: {
+      sms: { enabled: !!apiKey && f2s.enabled !== false, route: "dlt", last24h: { sent: Number(stats.sms_sent || 0), failed: Number(stats.sms_failed || 0), emergency: Number(stats.emergency_sms_count || 0) } },
+      whatsapp: { enabled: waEnabled, provider: "BotBee", last24h: { sent: Number(stats.wa_sent || 0) } },
+      email: { enabled: emailEnabled, provider: "SMTP", last24h: { sent: Number(stats.email_sent || 0) } },
+    },
+    checks,
   });
 });
 

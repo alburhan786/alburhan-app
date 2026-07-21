@@ -181,33 +181,62 @@ function buildQuickMessage(eventType: string, variables: string[], fallback?: st
 async function sendQuickRoute(
   mobile: string,
   message: string,
-  opts: { eventType: string; message?: string; bookingId?: string; customerId?: string; emergencyReason?: string }
+  opts: {
+    eventType: string;
+    message?: string;
+    bookingId?: string;
+    customerId?: string;
+    emergencyReason?: string;
+    emergencyEnabledBy?: string;
+    emergencyEnabledAt?: string;
+    primaryDltFailureReason?: string;
+    dltSenderIdAttempted?: string;
+  }
 ): Promise<SMSResult> {
-  const { apiKey, enabled } = getConfig();
+  const { apiKey, enabled, ex } = getConfig();
   if (!enabled || !apiKey) {
     return { ok: false, provider: "Fast2SMS", templateId: "quick_route_emergency", mobile, errorMessage: "Fast2SMS disabled or API key missing" };
   }
   const phone = toPhone(mobile);
-  const reason = opts.emergencyReason || "Emergency fallback";
+  const reason = opts.emergencyReason || (ex.emergency_reason as string) || "Emergency fallback";
+  const enabledBy = opts.emergencyEnabledBy || (ex.emergency_enabled_by as string) || "unknown";
+  const enabledAt = opts.emergencyEnabledAt || (ex.emergency_enabled_at as string) || new Date().toISOString();
   const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${apiKey}&route=q&message=${encodeURIComponent(message)}&numbers=${phone}&flash=0`;
   try {
     const resp = await withRetry(() => axios.get(url, { timeout: 12000 }), 2, 1500);
     const ok = resp.data?.return === true;
     const respMsg: string = resp.data?.message || "";
-    if (ok) console.warn(`[SMS][${opts.eventType}] ⚠ EMERGENCY QUICK ROUTE USED — ${reason} → ${phone}`);
+    if (ok) console.warn(`[SMS][${opts.eventType}] ⚠ EMERGENCY QUICK ROUTE USED — ${reason} (by ${enabledBy}) → ${phone}`);
     else console.error(`[SMS][${opts.eventType}] ❌ Emergency quick route failed: ${respMsg}`);
+    // Full emergency audit payload — stored in notification_logs.provider_response
+    const auditPayload = {
+      ok,
+      templateId: "quick_route_emergency",
+      route: "quick_route_emergency",
+      senderIdUsed: "Quick Route (no Sender ID)",
+      dltSenderIdAttempted: opts.dltSenderIdAttempted || null,
+      emergencyReason: reason,
+      emergencyEnabledBy: enabledBy,
+      emergencyEnabledAt: enabledAt,
+      primaryRouteFailed: !!opts.primaryDltFailureReason,
+      primaryDltFailureReason: opts.primaryDltFailureReason || null,
+      providerResponse: resp.data,
+      error: ok ? null : respMsg,
+    };
     await logSMS({
       eventType: opts.eventType, mobile, templateId: "quick_route_emergency", message,
       status: ok ? "sent" : "failed", httpStatus: resp.status,
-      responsePayload: { ...resp.data, emergencyReason: reason, route: "quick_route_emergency" },
+      responsePayload: auditPayload,
       errorMessage: ok ? undefined : respMsg,
       bookingId: opts.bookingId, customerId: opts.customerId,
     });
-    return { ok, provider: "Fast2SMS", templateId: "quick_route_emergency", mobile, httpStatus: resp.status, responsePayload: resp.data, errorMessage: ok ? undefined : respMsg };
+    return { ok, provider: "Fast2SMS", templateId: "quick_route_emergency", mobile, httpStatus: resp.status, responsePayload: auditPayload, errorMessage: ok ? undefined : respMsg };
   } catch (err: any) {
     const errorMessage = err?.response?.data?.message || err.message;
     console.error(`[SMS][${opts.eventType}] ❌ Emergency quick route error:`, errorMessage);
-    await logSMS({ eventType: opts.eventType, mobile, templateId: "quick_route_emergency", message, status: "failed", errorMessage, bookingId: opts.bookingId, customerId: opts.customerId });
+    await logSMS({ eventType: opts.eventType, mobile, templateId: "quick_route_emergency", message, status: "failed",
+      responsePayload: { route: "quick_route_emergency", emergencyReason: reason, emergencyEnabledBy: enabledBy, primaryDltFailureReason: opts.primaryDltFailureReason || null },
+      errorMessage, bookingId: opts.bookingId, customerId: opts.customerId });
     return { ok: false, provider: "Fast2SMS", templateId: "quick_route_emergency", mobile, errorMessage };
   }
 }
@@ -251,12 +280,19 @@ async function sendDLT(
   // 3. DLT template ID must be configured
   // Quick route is only allowed when admin explicitly enables Emergency SMS Fallback
   if (!templateId) {
-    const { emergencyFallbackEnabled } = getConfig();
+    const { emergencyFallbackEnabled, ex: cfgEx } = getConfig();
     if (emergencyFallbackEnabled) {
-      const reason = ex.emergency_reason || "Emergency fallback enabled";
+      const reason = (cfgEx.emergency_reason as string) || "Emergency fallback enabled";
       console.warn(`[SMS][${opts.eventType}] ⚠ DLT template not configured — using EMERGENCY quick route (reason: ${reason})`);
       const qMsg = buildQuickMessage(opts.eventType, variables, opts.message);
-      return sendQuickRoute(mobile, qMsg, { ...opts, emergencyReason: reason });
+      return sendQuickRoute(mobile, qMsg, {
+        ...opts,
+        emergencyReason: reason,
+        emergencyEnabledBy: cfgEx.emergency_enabled_by as string,
+        emergencyEnabledAt: cfgEx.emergency_enabled_at as string,
+        primaryDltFailureReason: `DLT template not configured for event "${opts.eventType}"`,
+        dltSenderIdAttempted: effectiveSenderId,
+      });
     }
     const msg = `DLT template not configured for "${opts.eventType}". Set ${opts.eventType}_tid in Admin → DLT Template Manager. Quick route is disabled — enable Emergency SMS Fallback to use it temporarily.`;
     console.warn(`[SMS][${opts.eventType}] ⛔ ${msg}`);
@@ -312,7 +348,14 @@ async function sendDLT(
         const reason = (currentEx.emergency_reason as string) || "Emergency fallback enabled";
         console.warn(`[SMS][${opts.eventType}] ⚠ DLT rejected — using EMERGENCY quick route (reason: ${reason})`);
         const qMsg = buildQuickMessage(opts.eventType, variables, opts.message);
-        return sendQuickRoute(mobile, qMsg, { ...opts, emergencyReason: reason });
+        return sendQuickRoute(mobile, qMsg, {
+          ...opts,
+          emergencyReason: reason,
+          emergencyEnabledBy: currentEx.emergency_enabled_by as string,
+          emergencyEnabledAt: currentEx.emergency_enabled_at as string,
+          primaryDltFailureReason: dltFailMsg,
+          dltSenderIdAttempted: effectiveSenderId,
+        });
       }
       return { ok: false, provider: "Fast2SMS", templateId, mobile, httpStatus, responsePayload, errorMessage: dltFailMsg };
     } else {
