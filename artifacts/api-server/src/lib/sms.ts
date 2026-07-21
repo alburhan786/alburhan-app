@@ -33,6 +33,8 @@ function getConfig() {
       visa_issued:           ex.visa_issued_tid           || ex.notify_template_id || "",
       hotel_voucher:         ex.hotel_voucher_issued_tid  || ex.notify_template_id || "",
       departure_reminder:    ex.departure_reminder_tid    || ex.notify_template_id || "",
+      balance_reminder:      ex.balance_reminder_tid      || ex.notify_template_id || "",
+      flight_assigned:       ex.flight_assigned_tid       || ex.notify_template_id || "",
       arrival_reminder:      ex.arrival_reminder_tid      || ex.notify_template_id || "",
       welcome_saudi_arabia:  ex.welcome_saudi_arabia_tid  || ex.notify_template_id || "",
       return_reminder:       ex.return_reminder_tid       || ex.notify_template_id || "",
@@ -53,6 +55,8 @@ function getConfig() {
       visa_issued:           ex.visa_issued_sender           || globalSender,
       hotel_voucher:         ex.hotel_voucher_sender         || globalSender,
       departure_reminder:    ex.departure_reminder_sender    || globalSender,
+      balance_reminder:      ex.balance_reminder_sender      || globalSender,
+      flight_assigned:       ex.flight_assigned_sender       || globalSender,
       arrival_reminder:      ex.arrival_reminder_sender      || globalSender,
       welcome_saudi_arabia:  ex.welcome_saudi_arabia_sender  || globalSender,
       return_reminder:       ex.return_reminder_sender       || globalSender,
@@ -139,6 +143,8 @@ async function resolveConfig() {
       invoice_created:    t("invoice_generated",  "invoice_created"),
       ticket_issued:      t("ticket_issued",      "ticket_issued"),
       departure_reminder: t("departure_reminder", "departure_reminder"),
+      balance_reminder:   t("balance_reminder",   "balance_reminder"),
+      flight_assigned:    t("flight_assigned",    "flight_assigned"),
       visa_issued:        t("visa_approved",      "visa_issued"),
       hotel_voucher:      t("hotel_assigned",     "hotel_voucher"),
       arrival_reminder:   t("arrival_reminder",   "arrival_reminder"),
@@ -154,6 +160,8 @@ async function resolveConfig() {
       invoice_created:    s("invoice_generated",  "invoice_created"),
       ticket_issued:      s("ticket_issued",      "ticket_issued"),
       departure_reminder: s("departure_reminder", "departure_reminder"),
+      balance_reminder:   s("balance_reminder",   "balance_reminder"),
+      flight_assigned:    s("flight_assigned",    "flight_assigned"),
       visa_issued:        s("visa_approved",      "visa_issued"),
       hotel_voucher:      s("hotel_assigned",     "hotel_voucher"),
       arrival_reminder:   s("arrival_reminder",   "arrival_reminder"),
@@ -582,6 +590,24 @@ export async function sendPendingPaymentReminder(ctx: BookingCtx & { balance: st
   );
 }
 
+export async function sendBalanceReminder(ctx: BookingCtx & { outstandingAmount: string; packageName?: string }): Promise<SMSResult> {
+  const { tids, senders } = await resolveConfig();
+  return sendDLT(
+    ctx.mobile, tids.balance_reminder,
+    [ctx.customerName, ctx.bookingNumber, ctx.packageName || "Hajj Package", ctx.outstandingAmount],
+    { eventType: "balance_reminder", message: `Balance ₹${ctx.outstandingAmount} outstanding for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.balance_reminder }
+  );
+}
+
+export async function sendFlightAssigned(ctx: BookingCtx & { flightNumber: string; fromAirport: string; toAirport: string; departureDate: string; departureTime: string }): Promise<SMSResult> {
+  const { tids, senders } = await resolveConfig();
+  return sendDLT(
+    ctx.mobile, tids.flight_assigned,
+    [ctx.customerName, ctx.flightNumber, ctx.fromAirport, ctx.toAirport, ctx.departureDate, ctx.departureTime],
+    { eventType: "flight_assigned", message: `Flight ${ctx.flightNumber} assigned for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.flight_assigned }
+  );
+}
+
 export async function sendInvoiceCreated(ctx: BookingCtx & { invoiceNumber?: string; amount?: string }): Promise<SMSResult> {
   const { tids, senders } = await resolveConfig();
   return sendDLT(
@@ -683,7 +709,7 @@ export async function sendCustomSMS(ctx: {
 
 export async function sendSMSWithFallback(
   ctx: BookingCtx,
-  method: "booking_created" | "booking_confirmed" | "payment_received" | "pending_payment" | "invoice_created",
+  method: "booking_created" | "booking_confirmed" | "payment_received" | "pending_payment" | "invoice_created" | "balance_reminder" | "flight_assigned",
   extra?: Record<string, string>
 ): Promise<SMSResult> {
   const methods: Record<string, () => Promise<SMSResult>> = {
@@ -692,6 +718,8 @@ export async function sendSMSWithFallback(
     payment_received:  () => sendPaymentReceived({ ...ctx, amount: extra?.amount || "0" }),
     pending_payment:   () => sendPendingPaymentReminder({ ...ctx, balance: extra?.balance || "0" }),
     invoice_created:   () => sendInvoiceCreated({ ...ctx, invoiceNumber: extra?.invoiceNumber }),
+    balance_reminder:  () => sendBalanceReminder({ ...ctx, outstandingAmount: extra?.outstandingAmount || extra?.balance || "0", packageName: extra?.packageName }),
+    flight_assigned:   () => sendFlightAssigned({ ...ctx, flightNumber: extra?.flightNumber || "", fromAirport: extra?.fromAirport || "", toAirport: extra?.toAirport || "", departureDate: extra?.departureDate || "", departureTime: extra?.departureTime || "" }),
   };
 
   const fn = methods[method];
