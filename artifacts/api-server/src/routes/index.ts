@@ -59,6 +59,7 @@ import customerJourneyRouter from "./customer-journey.js";
 import supportRouter from "./support.js";
 import enterpriseRouter from "./enterprise.js";
 import portalRouter from "./portal.js";
+import smsSettingsRouter from "./sms-settings.js";
 import { requireAdmin } from "../lib/auth.js";
 
 const router: IRouter = Router();
@@ -70,7 +71,7 @@ router.get("/", (_req, res) => {
 });
 
 // ── Build fingerprint — confirms which bundle is running on VPS (no auth needed) ──
-const BUILD_STAMP = "2026-07-20-v24.0";
+const BUILD_STAMP = "2026-07-21-v25.0-sender-id-mgmt";
 router.get("/version", (_req, res) => {
   res.json({
     build: BUILD_STAMP,
@@ -340,6 +341,7 @@ router.use("/customer/journey", customerJourneyRouter);
 router.use("/support", supportRouter);
 router.use("/enterprise", enterpriseRouter);
 router.use("/portal", portalRouter);
+router.use("/sms-settings", smsSettingsRouter);
 router.use("/webhook", webhooksRouter);
 router.use(storageRouter);
 

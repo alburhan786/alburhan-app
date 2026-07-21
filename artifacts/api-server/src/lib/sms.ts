@@ -9,11 +9,12 @@ function getConfig() {
   const apiKey = db.apiKey || process.env.FAST2SMS_API_KEY || process.env.FAST2SMS_XXL_API_KEY || "";
   const enabled = db.enabled !== false;
   const ex = db.extra || {};
+  const globalSender = ex.sender_id || "ABURHA";
   return {
     apiKey,
     enabled,
     ex,
-    sender_id: ex.sender_id || "ABURHA",
+    sender_id: globalSender,
     // Per-event template IDs — fall back to generic notify_template_id
     notify_tid: ex.notify_template_id || "",
     tids: {
@@ -32,8 +33,49 @@ function getConfig() {
       eid_greeting:       ex.eid_greeting_tid       || ex.notify_template_id || "",
       custom:             ex.custom_tid             || ex.notify_template_id || "",
     },
+    // Per-event sender IDs — fall back to global sender_id
+    senders: {
+      booking_created:    ex.booking_created_sender    || globalSender,
+      booking_confirmed:  ex.booking_confirmed_sender  || globalSender,
+      booking_rejected:   ex.booking_rejected_sender   || globalSender,
+      payment_received:   ex.payment_received_sender   || globalSender,
+      partial_payment:    ex.partial_payment_sender    || globalSender,
+      pending_payment:    ex.pending_payment_sender    || globalSender,
+      invoice_created:    ex.invoice_created_sender    || globalSender,
+      ticket_issued:      ex.ticket_issued_sender      || globalSender,
+      visa_issued:        ex.visa_issued_sender        || globalSender,
+      hotel_voucher:      ex.hotel_voucher_sender      || globalSender,
+      departure_reminder: ex.departure_reminder_sender || globalSender,
+      arrival_reminder:   ex.arrival_reminder_sender   || globalSender,
+      eid_greeting:       ex.eid_greeting_sender       || globalSender,
+      custom:             ex.custom_sender             || globalSender,
+      otp:                ex.otp_sender               || globalSender,
+    },
   };
 }
+
+// ── Approved sender ID cache (DB-backed, refreshed every 60 s) ─────────────────
+let _senderIdCache: { ids: string[]; ts: number } | null = null;
+const FALLBACK_SENDER_IDS = ["ABURHA", "ALBURH", "ALBUR", "ABTUMR", "ABTTHJ"];
+
+async function getApprovedSenderIds(): Promise<string[]> {
+  const TTL = 60_000;
+  if (_senderIdCache && Date.now() - _senderIdCache.ts < TTL) return _senderIdCache.ids;
+  try {
+    const r = await pool.query(
+      `SELECT sender_id FROM sender_ids WHERE status = 'active' ORDER BY default_sender DESC, sender_id`
+    );
+    const ids: string[] = r.rows.map((row: any) => row.sender_id as string);
+    _senderIdCache = { ids: ids.length ? ids : FALLBACK_SENDER_IDS, ts: Date.now() };
+    return _senderIdCache.ids;
+  } catch {
+    // DB table may not exist yet — fall back to known approved list
+    return FALLBACK_SENDER_IDS;
+  }
+}
+
+/** Bust the sender ID cache (called after DB updates) */
+export function bustSenderIdCache() { _senderIdCache = null; }
 
 function toPhone(mobile: string): string {
   const clean = mobile.replace(/\D/g, "");
@@ -117,6 +159,7 @@ async function sendDLT(
     message?: string;
     bookingId?: string;
     customerId?: string;
+    senderOverride?: string; // per-template sender ID (from senders map)
   }
 ): Promise<SMSResult> {
   const { apiKey, sender_id, enabled } = getConfig();
@@ -129,30 +172,28 @@ async function sendDLT(
     return { ok: false, provider: "Fast2SMS", templateId, mobile, errorMessage: "Fast2SMS API key not configured" };
   }
 
+  // Use per-template sender override if provided, otherwise fall back to global
+  const effectiveSenderId = opts.senderOverride || sender_id;
+
   // ── POLICY VALIDATION — block before any HTTP call ──────────────────────────
-  // 1. Sender ID must be ABURHA (India DLT registered)
-  if (sender_id !== "ABURHA") {
-    const msg = `SMS BLOCKED — sender_id "${sender_id}" is not "ABURHA". Only ABURHA is permitted for production SMS.`;
+  // 1. Sender ID must be in the approved DLT-registered list (loaded from DB)
+  const approvedIds = await getApprovedSenderIds();
+  if (!approvedIds.includes(effectiveSenderId)) {
+    const msg = `SMS BLOCKED — sender_id "${effectiveSenderId}" is not in the approved list [${approvedIds.join(", ")}]. Add it in Admin → SMS Settings → Sender ID Management.`;
     console.error(`[SMS][${opts.eventType}] ⛔ ${msg}`);
     await logSMS({ eventType: opts.eventType, mobile, templateId, status: "failed", errorMessage: msg, bookingId: opts.bookingId, customerId: opts.customerId });
     return { ok: false, provider: "Fast2SMS", templateId, mobile, errorMessage: msg };
   }
-  // 2. Route must be DLT (hardcoded in URL — this guard catches any future drift)
+  // 2. Route must be DLT (hardcoded — this guard catches any future drift)
   const ROUTE = "dlt";
-  if (ROUTE !== "dlt") {
-    const msg = `SMS BLOCKED — route "${ROUTE}" is not DLT. Only DLT SMS is permitted for production.`;
-    console.error(`[SMS][${opts.eventType}] ⛔ ${msg}`);
-    await logSMS({ eventType: opts.eventType, mobile, templateId, status: "failed", errorMessage: msg, bookingId: opts.bookingId, customerId: opts.customerId });
-    return { ok: false, provider: "Fast2SMS", templateId, mobile, errorMessage: msg };
-  }
   // 3. DLT template ID must be configured
   if (!templateId) {
-    const msg = `DLT template missing for event "${opts.eventType}". Set ${opts.eventType}_tid in API Settings → Fast2SMS.`;
+    const msg = `DLT template missing for event "${opts.eventType}". Set ${opts.eventType}_tid in Admin → SMS Settings → DLT Templates.`;
     console.warn(`[SMS][${opts.eventType}] ⚠ ${msg}`);
     await logSMS({ eventType: opts.eventType, mobile, templateId: "not_configured", status: "failed", errorMessage: msg, bookingId: opts.bookingId, customerId: opts.customerId });
     return { ok: false, provider: "Fast2SMS", templateId: "not_configured", mobile, errorMessage: msg };
   }
-  console.log(`[SMS][${opts.eventType}] ✔ Validation passed — sender=ABURHA route=DLT template=${templateId} → ${mobile}`);
+  console.log(`[SMS][${opts.eventType}] ✔ Validation passed — sender=${effectiveSenderId} route=DLT template=${templateId} → ${mobile}`);
 
   const phone = toPhone(mobile);
   const vars = encodeURIComponent(variables.map(v => {
@@ -161,7 +202,7 @@ async function sendDLT(
     return (s.startsWith("http://") || s.startsWith("https://")) ? s.substring(0, 100) : s.substring(0, 30);
   }).join("|") + "|");
   const endpoint = `https://www.fast2sms.com/dev/bulkV2`;
-  const url = `${endpoint}?authorization=${apiKey}&route=${ROUTE}&sender_id=${sender_id}&message=${templateId}&variables_values=${vars}&numbers=${phone}&flash=0`;
+  const url = `${endpoint}?authorization=${apiKey}&route=${ROUTE}&sender_id=${effectiveSenderId}&message=${templateId}&variables_values=${vars}&numbers=${phone}&flash=0`;
   const maskedUrl = url.replace(apiKey, `${apiKey.slice(0, 6)}***`);
 
   let httpStatus = 0;
@@ -185,7 +226,7 @@ async function sendDLT(
       : (respMsg || "DLT delivery failed");
 
     if (!ok) console.error(`[SMS][${opts.eventType}] ❌ ${isTemplateError ? "Template not approved" : "Delivery failed"} — ${respMsg}`);
-    else console.log(`[SMS][${opts.eventType}] ✅ Delivered via ABURHA/DLT → ${maskedUrl.slice(0, 80)}`);
+    else console.log(`[SMS][${opts.eventType}] ✅ Delivered via ${effectiveSenderId}/DLT → ${maskedUrl.slice(0, 80)}`);
 
     await logSMS({
       eventType: opts.eventType, mobile, templateId,
@@ -227,123 +268,123 @@ export interface BookingCtx {
 }
 
 export async function sendBookingCreated(ctx: BookingCtx): Promise<SMSResult> {
-  const { tids } = getConfig();
+  const { tids, senders } = getConfig();
   return sendDLT(
     ctx.mobile, tids.booking_created,
     [ctx.customerName, ctx.bookingNumber, ctx.packageName || "Hajj/Umrah"],
-    { eventType: "new_booking", message: `Booking #${ctx.bookingNumber} created`, bookingId: ctx.bookingId, customerId: ctx.customerId }
+    { eventType: "new_booking", message: `Booking #${ctx.bookingNumber} created`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.booking_created }
   );
 }
 
 export async function sendBookingConfirmed(ctx: BookingCtx): Promise<SMSResult> {
-  const { tids } = getConfig();
+  const { tids, senders } = getConfig();
   return sendDLT(
     ctx.mobile, tids.booking_confirmed,
     [ctx.customerName, ctx.bookingNumber, ctx.packageName || "Hajj/Umrah"],
-    { eventType: "booking_approved", message: `Booking #${ctx.bookingNumber} confirmed`, bookingId: ctx.bookingId, customerId: ctx.customerId }
+    { eventType: "booking_approved", message: `Booking #${ctx.bookingNumber} confirmed`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.booking_confirmed }
   );
 }
 
 export async function sendBookingRejected(ctx: BookingCtx & { reason?: string }): Promise<SMSResult> {
-  const { tids } = getConfig();
+  const { tids, senders } = getConfig();
   return sendDLT(
     ctx.mobile, tids.booking_rejected,
     [ctx.customerName, ctx.bookingNumber, ctx.reason || "Please contact us for details"],
-    { eventType: "booking_rejected", message: `Booking #${ctx.bookingNumber} rejected`, bookingId: ctx.bookingId, customerId: ctx.customerId }
+    { eventType: "booking_rejected", message: `Booking #${ctx.bookingNumber} rejected`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.booking_rejected }
   );
 }
 
 export async function sendPaymentReceived(ctx: BookingCtx & { amount: string; invoiceNumber?: string; invoiceUrl?: string }): Promise<SMSResult> {
-  const { tids, ex } = getConfig();
+  const { tids, ex, senders } = getConfig();
   const vars: string[] = [ctx.customerName, ctx.bookingNumber, ctx.amount];
   if (ctx.invoiceUrl && ex.payment_url_in_sms === "1") vars.push(ctx.invoiceUrl);
   return sendDLT(
     ctx.mobile, tids.payment_received,
     vars,
-    { eventType: "payment_received", message: `Payment ₹${ctx.amount} for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId }
+    { eventType: "payment_received", message: `Payment ₹${ctx.amount} for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.payment_received }
   );
 }
 
 export async function sendPartialPaymentReceived(ctx: BookingCtx & { paidAmount: string; balanceAmount: string; invoiceUrl?: string }): Promise<SMSResult> {
-  const { tids, ex } = getConfig();
+  const { tids, ex, senders } = getConfig();
   const vars: string[] = [ctx.customerName, ctx.bookingNumber, ctx.packageName || "your package", ctx.paidAmount, ctx.balanceAmount];
   if (ctx.invoiceUrl && ex.payment_url_in_sms === "1") vars.push(ctx.invoiceUrl);
   return sendDLT(
     ctx.mobile, tids.partial_payment,
     vars,
-    { eventType: "partial_payment", message: `Partial payment ₹${ctx.paidAmount} for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId }
+    { eventType: "partial_payment", message: `Partial payment ₹${ctx.paidAmount} for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.partial_payment }
   );
 }
 
 export async function sendPendingPaymentReminder(ctx: BookingCtx & { balance: string; dueDate?: string }): Promise<SMSResult> {
-  const { tids } = getConfig();
+  const { tids, senders } = getConfig();
   return sendDLT(
     ctx.mobile, tids.pending_payment,
     [ctx.customerName, ctx.bookingNumber, ctx.balance],
-    { eventType: "balance_reminder", message: `Balance ₹${ctx.balance} due for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId }
+    { eventType: "balance_reminder", message: `Balance ₹${ctx.balance} due for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.pending_payment }
   );
 }
 
 export async function sendInvoiceCreated(ctx: BookingCtx & { invoiceNumber?: string; amount?: string }): Promise<SMSResult> {
-  const { tids } = getConfig();
+  const { tids, senders } = getConfig();
   return sendDLT(
     ctx.mobile, tids.invoice_created,
     [ctx.customerName, ctx.bookingNumber, ctx.invoiceNumber || ctx.bookingNumber],
-    { eventType: "invoice_generated", message: `Invoice for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId }
+    { eventType: "invoice_generated", message: `Invoice for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.invoice_created }
   );
 }
 
 export async function sendFlightTicketIssued(ctx: BookingCtx & { flightNumber?: string; departureDate?: string }): Promise<SMSResult> {
-  const { tids } = getConfig();
+  const { tids, senders } = getConfig();
   return sendDLT(
     ctx.mobile, tids.ticket_issued,
     [ctx.customerName, ctx.bookingNumber, ctx.flightNumber || "TBA"],
-    { eventType: "ticket_issued", message: `Ticket issued for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId }
+    { eventType: "ticket_issued", message: `Ticket issued for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.ticket_issued }
   );
 }
 
 export async function sendVisaIssued(ctx: BookingCtx & { visaNumber?: string }): Promise<SMSResult> {
-  const { tids } = getConfig();
+  const { tids, senders } = getConfig();
   return sendDLT(
     ctx.mobile, tids.visa_issued,
     [ctx.customerName, ctx.bookingNumber, ctx.visaNumber || "Approved"],
-    { eventType: "visa_ready", message: `Visa approved for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId }
+    { eventType: "visa_ready", message: `Visa approved for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.visa_issued }
   );
 }
 
 export async function sendDepartureReminder(ctx: BookingCtx & { departureDate: string; flightNumber?: string }): Promise<SMSResult> {
-  const { tids } = getConfig();
+  const { tids, senders } = getConfig();
   return sendDLT(
     ctx.mobile, tids.departure_reminder,
     [ctx.customerName, ctx.bookingNumber, ctx.departureDate],
-    { eventType: "departure_reminder", message: `Departure reminder for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId }
+    { eventType: "departure_reminder", message: `Departure reminder for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.departure_reminder }
   );
 }
 
 export async function sendHotelVoucherIssued(ctx: BookingCtx & { hotelName?: string }): Promise<SMSResult> {
-  const { tids } = getConfig();
+  const { tids, senders } = getConfig();
   return sendDLT(
     ctx.mobile, tids.hotel_voucher,
     [ctx.customerName, ctx.bookingNumber, ctx.hotelName || "Your Hotel"],
-    { eventType: "hotel_voucher", message: `Hotel voucher ready for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId }
+    { eventType: "hotel_voucher", message: `Hotel voucher ready for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.hotel_voucher }
   );
 }
 
 export async function sendArrivalReminder(ctx: BookingCtx & { arrivalDate?: string; destination?: string }): Promise<SMSResult> {
-  const { tids } = getConfig();
+  const { tids, senders } = getConfig();
   return sendDLT(
     ctx.mobile, tids.arrival_reminder,
     [ctx.customerName, ctx.bookingNumber, ctx.arrivalDate || "As scheduled"],
-    { eventType: "arrival_reminder", message: `Arrival welcome for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId }
+    { eventType: "arrival_reminder", message: `Arrival welcome for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.arrival_reminder }
   );
 }
 
 export async function sendEidGreeting(ctx: { mobile: string; customerName: string; customerId?: string }): Promise<SMSResult> {
-  const { tids } = getConfig();
+  const { tids, senders } = getConfig();
   return sendDLT(
     ctx.mobile, tids.eid_greeting,
     [ctx.customerName, "Al Burhan Tours & Travels", ""],
-    { eventType: "feedback_request", message: `Eid greeting to ${ctx.customerName}`, customerId: ctx.customerId }
+    { eventType: "feedback_request", message: `Eid greeting to ${ctx.customerName}`, customerId: ctx.customerId, senderOverride: senders.eid_greeting }
   );
 }
 

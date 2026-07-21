@@ -2120,6 +2120,44 @@ async function runMigrations() {
     `);
     console.log("[Migration] staff table ensured");
   } catch (err) { console.error("[Migration] staff table failed:", err); }
+
+  // ── sender_ids: DLT approved sender headers ───────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS sender_ids (
+        id TEXT PRIMARY KEY,
+        sender_id TEXT UNIQUE NOT NULL,
+        status TEXT NOT NULL DEFAULT 'active',
+        default_sender BOOLEAN NOT NULL DEFAULT FALSE,
+        header_type TEXT,
+        creator TEXT,
+        header_classification TEXT,
+        valid_till DATE,
+        registration_date DATE,
+        operator_status TEXT,
+        global_status TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    const APPROVED = [
+      { id: "sid_aburha", sender_id: "ABURHA", default_sender: true,  header_type: "Transactional", creator: "Al Burhan Tours & Travels", header_classification: "Transaction", operator_status: "Registered", global_status: "Approved" },
+      { id: "sid_alburh", sender_id: "ALBURH", default_sender: false, header_type: "Transactional", creator: "Al Burhan Tours & Travels", header_classification: "Transaction", operator_status: "Registered", global_status: "Approved" },
+      { id: "sid_albur",  sender_id: "ALBUR",  default_sender: false, header_type: "Transactional", creator: "Al Burhan Tours & Travels", header_classification: "Transaction", operator_status: "Registered", global_status: "Approved" },
+      { id: "sid_abtumr", sender_id: "ABTUMR", default_sender: false, header_type: "Transactional", creator: "Al Burhan Tours & Travels", header_classification: "Transaction", operator_status: "Registered", global_status: "Approved" },
+      { id: "sid_abtthj", sender_id: "ABTTHJ", default_sender: false, header_type: "Transactional", creator: "Al Burhan Tours & Travels", header_classification: "Transaction", operator_status: "Registered", global_status: "Approved" },
+    ];
+    for (const s of APPROVED) {
+      await pool.query(
+        `INSERT INTO sender_ids (id, sender_id, status, default_sender, header_type, creator, header_classification, operator_status, global_status, created_at, updated_at)
+         VALUES ($1,$2,'active',$3,$4,$5,$6,$7,$8,NOW(),NOW())
+         ON CONFLICT (sender_id) DO NOTHING`,
+        [s.id, s.sender_id, s.default_sender, s.header_type, s.creator, s.header_classification, s.operator_status, s.global_status]
+      );
+    }
+    console.log("[Migration] sender_ids table ensured (5 approved DLT sender IDs seeded)");
+  } catch (err) { console.error("[Migration] sender_ids migration failed:", err); }
 }
 
 const rawPort = process.env["PORT"];

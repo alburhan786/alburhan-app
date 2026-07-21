@@ -1,0 +1,166 @@
+Update the Al Burhan Tours & Travels application to support all approved Fast2SMS DLT Sender IDs exactly as registered in our DLT account.
+
+These are the approved Sender IDs:
+
+1. ALBURH
+2. ALBUR
+3. ABURHA
+4. ABTUMR
+5. ABTTHJ
+
+Requirements
+
+1. Create a new Admin page:
+
+Admin → SMS Settings → Sender ID Management
+
+2. Automatically load and display all approved Sender IDs.
+
+Display:
+
+• Sender ID
+• Header Type
+• Creator
+• Header Classification
+• Valid Till
+• Registration Date
+• Operator Status
+• Global Status
+• Active/Inactive
+• Default Sender
+
+3. Make ABURHA the production default Sender ID.
+
+Allow Admin to change the default Sender ID only if required.
+
+4. Save every Sender ID in the production database.
+
+Example:
+
+sender_ids
+
+id
+sender_id
+status
+default_sender
+valid_till
+operator_status
+global_status
+created_at
+updated_at
+
+5. Every DLT Template must be mapped to one Sender ID.
+
+Example:
+
+booking_received → ABURHA
+booking_approved → ABURHA
+partial_payment → ABURHA
+payment_received → ABURHA
+invoice_ready → ABURHA
+payment_reminder → ABURHA
+visa_ready → ABURHA
+flight_ticket_issued → ABURHA
+hotel_voucher_ready → ABURHA
+departure_reminder → ABURHA
+otp → ABURHA
+
+The system must also support:
+
+ALBURH
+ALBUR
+ABTUMR
+ABTTHJ
+
+for future template mappings.
+
+6. Before sending every SMS validate:
+
+✓ Sender ID exists
+✓ Sender ID is Active
+✓ Sender ID is DLT Approved
+✓ Template ID exists
+✓ Template Active
+✓ Route = DLT
+
+If ANY validation fails:
+
+• Do NOT send SMS.
+• Do NOT use Quick SMS.
+• Do NOT use Promotional Route.
+• Do NOT use any fallback sender.
+• Continue Email and WhatsApp notifications.
+• Log the exact validation failure.
+
+7. Add a Sender ID dropdown in Admin.
+
+Example:
+
+Default Sender ID
+
+☑ ABURHA
+☐ ALBURH
+☐ ALBUR
+☐ ABTUMR
+☐ ABTTHJ
+
+8. Add a DLT Test Page.
+
+Allow Admin to:
+
+• Select Sender ID
+• Select DLT Template
+• Enter Mobile Number
+• Send Test SMS
+
+Display:
+
+✓ Sender ID Used
+✓ Template ID
+✓ Route
+✓ API Response
+✓ Delivery Status
+
+9. Create an Audit Page.
+
+Show:
+
+Event
+Sender ID
+Template ID
+Route
+Delivery
+Status
+Timestamp
+Failure Reason
+
+Highlight missing configuration in RED.
+
+10. Run a live production verification.
+
+Verify every SMS event:
+
+✓ Booking Received
+✓ Booking Approved
+✓ Partial Payment
+✓ Payment Received
+✓ Invoice Ready
+✓ Payment Reminder
+✓ Visa Ready
+✓ Flight Ticket Issued
+✓ Hotel Voucher Ready
+✓ Departure Reminder
+✓ OTP
+
+Every test must confirm:
+
+✓ Approved Sender ID loaded
+✓ DLT Template loaded
+✓ Route = DLT
+✓ SMS Delivered Successfully
+
+11. Never hardcode Sender IDs.
+
+Always load them dynamically from the production database so that newly approved Sender IDs can be added from the Admin Panel without code changes.
+
+12. Deploy to production only after verifying that all approved Sender IDs (ALBURH, ALBUR, ABURHA, ABTUMR, ABTTHJ) are available in the application, DLT-only SMS is enforced, and every SMS event passes end-to-end validation.

@@ -9,43 +9,53 @@ interface DltField {
   key: string;
   label: string;
   event: string;
-  senderReq: "ABURHA";
+  senderKey: string;
 }
 
 const DLT_FIELDS: DltField[] = [
-  { key: "otp_template_id",          label: "OTP (Login / Verification)",        event: "otp",                      senderReq: "ABURHA" },
-  { key: "booking_created_tid",      label: "1. Booking Received",               event: "booking_created",           senderReq: "ABURHA" },
-  { key: "booking_confirmed_tid",    label: "2. Booking Approved",               event: "booking_approved",          senderReq: "ABURHA" },
-  { key: "booking_rejected_tid",     label: "3. Booking Rejected",               event: "booking_rejected",          senderReq: "ABURHA" },
-  { key: "payment_received_tid",     label: "4. Full Payment Received",          event: "payment_received",          senderReq: "ABURHA" },
-  { key: "partial_payment_tid",      label: "5. Partial Payment",                event: "partial_payment",           senderReq: "ABURHA" },
-  { key: "invoice_created_tid",      label: "6. Invoice Ready",                  event: "invoice_generated",         senderReq: "ABURHA" },
-  { key: "pending_payment_tid",      label: "7. Payment Reminder",               event: "payment_due",               senderReq: "ABURHA" },
-  { key: "ticket_issued_tid",        label: "8. Flight Ticket Issued",           event: "ticket_issued",             senderReq: "ABURHA" },
-  { key: "departure_reminder_tid",   label: "9. Departure Reminder",             event: "departure_reminder",        senderReq: "ABURHA" },
-  { key: "visa_issued_tid",          label: "10. Visa Issued",                   event: "visa_approved",             senderReq: "ABURHA" },
-  { key: "hotel_voucher_issued_tid", label: "11. Hotel Voucher Issued",          event: "hotel_voucher_issued",      senderReq: "ABURHA" },
-  { key: "arrival_reminder_tid",     label: "12. Arrival Reminder",              event: "arrival_reminder",          senderReq: "ABURHA" },
-  { key: "eid_greeting_tid",         label: "13. Eid / Special Occasion Greeting", event: "eid_greeting",            senderReq: "ABURHA" },
+  { key: "otp_template_id",          label: "OTP (Login / Verification)",           event: "otp",                senderKey: "otp_sender" },
+  { key: "booking_created_tid",      label: "1. Booking Received",                   event: "booking_created",    senderKey: "booking_created_sender" },
+  { key: "booking_confirmed_tid",    label: "2. Booking Approved",                   event: "booking_approved",   senderKey: "booking_confirmed_sender" },
+  { key: "booking_rejected_tid",     label: "3. Booking Rejected",                   event: "booking_rejected",   senderKey: "booking_rejected_sender" },
+  { key: "payment_received_tid",     label: "4. Full Payment Received",              event: "payment_received",   senderKey: "payment_received_sender" },
+  { key: "partial_payment_tid",      label: "5. Partial Payment",                    event: "partial_payment",    senderKey: "partial_payment_sender" },
+  { key: "invoice_created_tid",      label: "6. Invoice Ready",                      event: "invoice_generated",  senderKey: "invoice_created_sender" },
+  { key: "pending_payment_tid",      label: "7. Payment Reminder",                   event: "payment_due",        senderKey: "pending_payment_sender" },
+  { key: "ticket_issued_tid",        label: "8. Flight Ticket Issued",               event: "ticket_issued",      senderKey: "ticket_issued_sender" },
+  { key: "departure_reminder_tid",   label: "9. Departure Reminder",                 event: "departure_reminder", senderKey: "departure_reminder_sender" },
+  { key: "visa_issued_tid",          label: "10. Visa Issued",                       event: "visa_approved",      senderKey: "visa_issued_sender" },
+  { key: "hotel_voucher_issued_tid", label: "11. Hotel Voucher Issued",              event: "hotel_voucher_issued",senderKey: "hotel_voucher_sender" },
+  { key: "arrival_reminder_tid",     label: "12. Arrival Reminder",                  event: "arrival_reminder",   senderKey: "arrival_reminder_sender" },
+  { key: "eid_greeting_tid",         label: "13. Eid / Special Occasion Greeting",   event: "eid_greeting",       senderKey: "eid_greeting_sender" },
 ];
+
+interface SenderIdRow { id: string; sender_id: string; status: string; default_sender: boolean; }
 
 export default function DltTemplateManager() {
   const { toast } = useToast();
   const [values, setValues] = useState<Record<string, string>>({});
   const [original, setOriginal] = useState<Record<string, string>>({});
-  const [meta, setMeta] = useState<{ sender_id?: string; notify_template_id?: string }>({});
+  const [senderIds, setSenderIds] = useState<SenderIdRow[]>([]);
+  const [globalSender, setGlobalSender] = useState("ABURHA");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await fetch(`${API}/api/api-settings/fast2sms`, { credentials: "include" });
-      const d = await r.json();
-      const extra: Record<string, string> = d.extraFields || {};
+      const [settR, sidR] = await Promise.all([
+        fetch(`${API}/api/api-settings/fast2sms`, { credentials: "include" }),
+        fetch(`${API}/api/sms-settings/sender-ids`, { credentials: "include" }),
+      ]);
+      const settD = await settR.json();
+      const sidD = await sidR.json();
+
+      const extra: Record<string, string> = settD.extraFields || {};
       setValues(extra);
       setOriginal(extra);
-      setMeta({ sender_id: extra.sender_id, notify_template_id: extra.notify_template_id });
+      setGlobalSender(extra.sender_id || "ABURHA");
+
+      if (sidD.ok) setSenderIds(sidD.senderIds || []);
     } catch {
       toast({ title: "Failed to load settings", variant: "destructive" });
     } finally {
@@ -74,7 +84,7 @@ export default function DltTemplateManager() {
         body: JSON.stringify(payload),
       });
       if (!r.ok) throw new Error(await r.text());
-      toast({ title: "DLT template IDs saved", description: "All changes saved to Fast2SMS settings." });
+      toast({ title: "DLT settings saved", description: "Template IDs and sender IDs saved successfully." });
       setOriginal(values);
     } catch (e: any) {
       toast({ title: "Save failed", description: e.message, variant: "destructive" });
@@ -86,6 +96,7 @@ export default function DltTemplateManager() {
   const configuredCount = DLT_FIELDS.filter(f => values[f.key]?.trim()).length;
   const missingCount = DLT_FIELDS.length - configuredCount;
   const hasChanges = JSON.stringify(values) !== JSON.stringify(original);
+  const activeSenders = senderIds.filter(s => s.status === "active");
 
   if (loading) {
     return (
@@ -99,7 +110,7 @@ export default function DltTemplateManager() {
 
   return (
     <AdminLayout>
-      <div className="max-w-4xl mx-auto p-4 space-y-5">
+      <div className="max-w-5xl mx-auto p-4 space-y-5">
         {/* Header */}
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -108,9 +119,8 @@ export default function DltTemplateManager() {
               DLT Template Manager
             </h1>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Fast2SMS DLT-registered template IDs. All SMS must use Sender ID{" "}
-              <span className="font-mono font-bold text-blue-700">ABURHA</span>{" "}
-              with DLT route only.
+              Map each SMS event to a TRAI-registered DLT Template ID and Sender ID.
+              All SMS uses <strong>route=dlt</strong> — no Quick/Promotional fallback.
             </p>
           </div>
           <button
@@ -145,7 +155,7 @@ export default function DltTemplateManager() {
           )}
           <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm">
             <Info className="w-4 h-4 text-blue-600" />
-            <span className="text-blue-800">Sender: <span className="font-mono font-bold">{meta.sender_id || "ABURHA"}</span></span>
+            <span className="text-blue-800">Default Sender: <span className="font-mono font-bold">{globalSender}</span></span>
           </div>
         </div>
 
@@ -154,23 +164,27 @@ export default function DltTemplateManager() {
           <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
           <div className="text-amber-800">
             <strong>DLT Compliance:</strong> Each event must have a TRAI-registered template ID from your DLT portal
-            (Jio Trueconnect / BSNL). SMS without a template ID will be <strong>blocked</strong> to prevent
-            DLT violations. Register templates at your telecom operator's DLT portal before adding IDs here.
+            (Jio Trueconnect / BSNL). The <strong>Sender ID</strong> column lets you assign a different DLT-approved
+            sender to each event — defaults to the global sender if not set. Register templates at your telecom
+            operator's DLT portal before adding IDs here.
           </div>
         </div>
 
         {/* Template ID table */}
         <div className="border border-border rounded-xl overflow-hidden bg-card">
           <div className="grid grid-cols-12 gap-0 bg-muted/50 border-b border-border px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-            <div className="col-span-5">Event</div>
-            <div className="col-span-5">DLT Template ID</div>
+            <div className="col-span-4">Event</div>
+            <div className="col-span-4">DLT Template ID</div>
+            <div className="col-span-2">Sender ID</div>
             <div className="col-span-2 text-center">Status</div>
           </div>
           <div className="divide-y divide-border">
             {DLT_FIELDS.map((field) => {
               const val = values[field.key] || "";
+              const senderVal = values[field.senderKey] || "";
               const isFilled = val.trim().length > 0;
-              const changed = val !== (original[field.key] || "");
+              const changed = val !== (original[field.key] || "") || senderVal !== (original[field.senderKey] || "");
+              const effectiveSender = senderVal || globalSender;
               return (
                 <div
                   key={field.key}
@@ -178,11 +192,14 @@ export default function DltTemplateManager() {
                     !isFilled ? "bg-red-50/40" : changed ? "bg-amber-50/40" : ""
                   }`}
                 >
-                  <div className="col-span-5 pr-4">
+                  {/* Event label */}
+                  <div className="col-span-4 pr-3">
                     <p className="text-sm font-medium text-foreground">{field.label}</p>
                     <p className="text-xs text-muted-foreground font-mono mt-0.5">{field.event}</p>
                   </div>
-                  <div className="col-span-5 pr-4">
+
+                  {/* Template ID input */}
+                  <div className="col-span-4 pr-3">
                     <input
                       type="text"
                       value={val}
@@ -197,6 +214,29 @@ export default function DltTemplateManager() {
                       }`}
                     />
                   </div>
+
+                  {/* Sender ID dropdown */}
+                  <div className="col-span-2 pr-3">
+                    {activeSenders.length > 0 ? (
+                      <select
+                        value={senderVal}
+                        onChange={e => handleChange(field.senderKey, e.target.value)}
+                        className="w-full text-xs font-mono px-2 py-1.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 bg-background"
+                        title={`Effective sender: ${effectiveSender}`}
+                      >
+                        <option value="">Default ({globalSender})</option>
+                        {activeSenders.map(s => (
+                          <option key={s.id} value={s.sender_id}>
+                            {s.sender_id}{s.default_sender ? " ★" : ""}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="text-xs font-mono text-muted-foreground">{effectiveSender}</span>
+                    )}
+                  </div>
+
+                  {/* Status */}
                   <div className="col-span-2 flex justify-center">
                     {isFilled ? (
                       <span className="flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
