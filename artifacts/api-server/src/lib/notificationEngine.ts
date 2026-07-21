@@ -866,10 +866,55 @@ async function sendOnChannelWithType(channel: Channel, eventType: EventType, ctx
             result = await smsLib.sendPendingPaymentReminder({ ...smsCtx, balance: balStr });
             break;
           }
+          case "visa_approved":
+          case "visa_ready":
+          case "visa_issued":
+            result = await smsLib.sendVisaIssued({ ...smsCtx, visaNumber: (ctx as any).visaNumber });
+            break;
+          case "ticket_issued":
+            result = await smsLib.sendFlightTicketIssued(smsCtx);
+            break;
+          case "hotel_assigned":
+          case "hotel_voucher_issued":
+            result = await smsLib.sendHotelVoucherIssued({ ...smsCtx, hotelName: (ctx as any).hotelName });
+            break;
+          case "flight_assigned":
+            result = await smsLib.sendFlightAssigned({
+              ...smsCtx,
+              flightNumber: (ctx as any).flightNumber || "",
+              fromAirport: (ctx as any).fromAirport || "",
+              toAirport: (ctx as any).toAirport || "",
+              departureDate: (ctx as any).departureDate || ctx.departureDate || "",
+              departureTime: (ctx as any).departureTime || "",
+            });
+            break;
+          case "departure_reminder":
+          case "departure_reminder_7d":
+          case "departure_reminder_3d":
+          case "departure_reminder_1d":
+            result = await smsLib.sendDepartureReminder({
+              ...smsCtx,
+              departureDate: (ctx as any).departureDate || ctx.departureDate || "",
+              daysRemaining: (ctx as any).daysRemaining,
+            });
+            break;
+          case "arrival_reminder":
+            result = await smsLib.sendArrivalReminder({
+              ...smsCtx,
+              arrivalDate: (ctx as any).arrivalDate,
+              destination: (ctx as any).destination,
+            });
+            break;
+          case "invoice_generated":
+            result = await smsLib.sendInvoiceCreated({
+              ...smsCtx,
+              invoiceNumber: ctx.invoiceNumber,
+              amount: ctx.amount != null ? String(Math.round(Number(ctx.amount))) : undefined,
+            });
+            break;
           default: {
-            // All other events: use generic DLT notify template (no Quick route fallback)
-            const smsOk = await sendDLTSMS(ctx.customerMobile, ctx.customerName, ctx.bookingNumber || "", ctx.invoiceNumber || "");
-            return { status: smsOk ? "sent" : "failed", providerResponse: { ok: smsOk, provider: "Fast2SMS", endpoint: "https://www.fast2sms.com/dev/bulkV2" } };
+            result = await smsLib.sendCustomSMS({ mobile: ctx.customerMobile, message });
+            break;
           }
         }
         return { status: result.ok ? "sent" : "failed", providerResponse: result };
@@ -1082,15 +1127,31 @@ export async function retryNotification(logId: string): Promise<{ success: boole
       const result = await sendWhatsApp(log.recipient, message);
       status = result.ok ? "sent" : "failed"; providerResponse = result;
     } else if (channel === "sms") {
-      // sendDLTSMS returns boolean — capture it rather than assuming success
-      const smsRetryOk = await sendDLTSMS(
-        log.recipient,
-        log.customer_name || log.recipient,
-        log.booking_number || "",
-        "",
-      );
-      status = smsRetryOk ? "sent" : "failed";
-      providerResponse = { ok: smsRetryOk, provider: "Fast2SMS", endpoint: "https://www.fast2sms.com/dev/bulkV2" };
+      const smsLib = await import("./sms.js");
+      const smsCtxRetry = {
+        mobile: log.recipient,
+        customerName: log.customer_name || "Customer",
+        bookingNumber: log.booking_number || "",
+        bookingId: log.booking_id || undefined,
+        customerId: log.customer_id || undefined,
+      };
+      const et = (log.event_type || "") as string;
+      let smsResult: import("./sms.js").SMSResult;
+      if (et === "new_booking")                             smsResult = await smsLib.sendBookingCreated(smsCtxRetry);
+      else if (et === "booking_approved")                   smsResult = await smsLib.sendBookingConfirmed(smsCtxRetry);
+      else if (et === "payment_received")                   smsResult = await smsLib.sendPaymentReceived({ ...smsCtxRetry, amount: "0" });
+      else if (et === "partial_payment")                    smsResult = await smsLib.sendPartialPaymentReceived({ ...smsCtxRetry, paidAmount: "0", balanceAmount: "0" });
+      else if (["balance_reminder","payment_due","balance_overdue","balance_reminder_7d","balance_reminder_3d","balance_reminder_15d","balance_reminder_30d"].includes(et))
+                                                            smsResult = await smsLib.sendPendingPaymentReminder({ ...smsCtxRetry, balance: "0" });
+      else if (et === "invoice_generated")                  smsResult = await smsLib.sendInvoiceCreated(smsCtxRetry);
+      else if (et === "visa_approved" || et === "visa_ready") smsResult = await smsLib.sendVisaIssued(smsCtxRetry);
+      else if (et === "ticket_issued")                      smsResult = await smsLib.sendFlightTicketIssued(smsCtxRetry);
+      else if (et === "hotel_assigned")                     smsResult = await smsLib.sendHotelVoucherIssued(smsCtxRetry);
+      else if (et === "flight_assigned")                    smsResult = await smsLib.sendFlightAssigned({ ...smsCtxRetry, flightNumber: "", fromAirport: "", toAirport: "", departureDate: "", departureTime: "" });
+      else if (et === "departure_reminder")                 smsResult = await smsLib.sendDepartureReminder({ ...smsCtxRetry, departureDate: "" });
+      else                                                  smsResult = await smsLib.sendCustomSMS({ mobile: log.recipient, message: log.message || "" });
+      status = smsResult.ok ? "sent" : "failed";
+      providerResponse = smsResult;
     } else if (channel === "rcs") {
       const result = await sendRCS(log.recipient, log.recipient, message);
       status = result.ok ? "sent" : "failed"; providerResponse = result;

@@ -60,19 +60,19 @@ export default function DltTemplateManager() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [settR, sidR, emR] = await Promise.all([
-        fetch(`${API}/api/api-settings/fast2sms`, { credentials: "include" }),
+      const [dltR, sidR, emR] = await Promise.all([
+        fetch(`${API}/api/sms-settings/dlt-config`, { credentials: "include" }),
         fetch(`${API}/api/sms-settings/sender-ids`, { credentials: "include" }),
         fetch(`${API}/api/sms-settings/emergency-fallback`, { credentials: "include" }),
       ]);
-      const settD = await settR.json();
+      const dltD = await dltR.json();
       const sidD = await sidR.json();
       const emD = await emR.json().catch(() => ({}));
 
-      const extra: Record<string, string> = settD.extraFields || {};
-      setValues(extra);
-      setOriginal(extra);
-      setGlobalSender(extra.sender_id || "ABURHA");
+      const config: Record<string, string> = dltD.config || {};
+      setValues(config);
+      setOriginal(config);
+      setGlobalSender(config.sender_id || dltD.globalSender || "ABURHA");
 
       if (sidD.ok) setSenderIds(sidD.senderIds || []);
       if (emD.ok !== undefined) setEmergency(emD);
@@ -92,19 +92,15 @@ export default function DltTemplateManager() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const payload = {
-        apiKey: values.apiKey || original.apiKey || "",
-        apiUrl: values.apiUrl || original.apiUrl || "",
-        extraFields: values,
-      };
-      const r = await fetch(`${API}/api/api-settings/fast2sms`, {
+      const r = await fetch(`${API}/api/sms-settings/dlt-config`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ config: values }),
       });
-      if (!r.ok) throw new Error(await r.text());
-      toast({ title: "DLT settings saved", description: "Template IDs and sender IDs saved successfully." });
+      const d = await r.json();
+      if (!r.ok || !d.ok) throw new Error(d.error || await r.text());
+      toast({ title: "DLT settings saved", description: "Template IDs saved to notification_templates. SMS will use new IDs immediately." });
       setOriginal(values);
     } catch (e: any) {
       toast({ title: "Save failed", description: e.message, variant: "destructive" });

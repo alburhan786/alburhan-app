@@ -831,4 +831,114 @@ router.post("/production-test", async (req: AuthenticatedRequest, res) => {
   }
 });
 
+// ── DLT template config: maps notification_templates (primary) to extra_fields keys ──────────────
+// resolveConfig() in sms.ts reads notification_templates FIRST, so DltTemplateManager must write there.
+const NT_EVENT_TO_EXTRA_KEY: Record<string, string> = {
+  "new_booking":          "booking_created_tid",
+  "booking_approved":     "booking_confirmed_tid",
+  "booking_rejected":     "booking_rejected_tid",
+  "payment_received":     "payment_received_tid",
+  "partial_payment":      "partial_payment_tid",
+  "pending_payment":      "pending_payment_tid",
+  "invoice_generated":    "invoice_created_tid",
+  "balance_reminder":     "balance_reminder_tid",
+  "agreement_signed":     "agreement_signed_tid",
+  "ticket_issued":        "ticket_issued_tid",
+  "visa_approved":        "visa_issued_tid",
+  "hotel_assigned":       "hotel_voucher_issued_tid",
+  "departure_reminder":   "departure_reminder_tid",
+  "arrival_reminder":     "arrival_reminder_tid",
+  "welcome_saudi_arabia": "welcome_saudi_arabia_tid",
+  "return_reminder":      "return_reminder_tid",
+  "eid_greeting":         "eid_greeting_tid",
+  "flight_assigned":      "flight_assigned_tid",
+};
+
+// ── GET /api/sms-settings/dlt-config ─────────────────────────────────────────
+// Merged view: notification_templates (primary) + api_settings.extra (fallback)
+// Keyed by extra_fields key (booking_created_tid etc.) for DltTemplateManager UI.
+router.get("/dlt-config", async (_req: AuthenticatedRequest, res) => {
+  try {
+    const ntRows = await pool.query(
+      `SELECT id, event_type, name, dlt_template_id, sender_id FROM notification_templates
+       WHERE channel='sms' ORDER BY event_type`
+    );
+    const ntMap: Record<string, { id: string; dlt_template_id: string; sender_id: string; name: string }> = {};
+    for (const r of ntRows.rows) ntMap[r.event_type] = { id: r.id, dlt_template_id: r.dlt_template_id || "", sender_id: r.sender_id || "", name: r.name };
+
+    const { decrypt } = await import("../lib/encryption.js");
+    const apiRow = await pool.query(`SELECT extra_fields_encrypted FROM api_settings WHERE provider='fast2sms' LIMIT 1`);
+    let extra: Record<string, string> = {};
+    if (apiRow.rows[0]?.extra_fields_encrypted) {
+      try { extra = JSON.parse(decrypt(apiRow.rows[0].extra_fields_encrypted)); } catch {}
+    }
+
+    const config: Record<string, string> = {};
+    for (const [ntEvent, extraKey] of Object.entries(NT_EVENT_TO_EXTRA_KEY)) {
+      const ntEntry = ntMap[ntEvent];
+      const senderKey = extraKey.replace(/_tid$/, "_sender");
+      config[extraKey] = ntEntry?.dlt_template_id || extra[extraKey] || "";
+      config[senderKey] = ntEntry?.sender_id || extra[senderKey] || "";
+    }
+    if (extra.otp_template_id) config.otp_template_id = extra.otp_template_id;
+    if (extra.otp_sender) config.otp_sender = extra.otp_sender;
+    if (extra.forgot_password_otp_tid) config.forgot_password_otp_tid = extra.forgot_password_otp_tid;
+    if (extra.forgot_password_otp_sender) config.forgot_password_otp_sender = extra.forgot_password_otp_sender;
+    config.sender_id = extra.sender_id || "ABURHA";
+
+    const templates = ntRows.rows.map((r: any) => ({
+      id: r.id, event_type: r.event_type, name: r.name,
+      dlt_template_id: r.dlt_template_id || "", sender_id: r.sender_id || "",
+      extra_key: NT_EVENT_TO_EXTRA_KEY[r.event_type] || null,
+    }));
+
+    res.json({ ok: true, config, templates, globalSender: extra.sender_id || "ABURHA" });
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// ── PUT /api/sms-settings/dlt-config ─────────────────────────────────────────
+// Saves to notification_templates (so resolveConfig picks them up) + api_settings.extra (fallback).
+router.put("/dlt-config", async (req: AuthenticatedRequest, res) => {
+  try {
+    const { config } = req.body as { config: Record<string, string> };
+    if (!config || typeof config !== "object") return void res.status(400).json({ ok: false, error: "config object required" });
+
+    const EXTRA_KEY_TO_NT_EVENT: Record<string, string> = {};
+    for (const [ntEvent, extraKey] of Object.entries(NT_EVENT_TO_EXTRA_KEY)) EXTRA_KEY_TO_NT_EVENT[extraKey] = ntEvent;
+
+    for (const [extraKey, ntEvent] of Object.entries(EXTRA_KEY_TO_NT_EVENT)) {
+      if (!(extraKey in config)) continue;
+      const tid = config[extraKey] || null;
+      const senderKey = extraKey.replace(/_tid$/, "_sender");
+      const senderId = config[senderKey] || null;
+      await pool.query(
+        `UPDATE notification_templates
+         SET dlt_template_id=$1, sender_id=COALESCE(NULLIF($2,''), sender_id), updated_at=NOW()
+         WHERE channel='sms' AND event_type=$3`,
+        [tid, senderId, ntEvent]
+      );
+    }
+
+    const { decrypt, encrypt } = await import("../lib/encryption.js");
+    const { invalidateCache } = await import("../lib/apiSettingsProvider.js");
+    const apiRow = await pool.query(`SELECT extra_fields_encrypted FROM api_settings WHERE provider='fast2sms' LIMIT 1`);
+    let extra: Record<string, string> = {};
+    if (apiRow.rows[0]?.extra_fields_encrypted) {
+      try { extra = JSON.parse(decrypt(apiRow.rows[0].extra_fields_encrypted)); } catch {}
+    }
+    await pool.query(
+      `UPDATE api_settings SET extra_fields_encrypted=$1, updated_at=NOW() WHERE provider='fast2sms'`,
+      [encrypt(JSON.stringify({ ...extra, ...config }))]
+    );
+    invalidateCache();
+    try { (await import("../lib/sms.js")).bustDBTemplateCache(); } catch {}
+
+    res.json({ ok: true, message: "DLT template IDs saved to notification_templates and api_settings" });
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
 export default router;

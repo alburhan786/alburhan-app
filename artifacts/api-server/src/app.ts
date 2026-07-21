@@ -3538,6 +3538,66 @@ app.post("/api/migrate/update-sms-sender", async (req, res) => {
   }
 });
 
+// GET /api/migrate/sms-config — full SMS DLT config dump + live Fast2SMS wallet test
+app.get("/api/migrate/sms-config", async (req, res) => {
+  const key = req.query.key as string;
+  if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
+  try {
+    const { pool: dPool } = await import("@workspace/db");
+    const { decrypt } = await import("./lib/encryption.js");
+    const { getCachedConfig } = await import("./lib/apiSettingsProvider.js");
+    const axios = (await import("axios")).default;
+
+    const cfg = getCachedConfig("fast2sms");
+    const apiKey = cfg.apiKey || process.env.FAST2SMS_API_KEY || "";
+    const extra = cfg.extra || {};
+
+    const ntRows = await dPool.query(
+      `SELECT event_type, name, dlt_template_id, sender_id FROM notification_templates WHERE channel='sms' ORDER BY event_type`
+    );
+    const apiRow = await dPool.query(`SELECT extra_fields_encrypted FROM api_settings WHERE provider='fast2sms' LIMIT 1`);
+    let extraRaw: Record<string, string> = {};
+    if (apiRow.rows[0]?.extra_fields_encrypted) {
+      try { extraRaw = JSON.parse(decrypt(apiRow.rows[0].extra_fields_encrypted)); } catch {}
+    }
+
+    let walletResult: any = null;
+    try {
+      const t0 = Date.now();
+      const wR = await axios.get(`https://www.fast2sms.com/dev/wallet?authorization=${apiKey}`, { timeout: 8000 });
+      walletResult = { ok: true, data: wR.data, ms: Date.now() - t0 };
+    } catch (e: any) { walletResult = { ok: false, error: e.message }; }
+
+    const PLACEHOLDER_IDS = new Set(["219801","219802","219803","219804","219805","214148","214143","214144","214142"]);
+    const templates = ntRows.rows.map((r: any) => ({
+      event_type: r.event_type, name: r.name,
+      dlt_template_id: r.dlt_template_id || "(empty)",
+      sender_id: r.sender_id || "(empty)",
+      is_placeholder: PLACEHOLDER_IDS.has(r.dlt_template_id || ""),
+      status: !r.dlt_template_id ? "MISSING" : PLACEHOLDER_IDS.has(r.dlt_template_id) ? "PLACEHOLDER — REPLACE WITH REAL ID" : "OK",
+    }));
+
+    const allOk = templates.every((t: any) => t.status === "OK");
+    const missing = templates.filter((t: any) => t.status !== "OK");
+
+    res.json({
+      ok: allOk,
+      summary: allOk ? "All DLT templates configured correctly" : `${missing.length} template(s) need real IDs from Fast2SMS DLT portal`,
+      apiKey: apiKey ? `${apiKey.slice(0, 6)}***${apiKey.slice(-4)} (len=${apiKey.length})` : "NOT SET",
+      globalSender: extra.sender_id || "ABURHA",
+      otpTemplateId: extra.otp_template_id || "(not set)",
+      walletBalance: walletResult,
+      templates,
+      extraFields: Object.fromEntries(
+        Object.entries(extraRaw).map(([k, v]) => [k, k.includes("key") || k.includes("secret") ? "***" : v])
+      ),
+      action: allOk ? "None needed" : "Log into admin → /admin/dlt-templates → Enter real DLT template IDs from Fast2SMS portal → Save All",
+    });
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
 // GET /api/migrate/deploy-status — lightweight deploy health check for monitoring
 app.get("/api/migrate/deploy-status", async (req, res) => {
   const key = req.query.key as string;

@@ -1,0 +1,83 @@
+Production Issue: DLT SMS Notifications Not Sending
+
+Problem:
+Customers are successfully:
+- Creating bookings
+- Making payments
+- Receiving data in the database
+
+However, NO DLT SMS is being delivered for:
+- Booking Confirmation
+- Payment Confirmation
+- Invoice Ready
+- OTP
+- Payment Reminder
+- Visa Issued
+- Ticket Issued
+- Hotel Voucher
+- Flight Reminder
+
+This is a LIVE production issue.
+
+Please perform a complete end-to-end diagnosis. Do NOT assume the SMS gateway is working.
+
+Check the following:
+
+1. Verify Fast2SMS/DLT API credentials are correct.
+2. Verify API key is loaded from production environment variables.
+3. Verify Entity ID is correct.
+4. Verify every DLT Template ID matches the registered template.
+5. Verify Sender ID is approved.
+6. Verify the mobile number format (91XXXXXXXXXX).
+7. Check whether the SMS API is actually being called.
+8. Log the complete request and response from Fast2SMS.
+9. Check if any API errors are being ignored.
+10. Verify booking events trigger SMS.
+11. Verify payment events trigger SMS.
+12. Verify invoice generation triggers SMS.
+13. Verify OTP triggers SMS.
+14. Check queue workers and cron jobs.
+15. Check production logs for SMS failures.
+16. Retry failed SMS automatically.
+17. Save every SMS attempt in the database with:
+    - Customer
+    - Mobile Number
+    - Template Used
+    - Status (Success/Failed)
+    - Gateway Response
+    - Error Message
+    - Date & Time
+
+Then perform REAL live testing:
+
+✓ Create a new booking.
+✓ Verify Booking Confirmation SMS is delivered.
+✓ Make a payment.
+✓ Verify Payment Confirmation SMS is delivered.
+✓ Generate an invoice.
+✓ Verify Invoice SMS is delivered.
+✓ Send an OTP.
+✓ Verify OTP SMS is delivered.
+
+If SMS is not delivered, identify the exact failure point:
+- Application
+- API
+- DLT
+- Template
+- Entity ID
+- Sender ID
+- Gateway
+- Database
+- Event Trigger
+
+Finally provide a complete production report showing:
+- SMS API Request
+- SMS API Response
+- Delivery Status
+- Gateway Error (if any)
+- Root Cause
+- Files Fixed
+- Code Changes
+- Proof of successful SMS delivery
+
+Do not finish until a real customer receives a successful DLT SMS after booking and payment.
