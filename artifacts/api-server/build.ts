@@ -68,7 +68,7 @@ async function buildAll() {
     "FAST2SMS_API_KEY",
     "FAST2SMS_XXL_API_KEY",
     "BOTBEE_API_KEY",
-    "BOTBEE_PHONE_NUMBER_ID",
+    // BOTBEE_PHONE_NUMBER_ID intentionally excluded — hardcoded in botbee.ts as CORRECT_PHONE_NUMBER_ID
     "BOTBEE_BUSINESS_ID",
     "RAZORPAY_KEY_ID",
     "RAZORPAY_SECRET",

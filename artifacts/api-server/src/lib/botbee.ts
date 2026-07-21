@@ -59,10 +59,19 @@ export interface BotBeeResult {
   messageId?: string;
 }
 
+// Known-correct Meta Phone Number ID from BotBee dashboard (MESSAGING LIMIT column).
+// Overrides the env/DB value to guard against typos in the secret.
+const CORRECT_PHONE_NUMBER_ID = "96591219661113";
+
 export function getCredentials() {
   const bbCfg = getCachedConfig("botbee");
   const apiToken = (bbCfg.apiKey || process.env.BOTBEE_API_KEY || "").trim();
-  const phone_number_id = (bbCfg.extra?.phone_number_id || process.env.BOTBEE_PHONE_NUMBER_ID || "").trim();
+  const rawPhoneId = (bbCfg.extra?.phone_number_id || process.env.BOTBEE_PHONE_NUMBER_ID || "").trim();
+  // Always use the correct 14-digit Meta Phone Number ID regardless of env typos
+  const phone_number_id = CORRECT_PHONE_NUMBER_ID;
+  if (rawPhoneId && rawPhoneId !== CORRECT_PHONE_NUMBER_ID) {
+    console.warn(`[BotBee] phone_number_id override: env/DB has "${rawPhoneId}", using correct value "${CORRECT_PHONE_NUMBER_ID}"`);
+  }
   const business_id = (bbCfg.extra?.business_id || process.env.BOTBEE_BUSINESS_ID || "").trim();
   const enabled = bbCfg.enabled !== false;
   const rawUrl = bbCfg.apiUrl || BOTBEE_BASE;
