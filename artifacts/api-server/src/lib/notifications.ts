@@ -12,6 +12,7 @@ import {
   sendInvoiceCreated as smsSendInvoiceCreated,
   sendFlightTicketIssued as smsSendTicket,
   sendVisaIssued as smsSendVisa,
+  sendHotelVoucherIssued as smsSendHotelVoucher,
   sendDepartureReminder as smsSendDepartureReminder,
 } from "./sms.js";
 
@@ -900,8 +901,9 @@ export async function sendAdminDocumentReadyNotification(opts: {
   const docLabel = opts.documentType.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
   const message = `Assalamu Alaikum ${opts.customerName},\n\nYour ${docLabel} for booking #${opts.bookingNumber} is ready.\n\nPlease login to your dashboard to view and download it.\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 8989701701`;
   const docSmsMap: Record<string, () => Promise<any>> = {
-    ticket: () => smsSendTicket({ mobile: opts.mobile, customerName: opts.customerName, bookingNumber: opts.bookingNumber }),
-    visa:   () => smsSendVisa({ mobile: opts.mobile, customerName: opts.customerName, bookingNumber: opts.bookingNumber }),
+    ticket:  () => smsSendTicket({ mobile: opts.mobile, customerName: opts.customerName, bookingNumber: opts.bookingNumber }),
+    visa:    () => smsSendVisa({ mobile: opts.mobile, customerName: opts.customerName, bookingNumber: opts.bookingNumber }),
+    voucher: () => smsSendHotelVoucher({ mobile: opts.mobile, customerName: opts.customerName, bookingNumber: opts.bookingNumber }),
   };
   const smsKey = Object.keys(docSmsMap).find(k => opts.documentType.toLowerCase().includes(k));
   await Promise.allSettled([

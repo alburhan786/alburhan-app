@@ -1003,6 +1003,87 @@ app.get("/api/migrate/notification-audit", async (req, res) => {
   });
 });
 
+// GET /api/admin/sms-audit — SMS delivery audit log with full validation details
+app.get("/api/admin/sms-audit", async (req, res) => {
+  try {
+    const { pool: auditPool } = await import("@workspace/db");
+    const isAdminSession = (req as any).user?.role === "admin";
+    const hasMigrateKey = migrationKeyValid(req.query.key as string);
+    if (!isAdminSession && !hasMigrateKey) {
+      return void res.status(403).json({ error: "Admin access required" });
+    }
+
+    const limit  = Math.min(parseInt(req.query.limit  as string) || 200, 500);
+    const offset = parseInt(req.query.offset as string) || 0;
+    const status = req.query.status as string | undefined; // "sent" | "failed"
+    const from   = req.query.from   as string | undefined; // ISO date
+    const to     = req.query.to     as string | undefined; // ISO date
+
+    const conditions: string[] = ["nl.channel = 'sms'"];
+    const params: unknown[] = [];
+    if (status) { params.push(status); conditions.push(`nl.status = $${params.length}`); }
+    if (from)   { params.push(from);   conditions.push(`nl.sent_at >= $${params.length}`); }
+    if (to)     { params.push(to);     conditions.push(`nl.sent_at <= $${params.length}`); }
+
+    const where = conditions.join(" AND ");
+
+    const [logsRes, summaryRes] = await Promise.all([
+      auditPool.query(`
+        SELECT
+          nl.id,
+          nl.sent_at                                       AS date_time,
+          nl.booking_id,
+          b.booking_number,
+          COALESCE(b.customer_name, nl.recipient)          AS customer_name,
+          nl.recipient                                     AS mobile_number,
+          COALESCE(
+            nl.provider_response->>'sender_id',
+            'ABURHA'
+          )                                                AS sender_id,
+          'DLT'                                            AS route,
+          nl.template                                      AS dlt_template_id,
+          nl.event_type,
+          nl.status                                        AS delivery_status,
+          nl.error_code                                    AS failure_reason,
+          nl.http_status,
+          nl.retry_count,
+          nl.provider_name                                 AS provider
+        FROM notification_logs nl
+        LEFT JOIN bookings b ON b.id = nl.booking_id
+        WHERE ${where}
+        ORDER BY nl.sent_at DESC
+        LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+        [...params, limit, offset]
+      ),
+      auditPool.query(`
+        SELECT
+          status,
+          event_type,
+          COUNT(*)::int   AS count,
+          MAX(sent_at)    AS last_sent
+        FROM notification_logs
+        WHERE channel = 'sms'
+        GROUP BY status, event_type
+        ORDER BY event_type, status`
+      ),
+    ]);
+
+    res.json({
+      generated_at: new Date().toISOString(),
+      policy: {
+        required_sender_id: "ABURHA",
+        required_route:     "DLT",
+        fallback_allowed:   false,
+      },
+      summary: summaryRes.rows,
+      total:   logsRes.rowCount,
+      logs:    logsRes.rows,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/migrate/trigger-test-notification — fire live resend on a real paid booking (no session needed)
 app.post("/api/migrate/trigger-test-notification", async (req, res) => {
   const key = (req.query.key || req.body?.key) as string;

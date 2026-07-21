@@ -113,6 +113,7 @@ import GSTReports from "@/pages/admin/GSTReports";
 import PayrollManager from "@/pages/admin/PayrollManager";
 import AssetManager from "@/pages/admin/AssetManager";
 import AuditLogs from "@/pages/admin/AuditLogs";
+import SmsAuditLog from "@/pages/admin/SmsAuditLog";
 import UserRolesManager from "@/pages/admin/UserRolesManager";
 import BillingSettings from "@/pages/admin/BillingSettings";
 import NotificationCenter from "@/pages/admin/NotificationCenter";
@@ -338,6 +339,7 @@ function Router() {
       <Route path="/knowledge" component={KnowledgeCenter} />
       <Route path="/admin/agreements" component={() => <AdminRoute component={AgreementCenter} />} />
       <Route path="/admin/audit-logs" component={() => <AdminRoute component={AuditLogs} />} />
+      <Route path="/admin/sms-audit" component={() => <AdminRoute component={SmsAuditLog} />} />
       <Route path="/admin/system-health" component={() => <AdminRoute component={SystemHealth} />} />
       <Route path="/admin/otp-debug" component={() => <AdminRoute component={OTPDebug} />} />
       <Route path="/admin/user-roles" component={() => <AdminRoute component={UserRolesManager} />} />

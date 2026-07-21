@@ -145,8 +145,11 @@ export async function processPaymentSuccessNotifications(opts: {
     paymentRef,
   };
 
-  // ── Attach ONLY the Tax Invoice PDF (single PDF source for all channels) ──
+  // ── Generate Tax Invoice PDF + Payment Receipt PDF ─────────────────────────
   const attachments: EmailAttachment[] = [];
+  let receiptBuf: Buffer | undefined;
+  const safeBookingNum = booking.bookingNumber.replace(/\//g, "-");
+
   if (invoiceNumber) {
     try {
       const safeInvNum = invoiceNumber.replace(/\//g, "-");
@@ -166,27 +169,39 @@ export async function processPaymentSuccessNotifications(opts: {
     }
   }
 
-  // ── Auto-send Tax Invoice PDF via WhatsApp (fire-and-forget) ──────────────
+  // Payment Receipt PDF — always attach alongside Tax Invoice
+  try {
+    receiptBuf = await generateReceiptPdfBuffer(docOpts);
+    attachments.push({ filename: `Receipt-${safeBookingNum}.pdf`, content: receiptBuf, contentType: "application/pdf" });
+    console.log(`[payments] Payment Receipt PDF generated for ${booking.bookingNumber}`);
+  } catch (err) {
+    console.error("[payments] Payment Receipt PDF generation failed (notifications will still send):", err);
+  }
+
+  // ── Auto-send Tax Invoice PDF + Receipt PDF via WhatsApp (fire-and-forget) ─
   if (attachments.length > 0) {
-    const _invAttachment  = attachments[0];
-    const _bookingMobile  = booking.customerMobile;
-    const _bookingNumber  = booking.bookingNumber;
-    const _bookingId      = booking.id;
-    const _customerId     = booking.customerId ?? undefined;
+    const _attachments   = [...attachments];
+    const _bookingMobile = booking.customerMobile;
+    const _bookingNumber = booking.bookingNumber;
+    const _bookingId     = booking.id;
+    const _customerId    = booking.customerId ?? undefined;
     (async () => {
       try {
         const { sendPDFDocument } = await import("../lib/botbee.js");
         const waOpts = { eventType: "payment_received", bookingId: _bookingId, customerId: _customerId };
-        const r = await sendPDFDocument(
-          _bookingMobile,
-          _invAttachment.content as Buffer,
-          _invAttachment.filename,
-          `Your Tax Invoice – Al Burhan Tours & Travels (Booking: ${_bookingNumber})`,
-          waOpts,
-        );
-        console.log(`[payments] WhatsApp Tax Invoice PDF for ${_bookingNumber}: ${r.ok ? "✅ sent" : "❌ " + r.errorMessage}`);
+        for (const att of _attachments) {
+          const label = att.filename.startsWith("TaxInvoice") ? "Tax Invoice" : "Payment Receipt";
+          const r = await sendPDFDocument(
+            _bookingMobile,
+            att.content as Buffer,
+            att.filename,
+            `Your ${label} – Al Burhan Tours & Travels (Booking: ${_bookingNumber})`,
+            waOpts,
+          );
+          console.log(`[payments] WhatsApp ${label} PDF for ${_bookingNumber}: ${r.ok ? "✅ sent" : "❌ " + r.errorMessage}`);
+        }
       } catch (pdfWaErr: any) {
-        console.error("[payments] WhatsApp Tax Invoice PDF delivery failed (non-fatal):", pdfWaErr?.message);
+        console.error("[payments] WhatsApp PDF delivery failed (non-fatal):", pdfWaErr?.message);
       }
     })();
   }

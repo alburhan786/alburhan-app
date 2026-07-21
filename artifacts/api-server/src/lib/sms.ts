@@ -26,6 +26,7 @@ function getConfig() {
       invoice_created:    ex.invoice_created_tid    || ex.notify_template_id || "",
       ticket_issued:      ex.ticket_issued_tid      || ex.notify_template_id || "",
       visa_issued:        ex.visa_issued_tid        || ex.notify_template_id || "",
+      hotel_voucher:      ex.hotel_voucher_issued_tid || ex.notify_template_id || "",
       departure_reminder: ex.departure_reminder_tid || ex.notify_template_id || "",
       arrival_reminder:   ex.arrival_reminder_tid   || ex.notify_template_id || "",
       eid_greeting:       ex.eid_greeting_tid       || ex.notify_template_id || "",
@@ -128,10 +129,30 @@ async function sendDLT(
     return { ok: false, provider: "Fast2SMS", templateId, mobile, errorMessage: "Fast2SMS API key not configured" };
   }
 
-  if (!templateId) {
-    console.warn(`[SMS][${opts.eventType}] ⚠ No DLT template ID configured for this event — SMS skipped. Set ${opts.eventType}_tid in API Settings → Fast2SMS.`);
-    return { ok: false, provider: "Fast2SMS", templateId: "not_configured", mobile, errorMessage: `No DLT template ID configured for ${opts.eventType}` };
+  // ── POLICY VALIDATION — block before any HTTP call ──────────────────────────
+  // 1. Sender ID must be ABURHA (India DLT registered)
+  if (sender_id !== "ABURHA") {
+    const msg = `SMS BLOCKED — sender_id "${sender_id}" is not "ABURHA". Only ABURHA is permitted for production SMS.`;
+    console.error(`[SMS][${opts.eventType}] ⛔ ${msg}`);
+    await logSMS({ eventType: opts.eventType, mobile, templateId, status: "failed", errorMessage: msg, bookingId: opts.bookingId, customerId: opts.customerId });
+    return { ok: false, provider: "Fast2SMS", templateId, mobile, errorMessage: msg };
   }
+  // 2. Route must be DLT (hardcoded in URL — this guard catches any future drift)
+  const ROUTE = "dlt";
+  if (ROUTE !== "dlt") {
+    const msg = `SMS BLOCKED — route "${ROUTE}" is not DLT. Only DLT SMS is permitted for production.`;
+    console.error(`[SMS][${opts.eventType}] ⛔ ${msg}`);
+    await logSMS({ eventType: opts.eventType, mobile, templateId, status: "failed", errorMessage: msg, bookingId: opts.bookingId, customerId: opts.customerId });
+    return { ok: false, provider: "Fast2SMS", templateId, mobile, errorMessage: msg };
+  }
+  // 3. DLT template ID must be configured
+  if (!templateId) {
+    const msg = `DLT template missing for event "${opts.eventType}". Set ${opts.eventType}_tid in API Settings → Fast2SMS.`;
+    console.warn(`[SMS][${opts.eventType}] ⚠ ${msg}`);
+    await logSMS({ eventType: opts.eventType, mobile, templateId: "not_configured", status: "failed", errorMessage: msg, bookingId: opts.bookingId, customerId: opts.customerId });
+    return { ok: false, provider: "Fast2SMS", templateId: "not_configured", mobile, errorMessage: msg };
+  }
+  console.log(`[SMS][${opts.eventType}] ✔ Validation passed — sender=ABURHA route=DLT template=${templateId} → ${mobile}`);
 
   const phone = toPhone(mobile);
   const vars = encodeURIComponent(variables.map(v => {
@@ -140,7 +161,7 @@ async function sendDLT(
     return (s.startsWith("http://") || s.startsWith("https://")) ? s.substring(0, 100) : s.substring(0, 30);
   }).join("|") + "|");
   const endpoint = `https://www.fast2sms.com/dev/bulkV2`;
-  const url = `${endpoint}?authorization=${apiKey}&route=dlt&sender_id=${sender_id}&message=${templateId}&variables_values=${vars}&numbers=${phone}&flash=0`;
+  const url = `${endpoint}?authorization=${apiKey}&route=${ROUTE}&sender_id=${sender_id}&message=${templateId}&variables_values=${vars}&numbers=${phone}&flash=0`;
   const maskedUrl = url.replace(apiKey, `${apiKey.slice(0, 6)}***`);
 
   let httpStatus = 0;
@@ -151,14 +172,25 @@ async function sendDLT(
     httpStatus = resp.status;
     responsePayload = resp.data;
     const ok = resp.data?.return === true;
+    // 4. Detect "template not approved" from Fast2SMS error codes
+    const respMsg: string = resp.data?.message || "";
+    const isTemplateError = !ok && (
+      respMsg.toLowerCase().includes("invalid message") ||
+      respMsg.toLowerCase().includes("invalid template") ||
+      respMsg.toLowerCase().includes("template not found") ||
+      String(resp.data?.status_code) === "401"
+    );
+    const errorMessage = ok ? undefined
+      : isTemplateError ? `Template not approved — ${respMsg}`
+      : (respMsg || "DLT delivery failed");
 
-    console.log(`[SMS][${opts.eventType}] ${ok ? "✅" : "❌"} → ${maskedUrl.slice(0, 120)}`);
+    if (!ok) console.error(`[SMS][${opts.eventType}] ❌ ${isTemplateError ? "Template not approved" : "Delivery failed"} — ${respMsg}`);
+    else console.log(`[SMS][${opts.eventType}] ✅ Delivered via ABURHA/DLT → ${maskedUrl.slice(0, 80)}`);
 
     await logSMS({
       eventType: opts.eventType, mobile, templateId,
       message: opts.message, status: ok ? "sent" : "failed",
-      httpStatus, responsePayload,
-      errorMessage: ok ? undefined : (resp.data?.message || "DLT delivery failed"),
+      httpStatus, responsePayload, errorMessage,
       bookingId: opts.bookingId, customerId: opts.customerId,
     });
 
@@ -285,6 +317,15 @@ export async function sendDepartureReminder(ctx: BookingCtx & { departureDate: s
     ctx.mobile, tids.departure_reminder,
     [ctx.customerName, ctx.bookingNumber, ctx.departureDate],
     { eventType: "departure_reminder", message: `Departure reminder for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId }
+  );
+}
+
+export async function sendHotelVoucherIssued(ctx: BookingCtx & { hotelName?: string }): Promise<SMSResult> {
+  const { tids } = getConfig();
+  return sendDLT(
+    ctx.mobile, tids.hotel_voucher,
+    [ctx.customerName, ctx.bookingNumber, ctx.hotelName || "Your Hotel"],
+    { eventType: "hotel_voucher", message: `Hotel voucher ready for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId }
   );
 }
 

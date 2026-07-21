@@ -190,6 +190,20 @@ router.post(
                 pdfBuffer
               );
               console.log(`[Documents][Email] Visa email to ${custEmail}: ok=${result.ok}${result.error ? ` err=${result.error}` : ""}`);
+
+            } else if (documentType === "hotel_voucher") {
+              // Hotel voucher email with optional PDF attachment
+              const { sendGenericEmail } = await import("../services/emailService.js");
+              const result = await sendGenericEmail(
+                custEmail,
+                `Your Hotel Voucher is Ready – Al Burhan Tours & Travels`,
+                `Assalamu Alaikum ${custName},\n\nYour Hotel Voucher for booking #${bkNum} is ready.\n\nPlease login to your dashboard to view and download it.\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 8989701701`,
+                {
+                  title: "Hotel Voucher Ready",
+                  attachments: pdfBuffer ? [{ filename: req.file.originalname, content: pdfBuffer, contentType: "application/pdf" }] : undefined,
+                }
+              );
+              console.log(`[Documents][Email] Hotel Voucher email to ${custEmail}: ok=${result.ok}${result.error ? ` err=${result.error}` : ""}`);
             }
           } catch (err: any) {
             console.error("[Documents][Email] Email send failed (non-fatal):", err?.message || err);

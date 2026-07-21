@@ -1,0 +1,99 @@
+FINAL PRODUCTION REQUIREMENTS – PAYMENT & DOCUMENT DELIVERY
+
+The payment pipeline is working correctly. Complete the remaining production requirements.
+
+When a payment is successfully received:
+
+1. Update Booking Status
+   - Payment Status = PAID
+   - Invoice Status = PAID
+   - Payment Date
+   - Payment Method
+   - Transaction ID
+   - Receipt Number
+
+2. Generate Documents
+   - Tax Invoice PDF
+   - Payment Receipt PDF
+
+3. Customer Dashboard
+   Automatically display:
+   ✓ Booking Details
+   ✓ Invoice (Download/View)
+   ✓ Tax Invoice PDF
+   ✓ Payment Receipt PDF
+   ✓ Payment History
+   ✓ Agreement PDF
+   ✓ Visa PDF (when issued)
+   ✓ Flight Ticket PDF (when issued)
+   ✓ Hotel Voucher PDF (when issued)
+
+4. Email
+   Send automatically with:
+   Subject:
+   Payment Received – Tax Invoice
+
+   Attach:
+   • Tax Invoice PDF
+   • Payment Receipt PDF
+
+5. WhatsApp
+   Send:
+   • Payment confirmation
+   • Tax Invoice PDF
+   • Payment Receipt PDF
+
+6. SMS (DLT ONLY)
+   Sender ID:
+   ABURHA
+
+   Route:
+   DLT SMS
+
+   Never use any other sender ID.
+
+7. Admin Dashboard
+   Show:
+   ✓ Email Sent
+   ✓ WhatsApp Sent
+   ✓ SMS Delivered
+   ✓ PDF Generated
+   ✓ Download Count
+   ✓ Viewed by Customer
+   ✓ Delivery Timestamp
+
+8. Customer Dashboard Timeline
+   Booking Received
+   Booking Approved
+   Payment Received
+   Invoice Generated
+   Receipt Generated
+   Agreement Ready
+   Visa Ready
+   Flight Ticket Ready
+   Hotel Voucher Ready
+   Departure Reminder
+
+9. Document Center
+   All PDFs must always be available:
+   • Agreement
+   • Invoice
+   • Tax Invoice
+   • Payment Receipt
+   • Visa
+   • Flight Ticket
+   • Hotel Voucher
+
+10. Final Production Verification
+   Perform a real production end-to-end test and verify:
+   ✓ Invoice status = PAID
+   ✓ Tax Invoice PDF generated
+   ✓ Receipt PDF generated
+   ✓ Email delivered with PDF attachments
+   ✓ WhatsApp delivered with PDFs
+   ✓ SMS sent only through DLT using Sender ID ABURHA
+   ✓ Customer dashboard updated immediately
+   ✓ Admin dashboard updated immediately
+   ✓ All PDFs are downloadable from both dashboards
+
+Deployment is complete only after every step succeeds without manual intervention.

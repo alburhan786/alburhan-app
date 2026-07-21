@@ -146,6 +146,7 @@ function buildMenu(openComplaints: number): MenuSection[] {
         { icon: KeyRound, label: "User Roles", href: "/admin/user-roles", require: ["users", "view"] },
         { icon: Scale, label: "Agreement Center", href: "/admin/agreements", require: ["audit_logs", "view"] },
         { icon: ClipboardList, label: "Audit Logs", href: "/admin/audit-logs", require: ["audit_logs", "view"] },
+        { icon: MessageSquare, label: "SMS Audit Log", href: "/admin/sms-audit", require: ["audit_logs", "view"] },
         { icon: HeartPulse, label: "System Health", href: "/admin/system-health", require: ["users", "view"] },
         { icon: Activity, label: "OTP Debug", href: "/admin/otp-debug", require: ["users", "view"] },
       ],
