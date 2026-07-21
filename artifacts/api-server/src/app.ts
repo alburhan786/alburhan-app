@@ -3538,6 +3538,73 @@ app.post("/api/migrate/update-sms-sender", async (req, res) => {
   }
 });
 
+// POST /api/migrate/test-sms — fire a real DLT SMS and return the raw gateway response
+app.post("/api/migrate/test-sms", async (req, res) => {
+  const key = (req.body?.key || req.query.key) as string;
+  if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
+  try {
+    const { mobile, eventType = "booking_approved", vars } = req.body as { mobile: string; eventType?: string; vars?: string[] };
+    if (!mobile) return void res.status(400).json({ error: "mobile required" });
+
+    const { pool: dPool } = await import("@workspace/db");
+    const { getCachedConfig } = await import("./lib/apiSettingsProvider.js");
+    const axios = (await import("axios")).default;
+
+    const f2s = getCachedConfig("fast2sms");
+    const apiKey = (f2s.apiKey as string) || process.env.FAST2SMS_API_KEY || "";
+    if (!apiKey) return void res.status(400).json({ error: "FAST2SMS_API_KEY not set" });
+
+    const tplRow = await dPool.query(
+      `SELECT dlt_template_id, sender_id, dlt_entity_id, body, name, variable_count FROM notification_templates
+       WHERE channel='sms' AND event_type=$1 AND dlt_template_id IS NOT NULL AND dlt_template_id!=''
+       ORDER BY enabled DESC, updated_at DESC LIMIT 1`,
+      [eventType]
+    );
+    if (!tplRow.rows[0]) return void res.status(404).json({ error: `No SMS template with DLT ID found for event_type=${eventType}` });
+    const tpl = tplRow.rows[0];
+
+    const mobile10 = String(mobile).replace(/\D/g, "").slice(-10);
+    if (mobile10.length !== 10) return void res.status(400).json({ error: `Invalid mobile: ${mobile} → ${mobile10}` });
+
+    const variables: string[] = vars?.length ? vars : ["Al Burhan", "ABT-001", "Hajj 2026", "confirmed"];
+    const varsEncoded = encodeURIComponent(variables.join("|") + "|");
+    const senderId = tpl.sender_id || "ABURHA";
+    const endpoint = "https://www.fast2sms.com/dev/bulkV2";
+    const url = `${endpoint}?authorization=${apiKey}&route=dlt&sender_id=${senderId}&message=${tpl.dlt_template_id}&variables_values=${varsEncoded}&numbers=${mobile10}&flash=0`;
+    if (tpl.dlt_entity_id) url.concat(`&entity_id=${tpl.dlt_entity_id}`);
+    const maskedUrl = url.replace(new RegExp(apiKey.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"), `${apiKey.slice(0, 6)}***${apiKey.slice(-4)}`);
+
+    const t0 = Date.now();
+    let httpStatus = 0;
+    let apiResponse: any;
+    let ok = false;
+    try {
+      const resp = await axios.get(url, { timeout: 15000 });
+      httpStatus = resp.status;
+      apiResponse = resp.data;
+      ok = resp.data?.return === true;
+    } catch (e: any) {
+      httpStatus = e?.response?.status || 0;
+      apiResponse = e?.response?.data || { error: e.message };
+    }
+    const ms = Date.now() - t0;
+
+    res.json({
+      ok, eventType, templateName: tpl.name,
+      dltTemplateId: tpl.dlt_template_id, senderId, entityId: tpl.dlt_entity_id || null,
+      mobile: mobile10, numbers: `91${mobile10}`,
+      variablesSent: variables, variableCount: tpl.variable_count,
+      templateBody: tpl.body,
+      requestUrl: maskedUrl, httpStatus, ms, apiResponse,
+      authorization: `${apiKey.slice(0, 6)}***${apiKey.slice(-4)} (len=${apiKey.length})`,
+      errorCode: apiResponse?.code || apiResponse?.error_code || null,
+      errorMessage: Array.isArray(apiResponse?.message) ? apiResponse.message.join("; ") : (apiResponse?.message || null),
+    });
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message, stack: e.stack });
+  }
+});
+
 // GET /api/migrate/sms-config — full SMS DLT config dump + live Fast2SMS wallet test
 app.get("/api/migrate/sms-config", async (req, res) => {
   const key = req.query.key as string;

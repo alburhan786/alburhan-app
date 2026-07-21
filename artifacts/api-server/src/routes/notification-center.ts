@@ -351,8 +351,99 @@ router.post("/test-send", requireAdmin as any, async (req: AuthenticatedRequest,
       const r = await sendWhatsApp(recipient, message || "Test message from Al Burhan Tours & Travels");
       result = r as any;
     } else if (channel === "sms") {
-      const r = await sendDLTSMS(recipient, recipient, "", message || "Test SMS from Al Burhan Tours & Travels");
-      result = r as any;
+      // ── Full DLT diagnostic test ───────────────────────────────────────────
+      const { getCachedConfig } = await import("../lib/apiSettingsProvider.js");
+      const f2s = getCachedConfig("fast2sms");
+      const apiKey = (f2s.apiKey as string) || process.env.FAST2SMS_API_KEY || "";
+      if (!apiKey) return void res.status(400).json({ ok: false, message: "Fast2SMS API key not configured in API Settings" });
+
+      // Normalize mobile to 10-digit (Fast2SMS expects 10 digits, auto-prepends 91)
+      const rawMobile = String(recipient).replace(/\D/g, "");
+      const mobile10 = rawMobile.length > 10 ? rawMobile.slice(-10) : rawMobile;
+      if (mobile10.length !== 10) return void res.status(400).json({ ok: false, message: `Invalid mobile: got "${rawMobile}" — must be exactly 10 digits` });
+
+      let dltTemplateId: string | null = null;
+      let senderId = "ABURHA";
+      let entityId: string | null = null;
+      let variablesSent: string[] = [];
+      let routeUsed = "q"; // quick route fallback when no template
+      let tplBody: string | null = null;
+
+      if (templateId) {
+        const tplRow = await pool.query(`SELECT * FROM notification_templates WHERE id=$1 AND channel='sms'`, [templateId]);
+        const tpl = tplRow.rows[0];
+        if (!tpl) return void res.status(400).json({ ok: false, message: `Template ID ${templateId} not found or not an SMS template` });
+        if (!tpl.dlt_template_id) return void res.status(400).json({ ok: false, message: `Template "${tpl.name}" has no DLT Template ID — set one first` });
+        dltTemplateId = tpl.dlt_template_id;
+        senderId = tpl.sender_id || "ABURHA";
+        entityId = tpl.dlt_entity_id || null;
+        tplBody = tpl.body || null;
+        routeUsed = "dlt";
+        // Build variables array from provided message as single var, or use defaults
+        variablesSent = message
+          ? String(message).split("|").map((s: string) => s.trim()).filter(Boolean)
+          : ["Al Burhan", "ABT-001", "Hajj 2026"];
+      } else {
+        // No template selected — Quick Route test for connectivity only
+        variablesSent = [];
+      }
+
+      // Build the exact request URL
+      const endpoint = "https://www.fast2sms.com/dev/bulkV2";
+      let requestUrl: string;
+      if (routeUsed === "dlt") {
+        const varsEncoded = encodeURIComponent(variablesSent.join("|") + "|");
+        requestUrl = `${endpoint}?authorization=${apiKey}&route=dlt&sender_id=${senderId}&message=${dltTemplateId}&variables_values=${varsEncoded}&numbers=${mobile10}&flash=0`;
+        if (entityId) requestUrl += `&entity_id=${entityId}`;
+      } else {
+        const msgEncoded = encodeURIComponent(message || "Test SMS from Al Burhan Tours & Travels. Ignore.");
+        requestUrl = `${endpoint}?authorization=${apiKey}&route=q&message=${msgEncoded}&numbers=${mobile10}&flash=0`;
+      }
+      const maskedUrl = requestUrl.replace(new RegExp(apiKey.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"), `${apiKey.slice(0, 6)}***${apiKey.slice(-4)}`);
+
+      const { default: axios } = await import("axios");
+      const startMs = Date.now();
+      let httpStatus = 0;
+      let apiResponse: any;
+      let smsOk = false;
+      // Do NOT catch — let it propagate so admin sees the raw error
+      try {
+        const resp = await axios.get(requestUrl, { timeout: 15000 });
+        httpStatus = resp.status;
+        apiResponse = resp.data;
+        smsOk = resp.data?.return === true;
+      } catch (axiosErr: any) {
+        httpStatus = axiosErr?.response?.status || 0;
+        apiResponse = axiosErr?.response?.data || { error: axiosErr.message, code: axiosErr.code };
+        smsOk = false;
+      }
+      const durationMs = Date.now() - startMs;
+
+      const errorCode: string | null = apiResponse?.code || apiResponse?.status_code || apiResponse?.error_code || null;
+      const errorMsg: string | null = Array.isArray(apiResponse?.message)
+        ? apiResponse.message.join("; ")
+        : (typeof apiResponse?.message === "string" ? apiResponse.message : null);
+
+      result = {
+        ok: smsOk,
+        provider: "Fast2SMS",
+        endpoint,
+        httpStatus,
+        requestUrl: maskedUrl,
+        durationMs,
+        route: routeUsed,
+        dltTemplateId: dltTemplateId || null,
+        senderId,
+        entityId: entityId || null,
+        mobile: mobile10,
+        numbers: `91${mobile10}`,
+        variablesSent: variablesSent.length ? variablesSent : null,
+        templateBody: tplBody,
+        apiResponse,
+        errorCode,
+        errorMessage: errorMsg,
+        authorization: `${apiKey.slice(0, 6)}***${apiKey.slice(-4)} (len=${apiKey.length})`,
+      } as any;
     } else if (channel === "rcs") {
       const r = await sendRCS(recipient, "Test Recipient", message || "Test RCS from Al Burhan Tours & Travels");
       result = r as any;

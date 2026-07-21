@@ -115,6 +115,7 @@ export default function SMSTemplateManager() {
   const [showTest, setShowTest] = useState(false);
   const [testPhone, setTestPhone] = useState("");
   const [testMsg, setTestMsg] = useState("");
+  const [testSelectedTplId, setTestSelectedTplId] = useState<string>("");
   const [testResult, setTestResult] = useState<any>(null);
   const [testing, setTesting] = useState(false);
 
@@ -178,18 +179,26 @@ export default function SMSTemplateManager() {
   };
 
   const sendGenericTest = async () => {
-    if (!testPhone || !testMsg) { toast({ title: "Enter phone and message", variant: "destructive" }); return; }
+    if (!testPhone) { toast({ title: "Enter phone number", variant: "destructive" }); return; }
+    const digits = testPhone.replace(/\D/g, "");
+    if (digits.length < 10) { toast({ title: "Phone must be at least 10 digits", variant: "destructive" }); return; }
     setTesting(true); setTestResult(null);
     try {
       const r = await fetch(`${API}/api/notification-center/test-send`, {
         method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
-        body: JSON.stringify({ channel: "sms", recipient: testPhone, message: testMsg }),
+        body: JSON.stringify({
+          channel: "sms",
+          recipient: digits,
+          message: testMsg,
+          templateId: testSelectedTplId || undefined,
+        }),
       });
       const d = await r.json();
       setTestResult(d);
-      toast({ title: d.ok ? "Test SMS sent!" : "Test SMS failed", variant: d.ok ? "default" : "destructive" });
+      toast({ title: d.ok ? "✅ SMS delivered to gateway!" : `❌ SMS failed: ${d.errorMessage || d.message || "See details below"}`, variant: d.ok ? "default" : "destructive" });
     } catch (e: any) {
       setTestResult({ ok: false, error: e.message });
+      toast({ title: "Request error", description: e.message, variant: "destructive" });
     } finally { setTesting(false); }
   };
 
@@ -267,30 +276,120 @@ export default function SMSTemplateManager() {
 
         {/* Quick Test Panel */}
         {showTest && (
-          <div className="mb-6 bg-amber-50 border border-amber-200 rounded-xl p-5">
-            <h3 className="font-semibold text-amber-800 mb-3 flex items-center gap-2">
-              <Send className="w-4 h-4" /> Quick Route Test (non-DLT, for connectivity check only)
+          <div className="mb-6 bg-amber-50 border border-amber-200 rounded-xl p-5 space-y-4">
+            <h3 className="font-semibold text-amber-800 flex items-center gap-2">
+              <Send className="w-4 h-4" /> Test SMS Send
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">Phone Number (10-digit)</label>
+                <label className="text-xs font-medium text-gray-600 block mb-1">Phone Number (10-digit) *</label>
                 <input value={testPhone} onChange={e => setTestPhone(e.target.value)}
                   placeholder="9876543210" className="w-full border rounded-lg px-3 py-2 text-sm" />
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">Message</label>
+                <label className="text-xs font-medium text-gray-600 block mb-1">Template (optional)</label>
+                <select
+                  value={testSelectedTplId}
+                  onChange={e => {
+                    setTestSelectedTplId(e.target.value);
+                    const tpl = templates.find(t => t.id === e.target.value);
+                    if (tpl) setTestMsg(tpl.body || "");
+                  }}
+                  className="w-full border rounded-lg px-3 py-2 text-sm bg-white"
+                >
+                  <option value="">— Quick Route (no DLT) —</option>
+                  {templates.filter(t => t.enabled && t.dlt_template_id).map(t => (
+                    <option key={t.id} value={t.id}>{t.name} ({t.dlt_template_id})</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 block mb-1">
+                  Variables (pipe-separated for DLT vars)
+                </label>
                 <input value={testMsg} onChange={e => setTestMsg(e.target.value)}
-                  placeholder="Test message…" className="w-full border rounded-lg px-3 py-2 text-sm" />
+                  placeholder="Value1|Value2|Value3" className="w-full border rounded-lg px-3 py-2 text-sm" />
               </div>
             </div>
-            <button onClick={sendGenericTest} disabled={testing}
-              className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 text-sm font-medium disabled:opacity-50">
-              {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              Send
-            </button>
+            {testSelectedTplId && (() => {
+              const tpl = templates.find(t => t.id === testSelectedTplId);
+              return tpl ? (
+                <div className="text-xs bg-white border border-amber-200 rounded-lg px-3 py-2 space-y-1">
+                  <div className="flex gap-4 flex-wrap">
+                    <span><span className="text-gray-500">DLT ID:</span> <span className="font-mono font-bold text-amber-700">{tpl.dlt_template_id}</span></span>
+                    <span><span className="text-gray-500">Sender:</span> <span className="font-mono font-bold">{tpl.sender_id || "ABURHA"}</span></span>
+                    {tpl.dlt_entity_id && <span><span className="text-gray-500">Entity ID:</span> <span className="font-mono">{tpl.dlt_entity_id}</span></span>}
+                    <span><span className="text-gray-500">Vars:</span> <span className="font-mono">{tpl.variable_count ?? "?"}</span></span>
+                  </div>
+                  <div className="text-gray-500 italic truncate">Template: {tpl.body}</div>
+                </div>
+              ) : null;
+            })()}
+            <div className="flex items-center gap-3">
+              <button onClick={sendGenericTest} disabled={testing}
+                className="flex items-center gap-2 px-5 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 text-sm font-semibold disabled:opacity-50">
+                {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                {testing ? "Sending…" : "Send Test SMS"}
+              </button>
+              {!testSelectedTplId && <span className="text-xs text-gray-500">No template selected — will use Quick Route (non-DLT)</span>}
+            </div>
+
+            {/* Full response display */}
             {testResult && (
-              <div className={`mt-3 rounded-lg p-3 text-xs font-mono whitespace-pre-wrap ${testResult.ok ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200"}`}>
-                {JSON.stringify(testResult, null, 2)}
+              <div className={`rounded-xl border-2 p-4 space-y-3 ${testResult.ok ? "border-green-300 bg-green-50" : "border-red-300 bg-red-50"}`}>
+                {/* Status banner */}
+                <div className={`flex items-center gap-2 font-bold text-sm ${testResult.ok ? "text-green-700" : "text-red-700"}`}>
+                  {testResult.ok
+                    ? <CheckCircle2 className="w-5 h-5" />
+                    : <XCircle className="w-5 h-5" />}
+                  {testResult.ok ? "✅ SMS accepted by Fast2SMS gateway" : "❌ Fast2SMS rejected the request"}
+                  {testResult.durationMs != null && <span className="ml-auto text-xs font-normal text-gray-500">{testResult.durationMs}ms</span>}
+                </div>
+
+                {/* Key fields grid */}
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+                  {[
+                    { label: "Route", value: testResult.route },
+                    { label: "HTTP Status", value: testResult.httpStatus },
+                    { label: "Mobile", value: testResult.numbers || testResult.mobile },
+                    { label: "Sender ID", value: testResult.senderId },
+                    { label: "DLT Template ID", value: testResult.dltTemplateId || "—" },
+                    { label: "Entity ID", value: testResult.entityId || "—" },
+                    { label: "Authorization", value: testResult.authorization },
+                    { label: "Variables sent", value: testResult.variablesSent ? testResult.variablesSent.join(" | ") : "—" },
+                    { label: "Error Code", value: testResult.errorCode || "—" },
+                    { label: "Error Message", value: testResult.errorMessage || "—" },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="bg-white rounded-lg px-3 py-2 border border-gray-200">
+                      <div className="text-gray-400 text-[10px] uppercase tracking-wide">{label}</div>
+                      <div className="font-mono font-medium text-gray-800 break-all mt-0.5">{String(value ?? "—")}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Request URL */}
+                {testResult.requestUrl && (
+                  <div className="bg-white rounded-lg px-3 py-2 border border-gray-200">
+                    <div className="text-gray-400 text-[10px] uppercase tracking-wide mb-1">Exact Request URL sent to Fast2SMS</div>
+                    <div className="font-mono text-[10px] text-blue-700 break-all">{testResult.requestUrl}</div>
+                  </div>
+                )}
+
+                {/* Template body */}
+                {testResult.templateBody && (
+                  <div className="bg-white rounded-lg px-3 py-2 border border-gray-200">
+                    <div className="text-gray-400 text-[10px] uppercase tracking-wide mb-1">DLT Template Body (registered)</div>
+                    <div className="text-xs text-gray-700 italic">{testResult.templateBody}</div>
+                  </div>
+                )}
+
+                {/* Raw gateway response */}
+                <div className="bg-white rounded-lg px-3 py-2 border border-gray-200">
+                  <div className="text-gray-400 text-[10px] uppercase tracking-wide mb-1">Raw Fast2SMS Gateway Response</div>
+                  <pre className="text-[10px] font-mono text-gray-800 whitespace-pre-wrap overflow-x-auto">
+                    {JSON.stringify(testResult.apiResponse, null, 2)}
+                  </pre>
+                </div>
               </div>
             )}
           </div>
