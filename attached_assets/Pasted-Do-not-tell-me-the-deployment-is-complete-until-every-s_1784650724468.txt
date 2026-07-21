@@ -1,0 +1,112 @@
+Do not tell me the deployment is complete until every step below has been verified with live data.
+
+1. Database Verification
+
+Verify that the sms_templates (or equivalent) table exists.
+
+Confirm:
+
+* All DLT templates are present.
+* Template IDs match Fast2SMS.
+* Sender ID is correct.
+* Variable count is correct.
+* Event mapping is correct.
+* Active status is enabled.
+
+Return screenshots and SQL query results.
+
+2. Migration Verification
+
+Verify that every required migration has run successfully.
+
+If any column or table is missing:
+
+* Run the migration.
+* Restart the API.
+* Verify again.
+
+Do not continue until the database schema is correct.
+
+3. Admin SMS Template Manager
+
+Verify that the Admin panel loads the SMS Template Manager.
+
+It must allow:
+
+* View templates
+* Edit template
+* Enable/Disable
+* Test SMS
+* View variable mapping
+
+Provide screenshots.
+
+4. Live SMS Test
+
+For each DLT template:
+
+* Generate the exact request.
+* Send a live SMS.
+* Record:
+    * HTTP status
+    * Request URL
+    * Request payload
+    * Fast2SMS response
+    * Delivery status
+
+If any template fails, identify the exact reason before moving to the next.
+
+5. Event Mapping Verification
+
+Verify that each business event triggers the correct template:
+
+* Booking Created
+* Booking Approved
+* Invoice Generated
+* Payment Pending
+* Payment Received
+* Receipt Generated
+* Agreement Generated
+* Flight Ticket Issued
+* Journey Reminder
+
+6. Notification Logs
+
+Verify that the notification log records:
+
+* Customer
+* Booking ID
+* Event
+* Template ID
+* Variables sent
+* Provider response
+* Status
+* Retry count
+
+7. End-to-End Test
+
+Create a test booking and verify:
+
+* SMS received
+* Email received
+* WhatsApp received (if configured)
+* Agreement generated
+* Invoice generated
+* Dashboard updated
+
+8. Final Report
+
+Do not mark this task complete until you provide:
+
+* Database verification
+* Migration verification
+* Live SMS proof
+* Notification log proof
+* Admin Template Manager screenshots
+* Final PASS/FAIL report
+
+If anything fails, stop immediately and report the exact error instead of claiming success.
+
+⸻
+
+This will ensure the deployment is genuinely production-ready rather than just successfully built. After this verification passes, you can move on to improving the agreement fields, flight details, hotel allocation, and customer dashboard.
