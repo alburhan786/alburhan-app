@@ -111,13 +111,17 @@ async function logSMS(data: {
   eventType: string;
   mobile: string;
   templateId: string;
+  senderId?: string;
   message?: string;
   status: "sent" | "failed";
   httpStatus?: number;
   responsePayload?: unknown;
   errorMessage?: string;
+  messageId?: string | null;
   bookingId?: string;
   customerId?: string;
+  customerName?: string;
+  bookingNumber?: string;
   retryCount?: number;
 }) {
   try {
@@ -126,20 +130,24 @@ async function logSMS(data: {
       `INSERT INTO notification_logs
        (id, event_type, customer_id, booking_id, channel, recipient, message, status,
         provider_response, provider_name, api_endpoint, http_status, request_payload,
-        sent_at, retry_count)
+        sent_at, retry_count, sender_id, wamid, customer_name, booking_number)
        VALUES ($1,$2,$3,$4,'sms',$5,$6,$7,$8,'Fast2SMS',
                'https://www.fast2sms.com/dev/bulkV2',
-               $9,$10,NOW(),$11)`,
+               $9,$10,NOW(),$11,$12,$13,$14,$15)`,
       [
         id, data.eventType,
         data.customerId || null, data.bookingId || null,
         data.mobile,
         data.message || null,
         data.status,
-        JSON.stringify({ ok: data.status === "sent", templateId: data.templateId, response: data.responsePayload, error: data.errorMessage }),
+        JSON.stringify({ ok: data.status === "sent", templateId: data.templateId, senderId: data.senderId, response: data.responsePayload, error: data.errorMessage }),
         data.httpStatus || null,
-        JSON.stringify({ mobile: data.mobile, template_id: data.templateId, route: "dlt" }),
+        JSON.stringify({ mobile: data.mobile, template_id: data.templateId, sender_id: data.senderId, route: "dlt" }),
         data.retryCount ?? 0,
+        data.senderId || null,
+        data.messageId || null,
+        data.customerName || null,
+        data.bookingNumber || null,
       ]
     );
   } catch (e) {
@@ -157,6 +165,7 @@ export interface SMSResult {
   httpStatus?: number;
   responsePayload?: unknown;
   errorMessage?: string;
+  messageId?: string | null;
   logId?: string;
 }
 
@@ -257,6 +266,8 @@ async function sendDLT(
     message?: string;
     bookingId?: string;
     customerId?: string;
+    customerName?: string;
+    bookingNumber?: string;
     senderOverride?: string; // per-template sender ID (from senders map)
   }
 ): Promise<SMSResult> {
@@ -347,25 +358,30 @@ async function sendDLT(
       const dltFailMsg = `DLT template rejected by Fast2SMS: ${respMsg}`;
       console.warn(`[SMS][${opts.eventType}] ⛔ ${dltFailMsg} — NOT falling back to Quick Route (production policy)`);
       await logSMS({
-        eventType: opts.eventType, mobile, templateId,
+        eventType: opts.eventType, mobile, templateId, senderId: effectiveSenderId,
         message: opts.message, status: "failed",
         httpStatus, responsePayload,
         errorMessage: dltFailMsg,
         bookingId: opts.bookingId, customerId: opts.customerId,
+        customerName: opts.customerName, bookingNumber: opts.bookingNumber,
       });
       return { ok: false, provider: "Fast2SMS", templateId, mobile, httpStatus, responsePayload, errorMessage: dltFailMsg };
     } else {
       console.error(`[SMS][${opts.eventType}] ❌ Delivery failed — ${respMsg}`);
     }
 
+    const messageId: string | null = (resp.data as any)?.request_id || null;
+    if (ok && messageId) console.log(`[SMS][${opts.eventType}] Message ID: ${messageId}`);
+
     await logSMS({
-      eventType: opts.eventType, mobile, templateId,
+      eventType: opts.eventType, mobile, templateId, senderId: effectiveSenderId,
       message: opts.message, status: ok ? "sent" : "failed",
-      httpStatus, responsePayload, errorMessage,
+      httpStatus, responsePayload, errorMessage, messageId,
       bookingId: opts.bookingId, customerId: opts.customerId,
+      customerName: opts.customerName, bookingNumber: opts.bookingNumber,
     });
 
-    return { ok, provider: "Fast2SMS", templateId, mobile, httpStatus, responsePayload };
+    return { ok, provider: "Fast2SMS", templateId, mobile, httpStatus, responsePayload, messageId };
   } catch (err: any) {
     const resp = err?.response;
     httpStatus = resp?.status || 0;
@@ -375,10 +391,11 @@ async function sendDLT(
     console.error(`[SMS][${opts.eventType}] ✗ after 3 retries for ${mobile}:`, errorMessage);
 
     await logSMS({
-      eventType: opts.eventType, mobile, templateId,
+      eventType: opts.eventType, mobile, templateId, senderId: effectiveSenderId,
       message: opts.message, status: "failed",
       httpStatus, responsePayload, errorMessage,
       bookingId: opts.bookingId, customerId: opts.customerId,
+      customerName: opts.customerName, bookingNumber: opts.bookingNumber,
       retryCount: 2,
     });
 

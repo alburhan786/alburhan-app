@@ -547,4 +547,178 @@ router.get("/production-report", async (_req: AuthenticatedRequest, res) => {
   });
 });
 
+// ── POST /api/sms-settings/production-test ───────────────────────────────────
+// Fire a real DLT SMS test for a specific event using its configured template + sender.
+// Logs to notification_logs. Returns full provider response for verification.
+router.post("/production-test", async (req: AuthenticatedRequest, res) => {
+  const { event, mobile, variables } = req.body || {};
+  if (!event || !mobile) {
+    return void res.status(400).json({ ok: false, error: "event and mobile are required" });
+  }
+
+  const phone = toPhone(String(mobile));
+  if (phone.length !== 10) {
+    return void res.status(400).json({ ok: false, error: "Invalid mobile — must be 10 digits" });
+  }
+
+  const f2s = getCachedConfig("fast2sms");
+  const extra = f2s.extra || {};
+  const apiKey = f2s.apiKey || process.env.FAST2SMS_API_KEY || "";
+  if (!apiKey) return void res.status(400).json({ ok: false, error: "Fast2SMS API key not configured" });
+
+  const globalSender = extra.sender_id || "ALBURH";
+
+  // Event → tidKey + senderKey map
+  const EVENT_MAP: Record<string, { tidKey: string; senderKey: string; label: string }> = {
+    otp:                  { tidKey: "otp_template_id",          senderKey: "otp_sender",                label: "OTP — Login / Registration" },
+    forgot_password_otp:  { tidKey: "forgot_password_otp_tid",  senderKey: "forgot_password_otp_sender", label: "OTP — Forgot Password" },
+    booking_created:      { tidKey: "booking_created_tid",      senderKey: "booking_created_sender",     label: "Booking Received" },
+    booking_approved:     { tidKey: "booking_confirmed_tid",    senderKey: "booking_confirmed_sender",   label: "Booking Approved" },
+    booking_rejected:     { tidKey: "booking_rejected_tid",     senderKey: "booking_rejected_sender",   label: "Booking Rejected" },
+    payment_received:     { tidKey: "payment_received_tid",     senderKey: "payment_received_sender",   label: "Full Payment Received" },
+    partial_payment:      { tidKey: "partial_payment_tid",      senderKey: "partial_payment_sender",    label: "Partial Payment" },
+    invoice_generated:    { tidKey: "invoice_created_tid",      senderKey: "invoice_created_sender",    label: "Invoice Generated" },
+    agreement_signed:     { tidKey: "agreement_signed_tid",     senderKey: "agreement_signed_sender",   label: "Agreement Signed" },
+    payment_due:          { tidKey: "pending_payment_tid",      senderKey: "pending_payment_sender",    label: "Payment Reminder" },
+    ticket_issued:        { tidKey: "ticket_issued_tid",        senderKey: "ticket_issued_sender",      label: "Flight Ticket Issued" },
+    visa_ready:           { tidKey: "visa_issued_tid",          senderKey: "visa_issued_sender",        label: "Visa Issued" },
+    hotel_voucher:        { tidKey: "hotel_voucher_issued_tid", senderKey: "hotel_voucher_sender",      label: "Hotel Voucher Issued" },
+    departure_reminder:   { tidKey: "departure_reminder_tid",  senderKey: "departure_reminder_sender", label: "Departure Reminder" },
+    arrival_reminder:     { tidKey: "arrival_reminder_tid",    senderKey: "arrival_reminder_sender",   label: "Arrival Reminder" },
+    welcome_saudi_arabia: { tidKey: "welcome_saudi_arabia_tid",senderKey: "welcome_saudi_arabia_sender",label: "Welcome to Saudi Arabia" },
+    return_reminder:      { tidKey: "return_reminder_tid",     senderKey: "return_reminder_sender",    label: "Return Reminder" },
+  };
+
+  const ev = EVENT_MAP[event];
+  if (!ev) return void res.status(400).json({ ok: false, error: `Unknown event type: "${event}"` });
+
+  const templateId = extra[ev.tidKey] || "";
+  const senderId = extra[ev.senderKey] || globalSender;
+
+  if (!templateId) {
+    return void res.json({
+      ok: false,
+      event,
+      label: ev.label,
+      templateId: null,
+      senderId,
+      route: "dlt",
+      mobile: phone,
+      status: "SKIPPED",
+      reason: `DLT Template not configured for "${event}". Set ${ev.tidKey} in DLT Template Manager.`,
+      sentAt: null,
+    });
+  }
+
+  const varsEncoded = Array.isArray(variables) && variables.length
+    ? encodeURIComponent(variables.join("|") + "|")
+    : encodeURIComponent("Al Burhan|TEST|Production Test|");
+
+  const endpoint = "https://www.fast2sms.com/dev/bulkV2";
+  const url = `${endpoint}?authorization=${apiKey}&route=dlt&sender_id=${senderId}&message=${templateId}&variables_values=${varsEncoded}&numbers=${phone}&flash=0`;
+  const maskedUrl = url.replace(apiKey, `${apiKey.slice(0, 6)}***`);
+  const startMs = Date.now();
+  const sentAt = new Date().toISOString();
+  const adminName = (req as any).user?.name || (req as any).user?.email || "admin";
+
+  try {
+    const resp = await axios.get(url, { timeout: 15000 });
+    const ok = resp.data?.return === true;
+    const durationMs = Date.now() - startMs;
+    const messageId: string | null = resp.data?.request_id || null;
+    const providerMsg: string = Array.isArray(resp.data?.message) ? resp.data.message.join("; ") : (resp.data?.message || "");
+
+    // Log to notification_logs permanently
+    const logId = `ptest_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    await pool.query(
+      `INSERT INTO notification_logs
+       (id, event_type, channel, recipient, message, status, provider_response,
+        provider_name, api_endpoint, http_status, request_payload,
+        sent_at, retry_count, sender_id, wamid, customer_name)
+       VALUES ($1,$2,'sms',$3,$4,$5,$6,'Fast2SMS',$7,$8,$9,NOW(),0,$10,$11,$12)`,
+      [
+        logId, event, phone,
+        `[PRODUCTION TEST] ${ev.label}`,
+        ok ? "sent" : "failed",
+        JSON.stringify({ ok, templateId, senderId, response: resp.data, route: "dlt", test: true, testedBy: adminName }),
+        endpoint,
+        resp.status,
+        JSON.stringify({ mobile: phone, template_id: templateId, sender_id: senderId, route: "dlt", test: true }),
+        senderId,
+        messageId,
+        `[TEST] by ${adminName}`,
+      ]
+    ).catch(() => {});
+
+    res.json({
+      ok,
+      event,
+      label: ev.label,
+      templateId,
+      senderId,
+      route: "dlt",
+      mobile: phone,
+      status: ok ? "DELIVERED" : "FAILED",
+      messageId,
+      sentAt,
+      durationMs,
+      httpStatus: resp.status,
+      providerResponse: resp.data,
+      providerMessage: providerMsg,
+      requestUrl: maskedUrl,
+      logId,
+      testedBy: adminName,
+      validations: {
+        templateConfigured: true,
+        senderIdSet: true,
+        routeDlt: true,
+        noFallback: true,
+        apiKeyPresent: true,
+      },
+    });
+  } catch (err: any) {
+    const durationMs = Date.now() - startMs;
+    const resp = err?.response;
+    const logId = `ptest_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const errMsg = resp?.data?.message || err.message;
+    await pool.query(
+      `INSERT INTO notification_logs
+       (id, event_type, channel, recipient, message, status, provider_response,
+        provider_name, api_endpoint, http_status, request_payload,
+        sent_at, retry_count, sender_id, customer_name)
+       VALUES ($1,$2,'sms',$3,$4,'failed',$5,'Fast2SMS',$6,$7,$8,NOW(),0,$9,$10)`,
+      [
+        logId, event, phone,
+        `[PRODUCTION TEST] ${ev.label}`,
+        JSON.stringify({ ok: false, templateId, senderId, error: errMsg, route: "dlt", test: true, testedBy: adminName }),
+        endpoint,
+        resp?.status || 0,
+        JSON.stringify({ mobile: phone, template_id: templateId, sender_id: senderId, route: "dlt", test: true }),
+        senderId,
+        `[TEST] by ${adminName}`,
+      ]
+    ).catch(() => {});
+
+    res.json({
+      ok: false,
+      event,
+      label: ev.label,
+      templateId,
+      senderId,
+      route: "dlt",
+      mobile: phone,
+      status: "FAILED",
+      messageId: null,
+      sentAt,
+      durationMs,
+      httpStatus: resp?.status || 0,
+      providerResponse: resp?.data || { error: err.message },
+      providerMessage: errMsg,
+      requestUrl: maskedUrl,
+      logId,
+      testedBy: adminName,
+    });
+  }
+});
+
 export default router;
