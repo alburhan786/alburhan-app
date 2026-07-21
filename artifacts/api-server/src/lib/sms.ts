@@ -9,7 +9,7 @@ function getConfig() {
   const apiKey = db.apiKey || process.env.FAST2SMS_API_KEY || process.env.FAST2SMS_XXL_API_KEY || "";
   const enabled = db.enabled !== false;
   const ex = db.extra || {};
-  const globalSender = ex.sender_id || "ABURHA";
+  const globalSender = ex.sender_id || "ALBURH";
   // Emergency quick-route fallback — must be EXPLICITLY enabled by admin
   const emergencyFallbackEnabled = ex.emergency_sms_fallback_enabled === "1";
   return {
@@ -21,38 +21,45 @@ function getConfig() {
     // Per-event template IDs — fall back to generic notify_template_id
     notify_tid: ex.notify_template_id || "",
     tids: {
-      booking_created:    ex.booking_created_tid    || ex.notify_template_id || "",
-      booking_confirmed:  ex.booking_confirmed_tid  || ex.notify_template_id || "",
-      booking_rejected:   ex.booking_rejected_tid   || ex.notify_template_id || "",
-      payment_received:   ex.payment_received_tid   || ex.notify_template_id || "",
-      partial_payment:    ex.partial_payment_tid    || ex.payment_received_tid || ex.notify_template_id || "",
-      pending_payment:    ex.pending_payment_tid    || ex.notify_template_id || "",
-      invoice_created:    ex.invoice_created_tid    || ex.notify_template_id || "",
-      ticket_issued:      ex.ticket_issued_tid      || ex.notify_template_id || "",
-      visa_issued:        ex.visa_issued_tid        || ex.notify_template_id || "",
-      hotel_voucher:      ex.hotel_voucher_issued_tid || ex.notify_template_id || "",
-      departure_reminder: ex.departure_reminder_tid || ex.notify_template_id || "",
-      arrival_reminder:   ex.arrival_reminder_tid   || ex.notify_template_id || "",
-      eid_greeting:       ex.eid_greeting_tid       || ex.notify_template_id || "",
-      custom:             ex.custom_tid             || ex.notify_template_id || "",
+      booking_created:       ex.booking_created_tid       || ex.notify_template_id || "",
+      booking_confirmed:     ex.booking_confirmed_tid     || ex.notify_template_id || "",
+      booking_rejected:      ex.booking_rejected_tid      || ex.notify_template_id || "",
+      payment_received:      ex.payment_received_tid      || ex.notify_template_id || "",
+      partial_payment:       ex.partial_payment_tid       || ex.payment_received_tid || ex.notify_template_id || "",
+      pending_payment:       ex.pending_payment_tid       || ex.notify_template_id || "",
+      invoice_created:       ex.invoice_created_tid       || ex.notify_template_id || "",
+      agreement_signed:      ex.agreement_signed_tid      || ex.notify_template_id || "",
+      ticket_issued:         ex.ticket_issued_tid         || ex.notify_template_id || "",
+      visa_issued:           ex.visa_issued_tid           || ex.notify_template_id || "",
+      hotel_voucher:         ex.hotel_voucher_issued_tid  || ex.notify_template_id || "",
+      departure_reminder:    ex.departure_reminder_tid    || ex.notify_template_id || "",
+      arrival_reminder:      ex.arrival_reminder_tid      || ex.notify_template_id || "",
+      welcome_saudi_arabia:  ex.welcome_saudi_arabia_tid  || ex.notify_template_id || "",
+      return_reminder:       ex.return_reminder_tid       || ex.notify_template_id || "",
+      eid_greeting:          ex.eid_greeting_tid          || ex.notify_template_id || "",
+      custom:                ex.custom_tid                || ex.notify_template_id || "",
     },
     // Per-event sender IDs — fall back to global sender_id
     senders: {
-      booking_created:    ex.booking_created_sender    || globalSender,
-      booking_confirmed:  ex.booking_confirmed_sender  || globalSender,
-      booking_rejected:   ex.booking_rejected_sender   || globalSender,
-      payment_received:   ex.payment_received_sender   || globalSender,
-      partial_payment:    ex.partial_payment_sender    || globalSender,
-      pending_payment:    ex.pending_payment_sender    || globalSender,
-      invoice_created:    ex.invoice_created_sender    || globalSender,
-      ticket_issued:      ex.ticket_issued_sender      || globalSender,
-      visa_issued:        ex.visa_issued_sender        || globalSender,
-      hotel_voucher:      ex.hotel_voucher_sender      || globalSender,
-      departure_reminder: ex.departure_reminder_sender || globalSender,
-      arrival_reminder:   ex.arrival_reminder_sender   || globalSender,
-      eid_greeting:       ex.eid_greeting_sender       || globalSender,
-      custom:             ex.custom_sender             || globalSender,
-      otp:                ex.otp_sender               || globalSender,
+      booking_created:       ex.booking_created_sender       || globalSender,
+      booking_confirmed:     ex.booking_confirmed_sender     || globalSender,
+      booking_rejected:      ex.booking_rejected_sender      || globalSender,
+      payment_received:      ex.payment_received_sender      || globalSender,
+      partial_payment:       ex.partial_payment_sender       || globalSender,
+      pending_payment:       ex.pending_payment_sender       || globalSender,
+      invoice_created:       ex.invoice_created_sender       || globalSender,
+      agreement_signed:      ex.agreement_signed_sender      || globalSender,
+      ticket_issued:         ex.ticket_issued_sender         || globalSender,
+      visa_issued:           ex.visa_issued_sender           || globalSender,
+      hotel_voucher:         ex.hotel_voucher_sender         || globalSender,
+      departure_reminder:    ex.departure_reminder_sender    || globalSender,
+      arrival_reminder:      ex.arrival_reminder_sender      || globalSender,
+      welcome_saudi_arabia:  ex.welcome_saudi_arabia_sender  || globalSender,
+      return_reminder:       ex.return_reminder_sender       || globalSender,
+      eid_greeting:          ex.eid_greeting_sender          || globalSender,
+      custom:                ex.custom_sender                || globalSender,
+      otp:                   ex.otp_sender                   || globalSender,
+      forgot_password_otp:   ex.forgot_password_otp_sender   || ex.otp_sender || globalSender,
     },
   };
 }
@@ -334,29 +341,18 @@ async function sendDLT(
     if (ok) {
       console.log(`[SMS][${opts.eventType}] ✅ Delivered via ${effectiveSenderId}/DLT → ${maskedUrl.slice(0, 80)}`);
     } else if (isTemplateError) {
-      // DLT template rejected — log failure, then try emergency quick route ONLY if admin enabled it
-      const { emergencyFallbackEnabled, ex: currentEx } = getConfig();
-      const dltFailMsg = `DLT template rejected: ${respMsg}`;
-      console.warn(`[SMS][${opts.eventType}] ⚠ ${dltFailMsg}`);
+      // DLT template rejected — log failure and STOP. Per production policy:
+      // "If DLT rejects the SMS: Do NOT use Quick SMS. Do NOT use Emergency SMS."
+      // WhatsApp and Email continue independently via their own channels.
+      const dltFailMsg = `DLT template rejected by Fast2SMS: ${respMsg}`;
+      console.warn(`[SMS][${opts.eventType}] ⛔ ${dltFailMsg} — NOT falling back to Quick Route (production policy)`);
       await logSMS({
         eventType: opts.eventType, mobile, templateId,
         message: opts.message, status: "failed",
-        httpStatus, responsePayload, errorMessage: dltFailMsg,
+        httpStatus, responsePayload,
+        errorMessage: dltFailMsg,
         bookingId: opts.bookingId, customerId: opts.customerId,
       });
-      if (emergencyFallbackEnabled) {
-        const reason = (currentEx.emergency_reason as string) || "Emergency fallback enabled";
-        console.warn(`[SMS][${opts.eventType}] ⚠ DLT rejected — using EMERGENCY quick route (reason: ${reason})`);
-        const qMsg = buildQuickMessage(opts.eventType, variables, opts.message);
-        return sendQuickRoute(mobile, qMsg, {
-          ...opts,
-          emergencyReason: reason,
-          emergencyEnabledBy: currentEx.emergency_enabled_by as string,
-          emergencyEnabledAt: currentEx.emergency_enabled_at as string,
-          primaryDltFailureReason: dltFailMsg,
-          dltSenderIdAttempted: effectiveSenderId,
-        });
-      }
       return { ok: false, provider: "Fast2SMS", templateId, mobile, httpStatus, responsePayload, errorMessage: dltFailMsg };
     } else {
       console.error(`[SMS][${opts.eventType}] ❌ Delivery failed — ${respMsg}`);

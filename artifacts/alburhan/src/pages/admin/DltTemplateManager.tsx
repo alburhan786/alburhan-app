@@ -13,20 +13,24 @@ interface DltField {
 }
 
 const DLT_FIELDS: DltField[] = [
-  { key: "otp_template_id",          label: "OTP (Login / Verification)",           event: "otp",                senderKey: "otp_sender" },
-  { key: "booking_created_tid",      label: "1. Booking Received",                   event: "booking_created",    senderKey: "booking_created_sender" },
-  { key: "booking_confirmed_tid",    label: "2. Booking Approved",                   event: "booking_approved",   senderKey: "booking_confirmed_sender" },
-  { key: "booking_rejected_tid",     label: "3. Booking Rejected",                   event: "booking_rejected",   senderKey: "booking_rejected_sender" },
-  { key: "payment_received_tid",     label: "4. Full Payment Received",              event: "payment_received",   senderKey: "payment_received_sender" },
-  { key: "partial_payment_tid",      label: "5. Partial Payment",                    event: "partial_payment",    senderKey: "partial_payment_sender" },
-  { key: "invoice_created_tid",      label: "6. Invoice Ready",                      event: "invoice_generated",  senderKey: "invoice_created_sender" },
-  { key: "pending_payment_tid",      label: "7. Payment Reminder",                   event: "payment_due",        senderKey: "pending_payment_sender" },
-  { key: "ticket_issued_tid",        label: "8. Flight Ticket Issued",               event: "ticket_issued",      senderKey: "ticket_issued_sender" },
-  { key: "departure_reminder_tid",   label: "9. Departure Reminder",                 event: "departure_reminder", senderKey: "departure_reminder_sender" },
-  { key: "visa_issued_tid",          label: "10. Visa Issued",                       event: "visa_approved",      senderKey: "visa_issued_sender" },
-  { key: "hotel_voucher_issued_tid", label: "11. Hotel Voucher Issued",              event: "hotel_voucher_issued",senderKey: "hotel_voucher_sender" },
-  { key: "arrival_reminder_tid",     label: "12. Arrival Reminder",                  event: "arrival_reminder",   senderKey: "arrival_reminder_sender" },
-  { key: "eid_greeting_tid",         label: "13. Eid / Special Occasion Greeting",   event: "eid_greeting",       senderKey: "eid_greeting_sender" },
+  { key: "otp_template_id",           label: "OTP — Login / Registration",           event: "otp",                  senderKey: "otp_sender" },
+  { key: "forgot_password_otp_tid",   label: "OTP — Forgot Password",                event: "forgot_password_otp",  senderKey: "forgot_password_otp_sender" },
+  { key: "booking_created_tid",       label: "1. Booking Received",                  event: "booking_created",      senderKey: "booking_created_sender" },
+  { key: "booking_confirmed_tid",     label: "2. Booking Approved / Confirmed",      event: "booking_approved",     senderKey: "booking_confirmed_sender" },
+  { key: "booking_rejected_tid",      label: "3. Booking Rejected",                  event: "booking_rejected",     senderKey: "booking_rejected_sender" },
+  { key: "payment_received_tid",      label: "4. Full Payment Received",             event: "payment_received",     senderKey: "payment_received_sender" },
+  { key: "partial_payment_tid",       label: "5. Partial Payment",                   event: "partial_payment",      senderKey: "partial_payment_sender" },
+  { key: "invoice_created_tid",       label: "6. Invoice Generated",                 event: "invoice_generated",    senderKey: "invoice_created_sender" },
+  { key: "agreement_signed_tid",      label: "7. Agreement Signed",                  event: "agreement_signed",     senderKey: "agreement_signed_sender" },
+  { key: "pending_payment_tid",       label: "8. Payment Reminder",                  event: "payment_due",          senderKey: "pending_payment_sender" },
+  { key: "ticket_issued_tid",         label: "9. Flight Ticket Issued",              event: "ticket_issued",        senderKey: "ticket_issued_sender" },
+  { key: "visa_issued_tid",           label: "10. Visa Issued",                      event: "visa_approved",        senderKey: "visa_issued_sender" },
+  { key: "hotel_voucher_issued_tid",  label: "11. Hotel Voucher Issued",             event: "hotel_voucher_issued", senderKey: "hotel_voucher_sender" },
+  { key: "departure_reminder_tid",    label: "12. Departure Reminder",               event: "departure_reminder",   senderKey: "departure_reminder_sender" },
+  { key: "arrival_reminder_tid",      label: "13. Arrival Reminder",                 event: "arrival_reminder",     senderKey: "arrival_reminder_sender" },
+  { key: "welcome_saudi_arabia_tid",  label: "14. Welcome to Saudi Arabia",          event: "welcome_saudi_arabia", senderKey: "welcome_saudi_arabia_sender" },
+  { key: "return_reminder_tid",       label: "15. Return Reminder",                  event: "return_reminder",      senderKey: "return_reminder_sender" },
+  { key: "eid_greeting_tid",          label: "16. Eid / Special Occasion Greeting",  event: "eid_greeting",         senderKey: "eid_greeting_sender" },
 ];
 
 interface SenderIdRow { id: string; sender_id: string; status: string; default_sender: boolean; }

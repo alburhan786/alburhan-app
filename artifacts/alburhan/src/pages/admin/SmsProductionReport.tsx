@@ -8,8 +8,24 @@ import {
 
 const API = import.meta.env.VITE_API_URL || "";
 
+interface ChannelStat {
+  lastSent: string | null;
+  lastFailed: string | null;
+  totalSent: number;
+  totalFailed: number;
+}
+interface SmsEvent {
+  event: string;
+  label: string;
+  templateConfigured: boolean;
+  templateId: string | null;
+  senderId: string;
+  route: string;
+  sms: ChannelStat | null;
+  whatsapp: ChannelStat | null;
+  email: ChannelStat | null;
+}
 interface Check { id: string; label: string; pass: boolean; detail?: string; }
-interface SmsEvent { event: string; label: string; templateConfigured: boolean; templateId: string | null; route: string; }
 interface ReportData {
   ok: boolean;
   productionReady: boolean;
@@ -20,6 +36,12 @@ interface ReportData {
   smsConfig: { apiKeyConfigured: boolean; globalSenderId: string; approvedSenderIds: string[]; templatesCoverage: { configured: number; total: number }; events: SmsEvent[] };
   channels: { sms: any; whatsapp: any; email: any };
   checks: Check[];
+}
+
+function fmtTime(iso: string | null | undefined) {
+  if (!iso) return "—";
+  try { return new Date(iso).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" }); }
+  catch { return iso; }
 }
 
 function CheckRow({ check }: { check: Check }) {
@@ -80,10 +102,16 @@ function ChannelCard({ icon: Icon, label, enabled, detail, stat }: { icon: any; 
   );
 }
 
+function StatPill({ val, color }: { val: number; color: string }) {
+  if (!val) return <span className="text-gray-300 text-xs">0</span>;
+  return <span className={`text-xs font-semibold ${color}`}>{val}</span>;
+}
+
 export default function SmsProductionReport() {
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showEventDetail, setShowEventDetail] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -104,65 +132,107 @@ export default function SmsProductionReport() {
 
   const handleExport = () => {
     if (!data) return;
+    const hr = "=".repeat(56);
     const lines: string[] = [
-      "AL BURHAN TOURS & TRAVELS — SMS PRODUCTION VERIFICATION REPORT",
-      `Generated: ${new Date(data.generatedAt).toLocaleString("en-IN")}`,
-      `Production Ready: ${data.productionReady ? "YES" : "NO"}`,
-      `Score: ${data.summary.score}/100 (${data.summary.passed}/${data.summary.total} checks passed)`,
+      hr,
+      "  AL BURHAN TOURS & TRAVELS",
+      "  PRODUCTION NOTIFICATION VERIFICATION REPORT",
+      hr,
+      `  Generated     : ${new Date(data.generatedAt).toLocaleString("en-IN")}`,
+      `  Overall Status: ${data.productionReady ? "PASS" : "FAIL"}`,
+      `  Production Ready: ${data.productionReady ? "YES" : "NO"}`,
+      `  Score         : ${data.summary.score}/100 (${data.summary.passed}/${data.summary.total} checks passed)`,
       "",
-      "PRODUCTION POLICY",
-      `  Primary SMS Route: ${data.policy.primaryRoute.toUpperCase()}`,
-      `  Emergency Fallback Default: ${data.policy.emergencyFallbackDefault}`,
-      `  Quick Route Automatic: ${data.policy.quickRouteAutomatic ? "YES (VIOLATION)" : "NO (Correct)"}`,
+      "SMS PROVIDER STATUS",
+      `  Provider   : Fast2SMS`,
+      `  Route      : DLT Primary Only`,
+      `  API Key    : ${data.smsConfig.apiKeyConfigured ? "Configured" : "NOT CONFIGURED"}`,
+      `  Global Sender ID: ${data.smsConfig.globalSenderId}`,
+      `  Approved Sender IDs: ${data.smsConfig.approvedSenderIds.join(", ") || "None"}`,
+      `  24h Sent   : ${data.channels.sms.last24h.sent}`,
+      `  24h Failed : ${data.channels.sms.last24h.failed}`,
+      `  Emergency  : ${data.channels.sms.last24h.emergency > 0 ? `${data.channels.sms.last24h.emergency} (ACTIVE — review immediately)` : "0 (OFF — correct)"}`,
       "",
-      "EMERGENCY STATUS",
-      `  Status: ${data.emergencyStatus.enabled ? "ENABLED ⚠" : "OFF ✓"}`,
-      ...(data.emergencyStatus.enabled ? [
-        `  Reason: ${data.emergencyStatus.reason}`,
-        `  Enabled By: ${data.emergencyStatus.enabledBy}`,
-        `  Enabled At: ${data.emergencyStatus.enabledAt}`,
-        `  IP Address: ${data.emergencyStatus.enabledIp}`,
-      ] : []),
+      "WHATSAPP PROVIDER STATUS",
+      `  Provider   : BotBee`,
+      `  Status     : ${data.channels.whatsapp.enabled ? "Active" : "Inactive"}`,
+      `  24h Sent   : ${data.channels.whatsapp.last24h.sent}`,
+      `  24h Failed : ${data.channels.whatsapp.last24h.failed || 0}`,
       "",
-      "SMS DLT TEMPLATE COVERAGE",
+      "EMAIL PROVIDER STATUS",
+      `  Provider   : SMTP`,
+      `  Status     : ${data.channels.email.enabled ? "Active" : "Inactive"}`,
+      `  24h Sent   : ${data.channels.email.last24h.sent}`,
+      `  24h Failed : ${data.channels.email.last24h.failed || 0}`,
+      "",
+      "SENDER IDs CONFIGURED",
+      `  Default   : ${data.smsConfig.globalSenderId}`,
+      `  Approved  : ${data.smsConfig.approvedSenderIds.join(", ") || "None in DB"}`,
+      "",
+      "DLT TEMPLATES CONFIGURED",
+      `  ${data.smsConfig.templatesCoverage.configured} of ${data.smsConfig.templatesCoverage.total} events configured`,
+      "",
       ...data.smsConfig.events.map(e =>
-        `  [${e.templateConfigured ? "✓" : "✗"}] ${e.label}: ${e.templateId || "(not configured)"}`
+        `  [${e.templateConfigured ? "✓" : "✗"}] ${e.label.padEnd(34)} Sender: ${e.senderId.padEnd(8)} Template: ${e.templateId || "(not configured)"}`
       ),
       "",
-      "NOTIFICATION CHANNELS",
-      `  SMS (Fast2SMS DLT): ${data.channels.sms.enabled ? "Active" : "Inactive"} — Sent 24h: ${data.channels.sms.last24h.sent} | Failed: ${data.channels.sms.last24h.failed} | Emergency: ${data.channels.sms.last24h.emergency}`,
-      `  WhatsApp (BotBee): ${data.channels.whatsapp.enabled ? "Active" : "Inactive"} — Sent 24h: ${data.channels.whatsapp.last24h.sent}`,
-      `  Email (SMTP): ${data.channels.email.enabled ? "Active" : "Inactive"} — Sent 24h: ${data.channels.email.last24h.sent}`,
+      "NOTIFICATION DELIVERY STATS (ALL TIME)",
+      `  ${"Event".padEnd(30)} ${"SMS Sent".padStart(8)} ${"SMS Fail".padStart(9)} ${"WA Sent".padStart(8)} ${"Email Sent".padStart(10)}`,
+      "  " + "-".repeat(68),
+      ...data.smsConfig.events.map(e =>
+        `  ${e.label.slice(0, 29).padEnd(30)} ${String(e.sms?.totalSent ?? 0).padStart(8)} ${String(e.sms?.totalFailed ?? 0).padStart(9)} ${String(e.whatsapp?.totalSent ?? 0).padStart(8)} ${String(e.email?.totalSent ?? 0).padStart(10)}`
+      ),
       "",
-      "CHECKS",
+      "PRODUCTION POLICY CHECKS",
+      `  Auto Quick-Route Fallback : ${data.policy.quickRouteAutomatic ? "YES (VIOLATION)" : "NO (correct — DLT rejection does not trigger fallback)"}`,
+      `  Emergency Default         : ${data.policy.emergencyFallbackDefault}`,
+      `  Emergency Status          : ${data.emergencyStatus.enabled ? "ACTIVE ⚠ — disable immediately after DLT recovery" : "OFF ✓"}`,
+      ...(data.emergencyStatus.enabled ? [
+        `  Emergency Reason          : ${data.emergencyStatus.reason}`,
+        `  Enabled By                : ${data.emergencyStatus.enabledBy}`,
+        `  Enabled At                : ${data.emergencyStatus.enabledAt}`,
+        `  IP Address                : ${data.emergencyStatus.enabledIp}`,
+      ] : []),
+      "",
+      "SYSTEM CHECKS",
       ...data.checks.map(c => `  [${c.pass ? "PASS" : "FAIL"}] ${c.label}${c.detail ? ` — ${c.detail}` : ""}`),
+      "",
+      hr,
+      `  Overall Status    : ${data.productionReady ? "PASS" : "FAIL"}`,
+      `  SMS Provider      : ${data.smsConfig.apiKeyConfigured ? "PASS" : "FAIL"}`,
+      `  WhatsApp Provider : ${data.channels.whatsapp.enabled ? "PASS" : "FAIL"}`,
+      `  Email Provider    : ${data.channels.email.enabled ? "PASS" : "FAIL"}`,
+      `  Sender IDs        : ${data.smsConfig.approvedSenderIds.length} configured (default: ${data.smsConfig.globalSenderId})`,
+      `  DLT Templates     : ${data.smsConfig.templatesCoverage.configured}/${data.smsConfig.templatesCoverage.total} events configured`,
+      `  Production Ready  : ${data.productionReady ? "YES" : "NO"}`,
+      hr,
     ];
     const blob = new Blob([lines.join("\n")], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `sms-production-report-${new Date().toISOString().slice(0, 10)}.txt`;
+    a.download = `production-verification-report-${new Date().toISOString().slice(0, 10)}.txt`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
   return (
     <AdminLayout>
-      <div className="max-w-4xl mx-auto p-4 space-y-6">
+      <div className="max-w-5xl mx-auto p-4 space-y-6">
         {/* Header */}
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-xl font-bold flex items-center gap-2">
               <ShieldCheck className="w-5 h-5 text-blue-600" />
-              SMS Production Verification Report
+              Production Notification Verification Report
             </h1>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Live check of all production SMS routing rules, channel health, and DLT compliance.
+              Live check of SMS · WhatsApp · Email routing, DLT compliance, and delivery stats per event.
             </p>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={handleExport} disabled={!data} className="flex items-center gap-2 border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-40 transition-colors">
-              <Download className="w-4 h-4" /> Export
+              <Download className="w-4 h-4" /> Export .txt
             </button>
             <button onClick={load} disabled={loading} className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 transition-colors">
               {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
@@ -202,18 +272,45 @@ export default function SmsProductionReport() {
                   Generated {new Date(data.generatedAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "medium" })}
                 </p>
               </div>
-              {/* Policy summary chips */}
               <div className="flex flex-wrap gap-2 justify-center sm:justify-end">
                 <span className="flex items-center gap-1 px-3 py-1.5 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full">
                   <Zap className="w-3 h-3" /> Route: DLT Only
                 </span>
                 <span className="flex items-center gap-1 px-3 py-1.5 bg-green-100 text-green-800 text-xs font-semibold rounded-full">
-                  <ShieldCheck className="w-3 h-3" /> Auto Quick Route: NEVER
+                  <ShieldCheck className="w-3 h-3" /> No Auto Fallback
                 </span>
                 <span className={`flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-full ${data.emergencyStatus.enabled ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-700"}`}>
                   <ShieldAlert className="w-3 h-3" />
                   Emergency: {data.emergencyStatus.enabled ? "ACTIVE ⚠" : "OFF"}
                 </span>
+              </div>
+            </div>
+
+            {/* Production Verification Summary — exact spec format */}
+            <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
+              <div className="px-4 py-3 bg-gray-50 border-b flex items-center gap-2">
+                <FileText className="w-4 h-4 text-gray-500" />
+                <h3 className="text-sm font-semibold text-gray-700">Production Verification Summary</h3>
+              </div>
+              <div className="divide-y text-sm">
+                {[
+                  { label: "Overall Status", value: data.productionReady ? "PASS" : "FAIL", ok: data.productionReady },
+                  { label: "SMS Provider Status", value: data.smsConfig.apiKeyConfigured ? `Active — Fast2SMS DLT (${data.smsConfig.globalSenderId})` : "NOT CONFIGURED", ok: data.smsConfig.apiKeyConfigured },
+                  { label: "WhatsApp Provider Status", value: data.channels.whatsapp.enabled ? "Active — BotBee" : "Inactive", ok: data.channels.whatsapp.enabled },
+                  { label: "Email Provider Status", value: data.channels.email.enabled ? "Active — SMTP" : "Inactive", ok: data.channels.email.enabled },
+                  { label: "Sender IDs Configured", value: `${data.smsConfig.approvedSenderIds.length} approved  (ALBURH · ALBUR · ABURHA · ABTUMR · ABTTHJ)  Default: ${data.smsConfig.globalSenderId}`, ok: data.smsConfig.approvedSenderIds.length > 0 },
+                  { label: "DLT Templates Configured", value: `${data.smsConfig.templatesCoverage.configured} / ${data.smsConfig.templatesCoverage.total} events`, ok: data.smsConfig.templatesCoverage.configured === data.smsConfig.templatesCoverage.total },
+                  { label: "Emergency Fallback", value: data.emergencyStatus.enabled ? "ACTIVE — disable after DLT recovery" : "OFF (correct)", ok: !data.emergencyStatus.enabled },
+                  { label: "Production Ready", value: data.productionReady ? "YES" : "NO", ok: data.productionReady },
+                ].map(row => (
+                  <div key={row.label} className="flex items-center gap-3 px-4 py-3">
+                    {row.ok
+                      ? <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />
+                      : <XCircle className="w-4 h-4 text-red-600 shrink-0" />}
+                    <span className="w-52 text-gray-600 font-medium shrink-0">{row.label}</span>
+                    <span className={row.ok ? "text-gray-800" : "text-red-700 font-semibold"}>{row.value}</span>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -238,16 +335,16 @@ export default function SmsProductionReport() {
                   ))}
                 </div>
                 <p className="text-xs text-red-700">
-                  Disable emergency mode in <strong>Admin → DLT Template Manager</strong> once DLT templates are configured.
+                  Disable emergency mode in <strong>Admin → DLT Template Manager</strong> once DLT templates are approved.
                 </p>
               </div>
             )}
 
-            {/* Production checks */}
+            {/* System checks */}
             <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
               <div className="px-4 py-3 bg-gray-50 border-b flex items-center gap-2">
                 <Activity className="w-4 h-4 text-gray-500" />
-                <h3 className="text-sm font-semibold text-gray-700">Production Requirement Checks</h3>
+                <h3 className="text-sm font-semibold text-gray-700">System Policy Checks</h3>
               </div>
               {data.checks.map(c => <CheckRow key={c.id} check={c} />)}
             </div>
@@ -282,31 +379,101 @@ export default function SmsProductionReport() {
               </div>
             </div>
 
-            {/* DLT Template Coverage */}
+            {/* DLT Template Coverage with per-event delivery stats */}
             <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
               <div className="px-4 py-3 bg-gray-50 border-b flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <FileText className="w-4 h-4 text-gray-500" />
-                  <h3 className="text-sm font-semibold text-gray-700">DLT Template Coverage</h3>
+                  <h3 className="text-sm font-semibold text-gray-700">DLT Template Coverage &amp; Delivery Stats</h3>
                 </div>
-                <span className={`text-xs font-bold px-2 py-1 rounded-full ${data.smsConfig.templatesCoverage.configured === data.smsConfig.templatesCoverage.total ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
-                  {data.smsConfig.templatesCoverage.configured} / {data.smsConfig.templatesCoverage.total} configured
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs font-bold px-2 py-1 rounded-full ${data.smsConfig.templatesCoverage.configured === data.smsConfig.templatesCoverage.total ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
+                    {data.smsConfig.templatesCoverage.configured} / {data.smsConfig.templatesCoverage.total} configured
+                  </span>
+                  <button
+                    onClick={() => setShowEventDetail(v => !v)}
+                    className="text-xs text-blue-600 underline"
+                  >
+                    {showEventDetail ? "Compact" : "Show delivery stats"}
+                  </button>
+                </div>
               </div>
-              <div className="divide-y">
-                {data.smsConfig.events.map(ev => (
-                  <div key={ev.event} className={`flex items-center gap-3 px-4 py-2.5 ${ev.templateConfigured ? "" : "bg-amber-50/40"}`}>
-                    {ev.templateConfigured
-                      ? <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />
-                      : <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />}
-                    <span className="flex-1 text-sm text-gray-700">{ev.label}</span>
-                    {ev.templateId
-                      ? <code className="text-xs font-mono bg-blue-50 text-blue-700 px-2 py-0.5 rounded">{ev.templateId}</code>
-                      : <span className="text-xs text-amber-600 font-medium">Not Configured</span>}
-                    <span className="text-[10px] text-gray-400 font-mono">route=dlt</span>
-                  </div>
-                ))}
-              </div>
+
+              {/* Compact view */}
+              {!showEventDetail && (
+                <div className="divide-y">
+                  {data.smsConfig.events.map(ev => (
+                    <div key={ev.event} className={`flex items-center gap-3 px-4 py-2.5 ${ev.templateConfigured ? "" : "bg-amber-50/40"}`}>
+                      {ev.templateConfigured
+                        ? <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />
+                        : <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />}
+                      <span className="flex-1 text-sm text-gray-700">{ev.label}</span>
+                      <span className="text-[10px] font-mono text-gray-400 mr-1">sender: {ev.senderId}</span>
+                      {ev.templateId
+                        ? <code className="text-xs font-mono bg-blue-50 text-blue-700 px-2 py-0.5 rounded">{ev.templateId}</code>
+                        : <span className="text-xs text-amber-600 font-medium">Not Configured</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Detailed view with delivery stats */}
+              {showEventDetail && (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-gray-50 border-b text-gray-500 uppercase tracking-wider">
+                        <th className="px-3 py-2 text-left font-semibold">Event</th>
+                        <th className="px-3 py-2 text-left font-semibold">Sender / Template</th>
+                        <th className="px-2 py-2 text-center font-semibold">SMS<br/><span className="font-normal normal-case">Sent / Failed</span></th>
+                        <th className="px-2 py-2 text-left font-semibold">SMS Last Sent</th>
+                        <th className="px-2 py-2 text-left font-semibold">SMS Last Failed</th>
+                        <th className="px-2 py-2 text-center font-semibold">WA<br/><span className="font-normal normal-case">Sent / Failed</span></th>
+                        <th className="px-2 py-2 text-center font-semibold">Email<br/><span className="font-normal normal-case">Sent / Failed</span></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {data.smsConfig.events.map(ev => (
+                        <tr key={ev.event} className={`${ev.templateConfigured ? "hover:bg-gray-50/50" : "bg-amber-50/30 hover:bg-amber-50/50"}`}>
+                          <td className="px-3 py-2.5">
+                            <div className="flex items-center gap-2">
+                              {ev.templateConfigured
+                                ? <CheckCircle className="w-3.5 h-3.5 text-green-600 shrink-0" />
+                                : <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
+                              <span className="text-gray-800 font-medium">{ev.label}</span>
+                            </div>
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <div className="font-mono">
+                              <span className="text-gray-500 mr-1">{ev.senderId}</span>
+                              {ev.templateId
+                                ? <span className="text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded">{ev.templateId}</span>
+                                : <span className="text-amber-600">—</span>}
+                            </div>
+                          </td>
+                          <td className="px-2 py-2.5 text-center">
+                            <StatPill val={ev.sms?.totalSent ?? 0} color="text-green-600" />
+                            {" / "}
+                            <StatPill val={ev.sms?.totalFailed ?? 0} color="text-red-500" />
+                          </td>
+                          <td className="px-2 py-2.5 text-gray-500 whitespace-nowrap">{fmtTime(ev.sms?.lastSent)}</td>
+                          <td className={`px-2 py-2.5 whitespace-nowrap ${ev.sms?.lastFailed ? "text-red-500" : "text-gray-300"}`}>{fmtTime(ev.sms?.lastFailed)}</td>
+                          <td className="px-2 py-2.5 text-center">
+                            <StatPill val={ev.whatsapp?.totalSent ?? 0} color="text-green-600" />
+                            {" / "}
+                            <StatPill val={ev.whatsapp?.totalFailed ?? 0} color="text-red-500" />
+                          </td>
+                          <td className="px-2 py-2.5 text-center">
+                            <StatPill val={ev.email?.totalSent ?? 0} color="text-green-600" />
+                            {" / "}
+                            <StatPill val={ev.email?.totalFailed ?? 0} color="text-red-500" />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
 
             {/* Quick links */}

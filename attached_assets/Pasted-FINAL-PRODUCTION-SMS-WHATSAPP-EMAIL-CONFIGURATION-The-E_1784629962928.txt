@@ -1,0 +1,250 @@
+FINAL PRODUCTION SMS / WHATSAPP / EMAIL CONFIGURATION
+
+The Emergency SMS module and Production Report have been added.
+
+Now finalize the production notification system.
+
+====================================================
+PRODUCTION POLICY
+====================================================
+
+Al Burhan Tours & Travels must use ONLY the Fast2SMS DLT Primary Route.
+
+Remove all automatic fallback logic.
+
+Do NOT automatically switch to:
+
+• Quick SMS
+• Emergency SMS
+• Alternate Route
+
+Every SMS must use:
+
+✓ Fast2SMS DLT API
+✓ Approved DLT Template
+✓ Approved Sender ID
+✓ Approved Route
+
+====================================================
+SENDER IDS
+====================================================
+
+Support all approved Sender IDs stored in the database.
+
+Approved Sender IDs:
+
+• ALBURH
+• ALBUR
+• ABURHA
+• ABTUMR
+• ABTTHJ
+
+Allow the Admin to select the Sender ID for each notification template.
+
+Default Sender ID:
+
+ALBURH
+
+====================================================
+NOTIFICATION EVENTS
+====================================================
+
+Every production notification must use the Primary DLT Route:
+
+• OTP Login
+• OTP Registration
+• Forgot Password OTP
+• Booking Created
+• Booking Confirmed
+• Booking Approved
+• Partial Payment
+• Full Payment
+• Invoice Generated
+• Payment Receipt
+• Agreement Signed
+• Visa Approved
+• Visa Issued
+• Flight Ticket
+• Hotel Voucher
+• Departure Reminder
+• Arrival Reminder
+• Welcome Saudi Arabia
+• Return Reminder
+
+====================================================
+MULTI-CHANNEL DELIVERY
+====================================================
+
+For every event send:
+
+1. SMS
+2. WhatsApp
+3. Email
+
+If SMS fails:
+
+• Continue WhatsApp
+• Continue Email
+
+Do not silently fail.
+
+Log the SMS provider response.
+
+====================================================
+PRODUCTION REPORT
+====================================================
+
+Create a Production Report page showing:
+
+SMS
+
+• Sender ID
+• DLT Template ID
+• Route
+• API Status
+• Last Sent
+• Last Failed
+• Delivery Status
+
+WhatsApp
+
+• Template
+• Status
+• Delivered
+• Failed
+
+Email
+
+• SMTP Status
+• Last Sent
+• Failed
+
+====================================================
+NOTIFICATION LOGS
+====================================================
+
+Store for every notification:
+
+Booking ID
+
+Customer
+
+Notification Type
+
+SMS Status
+
+WhatsApp Status
+
+Email Status
+
+Sender ID
+
+Template ID
+
+Provider Response
+
+Delivered Time
+
+Failed Time
+
+Retry Count
+
+====================================================
+NO AUTOMATIC FALLBACK
+====================================================
+
+If DLT rejects the SMS:
+
+Do NOT use Quick SMS.
+
+Do NOT use Emergency SMS.
+
+Display the provider error.
+
+Record the error.
+
+Continue WhatsApp and Email.
+
+====================================================
+ADMIN SETTINGS
+====================================================
+
+Allow Super Admin to:
+
+• Enable/Disable SMS
+• Enable/Disable WhatsApp
+• Enable/Disable Email
+• Change Sender ID
+• Assign DLT Template IDs
+• Test SMS
+• Test WhatsApp
+• Test Email
+
+====================================================
+LIVE PRODUCTION TEST
+====================================================
+
+Run real production tests using a live booking.
+
+Verify:
+
+✓ OTP SMS Delivered
+✓ OTP WhatsApp Delivered
+✓ OTP Email Delivered
+
+✓ Booking SMS Delivered
+✓ Booking WhatsApp Delivered
+✓ Booking Email Delivered
+
+✓ Payment SMS Delivered
+✓ Payment WhatsApp Delivered
+✓ Payment Email Delivered
+
+✓ Invoice SMS Delivered
+✓ Invoice WhatsApp Delivered
+✓ Invoice Email Delivered
+
+✓ Agreement SMS Delivered
+✓ Agreement WhatsApp Delivered
+✓ Agreement Email Delivered
+
+✓ Visa SMS Delivered
+✓ Visa WhatsApp Delivered
+✓ Visa Email Delivered
+
+✓ Ticket SMS Delivered
+✓ Ticket WhatsApp Delivered
+✓ Ticket Email Delivered
+
+====================================================
+DEPLOYMENT RULE
+====================================================
+
+Do NOT deploy until all of the following are verified on the live production VPS:
+
+✓ Fast2SMS DLT Primary Route working
+✓ Approved Sender IDs working
+✓ Approved Templates working
+✓ WhatsApp working
+✓ Email working
+✓ Notification Logs working
+✓ Production Report working
+✓ Booking Notifications working
+✓ Payment Notifications working
+✓ Invoice Notifications working
+✓ Agreement Notifications working
+✓ Visa Notifications working
+✓ Ticket Notifications working
+
+Finally generate a Production Verification Report showing:
+
+• Overall Status: PASS / FAIL
+• SMS Provider Status
+• WhatsApp Provider Status
+• Email Provider Status
+• Sender IDs Configured
+• DLT Templates Configured
+• Notifications Tested
+• Notifications Delivered
+• Failed Notifications
+• Production Ready: YES / NO

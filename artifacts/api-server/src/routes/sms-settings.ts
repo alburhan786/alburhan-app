@@ -345,20 +345,23 @@ router.get("/verification", async (_req: AuthenticatedRequest, res) => {
   const approvedIds = senderRows.rows.map((r: any) => r.sender_id);
 
   const EVENTS = [
-    { event: "otp",               label: "OTP Login / Registration", tidKey: "otp_template_id",         senderKey: "otp_sender" },
-    { event: "booking_created",   label: "Booking Received",         tidKey: "booking_created_tid",     senderKey: "booking_created_sender" },
-    { event: "booking_approved",  label: "Booking Approved",         tidKey: "booking_confirmed_tid",   senderKey: "booking_confirmed_sender" },
-    { event: "booking_rejected",  label: "Booking Rejected",         tidKey: "booking_rejected_tid",    senderKey: "booking_rejected_sender" },
-    { event: "payment_received",  label: "Payment Received",         tidKey: "payment_received_tid",    senderKey: "payment_received_sender" },
-    { event: "partial_payment",   label: "Partial Payment",          tidKey: "partial_payment_tid",     senderKey: "partial_payment_sender" },
-    { event: "invoice_generated", label: "Invoice Generated",        tidKey: "invoice_created_tid",     senderKey: "invoice_created_sender" },
-    { event: "agreement_signed",  label: "Agreement Signed",         tidKey: "agreement_signed_tid",    senderKey: "agreement_signed_sender" },
-    { event: "payment_due",       label: "Payment Reminder",         tidKey: "pending_payment_tid",     senderKey: "pending_payment_sender" },
-    { event: "ticket_issued",     label: "Flight Ticket Issued",     tidKey: "ticket_issued_tid",       senderKey: "ticket_issued_sender" },
-    { event: "visa_ready",        label: "Visa Ready",               tidKey: "visa_issued_tid",         senderKey: "visa_issued_sender" },
-    { event: "hotel_voucher",     label: "Hotel Voucher Ready",      tidKey: "hotel_voucher_issued_tid",senderKey: "hotel_voucher_sender" },
-    { event: "departure_reminder",label: "Departure Reminder",       tidKey: "departure_reminder_tid",  senderKey: "departure_reminder_sender" },
-    { event: "arrival_reminder",  label: "Arrival Reminder",         tidKey: "arrival_reminder_tid",    senderKey: "arrival_reminder_sender" },
+    { event: "otp",                  label: "OTP — Login / Registration",    tidKey: "otp_template_id",          senderKey: "otp_sender" },
+    { event: "forgot_password_otp",  label: "OTP — Forgot Password",         tidKey: "forgot_password_otp_tid",  senderKey: "forgot_password_otp_sender" },
+    { event: "booking_created",      label: "Booking Received",              tidKey: "booking_created_tid",      senderKey: "booking_created_sender" },
+    { event: "booking_approved",     label: "Booking Approved / Confirmed",  tidKey: "booking_confirmed_tid",    senderKey: "booking_confirmed_sender" },
+    { event: "booking_rejected",     label: "Booking Rejected",              tidKey: "booking_rejected_tid",     senderKey: "booking_rejected_sender" },
+    { event: "payment_received",     label: "Full Payment Received",         tidKey: "payment_received_tid",     senderKey: "payment_received_sender" },
+    { event: "partial_payment",      label: "Partial Payment",               tidKey: "partial_payment_tid",      senderKey: "partial_payment_sender" },
+    { event: "invoice_generated",    label: "Invoice Generated",             tidKey: "invoice_created_tid",      senderKey: "invoice_created_sender" },
+    { event: "agreement_signed",     label: "Agreement Signed",              tidKey: "agreement_signed_tid",     senderKey: "agreement_signed_sender" },
+    { event: "payment_due",          label: "Payment Reminder",              tidKey: "pending_payment_tid",      senderKey: "pending_payment_sender" },
+    { event: "ticket_issued",        label: "Flight Ticket Issued",          tidKey: "ticket_issued_tid",        senderKey: "ticket_issued_sender" },
+    { event: "visa_ready",           label: "Visa Issued",                   tidKey: "visa_issued_tid",          senderKey: "visa_issued_sender" },
+    { event: "hotel_voucher",        label: "Hotel Voucher Issued",          tidKey: "hotel_voucher_issued_tid", senderKey: "hotel_voucher_sender" },
+    { event: "departure_reminder",   label: "Departure Reminder",            tidKey: "departure_reminder_tid",   senderKey: "departure_reminder_sender" },
+    { event: "arrival_reminder",     label: "Arrival Reminder",              tidKey: "arrival_reminder_tid",     senderKey: "arrival_reminder_sender" },
+    { event: "welcome_saudi_arabia", label: "Welcome to Saudi Arabia",       tidKey: "welcome_saudi_arabia_tid", senderKey: "welcome_saudi_arabia_sender" },
+    { event: "return_reminder",      label: "Return Reminder",               tidKey: "return_reminder_tid",      senderKey: "return_reminder_sender" },
   ];
 
   const results = EVENTS.map(ev => {
@@ -410,29 +413,62 @@ router.get("/production-report", async (_req: AuthenticatedRequest, res) => {
   const approvedIds = senderRows.rows.map((r: any) => r.sender_id);
 
   const SMS_EVENTS = [
-    { event: "otp",               label: "OTP Login / Registration", tidKey: "otp_template_id" },
-    { event: "booking_created",   label: "Booking Created",          tidKey: "booking_created_tid" },
-    { event: "booking_approved",  label: "Booking Approved",         tidKey: "booking_confirmed_tid" },
-    { event: "booking_rejected",  label: "Booking Rejected",         tidKey: "booking_rejected_tid" },
-    { event: "payment_received",  label: "Payment Received",         tidKey: "payment_received_tid" },
-    { event: "partial_payment",   label: "Partial Payment",          tidKey: "partial_payment_tid" },
-    { event: "invoice_generated", label: "Invoice Generated",        tidKey: "invoice_created_tid" },
-    { event: "agreement_signed",  label: "Agreement Signed",         tidKey: "agreement_signed_tid" },
-    { event: "ticket_issued",     label: "Flight Ticket",            tidKey: "ticket_issued_tid" },
-    { event: "visa_ready",        label: "Visa Ready",               tidKey: "visa_issued_tid" },
-    { event: "hotel_voucher",     label: "Hotel Voucher",            tidKey: "hotel_voucher_issued_tid" },
-    { event: "departure_reminder",label: "Departure Reminder",       tidKey: "departure_reminder_tid" },
-    { event: "arrival_reminder",  label: "Arrival Reminder",         tidKey: "arrival_reminder_tid" },
+    { event: "otp",                  label: "OTP — Login / Registration",   tidKey: "otp_template_id",          senderKey: "otp_sender" },
+    { event: "forgot_password_otp",  label: "OTP — Forgot Password",        tidKey: "forgot_password_otp_tid",  senderKey: "forgot_password_otp_sender" },
+    { event: "booking_created",      label: "Booking Received",             tidKey: "booking_created_tid",      senderKey: "booking_created_sender" },
+    { event: "booking_approved",     label: "Booking Approved / Confirmed", tidKey: "booking_confirmed_tid",    senderKey: "booking_confirmed_sender" },
+    { event: "booking_rejected",     label: "Booking Rejected",             tidKey: "booking_rejected_tid",     senderKey: "booking_rejected_sender" },
+    { event: "payment_received",     label: "Full Payment Received",        tidKey: "payment_received_tid",     senderKey: "payment_received_sender" },
+    { event: "partial_payment",      label: "Partial Payment",              tidKey: "partial_payment_tid",      senderKey: "partial_payment_sender" },
+    { event: "invoice_generated",    label: "Invoice Generated",            tidKey: "invoice_created_tid",      senderKey: "invoice_created_sender" },
+    { event: "agreement_signed",     label: "Agreement Signed",             tidKey: "agreement_signed_tid",     senderKey: "agreement_signed_sender" },
+    { event: "payment_due",          label: "Payment Reminder",             tidKey: "pending_payment_tid",      senderKey: "pending_payment_sender" },
+    { event: "ticket_issued",        label: "Flight Ticket Issued",         tidKey: "ticket_issued_tid",        senderKey: "ticket_issued_sender" },
+    { event: "visa_ready",           label: "Visa Issued",                  tidKey: "visa_issued_tid",          senderKey: "visa_issued_sender" },
+    { event: "hotel_voucher",        label: "Hotel Voucher Issued",         tidKey: "hotel_voucher_issued_tid", senderKey: "hotel_voucher_sender" },
+    { event: "departure_reminder",   label: "Departure Reminder",           tidKey: "departure_reminder_tid",   senderKey: "departure_reminder_sender" },
+    { event: "arrival_reminder",     label: "Arrival Reminder",             tidKey: "arrival_reminder_tid",     senderKey: "arrival_reminder_sender" },
+    { event: "welcome_saudi_arabia", label: "Welcome to Saudi Arabia",      tidKey: "welcome_saudi_arabia_tid", senderKey: "welcome_saudi_arabia_sender" },
+    { event: "return_reminder",      label: "Return Reminder",              tidKey: "return_reminder_tid",      senderKey: "return_reminder_sender" },
   ];
+
+  // Per-event delivery stats from notification_logs (all time)
+  const eventStatsRows = await pool.query(`
+    SELECT
+      event_type,
+      channel,
+      MAX(CASE WHEN status='sent' THEN sent_at END) AS last_sent,
+      MAX(CASE WHEN status='failed' THEN sent_at END) AS last_failed,
+      COUNT(*) FILTER (WHERE status='sent') AS total_sent,
+      COUNT(*) FILTER (WHERE status='failed') AS total_failed
+    FROM notification_logs
+    WHERE event_type = ANY($1)
+    GROUP BY event_type, channel
+  `, [SMS_EVENTS.map(e => e.event)]).catch(() => ({ rows: [] }));
+
+  // Index stats by event_type and channel
+  const eventStats: Record<string, Record<string, any>> = {};
+  for (const r of eventStatsRows.rows) {
+    if (!eventStats[r.event_type]) eventStats[r.event_type] = {};
+    eventStats[r.event_type][r.channel] = r;
+  }
 
   const smsEvents = SMS_EVENTS.map(ev => {
     const tid = extra[ev.tidKey] || "";
+    const senderId = extra[ev.senderKey] || globalSender;
+    const smsStat = eventStats[ev.event]?.sms;
+    const waStat = eventStats[ev.event]?.whatsapp;
+    const emailStat = eventStats[ev.event]?.email;
     return {
       event: ev.event,
       label: ev.label,
       templateConfigured: !!tid,
       templateId: tid || null,
+      senderId,
       route: "dlt",
+      sms: smsStat ? { lastSent: smsStat.last_sent, lastFailed: smsStat.last_failed, totalSent: Number(smsStat.total_sent), totalFailed: Number(smsStat.total_failed) } : null,
+      whatsapp: waStat ? { lastSent: waStat.last_sent, lastFailed: waStat.last_failed, totalSent: Number(waStat.total_sent), totalFailed: Number(waStat.total_failed) } : null,
+      email: emailStat ? { lastSent: emailStat.last_sent, lastFailed: emailStat.last_failed, totalSent: Number(emailStat.total_sent), totalFailed: Number(emailStat.total_failed) } : null,
     };
   });
   const smsConfigured = smsEvents.filter(e => e.templateConfigured).length;
