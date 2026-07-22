@@ -63,3 +63,4 @@
 - [API bundle external strategy](build-external-strategy.md) — bundle ALL runtime deps; externalize only devDeps+pdfkit; allowlist strategy was the MODULE_NOT_FOUND root cause
 - [Payment audit complete](payment-audit-complete.md) — July 2026 full lifecycle audit; lastPaymentDate pool.query supplement in GET/; payment_transactions CREATE TABLE in runMigrations
 - [Journey status trigger mapping](journey-status-triggers.md) — 16 journey statuses must be in TRIGGER_TO_EVENT + WorkflowTrigger type; triggerWorkflow ctx needs journeyStatus field for buildDefaultMessage
+- [BotBee phone_number_id](botbee-phone-number-id.md) — correct is 965912196611113 (15 digits); hardcoded as CORRECT_PHONE_NUMBER_ID in botbee.ts; 14-digit typo blocked all templates for months

@@ -869,4 +869,29 @@ router.get("/migrate/inspect-sms-config", async (req: any, res: any) => {
   }
 });
 
+// ── Fix BotBee phone_number_id typo (96591219661113 → 965912196611113) ────────
+router.post("/migrate/fix-botbee-phone-id", async (req: any, res: any) => {
+  const { key } = req.body || {};
+  if (!migrationKeyOk(key)) return void res.status(403).json({ error: "Forbidden" });
+  try {
+    const { pool } = await import("@workspace/db");
+    const { decrypt, encrypt } = await import("../lib/encryption.js");
+    const row = await pool.query(`SELECT id, extra_fields_encrypted FROM api_settings WHERE provider='botbee' LIMIT 1`);
+    if (!row.rows[0]) return void res.status(404).json({ error: "botbee row not found" });
+    const r = row.rows[0];
+    let extra: Record<string, any> = {};
+    try { if (r.extra_fields_encrypted) extra = JSON.parse(decrypt(r.extra_fields_encrypted)); } catch {}
+    const before = extra.phone_number_id;
+    extra.phone_number_id = "965912196611113";
+    const encrypted = encrypt(JSON.stringify(extra));
+    await pool.query(`UPDATE api_settings SET extra_fields_encrypted=$1, updated_at=NOW() WHERE id=$2`, [encrypted, r.id]);
+    // Bust the in-memory config cache so the new value takes effect immediately
+    const { bustCache } = await import("../lib/getCachedConfig.js").catch(() => ({ bustCache: null })) as any;
+    if (typeof bustCache === "function") bustCache("botbee");
+    res.json({ ok: true, before, after: "965912196611113", message: "phone_number_id updated. Restart or wait 60s for cache to refresh." });
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
 export default router;
