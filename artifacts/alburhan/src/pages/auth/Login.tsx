@@ -94,7 +94,8 @@ export default function Login() {
   useEffect(() => {
     if (isAuthenticated && user) {
       const role = user.role;
-      if (role === "admin" || role === "super_admin") setLocation("/admin/dashboard");
+      if (role === "super_admin") setLocation("/admin/super");
+      else if (role === "admin") setLocation("/admin/dashboard");
       else if (role === "branch_manager") setLocation("/branch/dashboard");
       else if (role === "agent") setLocation("/agent/dashboard");
       else if (role === "staff") setLocation("/staff/dashboard");
@@ -203,11 +204,12 @@ export default function Login() {
           description: `Assalamu Alaikum${result.user?.name ? `, ${result.user.name}` : ""}! You have logged in.`,
         });
         const role = result.user?.role;
-        if (role === "admin")           setLocation("/admin/dashboard");
+        if (role === "super_admin")         setLocation("/admin/super");
+        else if (role === "admin")          setLocation("/admin/dashboard");
         else if (role === "branch_manager") setLocation("/branch/dashboard");
-        else if (role === "agent")      setLocation("/agent/dashboard");
-        else if (role === "staff")      setLocation("/staff/dashboard");
-        else                            setLocation(returnUrl || "/customer/dashboard");
+        else if (role === "agent")          setLocation("/agent/dashboard");
+        else if (role === "staff")          setLocation("/staff/dashboard");
+        else                                setLocation(returnUrl || "/customer/dashboard");
       }
     } catch (err: any) {
       const msg = err?.message || "Invalid OTP. Please try again.";

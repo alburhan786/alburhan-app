@@ -1,0 +1,576 @@
+MASTER PROMPT – RESTORE & PROTECT ALL ADMIN DASHBOARDS (AL BURHAN TOURS & TRAVELS)
+
+You are working on the production ERP/CRM for Al Burhan Tours & Travels.
+
+CRITICAL REQUIREMENT
+
+Do NOT remove, replace, overwrite, rename, or hide any existing working feature while fixing another issue.
+
+Before making any change:
+
+1. Scan the entire project.
+2. Build a dependency map.
+3. Identify every dashboard, route, menu, role, and API.
+4. Preserve everything that already works.
+5. Never delete production functionality.
+
+⸻
+
+PERMANENTLY RESTORE ALL DASHBOARDS
+
+Restore and permanently protect every dashboard.
+
+Super Admin Dashboard
+
+Must include:
+
+* Complete business overview
+* Today’s bookings
+* Revenue
+* Payments
+* Pending balances
+* Outstanding invoices
+* New customers
+* WhatsApp status
+* SMS status
+* Email status
+* RCS status
+* Push notifications
+* Staff activity
+* Branch summary
+* Live notification monitor
+* Recent logins
+* System health
+* Server health
+* API health
+* Razorpay
+* BotBee
+* Fast2SMS
+* SMTP
+* PostgreSQL
+* Firebase
+* Audit logs
+
+Never disappear after future deployments.
+
+⸻
+
+Branch Dashboard
+
+Every branch must have:
+
+* Branch bookings
+* Branch collections
+* Branch pending payments
+* Branch invoices
+* Branch customers
+* Branch pilgrims
+* Branch expenses
+* Branch profit
+* Branch staff
+* Branch reports
+* Branch notifications
+
+Branch users must never access other branches.
+
+⸻
+
+Agent Dashboard
+
+Restore completely.
+
+Must include:
+
+* My Customers
+* My Bookings
+* My Leads
+* My Payments
+* My Commission
+* My Pilgrims
+* My Documents
+* WhatsApp history
+* SMS history
+* Email history
+* Tasks
+* Reminders
+* Calendar
+* Customer Follow-up
+* Pending Collections
+* Performance Dashboard
+
+⸻
+
+Employee Dashboard
+
+Restore:
+
+* Assigned work
+* Today’s tasks
+* Customer support
+* Checklists
+* Attendance
+* Documents
+* Notifications
+
+⸻
+
+Accountant Dashboard
+
+Restore:
+
+* Income
+* Expenses
+* Ledger
+* Journal
+* Balance Sheet
+* Payment Register
+* Cash Book
+* Bank Book
+* GST Reports
+* Receipt Register
+* Invoice Register
+* Outstanding Amounts
+
+⸻
+
+Operations Dashboard
+
+Restore:
+
+* Visa
+* Ticket
+* Hotel
+* Transport
+* Room Allocation
+* Passport Collection
+* Document Verification
+* Flight Management
+* Hotel Voucher
+* Arrival
+* Departure
+
+⸻
+
+Customer Dashboard
+
+Keep existing features.
+
+Verify:
+
+* Booking
+* Invoice
+* Agreement
+* Payment Receipt
+* Visa
+* Ticket
+* Hotel Voucher
+* Room Number
+* Flight Details
+* Notifications
+* Payment History
+
+⸻
+
+LOGIN SYSTEM
+
+Restore every login.
+
+Super Admin
+
+Admin
+
+Branch Admin
+
+Manager
+
+Agent
+
+Employee
+
+Accountant
+
+Operations
+
+Customer
+
+Each login must open its own dashboard.
+
+Never redirect everyone to the same dashboard.
+
+⸻
+
+ROLE PERMISSIONS
+
+Audit every route.
+
+Verify every permission.
+
+No role should gain unauthorized access.
+
+Every permission must be role based.
+
+⸻
+
+ROUTE AUDIT
+
+Search every route.
+
+Ensure these routes exist.
+
+Examples:
+
+/dashboard
+
+/admin
+
+/super-admin
+
+/branch
+
+/agent
+
+/customer
+
+/operations
+
+/accountant
+
+/reports
+
+/settings
+
+/users
+
+/notifications
+
+/templates
+
+/api-settings
+
+Every route must load.
+
+No blank pages.
+
+No 404.
+
+No redirect loops.
+
+⸻
+
+MENU AUDIT
+
+Verify sidebar.
+
+Verify top navigation.
+
+Verify breadcrumbs.
+
+Verify quick actions.
+
+Verify dashboard cards.
+
+No menu should disappear.
+
+⸻
+
+DATABASE AUDIT
+
+Verify tables.
+
+users
+
+roles
+
+permissions
+
+branches
+
+bookings
+
+customers
+
+pilgrims
+
+payments
+
+invoices
+
+agreements
+
+documents
+
+notifications
+
+audit_logs
+
+login_logs
+
+activity_logs
+
+No missing migrations.
+
+⸻
+
+NOTIFICATION CENTER
+
+Keep existing work.
+
+Verify:
+
+WhatsApp
+
+SMS
+
+Email
+
+RCS
+
+Push
+
+PDF
+
+Invoice
+
+Receipt
+
+Agreement
+
+Retry
+
+Logs
+
+History
+
+Diagnostics
+
+⸻
+
+BOTBEE
+
+Do NOT break.
+
+Verify:
+
+Template send
+
+Text send
+
+Variables
+
+Delivery logs
+
+Sync
+
+Analytics
+
+Retry Queue
+
+Webhook
+
+Template IDs
+
+Phone Number ID
+
+Business ID
+
+⸻
+
+PAYMENT
+
+Verify:
+
+Online
+
+Offline
+
+Partial
+
+Full
+
+Pending
+
+Refund
+
+Receipt
+
+Invoice
+
+Ledger
+
+Outstanding
+
+Payment History
+
+⸻
+
+REPORTS
+
+Restore:
+
+Revenue
+
+Sales
+
+Collections
+
+Outstanding
+
+Pilgrim
+
+Branch
+
+Agent
+
+Commission
+
+Profit
+
+Expense
+
+Tax
+
+Visa
+
+Ticket
+
+Hotel
+
+Notification
+
+Login
+
+Audit
+
+⸻
+
+SETTINGS
+
+Restore:
+
+Company
+
+Users
+
+Roles
+
+Permissions
+
+SMTP
+
+Fast2SMS
+
+BotBee
+
+Firebase
+
+Razorpay
+
+System Settings
+
+Appearance
+
+Backup
+
+Security
+
+API Settings
+
+⸻
+
+SECURITY
+
+Verify:
+
+JWT
+
+Sessions
+
+Password Hash
+
+CSRF
+
+Rate Limiting
+
+Audit Logs
+
+Activity Logs
+
+Login Logs
+
+Role Protection
+
+Permission Protection
+
+⸻
+
+PERMANENT PROTECTION
+
+Create automated regression checks.
+
+Before every deployment automatically verify:
+
+✔ Super Admin Dashboard exists
+
+✔ Admin Dashboard exists
+
+✔ Branch Dashboard exists
+
+✔ Agent Dashboard exists
+
+✔ Customer Dashboard exists
+
+✔ Accountant Dashboard exists
+
+✔ Operations Dashboard exists
+
+✔ All menus exist
+
+✔ All routes exist
+
+✔ All APIs work
+
+✔ Database migrations complete
+
+✔ Notifications work
+
+✔ WhatsApp works
+
+✔ SMS works
+
+✔ Email works
+
+✔ Payments work
+
+✔ Documents work
+
+If anything disappears, fail the build and report the exact problem instead of deploying.
+
+⸻
+
+FINAL REQUIREMENT
+
+Do not stop after code changes.
+
+Perform a live production audit of the deployed system.
+
+Verify:
+
+* Every dashboard loads successfully.
+* Every role can log in.
+* Every menu is visible.
+* Every API returns success.
+* Every notification channel works.
+* Every document opens.
+* Every payment workflow functions.
+* No dashboard, menu, or role has disappeared.
+
+Generate a final Production Audit Report listing:
+
+* Total dashboards checked
+* Total routes checked
+* Total APIs checked
+* Missing features (if any)
+* Fixed issues
+* Remaining issues (if any)
+
+Only mark the task complete when all dashboards and role-based functionality are fully restored and permanently protected from future regressions.

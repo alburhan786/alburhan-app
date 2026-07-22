@@ -39,6 +39,7 @@ function buildMenu(openComplaints: number): MenuSection[] {
       items: [
         { icon: LayoutDashboard, label: "Dashboard", href: "/admin/dashboard" },
         { icon: Activity, label: "Operations", href: "/admin/operations", require: ["bookings", "view"] },
+        { icon: PieChart, label: "Executive Dashboard", href: "/admin/executive", require: ["reports", "view"] },
         { icon: Sparkles, label: "Super Admin Dashboard", href: "/admin/super", requireSuper: true },
       ],
     },
@@ -53,6 +54,7 @@ function buildMenu(openComplaints: number): MenuSection[] {
         { icon: Trash2, label: "Payment Trash", href: "/admin/payment-trash", require: ["payments", "delete"] },
         { icon: TrendingDown, label: "Expenses", href: "/admin/expenses", require: ["expenses", "view"] },
         { icon: Calculator, label: "Accounting", href: "/admin/accounting", require: ["accounting", "view"] },
+        { icon: BarChart2, label: "Finance Hub", href: "/admin/finance", require: ["accounting", "view"] },
         { icon: Home, label: "Family Ledger", href: "/admin/family-ledger", require: ["accounting", "view"] },
         { icon: UserCheck, label: "Customer Ledger", href: "/admin/customer-ledger", require: ["customers", "view"] },
         { icon: BookMarked, label: "Hajji Ledger", href: "/admin/hajji-ledger", require: ["groups", "view"] },
