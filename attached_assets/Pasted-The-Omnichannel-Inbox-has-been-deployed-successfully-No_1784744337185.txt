@@ -1,0 +1,120 @@
+The Omnichannel Inbox has been deployed successfully.
+
+Now perform a COMPLETE LIVE END-TO-END TEST.
+
+Do not assume anything works.
+
+Verify every integration with real API calls.
+
+1. WhatsApp (BotBee)
+- Connect account
+- Receive incoming messages
+- Send replies
+- Create lead automatically
+- Convert lead to booking
+- Save conversation
+- Store message history
+
+2. WhatsApp Cloud API
+- Test webhook
+- Test incoming
+- Test outgoing
+- Test templates
+- Test attachments
+
+3. Facebook
+- Connect Facebook Page
+- Connect Messenger
+- Connect Lead Ads
+- Verify webhook
+- Receive messages
+- Auto-create lead
+
+4. Instagram Business
+- Connect Instagram
+- Receive DM
+- Reply from ERP
+- Auto-create lead
+- Store conversation history
+
+5. Telegram
+- Connect Bot
+- Receive messages
+- Reply
+- Auto-create lead
+
+6. Website Chat
+- Receive visitor messages
+- Create lead
+- Assign staff
+- Open conversation in Omnichannel Inbox
+
+7. Website Contact Form
+- Submit enquiry
+- Verify lead creation
+- Verify notification
+- Verify CRM record
+
+8. Email
+- Receive email
+- Create lead
+- Reply from ERP
+- Save thread
+
+9. SMS
+- Receive delivery reports
+- Send SMS
+- Save logs
+
+10. RCS
+- Verify connection
+- Send test
+- Receive replies
+- Save conversation
+
+11. Lead Management
+Every incoming conversation must:
+- Create a lead automatically
+- Show source platform
+- Show customer profile
+- Show message history
+- Allow follow-up
+- Allow booking conversion
+
+12. Booking Flow
+Lead → Booking → Payment → Invoice → Agreement → Visa → Flight → Hotel → Journey Completion
+
+Verify the complete workflow.
+
+13. Dashboard
+Update statistics in real time.
+
+14. Notifications
+Verify:
+- WhatsApp
+- SMS
+- Email
+- Dashboard
+- Push
+
+15. Webhooks
+Verify every webhook returns HTTP 200.
+
+16. Database
+Verify every message is stored correctly.
+
+17. Remove every dummy, placeholder and mock record.
+
+18. Fix every error before finishing.
+
+19. Build frontend.
+
+20. Build backend.
+
+21. Deploy to VPS.
+
+22. Restart services.
+
+23. Verify production.
+
+Do not mark complete until every channel has been tested live and all tests pass successfully.

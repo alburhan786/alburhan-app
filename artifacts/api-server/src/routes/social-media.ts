@@ -603,6 +603,9 @@ router.get("/analytics", requireAdmin as any, async (_req, res) => {
 });
 
 // ── Webhook: Telegram ────────────────────────────────────────────────────────
+router.get("/webhook/telegram", (_req, res) => {
+  res.json({ ok: true, service: "telegram-webhook", status: "active" });
+});
 router.post("/webhook/telegram", async (req, res) => {
   res.json({ ok: true });
   try {

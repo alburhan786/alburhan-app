@@ -1,0 +1,509 @@
+# ENTERPRISE FEATURE REQUEST – CUSTOMER 360° PROFILE
+# Project: Al Burhan Tours & Travels ERP & SRM
+# Priority: CRITICAL
+# Deployment: Production
+# Requirement: Enterprise-grade Customer 360° Profile
+
+I want to build a complete Customer 360° Profile that becomes the central hub of my ERP. This page must provide every piece of customer information on a single screen, eliminating the need to switch between multiple modules.
+
+This must be a REAL production feature with database integration, live APIs, and real-time updates. Do NOT use mock data, placeholders, or dummy records.
+
+========================================================
+CUSTOMER 360° PROFILE
+========================================================
+
+Create a new module called:
+
+Customer 360° Profile
+
+Navigation:
+CRM & SRM
+→ Customer 360°
+
+When any customer or lead is opened, display a complete profile with the following sections.
+
+========================================================
+1. CUSTOMER OVERVIEW
+========================================================
+
+Display:
+
+• Customer Photo
+• Full Name
+• Customer ID
+• Booking ID
+• Agreement ID
+• Passport Number
+• Aadhaar Number
+• PAN Number
+• Nationality
+• Gender
+• Date of Birth
+• Blood Group
+• Mobile Number
+• WhatsApp Number
+• Email
+• Address
+• Emergency Contact
+• Customer Status
+• VIP Status
+• Loyalty Tier
+• Customer Since
+• Assigned Branch
+• Assigned Staff
+• Assigned Agent
+
+========================================================
+2. COMMUNICATION HISTORY
+========================================================
+
+Display all conversations from:
+
+✓ WhatsApp
+✓ Instagram
+✓ Facebook
+✓ Messenger
+✓ Telegram
+✓ Website Chat
+✓ Website Contact Form
+✓ Email
+✓ SMS
+✓ RCS
+✓ Dashboard Notifications
+
+Display:
+
+• Date & Time
+• Platform
+• Incoming/Outgoing
+• Message
+• Attachments
+• Delivery Status
+• Read Status
+
+Allow replying directly from the Customer Profile.
+
+========================================================
+3. LEAD HISTORY
+========================================================
+
+Display:
+
+• Source
+• Campaign
+• First Contact
+• Last Contact
+• Follow-up Count
+• Lead Score
+• Status
+• Assigned Sales Executive
+• Notes
+• Conversion Date
+
+Buttons:
+
+Convert to Booking
+
+Close Lead
+
+========================================================
+4. BOOKING HISTORY
+========================================================
+
+Display every booking:
+
+Package
+Departure
+Return
+Passengers
+Room Sharing
+Package Price
+Discount
+Booking Status
+Booking Timeline
+
+========================================================
+5. PAYMENT HISTORY
+========================================================
+
+Display:
+
+Invoice
+Receipt
+Amount
+Mode
+Transaction ID
+Pending Balance
+Advance
+Due Date
+Payment Timeline
+
+Buttons:
+
+Collect Payment
+
+Generate Receipt
+
+Send Receipt
+
+========================================================
+6. DOCUMENTS
+========================================================
+
+Display:
+
+Passport
+
+Visa
+
+Aadhaar
+
+PAN
+
+Photo
+
+Medical
+
+Agreement
+
+Flight Ticket
+
+Hotel Voucher
+
+Insurance
+
+Vaccination
+
+Other Files
+
+Preview, Download, Replace, Delete.
+
+========================================================
+7. VISA
+========================================================
+
+Visa Status
+
+Visa Number
+
+Issue Date
+
+Expiry Date
+
+Sponsor
+
+Remarks
+
+Timeline
+
+========================================================
+8. FLIGHT
+========================================================
+
+Airline
+
+Flight Number
+
+Departure
+
+Arrival
+
+PNR
+
+Seat
+
+Baggage
+
+Terminal
+
+Boarding Time
+
+========================================================
+9. HOTEL
+========================================================
+
+Hotel Name
+
+Room Number
+
+Sharing
+
+Check-in
+
+Check-out
+
+Google Maps
+
+========================================================
+10. TRANSPORT
+========================================================
+
+Bus Number
+
+Pickup Time
+
+Pickup Point
+
+Driver
+
+Guide
+
+Vehicle
+
+========================================================
+11. ZIYARAT
+========================================================
+
+Scheduled Tours
+
+Completed Tours
+
+Guide
+
+Bus
+
+Attendance
+
+========================================================
+12. TASKS & FOLLOW-UP
+========================================================
+
+Display:
+
+Upcoming Follow-up
+
+Completed Follow-up
+
+Notes
+
+Call History
+
+Meeting History
+
+Reminders
+
+========================================================
+13. INTERNAL NOTES
+========================================================
+
+Private Notes
+
+Sales Notes
+
+Operations Notes
+
+Finance Notes
+
+Manager Notes
+
+========================================================
+14. STAFF & AGENT
+========================================================
+
+Assigned Staff
+
+Assigned Agent
+
+Commission
+
+Branch
+
+Performance
+
+========================================================
+15. TIMELINE
+========================================================
+
+Show every event in chronological order:
+
+Lead Created
+
+Message Received
+
+Booking
+
+Payment
+
+Invoice
+
+Agreement
+
+Visa
+
+Flight
+
+Hotel
+
+Bus
+
+Ziyarat
+
+Reminder
+
+Notification
+
+Completed Journey
+
+========================================================
+16. AI ASSISTANT
+========================================================
+
+Enterprise AI Suggestions:
+
+• Customer likely to book
+• Outstanding payment reminder
+• Missing documents
+• Visa pending
+• Flight not assigned
+• Hotel pending
+• Suggested follow-up
+• Upsell recommendation
+• Loyalty recommendation
+• Customer satisfaction score
+
+========================================================
+17. QUICK ACTIONS
+========================================================
+
+Buttons:
+
+Call Customer
+
+WhatsApp
+
+Email
+
+SMS
+
+Telegram
+
+Facebook
+
+Instagram
+
+Create Booking
+
+Receive Payment
+
+Generate Invoice
+
+Generate Agreement
+
+Issue Visa
+
+Assign Flight
+
+Assign Hotel
+
+Assign Room
+
+Assign Bus
+
+Schedule Ziyarat
+
+Upload Document
+
+Generate Certificate
+
+========================================================
+18. CUSTOMER HEALTH SCORE
+========================================================
+
+Calculate automatically:
+
+Lead Score
+
+Booking Score
+
+Payment Score
+
+Communication Score
+
+Document Completion
+
+Overall Customer Health
+
+========================================================
+19. LIVE INTEGRATION
+========================================================
+
+Every module must stay synchronized automatically with:
+
+CRM
+
+Lead Management
+
+Bookings
+
+Payments
+
+Invoices
+
+Documents
+
+Communication Center
+
+Omnichannel Inbox
+
+WhatsApp
+
+Facebook
+
+Instagram
+
+Telegram
+
+Website Chat
+
+Email
+
+SMS
+
+RCS
+
+Automation Center
+
+========================================================
+20. ENTERPRISE REQUIREMENTS
+========================================================
+
+✓ Real Database
+✓ Live APIs
+✓ No Dummy Data
+✓ Auto Refresh
+✓ Real-Time Updates
+✓ Role-Based Permissions
+✓ Audit Logs
+✓ Search
+✓ Filters
+✓ Export PDF
+✓ Export Excel
+✓ Print
+✓ Mobile Responsive
+✓ Dark Mode Compatible
+✓ Fast Loading
+✓ Production Ready
+
+========================================================
+FINAL REQUIREMENT
+========================================================
+
+This Customer 360° Profile must become the master page of the ERP.
+
+Every customer-related module should open this page when clicking on a customer.
+
+The page must act as the single source of truth for every customer and provide a complete 360-degree view of the customer lifecycle, from first enquiry to journey completion and post-travel support.
+
+After implementation:
+
+1. Build frontend.
+2. Build backend.
+3. Run database migrations.
+4. Test every feature with live data.
+5. Verify all APIs.
+6. Deploy to VPS.
+7. Restart services.
+8. Verify production.
+9. Fix every error before marking complete.
+
+Do not finish until every module is fully integrated and tested in the live production environment.
