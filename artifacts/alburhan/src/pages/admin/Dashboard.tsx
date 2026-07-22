@@ -20,7 +20,7 @@ import {
   Hotel, Bus, Tent, Heart, Tag, TrendingDown, Calculator, Briefcase,
   Receipt, KeyRound, Archive, Code2, Plug, Settings2, Lock, Scale,
   ClipboardList, FileCheck, Truck, ShoppingCart, Smartphone, Globe,
-  Mail, CreditCard,
+  Mail, CreditCard, UserCircle,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -50,6 +50,7 @@ const SECTIONS: { title: string; color: string; items: ModItem[] }[] = [
       { icon: UserCheck,   label: "Agent Dashboard",          desc: "Agent analytics",          href: "/admin/agent-dashboard",  bg: "bg-cyan-100",    tc: "text-cyan-700"    },
       { icon: ShieldCheck, label: "Agent Login Management",   desc: "Agent login & access",     href: "/admin/agent-login",      bg: "bg-sky-100",     tc: "text-sky-700"     },
       { icon: Users,       label: "Staff Dashboard",          desc: "Staff management",         href: "/admin/staff-dashboard",  bg: "bg-teal-100",    tc: "text-teal-700"    },
+      { icon: UserCircle,  label: "Customer Dashboard",       desc: "Customer overview",        href: "/admin/customer-dashboard",bg: "bg-orange-100",  tc: "text-orange-700"  },
     ],
   },
   {
