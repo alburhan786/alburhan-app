@@ -1,0 +1,595 @@
+# MASTER PROMPT – CONNECT SOCIAL MEDIA INTEGRATION WITH LEAD MANAGEMENT
+# AL BURHAN TOURS & TRAVELS ERP
+
+You are a Senior Enterprise CRM Developer.
+
+The Social Media Integration Center already exists.
+
+Now integrate it completely with the CRM Lead Management system.
+
+This is PRODUCTION ONLY.
+
+Do NOT use mock data or fake messages.
+
+Every incoming message must automatically create or update a Lead.
+
+====================================================
+OBJECTIVE
+====================================================
+
+Connect ALL communication channels directly with Lead Management.
+
+Supported channels:
+
+✅ WhatsApp Business (BotBee)
+
+✅ WhatsApp Cloud API
+
+✅ Facebook Page
+
+✅ Facebook Messenger
+
+✅ Facebook Lead Ads
+
+✅ Instagram Business
+
+✅ Instagram Direct Messages
+
+✅ Telegram
+
+✅ Website Contact Form
+
+✅ Website Live Chat
+
+✅ AI Chatbot
+
+✅ RCS
+
+✅ SMS
+
+✅ Email
+
+====================================================
+WHEN A NEW MESSAGE ARRIVES
+====================================================
+
+Example:
+
+Customer sends:
+
+"Assalamualaikum, I need Umrah Package."
+
+System automatically:
+
+1. Receive message
+2. Identify platform
+3. Save conversation
+4. Search customer by mobile/email
+5. If customer exists:
+      Update Lead
+      Add new conversation
+      Notify assigned staff
+6. If customer does not exist:
+      Create New Lead automatically
+
+No manual entry required.
+
+====================================================
+LEAD AUTO CREATION
+====================================================
+
+Automatically fill:
+
+Lead ID
+
+Customer Name
+
+Mobile Number
+
+WhatsApp Number
+
+Instagram Username
+
+Facebook Name
+
+Telegram Username
+
+Email
+
+Platform
+
+Lead Source
+
+Package Interested
+
+Current Status
+
+Assigned Branch
+
+Assigned Staff
+
+Assigned Agent
+
+Date
+
+Time
+
+Conversation History
+
+Notes
+
+====================================================
+LEAD SOURCES
+====================================================
+
+Website
+
+WhatsApp
+
+Facebook
+
+Messenger
+
+Instagram
+
+Telegram
+
+Google
+
+Referral
+
+Walk-in
+
+Phone Call
+
+Meta Ads
+
+Google Ads
+
+RCS
+
+Email
+
+SMS
+
+Display source icon beside every lead.
+
+====================================================
+LEAD STATUS
+====================================================
+
+New
+
+Contacted
+
+Follow-up
+
+Interested
+
+Quotation Sent
+
+Negotiation
+
+Documents Pending
+
+Payment Pending
+
+Booked
+
+Confirmed
+
+Completed
+
+Lost
+
+Cancelled
+
+====================================================
+AUTO ASSIGNMENT
+====================================================
+
+Automatically assign leads using rules.
+
+Example
+
+WhatsApp →
+
+Sales Team A
+
+Instagram →
+
+Marketing Team
+
+Facebook →
+
+Online Sales
+
+Website →
+
+Customer Care
+
+Administrator can edit rules.
+
+====================================================
+FOLLOW-UP SYSTEM
+====================================================
+
+Every lead must have:
+
+Next Follow-up Date
+
+Reminder Time
+
+Priority
+
+Owner
+
+Reminder Notification
+
+WhatsApp Reminder
+
+Email Reminder
+
+SMS Reminder
+
+Dashboard Reminder
+
+====================================================
+CONVERSATION HISTORY
+====================================================
+
+Store every message.
+
+Display complete chat.
+
+Incoming
+
+Outgoing
+
+Images
+
+Videos
+
+Voice Notes
+
+PDF
+
+Location
+
+Files
+
+Everything stored.
+
+====================================================
+UNIFIED INBOX
+====================================================
+
+One inbox.
+
+Show
+
+WhatsApp
+
+Instagram
+
+Facebook
+
+Telegram
+
+Website
+
+Email
+
+SMS
+
+RCS
+
+Administrator can:
+
+Reply
+
+Assign
+
+Change Status
+
+Convert to Booking
+
+Schedule Follow-up
+
+Send Invoice
+
+Send Agreement
+
+Send Package
+
+====================================================
+ONE CLICK ACTIONS
+====================================================
+
+Every Lead should have:
+
+Call
+
+WhatsApp
+
+Email
+
+SMS
+
+Instagram
+
+Facebook Messenger
+
+Telegram
+
+Schedule Meeting
+
+Create Booking
+
+Create Invoice
+
+Create Agreement
+
+Upload Documents
+
+Convert Customer
+
+====================================================
+CRM DASHBOARD
+====================================================
+
+Display
+
+Today's Leads
+
+Unread Messages
+
+Today's Follow-ups
+
+Overdue Follow-ups
+
+Booked
+
+Lost
+
+Conversion Rate
+
+Revenue
+
+Lead Sources
+
+Top Staff
+
+====================================================
+NOTIFICATIONS
+====================================================
+
+Whenever new enquiry arrives
+
+Notify
+
+Super Admin
+
+Branch Manager
+
+Assigned Staff
+
+Assigned Agent
+
+Notification via
+
+Dashboard
+
+WhatsApp
+
+Email
+
+Push
+
+====================================================
+AUTOMATION
+====================================================
+
+Customer sends Instagram DM
+
+↓
+
+Create Lead
+
+↓
+
+Assign Staff
+
+↓
+
+Send Auto Reply
+
+↓
+
+Create Follow-up
+
+↓
+
+Show inside Lead Management
+
+↓
+
+Notify Administrator
+
+Same workflow for
+
+WhatsApp
+
+Facebook
+
+Telegram
+
+Website
+
+Email
+
+SMS
+
+RCS
+
+====================================================
+LEAD DETAILS PAGE
+====================================================
+
+Display
+
+Customer Photo
+
+Name
+
+Phone
+
+Email
+
+Platform
+
+Package
+
+Conversation
+
+Notes
+
+Timeline
+
+Invoices
+
+Payments
+
+Documents
+
+Agreement
+
+Booking
+
+Visa
+
+Ticket
+
+Hotel
+
+Room
+
+====================================================
+SEARCH
+====================================================
+
+Search by
+
+Name
+
+Mobile
+
+WhatsApp
+
+Instagram Username
+
+Facebook Name
+
+Telegram Username
+
+Email
+
+Passport
+
+Booking Number
+
+====================================================
+FILTERS
+====================================================
+
+Filter by
+
+Platform
+
+Status
+
+Staff
+
+Agent
+
+Branch
+
+Package
+
+City
+
+Date
+
+====================================================
+ANALYTICS
+====================================================
+
+Show
+
+Leads by Platform
+
+WhatsApp Leads
+
+Instagram Leads
+
+Facebook Leads
+
+Telegram Leads
+
+Website Leads
+
+Google Leads
+
+Conversion Rate
+
+Revenue
+
+Average Response Time
+
+====================================================
+TESTING
+====================================================
+
+Test every platform.
+
+Send one real message from
+
+WhatsApp
+
+Instagram
+
+Facebook
+
+Telegram
+
+Website Form
+
+Email
+
+SMS
+
+RCS
+
+Verify that:
+
+✓ Lead is automatically created
+
+✓ Conversation appears
+
+✓ Staff is notified
+
+✓ Follow-up is created
+
+✓ Lead appears in Lead Management
+
+✓ Auto Reply works
+
+✓ Conversation is stored
+
+✓ Search works
+
+✓ Filters work
+
+✓ Dashboard statistics update
+
+Do not mark this task complete until every communication channel automatically creates and updates leads in the CRM with no manual intervention.

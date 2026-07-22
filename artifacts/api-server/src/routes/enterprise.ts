@@ -192,31 +192,90 @@ router.post("/campaigns/:id/send", requireAdmin as any, async (req: Authenticate
 //  LEAD MANAGEMENT
 // ════════════════════════════════════════════════════════════════════
 
+router.get("/lead-stats", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const [totals, bySource, byStatus, followUps] = await Promise.all([
+      pool.query(`SELECT
+        COUNT(*)::int as total,
+        COUNT(*) FILTER (WHERE status='converted')::int as converted,
+        COUNT(*) FILTER (WHERE created_at::date = CURRENT_DATE)::int as today,
+        COUNT(*) FILTER (WHERE status='new')::int as new_count,
+        COUNT(*) FILTER (WHERE last_message_at >= NOW()-INTERVAL '24h')::int as active_today
+      FROM leads`),
+      pool.query(`SELECT source, COUNT(*)::int as count FROM leads GROUP BY source ORDER BY count DESC LIMIT 10`),
+      pool.query(`SELECT status, COUNT(*)::int as count FROM leads GROUP BY status ORDER BY count DESC`),
+      pool.query(`SELECT
+        COUNT(*) FILTER (WHERE follow_up_date::text = $1 AND status NOT IN ('converted','lost'))::int as today,
+        COUNT(*) FILTER (WHERE follow_up_date < $1::date AND status NOT IN ('converted','lost'))::int as overdue
+      FROM leads`, [today]),
+    ]);
+    const total = totals.rows[0].total || 1;
+    res.json({
+      ...totals.rows[0],
+      conversion_rate: Math.round((totals.rows[0].converted / total) * 100),
+      by_source: bySource.rows,
+      by_status: byStatus.rows,
+      follow_ups: followUps.rows[0],
+    });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
 router.get("/leads", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
-    const { status, source, assignedTo } = req.query as any;
+    const { status, source, platform, assignedTo, search, limit = "200" } = req.query as any;
     const conds: string[] = [];
     const params: any[] = [];
     if (status) { params.push(status); conds.push(`status = $${params.length}`); }
     if (source) { params.push(source); conds.push(`source = $${params.length}`); }
+    if (platform) { params.push(platform); conds.push(`platform = $${params.length}`); }
     if (assignedTo) { params.push(assignedTo); conds.push(`assigned_to = $${params.length}`); }
+    if (search) {
+      params.push(`%${search}%`);
+      const n = params.length;
+      conds.push(`(name ILIKE $${n} OR mobile ILIKE $${n} OR email ILIKE $${n} OR telegram_username ILIKE $${n} OR instagram_username ILIKE $${n} OR facebook_name ILIKE $${n})`);
+    }
+    params.push(parseInt(limit));
     const where = conds.length ? "WHERE " + conds.join(" AND ") : "";
-    const r = await pool.query(`SELECT * FROM leads ${where} ORDER BY created_at DESC`, params);
+    const r = await pool.query(`SELECT * FROM leads ${where} ORDER BY COALESCE(last_message_at, created_at) DESC LIMIT $${params.length}`, params);
     res.json(r.rows);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.get("/leads/:id/conversations", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { id } = req.params;
+    const msgs = await pool.query(
+      `SELECT * FROM social_messages WHERE lead_text_id=$1 ORDER BY created_at ASC LIMIT 200`,
+      [id]
+    );
+    // Also check notification_logs for outgoing messages to this lead's mobile
+    const lead = await pool.query(`SELECT mobile FROM leads WHERE id=$1`, [id]);
+    let outgoing: any[] = [];
+    if (lead.rows[0]?.mobile) {
+      const logs = await pool.query(
+        `SELECT id::text, 'outgoing' as direction, channel::text as platform, message, status, created_at
+         FROM notification_logs WHERE recipient=$1 ORDER BY created_at ASC LIMIT 50`,
+        [lead.rows[0].mobile]
+      );
+      outgoing = logs.rows;
+    }
+    res.json({ messages: msgs.rows, outgoing });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
 router.post("/leads", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
-    const { name, mobile, email, source = "website", message, packageInterest, assignedTo, assignedName, followUpDate, notes, budget } = req.body;
+    const { name, mobile, email, source = "website", message, packageInterest, assignedTo, assignedName, followUpDate, notes, budget, platform, priority, assignedBranch } = req.body;
     if (!name?.trim()) return void res.status(400).json({ error: "Name is required" });
     const id = `lead_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const r = await pool.query(
-      `INSERT INTO leads (id, name, mobile, email, source, message, package_interest, assigned_to, assigned_name, follow_up_date, notes, budget)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
-      [id, name.trim(), mobile || null, email || null, source, message || null,
-       packageInterest || null, assignedTo || null, assignedName || null,
-       followUpDate || null, notes || null, budget || null]
+      `INSERT INTO leads (id, name, mobile, email, source, message, package_interest, assigned_to, assigned_name, follow_up_date, notes, budget, platform, priority, assigned_branch)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+      [id, name.trim(), mobile||null, email||null, source, message||null,
+       packageInterest||null, assignedTo||null, assignedName||null,
+       followUpDate||null, notes||null, budget||null,
+       platform||null, priority||"normal", assignedBranch||null]
     );
     res.json(r.rows[0]);
   } catch (err: any) { res.status(500).json({ error: err.message }); }
@@ -224,7 +283,7 @@ router.post("/leads", requireAdmin as any, async (req: AuthenticatedRequest, res
 
 router.patch("/leads/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
-    const { name, mobile, email, source, status, assignedTo, assignedName, followUpDate, notes, packageInterest, budget, conversionBookingId } = req.body;
+    const { name, mobile, email, source, status, assignedTo, assignedName, followUpDate, notes, packageInterest, budget, conversionBookingId, priority, assignedBranch, platform, instagramUsername, facebookName, telegramUsername } = req.body;
     const r = await pool.query(
       `UPDATE leads SET
          name = COALESCE($1, name), mobile = COALESCE($2, mobile), email = COALESCE($3, email),
@@ -233,12 +292,21 @@ router.patch("/leads/:id", requireAdmin as any, async (req: AuthenticatedRequest
          follow_up_date = COALESCE($8, follow_up_date), notes = COALESCE($9, notes),
          package_interest = COALESCE($10, package_interest), budget = COALESCE($11, budget),
          conversion_booking_id = COALESCE($12, conversion_booking_id),
+         priority = COALESCE($13, priority),
+         assigned_branch = COALESCE($14, assigned_branch),
+         platform = COALESCE($15, platform),
+         instagram_username = COALESCE($16, instagram_username),
+         facebook_name = COALESCE($17, facebook_name),
+         telegram_username = COALESCE($18, telegram_username),
          converted_at = CASE WHEN $5 = 'converted' AND converted_at IS NULL THEN NOW() ELSE converted_at END,
          updated_at = NOW()
-       WHERE id = $13 RETURNING *`,
+       WHERE id = $19 RETURNING *`,
       [name||null, mobile||null, email||null, source||null, status||null,
        assignedTo||null, assignedName||null, followUpDate||null, notes||null,
-       packageInterest||null, budget||null, conversionBookingId||null, req.params.id]
+       packageInterest||null, budget||null, conversionBookingId||null,
+       priority||null, assignedBranch||null, platform||null,
+       instagramUsername||null, facebookName||null, telegramUsername||null,
+       req.params.id]
     );
     res.json(r.rows[0] || { error: "Not found" });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
