@@ -43,6 +43,7 @@ function buildMenu(openComplaints: number): MenuSection[] {
         { icon: Activity,        label: "Operations Dashboard",   href: "/admin/operations",  require: ["bookings", "view"] },
         { icon: PieChart,        label: "Executive Dashboard",    href: "/admin/executive",   require: ["reports", "view"] },
         { icon: TrendingUp,      label: "Business Intelligence",  href: "/admin/bi",          require: ["reports", "view"] },
+        { icon: Users2,          label: "Manager Dashboard",      href: "/admin/manager",     require: ["groups", "view"] },
         { icon: Sparkles,        label: "Super Admin Dashboard",  href: "/admin/super",       requireSuper: true },
       ],
     },

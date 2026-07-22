@@ -40,6 +40,7 @@ import NotificationHealth from "@/pages/admin/NotificationHealth";
 import BusinessSettings from "@/pages/admin/BusinessSettings";
 import ProductionReport from "@/pages/admin/ProductionReport";
 import FinanceHub from "@/pages/admin/FinanceHub";
+import ManagerDashboard from "@/pages/admin/ManagerDashboard";
 import AdminChat from "@/pages/admin/AdminChat";
 import PilgrimOpsCenter from "@/pages/admin/PilgrimOpsCenter";
 import BranchManager from "@/pages/admin/BranchManager";
@@ -240,6 +241,12 @@ function Router() {
       {/* Public Agreement Verification */}
       <Route path="/verify-agreement/:token" component={VerifyAgreement} />
 
+      {/* Short portal aliases — redirect to full paths */}
+      <Route path="/branch" component={() => <Redirect to="/branch/dashboard" />} />
+      <Route path="/agent" component={() => <Redirect to="/agent/dashboard" />} />
+      <Route path="/staff" component={() => <Redirect to="/staff/dashboard" />} />
+      <Route path="/customer" component={() => <Redirect to="/customer/dashboard" />} />
+
       {/* Portal Routes — Branch Manager, Agent, Staff */}
       <Route path="/branch/dashboard" component={() => <BranchRoute component={BranchPortal} />} />
       <Route path="/agent/dashboard" component={() => <AgentRoute component={AgentPortal} />} />
@@ -254,6 +261,7 @@ function Router() {
 
       {/* Admin Routes */}
       <Route path="/admin/dashboard" component={() => <AdminRoute component={AdminDashboard} />} />
+      <Route path="/admin/manager"   component={() => <AdminRoute component={ManagerDashboard} />} />
       <Route path="/admin/packages" component={() => <AdminRoute component={PackagesManager} />} />
       <Route path="/admin/bookings" component={() => <AdminRoute component={BookingsManager} />} />
       <Route path="/admin/invoices" component={() => <AdminRoute component={InvoiceManager} />} />

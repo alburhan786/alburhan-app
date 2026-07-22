@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 
 export type AdminRole =
-  | "super_admin" | "admin" | "accounts" | "manager"
+  | "super_admin" | "admin" | "finance" | "accounts" | "manager"
   | "sales" | "operations" | "guide" | "staff" | "read_only";
 
 export type Module =
@@ -14,6 +14,7 @@ export type Action = "view" | "create" | "edit" | "delete" | "approve" | "export
 export const ROLE_LABELS: Record<AdminRole, string> = {
   super_admin: "Super Admin",
   admin: "Admin",
+  finance: "Finance",
   accounts: "Accounts",
   manager: "Manager",
   sales: "Sales",
@@ -26,6 +27,7 @@ export const ROLE_LABELS: Record<AdminRole, string> = {
 export const ROLE_COLORS: Record<AdminRole, string> = {
   super_admin: "bg-purple-100 text-purple-800",
   admin: "bg-blue-100 text-blue-800",
+  finance: "bg-emerald-100 text-emerald-800",
   accounts: "bg-green-100 text-green-800",
   manager: "bg-teal-100 text-teal-800",
   sales: "bg-orange-100 text-orange-800",
@@ -50,6 +52,11 @@ const PERMISSIONS: Record<AdminRole, Partial<Record<Module, Action[]>>> = {
     bookings: ALL, payments: ALL, expenses: ALL, accounting: ALL, payroll: ALL,
     gst: ALL, assets: ALL, groups: ALL, pilgrims: ALL, staff: ALL,
     customers: ALL, reports: ALL, audit_logs: ALL, settings: ALL, users: RO,
+  },
+  finance: {
+    bookings: RO, payments: ALL, expenses: ALL, accounting: ALL, payroll: ALL,
+    gst: ALL, assets: ALL, groups: VIEW, pilgrims: VIEW, customers: VIEW,
+    reports: ALL, audit_logs: VIEW, staff: [], settings: [], users: [],
   },
   accounts: {
     bookings: RO, payments: ALL, expenses: ALL, accounting: ALL, payroll: ALL,

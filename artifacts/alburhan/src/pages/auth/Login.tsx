@@ -91,7 +91,9 @@ export default function Login() {
   const rawReturnUrl = searchParams.get("returnUrl");
   const returnUrl = rawReturnUrl && rawReturnUrl.startsWith("/") && !rawReturnUrl.startsWith("//") ? rawReturnUrl : null;
 
-  // Redirect to role-appropriate portal after login
+  // Redirect to role-appropriate portal after login.
+  // For portal user.roles (branch_manager / agent / staff) redirect immediately.
+  // For admin user.role, fetch adminRole from DB then route to the correct dashboard.
   function adminRedirect(userRole: string) {
     if (userRole === "branch_manager") { setLocation("/branch/dashboard"); return; }
     if (userRole === "agent")          { setLocation("/agent/dashboard"); return; }
@@ -100,17 +102,22 @@ export default function Login() {
       fetch(`${API_BASE}/api/admin-users/me`, { credentials: "include" })
         .then(r => r.ok ? r.json() : null)
         .then(data => {
-          const adminRole: string = data?.adminRole ?? "";
-          if (adminRole === "super_admin" || userRole === "super_admin") { setLocation("/admin/super"); return; }
-          if (adminRole === "accounts")   { setLocation("/admin/finance"); return; }
-          if (adminRole === "operations") { setLocation("/admin/operations"); return; }
-          if (adminRole === "sales")      { setLocation("/admin/customers"); return; }
-          if (adminRole === "guide")      { setLocation("/admin/guide-panel"); return; }
+          const ar: string = data?.adminRole ?? "";
+          // Exact redirect matrix — one entry per adminRole value
+          if (ar === "super_admin" || userRole === "super_admin") { setLocation("/admin/super");       return; }
+          if (ar === "finance")    { setLocation("/admin/finance");     return; }
+          if (ar === "accounts")   { setLocation("/admin/accounting");  return; }
+          if (ar === "operations") { setLocation("/admin/operations");  return; }
+          if (ar === "manager")    { setLocation("/admin/manager");     return; }
+          if (ar === "sales")      { setLocation("/admin/customers");   return; }
+          if (ar === "guide")      { setLocation("/admin/guide-panel"); return; }
+          // admin / staff / read_only / any unknown → standard dashboard
           setLocation("/admin/dashboard");
         })
         .catch(() => setLocation(userRole === "super_admin" ? "/admin/super" : "/admin/dashboard"));
       return;
     }
+    // Every other role (customer) → customer dashboard
     setLocation(returnUrl || "/customer/dashboard");
   }
 
