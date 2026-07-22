@@ -1,0 +1,233 @@
+# CRITICAL PRODUCTION RECOVERY REQUEST
+# Project: Al Burhan Tours & Travels ERP & SRM
+# Priority: HIGHEST
+# Environment: LIVE VPS
+# DO NOT LOSE ANY DATA
+
+The latest deployment has caused several admin modules and dashboard cards to disappear. This is NOT acceptable for a production ERP.
+
+Before making ANY changes:
+
+1. Create a complete backup of:
+   - PostgreSQL database
+   - Uploaded documents
+   - Images
+   - Agreements
+   - Invoices
+   - Receipts
+   - Customer documents
+   - Environment variables
+   - API keys
+   - Configuration
+   - Frontend
+   - Backend
+
+2. Create a Git checkpoint.
+
+3. Verify database backup completed successfully.
+
+4. DO NOT DROP, DELETE OR RESET ANY TABLE.
+
+5. DO NOT DELETE ANY EXISTING CUSTOMER DATA.
+
+6. DO NOT REMOVE ANY EXISTING FEATURES.
+
+==================================================
+RESTORE COMPLETE ADMIN DASHBOARD
+==================================================
+
+Restore every dashboard card that previously existed.
+
+Nothing should disappear after deployment.
+
+Restore:
+
+✓ Dashboard
+✓ Operations Dashboard
+✓ Executive Dashboard
+✓ Business Intelligence
+✓ Manager Dashboard
+✓ Super Admin Dashboard
+✓ Staff Dashboard
+✓ Customer Dashboard
+
+Restore ALL module cards exactly as before including:
+
+✓ Offline Booking
+✓ QR Tracker
+✓ Print Center
+✓ Reports
+✓ Bookings
+✓ Hajj Groups
+✓ Packages
+✓ Customers
+✓ Invoices
+✓ Payment Analytics
+✓ Payment Reminders
+✓ Auto Notifications
+✓ Inquiries
+✓ Gallery
+✓ KYC Management
+✓ Broadcast Messages
+✓ Super Dashboard
+✓ Pilgrim Reports
+✓ Support Center
+✓ Business Intelligence
+✓ Certificates
+✓ Guide Panel
+✓ Task Manager
+✓ Marketing Center
+✓ Lead Manager
+✓ Supplier Manager
+✓ Branch Manager
+✓ Agent Management
+✓ Staff Management
+✓ Payroll
+✓ Finance Hub
+✓ AI Operations
+✓ Executive Dashboard
+✓ Document Expiry
+✓ Communication Center
+✓ Automation Center
+✓ CRM
+✓ SRM
+✓ Loyalty & Rewards
+✓ Customer 360°
+✓ Omnichannel Inbox
+✓ Social Media Integration Center
+
+No module should disappear after deployment.
+
+==================================================
+RESTORE SOCIAL MEDIA INTEGRATION CENTER
+==================================================
+
+Restore the complete Social Media Integration Center.
+
+Include:
+
+✓ WhatsApp Business
+✓ WhatsApp Cloud API
+✓ Facebook Page
+✓ Facebook Messenger
+✓ Facebook Lead Ads
+✓ Instagram Business
+✓ Telegram
+✓ Website Chat
+✓ Website Contact Form
+✓ Email
+✓ SMS
+✓ RCS
+✓ Push Notifications
+
+Show:
+
+Connection Status
+
+Webhook Status
+
+Last Sync
+
+Last Activity
+
+Connected Account
+
+Reconnect Button
+
+Disconnect Button
+
+Test Connection
+
+Logs
+
+Statistics
+
+==================================================
+DO NOT REMOVE EXISTING FEATURES
+==================================================
+
+If any deployment introduces a regression:
+
+STOP.
+
+Restore the missing feature automatically.
+
+Never overwrite working modules.
+
+Always merge changes instead of replacing files.
+
+==================================================
+SAFE DEPLOYMENT POLICY
+==================================================
+
+Before every deployment:
+
+Compare current production routes.
+
+Compare current navigation.
+
+Compare menu items.
+
+Compare dashboard cards.
+
+Compare API routes.
+
+Compare database schema.
+
+Compare permissions.
+
+If anything will disappear:
+
+Automatically merge it back before deployment.
+
+==================================================
+POST DEPLOYMENT VALIDATION
+==================================================
+
+After deployment verify:
+
+✓ All sidebar menus visible
+
+✓ All dashboard cards visible
+
+✓ Every page opens
+
+✓ Every API responds
+
+✓ Every button works
+
+✓ Every Back button works
+
+✓ Every breadcrumb works
+
+✓ Every navigation link works
+
+✓ Customer data intact
+
+✓ Bookings intact
+
+✓ Payments intact
+
+✓ Invoices intact
+
+✓ Agreements intact
+
+✓ Documents intact
+
+✓ Leads intact
+
+✓ Omnichannel Inbox intact
+
+✓ Customer 360 intact
+
+✓ Social Media Integration intact
+
+==================================================
+AUTOMATIC REGRESSION CHECK
+==================================================
+
+Compare production with previous working build.
+
+Automatically detect:
+
+Missing pages
