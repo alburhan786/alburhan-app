@@ -20,7 +20,7 @@ import {
   Hotel, Bus, Tent, Heart, Tag, TrendingDown, Calculator, Briefcase,
   Receipt, KeyRound, Archive, Code2, Plug, Settings2, Lock, Scale,
   ClipboardList, FileCheck, Truck, ShoppingCart, Smartphone, Globe,
-  Mail, CreditCard, UserCircle,
+  Mail, CreditCard, UserCircle, Award,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -40,92 +40,160 @@ interface ModItem {
 }
 
 const SECTIONS: { title: string; color: string; items: ModItem[] }[] = [
+  /* ── 1. PORTALS ──────────────────────────────────────────────── */
   {
     title: "Portals",
     color: "from-violet-600 to-violet-800",
     items: [
-      { icon: Sparkles,    label: "Super Admin Dashboard",    desc: "Command center",           href: "/admin/super",            bg: "bg-violet-100",  tc: "text-violet-700"  },
-      { icon: Building2,   label: "Branch Dashboard",         desc: "Branch performance",       href: "/admin/branch-dashboard", bg: "bg-blue-100",    tc: "text-blue-700"    },
-      { icon: KeyRound,    label: "Branch Login Management",  desc: "Branch login & access",    href: "/admin/branch-login",     bg: "bg-indigo-100",  tc: "text-indigo-700"  },
-      { icon: UserCheck,   label: "Agent Dashboard",          desc: "Agent analytics",          href: "/admin/agent-dashboard",  bg: "bg-cyan-100",    tc: "text-cyan-700"    },
-      { icon: ShieldCheck, label: "Agent Login Management",   desc: "Agent login & access",     href: "/admin/agent-login",      bg: "bg-sky-100",     tc: "text-sky-700"     },
-      { icon: Users,       label: "Staff Dashboard",          desc: "Staff management",         href: "/admin/staff-dashboard",  bg: "bg-teal-100",    tc: "text-teal-700"    },
-      { icon: UserCircle,  label: "Customer Dashboard",       desc: "Customer overview",        href: "/admin/customer-dashboard",bg: "bg-orange-100",  tc: "text-orange-700"  },
+      { icon: Sparkles,    label: "Super Admin Dashboard",   desc: "Command center",              href: "/admin/super",             bg: "bg-violet-100",  tc: "text-violet-700"  },
+      { icon: Building2,   label: "Branch Dashboard",        desc: "Branch performance",          href: "/admin/branch-dashboard",  bg: "bg-blue-100",    tc: "text-blue-700"    },
+      { icon: KeyRound,    label: "Branch Login Management", desc: "Branch login & access",       href: "/admin/branch-login",      bg: "bg-indigo-100",  tc: "text-indigo-700"  },
+      { icon: UserCheck,   label: "Agent Dashboard",         desc: "Agent analytics",             href: "/admin/agent-dashboard",   bg: "bg-cyan-100",    tc: "text-cyan-700"    },
+      { icon: ShieldCheck, label: "Agent Login Management",  desc: "Agent login & access",        href: "/admin/agent-login",       bg: "bg-sky-100",     tc: "text-sky-700"     },
+      { icon: Users,       label: "Staff Dashboard",         desc: "Staff management",            href: "/admin/staff-dashboard",   bg: "bg-teal-100",    tc: "text-teal-700"    },
+      { icon: UserCircle,  label: "Customer Dashboard",      desc: "Customer overview",           href: "/admin/customer-dashboard",bg: "bg-orange-100",  tc: "text-orange-700"  },
     ],
   },
+
+  /* ── 2. OVERVIEW & INTELLIGENCE ─────────────────────────────── */
+  {
+    title: "Overview & Intelligence",
+    color: "from-indigo-600 to-indigo-800",
+    items: [
+      { icon: Briefcase,   label: "Executive Dashboard",     desc: "C-suite KPIs & overview",     href: "/admin/executive",         bg: "bg-indigo-100",  tc: "text-indigo-700"  },
+      { icon: Settings,    label: "Operations Dashboard",    desc: "Ops status & tracking",       href: "/admin/operations",        bg: "bg-blue-100",    tc: "text-blue-700"    },
+      { icon: UsersRound,  label: "Manager Dashboard",       desc: "Team & pipeline view",        href: "/admin/manager",           bg: "bg-violet-100",  tc: "text-violet-700"  },
+      { icon: PieChart,    label: "Business Intelligence",   desc: "Trends & insights",           href: "/admin/bi",                bg: "bg-purple-100",  tc: "text-purple-700"  },
+      { icon: Brain,       label: "AI Analytics Dashboard",  desc: "ML-powered insights",         href: "/admin/ai-ops",            bg: "bg-fuchsia-100", tc: "text-fuchsia-700" },
+    ],
+  },
+
+  /* ── 3. FINANCE & ACCOUNTING ─────────────────────────────────── */
   {
     title: "Finance & Accounting",
     color: "from-emerald-600 to-emerald-800",
     items: [
-      { icon: IndianRupee, label: "Finance Dashboard",        desc: "P&L, cash flow, ledger",   href: "/admin/finance",          bg: "bg-emerald-100", tc: "text-emerald-700" },
-      { icon: Calculator,  label: "Accounting Dashboard",     desc: "Books & journal entries",  href: "/admin/accounting",       bg: "bg-green-100",   tc: "text-green-700"   },
-      { icon: CreditCard,  label: "Payment Dashboard",        desc: "Transactions & receipts",  href: "/admin/payments",         bg: "bg-lime-100",    tc: "text-lime-700"    },
-      { icon: BookOpen,    label: "Invoice Dashboard",        desc: "Invoice management",       href: "/admin/invoices",         bg: "bg-cyan-100",    tc: "text-cyan-700"    },
-      { icon: Receipt,     label: "Receipt Dashboard",        desc: "Payment receipts",         href: "/admin/receipts",         bg: "bg-sky-100",     tc: "text-sky-700"     },
+      { icon: IndianRupee, label: "Finance Dashboard",       desc: "P&L, cash flow, ledger",      href: "/admin/finance",           bg: "bg-emerald-100", tc: "text-emerald-700" },
+      { icon: Calculator,  label: "Accounting Dashboard",    desc: "Books & journal entries",     href: "/admin/accounting",        bg: "bg-green-100",   tc: "text-green-700"   },
+      { icon: CreditCard,  label: "Payment Dashboard",       desc: "Transactions & receipts",     href: "/admin/payments",          bg: "bg-lime-100",    tc: "text-lime-700"    },
+      { icon: Wallet,      label: "Offline Payments",        desc: "Bank transfers & cash",       href: "/admin/offline-payments",  bg: "bg-teal-100",    tc: "text-teal-700"    },
+      { icon: BookOpen,    label: "Invoice Dashboard",       desc: "Invoice management",          href: "/admin/invoices",          bg: "bg-cyan-100",    tc: "text-cyan-700"    },
+      { icon: TrendingDown,label: "Expense Dashboard",       desc: "Expenses & cost tracking",    href: "/admin/expenses",          bg: "bg-orange-100",  tc: "text-orange-700"  },
+      { icon: Receipt,     label: "Receipt Dashboard",       desc: "Payment receipts",            href: "/admin/receipts",          bg: "bg-sky-100",     tc: "text-sky-700"     },
     ],
   },
+
+  /* ── 4. CRM, SALES & CUSTOMER ────────────────────────────────── */
   {
-    title: "CRM, HR & Workforce",
+    title: "CRM, Sales & Customer",
     color: "from-blue-600 to-blue-800",
     items: [
-      { icon: Target,       label: "CRM Dashboard",           desc: "Leads & pipeline",         href: "/admin/crm",              bg: "bg-blue-100",    tc: "text-blue-700"    },
-      { icon: Handshake,    label: "SRM Dashboard",           desc: "Supplier relationships",   href: "/admin/srm",              bg: "bg-purple-100",  tc: "text-purple-700"  },
-      { icon: Briefcase,    label: "HR Dashboard",            desc: "Staff & HR management",    href: "/admin/hr",               bg: "bg-amber-100",   tc: "text-amber-700"   },
-      { icon: IndianRupee,  label: "Payroll Dashboard",       desc: "Salary & payslips",        href: "/admin/payroll",          bg: "bg-yellow-100",  tc: "text-yellow-700"  },
-      { icon: PackageIcon,  label: "Inventory Dashboard",     desc: "Stock & equipment",        href: "/admin/inventory",        bg: "bg-lime-100",    tc: "text-lime-700"    },
-      { icon: ShoppingCart, label: "Procurement Dashboard",   desc: "Purchase orders",          href: "/admin/procurement",      bg: "bg-green-100",   tc: "text-green-700"   },
-      { icon: Truck,        label: "Supplier Dashboard",      desc: "Supplier directory",       href: "/admin/suppliers",        bg: "bg-fuchsia-100", tc: "text-fuchsia-700" },
+      { icon: Target,      label: "CRM Dashboard",           desc: "Leads & pipeline",            href: "/admin/crm",               bg: "bg-blue-100",    tc: "text-blue-700"    },
+      { icon: UserPlus,    label: "Lead Manager",            desc: "Lead capture & follow-up",    href: "/admin/leads",             bg: "bg-sky-100",     tc: "text-sky-700"     },
+      { icon: Users2,      label: "Customer 360° Profile",   desc: "Full customer history",       href: "/admin/customer360",       bg: "bg-indigo-100",  tc: "text-indigo-700"  },
+      { icon: Star,        label: "Loyalty & Rewards",       desc: "Points & redemptions",        href: "/admin/loyalty",           bg: "bg-yellow-100",  tc: "text-yellow-700"  },
+      { icon: Inbox,       label: "Omni Channel Inbox",      desc: "All messages in one view",    href: "/admin/inbox",             bg: "bg-violet-100",  tc: "text-violet-700"  },
     ],
   },
+
+  /* ── 5. SUPPLIER, PROCUREMENT & INVENTORY ────────────────────── */
   {
-    title: "Travel Operations",
+    title: "Supplier, Procurement & Inventory",
+    color: "from-purple-600 to-purple-800",
+    items: [
+      { icon: Handshake,   label: "SRM Dashboard",           desc: "Supplier relationships",      href: "/admin/srm",               bg: "bg-purple-100",  tc: "text-purple-700"  },
+      { icon: Truck,       label: "Supplier Dashboard",      desc: "Supplier directory",          href: "/admin/suppliers",         bg: "bg-fuchsia-100", tc: "text-fuchsia-700" },
+      { icon: ShoppingCart,label: "Procurement Dashboard",   desc: "Purchase orders",             href: "/admin/procurement",       bg: "bg-pink-100",    tc: "text-pink-700"    },
+      { icon: PackageIcon, label: "Inventory Dashboard",     desc: "Stock & equipment",           href: "/admin/inventory",         bg: "bg-rose-100",    tc: "text-rose-700"    },
+      { icon: Tag,         label: "Vendor Dashboard",        desc: "Vendor management",           href: "/admin/vendors",           bg: "bg-orange-100",  tc: "text-orange-700"  },
+    ],
+  },
+
+  /* ── 6. HR & WORKFORCE ───────────────────────────────────────── */
+  {
+    title: "HR & Workforce",
+    color: "from-amber-600 to-amber-800",
+    items: [
+      { icon: Briefcase,   label: "HR Dashboard",            desc: "Staff & HR management",       href: "/admin/hr",                bg: "bg-amber-100",   tc: "text-amber-700"   },
+      { icon: IndianRupee, label: "Payroll Dashboard",       desc: "Salary & payslips",           href: "/admin/payroll",           bg: "bg-yellow-100",  tc: "text-yellow-700"  },
+      { icon: UsersRound,  label: "Staff Manager",           desc: "Manage all staff members",    href: "/admin/staff",             bg: "bg-orange-100",  tc: "text-orange-700"  },
+      { icon: ListTodo,    label: "Task Dashboard",          desc: "Tasks & assignments",         href: "/admin/tasks",             bg: "bg-lime-100",    tc: "text-lime-700"    },
+      { icon: Archive,     label: "Asset Manager",           desc: "Company assets & equipment",  href: "/admin/assets",            bg: "bg-green-100",   tc: "text-green-700"   },
+    ],
+  },
+
+  /* ── 7. BOOKING & PILGRIM OPERATIONS ─────────────────────────── */
+  {
+    title: "Booking & Pilgrim Operations",
     color: "from-rose-600 to-rose-800",
     items: [
-      { icon: FileCheck,   label: "Visa Dashboard",           desc: "Visa status & processing", href: "/admin/visa",             bg: "bg-purple-100",  tc: "text-purple-700"  },
-      { icon: Plane,       label: "Flight Dashboard",         desc: "Flight management",        href: "/admin/flights",          bg: "bg-violet-100",  tc: "text-violet-700"  },
-      { icon: Hotel,       label: "Hotel Dashboard",          desc: "Hotel management",         href: "/admin/hotels",           bg: "bg-blue-100",    tc: "text-blue-700"    },
-      { icon: Bus,         label: "Transport Dashboard",      desc: "Buses & vehicles",         href: "/admin/buses",            bg: "bg-sky-100",     tc: "text-sky-700"     },
-      { icon: Tent,        label: "Room Allocation Dashboard",desc: "Mina / Arafat / Muzd.",   href: "/admin/allocations",      bg: "bg-indigo-100",  tc: "text-indigo-700"  },
-      { icon: FileText,    label: "Document Management Dashboard", desc: "Passport, Aadhaar & docs", href: "/admin/document-expiry", bg: "bg-pink-100", tc: "text-pink-700"  },
-      { icon: Scale,       label: "Agreement Dashboard",      desc: "Contracts & digital sign", href: "/admin/agreements",       bg: "bg-rose-100",    tc: "text-rose-700"    },
+      { icon: BookOpen,    label: "Bookings",                desc: "All bookings & reservations", href: "/admin/bookings",          bg: "bg-rose-100",    tc: "text-rose-700"    },
+      { icon: ClipboardPlus,label:"Offline Booking",         desc: "Walk-in & manual bookings",   href: "/admin/offline-bookings",  bg: "bg-red-100",     tc: "text-red-700"     },
+      { icon: UsersRound,  label: "Hajj Groups",            desc: "Group management & pilgrims", href: "/admin/groups",            bg: "bg-amber-100",   tc: "text-amber-700"   },
+      { icon: FileCheck,   label: "Visa Dashboard",          desc: "Visa status & processing",    href: "/admin/visa",              bg: "bg-purple-100",  tc: "text-purple-700"  },
+      { icon: Plane,       label: "Flight Dashboard",        desc: "Flight management",           href: "/admin/flights",           bg: "bg-violet-100",  tc: "text-violet-700"  },
+      { icon: Hotel,       label: "Hotel Dashboard",         desc: "Hotel management",            href: "/admin/hotels",            bg: "bg-blue-100",    tc: "text-blue-700"    },
+      { icon: Bus,         label: "Transport Dashboard",     desc: "Buses & vehicles",            href: "/admin/buses",             bg: "bg-sky-100",     tc: "text-sky-700"     },
+      { icon: Tent,        label: "Room Allocation",         desc: "Mina / Arafat / Muzdalifa",   href: "/admin/allocations",       bg: "bg-indigo-100",  tc: "text-indigo-700"  },
+      { icon: MapPin,      label: "Guide Panel",             desc: "Tour guide management",       href: "/admin/guide-panel",       bg: "bg-teal-100",    tc: "text-teal-700"    },
+      { icon: Heart,       label: "Ziyarat Dashboard",       desc: "Ziyarat schedule & sites",    href: "/admin/ziyarat",           bg: "bg-pink-100",    tc: "text-pink-700"    },
+      { icon: FileText,    label: "Pilgrim Reports",         desc: "Pilgrim data & reports",      href: "/admin/pilgrim-reports",   bg: "bg-orange-100",  tc: "text-orange-700"  },
+      { icon: ScanLine,    label: "QR Tracker",              desc: "Pilgrim QR tracking",         href: "/admin/qr-tracker",        bg: "bg-cyan-100",    tc: "text-cyan-700"    },
+      { icon: Printer,     label: "Print Center",            desc: "ID cards, luggage & docs",    href: "/admin/print-center",      bg: "bg-slate-100",   tc: "text-slate-700"   },
+      { icon: Scale,       label: "Agreement Dashboard",     desc: "Contracts & digital sign",    href: "/admin/agreements",        bg: "bg-emerald-100", tc: "text-emerald-700" },
+      { icon: Award,       label: "Certificate Center",      desc: "Haj & Umrah certificates",    href: "/admin/certificates",      bg: "bg-yellow-100",  tc: "text-yellow-700"  },
+      { icon: ClipboardList,label:"Document Management",     desc: "Passport, Aadhaar & docs",    href: "/admin/document-expiry",   bg: "bg-fuchsia-100", tc: "text-fuchsia-700" },
+      { icon: FileCheck,   label: "KYC Dashboard",           desc: "Know Your Customer docs",     href: "/admin/kyc",               bg: "bg-lime-100",    tc: "text-lime-700"    },
     ],
   },
-  {
-    title: "Analytics & Reporting",
-    color: "from-slate-600 to-slate-800",
-    items: [
-      { icon: BarChart2,   label: "Reports Dashboard",        desc: "Operational reports",      href: "/admin/reports",          bg: "bg-slate-100",   tc: "text-slate-700"   },
-      { icon: PieChart,    label: "Business Intelligence Dashboard", desc: "Trends & insights", href: "/admin/bi",               bg: "bg-gray-100",    tc: "text-gray-700"    },
-      { icon: Brain,       label: "AI Analytics Dashboard",   desc: "ML-powered insights",      href: "/admin/ai-ops",           bg: "bg-zinc-100",    tc: "text-zinc-700"    },
-    ],
-  },
+
+  /* ── 8. COMMUNICATION & MARKETING ───────────────────────────── */
   {
     title: "Communication & Marketing",
     color: "from-teal-600 to-teal-800",
     items: [
-      { icon: MessageSquare,label: "WhatsApp Dashboard",      desc: "Messages & templates",     href: "/admin/botbee-dashboard",      bg: "bg-emerald-100", tc: "text-emerald-700" },
-      { icon: Smartphone,   label: "SMS Dashboard",           desc: "DLT & SMS campaigns",      href: "/admin/sms-production-report", bg: "bg-blue-100",    tc: "text-blue-700"    },
-      { icon: Mail,         label: "Email Dashboard",         desc: "Templates & delivery",     href: "/admin/email-templates",       bg: "bg-violet-100",  tc: "text-violet-700"  },
-      { icon: Megaphone,    label: "Marketing Dashboard",     desc: "Campaigns & broadcasts",   href: "/admin/marketing",             bg: "bg-rose-100",    tc: "text-rose-700"    },
-      { icon: Bell,         label: "Notification Dashboard",  desc: "Delivery status & logs",   href: "/admin/notification-health",   bg: "bg-pink-100",    tc: "text-pink-700"    },
-      { icon: Share2,       label: "Social Media Integration Management", desc: "All social channels", href: "/admin/social-media", bg: "bg-sky-100",    tc: "text-sky-700"     },
-      { icon: Globe,        label: "Website CMS Dashboard",   desc: "Public pages & content",   href: "/admin/settings",              bg: "bg-teal-100",    tc: "text-teal-700"    },
+      { icon: MessageSquare,label:"WhatsApp Dashboard",      desc: "Messages & templates",        href: "/admin/botbee-dashboard",  bg: "bg-emerald-100", tc: "text-emerald-700" },
+      { icon: Smartphone,  label: "SMS Dashboard",           desc: "DLT & SMS campaigns",         href: "/admin/sms-dashboard",     bg: "bg-blue-100",    tc: "text-blue-700"    },
+      { icon: Mail,        label: "Email Dashboard",         desc: "Email templates & delivery",  href: "/admin/email-dashboard",   bg: "bg-violet-100",  tc: "text-violet-700"  },
+      { icon: Megaphone,   label: "Marketing Dashboard",     desc: "Campaigns & broadcasts",      href: "/admin/marketing",         bg: "bg-rose-100",    tc: "text-rose-700"    },
+      { icon: Send,        label: "Broadcast Center",        desc: "Mass messaging & alerts",     href: "/admin/broadcast",         bg: "bg-pink-100",    tc: "text-pink-700"    },
+      { icon: Bell,        label: "Notification Center",     desc: "Push & in-app notifications", href: "/admin/notifications",     bg: "bg-amber-100",   tc: "text-amber-700"   },
+      { icon: Share2,      label: "Social Media Integration",desc: "All social channels",         href: "/admin/social-media",      bg: "bg-sky-100",     tc: "text-sky-700"     },
+      { icon: Globe,       label: "Website CMS",             desc: "Public pages & content",      href: "/admin/cms",               bg: "bg-teal-100",    tc: "text-teal-700"    },
+      { icon: Zap,         label: "Automation Center",       desc: "Workflow automation rules",   href: "/admin/automation-center", bg: "bg-yellow-100",  tc: "text-yellow-700"  },
+      { icon: Activity,    label: "Workflow Center",         desc: "Notification pipelines",      href: "/admin/workflow-center",   bg: "bg-orange-100",  tc: "text-orange-700"  },
     ],
   },
+
+  /* ── 9. ANALYTICS & REPORTING ────────────────────────────────── */
+  {
+    title: "Analytics & Reporting",
+    color: "from-slate-600 to-slate-800",
+    items: [
+      { icon: BarChart2,   label: "Reports Dashboard",       desc: "Operational reports",         href: "/admin/reports",           bg: "bg-slate-100",   tc: "text-slate-700"   },
+      { icon: TrendingUp,  label: "GST Reports",             desc: "Tax & GST summaries",         href: "/admin/gst-reports",       bg: "bg-gray-100",    tc: "text-gray-700"    },
+      { icon: FileText,    label: "Production Report",       desc: "System & ops metrics",        href: "/admin/production-report", bg: "bg-zinc-100",    tc: "text-zinc-700"    },
+      { icon: Search,      label: "Global Search",           desc: "Search all ERP data",         href: "/admin/search",            bg: "bg-neutral-100", tc: "text-neutral-700" },
+    ],
+  },
+
+  /* ── 10. SYSTEM & SECURITY ───────────────────────────────────── */
   {
     title: "System & Security",
     color: "from-red-600 to-red-800",
     items: [
-      { icon: Smartphone,   label: "Mobile App Dashboard",    desc: "App configuration",        href: "/admin/api-settings",     bg: "bg-cyan-100",    tc: "text-cyan-700"    },
-      { icon: KeyRound,     label: "User & Role Management",  desc: "Accounts & permissions",   href: "/admin/user-roles",       bg: "bg-red-100",     tc: "text-red-700"     },
-      { icon: ShieldCheck,  label: "Permission Management",   desc: "Role permission matrix",   href: "/admin/permissions",      bg: "bg-rose-100",    tc: "text-rose-700"    },
-      { icon: ClipboardList,label: "Audit Log Dashboard",     desc: "All system activity",      href: "/admin/audit-logs",       bg: "bg-orange-100",  tc: "text-orange-700"  },
-      { icon: Activity,     label: "Activity Log Dashboard",  desc: "User activity stream",     href: "/admin/activity-logs",    bg: "bg-amber-100",   tc: "text-amber-700"   },
-      { icon: Lock,         label: "Security Dashboard",      desc: "System health & alerts",   href: "/admin/security",         bg: "bg-yellow-100",  tc: "text-yellow-700"  },
-      { icon: Archive,      label: "Backup Dashboard",        desc: "Data backups & restore",   href: "/admin/backups",          bg: "bg-green-100",   tc: "text-green-700"   },
-      { icon: Code2,        label: "API Dashboard",           desc: "API keys & endpoints",     href: "/admin/api-settings",     bg: "bg-teal-100",    tc: "text-teal-700"    },
-      { icon: Plug,         label: "Integration Dashboard",   desc: "Third-party connections",  href: "/admin/integrations",     bg: "bg-cyan-100",    tc: "text-cyan-700"    },
-      { icon: Settings2,    label: "Settings Dashboard",      desc: "Company configuration",    href: "/admin/settings",         bg: "bg-sky-100",     tc: "text-sky-700"     },
+      { icon: Smartphone,  label: "Mobile App Dashboard",    desc: "App configuration",           href: "/admin/mobile-app",        bg: "bg-cyan-100",    tc: "text-cyan-700"    },
+      { icon: KeyRound,    label: "User & Role Management",  desc: "Accounts & permissions",      href: "/admin/user-roles",        bg: "bg-red-100",     tc: "text-red-700"     },
+      { icon: ShieldCheck, label: "Permission Management",   desc: "Role permission matrix",      href: "/admin/permissions",       bg: "bg-rose-100",    tc: "text-rose-700"    },
+      { icon: ClipboardList,label:"Audit Log Dashboard",     desc: "All system activity",         href: "/admin/audit-logs",        bg: "bg-orange-100",  tc: "text-orange-700"  },
+      { icon: Users2,      label: "Activity Log Dashboard",  desc: "User activity stream",        href: "/admin/activity-logs",     bg: "bg-amber-100",   tc: "text-amber-700"   },
+      { icon: Lock,        label: "Security Dashboard",      desc: "Security health & alerts",    href: "/admin/security",          bg: "bg-yellow-100",  tc: "text-yellow-700"  },
+      { icon: Archive,     label: "Backup Dashboard",        desc: "Data backups & restore",      href: "/admin/backups",           bg: "bg-green-100",   tc: "text-green-700"   },
+      { icon: Code2,       label: "API Dashboard",           desc: "API keys & endpoints",        href: "/admin/api-settings",      bg: "bg-teal-100",    tc: "text-teal-700"    },
+      { icon: Plug,        label: "Integration Dashboard",   desc: "Third-party connections",     href: "/admin/integrations",      bg: "bg-indigo-100",  tc: "text-indigo-700"  },
+      { icon: Heart,       label: "System Health",           desc: "Uptime & diagnostics",        href: "/admin/system-health",     bg: "bg-pink-100",    tc: "text-pink-700"    },
+      { icon: CreditCard,  label: "Billing Settings",        desc: "Subscription & billing",      href: "/admin/billing-settings",  bg: "bg-purple-100",  tc: "text-purple-700"  },
+      { icon: Settings2,   label: "Settings Dashboard",      desc: "Company configuration",       href: "/admin/settings",          bg: "bg-sky-100",     tc: "text-sky-700"     },
     ],
   },
 ];
