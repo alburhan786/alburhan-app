@@ -344,6 +344,8 @@ router.use("/enterprise", enterpriseRouter);
 router.use("/portal", portalRouter);
 router.use("/sms-settings", smsSettingsRouter);
 router.use("/social-media", socialMediaRouter);
+import inboxRouter from "./inbox.js";
+router.use("/inbox", inboxRouter);
 router.use("/webhook", webhooksRouter);
 router.use(storageRouter);
 

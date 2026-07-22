@@ -1,0 +1,703 @@
+MASTER TASK: BUILD ENTERPRISE OMNICHANNEL INBOX FOR AL BURHAN TOURS & TRAVELS ERP
+
+DO NOT CREATE A DEMO.
+DO NOT CREATE MOCK DATA.
+DO NOT CREATE PLACEHOLDER BUTTONS.
+EVERY FEATURE MUST BE FULLY FUNCTIONAL, CONNECTED TO DATABASE, API, AND LIVE VPS.
+
+Project:
+Al Burhan Tours & Travels ERP + CRM + SRM
+Website: https://alburhantravels.com
+
+====================================================
+OBJECTIVE
+====================================================
+
+Build a complete Enterprise Omnichannel Communication Center similar to Salesforce, HubSpot, Zoho CRM, Freshworks, and Microsoft Dynamics.
+
+Instead of opening multiple apps, every customer conversation from every platform must appear inside ONE unified inbox.
+
+====================================================
+SUPPORTED CHANNELS
+====================================================
+
+Connect all of these:
+
+✅ WhatsApp Business (BotBee)
+✅ WhatsApp Cloud API
+✅ Facebook Page
+✅ Facebook Messenger
+✅ Facebook Lead Ads
+✅ Instagram Business
+✅ Instagram Direct Messages
+✅ Telegram Bot
+✅ Website Live Chat
+✅ Website Contact Form
+✅ Website Package Enquiry Form
+✅ Email (SMTP/IMAP)
+✅ SMS (Fast2SMS)
+✅ RCS (Jio Business Messaging)
+✅ Dashboard Notifications
+✅ Future-ready API connectors
+
+====================================================
+UNIFIED INBOX
+====================================================
+
+Create one inbox containing all incoming conversations.
+
+Show:
+
+Customer Name
+
+Customer Photo
+
+Platform Icon
+
+WhatsApp
+
+Instagram
+
+Facebook
+
+Telegram
+
+Website
+
+Email
+
+SMS
+
+RCS
+
+Last Message
+
+Unread Count
+
+Assigned Staff
+
+Assigned Agent
+
+Branch
+
+Lead Status
+
+Booking Status
+
+Last Activity
+
+Tags
+
+Priority
+
+Country
+
+City
+
+Language
+
+====================================================
+CHAT WINDOW
+====================================================
+
+Opening a conversation must show:
+
+Full chat history
+
+Images
+
+PDFs
+
+Voice Notes
+
+Videos
+
+Documents
+
+Location
+
+Replies
+
+Reactions
+
+Attachments
+
+Read Status
+
+Delivery Status
+
+Typing Status (if supported)
+
+====================================================
+RIGHT SIDEBAR
+====================================================
+
+Display complete customer profile:
+
+Customer Photo
+
+Name
+
+Mobile
+
+WhatsApp
+
+Instagram
+
+Facebook
+
+Telegram
+
+Email
+
+Passport Number
+
+Booking ID
+
+Agreement ID
+
+Invoice
+
+Package
+
+Journey
+
+Payments
+
+Balance
+
+Visa Status
+
+Flight
+
+Hotel
+
+Room Number
+
+Bus Number
+
+Guide
+
+Assigned Staff
+
+Assigned Agent
+
+Lead Source
+
+Lead Owner
+
+Customer Timeline
+
+====================================================
+ONE CLICK ACTIONS
+====================================================
+
+Every conversation should have:
+
+Reply
+
+Reply with Template
+
+Send Attachment
+
+Send Invoice
+
+Send Agreement
+
+Send Receipt
+
+Send Visa
+
+Send Ticket
+
+Send Hotel Voucher
+
+Schedule Reminder
+
+Add Internal Note
+
+Assign Staff
+
+Assign Agent
+
+Assign Branch
+
+Change Lead Status
+
+Change Priority
+
+Add Tags
+
+Convert to Lead
+
+Convert to Booking
+
+Create Follow-up
+
+Create Task
+
+Close Conversation
+
+Archive Conversation
+
+Delete Conversation
+
+====================================================
+AUTO LEAD CREATION
+====================================================
+
+Every new conversation automatically creates a Lead.
+
+Fields:
+
+Source
+
+Platform
+
+Campaign
+
+Ad
+
+UTM
+
+Device
+
+Country
+
+Language
+
+Customer Name
+
+Phone
+
+Email
+
+Instagram Username
+
+Facebook Profile
+
+Telegram ID
+
+Website Session
+
+Conversation ID
+
+Lead Score
+
+====================================================
+LEAD MANAGEMENT
+====================================================
+
+Every lead should automatically sync with Lead Management.
+
+Updating Lead updates Inbox.
+
+Updating Inbox updates Lead.
+
+No duplicate leads.
+
+Duplicate detection by:
+
+Phone
+
+WhatsApp
+
+Email
+
+Passport
+
+Instagram
+
+Facebook
+
+Telegram
+
+====================================================
+AUTO REPLY
+====================================================
+
+Allow channel-specific auto replies.
+
+Examples:
+
+WhatsApp
+
+Instagram
+
+Facebook
+
+Telegram
+
+Website Chat
+
+Business Hours
+
+After Hours
+
+Holiday
+
+Busy
+
+Language Detection
+
+====================================================
+ASSIGNMENT RULES
+====================================================
+
+Auto assign based on:
+
+Branch
+
+City
+
+Language
+
+Package
+
+Country
+
+Campaign
+
+Lead Source
+
+====================================================
+FOLLOW-UP ENGINE
+====================================================
+
+Automatically schedule:
+
+First Follow-up
+
+Second Follow-up
+
+Third Follow-up
+
+Balance Reminder
+
+Visa Reminder
+
+Passport Reminder
+
+Document Reminder
+
+Flight Reminder
+
+Hotel Reminder
+
+Departure Reminder
+
+Arrival Reminder
+
+====================================================
+SEARCH ENGINE
+====================================================
+
+Global search across:
+
+Phone
+
+WhatsApp
+
+Instagram
+
+Facebook
+
+Telegram
+
+Email
+
+Passport
+
+Booking ID
+
+Agreement ID
+
+Invoice Number
+
+Package
+
+Branch
+
+Staff
+
+Agent
+
+====================================================
+FILTERS
+====================================================
+
+Filter by:
+
+Platform
+
+Status
+
+Assigned Staff
+
+Agent
+
+Branch
+
+Unread
+
+Priority
+
+Lead Status
+
+Booking Status
+
+Visa Status
+
+Journey
+
+Package
+
+====================================================
+MESSAGE LOGS
+====================================================
+
+Store everything:
+
+Incoming
+
+Outgoing
+
+Delivery Status
+
+Read Status
+
+Failed
+
+Retry
+
+Webhook Response
+
+API Response
+
+Error Logs
+
+====================================================
+WEBHOOK CENTER
+====================================================
+
+Display:
+
+Webhook URL
+
+Webhook Status
+
+Last Webhook
+
+Last Success
+
+Last Failure
+
+Retry Button
+
+Reconnect Button
+
+====================================================
+SOCIAL MEDIA SETTINGS
+====================================================
+
+Settings page must include:
+
+Connect WhatsApp
+
+Connect Facebook
+
+Connect Instagram
+
+Connect Telegram
+
+Connect Website Chat
+
+Connect Email
+
+Connect SMS
+
+Connect RCS
+
+Connect Push
+
+Connect Future APIs
+
+Each connector must have:
+
+Connect
+
+Disconnect
+
+Reconnect
+
+Test Connection
+
+Last Sync
+
+Webhook Status
+
+Connection Health
+
+====================================================
+ANALYTICS
+====================================================
+
+Dashboard showing:
+
+Messages Today
+
+Leads Today
+
+Bookings Today
+
+Replies
+
+Missed Chats
+
+Average Response Time
+
+Conversion Rate
+
+Platform Performance
+
+Staff Performance
+
+Agent Performance
+
+Campaign Performance
+
+====================================================
+NOTIFICATIONS
+====================================================
+
+Notify staff instantly when:
+
+New WhatsApp
+
+New Instagram
+
+New Facebook
+
+New Telegram
+
+New Website Chat
+
+New Email
+
+New SMS
+
+New RCS
+
+====================================================
+SECURITY
+====================================================
+
+Role Based Access
+
+Super Admin
+
+Admin
+
+Branch Manager
+
+Sales
+
+Agent
+
+Guide
+
+Finance
+
+Customer Support
+
+====================================================
+MOBILE RESPONSIVE
+====================================================
+
+Everything must work perfectly on:
+
+Desktop
+
+Laptop
+
+Tablet
+
+Android
+
+iPhone
+
+====================================================
+DEPLOYMENT
+====================================================
+
+Build Backend
+
+Run Database Migration
+
+Build Frontend
+
+Deploy Backend
+
+Deploy Frontend
+
+Restart Services
+
+Verify VPS
+
+Verify Database
+
+Verify APIs
+
+====================================================
+FINAL QA
+====================================================
+
+Do NOT finish until every item passes.
+
+Test:
+
+✅ WhatsApp Conversation
+
+✅ Instagram DM
+
+✅ Facebook Messenger
+
+✅ Telegram Message
+
+✅ Website Chat
+
+✅ Website Enquiry
+
+✅ Email
+
+✅ SMS
+
+✅ RCS
+
+Verify:
+
+Conversation arrives automatically.
+
+Lead created automatically.
+
+Customer profile created.
+
+Follow-up created.
+
+Staff notified.
+
+Conversation searchable.
+
+Reply works.
+
+Convert to booking works.
+
+No duplicate records.
+
+All APIs connected.
+
+All database records saved.
+
+All pages load without errors.
+
+Deploy everything to the live VPS and verify that every feature is working on https://alburhantravels.com before marking the task complete.

@@ -187,6 +187,7 @@ export function buildNavSections(openComplaints = 0): NavSection[] {
     {
       section: "Communication",
       items: [
+        { icon: Inbox,         label: "Omnichannel Inbox",       href: "/admin/inbox",                   require: ["customers", "edit"] },
         { icon: Share2,        label: "Social Media Integration", href: "/admin/social-media",           require: ["settings",  "view"] },
         { icon: BellRing,      label: "Communication Center",  href: "/admin/communication-center",   require: ["customers", "edit"] },
         { icon: Zap,           label: "Workflow Center",        href: "/admin/workflow-center",         require: ["bookings",  "edit"] },
