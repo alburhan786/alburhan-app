@@ -1,0 +1,174 @@
+STOP.
+
+Do not make another isolated fix.
+
+This application has grown into a production ERP with over 100 modules.
+
+The recurring issue is that deployments succeed, but admin navigation, role redirects, or sidebar entries disappear later.
+
+Treat this as an architecture problem.
+
+=========================
+OBJECTIVE
+=========================
+
+Create ONE permanent Admin Framework.
+
+Never allow future deployments to overwrite or remove:
+
+• Super Admin Dashboard
+• Admin Dashboard
+• Executive Dashboard
+• Finance Dashboard
+• Accounts Dashboard
+• Operations Dashboard
+• Manager Dashboard
+• Sales Dashboard
+• Branch Dashboard
+• Agent Dashboard
+• Staff Dashboard
+• Guide Dashboard
+• Customer Dashboard
+
+=========================
+SINGLE SOURCE OF TRUTH
+=========================
+
+There must be only ONE source for:
+
+- Roles
+- Permissions
+- Sidebar
+- Navigation
+- Redirects
+- Portal routing
+
+No duplicated arrays.
+
+No duplicated switch statements.
+
+No duplicated buildMenu functions.
+
+No duplicated redirect helpers.
+
+=========================
+PRE-BUILD VALIDATION
+=========================
+
+Before every deployment automatically verify:
+
+✓ Every registered dashboard exists
+
+✓ Every route exists
+
+✓ Every sidebar entry exists
+
+✓ Every role has the correct landing page
+
+✓ Every permission matches the registry
+
+✓ Every menu item renders
+
+✓ No duplicate menu items
+
+✓ No orphan routes
+
+✓ No hidden pages
+
+=========================
+POST-BUILD VALIDATION
+=========================
+
+Open every dashboard automatically:
+
+Super Admin
+
+Admin
+
+Executive
+
+Finance
+
+Accounts
+
+Operations
+
+Manager
+
+Sales
+
+Branch
+
+Agent
+
+Staff
+
+Guide
+
+Customer
+
+Verify:
+
+✓ Login
+
+✓ Redirect
+
+✓ Sidebar
+
+✓ Dashboard widgets
+
+✓ API calls
+
+✓ Navigation
+
+✓ Browser console
+
+✓ Network requests
+
+=========================
+FAIL THE BUILD IF
+
+Any dashboard disappears
+
+Any sidebar entry disappears
+
+Any redirect changes
+
+Any permission changes
+
+Any route returns 404
+
+Any component fails to render
+
+Any menu count changes
+
+=========================
+FINAL REPORT
+
+Return:
+
+Total routes
+
+Total dashboards
+
+Total sidebar entries
+
+Total roles
+
+Total permissions
+
+Duplicate routes
+
+Duplicate menus
+
+Missing routes
+
+Missing dashboards
+
+Missing sidebar items
+
+Redirect matrix
+
+Permission matrix
+
+Only mark deployment COMPLETE if every test passes.
