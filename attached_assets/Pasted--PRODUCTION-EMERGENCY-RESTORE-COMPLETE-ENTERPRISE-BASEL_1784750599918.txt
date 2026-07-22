@@ -1,0 +1,119 @@
+🚨 PRODUCTION EMERGENCY – RESTORE COMPLETE ENTERPRISE BASELINE
+
+Current deployment is NOT complete.
+
+Role dashboards and enterprise modules are still missing.
+
+Follow Enterprise Production Lock + Master Lock.
+
+DO NOT:
+- Delete anything
+- Replace existing code
+- Rewrite working modules
+- Modify database schema
+- Remove routes
+- Remove APIs
+
+RESTORE THE COMPLETE BASELINE.
+
+Restore every missing module exactly as it existed before, including:
+
+• Super Admin Portal
+• Admin Portal
+• Executive Portal
+• Operations Portal
+• Finance Portal
+• HR Portal
+• CRM Portal
+• SRM Portal
+• Agent Portal
+• Branch Portal
+• Staff Portal
+• Customer Portal
+
+Restore all operational modules:
+
+• Bookings
+• Offline Booking
+• Payments
+• Offline Payments
+• Payment Management
+• Accounting
+• Expenses
+• Family Ledger
+• Customer Ledger
+• Invoices
+• Agreements
+• Visa
+• Flight Tickets
+• Hotels
+• Room Allocation
+• Transport
+• Ziyarat
+• Hajj Groups
+• Guide Panel
+• Pilgrim Reports
+• Print Center
+• QR Tracker
+• Broadcast Center
+• Marketing Center
+• Communication Center
+• Automation Center
+• Reports Center
+• KYC
+• Certificates
+• AI Operations
+• Admin AI Chat
+• Lead Manager
+• Supplier Manager
+• Branch Management
+• Agent Management
+• Staff Management
+• Payroll Manager
+• Notification Health
+• Production Report
+• Business Settings
+• Global Search
+• Customer 360
+• Omnichannel Inbox
+• Loyalty & Rewards
+• Social Media Integration
+
+VALIDATION REQUIRED
+
+Dashboard Cards ≥ 73
+Sidebar Navigation ≥ 121
+Frontend Routes ≥ 188
+Admin Components ≥ 126
+API Files ≥ 63
+
+Run:
+1. pnpm build
+2. TypeScript check
+3. Vite build
+4. Route verification
+5. Permission verification
+6. Role verification
+
+Verify login for:
+- Super Admin
+- Admin
+- Executive
+- Operations
+- Finance
+- HR
+- Agent
+- Branch
+- Staff
+- Customer
+
+Final report must include:
+
+• Dashboard cards count
+• Sidebar count
+• Route count
+• Missing modules = 0
+• Missing routes = 0
+• Build errors = 0
+• Runtime errors = 0
+• Production PASS only after every enterprise module has been restored.
