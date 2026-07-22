@@ -1,5 +1,5 @@
-// Al Burhan Tours & Travels — Service Worker v1.0
-const CACHE = "alburhan-v1";
+// Al Burhan Tours & Travels — Service Worker v2.0
+const CACHE = "alburhan-v2";
 const STATIC = [
   "/",
   "/index.html",
@@ -13,7 +13,7 @@ self.addEventListener("install", e => {
   );
 });
 
-// Activate — clean old caches
+// Activate — clean old caches (including stale alburhan-v1)
 self.addEventListener("activate", e => {
   e.waitUntil(
     caches.keys().then(keys =>
@@ -24,6 +24,7 @@ self.addEventListener("activate", e => {
 
 // Fetch strategy:
 // - API calls: network-first (always fresh)
+// - Vite dev / source files: network-only (never cache dynamic modules)
 // - Static assets: cache-first with network fallback
 self.addEventListener("fetch", e => {
   const url = new URL(e.request.url);
@@ -41,6 +42,12 @@ self.addEventListener("fetch", e => {
       )
     );
     return;
+  }
+
+  // Vite dev server / source files: always network (never cache)
+  const devPaths = ["/@vite", "/@react-refresh", "/@fs", "/src/", "/node_modules/", "/__vite"];
+  if (devPaths.some(p => url.pathname.startsWith(p))) {
+    return; // pass through — do NOT intercept
   }
 
   // Static assets: cache-first

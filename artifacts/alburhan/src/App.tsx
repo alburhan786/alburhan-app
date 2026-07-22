@@ -179,7 +179,7 @@ import CRMDashboard from "@/pages/admin/CRMDashboard";
 import SRMDashboard from "@/pages/admin/SRMDashboard";
 import HRDashboard from "@/pages/admin/HRDashboard";
 import InventoryDashboard from "@/pages/admin/InventoryDashboard";
-import ProcurementDashboard from "@/pages/admin/ProcurementDashboard";
+import ProcurementDashboard from "@/pages/admin/ProcurementHub";
 import { useAuth } from "@/hooks/use-auth";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { DeleteGuardProvider } from "@/components/DeleteGuard";
