@@ -16,6 +16,7 @@ import {
   BookOpen, UsersRound, MessageSquare, ImageIcon, Wallet, TrendingUp,
   ShieldCheck, Megaphone, PieChart, Bell, Plane, ListTodo, UserPlus, Building2, MapPin, Brain, Search, Activity, Settings, Sparkles,
   Zap, Target, Handshake, Star, UserCheck, Inbox, Share2, Users2,
+  Hotel, Bus, Tent, Heart, Tag, TrendingDown, Calculator,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -102,6 +103,24 @@ const MODULE_CARDS = [
   { icon: Share2,     label: "Social Media Integration",desc: "Connect channels & manage webhooks",   href: "/admin/social-media",      color: "bg-pink-50 text-pink-700",   border: "border-pink-200"   },
   { icon: MessageSquare, label: "Communication Center",desc: "Notifications, templates & messaging",  href: "/admin/communication-center",color: "bg-purple-50 text-purple-700",border: "border-purple-200"},
   { icon: Zap,        label: "Automation Center",      desc: "Triggers, workflows & auto-actions",    href: "/admin/automation-center", color: "bg-cyan-50 text-cyan-700",   border: "border-cyan-200"   },
+  // ── Travel Operations
+  { icon: Hotel,      label: "Hotels",                 desc: "Hotel assignments & room management",   href: "/admin/hotels",            color: "bg-sky-50 text-sky-700",     border: "border-sky-200"    },
+  { icon: Plane,      label: "Flights & Airlines",     desc: "Flight assignments & PNR tracking",     href: "/admin/flights",           color: "bg-blue-50 text-blue-700",   border: "border-blue-200"   },
+  { icon: Bus,        label: "Transport & Buses",      desc: "Bus allocation & seating plans",        href: "/admin/buses",             color: "bg-amber-50 text-amber-700", border: "border-amber-200"  },
+  { icon: ShieldCheck,label: "Visa Tracker",           desc: "Visa status, numbers & expiry",         href: "/admin/visa",              color: "bg-indigo-50 text-indigo-700",border: "border-indigo-200" },
+  { icon: Tent,       label: "Room Allocation",        desc: "Mina, Arafat & Muzdalifah beds",        href: "/admin/allocations",       color: "bg-teal-50 text-teal-700",   border: "border-teal-200"   },
+  { icon: MapPin,     label: "Ziyarat Schedule",       desc: "Ziyarat places, times & bus assignment",href: "/admin/ziyarat",           color: "bg-emerald-50 text-emerald-700",border: "border-emerald-200"},
+  { icon: Heart,      label: "Medical",                desc: "Pilgrim health records & medical notes", href: "/admin/medical",          color: "bg-rose-50 text-rose-700",   border: "border-rose-200"   },
+  { icon: Tag,        label: "Luggage Management",     desc: "Luggage tags & tracking",               href: "/admin/luggage",           color: "bg-orange-50 text-orange-700",border: "border-orange-200" },
+  // ── Finance & Documents
+  { icon: FileText,   label: "Agreements",             desc: "Booking agreements & e-signatures",     href: "/admin/agreements",        color: "bg-violet-50 text-violet-700",border: "border-violet-200" },
+  { icon: FileText,   label: "Customer Documents",     desc: "Passport, aadhaar, visa & other docs",  href: "/admin/documents",         color: "bg-slate-50 text-slate-700", border: "border-slate-200"  },
+  { icon: IndianRupee,label: "Receipts",               desc: "Payment receipts & acknowledgements",   href: "/admin/receipts",          color: "bg-green-50 text-green-700", border: "border-green-200"  },
+  { icon: Building2,  label: "Offline Payments",       desc: "Bank transfers & cash payment approvals",href: "/admin/offline-payments",  color: "bg-cyan-50 text-cyan-700",   border: "border-cyan-200"   },
+  { icon: TrendingDown,label: "Expenses",              desc: "Expense tracking & cost management",    href: "/admin/expenses",          color: "bg-red-50 text-red-700",     border: "border-red-200"    },
+  { icon: Calculator, label: "Accounting",             desc: "Journal entries & ledger management",   href: "/admin/accounting",        color: "bg-lime-50 text-lime-700",   border: "border-lime-200"   },
+  // ── HR
+  { icon: Briefcase,  label: "HR Dashboard",           desc: "Staff management, leaves & payroll",    href: "/admin/hr",                color: "bg-purple-50 text-purple-700",border: "border-purple-200" },
 ];
 
 function getStatusBadge(status: string) {

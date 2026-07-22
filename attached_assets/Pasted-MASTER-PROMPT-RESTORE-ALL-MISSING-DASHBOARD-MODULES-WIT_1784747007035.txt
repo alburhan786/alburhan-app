@@ -1,0 +1,329 @@
+MASTER PROMPT – RESTORE ALL MISSING DASHBOARD MODULES WITHOUT LOSING ANY DATA
+
+This is a PRODUCTION ERP running on Hostinger VPS for Al Burhan Tours & Travels.
+
+IMPORTANT
+
+DO NOT rewrite the dashboard from scratch.
+
+DO NOT remove or overwrite any existing modules.
+
+DO NOT delete any routes, pages, APIs, navigation items, permissions, or database records.
+
+Preserve every existing feature and restore all missing dashboard cards and navigation.
+
+Before making any changes:
+
+1. Scan the entire project.
+2. Find every existing page, route, component, API, and navigation entry.
+3. Compare them with the Dashboard quick-access cards.
+4. If a page already exists, only restore its Dashboard card and menu link.
+5. Do not create duplicate pages.
+
+⸻
+
+RESTORE THESE MISSING MODULES
+
+Restore every missing Dashboard card and Sidebar navigation.
+
+Dashboards
+
+* Dashboard
+* Operations Dashboard
+* Executive Dashboard
+* Business Intelligence
+* Manager Dashboard
+* Super Admin Dashboard
+* Staff Dashboard
+* Customer Dashboard
+
+⸻
+
+CRM & SRM
+
+* CRM
+* SRM
+* Lead Manager
+* Customer 360°
+* Omnichannel Inbox
+* Communication Center
+* Social Media Integration
+* Support Center
+* Automation Center
+
+⸻
+
+Customer
+
+* Customers
+* Enquiries
+* KYC Management
+* Loyalty & Rewards
+* Customer Documents
+
+⸻
+
+Bookings
+
+* Bookings
+* Offline Booking
+* Booking Approval
+* Booking History
+* Booking Trash
+
+⸻
+
+Finance
+
+* Payments
+* Payment Analytics
+* Payment Reminder
+* Payment Trash
+* Invoices
+* Reports
+
+⸻
+
+Operations
+
+* Packages
+* Hotels
+* Airlines
+* Transport
+* Supplier Manager
+* Visa
+* Flight Tickets
+* Agreements
+* Room Allocation
+* Bus Allocation
+* Ziyarat Schedule
+* Hajj Groups
+
+⸻
+
+Printing
+
+* QR Tracker
+* Print Center
+* Certificates
+* ID Cards
+* Badge Printing
+
+⸻
+
+Marketing
+
+* Marketing Center
+* Broadcast Messages
+* WhatsApp Campaigns
+* SMS Campaigns
+* Email Campaigns
+* Push Notifications
+
+⸻
+
+Communication
+
+Restore the complete Social Media Integration Center with:
+
+* WhatsApp Business
+* WhatsApp Cloud API
+* BotBee WhatsApp
+* Facebook Page
+* Facebook Messenger
+* Facebook Lead Ads
+* Instagram Business
+* Telegram
+* Website Live Chat
+* Email
+* SMS
+* Push Notification
+* Google RCS
+
+⸻
+
+Customer 360°
+
+Restore Customer 360 with:
+
+* Customer Profile
+* Passport
+* Aadhaar
+* PAN
+* Visa
+* Flight Ticket
+* Hotel
+* Room Number
+* Bus Number
+* Ziyarat Schedule
+* Agreements
+* Invoices
+* Payments
+* Communication Timeline
+* WhatsApp History
+* Instagram History
+* Facebook History
+* Telegram History
+* Follow-ups
+* Internal Notes
+* Assigned Staff
+* Assigned Agent
+* AI Recommendations
+
+⸻
+
+Omnichannel Inbox
+
+Restore:
+
+* WhatsApp
+* Instagram
+* Facebook
+* Messenger
+* Telegram
+* Website Chat
+* Email
+* SMS
+* Push
+* RCS
+
+Every incoming message should be visible in one inbox.
+
+Staff must be able to:
+
+* Reply
+* Assign
+* Add internal notes
+* Convert to Lead
+* Convert to Booking
+* Open Customer 360°
+* View history
+* Search conversations
+
+⸻
+
+Lead Management
+
+Restore Lead Manager completely.
+
+Messages received from:
+
+* WhatsApp
+* Facebook
+* Instagram
+* Telegram
+* Website
+* Email
+* SMS
+* RCS
+
+must automatically appear inside Lead Manager.
+
+Every lead must contain:
+
+* Platform
+* Customer Name
+* Mobile
+* Email
+* Source
+* Status
+* Priority
+* Package
+* Assigned Staff
+* Follow-up Date
+* Last Conversation
+* Notes
+
+Buttons:
+
+* View
+* Edit
+* Convert
+* Customer 360°
+* Booking
+* Delete
+
+⸻
+
+Navigation
+
+Verify every page has:
+
+* Dashboard Card
+* Sidebar Menu
+* Breadcrumb
+* Back Button
+* Search
+* Permission
+* Route
+
+No orphan pages.
+
+⸻
+
+Production Verification
+
+After deployment automatically verify:
+
+* Dashboard Cards
+* Sidebar
+* Routes
+* APIs
+* Navigation
+* Role Permissions
+* Database
+* Customer Data
+* Bookings
+* Payments
+* Documents
+* VPS Deployment
+* Build Status
+
+Every page must return HTTP 200.
+
+⸻
+
+DATA SAFETY
+
+This is mandatory.
+
+DO NOT:
+
+* Drop database tables
+* Delete customer data
+* Delete bookings
+* Delete payments
+* Delete invoices
+* Delete documents
+* Delete WhatsApp history
+* Delete leads
+* Delete CRM records
+* Delete dashboard configuration
+* Delete navigation
+
+If a module already exists, reconnect it instead of recreating it.
+
+⸻
+
+FINAL REPORT
+
+When finished provide a production verification report including:
+
+* ✅ Dashboard modules restored
+* ✅ Sidebar restored
+* ✅ Social Media Integration restored
+* ✅ Customer 360 restored
+* ✅ Omnichannel Inbox restored
+* ✅ CRM restored
+* ✅ SRM restored
+* ✅ Lead Manager restored
+* ✅ Routes verified
+* ✅ Navigation verified
+* ✅ APIs verified
+* ✅ Database preserved
+* ✅ Customer data preserved
+* ✅ Build successful
+* ✅ VPS deployed successfully
+* ✅ Production verification completed
+
+Do not stop until every missing dashboard card, sidebar menu, route, and module is restored and visible in production. If a feature already exists, restore its visibility instead of creating duplicates. Ensure no data is lost during the process.
