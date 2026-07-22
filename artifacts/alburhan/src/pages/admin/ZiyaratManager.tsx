@@ -84,7 +84,7 @@ export default function ZiyaratManager() {
         fetch(`${API}/api/groups`, { credentials: "include" }),
       ]);
       if (zr.ok) setList(await zr.json());
-      if (br.ok) setBuses((await br.json()).buses || await br.json());
+      if (br.ok) { const busData = await br.json(); setBuses(busData.buses || busData || []); }
       if (gr.ok) setGroups(await gr.json());
     } catch (e: any) {
       toast({ title: "Load failed", description: e.message, variant: "destructive" });
