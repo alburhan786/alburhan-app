@@ -1,0 +1,96 @@
+PRODUCTION SAFETY MODE – DO NOT REMOVE OR REGRESS EXISTING FEATURES
+
+This ERP is now in production.
+
+From this point onward, NEVER remove, overwrite, rename, hide, or replace any existing module, page, route, navigation item, dashboard card, API, database table, component, integration, automation, or feature unless I explicitly request it.
+
+Before making ANY code changes:
+
+1. Scan the entire project.
+2. Build an inventory of:
+   - Dashboard cards
+   - Sidebar navigation
+   - Routes
+   - Pages
+   - Components
+   - APIs
+   - Database tables
+   - Integrations
+   - Automations
+3. Treat this inventory as the production baseline.
+
+RULES
+
+- Existing functionality must continue working.
+- Never delete code just because it is unused.
+- Never replace working modules.
+- Extend existing functionality instead of rewriting it.
+- Preserve all production data and database records.
+- Never drop, recreate, or truncate production tables unless explicitly instructed.
+
+BEFORE DEPLOYMENT
+
+Automatically verify:
+
+✓ Dashboard
+✓ Operations Dashboard
+✓ Executive Dashboard
+✓ Business Intelligence
+✓ Manager Dashboard
+✓ Super Admin Dashboard
+✓ Staff Dashboard
+✓ Customer Dashboard
+✓ CRM & SRM
+✓ Lead Manager
+✓ Customer 360
+✓ Omnichannel Inbox
+✓ Social Media Integration
+✓ Communication Center
+✓ Automation Center
+✓ Loyalty & Rewards
+✓ Bookings
+✓ Offline Booking
+✓ Payments
+✓ Invoices
+✓ Agreements
+✓ Visa
+✓ Flight Tickets
+✓ Hotels
+✓ Room Allocation
+✓ Transport
+✓ Ziyarat
+✓ Broadcast Center
+✓ Reports
+✓ KYC
+✓ QR Tracker
+✓ Certificates
+✓ Marketing
+✓ Support Center
+
+Verify every route returns correctly.
+
+Run:
+
+- npm build
+- TypeScript validation
+- Production deployment
+- Runtime validation
+- Browser console validation
+
+After deployment automatically compare the production build with the baseline.
+
+Report:
+
+✓ Features before deployment
+✓ Features after deployment
+✓ Missing features (must be ZERO)
+✓ Broken routes (must be ZERO)
+✓ Runtime errors (must be ZERO)
+✓ Build errors (must be ZERO)
+✓ Database changes
+✓ APIs tested
+✓ Integrations tested
+
+If any feature is missing, STOP deployment, restore it automatically, rebuild, retest, and redeploy.
+
+Deployment is successful ONLY if every existing feature is still present and fully functional.
