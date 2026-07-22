@@ -1,0 +1,150 @@
+ENTERPRISE CHANGE MANAGEMENT POLICY (PERMANENT)
+
+This ERP is now in Enterprise Production Mode.
+
+Every future task MUST follow this workflow.
+
+==========================================
+STEP 1 – IMPACT ANALYSIS
+==========================================
+
+Before changing anything:
+
+• List every file that will be modified.
+• List every database table affected.
+• List every API affected.
+• List every route affected.
+• List every dashboard affected.
+• List every integration affected.
+
+If a change affects an existing feature, explain why before editing.
+
+==========================================
+STEP 2 – BACKUP
+==========================================
+
+Before making changes:
+
+• Create a Git checkpoint.
+• Create a database backup (schema only if no data changes are needed).
+• Record current module counts.
+• Record route counts.
+• Record API counts.
+
+==========================================
+STEP 3 – SAFE IMPLEMENTATION
+==========================================
+
+Only ADD or EXTEND functionality.
+
+Never replace entire working files unless absolutely necessary.
+
+Prefer small, isolated changes.
+
+==========================================
+STEP 4 – AUTOMATED VERIFICATION
+==========================================
+
+Run automatically:
+
+✓ TypeScript build
+✓ Vite build
+✓ Lint
+✓ API health check
+✓ Authentication check
+✓ Database migration check
+✓ Role and permission check
+✓ Customer dashboard
+✓ Admin dashboard
+✓ Staff dashboard
+✓ Branch dashboard
+✓ Finance dashboard
+✓ Omnichannel Inbox
+✓ Customer 360°
+✓ CRM
+✓ SRM
+✓ Social Media Center
+✓ Automation Center
+
+==========================================
+STEP 5 – BASELINE COMPARISON
+==========================================
+
+Compare with the locked production baseline.
+
+Verify:
+
+• Dashboard cards
+• Sidebar items
+• Routes
+• Components
+• API files
+• Database tables
+• Integrations
+
+If any count decreases:
+
+STOP.
+
+Restore the missing item.
+
+Rebuild.
+
+Retest.
+
+==========================================
+STEP 6 – POST DEPLOYMENT REPORT
+==========================================
+
+Report:
+
+• Files modified
+• Files added
+• Database changes
+• APIs added
+• Routes added
+• Components added
+• Features added
+• Features removed (must be ZERO)
+• Runtime errors
+• Build errors
+• Warnings
+• Performance
+
+==========================================
+STEP 7 – SUCCESS CRITERIA
+==========================================
+
+Deployment is considered successful ONLY if:
+
+Build errors = 0
+
+Runtime errors = 0
+
+Console errors = 0
+
+Missing routes = 0
+
+Missing APIs = 0
+
+Missing dashboard cards = 0
+
+Missing navigation items = 0
+
+Missing modules = 0
+
+Customer data loss = 0
+
+Booking data loss = 0
+
+Payment data loss = 0
+
+Invoice data loss = 0
+
+Agreement data loss = 0
+
+Integration failures = 0
+
+All production health checks PASS.
+
+Otherwise deployment is automatically rejected.
