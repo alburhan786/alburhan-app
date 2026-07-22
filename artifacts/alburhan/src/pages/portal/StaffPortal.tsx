@@ -65,6 +65,8 @@ export default function StaffPortal() {
     setError("");
     try {
       const r = await fetch(`${API}/api/portal/staff`, { credentials: "include" });
+      // 404/403 = no staff record yet — show "not found" state, not a blocking error
+      if (r.status === 404 || r.status === 403) { setData({}); setLoading(false); return; }
       if (!r.ok) { setError("Failed to load staff data"); setLoading(false); return; }
       setData(await r.json());
     } catch {

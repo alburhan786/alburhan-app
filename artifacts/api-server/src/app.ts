@@ -85,13 +85,17 @@ if (process.env.NODE_ENV !== 'production') {
         `SELECT id, name, mobile, email, role FROM users WHERE role=$1 ORDER BY created_at LIMIT 1`,
         [role]
       );
-      if (r.rows.length) {
-        const u = r.rows[0];
-        // Also set session cookie as before (belt-and-suspenders)
-        req.session.user = { id: u.id, name: u.name, mobile: u.mobile, email: u.email || "", role: u.role };
+      // If no user found for that role, fall back to any real user and override role
+      // so every portal role can be tested even if the dev DB only has admin/customer rows.
+      const row = r.rows.length
+        ? r.rows[0]
+        : (await pool.query(`SELECT id, name, mobile, email, role FROM users ORDER BY created_at LIMIT 1`)).rows[0];
+      if (row) {
+        const u = { ...row, role }; // override role with requested role
+        req.session.user = { id: u.id, name: u.name, mobile: u.mobile, email: u.email || "", role };
         (req.session as any).userId = u.id;
         await new Promise<void>((resolve, reject) => req.session.save((err: any) => err ? reject(err) : resolve()));
-        userJson = JSON.stringify({ id: u.id, name: u.name, mobile: u.mobile, email: u.email || "", role: u.role });
+        userJson = JSON.stringify({ id: u.id, name: u.name, mobile: u.mobile, email: u.email || "", role });
       }
     } catch (e) { /* ignore */ }
     // Return HTML that stores user in localStorage AND sets a plain cookie, then redirects.
