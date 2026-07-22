@@ -91,17 +91,32 @@ export default function Login() {
   const rawReturnUrl = searchParams.get("returnUrl");
   const returnUrl = rawReturnUrl && rawReturnUrl.startsWith("/") && !rawReturnUrl.startsWith("//") ? rawReturnUrl : null;
 
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      const role = user.role;
-      if (role === "super_admin") setLocation("/admin/super");
-      else if (role === "admin") setLocation("/admin/dashboard");
-      else if (role === "branch_manager") setLocation("/branch/dashboard");
-      else if (role === "agent") setLocation("/agent/dashboard");
-      else if (role === "staff") setLocation("/staff/dashboard");
-      else setLocation(returnUrl || "/customer/dashboard");
+  // Redirect to role-appropriate portal after login
+  function adminRedirect(userRole: string) {
+    if (userRole === "branch_manager") { setLocation("/branch/dashboard"); return; }
+    if (userRole === "agent")          { setLocation("/agent/dashboard"); return; }
+    if (userRole === "staff")          { setLocation("/staff/dashboard"); return; }
+    if (userRole === "admin" || userRole === "super_admin") {
+      fetch(`${API_BASE}/api/admin-users/me`, { credentials: "include" })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          const adminRole: string = data?.adminRole ?? "";
+          if (adminRole === "super_admin" || userRole === "super_admin") { setLocation("/admin/super"); return; }
+          if (adminRole === "accounts")   { setLocation("/admin/finance"); return; }
+          if (adminRole === "operations") { setLocation("/admin/operations"); return; }
+          if (adminRole === "sales")      { setLocation("/admin/customers"); return; }
+          if (adminRole === "guide")      { setLocation("/admin/guide-panel"); return; }
+          setLocation("/admin/dashboard");
+        })
+        .catch(() => setLocation(userRole === "super_admin" ? "/admin/super" : "/admin/dashboard"));
+      return;
     }
-  }, [isAuthenticated, user, setLocation]);
+    setLocation(returnUrl || "/customer/dashboard");
+  }
+
+  useEffect(() => {
+    if (isAuthenticated && user) adminRedirect(user.role);
+  }, [isAuthenticated, user]);
 
   useEffect(() => {
     return () => { if (cooldownRef.current) clearInterval(cooldownRef.current); };
@@ -203,13 +218,7 @@ export default function Login() {
           title: "Welcome back!",
           description: `Assalamu Alaikum${result.user?.name ? `, ${result.user.name}` : ""}! You have logged in.`,
         });
-        const role = result.user?.role;
-        if (role === "super_admin")         setLocation("/admin/super");
-        else if (role === "admin")          setLocation("/admin/dashboard");
-        else if (role === "branch_manager") setLocation("/branch/dashboard");
-        else if (role === "agent")          setLocation("/agent/dashboard");
-        else if (role === "staff")          setLocation("/staff/dashboard");
-        else                                setLocation(returnUrl || "/customer/dashboard");
+        adminRedirect(result.user?.role ?? "");
       }
     } catch (err: any) {
       const msg = err?.message || "Invalid OTP. Please try again.";

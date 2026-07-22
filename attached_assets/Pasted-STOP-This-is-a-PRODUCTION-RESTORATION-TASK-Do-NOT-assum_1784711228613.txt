@@ -1,0 +1,330 @@
+STOP.
+
+This is a PRODUCTION RESTORATION TASK.
+
+Do NOT assume success because routes exist.
+
+Routes alone are NOT enough.
+
+The system is considered complete ONLY when every role can log in and use every assigned module from the sidebar.
+
+=================================================
+
+PHASE 1 — FULL AUDIT
+
+Generate a complete inventory.
+
+Include:
+
+• Pages
+• Routes
+• Layouts
+• Sidebars
+• Navigation
+• Permissions
+• Roles
+• APIs
+• Components
+• Widgets
+
+Output everything before modifying code.
+
+=================================================
+
+PHASE 2 — VERIFY ALL PORTALS
+
+Verify these portals actually exist and render.
+
+Super Admin
+
+Admin
+
+Executive
+
+Finance
+
+Operations
+
+Branch
+
+Branch Manager
+
+Agent
+
+Staff
+
+Guide
+
+Customer
+
+Accountant
+
+Sales
+
+Manager
+
+Read Only
+
+=================================================
+
+PHASE 3 — VERIFY LOGIN
+
+Test every login.
+
+Each login must redirect correctly.
+
+super_admin → /admin/super
+
+admin → /admin/dashboard
+
+branch_manager → /branch
+
+agent → /agent
+
+staff → /staff
+
+customer → /customer
+
+finance → /finance
+
+operations → /operations
+
+manager → /manager
+
+sales → /sales
+
+=================================================
+
+PHASE 4 — SIDEBAR
+
+Completely rebuild navigation.
+
+NO hardcoded menu.
+
+Generate menu from permissions.
+
+Every accessible page MUST appear.
+
+Remove duplicates.
+
+Alphabetically organize modules.
+
+Group into:
+
+Overview
+
+Bookings
+
+Finance
+
+Operations
+
+Customers
+
+Marketing
+
+Reports
+
+Administration
+
+System
+
+=================================================
+
+PHASE 5 — RESTORE ALL MODULES
+
+Dashboard
+
+Executive Dashboard
+
+Finance Dashboard
+
+Operations Dashboard
+
+Super Dashboard
+
+Bookings
+
+Offline Booking
+
+Invoices
+
+Payments
+
+Receipts
+
+Refunds
+
+Expenses
+
+Accounting
+
+Ledger
+
+Branches
+
+Agents
+
+Customers
+
+Pilgrims
+
+Groups
+
+Packages
+
+Hotels
+
+Flights
+
+Visa
+
+Transport
+
+Guides
+
+Certificates
+
+Print Center
+
+QR Tracker
+
+Broadcast
+
+WhatsApp
+
+SMS
+
+Email
+
+RCS
+
+Notification Center
+
+Task Manager
+
+Support Center
+
+KYC
+
+Reports
+
+Analytics
+
+Business Intelligence
+
+Marketing
+
+Gallery
+
+CMS
+
+Settings
+
+Role Management
+
+Permission Management
+
+Audit Logs
+
+Login Logs
+
+Activity Logs
+
+API Monitor
+
+Server Health
+
+Backup Manager
+
+=================================================
+
+PHASE 6 — VERIFY EACH PAGE
+
+Automatically visit every route.
+
+Verify:
+
+Loads correctly
+
+No React errors
+
+No blank screen
+
+No API failure
+
+No missing component
+
+No permission error
+
+=================================================
+
+PHASE 7 — VERIFY APIs
+
+Every page must successfully call backend APIs.
+
+No failed requests.
+
+No missing endpoints.
+
+=================================================
+
+PHASE 8 — VERIFY PRODUCTION
+
+After deployment,
+
+crawl the production website.
+
+Visit every page.
+
+Verify every sidebar item.
+
+Verify every role.
+
+Verify every dashboard.
+
+=================================================
+
+PHASE 9 — FINAL REPORT
+
+Provide:
+
+Total routes
+
+Total dashboards
+
+Total modules
+
+Total APIs
+
+Total sidebar items
+
+Missing pages
+
+Missing APIs
+
+Broken permissions
+
+Broken navigation
+
+Broken widgets
+
+Screenshots of:
+
+Super Admin
+
+Admin
+
+Finance
+
+Executive
+
+Operations
+
+Branch
+
+Agent
+
+Customer
+
+Only mark COMPLETE after verifying everything on the live production website.
