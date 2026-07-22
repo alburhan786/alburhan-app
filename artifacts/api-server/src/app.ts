@@ -3538,6 +3538,113 @@ app.post("/api/migrate/update-sms-sender", async (req, res) => {
   }
 });
 
+// POST /api/migrate/test-whatsapp — diagnostic: fire raw BotBee calls and return full request/response
+app.post("/api/migrate/test-whatsapp", async (req, res) => {
+  const key = (req.body?.key || req.query.key) as string;
+  if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
+  try {
+    const { mobile = "9893989786", templateId = "409897", vars } = req.body as {
+      mobile?: string; templateId?: string; vars?: string[];
+    };
+    const axios = (await import("axios")).default;
+    const { getCredentials } = await import("./lib/botbee.js");
+    const creds = getCredentials();
+    const { apiToken, phone_number_id, business_id, baseUrl } = creds;
+
+    const phone = String(mobile).replace(/\D/g, "");
+    const phone10 = phone.length > 10 ? phone.slice(-10) : phone;
+    const phoneFormatted = phone10.length === 10 ? `91${phone10}` : phone;
+    const variables = vars?.length ? vars : ["Al Burhan", "ABT-001", "Hajj 2026"];
+    const isNumeric = /^\d+$/.test(templateId);
+
+    // ── 1. Check BotBee account info (GET /whatsapp/account) ──────────────────
+    let accountInfo: any = null;
+    try {
+      const accR = await axios.get(`${baseUrl}/whatsapp/account`, {
+        params: { apiToken, phone_number_id }, timeout: 10000,
+      });
+      accountInfo = { httpStatus: accR.status, data: accR.data };
+    } catch (e: any) {
+      accountInfo = { httpStatus: e?.response?.status || 0, data: e?.response?.data || { error: e.message } };
+    }
+
+    // ── 2. Try to list templates ───────────────────────────────────────────────
+    let templateListResult: any = null;
+    try {
+      const tlR = await axios.get(`${baseUrl}/whatsapp/template/list`, {
+        params: { apiToken, phone_number_id }, timeout: 10000,
+      });
+      const tpls = tlR.data?.templates || tlR.data?.data || tlR.data;
+      const tpl409897 = Array.isArray(tpls) ? tpls.find((t: any) => String(t.id) === templateId || t.name === "booking_submitted") : null;
+      templateListResult = { httpStatus: tlR.status, templateCount: Array.isArray(tpls) ? tpls.length : "?", template409897: tpl409897 || "NOT FOUND IN LIST" };
+    } catch (e: any) {
+      templateListResult = { httpStatus: e?.response?.status || 0, data: e?.response?.data || { error: e.message } };
+    }
+
+    // ── 3. Call /whatsapp/send/template (the path that fails with "account not found") ──
+    const sendTplEndpoint = `${baseUrl}/whatsapp/send/template`;
+    const sendTplPayload: Record<string, unknown> = {
+      apiToken, phone_number_id, phone_number: phoneFormatted,
+      ...(business_id ? { business_id } : {}),
+      ...(isNumeric ? { template_id: Number(templateId) } : { template_name: templateId }),
+      variables,
+    };
+    const sendTplReqPayload: Record<string, unknown> = { ...sendTplPayload, apiToken: `${apiToken.slice(0, 8)}***` };
+    let sendTplResult: any = null;
+    try {
+      const stR = await axios.post(sendTplEndpoint, sendTplPayload, {
+        headers: { "Content-Type": "application/json" }, timeout: 15000,
+      });
+      sendTplResult = { httpStatus: stR.status, ok: stR.data?.status !== "0" && stR.data?.status !== 0, data: stR.data, requestPayload: sendTplReqPayload };
+    } catch (e: any) {
+      sendTplResult = { httpStatus: e?.response?.status || 0, data: e?.response?.data || { error: e.message }, requestPayload: sendTplReqPayload };
+    }
+
+    // ── 4. Call /whatsapp/send (text path — this is what normally works) ──────
+    const sendTextEndpoint = `${baseUrl}/whatsapp/send`;
+    const textMsg = `[BotBee diagnostic test] Booking Submitted test. Customer: Al Burhan. Booking: ABT-001.`;
+    const sendTextParams = new URLSearchParams({ apiToken, phone_number_id, phone_number: phoneFormatted, message: textMsg });
+    const sendTextReqPayload = { phone_number_id, phone_number: phoneFormatted, message: textMsg };
+    let sendTextResult: any = null;
+    try {
+      const sxR = await axios.post(sendTextEndpoint, sendTextParams.toString(), {
+        headers: { "Content-Type": "application/x-www-form-urlencoded" }, timeout: 15000,
+      });
+      sendTextResult = { httpStatus: sxR.status, ok: sxR.data?.status !== "0" && sxR.data?.status !== 0, data: sxR.data, requestPayload: sendTextReqPayload };
+    } catch (e: any) {
+      sendTextResult = { httpStatus: e?.response?.status || 0, data: e?.response?.data || { error: e.message }, requestPayload: sendTextReqPayload };
+    }
+
+    // ── Analysis ──────────────────────────────────────────────────────────────
+    const sendTplError = sendTplResult?.data?.message || "";
+    let diagnosis = "";
+    if (sendTplError.includes("account not found")) {
+      diagnosis = "CONFIRMED: /whatsapp/send/template returns 'WhatsApp account not found'. This means BotBee cannot match the phone_number_id to any WhatsApp Business Account registered in their system. Possible causes: (1) phone_number_id does not exist in BotBee's WABA registry, (2) account not linked to BotBee, (3) template 409897 not attached to this WABA.";
+    } else if (sendTplResult?.ok) {
+      diagnosis = "SUCCESS: /whatsapp/send/template call succeeded.";
+    } else {
+      diagnosis = `FAILED with different error: ${sendTplError}`;
+    }
+
+    res.json({
+      credentials: {
+        apiToken: `${apiToken.slice(0, 8)}***${apiToken.slice(-4)} (len=${apiToken.length})`,
+        phone_number_id,
+        business_id: business_id || "(not set)",
+        baseUrl,
+      },
+      templateTested: { id: templateId, isNumeric, vars: variables, phoneFormatted },
+      accountInfo,
+      templateListResult,
+      sendTemplateApiPath: { endpoint: sendTplEndpoint, result: sendTplResult },
+      sendTextApiPath: { endpoint: sendTextEndpoint, result: sendTextResult },
+      diagnosis,
+    });
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message, stack: e.stack?.split("\n").slice(0, 5).join("\n") });
+  }
+});
+
 // POST /api/migrate/test-sms — fire a real DLT SMS and return the raw gateway response
 app.post("/api/migrate/test-sms", async (req, res) => {
   const key = (req.body?.key || req.query.key) as string;
