@@ -1,119 +1,744 @@
 {
-  "version": 2,
-  "description": "Master registry of every protected item in Al Burhan ERP. Nothing in this file may be removed without running update-snapshot.mjs and explicitly committing the change.",
+  "version": 3,
+  "description": "Master registry — single source of truth for Al Burhan ERP. Reflects ONLY what is implemented. Out-of-scope features are listed in outOfScope[]. Hidden pages (no sidebar entry by design) are auto-detected by update-snapshot.mjs into nav-snapshot.hiddenAdminPages.",
   "updatedAt": "2026-07-22",
-
+  "_auditPolicy": {
+    "failOnlyFor": [
+      "missing route",
+      "React error",
+      "API failure",
+      "blank screen",
+      "permission failure",
+      "broken navigation"
+    ],
+    "neverFailFor": [
+      "outOfScope features",
+      "planned modules",
+      "future releases"
+    ],
+    "sourceOfTruth": "implemented application (navigation.ts + App.tsx + component files)"
+  },
+  "outOfScope": [
+    {
+      "id": "receipts",
+      "label": "Receipts (Standalone Page)",
+      "coveredBy": "/admin/invoices + /admin/payments",
+      "reason": "Receipt generation is embedded in Bookings and Invoices; no standalone receipt ledger needed in this release."
+    },
+    {
+      "id": "refunds",
+      "label": "Refunds",
+      "coveredBy": "/admin/payment-trash",
+      "reason": "No standalone admin refund management module in this release. Voided payments go to Payment Trash."
+    },
+    {
+      "id": "cms",
+      "label": "CMS (Content Management)",
+      "coveredBy": "n/a",
+      "reason": "Content management not implemented in this release."
+    },
+    {
+      "id": "backup_manager",
+      "label": "Backup Manager",
+      "coveredBy": "n/a",
+      "reason": "Database backup tooling not implemented in this release."
+    },
+    {
+      "id": "login_logs",
+      "label": "Login Logs",
+      "coveredBy": "/admin/audit-logs",
+      "reason": "Login events are captured in Audit Logs. No dedicated login-log page in this release."
+    },
+    {
+      "id": "activity_logs",
+      "label": "Activity Logs",
+      "coveredBy": "/admin/audit-logs",
+      "reason": "Activity is captured in Audit Logs. No dedicated activity-log page in this release."
+    }
+  ],
   "dashboards": [
-    { "id": "super_admin",  "label": "Super Admin Dashboard",   "url": "/admin/super",        "roles": ["super_admin"],              "file": "src/pages/admin/SuperDashboard.tsx" },
-    { "id": "admin",        "label": "Admin Dashboard",         "url": "/admin/dashboard",    "roles": ["admin","staff","read_only"], "file": "src/pages/admin/Dashboard.tsx" },
-    { "id": "executive",    "label": "Executive Dashboard",     "url": "/admin/executive",    "roles": ["admin"],                    "file": "src/pages/admin/ExecutiveDashboard.tsx" },
-    { "id": "finance",      "label": "Finance Dashboard",       "url": "/admin/finance",      "roles": ["finance"],                  "file": "src/pages/admin/FinanceHub.tsx" },
-    { "id": "accounts",     "label": "Accounts Dashboard",      "url": "/admin/accounting",   "roles": ["accounts"],                 "file": "src/pages/admin/AccountingDashboard.tsx" },
-    { "id": "operations",   "label": "Operations Dashboard",    "url": "/admin/operations",   "roles": ["operations"],               "file": "src/pages/admin/OperationsDashboard.tsx" },
-    { "id": "manager",      "label": "Manager Dashboard",       "url": "/admin/manager",      "roles": ["manager"],                  "file": "src/pages/admin/ManagerDashboard.tsx" },
-    { "id": "sales",        "label": "Sales Dashboard",         "url": "/admin/customers",    "roles": ["sales"],                    "file": "src/pages/admin/CustomerManager.tsx" },
-    { "id": "guide",        "label": "Guide Panel",             "url": "/admin/guide-panel",  "roles": ["guide"],                    "file": "src/pages/admin/GuidePanel.tsx" },
-    { "id": "branch",       "label": "Branch Manager Portal",   "url": "/branch/dashboard",   "roles": ["branch_manager"],           "file": "src/pages/portal/BranchPortal.tsx" },
-    { "id": "agent",        "label": "Agent Portal",            "url": "/agent/dashboard",    "roles": ["agent"],                    "file": "src/pages/portal/AgentPortal.tsx" },
-    { "id": "staff_portal", "label": "Staff Portal",            "url": "/staff/dashboard",    "roles": ["staff"],                    "file": "src/pages/portal/StaffPortal.tsx" },
-    { "id": "customer",     "label": "Customer Portal",         "url": "/customer/dashboard", "roles": ["customer"],                 "file": "src/pages/customer/Dashboard.tsx" }
+    {
+      "id": "super_admin",
+      "label": "Super Admin Dashboard",
+      "url": "/admin/super",
+      "roles": [
+        "super_admin"
+      ],
+      "file": "src/pages/admin/SuperDashboard.tsx"
+    },
+    {
+      "id": "admin",
+      "label": "Admin Dashboard",
+      "url": "/admin/dashboard",
+      "roles": [
+        "admin",
+        "staff",
+        "read_only"
+      ],
+      "file": "src/pages/admin/Dashboard.tsx"
+    },
+    {
+      "id": "executive",
+      "label": "Executive Dashboard",
+      "url": "/admin/executive",
+      "roles": [
+        "admin"
+      ],
+      "file": "src/pages/admin/ExecutiveDashboard.tsx"
+    },
+    {
+      "id": "finance",
+      "label": "Finance Dashboard",
+      "url": "/admin/finance",
+      "roles": [
+        "finance"
+      ],
+      "file": "src/pages/admin/FinanceHub.tsx"
+    },
+    {
+      "id": "accounts",
+      "label": "Accounts Dashboard",
+      "url": "/admin/accounting",
+      "roles": [
+        "accounts"
+      ],
+      "file": "src/pages/admin/AccountingDashboard.tsx"
+    },
+    {
+      "id": "operations",
+      "label": "Operations Dashboard",
+      "url": "/admin/operations",
+      "roles": [
+        "operations"
+      ],
+      "file": "src/pages/admin/OperationsDashboard.tsx"
+    },
+    {
+      "id": "manager",
+      "label": "Manager Dashboard",
+      "url": "/admin/manager",
+      "roles": [
+        "manager"
+      ],
+      "file": "src/pages/admin/ManagerDashboard.tsx"
+    },
+    {
+      "id": "sales",
+      "label": "Sales Dashboard",
+      "url": "/admin/customers",
+      "roles": [
+        "sales"
+      ],
+      "file": "src/pages/admin/CustomerManager.tsx"
+    },
+    {
+      "id": "guide",
+      "label": "Guide Panel",
+      "url": "/admin/guide-panel",
+      "roles": [
+        "guide"
+      ],
+      "file": "src/pages/admin/GuidePanel.tsx"
+    },
+    {
+      "id": "branch",
+      "label": "Branch Manager Portal",
+      "url": "/branch/dashboard",
+      "roles": [
+        "branch_manager"
+      ],
+      "file": "src/pages/portal/BranchPortal.tsx"
+    },
+    {
+      "id": "agent",
+      "label": "Agent Portal",
+      "url": "/agent/dashboard",
+      "roles": [
+        "agent"
+      ],
+      "file": "src/pages/portal/AgentPortal.tsx"
+    },
+    {
+      "id": "staff_portal",
+      "label": "Staff Portal",
+      "url": "/staff/dashboard",
+      "roles": [
+        "staff"
+      ],
+      "file": "src/pages/portal/StaffPortal.tsx"
+    },
+    {
+      "id": "customer",
+      "label": "Customer Portal",
+      "url": "/customer/dashboard",
+      "roles": [
+        "customer"
+      ],
+      "file": "src/pages/customer/Dashboard.tsx"
+    }
   ],
-
   "roles": [
-    { "id": "super_admin",   "label": "Super Admin",     "redirect": "/admin/super",        "type": "admin"  },
-    { "id": "admin",         "label": "Admin",           "redirect": "/admin/dashboard",    "type": "admin"  },
-    { "id": "finance",       "label": "Finance",         "redirect": "/admin/finance",      "type": "admin"  },
-    { "id": "accounts",      "label": "Accounts",        "redirect": "/admin/accounting",   "type": "admin"  },
-    { "id": "manager",       "label": "Manager",         "redirect": "/admin/manager",      "type": "admin"  },
-    { "id": "sales",         "label": "Sales",           "redirect": "/admin/customers",    "type": "admin"  },
-    { "id": "operations",    "label": "Operations",      "redirect": "/admin/operations",   "type": "admin"  },
-    { "id": "guide",         "label": "Guide",           "redirect": "/admin/guide-panel",  "type": "admin"  },
-    { "id": "staff",         "label": "Staff",           "redirect": "/admin/dashboard",    "type": "admin"  },
-    { "id": "read_only",     "label": "Read Only",       "redirect": "/admin/dashboard",    "type": "admin"  },
-    { "id": "branch_manager","label": "Branch Manager",  "redirect": "/branch/dashboard",   "type": "portal" },
-    { "id": "agent",         "label": "Agent",           "redirect": "/agent/dashboard",    "type": "portal" }
+    {
+      "id": "super_admin",
+      "label": "Super Admin",
+      "redirect": "/admin/super",
+      "type": "admin"
+    },
+    {
+      "id": "admin",
+      "label": "Admin",
+      "redirect": "/admin/dashboard",
+      "type": "admin"
+    },
+    {
+      "id": "finance",
+      "label": "Finance",
+      "redirect": "/admin/finance",
+      "type": "admin"
+    },
+    {
+      "id": "accounts",
+      "label": "Accounts",
+      "redirect": "/admin/accounting",
+      "type": "admin"
+    },
+    {
+      "id": "manager",
+      "label": "Manager",
+      "redirect": "/admin/manager",
+      "type": "admin"
+    },
+    {
+      "id": "sales",
+      "label": "Sales",
+      "redirect": "/admin/customers",
+      "type": "admin"
+    },
+    {
+      "id": "operations",
+      "label": "Operations",
+      "redirect": "/admin/operations",
+      "type": "admin"
+    },
+    {
+      "id": "guide",
+      "label": "Guide",
+      "redirect": "/admin/guide-panel",
+      "type": "admin"
+    },
+    {
+      "id": "staff",
+      "label": "Staff",
+      "redirect": "/admin/dashboard",
+      "type": "admin"
+    },
+    {
+      "id": "read_only",
+      "label": "Read Only",
+      "redirect": "/admin/dashboard",
+      "type": "admin"
+    },
+    {
+      "id": "branch_manager",
+      "label": "Branch Manager",
+      "redirect": "/branch/dashboard",
+      "type": "portal"
+    },
+    {
+      "id": "agent",
+      "label": "Agent",
+      "redirect": "/agent/dashboard",
+      "type": "portal"
+    }
   ],
-
   "permissions": {
     "modules": [
-      "bookings","payments","expenses","accounting","payroll",
-      "gst","assets","groups","pilgrims","staff",
-      "customers","reports","audit_logs","settings","users"
+      "bookings",
+      "payments",
+      "expenses",
+      "accounting",
+      "payroll",
+      "gst",
+      "assets",
+      "groups",
+      "pilgrims",
+      "staff",
+      "customers",
+      "reports",
+      "audit_logs",
+      "settings",
+      "users"
     ],
-    "actions": ["view","create","edit","delete","approve","export"],
-    "adminRoles": ["super_admin","admin","finance","accounts","manager","sales","operations","guide","staff","read_only"],
+    "actions": [
+      "view",
+      "create",
+      "edit",
+      "delete",
+      "approve",
+      "export"
+    ],
+    "adminRoles": [
+      "super_admin",
+      "admin",
+      "finance",
+      "accounts",
+      "manager",
+      "sales",
+      "operations",
+      "guide",
+      "staff",
+      "read_only"
+    ],
     "sourceFile": "src/hooks/use-permissions.ts"
   },
-
   "portals": [
-    { "id": "branch",   "label": "Branch Manager Portal", "url": "/branch/dashboard",   "role": "branch_manager", "file": "src/pages/portal/BranchPortal.tsx"    },
-    { "id": "agent",    "label": "Agent Portal",          "url": "/agent/dashboard",    "role": "agent",          "file": "src/pages/portal/AgentPortal.tsx"     },
-    { "id": "staff",    "label": "Staff Portal",          "url": "/staff/dashboard",    "role": "staff",          "file": "src/pages/portal/StaffPortal.tsx"     },
-    { "id": "customer", "label": "Customer Portal",       "url": "/customer/dashboard", "role": "customer",       "file": "src/pages/customer/Dashboard.tsx"}
+    {
+      "id": "branch",
+      "label": "Branch Manager Portal",
+      "url": "/branch/dashboard",
+      "role": "branch_manager",
+      "file": "src/pages/portal/BranchPortal.tsx"
+    },
+    {
+      "id": "agent",
+      "label": "Agent Portal",
+      "url": "/agent/dashboard",
+      "role": "agent",
+      "file": "src/pages/portal/AgentPortal.tsx"
+    },
+    {
+      "id": "staff",
+      "label": "Staff Portal",
+      "url": "/staff/dashboard",
+      "role": "staff",
+      "file": "src/pages/portal/StaffPortal.tsx"
+    },
+    {
+      "id": "customer",
+      "label": "Customer Portal",
+      "url": "/customer/dashboard",
+      "role": "customer",
+      "file": "src/pages/customer/Dashboard.tsx"
+    }
   ],
-
   "notificationModules": [
-    { "id": "booking_confirmed",         "label": "Booking Confirmed",         "channels": ["sms","whatsapp","email"] },
-    { "id": "payment_received",          "label": "Payment Received",          "channels": ["sms","whatsapp","email"] },
-    { "id": "document_delivered",        "label": "Document Delivered",        "channels": ["whatsapp"]              },
-    { "id": "departure_reminder",        "label": "Departure Reminder",        "channels": ["sms","whatsapp"],       "slots": ["7d","3d","2d","1d","12h","6h","3h"] },
-    { "id": "otp_verification",          "label": "OTP Verification",          "channels": ["sms","whatsapp"]        },
-    { "id": "booking_approved",          "label": "Booking Approved",          "channels": ["whatsapp"]              },
-    { "id": "offline_payment_received",  "label": "Offline Payment Received",  "channels": ["sms","whatsapp"]        },
-    { "id": "offline_payment_approved",  "label": "Offline Payment Approved",  "channels": ["sms","whatsapp"]        },
-    { "id": "payment_reminder",          "label": "Payment Reminder",          "channels": ["sms","whatsapp"]        }
+    {
+      "id": "booking_confirmed",
+      "label": "Booking Confirmed",
+      "channels": [
+        "sms",
+        "whatsapp",
+        "email"
+      ]
+    },
+    {
+      "id": "payment_received",
+      "label": "Payment Received",
+      "channels": [
+        "sms",
+        "whatsapp",
+        "email"
+      ]
+    },
+    {
+      "id": "document_delivered",
+      "label": "Document Delivered",
+      "channels": [
+        "whatsapp"
+      ]
+    },
+    {
+      "id": "departure_reminder",
+      "label": "Departure Reminder",
+      "channels": [
+        "sms",
+        "whatsapp"
+      ],
+      "slots": [
+        "7d",
+        "3d",
+        "2d",
+        "1d",
+        "12h",
+        "6h",
+        "3h"
+      ]
+    },
+    {
+      "id": "otp_verification",
+      "label": "OTP Verification",
+      "channels": [
+        "sms",
+        "whatsapp"
+      ]
+    },
+    {
+      "id": "booking_approved",
+      "label": "Booking Approved",
+      "channels": [
+        "whatsapp"
+      ]
+    },
+    {
+      "id": "offline_payment_received",
+      "label": "Offline Payment Received",
+      "channels": [
+        "sms",
+        "whatsapp"
+      ]
+    },
+    {
+      "id": "offline_payment_approved",
+      "label": "Offline Payment Approved",
+      "channels": [
+        "sms",
+        "whatsapp"
+      ]
+    },
+    {
+      "id": "payment_reminder",
+      "label": "Payment Reminder",
+      "channels": [
+        "sms",
+        "whatsapp"
+      ]
+    }
   ],
-
   "apiEndpoints": [
-    { "path": "/api/version",                           "label": "API version",                  "acceptableStatus": [200]         },
-    { "path": "/api/health",                            "label": "System health",                "acceptableStatus": [200]         },
-    { "path": "/api/auth/me",                           "label": "Auth session check",           "acceptableStatus": [200,401]     },
-    { "path": "/api/packages",                          "label": "Packages list",                "acceptableStatus": [200]         },
-    { "path": "/api/ziyarat",                           "label": "Ziyarat packages",             "acceptableStatus": [200,401]     },
-    { "path": "/api/bookings",                          "label": "Bookings list",                "acceptableStatus": [200,401]     },
-    { "path": "/api/bookings/stats",                    "label": "Bookings stats",               "acceptableStatus": [200,401]     },
-    { "path": "/api/invoices",                          "label": "Invoices list",                "acceptableStatus": [200,401]     },
-    { "path": "/api/payments",                          "label": "Payments list",                "acceptableStatus": [200,401,404] },
-    { "path": "/api/payments/analytics",                "label": "Payment analytics",            "acceptableStatus": [200,401]     },
-    { "path": "/api/admin/customers",                   "label": "Customers list",               "acceptableStatus": [200,401]     },
-    { "path": "/api/groups",                            "label": "Hajj groups",                  "acceptableStatus": [200,401]     },
-    { "path": "/api/staff",                             "label": "Staff list",                   "acceptableStatus": [200,401]     },
-    { "path": "/api/admin/agents",                      "label": "Agents list",                  "acceptableStatus": [200,401]     },
-    { "path": "/api/admin/branches",                    "label": "Branches list",                "acceptableStatus": [200,401]     },
-    { "path": "/api/vendors",                           "label": "Vendors list",                 "acceptableStatus": [200,401]     },
-    { "path": "/api/expenses",                          "label": "Expenses list",                "acceptableStatus": [200,401]     },
-    { "path": "/api/assets",                            "label": "Assets list",                  "acceptableStatus": [200,401]     },
-    { "path": "/api/flights",                           "label": "Flights list",                 "acceptableStatus": [200,401]     },
-    { "path": "/api/hotels",                            "label": "Hotels list",                  "acceptableStatus": [200,401]     },
-    { "path": "/api/buses",                             "label": "Buses list",                   "acceptableStatus": [200,401]     },
-    { "path": "/api/agreements",                        "label": "Agreements list",              "acceptableStatus": [200,401]     },
-    { "path": "/api/loyalty",                           "label": "Loyalty programs",             "acceptableStatus": [200,401]     },
-    { "path": "/api/audit-logs",                        "label": "Audit logs",                   "acceptableStatus": [200,401]     },
-    { "path": "/api/broadcasts",                        "label": "Broadcasts list",              "acceptableStatus": [200,401]     },
-    { "path": "/api/admin/feedback/stats",              "label": "Feedback stats",               "acceptableStatus": [200,401]     },
-    { "path": "/api/auto-notifications/auto-settings",  "label": "Auto-notification settings",   "acceptableStatus": [200,401]     },
-    { "path": "/api/notifications",                     "label": "Notification logs",            "acceptableStatus": [200,401,404] },
-    { "path": "/api/admin-users",                       "label": "Admin users list",             "acceptableStatus": [200,401]     },
-    { "path": "/api/admin/roles",                       "label": "Admin roles list",             "acceptableStatus": [200,401]     },
-    { "path": "/api/sms/audit",                         "label": "SMS audit log",                "acceptableStatus": [200,401,404] }
+    {
+      "path": "/api/version",
+      "label": "API version",
+      "acceptableStatus": [
+        200
+      ]
+    },
+    {
+      "path": "/api/health",
+      "label": "System health",
+      "acceptableStatus": [
+        200
+      ]
+    },
+    {
+      "path": "/api/auth/me",
+      "label": "Auth session check",
+      "acceptableStatus": [
+        200,
+        401
+      ]
+    },
+    {
+      "path": "/api/packages",
+      "label": "Packages list",
+      "acceptableStatus": [
+        200
+      ]
+    },
+    {
+      "path": "/api/ziyarat",
+      "label": "Ziyarat packages",
+      "acceptableStatus": [
+        200,
+        401
+      ]
+    },
+    {
+      "path": "/api/bookings",
+      "label": "Bookings list",
+      "acceptableStatus": [
+        200,
+        401
+      ]
+    },
+    {
+      "path": "/api/bookings/stats",
+      "label": "Bookings stats",
+      "acceptableStatus": [
+        200,
+        401
+      ]
+    },
+    {
+      "path": "/api/invoices",
+      "label": "Invoices list",
+      "acceptableStatus": [
+        200,
+        401
+      ]
+    },
+    {
+      "path": "/api/payments",
+      "label": "Payments list",
+      "acceptableStatus": [
+        200,
+        401,
+        404
+      ]
+    },
+    {
+      "path": "/api/payments/analytics",
+      "label": "Payment analytics",
+      "acceptableStatus": [
+        200,
+        401
+      ]
+    },
+    {
+      "path": "/api/admin/customers",
+      "label": "Customers list",
+      "acceptableStatus": [
+        200,
+        401
+      ]
+    },
+    {
+      "path": "/api/groups",
+      "label": "Hajj groups",
+      "acceptableStatus": [
+        200,
+        401
+      ]
+    },
+    {
+      "path": "/api/staff",
+      "label": "Staff list",
+      "acceptableStatus": [
+        200,
+        401
+      ]
+    },
+    {
+      "path": "/api/admin/agents",
+      "label": "Agents list",
+      "acceptableStatus": [
+        200,
+        401
+      ]
+    },
+    {
+      "path": "/api/admin/branches",
+      "label": "Branches list",
+      "acceptableStatus": [
+        200,
+        401
+      ]
+    },
+    {
+      "path": "/api/vendors",
+      "label": "Vendors list",
+      "acceptableStatus": [
+        200,
+        401
+      ]
+    },
+    {
+      "path": "/api/expenses",
+      "label": "Expenses list",
+      "acceptableStatus": [
+        200,
+        401
+      ]
+    },
+    {
+      "path": "/api/assets",
+      "label": "Assets list",
+      "acceptableStatus": [
+        200,
+        401
+      ]
+    },
+    {
+      "path": "/api/flights",
+      "label": "Flights list",
+      "acceptableStatus": [
+        200,
+        401
+      ]
+    },
+    {
+      "path": "/api/hotels",
+      "label": "Hotels list",
+      "acceptableStatus": [
+        200,
+        401
+      ]
+    },
+    {
+      "path": "/api/buses",
+      "label": "Buses list",
+      "acceptableStatus": [
+        200,
+        401
+      ]
+    },
+    {
+      "path": "/api/agreements",
+      "label": "Agreements list",
+      "acceptableStatus": [
+        200,
+        401
+      ]
+    },
+    {
+      "path": "/api/loyalty",
+      "label": "Loyalty programs",
+      "acceptableStatus": [
+        200,
+        401
+      ]
+    },
+    {
+      "path": "/api/audit-logs",
+      "label": "Audit logs",
+      "acceptableStatus": [
+        200,
+        401
+      ]
+    },
+    {
+      "path": "/api/broadcasts",
+      "label": "Broadcasts list",
+      "acceptableStatus": [
+        200,
+        401
+      ]
+    },
+    {
+      "path": "/api/admin/feedback/stats",
+      "label": "Feedback stats",
+      "acceptableStatus": [
+        200,
+        401
+      ]
+    },
+    {
+      "path": "/api/auto-notifications/auto-settings",
+      "label": "Auto-notification settings",
+      "acceptableStatus": [
+        200,
+        401
+      ]
+    },
+    {
+      "path": "/api/notifications",
+      "label": "Notification logs",
+      "acceptableStatus": [
+        200,
+        401,
+        404
+      ]
+    },
+    {
+      "path": "/api/admin-users",
+      "label": "Admin users list",
+      "acceptableStatus": [
+        200,
+        401
+      ]
+    },
+    {
+      "path": "/api/admin/roles",
+      "label": "Admin roles list",
+      "acceptableStatus": [
+        200,
+        401
+      ]
+    },
+    {
+      "path": "/api/sms/audit",
+      "label": "SMS audit log",
+      "acceptableStatus": [
+        200,
+        401,
+        404
+      ]
+    }
   ],
-
   "widgets": {
-    "admin_dashboard":    ["totalBookings","totalRevenue","pendingPayments","activeGroups","recentActivity","quickStats"],
-    "executive":          ["kpiSummary","performanceMetrics","businessIntelligence","revenueChart"],
-    "finance":            ["revenueChart","expenseSummary","payrollSummary","gstReport","cashFlow"],
-    "accounting":         ["ledgerSummary","bankReconciliation","accountsPayable","accountsReceivable"],
-    "operations":         ["groupProgress","flightStatus","hotelAllocation","documentStatus","pilgrimOps"],
-    "manager":            ["teamPerformance","bookingsOverview","customerInsights","taskList"],
-    "customers":          ["customerList","leadPipeline","conversionRate","recentEnquiries"],
-    "super_admin":        ["systemHealth","userManagement","auditLogs","configPanel","apiSettings"],
-    "guide_panel":        ["pilgrimList","groupSchedule","attendanceLog","ziyaratItinerary"],
-    "branch_portal":      ["branchBookings","agentPerformance","branchRevenue","branchStats"],
-    "agent_portal":       ["agentBookings","agentCommission","agentCustomers","agentStats"],
-    "staff_portal":       ["staffProfile","staffDocuments","helpSupport"],
-    "customer_portal":    ["myBookings","myDocuments","myPayments","myAgreements","supportCenter"]
+    "admin_dashboard": [
+      "totalBookings",
+      "totalRevenue",
+      "pendingPayments",
+      "activeGroups",
+      "recentActivity",
+      "quickStats"
+    ],
+    "executive": [
+      "kpiSummary",
+      "performanceMetrics",
+      "businessIntelligence",
+      "revenueChart"
+    ],
+    "finance": [
+      "revenueChart",
+      "expenseSummary",
+      "payrollSummary",
+      "gstReport",
+      "cashFlow"
+    ],
+    "accounting": [
+      "ledgerSummary",
+      "bankReconciliation",
+      "accountsPayable",
+      "accountsReceivable"
+    ],
+    "operations": [
+      "groupProgress",
+      "flightStatus",
+      "hotelAllocation",
+      "documentStatus",
+      "pilgrimOps"
+    ],
+    "manager": [
+      "teamPerformance",
+      "bookingsOverview",
+      "customerInsights",
+      "taskList"
+    ],
+    "customers": [
+      "customerList",
+      "leadPipeline",
+      "conversionRate",
+      "recentEnquiries"
+    ],
+    "super_admin": [
+      "systemHealth",
+      "userManagement",
+      "auditLogs",
+      "configPanel",
+      "apiSettings"
+    ],
+    "guide_panel": [
+      "pilgrimList",
+      "groupSchedule",
+      "attendanceLog",
+      "ziyaratItinerary"
+    ],
+    "branch_portal": [
+      "branchBookings",
+      "agentPerformance",
+      "branchRevenue",
+      "branchStats"
+    ],
+    "agent_portal": [
+      "agentBookings",
+      "agentCommission",
+      "agentCustomers",
+      "agentStats"
+    ],
+    "staff_portal": [
+      "staffProfile",
+      "staffDocuments",
+      "helpSupport"
+    ],
+    "customer_portal": [
+      "myBookings",
+      "myDocuments",
+      "myPayments",
+      "myAgreements",
+      "supportCenter"
+    ]
   },
-
   "stats": {
     "totalDashboards": 13,
     "totalRoles": 12,
@@ -121,6 +746,10 @@
     "totalPermissionActions": 6,
     "totalPortals": 4,
     "totalNotificationModules": 9,
-    "totalApiEndpoints": 31
+    "totalApiEndpoints": 31,
+    "totalOutOfScope": 6,
+    "totalNavItems": 93,
+    "totalHiddenPages": 2,
+    "totalPrintOnlyPages": 3
   }
 }
