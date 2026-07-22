@@ -5,9 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite --config vite.config.ts --host 0.0.0.0",
-    "build": "node scripts/check-nav.mjs && vite build --config vite.config.ts",
+    "build": "node scripts/check-nav.mjs && node scripts/check-registry.mjs && vite build --config vite.config.ts",
     "serve": "vite preview --config vite.config.ts --host 0.0.0.0",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "check:nav": "node scripts/check-nav.mjs",
+    "check:registry": "node scripts/check-registry.mjs",
+    "check:all": "node scripts/check-nav.mjs && node scripts/check-registry.mjs",
+    "update:snapshot": "node scripts/update-snapshot.mjs",
     "test:regression": "node scripts/regression-test.mjs",
     "test:regression:post": "node scripts/regression-test.mjs --phase post",
     "deploy": "node scripts/deploy.mjs"
