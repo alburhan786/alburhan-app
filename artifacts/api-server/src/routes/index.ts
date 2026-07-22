@@ -346,6 +346,8 @@ router.use("/sms-settings", smsSettingsRouter);
 router.use("/social-media", socialMediaRouter);
 import inboxRouter from "./inbox.js";
 router.use("/inbox", inboxRouter);
+import customer360Router from "./customer360.js";
+router.use("/customer360", customer360Router);
 router.use("/webhook", webhooksRouter);
 router.use(storageRouter);
 

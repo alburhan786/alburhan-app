@@ -123,6 +123,7 @@ import NotificationCenter from "@/pages/admin/NotificationCenter";
 import NotificationLogs from "@/pages/admin/NotificationLogs";
 import CommunicationCenter from "@/pages/admin/CommunicationCenter";
 import OmnichannelInbox from "@/pages/admin/OmnichannelInbox";
+import Customer360 from "@/pages/admin/Customer360";
 import NotificationTemplates from "@/pages/admin/NotificationTemplates";
 import WhatsAppTemplateManager from "@/pages/admin/WhatsAppTemplateManager";
 import BotBeeDashboard from "@/pages/admin/BotBeeDashboard";
@@ -409,6 +410,7 @@ function Router() {
       <Route path="/admin/branch-dashboard" component={() => <AdminRoute component={BranchOverview} />} />
       <Route path="/admin/branch-login"     component={() => <AdminRoute component={BranchLoginManager} />} />
       <Route path="/admin/agent-login"      component={() => <AdminRoute component={AgentLoginManager} />} />
+      <Route path="/admin/customer360"       component={() => <AdminRoute component={Customer360} />} />
       <Route path="/admin/crm"              component={() => <AdminRoute component={CRMDashboard} />} />
       <Route path="/admin/srm"              component={() => <AdminRoute component={SRMDashboard} />} />
       <Route path="/admin/hr"               component={() => <AdminRoute component={HRDashboard} />} />

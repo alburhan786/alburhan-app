@@ -132,6 +132,7 @@ export function buildNavSections(openComplaints = 0): NavSection[] {
     {
       section: "CRM & SRM",
       items: [
+        { icon: UserCheck,     label: "Customer 360°",        href: "/admin/customer360",      require: ["customers", "view"] },
         { icon: Target,        label: "CRM Dashboard",       href: "/admin/crm",              require: ["customers", "view"] },
         { icon: Handshake,     label: "SRM Dashboard",       href: "/admin/srm",              require: ["accounting","view"] },
         { icon: Target,        label: "Leads",               href: "/admin/leads",            require: ["customers", "view"] },
