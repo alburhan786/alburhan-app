@@ -91,8 +91,8 @@ const SECTIONS: { title: string; color: string; items: ModItem[] }[] = [
       { icon: Target,      label: "CRM Dashboard",           desc: "Leads & pipeline",            href: "/admin/crm",               bg: "bg-blue-100",    tc: "text-blue-700"    },
       { icon: UserPlus,    label: "Lead Manager",            desc: "Lead capture & follow-up",    href: "/admin/leads",             bg: "bg-sky-100",     tc: "text-sky-700"     },
       { icon: Users2,      label: "Customer 360° Profile",   desc: "Full customer history",       href: "/admin/customer360",       bg: "bg-indigo-100",  tc: "text-indigo-700"  },
+      { icon: BarChart2,   label: "Customer Analytics",      desc: "Customer data & behaviour",   href: "/admin/customers",         bg: "bg-cyan-100",    tc: "text-cyan-700"    },
       { icon: Star,        label: "Loyalty & Rewards",       desc: "Points & redemptions",        href: "/admin/loyalty",           bg: "bg-yellow-100",  tc: "text-yellow-700"  },
-      { icon: Inbox,       label: "Omni Channel Inbox",      desc: "All messages in one view",    href: "/admin/inbox",             bg: "bg-violet-100",  tc: "text-violet-700"  },
     ],
   },
 
@@ -119,6 +119,7 @@ const SECTIONS: { title: string; color: string; items: ModItem[] }[] = [
       { icon: UsersRound,  label: "Staff Manager",           desc: "Manage all staff members",    href: "/admin/staff",             bg: "bg-orange-100",  tc: "text-orange-700"  },
       { icon: ListTodo,    label: "Task Dashboard",          desc: "Tasks & assignments",         href: "/admin/tasks",             bg: "bg-lime-100",    tc: "text-lime-700"    },
       { icon: Archive,     label: "Asset Manager",           desc: "Company assets & equipment",  href: "/admin/assets",            bg: "bg-green-100",   tc: "text-green-700"   },
+      { icon: ScanLine,    label: "Attendance",              desc: "Group attendance tracking",   href: "/admin/groups",            bg: "bg-teal-100",    tc: "text-teal-700"    },
     ],
   },
 
@@ -129,7 +130,8 @@ const SECTIONS: { title: string; color: string; items: ModItem[] }[] = [
     items: [
       { icon: BookOpen,    label: "Bookings",                desc: "All bookings & reservations", href: "/admin/bookings",          bg: "bg-rose-100",    tc: "text-rose-700"    },
       { icon: ClipboardPlus,label:"Offline Booking",         desc: "Walk-in & manual bookings",   href: "/admin/offline-bookings",  bg: "bg-red-100",     tc: "text-red-700"     },
-      { icon: UsersRound,  label: "Hajj Groups",            desc: "Group management & pilgrims", href: "/admin/groups",            bg: "bg-amber-100",   tc: "text-amber-700"   },
+      { icon: UsersRound,  label: "Hajj Groups",            desc: "Hajj group management",        href: "/admin/groups",            bg: "bg-amber-100",   tc: "text-amber-700"   },
+      { icon: Users2,      label: "Umrah Groups",           desc: "Umrah group management",       href: "/admin/groups",            bg: "bg-yellow-100",  tc: "text-yellow-700"  },
       { icon: FileCheck,   label: "Visa Dashboard",          desc: "Visa status & processing",    href: "/admin/visa",              bg: "bg-purple-100",  tc: "text-purple-700"  },
       { icon: Plane,       label: "Flight Dashboard",        desc: "Flight management",           href: "/admin/flights",           bg: "bg-violet-100",  tc: "text-violet-700"  },
       { icon: Hotel,       label: "Hotel Dashboard",         desc: "Hotel management",            href: "/admin/hotels",            bg: "bg-blue-100",    tc: "text-blue-700"    },
@@ -159,6 +161,7 @@ const SECTIONS: { title: string; color: string; items: ModItem[] }[] = [
       { icon: Send,        label: "Broadcast Center",        desc: "Mass messaging & alerts",     href: "/admin/broadcast",         bg: "bg-pink-100",    tc: "text-pink-700"    },
       { icon: Bell,        label: "Notification Center",     desc: "Push & in-app notifications", href: "/admin/notifications",     bg: "bg-amber-100",   tc: "text-amber-700"   },
       { icon: Share2,      label: "Social Media Integration",desc: "All social channels",         href: "/admin/social-media",      bg: "bg-sky-100",     tc: "text-sky-700"     },
+      { icon: Inbox,       label: "Omni Channel Inbox",      desc: "All messages in one view",    href: "/admin/inbox",             bg: "bg-cyan-100",    tc: "text-cyan-700"    },
       { icon: Globe,       label: "Website CMS",             desc: "Public pages & content",      href: "/admin/cms",               bg: "bg-teal-100",    tc: "text-teal-700"    },
       { icon: Zap,         label: "Automation Center",       desc: "Workflow automation rules",   href: "/admin/automation-center", bg: "bg-yellow-100",  tc: "text-yellow-700"  },
       { icon: Activity,    label: "Workflow Center",         desc: "Notification pipelines",      href: "/admin/workflow-center",   bg: "bg-orange-100",  tc: "text-orange-700"  },
