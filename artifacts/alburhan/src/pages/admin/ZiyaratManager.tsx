@@ -133,28 +133,40 @@ export default function ZiyaratManager() {
   async function del(id: string) {
     if (!confirm("Delete this ziyarat schedule?")) return;
     try {
-      await fetch(`${API}/api/ziyarat/${id}`, { method: "DELETE", credentials: "include" });
-      toast({ title: "Deleted" });
+      const r = await fetch(`${API}/api/ziyarat/${id}`, { method: "DELETE", credentials: "include" });
+      if (!r.ok) throw new Error("Delete failed");
+      toast({ title: "Deleted successfully" });
       load();
-    } catch { }
+    } catch (e: any) {
+      toast({ title: "Delete failed", description: e.message, variant: "destructive" });
+    }
   }
 
   async function loadAttendance(id: string) {
     if (expandedId === id) { setExpandedId(null); return; }
     setExpandedId(id);
-    const r = await fetch(`${API}/api/ziyarat/${id}/attendance`, { credentials: "include" });
-    if (r.ok) setAttendance(await r.json());
+    try {
+      const r = await fetch(`${API}/api/ziyarat/${id}/attendance`, { credentials: "include" });
+      if (r.ok) setAttendance(await r.json());
+      else toast({ title: "Could not load attendance", variant: "destructive" });
+    } catch (e: any) {
+      toast({ title: "Attendance load failed", description: e.message, variant: "destructive" });
+    }
   }
 
   async function toggleAttendance(scheduleId: string, pilgrimId: string, current: boolean) {
-    await fetch(`${API}/api/ziyarat/${scheduleId}/attendance`, {
-      method: "POST", credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pilgrim_id: pilgrimId, checked_in: !current }),
-    });
-    const r = await fetch(`${API}/api/ziyarat/${scheduleId}/attendance`, { credentials: "include" });
-    if (r.ok) setAttendance(await r.json());
-    load();
+    try {
+      const r = await fetch(`${API}/api/ziyarat/${scheduleId}/attendance`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pilgrim_id: pilgrimId, checked_in: !current }),
+      });
+      if (!r.ok) throw new Error("Failed to update attendance");
+      const att = await fetch(`${API}/api/ziyarat/${scheduleId}/attendance`, { credentials: "include" });
+      if (att.ok) setAttendance(await att.json());
+    } catch (e: any) {
+      toast({ title: "Attendance update failed", description: e.message, variant: "destructive" });
+    }
   }
 
   const filtered = list.filter(z =>

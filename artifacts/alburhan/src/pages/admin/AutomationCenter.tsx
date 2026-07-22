@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { AdminLayout } from "@/components/layout/AdminLayout";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -144,6 +145,7 @@ export default function AutomationCenter() {
   const totalRules = rules.length;
 
   return (
+    <AdminLayout>
     <div className="p-6 max-w-screen-xl mx-auto">
       {/* Header */}
       <div className="mb-6">
@@ -319,5 +321,6 @@ export default function AutomationCenter() {
         </div>
       )}
     </div>
+    </AdminLayout>
   );
 }

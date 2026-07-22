@@ -36,6 +36,12 @@ export default function AgentManager() {
 
   const save = async () => {
     if (!form.name.trim()) { toast({ title: "Agent name required", variant: "destructive" }); return; }
+    if (form.mobile && !/^\d{10}$/.test(form.mobile.replace(/[^0-9]/g, "").replace(/^91/, ""))) {
+      toast({ title: "Invalid mobile number — must be 10 digits", variant: "destructive" }); return;
+    }
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      toast({ title: "Invalid email address", variant: "destructive" }); return;
+    }
     setSaving(true);
     try {
       const url = editId ? `${BASE_API}/api/admin/agents/${editId}` : `${BASE_API}/api/admin/agents`;
@@ -52,8 +58,14 @@ export default function AgentManager() {
 
   const del = async (id: string, name: string) => {
     if (!confirm(`Remove agent "${name}"?`)) return;
-    await fetch(`${BASE_API}/api/admin/agents/${id}`, { method: "DELETE", credentials: "include" });
-    load();
+    try {
+      const r = await fetch(`${BASE_API}/api/admin/agents/${id}`, { method: "DELETE", credentials: "include" });
+      if (!r.ok) throw new Error("Delete failed");
+      toast({ title: `Agent "${name}" removed` });
+      load();
+    } catch (e: any) {
+      toast({ title: "Delete failed", description: e.message, variant: "destructive" });
+    }
   };
 
   const edit = (a: any) => {

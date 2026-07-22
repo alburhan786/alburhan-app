@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { AdminLayout } from "@/components/layout/AdminLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -101,6 +102,7 @@ export default function NotificationTemplates() {
   const untestedCount = templates.filter(t => t.health === "untested").length;
 
   return (
+    <AdminLayout>
     <div className="p-6 max-w-6xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -264,5 +266,6 @@ export default function NotificationTemplates() {
         </CardContent>
       </Card>
     </div>
+    </AdminLayout>
   );
 }

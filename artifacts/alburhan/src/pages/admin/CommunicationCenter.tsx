@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { AdminLayout } from "@/components/layout/AdminLayout";
 
 const API = import.meta.env.VITE_API_URL || "";
 function apiUrl(path: string) { return `${API}${path}`; }
@@ -117,19 +118,31 @@ function ProviderStatusRow() {
     setTesting(null);
   };
 
-  const STATUS_COLOR: Record<string, string> = { connected: "#22c55e", failed: "#ef4444", unknown: "#9ca3af" };
+  const STATUS_COLOR: Record<string, string> = { connected: "#22c55e", failed: "#ef4444", unknown: "#6b7280", "not-tested": "#6b7280" };
+
+  const testAll = async () => {
+    for (const id of Object.keys(PROVIDER_META)) {
+      await runTest(id);
+    }
+  };
 
   return (
     <div style={{ marginBottom: 28 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
         <h3 style={{ fontWeight: 700, color: "#111827", margin: 0 }}>🔌 Provider Connectivity</h3>
-        <button onClick={load} style={{ background: "none", border: "1px solid #d1d5db", borderRadius: 6, padding: "4px 12px", cursor: "pointer", fontSize: 12, color: "#374151" }}>↻ Refresh</button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={testAll} disabled={!!testing} style={{ background: "#0d5040", border: "none", borderRadius: 6, padding: "4px 12px", cursor: "pointer", fontSize: 12, color: "#fff", fontWeight: 600 }}>
+            {testing ? "Testing…" : "⚡ Test All"}
+          </button>
+          <button onClick={load} style={{ background: "none", border: "1px solid #d1d5db", borderRadius: 6, padding: "4px 12px", cursor: "pointer", fontSize: 12, color: "#374151" }}>↻ Refresh</button>
+        </div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 12 }}>
         {Object.entries(PROVIDER_META).map(([id, meta]) => {
           const p = providers.find(x => x.provider === id);
-          const status: string = p?.status || "unknown";
-          const color = STATUS_COLOR[status] || "#9ca3af";
+          const rawStatus: string = p?.status || "not-tested";
+          const status = rawStatus === "unknown" ? "not-tested" : rawStatus;
+          const color = STATUS_COLOR[status] || "#6b7280";
           const lastTested = p?.last_tested ? new Date(p.last_tested).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" }) : null;
           return (
             <div key={id} style={{ background: "#fff", border: `1px solid ${color}44`, borderRadius: 10, padding: 14, display: "flex", flexDirection: "column", gap: 6, boxShadow: "0 1px 3px #0001" }}>
@@ -139,13 +152,14 @@ function ProviderStatusRow() {
                   <div style={{ fontWeight: 700, fontSize: 12, color: "#374151", marginTop: 2 }}>{meta.label}</div>
                 </div>
                 <span style={{ background: color + "22", color, border: `1px solid ${color}55`, borderRadius: 12, padding: "2px 10px", fontSize: 10, fontWeight: 700, whiteSpace: "nowrap" }}>
-                  {status === "connected" ? "✅ Connected" : status === "failed" ? "❌ Failed" : "— Unknown"}
+                  {status === "connected" ? "✅ Connected" : status === "failed" ? "❌ Failed" : "○ Not Tested"}
                 </span>
               </div>
               {lastTested && <div style={{ fontSize: 10, color: "#9ca3af" }}>Tested: {lastTested}</div>}
+              {!lastTested && <div style={{ fontSize: 10, color: "#9ca3af" }}>Click "Test Now" to check status</div>}
               <button onClick={() => runTest(id)} disabled={testing === id}
-                style={{ background: testing === id ? "#f3f4f6" : "#f8fafc", border: "1px solid #e5e7eb", borderRadius: 6, padding: "4px 0", cursor: "pointer", fontSize: 11, color: "#374151", fontWeight: 600 }}>
-                {testing === id ? "Testing…" : "Test Now"}
+                style={{ background: testing === id ? "#f3f4f6" : "#f8fafc", border: "1px solid #e5e7eb", borderRadius: 6, padding: "4px 0", cursor: testing === id ? "not-allowed" : "pointer", fontSize: 11, color: "#374151", fontWeight: 600 }}>
+                {testing === id ? "⏳ Testing…" : "🔍 Test Now"}
               </button>
             </div>
           );
@@ -1332,7 +1346,8 @@ export default function CommunicationCenter() {
   const [tab, setTab] = useState("dashboard");
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f8fafc" }}>
+    <AdminLayout>
+    <div style={{ background: "#f8fafc" }}>
       <div style={{ background: "#fff", borderBottom: "1px solid #e5e7eb", padding: "20px 32px" }}>
         <h1 style={{ fontSize: 22, fontWeight: 800, color: "#111827", margin: 0 }}>📡 Communication Center</h1>
         <p style={{ color: "#6b7280", fontSize: 13, margin: "4px 0 0" }}>Enterprise Notification Engine · 33 Events · WhatsApp · SMS · RCS · Email · Push</p>
@@ -1365,5 +1380,6 @@ export default function CommunicationCenter() {
         {tab === "push" && <ChannelTab channel="push" />}
       </div>
     </div>
+    </AdminLayout>
   );
 }

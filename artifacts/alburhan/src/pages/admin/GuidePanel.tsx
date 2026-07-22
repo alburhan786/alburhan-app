@@ -73,8 +73,13 @@ export default function GuidePanel() {
       });
       if (r.ok) {
         setAttendance(prev => ({ ...prev, [pilgrimId]: status }));
+      } else {
+        const d = await r.json().catch(() => ({}));
+        toast({ title: "Failed to mark attendance", description: d.error || "Please try again", variant: "destructive" });
       }
-    } catch {}
+    } catch (e: any) {
+      toast({ title: "Network error", description: e.message, variant: "destructive" });
+    }
     setSaving(null);
   };
 

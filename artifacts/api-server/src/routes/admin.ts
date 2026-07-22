@@ -2579,11 +2579,23 @@ router.get("/agents", requireAdmin as any, async (_req: AuthenticatedRequest, re
 router.post("/agents", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
     const { name, mobile, email, city, branch_id, commission_rate = 0, is_active = true, notes } = req.body;
-    if (!name) return res.status(400).json({ error: "Agent name required" });
+    if (!name?.trim()) return res.status(400).json({ error: "Agent name is required" });
+    let cleanMobile = null;
+    if (mobile) {
+      cleanMobile = String(mobile).replace(/[^0-9]/g, "").replace(/^91/, "");
+      if (cleanMobile.length !== 10) return res.status(400).json({ error: "Mobile must be 10 digits" });
+    }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: "Invalid email address" });
+    }
+    if (cleanMobile) {
+      const dup = await pool.query(`SELECT id FROM agents WHERE mobile=$1`, [cleanMobile]);
+      if (dup.rows[0]) return res.status(409).json({ error: "An agent with this mobile already exists" });
+    }
     const r = await pool.query(
       `INSERT INTO agents (id, name, mobile, email, city, branch_id, commission_rate, is_active, notes, created_at)
        VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, NOW()) RETURNING *`,
-      [name, mobile||null, email||null, city||null, branch_id||null, commission_rate, is_active, notes||null]
+      [name.trim(), cleanMobile||null, email?.trim()||null, city?.trim()||null, branch_id||null, commission_rate, is_active, notes?.trim()||null]
     );
     res.json(r.rows[0]);
   } catch (err: any) { res.status(500).json({ error: err.message }); }

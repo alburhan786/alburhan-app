@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { AdminLayout } from "@/components/layout/AdminLayout";
 
 const API = import.meta.env.VITE_API_URL || "";
 function apiUrl(path: string) { return `${API}${path}`; }
@@ -424,6 +425,7 @@ function TimelineTab() {
   };
 
   return (
+    <AdminLayout>
     <div className="space-y-4">
       <div className="flex gap-2">
         <input
@@ -466,5 +468,6 @@ function TimelineTab() {
         </div>
       )}
     </div>
+    </AdminLayout>
   );
 }

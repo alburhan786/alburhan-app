@@ -1,3 +1,4 @@
+- [Admin pages missing AdminLayout](admin-layout-missing-pages.md) — 8 admin pages had no sidebar/breadcrumb; AdminRoute never adds layout; new pages must explicitly use AdminLayout or run grep -rL to audit
 - [DB pool init — override guard](db-pool-init-override.md) — lib/db Pool created at module-init; env reader must use unconditional `process.env[key]=val` (not !process.env[key]) or PM2's 16-char placeholder wins
 - [BotBee TEMPLATE_BODIES must match body_content](botbee-template-bodies-fix.md) — TEMPLATE_BODIES must use exact body_content ({{N}} format) from BotBee, NOT mixed_body_text (#!Name!#); fallback must pass Object.values(vars) flat array, not named object
 - [hajj_groups schema](hajj-groups-schema.md) — column is group_name (NOT name); g.name in any JOIN causes "column does not exist" error

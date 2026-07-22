@@ -46,9 +46,15 @@ export default function BranchManager() {
   };
 
   const del = async (id: string, name: string) => {
-    if (!confirm(`Delete branch "${name}"?`)) return;
-    await fetch(`${BASE_API}/api/admin/branches/${id}`, { method: "DELETE", credentials: "include" });
-    load();
+    if (!confirm(`Delete branch "${name}"? This cannot be undone.`)) return;
+    try {
+      const r = await fetch(`${BASE_API}/api/admin/branches/${id}`, { method: "DELETE", credentials: "include" });
+      if (!r.ok) { const d = await r.json(); throw new Error(d.error || "Delete failed"); }
+      toast({ title: `Branch "${name}" deleted` });
+      load();
+    } catch (e: any) {
+      toast({ title: "Delete failed", description: e.message, variant: "destructive" });
+    }
   };
 
   const edit = (b: any) => { setForm({ name: b.name, city: b.city||"", address: b.address||"", manager_name: b.manager_name||"", manager_mobile: b.manager_mobile||"", manager_email: b.manager_email||"", is_active: b.is_active }); setEditId(b.id); setShowForm(true); };

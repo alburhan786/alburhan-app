@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { MainLayout } from "@/components/layout/MainLayout";
+import { AdminLayout } from "@/components/layout/AdminLayout";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -115,7 +115,7 @@ export default function SupportManager() {
   const statusCfg = (s: string) => STATUS_CONFIG[s] || STATUS_CONFIG.open;
 
   return (
-    <MainLayout>
+    <AdminLayout>
       <div className="max-w-6xl mx-auto px-4 py-6">
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -326,6 +326,6 @@ export default function SupportManager() {
           </div>
         </div>
       </div>
-    </MainLayout>
+    </AdminLayout>
   );
 }

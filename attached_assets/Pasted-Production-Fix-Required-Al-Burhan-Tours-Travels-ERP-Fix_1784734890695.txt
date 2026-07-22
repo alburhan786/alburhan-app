@@ -1,0 +1,141 @@
+Production Fix Required - Al Burhan Tours & Travels ERP
+
+Fix all non-working modules before production deployment.
+
+1. Customer Ledger
+- Fix API and database query.
+- Display all customer records.
+- Search by name, booking ID, passport and mobile.
+
+2. Hajj Payment Ledger
+- Load payment history correctly.
+- Show invoices, receipts, pending balance and payment timeline.
+
+3. Digital Certificate
+- Fix PDF generation.
+- Remove unsupported CSS colors (oklch).
+- Use supported HEX/RGB colors.
+- Download PDF, Print and Share must work.
+
+4. Agent Management
+- Fix Create Agent API.
+- Save agent successfully.
+- Validate branch, email and mobile.
+- Show success notification.
+
+5. Branch Management
+- Fix create, edit, update and delete.
+- Ensure data is saved in the database.
+
+6. Package Requests
+- Load all customer package requests.
+- Approve, reject and assign requests.
+
+7. Inquiries
+- Clicking an inquiry must display full details.
+- Allow reply, assign and mark as resolved.
+
+8. Broadcast Messages
+- Send real WhatsApp, SMS, Email, RCS and Dashboard notifications.
+- Store delivery logs.
+
+9. Loyalty & Rewards
+- Fix complete module.
+- Load customer reward points, redemption history and transactions.
+
+10. Communication Center
+- Provider status must correctly show Connected or Disconnected.
+- Test WhatsApp (BotBee), Fast2SMS, SMTP, Firebase, Razorpay and RCS.
+- Remove all "Unknown" status.
+
+11. Ziyarat Management
+- Fix fetch errors.
+- Allow schedule creation, editing and assignment.
+
+12. Guide Panel
+- Load guide assignments, attendance and group information correctly.
+
+13. Admin AI Assistant
+- Restore AI Assistant functionality.
+- Enable AI operations for bookings, payments, visas and customer support.
+
+14. Navigation & Back Button
+- Add a Back button on EVERY dashboard, module and page.
+- Every page must allow users to return to the previous page or main dashboard.
+- Back button must work on Desktop, Mobile and Tablet.
+- No page should become a dead end.
+- Maintain breadcrumb navigation (Dashboard > Module > Page).
+- Preserve search filters and page state when returning.
+
+15. Dashboard Navigation
+Implement proper navigation for ALL dashboards including:
+- Super Admin Dashboard
+- Branch Dashboard
+- Agent Dashboard
+- Staff Dashboard
+- Customer Dashboard
+- Finance Dashboard
+- Accounting Dashboard
+- Payment Dashboard
+- CRM Dashboard
+- SRM Dashboard
+- HR Dashboard
+- Payroll Dashboard
+- Inventory Dashboard
+- Procurement Dashboard
+- Supplier Dashboard
+- Visa Dashboard
+- Flight Dashboard
+- Hotel Dashboard
+- Transport Dashboard
+- Room Allocation Dashboard
+- Document Management Dashboard
+- Agreement Dashboard
+- Invoice Dashboard
+- Receipt Dashboard
+- Reports Dashboard
+- Business Intelligence Dashboard
+- AI Analytics Dashboard
+- Marketing Dashboard
+- Notification Dashboard
+- WhatsApp Dashboard
+- SMS Dashboard
+- Email Dashboard
+- Website CMS Dashboard
+- Mobile App Dashboard
+- User & Role Management
+- Permission Management
+- Audit Log Dashboard
+- Activity Log Dashboard
+- Security Dashboard
+- Backup Dashboard
+- API Dashboard
+- Integration Dashboard
+- Settings Dashboard
+
+Every dashboard must:
+- Open correctly.
+- Load real PostgreSQL data.
+- Have working navigation.
+- Have a Back button.
+- Have Refresh.
+- Have Search (where applicable).
+- Have Add/Edit/Delete/Create buttons where applicable.
+- Be fully responsive.
+
+16. Production Testing
+- Test every Create, Save, Update, Delete, Search, Import, Export and Print function.
+- Verify every API endpoint returns HTTP 200 with valid data.
+- Verify every module loads successfully.
+- Ensure no page shows:
+  - Load Failed
+  - Save Failed
+  - Failed to load records
+  - Unknown
+  - Blank page
+  - PDF Error
+  - API Error
+  - Console Error
+  - Network Error
+
+Do NOT mark the project complete until every dashboard, module, API, automation, notification, PDF generation, navigation and CRUD operation is fully working with live PostgreSQL data on the production server. Perform end-to-end testing and fix all issues before deployment.

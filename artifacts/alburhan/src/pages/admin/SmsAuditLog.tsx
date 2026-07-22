@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { MessageSquare, CheckCircle, XCircle, Clock, RefreshCw, Download, Shield } from "lucide-react";
+import { AdminLayout } from "@/components/layout/AdminLayout";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -106,6 +107,7 @@ export default function SmsAuditLog() {
   }
 
   return (
+    <AdminLayout>
     <div style={{ padding: 24, maxWidth: 1400, margin: "0 auto" }}>
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
@@ -296,5 +298,6 @@ export default function SmsAuditLog() {
         </div>
       )}
     </div>
+    </AdminLayout>
   );
 }

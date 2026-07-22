@@ -8,7 +8,7 @@
 import { ReactNode, useEffect, useState, useMemo, useCallback } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { LogOut, Menu, ChevronDown, ChevronRight } from "lucide-react";
+import { LogOut, Menu, ChevronDown, ChevronRight, ChevronLeft, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useAdminNotifications } from "@/hooks/useAdminNotifications";
@@ -82,6 +82,38 @@ export function AdminLayout({ children }: { children: ReactNode }) {
       return next;
     });
   }, []);
+
+  // ── Breadcrumb bar with back button ─────────────────────────────────────
+  const BreadcrumbBar = () => {
+    const allItems = MENU.flatMap(s => s.items.map(i => ({ ...i, section: s.section })));
+    const current = allItems.find(i => {
+      const base = i.href.split("?")[0];
+      return location === base || location.startsWith(base + "/");
+    });
+    if (!current) return null;
+    return (
+      <div className="flex items-center gap-1.5 mb-5 pb-3 border-b border-border/60 flex-wrap">
+        <button
+          onClick={() => window.history.back()}
+          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-lg hover:bg-muted/60 font-medium"
+        >
+          <ChevronLeft size={14} />
+          Back
+        </button>
+        <span className="text-muted-foreground/40 text-xs">|</span>
+        <Link href="/admin/super">
+          <span className="flex items-center gap-1 text-sm text-muted-foreground hover:text-primary transition-colors cursor-pointer">
+            <Home size={12} />
+            <span className="hidden sm:inline">Dashboard</span>
+          </span>
+        </Link>
+        <ChevronRight size={11} className="text-muted-foreground/40" />
+        <span className="text-sm text-muted-foreground hidden sm:inline">{current.section}</span>
+        <ChevronRight size={11} className="text-muted-foreground/40 hidden sm:inline" />
+        <span className="text-sm font-semibold text-foreground">{current.label}</span>
+      </div>
+    );
+  };
 
   // ── Sidebar body ────────────────────────────────────────────────────────
   const SidebarNav = () => (
@@ -218,6 +250,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
           </div>
         </header>
         <div className="p-4 md:p-8 flex-1 overflow-x-hidden">
+          <BreadcrumbBar />
           {children}
         </div>
       </main>

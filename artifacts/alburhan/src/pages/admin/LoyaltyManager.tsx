@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { AdminLayout } from "@/components/layout/AdminLayout";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -133,6 +134,7 @@ export default function LoyaltyManager() {
   };
 
   return (
+    <AdminLayout>
     <div className="p-6 max-w-screen-xl mx-auto">
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
@@ -346,5 +348,6 @@ export default function LoyaltyManager() {
         </div>
       )}
     </div>
+    </AdminLayout>
   );
 }

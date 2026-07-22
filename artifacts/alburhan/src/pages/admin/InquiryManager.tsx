@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { AdminLayout } from "@/components/layout/AdminLayout";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -40,7 +41,8 @@ export default function InquiryManager() {
   const unreadCount = inquiries.filter(q => !q.isRead).length;
 
   return (
-    <div style={{ display: "flex", height: "calc(100vh - 64px)", fontFamily: "Inter, sans-serif", overflow: "hidden" }}>
+    <AdminLayout>
+    <div style={{ display: "flex", height: "calc(100vh - 260px)", minHeight: 500, fontFamily: "Inter, sans-serif", overflow: "hidden", borderRadius: 12, border: "1px solid #e5e7eb" }}>
 
       {/* Sidebar: List */}
       <div style={{ width: "380px", flexShrink: 0, borderRight: "1px solid #e5e7eb", display: "flex", flexDirection: "column", background: "#fff" }}>
@@ -138,5 +140,6 @@ export default function InquiryManager() {
         )}
       </div>
     </div>
+    </AdminLayout>
   );
 }
