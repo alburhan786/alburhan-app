@@ -287,7 +287,7 @@ function Router() {
       <Route path="/agreement/:id/sign" component={() => <CustomerRoute component={AgreementSigning} />} />
 
       {/* Admin Routes */}
-      <Route path="/admin/dashboard" component={() => <AdminRoute component={AdminDashboard} />} />
+      <Route path="/admin/dashboard" component={() => <AdminRoute component={SuperDashboard} />} />
       <Route path="/admin/manager"   component={() => <AdminRoute component={ManagerDashboard} />} />
       <Route path="/admin/packages" component={() => <AdminRoute component={PackagesManager} />} />
       <Route path="/admin/bookings" component={() => <AdminRoute component={BookingsManager} />} />
