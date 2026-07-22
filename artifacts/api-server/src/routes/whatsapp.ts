@@ -438,15 +438,21 @@ router.post("/connection-test", requireAdmin as any, async (_req, res) => {
     const start = Date.now();
     const r = await axios.post(endpoint, { apiToken, phone_number_id }, { headers: { "Content-Type": "application/json" }, timeout: 10000 });
     const latencyMs = Date.now() - start;
-    const ok = r.status >= 200 && r.status < 300;
-    res.json({ ok, connected: ok, httpStatus: r.status, latencyMs, baseUrl, responseSnippet: JSON.stringify(r.data).slice(0, 200) });
+    // BotBee returns HTTP 200 even for errors — must check status field in the body.
+    const botbeeOk = String(r.data?.status ?? "") !== "0" && String(r.data?.status ?? "") !== "false";
+    const botbeeError = !botbeeOk ? (typeof r.data?.message === "string" ? r.data.message : "BotBee returned status:0") : null;
+    res.json({
+      ok: botbeeOk, connected: botbeeOk, httpStatus: r.status, latencyMs, baseUrl,
+      error: botbeeError || undefined,
+      responseSnippet: JSON.stringify(r.data).slice(0, 300),
+    });
   } catch (err: any) {
     const resp = err?.response;
     res.json({
       ok: false, connected: false,
       httpStatus: resp?.status,
       error: resp?.data?.message || err.message,
-      responseSnippet: resp?.data ? JSON.stringify(resp.data).slice(0, 200) : null,
+      responseSnippet: resp?.data ? JSON.stringify(resp.data).slice(0, 300) : null,
     });
   }
 });

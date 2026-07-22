@@ -1082,6 +1082,16 @@ export async function fetchTemplates(): Promise<{ ok: boolean; templates?: WaTem
     const response = await axios.post(endpoint, body, { headers: { "Content-Type": "application/json" }, timeout: 15000 });
     const data = response.data;
 
+    // BotBee signals failure with status:"0" even on HTTP 200.
+    // Must check BEFORE trying to parse templates — otherwise we silently return
+    // ok:true with an empty array and hide the real error from the admin.
+    const botbeeStatus = String(data?.status ?? "");
+    if (botbeeStatus === "0" || botbeeStatus === "false") {
+      const errMsg = (typeof data?.message === "string" && data.message) ? data.message : "BotBee returned an error (status:0)";
+      console.error(`[BotBee] fetchTemplates: API returned failure — ${errMsg}`);
+      return { ok: false, errorMessage: errMsg, responsePayload: data };
+    }
+
     // BotBee POST /template/list returns { status: "1", message: [ { template_name, template_id, template_category, ... } ] }
     // Fallback: standard paths used by some other providers
     const rawArr: unknown[] =
@@ -1092,7 +1102,7 @@ export async function fetchTemplates(): Promise<{ ok: boolean; templates?: WaTem
       data?.result ||
       (Array.isArray(data) ? data : []);
 
-    if (!Array.isArray(rawArr)) return { ok: false, errorMessage: "Unexpected response format", responsePayload: data };
+    if (!Array.isArray(rawArr)) return { ok: false, errorMessage: `Unexpected response format — raw: ${JSON.stringify(data).slice(0, 200)}`, responsePayload: data };
 
     // Normalise BotBee field names (template_name → name, template_category → category, etc.)
     const raw: WaTemplate[] = rawArr.map((t: any) => ({

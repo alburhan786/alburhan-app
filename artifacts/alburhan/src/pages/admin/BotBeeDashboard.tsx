@@ -69,6 +69,8 @@ export default function BotBeeDashboard() {
   const [templates, setTemplates] = useState<any[]>([]);
   const [templateStats, setTemplateStats] = useState<TemplateStats | null>(null);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [templateFetchError, setTemplateFetchError] = useState<string | null>(null);
+  const [templateRawResponse, setTemplateRawResponse] = useState<string | null>(null);
   const [logs, setLogs] = useState<DeliveryLog[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [logPage, setLogPage] = useState(1);
@@ -107,11 +109,14 @@ export default function BotBeeDashboard() {
 
   const loadTemplates = useCallback(async () => {
     setLoadingTemplates(true);
+    setTemplateFetchError(null);
+    setTemplateRawResponse(null);
     try {
       const r = await fetch(`${API}/api/whatsapp/templates`, { credentials: "include" });
       const data = await r.json();
       if (data.ok && data.templates) {
         setTemplates(data.templates);
+        setTemplateFetchError(null);
         const stats = data.templates.reduce((acc: any, t: any) => {
           const s = (t.status || "").toUpperCase();
           acc[s] = (acc[s] || 0) + 1;
@@ -124,8 +129,14 @@ export default function BotBeeDashboard() {
         stats.disabled = stats.DISABLED || 0;
         stats.lastSync = new Date().toLocaleTimeString("en-IN");
         setTemplateStats(stats);
+      } else {
+        setTemplates([]);
+        setTemplateFetchError(data.errorMessage || data.message || "BotBee did not return templates");
+        setTemplateRawResponse(data.responsePayload ? JSON.stringify(data.responsePayload, null, 2) : null);
       }
-    } catch { }
+    } catch (e: any) {
+      setTemplateFetchError(e.message || "Network error");
+    }
     setLoadingTemplates(false);
   }, []);
 
@@ -476,13 +487,18 @@ export default function BotBeeDashboard() {
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {[
-                  { event: "Booking Submitted",       name: "bookingsubmitted",         id: "407645", params: "name, package, bookingId, invoiceUrl" },
-                  { event: "Payment Received",        name: "paymentreceived",          id: "407646", params: "name, package, bookingId, status=Paid, invoiceUrl" },
-                  { event: "Pending Payment Reminder",name: "pending_payment_reminder", id: "407648", params: "name, package, bookingId, paymentUrl" },
-                  { event: "Booking Approved",        name: "approve",                  id: "407642", params: "name, package, bookingId, invoiceUrl" },
-                  { event: "Departure Reminder",      name: "departure_reminder",       id: "407664", params: "name, package, flight, date, reportingTime, airport, hotel, emergency" },
-                  { event: "Visa Issued",             name: "visa_issued",              id: "407667", params: "name, bookingId, package, visaUrl" },
-                  { event: "Flight Ticket Issued",    name: "flight",                   id: "361654", params: "name, bookingId, flightNo, date, ticketUrl" },
+                  { event: "Booking Submitted",        name: "booking_receive",           id: "409897",  params: "Name, BookingID, PackageName" },
+                  { event: "Booking Approved",         name: "booking_approved",          id: "409950",  params: "Name, BookingID, PackageName, Amount, InvoiceUrl" },
+                  { event: "Payment Received",         name: "payment_received",          id: "409953",  params: "Name, BookingID, InvoiceNo, Amount" },
+                  { event: "Invoice Ready",            name: "invoice_ready",             id: "409956",  params: "Name, BookingID, InvoiceNo, Amount, InvoiceUrl" },
+                  { event: "Agreement Ready",          name: "agreement_ready",           id: "409958",  params: "Name, BookingID, AgreementNo, AgreementUrl" },
+                  { event: "Visa Issued",              name: "visa_issued",               id: "409991",  params: "Name, BookingID, VisaNo, VisaUrl" },
+                  { event: "Flight Ticket Issued",     name: "ticket_issued",             id: "409994",  params: "Name, BookingID, PNR, TicketUrl" },
+                  { event: "Flight Reminder",          name: "flight_reminder",           id: "409999",  params: "Name, BookingID, PackageName, Flight, DepartureDate, ReportingTime, Airport" },
+                  { event: "Departure Reminder",       name: "departure_reminder",        id: "410026",  params: "Name, BookingID, DepartureDate, ReportingTime, Airport" },
+                  { event: "Room Allocation",          name: "room_allocation",           id: "410008",  params: "Name, BookingID, Hotel, RoomNo" },
+                  { event: "Group Orientation",        name: "group_orientation",         id: "410022",  params: "Name, Date, Time, Venue" },
+                  { event: "Hajj Package Launch",      name: "hajj_package_launch",       id: "410040",  params: "Name, Year" },
                 ].map(t => (
                   <div key={t.id} className="flex items-start gap-2 bg-white rounded-lg border border-emerald-100 px-3 py-2">
                     <div className="flex-1 min-w-0">
@@ -535,8 +551,24 @@ export default function BotBeeDashboard() {
                 <tbody>
                   {loadingTemplates ? (
                     <tr><td colSpan={5} className="px-3 py-6 text-center text-muted-foreground"><Loader2 size={16} className="animate-spin inline mr-2" />Loading templates…</td></tr>
+                  ) : templateFetchError ? (
+                    <tr><td colSpan={5} className="px-3 py-6">
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="flex items-center gap-2 text-red-600 font-semibold text-sm">
+                          <XCircle size={16} /><span>BotBee template list failed</span>
+                        </div>
+                        <p className="text-xs text-red-700 font-mono bg-red-50 border border-red-200 rounded px-3 py-2 max-w-lg text-center">{templateFetchError}</p>
+                        {templateRawResponse && (
+                          <details className="text-left w-full max-w-lg">
+                            <summary className="text-[10px] text-gray-400 cursor-pointer hover:text-gray-600">Raw BotBee API response</summary>
+                            <pre className="mt-1 text-[10px] bg-gray-900 text-green-300 rounded p-2 overflow-auto max-h-28 font-mono">{templateRawResponse}</pre>
+                          </details>
+                        )}
+                        <p className="text-[11px] text-gray-500 mt-1">Templates exist locally (cards above). BotBee's template list API is returning an error.<br/>Contact BotBee support with the error above and phone_number_id <code className="bg-gray-100 px-1 rounded">96591219661113</code>.</p>
+                      </div>
+                    </td></tr>
                   ) : templates.length === 0 ? (
-                    <tr><td colSpan={5} className="px-3 py-6 text-center text-muted-foreground italic">No templates found. Check your BotBee credentials.</td></tr>
+                    <tr><td colSpan={5} className="px-3 py-6 text-center text-muted-foreground italic">Templates exist locally but could not be synchronized with BotBee.</td></tr>
                   ) : templates.map((t, i) => (
                     <tr key={i} className="border-b hover:bg-gray-50">
                       <td className="px-3 py-2.5 font-mono text-gray-800 font-medium">{t.name}</td>
