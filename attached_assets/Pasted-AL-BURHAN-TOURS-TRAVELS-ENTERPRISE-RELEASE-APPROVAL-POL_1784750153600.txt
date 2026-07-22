@@ -1,0 +1,169 @@
+AL BURHAN TOURS & TRAVELS
+ENTERPRISE RELEASE APPROVAL POLICY
+
+This ERP is now operating under Production Lock + Enterprise Change Management.
+
+Every future deployment must follow this release approval workflow.
+
+====================================================
+RELEASE LEVEL
+====================================================
+
+Every task must be classified before coding:
+
+PATCH
+• Bug fix
+• UI fix
+• Small enhancement
+
+MINOR RELEASE
+• New feature
+• New dashboard
+• New API
+• New report
+
+MAJOR RELEASE
+• Database migration
+• Authentication changes
+• Permission changes
+• Core architecture changes
+• Payment changes
+• Notification engine changes
+
+====================================================
+PATCH RULES
+====================================================
+
+Patch releases may NOT:
+
+• Remove features
+• Rename APIs
+• Change database schema destructively
+• Modify permissions unexpectedly
+
+====================================================
+MAJOR RELEASE RULES
+====================================================
+
+Before deployment:
+
+• Generate migration plan
+• Generate rollback plan
+• Verify affected modules
+• Verify integrations
+• Verify permissions
+• Verify database backups
+
+====================================================
+ROLLBACK PLAN
+====================================================
+
+Every deployment must include:
+
+• Previous Git checkpoint
+• Previous build artifact
+• Database rollback instructions (if applicable)
+• Restore procedure
+• Estimated rollback time
+
+If production verification fails:
+
+Immediately roll back to the previous stable version.
+
+====================================================
+PRODUCTION SMOKE TEST
+====================================================
+
+After deployment automatically verify:
+
+✓ Admin Login
+✓ Customer Login
+✓ Staff Login
+✓ Agent Login
+✓ Branch Login
+✓ Finance Login
+
+✓ Booking
+✓ Offline Booking
+✓ Payments
+✓ Razorpay
+✓ Invoice
+✓ Agreement
+✓ Visa
+✓ Flight
+✓ Hotel
+✓ Room Allocation
+✓ Transport
+✓ QR Tracking
+✓ Broadcast
+✓ CRM
+✓ SRM
+✓ Customer 360°
+✓ Omnichannel Inbox
+✓ Social Media Center
+✓ Automation Center
+✓ Reports
+✓ Customer Dashboard
+
+====================================================
+RELEASE REPORT
+====================================================
+
+Every deployment report must include:
+
+Release Type:
+Patch / Minor / Major
+
+Version
+
+Git Checkpoint
+
+Files Modified
+
+Files Added
+
+Database Changes
+
+Routes Added
+
+Components Added
+
+APIs Added
+
+Features Added
+
+Features Removed (must be ZERO unless explicitly approved)
+
+Security Checks
+
+Performance Summary
+
+Runtime Errors
+
+Build Errors
+
+Warnings
+
+Rollback Available: YES/NO
+
+Production Status:
+PASS / FAIL
+
+====================================================
+FINAL APPROVAL
+====================================================
+
+A deployment is successful only if:
+
+• Build Errors = 0
+• Runtime Errors = 0
+• Console Errors = 0
+• Failed APIs = 0
+• Failed Integrations = 0
+• Missing Routes = 0
+• Missing Modules = 0
+• Data Loss = 0
+• Rollback Plan = Available
+• Smoke Tests = 100% PASS
+
+Otherwise the deployment is automatically rejected and rolled back to the previous stable release.
