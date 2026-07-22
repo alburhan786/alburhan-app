@@ -147,6 +147,22 @@ import VerifyPilgrim from "@/pages/public/VerifyPilgrim";
 import VerifyFamily from "@/pages/public/VerifyFamily";
 import ScanPilgrim from "@/pages/public/ScanPilgrim";
 import AgreementCenter from "@/pages/admin/AgreementCenter";
+import StaffDashboard from "@/pages/admin/StaffDashboard";
+import AdminCustomerDashboard from "@/pages/admin/CustomerDashboard";
+import FlightDashboard from "@/pages/admin/FlightDashboard";
+import HotelDashboard from "@/pages/admin/HotelDashboard";
+import TransportDashboard from "@/pages/admin/TransportDashboard";
+import DocumentsDashboard from "@/pages/admin/DocumentsDashboard";
+import ReceiptsDashboard from "@/pages/admin/ReceiptsDashboard";
+import SmsDashboard from "@/pages/admin/SmsDashboard";
+import EmailDashboard from "@/pages/admin/EmailDashboard";
+import CmsDashboard from "@/pages/admin/CmsDashboard";
+import MobileAppDashboard from "@/pages/admin/MobileAppDashboard";
+import PermissionsManager from "@/pages/admin/PermissionsManager";
+import ActivityLogs from "@/pages/admin/ActivityLogs";
+import SecurityDashboard from "@/pages/admin/SecurityDashboard";
+import BackupDashboard from "@/pages/admin/BackupDashboard";
+import IntegrationsDashboard from "@/pages/admin/IntegrationsDashboard";
 import AgreementSigning from "@/pages/customer/AgreementSigning";
 import VerifyAgreement from "@/pages/public/VerifyAgreement";
 import BranchPortal from "@/pages/portal/BranchPortal";
@@ -394,6 +410,22 @@ function Router() {
       <Route path="/admin/hr"               component={() => <AdminRoute component={HRDashboard} />} />
       <Route path="/admin/inventory"        component={() => <AdminRoute component={InventoryDashboard} />} />
       <Route path="/admin/procurement"      component={() => <AdminRoute component={ProcurementDashboard} />} />
+      <Route path="/admin/staff-dashboard"   component={() => <AdminRoute component={StaffDashboard} />} />
+      <Route path="/admin/customer-dashboard" component={() => <AdminRoute component={AdminCustomerDashboard} />} />
+      <Route path="/admin/flight-dashboard"   component={() => <AdminRoute component={FlightDashboard} />} />
+      <Route path="/admin/hotel-dashboard"    component={() => <AdminRoute component={HotelDashboard} />} />
+      <Route path="/admin/transport-dashboard" component={() => <AdminRoute component={TransportDashboard} />} />
+      <Route path="/admin/documents"          component={() => <AdminRoute component={DocumentsDashboard} />} />
+      <Route path="/admin/receipts"           component={() => <AdminRoute component={ReceiptsDashboard} />} />
+      <Route path="/admin/sms-dashboard"      component={() => <AdminRoute component={SmsDashboard} />} />
+      <Route path="/admin/email-dashboard"    component={() => <AdminRoute component={EmailDashboard} />} />
+      <Route path="/admin/cms"                component={() => <AdminRoute component={CmsDashboard} />} />
+      <Route path="/admin/mobile-app"         component={() => <AdminRoute component={MobileAppDashboard} />} />
+      <Route path="/admin/permissions"        component={() => <AdminRoute component={PermissionsManager} />} />
+      <Route path="/admin/activity-logs"      component={() => <AdminRoute component={ActivityLogs} />} />
+      <Route path="/admin/security"           component={() => <AdminRoute component={SecurityDashboard} />} />
+      <Route path="/admin/backups"            component={() => <AdminRoute component={BackupDashboard} />} />
+      <Route path="/admin/integrations"       component={() => <AdminRoute component={IntegrationsDashboard} />} />
       <Route path="/admin/flights" component={() => <AdminRoute component={FlightManager} />} />
       <Route path="/admin/groups/:groupId/flights" component={() => <AdminRoute component={FlightManager} />} />
       <Route path="/admin/groups/:groupId/print/single-card/:pilgrimId"    component={() => <AdminRoute component={PrintSingleCard} />} />
