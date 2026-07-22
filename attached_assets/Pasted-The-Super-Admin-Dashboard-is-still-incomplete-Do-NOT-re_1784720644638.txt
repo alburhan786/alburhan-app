@@ -1,0 +1,67 @@
+The Super Admin Dashboard is still incomplete.
+
+Do NOT remove or replace existing modules.
+
+Extend the ERP by adding all missing enterprise dashboards and make them permanently visible in the sidebar and dashboard.
+
+Required Dashboards:
+
+1. Super Admin Dashboard
+2. Branch Dashboard
+3. Branch Login Management
+4. Agent Dashboard
+5. Agent Login Management
+6. Staff Dashboard
+7. Customer Dashboard
+8. Finance Dashboard
+9. Accounting Dashboard
+10. Payment Dashboard
+11. CRM Dashboard
+12. SRM Dashboard
+13. HR Dashboard
+14. Payroll Dashboard
+15. Inventory Dashboard
+16. Procurement Dashboard
+17. Supplier Dashboard
+18. Visa Dashboard
+19. Flight Dashboard
+20. Hotel Dashboard
+21. Transport Dashboard
+22. Room Allocation Dashboard
+23. Document Management Dashboard
+24. Agreement Dashboard
+25. Invoice Dashboard
+26. Receipt Dashboard
+27. Reports Dashboard
+28. Business Intelligence Dashboard
+29. AI Analytics Dashboard
+30. Marketing Dashboard
+31. Notification Dashboard
+32. WhatsApp Dashboard
+33. SMS Dashboard
+34. Email Dashboard
+35. Website CMS Dashboard
+36. Mobile App Dashboard
+37. User & Role Management
+38. Permission Management
+39. Audit Log Dashboard
+40. Activity Log Dashboard
+41. Security Dashboard
+42. Backup Dashboard
+43. API Dashboard
+44. Integration Dashboard
+45. Settings Dashboard
+
+Requirements:
+
+• Every dashboard must have its own route.
+• Every dashboard must have its own sidebar menu.
+• Every dashboard must have KPIs, charts, statistics, tables and quick actions.
+• All dashboards must be linked together.
+• Branch login and Agent login must be separate authentication systems.
+• Finance must include Profit & Loss, Balance Sheet, Cash Flow, Expenses, Income, Bank Accounts, Tax, Ledger and Journal.
+• Nothing should disappear after future updates.
+• The sidebar snapshot and regression tests must be updated.
+• Add automated tests to ensure these dashboard routes always exist.
+• The build must fail if any dashboard or sidebar menu is removed in future.
+• Run the full regression suite and deploy only after 100% tests pass.
