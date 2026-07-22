@@ -1,0 +1,338 @@
+ENTERPRISE PRODUCTION LOCK MODE
+AL BURHAN TOURS & TRAVELS ERP/CRM/SRM
+
+This ERP is now considered a LIVE PRODUCTION SYSTEM.
+
+The current production baseline is LOCKED.
+
+NEVER remove, rename, replace, hide, overwrite, or disable any existing feature unless I explicitly authorize it.
+
+==================================================
+PROTECT EVERYTHING
+==================================================
+
+Protect all existing:
+
+• Dashboard cards
+• Sidebar menus
+• Routes
+• Pages
+• Components
+• APIs
+• Database tables
+• Database records
+• Integrations
+• Automations
+• Customer data
+• Booking data
+• Payment history
+• Invoices
+• Agreements
+• Documents
+• Notifications
+• Reports
+• Settings
+• User permissions
+• Roles
+• Templates
+
+==================================================
+DO NOT BREAK EXISTING FEATURES
+==================================================
+
+Every future update must preserve 100% functionality of:
+
+Dashboard
+Operations Dashboard
+Executive Dashboard
+Business Intelligence
+Manager Dashboard
+Super Admin Dashboard
+Staff Dashboard
+Customer Dashboard
+
+CRM
+SRM
+Lead Manager
+Customer 360°
+Omnichannel Inbox
+Communication Center
+Automation Center
+Social Media Center
+Marketing Center
+Broadcast Center
+Loyalty & Rewards
+
+Bookings
+Offline Booking
+Groups
+Packages
+Customers
+Payments
+Invoices
+Receipts
+Agreements
+Visa
+Flight Tickets
+Hotels
+Room Allocation
+Transport
+Bus Allocation
+Ziyarat Schedule
+QR Tracker
+KYC
+Certificates
+Reports
+Support Center
+Task Manager
+Supplier Manager
+Finance
+HR
+Gallery
+AI Assistant
+
+==================================================
+SOCIAL MEDIA CENTER
+==================================================
+
+Never remove or disconnect:
+
+WhatsApp Business API
+Instagram
+Facebook
+Telegram
+Email
+SMS
+RCS
+Push Notifications
+Live Chat
+BotBee
+Meta Templates
+Conversation History
+Broadcast
+Automation
+Campaigns
+
+==================================================
+CUSTOMER 360
+==================================================
+
+Every customer profile must display:
+
+Customer Details
+
+Lead History
+
+Enquiries
+
+Bookings
+
+Payments
+
+Invoices
+
+Receipts
+
+Agreements
+
+Visa
+
+Flight Tickets
+
+Hotel Allocation
+
+Room Number
+
+Bus Number
+
+Ziyarat Schedule
+
+Documents
+
+Passport
+
+PAN
+
+Aadhaar
+
+Medical
+
+Emergency Contact
+
+Communication Timeline
+
+WhatsApp History
+
+Instagram History
+
+Facebook History
+
+Telegram History
+
+Internal Notes
+
+Assigned Staff
+
+Assigned Agent
+
+Tasks
+
+Reminders
+
+AI Next Best Action
+
+==================================================
+DATABASE PROTECTION
+==================================================
+
+Never:
+
+DROP TABLE
+
+DELETE TABLE
+
+TRUNCATE TABLE
+
+RESET DATABASE
+
+OVERWRITE EXISTING DATA
+
+RECREATE TABLES
+
+unless I explicitly request it.
+
+Use migrations only.
+
+==================================================
+BEFORE EVERY DEPLOYMENT
+==================================================
+
+Run automatically:
+
+TypeScript validation
+
+ESLint
+
+npm build
+
+Vite build
+
+Route verification
+
+API verification
+
+Authentication verification
+
+Database verification
+
+Payment verification
+
+Notification verification
+
+File upload verification
+
+PDF generation verification
+
+WhatsApp verification
+
+Email verification
+
+SMS verification
+
+==================================================
+COMPARE AGAINST BASELINE
+==================================================
+
+Verify counts never decrease.
+
+Dashboard cards ≥ current baseline
+
+Navigation ≥ current baseline
+
+Routes ≥ current baseline
+
+Pages ≥ current baseline
+
+Components ≥ current baseline
+
+API routes ≥ current baseline
+
+Modules ≥ current baseline
+
+If ANY count decreases:
+
+STOP deployment
+
+Restore missing feature
+
+Rebuild
+
+Retest
+
+Deploy again
+
+==================================================
+POST DEPLOYMENT REPORT
+==================================================
+
+Report:
+
+Dashboard cards
+
+Navigation items
+
+Routes
+
+Components
+
+API routes
+
+Database migrations
+
+Features added
+
+Features changed
+
+Features removed (must be ZERO)
+
+Runtime errors
+
+Build errors
+
+Console errors
+
+Failed APIs
+
+Broken links
+
+Missing pages
+
+Data integrity
+
+==================================================
+DEPLOYMENT SUCCESS CRITERIA
+==================================================
+
+Deployment is considered successful ONLY if:
+
+✔ Zero build errors
+
+✔ Zero runtime errors
+
+✔ Zero missing modules
+
+✔ Zero missing routes
+
+✔ Zero missing dashboard cards
+
+✔ Zero data loss
+
+✔ Zero broken APIs
+
+✔ Zero authentication failures
+
+✔ Zero payment failures
+
+✔ Zero notification failures
+
+✔ 100% backward compatibility with the locked production baseline.
