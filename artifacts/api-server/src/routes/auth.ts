@@ -525,6 +525,23 @@ router.get("/dev/logout", (req, res) => {
   });
 });
 
+// ── DEV ONLY: auto-login as admin for screenshot/e2e testing ────────────────
+router.get("/dev/admin-login", async (req, res) => {
+  if (process.env.NODE_ENV === "production") { res.status(404).end(); return; }
+  try {
+    const mobile = (req.query.mobile as string) || "9999999999";
+    const users = await db.select().from(usersTable).where(eq(usersTable.mobile, mobile)).limit(1);
+    const user = users[0];
+    if (!user) { res.status(404).json({ error: "User not found for mobile: " + mobile }); return; }
+    (req.session as any).userId = user.id;
+    await new Promise<void>((resolve, reject) => req.session.save(err => err ? reject(err) : resolve()));
+    const redirect = (req.query.redirect as string) || "/admin/super";
+    res.redirect(302, redirect);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── DEV ONLY: auto-login as a specific mobile for screenshot/e2e testing ────
 router.get("/dev/agent-login", async (req, res) => {
   if (process.env.NODE_ENV === "production") { res.status(404).end(); return; }

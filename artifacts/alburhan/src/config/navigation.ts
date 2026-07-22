@@ -10,6 +10,11 @@
  *  3. Never duplicate a section or item.
  *  4. The pre-build check (scripts/check-nav.mjs) will FAIL the build if any
  *     href registered here is missing from App.tsx routes.
+ *
+ * Sections (14 expandable):
+ *  Overview · Operations · Bookings · Finance · Pilgrims
+ *  CRM & SRM · HR · Inventory · Travel Operations
+ *  Communication · Reports · AI · Administration · System
  */
 
 import {
@@ -21,6 +26,7 @@ import {
   Scale, Users2, Package, ClipboardList, KeyRound, HeartPulse, Settings2, BellRing, Zap,
   MapPin, Tent, Tag, Bot, Award, Smartphone, Layers, Mail, Globe, FileText, TestTube2, History,
   Headphones, Target, Brain, AlarmClock, Handshake, Briefcase, ShoppingCart,
+  Workflow, Hotel, IndianRupee, LayoutGrid, Code2, Plug, Lock, Archive,
 } from "lucide-react";
 import type { Module, Action } from "@/hooks/use-permissions";
 
@@ -41,13 +47,13 @@ export interface NavSection {
 }
 
 /**
- * Master navigation definition.
+ * Master navigation definition — 14 expandable sections.
  * `openComplaints` is the only runtime value injected (badge counter).
  */
 export function buildNavSections(openComplaints = 0): NavSection[] {
   return [
 
-    // ── OVERVIEW ─────────────────────────────────────────────────────────────
+    // ── 1. OVERVIEW ─────────────────────────────────────────────────────────
     {
       section: "Overview",
       items: [
@@ -60,178 +66,191 @@ export function buildNavSections(openComplaints = 0): NavSection[] {
       ],
     },
 
-    // ── BOOKINGS & FINANCE ────────────────────────────────────────────────────
+    // ── 2. OPERATIONS ────────────────────────────────────────────────────────
     {
-      section: "Bookings & Finance",
+      section: "Operations",
       items: [
-        { icon: BookOpen,      label: "Bookings",           href: "/admin/bookings",          require: ["bookings",   "view"]   },
-        { icon: ClipboardPlus, label: "Offline Booking",    href: "/admin/offline-bookings",  require: ["bookings",   "create"] },
-        { icon: Receipt,       label: "Invoices",           href: "/admin/invoices",          require: ["bookings",   "view"]   },
-        { icon: CreditCard,    label: "Payment Management", href: "/admin/payments",          require: ["payments",   "view"]   },
-        { icon: BarChart2,     label: "Payment Analytics",  href: "/admin/payment-analytics", require: ["payments",   "view"]   },
-        { icon: AlarmClock,    label: "Payment Reminders",  href: "/admin/payment-reminders", require: ["payments",   "view"]   },
-        { icon: Building2,     label: "Offline Payments",   href: "/admin/offline-payments",  require: ["payments",   "view"]   },
-        { icon: Trash2,        label: "Payment Trash",      href: "/admin/payment-trash",     require: ["payments",   "delete"] },
-        { icon: TrendingDown,  label: "Expenses",           href: "/admin/expenses",          require: ["expenses",   "view"]   },
-        { icon: Calculator,    label: "Accounting",         href: "/admin/accounting",        require: ["accounting", "view"]   },
-        { icon: BarChart2,     label: "Finance Hub",        href: "/admin/finance",           require: ["accounting", "view"]   },
-        { icon: Home,          label: "Family Ledger",      href: "/admin/family-ledger",     require: ["accounting", "view"]   },
-        { icon: UserCheck,     label: "Customer Ledger",    href: "/admin/customer-ledger",   require: ["customers",  "view"]   },
-        { icon: BookMarked,    label: "Hajji Ledger",       href: "/admin/hajji-ledger",      require: ["groups",     "view"]   },
-        { icon: Truck,         label: "Vendors",            href: "/admin/vendors",           require: ["accounting", "view"]   },
-        { icon: Package,       label: "Suppliers",          href: "/admin/suppliers",         require: ["accounting", "view"]   },
-        { icon: Handshake,     label: "SRM Dashboard",      href: "/admin/srm",               require: ["accounting", "view"]   },
-        { icon: ShoppingCart,  label: "Procurement",        href: "/admin/procurement",       require: ["expenses",   "view"]   },
-        { icon: Package,       label: "Inventory",          href: "/admin/inventory",         require: ["assets",     "view"]   },
-        { icon: Scale,         label: "GST Reports",        href: "/admin/gst-reports",       require: ["gst",        "view"]   },
-        { icon: Users2,        label: "Payroll",            href: "/admin/payroll",           require: ["payroll",    "view"]   },
-        { icon: Award,         label: "Assets",             href: "/admin/assets",            require: ["assets",     "view"]   },
-        { icon: Trash2,        label: "Trash",              href: "/admin/bookings?tab=trash", require: ["bookings",  "delete"] },
+        { icon: BookOpen,      label: "Bookings",            href: "/admin/bookings",          require: ["bookings",   "view"]   },
+        { icon: ClipboardPlus, label: "Offline Booking",     href: "/admin/offline-bookings",  require: ["bookings",   "create"] },
+        { icon: Trash2,        label: "Booking Trash",       href: "/admin/bookings?tab=trash",require: ["bookings",   "delete"] },
+        { icon: Trash2,        label: "Payment Trash",       href: "/admin/payment-trash",     require: ["payments",   "delete"] },
+        { icon: Bot,           label: "Automation Center",   href: "/admin/automation-center", require: ["bookings",   "edit"]   },
       ],
     },
 
-    // ── PILGRIMS & GROUPS ─────────────────────────────────────────────────────
+    // ── 3. BOOKINGS & PAYMENTS ───────────────────────────────────────────────
     {
-      section: "Pilgrims & Groups",
+      section: "Bookings",
       items: [
-        { icon: UsersRound,    label: "Hajj Groups",        href: "/admin/groups",          require: ["groups",   "view"]   },
-        { icon: Plane,         label: "Flights",            href: "/admin/flights",          require: ["groups",   "view"]   },
-        { icon: Building2,     label: "Hotels",             href: "/admin/hotels",           require: ["groups",   "view"]   },
-        { icon: Bus,           label: "Buses",              href: "/admin/buses",            require: ["groups",   "view"]   },
-        { icon: Heart,         label: "Medical",            href: "/admin/medical",          require: ["pilgrims", "view"]   },
-        { icon: FileCheck,     label: "Visa Tracker",       href: "/admin/visa",             require: ["pilgrims", "view"]   },
-        { icon: ClipboardList, label: "Pilgrim Reports",    href: "/admin/pilgrim-reports",  require: ["pilgrims", "view"]   },
-        { icon: Activity,      label: "Pilgrim Operations", href: "/admin/pilgrim-ops",      require: ["pilgrims", "view"]   },
-        { icon: ScanLine,      label: "Group Tracking",     href: "/admin/group-tracking",   require: ["groups",   "view"]   },
-        { icon: BadgeCheck,    label: "Certificates",       href: "/admin/certificates",     require: ["pilgrims", "view"]   },
-        { icon: FileText,      label: "Document Expiry",    href: "/admin/document-expiry",  require: ["pilgrims", "view"]   },
-        { icon: BadgeCheck,    label: "Staff ID Cards",     href: "/admin/staff",            require: ["staff",    "view"]   },
-        { icon: ScanLine,      label: "QR Tracker",         href: "/admin/qr-tracker",       require: ["groups",   "view"]   },
-        { icon: Printer,       label: "Print Center",       href: "/admin/print-center",     require: ["groups",   "export"] },
-        { icon: Droplets,      label: "Spray Label",        href: "/admin/print/spray-label",require: ["groups",   "view"]   },
+        { icon: Receipt,       label: "Invoices",            href: "/admin/invoices",          require: ["bookings",   "view"]   },
+        { icon: CreditCard,    label: "Payments",            href: "/admin/payments",          require: ["payments",   "view"]   },
+        { icon: BarChart2,     label: "Payment Analytics",   href: "/admin/payment-analytics", require: ["payments",   "view"]   },
+        { icon: AlarmClock,    label: "Payment Reminders",   href: "/admin/payment-reminders", require: ["payments",   "view"]   },
+        { icon: Building2,     label: "Offline Payments",    href: "/admin/offline-payments",  require: ["payments",   "view"]   },
       ],
     },
 
-    // ── PACKAGES & CONTENT ────────────────────────────────────────────────────
+    // ── 4. FINANCE ───────────────────────────────────────────────────────────
     {
-      section: "Packages & Content",
+      section: "Finance",
       items: [
-        { icon: PackageSearch, label: "Packages",         href: "/admin/packages",    require: ["bookings",  "view"] },
-        { icon: ImageIcon,     label: "Gallery",          href: "/admin/gallery",     require: ["settings",  "view"] },
-        { icon: Megaphone,     label: "Marketing Center", href: "/admin/marketing",   require: ["customers", "edit"] },
-        { icon: BookOpen,      label: "Guide Panel",      href: "/admin/guide-panel", require: ["bookings",  "view"] },
+        { icon: TrendingDown,  label: "Expenses",            href: "/admin/expenses",          require: ["expenses",   "view"]   },
+        { icon: Calculator,    label: "Accounting",          href: "/admin/accounting",        require: ["accounting", "view"]   },
+        { icon: BarChart2,     label: "Finance Hub",         href: "/admin/finance",           require: ["accounting", "view"]   },
+        { icon: Home,          label: "Family Ledger",       href: "/admin/family-ledger",     require: ["accounting", "view"]   },
+        { icon: UserCheck,     label: "Customer Ledger",     href: "/admin/customer-ledger",   require: ["customers",  "view"]   },
+        { icon: BookMarked,    label: "Hajji Ledger",        href: "/admin/hajji-ledger",      require: ["groups",     "view"]   },
+        { icon: Scale,         label: "GST Reports",         href: "/admin/gst-reports",       require: ["gst",        "view"]   },
+        { icon: Users2,        label: "Payroll",             href: "/admin/payroll",           require: ["payroll",    "view"]   },
       ],
     },
 
-    // ── SALES & CRM ───────────────────────────────────────────────────────────
+    // ── 5. PILGRIMS ──────────────────────────────────────────────────────────
     {
-      section: "Sales & CRM",
+      section: "Pilgrims",
       items: [
-        { icon: Target,        label: "CRM Dashboard",    href: "/admin/crm",       require: ["customers", "view"] },
-        { icon: Target,        label: "Leads",            href: "/admin/leads",     require: ["customers", "view"] },
-        { icon: ClipboardList, label: "Tasks",            href: "/admin/tasks",     require: ["bookings",  "view"] },
-        { icon: Headphones,    label: "Support Manager",  href: "/admin/support",   require: ["customers", "view"] },
-        { icon: Star,          label: "Feedback",         href: "/admin/feedback",  require: ["customers", "view"], badge: openComplaints },
-        { icon: Inbox,         label: "Package Requests", href: "/admin/requests",  require: ["customers", "view"] },
-        { icon: MessageSquare, label: "Inquiries",        href: "/admin/inquiries", require: ["customers", "view"] },
-        { icon: Megaphone,     label: "Broadcast",        href: "/admin/broadcast", require: ["customers", "edit"] },
+        { icon: UsersRound,    label: "Hajj Groups",         href: "/admin/groups",            require: ["groups",   "view"]   },
+        { icon: Heart,         label: "Medical",             href: "/admin/medical",           require: ["pilgrims", "view"]   },
+        { icon: FileCheck,     label: "Visa Tracker",        href: "/admin/visa",              require: ["pilgrims", "view"]   },
+        { icon: ClipboardList, label: "Pilgrim Reports",     href: "/admin/pilgrim-reports",   require: ["pilgrims", "view"]   },
+        { icon: Activity,      label: "Pilgrim Operations",  href: "/admin/pilgrim-ops",       require: ["pilgrims", "view"]   },
+        { icon: ScanLine,      label: "Group Tracking",      href: "/admin/group-tracking",    require: ["groups",   "view"]   },
+        { icon: BadgeCheck,    label: "Certificates",        href: "/admin/certificates",      require: ["pilgrims", "view"]   },
+        { icon: FileText,      label: "Document Expiry",     href: "/admin/document-expiry",   require: ["pilgrims", "view"]   },
+        { icon: BadgeCheck,    label: "Staff ID Cards",      href: "/admin/staff",             require: ["staff",    "view"]   },
+        { icon: ScanLine,      label: "QR Tracker",          href: "/admin/qr-tracker",        require: ["groups",   "view"]   },
+        { icon: Printer,       label: "Print Center",        href: "/admin/print-center",      require: ["groups",   "export"] },
+        { icon: Droplets,      label: "Spray Label",         href: "/admin/print/spray-label", require: ["groups",   "view"]   },
       ],
     },
 
-    // ── CUSTOMERS & REPORTS ───────────────────────────────────────────────────
+    // ── 6. CRM & SRM ─────────────────────────────────────────────────────────
     {
-      section: "Customers & Reports",
+      section: "CRM & SRM",
       items: [
-        { icon: Users,       label: "Customers",         href: "/admin/customers",       require: ["customers", "view"] },
-        { icon: ShieldCheck, label: "KYC Management",    href: "/admin/kyc",             require: ["customers", "view"] },
-        { icon: UserCheck,   label: "Agent Management",  href: "/admin/agents",          require: ["customers", "view"] },
-        { icon: BarChart2,   label: "Agent Dashboard",   href: "/admin/agent-dashboard", require: ["customers", "view"] },
-        { icon: Building2,   label: "Branch Management", href: "/admin/branches",          require: ["customers", "view"] },
-        { icon: Building2,   label: "Branch Dashboard",  href: "/admin/branch-dashboard",  require: ["customers", "view"] },
-        { icon: BarChart2,   label: "Reports",           href: "/admin/reports",           require: ["reports",   "view"] },
-        { icon: BarChart2,   label: "Production Report", href: "/admin/production-report",require: ["reports",  "view"] },
+        { icon: Target,        label: "CRM Dashboard",       href: "/admin/crm",              require: ["customers", "view"] },
+        { icon: Handshake,     label: "SRM Dashboard",       href: "/admin/srm",              require: ["accounting","view"] },
+        { icon: Target,        label: "Leads",               href: "/admin/leads",            require: ["customers", "view"] },
+        { icon: ClipboardList, label: "Tasks",               href: "/admin/tasks",            require: ["bookings",  "view"] },
+        { icon: Headphones,    label: "Support Manager",     href: "/admin/support",          require: ["customers", "view"] },
+        { icon: Star,          label: "Feedback",            href: "/admin/feedback",         require: ["customers", "view"], badge: openComplaints },
+        { icon: Inbox,         label: "Package Requests",    href: "/admin/requests",         require: ["customers", "view"] },
+        { icon: MessageSquare, label: "Inquiries",           href: "/admin/inquiries",        require: ["customers", "view"] },
+        { icon: Megaphone,     label: "Broadcast",           href: "/admin/broadcast",        require: ["customers", "edit"] },
+        { icon: Zap,           label: "Loyalty & Rewards",   href: "/admin/loyalty",          require: ["bookings",  "view"] },
       ],
     },
 
-    // ── HAJJ OPERATIONS ───────────────────────────────────────────────────────
+    // ── 7. HR ────────────────────────────────────────────────────────────────
     {
-      section: "Hajj Operations",
+      section: "HR",
       items: [
-        { icon: MapPin, label: "Ziyarat",                    href: "/admin/ziyarat",    require: ["groups", "view"] },
-        { icon: Tent,   label: "Mina / Arafat / Muzdalifah", href: "/admin/allocations",require: ["groups", "view"] },
-        { icon: Tag,    label: "Luggage",                    href: "/admin/luggage",    require: ["groups", "view"] },
+        { icon: Briefcase,     label: "HR Dashboard",        href: "/admin/hr",               require: ["staff",    "view"] },
+        { icon: KeyRound,      label: "Branch Login Mgmt",   href: "/admin/branch-login",     require: ["users",    "view"] },
+        { icon: ShieldCheck,   label: "Agent Login Mgmt",    href: "/admin/agent-login",      require: ["users",    "view"] },
       ],
     },
 
-    // ── AUTOMATION ────────────────────────────────────────────────────────────
+    // ── 8. INVENTORY ─────────────────────────────────────────────────────────
     {
-      section: "Automation",
+      section: "Inventory",
       items: [
-        { icon: Bot,  label: "Automation Center", href: "/admin/automation-center", require: ["bookings", "edit"] },
-        { icon: Zap,  label: "Loyalty & Rewards", href: "/admin/loyalty",           require: ["bookings", "view"] },
+        { icon: Package,       label: "Inventory",           href: "/admin/inventory",        require: ["assets",     "view"]   },
+        { icon: ShoppingCart,  label: "Procurement",         href: "/admin/procurement",      require: ["expenses",   "view"]   },
+        { icon: Truck,         label: "Vendors",             href: "/admin/vendors",          require: ["accounting", "view"]   },
+        { icon: Package,       label: "Suppliers",           href: "/admin/suppliers",        require: ["accounting", "view"]   },
+        { icon: Award,         label: "Assets",              href: "/admin/assets",           require: ["assets",     "view"]   },
       ],
     },
 
-    // ── COMMUNICATION CENTER ──────────────────────────────────────────────────
+    // ── 9. TRAVEL OPERATIONS ─────────────────────────────────────────────────
     {
-      section: "Communication Center",
+      section: "Travel Operations",
       items: [
-        { icon: BellRing,     label: "Communication Center",  href: "/admin/communication-center",  require: ["customers", "edit"] },
-        { icon: Zap,          label: "Workflow Center",        href: "/admin/workflow-center",        require: ["bookings",  "edit"] },
-        { icon: Bot,          label: "BotBee Dashboard",       href: "/admin/botbee-dashboard",       require: ["settings",  "view"] },
-        { icon: History,      label: "WhatsApp History",        href: "/admin/whatsapp-history",       require: ["settings",  "view"] },
-        { icon: MessageSquare,label: "WhatsApp Templates",      href: "/admin/whatsapp-templates",     require: ["settings",  "view"] },
-        { icon: Smartphone,   label: "SMS Templates",          href: "/admin/sms-templates",          require: ["settings",  "view"] },
-        { icon: Layers,       label: "RCS Templates",          href: "/admin/rcs-templates",          require: ["settings",  "view"] },
-        { icon: Mail,         label: "Email Templates",        href: "/admin/email-templates",        require: ["settings",  "view"] },
-        { icon: FileText,     label: "DLT Template Manager",   href: "/admin/dlt-templates",          require: ["settings",  "view"] },
-        { icon: Smartphone,   label: "Sender ID Management",   href: "/admin/sms-settings",           require: ["settings",  "view"] },
-        { icon: TestTube2,    label: "SMS Test Center",        href: "/admin/sms-test",               require: ["settings",  "view"] },
-        { icon: TestTube2,    label: "Test Notifications",     href: "/admin/test-notifications",     require: ["settings",  "view"] },
-        { icon: History,      label: "Notification Logs",      href: "/admin/notification-logs",      require: ["settings",  "view"] },
-        { icon: HeartPulse,   label: "Notification Health",    href: "/admin/notification-health",    require: ["settings",  "view"] },
-        { icon: FileText,     label: "Notification Templates", href: "/admin/notification-templates",  require: ["settings",  "view"] },
-        { icon: BellRing,     label: "Auto Notifications",     href: "/admin/auto-notifications",     require: ["settings",  "view"] },
-        { icon: Smartphone,   label: "SMS Production Report",  href: "/admin/sms-production-report",  require: ["settings",  "view"] },
+        { icon: Plane,         label: "Flights",             href: "/admin/flights",          require: ["groups",   "view"]   },
+        { icon: Building2,     label: "Hotels",              href: "/admin/hotels",           require: ["groups",   "view"]   },
+        { icon: Bus,           label: "Buses",               href: "/admin/buses",            require: ["groups",   "view"]   },
+        { icon: MapPin,        label: "Ziyarat",             href: "/admin/ziyarat",          require: ["groups",   "view"]   },
+        { icon: Tent,          label: "Mina / Arafat / Muzd.", href: "/admin/allocations",   require: ["groups",   "view"]   },
+        { icon: Tag,           label: "Luggage",             href: "/admin/luggage",          require: ["groups",   "view"]   },
       ],
     },
 
-    // ── AI TOOLS ──────────────────────────────────────────────────────────────
+    // ── 10. COMMUNICATION ────────────────────────────────────────────────────
     {
-      section: "AI Tools",
+      section: "Communication",
+      items: [
+        { icon: BellRing,      label: "Communication Center",href: "/admin/communication-center",  require: ["customers", "edit"] },
+        { icon: Zap,           label: "Workflow Center",     href: "/admin/workflow-center",        require: ["bookings",  "edit"] },
+        { icon: Bot,           label: "BotBee Dashboard",    href: "/admin/botbee-dashboard",       require: ["settings",  "view"] },
+        { icon: History,       label: "WhatsApp History",    href: "/admin/whatsapp-history",       require: ["settings",  "view"] },
+        { icon: MessageSquare, label: "WhatsApp Templates",  href: "/admin/whatsapp-templates",     require: ["settings",  "view"] },
+        { icon: Smartphone,    label: "SMS Templates",       href: "/admin/sms-templates",          require: ["settings",  "view"] },
+        { icon: Layers,        label: "RCS Templates",       href: "/admin/rcs-templates",          require: ["settings",  "view"] },
+        { icon: Mail,          label: "Email Templates",     href: "/admin/email-templates",        require: ["settings",  "view"] },
+        { icon: FileText,      label: "DLT Template Manager",href: "/admin/dlt-templates",          require: ["settings",  "view"] },
+        { icon: Smartphone,    label: "Sender ID Management",href: "/admin/sms-settings",           require: ["settings",  "view"] },
+        { icon: TestTube2,     label: "SMS Test Center",     href: "/admin/sms-test",               require: ["settings",  "view"] },
+        { icon: TestTube2,     label: "Test Notifications",  href: "/admin/test-notifications",     require: ["settings",  "view"] },
+        { icon: History,       label: "Notification Logs",   href: "/admin/notification-logs",      require: ["settings",  "view"] },
+        { icon: HeartPulse,    label: "Notification Health", href: "/admin/notification-health",    require: ["settings",  "view"] },
+        { icon: FileText,      label: "Notification Templates",href: "/admin/notification-templates",require: ["settings", "view"] },
+        { icon: BellRing,      label: "Auto Notifications",  href: "/admin/auto-notifications",     require: ["settings",  "view"] },
+        { icon: Smartphone,    label: "SMS Production Report",href: "/admin/sms-production-report", require: ["settings",  "view"] },
+      ],
+    },
+
+    // ── 11. REPORTS ──────────────────────────────────────────────────────────
+    {
+      section: "Reports",
+      items: [
+        { icon: BarChart2,     label: "Reports",             href: "/admin/reports",           require: ["reports", "view"] },
+        { icon: BarChart2,     label: "Production Report",   href: "/admin/production-report", require: ["reports", "view"] },
+        { icon: PackageSearch, label: "Packages",            href: "/admin/packages",          require: ["bookings","view"] },
+        { icon: ImageIcon,     label: "Gallery",             href: "/admin/gallery",           require: ["settings","view"] },
+      ],
+    },
+
+    // ── 12. AI ───────────────────────────────────────────────────────────────
+    {
+      section: "AI",
       items: [
         { icon: Sparkles, label: "AI Assistant",  href: "/admin/ai" },
         { icon: Brain,    label: "AI Operations", href: "/admin/ai-ops", require: ["bookings", "view"] },
       ],
     },
 
-    // ── SYSTEM ────────────────────────────────────────────────────────────────
+    // ── 13. ADMINISTRATION ───────────────────────────────────────────────────
+    {
+      section: "Administration",
+      items: [
+        { icon: Users,       label: "Customers",         href: "/admin/customers",         require: ["customers", "view"] },
+        { icon: ShieldCheck, label: "KYC Management",    href: "/admin/kyc",               require: ["customers", "view"] },
+        { icon: UserCheck,   label: "Agent Management",  href: "/admin/agents",            require: ["customers", "view"] },
+        { icon: BarChart2,   label: "Agent Dashboard",   href: "/admin/agent-dashboard",   require: ["customers", "view"] },
+        { icon: Building2,   label: "Branch Management", href: "/admin/branches",          require: ["customers", "view"] },
+        { icon: Building2,   label: "Branch Dashboard",  href: "/admin/branch-dashboard",  require: ["customers", "view"] },
+        { icon: Megaphone,   label: "Marketing Center",  href: "/admin/marketing",         require: ["customers", "edit"] },
+        { icon: BookOpen,    label: "Guide Panel",       href: "/admin/guide-panel",       require: ["bookings",  "view"] },
+      ],
+    },
+
+    // ── 14. SYSTEM ───────────────────────────────────────────────────────────
     {
       section: "System",
       items: [
-        { icon: Briefcase,    label: "HR Dashboard",      href: "/admin/hr",              require: ["staff",      "view"] },
-        { icon: KeyRound,     label: "Branch Login Mgmt", href: "/admin/branch-login",    require: ["users",      "view"] },
-        { icon: ShieldCheck,  label: "Agent Login Mgmt",  href: "/admin/agent-login",     require: ["users",      "view"] },
-        { icon: Settings2,    label: "Business Settings", href: "/admin/settings",        require: ["settings",   "view"] },
-        { icon: Settings2,    label: "Billing Settings",  href: "/admin/billing-settings", require: ["settings",  "view"] },
-        { icon: KeyRound,     label: "API Settings",      href: "/admin/api-settings",    require: ["settings",   "view"] },
-        { icon: KeyRound,     label: "User Roles",        href: "/admin/user-roles",      require: ["users",      "view"] },
-        { icon: Scale,        label: "Agreement Center",  href: "/admin/agreements",      require: ["audit_logs", "view"] },
-        { icon: ClipboardList,label: "Audit Logs",        href: "/admin/audit-logs",      require: ["audit_logs", "view"] },
-        { icon: MessageSquare,label: "SMS Audit Log",     href: "/admin/sms-audit",       require: ["audit_logs", "view"] },
-        { icon: HeartPulse,   label: "System Health",     href: "/admin/system-health",   require: ["users",      "view"] },
-        { icon: Activity,     label: "OTP Debug",         href: "/admin/otp-debug",       require: ["users",      "view"] },
-        { icon: MessageSquare,label: "Admin Chat",        href: "/admin/chat",            require: ["customers",  "view"] },
+        { icon: Settings2,    label: "Business Settings",  href: "/admin/settings",          require: ["settings",   "view"] },
+        { icon: Settings2,    label: "Billing Settings",   href: "/admin/billing-settings",  require: ["settings",   "view"] },
+        { icon: KeyRound,     label: "API Settings",       href: "/admin/api-settings",      require: ["settings",   "view"] },
+        { icon: KeyRound,     label: "User Roles",         href: "/admin/user-roles",        require: ["users",      "view"] },
+        { icon: Scale,        label: "Agreement Center",   href: "/admin/agreements",        require: ["audit_logs", "view"] },
+        { icon: ClipboardList,label: "Audit Logs",         href: "/admin/audit-logs",        require: ["audit_logs", "view"] },
+        { icon: MessageSquare,label: "SMS Audit Log",      href: "/admin/sms-audit",         require: ["audit_logs", "view"] },
+        { icon: HeartPulse,   label: "System Health",      href: "/admin/system-health",     require: ["users",      "view"] },
+        { icon: Activity,     label: "OTP Debug",          href: "/admin/otp-debug",         require: ["users",      "view"] },
+        { icon: MessageSquare,label: "Admin Chat",         href: "/admin/chat",              require: ["customers",  "view"] },
       ],
     },
 
   ];
 }
-
-/**
- * Flat list of every href registered in the nav.
- * Used by the pre-build regression check (scripts/check-nav.mjs).
- * Update this whenever you add or remove a nav item above.
- */
-export const ALL_NAV_HREFS: string[] = buildNavSections(0)
-  .flatMap(s => s.items.map(i => i.href.split("?")[0])); // strip query strings
