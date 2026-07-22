@@ -2,6 +2,7 @@ import { useLocation } from "wouter";
 import { useGetMe, useSendOtp, useVerifyOtp, useLogout, User } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { PORTAL_REDIRECT, DEFAULT_CUSTOMER_REDIRECT } from "@/config/roleRedirects";
 
 const BASE_URL = import.meta.env.BASE_URL ?? "/";
 
@@ -51,19 +52,18 @@ export function useAuth() {
           title: "Welcome back!",
           description: `Assalamu Alaikum${data.user?.name ? `, ${data.user.name}` : ""}! You have logged in.`,
         });
-        if (data.user.role === 'admin') {
-          setLocation("/admin/dashboard");
-        } else if (data.user.role === 'branch_manager') {
-          setLocation("/branch/dashboard");
-        } else if (data.user.role === 'agent') {
-          setLocation("/agent/dashboard");
-        } else if (data.user.role === 'staff') {
-          setLocation("/staff/dashboard");
+        // Redirect driven by roleRedirects.ts — no hardcoded paths here.
+        // Admin sub-roles need /api/admin-users/me; Login.tsx handles that.
+        // use-auth is only called for the "already authenticated" fast-path.
+        if (PORTAL_REDIRECT[data.user.role]) {
+          setLocation(PORTAL_REDIRECT[data.user.role]);
+        } else if (data.user.role === 'admin' || data.user.role === 'super_admin') {
+          setLocation(DEFAULT_ADMIN_REDIRECT); // Login.tsx useEffect fires adminRedirect() immediately after
         } else {
           const params = new URLSearchParams(window.location.search);
           const rawReturn = params.get("returnUrl");
           const returnUrl = rawReturn && rawReturn.startsWith("/") && !rawReturn.startsWith("//") ? rawReturn : null;
-          setLocation(returnUrl || "/customer/dashboard");
+          setLocation(returnUrl || DEFAULT_CUSTOMER_REDIRECT);
         }
       },
       onError: (error: any) => {

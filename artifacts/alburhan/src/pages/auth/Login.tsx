@@ -1,5 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/use-auth";
+import {
+  PORTAL_REDIRECT,
+  ADMIN_ROLE_REDIRECT,
+  DEFAULT_ADMIN_REDIRECT,
+  DEFAULT_CUSTOMER_REDIRECT,
+} from "@/config/roleRedirects";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -91,34 +97,27 @@ export default function Login() {
   const rawReturnUrl = searchParams.get("returnUrl");
   const returnUrl = rawReturnUrl && rawReturnUrl.startsWith("/") && !rawReturnUrl.startsWith("//") ? rawReturnUrl : null;
 
-  // Redirect to role-appropriate portal after login.
-  // For portal user.roles (branch_manager / agent / staff) redirect immediately.
-  // For admin user.role, fetch adminRole from DB then route to the correct dashboard.
+  // ── Role redirect — driven entirely by src/config/roleRedirects.ts ────────
+  // DO NOT add if/else chains here. Add entries to roleRedirects.ts instead.
   function adminRedirect(userRole: string) {
-    if (userRole === "branch_manager") { setLocation("/branch/dashboard"); return; }
-    if (userRole === "agent")          { setLocation("/agent/dashboard"); return; }
-    if (userRole === "staff")          { setLocation("/staff/dashboard"); return; }
+    // 1. Portal roles (branch_manager, agent, staff) — no extra API call
+    if (PORTAL_REDIRECT[userRole]) {
+      setLocation(PORTAL_REDIRECT[userRole]);
+      return;
+    }
+    // 2. Admin portal roles — fetch adminRole from DB
     if (userRole === "admin" || userRole === "super_admin") {
       fetch(`${API_BASE}/api/admin-users/me`, { credentials: "include" })
         .then(r => r.ok ? r.json() : null)
         .then(data => {
-          const ar: string = data?.adminRole ?? "";
-          // Exact redirect matrix — one entry per adminRole value
-          if (ar === "super_admin" || userRole === "super_admin") { setLocation("/admin/super");       return; }
-          if (ar === "finance")    { setLocation("/admin/finance");     return; }
-          if (ar === "accounts")   { setLocation("/admin/accounting");  return; }
-          if (ar === "operations") { setLocation("/admin/operations");  return; }
-          if (ar === "manager")    { setLocation("/admin/manager");     return; }
-          if (ar === "sales")      { setLocation("/admin/customers");   return; }
-          if (ar === "guide")      { setLocation("/admin/guide-panel"); return; }
-          // admin / staff / read_only / any unknown → standard dashboard
-          setLocation("/admin/dashboard");
+          const ar: string = data?.adminRole ?? userRole;
+          setLocation(ADMIN_ROLE_REDIRECT[ar] ?? DEFAULT_ADMIN_REDIRECT);
         })
-        .catch(() => setLocation(userRole === "super_admin" ? "/admin/super" : "/admin/dashboard"));
+        .catch(() => setLocation(ADMIN_ROLE_REDIRECT[userRole] ?? DEFAULT_ADMIN_REDIRECT));
       return;
     }
-    // Every other role (customer) → customer dashboard
-    setLocation(returnUrl || "/customer/dashboard");
+    // 3. Customer and all other roles
+    setLocation(returnUrl || DEFAULT_CUSTOMER_REDIRECT);
   }
 
   useEffect(() => {
@@ -246,9 +245,9 @@ export default function Login() {
     setIsUpdating(true);
     try {
       await updateProfile({ name: name.trim(), email: email.trim() || undefined });
-      setLocation(returnUrl || "/customer/dashboard");
+      setLocation(returnUrl || DEFAULT_CUSTOMER_REDIRECT);
     } catch {
-      setLocation(returnUrl || "/customer/dashboard");
+      setLocation(returnUrl || DEFAULT_CUSTOMER_REDIRECT);
     } finally {
       setIsUpdating(false);
     }
@@ -453,7 +452,7 @@ export default function Login() {
                     {isUpdating ? "Saving..." : "Start My Journey →"}
                   </Button>
                   <div className="text-center">
-                    <button type="button" onClick={() => setLocation(returnUrl || "/customer/dashboard")} className="text-sm text-muted-foreground hover:text-primary underline underline-offset-4">
+                    <button type="button" onClick={() => setLocation(returnUrl || DEFAULT_CUSTOMER_REDIRECT)} className="text-sm text-muted-foreground hover:text-primary underline underline-offset-4">
                       Skip for now
                     </button>
                   </div>

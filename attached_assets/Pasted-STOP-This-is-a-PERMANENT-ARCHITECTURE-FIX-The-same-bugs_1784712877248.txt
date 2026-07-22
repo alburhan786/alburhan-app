@@ -1,0 +1,296 @@
+STOP.
+
+This is a PERMANENT ARCHITECTURE FIX.
+
+The same bugs keep returning after every deployment because the application has multiple sources of truth for routes, menus, redirects and permissions.
+
+DO NOT PATCH THE CURRENT BUG.
+
+Replace the architecture so this problem can NEVER happen again.
+
+====================================================
+
+PHASE 1 – SINGLE SOURCE OF TRUTH
+
+Create one central configuration.
+
+Example:
+
+navigation.ts
+
+or
+
+roleConfig.ts
+
+Store ONLY here:
+
+• Roles
+• Dashboards
+• Sidebar
+• Permissions
+• Landing page
+• Icons
+• Route
+• Parent menu
+• Children
+• Visibility
+
+NO hardcoded menus anywhere else.
+
+====================================================
+
+PHASE 2 – REMOVE DUPLICATES
+
+Delete every duplicate:
+
+buildMenu()
+
+sidebar.ts
+
+role switch
+
+admin redirect switch
+
+navigation arrays
+
+hardcoded links
+
+Everything must read from ONE config.
+
+====================================================
+
+PHASE 3 – ROLE CONFIGURATION
+
+Super Admin
+
+Admin
+
+Finance
+
+Accounts
+
+Operations
+
+Sales
+
+Manager
+
+Branch Manager
+
+Agent
+
+Staff
+
+Guide
+
+Customer
+
+Read Only
+
+Each role must define:
+
+Landing page
+
+Sidebar
+
+Permissions
+
+Modules
+
+====================================================
+
+PHASE 4 – LOGIN
+
+After login
+
+fetch
+
+GET /api/admin-users/me
+
+Read adminRole.
+
+Redirect automatically.
+
+Never hardcode redirects.
+
+====================================================
+
+PHASE 5 – SIDEBAR
+
+Sidebar generated automatically.
+
+If page exists
+
+AND
+
+role has permission
+
+show it.
+
+Otherwise hide it.
+
+Never manually edit sidebar again.
+
+====================================================
+
+PHASE 6 – ROUTES
+
+Every route must register automatically.
+
+If a page is added later
+
+it automatically appears in navigation when permission exists.
+
+====================================================
+
+PHASE 7 – PERMISSIONS
+
+Permissions control
+
+View
+
+Create
+
+Edit
+
+Delete
+
+Approve
+
+Export
+
+Reports
+
+Notifications
+
+====================================================
+
+PHASE 8 – REGRESSION TEST
+
+Before EVERY deployment automatically verify:
+
+✓ Super Admin
+
+✓ Admin
+
+✓ Finance
+
+✓ Accounts
+
+✓ Operations
+
+✓ Sales
+
+✓ Manager
+
+✓ Branch
+
+✓ Agent
+
+✓ Staff
+
+✓ Guide
+
+✓ Customer
+
+For every role verify:
+
+Login
+
+Redirect
+
+Sidebar
+
+Dashboard
+
+API
+
+Widgets
+
+No blank page
+
+No missing menu
+
+====================================================
+
+PHASE 9 – FAIL BUILD IF BROKEN
+
+Deployment MUST FAIL if
+
+Missing sidebar
+
+Broken redirect
+
+Missing permission
+
+Duplicate menu
+
+404
+
+Blank dashboard
+
+Role mismatch
+
+====================================================
+
+PHASE 10 – SNAPSHOTS
+
+Automatically compare previous deployment.
+
+If
+
+Sidebar changes
+
+Routes disappear
+
+Permissions disappear
+
+Dashboard disappears
+
+STOP deployment.
+
+====================================================
+
+PHASE 11 – PERMANENT GUARANTEE
+
+Future updates MUST NOT modify
+
+Navigation
+
+Permissions
+
+Redirects
+
+Role mapping
+
+unless migration updates the central configuration.
+
+No feature update may overwrite existing dashboards.
+
+====================================================
+
+FINAL REPORT
+
+Show
+
+✓ Total routes
+
+✓ Total dashboards
+
+✓ Total modules
+
+✓ Total sidebar items
+
+✓ Total roles
+
+✓ Total permissions
+
+✓ Zero duplicate menus
+
+✓ Zero hardcoded redirects
+
+✓ Zero missing sidebar entries
+
+✓ Zero inaccessible dashboards
+
+Deploy only after every test passes.
