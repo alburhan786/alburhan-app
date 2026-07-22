@@ -42,6 +42,7 @@
 - [Notification engine bug patterns](notification-engine-bugs.md) — sendDLTSMS returns boolean (not object); TRIGGER_TO_EVENT must use valid EventType values; Razorpay order route needs same amount cap as payment links
 - [Invoice visibility rules](invoice-visibility-rules.md) — never serve invoice PDF if paid_amount<=0; both /by-number/:num/pdf (public) and /:id/pdf (auth) enforce 403 PAYMENT_REQUIRED; frontend checks paidAmount>0 in addition to status
 - [Notification dedup fix](notification-dedup-fix.md) — payment_received dedup must be 0 (not 12h); BotBee /whatsapp/templates 404 is harmless (different from /whatsapp/send/template); admin resend at POST /api/payments/resend-notification/:bookingId
+- [Deploy tar exclusions](deploy-tar-bloat.md) — on-the-fly frontend tar must use --exclude=*.tar.gz --exclude=*.cjs; else 117MB nested archive bloats every VPS deploy to 125MB instead of ~8MB
 - [DLT SMS template DB-backed lookup](dlt-sms-db-templates.md) — notification_templates (channel=sms) overrides api_settings.extra tids; resolveConfig() merges both (DB wins); 60s cache, bustDBTemplateCache(); 9 templates pre-seeded with real IDs (219801-219805, 214142-214144, 214148)
 - [payment_transactions schema](payment-transactions-schema.md) — column is payment_mode (NOT mode); pt.mode causes PostgreSQL aggregate error; NO invoice_number column
 - [pilgrims table schema](pilgrims-table-schema.md) — FK is group_id (NOT booking_id); full_name (NOT name); mobile_india (NOT mobile)

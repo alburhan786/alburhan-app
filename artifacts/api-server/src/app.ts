@@ -264,7 +264,16 @@ app.get("/api/migrate/frontend.tar.gz", (req, res) => {
   res.setHeader("Content-Disposition", "attachment; filename=alburhan-frontend.tar.gz");
 
   const workspaceRoot = path.resolve(distDir, "../../../..");
-  const tar = spawn("tar", ["-czf", "-", "-C", workspaceRoot, "artifacts/alburhan/dist/public"]);
+  // Exclude heavy artifacts that should never be deployed to VPS:
+  //   *.tar.gz  — stale nested archive (frontend-dist.tar.gz, ~117 MB) created by prior builds
+  //   *.cjs     — API server bundle (dl-*.cjs); belongs to api-server deploy, not frontend
+  const tar = spawn("tar", [
+    "-czf", "-",
+    "--exclude=*.tar.gz",
+    "--exclude=*.cjs",
+    "-C", workspaceRoot,
+    "artifacts/alburhan/dist/public",
+  ]);
   tar.stdout.pipe(res);
   tar.stderr.on("data", (d: Buffer) => console.error("[tar]", d.toString()));
   tar.on("close", (code: number) => { if (code !== 0) console.error("[tar] exited", code); });
