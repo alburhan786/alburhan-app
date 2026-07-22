@@ -20,7 +20,7 @@ import {
   Building2, Bus, Heart, FileCheck, Sparkles, UserCheck, BookMarked, Truck,
   Scale, Users2, Package, ClipboardList, KeyRound, HeartPulse, Settings2, BellRing, Zap,
   MapPin, Tent, Tag, Bot, Award, Smartphone, Layers, Mail, Globe, FileText, TestTube2, History,
-  Headphones, Target, Brain, AlarmClock,
+  Headphones, Target, Brain, AlarmClock, Handshake, Briefcase, ShoppingCart,
 } from "lucide-react";
 import type { Module, Action } from "@/hooks/use-permissions";
 
@@ -80,6 +80,9 @@ export function buildNavSections(openComplaints = 0): NavSection[] {
         { icon: BookMarked,    label: "Hajji Ledger",       href: "/admin/hajji-ledger",      require: ["groups",     "view"]   },
         { icon: Truck,         label: "Vendors",            href: "/admin/vendors",           require: ["accounting", "view"]   },
         { icon: Package,       label: "Suppliers",          href: "/admin/suppliers",         require: ["accounting", "view"]   },
+        { icon: Handshake,     label: "SRM Dashboard",      href: "/admin/srm",               require: ["accounting", "view"]   },
+        { icon: ShoppingCart,  label: "Procurement",        href: "/admin/procurement",       require: ["expenses",   "view"]   },
+        { icon: Package,       label: "Inventory",          href: "/admin/inventory",         require: ["assets",     "view"]   },
         { icon: Scale,         label: "GST Reports",        href: "/admin/gst-reports",       require: ["gst",        "view"]   },
         { icon: Users2,        label: "Payroll",            href: "/admin/payroll",           require: ["payroll",    "view"]   },
         { icon: Award,         label: "Assets",             href: "/admin/assets",            require: ["assets",     "view"]   },
@@ -124,6 +127,7 @@ export function buildNavSections(openComplaints = 0): NavSection[] {
     {
       section: "Sales & CRM",
       items: [
+        { icon: Target,        label: "CRM Dashboard",    href: "/admin/crm",       require: ["customers", "view"] },
         { icon: Target,        label: "Leads",            href: "/admin/leads",     require: ["customers", "view"] },
         { icon: ClipboardList, label: "Tasks",            href: "/admin/tasks",     require: ["bookings",  "view"] },
         { icon: Headphones,    label: "Support Manager",  href: "/admin/support",   require: ["customers", "view"] },
@@ -142,8 +146,9 @@ export function buildNavSections(openComplaints = 0): NavSection[] {
         { icon: ShieldCheck, label: "KYC Management",    href: "/admin/kyc",             require: ["customers", "view"] },
         { icon: UserCheck,   label: "Agent Management",  href: "/admin/agents",          require: ["customers", "view"] },
         { icon: BarChart2,   label: "Agent Dashboard",   href: "/admin/agent-dashboard", require: ["customers", "view"] },
-        { icon: Building2,   label: "Branch Management", href: "/admin/branches",        require: ["customers", "view"] },
-        { icon: BarChart2,   label: "Reports",           href: "/admin/reports",         require: ["reports",   "view"] },
+        { icon: Building2,   label: "Branch Management", href: "/admin/branches",          require: ["customers", "view"] },
+        { icon: Building2,   label: "Branch Dashboard",  href: "/admin/branch-dashboard",  require: ["customers", "view"] },
+        { icon: BarChart2,   label: "Reports",           href: "/admin/reports",           require: ["reports",   "view"] },
         { icon: BarChart2,   label: "Production Report", href: "/admin/production-report",require: ["reports",  "view"] },
       ],
     },
@@ -204,6 +209,9 @@ export function buildNavSections(openComplaints = 0): NavSection[] {
     {
       section: "System",
       items: [
+        { icon: Briefcase,    label: "HR Dashboard",      href: "/admin/hr",              require: ["staff",      "view"] },
+        { icon: KeyRound,     label: "Branch Login Mgmt", href: "/admin/branch-login",    require: ["users",      "view"] },
+        { icon: ShieldCheck,  label: "Agent Login Mgmt",  href: "/admin/agent-login",     require: ["users",      "view"] },
         { icon: Settings2,    label: "Business Settings", href: "/admin/settings",        require: ["settings",   "view"] },
         { icon: Settings2,    label: "Billing Settings",  href: "/admin/billing-settings", require: ["settings",  "view"] },
         { icon: KeyRound,     label: "API Settings",      href: "/admin/api-settings",    require: ["settings",   "view"] },

@@ -153,6 +153,14 @@ import BranchPortal from "@/pages/portal/BranchPortal";
 import AgentPortal from "@/pages/portal/AgentPortal";
 import StaffPortal from "@/pages/portal/StaffPortal";
 import NotFound from "@/pages/not-found";
+import BranchOverview from "@/pages/admin/BranchOverview";
+import BranchLoginManager from "@/pages/admin/BranchLoginManager";
+import AgentLoginManager from "@/pages/admin/AgentLoginManager";
+import CRMDashboard from "@/pages/admin/CRMDashboard";
+import SRMDashboard from "@/pages/admin/SRMDashboard";
+import HRDashboard from "@/pages/admin/HRDashboard";
+import InventoryDashboard from "@/pages/admin/InventoryDashboard";
+import ProcurementDashboard from "@/pages/admin/ProcurementDashboard";
 import { useAuth } from "@/hooks/use-auth";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { DeleteGuardProvider } from "@/components/DeleteGuard";
@@ -378,6 +386,14 @@ function Router() {
       <Route path="/admin/allocations" component={() => <AdminRoute component={AllocationsManager} />} />
       <Route path="/admin/automation-center" component={() => <AdminRoute component={AutomationCenter} />} />
       <Route path="/admin/loyalty" component={() => <AdminRoute component={LoyaltyManager} />} />
+      <Route path="/admin/branch-dashboard" component={() => <AdminRoute component={BranchOverview} />} />
+      <Route path="/admin/branch-login"     component={() => <AdminRoute component={BranchLoginManager} />} />
+      <Route path="/admin/agent-login"      component={() => <AdminRoute component={AgentLoginManager} />} />
+      <Route path="/admin/crm"              component={() => <AdminRoute component={CRMDashboard} />} />
+      <Route path="/admin/srm"              component={() => <AdminRoute component={SRMDashboard} />} />
+      <Route path="/admin/hr"               component={() => <AdminRoute component={HRDashboard} />} />
+      <Route path="/admin/inventory"        component={() => <AdminRoute component={InventoryDashboard} />} />
+      <Route path="/admin/procurement"      component={() => <AdminRoute component={ProcurementDashboard} />} />
       <Route path="/admin/flights" component={() => <AdminRoute component={FlightManager} />} />
       <Route path="/admin/groups/:groupId/flights" component={() => <AdminRoute component={FlightManager} />} />
       <Route path="/admin/groups/:groupId/print/single-card/:pilgrimId"    component={() => <AdminRoute component={PrintSingleCard} />} />
