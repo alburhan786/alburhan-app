@@ -1,0 +1,355 @@
+# FINAL ENTERPRISE PRODUCTION AUDIT (NO ASSUMPTIONS)
+
+The build has completed successfully, but compilation success and HTTP 200 responses are NOT considered proof that the ERP is working correctly.
+
+Do NOT stop until the LIVE production ERP has been fully verified.
+
+=================================================
+STEP 1 – SCAN THE ENTIRE ERP
+=================================================
+
+Scan every page, route, navigation item, dashboard card, sidebar menu, permission, API endpoint and module.
+
+Generate a complete inventory.
+
+=================================================
+STEP 2 – VERIFY EVERY MODULE
+=================================================
+
+Open every module one by one in the LIVE production website.
+
+Verify that each page:
+
+✔ Opens successfully
+✔ Shows data
+✔ Loads without errors
+✔ Has correct breadcrumbs
+✔ Has a working Back button
+✔ Has search (where applicable)
+✔ Has filters (where applicable)
+✔ Has Add/Edit/Delete buttons
+✔ Works on desktop and tablet layouts
+
+=================================================
+STEP 3 – VERIFY DASHBOARD
+=================================================
+
+Count all dashboard quick-access cards.
+
+Verify every card is:
+
+Visible
+Clickable
+Linked correctly
+
+Missing cards must be restored.
+
+=================================================
+STEP 4 – VERIFY SIDEBAR
+=================================================
+
+Check every sidebar item.
+
+Nothing should be missing.
+
+Nothing duplicated.
+
+Nothing hidden because of permission bugs.
+
+=================================================
+STEP 5 – VERIFY CRM
+=================================================
+
+CRM
+Lead Manager
+Customer 360°
+Omnichannel Inbox
+Communication Center
+Automation Center
+Social Media Integration
+Support Center
+
+Each must work.
+
+=================================================
+STEP 6 – VERIFY OPERATIONS
+=================================================
+
+Bookings
+Offline Booking
+Packages
+Hotels
+Flights
+Transport
+Room Allocation
+Bus Allocation
+Visa
+Agreements
+Ziyarat
+Hajj Groups
+Documents
+KYC
+
+=================================================
+STEP 7 – VERIFY FINANCE
+=================================================
+
+Invoices
+
+Payments
+
+Offline Payments
+
+Receipts
+
+Payment Analytics
+
+Payment Reminders
+
+Reports
+
+=================================================
+STEP 8 – VERIFY COMMUNICATION
+=================================================
+
+WhatsApp
+
+Facebook
+
+Messenger
+
+Instagram
+
+Telegram
+
+Website Chat
+
+Email
+
+SMS
+
+Push Notifications
+
+Google RCS
+
+BotBee
+
+Cloud API
+
+Webhook Status
+
+=================================================
+STEP 9 – VERIFY CUSTOMER 360°
+=================================================
+
+Passport
+
+PAN
+
+Aadhaar
+
+Documents
+
+Payments
+
+Invoices
+
+Bookings
+
+Visa
+
+Flight
+
+Hotel
+
+Room
+
+Bus
+
+Conversation Timeline
+
+WhatsApp
+
+Facebook
+
+Instagram
+
+Telegram
+
+Internal Notes
+
+AI Recommendations
+
+=================================================
+STEP 10 – VERIFY LEAD MANAGER
+=================================================
+
+Incoming messages from:
+
+Website
+
+WhatsApp
+
+Facebook
+
+Instagram
+
+Telegram
+
+Email
+
+SMS
+
+RCS
+
+must automatically appear as Leads.
+
+Verify:
+
+Create Lead
+
+Assign Lead
+
+Convert Lead
+
+Booking
+
+Customer 360
+
+Follow-up
+
+Status
+
+Notes
+
+=================================================
+STEP 11 – VERIFY OMNICHANNEL
+=================================================
+
+One Inbox
+
+Multiple Channels
+
+Conversation Timeline
+
+Convert to Lead
+
+Convert to Booking
+
+Assign Staff
+
+Internal Notes
+
+Search
+
+Filters
+
+=================================================
+STEP 12 – VERIFY DATA SAFETY
+=================================================
+
+Confirm:
+
+No customer deleted
+
+No booking deleted
+
+No invoice deleted
+
+No payment deleted
+
+No lead deleted
+
+No WhatsApp history deleted
+
+No documents deleted
+
+No permissions deleted
+
+No routes removed
+
+No APIs removed
+
+=================================================
+STEP 13 – LIVE TEST
+=================================================
+
+Actually click every dashboard card.
+
+Actually open every page.
+
+Actually navigate every sidebar.
+
+Actually test routing.
+
+Do NOT rely only on source code.
+
+=================================================
+STEP 14 – SCREENSHOT REPORT
+=================================================
+
+Capture LIVE screenshots of:
+
+Dashboard
+
+Sidebar
+
+CRM
+
+Lead Manager
+
+Customer 360°
+
+Omnichannel Inbox
+
+Social Media Integration
+
+Bookings
+
+Payments
+
+Invoices
+
+Automation Center
+
+Communication Center
+
+=================================================
+FINAL REPORT
+=================================================
+
+Only mark COMPLETE when ALL are true:
+
+✅ All dashboard cards visible
+
+✅ All sidebar menus visible
+
+✅ All modules open
+
+✅ All APIs working
+
+✅ All routes working
+
+✅ Customer data preserved
+
+✅ Database preserved
+
+✅ No regressions
+
+✅ Production tested
+
+✅ VPS deployed
+
+Provide:
+
+• Total Dashboard Cards
+• Total Sidebar Menus
+• Total Routes
+• Total APIs
+• Total Integrations
+• Total Customer Records
+• Total Database Tables
+• Production URL Tested
+• Final PASS/FAIL summary
+
+Do NOT report success until the live production UI has been manually verified.

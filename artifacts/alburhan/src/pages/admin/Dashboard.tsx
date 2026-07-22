@@ -16,7 +16,7 @@ import {
   BookOpen, UsersRound, MessageSquare, ImageIcon, Wallet, TrendingUp,
   ShieldCheck, Megaphone, PieChart, Bell, Plane, ListTodo, UserPlus, Building2, MapPin, Brain, Search, Activity, Settings, Sparkles,
   Zap, Target, Handshake, Star, UserCheck, Inbox, Share2, Users2,
-  Hotel, Bus, Tent, Heart, Tag, TrendingDown, Calculator,
+  Hotel, Bus, Tent, Heart, Tag, TrendingDown, Calculator, Briefcase,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
