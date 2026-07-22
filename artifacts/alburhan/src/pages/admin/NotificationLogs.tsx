@@ -352,6 +352,11 @@ export default function NotificationLogs() {
                           <StIcon className="w-3 h-3" /> {st.label}
                         </span>
                         {log.retry_count > 0 && <span className="ml-1 text-[10px] text-gray-400">↻{log.retry_count}</span>}
+                        {log.status === "failed" && log.channel === "whatsapp" && failureReason && (
+                          <div className="mt-1 text-[10px] text-red-600 leading-tight max-w-[120px]" title={failureReason}>
+                            {failureReason.length > 40 ? failureReason.slice(0, 40) + "…" : failureReason}
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <span className="text-xs text-gray-500">{log.provider_name || "—"}</span>
@@ -363,10 +368,20 @@ export default function NotificationLogs() {
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{fmt(log.sent_at)}</td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-1">
-                          <button onClick={() => setExpanded(isExpanded ? null : log.id)} className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700" title="View details">
-                            <Eye className="w-3.5 h-3.5" />
-                          </button>
+                        <div className="flex items-center gap-1 flex-wrap">
+                          {log.status === "failed" ? (
+                            <button
+                              onClick={() => setExpanded(isExpanded ? null : log.id)}
+                              className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] font-semibold border transition-colors ${isExpanded ? "bg-red-100 border-red-300 text-red-700" : "bg-red-50 border-red-200 text-red-600 hover:bg-red-100 hover:text-red-700"}`}
+                            >
+                              <Eye className="w-3 h-3" />
+                              View Details
+                            </button>
+                          ) : (
+                            <button onClick={() => setExpanded(isExpanded ? null : log.id)} className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700" title="View details">
+                              <Eye className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                           {log.status === "failed" && (
                             <button onClick={() => handleRetry(log.id)} disabled={retrying[log.id]} className="p-1.5 rounded hover:bg-blue-50 text-gray-400 hover:text-blue-600 disabled:opacity-50" title="Retry">
                               {retrying[log.id] ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
@@ -387,6 +402,105 @@ export default function NotificationLogs() {
                                 <div>
                                   <p className="text-xs font-bold text-red-700 uppercase tracking-wide mb-0.5">Provider Rejection Reason</p>
                                   <p className="text-sm text-red-800 font-medium">{failureReason}</p>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* ── WHATSAPP FAILURE DIAGNOSTICS ───────────────── */}
+                            {log.status === "failed" && log.channel === "whatsapp" && (
+                              <div className="rounded-lg border border-red-200 overflow-hidden">
+                                <div className="flex items-center gap-2 px-3 py-2 bg-red-900 text-white">
+                                  <MessageSquare className="w-3.5 h-3.5 text-red-300" />
+                                  <span className="text-[11px] font-bold uppercase tracking-widest">WhatsApp Failure Diagnostics</span>
+                                </div>
+                                <div className="bg-white divide-y divide-red-50">
+
+                                  {/* Row 1: IDs grid */}
+                                  <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-red-50">
+                                    <div className="px-3 py-2">
+                                      <p className="text-[9px] font-bold text-red-500 uppercase tracking-widest mb-0.5">phone_number_id</p>
+                                      <code className="text-[11px] text-gray-800 font-mono select-all break-all">
+                                        {reqPayload?.phone_number_id ?? provResp?.requestPayload?.phone_number_id ?? "—"}
+                                      </code>
+                                    </div>
+                                    <div className="px-3 py-2">
+                                      <p className="text-[9px] font-bold text-red-500 uppercase tracking-widest mb-0.5">Phone Number Sent</p>
+                                      <code className="text-[11px] text-gray-800 font-mono select-all">
+                                        {reqPayload?.phone_number ?? provResp?.requestPayload?.phone_number ?? log.recipient ?? "—"}
+                                      </code>
+                                    </div>
+                                    <div className="px-3 py-2">
+                                      <p className="text-[9px] font-bold text-red-500 uppercase tracking-widest mb-0.5">WABA ID (business_id)</p>
+                                      <code className="text-[11px] text-gray-800 font-mono select-all break-all">
+                                        {reqPayload?.business_id ?? provResp?.requestPayload?.business_id ?? "—"}
+                                      </code>
+                                    </div>
+                                    <div className="px-3 py-2">
+                                      <p className="text-[9px] font-bold text-red-500 uppercase tracking-widest mb-0.5">Template ID</p>
+                                      <code className="text-[11px] text-gray-800 font-mono select-all">
+                                        {log.template ?? reqPayload?.template_id ?? reqPayload?.template_name ?? provResp?.requestPayload?.template_id ?? "—"}
+                                      </code>
+                                    </div>
+                                  </div>
+
+                                  {/* Row 2: BotBee status + error code + HTTP */}
+                                  <div className="grid grid-cols-3 divide-x divide-red-50">
+                                    <div className="px-3 py-2">
+                                      <p className="text-[9px] font-bold text-red-500 uppercase tracking-widest mb-0.5">BotBee Status Field</p>
+                                      {waRawResponse?.status != null ? (
+                                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold font-mono ${String(waRawResponse.status) === "0" ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
+                                          {String(waRawResponse.status)} {String(waRawResponse.status) === "0" ? "→ ERROR" : "→ OK"}
+                                        </span>
+                                      ) : <span className="text-[11px] text-gray-400">—</span>}
+                                    </div>
+                                    <div className="px-3 py-2">
+                                      <p className="text-[9px] font-bold text-red-500 uppercase tracking-widest mb-0.5">Meta / API Error Code</p>
+                                      <code className={`text-[11px] font-mono font-bold ${(log.error_code || waRawResponse?.code || waRawResponse?.error?.code) ? "text-red-700" : "text-gray-400"}`}>
+                                        {log.error_code || waRawResponse?.code || waRawResponse?.error?.code || waRawResponse?.error_data?.code || "none"}
+                                      </code>
+                                    </div>
+                                    <div className="px-3 py-2">
+                                      <p className="text-[9px] font-bold text-red-500 uppercase tracking-widest mb-0.5">HTTP Status</p>
+                                      <code className={`text-[11px] font-mono font-bold ${log.http_status && log.http_status >= 400 ? "text-red-700" : "text-gray-700"}`}>
+                                        {log.http_status ?? "—"}
+                                        {log.http_status === 200 ? " (BotBee may still return errors at HTTP 200)" : ""}
+                                      </code>
+                                    </div>
+                                  </div>
+
+                                  {/* Row 3: Error message from BotBee */}
+                                  <div className="px-3 py-2.5 bg-red-50">
+                                    <p className="text-[9px] font-bold text-red-500 uppercase tracking-widest mb-1">Error Message from BotBee / Meta</p>
+                                    <p className="text-sm text-red-800 font-semibold leading-snug">
+                                      {provResp?.errorMessage
+                                        || (typeof waRawResponse?.message === "string" ? waRawResponse.message : null)
+                                        || waRawResponse?.error?.message
+                                        || waRawResponse?.error_data?.details
+                                        || "No error message returned"}
+                                    </p>
+                                    {waRawResponse?.error?.type && (
+                                      <p className="text-[10px] text-red-600 mt-0.5 font-mono">Type: {waRawResponse.error.type}</p>
+                                    )}
+                                  </div>
+
+                                  {/* Row 4: Template variables sent */}
+                                  {(reqPayload?.variables || provResp?.requestPayload?.variables) && (
+                                    <div className="px-3 py-2">
+                                      <p className="text-[9px] font-bold text-red-500 uppercase tracking-widest mb-1">Template Variables Sent</p>
+                                      <code className="text-[11px] text-gray-700 font-mono bg-gray-50 rounded px-2 py-1 block break-all">
+                                        {JSON.stringify(reqPayload?.variables ?? provResp?.requestPayload?.variables)}
+                                      </code>
+                                    </div>
+                                  )}
+
+                                  {/* Row 5: API endpoint */}
+                                  <div className="px-3 py-2">
+                                    <p className="text-[9px] font-bold text-red-500 uppercase tracking-widest mb-0.5">API Endpoint Called</p>
+                                    <code className="text-[11px] text-gray-600 font-mono break-all">
+                                      {log.api_endpoint || provResp?.endpoint || "—"}
+                                    </code>
+                                  </div>
+
                                 </div>
                               </div>
                             )}
