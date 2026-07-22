@@ -1,0 +1,548 @@
+AL BURHAN TOURS & TRAVELS
+ENTERPRISE ERP / CRM / SRM
+PRODUCTION MASTER LOCK (PERMANENT)
+
+This is a LIVE production ERP.
+
+From this point onward, NO future task is allowed to reduce, replace, remove, rename, hide, overwrite, or break any existing feature without my explicit approval.
+
+====================================================
+PERMANENT BASELINE
+====================================================
+
+Current production baseline is now frozen.
+
+Protect ALL existing:
+
+• Dashboard
+• Sidebar
+• Routes
+• Components
+• APIs
+• Database
+• Customer Portal
+• Agent Portal
+• Branch Portal
+• Staff Portal
+• Finance Portal
+• Executive Dashboard
+• Business Intelligence
+• Operations Dashboard
+• Reports
+• Broadcast
+• Communication Center
+• Automation Center
+• CRM
+• SRM
+• Customer 360°
+• Omnichannel Inbox
+• Social Media Center
+• AI Assistant
+
+Nothing may disappear.
+
+====================================================
+ZERO DATA LOSS POLICY
+====================================================
+
+Never:
+
+DROP DATABASE
+
+DROP TABLE
+
+DELETE TABLE
+
+TRUNCATE TABLE
+
+RESET DATABASE
+
+RECREATE DATABASE
+
+DELETE FILES
+
+REMOVE API
+
+REMOVE ROUTE
+
+REMOVE COMPONENT
+
+REMOVE PAGE
+
+REMOVE MENU
+
+REMOVE DASHBOARD CARD
+
+REMOVE USER ROLE
+
+REMOVE PERMISSIONS
+
+REMOVE REPORT
+
+REMOVE NOTIFICATION
+
+REMOVE SETTINGS
+
+unless I specifically instruct it.
+
+====================================================
+EXTEND ONLY POLICY
+====================================================
+
+Every task must EXTEND the system.
+
+Never rewrite existing working modules.
+
+Never replace entire files when only a small change is required.
+
+Always merge changes.
+
+Preserve backward compatibility.
+
+====================================================
+CUSTOMER DATA PROTECTION
+====================================================
+
+Never modify or delete:
+
+Customer
+
+Lead
+
+Booking
+
+Payment
+
+Invoice
+
+Receipt
+
+Agreement
+
+Visa
+
+Flight Ticket
+
+Hotel
+
+Room Allocation
+
+Bus Allocation
+
+Ziyarat
+
+Passport
+
+PAN
+
+Aadhaar
+
+Medical
+
+Emergency Contact
+
+WhatsApp Chat
+
+Instagram Chat
+
+Facebook Chat
+
+Telegram Chat
+
+Email History
+
+SMS History
+
+Notes
+
+Timeline
+
+Activity Log
+
+Audit Log
+
+====================================================
+SOCIAL MEDIA PROTECTION
+====================================================
+
+Never disconnect:
+
+WhatsApp
+
+BotBee
+
+Meta
+
+Instagram
+
+Facebook
+
+Telegram
+
+Email
+
+SMS
+
+RCS
+
+Push Notifications
+
+Live Chat
+
+Broadcast
+
+Campaign Manager
+
+Automation
+
+====================================================
+CUSTOMER 360°
+====================================================
+
+Every customer profile must always include:
+
+Customer Information
+
+Lead Source
+
+Follow-ups
+
+Enquiries
+
+Bookings
+
+Payments
+
+Invoices
+
+Receipts
+
+Agreements
+
+Visa
+
+Tickets
+
+Hotels
+
+Room Number
+
+Bus Number
+
+Ziyarat Schedule
+
+Passport
+
+PAN
+
+Aadhaar
+
+Medical
+
+Emergency Contact
+
+Internal Notes
+
+Timeline
+
+Communication History
+
+WhatsApp
+
+Instagram
+
+Facebook
+
+Telegram
+
+Assigned Staff
+
+Assigned Agent
+
+AI Recommendations
+
+Next Best Action
+
+====================================================
+PRE-DEPLOYMENT GATE
+====================================================
+
+Deployment is NOT allowed until ALL checks pass.
+
+Run automatically:
+
+TypeScript Build
+
+pnpm build
+
+Vite Build
+
+ESLint
+
+Authentication Test
+
+API Test
+
+Database Test
+
+Role Test
+
+Permission Test
+
+File Upload Test
+
+Invoice PDF Test
+
+Agreement PDF Test
+
+Payment Test
+
+Razorpay Test
+
+WhatsApp Test
+
+SMS Test
+
+Email Test
+
+Customer Dashboard Test
+
+Admin Dashboard Test
+
+Staff Dashboard Test
+
+Branch Dashboard Test
+
+Finance Dashboard Test
+
+====================================================
+VERIFY BASELINE
+====================================================
+
+Compare against production baseline.
+
+Dashboard Cards
+
+Sidebar Items
+
+Sidebar Sections
+
+Routes
+
+Admin Pages
+
+Customer Pages
+
+Portal Pages
+
+Components
+
+API Routes
+
+Database Tables
+
+Database Views
+
+Database Functions
+
+Triggers
+
+Stored Procedures
+
+Notification Templates
+
+WhatsApp Templates
+
+Email Templates
+
+SMS Templates
+
+Automation Rules
+
+Cron Jobs
+
+If ANY count decreases:
+
+STOP deployment immediately.
+
+Restore automatically.
+
+Rebuild.
+
+Retest.
+
+Redeploy.
+
+====================================================
+FUNCTIONAL TESTS
+====================================================
+
+Verify every major workflow.
+
+Customer Registration
+
+Login
+
+OTP
+
+Booking
+
+Offline Booking
+
+Payment
+
+Invoice
+
+Receipt
+
+Agreement
+
+Visa
+
+Flight
+
+Hotel
+
+Room Allocation
+
+Transport
+
+QR Tracking
+
+Broadcast
+
+Reports
+
+CRM
+
+SRM
+
+Customer 360
+
+Social Media
+
+AI Assistant
+
+Customer Dashboard
+
+Staff Dashboard
+
+Branch Dashboard
+
+Finance Dashboard
+
+Admin Dashboard
+
+====================================================
+POST DEPLOYMENT REPORT
+====================================================
+
+Generate a report containing:
+
+New Features Added
+
+Files Modified
+
+Database Migration
+
+API Changes
+
+Routes Added
+
+Dashboard Cards Added
+
+Components Added
+
+Database Tables Changed
+
+Runtime Errors
+
+Build Errors
+
+Warnings
+
+Performance
+
+Security
+
+Data Integrity
+
+Missing Modules
+
+Removed Features
+
+Removed Routes
+
+Removed APIs
+
+Removed Components
+
+Removed Dashboard Cards
+
+Removed Database Tables
+
+Removed Navigation Items
+
+====================================================
+DEPLOYMENT SUCCESS CONDITIONS
+====================================================
+
+Deployment is SUCCESSFUL ONLY IF:
+
+✔ Build Errors = 0
+
+✔ Runtime Errors = 0
+
+✔ Console Errors = 0
+
+✔ API Errors = 0
+
+✔ Database Errors = 0
+
+✔ Missing Modules = 0
+
+✔ Missing Routes = 0
+
+✔ Missing Dashboard Cards = 0
+
+✔ Missing Navigation Items = 0
+
+✔ Missing Components = 0
+
+✔ Missing APIs = 0
+
+✔ Data Loss = 0
+
+✔ Customer Data Loss = 0
+
+✔ Booking Data Loss = 0
+
+✔ Payment Data Loss = 0
+
+✔ Invoice Data Loss = 0
+
+✔ Notification Failure = 0
+
+✔ WhatsApp Failure = 0
+
+✔ Email Failure = 0
+
+✔ SMS Failure = 0
+
+✔ 100% Backward Compatibility Maintained
+
+====================================================
+FINAL RULE
+====================================================
+
+Before every future task:
+
+1. Capture a production backup.
+2. Compare with the locked baseline.
+3. Apply only additive changes.
+4. Verify every module.
+5. Restore anything missing automatically.
+6. Deploy only after all tests pass.
+7. Never claim success without real verification.
+
+This policy remains permanently active unless I explicitly disable it.
