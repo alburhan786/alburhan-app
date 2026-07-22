@@ -1,0 +1,149 @@
+# PRODUCTION HOTFIX – FIX "Can't find variable: Briefcase"
+
+The production site is showing this runtime error:
+
+[plugin:vite:runtime-error-plugin]
+Can't find variable: Briefcase
+
+This is a production bug.
+
+Do NOT ignore it.
+
+====================================================
+TASK 1
+====================================================
+
+Find every file that references:
+
+Briefcase
+
+Check whether it is imported.
+
+Example:
+
+import {
+    ...
+    Briefcase,
+    ...
+} from "lucide-react";
+
+or the correct icon library used by this project.
+
+====================================================
+TASK 2
+====================================================
+
+If Briefcase does not exist in the current icon library,
+
+replace it with the closest valid icon, for example:
+
+BriefcaseBusiness
+
+Building2
+
+FolderKanban
+
+Building
+
+Suitcase
+
+or another existing icon already used in the project.
+
+Do NOT leave undefined icon references.
+
+====================================================
+TASK 3
+====================================================
+
+Search the ENTIRE project for:
+
+Briefcase
+
+Verify every occurrence.
+
+No undefined icon references should remain.
+
+====================================================
+TASK 4
+====================================================
+
+Run:
+
+• TypeScript compile
+• Vite build
+• Frontend build
+• Production deployment
+
+Fix every compile error before deployment.
+
+====================================================
+TASK 5
+====================================================
+
+After deployment:
+
+Open the LIVE production ERP.
+
+Navigate through:
+
+Dashboard
+
+HR Dashboard
+
+Operations Dashboard
+
+Manager Dashboard
+
+Executive Dashboard
+
+Business Intelligence
+
+Lead Manager
+
+Customer 360
+
+Omnichannel Inbox
+
+Social Media Integration
+
+Verify NO runtime errors appear.
+
+====================================================
+TASK 6
+====================================================
+
+Open browser console.
+
+Confirm:
+
+✔ No JavaScript errors
+
+✔ No React errors
+
+✔ No Vite runtime errors
+
+✔ No missing imports
+
+✔ No undefined variables
+
+====================================================
+FINAL REPORT
+====================================================
+
+Provide:
+
+✔ File(s) fixed
+
+✔ Icon imported or replaced
+
+✔ Build successful
+
+✔ Deployment successful
+
+✔ Runtime error resolved
+
+✔ Production URL verified
+
+✔ Browser console clean
+
+Do NOT report success until the runtime error is completely resolved on the live production website.
