@@ -1,0 +1,72 @@
+The live Super Admin Dashboard is still incomplete.
+
+Do NOT rely on source code inspection or build logs.
+
+Use the LIVE browser DOM as the source of truth.
+
+The current dashboard only shows about 25–30 cards while many required dashboard modules are missing.
+
+Restore ALL missing dashboard cards and make them visible on the Super Admin Dashboard.
+
+Missing modules include:
+
+• Super Admin Dashboard
+• Branch Dashboard
+• Branch Login Management
+• Agent Dashboard
+• Agent Login Management
+• Staff Dashboard
+• Customer Dashboard
+• Finance Dashboard
+• Accounting Dashboard
+• Payment Dashboard
+• CRM Dashboard
+• SRM Dashboard
+• HR Dashboard
+• Payroll Dashboard
+• Inventory Dashboard
+• Procurement Dashboard
+• Supplier Dashboard
+• Visa Dashboard
+• Flight Dashboard
+• Hotel Dashboard
+• Transport Dashboard
+• Room Allocation Dashboard
+• Document Management Dashboard
+• Agreement Dashboard
+• Invoice Dashboard
+• Receipt Dashboard
+• Reports Dashboard
+• Business Intelligence Dashboard
+• AI Analytics Dashboard
+• Marketing Dashboard
+• Notification Dashboard
+• WhatsApp Dashboard
+• SMS Dashboard
+• Email Dashboard
+• Website CMS Dashboard
+• Mobile App Dashboard
+• User & Role Management
+• Permission Management
+• Audit Log Dashboard
+• Activity Log Dashboard
+• Security Dashboard
+• Backup Dashboard
+• API Dashboard
+• Integration Dashboard
+• Settings Dashboard
+
+Requirements:
+
+1. Every card must be visible on the live dashboard.
+2. Every card must have an icon, title and description.
+3. Clicking each card must navigate to its module or show "Coming Soon" if not implemented.
+4. Keep the existing design and color scheme.
+5. Do not remove any existing modules.
+6. Do not modify the database.
+7. Do not change authentication.
+8. Do not change APIs.
+9. Verify using the LIVE browser after deployment.
+10. Capture a full-page screenshot proving every dashboard card is visible.
+11. Count the cards visible in the browser DOM and compare them with the required list.
+12. Do not report success unless every required dashboard module is actually visible on the live website.
