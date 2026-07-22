@@ -70,6 +70,7 @@
     "/admin/ziyarat",
     "/admin/allocations",
     "/admin/luggage",
+    "/admin/social-media",
     "/admin/communication-center",
     "/admin/workflow-center",
     "/admin/botbee-dashboard",
@@ -268,6 +269,7 @@
     "/admin/sms-settings",
     "/admin/sms-templates",
     "/admin/sms-test",
+    "/admin/social-media",
     "/admin/srm",
     "/admin/staff",
     "/admin/staff-dashboard",
@@ -352,9 +354,9 @@
     }
   ],
   "stats": {
-    "totalNavItems": 117,
+    "totalNavItems": 118,
     "totalRoles": 12,
-    "totalRoutes": 185,
+    "totalRoutes": 186,
     "totalHiddenPages": 2,
     "totalPrintOnlyPages": 3
   }

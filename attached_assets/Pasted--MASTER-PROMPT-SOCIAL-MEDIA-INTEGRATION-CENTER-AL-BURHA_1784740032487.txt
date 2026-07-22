@@ -1,0 +1,934 @@
+# MASTER PROMPT – SOCIAL MEDIA INTEGRATION CENTER
+# AL BURHAN TOURS & TRAVELS ERP / CRM / SRM
+# ENTERPRISE PRODUCTION IMPLEMENTATION
+
+You are the Lead Enterprise Full Stack Software Architect.
+
+Your task is to build a complete Enterprise Social Media Integration Center for the Al Burhan Tours & Travels ERP.
+
+This is a PRODUCTION IMPLEMENTATION.
+
+DO NOT use:
+- Mock data
+- Fake buttons
+- Dummy API responses
+- Static data
+- Demo pages
+- Placeholder functionality
+
+Every button must perform a real action.
+
+Every integration must use the real production API.
+
+----------------------------------------------------------
+OBJECTIVE
+----------------------------------------------------------
+
+Create a new Admin Module called:
+
+Settings
+    → Social Media Integration
+
+OR
+
+Communication Center
+    → Social Media Integration
+
+This page must become the central hub for all communication channels.
+
+The Administrator should be able to connect every platform from one dashboard without editing code or environment variables.
+
+----------------------------------------------------------
+SUPPORTED PLATFORMS
+----------------------------------------------------------
+
+Connect ALL of the following:
+
+✅ WhatsApp Business (BotBee)
+
+✅ WhatsApp Cloud API (Meta)
+
+✅ Facebook Page
+
+✅ Facebook Messenger
+
+✅ Facebook Lead Ads
+
+✅ Instagram Business
+
+✅ Instagram Direct Message
+
+✅ Telegram Bot
+
+✅ Telegram Channel
+
+✅ Telegram Group
+
+✅ Google RCS Business Messaging
+
+✅ Jio RCS
+
+✅ Website Contact Forms
+
+✅ Website Live Chat
+
+✅ Website AI Chatbot
+
+✅ Website Package Inquiry
+
+✅ Website Booking Form
+
+✅ Website Complaint Form
+
+✅ Website Support Form
+
+✅ SMTP Email
+
+✅ Fast2SMS
+
+✅ Firebase Push Notifications
+
+----------------------------------------------------------
+SOCIAL MEDIA DASHBOARD
+----------------------------------------------------------
+
+Each platform must have a professional dashboard card.
+
+Each card must display:
+
+Platform Logo
+
+Connection Status
+
+Connected
+
+Disconnected
+
+Token Expired
+
+Reconnect Required
+
+Connect Button
+
+Disconnect Button
+
+Reconnect Button
+
+Test Connection Button
+
+Webhook Status
+
+Sync Status
+
+Last Sync Time
+
+Last API Call
+
+Token Expiry
+
+API Version
+
+Provider Name
+
+Recent Messages
+
+Recent Errors
+
+Refresh Button
+
+View Logs
+
+Settings
+
+----------------------------------------------------------
+WHATSAPP BUSINESS
+----------------------------------------------------------
+
+Support BOTH
+
+BotBee API
+
+Meta Cloud API
+
+Features
+
+Connect
+
+Disconnect
+
+Reconnect
+
+Test API
+
+Verify Webhook
+
+Upload Templates
+
+Sync Templates
+
+Media Upload
+
+Image
+
+Video
+
+Document
+
+PDF
+
+Invoice PDF
+
+Agreement PDF
+
+Visa PDF
+
+Ticket PDF
+
+Voucher PDF
+
+Send Message
+
+Receive Message
+
+Read Status
+
+Delivery Status
+
+Retry Failed
+
+Message Logs
+
+Broadcast
+
+Bulk Messaging
+
+----------------------------------------------------------
+FACEBOOK
+----------------------------------------------------------
+
+Support
+
+Facebook Login
+
+Facebook Page
+
+Messenger
+
+Lead Ads
+
+Features
+
+Connect Facebook
+
+Connect Page
+
+Connect Messenger
+
+Import Leads
+
+Import Messages
+
+Auto Reply
+
+Auto Lead Creation
+
+Assign Staff
+
+Assign Branch
+
+Webhook
+
+Test Connection
+
+----------------------------------------------------------
+INSTAGRAM
+----------------------------------------------------------
+
+Support
+
+Instagram Business
+
+Instagram Direct Messages
+
+Instagram Comments
+
+Story Replies
+
+Features
+
+Connect
+
+Reconnect
+
+Import Messages
+
+Auto Reply
+
+Auto Lead Creation
+
+Conversation History
+
+Media Support
+
+----------------------------------------------------------
+TELEGRAM
+----------------------------------------------------------
+
+Support
+
+Telegram Bot
+
+Telegram Group
+
+Telegram Channel
+
+Features
+
+Connect
+
+Reconnect
+
+Webhook
+
+Broadcast
+
+Auto Reply
+
+Lead Creation
+
+Support Chat
+
+----------------------------------------------------------
+RCS
+----------------------------------------------------------
+
+Support
+
+Google RCS
+
+Jio RCS
+
+Business Messaging
+
+Features
+
+Connect
+
+Disconnect
+
+Webhook
+
+Campaign
+
+Delivery Status
+
+Fallback
+
+----------------------------------------------------------
+WEBSITE
+----------------------------------------------------------
+
+Automatically connect
+
+Contact Form
+
+Booking Form
+
+Package Inquiry
+
+Support Ticket
+
+Complaint Form
+
+Newsletter
+
+AI Chat
+
+Live Chat
+
+----------------------------------------------------------
+SMS
+----------------------------------------------------------
+
+Fast2SMS
+
+Delivery Report
+
+Templates
+
+Balance
+
+----------------------------------------------------------
+EMAIL
+----------------------------------------------------------
+
+SMTP
+
+Incoming
+
+Outgoing
+
+Delivery Status
+
+----------------------------------------------------------
+PUSH NOTIFICATIONS
+----------------------------------------------------------
+
+Firebase
+
+Android
+
+iPhone
+
+Web Push
+
+----------------------------------------------------------
+EASY CONNECTION WIZARD
+----------------------------------------------------------
+
+Administrator clicks
+
+CONNECT
+
+↓
+
+Choose Platform
+
+↓
+
+Login
+
+↓
+
+OAuth Authentication
+
+↓
+
+Grant Permissions
+
+↓
+
+Webhook Automatically Configured
+
+↓
+
+API Verified
+
+↓
+
+Test Connection
+
+↓
+
+Connected Successfully
+
+No coding required.
+
+----------------------------------------------------------
+AUTO LEAD CREATION
+----------------------------------------------------------
+
+Whenever an enquiry arrives from
+
+WhatsApp
+
+Facebook
+
+Messenger
+
+Instagram
+
+Telegram
+
+Website
+
+RCS
+
+SMS
+
+Email
+
+Automatically
+
+Create Lead
+
+Assign Sales Executive
+
+Assign Branch
+
+Assign Agent
+
+Notify Administrator
+
+Create Follow-up
+
+Store Conversation
+
+Track Customer
+
+----------------------------------------------------------
+AUTO REPLY
+----------------------------------------------------------
+
+Editable Templates
+
+Welcome
+
+Price Inquiry
+
+Package Details
+
+Visa
+
+Documents
+
+Passport
+
+Payment
+
+Booking
+
+Invoice
+
+Agreement
+
+Office Address
+
+Working Hours
+
+Support
+
+Emergency
+
+----------------------------------------------------------
+UNIFIED INBOX
+----------------------------------------------------------
+
+Display all messages from
+
+WhatsApp
+
+Messenger
+
+Instagram
+
+Telegram
+
+Website
+
+Email
+
+SMS
+
+RCS
+
+In one inbox.
+
+Actions
+
+Reply
+
+Assign
+
+Convert to Lead
+
+Convert to Booking
+
+Convert to Customer
+
+Archive
+
+Delete
+
+Forward
+
+Add Notes
+
+Attachments
+
+----------------------------------------------------------
+MESSAGE LOGS
+----------------------------------------------------------
+
+Maintain complete logs.
+
+Platform
+
+Customer
+
+Time
+
+Date
+
+Status
+
+Delivered
+
+Read
+
+Failed
+
+Retry
+
+API Response
+
+Error Message
+
+Webhook
+
+----------------------------------------------------------
+SYNC STATUS
+----------------------------------------------------------
+
+Display
+
+Connected
+
+Disconnected
+
+Connecting
+
+Syncing
+
+Failed
+
+Webhook Failed
+
+Permission Missing
+
+Token Expired
+
+----------------------------------------------------------
+TEST CONNECTION
+----------------------------------------------------------
+
+Every platform must include
+
+TEST CONNECTION
+
+Button
+
+Runs
+
+Real API Test
+
+Returns
+
+Success
+
+OR
+
+Detailed Error
+
+----------------------------------------------------------
+AUTOMATIC SYNCHRONIZATION
+----------------------------------------------------------
+
+Support
+
+1 Minute
+
+5 Minutes
+
+15 Minutes
+
+30 Minutes
+
+Hourly
+
+Daily
+
+Administrator configurable.
+
+----------------------------------------------------------
+ANALYTICS
+----------------------------------------------------------
+
+Show
+
+Connected Platforms
+
+Disconnected Platforms
+
+Messages Today
+
+Unread
+
+Delivered
+
+Failed
+
+Lead Count
+
+Bookings
+
+Revenue
+
+Conversion Rate
+
+Campaign Results
+
+Average Response Time
+
+----------------------------------------------------------
+SECURITY
+----------------------------------------------------------
+
+Encrypt
+
+API Keys
+
+OAuth Tokens
+
+Webhook Secrets
+
+Passwords
+
+Audit Logs
+
+Activity Logs
+
+Role Permissions
+
+----------------------------------------------------------
+BACK BUTTON (MANDATORY)
+----------------------------------------------------------
+
+Every page must contain a visible BACK button.
+
+The Back button must return to the previous page without reloading.
+
+Must exist on:
+
+Lead Management
+
+Customer Ledger
+
+Payment Ledger
+
+Hajji Payment Ledger
+
+Agent Management
+
+Branch Management
+
+Guide Panel
+
+Communication Center
+
+Broadcast
+
+Automation Center
+
+Digital Certificate Center
+
+Certificates
+
+Reports
+
+Finance
+
+CRM
+
+SRM
+
+Marketing
+
+Loyalty
+
+Rewards
+
+Package Requests
+
+Inquiries
+
+AI Assistant
+
+Admin AI Chat
+
+Every Dashboard
+
+Every Module
+
+Every Form
+
+Every Details Page
+
+----------------------------------------------------------
+ADMIN FEATURES
+----------------------------------------------------------
+
+Administrator must be able to
+
+Connect
+
+Disconnect
+
+Reconnect
+
+Refresh
+
+Test
+
+Reset
+
+Export Logs
+
+Backup Configuration
+
+Restore Configuration
+
+View Error Logs
+
+View Webhook Logs
+
+View API Logs
+
+----------------------------------------------------------
+REQUIRED APIS
+----------------------------------------------------------
+
+Meta Graph API
+
+WhatsApp Cloud API
+
+BotBee
+
+Facebook Messenger API
+
+Instagram Graph API
+
+Telegram Bot API
+
+Google RCS API
+
+Jio RCS
+
+Fast2SMS
+
+Firebase
+
+SMTP
+
+OAuth
+
+----------------------------------------------------------
+BUSINESS AUTOMATION
+----------------------------------------------------------
+
+Customer sends WhatsApp
+
+↓
+
+Lead Created
+
+↓
+
+Sales Assigned
+
+↓
+
+Auto Reply
+
+↓
+
+Booking
+
+↓
+
+Invoice
+
+↓
+
+Payment
+
+↓
+
+Agreement
+
+↓
+
+Visa
+
+↓
+
+Ticket
+
+↓
+
+Hotel Voucher
+
+↓
+
+Room Allocation
+
+↓
+
+Departure Reminder
+
+↓
+
+Return Reminder
+
+Everything automated.
+
+----------------------------------------------------------
+FINAL ACCEPTANCE
+----------------------------------------------------------
+
+Task is complete ONLY IF:
+
+✅ WhatsApp Connected
+
+✅ Facebook Connected
+
+✅ Instagram Connected
+
+✅ Telegram Connected
+
+✅ Website Connected
+
+✅ RCS Connected
+
+✅ Email Connected
+
+✅ SMS Connected
+
+✅ Firebase Connected
+
+✅ Auto Lead Creation Working
+
+✅ Auto Reply Working
+
+✅ Unified Inbox Working
+
+✅ Broadcast Working
+
+✅ Webhooks Verified
+
+✅ Message Logs Working
+
+✅ Sync Status Working
+
+✅ Last Sync Updating
+
+✅ Every Dashboard Has Working Back Button
+
+✅ No Mock Data
+
+✅ No Placeholder APIs
+
+✅ Production Ready
+
+Before completing the task:
+
+1. Perform complete end-to-end testing.
+2. Verify every API.
+3. Verify every webhook.
+4. Verify every CRUD operation.
+5. Verify lead creation from every communication channel.
+6. Verify automatic booking workflow.
+7. Verify notification workflow.
+8. Verify message delivery.
+9. Fix every error automatically.
+10. Do not mark the task complete until every feature works perfectly in the production Al Burhan Tours & Travels ERP.

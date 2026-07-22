@@ -60,6 +60,7 @@ import supportRouter from "./support.js";
 import enterpriseRouter from "./enterprise.js";
 import portalRouter from "./portal.js";
 import smsSettingsRouter from "./sms-settings.js";
+import socialMediaRouter from "./social-media.js";
 import { requireAdmin } from "../lib/auth.js";
 
 const router: IRouter = Router();
@@ -342,6 +343,7 @@ router.use("/support", supportRouter);
 router.use("/enterprise", enterpriseRouter);
 router.use("/portal", portalRouter);
 router.use("/sms-settings", smsSettingsRouter);
+router.use("/social-media", socialMediaRouter);
 router.use("/webhook", webhooksRouter);
 router.use(storageRouter);
 

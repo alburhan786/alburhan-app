@@ -26,7 +26,7 @@ import {
   Scale, Users2, Package, ClipboardList, KeyRound, HeartPulse, Settings2, BellRing, Zap,
   MapPin, Tent, Tag, Bot, Award, Smartphone, Layers, Mail, Globe, FileText, TestTube2, History,
   Headphones, Target, Brain, AlarmClock, Handshake, Briefcase, ShoppingCart,
-  Workflow, Hotel, IndianRupee, LayoutGrid, Code2, Plug, Lock, Archive, Shield,
+  Workflow, Hotel, IndianRupee, LayoutGrid, Code2, Plug, Lock, Archive, Shield, Share2,
 } from "lucide-react";
 import type { Module, Action } from "@/hooks/use-permissions";
 
@@ -187,6 +187,7 @@ export function buildNavSections(openComplaints = 0): NavSection[] {
     {
       section: "Communication",
       items: [
+        { icon: Share2,        label: "Social Media Integration", href: "/admin/social-media",           require: ["settings",  "view"] },
         { icon: BellRing,      label: "Communication Center",  href: "/admin/communication-center",   require: ["customers", "edit"] },
         { icon: Zap,           label: "Workflow Center",        href: "/admin/workflow-center",         require: ["bookings",  "edit"] },
         { icon: Bot,           label: "WhatsApp Dashboard",     href: "/admin/botbee-dashboard",        require: ["settings",  "view"] },
