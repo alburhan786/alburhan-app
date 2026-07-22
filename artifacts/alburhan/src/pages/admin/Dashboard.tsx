@@ -14,9 +14,13 @@ import {
   IndianRupee, Users, Package as PackageIcon, Clock, Send, FileText,
   CheckCircle, XCircle, ScanLine, Printer, ClipboardPlus, BarChart2,
   BookOpen, UsersRound, MessageSquare, ImageIcon, Wallet, TrendingUp,
-  ShieldCheck, Megaphone, PieChart, Bell, Plane, ListTodo, UserPlus, Building2, MapPin, Brain, Search, Activity, Settings, Sparkles,
+  ShieldCheck, Megaphone, PieChart, Bell, Plane, ListTodo, UserPlus,
+  Building2, MapPin, Brain, Search, Activity, Settings, Sparkles,
   Zap, Target, Handshake, Star, UserCheck, Inbox, Share2, Users2,
   Hotel, Bus, Tent, Heart, Tag, TrendingDown, Calculator, Briefcase,
+  Receipt, KeyRound, Archive, Code2, Plug, Settings2, Lock, Scale,
+  ClipboardList, FileCheck, Truck, ShoppingCart, Smartphone, Globe,
+  Mail, CreditCard,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -26,7 +30,104 @@ import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { Link } from "wouter";
 
-const BASE = import.meta.env.BASE_URL || "/";
+interface ModItem {
+  icon: React.ElementType;
+  label: string;
+  desc: string;
+  href: string;
+  bg: string;
+  tc: string;
+}
+
+const SECTIONS: { title: string; color: string; items: ModItem[] }[] = [
+  {
+    title: "Portals",
+    color: "from-violet-600 to-violet-800",
+    items: [
+      { icon: Sparkles,    label: "Super Admin Dashboard",    desc: "Command center",           href: "/admin/super",            bg: "bg-violet-100",  tc: "text-violet-700"  },
+      { icon: Building2,   label: "Branch Dashboard",         desc: "Branch performance",       href: "/admin/branch-dashboard", bg: "bg-blue-100",    tc: "text-blue-700"    },
+      { icon: KeyRound,    label: "Branch Login Management",  desc: "Branch login & access",    href: "/admin/branch-login",     bg: "bg-indigo-100",  tc: "text-indigo-700"  },
+      { icon: UserCheck,   label: "Agent Dashboard",          desc: "Agent analytics",          href: "/admin/agent-dashboard",  bg: "bg-cyan-100",    tc: "text-cyan-700"    },
+      { icon: ShieldCheck, label: "Agent Login Management",   desc: "Agent login & access",     href: "/admin/agent-login",      bg: "bg-sky-100",     tc: "text-sky-700"     },
+      { icon: Users,       label: "Staff Dashboard",          desc: "Staff management",         href: "/admin/staff-dashboard",  bg: "bg-teal-100",    tc: "text-teal-700"    },
+    ],
+  },
+  {
+    title: "Finance & Accounting",
+    color: "from-emerald-600 to-emerald-800",
+    items: [
+      { icon: IndianRupee, label: "Finance Dashboard",        desc: "P&L, cash flow, ledger",   href: "/admin/finance",          bg: "bg-emerald-100", tc: "text-emerald-700" },
+      { icon: Calculator,  label: "Accounting Dashboard",     desc: "Books & journal entries",  href: "/admin/accounting",       bg: "bg-green-100",   tc: "text-green-700"   },
+      { icon: CreditCard,  label: "Payment Dashboard",        desc: "Transactions & receipts",  href: "/admin/payments",         bg: "bg-lime-100",    tc: "text-lime-700"    },
+      { icon: BookOpen,    label: "Invoice Dashboard",        desc: "Invoice management",       href: "/admin/invoices",         bg: "bg-cyan-100",    tc: "text-cyan-700"    },
+      { icon: Receipt,     label: "Receipt Dashboard",        desc: "Payment receipts",         href: "/admin/receipts",         bg: "bg-sky-100",     tc: "text-sky-700"     },
+    ],
+  },
+  {
+    title: "CRM, HR & Workforce",
+    color: "from-blue-600 to-blue-800",
+    items: [
+      { icon: Target,       label: "CRM Dashboard",           desc: "Leads & pipeline",         href: "/admin/crm",              bg: "bg-blue-100",    tc: "text-blue-700"    },
+      { icon: Handshake,    label: "SRM Dashboard",           desc: "Supplier relationships",   href: "/admin/srm",              bg: "bg-purple-100",  tc: "text-purple-700"  },
+      { icon: Briefcase,    label: "HR Dashboard",            desc: "Staff & HR management",    href: "/admin/hr",               bg: "bg-amber-100",   tc: "text-amber-700"   },
+      { icon: IndianRupee,  label: "Payroll Dashboard",       desc: "Salary & payslips",        href: "/admin/payroll",          bg: "bg-yellow-100",  tc: "text-yellow-700"  },
+      { icon: PackageIcon,  label: "Inventory Dashboard",     desc: "Stock & equipment",        href: "/admin/inventory",        bg: "bg-lime-100",    tc: "text-lime-700"    },
+      { icon: ShoppingCart, label: "Procurement Dashboard",   desc: "Purchase orders",          href: "/admin/procurement",      bg: "bg-green-100",   tc: "text-green-700"   },
+      { icon: Truck,        label: "Supplier Dashboard",      desc: "Supplier directory",       href: "/admin/suppliers",        bg: "bg-fuchsia-100", tc: "text-fuchsia-700" },
+    ],
+  },
+  {
+    title: "Travel Operations",
+    color: "from-rose-600 to-rose-800",
+    items: [
+      { icon: FileCheck,   label: "Visa Dashboard",           desc: "Visa status & processing", href: "/admin/visa",             bg: "bg-purple-100",  tc: "text-purple-700"  },
+      { icon: Plane,       label: "Flight Dashboard",         desc: "Flight management",        href: "/admin/flights",          bg: "bg-violet-100",  tc: "text-violet-700"  },
+      { icon: Hotel,       label: "Hotel Dashboard",          desc: "Hotel management",         href: "/admin/hotels",           bg: "bg-blue-100",    tc: "text-blue-700"    },
+      { icon: Bus,         label: "Transport Dashboard",      desc: "Buses & vehicles",         href: "/admin/buses",            bg: "bg-sky-100",     tc: "text-sky-700"     },
+      { icon: Tent,        label: "Room Allocation Dashboard",desc: "Mina / Arafat / Muzd.",   href: "/admin/allocations",      bg: "bg-indigo-100",  tc: "text-indigo-700"  },
+      { icon: FileText,    label: "Document Management Dashboard", desc: "Passport, Aadhaar & docs", href: "/admin/document-expiry", bg: "bg-pink-100", tc: "text-pink-700"  },
+      { icon: Scale,       label: "Agreement Dashboard",      desc: "Contracts & digital sign", href: "/admin/agreements",       bg: "bg-rose-100",    tc: "text-rose-700"    },
+    ],
+  },
+  {
+    title: "Analytics & Reporting",
+    color: "from-slate-600 to-slate-800",
+    items: [
+      { icon: BarChart2,   label: "Reports Dashboard",        desc: "Operational reports",      href: "/admin/reports",          bg: "bg-slate-100",   tc: "text-slate-700"   },
+      { icon: PieChart,    label: "Business Intelligence Dashboard", desc: "Trends & insights", href: "/admin/bi",               bg: "bg-gray-100",    tc: "text-gray-700"    },
+      { icon: Brain,       label: "AI Analytics Dashboard",   desc: "ML-powered insights",      href: "/admin/ai-ops",           bg: "bg-zinc-100",    tc: "text-zinc-700"    },
+    ],
+  },
+  {
+    title: "Communication & Marketing",
+    color: "from-teal-600 to-teal-800",
+    items: [
+      { icon: MessageSquare,label: "WhatsApp Dashboard",      desc: "Messages & templates",     href: "/admin/botbee-dashboard",      bg: "bg-emerald-100", tc: "text-emerald-700" },
+      { icon: Smartphone,   label: "SMS Dashboard",           desc: "DLT & SMS campaigns",      href: "/admin/sms-production-report", bg: "bg-blue-100",    tc: "text-blue-700"    },
+      { icon: Mail,         label: "Email Dashboard",         desc: "Templates & delivery",     href: "/admin/email-templates",       bg: "bg-violet-100",  tc: "text-violet-700"  },
+      { icon: Megaphone,    label: "Marketing Dashboard",     desc: "Campaigns & broadcasts",   href: "/admin/marketing",             bg: "bg-rose-100",    tc: "text-rose-700"    },
+      { icon: Bell,         label: "Notification Dashboard",  desc: "Delivery status & logs",   href: "/admin/notification-health",   bg: "bg-pink-100",    tc: "text-pink-700"    },
+      { icon: Share2,       label: "Social Media Integration Management", desc: "All social channels", href: "/admin/social-media", bg: "bg-sky-100",    tc: "text-sky-700"     },
+      { icon: Globe,        label: "Website CMS Dashboard",   desc: "Public pages & content",   href: "/admin/settings",              bg: "bg-teal-100",    tc: "text-teal-700"    },
+    ],
+  },
+  {
+    title: "System & Security",
+    color: "from-red-600 to-red-800",
+    items: [
+      { icon: Smartphone,   label: "Mobile App Dashboard",    desc: "App configuration",        href: "/admin/api-settings",     bg: "bg-cyan-100",    tc: "text-cyan-700"    },
+      { icon: KeyRound,     label: "User & Role Management",  desc: "Accounts & permissions",   href: "/admin/user-roles",       bg: "bg-red-100",     tc: "text-red-700"     },
+      { icon: ShieldCheck,  label: "Permission Management",   desc: "Role permission matrix",   href: "/admin/permissions",      bg: "bg-rose-100",    tc: "text-rose-700"    },
+      { icon: ClipboardList,label: "Audit Log Dashboard",     desc: "All system activity",      href: "/admin/audit-logs",       bg: "bg-orange-100",  tc: "text-orange-700"  },
+      { icon: Activity,     label: "Activity Log Dashboard",  desc: "User activity stream",     href: "/admin/activity-logs",    bg: "bg-amber-100",   tc: "text-amber-700"   },
+      { icon: Lock,         label: "Security Dashboard",      desc: "System health & alerts",   href: "/admin/security",         bg: "bg-yellow-100",  tc: "text-yellow-700"  },
+      { icon: Archive,      label: "Backup Dashboard",        desc: "Data backups & restore",   href: "/admin/backups",          bg: "bg-green-100",   tc: "text-green-700"   },
+      { icon: Code2,        label: "API Dashboard",           desc: "API keys & endpoints",     href: "/admin/api-settings",     bg: "bg-teal-100",    tc: "text-teal-700"    },
+      { icon: Plug,         label: "Integration Dashboard",   desc: "Third-party connections",  href: "/admin/integrations",     bg: "bg-cyan-100",    tc: "text-cyan-700"    },
+      { icon: Settings2,    label: "Settings Dashboard",      desc: "Company configuration",    href: "/admin/settings",         bg: "bg-sky-100",     tc: "text-sky-700"     },
+    ],
+  },
+];
 
 function StatCard({ label, value, icon: Icon, bg, color, sub }: {
   label: string; value: string | number; icon: React.ElementType;
@@ -45,83 +146,6 @@ function StatCard({ label, value, icon: Icon, bg, color, sub }: {
     </Card>
   );
 }
-
-const MODULE_CARDS = [
-  { icon: ClipboardPlus, label: "Offline Booking", desc: "Create walk-in bookings", href: "/admin/offline-bookings", color: "bg-amber-50 text-amber-700", border: "border-amber-200" },
-  { icon: ScanLine, label: "QR Tracker", desc: "Find pilgrim by QR / name", href: "/admin/qr-tracker", color: "bg-sky-50 text-sky-700", border: "border-sky-200" },
-  { icon: Printer, label: "Print Center", desc: "All print options by group", href: "/admin/print-center", color: "bg-violet-50 text-violet-700", border: "border-violet-200" },
-  { icon: BarChart2, label: "Reports", desc: "Export bookings & revenue", href: "/admin/reports", color: "bg-emerald-50 text-emerald-700", border: "border-emerald-200" },
-  { icon: BookOpen, label: "Bookings", desc: "Approve & manage bookings", href: "/admin/bookings", color: "bg-blue-50 text-blue-700", border: "border-blue-200" },
-  { icon: UsersRound, label: "Hajj Groups", desc: "Manage groups & pilgrims", href: "/admin/groups", color: "bg-teal-50 text-teal-700", border: "border-teal-200" },
-  { icon: PackageIcon, label: "Packages", desc: "Tour packages & pricing", href: "/admin/packages", color: "bg-purple-50 text-purple-700", border: "border-purple-200" },
-  { icon: Users, label: "Customers", desc: "Customer records & info", href: "/admin/customers", color: "bg-rose-50 text-rose-700", border: "border-rose-200" },
-  { icon: FileText, label: "Invoices", desc: "Billing & payment status", href: "/admin/invoices", color: "bg-orange-50 text-orange-700", border: "border-orange-200" },
-  { icon: PieChart, label: "Payment Analytics", desc: "Today's collection & overdue", href: "/admin/payment-analytics", color: "bg-green-50 text-green-700", border: "border-green-200" },
-  { icon: Bell, label: "Payment Reminders", desc: "Auto-reminders for pending balances", href: "/admin/payment-reminders", color: "bg-amber-50 text-amber-700", border: "border-amber-200" },
-  { icon: Plane, label: "Auto Notifications", desc: "Flight reminders & document alerts", href: "/admin/auto-notifications", color: "bg-sky-50 text-sky-700", border: "border-sky-200" },
-  { icon: MessageSquare, label: "Inquiries", desc: "Customer inquiries", href: "/admin/inquiries", color: "bg-pink-50 text-pink-700", border: "border-pink-200" },
-  { icon: ImageIcon, label: "Gallery", desc: "Homepage banner images", href: "/admin/gallery", color: "bg-lime-50 text-lime-700", border: "border-lime-200" },
-  { icon: ShieldCheck, label: "KYC Management", desc: "Review & verify documents", href: "/admin/kyc", color: "bg-indigo-50 text-indigo-700", border: "border-indigo-200" },
-  { icon: Megaphone, label: "Broadcast Messages", desc: "Send SMS & WhatsApp blasts", href: "/admin/broadcast", color: "bg-cyan-50 text-cyan-700", border: "border-cyan-200" },
-  { icon: TrendingUp, label: "Super Dashboard", desc: "Live KPIs, notifications & alerts", href: "/admin/super", color: "bg-rose-50 text-rose-700", border: "border-rose-200" },
-  { icon: BarChart2, label: "Pilgrim Reports", desc: "Export pilgrim, visa & flight lists", href: "/admin/pilgrim-reports", color: "bg-teal-50 text-teal-700", border: "border-teal-200" },
-  { icon: MessageSquare, label: "Support Center", desc: "Customer support tickets", href: "/admin/support", color: "bg-blue-50 text-blue-700", border: "border-blue-200" },
-  { icon: PieChart, label: "Business Intelligence", desc: "Revenue & booking analytics charts", href: "/admin/bi", color: "bg-violet-50 text-violet-700", border: "border-violet-200" },
-  { icon: CheckCircle, label: "Certificates", desc: "Generate Hajj & Umrah certificates", href: "/admin/certificates", color: "bg-amber-50 text-amber-700", border: "border-amber-200" },
-  { icon: UsersRound, label: "Guide Panel", desc: "Group pilgrim list & attendance", href: "/admin/guide-panel", color: "bg-emerald-50 text-emerald-700", border: "border-emerald-200" },
-  { icon: ListTodo, label: "Task Manager", desc: "Assign & track team tasks", href: "/admin/tasks", color: "bg-violet-50 text-violet-700", border: "border-violet-200" },
-  { icon: Megaphone, label: "Marketing Center", desc: "Segment campaigns via WhatsApp & SMS", href: "/admin/marketing", color: "bg-rose-50 text-rose-700", border: "border-rose-200" },
-  { icon: UserPlus, label: "Lead Manager", desc: "Enquiries, follow-ups & conversions", href: "/admin/leads", color: "bg-sky-50 text-sky-700", border: "border-sky-200" },
-  { icon: Building2, label: "Supplier Manager", desc: "Hotels, airlines, transport & visas", href: "/admin/suppliers", color: "bg-amber-50 text-amber-700", border: "border-amber-200" },
-  { icon: MapPin, label: "Group Tracking", desc: "Live group city & activity updates", href: "/admin/group-tracking", color: "bg-teal-50 text-teal-700", border: "border-teal-200" },
-  { icon: Brain, label: "AI Operations", desc: "Smart alerts — visas, passports, payments", href: "/admin/ai-ops", color: "bg-violet-50 text-violet-700", border: "border-violet-200" },
-  { icon: TrendingUp, label: "Executive Dashboard", desc: "Owner KPIs — revenue, pipeline, metrics", href: "/admin/executive", color: "bg-amber-50 text-amber-700", border: "border-amber-200" },
-  { icon: Clock, label: "Document Expiry", desc: "Passport, visa & medical expiry alerts", href: "/admin/document-expiry", color: "bg-red-50 text-red-700", border: "border-red-200" },
-  { icon: Search, label: "Global Search", desc: "Search bookings, pilgrims, passports, visas", href: "/admin/search", color: "bg-slate-50 text-slate-700", border: "border-slate-200" },
-  { icon: Activity, label: "Notification Health", desc: "WhatsApp, SMS & email delivery stats", href: "/admin/notification-health", color: "bg-blue-50 text-blue-700", border: "border-blue-200" },
-  { icon: Settings, label: "Business Settings", desc: "Company, prefixes, branding & templates", href: "/admin/settings", color: "bg-primary/5 text-primary", border: "border-primary/20" },
-  { icon: ShieldCheck, label: "Production Report", desc: "Full system QA & readiness score", href: "/admin/production-report", color: "bg-emerald-50 text-emerald-700", border: "border-emerald-200" },
-  { icon: IndianRupee, label: "Finance Hub", desc: "Unified finance center — revenue, P&L, GST", href: "/admin/finance", color: "bg-emerald-50 text-emerald-700", border: "border-emerald-200" },
-  { icon: Sparkles, label: "Admin AI Chat", desc: "Ask about operations, payments, visas…", href: "/admin/chat", color: "bg-violet-50 text-violet-700", border: "border-violet-200" },
-  { icon: MapPin, label: "Pilgrim Ops Center", desc: "Live ops — visa, passport, payments, flights", href: "/admin/pilgrim-ops", color: "bg-sky-50 text-sky-700", border: "border-sky-200" },
-  { icon: Building2, label: "Branch Management", desc: "Manage offices, branches and managers", href: "/admin/branches", color: "bg-orange-50 text-orange-700", border: "border-orange-200" },
-  { icon: UserPlus, label: "Agent Management", desc: "Track agents, commissions and bookings", href: "/admin/agents", color: "bg-teal-50 text-teal-700", border: "border-teal-200" },
-  { icon: Users, label: "Staff Management", desc: "ID cards, roles & staff records", href: "/admin/staff", color: "bg-slate-50 text-slate-700", border: "border-slate-200" },
-  { icon: IndianRupee, label: "Payroll Manager", desc: "Salaries, payslips & attendance", href: "/admin/payroll", color: "bg-lime-50 text-lime-700", border: "border-lime-200" },
-  // ── Dashboards
-  { icon: Activity,   label: "Operations Dashboard",  desc: "Live booking & operations overview",     href: "/admin/operations",        color: "bg-blue-50 text-blue-700",   border: "border-blue-200"   },
-  { icon: Users2,     label: "Manager Dashboard",      desc: "Manager KPIs, groups & escalations",    href: "/admin/manager",           color: "bg-teal-50 text-teal-700",   border: "border-teal-200"   },
-  { icon: Users,      label: "Staff Dashboard",        desc: "Attendance, tasks & staff overview",    href: "/admin/staff-dashboard",   color: "bg-slate-50 text-slate-700", border: "border-slate-200"  },
-  { icon: Users,      label: "Customer Dashboard",     desc: "Customer activity & booking overview",  href: "/admin/customer-dashboard",color: "bg-rose-50 text-rose-700",   border: "border-rose-200"   },
-  // ── CRM & SRM
-  { icon: UserCheck,  label: "Customer 360°",          desc: "Unified customer profile & history",    href: "/admin/customer360",       color: "bg-indigo-50 text-indigo-700",border: "border-indigo-200" },
-  { icon: Target,     label: "CRM Dashboard",          desc: "Pipeline, leads & customer relations",  href: "/admin/crm",               color: "bg-sky-50 text-sky-700",     border: "border-sky-200"    },
-  { icon: Handshake,  label: "SRM Dashboard",          desc: "Supplier relationships & contracts",    href: "/admin/srm",               color: "bg-amber-50 text-amber-700", border: "border-amber-200"  },
-  { icon: Star,       label: "Loyalty & Rewards",      desc: "Points, tiers & rewards management",   href: "/admin/loyalty",           color: "bg-yellow-50 text-yellow-700",border: "border-yellow-200" },
-  // ── Communication
-  { icon: Inbox,      label: "Omnichannel Inbox",      desc: "All channels: WhatsApp, SMS, Telegram", href: "/admin/inbox",             color: "bg-emerald-50 text-emerald-700",border: "border-emerald-200"},
-  { icon: Share2,     label: "Social Media Integration",desc: "Connect channels & manage webhooks",   href: "/admin/social-media",      color: "bg-pink-50 text-pink-700",   border: "border-pink-200"   },
-  { icon: MessageSquare, label: "Communication Center",desc: "Notifications, templates & messaging",  href: "/admin/communication-center",color: "bg-purple-50 text-purple-700",border: "border-purple-200"},
-  { icon: Zap,        label: "Automation Center",      desc: "Triggers, workflows & auto-actions",    href: "/admin/automation-center", color: "bg-cyan-50 text-cyan-700",   border: "border-cyan-200"   },
-  // ── Travel Operations
-  { icon: Hotel,      label: "Hotels",                 desc: "Hotel assignments & room management",   href: "/admin/hotels",            color: "bg-sky-50 text-sky-700",     border: "border-sky-200"    },
-  { icon: Plane,      label: "Flights & Airlines",     desc: "Flight assignments & PNR tracking",     href: "/admin/flights",           color: "bg-blue-50 text-blue-700",   border: "border-blue-200"   },
-  { icon: Bus,        label: "Transport & Buses",      desc: "Bus allocation & seating plans",        href: "/admin/buses",             color: "bg-amber-50 text-amber-700", border: "border-amber-200"  },
-  { icon: ShieldCheck,label: "Visa Tracker",           desc: "Visa status, numbers & expiry",         href: "/admin/visa",              color: "bg-indigo-50 text-indigo-700",border: "border-indigo-200" },
-  { icon: Tent,       label: "Room Allocation",        desc: "Mina, Arafat & Muzdalifah beds",        href: "/admin/allocations",       color: "bg-teal-50 text-teal-700",   border: "border-teal-200"   },
-  { icon: MapPin,     label: "Ziyarat Schedule",       desc: "Ziyarat places, times & bus assignment",href: "/admin/ziyarat",           color: "bg-emerald-50 text-emerald-700",border: "border-emerald-200"},
-  { icon: Heart,      label: "Medical",                desc: "Pilgrim health records & medical notes", href: "/admin/medical",          color: "bg-rose-50 text-rose-700",   border: "border-rose-200"   },
-  { icon: Tag,        label: "Luggage Management",     desc: "Luggage tags & tracking",               href: "/admin/luggage",           color: "bg-orange-50 text-orange-700",border: "border-orange-200" },
-  // ── Finance & Documents
-  { icon: FileText,   label: "Agreements",             desc: "Booking agreements & e-signatures",     href: "/admin/agreements",        color: "bg-violet-50 text-violet-700",border: "border-violet-200" },
-  { icon: FileText,   label: "Customer Documents",     desc: "Passport, aadhaar, visa & other docs",  href: "/admin/documents",         color: "bg-slate-50 text-slate-700", border: "border-slate-200"  },
-  { icon: IndianRupee,label: "Receipts",               desc: "Payment receipts & acknowledgements",   href: "/admin/receipts",          color: "bg-green-50 text-green-700", border: "border-green-200"  },
-  { icon: Building2,  label: "Offline Payments",       desc: "Bank transfers & cash payment approvals",href: "/admin/offline-payments",  color: "bg-cyan-50 text-cyan-700",   border: "border-cyan-200"   },
-  { icon: TrendingDown,label: "Expenses",              desc: "Expense tracking & cost management",    href: "/admin/expenses",          color: "bg-red-50 text-red-700",     border: "border-red-200"    },
-  { icon: Calculator, label: "Accounting",             desc: "Journal entries & ledger management",   href: "/admin/accounting",        color: "bg-lime-50 text-lime-700",   border: "border-lime-200"   },
-  // ── HR
-  { icon: Briefcase,  label: "HR Dashboard",           desc: "Staff management, leaves & payroll",    href: "/admin/hr",                color: "bg-purple-50 text-purple-700",border: "border-purple-200" },
-];
 
 function getStatusBadge(status: string) {
   const map: Record<string, string> = {
@@ -143,22 +167,24 @@ export default function AdminDashboard() {
   if (!stats) return <AdminLayout><div className="p-12 text-center text-red-500">Failed to load stats.</div></AdminLayout>;
 
   const statCards = [
-    { label: "Total Revenue", value: formatCurrency(stats.totalRevenue), icon: IndianRupee, bg: "bg-emerald-100", color: "text-emerald-600", sub: "Collected payments" },
-    { label: "Total Bookings", value: stats.totalBookings, icon: BookOpen, bg: "bg-blue-100", color: "text-blue-600", sub: "All time" },
-    { label: "Confirmed", value: stats.confirmedBookings ?? 0, icon: CheckCircle, bg: "bg-teal-100", color: "text-teal-600", sub: "Paid & confirmed" },
-    { label: "Pending Approval", value: stats.pendingBookings, icon: Clock, bg: "bg-amber-100", color: "text-amber-600", sub: "Awaiting action" },
-    { label: "Total Customers", value: stats.totalCustomers, icon: Users, bg: "bg-purple-100", color: "text-purple-600", sub: "Registered users" },
-    { label: "Rejected", value: stats.rejectedBookings ?? 0, icon: XCircle, bg: "bg-red-100", color: "text-red-500", sub: "Declined bookings" },
-    { label: "Total Discount", value: formatCurrency((stats as any).totalDiscount ?? 0), icon: IndianRupee, bg: "bg-orange-100", color: "text-orange-600", sub: `${(stats as any).discountedBookings ?? 0} bookings` },
+    { label: "Total Revenue",    value: formatCurrency(stats.totalRevenue),          icon: IndianRupee, bg: "bg-emerald-100", color: "text-emerald-600", sub: "Collected payments"   },
+    { label: "Total Bookings",   value: stats.totalBookings,                          icon: BookOpen,    bg: "bg-blue-100",    color: "text-blue-600",    sub: "All time"             },
+    { label: "Confirmed",        value: stats.confirmedBookings ?? 0,                 icon: CheckCircle, bg: "bg-teal-100",    color: "text-teal-600",    sub: "Paid & confirmed"     },
+    { label: "Pending Approval", value: stats.pendingBookings,                        icon: Clock,       bg: "bg-amber-100",   color: "text-amber-600",   sub: "Awaiting action"      },
+    { label: "Total Customers",  value: stats.totalCustomers,                         icon: Users,       bg: "bg-purple-100",  color: "text-purple-600",  sub: "Registered users"     },
+    { label: "Rejected",         value: stats.rejectedBookings ?? 0,                  icon: XCircle,     bg: "bg-red-100",     color: "text-red-500",     sub: "Declined bookings"    },
+    { label: "Total Discount",   value: formatCurrency((stats as any).totalDiscount ?? 0), icon: IndianRupee, bg: "bg-orange-100", color: "text-orange-600", sub: `${(stats as any).discountedBookings ?? 0} bookings` },
   ];
+
+  const totalCards = SECTIONS.reduce((s, sec) => s + sec.items.length, 0);
 
   return (
     <AdminLayout>
       {/* Header */}
       <div className="mb-8 flex items-start justify-between">
         <div>
-          <h1 className="text-3xl font-serif font-bold text-foreground">Hajj Management Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Al Burhan Tours & Travels · Admin Portal</p>
+          <h1 className="text-3xl font-serif font-bold text-foreground">Admin Dashboard</h1>
+          <p className="text-muted-foreground mt-1">Al Burhan Tours & Travels · {totalCards} modules across {SECTIONS.length} sections</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => setBroadcastOpen(true)} className="flex items-center gap-2">
@@ -171,31 +197,35 @@ export default function AdminDashboard() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-10">
         {statCards.map((stat, i) => (
           <StatCard key={i} {...stat} />
         ))}
       </div>
 
-      {/* Modules Grid */}
-      <div className="mb-8">
-        <div className="flex items-center gap-2 mb-4">
-          <TrendingUp size={16} className="text-[#0B3D2E]" />
-          <h2 className="font-bold text-foreground">System Modules</h2>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-          {MODULE_CARDS.map((mod) => (
-            <Link key={mod.href} href={mod.href}>
-              <div className={`bg-white rounded-2xl border-2 ${mod.border} p-4 hover:shadow-md transition-shadow cursor-pointer group`}>
-                <div className={`w-10 h-10 rounded-xl ${mod.color} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
-                  <mod.icon size={20} />
-                </div>
-                <p className="font-bold text-foreground text-sm leading-tight">{mod.label}</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{mod.desc}</p>
-              </div>
-            </Link>
-          ))}
-        </div>
+      {/* Module Sections */}
+      <div className="mb-10 space-y-8">
+        {SECTIONS.map((section) => (
+          <div key={section.title}>
+            <div className={`flex items-center justify-between px-4 py-2.5 rounded-xl bg-gradient-to-r ${section.color} mb-4`}>
+              <h2 className="font-bold text-white text-sm uppercase tracking-widest">{section.title}</h2>
+              <span className="text-white/80 text-xs font-semibold">{section.items.length} modules</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+              {section.items.map((mod) => (
+                <Link key={mod.label} href={mod.href}>
+                  <div className="bg-white rounded-2xl border-2 border-border p-4 hover:shadow-md hover:border-primary/30 transition-all cursor-pointer group h-full">
+                    <div className={`w-10 h-10 rounded-xl ${mod.bg} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
+                      <mod.icon size={20} className={mod.tc} />
+                    </div>
+                    <p className="font-bold text-foreground text-sm leading-tight">{mod.label}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{mod.desc}</p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Bottom section: Recent Bookings + Quick Actions */}
@@ -248,11 +278,11 @@ export default function AdminDashboard() {
           </h3>
           <div className="space-y-2.5">
             {[
-              { icon: ClipboardPlus, label: "New Offline Booking", href: "/admin/offline-bookings" },
-              { icon: ScanLine, label: "QR Pilgrim Tracker", href: "/admin/qr-tracker" },
-              { icon: Printer, label: "Print Center", href: "/admin/print-center" },
-              { icon: BarChart2, label: "Generate Reports", href: "/admin/reports" },
-              { icon: UsersRound, label: "Manage Hajj Groups", href: "/admin/groups" },
+              { icon: ClipboardPlus, label: "New Offline Booking",  href: "/admin/offline-bookings" },
+              { icon: ScanLine,      label: "QR Pilgrim Tracker",   href: "/admin/qr-tracker"        },
+              { icon: Printer,       label: "Print Center",         href: "/admin/print-center"      },
+              { icon: BarChart2,     label: "Generate Reports",     href: "/admin/reports"           },
+              { icon: UsersRound,    label: "Manage Hajj Groups",   href: "/admin/groups"            },
             ].map((item, i) => (
               <Link key={i} href={item.href}>
                 <button className="w-full text-left px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 transition-colors flex items-center gap-3 text-sm text-white font-medium">
