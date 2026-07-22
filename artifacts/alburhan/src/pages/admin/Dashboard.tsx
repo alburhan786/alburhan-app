@@ -14,7 +14,8 @@ import {
   IndianRupee, Users, Package as PackageIcon, Clock, Send, FileText,
   CheckCircle, XCircle, ScanLine, Printer, ClipboardPlus, BarChart2,
   BookOpen, UsersRound, MessageSquare, ImageIcon, Wallet, TrendingUp,
-  ShieldCheck, Megaphone, PieChart, Bell, Plane, ListTodo, UserPlus, Building2, MapPin, Brain, Search, Activity, Settings, Sparkles
+  ShieldCheck, Megaphone, PieChart, Bell, Plane, ListTodo, UserPlus, Building2, MapPin, Brain, Search, Activity, Settings, Sparkles,
+  Zap, Target, Handshake, Star, UserCheck, Inbox, Share2, Users2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -86,6 +87,21 @@ const MODULE_CARDS = [
   { icon: UserPlus, label: "Agent Management", desc: "Track agents, commissions and bookings", href: "/admin/agents", color: "bg-teal-50 text-teal-700", border: "border-teal-200" },
   { icon: Users, label: "Staff Management", desc: "ID cards, roles & staff records", href: "/admin/staff", color: "bg-slate-50 text-slate-700", border: "border-slate-200" },
   { icon: IndianRupee, label: "Payroll Manager", desc: "Salaries, payslips & attendance", href: "/admin/payroll", color: "bg-lime-50 text-lime-700", border: "border-lime-200" },
+  // ── Dashboards
+  { icon: Activity,   label: "Operations Dashboard",  desc: "Live booking & operations overview",     href: "/admin/operations",        color: "bg-blue-50 text-blue-700",   border: "border-blue-200"   },
+  { icon: Users2,     label: "Manager Dashboard",      desc: "Manager KPIs, groups & escalations",    href: "/admin/manager",           color: "bg-teal-50 text-teal-700",   border: "border-teal-200"   },
+  { icon: Users,      label: "Staff Dashboard",        desc: "Attendance, tasks & staff overview",    href: "/admin/staff-dashboard",   color: "bg-slate-50 text-slate-700", border: "border-slate-200"  },
+  { icon: Users,      label: "Customer Dashboard",     desc: "Customer activity & booking overview",  href: "/admin/customer-dashboard",color: "bg-rose-50 text-rose-700",   border: "border-rose-200"   },
+  // ── CRM & SRM
+  { icon: UserCheck,  label: "Customer 360°",          desc: "Unified customer profile & history",    href: "/admin/customer360",       color: "bg-indigo-50 text-indigo-700",border: "border-indigo-200" },
+  { icon: Target,     label: "CRM Dashboard",          desc: "Pipeline, leads & customer relations",  href: "/admin/crm",               color: "bg-sky-50 text-sky-700",     border: "border-sky-200"    },
+  { icon: Handshake,  label: "SRM Dashboard",          desc: "Supplier relationships & contracts",    href: "/admin/srm",               color: "bg-amber-50 text-amber-700", border: "border-amber-200"  },
+  { icon: Star,       label: "Loyalty & Rewards",      desc: "Points, tiers & rewards management",   href: "/admin/loyalty",           color: "bg-yellow-50 text-yellow-700",border: "border-yellow-200" },
+  // ── Communication
+  { icon: Inbox,      label: "Omnichannel Inbox",      desc: "All channels: WhatsApp, SMS, Telegram", href: "/admin/inbox",             color: "bg-emerald-50 text-emerald-700",border: "border-emerald-200"},
+  { icon: Share2,     label: "Social Media Integration",desc: "Connect channels & manage webhooks",   href: "/admin/social-media",      color: "bg-pink-50 text-pink-700",   border: "border-pink-200"   },
+  { icon: MessageSquare, label: "Communication Center",desc: "Notifications, templates & messaging",  href: "/admin/communication-center",color: "bg-purple-50 text-purple-700",border: "border-purple-200"},
+  { icon: Zap,        label: "Automation Center",      desc: "Triggers, workflows & auto-actions",    href: "/admin/automation-center", color: "bg-cyan-50 text-cyan-700",   border: "border-cyan-200"   },
 ];
 
 function getStatusBadge(status: string) {
