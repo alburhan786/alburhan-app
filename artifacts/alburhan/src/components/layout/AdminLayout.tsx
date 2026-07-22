@@ -24,6 +24,7 @@ interface MenuItem {
   href: string;
   badge?: number;
   require?: [Module, Action];
+  requireSuper?: boolean;
 }
 
 interface MenuSection {
@@ -38,6 +39,7 @@ function buildMenu(openComplaints: number): MenuSection[] {
       items: [
         { icon: LayoutDashboard, label: "Dashboard", href: "/admin/dashboard" },
         { icon: Activity, label: "Operations", href: "/admin/operations", require: ["bookings", "view"] },
+        { icon: Sparkles, label: "Super Admin Dashboard", href: "/admin/super", requireSuper: true },
       ],
     },
     {
@@ -89,6 +91,7 @@ function buildMenu(openComplaints: number): MenuSection[] {
         { icon: Users, label: "Customers", href: "/admin/customers", require: ["customers", "view"] },
         { icon: ShieldCheck, label: "KYC Management", href: "/admin/kyc", require: ["customers", "view"] },
         { icon: UserCheck, label: "Agent Management", href: "/admin/agents", require: ["customers", "view"] },
+        { icon: BarChart2, label: "Agent Dashboard", href: "/admin/agent-dashboard", require: ["customers", "view"] },
         { icon: Building2, label: "Branch Management", href: "/admin/branches", require: ["customers", "view"] },
         { icon: Star, label: "Feedback", href: "/admin/feedback", badge: openComplaints, require: ["customers", "view"] },
         { icon: Inbox, label: "Package Requests", href: "/admin/requests", require: ["customers", "view"] },
@@ -161,7 +164,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
   const { logout, user, isAdmin } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openComplaints, setOpenComplaints] = useState(0);
-  const { can, roleLabel, roleColor } = usePermissions();
+  const { can, roleLabel, roleColor, isSuper } = usePermissions();
 
   const {
     notifications,
@@ -185,10 +188,14 @@ export function AdminLayout({ children }: { children: ReactNode }) {
     return raw
       .map(section => ({
         ...section,
-        items: section.items.filter(item => !item.require || can(item.require[0], item.require[1])),
+        items: section.items.filter(item => {
+          if (item.requireSuper && !isSuper) return false;
+          if (item.require && !can(item.require[0], item.require[1])) return false;
+          return true;
+        }),
       }))
       .filter(section => section.items.length > 0);
-  }, [openComplaints, can]);
+  }, [openComplaints, can, isSuper]);
 
   const isActive = (href: string) => location === href || location.startsWith(href + "/");
 
