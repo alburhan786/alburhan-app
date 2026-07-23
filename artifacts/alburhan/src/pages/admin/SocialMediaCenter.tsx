@@ -633,6 +633,164 @@ function AnalyticsTab() {
   );
 }
 
+// ── Social Overview Component ─────────────────────────────────────────────────
+function SocialOverview() {
+  const [omni, setOmni] = useState<any>(null);
+  const [social, setSocial] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    try {
+      const [o, s] = await Promise.all([
+        fetch(`${API}/api/admin/omni-stats`, { credentials: "include" }).then(r => r.json()),
+        fetch(`${API}/api/admin/social-stats`, { credentials: "include" }).then(r => r.json()),
+      ]);
+      setOmni(o); setSocial(s);
+    } catch {}
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); const t = setInterval(load, 60000); return () => clearInterval(t); }, [load]);
+
+  if (loading) return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {Array.from({ length: 8 }).map((_, i) => (
+        <div key={i} className="border rounded-xl p-4 bg-white animate-pulse"><div className="h-8 w-1/2 bg-gray-100 rounded mb-2"/><div className="h-6 w-1/3 bg-gray-100 rounded"/></div>
+      ))}
+    </div>
+  );
+
+  const topCards = omni ? [
+    { icon: "📬", label: "Unread Messages",  value: omni.unread,        color: "#2563eb" },
+    { icon: "⏳", label: "Pending Reply",     value: omni.pendingReply,  color: "#d97706" },
+    { icon: "⚠️", label: "Missed (2h+)",     value: omni.missed,        color: "#dc2626" },
+    { icon: "🎯", label: "Today's Leads",     value: omni.todayLeads,    color: "#7c3aed" },
+    { icon: "📋", label: "Today's Bookings",  value: omni.todayBookings, color: "#16a34a" },
+    { icon: "📈", label: "Leads This Week",   value: omni.weekLeads,     color: "#0891b2" },
+    { icon: "💬", label: "Messages 7d",       value: omni.weekMessages,  color: "#9333ea" },
+    { icon: "📊", label: "Total Campaigns",   value: social?.totals?.campaigns ?? 0, color: "#ea580c" },
+  ] : [];
+
+  return (
+    <div className="space-y-6">
+      {/* Stat grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {topCards.map(s => (
+          <div key={s.label} className="border rounded-xl p-4 bg-white shadow-sm">
+            <div className="text-2xl mb-1">{s.icon}</div>
+            <div className="text-2xl font-bold font-mono" style={{ color: s.color }}>{s.value ?? 0}</div>
+            <div className="text-xs text-muted-foreground mt-0.5">{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Notification channel health (7d) */}
+        {social?.notifications?.length > 0 && (
+          <div>
+            <h3 className="font-semibold text-sm mb-3">📡 Channel Health — Last 7 Days</h3>
+            <div className="border rounded-xl overflow-hidden bg-white divide-y">
+              {social.notifications.map((n: any) => {
+                const pct = n.total > 0 ? Math.round((n.sent / n.total) * 100) : 0;
+                return (
+                  <div key={n.channel} className="px-4 py-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-medium capitalize">{n.channel}</span>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <span className="text-green-600 font-semibold">{n.sent} sent</span>
+                        {n.failed > 0 && <span className="text-red-500">{n.failed} failed</span>}
+                        <span className="font-bold text-foreground">{pct}%</span>
+                      </div>
+                    </div>
+                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full bg-green-500 transition-all" style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Leads by source (30d) */}
+        {social?.leadsBySource?.length > 0 && (
+          <div>
+            <h3 className="font-semibold text-sm mb-3">🎯 Leads by Source — Last 30 Days</h3>
+            <div className="border rounded-xl overflow-hidden bg-white">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b"><tr>
+                  <th className="text-left px-4 py-2 text-xs font-medium text-gray-500">Source</th>
+                  <th className="text-right px-4 py-2 text-xs font-medium text-gray-500">Leads</th>
+                </tr></thead>
+                <tbody className="divide-y">
+                  {social.leadsBySource.slice(0, 10).map((r: any) => (
+                    <tr key={r.source} className="hover:bg-gray-50">
+                      <td className="px-4 py-2 capitalize">{(r.source || "unknown").replace(/_/g, " ")}</td>
+                      <td className="px-4 py-2 text-right font-semibold">{r.cnt}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Messages by platform (30d) */}
+        {social?.messagesByPlatform?.length > 0 && (
+          <div>
+            <h3 className="font-semibold text-sm mb-3">💬 Messages by Platform — Last 30 Days</h3>
+            <div className="border rounded-xl overflow-hidden bg-white">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b"><tr>
+                  <th className="text-left px-4 py-2 text-xs font-medium text-gray-500">Platform</th>
+                  <th className="text-right px-4 py-2 text-xs font-medium text-gray-500">Messages</th>
+                </tr></thead>
+                <tbody className="divide-y">
+                  {social.messagesByPlatform.map((r: any) => (
+                    <tr key={r.platform} className="hover:bg-gray-50">
+                      <td className="px-4 py-2 capitalize">{(r.platform || "unknown").replace(/_/g, " ")}</td>
+                      <td className="px-4 py-2 text-right font-semibold">{r.cnt}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Campaign ROI by channel */}
+        {social?.campaignsByChannel?.length > 0 && (
+          <div>
+            <h3 className="font-semibold text-sm mb-3">📣 Campaigns by Channel</h3>
+            <div className="border rounded-xl overflow-hidden bg-white">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b"><tr>
+                  <th className="text-left px-4 py-2 text-xs font-medium text-gray-500">Channel</th>
+                  <th className="text-right px-4 py-2 text-xs font-medium text-gray-500">Campaigns</th>
+                  <th className="text-right px-4 py-2 text-xs font-medium text-gray-500">Sent</th>
+                  <th className="text-right px-4 py-2 text-xs font-medium text-gray-500">Reach</th>
+                </tr></thead>
+                <tbody className="divide-y">
+                  {social.campaignsByChannel.map((r: any) => (
+                    <tr key={r.channel} className="hover:bg-gray-50">
+                      <td className="px-4 py-2 capitalize">{r.channel}</td>
+                      <td className="px-4 py-2 text-right font-semibold">{r.cnt}</td>
+                      <td className="px-4 py-2 text-right text-emerald-700 font-semibold">{r.sent}</td>
+                      <td className="px-4 py-2 text-right text-muted-foreground">{r.total}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="text-xs text-muted-foreground text-right">Auto-refreshes every 60 seconds · {new Date().toLocaleTimeString("en-IN")}</div>
+    </div>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function SocialMediaCenter() {
   const { can } = usePermissions();
@@ -718,12 +876,18 @@ export default function SocialMediaCenter() {
           </div>
         </div>
 
-        <Tabs defaultValue="platforms">
+        <Tabs defaultValue="overview">
           <TabsList className="flex-wrap h-auto gap-1">
+            <TabsTrigger value="overview">📊 Overview</TabsTrigger>
             <TabsTrigger value="platforms">📡 Platforms</TabsTrigger>
             <TabsTrigger value="inbox">📬 Unified Inbox</TabsTrigger>
-            <TabsTrigger value="analytics">📊 Analytics</TabsTrigger>
+            <TabsTrigger value="analytics">📈 Analytics</TabsTrigger>
           </TabsList>
+
+          {/* ── Overview tab ──────────────────────────────────────────────── */}
+          <TabsContent value="overview" className="mt-4">
+            <SocialOverview />
+          </TabsContent>
 
           {/* ── Platforms tab ─────────────────────────────────────────────── */}
           <TabsContent value="platforms" className="space-y-4 mt-4">

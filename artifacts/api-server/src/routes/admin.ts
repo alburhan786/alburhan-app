@@ -2714,6 +2714,127 @@ router.get("/pilgrim-ops", requireAdmin as any, async (req: AuthenticatedRequest
 // ════════════════════════════════════════════════════════════════════
 //  ACCEPTANCE TEST — authenticated endpoint to verify all key tables
 // ════════════════════════════════════════════════════════════════════
+// ── Omni-Channel Dashboard Stats ─────────────────────────────────────────────
+router.get("/omni-stats", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
+  try {
+    const [
+      unreadR, pendingR, todayLeadsR, todayBookingsR, missedR,
+      weekLeadsR, weekMsgsR, activityR,
+    ] = await Promise.all([
+      pool.query(`SELECT COUNT(*)::int AS c FROM social_messages WHERE status='unread' AND direction='incoming'`),
+      pool.query(`SELECT COUNT(*)::int AS c FROM social_messages WHERE status IN ('unread','in_progress') AND direction='incoming'`),
+      pool.query(`SELECT COUNT(*)::int AS c FROM leads WHERE created_at::date = CURRENT_DATE`),
+      pool.query(`SELECT COUNT(*)::int AS c FROM bookings WHERE created_at::date = CURRENT_DATE`),
+      pool.query(`SELECT COUNT(*)::int AS c FROM social_messages WHERE status='unread' AND direction='incoming' AND created_at < NOW() - INTERVAL '2 hours'`),
+      pool.query(`SELECT COUNT(*)::int AS c FROM leads WHERE created_at >= NOW() - INTERVAL '7 days'`),
+      pool.query(`SELECT COUNT(*)::int AS c FROM social_messages WHERE created_at >= NOW() - INTERVAL '7 days'`),
+      pool.query(`
+        SELECT * FROM (
+          SELECT
+            'lead' AS type,
+            l.name AS title,
+            l.source AS subtitle,
+            l.mobile AS meta,
+            l.created_at AS ts
+          FROM leads l
+          UNION ALL
+          SELECT
+            'message' AS type,
+            COALESCE(sm.sender_name, sm.sender_id, 'Unknown') AS title,
+            sm.platform AS subtitle,
+            LEFT(sm.message_text, 80) AS meta,
+            sm.created_at AS ts
+          FROM social_messages sm
+          WHERE sm.direction = 'incoming'
+          UNION ALL
+          SELECT
+            'notification' AS type,
+            COALESCE(nl.recipient, 'Customer') AS title,
+            nl.channel AS subtitle,
+            LEFT(nl.message, 80) AS meta,
+            nl.created_at AS ts
+          FROM notification_logs nl
+          WHERE nl.status = 'sent'
+        ) sub
+        ORDER BY ts DESC LIMIT 50
+      `),
+    ]);
+
+    res.json({
+      unread: unreadR.rows[0]?.c ?? 0,
+      pendingReply: pendingR.rows[0]?.c ?? 0,
+      todayLeads: todayLeadsR.rows[0]?.c ?? 0,
+      todayBookings: todayBookingsR.rows[0]?.c ?? 0,
+      missed: missedR.rows[0]?.c ?? 0,
+      weekLeads: weekLeadsR.rows[0]?.c ?? 0,
+      weekMessages: weekMsgsR.rows[0]?.c ?? 0,
+      activity: activityR.rows,
+    });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ── Social Media Stats ────────────────────────────────────────────────────────
+router.get("/social-stats", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
+  try {
+    const [
+      notifByChannelR, leadsBySourceR, msgsByPlatformR, campaignsByChannelR,
+      totalLeadsR, totalMsgsR, totalCampaignsR,
+    ] = await Promise.all([
+      pool.query(`
+        SELECT channel, status, COUNT(*)::int AS cnt
+        FROM notification_logs
+        WHERE created_at >= NOW() - INTERVAL '7 days'
+        GROUP BY channel, status
+        ORDER BY channel, status
+      `),
+      pool.query(`
+        SELECT source, COUNT(*)::int AS cnt
+        FROM leads
+        WHERE created_at >= NOW() - INTERVAL '30 days'
+        GROUP BY source ORDER BY cnt DESC
+      `),
+      pool.query(`
+        SELECT platform, COUNT(*)::int AS cnt
+        FROM social_messages
+        WHERE created_at >= NOW() - INTERVAL '30 days'
+        GROUP BY platform ORDER BY cnt DESC
+      `),
+      pool.query(`
+        SELECT channel, COUNT(*)::int AS cnt,
+          SUM(COALESCE(sent_count,0))::int AS sent,
+          SUM(COALESCE(total_recipients,0))::int AS total
+        FROM marketing_campaigns
+        GROUP BY channel
+      `),
+      pool.query(`SELECT COUNT(*)::int AS c FROM leads`),
+      pool.query(`SELECT COUNT(*)::int AS c FROM social_messages`),
+      pool.query(`SELECT COUNT(*)::int AS c FROM marketing_campaigns`),
+    ]);
+
+    // Build per-channel notification summary
+    const notifMap: Record<string, { sent: number; failed: number; total: number }> = {};
+    for (const row of notifByChannelR.rows) {
+      if (!notifMap[row.channel]) notifMap[row.channel] = { sent: 0, failed: 0, total: 0 };
+      notifMap[row.channel].total += row.cnt;
+      if (row.status === "sent" || row.status === "success") notifMap[row.channel].sent += row.cnt;
+      if (row.status === "failed" || row.status === "error") notifMap[row.channel].failed += row.cnt;
+    }
+    const notifications = Object.entries(notifMap).map(([channel, v]) => ({ channel, ...v }));
+
+    res.json({
+      totals: {
+        leads: totalLeadsR.rows[0]?.c ?? 0,
+        messages: totalMsgsR.rows[0]?.c ?? 0,
+        campaigns: totalCampaignsR.rows[0]?.c ?? 0,
+      },
+      notifications,
+      leadsBySource: leadsBySourceR.rows,
+      messagesByPlatform: msgsByPlatformR.rows,
+      campaignsByChannel: campaignsByChannelR.rows,
+    });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
 router.get("/acceptance-test", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
   const checks: Array<{ name: string; status: "ok" | "error"; count?: number; error?: string }> = [];
 

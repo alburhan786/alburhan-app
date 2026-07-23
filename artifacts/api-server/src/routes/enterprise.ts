@@ -8,6 +8,13 @@ const router = Router();
 
 // ── Lead Intelligence Migration ───────────────────────────────────────────────
 async function ensureLeadIntelligenceTables() {
+  // Campaign ROI columns
+  await pool.query(`ALTER TABLE marketing_campaigns ADD COLUMN IF NOT EXISTS interested_count INT DEFAULT 0`);
+  await pool.query(`ALTER TABLE marketing_campaigns ADD COLUMN IF NOT EXISTS bookings_generated INT DEFAULT 0`);
+  await pool.query(`ALTER TABLE marketing_campaigns ADD COLUMN IF NOT EXISTS revenue_generated NUMERIC(14,2) DEFAULT 0`);
+  await pool.query(`ALTER TABLE marketing_campaigns ADD COLUMN IF NOT EXISTS roi_percent NUMERIC(8,2) DEFAULT 0`);
+  await pool.query(`ALTER TABLE marketing_campaigns ADD COLUMN IF NOT EXISTS channel_tag TEXT`);
+  // Lead intelligence columns
   await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS score VARCHAR(20) DEFAULT 'cold'`);
   await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS score_factors JSONB DEFAULT '{}'::jsonb`);
   await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS passport_number TEXT`);
@@ -366,6 +373,33 @@ router.post("/campaigns/:id/send", requireAdmin as any, async (req: Authenticate
     } catch {}
 
     res.json({ ok: true, total, sent, failed });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ── Campaign ROI Update ───────────────────────────────────────────────────────
+router.put("/campaigns/:id/stats", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { interested_count, bookings_generated, revenue_generated, roi_percent, channel_tag } = req.body;
+    await pool.query(
+      `UPDATE marketing_campaigns SET
+        interested_count = COALESCE($1, interested_count),
+        bookings_generated = COALESCE($2, bookings_generated),
+        revenue_generated = COALESCE($3, revenue_generated),
+        roi_percent = COALESCE($4, roi_percent),
+        channel_tag = COALESCE($5, channel_tag)
+       WHERE id = $6`,
+      [
+        interested_count != null ? parseInt(interested_count) : null,
+        bookings_generated != null ? parseInt(bookings_generated) : null,
+        revenue_generated != null ? parseFloat(revenue_generated) : null,
+        roi_percent != null ? parseFloat(roi_percent) : null,
+        channel_tag || null,
+        id,
+      ]
+    );
+    const r = await pool.query(`SELECT * FROM marketing_campaigns WHERE id = $1`, [id]);
+    res.json(r.rows[0] || { error: "not found" });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 

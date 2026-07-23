@@ -291,6 +291,115 @@ function RightSidebar({ conv, onUpdate, onRefresh }: { conv: any; onUpdate: (dat
   );
 }
 
+// ── Omni Dashboard (shown when no conversation is selected) ───────────────────
+const TYPE_META: Record<string, { icon: string; color: string; label: string }> = {
+  lead:         { icon: "🎯", color: "text-violet-700", label: "Lead" },
+  message:      { icon: "💬", color: "text-blue-700",   label: "Message" },
+  notification: { icon: "🔔", color: "text-amber-700",  label: "Notification" },
+};
+
+function OmniDashboard({ onSelectFilter }: { onSelectFilter: (f: any) => void }) {
+  const [stats, setStats] = React.useState<any>(null);
+  const [loading, setLoading] = React.useState(true);
+
+  const load = React.useCallback(() => {
+    fetch(`${BASE_API}/api/admin/omni-stats`, { credentials: "include" })
+      .then(r => r.json())
+      .then(d => setStats(d))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  React.useEffect(() => {
+    load();
+    const t = setInterval(load, 30000);
+    return () => clearInterval(t);
+  }, [load]);
+
+  const statCards = stats ? [
+    { label: "Unread Messages", value: stats.unread, icon: "📬", color: "text-blue-700",   bg: "bg-blue-50 border-blue-200", filter: { status: "unread" } },
+    { label: "Pending Reply",   value: stats.pendingReply, icon: "⏳", color: "text-amber-700", bg: "bg-amber-50 border-amber-200", filter: { status: "in_progress" } },
+    { label: "Missed (2h+)",    value: stats.missed,   icon: "⚠️", color: "text-red-700",   bg: "bg-red-50 border-red-200", filter: {} },
+    { label: "Today's Leads",   value: stats.todayLeads, icon: "🎯", color: "text-violet-700", bg: "bg-violet-50 border-violet-200", filter: {} },
+    { label: "Today's Bookings",value: stats.todayBookings, icon: "📋", color: "text-green-700", bg: "bg-green-50 border-green-200", filter: {} },
+    { label: "Leads This Week", value: stats.weekLeads, icon: "📈", color: "text-indigo-700", bg: "bg-indigo-50 border-indigo-200", filter: {} },
+  ] : [];
+
+  return (
+    <div className="flex-1 overflow-y-auto bg-muted/5 p-4 space-y-5 hidden md:block">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-bold">Omni-Channel Dashboard</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">All channels in one inbox — WhatsApp, Telegram, Facebook, Instagram, Website, Email, SMS</p>
+        </div>
+        <button onClick={load} className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded border hover:bg-muted transition-colors">
+          ↻ Refresh
+        </button>
+      </div>
+
+      {/* Stat Cards */}
+      {loading ? (
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="border rounded-xl p-4 bg-background animate-pulse">
+              <div className="h-6 w-1/2 bg-muted rounded mb-2" />
+              <div className="h-8 w-1/3 bg-muted rounded" />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+          {statCards.map(s => (
+            <button
+              key={s.label}
+              className={`border rounded-xl p-4 text-left transition-all hover:shadow-md bg-background ${s.bg}`}
+              onClick={() => s.filter && Object.keys(s.filter).length && onSelectFilter(s.filter)}
+            >
+              <div className="text-xl mb-1">{s.icon}</div>
+              <div className={`text-2xl font-bold font-mono ${s.color}`}>{s.value ?? 0}</div>
+              <div className="text-xs text-muted-foreground mt-0.5">{s.label}</div>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Live Activity Feed */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-sm font-bold">Live Activity Feed</h3>
+          <span className="text-[10px] text-muted-foreground bg-green-50 text-green-700 px-2 py-0.5 rounded-full border border-green-200">● Live · refreshes every 30s</span>
+        </div>
+        <div className="border rounded-xl overflow-hidden bg-background divide-y max-h-[420px] overflow-y-auto">
+          {!stats?.activity?.length ? (
+            <div className="py-10 text-center text-muted-foreground text-sm">No activity yet. Messages and leads will appear here.</div>
+          ) : (
+            stats.activity.map((ev: any, i: number) => {
+              const m = TYPE_META[ev.type] || { icon: "📋", color: "text-gray-600", label: ev.type };
+              return (
+                <div key={i} className="flex items-start gap-3 px-4 py-2.5 hover:bg-muted/20 transition-colors">
+                  <span className="text-lg flex-shrink-0 mt-0.5">{m.icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-semibold truncate">{ev.title}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded border ${m.color} bg-white border-current/20`}>{m.label}</span>
+                      {ev.subtitle && <span className="text-[10px] text-muted-foreground capitalize">{String(ev.subtitle).replace(/_/g, " ")}</span>}
+                    </div>
+                    {ev.meta && <p className="text-xs text-muted-foreground truncate mt-0.5">{ev.meta}</p>}
+                  </div>
+                  <span className="text-[10px] text-muted-foreground flex-shrink-0 whitespace-nowrap">
+                    {ev.ts ? fmtTime(ev.ts) : ""}
+                  </span>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // MAIN PAGE
 // ═══════════════════════════════════════════════════════════════════
@@ -627,12 +736,8 @@ export default function OmnichannelInbox() {
             </div>
           </div>
         ) : (
-          /* Empty state */
-          <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground bg-muted/5 hidden md:flex">
-            <MessageCircle size={56} className="mb-4 opacity-15" />
-            <p className="text-lg font-semibold">Select a conversation</p>
-            <p className="text-sm mt-1">All channels in one inbox — WhatsApp, Telegram, Facebook, Instagram, Website, Email, SMS</p>
-          </div>
+          /* Omni Dashboard */
+          <OmniDashboard onSelectFilter={setFilter} />
         )}
 
         {/* ── RIGHT: Customer Profile ─────────────────────────────── */}
