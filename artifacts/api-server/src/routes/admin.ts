@@ -1704,7 +1704,7 @@ router.get("/global-search", requireAdmin as any, async (req: AuthenticatedReque
     const like = `%${q}%`;
     const ilike = `%${q.toLowerCase()}%`;
 
-    const [bookings, pilgrims, agreements, tickets, customers, flights] = await Promise.all([
+    const [bookings, pilgrims, agreements, tickets, customers, flights, invoices] = await Promise.all([
       pool.query(`
         SELECT 'booking' AS category, id::text, booking_number, customer_name, customer_mobile, customer_email, package_name, status, final_amount
         FROM bookings
@@ -1740,6 +1740,13 @@ router.get("/global-search", requireAdmin as any, async (req: AuthenticatedReque
         SELECT 'flight' AS category, id::text, flight_number, airline, route, pnr, departure_date::text
         FROM flights
         WHERE flight_number ILIKE $1 OR airline ILIKE $1 OR pnr ILIKE $1 OR route ILIKE $1
+        LIMIT 10
+      `, [like]).catch(() => ({ rows: [] })),
+      pool.query(`
+        SELECT 'invoice' AS category, id::text, invoice_number, booking_id::text, customer_name,
+               paid_amount, total_amount, status
+        FROM invoices
+        WHERE invoice_number ILIKE $1 OR customer_name ILIKE $1
         LIMIT 10
       `, [like]).catch(() => ({ rows: [] })),
     ]);
@@ -1803,6 +1810,18 @@ router.get("/global-search", requireAdmin as any, async (req: AuthenticatedReque
         title: `${row.flight_number} — ${row.airline}`,
         subtitle: `${row.route || "—"} · PNR: ${row.pnr || "—"}`,
         meta: row.departure_date ? new Date(row.departure_date).toLocaleDateString("en-IN") : "—",
+        raw: row,
+      });
+    }
+    for (const row of invoices.rows) {
+      const paid = Number(row.paid_amount || 0);
+      const total = Number(row.total_amount || 0);
+      results.push({
+        category: "invoice",
+        id: row.id,
+        title: `Invoice ${row.invoice_number || row.id.slice(0, 8)}`,
+        subtitle: row.customer_name || "—",
+        meta: `₹${paid.toLocaleString("en-IN")} / ₹${total.toLocaleString("en-IN")} · ${row.status}`,
         raw: row,
       });
     }
