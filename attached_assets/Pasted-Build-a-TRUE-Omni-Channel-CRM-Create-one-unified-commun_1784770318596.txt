@@ -1,0 +1,626 @@
+Build a TRUE Omni Channel CRM
+
+Create one unified communication center.
+
+Every incoming message automatically becomes a Lead.
+
+Supported sources:
+
+* WhatsApp Business API
+* Facebook Page
+* Facebook Messenger
+* Facebook Lead Ads
+* Instagram DM
+* Instagram Comments
+* Instagram Lead Ads
+* Telegram Bot
+* Telegram Channel
+* SMS
+* Email
+* Website Contact Form
+* Website Package Inquiry
+* Website Live Chat
+* Google Business Messages
+* Google Forms
+* Phone Calls
+* Missed Calls
+* Walk-in Customer
+* Referral
+* Travel Agent
+* QR Code Inquiry
+
+⸻
+
+Automatic Lead Creation
+
+Whenever a customer contacts us through any channel:
+
+Automatically:
+
+Create Lead
+
+OR
+
+Update existing Lead
+
+Rules:
+
+Match using
+
+* Mobile Number
+* WhatsApp Number
+* Email
+* Passport
+* Aadhaar
+* PAN
+
+Never create duplicate customers.
+
+⸻
+
+Lead Dashboard
+
+Add Lead Source field.
+
+Possible values:
+
+* WhatsApp
+* Facebook
+* Instagram
+* Telegram
+* SMS
+* Email
+* Website
+* Google Business
+* Google Ads
+* Referral
+* Walk-in
+* Travel Agent
+* Manual Entry
+
+⸻
+
+Customer 360
+
+Every customer profile should automatically show:
+
+Personal Information
+
+Passport
+
+Aadhaar
+
+PAN
+
+Documents
+
+Emergency Contact
+
+Blood Group
+
+Booking History
+
+Payment History
+
+Invoices
+
+Agreement
+
+Visa
+
+Flight
+
+Hotel
+
+Room
+
+Communication Timeline
+
+WhatsApp
+
+SMS
+
+Email
+
+Facebook Messenger
+
+Instagram
+
+Telegram
+
+Call History
+
+Notes
+
+Tasks
+
+Follow Ups
+
+⸻
+
+Social Media Dashboard
+
+Create separate widgets:
+
+Facebook
+
+Followers
+
+Messages
+
+Comments
+
+Leads
+
+Ads
+
+Instagram
+
+Followers
+
+DM
+
+Comments
+
+Story Replies
+
+Leads
+
+Telegram
+
+Chats
+
+Subscribers
+
+Bot Messages
+
+WhatsApp
+
+Conversations
+
+Templates
+
+Broadcasts
+
+Campaigns
+
+SMS
+
+Sent
+
+Delivered
+
+Failed
+
+Email
+
+Sent
+
+Opened
+
+Clicked
+
+Bounced
+
+⸻
+
+Omni Channel Dashboard
+
+Show:
+
+Unread Messages
+
+Pending Replies
+
+Today’s Leads
+
+Today’s Bookings
+
+Missed Messages
+
+Missed Calls
+
+Campaign Performance
+
+Live Activity Feed
+
+⸻
+
+Automatic Assignment
+
+New Lead
+
+↓
+
+Assign Branch
+
+↓
+
+Assign Sales Executive
+
+↓
+
+Notify Executive
+
+↓
+
+Create Follow-up
+
+↓
+
+Create Customer 360
+
+↓
+
+Send Welcome WhatsApp
+
+↓
+
+Send SMS
+
+↓
+
+Send Email
+
+↓
+
+Create Activity Log
+
+⸻
+
+AI Lead Scoring
+
+Automatically score every lead.
+
+Hot
+
+Warm
+
+Cold
+
+Lost
+
+Calculate using:
+
+Replies
+
+Website Visits
+
+WhatsApp Opens
+
+Package Clicks
+
+Previous Umrah
+
+Previous Hajj
+
+Family Members
+
+Budget
+
+Travel Month
+
+⸻
+
+Campaign Management
+
+Support:
+
+WhatsApp Campaign
+
+Facebook Campaign
+
+Instagram Campaign
+
+Telegram Campaign
+
+SMS Campaign
+
+Email Campaign
+
+Each campaign should show:
+
+Campaign Name
+
+Audience
+
+Sent
+
+Delivered
+
+Opened
+
+Clicked
+
+Replies
+
+Interested
+
+Bookings
+
+Revenue
+
+ROI
+
+⸻
+
+Dashboard Search
+
+Improve the sidebar search.
+
+Searching:
+
+WhatsApp
+
+should find:
+
+WhatsApp Dashboard
+
+Notification Center
+
+Omni Channel
+
+Campaigns
+
+Searching:
+
+Lead
+
+should find:
+
+Lead Dashboard
+
+Lead Manager
+
+Customer 360
+
+CRM Dashboard
+
+Searching:
+
+Instagram
+
+should open Instagram Dashboard
+
+Searching:
+
+Facebook
+
+should open Facebook Dashboard
+
+Searching:
+
+Telegram
+
+should open Telegram Dashboard
+
+Searching:
+
+Customer
+
+should open Customer Dashboard
+
+Customer 360
+
+Bookings
+
+Invoices
+
+Payments
+
+⸻
+
+Sidebar
+
+Do NOT remove any existing item.
+
+Group:
+
+CRM
+
+Lead Dashboard
+
+Customer 360
+
+CRM Dashboard
+
+SRM Dashboard
+
+Marketing
+
+Marketing Dashboard
+
+Omni Channel
+
+Facebook
+
+Instagram
+
+WhatsApp
+
+Telegram
+
+SMS
+
+Email
+
+Notification Center
+
+Operations
+
+Bookings
+
+Visa
+
+Flights
+
+Hotels
+
+Transport
+
+QR
+
+Guide
+
+Reports
+
+Administration
+
+Security
+
+Settings
+
+API
+
+Audit
+
+Activity
+
+Backup
+
+⸻
+
+Analytics
+
+Live Dashboard:
+
+Total Leads
+
+Today’s Leads
+
+Lead Sources
+
+Conversion %
+
+Revenue
+
+WhatsApp Sent
+
+Instagram Leads
+
+Facebook Leads
+
+Telegram Leads
+
+SMS Delivered
+
+Email Open Rate
+
+Top Executive
+
+Top Branch
+
+Top Campaign
+
+⸻
+
+Reports
+
+Generate reports by:
+
+Source
+
+Branch
+
+Executive
+
+Package
+
+Campaign
+
+Date
+
+City
+
+Country
+
+Travel Month
+
+⸻
+
+Security
+
+Role permissions:
+
+Super Admin
+
+Admin
+
+Branch Manager
+
+Sales Executive
+
+Marketing
+
+Finance
+
+Guide
+
+Customer
+
+Every role only sees its own permissions.
+
+⸻
+
+Production Requirements
+
+Do NOT use mock data.
+
+Use PostgreSQL.
+
+Use existing APIs.
+
+Do not break:
+
+Authentication
+
+Bookings
+
+Invoices
+
+Payments
+
+Customer Dashboard
+
+Customer Portal
+
+Notifications
+
+Documents
+
+Sidebar
+
+Search
+
+Roles
+
+Permissions
+
+Routes
+
+Database
+
+⸻
+
+Final Acceptance Checklist
+
+* No modules removed
+* No database migrations that lose data
+* No broken routes
+* No 404 pages
+* No duplicate leads
+* Social channels automatically create leads
+* Customer 360 updates automatically
+* Omni Channel working
+* Sidebar search finds every module
+* Dashboard cards navigate correctly
+* Mobile responsive
+* Chrome compatible
+* Production build passes
+* API build passes
+* Zero console errors
+* Zero TypeScript errors
+* Zero build errors
+* All existing functionality preserved
+
+Implement this as an enhancement to the existing ERP, not as a redesign or replacement. Preserve all production data, APIs, dashboards, permissions, and integrations while adding the new omni-channel lead management capabilities.
