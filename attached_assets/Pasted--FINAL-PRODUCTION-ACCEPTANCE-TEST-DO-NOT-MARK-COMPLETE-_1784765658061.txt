@@ -1,0 +1,137 @@
+# FINAL PRODUCTION ACCEPTANCE TEST (DO NOT MARK COMPLETE UNTIL EVERYTHING IS VERIFIED)
+
+The previous task was marked complete, but the Admin Dashboard still needs final verification.
+
+IMPORTANT:
+Do NOT assume the work is finished because the code compiles or the API is running.
+
+Perform a complete visual audit of the LIVE Admin Dashboard rendered in Google Chrome.
+
+Requirements:
+
+1. Verify every dashboard section is visible:
+- Portals
+- Dashboards & Business Intelligence
+- Finance & Accounting
+- CRM, Sales & Loyalty
+- HR & Workforce
+- Bookings & Pilgrim Operations
+- Communication & Marketing
+- Administration & Security
+
+2. Verify every module card exists and is visible.
+
+Specifically verify these modules are present:
+
+- Super Admin Dashboard
+- Branch Dashboard
+- Branch Login Management
+- Agent Dashboard
+- Agent Login Management
+- Staff Dashboard
+- Customer Dashboard
+- Admin Dashboard
+- Executive Dashboard
+- Operations Dashboard
+- Manager Dashboard
+- Business Intelligence
+- Finance Dashboard
+- Accounting Dashboard
+- Payment Dashboard
+- Invoice Dashboard
+- CRM Dashboard
+- Lead Manager
+- Lead Dashboard
+- Customer 360 Profile
+- Loyalty & Rewards
+- SRM Dashboard
+- Supplier Dashboard
+- Procurement Dashboard
+- Inventory Dashboard
+- HR Dashboard
+- Payroll Dashboard
+- Marketing Dashboard
+- Omni Channel Dashboard
+- Social Media Integration
+- WhatsApp Dashboard
+- SMS Dashboard
+- Email Dashboard
+- Notification Center
+- Bookings
+- Offline Booking
+- Hajj Groups
+- Umrah Groups
+- Visa Dashboard
+- Flight Dashboard
+- Hotel Dashboard
+- Transport Dashboard
+- Room Allocation
+- QR Tracker
+- Print Center
+- Agreement Dashboard
+- KYC Dashboard
+- Guide Panel
+- Ziyarat Dashboard
+- Pilgrim Reports
+- Security Dashboard
+- Audit Log Dashboard
+- Activity Dashboard
+- Backup Dashboard
+- API Dashboard
+- Integration Dashboard
+- Settings Dashboard
+
+3. Add a GLOBAL SIDEBAR SEARCH.
+
+The sidebar search must search:
+- Modules
+- Routes
+- Customers
+- Bookings
+- Invoices
+- Reports
+- Settings
+
+Include:
+- Instant search
+- Auto-complete
+- Keyboard shortcut (Ctrl+K)
+- Recent searches
+- Favourite modules
+- Mobile support
+
+4. Verify every card:
+- Opens the correct page
+- Uses live PostgreSQL data
+- Has no hardcoded/demo values
+- Has no broken routes
+- Has no React errors
+- Has no console errors
+
+5. Produce a final checklist with:
+✓ Present
+✗ Missing
+
+for every single module.
+
+6. If even ONE module is missing:
+- Do NOT mark the task complete.
+- Restore the missing module.
+- Rebuild.
+- Re-test.
+- Repeat until 100% complete.
+
+7. Only mark complete when:
+- 100% of modules are present.
+- 100% of routes work.
+- 100% of cards are visible.
+- 100% of sidebar items are present.
+- Sidebar Search is working.
+- Customer 360 Profile is restored.
+- Lead Manager is restored.
+- Omni Channel is restored.
+- Social Media Integration is restored.
+- No data loss.
+- No deleted modules.
+- No hidden cards.
+- Production Ready.
