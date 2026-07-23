@@ -27,6 +27,7 @@ import {
   MapPin, Tent, Tag, Bot, Award, Smartphone, Layers, Mail, Globe, FileText, TestTube2, History,
   Headphones, Target, Brain, AlarmClock, Handshake, Briefcase, ShoppingCart,
   Workflow, Hotel, IndianRupee, LayoutGrid, Code2, Plug, Lock, Archive, Shield, Share2,
+  Camera, Send, Bell,
 } from "lucide-react";
 import type { Module, Action } from "@/hooks/use-permissions";
 
@@ -179,6 +180,10 @@ export function buildNavSections(openComplaints = 0): NavSection[] {
         { icon: BellRing,      label: "Communication Center",           href: "/admin/communication-center",    require: ["customers", "edit"], aliases: ["communication", "comm center", "notify", "alerts"] },
         { icon: Zap,           label: "Workflow Center",                href: "/admin/workflow-center",         require: ["bookings",  "edit"], aliases: ["workflow", "pipeline", "automation", "triggers"] },
         { icon: Bot,           label: "WhatsApp Dashboard",             href: "/admin/botbee-dashboard",        require: ["settings",  "view"], aliases: ["whatsapp", "wa", "waba", "botbee", "chat", "messages", "wapp"] },
+        { icon: MessageSquare, label: "Facebook Dashboard",             href: "/admin/social-media#facebook",   require: ["settings",  "view"], aliases: ["facebook", "fb", "messenger", "facebook page", "meta", "social"] },
+        { icon: Camera,        label: "Instagram Dashboard",            href: "/admin/social-media#instagram",  require: ["settings",  "view"], aliases: ["instagram", "ig", "instagram dm", "instagram messages", "reels", "social"] },
+        { icon: Send,          label: "Telegram Dashboard",             href: "/admin/social-media#telegram",   require: ["settings",  "view"], aliases: ["telegram", "tg", "telegram bot", "telegram channel", "social"] },
+        { icon: Bell,          label: "Notification Center",            href: "/admin/notifications",           require: ["settings",  "view"], aliases: ["notification", "notify", "push", "alert", "bell", "whatsapp", "sms", "email"] },
         { icon: MessageSquare, label: "SMS Dashboard",                  href: "/admin/sms-dashboard",           require: ["settings",  "view"], aliases: ["sms", "text", "dlt", "bulk sms", "fast2sms", "short message"] },
         { icon: Mail,          label: "Email Dashboard",                href: "/admin/email-dashboard",         require: ["settings",  "view"], aliases: ["email", "mail", "smtp", "newsletter"] },
         { icon: HeartPulse,    label: "Notification Dashboard",         href: "/admin/notification-health",     require: ["settings",  "view"], aliases: ["notification", "push", "alert", "bell", "notify", "whatsapp"] },

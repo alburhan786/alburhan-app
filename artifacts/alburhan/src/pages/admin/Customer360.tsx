@@ -297,16 +297,13 @@ export default function Customer360() {
   useEffect(() => {
     if (activeTab !== "tasks" || !data?.user?.mobile) return;
     setTasksLoading(true);
-    fetch(`${API}/api/enterprise/tasks?category=customer&limit=200`, { credentials: "include" })
+    const mobile = data!.user!.mobile;
+    const qs = new URLSearchParams({ category: "customer", openOnly: "1", customerMobile: mobile }).toString();
+    fetch(`${API}/api/enterprise/tasks?${qs}`, { credentials: "include" })
       .then(r => r.ok ? r.json() : [])
       .then(d => {
-        const mobile = data!.user!.mobile;
         const all: any[] = Array.isArray(d) ? d : (d.tasks || d.data || []);
-        const last9 = mobile.replace(/\D/g, "").slice(-9);
-        setTasks(all.filter((t: any) =>
-          (t.description && t.description.includes(last9)) ||
-          (t.assigned_name && t.assigned_name === (data?.user?.name || ""))
-        ));
+        setTasks(all);
       })
       .catch(() => {})
       .finally(() => setTasksLoading(false));

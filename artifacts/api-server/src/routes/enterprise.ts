@@ -209,12 +209,20 @@ async function autoAssignLead(leadId: string): Promise<void> {
 
 router.get("/tasks", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
-    const { status, assignedTo, category } = req.query as any;
+    const { status, assignedTo, category, customerMobile, openOnly } = req.query as any;
     const conds: string[] = [];
     const params: any[] = [];
     if (status) { params.push(status); conds.push(`status = $${params.length}`); }
     if (assignedTo) { params.push(assignedTo); conds.push(`assigned_to = $${params.length}`); }
     if (category) { params.push(category); conds.push(`category = $${params.length}`); }
+    if (customerMobile) {
+      const last9 = String(customerMobile).replace(/\D/g, "").slice(-9);
+      params.push(`%${last9}%`);
+      conds.push(`(description ILIKE $${params.length} OR assigned_name ILIKE $${params.length})`);
+    }
+    if (openOnly === "1" || openOnly === "true") {
+      conds.push(`status NOT IN ('completed','done','cancelled')`);
+    }
     const where = conds.length ? "WHERE " + conds.join(" AND ") : "";
     const r = await pool.query(
       `SELECT * FROM tasks ${where} ORDER BY

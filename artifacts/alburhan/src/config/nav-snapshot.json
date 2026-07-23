@@ -77,6 +77,10 @@
     "/admin/communication-center",
     "/admin/workflow-center",
     "/admin/botbee-dashboard",
+    "/admin/social-media#facebook",
+    "/admin/social-media#instagram",
+    "/admin/social-media#telegram",
+    "/admin/notifications",
     "/admin/sms-dashboard",
     "/admin/email-dashboard",
     "/admin/notification-health",
@@ -336,11 +340,6 @@
       "reason": "Accessible via URL; intentionally omitted from sidebar navigation."
     },
     {
-      "route": "/admin/notifications",
-      "component": "unknown",
-      "reason": "Accessible via URL; intentionally omitted from sidebar navigation."
-    },
-    {
       "route": "/admin/search",
       "component": "unknown",
       "reason": "Accessible via URL; intentionally omitted from sidebar navigation."
@@ -364,10 +363,10 @@
     }
   ],
   "stats": {
-    "totalNavItems": 120,
+    "totalNavItems": 124,
     "totalRoles": 12,
     "totalRoutes": 189,
-    "totalHiddenPages": 3,
+    "totalHiddenPages": 2,
     "totalPrintOnlyPages": 3
   }
 }
