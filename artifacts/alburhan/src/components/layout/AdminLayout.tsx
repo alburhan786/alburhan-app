@@ -8,13 +8,14 @@
 import { ReactNode, useEffect, useState, useMemo, useCallback } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { LogOut, Menu, ChevronDown, ChevronRight, ChevronLeft, Home } from "lucide-react";
+import { LogOut, Menu, ChevronDown, ChevronRight, ChevronLeft, Home, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useAdminNotifications } from "@/hooks/useAdminNotifications";
 import { AdminNotificationCenter } from "@/components/admin/AdminNotificationCenter";
 import { BookingNotificationPopup } from "@/components/admin/BookingNotificationPopup";
 import { buildNavSections } from "@/config/navigation";
+import { CommandPalette } from "@/components/ui/CommandPalette";
 
 const API = import.meta.env.VITE_API_URL || "";
 const STORAGE_KEY = "ab-sidebar-collapsed";
@@ -30,6 +31,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openComplaints, setOpenComplaints] = useState(0);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(loadCollapsed);
+  const [commandOpen, setCommandOpen] = useState(false);
   const { can, roleLabel, roleColor, isSuper } = usePermissions();
 
   const {
@@ -81,6 +83,18 @@ export function AdminLayout({ children }: { children: ReactNode }) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
       return next;
     });
+  }, []);
+
+  // ── Global Ctrl+K / Cmd+K listener ──────────────────────────────────────
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        e.preventDefault();
+        setCommandOpen(prev => !prev);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
   // ── Breadcrumb bar with back button ─────────────────────────────────────
@@ -220,6 +234,16 @@ export function AdminLayout({ children }: { children: ReactNode }) {
       {/* ── Desktop Sidebar (w-60) ──────────────────────────────────── */}
       <aside className="w-60 bg-primary text-primary-foreground flex-col hidden md:flex sticky top-0 h-screen">
         <SidebarHeader />
+        <div className="px-3 pt-2 pb-1 shrink-0">
+          <button
+            onClick={() => setCommandOpen(true)}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-primary-foreground/10 hover:bg-primary-foreground/15 transition-colors text-primary-foreground/60 hover:text-primary-foreground/90 text-[12px]"
+          >
+            <Search size={13} className="shrink-0" />
+            <span className="flex-1 text-left">Search…</span>
+            <kbd className="text-[9px] font-mono bg-primary-foreground/10 px-1.5 py-0.5 rounded">⌘K</kbd>
+          </button>
+        </div>
         <SidebarNav />
         <SidebarFooter />
       </aside>
@@ -230,6 +254,15 @@ export function AdminLayout({ children }: { children: ReactNode }) {
           <div className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)} />
           <aside className="relative w-64 bg-primary text-primary-foreground flex flex-col h-full shadow-2xl">
             <SidebarHeader />
+            <div className="px-3 pt-2 pb-1 shrink-0">
+              <button
+                onClick={() => { setMobileOpen(false); setCommandOpen(true); }}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-primary-foreground/10 hover:bg-primary-foreground/15 transition-colors text-primary-foreground/60 hover:text-primary-foreground/90 text-[12px]"
+              >
+                <Search size={13} className="shrink-0" />
+                <span className="flex-1 text-left">Search…</span>
+              </button>
+            </div>
             <SidebarNav />
             <SidebarFooter />
           </aside>
@@ -258,6 +291,8 @@ export function AdminLayout({ children }: { children: ReactNode }) {
       {popupNotif && (
         <BookingNotificationPopup notif={popupNotif} onDismiss={dismissPopup} />
       )}
+
+      <CommandPalette open={commandOpen} onClose={() => setCommandOpen(false)} />
     </div>
   );
 }
