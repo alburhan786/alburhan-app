@@ -647,8 +647,8 @@ const PLATFORM_CONFIGS = [
     key: "instagram",  icon: "📸", label: "Instagram",
     color: "#e1306c", bg: "bg-pink-50",   border: "border-pink-200",
     // Instagram: Followers, DM count, Comments, Story Replies, Leads
-    metricsKeys: ["dmCount30d", "storyReplies30d", "leads", "campaigns"],
-    metricsLabels: ["DMs (30d)", "Story Replies (30d)", "Leads", "Campaigns"],
+    metricsKeys: ["dmCount30d", "comments30d", "storyReplies30d", "leads"],
+    metricsLabels: ["DMs (30d)", "Comments (30d)", "Story Replies (30d)", "Leads"],
     showFollowers: true,
   },
   {
@@ -664,8 +664,8 @@ const PLATFORM_CONFIGS = [
     key: "whatsapp",   icon: "💬", label: "WhatsApp",
     color: "#25d366", bg: "bg-emerald-50", border: "border-emerald-200",
     // WhatsApp: Conversations, Templates sent, Broadcasts, Campaigns
-    metricsKeys: ["messages30d", "templatesSent30d", "broadcasts"],
-    metricsLabels: ["Conversations (30d)", "Templates Sent (30d)", "Broadcasts"],
+    metricsKeys: ["messages30d", "templatesSent30d", "broadcasts", "campaigns"],
+    metricsLabels: ["Conversations (30d)", "Templates Sent (30d)", "Broadcasts", "Campaigns"],
     showFollowers: false,
   },
   {
@@ -773,12 +773,21 @@ function SocialOverview() {
                     </div>
                   ))}
                 </div>
-                {/* Today activity for social channels */}
-                {cfg.showFollowers && (p.messagesToday ?? 0) > 0 && (
-                  <div className="mt-2 pt-2 border-t border-current/10 text-xs text-muted-foreground">
-                    <span className="text-green-700 font-semibold">+{p.messagesToday}</span> messages today
-                  </div>
-                )}
+                {/* Footer: today activity + Configure link */}
+                <div className="mt-2 pt-2 border-t border-current/10 flex items-center justify-between">
+                  {cfg.showFollowers && (p.messagesToday ?? 0) > 0 ? (
+                    <span className="text-xs text-muted-foreground">
+                      <span className="text-green-700 font-semibold">+{p.messagesToday}</span> today
+                    </span>
+                  ) : <span />}
+                  <a
+                    href="/admin/social-media"
+                    className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-0.5 transition-colors"
+                    title={`Configure ${cfg.label}`}
+                  >
+                    ⚙️ Configure
+                  </a>
+                </div>
               </div>
             );
           })}

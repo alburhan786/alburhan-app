@@ -397,22 +397,19 @@ export default function MarketingCenter() {
                           )}
                           {c.sent_at && <span className="text-xs text-muted-foreground">{new Date(c.sent_at).toLocaleDateString("en-IN")}</span>}
                         </div>
-                        {/* Engagement + ROI row */}
-                        {(c.opened_count > 0 || c.clicked_count > 0 || c.replies_count > 0) && (
-                          <div className="flex items-center gap-3 mt-0.5 text-xs">
-                            {c.opened_count > 0 && <span className="text-sky-600 font-medium">👁 {c.opened_count} opened</span>}
-                            {c.clicked_count > 0 && <span className="text-indigo-600 font-medium">🔗 {c.clicked_count} clicked</span>}
-                            {c.replies_count > 0 && <span className="text-teal-600 font-medium">💬 {c.replies_count} replies</span>}
-                          </div>
-                        )}
-                        {hasRoi && (
-                          <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
-                            {c.interested_count > 0 && <span className="text-violet-600 font-medium">{c.interested_count} interested</span>}
-                            {c.bookings_generated > 0 && <span className="text-blue-600 font-medium">{c.bookings_generated} bookings</span>}
-                            {c.revenue_generated > 0 && <span className="text-green-600 font-medium">{fmtCurrency(c.revenue_generated)} revenue</span>}
-                            {c.roi_percent > 0 && <span className="text-amber-600 font-bold">ROI {c.roi_percent}%</span>}
-                          </div>
-                        )}
+                        {/* Engagement row — always visible */}
+                        <div className="flex items-center gap-3 mt-0.5 text-xs">
+                          <span className={c.opened_count > 0 ? "text-sky-600 font-medium" : "text-muted-foreground"}>👁 {c.opened_count ?? 0} opened</span>
+                          <span className={c.clicked_count > 0 ? "text-indigo-600 font-medium" : "text-muted-foreground"}>🔗 {c.clicked_count ?? 0} clicked</span>
+                          <span className={c.replies_count > 0 ? "text-teal-600 font-medium" : "text-muted-foreground"}>💬 {c.replies_count ?? 0} replies</span>
+                        </div>
+                        {/* ROI row — always visible */}
+                        <div className="flex items-center gap-3 mt-0.5 text-xs">
+                          <span className={c.interested_count > 0 ? "text-violet-600 font-medium" : "text-muted-foreground"}>{c.interested_count ?? 0} interested</span>
+                          <span className={c.bookings_generated > 0 ? "text-blue-600 font-medium" : "text-muted-foreground"}>{c.bookings_generated ?? 0} bookings</span>
+                          <span className={c.revenue_generated > 0 ? "text-green-600 font-medium" : "text-muted-foreground"}>{fmtCurrency(c.revenue_generated ?? 0)} revenue</span>
+                          <span className={c.roi_percent > 0 ? "text-amber-600 font-bold" : "text-muted-foreground"}>ROI {c.roi_percent ?? 0}%</span>
+                        </div>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         {statusBadge(c.status)}

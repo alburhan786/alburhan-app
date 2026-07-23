@@ -2985,19 +2985,21 @@ router.get("/social-stats", requireAdmin as any, async (_req: AuthenticatedReque
 
     // Fetch additional per-platform metrics from DB
     const [
-      waTemplatesR, waBroadcastsR, fbCommentsR, igDMsR, igStoryRepliesR,
+      waTemplatesR, waBroadcastsR, fbCommentsR, igDMsR, igStoryRepliesR, igCommentsR,
       smsSentR, emailNotifR,
     ] = await Promise.all([
       // WhatsApp templates sent (last 30d)
       pool.query(`SELECT COUNT(*)::int AS c FROM notification_logs WHERE channel='whatsapp' AND created_at >= NOW()-INTERVAL '30 days'`),
       // WhatsApp broadcasts (campaigns)
       pool.query(`SELECT COUNT(*)::int AS c FROM marketing_campaigns WHERE channel='whatsapp'`),
-      // Facebook comments (messages from facebook_page / facebook_messenger with message_type like 'comment')
+      // Facebook: messages from facebook platforms (30d)
       pool.query(`SELECT COUNT(*)::int AS c FROM social_messages WHERE platform IN ('facebook_page','facebook_messenger','facebook') AND created_at >= NOW()-INTERVAL '30 days'`),
-      // Instagram DMs
+      // Instagram DMs (incoming)
       pool.query(`SELECT COUNT(*)::int AS c FROM social_messages WHERE platform IN ('instagram','instagram_dm') AND direction='incoming' AND created_at >= NOW()-INTERVAL '30 days'`),
-      // Instagram story replies (message_type='story_reply')
+      // Instagram story replies
       pool.query(`SELECT COUNT(*)::int AS c FROM social_messages WHERE platform IN ('instagram','instagram_dm') AND message_type='story_reply' AND created_at >= NOW()-INTERVAL '30 days'`),
+      // Instagram comments (message_type='comment')
+      pool.query(`SELECT COUNT(*)::int AS c FROM social_messages WHERE platform IN ('instagram','instagram_dm') AND message_type='comment' AND created_at >= NOW()-INTERVAL '30 days'`),
       // SMS: sent / failed from notification_logs
       pool.query(`SELECT status, COUNT(*)::int AS c FROM notification_logs WHERE channel='sms' AND created_at >= NOW()-INTERVAL '30 days' GROUP BY status`),
       // Email: sent / failed from notification_logs
@@ -3039,9 +3041,8 @@ router.get("/social-stats", requireAdmin as any, async (_req: AuthenticatedReque
       if (p === "facebook") {
         platforms[p] = { ...base, comments30d: fbCommentsR.rows[0]?.c ?? 0, adsPerformance: camp.sent };
       } else if (p === "instagram") {
-        platforms[p] = { ...base, dmCount30d: igDMsR.rows[0]?.c ?? 0, storyReplies30d: igStoryRepliesR.rows[0]?.c ?? 0 };
+        platforms[p] = { ...base, dmCount30d: igDMsR.rows[0]?.c ?? 0, storyReplies30d: igStoryRepliesR.rows[0]?.c ?? 0, comments30d: igCommentsR.rows[0]?.c ?? 0 };
       } else if (p === "telegram") {
-        const tgCfg = configMap["telegram"] || configMap["telegram_channel"];
         platforms[p] = { ...base, chats: msgPlatMap["telegram"] || 0, subscribers: followerCounts["telegram"] ?? "--", botMessages: msgPlatMap["telegram"] || 0 };
       } else if (p === "whatsapp") {
         platforms[p] = { ...base, templatesSent30d: waTemplatesR.rows[0]?.c ?? 0, broadcasts: waBroadcastsR.rows[0]?.c ?? 0 };
