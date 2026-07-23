@@ -72,7 +72,7 @@ router.get("/", (_req, res) => {
 });
 
 // ── Build fingerprint — confirms which bundle is running on VPS (no auth needed) ──
-const BUILD_STAMP = "2026-07-22-v26.0-omnichannel-inbox";
+const BUILD_STAMP = "2026-07-23-v26.1-omni-social-marketing-fixed";
 router.get("/version", (_req, res) => {
   res.json({
     build: BUILD_STAMP,
@@ -341,6 +341,7 @@ router.use("/agreements", agreementsRouter);
 router.use("/customer/journey", customerJourneyRouter);
 router.use("/support", supportRouter);
 router.use("/enterprise", enterpriseRouter);
+router.use("/marketing", enterpriseRouter);
 router.use("/portal", portalRouter);
 router.use("/sms-settings", smsSettingsRouter);
 router.use("/social-media", socialMediaRouter);

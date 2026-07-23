@@ -634,6 +634,51 @@ function AnalyticsTab() {
 }
 
 // ── Social Overview Component ─────────────────────────────────────────────────
+const PLATFORM_CONFIGS = [
+  {
+    key: "facebook",   icon: "📘", label: "Facebook",
+    color: "#1877f2", bg: "bg-blue-50",   border: "border-blue-200",
+    metricsKeys: ["messages30d", "leads", "campaigns"],
+    metricsLabels: ["Messages (30d)", "Leads", "Campaigns"],
+    showFollowers: true,
+  },
+  {
+    key: "instagram",  icon: "📸", label: "Instagram",
+    color: "#e1306c", bg: "bg-pink-50",   border: "border-pink-200",
+    metricsKeys: ["messages30d", "leads", "campaigns"],
+    metricsLabels: ["Messages (30d)", "Leads", "Campaigns"],
+    showFollowers: true,
+  },
+  {
+    key: "telegram",   icon: "✈️", label: "Telegram",
+    color: "#0088cc", bg: "bg-cyan-50",   border: "border-cyan-200",
+    metricsKeys: ["messages30d", "leads", "campaigns"],
+    metricsLabels: ["Messages (30d)", "Leads", "Campaigns"],
+    showFollowers: true,
+  },
+  {
+    key: "whatsapp",   icon: "💬", label: "WhatsApp",
+    color: "#25d366", bg: "bg-emerald-50", border: "border-emerald-200",
+    metricsKeys: ["messages30d", "notifSent7d", "campaignsSent"],
+    metricsLabels: ["Messages (30d)", "Notifs Sent (7d)", "Campaigns Sent"],
+    showFollowers: false,
+  },
+  {
+    key: "sms",        icon: "📱", label: "SMS",
+    color: "#2563eb", bg: "bg-blue-50",   border: "border-blue-100",
+    metricsKeys: ["notifSent7d", "notifFailed7d", "campaigns"],
+    metricsLabels: ["Sent (7d)", "Failed (7d)", "Campaigns"],
+    showFollowers: false,
+  },
+  {
+    key: "email",      icon: "✉️", label: "Email",
+    color: "#7c3aed", bg: "bg-violet-50", border: "border-violet-200",
+    metricsKeys: ["notifSent7d", "notifFailed7d", "campaigns"],
+    metricsLabels: ["Sent (7d)", "Failed (7d)", "Campaigns"],
+    showFollowers: false,
+  },
+];
+
 function SocialOverview() {
   const [omni, setOmni] = useState<any>(null);
   const [social, setSocial] = useState<any>(null);
@@ -653,12 +698,16 @@ function SocialOverview() {
   useEffect(() => { load(); const t = setInterval(load, 60000); return () => clearInterval(t); }, [load]);
 
   if (loading) return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-      {Array.from({ length: 8 }).map((_, i) => (
-        <div key={i} className="border rounded-xl p-4 bg-white animate-pulse"><div className="h-8 w-1/2 bg-gray-100 rounded mb-2"/><div className="h-6 w-1/3 bg-gray-100 rounded"/></div>
-      ))}
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="border rounded-xl p-4 bg-white animate-pulse"><div className="h-8 w-1/2 bg-gray-100 rounded mb-2"/><div className="h-6 w-1/3 bg-gray-100 rounded"/></div>
+        ))}
+      </div>
     </div>
   );
+
+  const platforms = social?.platforms || {};
 
   const topCards = omni ? [
     { icon: "📬", label: "Unread Messages",  value: omni.unread,        color: "#2563eb" },
@@ -666,52 +715,70 @@ function SocialOverview() {
     { icon: "⚠️", label: "Missed (2h+)",     value: omni.missed,        color: "#dc2626" },
     { icon: "🎯", label: "Today's Leads",     value: omni.todayLeads,    color: "#7c3aed" },
     { icon: "📋", label: "Today's Bookings",  value: omni.todayBookings, color: "#16a34a" },
-    { icon: "📈", label: "Leads This Week",   value: omni.weekLeads,     color: "#0891b2" },
-    { icon: "💬", label: "Messages 7d",       value: omni.weekMessages,  color: "#9333ea" },
     { icon: "📊", label: "Total Campaigns",   value: social?.totals?.campaigns ?? 0, color: "#ea580c" },
   ] : [];
 
   return (
     <div className="space-y-6">
-      {/* Stat grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* Summary stat strip */}
+      <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
         {topCards.map(s => (
-          <div key={s.label} className="border rounded-xl p-4 bg-white shadow-sm">
-            <div className="text-2xl mb-1">{s.icon}</div>
-            <div className="text-2xl font-bold font-mono" style={{ color: s.color }}>{s.value ?? 0}</div>
-            <div className="text-xs text-muted-foreground mt-0.5">{s.label}</div>
+          <div key={s.label} className="border rounded-xl p-3 bg-white shadow-sm text-center">
+            <div className="text-xl mb-0.5">{s.icon}</div>
+            <div className="text-xl font-bold font-mono" style={{ color: s.color }}>{s.value ?? 0}</div>
+            <div className="text-[10px] text-muted-foreground">{s.label}</div>
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Notification channel health (7d) */}
-        {social?.notifications?.length > 0 && (
-          <div>
-            <h3 className="font-semibold text-sm mb-3">📡 Channel Health — Last 7 Days</h3>
-            <div className="border rounded-xl overflow-hidden bg-white divide-y">
-              {social.notifications.map((n: any) => {
-                const pct = n.total > 0 ? Math.round((n.sent / n.total) * 100) : 0;
-                return (
-                  <div key={n.channel} className="px-4 py-3">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium capitalize">{n.channel}</span>
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        <span className="text-green-600 font-semibold">{n.sent} sent</span>
-                        {n.failed > 0 && <span className="text-red-500">{n.failed} failed</span>}
-                        <span className="font-bold text-foreground">{pct}%</span>
-                      </div>
-                    </div>
-                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full bg-green-500 transition-all" style={{ width: `${pct}%` }} />
-                    </div>
+      {/* 6 Per-Platform Stat Widgets */}
+      <div>
+        <h3 className="font-semibold text-sm mb-3">📡 Per-Platform Overview</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {PLATFORM_CONFIGS.map(cfg => {
+            const p = platforms[cfg.key] || {};
+            const deliveryRate = p.deliveryRate;
+            return (
+              <div key={cfg.key} className={`border ${cfg.border} rounded-xl p-4 ${cfg.bg} bg-opacity-60`}>
+                {/* Header */}
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">{cfg.icon}</span>
+                    <span className="font-bold text-sm">{cfg.label}</span>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+                  {cfg.showFollowers && (
+                    <span className="text-xs text-muted-foreground bg-white/80 px-2 py-0.5 rounded-full border">
+                      👥 {p.followers ?? "--"}
+                    </span>
+                  )}
+                  {!cfg.showFollowers && deliveryRate !== null && deliveryRate !== undefined && (
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${deliveryRate >= 80 ? "bg-green-100 text-green-700" : deliveryRate >= 50 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"}`}>
+                      {deliveryRate}% delivery
+                    </span>
+                  )}
+                </div>
+                {/* Metrics */}
+                <div className="grid grid-cols-3 gap-2">
+                  {cfg.metricsKeys.map((mk, idx) => (
+                    <div key={mk} className="text-center">
+                      <p className="text-lg font-bold font-mono" style={{ color: cfg.color }}>{p[mk] ?? 0}</p>
+                      <p className="text-[10px] text-muted-foreground leading-tight">{cfg.metricsLabels[idx]}</p>
+                    </div>
+                  ))}
+                </div>
+                {/* Today activity for social channels */}
+                {cfg.showFollowers && (p.messagesToday ?? 0) > 0 && (
+                  <div className="mt-2 pt-2 border-t border-current/10 text-xs text-muted-foreground">
+                    <span className="text-green-700 font-semibold">+{p.messagesToday}</span> messages today
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Leads by source (30d) */}
         {social?.leadsBySource?.length > 0 && (
           <div>
@@ -735,52 +802,28 @@ function SocialOverview() {
           </div>
         )}
 
-        {/* Messages by platform (30d) */}
-        {social?.messagesByPlatform?.length > 0 && (
-          <div>
-            <h3 className="font-semibold text-sm mb-3">💬 Messages by Platform — Last 30 Days</h3>
-            <div className="border rounded-xl overflow-hidden bg-white">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b"><tr>
-                  <th className="text-left px-4 py-2 text-xs font-medium text-gray-500">Platform</th>
-                  <th className="text-right px-4 py-2 text-xs font-medium text-gray-500">Messages</th>
-                </tr></thead>
-                <tbody className="divide-y">
-                  {social.messagesByPlatform.map((r: any) => (
-                    <tr key={r.platform} className="hover:bg-gray-50">
-                      <td className="px-4 py-2 capitalize">{(r.platform || "unknown").replace(/_/g, " ")}</td>
-                      <td className="px-4 py-2 text-right font-semibold">{r.cnt}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* Campaign ROI by channel */}
+        {/* Campaign performance */}
         {social?.campaignsByChannel?.length > 0 && (
           <div>
             <h3 className="font-semibold text-sm mb-3">📣 Campaigns by Channel</h3>
-            <div className="border rounded-xl overflow-hidden bg-white">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b"><tr>
-                  <th className="text-left px-4 py-2 text-xs font-medium text-gray-500">Channel</th>
-                  <th className="text-right px-4 py-2 text-xs font-medium text-gray-500">Campaigns</th>
-                  <th className="text-right px-4 py-2 text-xs font-medium text-gray-500">Sent</th>
-                  <th className="text-right px-4 py-2 text-xs font-medium text-gray-500">Reach</th>
-                </tr></thead>
-                <tbody className="divide-y">
-                  {social.campaignsByChannel.map((r: any) => (
-                    <tr key={r.channel} className="hover:bg-gray-50">
-                      <td className="px-4 py-2 capitalize">{r.channel}</td>
-                      <td className="px-4 py-2 text-right font-semibold">{r.cnt}</td>
-                      <td className="px-4 py-2 text-right text-emerald-700 font-semibold">{r.sent}</td>
-                      <td className="px-4 py-2 text-right text-muted-foreground">{r.total}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="border rounded-xl overflow-hidden bg-white divide-y">
+              {social.campaignsByChannel.map((r: any) => {
+                const delPct = r.total > 0 ? Math.round((r.sent / r.total) * 100) : 0;
+                return (
+                  <div key={r.channel} className="px-4 py-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-medium capitalize">{r.channel}</span>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <span className="font-semibold text-foreground">{r.cnt} campaigns</span>
+                        <span className="text-emerald-700 font-bold">{delPct}% delivered</span>
+                      </div>
+                    </div>
+                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${delPct}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

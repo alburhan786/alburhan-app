@@ -14,6 +14,10 @@ async function ensureLeadIntelligenceTables() {
   await pool.query(`ALTER TABLE marketing_campaigns ADD COLUMN IF NOT EXISTS revenue_generated NUMERIC(14,2) DEFAULT 0`);
   await pool.query(`ALTER TABLE marketing_campaigns ADD COLUMN IF NOT EXISTS roi_percent NUMERIC(8,2) DEFAULT 0`);
   await pool.query(`ALTER TABLE marketing_campaigns ADD COLUMN IF NOT EXISTS channel_tag TEXT`);
+  // Campaign engagement metrics
+  await pool.query(`ALTER TABLE marketing_campaigns ADD COLUMN IF NOT EXISTS opened_count INT DEFAULT 0`);
+  await pool.query(`ALTER TABLE marketing_campaigns ADD COLUMN IF NOT EXISTS clicked_count INT DEFAULT 0`);
+  await pool.query(`ALTER TABLE marketing_campaigns ADD COLUMN IF NOT EXISTS replies_count INT DEFAULT 0`);
   // Lead intelligence columns
   await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS score VARCHAR(20) DEFAULT 'cold'`);
   await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS score_factors JSONB DEFAULT '{}'::jsonb`);
@@ -350,6 +354,44 @@ router.post("/campaigns/:id/send", requireAdmin as any, async (req: Authenticate
       return void res.json({ ok: true, total: 0, sent: 0, message: "No recipients in segment" });
     }
 
+    // Email channel: send to email addresses instead of mobiles
+    if (c.channel === "email") {
+      const uniqueEmails = [...new Set(emails)];
+      const emailTotal = uniqueEmails.length;
+      if (emailTotal === 0) {
+        await pool.query("UPDATE marketing_campaigns SET status='sent', total_recipients=0, sent_count=0, sent_at=NOW() WHERE id=$1", [c.id]);
+        return void res.json({ ok: true, total: 0, sent: 0, message: "No email recipients in segment" });
+      }
+      const { sendEmail } = await import("../lib/notifications.js");
+      const emailResults = await Promise.allSettled(
+        uniqueEmails.map((email: string) =>
+          sendEmail(email, c.subject || c.name, c.message)
+        )
+      );
+      const emailSent = emailResults.filter((r: any) => r.status === "fulfilled" && r.value?.ok).length;
+      const emailFailed = emailTotal - emailSent;
+      await pool.query(
+        `UPDATE marketing_campaigns SET status='sent', total_recipients=$1, sent_count=$2, failed_count=$3, sent_at=NOW() WHERE id=$4`,
+        [emailTotal, emailSent, emailFailed, c.id]
+      );
+      try {
+        await pool.query(
+          `INSERT INTO notification_logs (id, channel, status, message, created_at) VALUES (gen_random_uuid()::text, $1, 'sent', $2, NOW())`,
+          ["email", `Campaign: ${c.name} — ${emailSent}/${emailTotal} sent`]
+        );
+      } catch {}
+      return void res.json({ ok: true, total: emailTotal, sent: emailSent, failed: emailFailed });
+    }
+
+    // Unsupported channels (facebook, instagram, telegram): return structured error
+    if (!["whatsapp", "sms"].includes(c.channel)) {
+      return void res.status(422).json({
+        error: `Direct send is not supported for channel "${c.channel}". Use the platform's native tools.`,
+        channel: c.channel,
+        unsupported: true,
+      });
+    }
+
     const results = await Promise.allSettled(
       uniqueMobiles.map(async (mobile: string) => {
         if (c.channel === "whatsapp") return sendWhatsApp(mobile, c.message);
@@ -376,25 +418,36 @@ router.post("/campaigns/:id/send", requireAdmin as any, async (req: Authenticate
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
-// ── Campaign ROI Update ───────────────────────────────────────────────────────
+// ── Campaign ROI + Engagement Update ─────────────────────────────────────────
+// Accessible at both /api/enterprise/campaigns/:id/stats
+// and /api/marketing/campaigns/:id/stats (alias mount in routes/index.ts)
 router.put("/campaigns/:id/stats", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
     const { id } = req.params;
-    const { interested_count, bookings_generated, revenue_generated, roi_percent, channel_tag } = req.body;
+    const {
+      interested_count, bookings_generated, revenue_generated, roi_percent, channel_tag,
+      opened_count, clicked_count, replies_count,
+    } = req.body;
     await pool.query(
       `UPDATE marketing_campaigns SET
-        interested_count = COALESCE($1, interested_count),
+        interested_count  = COALESCE($1,  interested_count),
         bookings_generated = COALESCE($2, bookings_generated),
-        revenue_generated = COALESCE($3, revenue_generated),
-        roi_percent = COALESCE($4, roi_percent),
-        channel_tag = COALESCE($5, channel_tag)
-       WHERE id = $6`,
+        revenue_generated = COALESCE($3,  revenue_generated),
+        roi_percent       = COALESCE($4,  roi_percent),
+        channel_tag       = COALESCE($5,  channel_tag),
+        opened_count      = COALESCE($6,  opened_count),
+        clicked_count     = COALESCE($7,  clicked_count),
+        replies_count     = COALESCE($8,  replies_count)
+       WHERE id = $9`,
       [
-        interested_count != null ? parseInt(interested_count) : null,
-        bookings_generated != null ? parseInt(bookings_generated) : null,
-        revenue_generated != null ? parseFloat(revenue_generated) : null,
-        roi_percent != null ? parseFloat(roi_percent) : null,
+        interested_count  != null ? parseInt(interested_count)      : null,
+        bookings_generated!= null ? parseInt(bookings_generated)    : null,
+        revenue_generated != null ? parseFloat(revenue_generated)   : null,
+        roi_percent       != null ? parseFloat(roi_percent)         : null,
         channel_tag || null,
+        opened_count      != null ? parseInt(opened_count)          : null,
+        clicked_count     != null ? parseInt(clicked_count)         : null,
+        replies_count     != null ? parseInt(replies_count)         : null,
         id,
       ]
     );

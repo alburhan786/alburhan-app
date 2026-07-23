@@ -296,6 +296,12 @@ const TYPE_META: Record<string, { icon: string; color: string; label: string }> 
   lead:         { icon: "🎯", color: "text-violet-700", label: "Lead" },
   message:      { icon: "💬", color: "text-blue-700",   label: "Message" },
   notification: { icon: "🔔", color: "text-amber-700",  label: "Notification" },
+  timeline:     { icon: "📋", color: "text-emerald-700", label: "Booking Event" },
+};
+
+const CHANNEL_ICONS: Record<string, string> = {
+  facebook: "📘", instagram: "📸", telegram: "✈️",
+  whatsapp: "💬", whatsapp_api: "💬", website: "🌐", email: "✉️", sms: "📱",
 };
 
 function OmniDashboard({ onSelectFilter }: { onSelectFilter: (f: any) => void }) {
@@ -361,6 +367,26 @@ function OmniDashboard({ onSelectFilter }: { onSelectFilter: (f: any) => void })
               <div className="text-xs text-muted-foreground mt-0.5">{s.label}</div>
             </button>
           ))}
+        </div>
+      )}
+
+      {/* Per-Channel Unread Breakdown */}
+      {stats?.unreadByChannel && Object.keys(stats.unreadByChannel).length > 0 && (
+        <div>
+          <h3 className="text-sm font-bold mb-2">Unread by Channel</h3>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(stats.unreadByChannel as Record<string, number>).map(([platform, cnt]) => (
+              <button
+                key={platform}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border bg-background hover:bg-muted/40 transition-colors text-xs font-semibold"
+                onClick={() => onSelectFilter({ platform })}
+              >
+                <span>{CHANNEL_ICONS[platform] || "📣"}</span>
+                <span className="capitalize">{platform.replace(/_/g, " ")}</span>
+                <span className="ml-1 bg-red-100 text-red-700 rounded-full px-1.5 py-0.5 text-[10px] font-bold">{cnt}</span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

@@ -2719,7 +2719,7 @@ router.get("/omni-stats", requireAdmin as any, async (_req: AuthenticatedRequest
   try {
     const [
       unreadR, pendingR, todayLeadsR, todayBookingsR, missedR,
-      weekLeadsR, weekMsgsR, activityR,
+      weekLeadsR, weekMsgsR, unreadByChannelR, activityR,
     ] = await Promise.all([
       pool.query(`SELECT COUNT(*)::int AS c FROM social_messages WHERE status='unread' AND direction='incoming'`),
       pool.query(`SELECT COUNT(*)::int AS c FROM social_messages WHERE status IN ('unread','in_progress') AND direction='incoming'`),
@@ -2728,6 +2728,13 @@ router.get("/omni-stats", requireAdmin as any, async (_req: AuthenticatedRequest
       pool.query(`SELECT COUNT(*)::int AS c FROM social_messages WHERE status='unread' AND direction='incoming' AND created_at < NOW() - INTERVAL '2 hours'`),
       pool.query(`SELECT COUNT(*)::int AS c FROM leads WHERE created_at >= NOW() - INTERVAL '7 days'`),
       pool.query(`SELECT COUNT(*)::int AS c FROM social_messages WHERE created_at >= NOW() - INTERVAL '7 days'`),
+      pool.query(`
+        SELECT platform, COUNT(*)::int AS cnt
+        FROM social_messages
+        WHERE status = 'unread' AND direction = 'incoming'
+        GROUP BY platform
+        ORDER BY cnt DESC
+      `),
       pool.query(`
         SELECT * FROM (
           SELECT
@@ -2755,10 +2762,24 @@ router.get("/omni-stats", requireAdmin as any, async (_req: AuthenticatedRequest
             nl.created_at AS ts
           FROM notification_logs nl
           WHERE nl.status = 'sent'
+          UNION ALL
+          SELECT
+            'timeline' AS type,
+            ct.title AS title,
+            ct.event_type AS subtitle,
+            LEFT(ct.description, 80) AS meta,
+            ct.created_at AS ts
+          FROM customer_timeline ct
         ) sub
         ORDER BY ts DESC LIMIT 50
       `),
     ]);
+
+    // Build per-channel unread map
+    const unreadByChannel: Record<string, number> = {};
+    for (const row of unreadByChannelR.rows) {
+      unreadByChannel[row.platform] = row.cnt;
+    }
 
     res.json({
       unread: unreadR.rows[0]?.c ?? 0,
@@ -2768,6 +2789,7 @@ router.get("/omni-stats", requireAdmin as any, async (_req: AuthenticatedRequest
       missed: missedR.rows[0]?.c ?? 0,
       weekLeads: weekLeadsR.rows[0]?.c ?? 0,
       weekMessages: weekMsgsR.rows[0]?.c ?? 0,
+      unreadByChannel,
       activity: activityR.rows,
     });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
@@ -2776,9 +2798,13 @@ router.get("/omni-stats", requireAdmin as any, async (_req: AuthenticatedRequest
 // ── Social Media Stats ────────────────────────────────────────────────────────
 router.get("/social-stats", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
   try {
+    const SOCIAL_PLATFORMS = ["facebook", "instagram", "telegram", "whatsapp"];
+    const NOTIF_CHANNELS = ["whatsapp", "sms", "email"];
+
     const [
       notifByChannelR, leadsBySourceR, msgsByPlatformR, campaignsByChannelR,
       totalLeadsR, totalMsgsR, totalCampaignsR,
+      leadsByPlatformR, msgsTodayByPlatformR,
     ] = await Promise.all([
       pool.query(`
         SELECT channel, status, COUNT(*)::int AS cnt
@@ -2809,6 +2835,17 @@ router.get("/social-stats", requireAdmin as any, async (_req: AuthenticatedReque
       pool.query(`SELECT COUNT(*)::int AS c FROM leads`),
       pool.query(`SELECT COUNT(*)::int AS c FROM social_messages`),
       pool.query(`SELECT COUNT(*)::int AS c FROM marketing_campaigns`),
+      pool.query(`
+        SELECT COALESCE(source, platform, 'unknown') AS src, COUNT(*)::int AS cnt
+        FROM leads
+        GROUP BY src
+      `),
+      pool.query(`
+        SELECT platform, COUNT(*)::int AS cnt
+        FROM social_messages
+        WHERE created_at >= NOW() - INTERVAL '24 hours'
+        GROUP BY platform
+      `),
     ]);
 
     // Build per-channel notification summary
@@ -2821,12 +2858,64 @@ router.get("/social-stats", requireAdmin as any, async (_req: AuthenticatedReque
     }
     const notifications = Object.entries(notifMap).map(([channel, v]) => ({ channel, ...v }));
 
+    // Build per-platform lead counts
+    const leadPlatMap: Record<string, number> = {};
+    for (const row of leadsByPlatformR.rows) {
+      const key = (row.src || "unknown").toLowerCase();
+      leadPlatMap[key] = (leadPlatMap[key] || 0) + row.cnt;
+    }
+
+    // Build per-platform message counts (30d)
+    const msgPlatMap: Record<string, number> = {};
+    for (const row of msgsByPlatformR.rows) {
+      msgPlatMap[(row.platform || "unknown").toLowerCase()] = row.cnt;
+    }
+
+    // Build per-platform today messages
+    const msgTodayMap: Record<string, number> = {};
+    for (const row of msgsTodayByPlatformR.rows) {
+      msgTodayMap[(row.platform || "unknown").toLowerCase()] = row.cnt;
+    }
+
+    // Build per-channel campaign counts
+    const campChanMap: Record<string, { campaigns: number; sent: number; total: number }> = {};
+    for (const row of campaignsByChannelR.rows) {
+      campChanMap[(row.channel || "unknown").toLowerCase()] = { campaigns: row.cnt, sent: row.sent, total: row.total };
+    }
+
+    // Compose per-platform widgets
+    const PLATFORM_ICONS: Record<string, string> = {
+      facebook: "📘", instagram: "📸", telegram: "✈️",
+      whatsapp: "💬", sms: "📱", email: "✉️",
+    };
+    const platforms: Record<string, any> = {};
+    for (const p of [...SOCIAL_PLATFORMS, ...NOTIF_CHANNELS]) {
+      if (platforms[p]) continue; // dedupe whatsapp
+      const notif = notifMap[p] || { sent: 0, failed: 0, total: 0 };
+      const camp = campChanMap[p] || { campaigns: 0, sent: 0, total: 0 };
+      platforms[p] = {
+        icon: PLATFORM_ICONS[p] || "📣",
+        messages30d: msgPlatMap[p] || 0,
+        messagesToday: msgTodayMap[p] || 0,
+        leads: leadPlatMap[p] || 0,
+        followers: "--",
+        notifSent7d: notif.sent,
+        notifFailed7d: notif.failed,
+        notifTotal7d: notif.total,
+        campaigns: camp.campaigns,
+        campaignsSent: camp.sent,
+        campaignsReach: camp.total,
+        deliveryRate: notif.total > 0 ? Math.round((notif.sent / notif.total) * 100) : null,
+      };
+    }
+
     res.json({
       totals: {
         leads: totalLeadsR.rows[0]?.c ?? 0,
         messages: totalMsgsR.rows[0]?.c ?? 0,
         campaigns: totalCampaignsR.rows[0]?.c ?? 0,
       },
+      platforms,
       notifications,
       leadsBySource: leadsBySourceR.rows,
       messagesByPlatform: msgsByPlatformR.rows,

@@ -22,12 +22,12 @@ const SEGMENTS = [
 ];
 
 const CHANNELS = [
-  { id: "whatsapp", label: "WhatsApp", icon: "💬", color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  { id: "sms", label: "SMS", icon: "📱", color: "bg-blue-50 text-blue-700 border-blue-200" },
-  { id: "email", label: "Email", icon: "✉️", color: "bg-violet-50 text-violet-700 border-violet-200" },
-  { id: "facebook", label: "Facebook", icon: "📘", color: "bg-sky-50 text-sky-700 border-sky-200" },
-  { id: "instagram", label: "Instagram", icon: "📸", color: "bg-pink-50 text-pink-700 border-pink-200" },
-  { id: "telegram", label: "Telegram", icon: "✈️", color: "bg-cyan-50 text-cyan-700 border-cyan-200" },
+  { id: "whatsapp",  label: "WhatsApp",  icon: "💬", color: "bg-emerald-50 text-emerald-700 border-emerald-200", canSend: true },
+  { id: "sms",       label: "SMS",       icon: "📱", color: "bg-blue-50 text-blue-700 border-blue-200",          canSend: true },
+  { id: "email",     label: "Email",     icon: "✉️", color: "bg-violet-50 text-violet-700 border-violet-200",    canSend: true },
+  { id: "facebook",  label: "Facebook",  icon: "📘", color: "bg-sky-50 text-sky-700 border-sky-200",             canSend: false },
+  { id: "instagram", label: "Instagram", icon: "📸", color: "bg-pink-50 text-pink-700 border-pink-200",          canSend: false },
+  { id: "telegram",  label: "Telegram",  icon: "✈️", color: "bg-cyan-50 text-cyan-700 border-cyan-200",          canSend: false },
 ];
 
 const CHANNEL_FILTER_TABS = [
@@ -57,6 +57,9 @@ function fmtCurrency(v: any) {
 function RoiModal({ campaign, onClose, onSaved }: { campaign: any; onClose: () => void; onSaved: () => void }) {
   const { toast } = useToast();
   const [form, setForm] = useState({
+    opened_count: String(campaign.opened_count || 0),
+    clicked_count: String(campaign.clicked_count || 0),
+    replies_count: String(campaign.replies_count || 0),
     interested_count: String(campaign.interested_count || 0),
     bookings_generated: String(campaign.bookings_generated || 0),
     revenue_generated: String(campaign.revenue_generated || 0),
@@ -67,11 +70,14 @@ function RoiModal({ campaign, onClose, onSaved }: { campaign: any; onClose: () =
   const save = async () => {
     setSaving(true);
     try {
-      const r = await fetch(`${BASE_API}/api/enterprise/campaigns/${campaign.id}/stats`, {
+      const r = await fetch(`${BASE_API}/api/marketing/campaigns/${campaign.id}/stats`, {
         method: "PUT",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          opened_count: parseInt(form.opened_count) || 0,
+          clicked_count: parseInt(form.clicked_count) || 0,
+          replies_count: parseInt(form.replies_count) || 0,
           interested_count: parseInt(form.interested_count) || 0,
           bookings_generated: parseInt(form.bookings_generated) || 0,
           revenue_generated: parseFloat(form.revenue_generated) || 0,
@@ -79,7 +85,7 @@ function RoiModal({ campaign, onClose, onSaved }: { campaign: any; onClose: () =
         }),
       });
       if (r.ok) {
-        toast({ title: "ROI stats updated" });
+        toast({ title: "Campaign stats updated" });
         onSaved();
       } else {
         toast({ title: "Failed to update", variant: "destructive" });
@@ -90,38 +96,50 @@ function RoiModal({ campaign, onClose, onSaved }: { campaign: any; onClose: () =
     setSaving(false);
   };
 
+  const ENGAGEMENT_FIELDS = [
+    { key: "opened_count",      label: "Opened / Read",         placeholder: "0", section: "engagement" },
+    { key: "clicked_count",     label: "Clicked / Link Tapped", placeholder: "0", section: "engagement" },
+    { key: "replies_count",     label: "Replies Received",      placeholder: "0", section: "engagement" },
+    { key: "interested_count",  label: "Interested Leads",      placeholder: "0", section: "roi" },
+    { key: "bookings_generated",label: "Bookings Generated",    placeholder: "0", section: "roi" },
+    { key: "revenue_generated", label: "Revenue Generated (₹)", placeholder: "0.00", section: "roi" },
+    { key: "roi_percent",       label: "ROI %",                 placeholder: "0.00", section: "roi" },
+  ];
+
   return (
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Update ROI Stats</DialogTitle>
+          <DialogTitle>Campaign Stats</DialogTitle>
           <p className="text-xs text-muted-foreground mt-1 truncate">{campaign.name}</p>
         </DialogHeader>
-        <div className="space-y-3 py-2">
-          {[
-            { key: "interested_count", label: "Interested Leads", placeholder: "0" },
-            { key: "bookings_generated", label: "Bookings Generated", placeholder: "0" },
-            { key: "revenue_generated", label: "Revenue Generated (₹)", placeholder: "0.00" },
-            { key: "roi_percent", label: "ROI %", placeholder: "0.00" },
-          ].map(f => (
-            <div key={f.key}>
-              <Label className="text-xs">{f.label}</Label>
-              <Input
-                className="mt-1 h-9 text-sm"
-                type="number"
-                min="0"
-                placeholder={f.placeholder}
-                value={form[f.key]}
-                onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
-              />
-            </div>
-          ))}
+        <div className="py-2">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Engagement Metrics</p>
+          <div className="space-y-2.5 mb-4">
+            {ENGAGEMENT_FIELDS.filter(f => f.section === "engagement").map(f => (
+              <div key={f.key}>
+                <Label className="text-xs">{f.label}</Label>
+                <Input className="mt-1 h-9 text-sm" type="number" min="0" placeholder={f.placeholder}
+                  value={form[f.key]} onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))} />
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">ROI Tracking</p>
+          <div className="space-y-2.5">
+            {ENGAGEMENT_FIELDS.filter(f => f.section === "roi").map(f => (
+              <div key={f.key}>
+                <Label className="text-xs">{f.label}</Label>
+                <Input className="mt-1 h-9 text-sm" type="number" min="0" placeholder={f.placeholder}
+                  value={form[f.key]} onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))} />
+              </div>
+            ))}
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
           <Button size="sm" onClick={save} disabled={saving}>
             {saving ? <RefreshCw size={13} className="animate-spin mr-1" /> : null}
-            Save ROI
+            Save Stats
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -173,13 +191,28 @@ export default function MarketingCenter() {
     setSaving(false);
   };
 
-  const handleSend = async (id: string, name: string) => {
+  const handleSend = async (id: string, name: string, channel: string) => {
+    const ch = CHANNELS.find(c => c.id === channel);
+    if (!ch?.canSend) {
+      toast({
+        title: `${ch?.label || channel} — direct send not supported`,
+        description: "Save this campaign for planning. Use the platform's native tools to publish.",
+        variant: "destructive",
+      });
+      return;
+    }
     if (!confirm(`Send campaign "${name}"? This will dispatch messages to all recipients.`)) return;
     setSending(id);
     try {
       const r = await fetch(`${BASE_API}/api/enterprise/campaigns/${id}/send`, {
         method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
       });
+      if (r.status === 422) {
+        const d = await r.json();
+        toast({ title: d.error || "Direct send not supported for this channel", variant: "destructive" });
+        setSending(null);
+        return;
+      }
       const d = r.ok ? await r.json() : null;
       if (d?.ok) {
         toast({ title: `Campaign sent! ${d.sent}/${d.total} delivered` });
@@ -235,9 +268,15 @@ export default function MarketingCenter() {
                   <button key={ch.id} onClick={() => setForm(f => ({ ...f, channel: ch.id }))}
                     className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-semibold transition-all ${form.channel === ch.id ? ch.color + " ring-2 ring-offset-1 ring-current" : "border-border text-muted-foreground hover:bg-muted/50"}`}>
                     <span>{ch.icon}</span> {ch.label}
+                    {!ch.canSend && <span className="text-[9px] font-normal opacity-60 ml-0.5">(Planning)</span>}
                   </button>
                 ))}
               </div>
+              {!CHANNELS.find(c => c.id === form.channel)?.canSend && (
+                <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  ⚠️ <strong>{CHANNELS.find(c => c.id === form.channel)?.label}</strong> campaigns are saved for planning only — direct send is not available. Use the platform's native tools to publish.
+                </p>
+              )}
             </div>
 
             {/* Segment */}
@@ -358,9 +397,16 @@ export default function MarketingCenter() {
                           )}
                           {c.sent_at && <span className="text-xs text-muted-foreground">{new Date(c.sent_at).toLocaleDateString("en-IN")}</span>}
                         </div>
-                        {/* ROI row */}
+                        {/* Engagement + ROI row */}
+                        {(c.opened_count > 0 || c.clicked_count > 0 || c.replies_count > 0) && (
+                          <div className="flex items-center gap-3 mt-0.5 text-xs">
+                            {c.opened_count > 0 && <span className="text-sky-600 font-medium">👁 {c.opened_count} opened</span>}
+                            {c.clicked_count > 0 && <span className="text-indigo-600 font-medium">🔗 {c.clicked_count} clicked</span>}
+                            {c.replies_count > 0 && <span className="text-teal-600 font-medium">💬 {c.replies_count} replies</span>}
+                          </div>
+                        )}
                         {hasRoi && (
-                          <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                          <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
                             {c.interested_count > 0 && <span className="text-violet-600 font-medium">{c.interested_count} interested</span>}
                             {c.bookings_generated > 0 && <span className="text-blue-600 font-medium">{c.bookings_generated} bookings</span>}
                             {c.revenue_generated > 0 && <span className="text-green-600 font-medium">{fmtCurrency(c.revenue_generated)} revenue</span>}
@@ -375,12 +421,17 @@ export default function MarketingCenter() {
                             <BarChart2 size={12} /> ROI
                           </Button>
                         )}
-                        {c.status === "draft" && (
-                          <Button size="sm" className="gap-1.5 h-7 text-xs" onClick={() => handleSend(c.id, c.name)} disabled={sending === c.id}>
-                            {sending === c.id ? <RefreshCw size={12} className="animate-spin" /> : <Send size={12} />}
-                            Send
-                          </Button>
-                        )}
+                        {c.status === "draft" && (() => {
+                          const ch = CHANNELS.find(x => x.id === c.channel);
+                          return ch?.canSend ? (
+                            <Button size="sm" className="gap-1.5 h-7 text-xs" onClick={() => handleSend(c.id, c.name, c.channel)} disabled={sending === c.id}>
+                              {sending === c.id ? <RefreshCw size={12} className="animate-spin" /> : <Send size={12} />}
+                              Send
+                            </Button>
+                          ) : (
+                            <span className="text-[10px] text-muted-foreground border rounded-lg px-2 py-1 bg-muted/30">Planning</span>
+                          );
+                        })()}
                       </div>
                     </div>
 
