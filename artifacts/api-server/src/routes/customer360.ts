@@ -364,6 +364,104 @@ router.get("/user/:mobile/timeline-full", requireAdmin, async (req, res) => {
   } catch (err: any) { res.status(500).json({ message: err.message }); }
 });
 
+// ── By-ID unified timeline (spec: GET /api/customers/:id/timeline-full) ────
+router.get("/by-id/:id/timeline-full", requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const page    = Math.max(1, parseInt(String(req.query.page  || "1")));
+    const limit   = Math.min(Math.max(1, parseInt(String(req.query.limit || "50"))), 200);
+    const channel = String(req.query.channel || "all");
+    const offset  = (page - 1) * limit;
+
+    // Look up mobile + email by user ID
+    const userR = await pool.query(
+      `SELECT mobile, email FROM users WHERE id = $1 LIMIT 1`, [id]
+    );
+    if (!userR.rows[0]) return res.status(404).json({ message: "Customer not found" });
+
+    const { mobile, email } = userR.rows[0];
+    const pattern = mobileLike(mobile || "");
+
+    const [notifR, socialR, timelineR] = await Promise.all([
+      pool.query(`
+        SELECT id, channel AS channel_type, event_type, message AS content, status,
+               'out'::text AS direction, created_at, 'notification'::text AS source
+        FROM notification_logs
+        WHERE recipient LIKE $1
+           OR ($2 IS NOT NULL AND recipient = $2)
+        ORDER BY created_at DESC LIMIT 300
+      `, [pattern, email || null]),
+
+      pool.query(`
+        SELECT sm.id, sm.platform AS channel_type, sm.message_text AS content,
+               COALESCE(sm.direction, 'in') AS direction,
+               sm.message_type, sm.sender_name, sm.created_at,
+               'social'::text AS source, sm.is_internal_note
+        FROM social_messages sm
+        WHERE sm.sender_phone LIKE $1
+           OR sm.lead_id IN (SELECT id FROM leads WHERE mobile LIKE $1)
+        ORDER BY sm.created_at DESC LIMIT 300
+      `, [pattern]),
+
+      pool.query(`
+        SELECT id, event_type AS channel_type, title,
+               COALESCE(description,'') AS content,
+               'out'::text AS direction, created_at, 'timeline'::text AS source
+        FROM customer_timeline WHERE customer_id = $1
+        ORDER BY created_at DESC LIMIT 150
+      `, [id]),
+    ]);
+
+    const notifs = (notifR.rows as any[]).map(r => ({
+      id: `notif-${r.id}`,
+      type: normalizeChannel(r.channel_type),
+      direction: "out" as const,
+      content: String(r.content || r.event_type || ""),
+      status: r.status,
+      event_type: r.event_type,
+      is_internal_note: false,
+      sender_name: null,
+      created_at: r.created_at,
+      source: "notification",
+    }));
+
+    const socials = (socialR.rows as any[]).map(r => ({
+      id: `social-${r.id}`,
+      type: normalizeChannel(r.channel_type),
+      direction: (r.direction === "incoming" || r.direction === "in") ? "in" as const : "out" as const,
+      content: String(r.content || ""),
+      status: null,
+      event_type: r.message_type ?? null,
+      is_internal_note: Boolean(r.is_internal_note),
+      sender_name: r.sender_name ?? null,
+      created_at: r.created_at,
+      source: "social",
+    }));
+
+    const sysEvents = (timelineR.rows as any[]).map(r => ({
+      id: `tl-${r.id}`,
+      type: "system" as const,
+      direction: "out" as const,
+      content: r.title ? `${r.title}${r.content ? `: ${r.content}` : ""}` : String(r.content || ""),
+      status: null,
+      event_type: r.channel_type,
+      is_internal_note: false,
+      sender_name: null,
+      created_at: r.created_at,
+      source: "timeline",
+    }));
+
+    const seen = new Set<string>();
+    const all = [...notifs, ...socials, ...sysEvents]
+      .filter(e => { if (seen.has(e.id)) return false; seen.add(e.id); return true; })
+      .filter(e => channel === "all" || e.type === channel)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    const total = all.length;
+    res.json({ items: all.slice(offset, offset + limit), total, page, limit, pages: Math.ceil(total / limit) });
+  } catch (err: any) { res.status(500).json({ message: err.message }); }
+});
+
 // ── Health score calculator ────────────────────────────────────────────────
 function healthScore({ user, bookings, payments, docs, leads, comms }: any) {
   const leadScore = leads.length > 0 ? 100 : 0;

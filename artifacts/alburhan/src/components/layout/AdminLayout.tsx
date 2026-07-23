@@ -32,6 +32,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
   const [openComplaints, setOpenComplaints] = useState(0);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(loadCollapsed);
   const [commandOpen, setCommandOpen] = useState(false);
+  const [navSearch, setNavSearch] = useState("");
   const { can, roleLabel, roleColor, isSuper } = usePermissions();
 
   const {
@@ -48,17 +49,23 @@ export function AdminLayout({ children }: { children: ReactNode }) {
 
   // ── Build filtered menu ─────────────────────────────────────────────────
   const MENU = useMemo(() => {
+    const q = navSearch.toLowerCase().trim();
     return buildNavSections(openComplaints)
       .map(section => ({
         ...section,
         items: section.items.filter(item => {
           if (item.requireSuper && !isSuper) return false;
           if (item.require && !can(item.require[0], item.require[1])) return false;
+          if (q) {
+            const labelMatch = item.label.toLowerCase().includes(q);
+            const aliasMatch = item.aliases?.some(a => a.toLowerCase().includes(q));
+            return labelMatch || aliasMatch;
+          }
           return true;
         }),
       }))
       .filter(section => section.items.length > 0);
-  }, [openComplaints, can, isSuper]);
+  }, [openComplaints, can, isSuper, navSearch]);
 
   const isActive = (href: string) => {
     const base = href.split("?")[0];
@@ -235,14 +242,16 @@ export function AdminLayout({ children }: { children: ReactNode }) {
       <aside className="w-60 bg-primary text-primary-foreground flex-col hidden md:flex sticky top-0 h-screen">
         <SidebarHeader />
         <div className="px-3 pt-2 pb-1 shrink-0">
-          <button
-            onClick={() => setCommandOpen(true)}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-primary-foreground/10 hover:bg-primary-foreground/15 transition-colors text-primary-foreground/60 hover:text-primary-foreground/90 text-[12px]"
-          >
-            <Search size={13} className="shrink-0" />
-            <span className="flex-1 text-left">Search…</span>
-            <kbd className="text-[9px] font-mono bg-primary-foreground/10 px-1.5 py-0.5 rounded">⌘K</kbd>
-          </button>
+          <div className="relative">
+            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-primary-foreground/40 pointer-events-none" />
+            <input
+              value={navSearch}
+              onChange={e => setNavSearch(e.target.value)}
+              onKeyDown={e => { if (e.key === "Escape") setNavSearch(""); if ((e.ctrlKey || e.metaKey) && e.key === "k") { e.preventDefault(); setCommandOpen(true); } }}
+              placeholder="Search nav… (⌘K for full)"
+              className="w-full pl-7 pr-2 py-1.5 rounded-lg bg-primary-foreground/10 hover:bg-primary-foreground/15 transition-colors text-primary-foreground/80 placeholder-primary-foreground/40 text-[11px] outline-none focus:bg-primary-foreground/20 focus:ring-1 focus:ring-primary-foreground/30"
+            />
+          </div>
         </div>
         <SidebarNav />
         <SidebarFooter />
@@ -255,13 +264,16 @@ export function AdminLayout({ children }: { children: ReactNode }) {
           <aside className="relative w-64 bg-primary text-primary-foreground flex flex-col h-full shadow-2xl">
             <SidebarHeader />
             <div className="px-3 pt-2 pb-1 shrink-0">
-              <button
-                onClick={() => { setMobileOpen(false); setCommandOpen(true); }}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-primary-foreground/10 hover:bg-primary-foreground/15 transition-colors text-primary-foreground/60 hover:text-primary-foreground/90 text-[12px]"
-              >
-                <Search size={13} className="shrink-0" />
-                <span className="flex-1 text-left">Search…</span>
-              </button>
+              <div className="relative">
+                <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-primary-foreground/40 pointer-events-none" />
+                <input
+                  value={navSearch}
+                  onChange={e => setNavSearch(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Escape") setNavSearch(""); if ((e.ctrlKey || e.metaKey) && e.key === "k") { e.preventDefault(); setMobileOpen(false); setCommandOpen(true); } }}
+                  placeholder="Search nav…"
+                  className="w-full pl-7 pr-2 py-1.5 rounded-lg bg-primary-foreground/10 hover:bg-primary-foreground/15 transition-colors text-primary-foreground/80 placeholder-primary-foreground/40 text-[11px] outline-none focus:bg-primary-foreground/20"
+                />
+              </div>
             </div>
             <SidebarNav />
             <SidebarFooter />

@@ -39,6 +39,8 @@ export interface NavItem {
   require?: [Module, Action];
   /** Only visible to super_admin adminRole */
   requireSuper?: boolean;
+  /** Search aliases — sidebar search + Ctrl+K match on these keywords */
+  aliases?: string[];
 }
 
 export interface NavSection {
@@ -185,47 +187,32 @@ export function buildNavSections(openComplaints = 0): NavSection[] {
       ],
     },
 
-    // ── 10. COMMUNICATION ────────────────────────────────────────────────────
-    {
-      section: "Communication",
-      items: [
-        { icon: Inbox,         label: "Omnichannel Inbox",              href: "/admin/inbox",                   require: ["customers", "edit"] },
-        { icon: Share2,        label: "Social Media Integration",       href: "/admin/social-media",            require: ["settings",  "view"] },
-        { icon: BellRing,      label: "Communication Center",           href: "/admin/communication-center",    require: ["customers", "edit"] },
-        { icon: Zap,           label: "Workflow Center",                href: "/admin/workflow-center",         require: ["bookings",  "edit"] },
-        { icon: Bot,           label: "WhatsApp Dashboard",             href: "/admin/botbee-dashboard",        require: ["settings",  "view"] },
-        { icon: MessageSquare, label: "SMS Dashboard",                  href: "/admin/sms-dashboard",           require: ["settings",  "view"] },
-        { icon: Mail,          label: "Email Dashboard",                href: "/admin/email-dashboard",         require: ["settings",  "view"] },
-        { icon: HeartPulse,    label: "Notification Dashboard",         href: "/admin/notification-health",     require: ["settings",  "view"] },
-        { icon: Megaphone,     label: "Marketing Dashboard",            href: "/admin/marketing",               require: ["customers", "edit"] },
-        { icon: History,       label: "WhatsApp History",               href: "/admin/whatsapp-history",        require: ["settings",  "view"] },
-        { icon: MessageSquare, label: "WhatsApp Templates",             href: "/admin/whatsapp-templates",      require: ["settings",  "view"] },
-        { icon: Smartphone,    label: "SMS Templates",                  href: "/admin/sms-templates",           require: ["settings",  "view"] },
-        { icon: Layers,        label: "RCS Templates",                  href: "/admin/rcs-templates",           require: ["settings",  "view"] },
-        { icon: Mail,          label: "Email Templates",                href: "/admin/email-templates",         require: ["settings",  "view"] },
-        { icon: FileText,      label: "DLT Template Manager",           href: "/admin/dlt-templates",           require: ["settings",  "view"] },
-        { icon: Smartphone,    label: "Sender ID Management",           href: "/admin/sms-settings",            require: ["settings",  "view"] },
-        { icon: TestTube2,     label: "SMS Test Center",                href: "/admin/sms-test",                require: ["settings",  "view"] },
-        { icon: TestTube2,     label: "Test Notifications",             href: "/admin/test-notifications",      require: ["settings",  "view"] },
-        { icon: History,       label: "Notification Logs",              href: "/admin/notification-logs",       require: ["settings",  "view"] },
-        { icon: FileText,      label: "Notification Templates",         href: "/admin/notification-templates",  require: ["settings",  "view"] },
-        { icon: BellRing,      label: "Auto Notifications",             href: "/admin/auto-notifications",      require: ["settings",  "view"] },
-        { icon: Smartphone,    label: "SMS Production Report",          href: "/admin/sms-production-report",   require: ["settings",  "view"] },
-      ],
-    },
-
-    // ── 10b. MARKETING ───────────────────────────────────────────────────────
+    // ── 10. MARKETING ────────────────────────────────────────────────────────
     {
       section: "Marketing",
       items: [
-        { icon: Inbox,         label: "Omnichannel Inbox",        href: "/admin/inbox",               require: ["customers", "edit"] },
-        { icon: Share2,        label: "Social Media",             href: "/admin/social-media",        require: ["settings",  "view"] },
-        { icon: Megaphone,     label: "Marketing Dashboard",      href: "/admin/marketing",           require: ["customers", "edit"] },
-        { icon: Bot,           label: "WhatsApp Dashboard",       href: "/admin/botbee-dashboard",    require: ["settings",  "view"] },
-        { icon: MessageSquare, label: "SMS Dashboard",            href: "/admin/sms-dashboard",       require: ["settings",  "view"] },
-        { icon: Mail,          label: "Email Dashboard",          href: "/admin/email-dashboard",     require: ["settings",  "view"] },
-        { icon: HeartPulse,    label: "Notification Dashboard",   href: "/admin/notification-health", require: ["settings",  "view"] },
-        { icon: Megaphone,     label: "Broadcast",                href: "/admin/broadcast",           require: ["customers", "edit"] },
+        { icon: Inbox,         label: "Omnichannel Inbox",              href: "/admin/inbox",                   require: ["customers", "edit"], aliases: ["omni", "inbox", "multichannel", "omnichannel", "unified inbox", "all channels", "whatsapp", "social"] },
+        { icon: Share2,        label: "Social Media Integration",       href: "/admin/social-media",            require: ["settings",  "view"], aliases: ["social", "facebook", "fb", "instagram", "ig", "telegram", "tg", "messenger", "channels", "social media"] },
+        { icon: BellRing,      label: "Communication Center",           href: "/admin/communication-center",    require: ["customers", "edit"], aliases: ["communication", "comm center", "notify", "alerts"] },
+        { icon: Zap,           label: "Workflow Center",                href: "/admin/workflow-center",         require: ["bookings",  "edit"], aliases: ["workflow", "pipeline", "automation", "triggers"] },
+        { icon: Bot,           label: "WhatsApp Dashboard",             href: "/admin/botbee-dashboard",        require: ["settings",  "view"], aliases: ["whatsapp", "wa", "waba", "botbee", "chat", "messages", "wapp"] },
+        { icon: MessageSquare, label: "SMS Dashboard",                  href: "/admin/sms-dashboard",           require: ["settings",  "view"], aliases: ["sms", "text", "dlt", "bulk sms", "fast2sms", "short message"] },
+        { icon: Mail,          label: "Email Dashboard",                href: "/admin/email-dashboard",         require: ["settings",  "view"], aliases: ["email", "mail", "smtp", "newsletter"] },
+        { icon: HeartPulse,    label: "Notification Dashboard",         href: "/admin/notification-health",     require: ["settings",  "view"], aliases: ["notification", "push", "alert", "bell", "notify", "whatsapp"] },
+        { icon: Megaphone,     label: "Marketing Dashboard",            href: "/admin/marketing",               require: ["customers", "edit"], aliases: ["marketing", "campaign", "broadcast", "blast", "bulk"] },
+        { icon: History,       label: "WhatsApp History",               href: "/admin/whatsapp-history",        require: ["settings",  "view"], aliases: ["whatsapp", "wa", "history", "chat log"] },
+        { icon: MessageSquare, label: "WhatsApp Templates",             href: "/admin/whatsapp-templates",      require: ["settings",  "view"], aliases: ["whatsapp", "wa", "template", "message template"] },
+        { icon: Smartphone,    label: "SMS Templates",                  href: "/admin/sms-templates",           require: ["settings",  "view"], aliases: ["sms", "dlt template", "text template"] },
+        { icon: Layers,        label: "RCS Templates",                  href: "/admin/rcs-templates",           require: ["settings",  "view"], aliases: ["rcs", "rich communication", "template"] },
+        { icon: Mail,          label: "Email Templates",                href: "/admin/email-templates",         require: ["settings",  "view"], aliases: ["email", "mail template", "smtp template"] },
+        { icon: FileText,      label: "DLT Template Manager",           href: "/admin/dlt-templates",           require: ["settings",  "view"], aliases: ["dlt", "sms dlt", "template manager", "telecom"] },
+        { icon: Smartphone,    label: "Sender ID Management",           href: "/admin/sms-settings",            require: ["settings",  "view"], aliases: ["sender id", "sms settings", "sender"] },
+        { icon: TestTube2,     label: "SMS Test Center",                href: "/admin/sms-test",                require: ["settings",  "view"], aliases: ["sms test", "test sms", "test message"] },
+        { icon: TestTube2,     label: "Test Notifications",             href: "/admin/test-notifications",      require: ["settings",  "view"], aliases: ["test notification", "test alert", "test push"] },
+        { icon: History,       label: "Notification Logs",              href: "/admin/notification-logs",       require: ["settings",  "view"], aliases: ["notification log", "message log", "delivery log"] },
+        { icon: FileText,      label: "Notification Templates",         href: "/admin/notification-templates",  require: ["settings",  "view"], aliases: ["notification template", "alert template"] },
+        { icon: BellRing,      label: "Auto Notifications",             href: "/admin/auto-notifications",      require: ["settings",  "view"], aliases: ["auto notification", "automated alerts", "scheduled notification"] },
+        { icon: Smartphone,    label: "SMS Production Report",          href: "/admin/sms-production-report",   require: ["settings",  "view"], aliases: ["sms report", "production report", "sms analytics"] },
       ],
     },
 

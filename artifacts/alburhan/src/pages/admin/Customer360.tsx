@@ -197,6 +197,11 @@ export default function Customer360() {
   const [timelineLoading, setTimelineLoading] = useState(false);
   const [tasks, setTasks] = useState<any[]>([]);
   const [tasksLoading, setTasksLoading] = useState(false);
+  const [showTaskForm, setShowTaskForm] = useState(false);
+  const [taskTitle, setTaskTitle] = useState("");
+  const [taskDueDate, setTaskDueDate] = useState("");
+  const [taskNotes, setTaskNotes] = useState("");
+  const [creatingTask, setCreatingTask] = useState(false);
 
   const loadProfile = useCallback(async (type: "user" | "lead", id: string) => {
     setLoading(true);
@@ -231,6 +236,31 @@ export default function Customer360() {
     } finally { setAddingNote(false); }
   };
 
+  const createTask = async () => {
+    if (!taskTitle.trim() || !data?.user?.mobile) return;
+    setCreatingTask(true);
+    try {
+      const r = await fetch(`${API}/api/tasks`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: taskTitle.trim(),
+          notes: taskNotes.trim() || undefined,
+          due_date: taskDueDate || undefined,
+          customer_mobile: data.user.mobile,
+          customer_name: data.user.name || undefined,
+          status: "pending",
+        }),
+      });
+      if (r.ok) {
+        const created = await r.json();
+        setTasks(prev => [created, ...prev]);
+        setTaskTitle(""); setTaskDueDate(""); setTaskNotes(""); setShowTaskForm(false);
+      }
+    } finally { setCreatingTask(false); }
+  };
+
   const sendWhatsApp = async () => {
     if (!replyText || !data?.user?.mobile) return;
     setSendingReply(true);
@@ -246,14 +276,20 @@ export default function Customer360() {
   };
 
   useEffect(() => {
-    if (activeTab !== "comms" || !data?.user?.mobile) return;
+    if (activeTab !== "comms") return;
+    const uid = data?.user?.id;
+    const mobile = data?.user?.mobile;
+    if (!uid && !mobile) return;
     setTimelineLoading(true);
-    fetch(`${API}/api/customer360/user/${encodeURIComponent(data.user.mobile)}/timeline-full?limit=100`, { credentials: "include" })
+    const url = uid
+      ? `${API}/api/customer360/by-id/${uid}/timeline-full?limit=100`
+      : `${API}/api/customer360/user/${encodeURIComponent(mobile!)}/timeline-full?limit=100`;
+    fetch(url, { credentials: "include" })
       .then(r => r.ok ? r.json() : { items: [] })
       .then(d => setTimelineFull(Array.isArray(d.items) ? d.items : []))
       .catch(() => {})
       .finally(() => setTimelineLoading(false));
-  }, [activeTab, data?.user?.mobile]);
+  }, [activeTab, data?.user?.id, data?.user?.mobile]);
 
   useEffect(() => {
     if (activeTab !== "tasks" || !data?.user?.mobile) return;
@@ -1031,19 +1067,78 @@ export default function Customer360() {
                 {/* ── TASKS ── */}
                 {activeTab === "tasks" && (
                   <div className="space-y-3">
+                    {/* Header */}
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+                        <CheckSquare size={15} className="text-emerald-500" />
+                        Tasks linked to this customer
+                      </h3>
+                      <button onClick={() => setShowTaskForm(v => !v)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 transition-colors">
+                        <Plus size={12} /> New Task
+                      </button>
+                    </div>
+
+                    {/* Inline creation form */}
+                    {showTaskForm && (
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 space-y-3">
+                        <div className="font-semibold text-emerald-800 text-sm">Create Task for {data?.user?.name || data?.user?.mobile}</div>
+                        <input
+                          autoFocus
+                          value={taskTitle}
+                          onChange={e => setTaskTitle(e.target.value)}
+                          placeholder="Task title *"
+                          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white"
+                        />
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-xs text-gray-500 mb-1 block">Due Date</label>
+                            <input
+                              type="date"
+                              value={taskDueDate}
+                              onChange={e => setTaskDueDate(e.target.value)}
+                              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-gray-500 mb-1 block">Customer Mobile</label>
+                            <input value={data?.user?.mobile || ""} disabled
+                              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-500" />
+                          </div>
+                        </div>
+                        <textarea
+                          value={taskNotes}
+                          onChange={e => setTaskNotes(e.target.value)}
+                          rows={2}
+                          placeholder="Notes (optional)"
+                          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 resize-none bg-white"
+                        />
+                        <div className="flex items-center gap-2">
+                          <button onClick={createTask} disabled={!taskTitle.trim() || creatingTask}
+                            className="px-4 py-2 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-2 transition-colors">
+                            {creatingTask ? <RefreshCw size={12} className="animate-spin" /> : <CheckSquare size={12} />}
+                            {creatingTask ? "Creating…" : "Create Task"}
+                          </button>
+                          <button onClick={() => { setShowTaskForm(false); setTaskTitle(""); setTaskDueDate(""); setTaskNotes(""); }}
+                            className="px-4 py-2 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50 transition-colors">
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     {tasksLoading && (
                       <div className="flex items-center justify-center py-12">
                         <RefreshCw size={20} className="animate-spin text-emerald-500" />
                       </div>
                     )}
-                    {!tasksLoading && tasks.length === 0 && (
-                      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center">
+                    {!tasksLoading && tasks.length === 0 && !showTaskForm && (
+                      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center">
                         <CheckSquare size={28} className="mx-auto mb-3 text-gray-300" />
                         <p className="text-gray-500 font-medium">No tasks linked to this customer</p>
-                        <p className="text-sm text-gray-400 mt-1 mb-4">Tasks are matched by customer mobile number</p>
-                        <a href="/admin/tasks"
-                          className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700 transition-colors">
-                          <Plus size={14} /> Open Task Manager
+                        <p className="text-sm text-gray-400 mt-1 mb-4">Create one above or visit the full task manager</p>
+                        <a href="/admin/tasks" className="inline-flex items-center gap-2 text-sm text-emerald-600 hover:underline">
+                          Open Task Manager
                         </a>
                       </div>
                     )}
@@ -1078,10 +1173,12 @@ export default function Customer360() {
                         </div>
                       </div>
                     ))}
-                    <a href="/admin/tasks"
-                      className="flex items-center justify-center gap-2 w-full py-3 border-2 border-dashed border-gray-200 rounded-2xl text-sm text-gray-500 hover:border-emerald-300 hover:text-emerald-600 transition-colors">
-                      <Plus size={14} /> Create New Task
-                    </a>
+                    {tasks.length > 0 && (
+                      <a href="/admin/tasks"
+                        className="flex items-center justify-center gap-2 w-full py-3 border-2 border-dashed border-gray-200 rounded-2xl text-sm text-gray-500 hover:border-emerald-300 hover:text-emerald-600 transition-colors">
+                        View All in Task Manager
+                      </a>
+                    )}
                   </div>
                 )}
 
