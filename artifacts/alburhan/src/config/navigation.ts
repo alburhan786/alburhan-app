@@ -128,9 +128,9 @@ export function buildNavSections(openComplaints = 0): NavSection[] {
       ],
     },
 
-    // ── 6. CRM & SRM ─────────────────────────────────────────────────────────
+    // ── 6. CRM ───────────────────────────────────────────────────────────────
     {
-      section: "CRM & SRM",
+      section: "CRM",
       items: [
         { icon: UserCheck,     label: "Customer 360°",           href: "/admin/customer360",       require: ["customers", "view"] },
         { icon: Target,        label: "CRM Dashboard",           href: "/admin/crm",               require: ["customers", "view"] },
@@ -211,6 +211,21 @@ export function buildNavSections(openComplaints = 0): NavSection[] {
         { icon: FileText,      label: "Notification Templates",         href: "/admin/notification-templates",  require: ["settings",  "view"] },
         { icon: BellRing,      label: "Auto Notifications",             href: "/admin/auto-notifications",      require: ["settings",  "view"] },
         { icon: Smartphone,    label: "SMS Production Report",          href: "/admin/sms-production-report",   require: ["settings",  "view"] },
+      ],
+    },
+
+    // ── 10b. MARKETING ───────────────────────────────────────────────────────
+    {
+      section: "Marketing",
+      items: [
+        { icon: Inbox,         label: "Omnichannel Inbox",        href: "/admin/inbox",               require: ["customers", "edit"] },
+        { icon: Share2,        label: "Social Media",             href: "/admin/social-media",        require: ["settings",  "view"] },
+        { icon: Megaphone,     label: "Marketing Dashboard",      href: "/admin/marketing",           require: ["customers", "edit"] },
+        { icon: Bot,           label: "WhatsApp Dashboard",       href: "/admin/botbee-dashboard",    require: ["settings",  "view"] },
+        { icon: MessageSquare, label: "SMS Dashboard",            href: "/admin/sms-dashboard",       require: ["settings",  "view"] },
+        { icon: Mail,          label: "Email Dashboard",          href: "/admin/email-dashboard",     require: ["settings",  "view"] },
+        { icon: HeartPulse,    label: "Notification Dashboard",   href: "/admin/notification-health", require: ["settings",  "view"] },
+        { icon: Megaphone,     label: "Broadcast",                href: "/admin/broadcast",           require: ["customers", "edit"] },
       ],
     },
 

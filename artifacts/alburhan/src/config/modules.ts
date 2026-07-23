@@ -4,6 +4,7 @@ export interface ModuleItem {
   href: string;
   section: string;
   sectionColor: string;
+  aliases?: string[];
 }
 
 export const ALL_MODULES: ModuleItem[] = [
@@ -33,12 +34,12 @@ export const ALL_MODULES: ModuleItem[] = [
   { label: "Receipt Dashboard",        desc: "Payment receipts",            href: "/admin/receipts",          section: "Finance & Accounting",          sectionColor: "emerald" },
 
   /* ── CRM, SALES & CUSTOMER ─── */
-  { label: "CRM Dashboard",            desc: "Leads & pipeline",            href: "/admin/crm",               section: "CRM, Sales & Customer",         sectionColor: "blue" },
-  { label: "Lead Manager",             desc: "Lead capture & follow-up",    href: "/admin/leads",             section: "CRM, Sales & Customer",         sectionColor: "blue" },
-  { label: "Lead Dashboard",           desc: "Lead analytics & pipeline",   href: "/admin/leads",             section: "CRM, Sales & Customer",         sectionColor: "blue" },
-  { label: "Customer 360° Profile",    desc: "Full customer history",       href: "/admin/customer360",       section: "CRM, Sales & Customer",         sectionColor: "blue" },
-  { label: "Customer Analytics",       desc: "Customer data & behaviour",   href: "/admin/customers",         section: "CRM, Sales & Customer",         sectionColor: "blue" },
-  { label: "Loyalty & Rewards",        desc: "Points & redemptions",        href: "/admin/loyalty",           section: "CRM, Sales & Customer",         sectionColor: "blue" },
+  { label: "CRM Dashboard",            desc: "Leads & pipeline",            href: "/admin/crm",               section: "CRM, Sales & Customer",         sectionColor: "blue",    aliases: ["crm", "customer relationship", "pipeline", "sales"] },
+  { label: "Lead Manager",             desc: "Lead capture & follow-up",    href: "/admin/leads",             section: "CRM, Sales & Customer",         sectionColor: "blue",    aliases: ["lead", "leads", "prospects", "enquiry", "follow-up", "funnel"] },
+  { label: "Lead Dashboard",           desc: "Lead analytics & pipeline",   href: "/admin/leads",             section: "CRM, Sales & Customer",         sectionColor: "blue",    aliases: ["lead", "leads", "pipeline", "analytics"] },
+  { label: "Customer 360° Profile",    desc: "Full customer history",       href: "/admin/customer360",       section: "CRM, Sales & Customer",         sectionColor: "blue",    aliases: ["360", "customer profile", "full profile", "history"] },
+  { label: "Customer Analytics",       desc: "Customer data & behaviour",   href: "/admin/customers",         section: "CRM, Sales & Customer",         sectionColor: "blue",    aliases: ["customers", "data", "behaviour", "analytics"] },
+  { label: "Loyalty & Rewards",        desc: "Points & redemptions",        href: "/admin/loyalty",           section: "CRM, Sales & Customer",         sectionColor: "blue",    aliases: ["loyalty", "points", "rewards", "redeem", "tier"] },
 
   /* ── SUPPLIER, PROCUREMENT & INVENTORY ─── */
   { label: "SRM Dashboard",            desc: "Supplier relationships",      href: "/admin/srm",               section: "Supplier, Procurement & Inventory", sectionColor: "purple" },
@@ -76,17 +77,17 @@ export const ALL_MODULES: ModuleItem[] = [
   { label: "KYC Dashboard",            desc: "Know Your Customer docs",     href: "/admin/kyc",               section: "Booking & Pilgrim Operations",  sectionColor: "rose" },
 
   /* ── COMMUNICATION & MARKETING ─── */
-  { label: "WhatsApp Dashboard",       desc: "Messages & templates",        href: "/admin/botbee-dashboard",  section: "Communication & Marketing",     sectionColor: "teal" },
-  { label: "SMS Dashboard",            desc: "DLT & SMS campaigns",         href: "/admin/sms-dashboard",     section: "Communication & Marketing",     sectionColor: "teal" },
-  { label: "Email Dashboard",          desc: "Email templates & delivery",  href: "/admin/email-dashboard",   section: "Communication & Marketing",     sectionColor: "teal" },
-  { label: "Marketing Dashboard",      desc: "Campaigns & broadcasts",      href: "/admin/marketing",         section: "Communication & Marketing",     sectionColor: "teal" },
-  { label: "Broadcast Center",         desc: "Mass messaging & alerts",     href: "/admin/broadcast",         section: "Communication & Marketing",     sectionColor: "teal" },
-  { label: "Notification Center",      desc: "Push & in-app notifications", href: "/admin/notifications",     section: "Communication & Marketing",     sectionColor: "teal" },
-  { label: "Social Media Integration", desc: "All social channels",         href: "/admin/social-media",      section: "Communication & Marketing",     sectionColor: "teal" },
-  { label: "Omni Channel Dashboard",   desc: "Multi-channel overview",      href: "/admin/inbox",             section: "Communication & Marketing",     sectionColor: "teal" },
-  { label: "Website CMS",              desc: "Public pages & content",      href: "/admin/cms",               section: "Communication & Marketing",     sectionColor: "teal" },
-  { label: "Automation Center",        desc: "Workflow automation rules",   href: "/admin/automation-center", section: "Communication & Marketing",     sectionColor: "teal" },
-  { label: "Workflow Center",          desc: "Notification pipelines",      href: "/admin/workflow-center",   section: "Communication & Marketing",     sectionColor: "teal" },
+  { label: "WhatsApp Dashboard",       desc: "Messages & templates",        href: "/admin/botbee-dashboard",  section: "Communication & Marketing",     sectionColor: "teal",  aliases: ["wa", "whatsapp", "waba", "botbee", "chat", "messages", "templates", "wapp"] },
+  { label: "SMS Dashboard",            desc: "DLT & SMS campaigns",         href: "/admin/sms-dashboard",     section: "Communication & Marketing",     sectionColor: "teal",  aliases: ["sms", "text", "dlt", "bulk sms", "fast2sms", "short message"] },
+  { label: "Email Dashboard",          desc: "Email templates & delivery",  href: "/admin/email-dashboard",   section: "Communication & Marketing",     sectionColor: "teal",  aliases: ["email", "mail", "smtp", "email templates", "newsletter"] },
+  { label: "Marketing Dashboard",      desc: "Campaigns & broadcasts",      href: "/admin/marketing",         section: "Communication & Marketing",     sectionColor: "teal",  aliases: ["marketing", "campaign", "broadcast", "blast", "bulk"] },
+  { label: "Broadcast Center",         desc: "Mass messaging & alerts",     href: "/admin/broadcast",         section: "Communication & Marketing",     sectionColor: "teal",  aliases: ["broadcast", "mass message", "bulk", "alert", "announcement"] },
+  { label: "Notification Center",      desc: "Push & in-app notifications", href: "/admin/notifications",     section: "Communication & Marketing",     sectionColor: "teal",  aliases: ["notification", "push", "alert", "bell", "notify"] },
+  { label: "Social Media Integration", desc: "All social channels",         href: "/admin/social-media",      section: "Communication & Marketing",     sectionColor: "teal",  aliases: ["social", "facebook", "fb", "instagram", "ig", "telegram", "tg", "messenger", "channels", "social media"] },
+  { label: "Omni Channel Dashboard",   desc: "Multi-channel overview",      href: "/admin/inbox",             section: "Communication & Marketing",     sectionColor: "teal",  aliases: ["omni", "inbox", "multichannel", "omnichannel", "unified inbox", "all channels"] },
+  { label: "Website CMS",              desc: "Public pages & content",      href: "/admin/cms",               section: "Communication & Marketing",     sectionColor: "teal",  aliases: ["cms", "website", "content", "pages", "public site"] },
+  { label: "Automation Center",        desc: "Workflow automation rules",   href: "/admin/automation-center", section: "Communication & Marketing",     sectionColor: "teal",  aliases: ["automation", "rules", "triggers", "auto", "workflow"] },
+  { label: "Workflow Center",          desc: "Notification pipelines",      href: "/admin/workflow-center",   section: "Communication & Marketing",     sectionColor: "teal",  aliases: ["workflow", "pipeline", "notification flow", "automation"] },
 
   /* ── ANALYTICS & REPORTING ─── */
   { label: "Reports Dashboard",        desc: "Operational reports",         href: "/admin/reports",           section: "Analytics & Reporting",         sectionColor: "slate" },

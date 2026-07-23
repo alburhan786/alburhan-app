@@ -7,7 +7,8 @@ import {
   AlertCircle, Download, Eye, Upload, RefreshCw, Plus, Target,
   TrendingUp, Shield, Heart, Calendar, Hash, Globe, UserCheck,
   Package, Receipt, Landmark, Camera, Edit3, StickyNote, Award,
-  BookOpen, BarChart3, Layers, Users, ArrowRight, Info, Tag
+  BookOpen, BarChart3, Layers, Users, ArrowRight, ArrowLeft, Info, Tag,
+  CheckSquare, Smartphone, AtSign, Share2
 } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -191,6 +192,11 @@ export default function Customer360() {
   const [sendingReply, setSendingReply] = useState(false);
   const [addingNote, setAddingNote] = useState(false);
   const [searchQ, setSearchQ] = useState("");
+  const [commsFilter, setCommsFilter] = useState("all");
+  const [timelineFull, setTimelineFull] = useState<any[]>([]);
+  const [timelineLoading, setTimelineLoading] = useState(false);
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [tasksLoading, setTasksLoading] = useState(false);
 
   const loadProfile = useCallback(async (type: "user" | "lead", id: string) => {
     setLoading(true);
@@ -239,6 +245,34 @@ export default function Customer360() {
     } finally { setSendingReply(false); }
   };
 
+  useEffect(() => {
+    if (activeTab !== "comms" || !data?.user?.mobile) return;
+    setTimelineLoading(true);
+    fetch(`${API}/api/customer360/user/${encodeURIComponent(data.user.mobile)}/timeline-full?limit=100`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : { items: [] })
+      .then(d => setTimelineFull(Array.isArray(d.items) ? d.items : []))
+      .catch(() => {})
+      .finally(() => setTimelineLoading(false));
+  }, [activeTab, data?.user?.mobile]);
+
+  useEffect(() => {
+    if (activeTab !== "tasks" || !data?.user?.mobile) return;
+    setTasksLoading(true);
+    fetch(`${API}/api/tasks`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : [])
+      .then(d => {
+        const mobile = data!.user!.mobile;
+        const all: any[] = Array.isArray(d) ? d : (d.tasks || []);
+        const last9 = mobile.replace(/\D/g, "").slice(-9);
+        setTasks(all.filter((t: any) =>
+          (t.customer_mobile && t.customer_mobile.replace(/\D/g, "").endsWith(last9)) ||
+          (t.notes && t.notes.includes(last9))
+        ));
+      })
+      .catch(() => {})
+      .finally(() => setTasksLoading(false));
+  }, [activeTab, data?.user?.mobile]);
+
   // ── AI suggestions (rule-based) ──────────────────────────────────────────
   const aiSuggestions = data ? (() => {
     const tips: { icon: string; color: string; text: string }[] = [];
@@ -276,15 +310,16 @@ export default function Customer360() {
   })() : [];
 
   const tabs = [
-    { id: "overview", label: "Overview", icon: User },
-    { id: "bookings", label: "Bookings", icon: Package, badge: data?.bookings.length },
-    { id: "payments", label: "Payments", icon: CreditCard, badge: data?.payments.length },
-    { id: "comms", label: "Communications", icon: MessageSquare, badge: data?.communications.length },
-    { id: "lead", label: "Lead History", icon: Target, badge: data?.leads.length },
-    { id: "travel", label: "Travel", icon: Plane },
-    { id: "documents", label: "Documents", icon: FileText, badge: data?.documents.length },
-    { id: "timeline", label: "Timeline", icon: Activity, badge: data?.timeline.length },
-    { id: "ai", label: "AI Insights", icon: Brain, badge: aiSuggestions.length },
+    { id: "overview",   label: "Overview",        icon: User },
+    { id: "bookings",   label: "Bookings",         icon: Package,       badge: data?.bookings.length },
+    { id: "payments",   label: "Payments",         icon: CreditCard,    badge: data?.payments.length },
+    { id: "comms",      label: "Communication",    icon: MessageSquare, badge: data?.communications.length },
+    { id: "tasks",      label: "Tasks",            icon: CheckSquare },
+    { id: "lead",       label: "Lead History",     icon: Target,        badge: data?.leads.length },
+    { id: "travel",     label: "Travel",           icon: Plane },
+    { id: "documents",  label: "Documents",        icon: FileText,      badge: data?.documents.length },
+    { id: "timeline",   label: "Timeline",         icon: Activity,      badge: data?.timeline.length },
+    { id: "ai",         label: "AI Insights",      icon: Brain,         badge: aiSuggestions.length },
   ];
 
   if (!selectedId) {
@@ -511,6 +546,57 @@ export default function Customer360() {
                       ))}
                     </div>
 
+                    {/* Profile Completeness Bar */}
+                    {data.user && (() => {
+                      const fields = [
+                        { label: "Name",             ok: !!data.user.name },
+                        { label: "Email",            ok: !!data.user.email },
+                        { label: "Gender",           ok: !!data.user.gender },
+                        { label: "Date of Birth",    ok: !!data.user.date_of_birth },
+                        { label: "Nationality",      ok: !!data.user.nationality },
+                        { label: "Address",          ok: !!data.user.address },
+                        { label: "Passport",         ok: !!data.user.passport_number },
+                        { label: "Aadhaar",          ok: !!data.user.aadhar_number },
+                        { label: "PAN",              ok: !!data.user.pan_number },
+                        { label: "Blood Group",      ok: !!data.user.blood_group_full },
+                        { label: "Emergency Contact",ok: !!data.user.emergency_contact_name },
+                      ];
+                      const done = fields.filter(f => f.ok).length;
+                      const pct = Math.round((done / fields.length) * 100);
+                      const missing = fields.filter(f => !f.ok);
+                      return (
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                          <div className="flex items-center justify-between mb-3">
+                            <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+                              <UserCheck size={15} className="text-emerald-500" /> Profile Completeness
+                            </h3>
+                            <span className={`text-lg font-bold ${pct >= 80 ? "text-emerald-600" : pct >= 50 ? "text-yellow-600" : "text-red-500"}`}>
+                              {pct}%
+                            </span>
+                          </div>
+                          <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden mb-3">
+                            <div
+                              className={`h-full rounded-full transition-all ${pct >= 80 ? "bg-emerald-500" : pct >= 50 ? "bg-yellow-500" : "bg-red-400"}`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {fields.map(f => (
+                              <span key={f.label} className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-1 ${f.ok ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"}`}>
+                                {f.ok ? <CheckCircle size={9} /> : <AlertCircle size={9} />} {f.label}
+                              </span>
+                            ))}
+                          </div>
+                          {missing.length > 0 && (
+                            <div className="mt-3 text-xs text-gray-400">
+                              Missing: {missing.map(f => f.label).join(", ")} — update in{" "}
+                              <a href="/admin/customers" className="text-emerald-600 hover:underline">Customer Settings</a>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
                     {/* Loyalty Card */}
                     {data.loyalty && (
                       <div className={`rounded-2xl p-5 ${tierColor(data.loyalty.tier)} border`}>
@@ -666,52 +752,112 @@ export default function Customer360() {
                 )}
 
                 {/* ── COMMUNICATIONS ── */}
-                {activeTab === "comms" && (
-                  <div className="space-y-4">
-                    {/* Reply Box */}
-                    {data.user?.mobile && (
-                      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-                        <div className="flex gap-2 mb-2">
-                          <textarea value={replyText} onChange={e => setReplyText(e.target.value)}
-                            rows={2} placeholder="Type a reply via WhatsApp…"
-                            className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 resize-none" />
-                          <button onClick={sendWhatsApp} disabled={!replyText || sendingReply}
-                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2 text-sm">
-                            <Send size={13} /> {sendingReply ? "…" : "Send"}
-                          </button>
-                        </div>
-                        <div className="text-xs text-gray-400">Sends via WhatsApp to {data.user.mobile}</div>
-                      </div>
-                    )}
+                {activeTab === "comms" && (() => {
+                  const CH_META: Record<string, { label: string; bg: string; text: string; icon: React.ReactNode }> = {
+                    whatsapp:  { label: "WhatsApp",  bg: "bg-green-100",  text: "text-green-700",  icon: <MessageSquare size={12} /> },
+                    sms:       { label: "SMS",        bg: "bg-blue-100",   text: "text-blue-700",   icon: <Smartphone size={12} /> },
+                    email:     { label: "Email",      bg: "bg-purple-100", text: "text-purple-700", icon: <AtSign size={12} /> },
+                    facebook:  { label: "Facebook",   bg: "bg-blue-100",   text: "text-blue-800",   icon: <Share2 size={12} /> },
+                    instagram: { label: "Instagram",  bg: "bg-pink-100",   text: "text-pink-700",   icon: <Star size={12} /> },
+                    telegram:  { label: "Telegram",   bg: "bg-teal-100",   text: "text-teal-700",   icon: <Send size={12} /> },
+                    rcs:       { label: "RCS",        bg: "bg-indigo-100", text: "text-indigo-700", icon: <MessageSquare size={12} /> },
+                    web:       { label: "Web",        bg: "bg-slate-100",  text: "text-slate-700",  icon: <Globe size={12} /> },
+                    system:    { label: "System",     bg: "bg-gray-100",   text: "text-gray-600",   icon: <Activity size={12} /> },
+                  };
+                  const statusBadge = (s: string | null) => {
+                    if (!s) return null;
+                    const m: Record<string, string> = {
+                      delivered: "bg-green-100 text-green-700", sent: "bg-blue-100 text-blue-700",
+                      failed: "bg-red-100 text-red-600", read: "bg-purple-100 text-purple-700",
+                      pending: "bg-yellow-100 text-yellow-700",
+                    };
+                    return <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${m[s.toLowerCase()] || "bg-gray-100 text-gray-500"}`}>{s}</span>;
+                  };
 
-                    {/* Message Thread */}
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                      <div className="px-5 py-3 border-b border-gray-100 font-semibold text-gray-800">
-                        All Communications ({data.communications.length})
-                      </div>
-                      {data.communications.length === 0 && <div className="text-center py-8 text-gray-400">No communications</div>}
-                      <div className="divide-y divide-gray-50 max-h-[600px] overflow-y-auto">
-                        {data.communications.map((m, idx) => (
-                          <div key={m.id || idx} className={`px-5 py-3 flex gap-3 ${m.dir === "out" || m.dir === "outgoing" ? "bg-emerald-50/40" : ""}`}>
-                            <div className="text-lg shrink-0 mt-0.5">{platformIcon(m.platform)}</div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-0.5">
-                                <span className="text-xs font-semibold text-gray-600 capitalize">{m.platform?.replace(/_/g, " ")}</span>
-                                <span className={`text-xs px-1.5 py-0.5 rounded-full ${m.dir === "out" || m.dir === "outgoing" ? "bg-emerald-100 text-emerald-700" : "bg-blue-100 text-blue-700"}`}>
-                                  {m.dir === "out" || m.dir === "outgoing" ? "Outgoing" : "Incoming"}
-                                </span>
-                                {m.is_internal_note && <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full">Note</span>}
-                                <span className="text-xs text-gray-400 ml-auto">{fmtTime(m.created_at)}</span>
-                              </div>
-                              <p className="text-sm text-gray-800 leading-relaxed">{m.message_text || m.message || "—"}</p>
-                              {(m.event_type) && <div className="text-xs text-gray-400 mt-1">Event: {m.event_type}</div>}
-                            </div>
+                  const CHANNELS = ["all", "whatsapp", "sms", "email", "facebook", "instagram", "telegram", "system"];
+                  const feed = timelineFull.length > 0 ? timelineFull : data.communications.map(m => ({
+                    id: m.id, type: m.platform || m.channel || "system",
+                    direction: (m.dir === "out" || m.dir === "outgoing") ? "out" : "in",
+                    content: m.message_text || m.message || "", status: m.status,
+                    event_type: m.event_type, is_internal_note: m.is_internal_note, created_at: m.created_at,
+                  }));
+                  const filtered = commsFilter === "all" ? feed : feed.filter(m => (m.type || "").toLowerCase().includes(commsFilter));
+
+                  return (
+                    <div className="space-y-4">
+                      {/* Reply Box */}
+                      {data.user?.mobile && (
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+                          <div className="flex gap-2 mb-2">
+                            <textarea value={replyText} onChange={e => setReplyText(e.target.value)}
+                              rows={2} placeholder="Type a reply via WhatsApp…"
+                              className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 resize-none" />
+                            <button onClick={sendWhatsApp} disabled={!replyText || sendingReply}
+                              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2 text-sm">
+                              <Send size={13} /> {sendingReply ? "…" : "Send"}
+                            </button>
                           </div>
+                          <div className="text-xs text-gray-400">Sends via WhatsApp to {data.user.mobile}</div>
+                        </div>
+                      )}
+
+                      {/* Channel filter chips */}
+                      <div className="flex gap-2 flex-wrap">
+                        {CHANNELS.map(ch => (
+                          <button key={ch} onClick={() => setCommsFilter(ch)}
+                            className={`px-3 py-1 rounded-full text-xs font-medium transition-colors capitalize ${
+                              commsFilter === ch
+                                ? "bg-emerald-600 text-white"
+                                : "bg-white border border-gray-200 text-gray-600 hover:border-emerald-300 hover:text-emerald-700"
+                            }`}>
+                            {ch === "all" ? `All (${feed.length})` : ch}
+                          </button>
                         ))}
                       </div>
+
+                      {/* Unified Feed */}
+                      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                        <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+                          <span className="font-semibold text-gray-800">
+                            {commsFilter === "all" ? "All Channels" : CH_META[commsFilter]?.label || commsFilter}
+                            <span className="ml-2 text-sm font-normal text-gray-400">({filtered.length})</span>
+                          </span>
+                          {timelineLoading && <RefreshCw size={13} className="animate-spin text-gray-400" />}
+                        </div>
+                        {filtered.length === 0 && !timelineLoading && (
+                          <div className="text-center py-10 text-gray-400">No messages for this channel</div>
+                        )}
+                        <div className="divide-y divide-gray-50 max-h-[600px] overflow-y-auto">
+                          {filtered.map((m, idx) => {
+                            const ch = CH_META[(m.type || "").toLowerCase()] || CH_META.system;
+                            const isOut = m.direction === "out";
+                            return (
+                              <div key={m.id || idx} className={`px-5 py-3 flex gap-3 ${isOut ? "bg-emerald-50/30" : ""}`}>
+                                <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${ch.bg} ${ch.text}`}>
+                                  {ch.icon}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${ch.bg} ${ch.text}`}>{ch.label}</span>
+                                    <span className={`flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-medium ${isOut ? "bg-emerald-100 text-emerald-700" : "bg-blue-100 text-blue-700"}`}>
+                                      {isOut ? <ArrowRight size={9} /> : <ArrowLeft size={9} />}
+                                      {isOut ? "Sent" : "Received"}
+                                    </span>
+                                    {m.is_internal_note && <span className="text-[10px] bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full">Note</span>}
+                                    {statusBadge(m.status)}
+                                    <span className="text-[10px] text-gray-400 ml-auto">{fmtTime(m.created_at)}</span>
+                                  </div>
+                                  <p className="text-sm text-gray-800 leading-relaxed line-clamp-3">{m.content || "—"}</p>
+                                  {m.event_type && <div className="text-[10px] text-gray-400 mt-1 font-mono">{m.event_type}</div>}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* ── LEAD HISTORY ── */}
                 {activeTab === "lead" && (
@@ -879,6 +1025,63 @@ export default function Customer360() {
                         </div>
                       ))}
                     </div>
+                  </div>
+                )}
+
+                {/* ── TASKS ── */}
+                {activeTab === "tasks" && (
+                  <div className="space-y-3">
+                    {tasksLoading && (
+                      <div className="flex items-center justify-center py-12">
+                        <RefreshCw size={20} className="animate-spin text-emerald-500" />
+                      </div>
+                    )}
+                    {!tasksLoading && tasks.length === 0 && (
+                      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center">
+                        <CheckSquare size={28} className="mx-auto mb-3 text-gray-300" />
+                        <p className="text-gray-500 font-medium">No tasks linked to this customer</p>
+                        <p className="text-sm text-gray-400 mt-1 mb-4">Tasks are matched by customer mobile number</p>
+                        <a href="/admin/tasks"
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700 transition-colors">
+                          <Plus size={14} /> Open Task Manager
+                        </a>
+                      </div>
+                    )}
+                    {tasks.map(t => (
+                      <div key={t.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                        <div className="flex items-start justify-between gap-3 mb-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-gray-900">{t.title}</div>
+                            {t.description && <p className="text-sm text-gray-600 mt-1 leading-relaxed">{t.description}</p>}
+                          </div>
+                          <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 font-medium ${statusColor(t.status || "pending")}`}>
+                            {t.status || "pending"}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-3 text-xs text-gray-500 mt-2">
+                          {t.due_date && (
+                            <span className="flex items-center gap-1">
+                              <Clock size={10} /> Due {fmtDate(t.due_date)}
+                            </span>
+                          )}
+                          {t.assigned_name && <span>👤 {t.assigned_name}</span>}
+                          {t.priority && (
+                            <span className={`capitalize px-2 py-0.5 rounded-full ${
+                              t.priority === "high" ? "bg-red-50 text-red-600" :
+                              t.priority === "medium" ? "bg-yellow-50 text-yellow-700" :
+                              "bg-gray-50 text-gray-600"
+                            }`}>
+                              {t.priority}
+                            </span>
+                          )}
+                          {t.notes && <span className="text-gray-400 truncate max-w-xs">{t.notes}</span>}
+                        </div>
+                      </div>
+                    ))}
+                    <a href="/admin/tasks"
+                      className="flex items-center justify-center gap-2 w-full py-3 border-2 border-dashed border-gray-200 rounded-2xl text-sm text-gray-500 hover:border-emerald-300 hover:text-emerald-600 transition-colors">
+                      <Plus size={14} /> Create New Task
+                    </a>
                   </div>
                 )}
 

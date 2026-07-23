@@ -110,7 +110,10 @@ export function CommandPalette({ open, onClose }: Props) {
 
   const filteredModules: ModuleItem[] = query.trim().length === 0 ? [] : ALL_MODULES.filter(m => {
     const q = query.toLowerCase();
-    return m.label.toLowerCase().includes(q) || m.desc.toLowerCase().includes(q) || m.section.toLowerCase().includes(q);
+    return m.label.toLowerCase().includes(q)
+      || m.desc.toLowerCase().includes(q)
+      || m.section.toLowerCase().includes(q)
+      || (m.aliases?.some(a => a.toLowerCase().includes(q)) ?? false);
   });
 
   const topFrequent: ModuleItem[] = query.trim().length === 0
