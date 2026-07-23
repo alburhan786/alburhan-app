@@ -53,30 +53,32 @@ export default function WorkflowCenter() {
   const [tab, setTab] = useState("dashboard");
 
   return (
-    <div className="p-4 max-w-7xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">⚡ Workflow Center</h1>
-        <p className="text-gray-500 text-sm mt-1">Automate every business event — manage rules, track executions, and monitor customer journeys.</p>
-      </div>
+    <AdminLayout>
+      <div className="p-4 max-w-7xl mx-auto">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">⚡ Workflow Center</h1>
+          <p className="text-gray-500 text-sm mt-1">Automate every business event — manage rules, track executions, and monitor customer journeys.</p>
+        </div>
 
-      <div className="flex flex-wrap gap-2 mb-6">
-        {TABS.map(t => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === t.id ? "bg-indigo-600 text-white" : "bg-white border text-gray-700 hover:bg-gray-50"}`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+        <div className="flex flex-wrap gap-2 mb-6">
+          {TABS.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === t.id ? "bg-indigo-600 text-white" : "bg-white border text-gray-700 hover:bg-gray-50"}`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
 
-      {tab === "dashboard" && <DashboardTab />}
-      {tab === "rules" && <RulesTab />}
-      {tab === "logs" && <LogsTab statusFilter="all" />}
-      {tab === "failed" && <LogsTab statusFilter="failed" />}
-      {tab === "timeline" && <TimelineTab />}
-    </div>
+        {tab === "dashboard" && <DashboardTab />}
+        {tab === "rules" && <RulesTab />}
+        {tab === "logs" && <LogsTab statusFilter="all" />}
+        {tab === "failed" && <LogsTab statusFilter="failed" />}
+        {tab === "timeline" && <TimelineTab />}
+      </div>
+    </AdminLayout>
   );
 }
 
@@ -425,7 +427,6 @@ function TimelineTab() {
   };
 
   return (
-    <AdminLayout>
     <div className="space-y-4">
       <div className="flex gap-2">
         <input
@@ -468,6 +469,5 @@ function TimelineTab() {
         </div>
       )}
     </div>
-    </AdminLayout>
   );
 }

@@ -388,6 +388,7 @@ function Router() {
       <Route path="/admin/notification-logs" component={() => <AdminRoute component={NotificationLogs} />} />
       <Route path="/admin/notification-templates" component={() => <AdminRoute component={NotificationTemplates} />} />
       <Route path="/admin/billing-settings" component={() => <AdminRoute component={BillingSettings} />} />
+      <Route path="/admin/billing"          component={() => <AdminRoute component={BillingSettings} />} />
       <Route path="/admin/api-settings" component={() => <AdminRoute component={ApiSettings} />} />
       <Route path="/admin/inbox" component={() => <AdminRoute component={OmnichannelInbox} />} />
       <Route path="/admin/communication-center" component={() => <AdminRoute component={CommunicationCenter} />} />
