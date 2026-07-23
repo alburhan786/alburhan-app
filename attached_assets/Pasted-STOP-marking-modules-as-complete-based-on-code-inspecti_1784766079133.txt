@@ -1,0 +1,78 @@
+STOP marking modules as complete based on code inspection or internal checklists.
+
+I need a LIVE visual verification of the actual Admin Dashboard running in the browser.
+
+Requirements:
+
+1. Open the live Admin Dashboard in Google Chrome.
+2. Compare every visible dashboard card against the required list of 57 modules.
+3. If any module is missing from the UI, restore it immediately.
+4. Do not remove, replace, rename, or overwrite any existing module.
+5. Preserve all routes, APIs, permissions, database records, and business logic.
+6. Ensure every module has:
+   - Visible dashboard card
+   - Sidebar navigation entry
+   - Searchable from the sidebar search
+   - Working route
+   - Working permissions
+   - Working API connection
+7. Verify the following modules are actually visible:
+   - Branch Dashboard
+   - Branch Login Management
+   - Agent Dashboard
+   - Agent Login Management
+   - Staff Dashboard
+   - Customer Dashboard
+   - Admin Dashboard
+   - Executive Dashboard
+   - Operations Dashboard
+   - Manager Dashboard
+   - Finance Dashboard
+   - Accounting Dashboard
+   - Payment Dashboard
+   - Invoice Dashboard
+   - CRM Dashboard
+   - Lead Dashboard
+   - Lead Manager
+   - Customer 360 Profile
+   - Loyalty & Rewards
+   - SRM Dashboard
+   - Supplier Dashboard
+   - Procurement Dashboard
+   - Inventory Dashboard
+   - HR Dashboard
+   - Payroll Dashboard
+   - Omni Channel Dashboard
+   - Social Media Integration
+   - WhatsApp Dashboard
+   - SMS Dashboard
+   - Email Dashboard
+   - Notification Center
+   - Marketing Dashboard
+   - Bookings
+   - Offline Booking
+   - Hajj Groups
+   - Umrah Groups
+   - Visa Dashboard
+   - Flight Dashboard
+   - Hotel Dashboard
+   - Transport Dashboard
+   - Room Allocation
+   - QR Tracker
+   - Print Center
+   - Agreement Dashboard
+   - KYC Dashboard
+   - Guide Panel
+   - Ziyarat Dashboard
+   - Pilgrim Reports
+   - Audit Log Dashboard
+   - Activity Dashboard
+   - Security Dashboard
+   - Backup Dashboard
+   - API Dashboard
+   - Integration Dashboard
+   - Settings Dashboard
+
+8. After verification, capture ONE full-page browser screenshot showing every section and every dashboard card.
+
+Do not report success until every module is visibly present in the browser UI.

@@ -370,7 +370,7 @@ export default function SuperDashboard() {
 
         {/* ── Module Grid ────────────────────────────────────────────────── */}
         {MODULES.map(group => (
-          <section key={group.section} className="space-y-4">
+          <section key={group.section} id={group.section.toLowerCase().replace(/\s+&\s+/g,"-").replace(/[^a-z0-9]+/g,"-")} className="space-y-4">
             {/* Section header */}
             <div className={`rounded-2xl bg-gradient-to-r ${group.color} px-5 py-3 flex items-center gap-3`}>
               <h2 className="text-sm font-bold text-white uppercase tracking-widest">{group.section}</h2>
