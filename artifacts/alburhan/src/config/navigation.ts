@@ -76,16 +76,16 @@ export function buildNavSections(openComplaints = 0): NavSection[] {
       section: "Operations",
       items: [
         // Bookings & Ops
-        { icon: BookOpen,      label: "Bookings",                href: "/admin/bookings",            require: ["bookings",   "view"]   },
-        { icon: ClipboardPlus, label: "Offline Booking",         href: "/admin/offline-bookings",    require: ["bookings",   "create"] },
+        { icon: BookOpen,      label: "Bookings",                href: "/admin/bookings",            require: ["bookings",   "view"],   aliases: ["booking", "reservation", "customer", "customers", "hajj booking", "umrah booking"] },
+        { icon: ClipboardPlus, label: "Offline Booking",         href: "/admin/offline-bookings",    require: ["bookings",   "create"], aliases: ["offline", "walk-in", "counter booking"] },
         { icon: Trash2,        label: "Booking Trash",           href: "/admin/bookings?tab=trash",  require: ["bookings",   "delete"] },
         { icon: Trash2,        label: "Payment Trash",           href: "/admin/payment-trash",       require: ["payments",   "delete"] },
         { icon: Bot,           label: "Automation Center",       href: "/admin/automation-center",   require: ["bookings",   "edit"]   },
         // Payments
-        { icon: Receipt,       label: "Invoice Dashboard",       href: "/admin/invoices",            require: ["bookings",   "view"]   },
-        { icon: CreditCard,    label: "Payment Dashboard",       href: "/admin/payments",            require: ["payments",   "view"]   },
-        { icon: BarChart2,     label: "Payment Analytics",       href: "/admin/payment-analytics",   require: ["payments",   "view"]   },
-        { icon: AlarmClock,    label: "Payment Reminders",       href: "/admin/payment-reminders",   require: ["payments",   "view"]   },
+        { icon: Receipt,       label: "Invoice Dashboard",       href: "/admin/invoices",            require: ["bookings",   "view"],   aliases: ["invoice", "bill", "customer", "customers", "receipt"] },
+        { icon: CreditCard,    label: "Payment Dashboard",       href: "/admin/payments",            require: ["payments",   "view"],   aliases: ["payment", "transaction", "customer", "customers"] },
+        { icon: BarChart2,     label: "Payment Analytics",       href: "/admin/payment-analytics",   require: ["payments",   "view"],   aliases: ["payment analytics", "payment trends", "charts"] },
+        { icon: AlarmClock,    label: "Payment Reminders",       href: "/admin/payment-reminders",   require: ["payments",   "view"],   aliases: ["payment reminder", "due", "overdue"] },
         { icon: Building2,     label: "Offline Payments",        href: "/admin/offline-payments",    require: ["payments",   "view"]   },
         { icon: IndianRupee,   label: "Receipt Dashboard",       href: "/admin/receipts",            require: ["payments",   "view"]   },
         // Pilgrims & Hajj
