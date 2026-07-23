@@ -364,8 +364,8 @@ router.get("/user/:mobile/timeline-full", requireAdmin, async (req, res) => {
   } catch (err: any) { res.status(500).json({ message: err.message }); }
 });
 
-// ── By-ID unified timeline (spec: GET /api/customers/:id/timeline-full) ────
-router.get("/by-id/:id/timeline-full", requireAdmin, async (req, res) => {
+// ── By-ID unified timeline (GET /api/customers/:id/timeline-full) ──────────
+router.get("/:id/timeline-full", requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const page    = Math.max(1, parseInt(String(req.query.page  || "1")));

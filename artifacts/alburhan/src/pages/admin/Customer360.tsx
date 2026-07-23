@@ -282,7 +282,7 @@ export default function Customer360() {
     if (!uid && !mobile) return;
     setTimelineLoading(true);
     const url = uid
-      ? `${API}/api/customer360/by-id/${uid}/timeline-full?limit=100`
+      ? `${API}/api/customers/${uid}/timeline-full?limit=100`
       : `${API}/api/customer360/user/${encodeURIComponent(mobile!)}/timeline-full?limit=100`;
     fetch(url, { credentials: "include" })
       .then(r => r.ok ? r.json() : { items: [] })

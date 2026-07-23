@@ -134,10 +134,10 @@ export function buildNavSections(openComplaints = 0): NavSection[] {
     {
       section: "CRM",
       items: [
-        { icon: UserCheck,     label: "Customer 360°",           href: "/admin/customer360",       require: ["customers", "view"] },
-        { icon: Target,        label: "CRM Dashboard",           href: "/admin/crm",               require: ["customers", "view"] },
-        { icon: Handshake,     label: "SRM Dashboard",           href: "/admin/srm",               require: ["accounting","view"] },
-        { icon: Target,        label: "Leads",                   href: "/admin/leads",             require: ["customers", "view"] },
+        { icon: UserCheck,     label: "Customer 360°",           href: "/admin/customer360",       require: ["customers", "view"], aliases: ["360", "customer", "lead", "profile", "history", "customer 360"] },
+        { icon: Target,        label: "CRM Dashboard",           href: "/admin/crm",               require: ["customers", "view"], aliases: ["crm", "lead", "leads", "pipeline", "sales"] },
+        { icon: Handshake,     label: "SRM Dashboard",           href: "/admin/srm",               require: ["accounting","view"], aliases: ["srm", "supplier", "vendor"] },
+        { icon: Target,        label: "Leads",                   href: "/admin/leads",             require: ["customers", "view"], aliases: ["lead", "leads", "prospects", "enquiry", "follow-up"] },
         { icon: ClipboardList, label: "Tasks",                   href: "/admin/tasks",             require: ["bookings",  "view"] },
         { icon: Headphones,    label: "Support Manager",         href: "/admin/support",           require: ["customers", "view"] },
         { icon: Star,          label: "Feedback",                href: "/admin/feedback",          require: ["customers", "view"], badge: openComplaints },

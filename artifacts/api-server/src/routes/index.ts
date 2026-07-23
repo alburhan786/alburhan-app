@@ -349,6 +349,8 @@ import inboxRouter from "./inbox.js";
 router.use("/inbox", inboxRouter);
 import customer360Router from "./customer360.js";
 router.use("/customer360", customer360Router);
+// Spec contract: GET /api/customers/:id/timeline-full
+router.use("/customers", customer360Router);
 router.use("/webhook", webhooksRouter);
 router.use(storageRouter);
 
