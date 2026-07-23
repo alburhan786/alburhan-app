@@ -857,8 +857,23 @@ export default function SocialMediaCenter() {
   const [platformData, setPlatformData] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [configuring, setConfiguring] = useState<typeof ALL_PLATFORMS[0] | null>(null);
-  const [activeGroup, setActiveGroup] = useState<string | null>(null);
+  const HASH_TO_GROUP: Record<string, string> = {
+    instagram: "Instagram", facebook: "Facebook", telegram: "Telegram",
+    whatsapp: "WhatsApp", sms: "SMS", email: "Email", rcs: "RCS",
+    push: "Push", website: "Website",
+  };
+  const initialGroup = HASH_TO_GROUP[window.location.hash.replace("#", "").toLowerCase()] ?? null;
+  const [activeGroup, setActiveGroup] = useState<string | null>(initialGroup);
   const [disconnecting, setDisconnecting] = useState<string | null>(null);
+
+  useEffect(() => {
+    const onHash = () => {
+      const g = HASH_TO_GROUP[window.location.hash.replace("#", "").toLowerCase()];
+      setActiveGroup(g ?? null);
+    };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
 
   const loadPlatforms = useCallback(async () => {
     try {

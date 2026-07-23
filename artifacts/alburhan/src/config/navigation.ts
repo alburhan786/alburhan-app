@@ -74,28 +74,48 @@ export function buildNavSections(openComplaints = 0): NavSection[] {
     {
       section: "Operations",
       items: [
-        { icon: BookOpen,      label: "Bookings",                href: "/admin/bookings",          require: ["bookings",   "view"]   },
-        { icon: ClipboardPlus, label: "Offline Booking",         href: "/admin/offline-bookings",  require: ["bookings",   "create"] },
-        { icon: Trash2,        label: "Booking Trash",           href: "/admin/bookings?tab=trash",require: ["bookings",   "delete"] },
-        { icon: Trash2,        label: "Payment Trash",           href: "/admin/payment-trash",     require: ["payments",   "delete"] },
-        { icon: Bot,           label: "Automation Center",       href: "/admin/automation-center", require: ["bookings",   "edit"]   },
+        // Bookings & Ops
+        { icon: BookOpen,      label: "Bookings",                href: "/admin/bookings",            require: ["bookings",   "view"]   },
+        { icon: ClipboardPlus, label: "Offline Booking",         href: "/admin/offline-bookings",    require: ["bookings",   "create"] },
+        { icon: Trash2,        label: "Booking Trash",           href: "/admin/bookings?tab=trash",  require: ["bookings",   "delete"] },
+        { icon: Trash2,        label: "Payment Trash",           href: "/admin/payment-trash",       require: ["payments",   "delete"] },
+        { icon: Bot,           label: "Automation Center",       href: "/admin/automation-center",   require: ["bookings",   "edit"]   },
+        // Payments
+        { icon: Receipt,       label: "Invoice Dashboard",       href: "/admin/invoices",            require: ["bookings",   "view"]   },
+        { icon: CreditCard,    label: "Payment Dashboard",       href: "/admin/payments",            require: ["payments",   "view"]   },
+        { icon: BarChart2,     label: "Payment Analytics",       href: "/admin/payment-analytics",   require: ["payments",   "view"]   },
+        { icon: AlarmClock,    label: "Payment Reminders",       href: "/admin/payment-reminders",   require: ["payments",   "view"]   },
+        { icon: Building2,     label: "Offline Payments",        href: "/admin/offline-payments",    require: ["payments",   "view"]   },
+        { icon: IndianRupee,   label: "Receipt Dashboard",       href: "/admin/receipts",            require: ["payments",   "view"]   },
+        // Pilgrims & Hajj
+        { icon: UsersRound,    label: "Hajj Groups",              href: "/admin/groups",             require: ["groups",   "view"]   },
+        { icon: Heart,         label: "Medical",                  href: "/admin/medical",            require: ["pilgrims", "view"]   },
+        { icon: FileCheck,     label: "Visa Dashboard",           href: "/admin/visa",               require: ["pilgrims", "view"]   },
+        { icon: ClipboardList, label: "Pilgrim Reports",          href: "/admin/pilgrim-reports",    require: ["pilgrims", "view"]   },
+        { icon: Activity,      label: "Pilgrim Operations",       href: "/admin/pilgrim-ops",        require: ["pilgrims", "view"]   },
+        { icon: ScanLine,      label: "Group Tracking",           href: "/admin/group-tracking",     require: ["groups",   "view"]   },
+        { icon: BadgeCheck,    label: "Certificates",             href: "/admin/certificates",       require: ["pilgrims", "view"]   },
+        { icon: FileText,      label: "Document Management Dashboard", href: "/admin/documents",    require: ["pilgrims", "view"]   },
+        { icon: FileText,      label: "Document Expiry",          href: "/admin/document-expiry",    require: ["pilgrims", "view"]   },
+        { icon: BadgeCheck,    label: "Staff ID Cards",           href: "/admin/staff",              require: ["staff",    "view"]   },
+        { icon: ScanLine,      label: "QR Tracker",               href: "/admin/qr-tracker",         require: ["groups",   "view"]   },
+        { icon: Printer,       label: "Print Center",             href: "/admin/print-center",       require: ["groups",   "export"] },
+        { icon: Droplets,      label: "Spray Label",              href: "/admin/print/spray-label",  require: ["groups",   "view"]   },
+        // Travel
+        { icon: Plane,         label: "Flight Dashboard",        href: "/admin/flight-dashboard",    require: ["groups",   "view"]   },
+        { icon: Plane,         label: "Flights",                 href: "/admin/flights",              require: ["groups",   "view"]   },
+        { icon: Hotel,         label: "Hotel Dashboard",         href: "/admin/hotel-dashboard",      require: ["groups",   "view"]   },
+        { icon: Building2,     label: "Hotels",                  href: "/admin/hotels",               require: ["groups",   "view"]   },
+        { icon: Bus,           label: "Transport Dashboard",     href: "/admin/transport-dashboard",  require: ["groups",   "view"]   },
+        { icon: Bus,           label: "Buses",                   href: "/admin/buses",                require: ["groups",   "view"]   },
+        { icon: MapPin,        label: "Ziyarat",                 href: "/admin/ziyarat",              require: ["groups",   "view"]   },
+        { icon: Tent,          label: "Room Allocation Dashboard", href: "/admin/allocations",        require: ["groups",   "view"]   },
+        { icon: Tag,           label: "Luggage",                 href: "/admin/luggage",              require: ["groups",   "view"]   },
+        { icon: Scale,         label: "Agreement Dashboard",     href: "/admin/agreements",           require: ["audit_logs","view"]  },
       ],
     },
 
-    // ── 3. BOOKINGS & PAYMENTS ───────────────────────────────────────────────
-    {
-      section: "Bookings",
-      items: [
-        { icon: Receipt,       label: "Invoice Dashboard",       href: "/admin/invoices",          require: ["bookings",   "view"]   },
-        { icon: CreditCard,    label: "Payment Dashboard",       href: "/admin/payments",          require: ["payments",   "view"]   },
-        { icon: BarChart2,     label: "Payment Analytics",       href: "/admin/payment-analytics", require: ["payments",   "view"]   },
-        { icon: AlarmClock,    label: "Payment Reminders",       href: "/admin/payment-reminders", require: ["payments",   "view"]   },
-        { icon: Building2,     label: "Offline Payments",        href: "/admin/offline-payments",  require: ["payments",   "view"]   },
-        { icon: IndianRupee,   label: "Receipt Dashboard",       href: "/admin/receipts",          require: ["payments",   "view"]   },
-      ],
-    },
-
-    // ── 4. FINANCE ───────────────────────────────────────────────────────────
+    // ── 3. FINANCE ───────────────────────────────────────────────────────────
     {
       section: "Finance",
       items: [
@@ -107,26 +127,6 @@ export function buildNavSections(openComplaints = 0): NavSection[] {
         { icon: BookMarked,    label: "Hajji Ledger",            href: "/admin/hajji-ledger",      require: ["groups",     "view"]   },
         { icon: Scale,         label: "GST Reports",             href: "/admin/gst-reports",       require: ["gst",        "view"]   },
         { icon: Users2,        label: "Payroll Dashboard",       href: "/admin/payroll",           require: ["payroll",    "view"]   },
-      ],
-    },
-
-    // ── 5. PILGRIMS ──────────────────────────────────────────────────────────
-    {
-      section: "Pilgrims",
-      items: [
-        { icon: UsersRound,    label: "Hajj Groups",              href: "/admin/groups",            require: ["groups",   "view"]   },
-        { icon: Heart,         label: "Medical",                  href: "/admin/medical",           require: ["pilgrims", "view"]   },
-        { icon: FileCheck,     label: "Visa Dashboard",           href: "/admin/visa",              require: ["pilgrims", "view"]   },
-        { icon: ClipboardList, label: "Pilgrim Reports",          href: "/admin/pilgrim-reports",   require: ["pilgrims", "view"]   },
-        { icon: Activity,      label: "Pilgrim Operations",       href: "/admin/pilgrim-ops",       require: ["pilgrims", "view"]   },
-        { icon: ScanLine,      label: "Group Tracking",           href: "/admin/group-tracking",    require: ["groups",   "view"]   },
-        { icon: BadgeCheck,    label: "Certificates",             href: "/admin/certificates",      require: ["pilgrims", "view"]   },
-        { icon: FileText,      label: "Document Management Dashboard", href: "/admin/documents",   require: ["pilgrims", "view"]   },
-        { icon: FileText,      label: "Document Expiry",          href: "/admin/document-expiry",   require: ["pilgrims", "view"]   },
-        { icon: BadgeCheck,    label: "Staff ID Cards",           href: "/admin/staff",             require: ["staff",    "view"]   },
-        { icon: ScanLine,      label: "QR Tracker",               href: "/admin/qr-tracker",        require: ["groups",   "view"]   },
-        { icon: Printer,       label: "Print Center",             href: "/admin/print-center",      require: ["groups",   "export"] },
-        { icon: Droplets,      label: "Spray Label",              href: "/admin/print/spray-label", require: ["groups",   "view"]   },
       ],
     },
 
@@ -170,24 +170,7 @@ export function buildNavSections(openComplaints = 0): NavSection[] {
       ],
     },
 
-    // ── 9. TRAVEL OPERATIONS ─────────────────────────────────────────────────
-    {
-      section: "Travel Operations",
-      items: [
-        { icon: Plane,         label: "Flight Dashboard",        href: "/admin/flight-dashboard",    require: ["groups",   "view"]   },
-        { icon: Plane,         label: "Flights",                 href: "/admin/flights",              require: ["groups",   "view"]   },
-        { icon: Hotel,         label: "Hotel Dashboard",         href: "/admin/hotel-dashboard",      require: ["groups",   "view"]   },
-        { icon: Building2,     label: "Hotels",                  href: "/admin/hotels",               require: ["groups",   "view"]   },
-        { icon: Bus,           label: "Transport Dashboard",     href: "/admin/transport-dashboard",  require: ["groups",   "view"]   },
-        { icon: Bus,           label: "Buses",                   href: "/admin/buses",                require: ["groups",   "view"]   },
-        { icon: MapPin,        label: "Ziyarat",                 href: "/admin/ziyarat",              require: ["groups",   "view"]   },
-        { icon: Tent,          label: "Room Allocation Dashboard", href: "/admin/allocations",        require: ["groups",   "view"]   },
-        { icon: Tag,           label: "Luggage",                 href: "/admin/luggage",              require: ["groups",   "view"]   },
-        { icon: Scale,         label: "Agreement Dashboard",     href: "/admin/agreements",           require: ["audit_logs","view"]  },
-      ],
-    },
-
-    // ── 10. MARKETING ────────────────────────────────────────────────────────
+    // ── 9. MARKETING ─────────────────────────────────────────────────────────
     {
       section: "Marketing",
       items: [
@@ -242,20 +225,14 @@ export function buildNavSections(openComplaints = 0): NavSection[] {
     {
       section: "Administration",
       items: [
-        { icon: Users,       label: "Customers",               href: "/admin/customers",         require: ["customers", "view"] },
-        { icon: ShieldCheck, label: "KYC Management",          href: "/admin/kyc",               require: ["customers", "view"] },
-        { icon: UserCheck,   label: "Agent Management",        href: "/admin/agents",            require: ["customers", "view"] },
-        { icon: BarChart2,   label: "Agent Dashboard",         href: "/admin/agent-dashboard",   require: ["customers", "view"] },
-        { icon: Building2,   label: "Branch Management",       href: "/admin/branches",          require: ["customers", "view"] },
-        { icon: Building2,   label: "Branch Dashboard",        href: "/admin/branch-dashboard",  require: ["customers", "view"] },
-        { icon: BookOpen,    label: "Guide Panel",             href: "/admin/guide-panel",       require: ["bookings",  "view"] },
-      ],
-    },
-
-    // ── 14. SYSTEM ───────────────────────────────────────────────────────────
-    {
-      section: "System",
-      items: [
+        { icon: Users,        label: "Customers",               href: "/admin/customers",         require: ["customers", "view"] },
+        { icon: ShieldCheck,  label: "KYC Management",          href: "/admin/kyc",               require: ["customers", "view"] },
+        { icon: UserCheck,    label: "Agent Management",        href: "/admin/agents",            require: ["customers", "view"] },
+        { icon: BarChart2,    label: "Agent Dashboard",         href: "/admin/agent-dashboard",   require: ["customers", "view"] },
+        { icon: Building2,    label: "Branch Management",       href: "/admin/branches",          require: ["customers", "view"] },
+        { icon: Building2,    label: "Branch Dashboard",        href: "/admin/branch-dashboard",  require: ["customers", "view"] },
+        { icon: BookOpen,     label: "Guide Panel",             href: "/admin/guide-panel",       require: ["bookings",  "view"] },
+        // System & Settings
         { icon: Settings2,    label: "Settings Dashboard",      href: "/admin/settings",          require: ["settings",   "view"] },
         { icon: Settings2,    label: "Billing Settings",        href: "/admin/billing-settings",  require: ["settings",   "view"] },
         { icon: Code2,        label: "API Dashboard",           href: "/admin/api-settings",      require: ["settings",   "view"] },

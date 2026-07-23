@@ -240,17 +240,20 @@ export default function Customer360() {
     if (!taskTitle.trim() || !data?.user?.mobile) return;
     setCreatingTask(true);
     try {
-      const r = await fetch(`${API}/api/tasks`, {
+      const r = await fetch(`${API}/api/enterprise/tasks`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: taskTitle.trim(),
-          notes: taskNotes.trim() || undefined,
-          due_date: taskDueDate || undefined,
-          customer_mobile: data.user.mobile,
-          customer_name: data.user.name || undefined,
-          status: "pending",
+          description: [
+            taskNotes.trim() || "",
+            `Customer: ${data.user.name || ""} | Mobile: ${data.user.mobile}`,
+          ].filter(Boolean).join("\n"),
+          dueDate: taskDueDate || undefined,
+          assignedName: data.user.name || undefined,
+          category: "customer",
+          priority: "medium",
         }),
       });
       if (r.ok) {
@@ -294,15 +297,15 @@ export default function Customer360() {
   useEffect(() => {
     if (activeTab !== "tasks" || !data?.user?.mobile) return;
     setTasksLoading(true);
-    fetch(`${API}/api/tasks`, { credentials: "include" })
+    fetch(`${API}/api/enterprise/tasks?category=customer&limit=200`, { credentials: "include" })
       .then(r => r.ok ? r.json() : [])
       .then(d => {
         const mobile = data!.user!.mobile;
-        const all: any[] = Array.isArray(d) ? d : (d.tasks || []);
+        const all: any[] = Array.isArray(d) ? d : (d.tasks || d.data || []);
         const last9 = mobile.replace(/\D/g, "").slice(-9);
         setTasks(all.filter((t: any) =>
-          (t.customer_mobile && t.customer_mobile.replace(/\D/g, "").endsWith(last9)) ||
-          (t.notes && t.notes.includes(last9))
+          (t.description && t.description.includes(last9)) ||
+          (t.assigned_name && t.assigned_name === (data?.user?.name || ""))
         ));
       })
       .catch(() => {})
