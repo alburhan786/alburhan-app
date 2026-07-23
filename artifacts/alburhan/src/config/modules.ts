@@ -27,9 +27,9 @@ export const ALL_MODULES: ModuleItem[] = [
   /* ── FINANCE & ACCOUNTING ─── */
   { label: "Finance Dashboard",        desc: "P&L, cash flow, ledger",      href: "/admin/finance",           section: "Finance & Accounting",          sectionColor: "emerald" },
   { label: "Accounting Dashboard",     desc: "Books & journal entries",     href: "/admin/accounting",        section: "Finance & Accounting",          sectionColor: "emerald" },
-  { label: "Payment Dashboard",        desc: "Transactions & receipts",     href: "/admin/payments",          section: "Finance & Accounting",          sectionColor: "emerald" },
-  { label: "Offline Payments",         desc: "Bank transfers & cash",       href: "/admin/offline-payments",  section: "Finance & Accounting",          sectionColor: "emerald" },
-  { label: "Invoice Dashboard",        desc: "Invoice management",          href: "/admin/invoices",          section: "Finance & Accounting",          sectionColor: "emerald" },
+  { label: "Payment Dashboard",        desc: "Transactions & receipts",     href: "/admin/payments",          section: "Finance & Accounting",          sectionColor: "emerald", aliases: ["payment", "transaction", "receipt", "customer", "customers"] },
+  { label: "Offline Payments",         desc: "Bank transfers & cash",       href: "/admin/offline-payments",  section: "Finance & Accounting",          sectionColor: "emerald", aliases: ["offline payment", "bank transfer", "cash payment"] },
+  { label: "Invoice Dashboard",        desc: "Invoice management",          href: "/admin/invoices",          section: "Finance & Accounting",          sectionColor: "emerald", aliases: ["invoice", "bill", "customer", "customers"] },
   { label: "Expense Dashboard",        desc: "Expenses & cost tracking",    href: "/admin/expenses",          section: "Finance & Accounting",          sectionColor: "emerald" },
   { label: "Receipt Dashboard",        desc: "Payment receipts",            href: "/admin/receipts",          section: "Finance & Accounting",          sectionColor: "emerald" },
 
@@ -58,8 +58,8 @@ export const ALL_MODULES: ModuleItem[] = [
   { label: "Attendance",               desc: "Group attendance tracking",   href: "/admin/groups",            section: "HR & Workforce",                sectionColor: "amber" },
 
   /* ── BOOKING & PILGRIM OPERATIONS ─── */
-  { label: "Bookings",                 desc: "All bookings & reservations", href: "/admin/bookings",          section: "Booking & Pilgrim Operations",  sectionColor: "rose" },
-  { label: "Offline Booking",          desc: "Walk-in & manual bookings",   href: "/admin/offline-bookings",  section: "Booking & Pilgrim Operations",  sectionColor: "rose" },
+  { label: "Bookings",                 desc: "All bookings & reservations", href: "/admin/bookings",          section: "Booking & Pilgrim Operations",  sectionColor: "rose",  aliases: ["booking", "reservation", "hajj booking", "umrah booking", "customer", "customers"] },
+  { label: "Offline Booking",          desc: "Walk-in & manual bookings",   href: "/admin/offline-bookings",  section: "Booking & Pilgrim Operations",  sectionColor: "rose",  aliases: ["offline", "walk-in", "manual booking", "counter"] },
   { label: "Hajj Groups",              desc: "Hajj group management",       href: "/admin/groups",            section: "Booking & Pilgrim Operations",  sectionColor: "rose" },
   { label: "Umrah Groups",             desc: "Umrah group management",      href: "/admin/groups?type=umrah", section: "Booking & Pilgrim Operations",  sectionColor: "rose" },
   { label: "Visa Dashboard",           desc: "Visa status & processing",    href: "/admin/visa",              section: "Booking & Pilgrim Operations",  sectionColor: "rose" },
@@ -82,7 +82,7 @@ export const ALL_MODULES: ModuleItem[] = [
   { label: "SMS Dashboard",            desc: "DLT & SMS campaigns",         href: "/admin/sms-dashboard",     section: "Communication & Marketing",     sectionColor: "teal",  aliases: ["sms", "text", "dlt", "bulk sms", "fast2sms", "short message"] },
   { label: "Email Dashboard",          desc: "Email templates & delivery",  href: "/admin/email-dashboard",   section: "Communication & Marketing",     sectionColor: "teal",  aliases: ["email", "mail", "smtp", "email templates", "newsletter"] },
   { label: "Marketing Dashboard",      desc: "Campaigns & broadcasts",      href: "/admin/marketing",         section: "Communication & Marketing",     sectionColor: "teal",  aliases: ["marketing", "campaign", "broadcast", "blast", "bulk", "whatsapp", "sms"] },
-  { label: "Broadcast Center",         desc: "Mass messaging & alerts",     href: "/admin/broadcast",         section: "Communication & Marketing",     sectionColor: "teal",  aliases: ["broadcast", "mass message", "bulk", "alert", "announcement"] },
+  { label: "Broadcast Center",         desc: "Mass messaging & alerts",     href: "/admin/broadcast",         section: "Communication & Marketing",     sectionColor: "teal",  aliases: ["broadcast", "mass message", "bulk", "alert", "announcement", "whatsapp", "sms", "email"] },
   { label: "Notification Center",      desc: "Push & in-app notifications", href: "/admin/notifications",     section: "Communication & Marketing",     sectionColor: "teal",  aliases: ["notification", "push", "alert", "bell", "notify", "whatsapp", "sms", "email"] },
   { label: "Social Media Integration", desc: "All social channels",         href: "/admin/social-media",      section: "Communication & Marketing",     sectionColor: "teal",  aliases: ["social", "facebook", "fb", "instagram", "ig", "telegram", "tg", "messenger", "channels", "social media"] },
   { label: "Instagram Dashboard",      desc: "Instagram DMs & comments",    href: "/admin/social-media#instagram", section: "Communication & Marketing", sectionColor: "teal",  aliases: ["instagram", "ig", "instagram dm", "instagram messages", "reels", "social"] },

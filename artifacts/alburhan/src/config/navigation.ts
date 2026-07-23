@@ -113,21 +113,21 @@ export function buildNavSections(openComplaints = 0): NavSection[] {
         { icon: Tent,          label: "Room Allocation Dashboard", href: "/admin/allocations",        require: ["groups",   "view"]   },
         { icon: Tag,           label: "Luggage",                 href: "/admin/luggage",              require: ["groups",   "view"]   },
         { icon: Scale,         label: "Agreement Dashboard",     href: "/admin/agreements",           require: ["audit_logs","view"]  },
-      ],
-    },
-
-    // ── 3. FINANCE ───────────────────────────────────────────────────────────
-    {
-      section: "Finance",
-      items: [
-        { icon: TrendingDown,  label: "Expenses",                href: "/admin/expenses",          require: ["expenses",   "view"]   },
-        { icon: Calculator,    label: "Accounting Dashboard",    href: "/admin/accounting",        require: ["accounting", "view"]   },
-        { icon: BarChart2,     label: "Finance Dashboard",       href: "/admin/finance",           require: ["accounting", "view"]   },
-        { icon: Home,          label: "Family Ledger",           href: "/admin/family-ledger",     require: ["accounting", "view"]   },
-        { icon: UserCheck,     label: "Customer Ledger",         href: "/admin/customer-ledger",   require: ["customers",  "view"]   },
-        { icon: BookMarked,    label: "Hajji Ledger",            href: "/admin/hajji-ledger",      require: ["groups",     "view"]   },
-        { icon: Scale,         label: "GST Reports",             href: "/admin/gst-reports",       require: ["gst",        "view"]   },
-        { icon: Users2,        label: "Payroll Dashboard",       href: "/admin/payroll",           require: ["payroll",    "view"]   },
+        // Finance & Accounting (merged per spec)
+        { icon: TrendingDown,  label: "Expenses",                href: "/admin/expenses",             require: ["expenses",   "view"]  },
+        { icon: Calculator,    label: "Accounting Dashboard",    href: "/admin/accounting",           require: ["accounting", "view"]  },
+        { icon: BarChart2,     label: "Finance Dashboard",       href: "/admin/finance",              require: ["accounting", "view"]  },
+        { icon: Home,          label: "Family Ledger",           href: "/admin/family-ledger",        require: ["accounting", "view"]  },
+        { icon: UserCheck,     label: "Customer Ledger",         href: "/admin/customer-ledger",      require: ["customers",  "view"]  },
+        { icon: BookMarked,    label: "Hajji Ledger",            href: "/admin/hajji-ledger",         require: ["groups",     "view"]  },
+        { icon: Scale,         label: "GST Reports",             href: "/admin/gst-reports",          require: ["gst",        "view"]  },
+        { icon: Users2,        label: "Payroll Dashboard",       href: "/admin/payroll",              require: ["payroll",    "view"]  },
+        // Inventory & Supply Chain (merged per spec)
+        { icon: Package,       label: "Inventory Dashboard",     href: "/admin/inventory",            require: ["assets",     "view"]  },
+        { icon: ShoppingCart,  label: "Procurement Dashboard",   href: "/admin/procurement",          require: ["expenses",   "view"]  },
+        { icon: Truck,         label: "Vendors",                 href: "/admin/vendors",              require: ["accounting", "view"]  },
+        { icon: Package,       label: "Supplier Dashboard",      href: "/admin/suppliers",            require: ["accounting", "view"]  },
+        { icon: Award,         label: "Assets",                  href: "/admin/assets",               require: ["assets",     "view"]  },
       ],
     },
 
@@ -144,34 +144,12 @@ export function buildNavSections(openComplaints = 0): NavSection[] {
         { icon: Star,          label: "Feedback",                href: "/admin/feedback",          require: ["customers", "view"], badge: openComplaints },
         { icon: Inbox,         label: "Package Requests",        href: "/admin/requests",          require: ["customers", "view"] },
         { icon: MessageSquare, label: "Inquiries",               href: "/admin/inquiries",         require: ["customers", "view"] },
-        { icon: Megaphone,     label: "Broadcast",               href: "/admin/broadcast",         require: ["customers", "edit"] },
+        { icon: Megaphone,     label: "Broadcast",               href: "/admin/broadcast",         require: ["customers", "edit"], aliases: ["broadcast", "bulk", "mass message", "whatsapp", "sms", "email", "campaign"] },
         { icon: Zap,           label: "Loyalty & Rewards",       href: "/admin/loyalty",           require: ["bookings",  "view"] },
       ],
     },
 
-    // ── 7. HR ────────────────────────────────────────────────────────────────
-    {
-      section: "HR",
-      items: [
-        { icon: Briefcase,     label: "HR Dashboard",            href: "/admin/hr",                require: ["staff",    "view"] },
-        { icon: KeyRound,      label: "Branch Login Management", href: "/admin/branch-login",      require: ["users",    "view"] },
-        { icon: ShieldCheck,   label: "Agent Login Management",  href: "/admin/agent-login",       require: ["users",    "view"] },
-      ],
-    },
-
-    // ── 8. INVENTORY ─────────────────────────────────────────────────────────
-    {
-      section: "Inventory",
-      items: [
-        { icon: Package,       label: "Inventory Dashboard",     href: "/admin/inventory",         require: ["assets",     "view"]   },
-        { icon: ShoppingCart,  label: "Procurement Dashboard",   href: "/admin/procurement",       require: ["expenses",   "view"]   },
-        { icon: Truck,         label: "Vendors",                 href: "/admin/vendors",           require: ["accounting", "view"]   },
-        { icon: Package,       label: "Supplier Dashboard",      href: "/admin/suppliers",         require: ["accounting", "view"]   },
-        { icon: Award,         label: "Assets",                  href: "/admin/assets",            require: ["assets",     "view"]   },
-      ],
-    },
-
-    // ── 9. MARKETING ─────────────────────────────────────────────────────────
+    // ── 7. MARKETING ─────────────────────────────────────────────────────────
     {
       section: "Marketing",
       items: [
@@ -237,6 +215,10 @@ export function buildNavSections(openComplaints = 0): NavSection[] {
         { icon: Building2,    label: "Branch Management",       href: "/admin/branches",          require: ["customers", "view"] },
         { icon: Building2,    label: "Branch Dashboard",        href: "/admin/branch-dashboard",  require: ["customers", "view"] },
         { icon: BookOpen,     label: "Guide Panel",             href: "/admin/guide-panel",       require: ["bookings",  "view"] },
+        // HR & People (merged per spec)
+        { icon: Briefcase,    label: "HR Dashboard",            href: "/admin/hr",                require: ["staff",    "view"] },
+        { icon: KeyRound,     label: "Branch Login Management", href: "/admin/branch-login",      require: ["users",    "view"] },
+        { icon: ShieldCheck,  label: "Agent Login Management",  href: "/admin/agent-login",       require: ["users",    "view"] },
         // System & Settings
         { icon: Settings2,    label: "Settings Dashboard",      href: "/admin/settings",          require: ["settings",   "view"] },
         { icon: Settings2,    label: "Billing Settings",        href: "/admin/billing-settings",  require: ["settings",   "view"] },
