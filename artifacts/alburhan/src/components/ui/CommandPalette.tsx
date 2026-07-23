@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
-import { Search, Star, ArrowRight, Loader2, Clock, Zap, BookOpen, User, FileText, X } from "lucide-react";
+import { Search, Star, ArrowRight, Loader2, Clock, Zap, BookOpen, User, FileText, Receipt, X } from "lucide-react";
 import { ALL_MODULES, SECTION_COLOR_MAP, type ModuleItem } from "@/config/modules";
 
 const BASE_API = import.meta.env.VITE_API_URL || "";
@@ -45,11 +45,15 @@ interface DbResult {
 const DB_CATEGORY_META: Record<string, { label: string; icon: React.ReactNode; href: (r: DbResult) => string }> = {
   booking:   { label: "Booking",   icon: <BookOpen size={12} />,  href: (r) => `/admin/bookings?q=${r.raw.booking_number ?? ""}` },
   customer:  { label: "Customer",  icon: <User size={12} />,      href: () => `/admin/customers` },
+  invoice:   { label: "Invoice",   icon: <Receipt size={12} />,   href: (r) => `/admin/invoices?q=${(r.raw.invoice_number as string) ?? r.id}` },
   agreement: { label: "Agreement", icon: <FileText size={12} />,  href: () => `/admin/agreements` },
   ticket:    { label: "Support",   icon: <FileText size={12} />,  href: () => `/admin/support` },
   pilgrim:   { label: "Pilgrim",   icon: <User size={12} />,      href: () => `/admin/pilgrim-reports` },
   flight:    { label: "Flight",    icon: <ArrowRight size={12} />,href: () => `/admin/flights` },
 };
+
+const PRIMARY_DB_ORDER = ["customer", "booking", "invoice"];
+const SECONDARY_DB_ORDER = ["pilgrim", "agreement", "ticket", "flight"];
 
 interface SelectableItem {
   type: "module" | "db";
@@ -126,9 +130,12 @@ export function CommandPalette({ open, onClose }: Props) {
     return acc;
   }, {} as Record<string, DbResult[]>);
 
-  const dbCategories = ["booking", "customer", "pilgrim", "agreement", "ticket", "flight"]
-    .filter(c => dbGrouped[c])
-    .concat(Object.keys(dbGrouped).filter(c => !["booking", "customer", "pilgrim", "agreement", "ticket", "flight"].includes(c)));
+  const knownOrder = [...PRIMARY_DB_ORDER, ...SECONDARY_DB_ORDER];
+  const dbCategories = [
+    ...PRIMARY_DB_ORDER.filter(c => dbGrouped[c]),
+    ...SECONDARY_DB_ORDER.filter(c => dbGrouped[c]),
+    ...Object.keys(dbGrouped).filter(c => !knownOrder.includes(c)),
+  ];
 
   const allSelectable: SelectableItem[] = [
     ...topFrequent.map(m  => ({ type: "module" as const, module: m, href: m.href })),
@@ -260,12 +267,12 @@ export function CommandPalette({ open, onClose }: Props) {
   const hasNoResults = !isEmpty && filteredModules.length === 0 && dbResults.length === 0 && !dbLoading;
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-start justify-center pt-[8vh] px-4">
+    <div className="fixed inset-0 z-[200] flex items-end sm:items-start sm:justify-center sm:pt-[8vh] sm:px-4">
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
 
-      {/* Palette */}
-      <div className="relative w-full max-w-2xl bg-background rounded-2xl shadow-2xl border border-border overflow-hidden flex flex-col max-h-[80vh] sm:max-h-[75vh]">
+      {/* Palette — full-screen on mobile, centered modal on sm+ */}
+      <div className="relative w-full sm:max-w-2xl bg-background sm:rounded-2xl shadow-2xl sm:border border-t border-border overflow-hidden flex flex-col h-[92vh] sm:h-auto sm:max-h-[75vh]">
 
         {/* Search Input */}
         <div className="flex items-center gap-3 px-4 py-3.5 border-b border-border flex-shrink-0">
