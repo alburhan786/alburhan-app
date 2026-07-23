@@ -2992,8 +2992,8 @@ router.get("/social-stats", requireAdmin as any, async (_req: AuthenticatedReque
       pool.query(`SELECT COUNT(*)::int AS c FROM notification_logs WHERE channel='whatsapp' AND created_at >= NOW()-INTERVAL '30 days'`),
       // WhatsApp broadcasts (campaigns)
       pool.query(`SELECT COUNT(*)::int AS c FROM marketing_campaigns WHERE channel='whatsapp'`),
-      // Facebook: messages from facebook platforms (30d)
-      pool.query(`SELECT COUNT(*)::int AS c FROM social_messages WHERE platform IN ('facebook_page','facebook_messenger','facebook') AND created_at >= NOW()-INTERVAL '30 days'`),
+      // Facebook: comments only (message_type='comment') from facebook platforms (30d)
+      pool.query(`SELECT COUNT(*)::int AS c FROM social_messages WHERE platform IN ('facebook_page','facebook_messenger','facebook') AND message_type='comment' AND created_at >= NOW()-INTERVAL '30 days'`),
       // Instagram DMs (incoming)
       pool.query(`SELECT COUNT(*)::int AS c FROM social_messages WHERE platform IN ('instagram','instagram_dm') AND direction='incoming' AND created_at >= NOW()-INTERVAL '30 days'`),
       // Instagram story replies
@@ -3047,7 +3047,8 @@ router.get("/social-stats", requireAdmin as any, async (_req: AuthenticatedReque
       } else if (p === "whatsapp") {
         platforms[p] = { ...base, templatesSent30d: waTemplatesR.rows[0]?.c ?? 0, broadcasts: waBroadcastsR.rows[0]?.c ?? 0 };
       } else if (p === "sms") {
-        platforms[p] = { ...base, sent30d: smsMap["sent"] ?? 0, delivered30d: (smsMap["sent"] ?? 0), failed30d: smsMap["failed"] ?? 0 };
+        // delivered = explicit 'delivered' status; sent = all 'sent' status from notification_logs
+        platforms[p] = { ...base, sent30d: smsMap["sent"] ?? 0, delivered30d: smsMap["delivered"] ?? 0, failed30d: smsMap["failed"] ?? 0 };
       } else if (p === "email") {
         const emailSent = emailMap["sent"] ?? 0;
         const emailFailed = emailMap["failed"] ?? 0;

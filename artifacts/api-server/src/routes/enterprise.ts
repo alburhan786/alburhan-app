@@ -323,7 +323,8 @@ router.post("/campaigns/:id/send", requireAdmin as any, async (req: Authenticate
     const seg = c.segment;
 
     if (seg === "all") {
-      const r = await pool.query("SELECT mobile, email FROM users WHERE role = 'customer' AND mobile IS NOT NULL");
+      // No mobile IS NOT NULL filter — include email-only customers for email campaigns
+      const r = await pool.query("SELECT mobile, email FROM users WHERE role = 'customer'");
       mobiles = r.rows.map((x: any) => x.mobile).filter(Boolean);
       emails = r.rows.map((x: any) => x.email).filter(Boolean);
     } else if (seg === "hajj") {
@@ -347,16 +348,10 @@ router.post("/campaigns/:id/send", requireAdmin as any, async (req: Authenticate
     }
 
     const uniqueMobiles = [...new Set(mobiles)];
-    const total = uniqueMobiles.length;
+    const uniqueEmails = [...new Set(emails)];
 
-    if (total === 0) {
-      await pool.query("UPDATE marketing_campaigns SET status='sent', total_recipients=0, sent_count=0, sent_at=NOW() WHERE id=$1", [c.id]);
-      return void res.json({ ok: true, total: 0, sent: 0, message: "No recipients in segment" });
-    }
-
-    // Email channel: send to email addresses instead of mobiles
+    // Email channel: handle BEFORE mobile-count early return — email recipients are email-based
     if (c.channel === "email") {
-      const uniqueEmails = [...new Set(emails)];
       const emailTotal = uniqueEmails.length;
       if (emailTotal === 0) {
         await pool.query("UPDATE marketing_campaigns SET status='sent', total_recipients=0, sent_count=0, sent_at=NOW() WHERE id=$1", [c.id]);
@@ -381,6 +376,13 @@ router.post("/campaigns/:id/send", requireAdmin as any, async (req: Authenticate
         );
       } catch {}
       return void res.json({ ok: true, total: emailTotal, sent: emailSent, failed: emailFailed });
+    }
+
+    // For non-email channels: guard on mobile count
+    const total = uniqueMobiles.length;
+    if (total === 0) {
+      await pool.query("UPDATE marketing_campaigns SET status='sent', total_recipients=0, sent_count=0, sent_at=NOW() WHERE id=$1", [c.id]);
+      return void res.json({ ok: true, total: 0, sent: 0, message: "No recipients in segment" });
     }
 
     // Unsupported channels (facebook, instagram, telegram): return structured error
