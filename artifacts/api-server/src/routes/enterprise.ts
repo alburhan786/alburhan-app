@@ -6,6 +6,192 @@ import { sendWhatsApp, sendDLTSMS } from "../lib/notifications.js";
 
 const router = Router();
 
+// ── Lead Intelligence Migration ───────────────────────────────────────────────
+async function ensureLeadIntelligenceTables() {
+  await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS score VARCHAR(20) DEFAULT 'cold'`);
+  await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS score_factors JSONB DEFAULT '{}'::jsonb`);
+  await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS passport_number TEXT`);
+  await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS aadhaar_last4 TEXT`);
+  await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS pan_number TEXT`);
+  await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS assignment_notified_at TIMESTAMPTZ`);
+  await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS followup_due_at TIMESTAMPTZ`);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS lead_assignment_rules (
+      id TEXT PRIMARY KEY,
+      rule_name TEXT NOT NULL,
+      branch_name TEXT,
+      executive_name TEXT,
+      executive_mobile TEXT,
+      platform TEXT,
+      source TEXT,
+      city_regex TEXT,
+      priority INTEGER DEFAULT 0,
+      is_active BOOLEAN DEFAULT true,
+      auto_welcome_message TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+  console.log("[LeadIntelligence] Migration complete");
+}
+ensureLeadIntelligenceTables().catch(e => console.error("[LeadIntelligence] Migration error:", e));
+
+// ── AI Lead Scoring ────────────────────────────────────────────────────────────
+async function computeLeadScore(leadId: string): Promise<{ score: string; factors: Record<string, number> }> {
+  try {
+    const lead = (await pool.query(`SELECT * FROM leads WHERE id = $1`, [leadId])).rows[0];
+    if (!lead) return { score: "cold", factors: {} };
+
+    const factors: Record<string, number> = {};
+    let total = 0;
+
+    // +30 for prior Umrah/Hajj history (check bookings by mobile)
+    if (lead.mobile) {
+      const mobile10 = lead.mobile.replace(/\D/g, "").slice(-10);
+      if (mobile10.length >= 8) {
+        const hist = await pool.query(
+          `SELECT COUNT(*)::int as c FROM bookings WHERE REGEXP_REPLACE(customer_mobile,'\\D','','g') LIKE $1 AND status IN ('confirmed','completed')`,
+          [`%${mobile10}`]
+        );
+        if ((hist.rows[0]?.c || 0) > 0) { factors.prior_hajj_umrah = 30; total += 30; }
+      }
+    }
+
+    // +20 for known budget
+    if (lead.budget && parseFloat(String(lead.budget)) > 0) { factors.budget_set = 20; total += 20; }
+
+    // +15 for travel month hint in package_interest
+    const pi = (lead.package_interest || "").toLowerCase();
+    const monthHints = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec","2025","2026","2027","hajj","umrah"];
+    if (monthHints.some(m => pi.includes(m))) { factors.travel_month_near = 15; total += 15; }
+
+    // +5 per reply (capped at 5 replies = max 25 points)
+    const msgs = await pool.query(`SELECT COUNT(*)::int as c FROM social_messages WHERE lead_text_id=$1`, [leadId]);
+    const replyCount = Math.min(msgs.rows[0]?.c || 0, 5);
+    if (replyCount > 0) { factors.replies = replyCount * 5; total += factors.replies; }
+
+    // −20 if no activity for 14 days
+    const inactive = await pool.query(
+      `SELECT 1 FROM leads WHERE id=$1 AND COALESCE(last_message_at, updated_at, created_at) < NOW() - INTERVAL '14 days'`,
+      [leadId]
+    );
+    if (inactive.rows.length > 0) { factors.inactive_14d = -20; total -= 20; }
+
+    // Map to tier
+    let score = "cold";
+    if (lead.status === "lost" || lead.status === "cancelled") score = "lost";
+    else if (total >= 60) score = "hot";
+    else if (total >= 30) score = "warm";
+    else if (total >= 10) score = "cold";
+    else score = "lost";
+
+    await pool.query(`UPDATE leads SET score=$1, score_factors=$2 WHERE id=$3`, [score, JSON.stringify(factors), leadId]);
+    return { score, factors };
+  } catch {
+    return { score: "cold", factors: {} };
+  }
+}
+
+// ── Deduplication ─────────────────────────────────────────────────────────────
+async function findExistingLead(mobile?: string, email?: string, passport?: string, aadhaar?: string, pan?: string): Promise<string | null> {
+  const conds: string[] = [];
+  const params: any[] = [];
+
+  if (mobile) {
+    const m10 = mobile.replace(/\D/g, "").slice(-10);
+    if (m10.length >= 8) {
+      params.push(`%${m10}`);
+      conds.push(`(mobile IS NOT NULL AND REGEXP_REPLACE(mobile,'\\D','','g') LIKE $${params.length})`);
+    }
+  }
+  if (email?.trim()) {
+    params.push(email.toLowerCase().trim());
+    conds.push(`(email IS NOT NULL AND LOWER(TRIM(email)) = $${params.length})`);
+  }
+  if (passport?.trim()) {
+    params.push(passport.toUpperCase().trim());
+    conds.push(`(passport_number IS NOT NULL AND UPPER(TRIM(passport_number)) = $${params.length})`);
+  }
+  if (aadhaar?.trim()) {
+    params.push(aadhaar.trim());
+    conds.push(`(aadhaar_last4 IS NOT NULL AND aadhaar_last4 = $${params.length})`);
+  }
+  if (pan?.trim()) {
+    params.push(pan.toUpperCase().trim());
+    conds.push(`(pan_number IS NOT NULL AND UPPER(TRIM(pan_number)) = $${params.length})`);
+  }
+
+  if (conds.length === 0) return null;
+  const r = await pool.query(`SELECT id FROM leads WHERE ${conds.join(" OR ")} ORDER BY created_at DESC LIMIT 1`, params);
+  return r.rows[0]?.id || null;
+}
+
+// ── Auto-Assignment Pipeline ───────────────────────────────────────────────────
+async function autoAssignLead(leadId: string): Promise<void> {
+  try {
+    const lead = (await pool.query(`SELECT * FROM leads WHERE id = $1`, [leadId])).rows[0];
+    if (!lead || lead.assigned_name) return; // Skip if already manually assigned
+
+    const rulesR = await pool.query(`
+      SELECT * FROM lead_assignment_rules WHERE is_active = true
+      ORDER BY
+        CASE WHEN platform IS NOT NULL AND platform = $1 THEN 0
+             WHEN source IS NOT NULL AND source = $2 THEN 1
+             ELSE 2 END,
+        priority DESC, created_at ASC
+      LIMIT 1
+    `, [lead.platform || "", lead.source || ""]);
+
+    const rule = rulesR.rows[0];
+    if (!rule) return;
+
+    await pool.query(`
+      UPDATE leads SET
+        assigned_name = COALESCE($1, assigned_name),
+        assigned_branch = COALESCE($2, assigned_branch),
+        assignment_notified_at = NOW(),
+        followup_due_at = NOW() + INTERVAL '24 hours',
+        updated_at = NOW()
+      WHERE id = $3
+    `, [rule.executive_name || null, rule.branch_name || null, leadId]);
+
+    // Create follow-up task (24h deadline)
+    const taskId = `task_${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
+    await pool.query(`
+      INSERT INTO tasks (id, title, description, priority, assigned_name, due_date, category, created_at, updated_at)
+      VALUES ($1, $2, $3, 'high', $4, (NOW() + INTERVAL '24 hours')::date, 'lead_followup', NOW(), NOW())
+    `, [taskId,
+        `Follow up: ${lead.name}`,
+        `New lead from ${lead.source || lead.platform || "unknown"}. Mobile: ${lead.mobile || "-"}, Package: ${lead.package_interest || "-"}`,
+        rule.executive_name || null]);
+
+    // Notify executive
+    if (rule.executive_mobile) {
+      const notif = `🎯 New Lead Assigned!\n\nName: ${lead.name}\nMobile: ${lead.mobile || "-"}\nSource: ${lead.source || lead.platform || "Unknown"}\nPackage: ${lead.package_interest || "Not specified"}\n\nPlease follow up within 24 hours.\n\nAl Burhan CRM`;
+      sendWhatsApp(rule.executive_mobile, notif).catch(() => {});
+    }
+
+    // Send welcome to customer
+    if (lead.mobile) {
+      const welcome = rule.auto_welcome_message ||
+        `Assalamu Alaikum ${lead.name}!\n\nThank you for your interest in Al Burhan Tours & Travels. Our team will contact you shortly.\n\nFor immediate assistance: +91 9893225590\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
+      sendWhatsApp(lead.mobile, welcome).catch(() => {});
+    }
+
+    // Log to customer_timeline if the mobile matches a user
+    if (lead.mobile) {
+      const mobile10 = lead.mobile.replace(/\D/g, "").slice(-10);
+      pool.query(`
+        INSERT INTO customer_timeline (customer_id, event_type, title, description, icon, created_at)
+        SELECT u.id, 'lead_assigned', 'Lead Assigned', $1, '👤', NOW()
+        FROM users u WHERE REGEXP_REPLACE(COALESCE(u.mobile,''),'\\D','','g') LIKE $2 LIMIT 1
+      `, [`Assigned to ${rule.executive_name || "team"} (${rule.branch_name || "HQ"})`, `%${mobile10}`]).catch(() => {});
+    }
+  } catch (e) {
+    console.error("[autoAssign] Error:", e);
+  }
+}
+
 // ════════════════════════════════════════════════════════════════════
 //  TASK MANAGEMENT
 // ════════════════════════════════════════════════════════════════════
@@ -47,7 +233,6 @@ router.post("/tasks", requireAdmin as any, async (req: AuthenticatedRequest, res
 router.patch("/tasks/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
     const { title, description, priority, status, assignedTo, assignedName, dueDate, category } = req.body;
-    const completedAt = status === "completed" ? "NOW()" : "completed_at";
     const r = await pool.query(
       `UPDATE tasks SET
          title = COALESCE($1, title),
@@ -122,7 +307,6 @@ router.post("/campaigns/:id/send", requireAdmin as any, async (req: Authenticate
     if (!camp.rows[0]) return void res.status(404).json({ error: "Campaign not found" });
     const c = camp.rows[0];
 
-    // Resolve recipients based on segment
     let mobiles: string[] = [];
     let emails: string[] = [];
     const seg = c.segment;
@@ -159,8 +343,6 @@ router.post("/campaigns/:id/send", requireAdmin as any, async (req: Authenticate
       return void res.json({ ok: true, total: 0, sent: 0, message: "No recipients in segment" });
     }
 
-    // Send in background
-    let sent = 0;
     const results = await Promise.allSettled(
       uniqueMobiles.map(async (mobile: string) => {
         if (c.channel === "whatsapp") return sendWhatsApp(mobile, c.message);
@@ -168,7 +350,7 @@ router.post("/campaigns/:id/send", requireAdmin as any, async (req: Authenticate
         return false;
       })
     );
-    sent = results.filter((r: any) => r.status === "fulfilled" && r.value).length;
+    const sent = results.filter((r: any) => r.status === "fulfilled" && r.value).length;
     const failed = total - sent;
 
     await pool.query(
@@ -176,7 +358,6 @@ router.post("/campaigns/:id/send", requireAdmin as any, async (req: Authenticate
       [total, sent, failed, c.id]
     );
 
-    // Log to notification_logs
     try {
       await pool.query(
         `INSERT INTO notification_logs (id, channel, status, message, created_at) VALUES (gen_random_uuid()::text, $1, 'sent', $2, NOW())`,
@@ -189,13 +370,13 @@ router.post("/campaigns/:id/send", requireAdmin as any, async (req: Authenticate
 });
 
 // ════════════════════════════════════════════════════════════════════
-//  LEAD MANAGEMENT
+//  LEAD MANAGEMENT — with dedup, scoring & auto-assignment
 // ════════════════════════════════════════════════════════════════════
 
 router.get("/lead-stats", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
   try {
     const today = new Date().toISOString().slice(0, 10);
-    const [totals, bySource, byStatus, followUps] = await Promise.all([
+    const [totals, bySource, byStatus, followUps, byScore] = await Promise.all([
       pool.query(`SELECT
         COUNT(*)::int as total,
         COUNT(*) FILTER (WHERE status='converted')::int as converted,
@@ -203,12 +384,13 @@ router.get("/lead-stats", requireAdmin as any, async (_req: AuthenticatedRequest
         COUNT(*) FILTER (WHERE status='new')::int as new_count,
         COUNT(*) FILTER (WHERE last_message_at >= NOW()-INTERVAL '24h')::int as active_today
       FROM leads`),
-      pool.query(`SELECT source, COUNT(*)::int as count FROM leads GROUP BY source ORDER BY count DESC LIMIT 10`),
+      pool.query(`SELECT source, COUNT(*)::int as count FROM leads GROUP BY source ORDER BY count DESC LIMIT 15`),
       pool.query(`SELECT status, COUNT(*)::int as count FROM leads GROUP BY status ORDER BY count DESC`),
       pool.query(`SELECT
         COUNT(*) FILTER (WHERE follow_up_date::text = $1 AND status NOT IN ('converted','lost'))::int as today,
         COUNT(*) FILTER (WHERE follow_up_date < $1::date AND status NOT IN ('converted','lost'))::int as overdue
       FROM leads`, [today]),
+      pool.query(`SELECT COALESCE(score,'cold') as score, COUNT(*)::int as count FROM leads GROUP BY score ORDER BY count DESC`),
     ]);
     const total = totals.rows[0].total || 1;
     res.json({
@@ -217,19 +399,21 @@ router.get("/lead-stats", requireAdmin as any, async (_req: AuthenticatedRequest
       by_source: bySource.rows,
       by_status: byStatus.rows,
       follow_ups: followUps.rows[0],
+      by_score: byScore.rows,
     });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
 router.get("/leads", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
-    const { status, source, platform, assignedTo, search, limit = "200" } = req.query as any;
+    const { status, source, platform, assignedTo, search, score, limit = "200" } = req.query as any;
     const conds: string[] = [];
     const params: any[] = [];
     if (status) { params.push(status); conds.push(`status = $${params.length}`); }
     if (source) { params.push(source); conds.push(`source = $${params.length}`); }
     if (platform) { params.push(platform); conds.push(`platform = $${params.length}`); }
     if (assignedTo) { params.push(assignedTo); conds.push(`assigned_to = $${params.length}`); }
+    if (score) { params.push(score); conds.push(`COALESCE(score,'cold') = $${params.length}`); }
     if (search) {
       params.push(`%${search}%`);
       const n = params.length;
@@ -237,7 +421,16 @@ router.get("/leads", requireAdmin as any, async (req: AuthenticatedRequest, res)
     }
     params.push(parseInt(limit));
     const where = conds.length ? "WHERE " + conds.join(" AND ") : "";
-    const r = await pool.query(`SELECT * FROM leads ${where} ORDER BY COALESCE(last_message_at, created_at) DESC LIMIT $${params.length}`, params);
+    const r = await pool.query(`
+      SELECT l.*,
+        COALESCE(sm.conversation_count, 0)::int AS conversation_count
+      FROM leads l
+      LEFT JOIN (
+        SELECT lead_text_id, COUNT(*)::int AS conversation_count
+        FROM social_messages GROUP BY lead_text_id
+      ) sm ON sm.lead_text_id = l.id
+      ${where} ORDER BY COALESCE(l.last_message_at, l.updated_at, l.created_at) DESC LIMIT $${params.length}
+    `, params);
     res.json(r.rows);
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
@@ -249,7 +442,6 @@ router.get("/leads/:id/conversations", requireAdmin as any, async (req: Authenti
       `SELECT * FROM social_messages WHERE lead_text_id=$1 ORDER BY created_at ASC LIMIT 200`,
       [id]
     );
-    // Also check notification_logs for outgoing messages to this lead's mobile
     const lead = await pool.query(`SELECT mobile FROM leads WHERE id=$1`, [id]);
     let outgoing: any[] = [];
     if (lead.rows[0]?.mobile) {
@@ -264,26 +456,58 @@ router.get("/leads/:id/conversations", requireAdmin as any, async (req: Authenti
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
+// POST /leads — with deduplication + auto-score + auto-assign
 router.post("/leads", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
-    const { name, mobile, email, source = "website", message, packageInterest, assignedTo, assignedName, followUpDate, notes, budget, platform, priority, assignedBranch } = req.body;
+    const { name, mobile, email, source = "manual_entry", message, packageInterest, assignedTo, assignedName,
+            followUpDate, notes, budget, platform, priority, assignedBranch,
+            passportNumber, aadhaarLast4, panNumber } = req.body;
     if (!name?.trim()) return void res.status(400).json({ error: "Name is required" });
+
+    // Deduplication check
+    const existingId = await findExistingLead(mobile, email, passportNumber, aadhaarLast4, panNumber);
+    if (existingId) {
+      // Update existing lead instead of creating duplicate
+      const r = await pool.query(
+        `UPDATE leads SET
+           name = COALESCE($1, name), mobile = COALESCE($2, mobile), email = COALESCE($3, email),
+           source = COALESCE($4, source), message = COALESCE($5, message),
+           package_interest = COALESCE($6, package_interest), budget = COALESCE($7, budget),
+           notes = COALESCE($8, notes), updated_at = NOW()
+         WHERE id = $9 RETURNING *`,
+        [name.trim(), mobile||null, email||null, source, message||null,
+         packageInterest||null, budget||null, notes||null, existingId]
+      );
+      computeLeadScore(existingId).catch(() => {});
+      return void res.json({ ...r.rows[0], _merged: true });
+    }
+
     const id = `lead_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const r = await pool.query(
-      `INSERT INTO leads (id, name, mobile, email, source, message, package_interest, assigned_to, assigned_name, follow_up_date, notes, budget, platform, priority, assigned_branch)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+      `INSERT INTO leads (id, name, mobile, email, source, message, package_interest, assigned_to, assigned_name,
+         follow_up_date, notes, budget, platform, priority, assigned_branch, passport_number, aadhaar_last4, pan_number, score)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,'cold') RETURNING *`,
       [id, name.trim(), mobile||null, email||null, source, message||null,
        packageInterest||null, assignedTo||null, assignedName||null,
        followUpDate||null, notes||null, budget||null,
-       platform||null, priority||"normal", assignedBranch||null]
+       platform||null, priority||"normal", assignedBranch||null,
+       passportNumber||null, aadhaarLast4||null, panNumber||null]
     );
-    res.json(r.rows[0]);
+    const lead = r.rows[0];
+
+    // Async: score + auto-assign (non-blocking)
+    computeLeadScore(id).catch(() => {});
+    if (!assignedName) autoAssignLead(id).catch(() => {});
+
+    res.json(lead);
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
 router.patch("/leads/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
-    const { name, mobile, email, source, status, assignedTo, assignedName, followUpDate, notes, packageInterest, budget, conversionBookingId, priority, assignedBranch, platform, instagramUsername, facebookName, telegramUsername } = req.body;
+    const { name, mobile, email, source, status, assignedTo, assignedName, followUpDate, notes, packageInterest,
+            budget, conversionBookingId, priority, assignedBranch, platform, instagramUsername,
+            facebookName, telegramUsername, passportNumber, aadhaarLast4, panNumber } = req.body;
     const r = await pool.query(
       `UPDATE leads SET
          name = COALESCE($1, name), mobile = COALESCE($2, mobile), email = COALESCE($3, email),
@@ -292,29 +516,130 @@ router.patch("/leads/:id", requireAdmin as any, async (req: AuthenticatedRequest
          follow_up_date = COALESCE($8, follow_up_date), notes = COALESCE($9, notes),
          package_interest = COALESCE($10, package_interest), budget = COALESCE($11, budget),
          conversion_booking_id = COALESCE($12, conversion_booking_id),
-         priority = COALESCE($13, priority),
-         assigned_branch = COALESCE($14, assigned_branch),
-         platform = COALESCE($15, platform),
-         instagram_username = COALESCE($16, instagram_username),
-         facebook_name = COALESCE($17, facebook_name),
-         telegram_username = COALESCE($18, telegram_username),
+         priority = COALESCE($13, priority), assigned_branch = COALESCE($14, assigned_branch),
+         platform = COALESCE($15, platform), instagram_username = COALESCE($16, instagram_username),
+         facebook_name = COALESCE($17, facebook_name), telegram_username = COALESCE($18, telegram_username),
+         passport_number = COALESCE($19, passport_number),
+         aadhaar_last4 = COALESCE($20, aadhaar_last4),
+         pan_number = COALESCE($21, pan_number),
          converted_at = CASE WHEN $5 = 'converted' AND converted_at IS NULL THEN NOW() ELSE converted_at END,
          updated_at = NOW()
-       WHERE id = $19 RETURNING *`,
+       WHERE id = $22 RETURNING *`,
       [name||null, mobile||null, email||null, source||null, status||null,
        assignedTo||null, assignedName||null, followUpDate||null, notes||null,
        packageInterest||null, budget||null, conversionBookingId||null,
        priority||null, assignedBranch||null, platform||null,
        instagramUsername||null, facebookName||null, telegramUsername||null,
+       passportNumber||null, aadhaarLast4||null, panNumber||null,
        req.params.id]
     );
-    res.json(r.rows[0] || { error: "Not found" });
+    const updated = r.rows[0];
+    if (updated?.id) computeLeadScore(updated.id).catch(() => {});
+    res.json(updated || { error: "Not found" });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
 router.delete("/leads/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
     await pool.query("DELETE FROM leads WHERE id = $1", [req.params.id]);
+    res.json({ ok: true });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /leads/:id/assign — manual assignment trigger
+router.post("/leads/:id/assign", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { assignedName, assignedBranch, executiveMobile, welcomeMessage } = req.body;
+    const { id } = req.params;
+
+    const lead = (await pool.query(`SELECT * FROM leads WHERE id=$1`, [id])).rows[0];
+    if (!lead) return void res.status(404).json({ error: "Lead not found" });
+
+    await pool.query(`
+      UPDATE leads SET assigned_name=$1, assigned_branch=$2, assignment_notified_at=NOW(),
+        followup_due_at=NOW() + INTERVAL '24 hours', updated_at=NOW() WHERE id=$3
+    `, [assignedName||lead.assigned_name, assignedBranch||lead.assigned_branch, id]);
+
+    // Create follow-up task
+    const taskId = `task_${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
+    await pool.query(`
+      INSERT INTO tasks (id, title, description, priority, assigned_name, due_date, category, created_at, updated_at)
+      VALUES ($1,$2,$3,'high',$4,(NOW()+INTERVAL '24 hours')::date,'lead_followup',NOW(),NOW())
+    `, [taskId, `Follow up: ${lead.name}`, `Lead source: ${lead.source||lead.platform||"unknown"}. Mobile: ${lead.mobile||"-"}`, assignedName||null]);
+
+    // Notify executive
+    if (executiveMobile) {
+      const msg = `🎯 Lead Assigned to You!\n\nName: ${lead.name}\nMobile: ${lead.mobile||"-"}\nSource: ${lead.source||"Unknown"}\nPackage: ${lead.package_interest||"Not specified"}\n\nFollow up within 24 hours.\nAl Burhan CRM`;
+      sendWhatsApp(executiveMobile, msg).catch(() => {});
+      sendDLTSMS(executiveMobile, msg).catch(() => {});
+    }
+
+    // Welcome customer
+    if (lead.mobile) {
+      const wMsg = welcomeMessage || `Assalamu Alaikum ${lead.name}!\n\nThank you for contacting Al Burhan Tours & Travels. Our team will reach you shortly.\n\nPhone: +91 9893225590\n\nJazak Allah Khair!`;
+      sendWhatsApp(lead.mobile, wMsg).catch(() => {});
+    }
+
+    computeLeadScore(id).catch(() => {});
+    res.json({ ok: true });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /leads/:id/score — manually trigger score recompute
+router.post("/leads/:id/score", requireAdmin as any, async (req, res) => {
+  try {
+    const result = await computeLeadScore(req.params.id);
+    res.json(result);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ════════════════════════════════════════════════════════════════════
+//  LEAD ASSIGNMENT RULES
+// ════════════════════════════════════════════════════════════════════
+
+router.get("/lead-assignment-rules", requireAdmin as any, async (_req, res) => {
+  try {
+    const r = await pool.query(`SELECT * FROM lead_assignment_rules ORDER BY priority DESC, created_at ASC`);
+    res.json(r.rows);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.post("/lead-assignment-rules", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { ruleName, branchName, executiveName, executiveMobile, platform, source, cityRegex, priority, autoWelcomeMessage } = req.body;
+    if (!ruleName?.trim()) return void res.status(400).json({ error: "Rule name is required" });
+    const id = `lar_${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
+    const r = await pool.query(`
+      INSERT INTO lead_assignment_rules (id, rule_name, branch_name, executive_name, executive_mobile, platform, source, city_regex, priority, auto_welcome_message)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *
+    `, [id, ruleName.trim(), branchName||null, executiveName||null, executiveMobile||null,
+        platform||null, source||null, cityRegex||null, priority||0, autoWelcomeMessage||null]);
+    res.json(r.rows[0]);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.patch("/lead-assignment-rules/:id", requireAdmin as any, async (req, res) => {
+  try {
+    const { ruleName, branchName, executiveName, executiveMobile, platform, source, cityRegex, priority, isActive, autoWelcomeMessage } = req.body;
+    const r = await pool.query(`
+      UPDATE lead_assignment_rules SET
+        rule_name = COALESCE($1, rule_name), branch_name = COALESCE($2, branch_name),
+        executive_name = COALESCE($3, executive_name), executive_mobile = COALESCE($4, executive_mobile),
+        platform = COALESCE($5, platform), source = COALESCE($6, source),
+        city_regex = COALESCE($7, city_regex), priority = COALESCE($8, priority),
+        is_active = COALESCE($9, is_active), auto_welcome_message = COALESCE($10, auto_welcome_message),
+        updated_at = NOW()
+      WHERE id = $11 RETURNING *
+    `, [ruleName||null, branchName||null, executiveName||null, executiveMobile||null,
+        platform||null, source||null, cityRegex||null, priority??null, isActive??null, autoWelcomeMessage||null,
+        req.params.id]);
+    res.json(r.rows[0] || { error: "Not found" });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.delete("/lead-assignment-rules/:id", requireAdmin as any, async (req, res) => {
+  try {
+    await pool.query(`DELETE FROM lead_assignment_rules WHERE id=$1`, [req.params.id]);
     res.json({ ok: true });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
@@ -401,25 +726,18 @@ router.patch("/group-tracking/:groupId", requireAdmin as any, async (req: Authen
       `INSERT INTO group_tracking (group_id, current_city, current_activity, next_activity, notes, meeting_point, updated_by, updated_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
        ON CONFLICT (group_id) DO UPDATE SET
-         current_city = EXCLUDED.current_city,
-         current_activity = EXCLUDED.current_activity,
-         next_activity = EXCLUDED.next_activity,
-         notes = EXCLUDED.notes,
-         meeting_point = EXCLUDED.meeting_point,
-         updated_by = EXCLUDED.updated_by,
-         updated_at = NOW()
+         current_city = EXCLUDED.current_city, current_activity = EXCLUDED.current_activity,
+         next_activity = EXCLUDED.next_activity, notes = EXCLUDED.notes,
+         meeting_point = EXCLUDED.meeting_point, updated_by = EXCLUDED.updated_by, updated_at = NOW()
        RETURNING *`,
-      [req.params.groupId, currentCity || null, currentActivity || null,
-       nextActivity || null, notes || null, meetingPoint || null, req.user?.id || null]
+      [req.params.groupId, currentCity||null, currentActivity||null, nextActivity||null, notes||null, meetingPoint||null, req.user?.id||null]
     );
     res.json(r.rows[0]);
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
-// Public endpoint — customer reads their group status
 router.get("/my-group-status/:bookingId", async (req: AuthenticatedRequest, res) => {
   try {
-    // Get booking → group_id
     const bk = await pool.query("SELECT group_id FROM bookings WHERE id = $1", [req.params.bookingId]);
     if (!bk.rows[0]?.group_id) return void res.json(null);
     const groupId = bk.rows[0].group_id;
@@ -438,17 +756,15 @@ router.post("/sos", async (req: AuthenticatedRequest, res) => {
     const { bookingId, customerName, customerMobile, message } = req.body;
     if (!bookingId) return void res.status(400).json({ error: "bookingId required" });
 
-    const sosMsg = `🆘 EMERGENCY SOS\nCustomer: ${customerName || "Unknown"}\nMobile: ${customerMobile || "—"}\nBooking: ${bookingId}\nMessage: ${message || "Emergency assistance needed"}\nTime: ${new Date().toLocaleString("en-IN")}`;
+    const sosMsg = `🆘 EMERGENCY SOS\nCustomer: ${customerName||"Unknown"}\nMobile: ${customerMobile||"—"}\nBooking: ${bookingId}\nMessage: ${message||"Emergency assistance needed"}\nTime: ${new Date().toLocaleString("en-IN")}`;
 
-    // Get admin mobiles to alert
     const admins = await pool.query("SELECT mobile FROM users WHERE role IN ('admin','super_admin') AND mobile IS NOT NULL LIMIT 5");
     await Promise.allSettled(admins.rows.map((a: any) => sendWhatsApp(a.mobile, sosMsg)));
 
-    // Log the SOS
     try {
       await pool.query(
         `INSERT INTO notification_logs (id, channel, recipient, status, message, created_at) VALUES (gen_random_uuid()::text,'whatsapp',$1,'sent',$2,NOW())`,
-        [customerMobile || "sos", `SOS from ${customerName} (${bookingId})`]
+        [customerMobile||"sos", `SOS from ${customerName} (${bookingId})`]
       );
     } catch {}
 
