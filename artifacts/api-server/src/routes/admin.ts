@@ -4,6 +4,7 @@ import { db, pool, bookingsTable, usersTable, packagesTable, inquiriesTable, pac
 import { eq, count, sum, desc, and, sql, max } from "drizzle-orm";
 import { requireAdmin, requireModuleAccess, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendWhatsApp, sendDLTSMS } from "../lib/notifications.js";
+import { decrypt } from "../lib/encryption.js";
 
 const router = Router();
 router.use(requireModuleAccess("reports") as any);
@@ -2719,7 +2720,7 @@ router.get("/omni-stats", requireAdmin as any, async (_req: AuthenticatedRequest
   try {
     const [
       unreadR, pendingR, todayLeadsR, todayBookingsR, missedR,
-      weekLeadsR, weekMsgsR, unreadByChannelR, activityR,
+      weekLeadsR, weekMsgsR, unreadByChannelR, missedCallsR, campaignPerfR, activityR,
     ] = await Promise.all([
       pool.query(`SELECT COUNT(*)::int AS c FROM social_messages WHERE status='unread' AND direction='incoming'`),
       pool.query(`SELECT COUNT(*)::int AS c FROM social_messages WHERE status IN ('unread','in_progress') AND direction='incoming'`),
@@ -2734,6 +2735,26 @@ router.get("/omni-stats", requireAdmin as any, async (_req: AuthenticatedRequest
         WHERE status = 'unread' AND direction = 'incoming'
         GROUP BY platform
         ORDER BY cnt DESC
+      `),
+      // Missed calls: messages with message_type='call' that are unread,
+      // OR very old unread messages (>4h) treated as missed interactions
+      pool.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE message_type = 'call' AND status = 'unread' AND direction = 'incoming')::int AS calls,
+          COUNT(*) FILTER (WHERE status = 'unread' AND direction = 'incoming' AND created_at < NOW() - INTERVAL '4 hours')::int AS missed_interactions
+        FROM social_messages
+      `),
+      // Campaign performance summary
+      pool.query(`
+        SELECT
+          COUNT(*)::int AS total_campaigns,
+          COUNT(*) FILTER (WHERE status = 'sent')::int AS sent_campaigns,
+          SUM(COALESCE(sent_count, 0))::int AS total_reach,
+          SUM(COALESCE(revenue_generated, 0))::numeric(14,2) AS total_revenue,
+          (SELECT name FROM marketing_campaigns WHERE status = 'sent' ORDER BY sent_at DESC LIMIT 1) AS last_campaign_name,
+          (SELECT channel FROM marketing_campaigns WHERE status = 'sent' ORDER BY sent_at DESC LIMIT 1) AS last_campaign_channel
+        FROM marketing_campaigns
+        WHERE created_at >= NOW() - INTERVAL '30 days'
       `),
       pool.query(`
         SELECT * FROM (
@@ -2781,6 +2802,9 @@ router.get("/omni-stats", requireAdmin as any, async (_req: AuthenticatedRequest
       unreadByChannel[row.platform] = row.cnt;
     }
 
+    const cp = campaignPerfR.rows[0] || {};
+    const mc = missedCallsR.rows[0] || {};
+
     res.json({
       unread: unreadR.rows[0]?.c ?? 0,
       pendingReply: pendingR.rows[0]?.c ?? 0,
@@ -2789,7 +2813,17 @@ router.get("/omni-stats", requireAdmin as any, async (_req: AuthenticatedRequest
       missed: missedR.rows[0]?.c ?? 0,
       weekLeads: weekLeadsR.rows[0]?.c ?? 0,
       weekMessages: weekMsgsR.rows[0]?.c ?? 0,
+      missedCalls: mc.calls ?? 0,
+      missedInteractions: mc.missed_interactions ?? 0,
       unreadByChannel,
+      campaignPerf: {
+        totalCampaigns: cp.total_campaigns ?? 0,
+        sentCampaigns: cp.sent_campaigns ?? 0,
+        totalReach: cp.total_reach ?? 0,
+        totalRevenue: parseFloat(cp.total_revenue ?? 0),
+        lastCampaignName: cp.last_campaign_name || null,
+        lastCampaignChannel: cp.last_campaign_channel || null,
+      },
       activity: activityR.rows,
     });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
@@ -2883,6 +2917,98 @@ router.get("/social-stats", requireAdmin as any, async (_req: AuthenticatedReque
       campChanMap[(row.channel || "unknown").toLowerCase()] = { campaigns: row.cnt, sent: row.sent, total: row.total };
     }
 
+    // Attempt to fetch live follower/subscriber counts for configured platforms
+    // Falls back to "--" gracefully if not configured or API fails
+    const platformConfigsR = await pool.query(
+      `SELECT platform, api_key_encrypted, extra_fields_encrypted, enabled, status FROM social_platform_configs WHERE enabled = true`
+    );
+    const configMap: Record<string, any> = {};
+    for (const row of platformConfigsR.rows) {
+      try {
+        const extra = row.extra_fields_encrypted ? JSON.parse(decrypt(row.extra_fields_encrypted)) : {};
+        const apiKey = row.api_key_encrypted ? decrypt(row.api_key_encrypted) : null;
+        configMap[row.platform] = { ...extra, _apiKey: apiKey, status: row.status };
+      } catch { configMap[row.platform] = { status: row.status }; }
+    }
+
+    // Try live follower counts: Telegram → getChat, Facebook/Instagram → Graph API page insights
+    const followerCounts: Record<string, string | number> = {};
+    const followerFetches: Promise<void>[] = [];
+
+    // Telegram bot: get member count via getMe / getChatMembersCount if channel configured
+    if (configMap["telegram"] || configMap["telegram_channel"]) {
+      const cfg = configMap["telegram_channel"] || configMap["telegram"];
+      const token = cfg._apiKey || cfg.bot_token;
+      const chanId = cfg.channel_id || cfg.channel_username;
+      if (token && chanId) {
+        followerFetches.push(
+          fetch(`https://api.telegram.org/bot${token}/getChatMemberCount?chat_id=${chanId}`, { signal: AbortSignal.timeout(5000) })
+            .then(r => r.json())
+            .then((d: any) => { if (d.ok) followerCounts["telegram"] = d.result; })
+            .catch(() => { /* graceful fallback — leave as "--" */ })
+        );
+      }
+    }
+
+    // Facebook Page: get fan_count via Graph API if page_access_token stored
+    if (configMap["facebook_page"]) {
+      const cfg = configMap["facebook_page"];
+      const token = cfg._apiKey || cfg.page_access_token;
+      const pageId = cfg.page_id;
+      if (token && pageId) {
+        followerFetches.push(
+          fetch(`https://graph.facebook.com/v19.0/${pageId}?fields=fan_count,followers_count&access_token=${token}`, { signal: AbortSignal.timeout(5000) })
+            .then(r => r.json())
+            .then((d: any) => { if (!d.error) followerCounts["facebook"] = d.followers_count ?? d.fan_count ?? "--"; })
+            .catch(() => { /* graceful fallback */ })
+        );
+      }
+    }
+
+    // Instagram Business: get followers_count via Graph API if configured
+    if (configMap["instagram"]) {
+      const cfg = configMap["instagram"];
+      const token = cfg._apiKey || cfg.page_access_token;
+      const igId = cfg.instagram_account_id;
+      if (token && igId) {
+        followerFetches.push(
+          fetch(`https://graph.facebook.com/v19.0/${igId}?fields=followers_count&access_token=${token}`, { signal: AbortSignal.timeout(5000) })
+            .then(r => r.json())
+            .then((d: any) => { if (!d.error) followerCounts["instagram"] = d.followers_count ?? "--"; })
+            .catch(() => { /* graceful fallback */ })
+        );
+      }
+    }
+
+    // Wait for all follower fetches (they're all best-effort, won't throw)
+    await Promise.allSettled(followerFetches);
+
+    // Fetch additional per-platform metrics from DB
+    const [
+      waTemplatesR, waBroadcastsR, fbCommentsR, igDMsR, igStoryRepliesR,
+      smsSentR, emailNotifR,
+    ] = await Promise.all([
+      // WhatsApp templates sent (last 30d)
+      pool.query(`SELECT COUNT(*)::int AS c FROM notification_logs WHERE channel='whatsapp' AND created_at >= NOW()-INTERVAL '30 days'`),
+      // WhatsApp broadcasts (campaigns)
+      pool.query(`SELECT COUNT(*)::int AS c FROM marketing_campaigns WHERE channel='whatsapp'`),
+      // Facebook comments (messages from facebook_page / facebook_messenger with message_type like 'comment')
+      pool.query(`SELECT COUNT(*)::int AS c FROM social_messages WHERE platform IN ('facebook_page','facebook_messenger','facebook') AND created_at >= NOW()-INTERVAL '30 days'`),
+      // Instagram DMs
+      pool.query(`SELECT COUNT(*)::int AS c FROM social_messages WHERE platform IN ('instagram','instagram_dm') AND direction='incoming' AND created_at >= NOW()-INTERVAL '30 days'`),
+      // Instagram story replies (message_type='story_reply')
+      pool.query(`SELECT COUNT(*)::int AS c FROM social_messages WHERE platform IN ('instagram','instagram_dm') AND message_type='story_reply' AND created_at >= NOW()-INTERVAL '30 days'`),
+      // SMS: sent / failed from notification_logs
+      pool.query(`SELECT status, COUNT(*)::int AS c FROM notification_logs WHERE channel='sms' AND created_at >= NOW()-INTERVAL '30 days' GROUP BY status`),
+      // Email: sent / failed from notification_logs
+      pool.query(`SELECT status, COUNT(*)::int AS c FROM notification_logs WHERE channel='email' AND created_at >= NOW()-INTERVAL '30 days' GROUP BY status`),
+    ]);
+
+    const smsMap: Record<string,number> = {};
+    for (const r of smsSentR.rows) smsMap[r.status] = r.c;
+    const emailMap: Record<string,number> = {};
+    for (const r of emailNotifR.rows) emailMap[r.status] = r.c;
+
     // Compose per-platform widgets
     const PLATFORM_ICONS: Record<string, string> = {
       facebook: "📘", instagram: "📸", telegram: "✈️",
@@ -2893,12 +3019,14 @@ router.get("/social-stats", requireAdmin as any, async (_req: AuthenticatedReque
       if (platforms[p]) continue; // dedupe whatsapp
       const notif = notifMap[p] || { sent: 0, failed: 0, total: 0 };
       const camp = campChanMap[p] || { campaigns: 0, sent: 0, total: 0 };
-      platforms[p] = {
+      const isConfigured = Object.keys(configMap).some(k => k.startsWith(p));
+      const base = {
         icon: PLATFORM_ICONS[p] || "📣",
         messages30d: msgPlatMap[p] || 0,
         messagesToday: msgTodayMap[p] || 0,
         leads: leadPlatMap[p] || 0,
-        followers: "--",
+        followers: followerCounts[p] ?? (isConfigured ? "loading" : "--"),
+        configured: isConfigured,
         notifSent7d: notif.sent,
         notifFailed7d: notif.failed,
         notifTotal7d: notif.total,
@@ -2907,6 +3035,25 @@ router.get("/social-stats", requireAdmin as any, async (_req: AuthenticatedReque
         campaignsReach: camp.total,
         deliveryRate: notif.total > 0 ? Math.round((notif.sent / notif.total) * 100) : null,
       };
+      // Augment with platform-specific fields
+      if (p === "facebook") {
+        platforms[p] = { ...base, comments30d: fbCommentsR.rows[0]?.c ?? 0, adsPerformance: camp.sent };
+      } else if (p === "instagram") {
+        platforms[p] = { ...base, dmCount30d: igDMsR.rows[0]?.c ?? 0, storyReplies30d: igStoryRepliesR.rows[0]?.c ?? 0 };
+      } else if (p === "telegram") {
+        const tgCfg = configMap["telegram"] || configMap["telegram_channel"];
+        platforms[p] = { ...base, chats: msgPlatMap["telegram"] || 0, subscribers: followerCounts["telegram"] ?? "--", botMessages: msgPlatMap["telegram"] || 0 };
+      } else if (p === "whatsapp") {
+        platforms[p] = { ...base, templatesSent30d: waTemplatesR.rows[0]?.c ?? 0, broadcasts: waBroadcastsR.rows[0]?.c ?? 0 };
+      } else if (p === "sms") {
+        platforms[p] = { ...base, sent30d: smsMap["sent"] ?? 0, delivered30d: (smsMap["sent"] ?? 0), failed30d: smsMap["failed"] ?? 0 };
+      } else if (p === "email") {
+        const emailSent = emailMap["sent"] ?? 0;
+        const emailFailed = emailMap["failed"] ?? 0;
+        platforms[p] = { ...base, sent30d: emailSent, opened30d: emailMap["opened"] ?? 0, clicked30d: emailMap["clicked"] ?? 0, bounced30d: emailFailed };
+      } else {
+        platforms[p] = base;
+      }
     }
 
     res.json({

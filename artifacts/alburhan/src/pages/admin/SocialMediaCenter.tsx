@@ -638,43 +638,50 @@ const PLATFORM_CONFIGS = [
   {
     key: "facebook",   icon: "📘", label: "Facebook",
     color: "#1877f2", bg: "bg-blue-50",   border: "border-blue-200",
-    metricsKeys: ["messages30d", "leads", "campaigns"],
-    metricsLabels: ["Messages (30d)", "Leads", "Campaigns"],
+    // Facebook: Followers, Messages, Comments, Leads, Ads performance
+    metricsKeys: ["messages30d", "comments30d", "leads", "adsPerformance"],
+    metricsLabels: ["Messages (30d)", "Comments (30d)", "Leads", "Ads Sent"],
     showFollowers: true,
   },
   {
     key: "instagram",  icon: "📸", label: "Instagram",
     color: "#e1306c", bg: "bg-pink-50",   border: "border-pink-200",
-    metricsKeys: ["messages30d", "leads", "campaigns"],
-    metricsLabels: ["Messages (30d)", "Leads", "Campaigns"],
+    // Instagram: Followers, DM count, Comments, Story Replies, Leads
+    metricsKeys: ["dmCount30d", "storyReplies30d", "leads", "campaigns"],
+    metricsLabels: ["DMs (30d)", "Story Replies (30d)", "Leads", "Campaigns"],
     showFollowers: true,
   },
   {
     key: "telegram",   icon: "✈️", label: "Telegram",
     color: "#0088cc", bg: "bg-cyan-50",   border: "border-cyan-200",
-    metricsKeys: ["messages30d", "leads", "campaigns"],
-    metricsLabels: ["Messages (30d)", "Leads", "Campaigns"],
+    // Telegram: Chats, Subscribers (live API), Bot Messages
+    metricsKeys: ["chats", "botMessages", "campaigns"],
+    metricsLabels: ["Chats (30d)", "Bot Messages (30d)", "Campaigns"],
     showFollowers: true,
+    followersLabel: "Subscribers",
   },
   {
     key: "whatsapp",   icon: "💬", label: "WhatsApp",
     color: "#25d366", bg: "bg-emerald-50", border: "border-emerald-200",
-    metricsKeys: ["messages30d", "notifSent7d", "campaignsSent"],
-    metricsLabels: ["Messages (30d)", "Notifs Sent (7d)", "Campaigns Sent"],
+    // WhatsApp: Conversations, Templates sent, Broadcasts, Campaigns
+    metricsKeys: ["messages30d", "templatesSent30d", "broadcasts"],
+    metricsLabels: ["Conversations (30d)", "Templates Sent (30d)", "Broadcasts"],
     showFollowers: false,
   },
   {
     key: "sms",        icon: "📱", label: "SMS",
     color: "#2563eb", bg: "bg-blue-50",   border: "border-blue-100",
-    metricsKeys: ["notifSent7d", "notifFailed7d", "campaigns"],
-    metricsLabels: ["Sent (7d)", "Failed (7d)", "Campaigns"],
+    // SMS: Sent, Delivered, Failed (from notification_logs)
+    metricsKeys: ["sent30d", "delivered30d", "failed30d"],
+    metricsLabels: ["Sent (30d)", "Delivered (30d)", "Failed (30d)"],
     showFollowers: false,
   },
   {
     key: "email",      icon: "✉️", label: "Email",
     color: "#7c3aed", bg: "bg-violet-50", border: "border-violet-200",
-    metricsKeys: ["notifSent7d", "notifFailed7d", "campaigns"],
-    metricsLabels: ["Sent (7d)", "Failed (7d)", "Campaigns"],
+    // Email: Sent, Opened, Clicked, Bounced (from notification_logs)
+    metricsKeys: ["sent30d", "opened30d", "clicked30d", "bounced30d"],
+    metricsLabels: ["Sent (30d)", "Opened (30d)", "Clicked (30d)", "Bounced (30d)"],
     showFollowers: false,
   },
 ];
@@ -713,9 +720,9 @@ function SocialOverview() {
     { icon: "📬", label: "Unread Messages",  value: omni.unread,        color: "#2563eb" },
     { icon: "⏳", label: "Pending Reply",     value: omni.pendingReply,  color: "#d97706" },
     { icon: "⚠️", label: "Missed (2h+)",     value: omni.missed,        color: "#dc2626" },
+    { icon: "📵", label: "Missed Calls",      value: omni.missedCalls,   color: "#ea580c" },
     { icon: "🎯", label: "Today's Leads",     value: omni.todayLeads,    color: "#7c3aed" },
-    { icon: "📋", label: "Today's Bookings",  value: omni.todayBookings, color: "#16a34a" },
-    { icon: "📊", label: "Total Campaigns",   value: social?.totals?.campaigns ?? 0, color: "#ea580c" },
+    { icon: "📊", label: "Total Campaigns",   value: social?.totals?.campaigns ?? 0, color: "#16a34a" },
   ] : [];
 
   return (
@@ -748,7 +755,7 @@ function SocialOverview() {
                   </div>
                   {cfg.showFollowers && (
                     <span className="text-xs text-muted-foreground bg-white/80 px-2 py-0.5 rounded-full border">
-                      👥 {p.followers ?? "--"}
+                      👥 {(cfg as any).followersLabel ?? "Followers"}: {p.followers ?? "--"}
                     </span>
                   )}
                   {!cfg.showFollowers && deliveryRate !== null && deliveryRate !== undefined && (
@@ -757,8 +764,8 @@ function SocialOverview() {
                     </span>
                   )}
                 </div>
-                {/* Metrics */}
-                <div className="grid grid-cols-3 gap-2">
+                {/* Metrics — 2-col for 4 metrics, 3-col otherwise */}
+                <div className={`grid gap-2 ${cfg.metricsKeys.length >= 4 ? "grid-cols-2" : "grid-cols-3"}`}>
                   {cfg.metricsKeys.map((mk, idx) => (
                     <div key={mk} className="text-center">
                       <p className="text-lg font-bold font-mono" style={{ color: cfg.color }}>{p[mk] ?? 0}</p>

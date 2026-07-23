@@ -323,12 +323,14 @@ function OmniDashboard({ onSelectFilter }: { onSelectFilter: (f: any) => void })
   }, [load]);
 
   const statCards = stats ? [
-    { label: "Unread Messages", value: stats.unread, icon: "📬", color: "text-blue-700",   bg: "bg-blue-50 border-blue-200", filter: { status: "unread" } },
-    { label: "Pending Reply",   value: stats.pendingReply, icon: "⏳", color: "text-amber-700", bg: "bg-amber-50 border-amber-200", filter: { status: "in_progress" } },
-    { label: "Missed (2h+)",    value: stats.missed,   icon: "⚠️", color: "text-red-700",   bg: "bg-red-50 border-red-200", filter: {} },
-    { label: "Today's Leads",   value: stats.todayLeads, icon: "🎯", color: "text-violet-700", bg: "bg-violet-50 border-violet-200", filter: {} },
-    { label: "Today's Bookings",value: stats.todayBookings, icon: "📋", color: "text-green-700", bg: "bg-green-50 border-green-200", filter: {} },
-    { label: "Leads This Week", value: stats.weekLeads, icon: "📈", color: "text-indigo-700", bg: "bg-indigo-50 border-indigo-200", filter: {} },
+    { label: "Unread Messages",  value: stats.unread,        icon: "📬", color: "text-blue-700",   bg: "bg-blue-50 border-blue-200",   filter: { status: "unread" } },
+    { label: "Pending Reply",    value: stats.pendingReply,  icon: "⏳", color: "text-amber-700",  bg: "bg-amber-50 border-amber-200",  filter: { status: "in_progress" } },
+    { label: "Missed (2h+)",     value: stats.missed,        icon: "⚠️", color: "text-red-700",    bg: "bg-red-50 border-red-200",      filter: {} },
+    { label: "Missed Calls",     value: stats.missedCalls,   icon: "📵", color: "text-orange-700", bg: "bg-orange-50 border-orange-200",filter: {} },
+    { label: "Today's Leads",    value: stats.todayLeads,    icon: "🎯", color: "text-violet-700", bg: "bg-violet-50 border-violet-200",filter: {} },
+    { label: "Today's Bookings", value: stats.todayBookings, icon: "📋", color: "text-green-700",  bg: "bg-green-50 border-green-200",  filter: {} },
+    { label: "Leads This Week",  value: stats.weekLeads,     icon: "📈", color: "text-indigo-700", bg: "bg-indigo-50 border-indigo-200",filter: {} },
+    { label: "Msgs This Week",   value: stats.weekMessages,  icon: "💬", color: "text-sky-700",    bg: "bg-sky-50 border-sky-200",      filter: {} },
   ] : [];
 
   return (
@@ -387,6 +389,42 @@ function OmniDashboard({ onSelectFilter }: { onSelectFilter: (f: any) => void })
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Campaign Performance Summary */}
+      {stats?.campaignPerf && (
+        <div className="border rounded-xl bg-background p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-base">📣</span>
+            <h3 className="text-sm font-bold">Campaign Performance (Last 30 Days)</h3>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="text-center">
+              <div className="text-xl font-bold font-mono text-purple-700">{stats.campaignPerf.totalCampaigns}</div>
+              <div className="text-[10px] text-muted-foreground">Total Campaigns</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xl font-bold font-mono text-green-700">{stats.campaignPerf.sentCampaigns}</div>
+              <div className="text-[10px] text-muted-foreground">Sent</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xl font-bold font-mono text-blue-700">{(stats.campaignPerf.totalReach || 0).toLocaleString()}</div>
+              <div className="text-[10px] text-muted-foreground">Total Reach</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xl font-bold font-mono text-amber-700">₹{(stats.campaignPerf.totalRevenue || 0).toLocaleString()}</div>
+              <div className="text-[10px] text-muted-foreground">Revenue Generated</div>
+            </div>
+          </div>
+          {stats.campaignPerf.lastCampaignName && (
+            <div className="mt-3 pt-3 border-t text-xs text-muted-foreground">
+              Last campaign: <span className="font-semibold text-foreground">{stats.campaignPerf.lastCampaignName}</span>
+              {stats.campaignPerf.lastCampaignChannel && (
+                <span className="ml-2 capitalize bg-muted px-1.5 py-0.5 rounded">{stats.campaignPerf.lastCampaignChannel}</span>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -763,7 +801,11 @@ export default function OmnichannelInbox() {
           </div>
         ) : (
           /* Omni Dashboard */
-          <OmniDashboard onSelectFilter={setFilter} />
+          <OmniDashboard onSelectFilter={(f: any) => {
+            if (f.platform) setFilterPlatform(f.platform);
+            if (f.status === "unread") { setFilterUnread(true); setFilterTab("unread"); }
+            else if (f.status) setFilterStatus(f.status);
+          }} />
         )}
 
         {/* ── RIGHT: Customer Profile ─────────────────────────────── */}
