@@ -1,0 +1,259 @@
+==========================
+CRITICAL PRODUCTION FIX
+BOOKING & PAYMENT NOTIFICATIONS
+==========================
+
+This is a HIGH PRIORITY production issue.
+
+Current Problem:
+
+Customers successfully complete bookings and payments, but NO confirmation is sent.
+
+This must NEVER happen in production.
+
+Every successful booking and every successful payment MUST automatically trigger notifications.
+
+=====================================
+BOOKING CONFIRMATION
+=====================================
+
+Immediately after a booking is successfully created, automatically send:
+
+1. WhatsApp
+2. SMS
+3. Email
+4. Push Notification (if app installed)
+
+The customer must receive:
+
+• Booking Confirmation
+• Booking Number
+• Customer Name
+• Package Name
+• Journey Details
+• Booking Date
+• Total Package Amount
+• Amount Paid
+• Balance Amount
+• Booking Status
+• Customer Dashboard URL
+• Booking Tracking URL
+• Customer Support Number
+
+Attach or include links for:
+
+• Agreement PDF
+• Booking Summary PDF
+• Invoice PDF (if generated)
+
+=====================================
+PAYMENT CONFIRMATION
+=====================================
+
+Immediately after ANY successful payment (Partial or Full), automatically send:
+
+WhatsApp
+
+SMS
+
+Email
+
+Push Notification
+
+Include:
+
+• Payment Successful
+• Amount Received
+• Receipt Number
+• Invoice Number
+• Booking Number
+• Transaction ID
+• Payment Method
+• Payment Date & Time
+• Remaining Balance
+• Updated Booking Status
+• Customer Dashboard URL
+
+Attach:
+
+• Receipt PDF
+• Updated Invoice PDF
+• Agreement PDF (if updated)
+
+=====================================
+WHATSAPP DELIVERY
+=====================================
+
+Verify:
+
+Meta Cloud API
+
+BotBee API
+
+Template Names
+
+Template Status
+
+Phone Number Formatting
+
+Webhook
+
+Delivery Status
+
+Media Upload
+
+PDF Delivery
+
+Retry Queue
+
+Failed Queue
+
+If WhatsApp delivery fails:
+
+Retry automatically.
+
+Log failure.
+
+Notify Admin.
+
+=====================================
+SMS DELIVERY
+=====================================
+
+Verify:
+
+SMS Gateway
+
+DLT Templates
+
+Sender ID
+
+Template Mapping
+
+Delivery Reports
+
+Retry Logic
+
+If SMS fails:
+
+Retry.
+
+Log error.
+
+Notify Admin.
+
+=====================================
+EMAIL DELIVERY
+=====================================
+
+Verify:
+
+SMTP
+
+HTML Templates
+
+Attachments
+
+PDF Generation
+
+Delivery Logs
+
+=====================================
+NO EVENT MAY BE LOST
+=====================================
+
+If any notification cannot be delivered immediately:
+
+Store it in a Notification Queue.
+
+Retry automatically.
+
+Maintain complete delivery history.
+
+=====================================
+ADMIN PANEL
+=====================================
+
+Create a Notification Log showing:
+
+Booking Number
+
+Customer
+
+WhatsApp Status
+
+SMS Status
+
+Email Status
+
+Push Status
+
+Sent Time
+
+Retry Count
+
+Failure Reason
+
+Delivered Time
+
+=====================================
+LIVE TESTING
+=====================================
+
+Run REAL production tests.
+
+Test:
+
+New Booking
+
+Offline Booking
+
+Online Booking
+
+Admin Booking
+
+Partial Payment
+
+Full Payment
+
+UPI Payment
+
+Razorpay Payment
+
+Cash Payment
+
+Bank Transfer
+
+Cheque Payment
+
+Refund
+
+For every test verify that:
+
+✓ Booking created
+
+✓ Invoice generated
+
+✓ Receipt generated
+
+✓ Agreement generated
+
+✓ Customer Dashboard updated
+
+✓ Admin Dashboard updated
+
+✓ WhatsApp received
+
+✓ SMS received
+
+✓ Email received
+
+✓ Push notification received
+
+✓ PDF attachments received
+
+=====================================
+DO NOT MARK COMPLETE
+=====================================
+
+Do NOT mark this task complete until ALL notification channels have been tested successfully with REAL transactions and every customer receives Booking Confirmation and Payment Confirmation without manual intervention.

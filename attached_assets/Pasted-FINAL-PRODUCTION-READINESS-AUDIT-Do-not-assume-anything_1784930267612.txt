@@ -1,0 +1,277 @@
+FINAL PRODUCTION READINESS AUDIT
+
+Do not assume anything is working.
+
+Perform a complete end-to-end audit of the entire Al Burhan Tours & Travels ERP.
+
+Verify every feature with real data.
+
+1. Customer Registration
+- OTP
+- Email
+- WhatsApp
+- SMS
+- Login
+- Password Reset
+
+2. Booking
+- Online Booking
+- Offline Booking
+- Admin Booking
+- Agent Booking
+- Branch Booking
+
+3. Payments
+- Razorpay
+- Bank Transfer
+- Cash
+- Cheque
+- UPI
+
+Verify:
+- Ledger
+- Invoice
+- Receipt
+- Balance
+- GST
+- Outstanding
+
+4. Agreement
+
+Generate automatically on:
+- Booking
+- Partial Payment (if configured)
+- Full Payment
+
+Send agreement via:
+- WhatsApp
+- SMS
+- Email
+
+5. Invoice
+
+Always regenerate live.
+
+No cached PDF.
+
+Status must match:
+
+Pending
+
+Partially Paid
+
+Paid in Full
+
+Overdue
+
+Cancelled
+
+Refunded
+
+6. Receipt
+
+Receipt Number
+
+Invoice Number
+
+Booking Number
+
+QR Code
+
+Payment Method
+
+Gateway Reference
+
+Customer Details
+
+Company Details
+
+7. Customer Dashboard
+
+Everything must refresh automatically after payment.
+
+Invoice
+
+Receipt
+
+Agreement
+
+Balance
+
+Payment History
+
+Documents
+
+Booking Status
+
+8. Admin Dashboard
+
+Finance
+
+Revenue
+
+Bookings
+
+Payments
+
+Outstanding
+
+Cancelled
+
+Refunded
+
+Reports
+
+9. Notifications
+
+Booking Confirmation
+
+Payment Confirmation
+
+Invoice
+
+Receipt
+
+Agreement
+
+Visa Ready
+
+Ticket Ready
+
+Reminder
+
+Departure Reminder
+
+Arrival Reminder
+
+Return Reminder
+
+via:
+
+WhatsApp
+
+SMS
+
+Email
+
+Push Notification
+
+10. WhatsApp API
+
+Verify:
+
+Template delivery
+
+Media delivery
+
+PDF delivery
+
+Retry queue
+
+Webhook
+
+Status updates
+
+11. SMS
+
+Booking
+
+Payment
+
+Reminder
+
+OTP
+
+Delivery Report
+
+12. Email
+
+Professional HTML
+
+Invoice PDF
+
+Receipt PDF
+
+Agreement PDF
+
+13. CRM
+
+Customer Timeline
+
+Activity Logs
+
+Lead Status
+
+Task Management
+
+14. Reports
+
+Daily
+
+Monthly
+
+Yearly
+
+GST
+
+Finance
+
+Outstanding
+
+Overdue
+
+Profit
+
+Loss
+
+Branch
+
+Agent
+
+15. Security
+
+Permissions
+
+Roles
+
+Audit Logs
+
+Backups
+
+System Health
+
+API Health
+
+Webhook Health
+
+Database Health
+
+Storage Health
+
+Queue Health
+
+16. Performance
+
+Load test
+
+100 users
+
+500 users
+
+1000 users
+
+No crashes
+
+No stale cache
+
+17. Final Deliverable
+
+Generate a Production Readiness Report showing:
+
+PASS
+
+WARNING
+
+FAIL
+
+Nothing should be marked complete unless it has been tested with real transactions.

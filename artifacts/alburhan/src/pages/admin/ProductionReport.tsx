@@ -79,7 +79,7 @@ const CERT_ITEMS = [
 export default function ProductionReport() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"overview"|"modules"|"apis"|"db"|"security"|"cert">("overview");
+  const [tab, setTab] = useState<"overview"|"notifs"|"modules"|"apis"|"db"|"security"|"cert">("overview");
 
   const load = async () => {
     setLoading(true);
@@ -174,11 +174,12 @@ export default function ProductionReport() {
             <div className="flex gap-1 bg-muted/30 rounded-xl p-1 flex-wrap">
               {[
                 { key: "overview", label: "Overview" },
-                { key: "modules", label: `Modules (${d.totalAdminFeatures || 0})` },
-                { key: "apis", label: `APIs (${d.totalApiGroups || 0})` },
-                { key: "db", label: `Database (${d.totalTablesHealthy||0}/${d.totalTables||0})` },
+                { key: "notifs",   label: "Notifications" },
+                { key: "modules",  label: `Modules (${d.totalAdminFeatures || 0})` },
+                { key: "apis",     label: `APIs (${d.totalApiGroups || 0})` },
+                { key: "db",       label: `Database (${d.totalTablesHealthy||0}/${d.totalTables||0})` },
                 { key: "security", label: "Security" },
-                { key: "cert", label: "🏆 Certificate" },
+                { key: "cert",     label: "🏆 Certificate" },
               ].map(t => (
                 <button key={t.key} onClick={() => setTab(t.key as any)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${tab === t.key ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
@@ -186,6 +187,107 @@ export default function ProductionReport() {
                 </button>
               ))}
             </div>
+
+            {/* ── Notifications Pipeline ── */}
+            {tab === "notifs" && (
+              <div className="space-y-4">
+                <div className="rounded-2xl border bg-primary/5 border-primary/20 p-4">
+                  <p className="text-sm font-semibold text-primary">Notification Pipeline Audit — Last 30 Days</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Real delivery rates per event type from notification_logs. PASS ≥ 85%, WARN ≥ 60%, FAIL &lt; 60%.</p>
+                </div>
+
+                {/* Per-event pipeline */}
+                <div className="rounded-2xl border overflow-hidden">
+                  <div className="grid grid-cols-5 bg-muted/30 px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    <span className="col-span-2">Event</span>
+                    <span className="text-center">Sent / Total</span>
+                    <span className="text-center">Rate</span>
+                    <span className="text-right">Status</span>
+                  </div>
+                  {(d.notifPipeline || []).map((p: any) => {
+                    const s = p.status === "healthy" ? STATUS_STYLE.healthy : p.status === "warning" ? STATUS_STYLE.warning : p.status === "error" ? STATUS_STYLE.error : STATUS_STYLE.warning;
+                    const rateColor = p.status === "healthy" ? "text-emerald-700" : p.status === "warning" ? "text-amber-700" : p.status === "error" ? "text-red-700" : "text-slate-500";
+                    return (
+                      <div key={p.event} className="grid grid-cols-5 px-4 py-3 border-t hover:bg-muted/10 items-center">
+                        <div className="col-span-2">
+                          <p className="text-sm font-medium">{p.label}</p>
+                          {p.enabledChannels?.length > 0 && (
+                            <p className="text-[10px] text-muted-foreground mt-0.5">Channels: {p.enabledChannels.join(", ")}</p>
+                          )}
+                          {p.lastAt && (
+                            <p className="text-[10px] text-muted-foreground">Last: {new Date(p.lastAt).toLocaleDateString("en-IN")}</p>
+                          )}
+                        </div>
+                        <span className="text-center font-mono text-sm">{p.total === 0 ? "—" : `${p.sent}/${p.total}`}</span>
+                        <span className={`text-center font-bold font-mono text-lg ${rateColor}`}>
+                          {p.rate === null ? "—" : `${p.rate}%`}
+                        </span>
+                        <div className="text-right">
+                          <Badge variant="outline" className={`text-[10px] capitalize ${s.badge}`}>
+                            {p.status === "no_data" ? "no data" : p.status}
+                          </Badge>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Channel delivery rates */}
+                <div>
+                  <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <Bell size={13} /> Channel Delivery Rates (30 Days)
+                  </h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {(d.notifHealth || []).map((n: any) => {
+                      const rate = n.total > 0 ? Math.round((n.sent / n.total) * 100) : null;
+                      const ok = rate === null ? "bg-slate-50 border-slate-200" : rate >= 85 ? "bg-emerald-50 border-emerald-200" : rate >= 60 ? "bg-amber-50 border-amber-200" : "bg-red-50 border-red-200";
+                      const tc = rate === null ? "text-slate-500" : rate >= 85 ? "text-emerald-700" : rate >= 60 ? "text-amber-700" : "text-red-700";
+                      return (
+                        <div key={n.channel} className={`rounded-2xl border p-4 flex items-center gap-3 ${ok}`}>
+                          <Bell size={18} className={tc} />
+                          <div className="flex-1">
+                            <p className="text-sm font-bold uppercase">{n.channel}</p>
+                            <p className="text-xs text-muted-foreground">{n.total === 0 ? "No data yet" : `${n.sent} of ${n.total}`}</p>
+                          </div>
+                          <p className={`text-2xl font-bold font-mono ${tc}`}>{rate === null ? "—" : `${rate}%`}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Recent failures */}
+                {(d.recentFailedNotifs || []).length > 0 && (
+                  <div>
+                    <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                      <XCircle size={13} className="text-red-500" /> Recent Failures (Last 7 Days)
+                    </h2>
+                    <div className="rounded-2xl border overflow-hidden">
+                      {(d.recentFailedNotifs || []).map((f: any, i: number) => (
+                        <div key={i} className="px-4 py-2.5 border-t first:border-0 bg-red-50/30 text-sm">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge variant="outline" className="text-[10px] bg-red-100 text-red-700 border-red-200">{f.channel}</Badge>
+                            <span className="font-medium text-xs">{f.event_type}</span>
+                            <span className="text-muted-foreground text-xs ml-auto">{new Date(f.created_at).toLocaleString("en-IN")}</span>
+                          </div>
+                          {f.error_code && <p className="text-xs text-red-700 mt-1">Error: {f.error_code}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {(d.recentFailedNotifs || []).length === 0 && (
+                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 flex items-center gap-3">
+                    <CheckCircle size={18} className="text-emerald-600 shrink-0" />
+                    <div>
+                      <p className="text-sm font-semibold text-emerald-800">No notification failures in the last 7 days</p>
+                      <p className="text-xs text-emerald-700 mt-0.5">All channels are delivering successfully or no notifications have been sent yet.</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Overview */}
             {tab === "overview" && (

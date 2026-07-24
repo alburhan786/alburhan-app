@@ -267,6 +267,7 @@ export async function processPaymentSuccessNotifications(opts: {
       balanceAmount:  remainingBalance,
       invoiceNumber:  invoiceNumber         ?? undefined,
       invoiceUrl,
+      dashboardUrl:   `${siteBase}/customer/dashboard`,
       paymentRef:     paymentRef            ?? undefined,
       paymentMode:    paymentModeLabel,
       paymentDate:    paymentDateStr,

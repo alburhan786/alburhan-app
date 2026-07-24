@@ -2209,6 +2209,60 @@ router.get("/production-report", requireAdmin as any, async (_req: Authenticated
     }
     const notifHealth = ["whatsapp", "sms", "email"].map(ch => notifByChannelMap[ch] || { channel: ch, total: 0, sent: 0 });
 
+    // Real notification pipeline audit — per event + channel status
+    const [notifEventRows, notifSettingsRows, recentFailsRows] = await Promise.all([
+      pool.query(`
+        SELECT event_type,
+               COUNT(*)::int                                              AS total,
+               COUNT(*) FILTER (WHERE status='sent')::int                AS sent,
+               COUNT(*) FILTER (WHERE status='failed')::int              AS failed,
+               MAX(created_at)                                            AS last_at
+        FROM notification_logs
+        WHERE created_at >= NOW() - INTERVAL '30 days'
+          AND event_type IN ('new_booking','payment_received','partial_payment','booking_approved',
+                             'partial_payment_received','agreement_generated')
+        GROUP BY event_type
+        ORDER BY total DESC
+      `).catch(() => ({ rows: [] })),
+      pool.query(`
+        SELECT event_type, channel, enabled
+        FROM notification_settings
+        WHERE event_type IN ('new_booking','payment_received','partial_payment','booking_approved')
+          AND channel IN ('whatsapp','sms','email')
+        ORDER BY event_type, channel
+      `).catch(() => ({ rows: [] })),
+      pool.query(`
+        SELECT event_type, channel, error_code, provider_response, created_at
+        FROM notification_logs
+        WHERE status='failed' AND created_at >= NOW() - INTERVAL '7 days'
+        ORDER BY created_at DESC LIMIT 10
+      `).catch(() => ({ rows: [] })),
+    ]);
+
+    const notifPipeline = [
+      { event: "new_booking",          label: "New Booking → Customer" },
+      { event: "booking_approved",     label: "Booking Approved → Customer" },
+      { event: "payment_received",     label: "Full Payment → Customer" },
+      { event: "partial_payment",      label: "Partial Payment → Customer" },
+      { event: "partial_payment_received", label: "Partial Payment (trigger)" },
+      { event: "agreement_generated",  label: "Agreement Generated → Customer" },
+    ].map(({ event, label }) => {
+      const row = notifEventRows.rows.find((r: any) => r.event_type === event);
+      const rate = row && Number(row.total) > 0 ? Math.round((Number(row.sent) / Number(row.total)) * 100) : null;
+      const settings = notifSettingsRows.rows.filter((r: any) => r.event_type === event);
+      const enabledChannels = settings.filter((r: any) => r.enabled).map((r: any) => r.channel);
+      return {
+        event, label,
+        total: Number(row?.total || 0),
+        sent:  Number(row?.sent  || 0),
+        failed: Number(row?.failed || 0),
+        rate,
+        lastAt: row?.last_at || null,
+        enabledChannels,
+        status: rate === null ? "no_data" : rate >= 85 ? "healthy" : rate >= 60 ? "warning" : "error",
+      };
+    });
+
     const errorTables = tableCounts.filter((t: any) => t.status === "error");
     const notifTotal = notifStats.rows[0]?.total || 0;
     const notifSent = notifStats.rows[0]?.sent || 0;
@@ -2242,6 +2296,10 @@ router.get("/production-report", requireAdmin as any, async (_req: Authenticated
       issues.push(`Missing DB tables: ${errorTables.map((t: any) => t.name).join(", ")}`);
     }
     if (notifRate < 80) issues.push(`Notification success rate ${notifRate}% (below 80%)`);
+    const failedEvents = notifPipeline.filter(p => p.status === "error");
+    if (failedEvents.length > 0) issues.push(`Low delivery rate: ${failedEvents.map(p => p.label).join(", ")}`);
+    const noDataEvents = notifPipeline.filter(p => p.status === "no_data" && ["new_booking","payment_received"].includes(p.event));
+    if (noDataEvents.length > 0) issues.push(`No delivery data yet for: ${noDataEvents.map(p => p.label).join(", ")} — send a test booking/payment to verify`);
 
     const tableScore = Math.round(((tableChecks.length - errorTables.length) / tableChecks.length) * 35);
     const moduleScore = 30;
@@ -2277,6 +2335,8 @@ router.get("/production-report", requireAdmin as any, async (_req: Authenticated
       adminModules,
       apiChecks,
       notifHealth,
+      notifPipeline,
+      recentFailedNotifs: recentFailsRows.rows,
       performance,
       security,
       issues,
