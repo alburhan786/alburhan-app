@@ -1,0 +1,715 @@
+# MASTER TASK: Build Enterprise One-Click Social Media Integration Hub (OAuth)
+
+## Objective
+
+Redesign the entire Social Media Integration module into an enterprise-grade Integration Center similar to Shopify, HubSpot, Zoho CRM, Salesforce, and modern SaaS platforms.
+
+The goal is ZERO technical configuration for customers.
+
+Users should NEVER have to manually enter:
+
+- App ID
+- App Secret
+- Page Access Token
+- Verify Token
+- Webhook URL
+- Business Account ID
+- Instagram ID
+- Page ID
+
+Everything should be configured automatically through OAuth.
+
+This feature will be sold commercially to travel agencies, so it must be production-ready, scalable, secure, and extremely easy to use.
+
+---
+
+# Integration Center
+
+Create a completely new page:
+
+Settings
+→ Integrations
+
+Modern card layout.
+
+Categories:
+
+## Social Media
+
+Facebook
+
+Instagram
+
+WhatsApp Business
+
+Messenger
+
+Telegram
+
+X (Twitter)
+
+LinkedIn
+
+YouTube
+
+Threads
+
+TikTok
+
+---
+
+## Google
+
+Google Business Profile
+
+Google Analytics
+
+Google Search Console
+
+Gmail
+
+Google Calendar
+
+Google Drive
+
+Google Maps
+
+YouTube
+
+---
+
+## Communication
+
+SMTP Email
+
+SMS
+
+Push Notifications
+
+Live Chat
+
+RCS Messaging
+
+Web Push
+
+Voice Calling
+
+---
+
+## Payment
+
+Razorpay
+
+Stripe
+
+PayPal
+
+Cashfree
+
+PhonePe
+
+Google Pay
+
+UPI
+
+Bank Transfer
+
+---
+
+## AI
+
+OpenAI
+
+Gemini
+
+Claude
+
+DeepSeek
+
+AI Chatbot
+
+Voice AI
+
+---
+
+## Travel APIs
+
+Flight API
+
+Hotel API
+
+Visa API
+
+Currency API
+
+Weather API
+
+Maps API
+
+Location API
+
+---
+
+# One Click Connect
+
+Every integration must have only ONE button.
+
+Examples:
+
+Connect Facebook
+
+Connect Instagram
+
+Connect WhatsApp
+
+Connect Google
+
+Connect Telegram
+
+Connect Razorpay
+
+Connect OpenAI
+
+No technical fields visible.
+
+---
+
+# Meta OAuth
+
+When user clicks
+
+Connect Meta
+
+Open official Meta OAuth popup.
+
+User logs into Facebook.
+
+Select:
+
+Business Portfolio
+
+↓
+
+Facebook Page
+
+↓
+
+Instagram Business Account
+
+↓
+
+WhatsApp Business Account
+
+↓
+
+Grant Permissions
+
+↓
+
+Done
+
+ERP automatically stores:
+
+Business ID
+
+Business Name
+
+Page ID
+
+Page Name
+
+Instagram ID
+
+Instagram Username
+
+WhatsApp Business Account ID
+
+Phone Number ID
+
+Access Token
+
+Long Lived Token
+
+Webhook Subscription
+
+Permissions
+
+Token Expiry
+
+Never ask user to paste anything.
+
+---
+
+# Automatic Configuration
+
+After OAuth automatically:
+
+Create Webhook
+
+Subscribe:
+
+messages
+
+message_deliveries
+
+message_reads
+
+message_reactions
+
+message_echoes
+
+leadgen
+
+comments
+
+mentions
+
+instagram_messages
+
+instagram_mentions
+
+feed
+
+messaging_postbacks
+
+Automatically verify webhook.
+
+Automatically save verify token.
+
+Automatically subscribe page.
+
+Automatically subscribe Instagram.
+
+Automatically subscribe WhatsApp.
+
+Automatically sync templates.
+
+Automatically sync phone numbers.
+
+Automatically sync business information.
+
+---
+
+# Automatic Health Check
+
+After connection run live diagnostics.
+
+Show
+
+Facebook Connected
+
+Instagram Connected
+
+Messenger Connected
+
+WhatsApp Connected
+
+Webhook Active
+
+Permissions OK
+
+Long Token OK
+
+Templates Synced
+
+API Reachable
+
+Last Sync Time
+
+Connection Health %
+
+If any issue:
+
+Show
+
+Repair Automatically
+
+Reconnect
+
+Refresh Token
+
+---
+
+# Auto Refresh Tokens
+
+Monitor token expiry.
+
+Refresh automatically before expiry.
+
+Never require manual re-login unless Meta requires it.
+
+Notify admin before expiry.
+
+---
+
+# Connection Wizard
+
+Beautiful setup wizard.
+
+Step 1
+
+Welcome
+
+↓
+
+Step 2
+
+Login with Meta
+
+↓
+
+Step 3
+
+Choose Business
+
+↓
+
+Step 4
+
+Choose Facebook Page
+
+↓
+
+Step 5
+
+Choose Instagram
+
+↓
+
+Step 6
+
+Choose WhatsApp Number
+
+↓
+
+Step 7
+
+Sync Templates
+
+↓
+
+Step 8
+
+Complete
+
+Total setup time should be under two minutes.
+
+---
+
+# Multi Business Support
+
+Support multiple businesses.
+
+Agency A
+
+Agency B
+
+Agency C
+
+Each business should have separate:
+
+Tokens
+
+Pages
+
+Instagram
+
+WhatsApp
+
+Templates
+
+Webhooks
+
+Phone Numbers
+
+---
+
+# Notification Center
+
+Show
+
+Connected
+
+Disconnected
+
+Warning
+
+Expired Token
+
+Permission Error
+
+Webhook Error
+
+Sync Failed
+
+API Down
+
+Provide
+
+Reconnect
+
+Repair
+
+Refresh Token
+
+View Logs
+
+---
+
+# Logs
+
+Maintain logs for:
+
+OAuth Login
+
+Token Refresh
+
+Webhook Verification
+
+API Calls
+
+Template Sync
+
+Errors
+
+Repairs
+
+Reconnects
+
+Include:
+
+Timestamp
+
+Provider
+
+Action
+
+Status
+
+Duration
+
+Response
+
+Error Message
+
+---
+
+# Security
+
+Encrypt:
+
+Tokens
+
+Secrets
+
+Refresh Tokens
+
+Business IDs
+
+Phone IDs
+
+Use encrypted server storage.
+
+Never expose secrets to frontend.
+
+Never expose App Secret.
+
+Never expose Access Token.
+
+Implement CSRF protection.
+
+Use OAuth state validation.
+
+Use secure sessions.
+
+---
+
+# Production Dashboard
+
+Create Integration Dashboard.
+
+Cards:
+
+Facebook
+
+Instagram
+
+WhatsApp
+
+Google
+
+Telegram
+
+SMTP
+
+SMS
+
+Push
+
+Razorpay
+
+OpenAI
+
+Each shows
+
+Connected
+
+Last Sync
+
+Status
+
+Health %
+
+Repair
+
+Reconnect
+
+Logs
+
+---
+
+# API Health
+
+Live monitoring.
+
+Every minute verify:
+
+OAuth
+
+Webhook
+
+Token
+
+Permissions
+
+API latency
+
+Rate Limits
+
+Failures
+
+Retries
+
+Queue
+
+---
+
+# One Click Repair
+
+If any integration fails:
+
+Repair Automatically
+
+Actions:
+
+Refresh Token
+
+Recreate Webhook
+
+Resubscribe Page
+
+Reconnect Templates
+
+Validate Permissions
+
+Restart Queue
+
+Retry Failed Jobs
+
+---
+
+# User Experience
+
+Customer should never see:
+
+App ID
+
+App Secret
+
+Webhook URL
+
+Verify Token
+
+Business IDs
+
+Phone IDs
+
+Access Tokens
+
+Everything should be managed automatically.
+
+---
+
+# Admin Controls
+
+Allow Super Admin to:
+
+Disconnect
+
+Reconnect
+
+Refresh
+
+View Logs
+
+Export Logs
+
+Force Sync
+
+Reset Integration
+
+---
+
+# Scalability
+
+Support thousands of agencies.
+
+Multi Tenant.
+
+Database optimized.
+
+Queue based.
+
+Retry mechanism.
+
+Background workers.
+
+Rate limiting.
+
+---
+
+# Final Validation
+
+Do not mark complete until:
+
+✓ OAuth works
+
+✓ Meta login works
+
+✓ Facebook connects
+
+✓ Instagram connects
+
+✓ WhatsApp connects
+
+✓ Tokens stored securely
+
+✓ Webhook created automatically
+
+✓ Permissions verified
+
+✓ Templates synced
+
+✓ Health dashboard working
+
+✓ Auto Repair working
+
+✓ Token refresh working
+
+✓ Multi-business working
+
+✓ Logs working
+
+✓ Production tested with live Meta accounts
+
+Deliver a polished, enterprise-grade Integration Center comparable to Shopify, HubSpot, Zoho CRM, and Salesforce, optimized specifically for Al Burhan Tours & Travels ERP/CRM.

@@ -1,0 +1,509 @@
+# MASTER TASK: Production Stabilization & End-to-End Validation
+
+## Objective
+
+STOP adding new features until every existing production feature is fully working.
+
+This ERP will be used by real customers, so reliability is more important than adding more modules.
+
+Do NOT assume any feature works because the code compiles.
+
+Every feature must be tested with real data.
+
+---
+
+# Perform a complete production audit
+
+Audit every module.
+
+Mark each module as:
+
+✅ PASS
+
+⚠ WARNING
+
+❌ FAIL
+
+Do not hardcode results.
+
+Use live database checks.
+
+Use live API checks.
+
+Use live integrations.
+
+---
+
+# Booking Flow
+
+Test complete booking flow.
+
+Customer creates booking.
+
+Verify:
+
+Booking saved
+
+Invoice generated
+
+Agreement generated
+
+Receipt generated
+
+Booking ID generated
+
+Agreement ID generated
+
+Invoice Number generated
+
+Receipt Number generated
+
+Dashboard updated
+
+Admin dashboard updated
+
+Customer dashboard updated
+
+Booking history updated
+
+Notification created
+
+Audit log created
+
+If anything fails,
+
+fix it automatically.
+
+---
+
+# Payment Flow
+
+Test:
+
+Advance payment
+
+Partial payment
+
+Multiple partial payments
+
+Final payment
+
+Verify:
+
+Paid amount
+
+Balance
+
+Invoice status
+
+Receipt status
+
+Agreement status
+
+Outstanding amount
+
+Everything must stay synchronized.
+
+---
+
+# Notification Pipeline
+
+This is CRITICAL.
+
+Verify every booking automatically sends notifications.
+
+Channels:
+
+WhatsApp
+
+SMS
+
+Email
+
+Push Notification
+
+Customer Inbox
+
+Admin Inbox
+
+---
+
+Booking Confirmation
+
+Verify customer receives:
+
+Booking Confirmation
+
+Agreement
+
+Invoice
+
+Payment instructions
+
+Dashboard link
+
+Support contact
+
+---
+
+Payment Received
+
+Verify customer receives:
+
+Payment received
+
+Receipt PDF
+
+Updated balance
+
+Invoice
+
+Agreement
+
+Dashboard link
+
+---
+
+Final Payment
+
+Verify customer receives:
+
+Paid in Full
+
+Final Invoice
+
+Agreement PDF
+
+Receipt
+
+Package confirmation
+
+Dashboard link
+
+---
+
+# WhatsApp
+
+Test LIVE.
+
+Verify:
+
+Template exists
+
+Template approved
+
+Variables correct
+
+BotBee API working
+
+Meta API working
+
+Webhook working
+
+Delivery success
+
+Retry queue
+
+Message logs
+
+No silent failures.
+
+If failed,
+
+show exact reason.
+
+---
+
+# SMS
+
+Verify:
+
+Provider connected
+
+API key valid
+
+Sender ID valid
+
+DLT template valid
+
+Delivery status
+
+Retry queue
+
+Message logs
+
+If SMS fails,
+
+show exact reason.
+
+---
+
+# Email
+
+Verify:
+
+SMTP
+
+Authentication
+
+TLS
+
+Attachments
+
+Invoice PDF
+
+Receipt PDF
+
+Agreement PDF
+
+Retry
+
+Delivery logs
+
+---
+
+# Push Notifications
+
+Verify:
+
+Subscription
+
+Permission
+
+FCM/Web Push
+
+Customer dashboard
+
+Admin dashboard
+
+Delivery logs
+
+Retry queue
+
+---
+
+# Customer Dashboard
+
+Verify:
+
+Bookings
+
+Invoices
+
+Payments
+
+Receipts
+
+Agreement
+
+Notifications
+
+Push
+
+WhatsApp status
+
+SMS status
+
+Email status
+
+Everything must display correctly.
+
+---
+
+# Admin Dashboard
+
+Verify:
+
+Live bookings
+
+Payments
+
+Outstanding
+
+Reports
+
+Notifications
+
+WhatsApp queue
+
+SMS queue
+
+Email queue
+
+Push queue
+
+Errors
+
+Health
+
+---
+
+# Social Media Integration
+
+Verify:
+
+OAuth login
+
+Facebook
+
+Instagram
+
+Messenger
+
+WhatsApp Business
+
+Webhook
+
+Token refresh
+
+Auto reconnect
+
+Health
+
+Repair
+
+No manual App ID
+
+No manual App Secret
+
+No manual Access Token
+
+Everything should be OAuth.
+
+---
+
+# Production Health Dashboard
+
+Every module should display:
+
+PASS
+
+WARNING
+
+FAIL
+
+Include:
+
+Database
+
+Redis
+
+SMTP
+
+SMS
+
+WhatsApp
+
+Meta
+
+Google
+
+Push
+
+Storage
+
+Queue
+
+Scheduler
+
+Payments
+
+PDF
+
+Webhook
+
+Cron
+
+Background Jobs
+
+---
+
+# Logging
+
+Every failure must create logs.
+
+Include:
+
+Time
+
+User
+
+Booking
+
+Customer
+
+Error
+
+Stack trace
+
+Retry count
+
+---
+
+# Automatic Repair
+
+Whenever possible:
+
+Reconnect
+
+Retry
+
+Refresh token
+
+Restart queue
+
+Repair webhook
+
+Repair notifications
+
+Repair payment sync
+
+Repair reports
+
+---
+
+# Final Acceptance
+
+Do NOT mark complete until every item below passes.
+
+✓ Booking workflow
+
+✓ Payment workflow
+
+✓ Invoice generation
+
+✓ Receipt generation
+
+✓ Agreement generation
+
+✓ WhatsApp notifications
+
+✓ SMS notifications
+
+✓ Email notifications
+
+✓ Push notifications
+
+✓ Customer dashboard
+
+✓ Admin dashboard
+
+✓ Reports
+
+✓ Meta OAuth
+
+✓ Social Media
+
+✓ Health Dashboard
+
+✓ Production Report
+
+✓ Zero build errors
+
+✓ Zero runtime errors
+
+✓ Zero console errors
+
+✓ Live deployment verified
+
+Finally generate a Production Readiness Report with PASS/WARNING/FAIL status for every module and list any remaining issues that still require manual intervention.
