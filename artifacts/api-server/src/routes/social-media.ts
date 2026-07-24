@@ -940,13 +940,20 @@ router.get("/meta/health", requireAdmin as any, async (_req, res) => {
 
   const fbMeResult = await runTest({
     id: "fb_me", name: "Facebook — GET /me (Token + Page Identity)", category: "Facebook",
-    endpoint: "GET /me?fields=id,name,fan_count,followers_count,category,verification_status",
-    skip: !fbToken ? "Facebook Page Access Token not configured" : null,
-    run: () => fetch(`${GRAPH}/me?fields=id,name,fan_count,followers_count,category,verification_status&access_token=${fbToken}`, { signal: AbortSignal.timeout(TO) }),
+    endpoint: "GET /me?fields=id,name",
+    skip: !fbToken ? "Facebook Page Access Token not configured — see Setup Guide below" : null,
+    run: () => fetch(`${GRAPH}/me?fields=id,name&access_token=${fbToken}`, { signal: AbortSignal.timeout(TO) }),
     onResult: (ok, d, t) => {
       if (!ok) return;
       discoveredPageId = d.id || discoveredPageId;
-      t.data = { page_id: d.id, page_name: d.name, fan_count: d.fan_count, followers_count: d.followers_count, category: d.category };
+      t.data = { page_id: d.id, page_name: d.name };
+      // Detect if this is a User token (not a Page token) — page tokens return the page name, user tokens return a person name
+      if (d.id && !d.name?.toLowerCase().includes("tour") && !d.name?.toLowerCase().includes("travel") && !d.name?.toLowerCase().includes("hajj") && !d.name?.toLowerCase().includes("umrah") && !d.name?.toLowerCase().includes("al burhan")) {
+        t.ok = false;
+        t.error = `This appears to be a User Access Token for "${d.name}" (user ID: ${d.id}), not a Facebook Page Access Token. Page tokens return the Page name, not a person's name. See Setup Guide to generate the correct token.`;
+        t.fix = "In Graph API Explorer: (1) Select your App, (2) click 'Get User or Page Access Token', (3) check ALL page permissions, (4) change the dropdown from 'User Token' to your Page name. The token next to your Page name is the Page Access Token.";
+        discoveredPageId = null; // reset — this page ID is a user ID, not a page ID
+      }
     },
     fix_error: (c, tp) => defaultFix(c, tp, "fb_me"),
   });
@@ -1059,12 +1066,16 @@ router.get("/meta/health", requireAdmin as any, async (_req, res) => {
     },
   });
 
-  // ══════════ WHATSAPP CLOUD API TESTS ══════════════════════════════════════
+  // ══════════ WHATSAPP CLOUD API TESTS (OPTIONAL — BotBee is production provider) ══
+
+  // WhatsApp Cloud API is intentionally OPTIONAL. Production WhatsApp delivery uses BotBee,
+  // not Meta Cloud API directly. These tests are skipped unless WA credentials are configured.
+  const waSkipReason = "WhatsApp Cloud API is optional — production delivery uses BotBee. Configure WA credentials only if you want direct Meta Cloud API access alongside BotBee.";
 
   await runTest({
-    id: "wa_phone", name: "WhatsApp — GET /{phone_id} (Phone Number Details)", category: "WhatsApp",
+    id: "wa_phone", name: "WhatsApp Cloud API — Phone Number (Optional)", category: "WhatsApp",
     endpoint: `GET /${waPhoneId || "{phone_id}"}?fields=display_phone_number,verified_name,quality_rating,status`,
-    skip: !waToken ? "WhatsApp access token not configured" : !waPhoneId ? "Phone Number ID not configured — add it in WhatsApp Meta settings" : null,
+    skip: !waToken ? waSkipReason : !waPhoneId ? "Phone Number ID not configured — optional, add in WhatsApp Meta settings if needed" : null,
     run: () => fetch(`${GRAPH}/${waPhoneId}?fields=display_phone_number,verified_name,quality_rating,status,name_status&access_token=${waToken}`, { signal: AbortSignal.timeout(TO) }),
     onResult: (ok, d, t) => { if (ok) t.data = { phone: d.display_phone_number, verified_name: d.verified_name, quality: d.quality_rating, status: d.status }; },
     fix_error: (c, tp) => {
@@ -1074,18 +1085,18 @@ router.get("/meta/health", requireAdmin as any, async (_req, res) => {
   });
 
   await runTest({
-    id: "wa_waba", name: "WhatsApp — GET /{waba_id} (Business Account)", category: "WhatsApp",
+    id: "wa_waba", name: "WhatsApp Cloud API — Business Account (Optional)", category: "WhatsApp",
     endpoint: `GET /${waWabaId || "{waba_id}"}?fields=name,currency,timezone_id,account_review_status`,
-    skip: !waToken ? "No WA token" : !waWabaId ? "WABA ID not configured — add it in WhatsApp Meta settings" : null,
+    skip: !waToken ? waSkipReason : !waWabaId ? "WABA ID not configured — optional" : null,
     run: () => fetch(`${GRAPH}/${waWabaId}?fields=name,currency,timezone_id,account_review_status&access_token=${waToken}`, { signal: AbortSignal.timeout(TO) }),
     onResult: (ok, d, t) => { if (ok) t.data = { waba_name: d.name, currency: d.currency, timezone: d.timezone_id, status: d.account_review_status }; },
     fix_error: (c, tp) => defaultFix(c, tp, "wa_waba"),
   });
 
   await runTest({
-    id: "wa_templates", name: "WhatsApp — GET /{waba_id}/message_templates", category: "WhatsApp",
+    id: "wa_templates", name: "WhatsApp Cloud API — Templates (Optional)", category: "WhatsApp",
     endpoint: `GET /${waWabaId || "{waba_id}"}/message_templates?limit=5`,
-    skip: !waToken ? "No WA token" : !waWabaId ? "WABA ID required" : null,
+    skip: !waToken ? waSkipReason : !waWabaId ? "WABA ID required — optional" : null,
     run: () => fetch(`${GRAPH}/${waWabaId}/message_templates?limit=5&access_token=${waToken}`, { signal: AbortSignal.timeout(TO) }),
     onResult: (ok, d, t) => {
       if (ok) t.data = { template_count: d.data?.length ?? 0, templates: (d.data || []).slice(0, 3).map((tp: any) => ({ name: tp.name, status: tp.status, language: tp.language })) };
@@ -1198,6 +1209,93 @@ router.get("/meta/health", requireAdmin as any, async (_req, res) => {
       ig_id: !!igId, wa_token: !!waToken, wa_phone_id: !!waPhoneId, wa_waba_id: !!waWabaId,
       webhook_verify_token: !!webhookVerifyToken,
     },
+  });
+});
+
+// ── POST /api/social-media/meta/quick-configure ───────────────────────────────
+// Saves Page Access Token + verify token to all Facebook/Instagram platforms at once.
+// Also optionally discovers and saves Page ID + IG ID from the token.
+router.post("/meta/quick-configure", requireAdmin as any, async (req, res) => {
+  const GRAPH = "https://graph.facebook.com/v19.0";
+  const { page_access_token, verify_token, page_id: manualPageId, ig_id: manualIgId } = req.body;
+  const results: any[] = [];
+
+  if (!page_access_token?.trim()) {
+    return void res.status(400).json({ ok: false, error: "page_access_token is required" });
+  }
+  const tok = page_access_token.trim();
+  const verTok = verify_token?.trim() || "alburhan2026";
+
+  // Step 1: validate token + discover page ID
+  let pageId = manualPageId?.trim() || null;
+  let pageName = "";
+  try {
+    const r = await fetch(`${GRAPH}/me?fields=id,name&access_token=${tok}`, { signal: AbortSignal.timeout(10000) });
+    const d = await r.json() as any;
+    if (d.error) {
+      return void res.status(400).json({ ok: false, error: `Token validation failed: ${d.error.message} (code ${d.error.code})` });
+    }
+    pageId = pageId || d.id;
+    pageName = d.name;
+    results.push({ step: "Token validated", id: d.id, name: d.name });
+  } catch (e: any) {
+    return void res.status(500).json({ ok: false, error: `Graph API unreachable: ${e.message}` });
+  }
+
+  // Step 2: discover IG ID if not provided
+  let igId = manualIgId?.trim() || null;
+  if (pageId && !igId) {
+    try {
+      const r = await fetch(`${GRAPH}/${pageId}?fields=instagram_business_account&access_token=${tok}`, { signal: AbortSignal.timeout(10000) });
+      const d = await r.json() as any;
+      if (d.instagram_business_account?.id) {
+        igId = d.instagram_business_account.id;
+        results.push({ step: "Instagram Account ID discovered", ig_id: igId });
+      } else {
+        results.push({ step: "Instagram Account ID", note: "Not linked to this Page — link in Meta Business Suite → Accounts → Instagram Accounts" });
+      }
+    } catch { /* best effort */ }
+  }
+
+  // Step 3: upsert each platform config
+  const PLATFORMS_TO_UPDATE = [
+    { platform: "facebook_page", extraFields: { page_access_token: tok, page_id: pageId, webhook_verify_token: verTok } },
+    { platform: "facebook_messenger", extraFields: { page_access_token: tok, page_id: pageId, webhook_verify_token: verTok } },
+    { platform: "facebook_leads", extraFields: { page_access_token: tok, page_id: pageId, webhook_verify_token: verTok } },
+    ...(igId ? [
+      { platform: "instagram", extraFields: { page_access_token: tok, page_id: pageId, instagram_account_id: igId, webhook_verify_token: verTok } },
+      { platform: "instagram_dm", extraFields: { page_access_token: tok, page_id: pageId, instagram_account_id: igId, webhook_verify_token: verTok } },
+    ] : []),
+  ];
+
+  for (const { platform, extraFields } of PLATFORMS_TO_UPDATE) {
+    const existing = await pool.query(`SELECT extra_fields_encrypted FROM social_platform_configs WHERE platform=$1`, [platform]);
+    const currentExtra = existing.rows[0] ? decryptExtra(existing.rows[0].extra_fields_encrypted) : {};
+    const merged = { ...currentExtra, ...extraFields };
+    const encExtra = encrypt(JSON.stringify(merged));
+    if (existing.rows[0]) {
+      await pool.query(`UPDATE social_platform_configs SET extra_fields_encrypted=$1, enabled=true, status='active', updated_at=NOW() WHERE platform=$2`, [encExtra, platform]);
+    } else {
+      await pool.query(`INSERT INTO social_platform_configs (platform, enabled, status, extra_fields_encrypted) VALUES ($1, true, 'active', $2)`, [platform, encExtra]);
+    }
+    results.push({ step: `Saved ${platform}`, page_id: pageId, ig_id: igId || undefined, verify_token: verTok });
+  }
+
+  res.json({
+    ok: true,
+    page_id: pageId,
+    page_name: pageName,
+    ig_id: igId,
+    verify_token: verTok,
+    platforms_updated: PLATFORMS_TO_UPDATE.length,
+    results,
+    next_steps: [
+      `✅ Token saved to ${PLATFORMS_TO_UPDATE.length} platforms`,
+      `Set verify token "${verTok}" in: Meta App Dashboard → Products → Webhooks → Edit Subscription → Verify Token`,
+      `Webhook URL to register: https://alburhantravels.com/api/social-media/webhook/meta`,
+      `Then click "Subscribe All Webhook Fields" on this page`,
+      !igId ? "Instagram not linked — in Instagram app: Settings → Account → Switch to Professional, then link to your Facebook Page" : `Instagram Account ID ${igId} saved`,
+    ],
   });
 });
 

@@ -475,6 +475,160 @@ function WATestPanel({ configured }: { configured: boolean }) {
   );
 }
 
+// ── Quick Configure Panel ─────────────────────────────────────────────────────
+// One-click setup: paste a Page Access Token + verify token → saves to all FB/IG platforms
+
+function QuickConfigurePanel({ onConfigured }: { onConfigured: () => void }) {
+  const { toast } = useToast();
+  const [open, setOpen] = useState(true);
+  const [tok, setTok] = useState("");
+  const [verifyTok, setVerifyTok] = useState("alburhan2026");
+  const [pageId, setPageId] = useState("");
+  const [igId, setIgId] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<any>(null);
+
+  const configure = async () => {
+    if (!tok.trim()) return;
+    setLoading(true); setResult(null);
+    try {
+      const r = await fetch(`${API}/api/social-media/meta/quick-configure`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ page_access_token: tok.trim(), verify_token: verifyTok.trim() || "alburhan2026", page_id: pageId.trim() || undefined, ig_id: igId.trim() || undefined }),
+      });
+      const d = await r.json();
+      setResult(d);
+      if (d.ok) {
+        toast({ title: `✅ Configured ${d.platforms_updated} platforms`, description: `Page: ${d.page_name}${d.ig_id ? " · Instagram linked" : ""}` });
+        onConfigured();
+      } else {
+        toast({ title: "Configuration failed", description: d.error, variant: "destructive" });
+      }
+    } catch (e: any) { toast({ title: "Error", description: e.message, variant: "destructive" }); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <div className="border-2 border-blue-300 rounded-xl overflow-hidden bg-blue-50/30">
+      <button onClick={() => setOpen(o => !o)} className="w-full flex items-center justify-between px-4 py-3 bg-blue-600 hover:bg-blue-700 transition-colors text-left">
+        <div className="flex items-center gap-2">
+          <span className="text-white text-base">⚡</span>
+          <p className="text-sm font-bold text-white">Quick Configure — Paste Your Page Access Token</p>
+        </div>
+        <span className="text-blue-200 text-xs">{open ? "▲" : "▼ Open"}</span>
+      </button>
+
+      {open && (
+        <div className="p-4 space-y-4">
+          {/* How to get a Page Access Token */}
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+            <p className="text-xs font-bold text-amber-900 mb-2">📋 How to get a Facebook Page Access Token</p>
+            <ol className="text-[11px] text-amber-800 space-y-1.5">
+              <li><strong>Step 1:</strong> Open <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noopener noreferrer" className="underline text-blue-700">Meta Graph API Explorer ↗</a></li>
+              <li><strong>Step 2:</strong> Top-right — select your Meta App from the dropdown (e.g. "Al Burhan ERP" or your app name)</li>
+              <li><strong>Step 3:</strong> Click <strong>"Generate Access Token"</strong> button</li>
+              <li><strong>Step 4:</strong> In the popup, <strong>check all these permissions:</strong>
+                <div className="mt-1 ml-2 font-mono text-[10px] bg-white rounded p-1.5 border border-amber-200 space-y-0.5">
+                  <div>✓ pages_show_list &nbsp; ✓ pages_read_engagement</div>
+                  <div>✓ pages_messaging &nbsp; ✓ pages_manage_metadata</div>
+                  <div>✓ pages_read_user_content &nbsp; ✓ leads_retrieval</div>
+                  <div>✓ instagram_basic &nbsp; ✓ instagram_manage_messages</div>
+                </div>
+              </li>
+              <li><strong>Step 5:</strong> After granting — look at the <strong>left dropdown next to "User Token"</strong> — switch it to your <strong>Page name</strong> (e.g. "Al Burhan Tours &amp; Travels")</li>
+              <li><strong>Step 6:</strong> Copy the token shown in the Access Token field — this is your <strong>Page Access Token</strong></li>
+              <li><strong>Step 7:</strong> Paste it below and click Configure</li>
+            </ol>
+            <div className="mt-2 text-[10px] text-amber-700 bg-amber-100 rounded p-1.5">
+              ⚠️ <strong>Important:</strong> The token you paste must return your <em>Page name</em> (e.g. "Al Burhan Tours"), not a person's name. If /me returns a person, you have a User Token, not a Page Token — repeat from Step 5.
+            </div>
+          </div>
+
+          {/* Token input */}
+          <div className="space-y-3">
+            <div>
+              <label className="text-[11px] font-semibold text-gray-700 block mb-1">Facebook Page Access Token *</label>
+              <textarea
+                className="w-full border rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white resize-none"
+                rows={3} placeholder="EAAxxxxxxxxxxxxxxx…" value={tok}
+                onChange={e => setTok(e.target.value)}
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="text-[11px] font-semibold text-gray-700 block mb-1">Webhook Verify Token *</label>
+                <input type="text" className="w-full border rounded-lg px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                  value={verifyTok} onChange={e => setVerifyTok(e.target.value)}
+                  placeholder="alburhan2026" />
+                <p className="text-[9px] text-gray-400 mt-0.5">Must match Meta App → Webhooks → Verify Token</p>
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold text-gray-700 block mb-1">Page ID (optional)</label>
+                <input type="text" className="w-full border rounded-lg px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                  value={pageId} onChange={e => setPageId(e.target.value)} placeholder="Auto-detected" />
+                <p className="text-[9px] text-gray-400 mt-0.5">Leave blank — auto-detected from token</p>
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold text-gray-700 block mb-1">Instagram Account ID (optional)</label>
+                <input type="text" className="w-full border rounded-lg px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                  value={igId} onChange={e => setIgId(e.target.value)} placeholder="Auto-detected" />
+                <p className="text-[9px] text-gray-400 mt-0.5">Leave blank — auto-detected from Page</p>
+              </div>
+            </div>
+            <Button onClick={configure} disabled={loading || !tok.trim()} className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
+              {loading ? <><Spin /> Configuring…</> : "⚡ Save & Configure All Platforms"}
+            </Button>
+          </div>
+
+          {/* Result */}
+          {result && (
+            <div className={`rounded-xl p-3 border text-xs ${result.ok ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
+              {result.ok ? (
+                <>
+                  <p className="font-bold text-green-800 mb-2">✅ {result.platforms_updated} platforms configured!</p>
+                  <div className="text-green-700 space-y-0.5">
+                    <p>Page: <strong>{result.page_name}</strong> (ID: {result.page_id})</p>
+                    {result.ig_id && <p>Instagram Account ID: <strong>{result.ig_id}</strong></p>}
+                    {!result.ig_id && <p className="text-amber-700">⚠️ Instagram not linked to this Page. Link it in Meta Business Suite → Accounts → Instagram Accounts, then re-configure.</p>}
+                  </div>
+                  <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-2.5">
+                    <p className="font-bold text-blue-800 mb-1.5">📋 Next Steps (do these in Meta App Dashboard)</p>
+                    <ol className="text-blue-700 space-y-1">
+                      {result.next_steps?.map((s: string, i: number) => (
+                        <li key={i}><strong>{i + 1}.</strong> {s}</li>
+                      ))}
+                    </ol>
+                    <div className="mt-2 bg-white rounded p-2 border border-blue-200">
+                      <p className="font-mono text-[10px] text-gray-600">Webhook URL: <strong>https://alburhantravels.com/api/social-media/webhook/meta</strong></p>
+                      <p className="font-mono text-[10px] text-gray-600">Verify Token: <strong>{result.verify_token}</strong></p>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <p className="text-red-700 font-medium">❌ {result.error}</p>
+              )}
+            </div>
+          )}
+
+          {/* Webhook setup reminder */}
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+            <p className="text-[11px] font-bold text-gray-800 mb-2">📡 After configuring the token — set up webhooks in Meta App Dashboard</p>
+            <ol className="text-[11px] text-gray-700 space-y-1">
+              <li><strong>1.</strong> Go to <a href="https://developers.facebook.com/apps/" target="_blank" rel="noopener noreferrer" className="underline text-blue-600">Meta App Dashboard ↗</a> → your app → <strong>Products → Messenger → Webhooks</strong></li>
+              <li><strong>2.</strong> Click <strong>"Edit Subscription"</strong></li>
+              <li><strong>3.</strong> Callback URL: <code className="bg-gray-200 px-1 rounded text-[10px]">https://alburhantravels.com/api/social-media/webhook/meta</code></li>
+              <li><strong>4.</strong> Verify Token: <code className="bg-gray-200 px-1 rounded text-[10px]">{verifyTok || "alburhan2026"}</code></li>
+              <li><strong>5.</strong> Click <strong>"Verify and Save"</strong> — the server will auto-respond to the challenge</li>
+              <li><strong>6.</strong> Then click <strong>"Subscribe All Webhook Fields"</strong> button below on this page</li>
+            </ol>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Subscribe webhooks panel ───────────────────────────────────────────────────
 
 function SubscribePanel({ onDone }: { onDone: () => void }) {
@@ -721,6 +875,9 @@ export default function MetaHealth() {
 
         {/* ── Auto-Repair Log ── */}
         <RepairLog data={repairData ?? undefined} loading={loadingRepair} />
+
+        {/* ── Quick Configure panel (shown when FB token not configured) ── */}
+        <QuickConfigurePanel onConfigured={() => { setTimeout(runHealth, 600); }} />
 
         {/* ── WhatsApp + Subscribe panels ── */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
