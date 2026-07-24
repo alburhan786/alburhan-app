@@ -2,7 +2,7 @@
 import { Router } from "express";
 import { db, bookingsTable, pilgrimsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { requireAuth, type AuthenticatedRequest } from "../lib/auth.js";
+import { requireAuth, requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendCustomerDocumentUploadNotification } from "../lib/notifications.js";
 import { sendDocumentToCustomer, TRAVEL_DOC_TYPES } from "../lib/documentDelivery.js";
 import { sendTicketEmail, sendVisaEmail } from "../services/emailService.js";
@@ -41,6 +41,26 @@ const VALID_DOCUMENT_TYPES = [
 ];
 
 const router = Router();
+
+// ── GET /api/documents — admin list all documents ────────────────────────────
+router.get("/", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT d.id, d.booking_id, d.document_type, d.file_name, d.file_url,
+              d.uploaded_by, d.created_at,
+              b.booking_number, b.package_name,
+              u.name AS customer_name
+       FROM documents d
+       LEFT JOIN bookings b ON d.booking_id = b.id
+       LEFT JOIN users u ON b.customer_id = u.id
+       ORDER BY d.created_at DESC
+       LIMIT 500`
+    );
+    res.json(result.rows);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // ── Upload document ─────────────────────────────────────────────────────────
 router.post(

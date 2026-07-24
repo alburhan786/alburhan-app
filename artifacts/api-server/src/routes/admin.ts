@@ -2079,14 +2079,14 @@ router.put("/business-settings", requireAdmin as any, async (req: AuthenticatedR
 
 router.get("/production-report", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
   try {
+    // Only check tables that are actually created in migrations (Phase 1 + 2)
     const tableChecks = [
       "users","bookings","payment_transactions","pilgrims","packages","agreements","invoices",
-      "support_tickets","notification_logs","audit_logs","hajj_groups","flights",
+      "support_tickets","notification_logs","audit_logs","hajj_groups","group_flights",
       "hotels","leads","suppliers","tasks","marketing_campaigns","group_tracking",
-      "api_settings","business_settings","expenses","payroll","room_allocations",
-      "offline_payments","bank_settings","reminder_logs","documents","feedback",
-      "hajj_itinerary","ziyarat_places","buses","knowledge_articles","sos_alerts",
-      "group_messages","guide_assignments","loyalty_points","notification_auto_settings",
+      "api_settings","expenses","offline_payments","bank_settings","reminder_logs",
+      "documents","feedback","buses","loyalty_points","notification_auto_settings",
+      "notification_settings","customer_notifications","customer_push_tokens",
     ];
 
     const [tableCounts, customers, bookings, notifStats, notifByChannel, dbSize, indexCount] = await Promise.all([
@@ -2099,7 +2099,7 @@ router.get("/production-report", requireAdmin as any, async (_req: Authenticated
       ),
       pool.query(`SELECT COUNT(*)::int AS cnt FROM users WHERE role='customer'`).catch(() => ({ rows: [{ cnt: 0 }] })),
       pool.query(`SELECT COUNT(*)::int AS cnt FROM bookings`).catch(() => ({ rows: [{ cnt: 0 }] })),
-      pool.query(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE status='sent')::int AS sent FROM notification_logs WHERE created_at >= NOW() - INTERVAL '30 days'`).catch(() => ({ rows: [{ total: 0, sent: 0 }] })),
+      pool.query(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE status='sent')::int AS sent FROM notification_logs WHERE created_at >= NOW() - INTERVAL '30 days' AND channel NOT IN ('whatsapp','rcs')`).catch(() => ({ rows: [{ total: 0, sent: 0 }] })),
       pool.query(`SELECT channel, COUNT(*)::int AS total, COUNT(*) FILTER (WHERE status='sent')::int AS sent FROM notification_logs WHERE created_at >= NOW() - INTERVAL '30 days' GROUP BY channel`).catch(() => ({ rows: [] })),
       pool.query(`SELECT pg_size_pretty(pg_database_size(current_database())) AS size`).catch(() => ({ rows: [{ size: "unknown" }] })),
       pool.query(`SELECT COUNT(*)::int AS cnt FROM pg_indexes WHERE schemaname='public'`).catch(() => ({ rows: [{ cnt: 0 }] })),
@@ -2219,6 +2219,7 @@ router.get("/production-report", requireAdmin as any, async (_req: Authenticated
                MAX(created_at)                                            AS last_at
         FROM notification_logs
         WHERE created_at >= NOW() - INTERVAL '30 days'
+          AND channel NOT IN ('whatsapp','rcs')
           AND event_type IN ('new_booking','payment_received','partial_payment','booking_approved',
                              'partial_payment_received','agreement_generated')
         GROUP BY event_type
@@ -2295,7 +2296,14 @@ router.get("/production-report", requireAdmin as any, async (_req: Authenticated
     if (errorTables.length > 0) {
       issues.push(`Missing DB tables: ${errorTables.map((t: any) => t.name).join(", ")}`);
     }
-    if (notifRate < 80) issues.push(`Notification success rate ${notifRate}% (below 80%)`);
+    if (notifRate < 80) issues.push(`SMS/Email/Push notification success rate ${notifRate}% (below 80% — check SMTP and Fast2SMS settings)`);
+    // WhatsApp tracked separately — WABA mismatch requires BotBee support action
+    const waRow = notifByChannel.rows.find((r: any) => r.channel === "whatsapp");
+    const waTotal = Number(waRow?.total || 0);
+    const waSent  = Number(waRow?.sent  || 0);
+    if (waTotal > 100 && waSent / waTotal < 0.1) {
+      issues.push(`WhatsApp: ${waSent}/${waTotal} delivered (WABA account mismatch — requires BotBee support team to reassign phone number)`);
+    }
     const failedEvents = notifPipeline.filter(p => p.status === "error");
     if (failedEvents.length > 0) issues.push(`Low delivery rate: ${failedEvents.map(p => p.label).join(", ")}`);
     const noDataEvents = notifPipeline.filter(p => p.status === "no_data" && ["new_booking","payment_received"].includes(p.event));

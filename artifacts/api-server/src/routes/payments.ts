@@ -325,6 +325,29 @@ function getRazorpay(): RazorpayWithPaymentLink {
   return new Razorpay({ key_id: keyId, key_secret: secret }) as RazorpayWithPaymentLink;
 }
 
+// GET /api/payments — admin list of all payment transactions (used by ReceiptsDashboard)
+router.get("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  const limit = Math.min(500, parseInt(req.query.limit as string || "100"));
+  try {
+    const result = await pool.query(
+      `SELECT pt.id, pt.booking_id, pt.amount, pt.payment_mode, pt.payment_date,
+              pt.notes, pt.created_at, pt.is_deleted,
+              b.booking_number, b.package_name,
+              u.name AS customer_name, u.mobile AS customer_mobile
+       FROM payment_transactions pt
+       LEFT JOIN bookings b ON pt.booking_id = b.id
+       LEFT JOIN users u ON b.customer_id = u.id
+       WHERE pt.is_deleted IS NOT TRUE
+       ORDER BY pt.created_at DESC
+       LIMIT $1`,
+      [limit]
+    );
+    res.json(result.rows);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post("/create-order", requireAuth as any, async (req: AuthenticatedRequest, res) => {
   const parsed = CreatePaymentOrderBody.safeParse(req.body);
   if (!parsed.success) {

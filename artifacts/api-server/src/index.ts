@@ -1465,6 +1465,10 @@ async function runMigrations() {
     await pool.query(`ALTER TABLE api_settings ADD COLUMN IF NOT EXISTS last_sms_status TEXT`);
     await pool.query(`ALTER TABLE api_settings ADD COLUMN IF NOT EXISTS last_sms_at TIMESTAMPTZ`);
     console.log("[Migration] api_settings last_sms_status/last_sms_at columns ensured");
+    // key/value columns for generic kv storage (VAPID keys, template overrides, etc.)
+    await pool.query(`ALTER TABLE api_settings ADD COLUMN IF NOT EXISTS key TEXT UNIQUE`);
+    await pool.query(`ALTER TABLE api_settings ADD COLUMN IF NOT EXISTS value TEXT`);
+    console.log("[Migration] api_settings key/value columns ensured");
     await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS provider_name TEXT`);
     await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS api_endpoint TEXT`);
     await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS http_status INTEGER`);
@@ -1900,6 +1904,30 @@ async function runMigrations() {
     console.log("[Migration] push channel enabled for key notification events");
   } catch (err: any) {
     console.warn("[Migration] push notification_settings seeding (non-fatal):", err.message);
+  }
+
+  // ── notification_settings: ensure sms+email for ALL critical events ──────
+  try {
+    const criticalEvents = [
+      "new_booking","booking_approved","booking_rejected","payment_received",
+      "partial_payment","partial_payment_received","agreement_generated","agreement_ready",
+      "agreement_signed","invoice_generated","invoice_ready","receipt_generated",
+      "visa_issued","visa_approved","ticket_issued","departure_reminder",
+      "balance_reminder","journey_status_changed","custom_admin",
+    ];
+    for (const evt of criticalEvents) {
+      for (const ch of ["sms", "email"]) {
+        await pool.query(
+          `INSERT INTO notification_settings (id, event_type, channel, enabled, created_at)
+           VALUES (gen_random_uuid()::text, $1, $2, true, NOW())
+           ON CONFLICT (event_type, channel) DO NOTHING`,
+          [evt, ch]
+        );
+      }
+    }
+    console.log("[Migration] sms+email channels seeded for all critical events");
+  } catch (err: any) {
+    console.warn("[Migration] critical event channel seeding (non-fatal):", err.message);
   }
 
   // ── notification_settings: enable push for ALL 19 spec events ────────────

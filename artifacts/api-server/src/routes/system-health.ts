@@ -152,28 +152,40 @@ router.get("/system-health", requireAdmin as any, async (_req, res) => {
     };
   }
 
-  // 8. Push (Firebase)
-  {
-    const ok = !!process.env.FIREBASE_SERVICE_ACCOUNT;
+  // 8. Push (Web Push VAPID — replaces Firebase)
+  try {
+    const [vapidRows, tokenRows] = await Promise.all([
+      pool.query(`SELECT value FROM api_settings WHERE key='vapid_keys' LIMIT 1`),
+      pool.query(`SELECT COUNT(*) c FROM customer_push_tokens WHERE subscription IS NOT NULL`),
+    ]);
+    const ok = vapidRows.rows.length > 0 && !!vapidRows.rows[0]?.value;
+    const subscribers = Number(tokenRows.rows[0]?.c || 0);
     results.push_provider = {
       status: ok ? "ok" : "warn",
-      message: ok ? "Firebase push configured" : "Firebase not configured (push notifications disabled)",
+      message: ok
+        ? `Web Push (VAPID) active — ${subscribers} active subscriber${subscribers !== 1 ? "s" : ""}`
+        : "Web Push VAPID keys not yet generated — send first push notification to activate",
+      detail: ok ? { subscribers } : undefined,
     };
+  } catch {
+    results.push_provider = { status: "warn", message: "Web Push status could not be determined" };
   }
 
-  // 9. Retry queue backlog
+  // 9. Retry queue backlog (only recent items — older exhausted WhatsApp failures are expected)
   try {
     const rq = await pool.query(
       `SELECT COUNT(*) FILTER (WHERE status='pending') as pending,
-              COUNT(*) FILTER (WHERE status='failed') as exhausted
+              COUNT(*) FILTER (WHERE status='failed' AND updated_at >= NOW() - INTERVAL '24 hours') as exhausted_recent,
+              COUNT(*) FILTER (WHERE status='failed') as exhausted_total
        FROM notification_retry_queue`
     );
-    const pending   = Number(rq.rows[0]?.pending   || 0);
-    const exhausted = Number(rq.rows[0]?.exhausted || 0);
+    const pending         = Number(rq.rows[0]?.pending          || 0);
+    const exhaustedRecent = Number(rq.rows[0]?.exhausted_recent || 0);
+    const exhaustedTotal  = Number(rq.rows[0]?.exhausted_total  || 0);
     results.retry_queue = {
-      status: exhausted > 10 ? "warn" : "ok",
-      message: `${pending} pending retries, ${exhausted} exhausted`,
-      detail: { pending, exhausted },
+      status: exhaustedRecent > 5 ? "warn" : "ok",
+      message: `${pending} pending retries, ${exhaustedRecent} exhausted in last 24h (${exhaustedTotal} total)`,
+      detail: { pending, exhaustedRecent, exhaustedTotal },
     };
   } catch (e: any) {
     results.retry_queue = { status: "warn", message: "Could not read retry queue", detail: e.message };

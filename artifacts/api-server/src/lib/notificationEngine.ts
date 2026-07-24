@@ -431,11 +431,11 @@ async function getEnabledChannels(eventType: string): Promise<Channel[]> {
       `SELECT channel FROM notification_settings WHERE event_type=$1 AND enabled=true`,
       [eventType]
     );
-    // Default: all 4 live channels if no settings exist
-    if (res.rows.length === 0) return ["whatsapp", "sms", "email", "rcs"];
+    // Default: sms + email (rcs removed — 97% failure; whatsapp needs WABA fix via BotBee)
+    if (res.rows.length === 0) return ["sms", "email"];
     return res.rows.map((r: any) => r.channel as Channel);
   } catch {
-    return ["whatsapp", "sms", "email", "rcs"];
+    return ["sms", "email"];
   }
 }
 
