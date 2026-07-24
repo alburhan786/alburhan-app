@@ -2207,7 +2207,7 @@ router.get("/production-report", requireAdmin as any, async (_req: Authenticated
     for (const row of notifByChannel.rows) {
       notifByChannelMap[row.channel] = { channel: row.channel, total: row.total, sent: row.sent };
     }
-    const notifHealth = ["whatsapp", "sms", "email"].map(ch => notifByChannelMap[ch] || { channel: ch, total: 0, sent: 0 });
+    const notifHealth = ["whatsapp", "sms", "email", "push"].map(ch => notifByChannelMap[ch] || { channel: ch, total: 0, sent: 0 });
 
     // Real notification pipeline audit — per event + channel status
     const [notifEventRows, notifSettingsRows, recentFailsRows] = await Promise.all([

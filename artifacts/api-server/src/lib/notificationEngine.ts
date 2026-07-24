@@ -345,6 +345,18 @@ export function applyTemplate(template: string, ctx: NotificationContext): strin
     });
 }
 
+// ── Category helper for customer inbox ──────────────────────────────────────
+function getNotificationCategory(eventType: string): string {
+  if (["new_booking","booking_approved","booking_rejected","booking_cancelled","booking_completed"].includes(eventType)) return "booking";
+  if (["payment_received","partial_payment","invoice_paid","receipt_generated","balance_overdue","offline_payment_submitted","payment_verified","payment_rejected","refund"].includes(eventType)) return "payment";
+  if (["invoice_generated","invoice_ready","invoice_cancelled"].includes(eventType)) return "invoice";
+  if (["agreement_ready","agreement_signed"].includes(eventType)) return "agreement";
+  if (["visa_issued","visa_approved","visa_rejected","visa_ready"].includes(eventType)) return "visa";
+  if (["ticket_issued","flight_assigned","flight_changed","flight_cancelled","flight_reminder","return_flight_reminder","flight_update"].includes(eventType)) return "flight";
+  if (["departure_reminder","return_reminder","balance_reminder","balance_reminder_30d","balance_reminder_15d","balance_reminder_7d","balance_reminder_3d","airport_reporting_reminder","passport_reminder","passport_expiry","room_allocation"].includes(eventType)) return "reminder";
+  return "general";
+}
+
 export async function trackNotification(data: {
   eventType: string;
   channel: Channel;
@@ -1048,6 +1060,17 @@ export async function fireNotificationEvent(
     ).catch((e: any) => console.error("[notificationEngine] admin alert insert failed:", e?.message));
   } else {
     console.log(`[notificationEngine] ${eventType} → ${successCount}/${orderedChannels.length} channels succeeded`);
+    // ── Populate customer notification inbox ──────────────────────────────────
+    if (ctx.customerId) {
+      const notifId = `cn_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const notifTitle = (EVENT_LABELS as Record<string, string>)[eventType] || eventType.replace(/_/g, " ");
+      const notifCategory = getNotificationCategory(eventType);
+      pool.query(
+        `INSERT INTO customer_notifications (id, customer_id, title, message, type, is_read, category, created_at)
+         VALUES ($1,$2,$3,$4,$5,false,$6,NOW()) ON CONFLICT (id) DO NOTHING`,
+        [notifId, ctx.customerId, notifTitle, message.substring(0, 500), eventType, notifCategory]
+      ).catch((e: any) => console.warn("[notifEngine] customer inbox insert failed (non-fatal):", e?.message));
+    }
   }
 }
 

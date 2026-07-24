@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { CreditCard, FileText, Download, Clock, Upload, Trash2, CheckCircle, AlertCircle, X, Eye, ShieldAlert, IndianRupee, Plane, Stamp, Hotel, Bus, Printer, Share2, Copy, Bell, BellRing, CheckCheck, Megaphone, ClipboardList, MessageSquare, Send, User, XCircle, Building2, Banknote, RefreshCcw, Syringe, MapPin, Bed, ChevronRight, AlertTriangle, PhoneCall, Activity } from "lucide-react";
+import { CreditCard, FileText, Download, Clock, Upload, Trash2, CheckCircle, AlertCircle, X, Eye, ShieldAlert, IndianRupee, Plane, Stamp, Hotel, Bus, Printer, Share2, Copy, Bell, BellRing, CheckCheck, Megaphone, ClipboardList, MessageSquare, Send, User, XCircle, Building2, Banknote, RefreshCcw, Syringe, MapPin, Bed, ChevronRight, AlertTriangle, PhoneCall, Activity, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -1864,23 +1864,42 @@ const NOTIF_TYPE_EMOJI: Record<string, string> = {
 };
 
 interface CustomerNotification {
-  id: string; title: string; message: string; type: string; isRead: boolean; createdAt: string;
+  id: string; title: string; message: string; type: string; isRead: boolean; createdAt: string; category?: string;
 }
 
+const CATEGORY_TABS = [
+  { key: "all",       label: "All",        emoji: "📋" },
+  { key: "booking",   label: "Booking",    emoji: "📦" },
+  { key: "payment",   label: "Payment",    emoji: "💳" },
+  { key: "invoice",   label: "Invoice",    emoji: "🧾" },
+  { key: "agreement", label: "Agreement",  emoji: "📝" },
+  { key: "visa",      label: "Visa",       emoji: "🛂" },
+  { key: "flight",    label: "Flight",     emoji: "✈️" },
+  { key: "reminder",  label: "Reminder",   emoji: "⏰" },
+];
+
 function NotificationsPanel({
-  notifications, onClose, onMarkRead, onMarkAllRead,
+  notifications, onClose, onMarkRead, onMarkAllRead, onDelete, onClearAll,
+  search, setSearch, category, setCategory,
 }: {
   notifications: CustomerNotification[];
   onClose: () => void;
   onMarkRead: (id: string) => void;
   onMarkAllRead: () => void;
+  onDelete: (id: string) => void;
+  onClearAll: () => void;
+  search: string;
+  setSearch: (s: string) => void;
+  category: string;
+  setCategory: (c: string) => void;
 }) {
   const unread = notifications.filter(n => !n.isRead).length;
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative w-full max-w-sm h-full bg-white shadow-2xl flex flex-col">
-        <div className="flex items-center justify-between px-4 py-4 border-b border-border bg-primary text-white">
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-primary text-white">
           <div className="flex items-center gap-2">
             <BellRing className="w-5 h-5" />
             <span className="font-bold text-base">Notifications</span>
@@ -1889,7 +1908,12 @@ function NotificationsPanel({
           <div className="flex items-center gap-2">
             {unread > 0 && (
               <button onClick={onMarkAllRead} className="text-xs text-white/70 hover:text-white flex items-center gap-1">
-                <CheckCheck size={13} /> Mark all read
+                <CheckCheck size={13} /> All read
+              </button>
+            )}
+            {notifications.length > 0 && (
+              <button onClick={onClearAll} className="text-xs text-white/60 hover:text-white flex items-center gap-1" title="Clear all">
+                <Trash2 size={12} />
               </button>
             )}
             <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-lg transition-colors">
@@ -1897,38 +1921,83 @@ function NotificationsPanel({
             </button>
           </div>
         </div>
+
+        {/* Search */}
+        <div className="px-3 pt-2.5 pb-1">
+          <div className="relative">
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search notifications…"
+              className="w-full pl-8 pr-3 py-1.5 text-sm border border-border rounded-lg focus:outline-none focus:ring-1 focus:ring-primary bg-muted/20"
+            />
+            {search && (
+              <button onClick={() => setSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                <X size={12} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Category Filter */}
+        <div className="flex gap-1 px-3 py-1.5 overflow-x-auto scrollbar-none">
+          {CATEGORY_TABS.map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setCategory(tab.key)}
+              className={`shrink-0 text-[10px] font-semibold px-2 py-1 rounded-full border transition-colors ${
+                category === tab.key
+                  ? "bg-primary text-white border-primary"
+                  : "bg-white text-muted-foreground border-border hover:border-primary hover:text-primary"
+              }`}
+            >
+              {tab.emoji} {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* List */}
         <div className="flex-1 overflow-y-auto">
           {notifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
               <Bell className="w-10 h-10 opacity-20" />
-              <p className="text-sm">No notifications yet</p>
+              <p className="text-sm">{search || category !== "all" ? "No matching notifications" : "No notifications yet"}</p>
             </div>
           ) : (
             <div className="divide-y divide-border">
               {notifications.map(n => (
                 <div
                   key={n.id}
-                  className={`p-4 cursor-pointer transition-colors hover:bg-muted/30 ${!n.isRead ? "bg-primary/5 border-l-4 border-l-primary" : ""}`}
-                  onClick={() => !n.isRead && onMarkRead(n.id)}
+                  className={`p-3 transition-colors hover:bg-muted/30 ${!n.isRead ? "bg-primary/5 border-l-4 border-l-primary" : ""}`}
                 >
-                  <div className="flex items-start gap-3">
-                    <span className="text-xl shrink-0 mt-0.5">{NOTIF_TYPE_EMOJI[n.type] || "📢"}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className={`text-sm font-semibold ${!n.isRead ? "text-primary" : "text-foreground"}`}>{n.title}</p>
-                        {!n.isRead && <span className="w-2 h-2 rounded-full bg-primary shrink-0 mt-1.5" />}
+                  <div className="flex items-start gap-2.5">
+                    <span className="text-lg shrink-0 mt-0.5">{NOTIF_TYPE_EMOJI[n.type] || NOTIF_TYPE_EMOJI[n.category || ""] || "📢"}</span>
+                    <div className="flex-1 min-w-0 cursor-pointer" onClick={() => !n.isRead && onMarkRead(n.id)}>
+                      <div className="flex items-start justify-between gap-1">
+                        <p className={`text-sm font-semibold leading-tight ${!n.isRead ? "text-primary" : "text-foreground"}`}>{n.title}</p>
+                        {!n.isRead && <span className="w-2 h-2 rounded-full bg-primary shrink-0 mt-1" />}
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{n.message}</p>
-                      <p className="text-[10px] text-muted-foreground/60 mt-2">{formatDate(n.createdAt)}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed line-clamp-2">{n.message}</p>
+                      <p className="text-[10px] text-muted-foreground/60 mt-1">{formatDate(n.createdAt)}</p>
                     </div>
+                    <button
+                      onClick={e => { e.stopPropagation(); onDelete(n.id); }}
+                      className="p-1 rounded hover:bg-red-50 text-muted-foreground hover:text-red-500 transition-colors shrink-0 mt-0.5"
+                      title="Delete"
+                    >
+                      <Trash2 size={12} />
+                    </button>
                   </div>
                 </div>
               ))}
             </div>
           )}
         </div>
-        <div className="border-t border-border p-3 bg-muted/30">
-          <p className="text-[11px] text-center text-muted-foreground">Messages from Al Burhan Tours & Travels</p>
+
+        <div className="border-t border-border p-2.5 bg-muted/30 flex items-center justify-between">
+          <p className="text-[10px] text-muted-foreground">Al Burhan Tours & Travels</p>
+          <p className="text-[10px] text-muted-foreground">{notifications.length} notification{notifications.length !== 1 ? "s" : ""}</p>
         </div>
       </div>
     </div>
@@ -2631,6 +2700,8 @@ export default function CustomerDashboard() {
   const [notifications, setNotifications] = useState<CustomerNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const prevUnreadRef = React.useRef(0);
+  const [notifSearch, setNotifSearch] = useState("");
+  const [notifCategory, setNotifCategory] = useState("all");
   const [agreementsByBooking, setAgreementsByBooking] = useState<Record<string, any>>({});
 
   const [paymentHistory, setPaymentHistory] = useState<Record<string, any[]>>({});
@@ -2726,9 +2797,13 @@ export default function CustomerDashboard() {
     return () => clearInterval(iv);
   }, [reloadAgreements]);
 
-  const loadNotifications = useCallback(async () => {
+  const loadNotifications = useCallback(async (search?: string, category?: string) => {
     try {
-      const res = await fetch(`${BASE_API}/api/notifications/my`, { credentials: "include" });
+      const params = new URLSearchParams();
+      if (search) params.set("search", search);
+      if (category && category !== "all") params.set("category", category);
+      const qs = params.toString() ? `?${params.toString()}` : "";
+      const res = await fetch(`${BASE_API}/api/notifications/my${qs}`, { credentials: "include" });
       if (!res.ok) return;
       setNotifications(await res.json());
     } catch {}
@@ -2736,7 +2811,19 @@ export default function CustomerDashboard() {
 
   const handleOpenNotifications = () => {
     setShowNotifications(true);
+    setNotifSearch("");
+    setNotifCategory("all");
     loadNotifications();
+  };
+
+  const handleNotifSearch = (s: string) => {
+    setNotifSearch(s);
+    loadNotifications(s, notifCategory);
+  };
+
+  const handleNotifCategory = (c: string) => {
+    setNotifCategory(c);
+    loadNotifications(notifSearch, c);
   };
 
   const handleMarkRead = async (id: string) => {
@@ -2749,6 +2836,18 @@ export default function CustomerDashboard() {
   const handleMarkAllRead = async () => {
     await fetch(`${BASE_API}/api/notifications/my/read-all`, { method: "PATCH", credentials: "include" });
     setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+    setUnreadCount(0);
+    prevUnreadRef.current = 0;
+  };
+
+  const handleDeleteNotification = async (id: string) => {
+    await fetch(`${BASE_API}/api/notifications/my/${id}`, { method: "DELETE", credentials: "include" });
+    setNotifications(prev => prev.filter(n => n.id !== id));
+  };
+
+  const handleClearAllNotifications = async () => {
+    await fetch(`${BASE_API}/api/notifications/my`, { method: "DELETE", credentials: "include" });
+    setNotifications([]);
     setUnreadCount(0);
     prevUnreadRef.current = 0;
   };
@@ -2892,6 +2991,12 @@ export default function CustomerDashboard() {
           onClose={() => setShowNotifications(false)}
           onMarkRead={handleMarkRead}
           onMarkAllRead={handleMarkAllRead}
+          onDelete={handleDeleteNotification}
+          onClearAll={handleClearAllNotifications}
+          search={notifSearch}
+          setSearch={handleNotifSearch}
+          category={notifCategory}
+          setCategory={handleNotifCategory}
         />
       )}
 

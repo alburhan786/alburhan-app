@@ -3,7 +3,7 @@ import { Router } from "express";
 import { SendNotificationBody } from "@workspace/api-zod";
 import { requireAdmin, requireAuth, requireModuleAccess, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendWhatsApp, sendEmail } from "../lib/notifications.js";
-import { db, customerNotificationsTable } from "@workspace/db";
+import { db, pool, customerNotificationsTable } from "@workspace/db";
 import { eq, and, desc, count } from "drizzle-orm";
 
 const router = Router();
@@ -38,16 +38,27 @@ router.post("/send", requireModuleAccess("customers") as any, requireAdmin as an
 router.get("/my", requireAuth as any, async (req: AuthenticatedRequest, res) => {
   const userId = req.user?.id;
   if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
-  const notifications = await db
-    .select()
-    .from(customerNotificationsTable)
-    .where(eq(customerNotificationsTable.customerId, userId))
-    .orderBy(desc(customerNotificationsTable.createdAt))
-    .limit(50);
-  res.json(notifications.map(n => ({
-    ...n,
-    createdAt: n.createdAt?.toISOString?.(),
-  })));
+  const { search, category } = req.query as any;
+  try {
+    const params: unknown[] = [userId];
+    const conditions: string[] = ["customer_id = $1"];
+    let idx = 2;
+    if (search) { conditions.push(`(title ILIKE $${idx} OR message ILIKE $${idx})`); params.push(`%${search}%`); idx++; }
+    if (category && category !== "all") { conditions.push(`(type ILIKE $${idx} OR category = $${idx})`); params.push(category); idx++; }
+    const where = conditions.join(" AND ");
+    const result = await pool.query(
+      `SELECT id, customer_id AS "customerId", title, message, type, is_read AS "isRead", category, created_at AS "createdAt"
+       FROM customer_notifications WHERE ${where} ORDER BY created_at DESC LIMIT 100`,
+      params
+    );
+    res.json(result.rows.map((n: any) => ({ ...n, createdAt: n.createdAt instanceof Date ? n.createdAt.toISOString() : n.createdAt })));
+  } catch {
+    // Fallback to Drizzle if pool.query fails (e.g. category column not yet migrated)
+    const notifications = await db.select().from(customerNotificationsTable)
+      .where(eq(customerNotificationsTable.customerId, userId))
+      .orderBy(desc(customerNotificationsTable.createdAt)).limit(100);
+    res.json(notifications.map(n => ({ ...n, createdAt: n.createdAt?.toISOString?.() })));
+  }
 });
 
 router.get("/my/unread-count", requireAuth as any, async (req: AuthenticatedRequest, res) => {
@@ -83,6 +94,20 @@ router.patch("/my/:id/read", requireAuth as any, async (req: AuthenticatedReques
       eq(customerNotificationsTable.id, req.params.id),
       eq(customerNotificationsTable.customerId, userId)
     ));
+  res.json({ success: true });
+});
+
+router.delete("/my/:id", requireAuth as any, async (req: AuthenticatedRequest, res) => {
+  const userId = req.user?.id;
+  if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
+  await pool.query(`DELETE FROM customer_notifications WHERE id=$1 AND customer_id=$2`, [req.params.id, userId]);
+  res.json({ success: true });
+});
+
+router.delete("/my", requireAuth as any, async (req: AuthenticatedRequest, res) => {
+  const userId = req.user?.id;
+  if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
+  await pool.query(`DELETE FROM customer_notifications WHERE customer_id=$1`, [userId]);
   res.json({ success: true });
 });
 

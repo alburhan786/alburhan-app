@@ -1,0 +1,276 @@
+FINAL PRODUCTION PUSH NOTIFICATION & NOTIFICATION VALIDATION
+
+Do NOT mark this task complete until every item below has been verified using real production tests.
+
+==================================================
+1. WEB PUSH NOTIFICATIONS
+==================================================
+
+Verify Push Notifications work in production.
+
+Customer must receive Push Notifications for:
+
+• Booking Created
+• Booking Approved
+• Booking Rejected
+• Payment Received
+• Partial Payment
+• Full Payment
+• Payment Reminder
+• Invoice Generated
+• Receipt Generated
+• Agreement Generated
+• Visa Uploaded
+• Flight Ticket Uploaded
+• Hotel Voucher Uploaded
+• Room Allocation
+• Passport Expiry Reminder
+• Flight Change
+• Departure Reminder
+• Return Reminder
+• Admin Announcement
+
+==================================================
+2. PUSH SUBSCRIPTIONS
+==================================================
+
+Verify:
+
+✓ Browser subscription
+✓ Customer subscription
+✓ Multiple devices
+✓ Android
+✓ iPhone (PWA if supported)
+✓ Desktop Chrome
+✓ Safari
+✓ Edge
+
+Customer should never receive duplicate notifications.
+
+==================================================
+3. NOTIFICATION CENTER
+==================================================
+
+Customer Dashboard should have:
+
+Notification Bell
+
+Unread Count
+
+Read/Unread
+
+Notification History
+
+Delete Notification
+
+Mark All Read
+
+Search Notifications
+
+Filter by:
+
+Booking
+
+Payment
+
+Invoice
+
+Agreement
+
+Visa
+
+Flight
+
+Reminder
+
+==================================================
+4. TEST EVERY CHANNEL
+==================================================
+
+Whenever:
+
+Booking Created
+
+Booking Approved
+
+Payment Received
+
+Partial Payment
+
+Full Payment
+
+Verify customer receives ALL:
+
+✓ WhatsApp
+
+✓ SMS
+
+✓ Email
+
+✓ Push Notification
+
+==================================================
+5. VERIFY CONTENT
+==================================================
+
+Every notification must include:
+
+Customer Name
+
+Booking Number
+
+Invoice Number
+
+Receipt Number
+
+Agreement ID
+
+Package Name
+
+Amount Paid
+
+Balance
+
+Status
+
+Dashboard URL
+
+Support Number
+
+==================================================
+6. ATTACHMENTS
+==================================================
+
+Verify:
+
+Invoice PDF
+
+Receipt PDF
+
+Agreement PDF
+
+Booking Summary PDF
+
+are attached where supported.
+
+==================================================
+7. ADMIN PANEL
+==================================================
+
+Create Notification Monitor showing:
+
+Pending
+
+Delivered
+
+Failed
+
+Retry Queue
+
+Success Rate
+
+Average Delivery
+
+Provider Response
+
+==================================================
+8. RETRY ENGINE
+==================================================
+
+If any channel fails:
+
+Retry automatically
+
+Log failure
+
+Retry count
+
+Provider response
+
+Final status
+
+==================================================
+9. REAL TESTS
+==================================================
+
+Run LIVE production tests.
+
+Create a real booking.
+
+Make a ₹1 payment.
+
+Make a partial payment.
+
+Make a full payment.
+
+Verify:
+
+WhatsApp received
+
+SMS received
+
+Email received
+
+Push received
+
+Invoice updated
+
+Receipt updated
+
+Agreement updated
+
+Dashboard updated
+
+Admin updated
+
+==================================================
+10. FINAL REPORT
+==================================================
+
+Generate a Production Readiness Report with PASS / FAIL for:
+
+Database
+
+Razorpay
+
+WhatsApp
+
+BotBee
+
+Meta Cloud API
+
+SMS Gateway
+
+SMTP
+
+Push Notifications
+
+PDF Generator
+
+Object Storage
+
+Webhook Queue
+
+Notification Queue
+
+Background Jobs
+
+Cron Jobs
+
+Customer Dashboard
+
+Admin Dashboard
+
+Booking Workflow
+
+Payment Workflow
+
+Agreement Workflow
+
+Invoice Workflow
+
+Receipt Workflow
+
+Every item must show PASS only after a successful real production test.
+
+Do not mark the task complete until every notification channel is confirmed working with real customer bookings and payments.

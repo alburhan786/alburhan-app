@@ -1867,6 +1867,12 @@ async function runMigrations() {
     console.log("[Migration] customer_push_tokens table ensured");
   } catch (err) { console.error("[Migration] customer_push_tokens migration failed:", err); }
 
+  // ── customer_notifications: add category column for inbox filtering ──────
+  try {
+    await pool.query(`ALTER TABLE customer_notifications ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'general'`);
+    console.log("[Migration] customer_notifications.category column ensured");
+  } catch (err) { console.error("[Migration] customer_notifications.category migration failed:", err); }
+
   // ── customer_push_tokens: add web push subscription column ───────────────
   try {
     await pool.query(`ALTER TABLE customer_push_tokens ADD COLUMN IF NOT EXISTS subscription JSONB`);
@@ -1893,8 +1899,27 @@ async function runMigrations() {
     }
     console.log("[Migration] push channel enabled for key notification events");
   } catch (err: any) {
-    // Non-fatal — notification_settings may not have a unique constraint yet
     console.warn("[Migration] push notification_settings seeding (non-fatal):", err.message);
+  }
+
+  // ── notification_settings: enable push for ALL 19 spec events ────────────
+  try {
+    const allPushEvents = [
+      "booking_rejected", "receipt_generated", "hotel_assigned",
+      "room_allocation", "passport_expiry", "flight_changed",
+      "return_reminder", "custom_admin", "journey_status_changed",
+    ];
+    for (const evt of allPushEvents) {
+      await pool.query(
+        `INSERT INTO notification_settings (id, event_type, channel, enabled, created_at)
+         VALUES (gen_random_uuid()::text, $1, 'push', true, NOW())
+         ON CONFLICT (event_type, channel) DO NOTHING`,
+        [evt]
+      );
+    }
+    console.log("[Migration] push channel enabled for extended notification events");
+  } catch (err: any) {
+    console.warn("[Migration] extended push seeding (non-fatal):", err.message);
   }
 
   // ── Performance indexes (additive, safe — production stabilization pass) ────
@@ -2530,8 +2555,19 @@ async function start() {
             } else if (item.channel === "email") {
               const r = await sendEmail(item.recipient, "Update from Al Burhan Tours & Travels", item.message.replace(/\n/g, "<br>"));
               ok = r.ok; errorMessage = r.errorMessage;
-            } else {
-              errorMessage = "Push retry not supported (Firebase not configured)";
+            } else if (item.channel === "push") {
+              try {
+                const { sendPushToCustomer } = await import("./lib/webPush.js");
+                const pushResult = await sendPushToCustomer(item.customer_id, {
+                  title: "Al Burhan Tours & Travels",
+                  body: item.message?.substring(0, 200) || "Update from Al Burhan Tours & Travels",
+                  url: "https://alburhantravels.com/customer/dashboard",
+                });
+                ok = pushResult.ok;
+                errorMessage = pushResult.ok ? undefined : "Push delivery failed (no active subscriptions)";
+              } catch (pushErr: any) {
+                errorMessage = pushErr?.message || "Push retry error";
+              }
             }
           } catch (err: any) {
             errorMessage = err?.message || "Retry error";

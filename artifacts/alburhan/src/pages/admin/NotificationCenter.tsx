@@ -31,6 +31,7 @@ const CHANNEL_ICONS: Record<string, React.ReactNode> = {
   whatsapp: <MessageSquare size={13} className="text-emerald-600" />,
   email:    <Mail size={13} className="text-blue-600" />,
   sms:      <Smartphone size={13} className="text-purple-600" />,
+  push:     <Bell size={13} className="text-amber-600" />,
 };
 
 const STATUS_COLORS: Record<string, string> = {
