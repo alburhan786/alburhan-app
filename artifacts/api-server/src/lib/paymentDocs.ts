@@ -72,12 +72,12 @@ export async function generateInvoicePdfBuffer(opts: DocOpts): Promise<Buffer> {
   const paid    = Number(opts.paidAmount ?? 0);
   const balance = Number(opts.balanceAmount ?? Math.max(0, total - paid));
 
-  // ── Payment status badge ────────────────────────────────────────────────────
+  // ── Payment status badge — colors per spec: Pending=Orange, Partial=Blue, Paid=Green ──
   const isFullyPaid   = balance <= 0.01;
   const isPartialPaid = paid > 0 && !isFullyPaid;
   const statusLabel   = isFullyPaid ? "PAID IN FULL" : isPartialPaid ? "PARTIALLY PAID" : "PENDING PAYMENT";
-  const statusColor   = isFullyPaid ? "#065f46" : isPartialPaid ? "#92400e" : "#6b7280";
-  const statusBg      = isFullyPaid ? "#d1fae5" : isPartialPaid ? "#fef3c7" : "#f3f4f6";
+  const statusColor   = isFullyPaid ? "#1B5E20" : isPartialPaid ? "#1565C0" : "#E65100";
+  const statusBg      = isFullyPaid ? "#E8F5E9" : isPartialPaid ? "#E3F2FD" : "#FFF3E0";
   const badgeW = 140;
   const badgeH = 24;
   const badgeX = PAGE_W - MARGIN - badgeW;

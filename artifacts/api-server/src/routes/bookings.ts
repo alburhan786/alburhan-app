@@ -1092,8 +1092,9 @@ router.get("/by-invoice-number/:invoiceNumber/invoice-public", async (req, res) 
     return;
   }
   const b = bookings[0];
-  if (b.status !== "confirmed") {
-    res.status(400).json({ message: "Invoice only available for confirmed bookings" });
+  // Allow confirmed + partially_paid (payment has been received; invoice should be viewable)
+  if (!["confirmed", "partially_paid"].includes(b.status as string)) {
+    res.status(400).json({ message: "Invoice only available once a payment has been received" });
     return;
   }
   const { pkg, maktabNumber } = await resolveInvoiceData(b);
@@ -1107,8 +1108,8 @@ router.get("/:id/invoice", requireAuth as any, async (req: AuthenticatedRequest,
     return;
   }
   const b = bookings[0];
-  if (b.status !== "confirmed") {
-    res.status(400).json({ message: "Invoice only available for confirmed bookings" });
+  if (!["confirmed", "partially_paid"].includes(b.status as string)) {
+    res.status(400).json({ message: "Invoice only available once a payment has been received" });
     return;
   }
   const { pkg, maktabNumber } = await resolveInvoiceData(b);
@@ -1135,12 +1136,12 @@ function deriveHajYear(b: { preferredDepartureDate?: string | null; packageName?
   return String(new Date().getFullYear());
 }
 
-function derivePaymentStatus(b: typeof bookingsTable.$inferSelect): "Paid" | "Partial" | "Pending" {
-  const final = b.finalAmount ? Number(b.finalAmount) : 0;
-  const advance = b.advanceAmount ? Number(b.advanceAmount) : 0;
-  if (b.status === "confirmed" && b.razorpayPaymentId) return "Paid";
-  if (advance > 0 && advance >= final) return "Paid";
-  if (advance > 0) return "Partial";
+function derivePaymentStatus(b: typeof bookingsTable.$inferSelect): "Paid" | "Partial" | "Pending" | "Overdue" {
+  const final  = Number(b.finalAmount  || 0);
+  // Use the greater of paidAmount (all payments) and advanceAmount (initial deposit)
+  const paid   = Math.max(Number(b.paidAmount || 0), Number(b.advanceAmount || 0));
+  if (final > 0 && paid >= final - 0.01) return "Paid";
+  if (paid > 0)                          return "Partial";
   return "Pending";
 }
 
@@ -1149,6 +1150,12 @@ function buildInvoiceResponse(b: typeof bookingsTable.$inferSelect, pkg: { gstPe
   const dueDate = paymentDate
     ? new Date(new Date(paymentDate).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()
     : null;
+
+  // Single source of truth for paid/balance — always prefer paidAmount (all payments recorded),
+  // fall back to advanceAmount (initial deposit). Never use advanceAmount alone for balance.
+  const finalAmt   = Number(b.finalAmount  || 0);
+  const paidAmt    = Math.max(Number(b.paidAmount || 0), Number(b.advanceAmount || 0));
+  const balanceDue = Math.max(0, finalAmt - paidAmt);
 
   return {
     invoiceNumber: b.invoiceNumber,
@@ -1166,7 +1173,10 @@ function buildInvoiceResponse(b: typeof bookingsTable.$inferSelect, pkg: { gstPe
     pricePerPerson: b.totalAmount && b.numberOfPilgrims ? Number(b.totalAmount) / b.numberOfPilgrims : null,
     totalAmount: b.totalAmount ? Number(b.totalAmount) : null,
     gstAmount: b.gstAmount ? Number(b.gstAmount) : null,
-    finalAmount: b.finalAmount ? Number(b.finalAmount) : null,
+    finalAmount: finalAmt || null,
+    // paidAmount = real source of truth for balance/status computation on the frontend
+    paidAmount: paidAmt,
+    balanceDue,
     advanceAmount: b.advanceAmount ? Number(b.advanceAmount) : null,
     previousBalance: 0,
     paymentDate,
@@ -1175,12 +1185,12 @@ function buildInvoiceResponse(b: typeof bookingsTable.$inferSelect, pkg: { gstPe
     hajYear: deriveHajYear(b),
     chequeInfo: b.razorpayPaymentId
       ? `Razorpay ${b.razorpayPaymentId}`
-      : (b.advanceAmount && Number(b.advanceAmount) > 0 ? `Advance ${fmtDateShort(b.updatedAt)}` : ""),
+      : (paidAmt > 0 ? `Cash / Bank Transfer` : ""),
     roomType: b.roomType,
     status: b.status,
     travelDate: b.preferredDepartureDate || null,
     maktabNumber: maktabNumber || null,
-    paymentMethod: b.razorpayPaymentId ? "Razorpay" : (b.isOffline ? "Cash" : "Bank Transfer"),
+    paymentMethod: b.razorpayPaymentId ? "Online (Razorpay)" : (b.isOffline ? "Cash / Bank" : "Bank Transfer"),
     paymentStatus: derivePaymentStatus(b),
     pilgrims: b.pilgrims ?? [],
     sacCode: "998555",

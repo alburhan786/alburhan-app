@@ -1,0 +1,329 @@
+Excellent. The root causes are correct, but do NOT stop after fixing only these five issues.
+
+Convert the entire payment system into a production-grade enterprise workflow.
+
+==================================================
+PAYMENT SYNCHRONIZATION
+==================================================
+
+Every successful payment must instantly update ALL modules.
+
+Synchronize:
+
+• Booking
+• Invoice
+• Receipt
+• Customer Dashboard
+• Admin Dashboard
+• Finance Dashboard
+• Customer Ledger
+• Family Ledger
+• Reports
+• Analytics
+• Journey Status
+• Payment Timeline
+• Audit Logs
+
+Every module must show identical payment information.
+
+==================================================
+INVOICE PDF
+==================================================
+
+Remove every cached invoice PDF.
+
+Always generate a fresh Invoice PDF using the latest database values.
+
+Never return an old Google Cloud Storage URL.
+
+Every download must regenerate or validate the latest version.
+
+Invoice status rules:
+
+Paid Amount = 0
+Status = PENDING
+
+Paid Amount > 0 AND Balance > 0
+Status = PARTIALLY PAID
+
+Balance = 0
+Status = PAID
+
+Overdue + Balance > 0
+Status = OVERDUE
+
+==================================================
+RECEIPT PDF
+==================================================
+
+Receipt PDF must also regenerate automatically.
+
+Display:
+
+Receipt Number
+
+Invoice Number
+
+Booking Number
+
+Customer Name
+
+Package
+
+Paid Amount
+
+Balance
+
+Transaction ID
+
+Payment Date
+
+Payment Method
+
+Current Status
+
+==================================================
+PAYMENT WORKFLOW
+==================================================
+
+After successful Razorpay payment:
+
+1. Verify signature
+
+2. Store payment
+
+3. Update booking
+
+4. Update invoice
+
+5. Update receipt
+
+6. Update ledgers
+
+7. Update finance
+
+8. Update reports
+
+9. Update analytics
+
+10. Update customer dashboard
+
+11. Generate Invoice PDF
+
+12. Generate Receipt PDF
+
+13. Generate Agreement PDF
+
+14. Generate Booking Summary
+
+15. Send WhatsApp
+
+16. Send SMS
+
+17. Send Email
+
+18. Send Push Notification
+
+19. Log everything
+
+No manual refresh required.
+
+==================================================
+WHATSAPP
+==================================================
+
+Automatically send:
+
+Booking Confirmation
+
+Payment Confirmation
+
+Invoice PDF
+
+Receipt PDF
+
+Agreement PDF
+
+Customer Dashboard Link
+
+Booking Link
+
+Secure Download Links
+
+Retry failed messages automatically.
+
+==================================================
+SMS
+==================================================
+
+Send:
+
+Payment Received
+
+Amount Paid
+
+Remaining Balance
+
+Invoice Link
+
+Customer Dashboard Link
+
+==================================================
+EMAIL
+==================================================
+
+Professional HTML email with:
+
+Invoice PDF
+
+Receipt PDF
+
+Agreement PDF
+
+Booking Summary
+
+==================================================
+CUSTOMER DASHBOARD
+==================================================
+
+Update instantly without page refresh.
+
+Show:
+
+Payment Timeline
+
+Payment History
+
+Invoice
+
+Receipt
+
+Agreement
+
+Booking Status
+
+Current Balance
+
+==================================================
+ADMIN DASHBOARD
+==================================================
+
+Update live:
+
+Today's Collection
+
+Outstanding
+
+Revenue
+
+Cash Flow
+
+Pending
+
+Partially Paid
+
+Paid
+
+==================================================
+FINANCE
+==================================================
+
+Automatically create:
+
+Journal Entry
+
+Ledger Entry
+
+GST Entry
+
+Audit Entry
+
+Transaction Log
+
+==================================================
+REPORTS
+==================================================
+
+Include:
+
+Pending
+
+Partially Paid
+
+Paid
+
+Revenue
+
+Outstanding
+
+Collected Amount
+
+==================================================
+TESTING
+==================================================
+
+Test these scenarios.
+
+₹0 payment
+
+Invoice = PENDING
+
+₹1 payment
+
+Invoice = PARTIALLY PAID
+
+Receipt = PARTIALLY PAID
+
+Dashboard = PARTIALLY PAID
+
+50% payment
+
+Everything = PARTIALLY PAID
+
+100% payment
+
+Everything = PAID
+
+Verify:
+
+Dashboard
+
+Invoice PDF
+
+Receipt PDF
+
+Finance
+
+Reports
+
+Customer Portal
+
+Admin Portal
+
+WhatsApp
+
+SMS
+
+Email
+
+All must show identical values.
+
+==================================================
+PRODUCTION REQUIREMENTS
+==================================================
+
+No stale cache.
+
+No duplicate PDFs.
+
+No duplicate notifications.
+
+No inconsistent balances.
+
+Atomic database transactions.
+
+Idempotent webhooks.
+
+Complete audit trail.
+
+Do not finish until every module is synchronized and verified with end-to-end testing.

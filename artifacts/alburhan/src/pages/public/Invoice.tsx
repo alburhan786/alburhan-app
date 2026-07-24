@@ -68,13 +68,12 @@ function formatPackageType(type: string | null | undefined): string {
 }
 
 function StatusBadge({ status }: { status: string | undefined }) {
-  const s = (status || "Pending").toLowerCase();
-  let bg = "#FEF3CD";
-  let color = "#856404";
-  let label = "PENDING";
-  if (s === "paid") { bg = "#D4EDDA"; color = "#155724"; label = "PAID"; }
-  else if (s === "partial") { bg = "#FFF3CD"; color = "#856404"; label = "PARTIAL"; }
-  else { bg = "#F8D7DA"; color = "#721C24"; label = "PENDING"; }
+  const s = (status || "pending").toLowerCase().replace(/[\s_-]/g, "");
+  // Colors per spec: Pending=Orange, Partial=Blue, Paid=Green, Overdue=Red
+  let bg = "#FFF3E0"; let color = "#E65100"; let label = "PENDING PAYMENT";
+  if (s === "paid")                                     { bg = "#E8F5E9"; color = "#1B5E20"; label = "PAID IN FULL"; }
+  else if (s === "partial" || s === "partiallypaid")    { bg = "#E3F2FD"; color = "#1565C0"; label = "PARTIALLY PAID"; }
+  else if (s === "overdue")                             { bg = "#FFEBEE"; color = "#B71C1C"; label = "OVERDUE"; }
   return (
     <span style={{ backgroundColor: bg, color, padding: "2px 10px", borderRadius: "4px", fontSize: "10px", fontWeight: 700, letterSpacing: "0.5px" }}>
       {label}
@@ -115,7 +114,9 @@ function InvoiceContent({ invoice }: { invoice: InvoiceType }) {
   const tcsRate = (invoice as any).tcsRate ?? 2;
   const tcsAmount = (invoice as any).tcsAmount ?? 0;
   const advanceAmount = invoice.advanceAmount ?? 0;
-  const balance = finalAmount - advanceAmount;
+  // Use paidAmount (real source of truth from DB) — fallback to advanceAmount for old bookings
+  const paidAmount    = (invoice as any).paidAmount ?? advanceAmount;
+  const balance       = Math.max(0, finalAmount - paidAmount);
   const previousBalance = invoice.previousBalance ?? 0;
   const currentBalance = balance + previousBalance;
   const pilgrimCount = pilgrims.length > 0 ? pilgrims.length : 1;
@@ -341,7 +342,7 @@ function InvoiceContent({ invoice }: { invoice: InvoiceType }) {
                 </tr>
                 <tr>
                   <td className="py-1">Received Amount</td>
-                  <td className="py-1 text-right">{"\u20B9"} {formatINR(advanceAmount)}</td>
+                  <td className="py-1 text-right">{"\u20B9"} {formatINR(paidAmount)}</td>
                 </tr>
                 <tr>
                   <td className="py-1">Balance</td>

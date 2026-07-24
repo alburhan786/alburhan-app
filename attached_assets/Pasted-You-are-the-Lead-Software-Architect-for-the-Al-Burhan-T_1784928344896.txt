@@ -1,0 +1,295 @@
+You are the Lead Software Architect for the Al Burhan Tours & Travels ERP.
+
+A critical production bug exists.
+
+CURRENT ISSUE
+
+Customer successfully pays online.
+
+Customer Dashboard correctly shows:
+
+• Amount Paid
+• Remaining Balance
+• Payment History
+
+However the downloaded Invoice PDF still displays the wrong payment status.
+
+Sometimes it shows:
+
+PENDING
+
+instead of
+
+PARTIALLY PAID
+
+or
+
+PAID.
+
+This creates inconsistent documents.
+
+==================================================
+OBJECTIVE
+==================================================
+
+Create a single source of truth for invoice generation.
+
+The Invoice PDF must ALWAYS reflect the latest payment status stored in the database.
+
+==================================================
+FIX REQUIRED
+==================================================
+
+1.
+
+Audit every invoice generation endpoint.
+
+Find all places where invoice PDFs are generated.
+
+Ensure there is only ONE invoice generation service.
+
+Remove duplicate generators.
+
+--------------------------------------------------
+
+2.
+
+Invoice status must be calculated dynamically.
+
+Rules:
+
+Paid Amount = 0
+
+Status = PENDING
+
+Paid Amount > 0 AND Balance > 0
+
+Status = PARTIALLY PAID
+
+Balance = 0
+
+Status = PAID
+
+Overdue + Balance > 0
+
+Status = OVERDUE
+
+Never hardcode invoice status.
+
+--------------------------------------------------
+
+3.
+
+Whenever payment succeeds:
+
+Immediately regenerate
+
+Invoice PDF
+
+Receipt PDF
+
+Agreement PDF
+
+Booking Summary
+
+Store the latest version.
+
+Replace old PDF.
+
+Invalidate cache.
+
+--------------------------------------------------
+
+4.
+
+Customer Dashboard
+
+Download Invoice PDF
+
+must always generate or fetch the latest version.
+
+Never return cached outdated PDFs.
+
+--------------------------------------------------
+
+5.
+
+Receipt PDF
+
+must use identical payment calculations.
+
+Display
+
+Paid Amount
+
+Remaining Balance
+
+Transaction ID
+
+Payment Date
+
+Receipt Number
+
+Payment Method
+
+Status
+
+--------------------------------------------------
+
+6.
+
+Invoice PDF
+
+Display
+
+Invoice Number
+
+Booking Number
+
+Customer Name
+
+Package
+
+Package Amount
+
+GST
+
+Total Amount
+
+Received Amount
+
+Balance Amount
+
+Payment Timeline
+
+Correct Status Badge
+
+Status badge colors
+
+Pending = Orange
+
+Partially Paid = Blue
+
+Paid = Green
+
+Overdue = Red
+
+--------------------------------------------------
+
+7.
+
+Whenever payment is received
+
+Automatically
+
+Update Invoice
+
+Update Receipt
+
+Update Booking
+
+Update Ledger
+
+Update Dashboard
+
+Update Reports
+
+Update Customer Portal
+
+Everything must stay synchronized.
+
+--------------------------------------------------
+
+8.
+
+PDF Versioning
+
+Every regenerated PDF
+
+must replace the previous file.
+
+Never allow multiple outdated versions.
+
+--------------------------------------------------
+
+9.
+
+Caching
+
+Disable stale PDF caching.
+
+Customer should always download the newest PDF.
+
+--------------------------------------------------
+
+10.
+
+Testing
+
+Scenario 1
+
+₹0 Paid
+
+Invoice must display
+
+PENDING
+
+Scenario 2
+
+₹1 Paid
+
+Invoice must display
+
+PARTIALLY PAID
+
+Scenario 3
+
+50% Paid
+
+Invoice must display
+
+PARTIALLY PAID
+
+Scenario 4
+
+100% Paid
+
+Invoice must display
+
+PAID
+
+Verify:
+
+Dashboard
+
+Invoice PDF
+
+Receipt PDF
+
+Customer Portal
+
+Admin Portal
+
+Finance Module
+
+All show identical values.
+
+--------------------------------------------------
+
+11.
+
+Production Quality
+
+No duplicate invoice generators.
+
+No stale cache.
+
+No outdated PDFs.
+
+One source of truth.
+
+Atomic database transactions.
+
+Automatic PDF regeneration after every payment.
+
+Return a production-ready enterprise invoice system.
