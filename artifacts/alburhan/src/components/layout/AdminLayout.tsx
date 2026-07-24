@@ -236,10 +236,10 @@ export function AdminLayout({ children }: { children: ReactNode }) {
   );
 
   return (
-    <div className="min-h-screen bg-muted/30 flex">
+    <div className="h-screen bg-muted/30 flex overflow-hidden">
 
       {/* ── Desktop Sidebar (w-60) ──────────────────────────────────── */}
-      <aside className="w-60 bg-primary text-primary-foreground flex-col hidden md:flex sticky top-0 h-screen">
+      <aside className="w-60 bg-primary text-primary-foreground flex-col hidden md:flex shrink-0 h-full">
         <SidebarHeader />
         <div className="px-3 pt-2 pb-1 shrink-0">
           <div className="relative">
@@ -282,7 +282,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
       )}
 
       {/* ── Main Content ─────────────────────────────────────────────── */}
-      <main className="flex-1 flex flex-col min-w-0">
+      <main className="flex-1 flex flex-col min-w-0 overflow-y-auto overflow-x-hidden">
         <header className="h-13 bg-white border-b border-border flex items-center px-4 md:hidden sticky top-0 z-40 shadow-sm">
           <Button variant="ghost" size="icon" onClick={() => setMobileOpen(true)}>
             <Menu size={20} />
@@ -294,7 +294,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
             </Button>
           </div>
         </header>
-        <div className="p-4 md:p-8 flex-1 overflow-x-hidden">
+        <div className="p-4 md:p-8 flex-1">
           <BreadcrumbBar />
           {children}
         </div>
