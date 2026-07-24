@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useRef } from "react";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { useQueryClient } from "@tanstack/react-query";
 
 const DOC_TYPES = [
@@ -2624,6 +2625,8 @@ export default function CustomerDashboard() {
   const [payMode, setPayMode] = useState<"full" | "partial">("full");
   const [paymentSuccess, setPaymentSuccess] = useState<{ booking: any; isPartial: boolean; paidAmount: number } | null>(null);
 
+  const { permission: pushPermission, isSubscribed: pushSubscribed, subscribe: enablePush, isLoading: pushLoading } = usePushNotifications();
+
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<CustomerNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -2845,6 +2848,30 @@ export default function CustomerDashboard() {
           bookingNumber={(uploadBooking as any).bookingNumber}
           onClose={() => setUploadBookingId(null)}
         />
+      )}
+
+      {/* ── Push Notification Prompt ──────────────────────────────────────── */}
+      {pushPermission === "default" && !pushSubscribed && (
+        <div className="mx-3 mb-2 mt-2 rounded-2xl border border-amber-200 bg-amber-50 p-3 flex items-center gap-3 shadow-sm">
+          <BellRing className="w-5 h-5 text-amber-600 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-amber-900">Enable Push Notifications</p>
+            <p className="text-xs text-amber-700 mt-0.5">Get instant alerts for payments, bookings &amp; documents.</p>
+          </div>
+          <button
+            onClick={enablePush}
+            disabled={pushLoading}
+            className="text-xs bg-amber-600 text-white px-3 py-1.5 rounded-lg hover:bg-amber-700 disabled:opacity-60 shrink-0"
+          >
+            {pushLoading ? "Enabling…" : "Enable"}
+          </button>
+        </div>
+      )}
+      {pushPermission === "granted" && pushSubscribed && (
+        <div className="mx-3 mb-2 mt-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-2.5 flex items-center gap-2.5">
+          <CheckCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+          <p className="text-xs text-emerald-800 font-medium">Push notifications active — you'll receive instant alerts.</p>
+        </div>
       )}
 
       {isInitializing && (

@@ -1,0 +1,57 @@
+{
+  "timestamp": "2026-07-24T22:22:06.208Z",
+  "outcome": "FAILED_API_DEPLOY",
+  "productionUrl": "https://alburhantravels.com",
+  "elapsedSeconds": 76.3,
+  "skipTest": true,
+  "steps": [
+    {
+      "step": 1,
+      "label": "PRE-DEPLOY Regression Test",
+      "status": "passed",
+      "startedAt": "2026-07-24T22:20:49.865Z"
+    },
+    {
+      "step": 2,
+      "label": "Navigation Structure Check (check-nav.mjs)",
+      "status": "passed",
+      "startedAt": "2026-07-24T22:20:49.866Z"
+    },
+    {
+      "step": 3,
+      "label": "Master Registry Integrity Check (check-registry.mjs)",
+      "status": "passed",
+      "startedAt": "2026-07-24T22:20:50.079Z"
+    },
+    {
+      "step": 4,
+      "label": "Build Frontend",
+      "status": "passed",
+      "startedAt": "2026-07-24T22:20:50.264Z"
+    },
+    {
+      "step": 5,
+      "label": "Build API Server",
+      "status": "passed",
+      "startedAt": "2026-07-24T22:21:01.460Z"
+    },
+    {
+      "step": 6,
+      "label": "Deploy API Server to VPS",
+      "status": "failed",
+      "startedAt": "2026-07-24T22:21:06.197Z"
+    }
+  ],
+  "registry": {
+    "version": 3,
+    "updatedAt": "2026-07-23",
+    "dashboards": 13,
+    "sidebarItems": 124,
+    "portalRoutes": 4,
+    "apiEndpoints": 31,
+    "roleRedirects": 12,
+    "notificationModules": 9,
+    "permissionModules": 15,
+    "widgetDashboards": 13
+  }
+}

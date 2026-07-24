@@ -1,4 +1,4 @@
-// Al Burhan Tours & Travels — Service Worker v3.0
+// Al Burhan Tours & Travels — Service Worker v4.0 (with Web Push)
 const CACHE = "alburhan-v3";
 const STATIC = ["/manifest.json"];
 
@@ -87,5 +87,35 @@ self.addEventListener("fetch", e => {
         return resp;
       })
       .catch(() => caches.match(e.request))
+  );
+});
+
+// ── Web Push Notifications ─────────────────────────────────────────────────
+self.addEventListener("push", event => {
+  let data = { title: "Al Burhan Tours & Travels", body: "You have a new notification.", url: "/customer/dashboard" };
+  try { if (event.data) data = { ...data, ...event.data.json() }; } catch { /* ignore parse error */ }
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: data.icon || "/imagesopengraph.jpg",
+      badge: "/favicon.ico",
+      tag: data.tag || "alburhan",
+      renotify: true,
+      requireInteraction: false,
+      data: { url: data.url || "/customer/dashboard" },
+    })
+  );
+});
+
+self.addEventListener("notificationclick", event => {
+  event.notification.close();
+  const url = event.notification.data?.url || "/customer/dashboard";
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then(clientList => {
+      for (const client of clientList) {
+        if ("focus" in client) { client.focus(); return; }
+      }
+      return clients.openWindow(url);
+    })
   );
 });

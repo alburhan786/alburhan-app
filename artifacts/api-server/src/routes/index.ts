@@ -61,6 +61,7 @@ import enterpriseRouter from "./enterprise.js";
 import portalRouter from "./portal.js";
 import smsSettingsRouter from "./sms-settings.js";
 import socialMediaRouter from "./social-media.js";
+import pushRouter from "./push.js";
 import { requireAdmin } from "../lib/auth.js";
 
 const router: IRouter = Router();
@@ -72,7 +73,7 @@ router.get("/", (_req, res) => {
 });
 
 // ── Build fingerprint — confirms which bundle is running on VPS (no auth needed) ──
-const BUILD_STAMP = "2026-07-23-v26.1-omni-social-marketing-fixed";
+const BUILD_STAMP = "2026-07-24-v27.0-web-push-notifications";
 router.get("/version", (_req, res) => {
   res.json({
     build: BUILD_STAMP,
@@ -345,6 +346,7 @@ router.use("/marketing", enterpriseRouter);
 router.use("/portal", portalRouter);
 router.use("/sms-settings", smsSettingsRouter);
 router.use("/social-media", socialMediaRouter);
+router.use("/push", pushRouter);
 import inboxRouter from "./inbox.js";
 router.use("/inbox", inboxRouter);
 import customer360Router from "./customer360.js";

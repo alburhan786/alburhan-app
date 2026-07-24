@@ -1867,6 +1867,36 @@ async function runMigrations() {
     console.log("[Migration] customer_push_tokens table ensured");
   } catch (err) { console.error("[Migration] customer_push_tokens migration failed:", err); }
 
+  // ── customer_push_tokens: add web push subscription column ───────────────
+  try {
+    await pool.query(`ALTER TABLE customer_push_tokens ADD COLUMN IF NOT EXISTS subscription JSONB`);
+    console.log("[Migration] customer_push_tokens.subscription column ensured");
+  } catch (err) { console.error("[Migration] push subscription column failed:", err); }
+
+  // ── VAPID keys: ensure api_settings row exists (webPush.ts generates on first use) ───
+  // No seeding needed — webPush.ts generates + persists VAPID keys on first call.
+
+  // ── notification_settings: enable push channel for key events ─────────────
+  try {
+    const pushEvents = [
+      "new_booking", "booking_approved", "payment_received", "partial_payment",
+      "agreement_ready", "invoice_ready", "visa_issued", "ticket_issued",
+      "departure_reminder", "balance_reminder",
+    ];
+    for (const evt of pushEvents) {
+      await pool.query(
+        `INSERT INTO notification_settings (id, event_type, channel, enabled, created_at)
+         VALUES (gen_random_uuid()::text, $1, 'push', true, NOW())
+         ON CONFLICT (event_type, channel) DO NOTHING`,
+        [evt]
+      );
+    }
+    console.log("[Migration] push channel enabled for key notification events");
+  } catch (err: any) {
+    // Non-fatal — notification_settings may not have a unique constraint yet
+    console.warn("[Migration] push notification_settings seeding (non-fatal):", err.message);
+  }
+
   // ── Performance indexes (additive, safe — production stabilization pass) ────
   try {
     await pool.query(`CREATE INDEX IF NOT EXISTS bookings_customer_id_idx ON bookings(customer_id)`);

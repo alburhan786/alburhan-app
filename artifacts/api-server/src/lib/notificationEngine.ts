@@ -463,7 +463,14 @@ async function sendOnChannel(channel: Channel, ctx: NotificationContext, message
       const result = await sendEmail(ctx.customerEmail, subject, message.replace(/\n/g, "<br>"));
       return { status: result.ok ? "sent" : "failed", providerResponse: result };
     } else if (channel === "push") {
-      return { status: "failed", providerResponse: { ok: false, provider: "Firebase", endpoint: "https://fcm.googleapis.com/fcm/send", errorMessage: "Push not configured — Firebase credentials required" } };
+      if (!ctx.customerId) return { status: "failed", providerResponse: { ok: false, provider: "WebPush", endpoint: "web-push", errorMessage: "No customer ID for push" } };
+      try {
+        const { sendPushToCustomer } = await import("./webPush.js");
+        const pushResult = await sendPushToCustomer(ctx.customerId, { title: "Al Burhan Tours & Travels", body: message.substring(0, 200), url: "https://alburhantravels.com/customer/dashboard" });
+        return { status: pushResult.ok ? "sent" : "failed", providerResponse: { ok: pushResult.ok, provider: "WebPush", endpoint: "web-push", sent: pushResult.sent, total: pushResult.total } };
+      } catch (pushErr: any) {
+        return { status: "failed", providerResponse: { ok: false, provider: "WebPush", endpoint: "web-push", errorMessage: pushErr.message } };
+      }
     }
     return { status: "failed", providerResponse: { ok: false, provider: "unknown", endpoint: "", errorMessage: "Unknown channel" } };
   } catch (err: unknown) {
@@ -930,7 +937,15 @@ async function sendOnChannelWithType(channel: Channel, eventType: EventType, ctx
       const result = await sendEmail(ctx.customerEmail, buildEmailSubject(eventType, ctx), message.replace(/\n/g, "<br>"), undefined, attachments);
       return { status: result.ok ? "sent" : "failed", providerResponse: result };
     } else if (channel === "push") {
-      return { status: "failed", providerResponse: { ok: false, provider: "Firebase", endpoint: "https://fcm.googleapis.com/fcm/send", errorMessage: "Push not configured" } };
+      if (!ctx.customerId) return { status: "failed", providerResponse: { ok: false, provider: "WebPush", endpoint: "web-push", errorMessage: "No customer ID for push" } };
+      try {
+        const { sendPushToCustomer } = await import("./webPush.js");
+        const pushTitle = buildEmailSubject(eventType, ctx) || "Al Burhan Tours & Travels";
+        const pushResult = await sendPushToCustomer(ctx.customerId, { title: pushTitle, body: message.substring(0, 200), url: "https://alburhantravels.com/customer/dashboard" });
+        return { status: pushResult.ok ? "sent" : "failed", providerResponse: { ok: pushResult.ok, provider: "WebPush", endpoint: "web-push", sent: pushResult.sent, total: pushResult.total } };
+      } catch (pushErr: any) {
+        return { status: "failed", providerResponse: { ok: false, provider: "WebPush", endpoint: "web-push", errorMessage: pushErr.message } };
+      }
     }
     return { status: "failed", providerResponse: { ok: false, provider: "unknown", endpoint: "", errorMessage: "Unknown channel" } };
   } catch (err: unknown) {

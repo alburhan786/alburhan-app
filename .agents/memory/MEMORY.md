@@ -31,6 +31,7 @@
 - [VPS self-update uses process.exit(0)](vps-self-update-exit.md) — spawn("pm2",...) silently fails (not in PATH); process.exit(0) lets PM2 detect crash and restart with new bundle file on disk
 - [BotBee ABT production templates](botbee-abt-templates.md) — 15 templates (409950–410040) confirmed; 3 absent are graceful no-ops; all var counts verified from template list API 2026-07-18.
 - [BotBee named variables format](botbee-named-variables.md) — MUST send variables as named object {Name:"val", BookingID:"val2",...} matching exact keys from template variable_map. Flat array AND components both silently accepted (200+wamid) but NOT substituted. Each template has unique keys from variable_map field in template list API.
+- [Web Push Notifications](web-push-implementation.md) — VAPID via web-push package; VAPID keys in api_settings; customer_push_tokens.subscription JSONB; push route at /api/push; sw.js v4.0 handles push events; usePushNotifications hook in customer dashboard
 - [agreementPdf drawPage2 cellH scope bug](agreement-pdf-scope.md) — cellH/g are defined in drawPage1 scope; drawPage2 must declare its own const cellH=23; const g=2 or ReferenceError at runtime.
 - [Payment notification gate fix](payment-notification-gate.md) — never gate processPaymentSuccessNotifications on newStatus; BotBee upload field is "media_file" not "file"; use native FormData
 - [ts-nocheck route strategy](ts-nocheck-routes.md) — 25+ API route files use // @ts-nocheck due to pervasive Drizzle schema type mismatches; do not remove without rebuilding lib/db types

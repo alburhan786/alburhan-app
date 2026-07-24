@@ -1,0 +1,366 @@
+FINAL PRODUCTION READINESS TASK
+DO NOT MARK THIS PROJECT COMPLETE UNTIL EVERY ITEM BELOW HAS BEEN VERIFIED WITH REAL TESTS.
+
+The application must be production-ready for Al Burhan Tours & Travels ERP/CRM.
+
+=====================================================
+1. BOOKING NOTIFICATIONS
+=====================================================
+
+Whenever a customer successfully creates a booking:
+
+Automatically send:
+
+• WhatsApp
+• SMS
+• Email
+• Push Notification
+
+Include:
+
+• Customer Name
+• Booking Number
+• Agreement ID
+• Package Name
+• Departure Date
+• Total Package Amount
+• Amount Paid
+• Balance Amount
+• Booking Status
+• Customer Dashboard URL
+• Booking Tracking URL
+• Support Number
+
+Attach:
+
+• Agreement PDF
+• Booking Summary PDF
+• Invoice PDF (if available)
+
+=====================================================
+2. PAYMENT SUCCESS NOTIFICATIONS
+=====================================================
+
+Whenever ANY payment succeeds:
+
+Partial Payment
+
+Full Payment
+
+Razorpay
+
+UPI
+
+Cash
+
+Cheque
+
+Bank Transfer
+
+Immediately send:
+
+WhatsApp
+
+SMS
+
+Email
+
+Push Notification
+
+Include:
+
+• Payment Received
+• Amount
+• Receipt Number
+• Invoice Number
+• Booking Number
+• Transaction ID
+• Payment Method
+• Paid Amount
+• Remaining Balance
+• Updated Status
+• Customer Dashboard URL
+
+Attach:
+
+• Receipt PDF
+• Updated Invoice PDF
+• Updated Agreement PDF (when applicable)
+
+=====================================================
+3. VERIFY NOTIFICATION PIPELINE
+=====================================================
+
+Check every step:
+
+Booking Event
+
+Payment Event
+
+Webhook
+
+Notification Queue
+
+WhatsApp API
+
+BotBee
+
+Meta Cloud API
+
+SMS Gateway
+
+SMTP
+
+Push Notifications
+
+Retry Queue
+
+Delivery Queue
+
+Failed Queue
+
+Dead Letter Queue
+
+Nothing should silently fail.
+
+=====================================================
+4. AUTOMATIC RETRIES
+=====================================================
+
+If WhatsApp fails:
+
+Retry automatically.
+
+If SMS fails:
+
+Retry automatically.
+
+If Email fails:
+
+Retry automatically.
+
+If Push fails:
+
+Retry automatically.
+
+Log every retry.
+
+=====================================================
+5. DELIVERY LOGS
+=====================================================
+
+Create a Notification Log showing:
+
+Booking Number
+
+Customer
+
+WhatsApp Status
+
+SMS Status
+
+Email Status
+
+Push Status
+
+Attempt Count
+
+Retry Count
+
+Failure Reason
+
+Delivered Time
+
+Message ID
+
+Provider Response
+
+=====================================================
+6. ADMIN DASHBOARD
+=====================================================
+
+Create a Notification Health Dashboard displaying:
+
+WhatsApp Status
+
+SMS Status
+
+Email Status
+
+Push Status
+
+Pending Queue
+
+Failed Queue
+
+Retry Queue
+
+Today's Notifications
+
+Delivered
+
+Failed
+
+Success Rate
+
+Average Delivery Time
+
+=====================================================
+7. PRODUCTION HEALTH REPORT
+=====================================================
+
+Replace placeholder or hardcoded statuses with real health checks for:
+
+Database
+
+Redis (if used)
+
+Razorpay API
+
+Meta API
+
+BotBee API
+
+SMS Gateway
+
+SMTP
+
+Object Storage
+
+PDF Generator
+
+Webhook Queue
+
+Notification Queue
+
+Background Jobs
+
+Cron Jobs
+
+Disk Space
+
+Memory
+
+CPU
+
+SSL Certificate
+
+Domain
+
+Every module should report PASS / WARN / FAIL based on live checks.
+
+=====================================================
+8. PDF VERIFICATION
+=====================================================
+
+Verify:
+
+Agreement PDF
+
+Invoice PDF
+
+Receipt PDF
+
+Booking Summary PDF
+
+Payment Receipt PDF
+
+Always generate fresh PDFs using live database data.
+
+Never return cached or stale PDFs.
+
+=====================================================
+9. CUSTOMER DASHBOARD
+=====================================================
+
+Verify customer always sees:
+
+Booking Status
+
+Payment Status
+
+Invoice Status
+
+Agreement Status
+
+Receipt Status
+
+Outstanding Balance
+
+Payment History
+
+Correct PDF downloads
+
+Live status after every payment.
+
+=====================================================
+10. LIVE TESTS
+=====================================================
+
+Run REAL production tests:
+
+✓ New Booking
+
+✓ Offline Booking
+
+✓ Online Booking
+
+✓ Razorpay Payment
+
+✓ Partial Payment
+
+✓ Full Payment
+
+✓ UPI
+
+✓ Bank Transfer
+
+✓ Cash
+
+✓ Cheque
+
+Verify every test receives:
+
+WhatsApp
+
+SMS
+
+Email
+
+Push Notification
+
+Invoice
+
+Receipt
+
+Agreement
+
+Dashboard Update
+
+Admin Update
+
+=====================================================
+11. FAILURE REPORT
+=====================================================
+
+If any notification fails, show:
+
+Exact module
+
+Exact error
+
+API response
+
+Provider response
+
+Stack trace
+
+Suggested fix
+
+Never silently ignore failures.
+
+=====================================================
+12. COMPLETION CRITERIA
+=====================================================
+
+DO NOT mark this task complete until every notification channel has been tested with real transactions and all confirmations (Booking and Payment) are delivered successfully through WhatsApp, SMS, Email, and Push Notifications, with PDFs and live dashboard updates working correctly.
