@@ -155,6 +155,7 @@ export function buildNavSections(openComplaints = 0): NavSection[] {
       items: [
         { icon: Inbox,         label: "Omnichannel Inbox",              href: "/admin/inbox",                   require: ["customers", "edit"], aliases: ["omni", "inbox", "multichannel", "omnichannel", "unified inbox", "all channels", "whatsapp", "social"] },
         { icon: Share2,        label: "Social Media Integration",       href: "/admin/social-media",            require: ["settings",  "view"], aliases: ["social", "facebook", "fb", "instagram", "ig", "telegram", "tg", "messenger", "channels", "social media"] },
+        { icon: Activity,      label: "Meta Connection Health",          href: "/admin/meta-health",             require: ["settings",  "view"], aliases: ["meta", "meta health", "facebook health", "instagram health", "whatsapp meta", "meta audit", "token", "oauth"] },
         { icon: BellRing,      label: "Communication Center",           href: "/admin/communication-center",    require: ["customers", "edit"], aliases: ["communication", "comm center", "notify", "alerts"] },
         { icon: Zap,           label: "Workflow Center",                href: "/admin/workflow-center",         require: ["bookings",  "edit"], aliases: ["workflow", "pipeline", "automation", "triggers"] },
         { icon: Bot,           label: "WhatsApp Dashboard",             href: "/admin/botbee-dashboard",        require: ["settings",  "view"], aliases: ["whatsapp", "wa", "waba", "botbee", "chat", "messages", "wapp"] },

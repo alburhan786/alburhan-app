@@ -430,6 +430,33 @@ router.put("/platforms/:platform", requireAdmin as any, async (req, res) => {
         if (val && !val.startsWith("••")) newExtra[k] = val;
       }
     }
+    // ── Token validation for Meta platforms ────────────────────────────────
+    const META_PLATFORMS = ["facebook_page","facebook_messenger","facebook_leads","instagram","instagram_dm","whatsapp_meta"];
+    if (META_PLATFORMS.includes(platform)) {
+      const newFbToken = extra_fields?.page_access_token && !String(extra_fields.page_access_token).startsWith("••") ? String(extra_fields.page_access_token) : null;
+      const newWaToken = extra_fields?.access_token && !String(extra_fields.access_token).startsWith("••") ? String(extra_fields.access_token) : null;
+      const tokenToValidate = newFbToken || newWaToken;
+      if (tokenToValidate) {
+        try {
+          const GRAPH = "https://graph.facebook.com/v19.0";
+          const checkUrl = platform === "whatsapp_meta" && newExtra.phone_number_id
+            ? `${GRAPH}/${newExtra.phone_number_id}?fields=id,display_phone_number&access_token=${tokenToValidate}`
+            : `${GRAPH}/me?fields=id,name&access_token=${tokenToValidate}`;
+          await axios.get(checkUrl, { timeout: 8000 });
+        } catch (vErr: any) {
+          const apiErr = vErr?.response?.data?.error;
+          if (apiErr?.code === 190 || apiErr?.code === 102 || apiErr?.type === "OAuthException") {
+            return void res.status(422).json({
+              message: `❌ Token validation failed: ${apiErr.message}`,
+              error_code: apiErr.code,
+              hint: "Generate a new long-lived Page Access Token from Meta Business Suite → Settings → Advanced → Page Access Token.",
+            });
+          }
+          // Network errors or unknown — allow save with a warning
+        }
+      }
+    }
+
     const encExtra = encrypt(JSON.stringify(newExtra));
     const apiKey = newExtra.bot_token || newExtra.access_token || newExtra.page_access_token || newExtra.api_key;
     const encKey = apiKey ? encrypt(apiKey) : existingRow?.api_key_encrypted ?? null;
@@ -732,6 +759,357 @@ router.post("/telegram/set-webhook", requireAdmin as any, async (req, res) => {
       res.json({ ok: false, message: "Telegram webhook failed", detail: resp.data });
     }
   } catch (e: any) { res.status(500).json({ ok: false, message: e?.response?.data?.description || e?.message }); }
+});
+
+// ── GET /api/social-media/meta/health ────────────────────────────────────────
+// Full Meta integration audit: calls every Graph API endpoint and returns
+// per-component status, token debug info, and actionable error messages.
+router.get("/meta/health", requireAdmin as any, async (_req, res) => {
+  const GRAPH = "https://graph.facebook.com/v19.0";
+  const timeout = { signal: AbortSignal.timeout(8000) };
+
+  // ── Load all Meta platform configs ────────────────────────────────────────
+  const cfgRows = await pool.query(
+    `SELECT platform, extra_fields_encrypted, api_key_encrypted, webhook_verified, last_tested, updated_at
+     FROM social_platform_configs
+     WHERE platform IN ('facebook_page','facebook_messenger','facebook_leads','instagram','instagram_dm','whatsapp_meta')`
+  );
+  const cfgMap: Record<string, any> = {};
+  for (const row of cfgRows.rows) {
+    const extra = decryptExtra(row.extra_fields_encrypted);
+    const apiKey = row.api_key_encrypted ? decrypt(row.api_key_encrypted) : null;
+    cfgMap[row.platform] = {
+      ...extra,
+      _apiKey: apiKey,
+      webhook_verified: row.webhook_verified,
+      last_tested: row.last_tested,
+      updated_at: row.updated_at,
+    };
+  }
+
+  // Helper: get the best page access token across all Facebook platforms
+  const fbToken = cfgMap["facebook_page"]?.page_access_token
+    || cfgMap["facebook_messenger"]?.page_access_token
+    || cfgMap["facebook_leads"]?.page_access_token
+    || cfgMap["instagram"]?.page_access_token
+    || cfgMap["instagram_dm"]?.page_access_token;
+  const fbPageId = cfgMap["facebook_page"]?.page_id
+    || cfgMap["facebook_messenger"]?.page_id
+    || cfgMap["facebook_leads"]?.page_id;
+  const fbAppId = cfgMap["facebook_page"]?.app_id || cfgMap["facebook_messenger"]?.app_id;
+  const fbAppSecret = cfgMap["facebook_page"]?.app_secret || cfgMap["facebook_messenger"]?.app_secret;
+  const igId = cfgMap["instagram"]?.instagram_account_id
+    || cfgMap["instagram_dm"]?.instagram_account_id;
+  const waToken = cfgMap["whatsapp_meta"]?.access_token || cfgMap["whatsapp_meta"]?._apiKey;
+  const waPhoneId = cfgMap["whatsapp_meta"]?.phone_number_id;
+  const waWabaId = cfgMap["whatsapp_meta"]?.waba_id;
+  const webhookVerifyToken = cfgMap["facebook_page"]?.webhook_verify_token
+    || cfgMap["whatsapp_meta"]?.webhook_verify_token;
+
+  // App access token (no API call needed — just app_id|app_secret)
+  const appAccessToken = fbAppId && fbAppSecret ? `${fbAppId}|${fbAppSecret}` : null;
+
+  // ── Results structure ─────────────────────────────────────────────────────
+  const result: Record<string, any> = {
+    checkedAt: new Date().toISOString(),
+    app: { ok: false, app_id: fbAppId || null, app_name: null, error: null, configured: false },
+    facebook: { ok: false, configured: false, error: null },
+    instagram: { ok: false, configured: false, error: null },
+    whatsapp: { ok: false, configured: false, error: null },
+    messenger: { ok: false, configured: false, error: null },
+    webhooks: { configured: false, verify_token_set: false, webhook_verified: false, last_received: null, subscribed_fields: [] },
+    token_debug: {},
+    summary: { working: [] as string[], errors: [] as string[], warnings: [] as string[] },
+  };
+
+  // ── 1. App Status ─────────────────────────────────────────────────────────
+  if (fbAppId && fbAppSecret) {
+    result.app.configured = true;
+    try {
+      const r = await fetch(`${GRAPH}/${fbAppId}?fields=name,category&access_token=${appAccessToken}`, timeout);
+      const d: any = await r.json();
+      if (d.error) {
+        result.app.error = d.error.message;
+        result.summary.errors.push(`App: ${d.error.message}`);
+      } else {
+        result.app.ok = true;
+        result.app.app_name = d.name;
+        result.app.category = d.category;
+        result.summary.working.push(`Meta App "${d.name}" (${fbAppId})`);
+      }
+    } catch (e: any) { result.app.error = e.message; result.summary.errors.push(`App check failed: ${e.message}`); }
+  } else {
+    result.app.error = "App ID or App Secret not configured";
+    result.summary.warnings.push("App credentials missing — token debug unavailable");
+  }
+
+  // ── 2. Facebook Page ──────────────────────────────────────────────────────
+  if (fbToken) {
+    result.facebook.configured = true;
+    try {
+      const r = await fetch(
+        `${GRAPH}/me?fields=id,name,fan_count,followers_count,category,verification_status&access_token=${fbToken}`,
+        timeout
+      );
+      const d: any = await r.json();
+      if (d.error) {
+        result.facebook.error = d.error.message;
+        result.facebook.error_code = d.error.code;
+        result.summary.errors.push(`Facebook Page: ${d.error.message}`);
+      } else {
+        result.facebook.ok = true;
+        result.facebook.page_id = d.id;
+        result.facebook.page_name = d.name;
+        result.facebook.fan_count = d.fan_count ?? 0;
+        result.facebook.followers_count = d.followers_count ?? 0;
+        result.facebook.category = d.category;
+        result.facebook.verified = d.verification_status === "blue_verified";
+        result.summary.working.push(`Facebook Page "${d.name}" (${d.id})`);
+      }
+    } catch (e: any) { result.facebook.error = e.message; result.summary.errors.push(`Facebook check failed: ${e.message}`); }
+
+    // Check Messenger subscriptions
+    try {
+      const r = await fetch(`${GRAPH}/me/subscribed_apps?access_token=${fbToken}`, timeout);
+      const d: any = await r.json();
+      if (!d.error && d.data) {
+        const fields = d.data?.[0]?.subscribed_fields || [];
+        result.messenger.ok = true;
+        result.messenger.configured = true;
+        result.messenger.subscribed_fields = fields;
+        result.webhooks.subscribed_fields = fields;
+        const required = ["messages","messaging_postbacks","message_deliveries","message_reads","leadgen"];
+        const missing = required.filter((f: string) => !fields.includes(f));
+        if (missing.length > 0) {
+          result.summary.warnings.push(`Webhook fields not subscribed: ${missing.join(", ")}`);
+        } else {
+          result.summary.working.push("All required webhook fields subscribed");
+        }
+      }
+    } catch { /* best-effort */ }
+  } else {
+    result.facebook.error = "Page Access Token not configured";
+    result.summary.warnings.push("Facebook Page Access Token missing");
+  }
+
+  // ── 3. Instagram Business Account ────────────────────────────────────────
+  if (fbToken && igId) {
+    result.instagram.configured = true;
+    try {
+      const r = await fetch(
+        `${GRAPH}/${igId}?fields=id,name,username,followers_count,media_count,biography&access_token=${fbToken}`,
+        timeout
+      );
+      const d: any = await r.json();
+      if (d.error) {
+        result.instagram.error = d.error.message;
+        result.instagram.error_code = d.error.code;
+        result.summary.errors.push(`Instagram (${igId}): ${d.error.message}`);
+        // Try to find the correct IG ID from the page
+        if (fbToken && fbPageId) {
+          try {
+            const pr = await fetch(
+              `${GRAPH}/${fbPageId || "me"}?fields=instagram_business_account&access_token=${fbToken}`,
+              timeout
+            );
+            const pd: any = await pr.json();
+            if (pd.instagram_business_account?.id) {
+              result.instagram.suggested_id = pd.instagram_business_account.id;
+              result.summary.warnings.push(`Correct Instagram Account ID may be: ${pd.instagram_business_account.id}`);
+            }
+          } catch { /* best-effort */ }
+        }
+      } else {
+        result.instagram.ok = true;
+        result.instagram.ig_id = d.id;
+        result.instagram.username = d.username;
+        result.instagram.name = d.name;
+        result.instagram.followers_count = d.followers_count ?? 0;
+        result.instagram.media_count = d.media_count ?? 0;
+        result.instagram.biography = d.biography;
+        result.summary.working.push(`Instagram @${d.username} (${d.id})`);
+      }
+    } catch (e: any) { result.instagram.error = e.message; result.summary.errors.push(`Instagram check failed: ${e.message}`); }
+  } else if (fbToken && !igId) {
+    // Try to discover IG account from FB page
+    result.instagram.configured = false;
+    result.instagram.error = "Instagram Account ID not configured";
+    if (fbPageId) {
+      try {
+        const pr = await fetch(
+          `${GRAPH}/${fbPageId}?fields=instagram_business_account&access_token=${fbToken}`,
+          timeout
+        );
+        const pd: any = await pr.json();
+        if (pd.instagram_business_account?.id) {
+          result.instagram.suggested_id = pd.instagram_business_account.id;
+          result.summary.warnings.push(`Instagram Account ID discovered from Page: ${pd.instagram_business_account.id} — save this in Instagram settings`);
+        } else {
+          result.summary.warnings.push("No Instagram Business Account linked to this Facebook Page");
+        }
+      } catch { /* best-effort */ }
+    }
+  } else {
+    result.instagram.error = "Page Access Token required";
+  }
+
+  // ── 4. WhatsApp Business ─────────────────────────────────────────────────
+  if (waToken && waPhoneId) {
+    result.whatsapp.configured = true;
+    try {
+      const r = await fetch(
+        `${GRAPH}/${waPhoneId}?fields=display_phone_number,verified_name,quality_rating,status,name_status&access_token=${waToken}`,
+        timeout
+      );
+      const d: any = await r.json();
+      if (d.error) {
+        result.whatsapp.error = d.error.message;
+        result.whatsapp.error_code = d.error.code;
+        result.summary.errors.push(`WhatsApp (${waPhoneId}): ${d.error.message}`);
+      } else {
+        result.whatsapp.ok = true;
+        result.whatsapp.phone_number = d.display_phone_number;
+        result.whatsapp.verified_name = d.verified_name;
+        result.whatsapp.quality_rating = d.quality_rating;
+        result.whatsapp.status = d.status;
+        result.summary.working.push(`WhatsApp ${d.display_phone_number} (${d.verified_name})`);
+      }
+    } catch (e: any) { result.whatsapp.error = e.message; result.summary.errors.push(`WhatsApp check failed: ${e.message}`); }
+
+    // WABA info
+    if (waWabaId) {
+      try {
+        const r = await fetch(`${GRAPH}/${waWabaId}?fields=name,currency,timezone_id&access_token=${waToken}`, timeout);
+        const d: any = await r.json();
+        if (!d.error) { result.whatsapp.waba_name = d.name; result.whatsapp.currency = d.currency; }
+      } catch { /* best-effort */ }
+    }
+  } else if (!waToken) {
+    result.whatsapp.error = "WhatsApp access token not configured";
+    result.summary.warnings.push("WhatsApp Cloud API not configured");
+  } else {
+    result.whatsapp.error = "Phone Number ID not configured";
+    result.summary.warnings.push("WhatsApp Phone Number ID missing");
+  }
+
+  // ── 5. Webhook Status ────────────────────────────────────────────────────
+  result.webhooks.configured = !!webhookVerifyToken;
+  result.webhooks.verify_token_set = !!webhookVerifyToken && !webhookVerifyToken.startsWith("http");
+  result.webhooks.webhook_verified = cfgMap["facebook_page"]?.webhook_verified
+    || cfgMap["whatsapp_meta"]?.webhook_verified || false;
+  if (webhookVerifyToken?.startsWith("http")) {
+    result.summary.errors.push("Webhook verify token looks like a URL — it must be a secret string (e.g. 'alburhan_verify_2026'), not a URL");
+  } else if (!webhookVerifyToken) {
+    result.summary.warnings.push("Webhook verify token not set — Meta cannot verify your webhook");
+  }
+  // Last webhook received
+  try {
+    const lr = await pool.query(
+      `SELECT created_at FROM social_messages WHERE platform IN ('facebook_page','facebook_messenger','facebook_leads','instagram','instagram_dm','whatsapp_meta') ORDER BY created_at DESC LIMIT 1`
+    );
+    result.webhooks.last_received = lr.rows[0]?.created_at || null;
+  } catch { /* best-effort */ }
+  result.webhooks.webhook_url = "https://alburhantravels.com/api/social-media/webhook/meta";
+
+  // ── 6. Token Debug (requires app credentials) ────────────────────────────
+  if (appAccessToken) {
+    if (fbToken) {
+      try {
+        const r = await fetch(`${GRAPH}/debug_token?input_token=${encodeURIComponent(fbToken)}&access_token=${encodeURIComponent(appAccessToken)}`, timeout);
+        const d: any = await r.json();
+        if (d.data) {
+          result.token_debug.facebook = {
+            valid: d.data.is_valid,
+            type: d.data.type,
+            app_id: d.data.app_id,
+            expires_at: d.data.expires_at === 0 ? "never" : new Date((d.data.expires_at || 0) * 1000).toISOString(),
+            scopes: d.data.scopes || [],
+            issued_at: d.data.issued_at ? new Date(d.data.issued_at * 1000).toISOString() : null,
+            error: d.data.error?.message || null,
+          };
+          if (!d.data.is_valid) result.summary.errors.push(`Facebook token invalid: ${d.data.error?.message || "unknown reason"}`);
+          const neededScopes = ["pages_read_engagement","pages_manage_metadata","pages_messaging","pages_show_list"];
+          const missing = neededScopes.filter((s: string) => !(d.data.scopes || []).includes(s));
+          if (missing.length) result.summary.warnings.push(`Facebook token missing permissions: ${missing.join(", ")}`);
+        }
+      } catch { /* best-effort */ }
+    }
+    if (waToken) {
+      try {
+        const r = await fetch(`${GRAPH}/debug_token?input_token=${encodeURIComponent(waToken)}&access_token=${encodeURIComponent(appAccessToken)}`, timeout);
+        const d: any = await r.json();
+        if (d.data) {
+          result.token_debug.whatsapp = {
+            valid: d.data.is_valid,
+            type: d.data.type,
+            expires_at: d.data.expires_at === 0 ? "never" : new Date((d.data.expires_at || 0) * 1000).toISOString(),
+            scopes: d.data.scopes || [],
+            error: d.data.error?.message || null,
+          };
+          if (!d.data.is_valid) result.summary.errors.push(`WhatsApp token invalid: ${d.data.error?.message || "unknown reason"}`);
+        }
+      } catch { /* best-effort */ }
+    }
+  }
+
+  // ── Final summaries ───────────────────────────────────────────────────────
+  if (result.summary.errors.length === 0 && result.summary.warnings.length === 0) {
+    result.summary.working.push("All Meta integrations healthy ✅");
+  }
+
+  res.json(result);
+});
+
+// ── POST /api/social-media/meta/subscribe-webhooks ──────────────────────────
+// Subscribes the Facebook Page to all required webhook fields
+router.post("/meta/subscribe-webhooks", requireAdmin as any, async (_req, res) => {
+  const GRAPH = "https://graph.facebook.com/v19.0";
+  try {
+    const cfgRows = await pool.query(
+      `SELECT platform, extra_fields_encrypted FROM social_platform_configs
+       WHERE platform IN ('facebook_page','facebook_messenger','facebook_leads','instagram','instagram_dm')`
+    );
+    let fbToken: string | null = null;
+    let pageId: string | null = null;
+    for (const row of cfgRows.rows) {
+      const extra = decryptExtra(row.extra_fields_encrypted);
+      if (extra.page_access_token) fbToken = extra.page_access_token;
+      if (extra.page_id) pageId = extra.page_id;
+    }
+    if (!fbToken) return void res.status(400).json({ ok: false, message: "Page Access Token not configured" });
+
+    // If no page_id configured, try to get it from /me
+    if (!pageId) {
+      const meR = await axios.get(`${GRAPH}/me?fields=id&access_token=${fbToken}`, { timeout: 8000 });
+      pageId = meR.data?.id;
+    }
+    if (!pageId) return void res.status(400).json({ ok: false, message: "Could not determine Page ID" });
+
+    const FIELDS = [
+      "messages","messaging_postbacks","message_deliveries","message_reads",
+      "messaging_optins","messaging_referrals","leadgen","feed","mention",
+      "instagram_manage_messages","instagram_manage_comments",
+    ].join(",");
+
+    const resp = await axios.post(
+      `${GRAPH}/${pageId}/subscribed_apps`,
+      null,
+      { params: { subscribed_fields: FIELDS, access_token: fbToken }, timeout: 10000 }
+    );
+
+    if (resp.data?.success) {
+      // Mark webhook_verified in DB for all Facebook platforms
+      await pool.query(
+        `UPDATE social_platform_configs SET webhook_verified=true WHERE platform IN ('facebook_page','facebook_messenger','facebook_leads','instagram','instagram_dm')`
+      );
+      res.json({ ok: true, message: `✅ Subscribed to ${FIELDS.split(",").length} webhook fields on Page ${pageId}`, page_id: pageId, fields: FIELDS.split(",") });
+    } else {
+      res.json({ ok: false, message: "Subscription returned unexpected response", detail: resp.data });
+    }
+  } catch (e: any) {
+    const msg = e?.response?.data?.error?.message || e?.message;
+    res.status(500).json({ ok: false, message: `Webhook subscription failed: ${msg}` });
+  }
 });
 
 // ── POST /api/social-media/reply ─────────────────────────────────────────────
