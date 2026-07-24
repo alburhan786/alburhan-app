@@ -11,6 +11,7 @@ import os from "os";
 import { fileURLToPath } from "url";
 import { spawn } from "child_process";
 import router from "./routes/index.js";
+import { ensureErrorLogTable, errorLogMiddleware } from "./routes/error-logs.js";
 // Lazy pool from @workspace/db — pool creation is deferred until first use (after dotenv)
 import { pool as sharedPool } from "@workspace/db";
 const __filename = fileURLToPath(import.meta.url);
@@ -4310,6 +4311,9 @@ app.get("/api/test-email", async (req: any, res: any) => {
 });
 
 // ── Main API router ───────────────────────────────────────────────────────────
+// Error log middleware (must be before router so it captures 4xx/5xx)
+ensureErrorLogTable().catch(() => {});
+app.use("/api", errorLogMiddleware as any);
 app.use("/api", router);
 
 // Global JSON error handler

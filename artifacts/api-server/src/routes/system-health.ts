@@ -405,6 +405,93 @@ router.post("/test-sms", requireAdmin as any, async (req, res) => {
   res.json({ testOtp, diagnostics: diag });
 });
 
+// ── GET /api/admin/performance — Real performance metrics ─────────────────
+router.get("/performance", requireAdmin as any, async (_req, res) => {
+  const t0 = Date.now();
+  try {
+    const os  = await import("os");
+    const mem = process.memoryUsage();
+    const cpu = process.cpuUsage();
+
+    const [dbPing, queueStats, notifStats, storageStats, errStats] = await Promise.all([
+      // DB response time
+      (async () => {
+        const t = Date.now();
+        await pool.query("SELECT 1");
+        return Date.now() - t;
+      })(),
+      // Queue stats
+      pool.query(`SELECT status, COUNT(*)::int AS cnt FROM notification_retry_queue GROUP BY status`)
+        .catch(() => ({ rows: [] })),
+      // Notification throughput (last hour)
+      pool.query(`
+        SELECT
+          COUNT(*)::int AS total,
+          COUNT(*) FILTER (WHERE status='sent')::int AS sent,
+          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '1 hour')::int AS last_hour
+        FROM notification_logs WHERE created_at >= NOW() - INTERVAL '24 hours'
+      `).catch(() => ({ rows: [{ total: 0, sent: 0, last_hour: 0 }] })),
+      // Object storage
+      pool.query(`SELECT COUNT(*)::int AS cnt, SUM(COALESCE(size_bytes,0))::bigint AS total_bytes FROM documents`).catch(() => ({ rows: [{ cnt: 0, total_bytes: 0 }] })),
+      // Error rate
+      pool.query(`SELECT COUNT(*)::int AS cnt FROM error_request_logs WHERE created_at >= NOW() - INTERVAL '1 hour'`).catch(() => ({ rows: [{ cnt: 0 }] })),
+    ]);
+
+    const queueMap: Record<string, number> = {};
+    for (const r of (queueStats as any).rows) queueMap[r.status] = r.cnt;
+
+    const totalMem = os.totalmem();
+    const freeMem  = os.freemem();
+    const usedMem  = totalMem - freeMem;
+    const la       = os.loadavg();
+    const cpuCount = os.cpus().length;
+
+    res.json({
+      generatedAt: new Date().toISOString(),
+      responseTime_ms: Date.now() - t0,
+      memory: {
+        heapUsed_mb:  Math.round(mem.heapUsed / 1024 / 1024),
+        heapTotal_mb: Math.round(mem.heapTotal / 1024 / 1024),
+        rss_mb:       Math.round(mem.rss / 1024 / 1024),
+        system_used_mb:  Math.round(usedMem / 1024 / 1024),
+        system_total_mb: Math.round(totalMem / 1024 / 1024),
+        pct: Math.round(usedMem / totalMem * 100),
+      },
+      cpu: {
+        user_ms:  Math.round(cpu.user / 1000),
+        system_ms: Math.round(cpu.system / 1000),
+        load_avg:  la,
+        cpu_count: cpuCount,
+        load_1m_pct: Math.round(la[0] / cpuCount * 100),
+      },
+      database: {
+        response_ms: dbPing,
+        status: dbPing < 100 ? "ok" : dbPing < 500 ? "warn" : "slow",
+      },
+      queue: {
+        pending:  queueMap["pending"]  || 0,
+        exhausted: queueMap["failed"]  || 0,
+        sent:     queueMap["sent"]     || 0,
+      },
+      notifications: {
+        total_24h:  (notifStats as any).rows[0]?.total || 0,
+        sent_24h:   (notifStats as any).rows[0]?.sent  || 0,
+        last_hour:  (notifStats as any).rows[0]?.last_hour || 0,
+      },
+      storage: {
+        document_count: (storageStats as any).rows[0]?.cnt || 0,
+        total_bytes:    Number((storageStats as any).rows[0]?.total_bytes || 0),
+        total_mb:       Math.round(Number((storageStats as any).rows[0]?.total_bytes || 0) / 1024 / 1024),
+      },
+      errors: {
+        last_hour: (errStats as any).rows[0]?.cnt || 0,
+      },
+    });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // POST /api/admin/resync-fast2sms — force-sync the bundle env key into the DB
 router.post("/resync-fast2sms", requireAdmin as any, async (_req, res) => {
   try {

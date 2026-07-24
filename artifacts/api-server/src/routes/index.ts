@@ -62,6 +62,8 @@ import portalRouter from "./portal.js";
 import smsSettingsRouter from "./sms-settings.js";
 import socialMediaRouter from "./social-media.js";
 import pushRouter from "./push.js";
+import e2eRouter from "./e2e.js";
+import errorLogsRouter, { ensureErrorLogTable, errorLogMiddleware } from "./error-logs.js";
 import { requireAdmin } from "../lib/auth.js";
 
 const router: IRouter = Router();
@@ -73,7 +75,7 @@ router.get("/", (_req, res) => {
 });
 
 // ── Build fingerprint — confirms which bundle is running on VPS (no auth needed) ──
-const BUILD_STAMP = "2026-07-24-v27.1-production-stabilization";
+const BUILD_STAMP = "2026-07-24-v27.2-e2e-oauth-errorlogs-perf";
 router.get("/version", (_req, res) => {
   res.json({
     build: BUILD_STAMP,
@@ -347,6 +349,8 @@ router.use("/portal", portalRouter);
 router.use("/sms-settings", smsSettingsRouter);
 router.use("/social-media", socialMediaRouter);
 router.use("/push", pushRouter);
+router.use("/admin/e2e", e2eRouter);
+router.use("/admin/error-logs", errorLogsRouter);
 import inboxRouter from "./inbox.js";
 router.use("/inbox", inboxRouter);
 import customer360Router from "./customer360.js";

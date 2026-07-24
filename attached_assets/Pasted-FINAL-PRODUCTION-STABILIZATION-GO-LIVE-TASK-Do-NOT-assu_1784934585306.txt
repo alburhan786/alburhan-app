@@ -1,0 +1,331 @@
+FINAL PRODUCTION STABILIZATION & GO-LIVE TASK
+
+Do NOT assume the system is complete because the health score shows 97/100.
+
+I want a TRUE PRODUCTION READY audit with real functionality tests, not simulated checks.
+
+Your mission is to make Al Burhan Tours & Travels ERP/CRM completely production-ready.
+
+=====================================================
+PHASE 1 – END TO END TEST
+=====================================================
+
+Perform an actual workflow:
+
+1. Create a test customer.
+2. Create a booking.
+3. Generate invoice.
+4. Generate agreement.
+5. Record payment.
+6. Generate receipt.
+7. Send notifications.
+8. Verify customer dashboard.
+9. Verify admin dashboard.
+10. Verify database records.
+
+Every step must PASS.
+
+=====================================================
+PHASE 2 – VERIFY EVERY CHANNEL
+=====================================================
+
+Test every notification channel using live configuration.
+
+✓ WhatsApp
+✓ SMS
+✓ Email
+✓ Push Notification
+✓ Customer Dashboard Notification
+✓ Admin Notification
+✓ Activity Logs
+
+Verify each channel actually sends the message.
+
+Do NOT only verify queue insertion.
+
+Verify delivery.
+
+=====================================================
+PHASE 3 – WHATSAPP
+=====================================================
+
+Investigate why BotBee reports WABA mismatch.
+
+Automatically detect:
+
+• Wrong WABA ID
+• Wrong Phone Number ID
+• Wrong Access Token
+• Wrong Business Account
+• Wrong Webhook
+• Wrong Sender
+
+Create a diagnostics page showing
+
+PASS
+WARNING
+FAIL
+
+for every Meta resource.
+
+If this cannot be fixed automatically,
+show exactly which value is wrong
+and exactly where the administrator must update it.
+
+=====================================================
+PHASE 4 – SMS
+=====================================================
+
+Verify Fast2SMS configuration.
+
+Test:
+
+Booking confirmation
+
+Payment received
+
+OTP
+
+Agreement
+
+Invoice
+
+Receipt
+
+Refund
+
+Cancellation
+
+Send a real API request.
+
+Confirm:
+
+HTTP status
+
+API response
+
+Delivery ID
+
+Failure reason if any.
+
+=====================================================
+PHASE 5 – PAYMENT
+=====================================================
+
+Verify Razorpay LIVE.
+
+Create:
+
+Invoice
+
+Payment
+
+Receipt
+
+Refund test
+
+Webhook
+
+Signature validation
+
+Everything must PASS.
+
+=====================================================
+PHASE 6 – AGREEMENT
+=====================================================
+
+Verify Agreement generation.
+
+Partial payment
+
+Full payment
+
+Offline booking
+
+Online booking
+
+Admin booking
+
+Customer booking
+
+All must generate PDF.
+
+Agreement must automatically appear in
+
+Customer Dashboard
+
+Admin Dashboard
+
+WhatsApp
+
+Email
+
+Downloads
+
+=====================================================
+PHASE 7 – RECEIPTS
+=====================================================
+
+Verify:
+
+Receipt PDF
+
+Receipt Email
+
+Receipt WhatsApp
+
+Receipt Dashboard
+
+Receipt Download
+
+=====================================================
+PHASE 8 – CUSTOMER DASHBOARD
+=====================================================
+
+Verify every module.
+
+Booking
+
+Invoice
+
+Agreement
+
+Receipt
+
+Visa
+
+Flight
+
+Hotel
+
+Room
+
+Documents
+
+Notifications
+
+Payments
+
+Downloads
+
+Push Notifications
+
+Everything must work.
+
+=====================================================
+PHASE 9 – SOCIAL MEDIA HUB
+=====================================================
+
+Verify the new OAuth Social Media Hub.
+
+Facebook Login
+
+Instagram Login
+
+Messenger Login
+
+WhatsApp Login
+
+Google Login
+
+Google Business
+
+Google Calendar
+
+Google Drive
+
+YouTube
+
+Telegram
+
+No manual tokens.
+
+No App Secret entry.
+
+Everything should use OAuth authorization.
+
+=====================================================
+PHASE 10 – ERROR LOGGING
+=====================================================
+
+Create Production Diagnostics.
+
+Every failed request should display:
+
+Endpoint
+
+Status Code
+
+Reason
+
+Stack Trace
+
+API Response
+
+Timestamp
+
+Retry Button
+
+=====================================================
+PHASE 11 – PERFORMANCE
+=====================================================
+
+Check
+
+Memory
+
+CPU
+
+Database
+
+Queue
+
+Redis
+
+Uploads
+
+Object Storage
+
+Email Queue
+
+Notification Queue
+
+Response Time
+
+=====================================================
+PHASE 12 – FINAL SCORE
+=====================================================
+
+Generate a final Production Report.
+
+Every module should be marked
+
+PASS
+
+WARNING
+
+FAIL
+
+with explanation.
+
+If any item is WARNING or FAIL,
+
+automatically fix it where possible.
+
+Do not stop until every code-related issue is resolved.
+
+Only external provider issues (Meta approval, BotBee WABA ownership, SMS provider restrictions, etc.) may remain as warnings.
+
+=====================================================
+GOAL
+=====================================================
+
+I want Al Burhan Tours & Travels ERP/CRM to be production-grade, enterprise-level software comparable to Salesforce, Zoho CRM, HubSpot, Odoo Enterprise, and Shopify Admin.
+
+No placeholder logic.
+
+No simulated health checks.
+
+No fake PASS status.
+
+Every status must be based on a real functional test against the live production environment.

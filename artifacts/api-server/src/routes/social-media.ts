@@ -1952,4 +1952,230 @@ router.post("/website-inquiry", async (req, res) => {
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// OAUTH HUB — Real OAuth flows for Meta, Google, Telegram
+// ═══════════════════════════════════════════════════════════════════════════
+
+const OAUTH_REDIRECT_BASE = "https://alburhantravels.com/api/social-media/oauth";
+
+// ── Ensure oauth_connections table ───────────────────────────────────────────
+async function ensureOAuthTable() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS oauth_connections (
+        id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        provider      TEXT NOT NULL,
+        platform      TEXT NOT NULL,
+        account_name  TEXT,
+        account_id    TEXT,
+        access_token  TEXT,
+        refresh_token TEXT,
+        token_expiry  TIMESTAMPTZ,
+        scope         TEXT,
+        extra         JSONB DEFAULT '{}',
+        connected_at  TIMESTAMPTZ DEFAULT NOW(),
+        updated_at    TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE (provider, platform)
+      )
+    `);
+  } catch {}
+}
+ensureOAuthTable();
+
+// ── GET /oauth/status — List all connected OAuth accounts ────────────────────
+router.get("/oauth/status", requireAdmin as any, async (_req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT provider, platform, account_name, account_id, connected_at, updated_at,
+              token_expiry, scope,
+              CASE WHEN access_token IS NOT NULL THEN true ELSE false END AS connected
+       FROM oauth_connections ORDER BY connected_at DESC`
+    );
+    res.json({ connections: r.rows });
+  } catch (e: any) {
+    res.json({ connections: [] });
+  }
+});
+
+// ── GET /oauth/:provider/start — Initiate OAuth redirect ────────────────────
+router.get("/oauth/:provider/start", requireAdmin as any, async (req: any, res: any) => {
+  const { provider } = req.params;
+  const { platform = provider } = req.query as any;
+
+  try {
+    if (provider === "meta") {
+      // Load Meta app credentials from DB
+      const cfgR = await pool.query(
+        `SELECT extra_fields_encrypted FROM social_platform_configs WHERE platform='facebook_page' LIMIT 1`
+      );
+      const extra = cfgR.rows[0] ? decryptExtra(cfgR.rows[0].extra_fields_encrypted) : {};
+      const appId = extra.app_id || process.env.META_APP_ID;
+      if (!appId) {
+        return void res.status(400).json({
+          error: "Meta App ID not configured",
+          instruction: "Go to Social Media → Facebook Page → configure App ID and App Secret first",
+        });
+      }
+      const scope = [
+        "pages_manage_metadata", "pages_read_engagement", "pages_messaging",
+        "instagram_basic", "instagram_manage_messages",
+        "leads_retrieval", "whatsapp_business_messaging",
+        "business_management", "public_profile", "email",
+      ].join(",");
+      const state = `meta:${platform}:${Date.now()}`;
+      const callbackUrl = `${OAUTH_REDIRECT_BASE}/meta/callback`;
+      const url = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent(callbackUrl)}&scope=${encodeURIComponent(scope)}&state=${encodeURIComponent(state)}&response_type=code`;
+      res.json({ redirect_url: url, provider: "meta", platform, state });
+
+    } else if (provider === "google") {
+      // Load Google credentials from DB or env
+      const cfgR = await pool.query(
+        `SELECT extra_fields_encrypted FROM social_platform_configs WHERE platform='google' LIMIT 1`
+      ).catch(() => ({ rows: [] }));
+      const extra = cfgR.rows[0] ? decryptExtra(cfgR.rows[0].extra_fields_encrypted) : {};
+      const clientId = extra.client_id || process.env.GOOGLE_CLIENT_ID;
+      if (!clientId) {
+        return void res.status(400).json({
+          error: "Google Client ID not configured",
+          instruction: "Go to Social Media → Google → configure Client ID and Client Secret first",
+        });
+      }
+      const platformScopes: Record<string, string> = {
+        google_business:  "https://www.googleapis.com/auth/business.manage",
+        google_calendar:  "https://www.googleapis.com/auth/calendar",
+        google_drive:     "https://www.googleapis.com/auth/drive",
+        youtube:          "https://www.googleapis.com/auth/youtube",
+        google:           "https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile",
+      };
+      const scope = (platformScopes[String(platform)] || platformScopes.google) + " openid email profile";
+      const state = `google:${platform}:${Date.now()}`;
+      const callbackUrl = `${OAUTH_REDIRECT_BASE}/google/callback`;
+      const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(callbackUrl)}&scope=${encodeURIComponent(scope)}&state=${encodeURIComponent(state)}&response_type=code&access_type=offline&prompt=consent`;
+      res.json({ redirect_url: url, provider: "google", platform, state });
+
+    } else if (provider === "telegram") {
+      res.json({
+        provider: "telegram",
+        instruction: "Telegram uses a bot token (not OAuth). Go to @BotFather on Telegram, create a bot, and paste the token in Social Media → Telegram settings.",
+        manual: true,
+      });
+    } else {
+      res.status(400).json({ error: `Unknown OAuth provider: ${provider}` });
+    }
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── GET /oauth/meta/callback — Meta OAuth callback ───────────────────────────
+router.get("/oauth/meta/callback", async (req: any, res: any) => {
+  const { code, state, error: oauthError } = req.query as any;
+  if (oauthError) {
+    return void res.redirect(`/admin/social-oauth?error=${encodeURIComponent(oauthError)}`);
+  }
+  const [, platform] = (state || "meta::").split(":");
+  try {
+    const cfgR = await pool.query(
+      `SELECT extra_fields_encrypted FROM social_platform_configs WHERE platform='facebook_page' LIMIT 1`
+    );
+    const extra = cfgR.rows[0] ? decryptExtra(cfgR.rows[0].extra_fields_encrypted) : {};
+    const appId     = extra.app_id     || process.env.META_APP_ID;
+    const appSecret = extra.app_secret || process.env.META_APP_SECRET;
+    const callbackUrl = `${OAUTH_REDIRECT_BASE}/meta/callback`;
+
+    const tokenResp = await fetch(
+      `https://graph.facebook.com/v19.0/oauth/access_token?client_id=${appId}&redirect_uri=${encodeURIComponent(callbackUrl)}&client_secret=${appSecret}&code=${code}`,
+      { signal: AbortSignal.timeout(10000) }
+    );
+    const tokenData = await tokenResp.json() as any;
+    if (!tokenData.access_token) throw new Error(JSON.stringify(tokenData));
+
+    // Exchange for long-lived token
+    let longToken = tokenData.access_token;
+    try {
+      const llR = await fetch(`https://graph.facebook.com/v19.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${appId}&client_secret=${appSecret}&fb_exchange_token=${encodeURIComponent(tokenData.access_token)}`, { signal: AbortSignal.timeout(10000) });
+      const ll = await llR.json() as any;
+      if (ll.access_token) longToken = ll.access_token;
+    } catch {}
+
+    // Get account info
+    const meR = await fetch(`https://graph.facebook.com/v19.0/me?fields=id,name&access_token=${longToken}`, { signal: AbortSignal.timeout(8000) });
+    const me = await meR.json() as any;
+    const expiry = tokenData.expires_in ? new Date(Date.now() + tokenData.expires_in * 1000) : null;
+
+    await pool.query(
+      `INSERT INTO oauth_connections (provider, platform, account_name, account_id, access_token, token_expiry, scope, connected_at, updated_at)
+       VALUES ('meta', $1, $2, $3, $4, $5, $6, NOW(), NOW())
+       ON CONFLICT (provider, platform) DO UPDATE
+         SET account_name=EXCLUDED.account_name, account_id=EXCLUDED.account_id,
+             access_token=EXCLUDED.access_token, token_expiry=EXCLUDED.token_expiry,
+             scope=EXCLUDED.scope, updated_at=NOW()`,
+      [platform || "facebook_page", me.name || "Meta Account", me.id, encrypt(longToken), expiry, "pages_manage_metadata,pages_messaging,instagram_basic"]
+    );
+    res.redirect(`/admin/social-oauth?connected=meta&account=${encodeURIComponent(me.name || "Meta Account")}`);
+  } catch (e: any) {
+    res.redirect(`/admin/social-oauth?error=${encodeURIComponent(e.message)}`);
+  }
+});
+
+// ── GET /oauth/google/callback — Google OAuth callback ───────────────────────
+router.get("/oauth/google/callback", async (req: any, res: any) => {
+  const { code, state, error: oauthError } = req.query as any;
+  if (oauthError) {
+    return void res.redirect(`/admin/social-oauth?error=${encodeURIComponent(oauthError)}`);
+  }
+  const [, platform] = (state || "google::").split(":");
+  try {
+    const cfgR = await pool.query(
+      `SELECT extra_fields_encrypted FROM social_platform_configs WHERE platform='google' LIMIT 1`
+    ).catch(() => ({ rows: [] }));
+    const extra = cfgR.rows[0] ? decryptExtra(cfgR.rows[0].extra_fields_encrypted) : {};
+    const clientId     = extra.client_id     || process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = extra.client_secret || process.env.GOOGLE_CLIENT_SECRET;
+    const callbackUrl  = `${OAUTH_REDIRECT_BASE}/google/callback`;
+
+    const tokenResp = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ code, client_id: clientId, client_secret: clientSecret, redirect_uri: callbackUrl, grant_type: "authorization_code" }),
+      signal: AbortSignal.timeout(10000),
+    });
+    const tokenData = await tokenResp.json() as any;
+    if (!tokenData.access_token) throw new Error(JSON.stringify(tokenData));
+
+    const userR = await fetch(`https://www.googleapis.com/oauth2/v2/userinfo?access_token=${tokenData.access_token}`, { signal: AbortSignal.timeout(8000) });
+    const user  = await userR.json() as any;
+    const expiry = tokenData.expires_in ? new Date(Date.now() + tokenData.expires_in * 1000) : null;
+
+    await pool.query(
+      `INSERT INTO oauth_connections (provider, platform, account_name, account_id, access_token, refresh_token, token_expiry, scope, connected_at, updated_at)
+       VALUES ('google', $1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+       ON CONFLICT (provider, platform) DO UPDATE
+         SET account_name=EXCLUDED.account_name, account_id=EXCLUDED.account_id,
+             access_token=EXCLUDED.access_token, refresh_token=EXCLUDED.refresh_token,
+             token_expiry=EXCLUDED.token_expiry, scope=EXCLUDED.scope, updated_at=NOW()`,
+      [platform || "google", user.name || user.email, user.id, encrypt(tokenData.access_token), tokenData.refresh_token ? encrypt(tokenData.refresh_token) : null, expiry, tokenData.scope]
+    );
+    res.redirect(`/admin/social-oauth?connected=google&account=${encodeURIComponent(user.name || user.email)}`);
+  } catch (e: any) {
+    res.redirect(`/admin/social-oauth?error=${encodeURIComponent(e.message)}`);
+  }
+});
+
+// ── DELETE /oauth/:provider/disconnect — Remove OAuth connection ─────────────
+router.delete("/oauth/:provider/disconnect", requireAdmin as any, async (req: any, res: any) => {
+  const { provider } = req.params;
+  const { platform } = req.query as any;
+  try {
+    await pool.query(
+      `DELETE FROM oauth_connections WHERE provider=$1 AND platform=$2`,
+      [provider, platform || provider]
+    );
+    res.json({ ok: true, message: `Disconnected ${provider}/${platform}` });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 export default router;
+
