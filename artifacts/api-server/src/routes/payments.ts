@@ -159,6 +159,12 @@ export async function processPaymentSuccessNotifications(opts: {
     : (process.env.SITE_URL || "https://alburhantravels.com");
   const invoiceUrl = invoiceNumber ? `${siteBase}/invoice/${booking.bookingNumber}` : undefined;
 
+  // Auto receipt number: RCP-{bookingNumber}-{last6 of ms timestamp}
+  const receiptNumber = `RCP-${booking.bookingNumber}-${Date.now().toString().slice(-6)}`;
+  const paymentMethodLabel = (paymentMode || "online")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c: string) => c.toUpperCase());
+
   const docOpts = {
     bookingNumber: booking.bookingNumber,
     customerName: booking.customerName,
@@ -171,8 +177,11 @@ export async function processPaymentSuccessNotifications(opts: {
     paidAmount: newPaidAmount,
     balanceAmount: remainingBalance,
     invoiceNumber,
+    receiptNumber,
     paymentAmount: thisPaymentAmount,
     paymentRef,
+    paymentDate,
+    paymentMethod: paymentMethodLabel,
   };
 
   // ── Generate Tax Invoice PDF + Payment Receipt PDF ─────────────────────────
@@ -1901,20 +1910,37 @@ router.get("/receipt-pdf/:bookingId", requireAuth as any, async (req: Authentica
     const remainingBal  = Math.max(0, finalAmount - paidAmount);
     const invoiceNumber = row.inv_num || row.invoice_number || null;
 
+    // Fetch latest payment transaction for this booking to get the transaction ref + method
+    const txRes = await pool.query(
+      `SELECT reference_number, payment_mode, payment_date
+       FROM payment_transactions WHERE booking_id=$1
+       ORDER BY payment_date DESC LIMIT 1`,
+      [bookingId]
+    ).catch(() => ({ rows: [] as any[] }));
+    const latestTx = txRes.rows[0];
+    const paymentRef  = row.razorpay_payment_id || latestTx?.reference_number || undefined;
+    const paymentMode = row.razorpay_payment_id
+      ? "Online (Razorpay)"
+      : (row.is_offline ? "Cash / Bank Transfer" : (latestTx?.payment_mode || "Bank Transfer"));
+    const receiptNum  = `RCP-${row.booking_number}-${Date.now().toString().slice(-6)}`;
+
     const buf = await generateReceiptPdfBuffer({
-      bookingNumber:   row.booking_number,
-      customerName:    row.customer_name,
-      customerMobile:  row.customer_mobile,
-      customerEmail:   row.customer_email,
-      packageName:     row.package_name,
+      bookingNumber:    row.booking_number,
+      customerName:     row.customer_name,
+      customerMobile:   row.customer_mobile,
+      customerEmail:    row.customer_email,
+      packageName:      row.package_name,
       numberOfPilgrims: row.number_of_pilgrims,
-      totalAmount:     finalAmount,
+      totalAmount:      finalAmount,
       finalAmount,
       paidAmount,
-      balanceAmount:   remainingBal,
+      balanceAmount:    remainingBal,
       invoiceNumber,
-      paymentAmount:   paidAmount,
-      paymentRef:      row.razorpay_payment_id || undefined,
+      receiptNumber:    receiptNum,
+      paymentAmount:    paidAmount,
+      paymentRef,
+      paymentMethod:    paymentMode,
+      paymentDate:      latestTx?.payment_date ? new Date(latestTx.payment_date) : new Date(),
     });
     res.set({
       "Content-Type":        "application/pdf",

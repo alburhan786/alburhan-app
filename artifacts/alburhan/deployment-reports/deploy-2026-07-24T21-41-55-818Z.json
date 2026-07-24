@@ -1,0 +1,82 @@
+{
+  "timestamp": "2026-07-24T21:41:55.818Z",
+  "outcome": "SUCCESS",
+  "productionUrl": "https://alburhantravels.com",
+  "elapsedSeconds": 38.9,
+  "skipTest": true,
+  "steps": [
+    {
+      "step": 1,
+      "label": "PRE-DEPLOY Regression Test",
+      "status": "passed",
+      "startedAt": "2026-07-24T21:41:16.878Z"
+    },
+    {
+      "step": 2,
+      "label": "Navigation Structure Check (check-nav.mjs)",
+      "status": "passed",
+      "startedAt": "2026-07-24T21:41:16.879Z"
+    },
+    {
+      "step": 3,
+      "label": "Master Registry Integrity Check (check-registry.mjs)",
+      "status": "passed",
+      "startedAt": "2026-07-24T21:41:17.091Z"
+    },
+    {
+      "step": 4,
+      "label": "Build Frontend",
+      "status": "passed",
+      "startedAt": "2026-07-24T21:41:17.290Z"
+    },
+    {
+      "step": 5,
+      "label": "Build API Server",
+      "status": "passed",
+      "startedAt": "2026-07-24T21:41:28.359Z"
+    },
+    {
+      "step": 6,
+      "label": "Deploy API Server to VPS",
+      "status": "passed",
+      "startedAt": "2026-07-24T21:41:33.305Z"
+    },
+    {
+      "step": 7,
+      "label": "Wait for PM2 Restart",
+      "status": "passed",
+      "startedAt": "2026-07-24T21:41:36.848Z"
+    },
+    {
+      "step": 8,
+      "label": "Deploy Frontend to VPS",
+      "status": "passed",
+      "startedAt": "2026-07-24T21:41:51.851Z"
+    },
+    {
+      "step": 9,
+      "label": "POST-DEPLOY Regression Test",
+      "status": "passed",
+      "startedAt": "2026-07-24T21:41:55.810Z"
+    },
+    {
+      "step": 10,
+      "label": "Save Deployment Report",
+      "status": "running",
+      "startedAt": "2026-07-24T21:41:55.811Z"
+    }
+  ],
+  "registry": {
+    "version": 3,
+    "updatedAt": "2026-07-23",
+    "dashboards": 13,
+    "sidebarItems": 124,
+    "portalRoutes": 4,
+    "apiEndpoints": 31,
+    "roleRedirects": 12,
+    "notificationModules": 9,
+    "permissionModules": 15,
+    "widgetDashboards": 13
+  },
+  "notes": "All steps passed — production live."
+}

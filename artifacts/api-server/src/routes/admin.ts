@@ -274,24 +274,74 @@ router.get("/reports/customers", requireAdmin as any, async (_req: Authenticated
   })));
 });
 
-router.get("/reports/payments", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
-  const bookings = await db
-    .select()
-    .from(bookingsTable)
-    .where(eq(bookingsTable.status, "confirmed"))
-    .orderBy(desc(bookingsTable.updatedAt));
+router.get("/reports/payments", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  // Include both fully-paid (confirmed) and partially-paid bookings; exclude pending/approved/cancelled
+  const statusFilter = (req.query.status as string) || "all";
+  const whereClause = statusFilter === "confirmed"
+    ? `WHERE status = 'confirmed'`
+    : statusFilter === "partially_paid"
+    ? `WHERE status = 'partially_paid'`
+    : `WHERE status IN ('confirmed','partially_paid')`;
 
-  res.json(bookings.map(b => ({
-    bookingNumber: b.bookingNumber,
-    customerName: b.customerName,
-    customerMobile: b.customerMobile,
-    packageName: b.packageName,
-    invoiceNumber: b.invoiceNumber,
-    totalAmount: b.totalAmount ? Number(b.totalAmount) : null,
-    gstAmount: b.gstAmount ? Number(b.gstAmount) : null,
-    finalAmount: b.finalAmount ? Number(b.finalAmount) : null,
-    paymentDate: b.updatedAt?.toISOString?.(),
-    razorpayPaymentId: b.razorpayPaymentId,
+  const result = await pool.query(`
+    SELECT
+      b.id,
+      b.booking_number,
+      b.customer_name,
+      b.customer_mobile,
+      b.customer_email,
+      b.package_name,
+      b.invoice_number,
+      b.status,
+      b.final_amount::numeric       AS final_amount,
+      b.paid_amount::numeric        AS paid_amount,
+      b.gst_amount::numeric         AS gst_amount,
+      b.advance_amount::numeric     AS advance_amount,
+      GREATEST(0, COALESCE(b.final_amount::numeric,0) - COALESCE(b.paid_amount::numeric,0)) AS balance_due,
+      b.razorpay_payment_id,
+      b.last_payment_date,
+      b.updated_at,
+      (
+        SELECT SUM(pt.amount)
+        FROM payment_transactions pt
+        WHERE pt.booking_id = b.id
+      ) AS total_transactions,
+      (
+        SELECT MAX(pt.payment_date)
+        FROM payment_transactions pt
+        WHERE pt.booking_id = b.id
+      ) AS last_payment_date_tx
+    FROM bookings b
+    ${whereClause}
+    ORDER BY b.updated_at DESC
+  `).catch((err: any) => {
+    console.error("[reports/payments]", err?.message);
+    return { rows: [] as any[] };
+  });
+
+  res.json(result.rows.map((b: any) => ({
+    id: b.id,
+    bookingNumber: b.booking_number,
+    customerName: b.customer_name,
+    customerMobile: b.customer_mobile,
+    customerEmail: b.customer_email,
+    packageName: b.package_name,
+    invoiceNumber: b.invoice_number,
+    status: b.status,
+    paymentStatus: Number(b.paid_amount || 0) <= 0
+      ? "Pending"
+      : Number(b.balance_due || 0) <= 0.01
+      ? "Paid"
+      : "Partial",
+    totalAmount: Number(b.final_amount || 0),
+    gstAmount: Number(b.gst_amount || 0),
+    finalAmount: Number(b.final_amount || 0),
+    paidAmount: Number(b.paid_amount || 0),
+    balanceDue: Number(b.balance_due || 0),
+    advanceAmount: Number(b.advance_amount || 0),
+    razorpayPaymentId: b.razorpay_payment_id,
+    lastPaymentDate: b.last_payment_date_tx || b.last_payment_date || b.updated_at,
+    paymentDate: b.updated_at,
   })));
 });
 

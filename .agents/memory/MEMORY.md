@@ -69,3 +69,4 @@
 - [Payment audit bugs](payment-audit-bugs.md) — 5 bugs fixed July 2026: stale GCS PDF redirect, no journal entries for online payments, webhook missing journey_status, revenue stats excluded partially_paid, fire-and-forget audit trail
 - [Journey status trigger mapping](journey-status-triggers.md) — 16 journey statuses must be in TRIGGER_TO_EVENT + WorkflowTrigger type; triggerWorkflow ctx needs journeyStatus field for buildDefaultMessage
 - [BotBee phone_number_id](botbee-phone-number-id.md) — correct is 965912196611113 (15 digits); hardcoded as CORRECT_PHONE_NUMBER_ID in botbee.ts; 14-digit typo blocked all templates for months
+- [Invoice & payment status architecture](invoice-payment-status-arch.md) — deriveStatusFromAmounts is the canonical status fn; paidAmount (not advanceAmount) is source of truth; receipt PDF has full fields; admin report includes partially_paid

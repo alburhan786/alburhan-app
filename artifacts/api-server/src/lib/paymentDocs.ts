@@ -17,9 +17,12 @@ interface DocOpts {
   paidAmount?: number | null;
   balanceAmount?: number | null;
   invoiceNumber?: string | null;
+  receiptNumber?: string | null;
   paymentAmount?: number | null;
   paymentRef?: string | null;
   paymentDate?: Date;
+  paymentMethod?: string | null;
+  currentStatus?: string | null;
 }
 
 function pdfToBuffer(doc: PDFKit.PDFDocument): Promise<Buffer> {
@@ -60,6 +63,23 @@ function drawKV(doc: PDFKit.PDFDocument, y: number, rows: [string, string][]) {
   return cy;
 }
 
+function drawSectionHeader(doc: PDFKit.PDFDocument, y: number, label: string): number {
+  const MARGIN = 40;
+  const PAGE_W = doc.page.width;
+  doc.rect(MARGIN, y, PAGE_W - MARGIN * 2, 22).fill(DARK_GREEN);
+  doc.fill("white").font("Helvetica-Bold").fontSize(9).text(label, MARGIN + 8, y + 6, { width: PAGE_W - MARGIN * 2 - 16 });
+  doc.fill("black");
+  return y + 22;
+}
+
+function deriveStatusFromAmounts(paid: number, total: number, overdue = false): { label: string; color: string; bg: string } {
+  const balance = Math.max(0, total - paid);
+  if (paid <= 0)               return { label: "PENDING PAYMENT", color: "#E65100", bg: "#FFF3E0" };
+  if (balance <= 0.01)         return { label: "PAID IN FULL",    color: "#1B5E20", bg: "#E8F5E9" };
+  if (overdue && balance > 0)  return { label: "OVERDUE",         color: "#B71C1C", bg: "#FFEBEE" };
+  return                              { label: "PARTIALLY PAID",  color: "#1565C0", bg: "#E3F2FD" };
+}
+
 export async function generateInvoicePdfBuffer(opts: DocOpts): Promise<Buffer> {
   const doc = new PDFDocument({ size: "A4", margin: 0 });
   let y = drawHeader(doc, `TAX INVOICE — ${opts.invoiceNumber || opts.bookingNumber}`);
@@ -73,11 +93,7 @@ export async function generateInvoicePdfBuffer(opts: DocOpts): Promise<Buffer> {
   const balance = Number(opts.balanceAmount ?? Math.max(0, total - paid));
 
   // ── Payment status badge — colors per spec: Pending=Orange, Partial=Blue, Paid=Green ──
-  const isFullyPaid   = balance <= 0.01;
-  const isPartialPaid = paid > 0 && !isFullyPaid;
-  const statusLabel   = isFullyPaid ? "PAID IN FULL" : isPartialPaid ? "PARTIALLY PAID" : "PENDING PAYMENT";
-  const statusColor   = isFullyPaid ? "#1B5E20" : isPartialPaid ? "#1565C0" : "#E65100";
-  const statusBg      = isFullyPaid ? "#E8F5E9" : isPartialPaid ? "#E3F2FD" : "#FFF3E0";
+  const { label: statusLabel, color: statusColor, bg: statusBg } = deriveStatusFromAmounts(paid, total);
   const badgeW = 140;
   const badgeH = 24;
   const badgeX = PAGE_W - MARGIN - badgeW;
@@ -131,19 +147,77 @@ export async function generateReceiptPdfBuffer(opts: DocOpts): Promise<Buffer> {
   const doc = new PDFDocument({ size: "A4", margin: 0 });
   let y = drawHeader(doc, "PAYMENT RECEIPT");
   y += 10;
-  const amt = Number(opts.paymentAmount ?? 0);
+
+  const MARGIN = 40;
+  const PAGE_W = doc.page.width;
+  const totalAmt   = Number(opts.totalAmount ?? opts.finalAmount ?? 0);
+  const paidAmt    = Number(opts.paidAmount ?? opts.paymentAmount ?? 0);
+  const balanceAmt = Number(opts.balanceAmount ?? Math.max(0, totalAmt - paidAmt));
+  const thisPayAmt = Number(opts.paymentAmount ?? paidAmt);
+
+  // Auto-generate receipt number if not supplied
+  const receiptNum = opts.receiptNumber
+    || `RCP-${opts.bookingNumber}-${Date.now().toString().slice(-6)}`;
+
+  // ── Status badge ────────────────────────────────────────────────────────────
+  const { label: statusLabel, color: statusColor, bg: statusBg } = deriveStatusFromAmounts(paidAmt, totalAmt);
+  const badgeW = 160;
+  const badgeH = 26;
+  const badgeX = PAGE_W - MARGIN - badgeW;
+  doc.rect(badgeX, y, badgeW, badgeH).fill(statusBg);
+  doc.fill(statusColor).font("Helvetica-Bold").fontSize(10)
+     .text(statusLabel, badgeX, y + 7, { width: badgeW, align: "center" });
+  doc.fill("black");
+  y += badgeH + 10;
+
+  // ── Booking Details ─────────────────────────────────────────────────────────
+  y = drawSectionHeader(doc, y, "BOOKING DETAILS");
+  y += 4;
   y = drawKV(doc, y, [
-    ["Receipt For", `Booking #${opts.bookingNumber}`],
-    ["Customer", opts.customerName],
-    ["Mobile", opts.customerMobile],
-    ["Amount Received", `Rs. ${amt.toLocaleString("en-IN")}`],
-    ["Payment Ref.", opts.paymentRef || "—"],
-    ["Date", (opts.paymentDate || new Date()).toLocaleString("en-IN")],
-    ["Balance Remaining", `Rs. ${Number(opts.balanceAmount ?? 0).toLocaleString("en-IN")}`],
+    ["Receipt No.",     receiptNum],
+    ["Invoice No.",     opts.invoiceNumber || "—"],
+    ["Booking No.",     opts.bookingNumber],
+    ["Customer Name",   opts.customerName],
+    ["Mobile",          opts.customerMobile],
+    ["Email",           opts.customerEmail || "—"],
+    ["Package",         opts.packageName || "—"],
+    ["No. of Pilgrims", String(opts.numberOfPilgrims ?? "—")],
   ]);
-  doc.fontSize(9).fill("#888").text(
-    "Thank you for your payment. This is a system-generated receipt.",
-    40, doc.page.height - 60, { width: doc.page.width - 80, align: "center" }
+  y += 12;
+
+  // ── Transaction Details ─────────────────────────────────────────────────────
+  y = drawSectionHeader(doc, y, "TRANSACTION DETAILS");
+  y += 4;
+  const payDateStr = (opts.paymentDate || new Date()).toLocaleDateString("en-IN", {
+    day: "2-digit", month: "long", year: "numeric",
+  });
+  y = drawKV(doc, y, [
+    ["Amount Paid",      `Rs. ${thisPayAmt.toLocaleString("en-IN")}`],
+    ["Total Paid",       `Rs. ${paidAmt.toLocaleString("en-IN")}`],
+    ["Grand Total",      `Rs. ${totalAmt.toLocaleString("en-IN")}`],
+    ["Balance Due",      `Rs. ${balanceAmt.toLocaleString("en-IN")}`],
+    ["Transaction ID",   opts.paymentRef || "—"],
+    ["Payment Method",   opts.paymentMethod || "—"],
+    ["Payment Date",     payDateStr],
+    ["Status",           statusLabel],
+  ]);
+  y += 20;
+
+  // ── Amount in words ─────────────────────────────────────────────────────────
+  doc.rect(MARGIN, y, PAGE_W - MARGIN * 2, 28).fill("#F9FAFB").stroke("#E5E7EB");
+  doc.fill(DARK_GREEN).font("Helvetica-Bold").fontSize(9)
+     .text(`Amount Paid: Rs. ${thisPayAmt.toLocaleString("en-IN")} | Balance: Rs. ${balanceAmt.toLocaleString("en-IN")}`,
+       MARGIN + 8, y + 8, { width: PAGE_W - MARGIN * 2 - 16 });
+  y += 36;
+
+  doc.fontSize(8).fill("#666").text(
+    "This is a computer-generated payment receipt and does not require a signature.\n" +
+    "For queries: +91 9893989786 | info@alburhantravels.com | alburhantravels.com",
+    MARGIN, doc.page.height - 65, { width: PAGE_W - MARGIN * 2, align: "center" }
+  );
+  doc.fill("#999").fontSize(7).text(
+    `Generated: ${new Date().toLocaleString("en-IN")} | Receipt: ${receiptNum}`,
+    MARGIN, doc.page.height - 45, { width: PAGE_W - MARGIN * 2, align: "center" }
   );
   return pdfToBuffer(doc);
 }

@@ -1,0 +1,389 @@
+Excellent work.
+
+Do NOT stop yet.
+
+Perform a complete production audit of the Al Burhan ERP payment ecosystem.
+
+=========================
+VERIFY EVERYTHING
+=========================
+
+1. Dashboard
+
+Verify:
+
+Customer Dashboard
+
+Admin Dashboard
+
+Finance Dashboard
+
+Agent Dashboard
+
+Branch Dashboard
+
+all show identical values.
+
+No stale data.
+
+=========================
+
+2. Invoice
+
+Verify:
+
+Invoice HTML
+
+Invoice PDF
+
+Invoice Download
+
+Invoice Share
+
+Invoice Email
+
+Invoice WhatsApp
+
+Invoice SMS Link
+
+always use latest payment information.
+
+=========================
+
+3. Receipt
+
+Verify:
+
+Receipt HTML
+
+Receipt PDF
+
+Receipt Download
+
+Receipt Share
+
+Receipt Email
+
+Receipt WhatsApp
+
+Receipt SMS
+
+=========================
+
+4. Agreement
+
+Automatically regenerate Agreement after payment.
+
+Customer can download latest version.
+
+=========================
+
+5. Booking Status
+
+Booking Status
+
+Journey Status
+
+Payment Status
+
+Invoice Status
+
+Receipt Status
+
+must stay synchronized.
+
+=========================
+
+6. WhatsApp
+
+Immediately after payment:
+
+Send:
+
+Booking Confirmation
+
+Payment Confirmation
+
+Invoice PDF
+
+Receipt PDF
+
+Agreement PDF
+
+Customer Dashboard Link
+
+Booking Link
+
+Payment History Link
+
+Track delivery status.
+
+Retry failures.
+
+=========================
+
+7. SMS
+
+Automatically send:
+
+Payment Received
+
+Amount Paid
+
+Balance
+
+Invoice Link
+
+Customer Dashboard Link
+
+=========================
+
+8. Email
+
+Professional HTML email.
+
+Attachments:
+
+Invoice PDF
+
+Receipt PDF
+
+Agreement PDF
+
+Booking Summary
+
+=========================
+
+9. Push Notifications
+
+Firebase
+
+Browser Push
+
+Mobile Push
+
+should all work.
+
+=========================
+
+10. Finance
+
+Automatically update:
+
+Ledger
+
+Journal
+
+GST
+
+Revenue
+
+Outstanding
+
+Cash Flow
+
+Profit
+
+Reports
+
+=========================
+
+11. Reports
+
+Include:
+
+Pending
+
+Partially Paid
+
+Paid
+
+Cancelled
+
+Refunded
+
+Overdue
+
+=========================
+
+12. Razorpay
+
+Verify:
+
+Webhook
+
+Signature
+
+Duplicate Protection
+
+Idempotency
+
+Retry
+
+Logging
+
+Queue
+
+=========================
+
+13. Background Jobs
+
+Notification Queue
+
+PDF Queue
+
+Email Queue
+
+SMS Queue
+
+WhatsApp Queue
+
+Retry Queue
+
+must all be monitored.
+
+=========================
+
+14. Audit Logs
+
+Store:
+
+Payment
+
+Invoice
+
+Receipt
+
+Agreement
+
+Notification
+
+Email
+
+SMS
+
+WhatsApp
+
+Every action must be traceable.
+
+=========================
+
+15. Security
+
+Signed URLs
+
+Secure PDF Downloads
+
+Role Permissions
+
+Customer can access only own documents.
+
+=========================
+
+16. Health Dashboard
+
+Create Admin → System Health
+
+Show:
+
+Razorpay
+
+WhatsApp API
+
+SMS Gateway
+
+SMTP
+
+Firebase
+
+PDF Generator
+
+Database
+
+Queue Workers
+
+Webhook
+
+Storage
+
+Green/Red indicators.
+
+=========================
+
+17. Final Testing
+
+Run complete end-to-end testing.
+
+Scenario:
+
+Booking
+
+↓
+
+Invoice
+
+↓
+
+₹1 Payment
+
+↓
+
+Invoice = PARTIALLY PAID
+
+↓
+
+Receipt Generated
+
+↓
+
+Agreement Updated
+
+↓
+
+Dashboard Updated
+
+↓
+
+Ledger Updated
+
+↓
+
+Finance Updated
+
+↓
+
+Reports Updated
+
+↓
+
+WhatsApp Sent
+
+↓
+
+SMS Sent
+
+↓
+
+Email Sent
+
+↓
+
+Push Sent
+
+↓
+
+Customer Downloads Correct PDF
+
+Repeat for:
+
+₹0
+
+50%
+
+100%
+
+Verify every module.
+
+=========================
+
+Do not mark complete until every production test passes.
