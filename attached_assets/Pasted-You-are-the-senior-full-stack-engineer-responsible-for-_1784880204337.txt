@@ -1,0 +1,397 @@
+You are the senior full-stack engineer responsible for completing the Meta, Facebook, Instagram, Messenger, WhatsApp Business, and Omnichannel CRM integration for the Al Burhan Tours & Travels ERP.
+
+Current Status:
+- Meta Business Portfolio is configured.
+- Meta App "alburhantravels" exists.
+- Facebook Page exists.
+- Instagram Business Account (@alburhantravels) exists.
+- WhatsApp Business Account exists.
+- Ad Account is connected.
+- ERP Social Media Dashboard is already built.
+- Dashboard currently shows:
+  - Facebook: 0 messages, 0 leads
+  - Instagram: partial data
+  - WhatsApp: 0 conversations, 0% delivery
+  - Followers stuck on "Loading"
+  - Error: "Invalid OAuth access token – Cannot parse access token"
+
+Your task is to complete the backend integration and make the entire omnichannel system production-ready.
+
+==================================================
+1. META GRAPH API
+==================================================
+
+Implement full Meta Graph API integration.
+
+Support:
+
+- Facebook Pages API
+- Facebook Messenger API
+- Instagram Graph API
+- Instagram Messaging API
+- WhatsApp Business Cloud API
+- Facebook Lead Ads API
+- Marketing API (optional)
+
+==================================================
+2. ACCESS TOKEN MANAGEMENT
+==================================================
+
+Implement secure token management.
+
+Store:
+
+META_APP_ID
+META_APP_SECRET
+META_VERIFY_TOKEN
+META_PAGE_ACCESS_TOKEN
+META_SYSTEM_USER_TOKEN
+FACEBOOK_PAGE_ID
+INSTAGRAM_BUSINESS_ID
+WHATSAPP_BUSINESS_ACCOUNT_ID
+WHATSAPP_PHONE_NUMBER_ID
+
+Requirements:
+
+• Validate every token before saving.
+• Detect expired tokens.
+• Display meaningful errors.
+• Never save invalid tokens.
+• Support long-lived token refresh.
+
+==================================================
+3. WEBHOOKS
+==================================================
+
+Create production webhook endpoints.
+
+Required endpoints:
+
+/api/meta/webhook
+/api/facebook/webhook
+/api/instagram/webhook
+/api/whatsapp/webhook
+
+Webhook verification:
+
+GET
+hub.mode
+hub.challenge
+hub.verify_token
+
+Webhook events:
+
+Facebook
+- messages
+- messaging_postbacks
+- feed
+- leadgen
+
+Instagram
+- messages
+- comments
+- mentions
+- story replies
+
+WhatsApp
+- messages
+- message status
+- template status
+- conversations
+
+==================================================
+4. CONNECTED ASSETS
+==================================================
+
+Automatically verify that:
+
+Facebook Page
+Instagram Account
+WhatsApp Business Account
+Ad Account
+
+are connected to the Meta App.
+
+If any asset is missing:
+
+Show clear instructions inside ERP.
+
+==================================================
+5. FACEBOOK
+==================================================
+
+Display live:
+
+Followers
+Inbox
+Messenger
+Unread
+Comments
+Posts
+Reactions
+Lead Ads
+Campaign Performance
+
+Allow replying directly from ERP.
+
+==================================================
+6. INSTAGRAM
+==================================================
+
+Display:
+
+Followers
+DMs
+Story Replies
+Comments
+Mentions
+Posts
+Engagement
+
+Allow replying directly.
+
+==================================================
+7. WHATSAPP
+==================================================
+
+Fix Cloud API integration.
+
+Support:
+
+Incoming messages
+
+Outgoing messages
+
+Templates
+
+Media
+
+Documents
+
+Images
+
+Audio
+
+Video
+
+Delivery status
+
+Read receipts
+
+Broadcasts
+
+Campaigns
+
+Automatic replies
+
+Template approval status
+
+Conversation history
+
+==================================================
+8. OMNICHANNEL INBOX
+==================================================
+
+Create one inbox for:
+
+Facebook
+
+Messenger
+
+Instagram
+
+WhatsApp
+
+Telegram
+
+SMS
+
+Email
+
+Each conversation must create or update CRM customer.
+
+==================================================
+9. CRM
+==================================================
+
+Automatically:
+
+Create Lead
+
+Create Customer
+
+Create Enquiry
+
+Assign Staff
+
+Assign Branch
+
+Track Source
+
+Track Campaign
+
+Track Platform
+
+Track UTM
+
+==================================================
+10. DASHBOARD
+==================================================
+
+Replace fake numbers with live API data.
+
+Show:
+
+Unread Messages
+
+Followers
+
+Comments
+
+Campaigns
+
+Lead Count
+
+Open Conversations
+
+Response Time
+
+Delivery %
+
+WhatsApp Templates
+
+Facebook Ads
+
+Instagram Insights
+
+==================================================
+11. ERROR HANDLING
+==================================================
+
+If Meta returns:
+
+Invalid OAuth Token
+
+Expired Token
+
+Permission Error
+
+Missing Scope
+
+Webhook Error
+
+Display user-friendly messages.
+
+Never crash.
+
+==================================================
+12. SETTINGS PAGE
+==================================================
+
+Create professional Meta Settings page.
+
+Allow saving:
+
+App ID
+
+App Secret
+
+Verify Token
+
+Webhook URL
+
+Page Access Token
+
+Instagram ID
+
+Facebook Page ID
+
+Phone Number ID
+
+Business Account ID
+
+Validate each field before saving.
+
+==================================================
+13. SECURITY
+==================================================
+
+Encrypt:
+
+Tokens
+
+Secrets
+
+API Keys
+
+Do not expose secrets in frontend.
+
+==================================================
+14. LOGGING
+==================================================
+
+Create logs for:
+
+Facebook API
+
+Instagram API
+
+WhatsApp API
+
+Webhook events
+
+Token refresh
+
+Errors
+
+==================================================
+15. TESTING
+==================================================
+
+Create a "Test Connection" feature.
+
+It should verify:
+
+✓ App ID
+
+✓ App Secret
+
+✓ Access Token
+
+✓ Facebook Page
+
+✓ Instagram Account
+
+✓ WhatsApp Business
+
+✓ Webhook
+
+✓ Permissions
+
+Display green checkmarks for passed tests.
+
+==================================================
+16. FINAL RESULT
+==================================================
+
+After implementation:
+
+✓ Facebook followers display correctly.
+
+✓ Instagram followers display correctly.
+
+✓ Facebook messages sync instantly.
+
+✓ Instagram DMs sync instantly.
+
+✓ WhatsApp conversations sync instantly.
+
+✓ Lead Ads create CRM leads automatically.
+
+✓ Omnichannel Inbox works.
+
+✓ Dashboard displays live metrics.
+
+✓ Invalid OAuth Token errors are eliminated.
+
+Perform a full code review, implement all missing backend functionality, migrate any placeholder code to production-ready implementations, and test the entire Meta integration end-to-end before marking the task complete.

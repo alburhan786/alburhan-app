@@ -461,18 +461,24 @@ function ConfigModal({ platform, onClose, onSaved }: {
   );
 }
 
+const REPLY_CAPABLE = new Set(["telegram_bot", "facebook_messenger", "instagram_dm", "whatsapp_meta"]);
+
 // ── Inbox tab ─────────────────────────────────────────────────────────────────
 function UnifiedInbox() {
+  const { toast } = useToast();
   const [messages, setMessages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState({ platform: "all", status: "all" });
+  const [expanded, setExpanded] = useState<number | null>(null);
+  const [replyText, setReplyText] = useState("");
+  const [sending, setSending] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
     const q = new URLSearchParams();
     if (filter.platform !== "all") q.set("platform", filter.platform);
     if (filter.status !== "all") q.set("status", filter.status);
-    q.set("limit", "50");
+    q.set("limit", "100");
     fetch(`${API}/api/social-media/messages?${q}`, { credentials: "include" })
       .then(r => r.json())
       .then(d => setMessages(d.messages || []))
@@ -482,6 +488,32 @@ function UnifiedInbox() {
 
   useEffect(() => { load(); }, [load]);
 
+  const sendReply = async (msg: any) => {
+    if (!replyText.trim()) return;
+    setSending(true);
+    try {
+      const r = await fetch(`${API}/api/social-media/reply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ platform: msg.platform, sender_id: msg.sender_id, message_text: replyText, message_id: msg.id }),
+      });
+      const d = await r.json();
+      if (d.ok) {
+        toast({ title: "Reply sent", description: `Message delivered via ${msg.platform.replace(/_/g," ")}` });
+        setReplyText("");
+        setExpanded(null);
+        load();
+      } else {
+        toast({ title: "Send failed", description: d.message, variant: "destructive" });
+      }
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    } finally {
+      setSending(false);
+    }
+  };
+
   const platformEmoji: Record<string, string> = {
     telegram_bot: "✈️", telegram_channel: "📢",
     facebook_page: "📘", facebook_messenger: "💬", facebook_leads: "🎯",
@@ -490,9 +522,16 @@ function UnifiedInbox() {
     website_booking: "📋", website_support: "🎫",
   };
 
+  const statusColor: Record<string, string> = {
+    unread: "bg-blue-50 border-blue-200",
+    linked: "bg-green-50 border-green-200",
+    replied: "bg-gray-50 border-gray-200",
+    in_progress: "bg-amber-50 border-amber-200",
+  };
+
   return (
     <div className="space-y-3">
-      <div className="flex gap-2 flex-wrap">
+      <div className="flex gap-2 flex-wrap items-center">
         <select className="border rounded px-2 py-1 text-sm" value={filter.platform} onChange={e => setFilter(f => ({ ...f, platform: e.target.value }))}>
           <option value="all">All Platforms</option>
           {["telegram_bot","facebook_messenger","facebook_leads","instagram_dm","whatsapp_meta","website_contact","website_support"].map(p => (
@@ -502,39 +541,95 @@ function UnifiedInbox() {
         <select className="border rounded px-2 py-1 text-sm" value={filter.status} onChange={e => setFilter(f => ({ ...f, status: e.target.value }))}>
           <option value="all">All Status</option>
           <option value="unread">Unread</option>
+          <option value="linked">Linked to Lead</option>
           <option value="in_progress">In Progress</option>
           <option value="replied">Replied</option>
           <option value="archived">Archived</option>
         </select>
         <Button size="sm" variant="outline" onClick={load}>↻ Refresh</Button>
+        {messages.length > 0 && (
+          <span className="text-xs text-muted-foreground ml-auto">{messages.filter(m => m.direction !== "outgoing").length} messages</span>
+        )}
       </div>
 
       {loading ? (
         <div className="text-center py-8 text-muted-foreground text-sm">Loading messages…</div>
-      ) : messages.length === 0 ? (
+      ) : messages.filter(m => m.direction !== "outgoing").length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           <p className="text-4xl mb-3">📭</p>
           <p className="text-sm">No messages yet. Connect a platform to start receiving messages.</p>
         </div>
       ) : (
         <div className="space-y-2">
-          {messages.map((msg: any) => (
-            <div key={msg.id} className={`border rounded-lg p-3 ${msg.status === "unread" ? "bg-blue-50 border-blue-200" : "bg-white"}`}>
-              <div className="flex items-start gap-3">
-                <span className="text-2xl">{platformEmoji[msg.platform] || "💬"}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium text-sm">{msg.sender_name || msg.sender_id || "Unknown"}</span>
-                    <Badge variant="outline" className="text-[10px] px-1 py-0">{msg.platform.replace(/_/g, " ")}</Badge>
-                    <Badge variant={msg.status === "unread" ? "default" : "secondary"} className="text-[10px] px-1 py-0">{msg.status}</Badge>
-                    <span className="text-xs text-muted-foreground ml-auto">{new Date(msg.created_at).toLocaleString()}</span>
+          {messages.filter(m => m.direction !== "outgoing").map((msg: any) => {
+            const isExpanded = expanded === msg.id;
+            const canReply = REPLY_CAPABLE.has(msg.platform) && msg.sender_id;
+            return (
+              <div key={msg.id} className={`border rounded-lg overflow-hidden transition-all ${statusColor[msg.status] || "bg-white"}`}>
+                {/* Message row */}
+                <div
+                  className="p-3 cursor-pointer hover:bg-black/5 transition-colors"
+                  onClick={() => { setExpanded(isExpanded ? null : msg.id); setReplyText(""); }}
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="text-2xl flex-shrink-0">{platformEmoji[msg.platform] || "💬"}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-sm">{msg.sender_name || msg.sender_id || "Unknown"}</span>
+                        <Badge variant="outline" className="text-[10px] px-1 py-0">{msg.platform.replace(/_/g, " ")}</Badge>
+                        <Badge variant={msg.status === "unread" ? "default" : "secondary"} className="text-[10px] px-1 py-0">{msg.status}</Badge>
+                        {canReply && <span className="text-[10px] text-blue-600 border border-blue-200 rounded px-1">↩ reply</span>}
+                        <span className="text-xs text-muted-foreground ml-auto">{new Date(msg.created_at).toLocaleString()}</span>
+                      </div>
+                      <p className={`text-sm text-gray-700 mt-1 ${isExpanded ? "" : "truncate"}`}>{msg.message_text}</p>
+                      {msg.sender_phone && <p className="text-xs text-gray-400 mt-0.5">{msg.sender_phone}</p>}
+                      {msg.reply_text && !isExpanded && (
+                        <p className="text-xs text-green-600 mt-0.5 truncate">↩ {msg.reply_text}</p>
+                      )}
+                    </div>
                   </div>
-                  <p className="text-sm text-gray-700 mt-1 truncate">{msg.message_text}</p>
-                  {msg.sender_phone && <p className="text-xs text-gray-400 mt-0.5">{msg.sender_phone}</p>}
                 </div>
+
+                {/* Expanded: reply panel */}
+                {isExpanded && (
+                  <div className="border-t px-3 pb-3 pt-2 bg-white/80 space-y-2">
+                    {msg.reply_text && (
+                      <div className="text-xs text-green-700 bg-green-50 border border-green-200 rounded p-2">
+                        ✅ Previous reply: "{msg.reply_text}"
+                      </div>
+                    )}
+                    {msg.lead_name && (
+                      <p className="text-xs text-muted-foreground">👤 Lead: <strong>{msg.lead_name}</strong></p>
+                    )}
+                    {canReply ? (
+                      <div className="flex gap-2 items-end">
+                        <textarea
+                          className="flex-1 border rounded p-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300"
+                          rows={2}
+                          placeholder={`Reply via ${msg.platform.replace(/_/g," ")}…`}
+                          value={replyText}
+                          onChange={e => setReplyText(e.target.value)}
+                          onKeyDown={e => { if (e.key === "Enter" && e.ctrlKey) sendReply(msg); }}
+                        />
+                        <Button
+                          size="sm"
+                          disabled={sending || !replyText.trim()}
+                          onClick={() => sendReply(msg)}
+                          className="h-16 px-3"
+                        >
+                          {sending ? "…" : "Send ↩"}
+                        </Button>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-amber-600 bg-amber-50 rounded p-2">
+                        ⚠️ Direct reply not available for <strong>{msg.platform.replace(/_/g," ")}</strong>. Respond via the platform app.
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

@@ -47,8 +47,12 @@ async function ensureTables() {
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
   `);
-  // Add lead_text_id if missing (safe ALTER)
+  // Add missing columns (safe ALTERs)
   await pool.query(`ALTER TABLE social_messages ADD COLUMN IF NOT EXISTS lead_text_id TEXT`);
+  await pool.query(`ALTER TABLE social_messages ADD COLUMN IF NOT EXISTS direction VARCHAR(20) DEFAULT 'incoming'`);
+  await pool.query(`ALTER TABLE social_messages ADD COLUMN IF NOT EXISTS reply_text TEXT`);
+  // Back-fill existing rows so direction-based queries work
+  await pool.query(`UPDATE social_messages SET direction='incoming' WHERE direction IS NULL`);
 
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_social_messages_platform ON social_messages(platform)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_social_messages_status ON social_messages(status)`);
@@ -617,8 +621,8 @@ router.post("/webhook/telegram", async (req, res) => {
     const chatId = String(msg.chat?.id);
 
     const insertR = await pool.query(`
-      INSERT INTO social_messages (platform,message_id,sender_id,sender_name,sender_phone,message_text,message_type,raw_data)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+      INSERT INTO social_messages (platform,message_id,sender_id,sender_name,sender_phone,message_text,message_type,raw_data,direction)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'incoming')
       ON CONFLICT DO NOTHING RETURNING id
     `, [
       "telegram_bot", String(update.update_id), chatId, senderName,
@@ -673,8 +677,8 @@ router.post("/webhook/meta", async (req, res) => {
         if (!event.message) continue;
         const platform = object === "instagram" ? "instagram_dm" : "facebook_messenger";
         const insertR = await pool.query(`
-          INSERT INTO social_messages (platform,message_id,sender_id,message_text,message_type,raw_data)
-          VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING RETURNING id
+          INSERT INTO social_messages (platform,message_id,sender_id,message_text,message_type,raw_data,direction)
+          VALUES ($1,$2,$3,$4,$5,$6,'incoming') ON CONFLICT DO NOTHING RETURNING id
         `, [platform, event.message.mid || String(Date.now()), String(event.sender?.id),
             event.message.text || "[attachment]", event.message.attachments ? "attachment" : "text", JSON.stringify(event)]);
         if (insertR.rows[0]) {
@@ -690,8 +694,8 @@ router.post("/webhook/meta", async (req, res) => {
       for (const change of (entry.changes || [])) {
         if (change.field === "leadgen" && change.value) {
           const insertR = await pool.query(`
-            INSERT INTO social_messages (platform,message_id,sender_id,message_text,message_type,raw_data)
-            VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING RETURNING id
+            INSERT INTO social_messages (platform,message_id,sender_id,message_text,message_type,raw_data,direction)
+            VALUES ($1,$2,$3,$4,$5,$6,'incoming') ON CONFLICT DO NOTHING RETURNING id
           `, ["facebook_leads", String(change.value.leadgen_id||Date.now()),
               String(change.value.page_id||"unknown"), `Lead from form ${change.value.form_id}`, "lead", JSON.stringify(change.value)]);
           if (insertR.rows[0]) {
@@ -728,6 +732,75 @@ router.post("/telegram/set-webhook", requireAdmin as any, async (req, res) => {
       res.json({ ok: false, message: "Telegram webhook failed", detail: resp.data });
     }
   } catch (e: any) { res.status(500).json({ ok: false, message: e?.response?.data?.description || e?.message }); }
+});
+
+// ── POST /api/social-media/reply ─────────────────────────────────────────────
+// Send a reply to a message via the appropriate platform API
+router.post("/reply", requireAdmin as any, async (req, res) => {
+  const { platform, sender_id, message_text, message_id } = req.body;
+  if (!platform || !sender_id || !message_text?.trim()) {
+    return void res.status(400).json({ ok: false, message: "platform, sender_id and message_text are required" });
+  }
+  try {
+    const r = await pool.query(`SELECT * FROM social_platform_configs WHERE platform=$1`, [platform]);
+    const row = r.rows[0];
+    if (!row) return void res.status(404).json({ ok: false, message: "Platform not configured" });
+    const extra = decryptExtra(row.extra_fields_encrypted);
+
+    let sent = false;
+    let sentDetail: any = null;
+
+    if (platform === "telegram_bot") {
+      const token = extra.bot_token;
+      if (!token) return void res.status(400).json({ ok: false, message: "Telegram bot token not configured" });
+      const resp = await axios.post(
+        `https://api.telegram.org/bot${token}/sendMessage`,
+        { chat_id: sender_id, text: message_text },
+        { timeout: 10000 }
+      );
+      sent = resp.data?.ok === true;
+      sentDetail = resp.data;
+    } else if (["facebook_messenger", "instagram_dm"].includes(platform)) {
+      const token = extra.page_access_token;
+      if (!token) return void res.status(400).json({ ok: false, message: "Page access token not configured" });
+      const resp = await axios.post(
+        `https://graph.facebook.com/v19.0/me/messages`,
+        { recipient: { id: sender_id }, message: { text: message_text } },
+        { params: { access_token: token }, timeout: 10000 }
+      );
+      sent = !!resp.data?.message_id;
+      sentDetail = resp.data;
+    } else if (platform === "whatsapp_meta") {
+      const token = extra.access_token;
+      const phoneId = extra.phone_number_id;
+      if (!token || !phoneId) return void res.status(400).json({ ok: false, message: "Access token and Phone Number ID required" });
+      const resp = await axios.post(
+        `https://graph.facebook.com/v19.0/${phoneId}/messages`,
+        { messaging_product: "whatsapp", to: sender_id, type: "text", text: { body: message_text } },
+        { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, timeout: 10000 }
+      );
+      sent = !!resp.data?.messages?.[0]?.id;
+      sentDetail = resp.data;
+    } else {
+      return void res.status(400).json({ ok: false, message: `Reply not supported for ${platform}` });
+    }
+
+    if (sent) {
+      await pool.query(`
+        INSERT INTO social_messages (platform, message_id, sender_id, message_text, message_type, direction, status)
+        VALUES ($1,$2,$3,$4,'text','outgoing','sent')
+      `, [platform, `reply_${Date.now()}`, sender_id, message_text]);
+      if (message_id) {
+        await pool.query(`UPDATE social_messages SET status='replied', replied_at=NOW(), reply_text=$1 WHERE id=$2`,
+          [message_text, message_id]);
+      }
+    }
+
+    res.json({ ok: sent, message: sent ? "Reply sent" : "Send failed", detail: sentDetail });
+  } catch (e: any) {
+    const errMsg = e?.response?.data?.error?.message || e?.message || "Unknown error";
+    res.status(500).json({ ok: false, message: `Reply failed: ${errMsg}` });
+  }
 });
 
 // ── POST /api/social-media/website-inquiry ──────────────────────────────────
