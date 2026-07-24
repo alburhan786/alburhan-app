@@ -625,7 +625,7 @@ router.get("/bi", requireAdmin as any, async (req: AuthenticatedRequest, res) =>
           TO_CHAR(created_at, 'YYYY-MM') AS sort_key,
           COUNT(*)::int AS bookings,
           COUNT(*) FILTER (WHERE status='confirmed')::int AS confirmed,
-          ${safeSum('CASE WHEN status=\'confirmed\' THEN paid_amount ELSE 0 END')} AS revenue
+          ${safeSum('CASE WHEN status IN (\'confirmed\',\'partially_paid\') THEN paid_amount ELSE 0 END')} AS revenue
         FROM bookings
         WHERE created_at >= NOW() - INTERVAL '12 months'
         GROUP BY TO_CHAR(created_at,'Mon YY'), TO_CHAR(created_at,'YYYY-MM')

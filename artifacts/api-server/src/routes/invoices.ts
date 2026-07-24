@@ -179,25 +179,8 @@ router.get("/by-number/:bookingNumber/pdf", async (req, res) => {
       });
     }
 
-    // If a pre-generated PDF is stored in object storage, serve it directly
-    if (b.pdf_path) {
-      // Redirect to stored URL for fast delivery
-      if (b.pdf_path.startsWith("http")) {
-        return void res.redirect(302, b.pdf_path);
-      }
-      // Internal path — proxy it
-      const fs = await import("fs");
-      const path = await import("path");
-      const fullPath = path.resolve(process.cwd(), b.pdf_path.replace(/^\//, ""));
-      if (fs.existsSync(fullPath)) {
-        const invoiceNumber = b.inv_num || b.invoice_number;
-        res.setHeader("Content-Type", "application/pdf");
-        res.setHeader("Content-Disposition", `attachment; filename="Invoice-${invoiceNumber || bookingNumber}.pdf"`);
-        return void res.sendFile(fullPath);
-      }
-    }
-
-    // Generate PDF on-the-fly
+    // Always generate fresh PDF from current DB state — never serve stale cached
+    // GCS redirect, which shows old "PENDING" status before payment was recorded.
     const invoiceNumber = b.inv_num || b.invoice_number;
     const buf = await generateInvoicePdfBuffer({
       bookingNumber: b.booking_number,

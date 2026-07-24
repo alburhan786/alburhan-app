@@ -17,6 +17,7 @@ import { upsertInvoiceForBooking } from "./invoices.js";
 import { autoGenerateAgreement } from "./agreements.js";
 import { uploadToGCS } from "../lib/gcsUpload.js";
 import { broadcastCustomerJourneyUpdate } from "./customer-journey.js";
+import { postPaymentJournal } from "../lib/journalHelper.js";
 
 const router = Router();
 
@@ -78,18 +79,46 @@ function mapBookingRow(r: any) {
 
 /**
  * Insert an online Razorpay payment into payment_transactions for the audit
- * trail (deduped by reference_number + booking_id). Fire-and-forget.
+ * trail (deduped by reference_number + booking_id). Returns the txnId on
+ * insert so callers can create the matching journal entry.
  */
-function recordOnlinePaymentTransaction(bookingId: string, amount: number, razorpayPaymentId: string, note = "Online payment via Razorpay") {
+async function recordOnlinePaymentTransaction(
+  bookingId: string,
+  amount: number,
+  razorpayPaymentId: string,
+  note = "Online payment via Razorpay",
+  bookingNumber?: string,
+): Promise<string | null> {
   const today = new Date().toISOString().slice(0, 10);
-  pool.query(
-    `INSERT INTO payment_transactions (id, booking_id, amount, payment_date, payment_mode, reference_number, notes)
-     SELECT $1,$2,$3,$4,'online',$5,$6
-     WHERE NOT EXISTS (
-       SELECT 1 FROM payment_transactions WHERE reference_number=$5 AND booking_id=$2
-     )`,
-    [crypto.randomUUID(), bookingId, String(amount), today, razorpayPaymentId, note]
-  ).catch(e => console.error("[payments] payment_transactions insert failed:", e?.message));
+  const txnId = crypto.randomUUID();
+  try {
+    const r = await pool.query(
+      `INSERT INTO payment_transactions (id, booking_id, amount, payment_date, payment_mode, reference_number, notes)
+       SELECT $1,$2,$3,$4,'online',$5,$6
+       WHERE NOT EXISTS (
+         SELECT 1 FROM payment_transactions WHERE reference_number=$5 AND booking_id=$2
+       )
+       RETURNING id`,
+      [txnId, bookingId, String(amount), today, razorpayPaymentId, note]
+    );
+    if (!r.rows[0]) {
+      console.log(`[payments] payment_transactions: duplicate skipped (${razorpayPaymentId})`);
+      return null;
+    }
+    const insertedId = r.rows[0].id as string;
+    // Auto-create accounting journal entry (Dr: Cash/Bank  Cr: Customer Advance)
+    postPaymentJournal({
+      txnId: insertedId,
+      amount,
+      mode: "online",
+      date: today,
+      bookingNumber,
+    }).catch((e: any) => console.error("[payments] postPaymentJournal failed (non-fatal):", e?.message));
+    return insertedId;
+  } catch (e: any) {
+    console.error("[payments] payment_transactions insert failed:", e?.message);
+    return null;
+  }
 }
 
 /**
@@ -476,8 +505,8 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
   const _verifyBkRes = await pool.query(`SELECT * FROM bookings WHERE id=$1 LIMIT 1`, [bookingId]);
   const booking = mapBookingRow(_verifyBkRes.rows[0]);
 
-  // Record in payment_transactions for complete audit trail
-  recordOnlinePaymentTransaction(bookingId, thisPayment, razorpayPaymentId);
+  // Record in payment_transactions + auto-create journal entry (Dr: Cash  Cr: Customer Advance)
+  recordOnlinePaymentTransaction(bookingId, thisPayment, razorpayPaymentId, "Online payment via Razorpay", booking.bookingNumber);
 
   console.log("[verify] Payment verified:", razorpayPaymentId, "→ Booking", booking.bookingNumber, newStatus);
 
@@ -836,10 +865,24 @@ router.post("/webhook", async (req: any, res) => {
     const _wbBkRes = await pool.query(`SELECT * FROM bookings WHERE id=$1 LIMIT 1`, [booking.id]);
     const updated = mapBookingRow(_wbBkRes.rows[0]);
 
-    // Record in payment_transactions for complete audit trail
+    // Record in payment_transactions + auto-create journal entry (Dr: Cash  Cr: Customer Advance)
     if (paymentId) {
-      recordOnlinePaymentTransaction(booking.id, thisPayment, paymentId, "Online payment via Razorpay (webhook)");
+      recordOnlinePaymentTransaction(booking.id, thisPayment, paymentId, "Online payment via Razorpay (webhook)", updated.bookingNumber);
     }
+
+    // Advance journey_status (webhook didn't previously do this — customers got stuck)
+    const webhookJourneyStatus = isFullyPaid ? "payment_received" : "partial_payment_received";
+    const webhookAllowedFrom = isFullyPaid
+      ? "('booking_requested','documents_pending','documents_received','admin_verification','payment_pending','booking_approved','partial_payment_received')"
+      : "('booking_requested','documents_pending','documents_received','admin_verification','payment_pending','booking_approved')";
+    pool.query(
+      `UPDATE bookings SET journey_status = $1, updated_at = NOW()
+       WHERE id = $2 AND journey_status IN ${webhookAllowedFrom}`,
+      [webhookJourneyStatus, booking.id]
+    ).then(() => {
+      console.log(`[Webhook] journey_status → ${webhookJourneyStatus} for ${updated.bookingNumber}`);
+      broadcastCustomerJourneyUpdate(booking.id, webhookJourneyStatus);
+    }).catch((err: any) => console.error("[Webhook] journey_status advance failed:", err?.message));
 
     // Upsert invoice and capture real invoice number (covers partial payments too)
     let finalInvoiceNumber = invoiceNumber;
@@ -1505,8 +1548,8 @@ router.post("/verify-public", async (req, res) => {
   const _vpBkRes = await pool.query(`SELECT * FROM bookings WHERE id=$1 LIMIT 1`, [bookingId]);
   const updated = mapBookingRow(_vpBkRes.rows[0]);
 
-  // Record in payment_transactions for complete audit trail
-  recordOnlinePaymentTransaction(bookingId, chargeAmount, razorpay_payment_id, "Online payment via Razorpay (public)");
+  // Record in payment_transactions + auto-create journal entry (Dr: Cash  Cr: Customer Advance)
+  recordOnlinePaymentTransaction(bookingId, chargeAmount, razorpay_payment_id, "Online payment via Razorpay (public)", updated.bookingNumber);
 
   console.log(`${logPfx} ✅ DB updated: ${updated.bookingNumber} → ${newStatus}`);
 

@@ -1,0 +1,433 @@
+You are the Lead Full Stack Engineer for the Al Burhan Tours & Travels ERP & CRM.
+
+Perform a complete audit and permanently fix the entire payment, invoice, booking, notification and automation workflow.
+
+==========================
+ISSUES TO FIX
+==========================
+
+1. PAYMENT STATUS SYNCHRONIZATION
+
+Currently:
+
+• Razorpay payment succeeds.
+• Customer dashboard shows payment received.
+• Invoice PDF still shows "PENDING".
+• Invoice balance is incorrect.
+• Booking payment status does not update everywhere.
+
+Fix so that payment status updates everywhere instantly.
+
+After successful payment:
+
+Customer Dashboard
+Invoice
+Booking
+Payment History
+Admin Dashboard
+Finance Dashboard
+Customer Ledger
+Family Ledger
+Reports
+Analytics
+
+must all display identical payment data.
+
+Use database transactions so updates cannot become inconsistent.
+
+==========================
+2. AUTO PAYMENT CONFIRMATION
+==========================
+
+Immediately after successful payment:
+
+Generate:
+
+• Payment Receipt PDF
+• Updated Invoice PDF
+• Updated Booking Summary
+• Updated Ledger Entry
+
+Save permanently.
+
+==========================
+3. WHATSAPP AUTOMATION
+==========================
+
+After payment succeeds automatically send:
+
+Customer Name
+
+Booking ID
+
+Invoice Number
+
+Receipt Number
+
+Paid Amount
+
+Remaining Balance
+
+Payment Date
+
+Package Name
+
+Secure Customer Dashboard URL
+
+Invoice PDF
+
+Receipt PDF
+
+Agreement PDF
+
+No manual action required.
+
+Retry automatically if sending fails.
+
+Store delivery logs.
+
+==========================
+4. SMS AUTOMATION
+==========================
+
+Automatically send SMS:
+
+Payment Received Successfully
+
+Paid Amount
+
+Remaining Balance
+
+Customer Dashboard Link
+
+Invoice Link
+
+Support Number
+
+Retry if failed.
+
+==========================
+5. EMAIL AUTOMATION
+==========================
+
+Automatically send:
+
+Professional HTML email.
+
+Attachments:
+
+Invoice PDF
+
+Receipt PDF
+
+Agreement PDF
+
+Booking Summary
+
+Include payment details.
+
+Track delivery.
+
+==========================
+6. CUSTOMER DASHBOARD
+==========================
+
+Refresh instantly.
+
+Display:
+
+Payment Received
+
+Remaining Balance
+
+Payment Timeline
+
+Receipt Download
+
+Invoice Download
+
+Agreement Download
+
+Booking Status
+
+Payment History
+
+All without page refresh.
+
+==========================
+7. ADMIN DASHBOARD
+==========================
+
+Immediately update:
+
+Today's Collection
+
+Revenue
+
+Outstanding
+
+Pending Payments
+
+Recent Payments
+
+Cash Flow
+
+Finance Reports
+
+==========================
+8. FINANCE MODULE
+==========================
+
+Automatically:
+
+Create Ledger Entry
+
+Create Journal Entry
+
+Update Outstanding Balance
+
+Update Customer Ledger
+
+Update Family Ledger
+
+Update GST Calculations
+
+==========================
+9. PAYMENT WEBHOOK
+==========================
+
+Audit Razorpay webhook.
+
+Guarantee:
+
+Webhook verification
+
+Signature validation
+
+Duplicate protection
+
+Idempotency
+
+Retry queue
+
+Logging
+
+Failure notifications
+
+==========================
+10. PDF GENERATION
+==========================
+
+Automatically regenerate:
+
+Invoice
+
+Receipt
+
+Agreement
+
+Booking Summary
+
+using latest payment information.
+
+Invoice status:
+
+Pending
+
+Partial
+
+Paid
+
+Overdue
+
+must always be accurate.
+
+==========================
+11. CUSTOMER PORTAL
+==========================
+
+Customer should receive:
+
+WhatsApp
+
+SMS
+
+Email
+
+with secure links to:
+
+Invoice
+
+Receipt
+
+Agreement
+
+Booking
+
+Payment History
+
+Customer Dashboard
+
+Links should use secure signed URLs.
+
+==========================
+12. NOTIFICATION ENGINE
+==========================
+
+Create centralized notification service.
+
+Supports:
+
+WhatsApp
+
+SMS
+
+Email
+
+Firebase Push
+
+Future RCS
+
+Every notification logged with:
+
+Status
+
+Provider
+
+Timestamp
+
+Retries
+
+Delivery
+
+Read Status
+
+==========================
+13. DATABASE AUDIT
+==========================
+
+Verify synchronization between:
+
+bookings
+
+payments
+
+invoices
+
+receipts
+
+customers
+
+ledgers
+
+transactions
+
+notifications
+
+No table should contain inconsistent payment values.
+
+==========================
+14. ERROR LOGGING
+==========================
+
+Create detailed logs.
+
+If any automation fails:
+
+Retry automatically.
+
+Notify administrator.
+
+Store failure reason.
+
+==========================
+15. TESTING
+==========================
+
+Perform end-to-end testing.
+
+Scenario:
+
+Create Booking
+
+Generate Invoice
+
+Pay ₹1
+
+Verify:
+
+Invoice Status changes to Partially Paid
+
+Dashboard updates
+
+Admin updates
+
+Finance updates
+
+Ledger updates
+
+WhatsApp sent
+
+SMS sent
+
+Email sent
+
+Invoice PDF updated
+
+Receipt PDF generated
+
+Agreement available
+
+Payment History updated
+
+Booking timeline updated
+
+Repeat with full payment.
+
+Verify status becomes PAID everywhere.
+
+==========================
+16. PERFORMANCE
+==========================
+
+Target processing time:
+
+Payment Success → Complete System Update
+
+Less than 5 seconds.
+
+==========================
+17. FINAL RESULT
+==========================
+
+Deliver a production-ready enterprise payment workflow.
+
+No manual synchronization.
+
+No stale invoice status.
+
+No missing notifications.
+
+No duplicate notifications.
+
+Every payment must automatically update every module and automatically send:
+
+WhatsApp
+
+SMS
+
+Email
+
+Invoice PDF
+
+Receipt PDF
+
+Agreement PDF
+
+Customer Dashboard Link
+
+Booking Link
+
+with enterprise-grade reliability.
+
+Do not stop until every issue is fixed and verified with end-to-end testing.
