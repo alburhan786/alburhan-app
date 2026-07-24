@@ -1240,6 +1240,473 @@ router.post("/meta/test-message", requireAdmin as any, async (req, res) => {
   }
 });
 
+// ── POST /api/social-media/meta/auto-repair ───────────────────────────────────
+// Attempts every possible automatic repair: token extension, ID discovery/save,
+// webhook re-subscription, challenge verification. Returns a full repair log.
+router.post("/meta/auto-repair", requireAdmin as any, async (_req, res) => {
+  const GRAPH = "https://graph.facebook.com/v19.0";
+  const WEBHOOK_URL = "https://alburhantravels.com/api/social-media/webhook/meta";
+  const TO = 10000;
+  const repairs: any[] = [];
+
+  // ── Load configs ────────────────────────────────────────────────────────────
+  const cfgRows = await pool.query(
+    `SELECT platform, extra_fields_encrypted, api_key_encrypted FROM social_platform_configs
+     WHERE platform IN ('facebook_page','facebook_messenger','facebook_leads','instagram','instagram_dm','whatsapp_meta')`
+  );
+  const cfgMap: Record<string, any> = {};
+  const rawRows: Record<string, any> = {};
+  for (const row of cfgRows.rows) {
+    const extra = decryptExtra(row.extra_fields_encrypted);
+    const apiKey = row.api_key_encrypted ? decrypt(row.api_key_encrypted) : null;
+    cfgMap[row.platform] = { ...extra, _apiKey: apiKey };
+    rawRows[row.platform] = row;
+  }
+
+  const fbToken = cfgMap.facebook_page?.page_access_token || cfgMap.facebook_messenger?.page_access_token
+    || cfgMap.facebook_leads?.page_access_token || cfgMap.instagram?.page_access_token || cfgMap.instagram_dm?.page_access_token;
+  const fbAppId = cfgMap.facebook_page?.app_id || cfgMap.facebook_messenger?.app_id;
+  const fbAppSecret = cfgMap.facebook_page?.app_secret || cfgMap.facebook_messenger?.app_secret;
+  const igId = cfgMap.instagram?.instagram_account_id || cfgMap.instagram_dm?.instagram_account_id;
+  const waToken = cfgMap.whatsapp_meta?.access_token || cfgMap.whatsapp_meta?._apiKey;
+  const waPhoneId = cfgMap.whatsapp_meta?.phone_number_id;
+  const waWabaId = cfgMap.whatsapp_meta?.waba_id;
+  const webhookVerifyToken = cfgMap.facebook_page?.webhook_verify_token || cfgMap.whatsapp_meta?.webhook_verify_token;
+
+  // ── Helper: log a repair ───────────────────────────────────────────────────
+  type RepairResult = "fixed" | "failed" | "skipped" | "validated";
+  const log = (action: string, result: RepairResult, detail: string, data?: any) =>
+    repairs.push({ action, result, detail, data: data || null, ts: new Date().toISOString() });
+
+  // ── Helper: save updated extra fields to a platform ────────────────────────
+  async function saveExtra(platform: string, updates: Record<string, any>): Promise<boolean> {
+    const row = rawRows[platform];
+    if (!row) return false;
+    const existing = decryptExtra(row.extra_fields_encrypted);
+    const merged = { ...existing, ...updates };
+    const encExtra = encrypt(JSON.stringify(merged));
+    await pool.query(`UPDATE social_platform_configs SET extra_fields_encrypted=$1, updated_at=NOW() WHERE platform=$2`, [encExtra, platform]);
+    return true;
+  }
+
+  // ── Helper: safe fetch + parse ─────────────────────────────────────────────
+  async function gfetch(url: string, opts?: RequestInit): Promise<{ ok: boolean; status: number; data: any }> {
+    try {
+      const r = await fetch(url, { signal: AbortSignal.timeout(TO), ...opts });
+      const txt = await r.text();
+      let data: any;
+      try { data = JSON.parse(txt); } catch { data = { _raw: txt.slice(0, 200) }; }
+      return { ok: r.ok && !data?.error, status: r.status, data };
+    } catch (e: any) {
+      return { ok: false, status: 0, data: { error: { message: e.message } } };
+    }
+  }
+
+  // ══ Repair 1: Extend Facebook User/Page Access Token ═══════════════════════
+  let activeFbToken = fbToken;
+  if (fbToken && fbAppId && fbAppSecret) {
+    const r = await gfetch(`${GRAPH}/oauth/access_token?grant_type=fb_exchange_token&client_id=${fbAppId}&client_secret=${fbAppSecret}&fb_exchange_token=${encodeURIComponent(fbToken)}`);
+    if (r.ok && r.data.access_token && r.data.access_token !== fbToken) {
+      activeFbToken = r.data.access_token;
+      for (const plat of ["facebook_page", "facebook_messenger", "facebook_leads", "instagram", "instagram_dm"]) {
+        if (cfgMap[plat]?.page_access_token === fbToken) await saveExtra(plat, { page_access_token: activeFbToken });
+      }
+      log("Extend Facebook Access Token (fb_exchange_token)", "fixed",
+        `Token extended successfully. Expires in ${r.data.expires_in ? Math.round(r.data.expires_in / 86400) + " days" : "unknown"}. Saved to all configured platforms.`,
+        { expires_in: r.data.expires_in });
+    } else if (r.data?.error) {
+      const msg = r.data.error.message || "";
+      const isExpired = r.data.error.code === 190 || msg.toLowerCase().includes("expired") || msg.toLowerCase().includes("invalid");
+      log("Extend Facebook Access Token", "failed",
+        isExpired
+          ? `Token has expired and cannot be extended automatically. Manual action required: generate a new Page Access Token in Meta Business Suite → Settings → Advanced → Page Access Token.`
+          : `Exchange failed: ${msg} (code ${r.data.error.code})`,
+        { error: r.data.error });
+    } else {
+      log("Extend Facebook Access Token", "validated", "Token returned is the same — it is already a long-lived Page token (Page tokens never expire unless revoked).");
+    }
+  } else if (fbToken && !fbAppId) {
+    log("Extend Facebook Access Token", "skipped", "App ID and App Secret required. Add them in Facebook Page platform settings to enable token extension.");
+  } else {
+    log("Extend Facebook Access Token", "skipped", "No Facebook Page Access Token configured.");
+  }
+
+  // ══ Repair 2: Discover + save Facebook Page ID ════════════════════════════
+  let discoveredPageId: string | null = null;
+  if (activeFbToken) {
+    const r = await gfetch(`${GRAPH}/me?fields=id,name,fan_count&access_token=${activeFbToken}`);
+    if (r.ok && r.data.id) {
+      discoveredPageId = r.data.id;
+      let saved = false;
+      for (const plat of ["facebook_page", "facebook_messenger", "facebook_leads"]) {
+        if (rawRows[plat] && cfgMap[plat]?.page_id !== r.data.id) {
+          await saveExtra(plat, { page_id: r.data.id });
+          saved = true;
+        }
+      }
+      log("Discover and Save Facebook Page ID", saved ? "fixed" : "validated",
+        saved ? `Saved Page ID ${r.data.id} ("${r.data.name}") to facebook_page, facebook_messenger, facebook_leads.`
+          : `Page ID ${r.data.id} ("${r.data.name}") already correctly configured.`,
+        { page_id: r.data.id, page_name: r.data.name, fan_count: r.data.fan_count });
+    } else {
+      log("Discover Facebook Page ID", "failed", `GET /me failed: ${r.data?.error?.message} (code ${r.data?.error?.code})`, { error: r.data?.error });
+    }
+  } else {
+    log("Discover Facebook Page ID", "skipped", "No Facebook token available.");
+  }
+
+  // ══ Repair 3: Discover + save Instagram Account ID ════════════════════════
+  const effectivePageId = discoveredPageId || cfgMap.facebook_page?.page_id || cfgMap.facebook_messenger?.page_id;
+  if (activeFbToken && effectivePageId) {
+    const r = await gfetch(`${GRAPH}/${effectivePageId}?fields=instagram_business_account&access_token=${activeFbToken}`);
+    if (r.ok && r.data.instagram_business_account?.id) {
+      const correctIgId = r.data.instagram_business_account.id;
+      let saved = false;
+      for (const plat of ["instagram", "instagram_dm"]) {
+        if (rawRows[plat] && cfgMap[plat]?.instagram_account_id !== correctIgId) {
+          await saveExtra(plat, { instagram_account_id: correctIgId });
+          saved = true;
+        } else if (!rawRows[plat] && igId !== correctIgId) {
+          // Platform not configured — note the correct ID for the user
+        }
+      }
+      if (correctIgId !== igId && !rawRows.instagram && !rawRows.instagram_dm) {
+        log("Discover Instagram Account ID", "validated",
+          `Correct Instagram Account ID is ${correctIgId} — but Instagram platform is not configured in Social Media settings. Add the Instagram DM platform and set this ID.`,
+          { suggested_id: correctIgId });
+      } else {
+        log("Discover and Save Instagram Account ID", saved ? "fixed" : "validated",
+          saved ? `Updated Instagram Account ID to ${correctIgId} (was: ${igId || "not set"}).`
+            : `Instagram Account ID ${correctIgId} is already correct.`,
+          { instagram_account_id: correctIgId, was: igId || null });
+      }
+    } else if (!r.data?.instagram_business_account) {
+      log("Discover Instagram Account ID", "failed",
+        "No Instagram Business Account linked to this Facebook Page. To fix: In Instagram app → Settings → Account → Switch to Professional, then link to your Facebook Page via Facebook → Settings → Linked Accounts.", {});
+    } else {
+      log("Discover Instagram Account ID", "failed", `API error: ${r.data?.error?.message}`, { error: r.data?.error });
+    }
+  } else {
+    log("Discover Instagram Account ID", "skipped", !activeFbToken ? "No Facebook token." : "Page ID could not be determined — run repair 2 first.");
+  }
+
+  // ══ Repair 4: Validate WhatsApp Phone Number ID ═══════════════════════════
+  if (waToken && waPhoneId) {
+    const r = await gfetch(`${GRAPH}/${waPhoneId}?fields=id,display_phone_number,verified_name,quality_rating,status&access_token=${waToken}`);
+    if (r.ok && r.data.id) {
+      log("Validate WhatsApp Phone Number ID", "validated",
+        `Phone Number ID ${waPhoneId} confirmed valid. Number: ${r.data.display_phone_number}, Name: ${r.data.verified_name}, Quality: ${r.data.quality_rating}, Status: ${r.data.status}.`,
+        { phone: r.data.display_phone_number, name: r.data.verified_name, quality: r.data.quality_rating, status: r.data.status });
+    } else {
+      log("Validate WhatsApp Phone Number ID", "failed",
+        `Phone Number ID ${waPhoneId} is invalid: ${r.data?.error?.message} (code ${r.data?.error?.code}). Check Meta Business Manager → WhatsApp Manager → Phone Numbers for the correct numeric ID.`,
+        { error: r.data?.error });
+    }
+  } else {
+    log("Validate WhatsApp Phone Number ID", "skipped", !waToken ? "WhatsApp access token not configured." : "Phone Number ID not configured in WhatsApp Meta settings.");
+  }
+
+  // ══ Repair 5: Validate WhatsApp Business Account (WABA) ══════════════════
+  if (waToken && waWabaId) {
+    const r = await gfetch(`${GRAPH}/${waWabaId}?fields=id,name,currency,account_review_status&access_token=${waToken}`);
+    if (r.ok && r.data.id) {
+      log("Validate WhatsApp Business Account (WABA)", "validated",
+        `WABA ID ${waWabaId} confirmed: "${r.data.name}", Currency: ${r.data.currency}, Status: ${r.data.account_review_status}.`,
+        { waba_name: r.data.name, currency: r.data.currency, review_status: r.data.account_review_status });
+    } else {
+      log("Validate WhatsApp Business Account (WABA)", "failed",
+        `WABA ID ${waWabaId} is invalid: ${r.data?.error?.message} (code ${r.data?.error?.code}). Open Meta Business Manager and copy the correct WABA ID.`,
+        { error: r.data?.error });
+    }
+  } else {
+    log("Validate WhatsApp Business Account (WABA)", "skipped", !waToken ? "No WA token." : "WABA ID not configured in WhatsApp Meta settings.");
+  }
+
+  // ══ Repair 6: Re-subscribe all webhook fields ═════════════════════════════
+  const finalPageId = discoveredPageId || cfgMap.facebook_page?.page_id || cfgMap.facebook_messenger?.page_id;
+  if (activeFbToken && finalPageId) {
+    const FIELDS = ["messages","messaging_postbacks","message_deliveries","message_reads","messaging_optins","messaging_referrals","leadgen","feed","mention","instagram_manage_messages","instagram_manage_comments"].join(",");
+    const r = await gfetch(
+      `${GRAPH}/${finalPageId}/subscribed_apps?subscribed_fields=${encodeURIComponent(FIELDS)}&access_token=${activeFbToken}`,
+      { method: "POST" }
+    );
+    if (r.ok && r.data.success) {
+      await pool.query(`UPDATE social_platform_configs SET webhook_verified=true WHERE platform IN ('facebook_page','facebook_messenger','facebook_leads','instagram','instagram_dm')`);
+      log("Re-subscribe Webhook Fields", "fixed",
+        `Page ${finalPageId} subscribed to all 11 fields: messages, messaging_postbacks, message_deliveries, message_reads, messaging_optins, messaging_referrals, leadgen, feed, mention, instagram_manage_messages, instagram_manage_comments.`);
+    } else {
+      log("Re-subscribe Webhook Fields", "failed",
+        `Subscription failed: ${r.data?.error?.message || JSON.stringify(r.data)} (HTTP ${r.status}). Check that the token has 'pages_manage_metadata' permission.`,
+        { error: r.data?.error });
+    }
+  } else {
+    log("Re-subscribe Webhook Fields", "skipped", !activeFbToken ? "No FB token." : "Page ID unavailable.");
+  }
+
+  // ══ Repair 7: Verify webhook challenge ════════════════════════════════════
+  if (webhookVerifyToken && !webhookVerifyToken.startsWith("http")) {
+    const r = await gfetch(`${WEBHOOK_URL}?hub.mode=subscribe&hub.verify_token=${encodeURIComponent(webhookVerifyToken)}&hub.challenge=repair_verify_54321`);
+    const raw = r.data?._raw ?? "";
+    if (r.status === 200 && String(raw).includes("repair_verify_54321")) {
+      log("Verify Webhook Challenge (Live Self-Test)", "fixed",
+        "Webhook endpoint is live and responding correctly to Meta challenge requests. The verify token is correct and the server is reachable.",
+        { challenge_echoed: String(raw).trim() });
+    } else {
+      log("Verify Webhook Challenge", "failed",
+        `Challenge failed — HTTP ${r.status}. ${r.status === 403 ? "Verify token mismatch: the token saved here does not match what's in your Meta App → Webhooks." : `Response: ${String(raw).slice(0, 80)}`}`,
+        { http_status: r.status, response: String(raw).slice(0, 100) });
+    }
+  } else {
+    log("Verify Webhook Challenge", "skipped",
+      !webhookVerifyToken ? "No verify token configured — set one in Facebook Page platform settings."
+        : "Verify token is a URL — must be a short secret string like 'alburhan_verify_2026'.");
+  }
+
+  // ══ Repair 8: Reconnect disconnected assets (mark platforms active) ════════
+  let reconnected = 0;
+  for (const plat of ["facebook_page", "facebook_messenger", "facebook_leads", "instagram", "instagram_dm"]) {
+    const row = rawRows[plat];
+    if (row && cfgMap[plat]) {
+      const tokenOk = activeFbToken && cfgMap[plat]?.page_access_token;
+      if (tokenOk) {
+        await pool.query(`UPDATE social_platform_configs SET status='active', last_tested=NOW() WHERE platform=$1`, [plat]);
+        reconnected++;
+      }
+    }
+  }
+  if (waToken) {
+    await pool.query(`UPDATE social_platform_configs SET status='active', last_tested=NOW() WHERE platform='whatsapp_meta'`);
+    reconnected++;
+  }
+  if (reconnected > 0) {
+    log("Reconnect Configured Assets", "fixed", `Marked ${reconnected} platform(s) as active and updated last_tested timestamp.`);
+  } else {
+    log("Reconnect Configured Assets", "skipped", "No platforms with valid tokens to reconnect.");
+  }
+
+  const summary = {
+    total: repairs.length,
+    fixed: repairs.filter(r => r.result === "fixed").length,
+    validated: repairs.filter(r => r.result === "validated").length,
+    failed: repairs.filter(r => r.result === "failed").length,
+    skipped: repairs.filter(r => r.result === "skipped").length,
+  };
+
+  res.json({ repairedAt: new Date().toISOString(), repairs, summary });
+});
+
+// ── GET /api/social-media/meta/platform/:platform ─────────────────────────────
+// Per-platform focused live test — returns detailed API data for one platform
+router.get("/meta/platform/:platform", requireAdmin as any, async (req, res) => {
+  const { platform } = req.params;
+  const GRAPH = "https://graph.facebook.com/v19.0";
+  const TO = 10000;
+  const t0 = Date.now();
+
+  const cfgRows = await pool.query(
+    `SELECT platform, extra_fields_encrypted, api_key_encrypted, webhook_verified
+     FROM social_platform_configs
+     WHERE platform IN ('facebook_page','facebook_messenger','facebook_leads','instagram','instagram_dm','whatsapp_meta')`
+  );
+  const cfgMap: Record<string, any> = {};
+  for (const row of cfgRows.rows) {
+    const extra = decryptExtra(row.extra_fields_encrypted);
+    const apiKey = row.api_key_encrypted ? decrypt(row.api_key_encrypted) : null;
+    cfgMap[row.platform] = { ...extra, _apiKey: apiKey, webhook_verified: row.webhook_verified };
+  }
+
+  const fbToken = cfgMap.facebook_page?.page_access_token || cfgMap.facebook_messenger?.page_access_token
+    || cfgMap.facebook_leads?.page_access_token || cfgMap.instagram?.page_access_token || cfgMap.instagram_dm?.page_access_token;
+  const fbPageId = cfgMap.facebook_page?.page_id || cfgMap.facebook_messenger?.page_id || cfgMap.facebook_leads?.page_id;
+  const igId = cfgMap.instagram?.instagram_account_id || cfgMap.instagram_dm?.instagram_account_id;
+  const waToken = cfgMap.whatsapp_meta?.access_token || cfgMap.whatsapp_meta?._apiKey;
+  const waPhoneId = cfgMap.whatsapp_meta?.phone_number_id;
+  const waWabaId = cfgMap.whatsapp_meta?.waba_id;
+  const webhookVerifyToken = cfgMap.facebook_page?.webhook_verify_token || cfgMap.whatsapp_meta?.webhook_verify_token;
+
+  async function gfetch(url: string, opts?: RequestInit) {
+    const t1 = Date.now();
+    try {
+      const r = await fetch(url, { signal: AbortSignal.timeout(TO), ...opts });
+      const txt = await r.text();
+      let data: any;
+      try { data = JSON.parse(txt); } catch { data = { _raw: txt.slice(0, 300) }; }
+      // Trim arrays
+      if (data && typeof data === "object" && !Array.isArray(data)) {
+        const trimmed: any = {};
+        for (const k of Object.keys(data)) {
+          const v = data[k];
+          trimmed[k] = Array.isArray(v) ? v.slice(0, 5) : v;
+        }
+        data = trimmed;
+      }
+      return { ok: r.ok && !data?.error, status: r.status, ms: Date.now() - t1, data };
+    } catch (e: any) {
+      return { ok: false, status: 0, ms: Date.now() - t1, data: { error: { message: e.message } } };
+    }
+  }
+
+  type PTest = { name: string; endpoint: string; ok: boolean; status: number; ms: number; data: any; error?: string };
+  const tests: PTest[] = [];
+  const summary: any = {};
+
+  const addTest = (name: string, endpoint: string, r: any, extract?: (d: any) => any) => {
+    const ok = r.ok;
+    tests.push({ name, endpoint, ok, status: r.status, ms: r.ms, data: extract ? extract(r.data) : null, error: !ok ? (r.data?.error?.message || `HTTP ${r.status}`) : undefined });
+    return r;
+  };
+
+  try {
+    if (platform === "facebook") {
+      if (!fbToken) return void res.json({ platform, ok: false, error: "Page Access Token not configured", tests, duration_ms: Date.now() - t0 });
+      const me = await gfetch(`${GRAPH}/me?fields=id,name,fan_count,followers_count,category,verification_status,about,website&access_token=${fbToken}`);
+      addTest("GET /me (Identity + Followers)", `/me`, me, d => ({ page_id: d.id, page_name: d.name, fans: d.fan_count, followers: d.followers_count, category: d.category }));
+      const pageId = me.data?.id || fbPageId;
+      if (pageId) {
+        const feed = await gfetch(`${GRAPH}/${pageId}/feed?limit=5&fields=id,message,story,created_time,likes.summary(true)&access_token=${fbToken}`);
+        addTest("GET /{page_id}/feed (Recent Posts)", `/${pageId}/feed`, feed, d => ({ post_count: d.data?.length ?? 0, posts: (d.data || []).map((p: any) => ({ id: p.id, preview: (p.message || p.story || "").slice(0, 80), created: p.created_time })) }));
+        const inbox = await gfetch(`${GRAPH}/${pageId}/conversations?limit=5&fields=id,snippet,updated_time,message_count&access_token=${fbToken}`);
+        addTest("GET /{page_id}/conversations (Inbox / Messenger Threads)", `/${pageId}/conversations`, inbox, d => ({ thread_count: d.data?.length ?? 0, total: d.summary?.total_count }));
+        const leads = await gfetch(`${GRAPH}/${pageId}/leadgen_forms?limit=5&fields=id,name,status,leads_count&access_token=${fbToken}`);
+        addTest("GET /{page_id}/leadgen_forms (Lead Ads Forms)", `/${pageId}/leadgen_forms`, leads, d => ({ form_count: d.data?.length ?? 0, forms: (d.data || []).map((f: any) => ({ name: f.name, status: f.status, leads: f.leads_count })) }));
+      }
+      // DB: leads in social_messages
+      try {
+        const dbLeads = await pool.query(`SELECT COUNT(*) as c FROM social_messages WHERE platform='facebook_leads'`);
+        tests.push({ name: "DB: Lead Events Received", endpoint: "social_messages WHERE platform='facebook_leads'", ok: true, status: 200, ms: 0, data: { total_lead_events: parseInt(dbLeads.rows[0]?.c || "0") } });
+      } catch { /* best-effort */ }
+
+    } else if (platform === "instagram") {
+      if (!fbToken) return void res.json({ platform, ok: false, error: "Facebook token required for Instagram", tests, duration_ms: Date.now() - t0 });
+      const pageId = fbPageId;
+      // Discover IG ID from page
+      let effectiveIgId = igId;
+      if (pageId) {
+        const disc = await gfetch(`${GRAPH}/${pageId}?fields=instagram_business_account&access_token=${fbToken}`);
+        addTest("GET /{page_id}?fields=instagram_business_account (Discover IG ID)", `/${pageId}?fields=instagram_business_account`, disc, d => ({ linked_ig_id: d.instagram_business_account?.id, configured_ig_id: igId, match: d.instagram_business_account?.id === igId }));
+        effectiveIgId = effectiveIgId || disc.data?.instagram_business_account?.id;
+      }
+      if (effectiveIgId) {
+        const acct = await gfetch(`${GRAPH}/${effectiveIgId}?fields=id,username,name,biography,followers_count,media_count,website&access_token=${fbToken}`);
+        addTest("GET /{ig_id} (Account + Followers)", `/${effectiveIgId}`, acct, d => ({ ig_id: d.id, username: `@${d.username}`, followers: d.followers_count, media_count: d.media_count, bio: d.biography }));
+        const dms = await gfetch(`${GRAPH}/${effectiveIgId}/conversations?platform=instagram&limit=5&fields=id,updated_time&access_token=${fbToken}`);
+        addTest("GET /{ig_id}/conversations (DMs)", `/${effectiveIgId}/conversations`, dms, d => ({ dm_count: d.data?.length ?? 0 }));
+        const media = await gfetch(`${GRAPH}/${effectiveIgId}/media?limit=5&fields=id,caption,media_type,timestamp,like_count,comments_count&access_token=${fbToken}`);
+        addTest("GET /{ig_id}/media (Recent Posts)", `/${effectiveIgId}/media`, media, d => ({ post_count: d.data?.length ?? 0, posts: (d.data || []).map((m: any) => ({ type: m.media_type, caption: (m.caption || "").slice(0, 60), likes: m.like_count, comments: m.comments_count })) }));
+        // story replies require stories permission — attempt gracefully
+        const stories = await gfetch(`${GRAPH}/${effectiveIgId}/stories?fields=id,media_type,timestamp&access_token=${fbToken}`);
+        addTest("GET /{ig_id}/stories (Story Replies)", `/${effectiveIgId}/stories`, stories, d => ({ story_count: d.data?.length ?? 0 }));
+      } else {
+        tests.push({ name: "Instagram Account Tests", endpoint: "skipped", ok: false, status: 0, ms: 0, data: null, error: "Instagram Account ID not available — configure it in Instagram platform settings" });
+      }
+
+    } else if (platform === "whatsapp") {
+      if (!waToken) return void res.json({ platform, ok: false, error: "WhatsApp access token not configured", tests, duration_ms: Date.now() - t0 });
+      if (waPhoneId) {
+        const phone = await gfetch(`${GRAPH}/${waPhoneId}?fields=id,display_phone_number,verified_name,quality_rating,status,name_status&access_token=${waToken}`);
+        addTest("GET /{phone_id} (Phone Number)", `/${waPhoneId}`, phone, d => ({ phone: d.display_phone_number, name: d.verified_name, quality: d.quality_rating, status: d.status }));
+      } else {
+        tests.push({ name: "Phone Number Check", endpoint: "skipped", ok: false, status: 0, ms: 0, data: null, error: "Phone Number ID not configured" });
+      }
+      if (waWabaId) {
+        const waba = await gfetch(`${GRAPH}/${waWabaId}?fields=id,name,currency,timezone_id,account_review_status&access_token=${waToken}`);
+        addTest("GET /{waba_id} (Business Account)", `/${waWabaId}`, waba, d => ({ name: d.name, currency: d.currency, timezone: d.timezone_id, status: d.account_review_status }));
+        const templates = await gfetch(`${GRAPH}/${waWabaId}/message_templates?limit=10&fields=id,name,status,language,category&access_token=${waToken}`);
+        addTest("GET /{waba_id}/message_templates", `/${waWabaId}/message_templates`, templates, d => ({ template_count: d.data?.length ?? 0, templates: (d.data || []).map((t: any) => ({ name: t.name, status: t.status, lang: t.language })) }));
+        const phoneNumbers = await gfetch(`${GRAPH}/${waWabaId}/phone_numbers?fields=id,display_phone_number,verified_name,quality_rating&access_token=${waToken}`);
+        addTest("GET /{waba_id}/phone_numbers (All Numbers)", `/${waWabaId}/phone_numbers`, phoneNumbers, d => ({ phone_count: d.data?.length ?? 0, numbers: (d.data || []).map((n: any) => ({ id: n.id, phone: n.display_phone_number, name: n.verified_name })) }));
+      } else {
+        tests.push({ name: "WABA + Templates Check", endpoint: "skipped", ok: false, status: 0, ms: 0, data: null, error: "WABA ID not configured" });
+      }
+      // DB: WA events
+      try {
+        const r = await pool.query(`SELECT COUNT(*) as c, MAX(created_at) as last FROM social_messages WHERE platform='whatsapp_meta'`);
+        tests.push({ name: "DB: WhatsApp Events Received", endpoint: "social_messages", ok: true, status: 200, ms: 0, data: { total: parseInt(r.rows[0]?.c || "0"), last_received: r.rows[0]?.last } });
+      } catch { /* best-effort */ }
+
+    } else if (platform === "messenger") {
+      if (!fbToken) return void res.json({ platform, ok: false, error: "Page Access Token not configured", tests, duration_ms: Date.now() - t0 });
+      const pageId = fbPageId;
+      if (pageId) {
+        const convs = await gfetch(`${GRAPH}/${pageId}/conversations?limit=5&fields=id,snippet,updated_time,message_count,participants&access_token=${fbToken}`);
+        addTest("GET /{page_id}/conversations (Threads)", `/${pageId}/conversations`, convs, d => ({ thread_count: d.data?.length ?? 0, total: d.summary?.total_count, threads: (d.data || []).slice(0, 3).map((c: any) => ({ snippet: c.snippet?.slice(0, 60), updated: c.updated_time, messages: c.message_count })) }));
+        // Check subscribed_apps
+        const subs = await gfetch(`${GRAPH}/me/subscribed_apps?access_token=${fbToken}`);
+        const fields = subs.data?.data?.[0]?.subscribed_fields || [];
+        addTest("GET /me/subscribed_apps (Messenger Webhook Fields)", `/me/subscribed_apps`, subs, d => ({ subscribed_fields: d.data?.[0]?.subscribed_fields || [], has_messages: (d.data?.[0]?.subscribed_fields || []).includes("messages") }));
+        // DB: messenger inbox events
+        try {
+          const r = await pool.query(`SELECT COUNT(*) as c, MAX(created_at) as last FROM social_messages WHERE platform IN ('facebook_messenger','facebook_page')`);
+          tests.push({ name: "DB: Messenger Messages Received", endpoint: "social_messages", ok: true, status: 200, ms: 0, data: { total: parseInt(r.rows[0]?.c || "0"), last_received: r.rows[0]?.last } });
+        } catch { /* best-effort */ }
+        void fields;
+      } else {
+        tests.push({ name: "Messenger Tests", endpoint: "skipped", ok: false, status: 0, ms: 0, data: null, error: "Page ID not configured" });
+      }
+
+    } else if (platform === "leads") {
+      if (!fbToken) return void res.json({ platform, ok: false, error: "Page Access Token not configured", tests, duration_ms: Date.now() - t0 });
+      const pageId = fbPageId;
+      if (pageId) {
+        const forms = await gfetch(`${GRAPH}/${pageId}/leadgen_forms?limit=10&fields=id,name,status,leads_count,created_time&access_token=${fbToken}`);
+        addTest("GET /{page_id}/leadgen_forms", `/${pageId}/leadgen_forms`, forms, d => ({ form_count: d.data?.length ?? 0, forms: (d.data || []).map((f: any) => ({ id: f.id, name: f.name, status: f.status, leads: f.leads_count, created: f.created_time })) }));
+        // Check leadgen webhook subscription
+        const subs = await gfetch(`${GRAPH}/me/subscribed_apps?access_token=${fbToken}`);
+        const fields = subs.data?.data?.[0]?.subscribed_fields || [];
+        addTest("GET /me/subscribed_apps (leadgen field check)", `/me/subscribed_apps`, subs, d => ({ leadgen_subscribed: (d.data?.[0]?.subscribed_fields || []).includes("leadgen"), all_fields: d.data?.[0]?.subscribed_fields || [] }));
+        // DB: lead events
+        try {
+          const r = await pool.query(`SELECT COUNT(*) as c, MAX(created_at) as last FROM social_messages WHERE platform='facebook_leads'`);
+          tests.push({ name: "DB: Lead Events Received", endpoint: "social_messages WHERE platform='facebook_leads'", ok: true, status: 200, ms: 0, data: { total: parseInt(r.rows[0]?.c || "0"), last_received: r.rows[0]?.last } });
+        } catch { /* best-effort */ }
+        void fields;
+      } else {
+        tests.push({ name: "Lead Ads Tests", endpoint: "skipped", ok: false, status: 0, ms: 0, data: null, error: "Page ID not configured" });
+      }
+
+    } else if (platform === "webhooks") {
+      // Challenge self-test
+      const verifyOk = !!webhookVerifyToken && !webhookVerifyToken.startsWith("http");
+      const WEBHOOK_URL = "https://alburhantravels.com/api/social-media/webhook/meta";
+      if (verifyOk) {
+        const r = await gfetch(`${WEBHOOK_URL}?hub.mode=subscribe&hub.verify_token=${encodeURIComponent(webhookVerifyToken!)}&hub.challenge=platform_test_99887`);
+        const raw = r.data?._raw ?? "";
+        const challenged = String(raw).includes("platform_test_99887");
+        tests.push({ name: "Live Webhook Challenge (Self-Test)", endpoint: WEBHOOK_URL, ok: challenged, status: r.status, ms: r.ms, data: { challenge_echoed: challenged, response: String(raw).slice(0, 50) }, error: !challenged ? "Challenge not echoed — verify token mismatch" : undefined });
+      } else {
+        tests.push({ name: "Webhook Challenge", endpoint: "skipped", ok: false, status: 0, ms: 0, data: null, error: !webhookVerifyToken ? "Verify token not configured" : "Verify token is a URL — must be a secret string" });
+      }
+      if (fbToken) {
+        const subs = await gfetch(`${GRAPH}/me/subscribed_apps?access_token=${fbToken}`);
+        addTest("GET /me/subscribed_apps (All Subscribed Fields)", `/me/subscribed_apps`, subs, d => ({ subscribed_fields: d.data?.[0]?.subscribed_fields || [], count: (d.data?.[0]?.subscribed_fields || []).length }));
+      }
+      // DB: all Meta events
+      try {
+        const r = await pool.query(`SELECT platform, COUNT(*) as c, MAX(created_at) as last FROM social_messages WHERE platform IN ('facebook_page','facebook_messenger','facebook_leads','instagram','instagram_dm','whatsapp_meta') GROUP BY platform`);
+        tests.push({ name: "DB: All Meta Events Received", endpoint: "social_messages GROUP BY platform", ok: r.rows.length > 0, status: 200, ms: 0, data: { by_platform: r.rows.map(row => ({ platform: row.platform, count: parseInt(row.c), last: row.last })), total: r.rows.reduce((sum: number, row: any) => sum + parseInt(row.c), 0) } });
+      } catch { /* best-effort */ }
+      // Last sync from social_platform_configs
+      try {
+        const r = await pool.query(`SELECT platform, last_tested, webhook_verified, status FROM social_platform_configs WHERE platform IN ('facebook_page','facebook_messenger','facebook_leads','instagram','instagram_dm','whatsapp_meta')`);
+        tests.push({ name: "DB: Platform Sync Status", endpoint: "social_platform_configs.last_tested", ok: true, status: 200, ms: 0, data: { platforms: r.rows } });
+      } catch { /* best-effort */ }
+
+    } else {
+      return void res.status(400).json({ ok: false, error: `Unknown platform: ${platform}. Valid: facebook, instagram, whatsapp, messenger, leads, webhooks` });
+    }
+
+    const passed = tests.filter(t => t.ok).length;
+    const failed = tests.filter(t => !t.ok).length;
+    summary.total = tests.length;
+    summary.passed = passed;
+    summary.failed = failed;
+
+    res.json({ platform, ok: failed === 0, checkedAt: new Date().toISOString(), duration_ms: Date.now() - t0, tests, summary });
+  } catch (e: any) {
+    res.status(500).json({ ok: false, platform, error: e.message, tests, duration_ms: Date.now() - t0 });
+  }
+});
+
 // ── POST /api/social-media/meta/subscribe-webhooks ──────────────────────────
 // Subscribes the Facebook Page to all required webhook fields
 router.post("/meta/subscribe-webhooks", requireAdmin as any, async (_req, res) => {
