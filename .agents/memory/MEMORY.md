@@ -70,3 +70,4 @@
 - [Journey status trigger mapping](journey-status-triggers.md) — 16 journey statuses must be in TRIGGER_TO_EVENT + WorkflowTrigger type; triggerWorkflow ctx needs journeyStatus field for buildDefaultMessage
 - [BotBee phone_number_id](botbee-phone-number-id.md) — correct is 965912196611113 (15 digits); hardcoded as CORRECT_PHONE_NUMBER_ID in botbee.ts; 14-digit typo blocked all templates for months
 - [Invoice & payment status architecture](invoice-payment-status-arch.md) — deriveStatusFromAmounts is the canonical status fn; paidAmount (not advanceAmount) is source of truth; receipt PDF has full fields; admin report includes partially_paid
+- [Agreement fires for all payments](agreement-all-payments.md) — autoGenerateAgreement must NOT be gated on isFullyPaid; partial payers need agreement too; agreements.ts already handles partially_paid status

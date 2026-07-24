@@ -307,8 +307,8 @@ export async function processPaymentSuccessNotifications(opts: {
     }).catch(err => console.error(`[payments] Payment receipt email error for ${booking.bookingNumber}:`, err?.message));
   }
 
-  // Auto-generate Hajj Agreement when fully paid
-  if (isFullyPaid && booking.id) {
+  // Auto-generate/refresh Hajj Agreement on every payment (partial or full)
+  if (booking.id) {
     autoGenerateAgreement(booking.id).catch(err =>
       console.error("[payments] autoGenerateAgreement failed:", err)
     );

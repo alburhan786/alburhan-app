@@ -179,16 +179,64 @@ router.get("/system-health", requireAdmin as any, async (_req, res) => {
     results.retry_queue = { status: "warn", message: "Could not read retry queue", detail: e.message };
   }
 
-  // 10. Razorpay
+  // 10. Razorpay — live API ping
   {
-    const keyId = process.env.RAZORPAY_KEY_ID;
+    const keyId  = process.env.RAZORPAY_KEY_ID;
     const secret = process.env.RAZORPAY_SECRET;
-    const ok = !!keyId && !!secret && !keyId.includes("YOUR_") && keyId.startsWith("rzp_");
-    results.razorpay = {
-      status: ok ? "ok" : "warn",
-      message: ok ? `Razorpay configured (${keyId?.startsWith("rzp_live") ? "LIVE" : "TEST"} key)` : "Razorpay key not configured",
-      detail: ok ? { mode: keyId?.startsWith("rzp_live") ? "live" : "test", keyId: keyId?.slice(0, 12) + "****" } : undefined,
+    const hasKeys = !!keyId && !!secret && !keyId.includes("YOUR_") && keyId.startsWith("rzp_");
+    if (!hasKeys) {
+      results.razorpay = { status: "warn", message: "Razorpay key not configured" };
+    } else {
+      try {
+        const auth = Buffer.from(`${keyId}:${secret}`).toString("base64");
+        const rzpRes = await fetch("https://api.razorpay.com/v1/payments?count=1", {
+          headers: { Authorization: `Basic ${auth}` },
+          signal: AbortSignal.timeout(5000),
+        });
+        if (rzpRes.ok || rzpRes.status === 200) {
+          results.razorpay = {
+            status: "ok",
+            message: `Razorpay API reachable (${keyId.startsWith("rzp_live") ? "LIVE" : "TEST"} key)`,
+            detail: { mode: keyId.startsWith("rzp_live") ? "live" : "test", keyId: keyId.slice(0, 12) + "****", httpStatus: rzpRes.status },
+          };
+        } else {
+          results.razorpay = {
+            status: "warn",
+            message: `Razorpay API responded ${rzpRes.status} — keys may be invalid`,
+            detail: { httpStatus: rzpRes.status, mode: keyId.startsWith("rzp_live") ? "live" : "test" },
+          };
+        }
+      } catch (e: any) {
+        results.razorpay = { status: "warn", message: `Razorpay API unreachable: ${e.message}`, detail: { keyConfigured: true } };
+      }
+    }
+  }
+
+  // 10b. PDF Generator — functional test (generate a tiny test invoice)
+  try {
+    const { generateReceiptPdfBuffer } = await import("../lib/paymentDocs.js");
+    const buf = await generateReceiptPdfBuffer({
+      bookingNumber:  "HEALTH-CHECK",
+      customerName:   "System Health Test",
+      customerMobile: "0000000000",
+      packageName:    "Health Check Package",
+      totalAmount:    1000,
+      paidAmount:     1000,
+      balanceAmount:  0,
+      receiptNumber:  "RCP-HEALTH-000001",
+      paymentMethod:  "Test",
+      paymentDate:    new Date(),
+      currentStatus:  "paid",
+    });
+    results.pdf_generator = {
+      status: buf && buf.length > 1000 ? "ok" : "error",
+      message: buf && buf.length > 1000
+        ? `PDF generator functional (${Math.round(buf.length / 1024)} KB test receipt)`
+        : "PDF generator returned empty/small buffer",
+      detail: { bytes: buf?.length || 0 },
     };
+  } catch (e: any) {
+    results.pdf_generator = { status: "error", message: `PDF generator failed: ${e.message}` };
   }
 
   // 11. Object Storage

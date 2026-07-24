@@ -9,7 +9,7 @@ import {
   CheckCircle, XCircle, AlertTriangle, RefreshCw, Send,
   Loader2, Activity, MessageCircle, Database, Shield,
   Clock, Mail, Radio, Bell, ListChecks, Cpu, HardDrive,
-  MemoryStick, Wifi, RotateCcw, Server,
+  MemoryStick, Wifi, RotateCcw, Server, FileText,
 } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -222,7 +222,8 @@ export default function SystemHealth() {
               <CheckCard label="OTP Table"                icon={Shield}     check={c?.otp_table} />
               <CheckCard label="Session Store"           icon={Shield}     check={c?.sessions} />
               <CheckCard label="Environment Variables"   icon={Activity}   check={c?.env_vars} />
-              <CheckCard label="Razorpay Payments"       icon={Activity}   check={c?.razorpay} />
+              <CheckCard label="Razorpay (Live API Ping)" icon={Activity}   check={c?.razorpay} />
+              <CheckCard label="PDF Generator"           icon={FileText}   check={c?.pdf_generator} />
               <CheckCard label="Object Storage"          icon={HardDrive}  check={c?.object_storage} />
               <CheckCard label="Cron Jobs (9 active)"   icon={Clock}      check={c?.cron_jobs} />
               <CheckCard label="Server"                  icon={Server}     check={c?.server} />

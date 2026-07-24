@@ -1,0 +1,259 @@
+We are now preparing Al Burhan Tours & Travels ERP for commercial release.
+
+Do not implement only code changes.
+
+Perform a complete production audit and fix every remaining issue.
+
+==========================
+PAYMENT SYSTEM
+==========================
+
+Verify every payment flow:
+
+• Razorpay Checkout
+• UPI
+• Net Banking
+• Card
+• Bank Transfer
+• Cash
+• Cheque
+
+Each payment must:
+
+• update booking
+• update invoice
+• update receipt
+• update ledger
+• update finance dashboard
+• update customer dashboard
+• update admin dashboard
+
+==========================
+INVOICE
+==========================
+
+Invoice must always regenerate live.
+
+Never serve cached PDF.
+
+Status must automatically become:
+
+Pending Payment
+
+Partially Paid
+
+Paid in Full
+
+Overdue
+
+Cancelled
+
+Refunded
+
+Balance calculation must always be correct.
+
+GST calculation must always remain accurate.
+
+==========================
+RECEIPT
+==========================
+
+Receipt PDF must include:
+
+Receipt Number
+
+Invoice Number
+
+Booking Number
+
+Payment Method
+
+Transaction ID
+
+Gateway Reference
+
+Amount Paid
+
+Balance
+
+Payment Date
+
+Customer Details
+
+QR Code
+
+Company Logo
+
+==========================
+CUSTOMER NOTIFICATIONS
+==========================
+
+Immediately after successful payment automatically send:
+
+WhatsApp
+
+SMS
+
+Email
+
+Push Notification
+
+with:
+
+Invoice PDF
+
+Receipt PDF
+
+Agreement PDF
+
+Booking Summary
+
+Payment Summary
+
+Customer Dashboard URL
+
+Payment History URL
+
+==========================
+CUSTOMER DASHBOARD
+==========================
+
+Customer Dashboard must refresh instantly after payment.
+
+No logout required.
+
+No page refresh required.
+
+Balance
+
+Status
+
+Receipt
+
+Invoice
+
+Agreement
+
+must update immediately.
+
+==========================
+ADMIN
+==========================
+
+Finance Dashboard
+
+Revenue Dashboard
+
+Booking Dashboard
+
+Reports
+
+Payment Reports
+
+Outstanding Reports
+
+must all update instantly.
+
+==========================
+WHATSAPP
+==========================
+
+Every payment must send:
+
+Booking Confirmation
+
+Payment Confirmation
+
+Invoice PDF
+
+Receipt PDF
+
+Agreement PDF
+
+Payment Link (if balance remains)
+
+Track delivery status.
+
+Retry failures.
+
+==========================
+SMS
+==========================
+
+Send:
+
+Payment Received
+
+Amount
+
+Balance
+
+Invoice URL
+
+Receipt URL
+
+Dashboard URL
+
+==========================
+EMAIL
+==========================
+
+Professional HTML email with:
+
+Invoice
+
+Receipt
+
+Agreement
+
+Payment Summary
+
+==========================
+LOGGING
+==========================
+
+Every payment must create logs:
+
+Payment
+
+Invoice
+
+Receipt
+
+Email
+
+SMS
+
+WhatsApp
+
+Webhook
+
+Audit
+
+==========================
+TESTING
+==========================
+
+Run automated tests for:
+
+₹1 payment
+
+50% payment
+
+100% payment
+
+Refund
+
+Failed payment
+
+Duplicate webhook
+
+Webhook retry
+
+Invoice regeneration
+
+Receipt regeneration
+
+Every test must pass before marking complete.
+
+Do not finish until every production scenario has been verified.

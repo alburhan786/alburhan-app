@@ -345,6 +345,85 @@ router.get("/reports/payments", requireAdmin as any, async (req: AuthenticatedRe
   })));
 });
 
+// ── Outstanding / Overdue / All-Status Consolidated Report ───────────────────
+router.get("/reports/outstanding", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const statusFilter = (req.query.status as string) || "all";
+
+    const whereMap: Record<string, string> = {
+      pending:        `WHERE b.status IN ('pending','approved') AND COALESCE(b.paid_amount::numeric,0) = 0`,
+      partially_paid: `WHERE b.status = 'partially_paid'`,
+      paid:           `WHERE b.status = 'confirmed' AND COALESCE(b.paid_amount::numeric,0) >= COALESCE(b.final_amount::numeric,0) - 0.01`,
+      cancelled:      `WHERE b.status IN ('cancelled','rejected')`,
+      overdue:        `WHERE b.status IN ('approved','confirmed','partially_paid') AND COALESCE(b.paid_amount::numeric,0) < COALESCE(b.final_amount::numeric,0) - 0.01 AND b.created_at < NOW() - INTERVAL '7 days'`,
+      all:            `WHERE b.status NOT IN ('draft')`,
+    };
+    const where = whereMap[statusFilter] || whereMap.all;
+
+    const result = await pool.query(`
+      SELECT
+        b.id,
+        b.booking_number,
+        b.customer_name,
+        b.customer_mobile,
+        b.customer_email,
+        b.package_name,
+        b.invoice_number,
+        b.status                                                           AS booking_status,
+        b.final_amount::numeric                                            AS total_amount,
+        COALESCE(b.paid_amount::numeric, 0)                               AS paid_amount,
+        GREATEST(0, COALESCE(b.final_amount::numeric,0)
+                    - COALESCE(b.paid_amount::numeric,0))                  AS balance_due,
+        b.created_at,
+        b.updated_at,
+        (SELECT MAX(pt.payment_date) FROM payment_transactions pt
+           WHERE pt.booking_id = b.id)                                     AS last_payment_date,
+        CASE
+          WHEN COALESCE(b.paid_amount::numeric,0) <= 0 THEN 'Pending'
+          WHEN GREATEST(0, COALESCE(b.final_amount::numeric,0)
+               - COALESCE(b.paid_amount::numeric,0)) <= 0.01 THEN 'Paid'
+          WHEN b.created_at < NOW() - INTERVAL '7 days'
+           AND COALESCE(b.paid_amount::numeric,0) < COALESCE(b.final_amount::numeric,0) THEN 'Overdue'
+          ELSE 'Partial'
+        END AS payment_status
+      FROM bookings b
+      ${where}
+      ORDER BY b.updated_at DESC
+      LIMIT 500
+    `);
+
+    const summary = {
+      total: result.rows.length,
+      totalOutstanding: result.rows.reduce((s: number, r: any) => s + Number(r.balance_due || 0), 0),
+      totalPaid:        result.rows.reduce((s: number, r: any) => s + Number(r.paid_amount || 0), 0),
+    };
+
+    res.json({
+      filter: statusFilter,
+      summary,
+      rows: result.rows.map((b: any) => ({
+        id:              b.id,
+        bookingNumber:   b.booking_number,
+        customerName:    b.customer_name,
+        customerMobile:  b.customer_mobile,
+        customerEmail:   b.customer_email,
+        packageName:     b.package_name,
+        invoiceNumber:   b.invoice_number,
+        bookingStatus:   b.booking_status,
+        paymentStatus:   b.payment_status,
+        totalAmount:     Number(b.total_amount || 0),
+        paidAmount:      Number(b.paid_amount  || 0),
+        balanceDue:      Number(b.balance_due  || 0),
+        lastPaymentDate: b.last_payment_date || b.updated_at,
+        createdAt:       b.created_at,
+      })),
+    });
+  } catch (err: any) {
+    console.error("[reports/outstanding]", err?.message);
+    res.status(500).json({ message: "Failed to load outstanding report" });
+  }
+});
+
 // ── Super Admin Dashboard Stats ───────────────────────────────────────────────
 router.get("/super-stats", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
   try {
