@@ -86,7 +86,7 @@ router.get("/", (_req, res) => {
 });
 
 // ── Build fingerprint — confirms which bundle is running on VPS (no auth needed) ──
-const BUILD_STAMP = "2026-07-25-v29.0-enterprise-travel-ops";
+const BUILD_STAMP = "2026-07-25-v29.1-enterprise-stable";
 // Init tables on startup
 ensureCommEventsTable().catch(() => {});
 ensureCommissionTables().catch(() => {});

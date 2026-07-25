@@ -2241,6 +2241,19 @@ async function runMigrations() {
     }
     console.log("[Migration] sender_ids table ensured (5 approved DLT sender IDs seeded)");
   } catch (err) { console.error("[Migration] sender_ids migration failed:", err); }
+
+  // v29.1 — Performance indexes for high-frequency query columns
+  try {
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_attendance_logs_event_id ON attendance_logs(event_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_pilgrims_barcode_id ON pilgrims(barcode_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_pilgrims_family_id ON pilgrims(family_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_pilgrims_mobile_india ON pilgrims(mobile_india)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_payment_transactions_created_at ON payment_transactions(created_at DESC)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_notification_logs_channel ON notification_logs(channel)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_reminder_logs_booking_id ON reminder_logs(booking_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_reminder_logs_created_at ON reminder_logs(created_at DESC)`);
+    console.log("[Migration] v29.1 performance indexes ensured");
+  } catch (err) { console.error("[Migration] v29.1 index migration failed:", err); }
 }
 
 const rawPort = process.env["PORT"];

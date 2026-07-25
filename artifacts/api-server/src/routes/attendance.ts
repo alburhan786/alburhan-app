@@ -90,17 +90,26 @@ router.get("/:groupId/attendance/events", requireAdmin, async (req: Authenticate
     .where(eq(pilgrimsTable.groupId, groupId));
   const total = pilgrimCount.length;
 
-  const withStats = await Promise.all(
-    events.map(async (ev) => {
-      const logs = await db
-        .select()
+  // Batch-load all logs for all events in a single query (avoids N+1)
+  const eventIds = events.map((e) => e.id);
+  const allLogs = eventIds.length
+    ? await db
+        .select({ eventId: attendanceLogsTable.eventId, status: attendanceLogsTable.status })
         .from(attendanceLogsTable)
-        .where(eq(attendanceLogsTable.eventId, ev.id));
-      const present = logs.filter((l) => l.status === "present").length;
-      const absent = logs.filter((l) => l.status === "absent").length;
-      return { ...ev, present, absent, total, missing: total - present };
-    })
-  );
+        .where(inArray(attendanceLogsTable.eventId, eventIds))
+    : [];
+
+  const logsByEvent: Record<string, { present: number; absent: number }> = {};
+  for (const row of allLogs) {
+    if (!logsByEvent[row.eventId]) logsByEvent[row.eventId] = { present: 0, absent: 0 };
+    if (row.status === "present") logsByEvent[row.eventId].present++;
+    else if (row.status === "absent") logsByEvent[row.eventId].absent++;
+  }
+
+  const withStats = events.map((ev) => {
+    const s = logsByEvent[ev.id] ?? { present: 0, absent: 0 };
+    return { ...ev, present: s.present, absent: s.absent, total, missing: total - s.present };
+  });
 
   res.json(withStats);
 });
@@ -117,15 +126,6 @@ router.post("/:groupId/attendance/events", requireAdmin, async (req, res) => {
 });
 
 router.delete("/:groupId/attendance/events/:eventId", requireAdmin, async (req, res) => {
-  const { groupId, eventId } = req.params;
-  const event = await getEventForGroup(eventId, groupId);
-  if (!event) { res.status(404).json({ error: "Event not found in this group" }); return; }
-  await db.delete(attendanceLogsTable).where(eq(attendanceLogsTable.eventId, eventId));
-  await db.delete(attendanceEventsTable).where(eq(attendanceEventsTable.id, eventId));
-  res.json({ success: true });
-});
-
-router.post("/:groupId/attendance/events/:eventId/delete", requireAdmin, async (req, res) => {
   const { groupId, eventId } = req.params;
   const event = await getEventForGroup(eventId, groupId);
   if (!event) { res.status(404).json({ error: "Event not found in this group" }); return; }

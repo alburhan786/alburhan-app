@@ -113,6 +113,12 @@ export function buildNavSections(openComplaints = 0): NavSection[] {
         { icon: Tent,          label: "Room Allocation Dashboard", href: "/admin/allocations",        require: ["groups",   "view"]   },
         { icon: Tag,           label: "Luggage",                 href: "/admin/luggage",              require: ["groups",   "view"]   },
         { icon: Scale,         label: "Agreement Dashboard",     href: "/admin/agreements",           require: ["audit_logs","view"]  },
+        // v29 Enterprise Ops Centers
+        { icon: Plane,         label: "Flight Ops Center",       href: "/admin/flight-ops",           require: ["groups",   "view"]   },
+        { icon: Hotel,         label: "Hotel Ops Center",        href: "/admin/hotel-ops",            require: ["groups",   "view"]   },
+        { icon: Tent,          label: "Group Ops Center",        href: "/admin/group-ops",            require: ["groups",   "view"]   },
+        { icon: Truck,         label: "Transport Ops Center",    href: "/admin/transport-ops",        require: ["groups",   "view"]   },
+        { icon: Briefcase,     label: "HR Ops Center",           href: "/admin/hr-ops",               require: ["payroll",  "view"]   },
         // Finance & Accounting (merged per spec)
         { icon: TrendingDown,  label: "Expenses",                href: "/admin/expenses",             require: ["expenses",   "view"]  },
         { icon: Calculator,    label: "Accounting Dashboard",    href: "/admin/accounting",           require: ["accounting", "view"]  },
