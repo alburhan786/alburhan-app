@@ -1,0 +1,313 @@
+MASTER TASK – BUILD THE CENTRAL COMMUNICATION & AUTOMATION ENGINE
+
+We are no longer building isolated notification features.
+
+We are now building the Enterprise Central Communication & Automation Engine for the Al Burhan Tours & Travels ERP.
+
+This engine must become the ONLY communication layer used by every module.
+
+IMPORTANT RULES
+
+* No module may send WhatsApp, SMS, Email, Push Notification, or Dashboard Notification directly.
+* Every module must publish an event to the Communication Engine.
+* The Communication Engine is the only service allowed to send customer or admin notifications.
+* Existing functionality must continue to work without breaking.
+
+⸻
+
+CENTRAL EVENT BUS
+
+Create a central event bus.
+
+Supported events include (but are not limited to):
+
+* BOOKING_CREATED
+* BOOKING_UPDATED
+* BOOKING_CANCELLED
+* PAYMENT_RECEIVED
+* PAYMENT_FAILED
+* PAYMENT_REFUNDED
+* INVOICE_GENERATED
+* RECEIPT_GENERATED
+* AGREEMENT_GENERATED
+* AGREEMENT_SIGNED
+* DOCUMENT_UPLOADED
+* VISA_APPROVED
+* VISA_REJECTED
+* FLIGHT_ASSIGNED
+* FLIGHT_UPDATED
+* HOTEL_ASSIGNED
+* ROOM_ALLOCATED
+* PACKAGE_UPDATED
+* CUSTOMER_REGISTERED
+* OTP_SENT
+* PASSWORD_RESET
+* ADMIN_NOTIFICATION
+* MARKETING_BROADCAST
+
+Every module must publish one of these events instead of sending messages directly.
+
+⸻
+
+CENTRAL JOB QUEUE
+
+Implement a reliable queue.
+
+Each event should create a queue job with:
+
+* Event ID
+* Booking ID
+* Customer ID
+* Priority
+* Status
+* Retry Count
+* Scheduled Time
+* Processing Logs
+
+Queue states:
+
+* Pending
+* Processing
+* Completed
+* Failed
+* Cancelled
+* Retrying
+
+⸻
+
+AUTOMATIC COMMUNICATION CHANNELS
+
+Based on event rules, automatically send through enabled channels:
+
+* WhatsApp
+* SMS
+* Email
+* Push Notification
+* Customer Dashboard
+* Admin Dashboard
+* Omnichannel Inbox
+
+Each channel can be enabled or disabled independently.
+
+⸻
+
+BOOKING AUTOMATION
+
+When a booking is created:
+
+1. Save booking.
+2. Generate Booking ID.
+3. Generate Agreement PDF.
+4. Generate Invoice PDF.
+5. Update Customer Dashboard.
+6. Send WhatsApp.
+7. Send SMS.
+8. Send Email.
+9. Send Push Notification.
+10. Notify Admin.
+11. Write Audit Log.
+12. Update Delivery Status.
+
+No manual action should be required.
+
+⸻
+
+PAYMENT AUTOMATION
+
+When payment is successful:
+
+* Update Finance.
+* Update Booking Status.
+* Generate Receipt PDF.
+* Update Dashboard.
+* Send Receipt by WhatsApp.
+* Send Receipt by SMS.
+* Send Receipt by Email.
+* Send Push Notification.
+* Notify Admin.
+* Record all delivery results.
+
+⸻
+
+DOCUMENT AUTOMATION
+
+When a document is generated:
+
+Automatically send:
+
+* Agreement
+* Invoice
+* Receipt
+* Visa
+* Flight Ticket
+* Hotel Voucher
+* Room Allocation
+* Travel Itinerary
+
+through every enabled channel.
+
+⸻
+
+PROVIDER MANAGER
+
+Create one provider manager.
+
+Supported providers:
+
+* BotBee WhatsApp
+* Fast2SMS
+* SMTP Email
+* Firebase Push
+* Dashboard Notification
+
+The engine chooses the correct provider automatically.
+
+No module should know provider details.
+
+⸻
+
+FAILURE HANDLING
+
+If one provider fails:
+
+Continue sending through all remaining channels.
+
+Never stop the workflow because one provider is unavailable.
+
+⸻
+
+RETRY ENGINE
+
+Retry failed jobs automatically after:
+
+* 1 minute
+* 5 minutes
+* 15 minutes
+* 1 hour
+* 24 hours
+
+After the final retry:
+
+* Mark Failed
+* Notify Admin
+* Keep complete logs
+
+⸻
+
+TEMPLATE MANAGER
+
+Manage all templates centrally.
+
+Support:
+
+* WhatsApp
+* SMS
+* Email
+* Push
+* Dashboard
+
+Allow placeholders such as:
+
+{{CustomerName}}
+{{BookingID}}
+{{InvoiceNumber}}
+{{ReceiptNumber}}
+{{Package}}
+{{DepartureDate}}
+{{PaymentAmount}}
+
+⸻
+
+ADMIN COMMUNICATION DASHBOARD
+
+Create an Enterprise Communication Dashboard showing:
+
+* Queue
+* Pending
+* Sending
+* Delivered
+* Failed
+* Retrying
+* Cancelled
+
+Provide filters by:
+
+* Booking ID
+* Customer
+* Mobile
+* WhatsApp
+* Email
+* Date
+* Event Type
+* Status
+
+⸻
+
+DELIVERY LOGS
+
+For every notification store:
+
+* Event ID
+* Provider
+* Channel
+* Request
+* Response
+* HTTP Status
+* Provider Message ID
+* Timestamp
+* Retry Count
+* Error Message
+* Final Status
+
+⸻
+
+HEALTH MONITOR
+
+Create real health checks for:
+
+* WhatsApp
+* SMS
+* Email
+* Push
+* Database
+* Queue
+* OAuth
+* Templates
+* Webhooks
+* API Keys
+
+Perform actual API calls, not configuration-only checks.
+
+⸻
+
+TESTING
+
+After implementation perform an end-to-end test:
+
+1. Create booking.
+2. Receive payment.
+3. Generate invoice.
+4. Generate receipt.
+5. Generate agreement.
+6. Upload visa.
+7. Assign hotel.
+8. Assign room.
+9. Assign flight.
+
+Verify that:
+
+* WhatsApp is sent.
+* SMS is sent.
+* Email is sent.
+* Push is sent.
+* Customer Dashboard updates.
+* Admin Dashboard updates.
+* Queue completes successfully.
+* No duplicate notifications.
+* No missed notifications.
+
+Generate a final production report with pass/fail results.
+
+⸻
+
+This approach is the same architectural pattern used by enterprise platforms such as Salesforce, HubSpot, Shopify, and Zoho CRM. It will give your Al Burhan Tours & Travels ERP a single, reliable communication backbone instead of multiple independent notification systems.

@@ -85,13 +85,30 @@ router.get("/summary", async (_req, res) => {
   }
 });
 
-// ── GET /queue — Live notification queue ───────────────────────────────────
+// ── GET /queue — Live notification queue (with full filter support) ─────────
 router.get("/queue", async (req, res) => {
-  const limit  = Math.min(Number(req.query.limit  || 50), 200);
-  const offset = Number(req.query.offset || 0);
-  const status = req.query.status as string | undefined;
+  const limit      = Math.min(Number(req.query.limit  || 50), 200);
+  const offset     = Number(req.query.offset || 0);
+  const status     = req.query.status     as string | undefined;
+  const eventType  = req.query.event_type as string | undefined;
+  const channel    = req.query.channel    as string | undefined;
+  const search     = req.query.search     as string | undefined;   // booking_id / customer / mobile
+  const dateFrom   = req.query.date_from  as string | undefined;
+  const dateTo     = req.query.date_to    as string | undefined;
   try {
-    const where = status ? `WHERE rq.status = '${status.replace(/'/g,"")}'` : "";
+    const conds: string[] = ["1=1"];
+    const params: any[]   = [];
+    let pi = 1;
+    if (status)    { conds.push(`rq.status = $${pi++}`);                       params.push(status.replace(/'/g,"")); }
+    if (eventType) { conds.push(`rq.event_type ILIKE $${pi++}`);               params.push(`%${eventType}%`); }
+    if (channel)   { conds.push(`rq.channel = $${pi++}`);                      params.push(channel); }
+    if (dateFrom)  { conds.push(`rq.created_at >= $${pi++}::date`);            params.push(dateFrom); }
+    if (dateTo)    { conds.push(`rq.created_at < ($${pi++}::date + INTERVAL '1 day')`); params.push(dateTo); }
+    if (search) {
+      conds.push(`(rq.booking_id ILIKE $${pi} OR rq.recipient ILIKE $${pi} OR nl.customer_name ILIKE $${pi} OR nl.booking_number ILIKE $${pi})`);
+      params.push(`%${search}%`); pi++;
+    }
+    const where = `WHERE ${conds.join(" AND ")}`;
     const r = await pool.query(`
       SELECT rq.id, rq.event_type, rq.channel, rq.customer_id, rq.booking_id,
              rq.recipient, rq.message, rq.status, rq.retry_count, rq.last_error,
@@ -101,9 +118,13 @@ router.get("/queue", async (req, res) => {
       LEFT JOIN notification_logs nl ON nl.id = rq.notification_log_id
       ${where}
       ORDER BY rq.updated_at DESC
-      LIMIT $1 OFFSET $2`, [limit, offset]);
+      LIMIT $${pi++} OFFSET $${pi++}`,
+      [...params, limit, offset]);
     const cnt = await pool.query(
-      `SELECT COUNT(*)::int AS cnt FROM notification_retry_queue ${where}`
+      `SELECT COUNT(*)::int AS cnt
+       FROM notification_retry_queue rq
+       LEFT JOIN notification_logs nl ON nl.id = rq.notification_log_id
+       ${where}`, params
     );
     res.json({ items: r.rows, total: cnt.rows[0]?.cnt || 0, limit, offset });
   } catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -355,6 +376,52 @@ router.get("/health", async (_req, res) => {
     ).catch(() => ({ rows: [{ cnt: 0 }] }));
     results.event_bus = { status: "ok", events_last_hour: er.rows[0]?.cnt || 0 };
   } catch (e: any) { results.event_bus = { status: "error", error: e.message }; }
+
+  // Push Notifications (Web Push / VAPID)
+  try {
+    const vapid = await pool.query(
+      `SELECT extra FROM api_settings WHERE provider='webpush' LIMIT 1`
+    ).catch(() => ({ rows: [] }));
+    const extra = vapid.rows[0]?.extra || {};
+    const hasVapid = !!(extra.vapidPublicKey || extra.publicKey);
+    const subCount = await pool.query(
+      `SELECT COUNT(*)::int AS cnt FROM customer_push_tokens`
+    ).catch(() => ({ rows: [{ cnt: 0 }] }));
+    results.push_vapid = {
+      status: hasVapid ? "ok" : "unconfigured",
+      provider: "Web Push (VAPID)",
+      detail: hasVapid ? `${subCount.rows[0]?.cnt || 0} subscribers` : "VAPID keys not yet generated",
+    };
+  } catch (e: any) { results.push_vapid = { status: "error", error: e.message.slice(0,80) }; }
+
+  // Templates
+  try {
+    const tr = await pool.query(
+      `SELECT
+         COUNT(*)::int AS total,
+         COUNT(*) FILTER (WHERE channel='whatsapp')::int AS whatsapp,
+         COUNT(*) FILTER (WHERE channel='sms')::int AS sms,
+         COUNT(*) FILTER (WHERE channel='email')::int AS email
+       FROM notification_templates`
+    );
+    const t = tr.rows[0] || {};
+    results.templates = {
+      status: t.total > 0 ? "ok" : "warn",
+      detail: `${t.total} templates (WA:${t.whatsapp} SMS:${t.sms} Email:${t.email})`,
+    };
+  } catch (e: any) { results.templates = { status: "error", error: e.message.slice(0,60) }; }
+
+  // API Keys (Razorpay)
+  try {
+    const { getCachedConfig } = await import("../lib/apiSettings.js");
+    const rzp = getCachedConfig("razorpay");
+    const hasRzp = !!(rzp.keyId && rzp.keyId.length > 5);
+    results.payments_razorpay = {
+      status: hasRzp ? "ok" : "unconfigured",
+      provider: "Razorpay",
+      detail: hasRzp ? "Key configured" : "No key",
+    };
+  } catch (e: any) { results.payments_razorpay = { status: "unconfigured", provider: "Razorpay" }; }
 
   const allOk = Object.values(results).every((v: any) => v.status === "ok" || v.status === "unconfigured");
   res.json({

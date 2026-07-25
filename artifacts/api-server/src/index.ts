@@ -2557,8 +2557,8 @@ async function start() {
     setInterval(runRetryEngine, 60 * 1000); // every 60s instead of every 15s
     console.log("[RetryEngine] WhatsApp retry engine scheduled every 60 seconds (exponential backoff, max 5 retries)");
 
-    // ── Generic cross-channel retry engine (SMS/RCS/Email/Push) — 1min/5min/30min/2hr/2hr, max 5 ──
-    const RETRY_DELAYS_SEC = [60, 300, 1800, 7200, 7200];
+    // ── Generic cross-channel retry engine (SMS/RCS/Email/Push) — 1m/5m/15m/1h/24h, max 5 ──
+    const RETRY_DELAYS_SEC = [60, 300, 900, 3600, 86400];
     const runGenericRetryEngine = async () => {
       try {
         const due = await pool.query(
@@ -2637,7 +2637,7 @@ async function start() {
       }
     };
     setInterval(runGenericRetryEngine, 10 * 1000);
-    console.log("[GenericRetryEngine] SMS/RCS/Email retry engine: 1m/5m/30m/2h/2h backoff, max 5 retries");
+    console.log("[GenericRetryEngine] SMS/RCS/Email retry engine: 1m/5m/15m/1h/24h backoff, max 5 retries");
   });
 }
 
