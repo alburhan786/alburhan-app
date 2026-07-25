@@ -1,0 +1,894 @@
+# MASTER TASK – BUILD ENTERPRISE CENTRAL COMMUNICATION & AUTOMATION ENGINE
+
+You are the Lead Enterprise Software Architect for the Al Burhan Tours & Travels ERP/CRM.
+
+Your mission is to design and implement a production-ready, enterprise-grade Central Communication & Automation Engine that becomes the single source of truth for all communications throughout the ERP.
+
+The architecture must be inspired by Salesforce, HubSpot, Zoho CRM, Microsoft Dynamics 365, Shopify, and Oracle NetSuite.
+
+This is NOT a simple notification module.
+
+This must become the communication backbone of the entire ERP.
+
+====================================================
+PRIMARY OBJECTIVE
+====================================================
+
+No module in the ERP may send WhatsApp, SMS, Email, Push Notifications, Dashboard Notifications, or Webhooks directly.
+
+Every ERP module must only publish an event.
+
+The Central Communication & Automation Engine will process every event and execute all workflows automatically.
+
+Remove duplicated notification logic across the application.
+
+====================================================
+ERP MODULES
+====================================================
+
+Integrate every module:
+
+• Booking
+• Payments
+• Finance
+• Customer Management
+• CRM
+• Leads
+• Agreements
+• Invoices
+• Receipts
+• Visa
+• Passport
+• Flights
+• Hotels
+• Room Allocation
+• Documents
+• Customer Dashboard
+• Admin Dashboard
+• Branch Dashboard
+• Agent Dashboard
+• Website CMS
+• Mobile App
+• API
+• Future Modules
+
+====================================================
+SYSTEM ARCHITECTURE
+====================================================
+
+ERP Modules
+
+↓
+
+Central Event Bus
+
+↓
+
+Communication & Automation Engine
+
+↓
+
+Workflow Engine
+
+↓
+
+Notification Engine
+
+↓
+
+Provider Manager
+
+↓
+
+Queue Manager
+
+↓
+
+Retry Engine
+
+↓
+
+Template Engine
+
+↓
+
+PDF Engine
+
+↓
+
+Scheduler
+
+↓
+
+Webhook Manager
+
+↓
+
+Audit Logger
+
+↓
+
+Analytics
+
+↓
+
+WhatsApp
+
+SMS
+
+Email
+
+Push
+
+Dashboard
+
+Webhooks
+
+Future Channels
+
+====================================================
+EVENT BUS
+====================================================
+
+Create one centralized Event Bus.
+
+Supported events include:
+
+BOOKING_CREATED
+
+BOOKING_UPDATED
+
+BOOKING_CANCELLED
+
+PAYMENT_RECEIVED
+
+PAYMENT_FAILED
+
+INVOICE_GENERATED
+
+RECEIPT_GENERATED
+
+AGREEMENT_CREATED
+
+AGREEMENT_SIGNED
+
+DOCUMENT_UPLOADED
+
+PASSPORT_APPROVED
+
+VISA_APPROVED
+
+FLIGHT_ASSIGNED
+
+FLIGHT_UPDATED
+
+HOTEL_ASSIGNED
+
+ROOM_ALLOCATED
+
+DEPARTURE_REMINDER
+
+BALANCE_DUE
+
+REFUND_COMPLETED
+
+CUSTOMER_REGISTERED
+
+OTP_SENT
+
+PASSWORD_RESET
+
+ADMIN_ALERT
+
+System must allow unlimited future events.
+
+====================================================
+WORKFLOW ENGINE
+====================================================
+
+Build a configurable Workflow Engine.
+
+Example:
+
+IF Booking Created
+
+THEN
+
+Generate Booking ID
+
+Generate Agreement
+
+Generate Invoice
+
+Generate QR Code
+
+Generate PDFs
+
+Update Customer Dashboard
+
+Update Admin Dashboard
+
+Notify Branch
+
+Notify Agent
+
+Send WhatsApp
+
+Send SMS
+
+Send Email
+
+Send Push Notification
+
+Write Audit Log
+
+Workflows must be configurable without editing source code.
+
+====================================================
+PROVIDER MANAGER
+====================================================
+
+Provider abstraction.
+
+WhatsApp
+
+• BotBee
+• Meta Cloud API
+• Twilio
+• 360Dialog
+
+SMS
+
+• Fast2SMS
+• MSG91
+• Twilio
+
+Email
+
+• SMTP
+• SendGrid
+• Mailgun
+• Amazon SES
+
+Push
+
+• Firebase
+• Web Push
+
+Providers must be interchangeable through configuration only.
+
+====================================================
+TEMPLATE MANAGER
+====================================================
+
+Central template library.
+
+Booking Confirmation
+
+Payment Confirmation
+
+Invoice
+
+Receipt
+
+Agreement
+
+Visa
+
+Flight Ticket
+
+Hotel Voucher
+
+Room Allocation
+
+Balance Reminder
+
+Departure Reminder
+
+OTP
+
+Password Reset
+
+Welcome Message
+
+Support multilingual templates:
+
+English
+
+Hindi
+
+Urdu
+
+Arabic
+
+Dynamic placeholders:
+
+{{customer_name}}
+
+{{booking_id}}
+
+{{invoice_no}}
+
+{{amount}}
+
+{{hotel}}
+
+{{flight}}
+
+{{visa_number}}
+
+{{departure_date}}
+
+====================================================
+PDF AUTOMATION
+====================================================
+
+Automatically generate:
+
+Agreement PDF
+
+Invoice PDF
+
+Receipt PDF
+
+Visa Copy
+
+Flight Ticket
+
+Hotel Voucher
+
+Room Allocation Letter
+
+Attach PDFs automatically where applicable.
+
+====================================================
+CHANNELS
+====================================================
+
+Support:
+
+WhatsApp
+
+SMS
+
+Email
+
+Push Notification
+
+Customer Dashboard Notification
+
+Admin Dashboard Notification
+
+Branch Dashboard Notification
+
+Agent Dashboard Notification
+
+Internal Inbox
+
+Webhook
+
+Future Channels
+
+====================================================
+FAILURE HANDLING
+====================================================
+
+Failure of one provider must NEVER stop the workflow.
+
+Example:
+
+WhatsApp fails
+
+↓
+
+Continue
+
+SMS
+
+↓
+
+Email
+
+↓
+
+Push
+
+↓
+
+Dashboard
+
+↓
+
+Webhook
+
+↓
+
+Admin Alert
+
+Retry WhatsApp automatically.
+
+Never silently fail.
+
+====================================================
+RETRY ENGINE
+====================================================
+
+Retry schedule:
+
+1 minute
+
+5 minutes
+
+15 minutes
+
+30 minutes
+
+1 hour
+
+6 hours
+
+24 hours
+
+Maximum retry count configurable.
+
+After final retry:
+
+Move to Dead Letter Queue
+
+Notify Administrator
+
+Store full failure reason
+
+====================================================
+DEAD LETTER QUEUE
+====================================================
+
+Store permanently:
+
+Customer
+
+Booking
+
+Provider
+
+Payload
+
+Response
+
+Retry Count
+
+Failure Reason
+
+Retry Button
+
+Force Send Button
+
+====================================================
+DELIVERY TRACKING
+====================================================
+
+Track every notification.
+
+Store:
+
+Notification ID
+
+Booking ID
+
+Customer ID
+
+Provider
+
+Channel
+
+Template
+
+Queued
+
+Sending
+
+Delivered
+
+Read
+
+Failed
+
+Cancelled
+
+Provider Message ID
+
+HTTP Response
+
+Timestamp
+
+Retry Count
+
+Execution Time
+
+====================================================
+CUSTOMER TIMELINE
+====================================================
+
+Maintain a complete communication timeline.
+
+Example:
+
+Booking Created
+
+Agreement Generated
+
+Invoice Generated
+
+WhatsApp Delivered
+
+SMS Delivered
+
+Email Delivered
+
+Payment Received
+
+Receipt Sent
+
+Visa Uploaded
+
+Visa Delivered
+
+Flight Ticket Sent
+
+Hotel Voucher Sent
+
+Room Allocation Sent
+
+====================================================
+COMMUNICATION DASHBOARD
+====================================================
+
+Build a new Admin Module:
+
+Communication & Automation Center
+
+Include:
+
+Live Queue
+
+Pending
+
+Processing
+
+Delivered
+
+Failed
+
+Retrying
+
+Cancelled
+
+Provider Health
+
+Workflow Health
+
+Today's Notifications
+
+Today's Failures
+
+Success Rate
+
+Average Delivery Time
+
+Provider Performance
+
+Queue Size
+
+====================================================
+HEALTH MONITOR
+====================================================
+
+Perform REAL health checks.
+
+Verify:
+
+WhatsApp API
+
+SMS API
+
+SMTP
+
+Firebase
+
+Queue
+
+Scheduler
+
+Database
+
+OAuth
+
+Templates
+
+PDF Generator
+
+Storage
+
+Webhooks
+
+Do NOT only verify configuration.
+
+Perform real API validation.
+
+====================================================
+AUTOMATION BUILDER
+====================================================
+
+Allow admin to create workflows visually.
+
+Example:
+
+IF Payment Received
+
+THEN
+
+Generate Receipt
+
+Generate PDF
+
+Send WhatsApp
+
+Send SMS
+
+Send Email
+
+Push Notification
+
+Update Dashboard
+
+Notify Finance
+
+No coding required.
+
+====================================================
+DUPLICATE PREVENTION
+====================================================
+
+Implement:
+
+Event IDs
+
+Idempotency Keys
+
+Message Hash
+
+Deduplication Window
+
+Guarantee exactly-once processing.
+
+====================================================
+SECURITY
+====================================================
+
+Encrypt:
+
+API Keys
+
+Tokens
+
+Secrets
+
+Webhook Secrets
+
+Support RBAC.
+
+Maintain complete audit logs.
+
+====================================================
+ANALYTICS
+====================================================
+
+Display:
+
+Total Messages
+
+Delivered
+
+Failed
+
+Read Rate
+
+Open Rate
+
+Average Delivery Time
+
+WhatsApp Success Rate
+
+SMS Success Rate
+
+Email Success Rate
+
+Branch-wise
+
+Agent-wise
+
+Package-wise
+
+Daily
+
+Weekly
+
+Monthly
+
+====================================================
+REAL BUSINESS AUTOMATION
+====================================================
+
+Booking Created
+
+↓
+
+Generate Booking ID
+
+↓
+
+Generate Agreement
+
+↓
+
+Generate Invoice
+
+↓
+
+Update Dashboard
+
+↓
+
+Send WhatsApp
+
+↓
+
+Send SMS
+
+↓
+
+Send Email
+
+↓
+
+Send Push
+
+↓
+
+Notify Admin
+
+↓
+
+Audit Log
+
+Payment Received
+
+↓
+
+Update Payment Status
+
+↓
+
+Generate Receipt
+
+↓
+
+Update Finance
+
+↓
+
+Update Dashboard
+
+↓
+
+Send Receipt
+
+↓
+
+Notify Admin
+
+Visa Approved
+
+↓
+
+Upload Visa
+
+↓
+
+Send Visa
+
+↓
+
+Dashboard Update
+
+↓
+
+Push Notification
+
+Flight Assigned
+
+↓
+
+Upload Ticket
+
+↓
+
+Send Ticket
+
+↓
+
+Dashboard Update
+
+Room Allocated
+
+↓
+
+Generate Room Letter
+
+↓
+
+Send Room Details
+
+↓
+
+Dashboard Update
+
+====================================================
+PRODUCTION REQUIREMENTS
+====================================================
+
+Do NOT break any existing feature.
+
+Audit every existing notification.
+
+Migrate all notification logic into the new engine.
+
+Remove duplicate implementations safely.
+
+Maintain backward compatibility.
+
+Implement database migrations safely.
+
+Use transactions where required.
+
+Log every workflow execution.
+
+Implement monitoring.
+
+Implement structured logging.
+
+Implement comprehensive error handling.
+
+Implement scalable architecture.
+
+====================================================
+FINAL ACCEPTANCE CRITERIA
+====================================================
+
+The task is complete ONLY when:
+
+✓ No module sends notifications directly.
+
+✓ Every communication flows through the Central Communication & Automation Engine.
+
+✓ Every booking automatically generates Agreement, Invoice, PDFs, Dashboard updates, and sends WhatsApp, SMS, Email, Push Notifications, and Admin Notifications.
+
+✓ Every payment automatically generates Receipt, updates Finance, updates Dashboard, and sends confirmations.
+
+✓ Failed messages retry automatically.
+
+✓ No notification is silently lost.
+
+✓ No duplicate notifications occur.
+
+✓ Every notification has full delivery tracking.
+
+✓ Every booking has a complete communication timeline.
+
+✓ Communication & Automation Center displays live monitoring.
+
+✓ Real production end-to-end tests pass successfully.
+
+✓ Production deployment completes without regression.
+
+Only mark the task complete after all production tests have passed successfully.
