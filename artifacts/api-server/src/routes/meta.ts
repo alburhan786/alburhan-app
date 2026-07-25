@@ -30,13 +30,15 @@ router.get("/health", async (req, res) => {
   let templateCount = 0;
   let tokenStatus: any = null;
   let recentErrors: any[] = [];
+  let lastOkR: any = null;
 
   try {
-    const [msgR, tplR, tokR, errR] = await Promise.all([
+    const [msgR, tplR, tokR, errR, _lastOkR] = await Promise.all([
       pool.query(`SELECT status, COUNT(*) cnt FROM meta_messages WHERE created_at > NOW()-INTERVAL '7 days' GROUP BY status`),
       pool.query(`SELECT COUNT(*) FROM meta_templates WHERE status='APPROVED'`),
       pool.query(`SELECT * FROM meta_token_status WHERE id='current'`),
-      pool.query(`SELECT wamid, error_message, created_at FROM meta_messages WHERE status='failed' ORDER BY created_at DESC LIMIT 5`),
+      pool.query(`SELECT wamid, error_message, error_code, created_at FROM meta_messages WHERE status='failed' ORDER BY created_at DESC LIMIT 5`),
+      pool.query(`SELECT wamid, recipient, template_name, event_type, created_at FROM meta_messages WHERE status IN ('delivered','read') ORDER BY created_at DESC LIMIT 1`),
     ]);
     for (const r of msgR.rows) {
       queueStats[r.status] = parseInt(r.cnt);
@@ -45,6 +47,7 @@ router.get("/health", async (req, res) => {
     templateCount = parseInt(tplR.rows[0]?.count || "0");
     tokenStatus   = tokR.rows[0] || null;
     recentErrors  = errR.rows;
+    lastOkR       = _lastOkR;
   } catch {}
 
   const total        = queueStats.total || 1;
@@ -62,6 +65,15 @@ router.get("/health", async (req, res) => {
         (missing.length === 0 ? 0 : 0)  // no bonus for secrets — missing already shown
       )
     : 0;
+
+  const lastMsg = lastOkR?.rows[0] || null;
+  const securityStatus = {
+    webhookSignatureEnabled: !!(process.env.META_WEBHOOK_SECRET),
+    appSecretConfigured:     !!(process.env.META_APP_SECRET),
+    tokenValid:              tokenStatus?.token_valid || false,
+    missingSecretCount:      missing.length,
+    status: missing.length === 0 && tokenStatus?.token_valid ? "secure" : missing.length > 0 ? "pending_secrets" : "token_invalid",
+  };
 
   res.json({
     ok: waHealth.status === "ok",
@@ -90,10 +102,20 @@ router.get("/health", async (req, res) => {
     failureRate,
     readRate,
     retryCount: queueStats.retrying,
+    failedCount: queueStats.failed,
     recentErrors,
+    lastSuccessfulMessage: lastMsg ? {
+      wamid: lastMsg.wamid,
+      recipient: lastMsg.recipient,
+      templateName: lastMsg.template_name,
+      eventType: lastMsg.event_type,
+      sentAt: lastMsg.created_at,
+    } : null,
+    securityStatus,
     score,
     missingSecrets: missing,
     version: process.env.META_API_VERSION || "v20.0",
+    buildStamp: process.env.BUILD_STAMP || "v30.0-meta-production",
     provider: "MetaCloudAPI",
     fallback: "BotBee",
   });

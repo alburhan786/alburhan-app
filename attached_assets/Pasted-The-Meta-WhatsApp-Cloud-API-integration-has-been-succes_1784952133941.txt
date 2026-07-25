@@ -1,0 +1,97 @@
+The Meta WhatsApp Cloud API integration has been successfully built and deployed. The frontend, backend, VPS deployment, and /api/meta/test-send endpoint are verified.
+
+Now complete the FINAL Production Go-Live process.
+
+Objectives:
+- Make Meta WhatsApp Cloud API the primary provider.
+- Keep BotBee as automatic fallback.
+- Achieve full production readiness (95–100%).
+
+Tasks:
+
+1. Verify all required production secrets:
+   - META_ACCESS_TOKEN
+   - META_PHONE_NUMBER_ID
+   - META_WABA_ID
+   - META_BUSINESS_ACCOUNT_ID
+   - META_APP_ID
+   - META_APP_SECRET
+   - META_VERIFY_TOKEN
+   - META_API_VERSION
+
+2. Add any missing secrets to the missing-secrets report.
+
+3. Validate the access token using Meta Graph API.
+
+4. Verify the Phone Number ID belongs to the configured WhatsApp Business Account.
+
+5. Verify webhook subscription and callback:
+   https://alburhantravels.com/api/social-media/webhook/meta
+
+6. Sync all approved WhatsApp templates from Meta.
+
+7. Execute a production test using /api/meta/test-send.
+
+8. Confirm:
+   ✓ HTTP 200
+   ✓ Meta Message ID
+   ✓ Queue completed
+   ✓ Delivery callback
+   ✓ Read callback (if available)
+   ✓ Timeline updated
+   ✓ Audit log recorded
+
+9. Verify every workflow sends through Meta Cloud API:
+   • OTP Login
+   • New Booking
+   • Booking Approved
+   • Partial Payment
+   • Full Payment
+   • Invoice
+   • Agreement
+   • Agreement Signed
+   • Visa Approved
+   • Flight Assigned
+   • Hotel Assigned
+   • Room Allocation
+   • Passport Upload
+   • Reminder Messages
+   • Broadcast Messages
+
+10. Automatically fall back to BotBee if Meta returns any error.
+
+11. Create an Admin Dashboard page:
+   /admin/meta-status
+
+Display:
+- Meta Connection
+- Token Status
+- Token Expiry
+- Phone Number
+- WABA ID
+- Business Account ID
+- Webhook Status
+- Template Count
+- Queue Health
+- Delivery Success %
+- Failed Messages
+- Retry Queue
+- Current Provider
+- Last Successful WhatsApp Message
+- Missing Secrets
+
+12. Produce a FINAL Production Certification Report including:
+- ERP Version
+- VPS Version
+- Build Number
+- Production Health Score
+- WhatsApp Status
+- Meta Cloud API Status
+- Queue Status
+- Retry Status
+- Webhook Status
+- Template Sync Status
+- Security Status
+- Remaining Issues (if any)
+
+Do not modify any existing ERP functionality. Keep Meta Cloud API as the primary provider and BotBee as the automatic fallback.
