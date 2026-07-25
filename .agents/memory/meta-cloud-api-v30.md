@@ -53,5 +53,10 @@ Handles: WA delivery statuses (statuses[]), incoming WA messages, Facebook lead 
 - GET /api/meta/missing-secrets — list unconfigured secrets
 - POST /api/meta/test-send — send test message (admin only)
 
+## /admin/meta-status page
+Full production status dashboard at `/admin/meta-status`. Shows all 13 fields,
+missing-secrets alert, validate-token/sync-templates/retry buttons,
+10-event E2E Certification runner, printable Production Certification Report.
+
 ## Deployed
-v30.0-meta-production — 2026-07-25
+v30.0-meta-production — 2026-07-25 · frontend redeployed with MetaStatus page

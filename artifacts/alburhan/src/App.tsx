@@ -129,6 +129,7 @@ import WhatsAppTemplateManager from "@/pages/admin/WhatsAppTemplateManager";
 import BotBeeDashboard from "@/pages/admin/BotBeeDashboard";
 import SocialMediaCenter from "@/pages/admin/SocialMediaCenter";
 import MetaHealth from "@/pages/admin/MetaHealth";
+import MetaStatus from "@/pages/admin/MetaStatus";
 import OAuthHub from "@/pages/admin/OAuthHub";
 import E2ETestRunner from "@/pages/admin/E2ETestRunner";
 import ErrorLogs from "@/pages/admin/ErrorLogs";
@@ -417,6 +418,7 @@ function Router() {
       <Route path="/admin/botbee-dashboard" component={() => <AdminRoute component={BotBeeDashboard} />} />
       <Route path="/admin/social-media" component={() => <AdminRoute component={SocialMediaCenter} />} />
       <Route path="/admin/meta-health" component={() => <AdminRoute component={MetaHealth} />} />
+      <Route path="/admin/meta-status" component={() => <AdminRoute component={MetaStatus} />} />
       <Route path="/admin/social-oauth" component={() => <AdminRoute component={OAuthHub} />} />
       <Route path="/admin/e2e-test" component={() => <AdminRoute component={E2ETestRunner} />} />
       <Route path="/admin/error-logs" component={() => <AdminRoute component={ErrorLogs} />} />

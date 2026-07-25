@@ -1,0 +1,81 @@
+The Meta WhatsApp Cloud API integration has been deployed successfully to v30.0-meta-production.
+
+Now complete the FINAL production activation.
+
+Tasks:
+
+1. Verify all required production secrets exist:
+   - META_ACCESS_TOKEN
+   - META_PHONE_NUMBER_ID
+   - META_BUSINESS_ACCOUNT_ID
+   - META_WABA_ID
+   - META_APP_ID
+   - META_APP_SECRET
+   - META_VERIFY_TOKEN
+   - META_API_VERSION=v20.0
+
+2. Validate the production access token using the Meta Graph API.
+
+3. Verify the Phone Number ID belongs to the configured WhatsApp Business Account.
+
+4. Verify webhook subscription:
+   https://alburhantravels.com/api/social-media/webhook/meta
+
+5. Synchronize all approved WhatsApp templates from Meta.
+
+6. Send one real production template test message using Meta Cloud API (not BotBee).
+
+7. Confirm:
+   - Message accepted by Meta
+   - Message ID generated
+   - Delivery callback received
+   - Read callback received (if available)
+   - Timeline updated
+   - Audit log created
+   - Queue completed successfully
+
+8. If Meta Cloud API fails, automatically fall back to BotBee and log the reason.
+
+9. Create a new Admin page:
+   /admin/meta-status
+
+Display:
+   - Connection Status
+   - Token Status
+   - Token Expiry
+   - Phone Number
+   - Business Account
+   - WABA ID
+   - Webhook Status
+   - Template Count
+   - Queue Status
+   - Delivery Rate
+   - Failure Rate
+   - Last Successful Message
+   - Current WhatsApp Provider (Meta or BotBee)
+
+10. Run a complete end-to-end production test for:
+    - New Booking
+    - Booking Approved
+    - Payment Received
+    - Invoice Generated
+    - Agreement Generated
+    - Agreement Signed
+    - Visa Approved
+    - Flight Assigned
+    - Room Allocation
+    - OTP Login
+
+Generate a final Production Certification Report that includes:
+- Overall Health Score
+- Meta Integration Status
+- WhatsApp Cloud API Status
+- Webhook Status
+- Template Sync Status
+- Delivery Success Rate
+- Queue Health
+- Retry Health
+- Security Validation
+- Remaining Issues (if any)
+
+Do not modify existing ERP functionality. Keep Meta Cloud API as the primary provider and BotBee as the automatic fallback.
