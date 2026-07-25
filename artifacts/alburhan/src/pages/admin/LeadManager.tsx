@@ -17,12 +17,21 @@ import {
 const BASE_API = import.meta.env.VITE_API_URL || "";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
+// 22 spec-required sources first, then India-specific additions
 const SOURCES = [
-  "website", "whatsapp", "instagram", "facebook", "messenger",
-  "telegram", "phone", "walk-in", "referral", "email",
-  "facebook_ads", "google_ads", "rcs", "sms", "google",
-  "youtube", "twitter_x", "justdial", "sulekha", "trade_fair",
-  "naukri", "other",
+  // Digital channels
+  "whatsapp", "facebook", "instagram", "telegram", "sms", "email",
+  // Web sources
+  "website", "website_chat", "website_package", "website_contact", "google_forms",
+  // Paid acquisition
+  "google_business", "google_ads", "facebook_ads", "instagram_ads",
+  // Offline / personal
+  "phone", "missed_call", "walk-in", "referral", "travel_agent",
+  // Admin & utility
+  "manual_entry", "qr_code",
+  // India-specific
+  "messenger", "rcs", "google", "youtube", "twitter_x",
+  "justdial", "sulekha", "trade_fair", "naukri", "other",
 ];
 
 const STATUSES = [
@@ -48,10 +57,15 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const SOURCE_ICONS: Record<string, string> = {
-  website: "🌐", whatsapp: "💬", instagram: "📸", facebook: "👥",
-  messenger: "💬", telegram: "✈️", phone: "📞", "walk-in": "🚶",
-  referral: "🤝", email: "✉️", facebook_ads: "📢", google_ads: "🔍",
-  rcs: "📡", sms: "📱", google: "🔍", youtube: "▶️",
+  // Spec-required 22
+  whatsapp: "💬", facebook: "👥", instagram: "📸", telegram: "✈️",
+  sms: "📱", email: "✉️", website: "🌐", google_business: "🏢",
+  google_ads: "🔍", referral: "🤝", "walk-in": "🚶", travel_agent: "🧳",
+  manual_entry: "✏️", qr_code: "📲", website_chat: "💭",
+  website_package: "📦", website_contact: "📋", missed_call: "📵",
+  phone: "📞", facebook_ads: "📢", instagram_ads: "📸", google_forms: "📝",
+  // India-specific additions
+  messenger: "💬", rcs: "📡", google: "🔍", youtube: "▶️",
   twitter_x: "🐦", justdial: "📇", sulekha: "🟡", trade_fair: "🏪",
   naukri: "💼", other: "📋",
 };

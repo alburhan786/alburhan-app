@@ -77,7 +77,7 @@ router.get("/", (_req, res) => {
 });
 
 // ── Build fingerprint — confirms which bundle is running on VPS (no auth needed) ──
-const BUILD_STAMP = "2026-07-25-v27.4-customer360-sidebar-search";
+const BUILD_STAMP = "2026-07-25-v27.5-lead-intelligence-omni-social";
 // Init Communication Engine tables on startup
 ensureCommEventsTable().catch(() => {});
 router.get("/version", (_req, res) => {
