@@ -1,0 +1,568 @@
+MASTER TASK – BUILD ENTERPRISE FINANCE, ACCOUNTING, AGENT & BRANCH ERP MODULE (v28)
+
+The Communication Engine is COMPLETE and production-ready.
+
+DO NOT modify or break any existing modules.
+
+Existing modules including Booking, CRM, Customer Dashboard, Admin Dashboard, Notification Engine, Queue Engine, WhatsApp, SMS, Email, Invoice, Agreement, Visa, Room Allocation, Payment, Workflow Engine, Retry Engine, and Monitoring are already working.
+
+This task is ONLY to build the remaining ERP business modules.
+
+⸻
+
+GOAL
+
+Transform Al Burhan Tours & Travels ERP into a complete Enterprise ERP.
+
+The new modules must integrate with the existing architecture.
+
+Use the existing:
+
+* Authentication
+* Permissions
+* PostgreSQL
+* Notification Engine
+* Workflow Engine
+* Audit Logs
+* Timeline
+* Queue
+* Dashboard
+* Customer Profiles
+
+Never bypass the Workflow Engine.
+
+⸻
+
+MODULE 1 – FINANCE & ACCOUNTING
+
+Build a complete accounting module.
+
+Features:
+
+General Ledger
+
+Chart of Accounts
+
+Journal Entries
+
+Cash Book
+
+Bank Book
+
+Petty Cash
+
+Income Ledger
+
+Expense Ledger
+
+Customer Ledger
+
+Supplier Ledger
+
+Agent Ledger
+
+Branch Ledger
+
+Opening Balance
+
+Closing Balance
+
+Daily Cash Closing
+
+Bank Reconciliation
+
+GST Reports
+
+Trial Balance
+
+Profit & Loss
+
+Balance Sheet
+
+Cash Flow Statement
+
+Outstanding Receivable
+
+Outstanding Payable
+
+Revenue Reports
+
+Expense Reports
+
+Financial Dashboard
+
+Every Booking
+
+↓
+
+Automatically creates Accounting Entries.
+
+Example
+
+Booking
+
+Debit Customer
+
+Credit Sales
+
+Payment
+
+Debit Bank
+
+Credit Customer
+
+Refund
+
+Debit Refund
+
+Credit Bank
+
+Everything automatic.
+
+No manual accounting required.
+
+⸻
+
+MODULE 2 – AGENT MANAGEMENT
+
+Create complete Agent Portal.
+
+Each agent has
+
+Login
+
+Dashboard
+
+Bookings
+
+Commission
+
+Ledger
+
+Wallet
+
+Outstanding
+
+Customers
+
+Reports
+
+Performance
+
+Commission automatically calculated.
+
+Admin can
+
+Approve
+
+Reject
+
+Suspend
+
+Activate
+
+Agent.
+
+⸻
+
+MODULE 3 – BRANCH MANAGEMENT
+
+Support unlimited branches.
+
+Every branch has
+
+Dashboard
+
+Bookings
+
+Customers
+
+Staff
+
+Revenue
+
+Expenses
+
+Profit
+
+Cash
+
+Documents
+
+Reports
+
+Branch Manager Login
+
+Branch Staff Login
+
+Permissions
+
+Branch-wise statistics.
+
+⸻
+
+MODULE 4 – MULTI LEVEL PERMISSIONS
+
+Create enterprise RBAC.
+
+Roles
+
+Super Admin
+
+Director
+
+Finance Manager
+
+Operations Manager
+
+Branch Manager
+
+Agent
+
+Visa Team
+
+Accounts Team
+
+Support Team
+
+Reception
+
+Customer
+
+Each permission individually configurable.
+
+⸻
+
+MODULE 5 – VENDOR MANAGEMENT
+
+Create Vendors
+
+Hotels
+
+Transport
+
+Airlines
+
+Visa Supplier
+
+Catering
+
+Laundry
+
+Others
+
+Vendor Ledger
+
+Payments
+
+Invoices
+
+Outstanding
+
+Contracts
+
+Documents
+
+Performance
+
+⸻
+
+MODULE 6 – PURCHASE MANAGEMENT
+
+Purchase Orders
+
+Vendor Bills
+
+Approval Workflow
+
+Goods Received
+
+Expense Posting
+
+Vendor Payment
+
+Accounting Integration
+
+⸻
+
+MODULE 7 – ADVANCED REPORTS
+
+Daily Sales
+
+Monthly Sales
+
+Yearly Sales
+
+Branch Reports
+
+Agent Reports
+
+Profit Reports
+
+Visa Reports
+
+Flight Reports
+
+Hotel Reports
+
+Room Reports
+
+Booking Reports
+
+Customer Reports
+
+Refund Reports
+
+Cancellation Reports
+
+Outstanding Reports
+
+Cash Reports
+
+Financial Reports
+
+Export
+
+PDF
+
+Excel
+
+CSV
+
+⸻
+
+MODULE 8 – ANALYTICS DASHBOARD
+
+Real-time KPIs
+
+Today’s Revenue
+
+Today’s Booking
+
+Pending Payments
+
+Pending Visa
+
+Pending Passport
+
+Pending Agreements
+
+Upcoming Flights
+
+Occupied Rooms
+
+Available Rooms
+
+Outstanding
+
+Cash Balance
+
+Bank Balance
+
+Profit
+
+Expenses
+
+Top Branch
+
+Top Agent
+
+Conversion Rate
+
+Charts
+
+Graphs
+
+Heatmaps
+
+⸻
+
+MODULE 9 – CUSTOMER FINANCIAL HISTORY
+
+Each customer has
+
+Invoice History
+
+Receipt History
+
+Payments
+
+Refunds
+
+Outstanding
+
+Ledger
+
+Timeline
+
+Documents
+
+Download PDFs
+
+⸻
+
+MODULE 10 – SYSTEM AUDIT
+
+Every financial action
+
+Log
+
+User
+
+IP
+
+Browser
+
+Time
+
+Old Value
+
+New Value
+
+Reason
+
+Approval
+
+No financial record can be deleted.
+
+Soft Delete only.
+
+⸻
+
+MODULE 11 – API
+
+REST APIs
+
+GraphQL Ready
+
+Pagination
+
+Filtering
+
+Search
+
+Sorting
+
+Audit
+
+Validation
+
+Rate Limiting
+
+OpenAPI Documentation
+
+⸻
+
+MODULE 12 – PERFORMANCE
+
+Database optimized
+
+Indexes
+
+Transactions
+
+Caching
+
+Background Jobs
+
+Queue
+
+Retry
+
+No N+1 queries
+
+Lazy Loading
+
+Server-side Pagination
+
+⸻
+
+MODULE 13 – UI
+
+Modern Enterprise ERP UI
+
+Responsive
+
+Desktop
+
+Tablet
+
+Mobile
+
+Dark Mode
+
+Light Mode
+
+Professional Tables
+
+Filters
+
+Charts
+
+Cards
+
+Exports
+
+Search Everywhere
+
+⸻
+
+SECURITY
+
+Use PostgreSQL Transactions.
+
+No SQL Injection.
+
+No XSS.
+
+CSRF Protection.
+
+Permission checks on every endpoint.
+
+Audit everything.
+
+Never expose secrets.
+
+⸻
+
+IMPORTANT
+
+DO NOT modify existing Communication Engine.
+
+DO NOT break Booking.
+
+DO NOT break Payment.
+
+DO NOT break Invoice.
+
+DO NOT break Agreement.
+
+DO NOT break WhatsApp.
+
+DO NOT break SMS.
+
+DO NOT break Email.
+
+DO NOT break Customer Dashboard.
+
+DO NOT break Admin Dashboard.
+
+Reuse existing Workflow Engine and Notification Engine.
+
+All new modules must integrate cleanly with the existing architecture.
+
+⸻
+
+SUCCESS CRITERIA
+
+* Enterprise Finance & Accounting completed.
+* Agent Portal completed.
+* Branch Portal completed.
+* Vendor & Purchase Management completed.
+* Real-time Analytics Dashboard completed.
+* Full RBAC implemented.
+* Reports and exports working.
+* Automatic accounting entries enabled.
+* Existing production modules remain fully functional with no regressions.
+
+This should be implemented as v28 Enterprise ERP, following enterprise-grade coding standards with modular, scalable architecture suitable for future expansion.

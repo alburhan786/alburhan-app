@@ -65,6 +65,9 @@ import pushRouter from "./push.js";
 import e2eRouter from "./e2e.js";
 import errorLogsRouter, { ensureErrorLogTable, errorLogMiddleware } from "./error-logs.js";
 import commsEngineRouter from "./comms-engine.js";
+import commissionsRouter, { ensureCommissionTables } from "./commissions.js";
+import purchaseRouter, { ensurePurchaseTables } from "./purchase.js";
+import financeReportsRouter from "./finance-reports.js";
 import { ensureCommEventsTable } from "../lib/eventBus.js";
 import { requireAdmin } from "../lib/auth.js";
 
@@ -77,9 +80,11 @@ router.get("/", (_req, res) => {
 });
 
 // ── Build fingerprint — confirms which bundle is running on VPS (no auth needed) ──
-const BUILD_STAMP = "2026-07-25-v27.8-meta-wapi-rcs-disabled";
-// Init Communication Engine tables on startup
+const BUILD_STAMP = "2026-07-25-v28.0-enterprise-erp";
+// Init tables on startup
 ensureCommEventsTable().catch(() => {});
+ensureCommissionTables().catch(() => {});
+ensurePurchaseTables().catch(() => {});
 router.get("/version", (_req, res) => {
   res.json({
     build: BUILD_STAMP,
@@ -356,6 +361,9 @@ router.use("/push", pushRouter);
 router.use("/admin/e2e", e2eRouter);
 router.use("/admin/error-logs", errorLogsRouter);
 router.use("/comms", commsEngineRouter);
+router.use("/commissions", commissionsRouter);
+router.use("/purchase", purchaseRouter);
+router.use("/finance-reports", financeReportsRouter);
 import inboxRouter from "./inbox.js";
 router.use("/inbox", inboxRouter);
 import customer360Router from "./customer360.js";

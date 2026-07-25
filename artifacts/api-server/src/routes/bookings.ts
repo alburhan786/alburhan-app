@@ -5,6 +5,7 @@ import { eq, and, desc, count, sql, isNull, or, ilike } from "drizzle-orm";
 import multer from "multer";
 import { uploadToGCS } from "../lib/gcsUpload.js";
 import { upsertPilgrimFromProfile } from "../lib/pilgrimUtils.js";
+import { postBookingJournal } from "../lib/journalHelper.js";
 
 interface MulterRequest extends Request {
   file?: Express.Multer.File;
@@ -498,6 +499,17 @@ router.post("/", requireAuth as any, async (req: AuthenticatedRequest, res) => {
     invoiceUrl:     `${siteBase}/invoice/${booking.bookingNumber}`,
     dashboardUrl:   `${siteBase}/customer/dashboard`,
   }).catch(console.error);
+
+  // Auto-accounting: Dr Accounts Receivable / Cr Sales Revenue (non-fatal)
+  if (booking.finalAmount && Number(booking.finalAmount) > 0) {
+    postBookingJournal({
+      bookingId: booking.id,
+      bookingNumber: booking.bookingNumber,
+      amount: Number(booking.finalAmount),
+      date: new Date().toISOString().split("T")[0],
+      customerName: booking.customerName,
+    }).catch(() => {});
+  }
 
   notifyNewBooking({
     bookingId: booking.id,

@@ -121,6 +121,78 @@ export async function postExpenseJournal(params: {
 }
 
 /**
+ * Auto-post a double-entry journal entry when a booking is created or approved.
+ * Dr: Accounts Receivable (1003) — Cr: Sales Revenue (4001)
+ * Non-fatal: errors logged but never propagated.
+ */
+export async function postBookingJournal(params: {
+  bookingId: string; bookingNumber: string; amount: number; date: string; customerName?: string;
+}): Promise<void> {
+  try {
+    const dup = await pool.query(
+      `SELECT id FROM journal_entries WHERE source='booking' AND source_id=$1 LIMIT 1`,
+      [params.bookingId]
+    );
+    if (dup.rows.length) return;
+
+    const drId = await acctId("1003"); // Accounts Receivable
+    const crId = await acctId("4001"); // Sales Revenue
+    if (!drId || !crId) return;        // COA not seeded yet — skip silently
+
+    const num = await nextNum("booking", "BK");
+    const { rows: [entry] } = await pool.query(
+      `INSERT INTO journal_entries (id, entry_number, date, narration, reference, source, source_id)
+       VALUES (gen_random_uuid()::text,$1,$2,$3,$4,'booking',$5) RETURNING id`,
+      [num, params.date, `Booking — ${params.customerName ?? params.bookingNumber}`, params.bookingNumber, params.bookingId]
+    );
+    await pool.query(
+      `INSERT INTO journal_entry_lines (id, journal_entry_id, account_id, debit, credit)
+       VALUES (gen_random_uuid()::text,$1,$2,$3,0),
+              (gen_random_uuid()::text,$1,$4,0,$3)`,
+      [entry.id, drId, params.amount, crId]
+    );
+  } catch (err) {
+    console.error("[journalHelper] postBookingJournal (non-fatal):", err);
+  }
+}
+
+/**
+ * Auto-post a journal entry for a refund.
+ * Dr: Refund Expense (5012) — Cr: Cash (1001) or Bank (1002)
+ * Non-fatal: errors logged but never propagated.
+ */
+export async function postRefundJournal(params: {
+  refundId: string; amount: number; mode: string; date: string; bookingNumber?: string;
+}): Promise<void> {
+  try {
+    const dup = await pool.query(
+      `SELECT id FROM journal_entries WHERE source='refund' AND source_id=$1 LIMIT 1`,
+      [params.refundId]
+    );
+    if (dup.rows.length) return;
+
+    const drId = await acctId("5012"); // Refund Expense
+    const crId = await acctId(params.mode === "cash" ? "1001" : "1002"); // Cash or Bank
+    if (!drId || !crId) return;
+
+    const num = await nextNum("refund", "REF");
+    const { rows: [entry] } = await pool.query(
+      `INSERT INTO journal_entries (id, entry_number, date, narration, reference, source, source_id)
+       VALUES (gen_random_uuid()::text,$1,$2,$3,$4,'refund',$5) RETURNING id`,
+      [num, params.date, `Refund — ${params.bookingNumber ?? params.refundId}`, params.bookingNumber ?? null, params.refundId]
+    );
+    await pool.query(
+      `INSERT INTO journal_entry_lines (id, journal_entry_id, account_id, debit, credit)
+       VALUES (gen_random_uuid()::text,$1,$2,$3,0),
+              (gen_random_uuid()::text,$1,$4,0,$3)`,
+      [entry.id, drId, params.amount, crId]
+    );
+  } catch (err) {
+    console.error("[journalHelper] postRefundJournal (non-fatal):", err);
+  }
+}
+
+/**
  * Bulk sync: auto-create journal entries for all existing payments and expenses
  * that don't have one yet. Safe to call multiple times (idempotent).
  */

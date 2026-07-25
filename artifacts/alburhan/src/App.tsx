@@ -171,6 +171,9 @@ import MobileAppDashboard from "@/pages/admin/MobileAppDashboard";
 import PermissionsManager from "@/pages/admin/PermissionsManager";
 import ActivityLogs from "@/pages/admin/ActivityLogs";
 import SecurityDashboard from "@/pages/admin/SecurityDashboard";
+import CommissionManager from "@/pages/admin/CommissionManager";
+import PurchaseManager from "@/pages/admin/PurchaseManager";
+import AdvancedReportsCenter from "@/pages/admin/AdvancedReportsCenter";
 import BackupDashboard from "@/pages/admin/BackupDashboard";
 import IntegrationsDashboard from "@/pages/admin/IntegrationsDashboard";
 import AgreementSigning from "@/pages/customer/AgreementSigning";
@@ -321,7 +324,7 @@ function Router() {
       <Route path="/admin/groups/:groupId/families/:familyId/print" component={() => <AdminRoute component={PrintFamilySheet} />} />
       <Route path="/admin/offline-bookings" component={() => <AdminRoute component={OfflineBookingManager} />} />
       <Route path="/admin/qr-tracker" component={() => <AdminRoute component={QRTracker} />} />
-      <Route path="/admin/reports" component={() => <AdminRoute component={ReportsManager} />} />
+      <Route path="/admin/reports" component={() => <AdminRoute component={AdvancedReportsCenter} />} />
       <Route path="/admin/offline-payments" component={() => <AdminRoute component={OfflinePaymentsManager} />} />
       <Route path="/admin/payment-analytics" component={() => <AdminRoute component={PaymentAnalytics} />} />
       <Route path="/admin/payments" component={() => <AdminRoute component={PaymentAnalytics} />} />
@@ -382,6 +385,8 @@ function Router() {
       <Route path="/admin/branch-dashboard/:id" component={() => <AdminRoute component={BranchDashboard} />} />
       <Route path="/admin/agents" component={() => <AdminRoute component={AgentManager} />} />
       <Route path="/admin/agent-dashboard" component={() => <AdminRoute component={AgentDashboard} />} />
+      <Route path="/admin/commissions" component={() => <AdminRoute component={CommissionManager} />} />
+      <Route path="/admin/purchase" component={() => <AdminRoute component={PurchaseManager} />} />
       <Route path="/knowledge" component={KnowledgeCenter} />
       <Route path="/admin/agreements" component={() => <AdminRoute component={AgreementCenter} />} />
       <Route path="/admin/audit-logs" component={() => <AdminRoute component={AuditLogs} />} />
