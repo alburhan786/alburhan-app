@@ -1,0 +1,496 @@
+MASTER TASK – COMPLETE THE ENTERPRISE COMMUNICATION & AUTOMATION ENGINE (FINAL INTEGRATION)
+
+We are NOT creating another Communication Engine.
+
+We already have an Event Bus, Queue, Workflow Engine, Retry Engine, Health Checks, Analytics, and Communication Center.
+
+Your task is to audit, complete, integrate, and validate the existing system so it becomes the single communication backbone for the entire Al Burhan Tours & Travels ERP.
+
+OBJECTIVE
+
+Every customer action must automatically trigger the correct business workflow without any manual intervention.
+
+No module may send WhatsApp, SMS, Email, Push Notification, or Dashboard Notification directly.
+
+Every module must publish an event to the Central Communication Engine.
+
+The Communication Engine is the only component responsible for communication delivery.
+
+⸻
+
+STEP 1 – COMPLETE SYSTEM AUDIT
+
+Audit every ERP module and verify whether it is connected to the Communication Engine.
+
+Modules to audit:
+
+* Booking
+* Customer
+* Leads
+* CRM
+* Finance
+* Payments
+* Invoice
+* Receipt
+* Agreement
+* Visa
+* Passport
+* Flight
+* Hotel
+* Room Allocation
+* Package Management
+* Customer Dashboard
+* Admin Dashboard
+* Website Booking
+* Mobile App
+* Broadcast Center
+* Omnichannel Inbox
+* Social Media Center
+
+Produce an audit report showing:
+
+✅ Connected
+
+⚠ Partially Connected
+
+❌ Not Connected
+
+⸻
+
+STEP 2 – CONNECT EVERY MODULE
+
+If any module bypasses the Communication Engine:
+
+Remove direct notification logic.
+
+Publish events instead.
+
+Examples:
+
+BOOKING_CREATED
+
+BOOKING_UPDATED
+
+PAYMENT_RECEIVED
+
+PAYMENT_FAILED
+
+INVOICE_GENERATED
+
+RECEIPT_GENERATED
+
+AGREEMENT_GENERATED
+
+AGREEMENT_SIGNED
+
+DOCUMENT_UPLOADED
+
+VISA_APPROVED
+
+FLIGHT_ASSIGNED
+
+HOTEL_ASSIGNED
+
+ROOM_ALLOCATED
+
+BOOKING_CANCELLED
+
+REFUND_COMPLETED
+
+CUSTOMER_REGISTERED
+
+PASSWORD_RESET
+
+OTP_SENT
+
+MARKETING_BROADCAST
+
+No module should call WhatsApp, SMS, Email, Push, or Dashboard directly.
+
+⸻
+
+STEP 3 – COMPLETE THE COMMUNICATION ENGINE
+
+Verify and complete:
+
+✅ Event Bus
+
+✅ Workflow Engine
+
+✅ Queue Processor
+
+✅ Dead Letter Queue
+
+✅ Retry Engine
+
+✅ Delivery Tracking
+
+✅ Notification Templates
+
+✅ Provider Manager
+
+✅ Analytics
+
+✅ Timeline
+
+✅ Audit Logs
+
+Complete any missing enterprise functionality.
+
+⸻
+
+STEP 4 – FIX RETRY ENGINE
+
+Retry schedule must be exactly:
+
+1 minute
+
+5 minutes
+
+15 minutes
+
+1 hour
+
+24 hours
+
+After the final retry:
+
+Mark FAILED.
+
+Notify Admin.
+
+Store complete error details.
+
+⸻
+
+STEP 5 – COMPLETE HEALTH CENTER
+
+Health Center must verify using REAL API requests:
+
+WhatsApp
+
+SMS
+
+Email
+
+Firebase Push
+
+Dashboard Notifications
+
+OAuth
+
+Queue
+
+Database
+
+Templates
+
+Webhooks
+
+API Keys
+
+Storage
+
+PDF Generator
+
+Background Workers
+
+No configuration-only checks.
+
+⸻
+
+STEP 6 – COMPLETE DELIVERY LOGS
+
+Every notification must store:
+
+Event ID
+
+Booking ID
+
+Customer ID
+
+Channel
+
+Provider
+
+Request
+
+Response
+
+HTTP Status
+
+Provider Message ID
+
+Timestamp
+
+Retry Count
+
+Processing Time
+
+Delivery Status
+
+Failure Reason
+
+⸻
+
+STEP 7 – COMPLETE ADMIN COMMUNICATION CENTER
+
+Provide enterprise monitoring.
+
+Queue:
+
+Pending
+
+Processing
+
+Delivered
+
+Failed
+
+Retrying
+
+Cancelled
+
+Filters:
+
+Booking ID
+
+Customer
+
+Phone
+
+WhatsApp
+
+Email
+
+SMS
+
+Event Type
+
+Provider
+
+Date
+
+Branch
+
+Agent
+
+Status
+
+Include:
+
+Live Event Log
+
+Retry Queue
+
+Dead Letter Queue
+
+Fire Test Panel
+
+Search
+
+Export CSV
+
+Export Excel
+
+⸻
+
+STEP 8 – COMPLETE CUSTOMER AUTOMATION
+
+Creating a booking must automatically:
+
+Save booking.
+
+Generate Booking ID.
+
+Generate Agreement PDF.
+
+Generate Invoice PDF.
+
+Update Customer Dashboard.
+
+Send WhatsApp.
+
+Send SMS.
+
+Send Email.
+
+Send Push Notification.
+
+Notify Admin.
+
+Write Audit Log.
+
+Store Delivery Status.
+
+No manual steps.
+
+⸻
+
+STEP 9 – COMPLETE PAYMENT AUTOMATION
+
+Receiving payment must automatically:
+
+Update Finance.
+
+Update Booking.
+
+Generate Receipt PDF.
+
+Update Dashboard.
+
+Send Receipt on WhatsApp.
+
+Send Receipt by SMS.
+
+Send Receipt by Email.
+
+Send Push Notification.
+
+Notify Admin.
+
+Store Delivery Logs.
+
+⸻
+
+STEP 10 – COMPLETE DOCUMENT AUTOMATION
+
+Automatically distribute:
+
+Agreement
+
+Invoice
+
+Receipt
+
+Visa
+
+Flight Ticket
+
+Hotel Voucher
+
+Room Allocation
+
+Travel Itinerary
+
+through every enabled communication channel.
+
+⸻
+
+STEP 11 – PROVIDER FAILOVER
+
+If WhatsApp fails:
+
+Continue with:
+
+SMS
+
+Email
+
+Push
+
+Dashboard
+
+Admin Notification
+
+Never stop the workflow because one provider failed.
+
+⸻
+
+STEP 12 – SOCIAL MEDIA HUB
+
+Integrate the existing Communication Engine with:
+
+Meta (Facebook + Instagram + Messenger)
+
+WhatsApp Cloud API
+
+Google Business
+
+Telegram
+
+YouTube
+
+LinkedIn (optional)
+
+All connections must use secure OAuth.
+
+No manual App ID, Secret, or Access Token entry after the initial setup.
+
+⸻
+
+STEP 13 – END-TO-END PRODUCTION TEST
+
+Perform real production tests.
+
+Test:
+
+New Booking
+
+Payment
+
+Invoice
+
+Receipt
+
+Agreement
+
+Visa
+
+Flight
+
+Hotel
+
+Room Allocation
+
+Cancellation
+
+Refund
+
+Verify:
+
+WhatsApp sent
+
+SMS sent
+
+Email sent
+
+Push sent
+
+Customer Dashboard updated
+
+Admin Dashboard updated
+
+Queue completed
+
+Retry engine works
+
+No duplicate messages
+
+No missed notifications
+
+Logs recorded
+
+Delivery tracked
+
+⸻
+
+STEP 14 – FINAL PRODUCTION REPORT
+
+Generate a comprehensive report including:
+
+* Architecture diagram
+* Connected modules
+* Communication flow
+* Queue health
+* Provider health
+* Retry statistics
+* Failed jobs
+* Delivery success rates
+* API response times
+* Remaining issues (if any)
+* Overall production readiness score
+
+Only mark the task complete when every critical business workflow is fully automated and verified end-to-end.
+
+Goal: Achieve an enterprise-grade communication platform comparable to Salesforce, HubSpot, Zoho CRM, and Shopify, where every booking, payment, document, and customer update is handled automatically through a single, centralized Communication & Automation Engine with no duplicate messages, no missed notifications, and complete auditability.

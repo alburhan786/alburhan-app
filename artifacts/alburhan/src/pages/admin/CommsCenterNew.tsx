@@ -111,6 +111,7 @@ const TABS = [
   { id: "dlq",       label: "💀 Dead Letter Queue"  },
   { id: "health",    label: "🏥 Provider Health"    },
   { id: "analytics", label: "📈 Analytics"          },
+  { id: "report",    label: "🔍 Audit Report"       },
 ];
 
 const KNOWN_EVENTS = [
@@ -148,11 +149,12 @@ export default function CommsCenterNew() {
   const [eventsSearch, setEventsSearch] = useState("");
   const [eventsStatus, setEventsStatus] = useState("");
 
-  // DLQ / Health / Analytics
+  // DLQ / Health / Analytics / Report
   const [dlq, setDlq] = useState<QueueItem[]>([]);
   const [dlqTotal, setDlqTotal] = useState(0);
   const [health, setHealth] = useState<HealthCheck | null>(null);
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
+  const [report, setReport] = useState<any>(null);
 
   // Fire-test state
   const [testEventType, setTestEventType] = useState("BOOKING_CREATED");
@@ -230,6 +232,21 @@ export default function CommsCenterNew() {
     setLoad("analytics", false);
   }, []);
 
+  const loadReport = useCallback(async () => {
+    setLoad("report", true);
+    const r = await fetch(`${API}/api/comms/production-report`, { credentials: "include" });
+    if (r.ok) setReport(await r.json());
+    setLoad("report", false);
+  }, []);
+
+  const exportLogs = () => {
+    const params = new URLSearchParams();
+    if (logSearch)  params.set("search",  logSearch);
+    if (logChannel) params.set("channel", logChannel);
+    if (logStatus)  params.set("status",  logStatus);
+    window.open(`${API}/api/comms/notification-logs/export?${params}`, "_blank");
+  };
+
   const fireTestEvent = async () => {
     setTestFiring(true);
     setTestResult(null);
@@ -268,6 +285,7 @@ export default function CommsCenterNew() {
     if (tab === "dlq")       loadDlq();
     if (tab === "health")    loadHealth();
     if (tab === "analytics") loadAnalytics();
+    if (tab === "report")    loadReport();
   }, [tab]);
 
   // Auto-refresh
@@ -569,6 +587,7 @@ export default function CommsCenterNew() {
                 {["sent","failed","pending"].map(s => <option key={s} value={s}>{s}</option>)}
               </select>
               <Button onClick={loadLogs} className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-1.5">Search</Button>
+              <Button onClick={exportLogs} className="bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-1.5">⬇️ Export CSV</Button>
               <span className="text-sm text-gray-400 ml-auto">{logsTotal} total</span>
             </div>
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">

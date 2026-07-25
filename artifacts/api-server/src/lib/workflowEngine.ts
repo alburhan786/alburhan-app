@@ -30,7 +30,13 @@ export type WorkflowTrigger =
   | "flight_confirmed" | "hotel_confirmed" | "bus_allocated" | "room_allocated"
   | "departure_ready" | "journey_started"
   | "reached_makkah" | "reached_madinah"
-  | "return_flight" | "journey_completed";
+  | "return_flight" | "journey_completed"
+  // Package requests (customer portal)
+  | "request_submitted" | "request_approved" | "request_rejected" | "request_details_submitted"
+  // Lead / Inquiry
+  | "lead_submitted"
+  // Feedback
+  | "feedback_received";
 
 export interface WorkflowContext extends Omit<NotificationContext, "customerName"> {
   bookingId?: string;
@@ -142,6 +148,14 @@ const TRIGGER_TO_EVENT: Record<string, string> = {
   document_expiry_30:       "passport_expiry",
   document_expiry_7:        "passport_expiry",
   medical_emergency:        "medical_emergency",
+  // Package requests
+  request_submitted:        "booking_requested",
+  request_approved:         "booking_approved",
+  request_rejected:         "booking_cancelled",
+  request_details_submitted:"new_booking",
+  // Leads & Feedback
+  lead_submitted:           "new_booking",
+  feedback_received:        "feedback_request",
 };
 
 const ADMIN_EVENT_TRIGGERS = new Set([

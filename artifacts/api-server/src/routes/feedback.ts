@@ -4,6 +4,7 @@ import { db, feedbackTable, otpsTable, pilgrimsTable, hajjGroupsTable, bookingsT
 import { eq, and, gt, desc, count, avg, sql, gte } from "drizzle-orm";
 import { requireAuth, requireAdmin, generateOtp, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendOtpSMS, sendWhatsApp } from "../lib/notifications.js";
+import { triggerWorkflow } from "../lib/workflowEngine.js";
 
 const router = Router();
 
@@ -278,6 +279,13 @@ router.post("/submit", async (req, res) => {
       wouldRecommend: wouldRecommend || null,
       isComplaint,
     }).returning();
+
+    // Route through Communication Engine for audit trail + analytics
+    triggerWorkflow("feedback_received", {
+      customerName: pilgrimName || "Pilgrim",
+      customerMobile: cleanedMobile,
+      bookingId: bookingId || undefined,
+    }).catch(() => {});
 
     res.status(201).json({ success: true, id: inserted.id, isComplaint });
   } catch (err: any) {

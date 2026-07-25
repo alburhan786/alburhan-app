@@ -5,7 +5,7 @@ import { eq, desc, and } from "drizzle-orm";
 import { requireAuth, type AuthenticatedRequest } from "../lib/auth.js";
 import multer from "multer";
 import { uploadToGCS } from "../lib/gcsUpload.js";
-import { sendWhatsApp, sendDLTSMS } from "../lib/notifications.js";
+import { triggerWorkflow } from "../lib/workflowEngine.js";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -31,44 +31,42 @@ function generateBookingNumber(): string {
   return `ABT${yy}${mm}${rand}`;
 }
 
+// All customer notifications route through the Communication Engine
+async function notifyCustomerRequestReceived(opts: { mobile: string; customerName: string; packageName: string; bookingId?: string }) {
+  await triggerWorkflow("request_submitted", {
+    customerName: opts.customerName, customerMobile: opts.mobile,
+    packageName: opts.packageName, bookingId: opts.bookingId,
+  }).catch(console.error);
+}
+
+async function notifyCustomerRequestApproved(opts: { mobile: string; customerName: string; packageName: string; bookingId?: string }) {
+  await triggerWorkflow("request_approved", {
+    customerName: opts.customerName, customerMobile: opts.mobile,
+    packageName: opts.packageName, bookingId: opts.bookingId,
+  }).catch(console.error);
+}
+
+async function notifyCustomerRequestRejected(opts: { mobile: string; customerName: string; packageName: string; reason?: string | null; bookingId?: string }) {
+  await triggerWorkflow("request_rejected", {
+    customerName: opts.customerName, customerMobile: opts.mobile,
+    packageName: opts.packageName, bookingId: opts.bookingId,
+  }).catch(console.error);
+}
+
+async function notifyCustomerDetailsSubmitted(opts: { mobile: string; customerName: string; packageName: string; bookingId?: string }) {
+  await triggerWorkflow("request_details_submitted", {
+    customerName: opts.customerName, customerMobile: opts.mobile,
+    packageName: opts.packageName, bookingId: opts.bookingId,
+  }).catch(console.error);
+}
+
 async function notifyAdminNewRequest(opts: { customerName: string; customerMobile: string; packageName: string }) {
+  // Admin-only direct alert kept intentionally for real-time ops awareness
+  const { sendWhatsApp } = await import("../lib/notifications.js");
   const msg = `New Package Request!\n\nCustomer: ${opts.customerName}\nMobile: ${opts.customerMobile}\nPackage: ${opts.packageName}\n\nReview in admin dashboard → Requests.`;
   await Promise.allSettled([
     sendWhatsApp("9893989786", msg),
     sendWhatsApp("8989701701", msg),
-  ]);
-}
-
-async function notifyCustomerRequestReceived(opts: { mobile: string; customerName: string; packageName: string }) {
-  const msg = `Assalamu Alaikum ${opts.customerName},\n\nYour request for "${opts.packageName}" has been received! Our team will review it and get back to you shortly.\n\nFor queries: +91 8989701701\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
-  await Promise.allSettled([
-    sendWhatsApp(opts.mobile, msg),
-    sendDLTSMS(opts.mobile, opts.customerName, opts.packageName, "REQUESTED"),
-  ]);
-}
-
-async function notifyCustomerRequestApproved(opts: { mobile: string; customerName: string; packageName: string }) {
-  const msg = `Assalamu Alaikum ${opts.customerName},\n\nYour request for "${opts.packageName}" has been APPROVED!\n\nPlease login to your dashboard and fill in your travel details to proceed.\n\nHelp: +91 8989701701 / +91 9893989786\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
-  await Promise.allSettled([
-    sendWhatsApp(opts.mobile, msg),
-    sendDLTSMS(opts.mobile, opts.customerName, opts.packageName, "APPROVED"),
-  ]);
-}
-
-async function notifyCustomerRequestRejected(opts: { mobile: string; customerName: string; packageName: string; reason?: string | null }) {
-  const reasonText = opts.reason ? `\n\nReason: ${opts.reason}` : "";
-  const msg = `Assalamu Alaikum ${opts.customerName},\n\nWe regret that your request for "${opts.packageName}" could not be accommodated at this time.${reasonText}\n\nPlease contact us for alternatives:\n+91 8989701701 / +91 9893989786\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
-  await Promise.allSettled([
-    sendWhatsApp(opts.mobile, msg),
-    sendDLTSMS(opts.mobile, opts.customerName, opts.packageName, "REJECTED"),
-  ]);
-}
-
-async function notifyCustomerDetailsSubmitted(opts: { mobile: string; customerName: string; packageName: string }) {
-  const msg = `Assalamu Alaikum ${opts.customerName},\n\nYour travel details for "${opts.packageName}" have been received successfully!\n\nOur team will review and process your booking. We will contact you shortly.\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 8989701701`;
-  await Promise.allSettled([
-    sendWhatsApp(opts.mobile, msg),
-    sendDLTSMS(opts.mobile, opts.customerName, opts.packageName, "SUBMITTED"),
   ]);
 }
 
