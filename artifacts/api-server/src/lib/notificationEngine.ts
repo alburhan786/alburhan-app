@@ -6,6 +6,7 @@ import {
   sendEmail,
 } from "./notifications.js";
 import { sendTemplate as sendBotBeeTemplate } from "./botbee.js";
+import { sendMetaEventTemplate, isMetaWapiConfigured, META_EVENT_TEMPLATE_MAP } from "./metaWapi.js";
 
 export type EventType =
   // Account & Auth
@@ -746,6 +747,24 @@ export async function sendBotBeeEventTemplate(
 async function sendWhatsAppForEvent(eventType: EventType, ctx: NotificationContext, message: string, bookingId?: string, customerId?: string): Promise<{ status: "sent" | "failed"; providerResponse: unknown }> {
   console.log(`[notifEngine] sendWhatsAppForEvent: ${eventType} → ${ctx.customerMobile} | isABTTemplate=${ABT_TEMPLATE_EVENTS.has(eventType)}`);
   try {
+    // ── Priority 0: Meta WhatsApp Cloud API (primary provider) ───────────────
+    // Activated when META_ACCESS_TOKEN is configured in Replit Secrets.
+    // Falls back automatically to BotBee when not configured or when the
+    // template is not found / not approved in Meta Business Manager.
+    if (isMetaWapiConfigured() && META_EVENT_TEMPLATE_MAP[eventType] !== undefined) {
+      console.log(`[notifEngine] ${eventType}: trying Meta Cloud API first (primary provider)…`);
+      try {
+        const metaResult = await sendMetaEventTemplate(eventType, ctx as Record<string, any>, { bookingId, customerId });
+        if (metaResult.ok) {
+          console.log(`[notifEngine] ✅ Meta Cloud API ok: ${eventType} → ${ctx.customerMobile} | wamid=${metaResult.wamid}`);
+          return { status: "sent", providerResponse: metaResult };
+        }
+        console.warn(`[notifEngine] ⚠️ Meta Cloud API failed: ${eventType} | ${metaResult.errorMessage} — falling back to BotBee`);
+      } catch (metaErr: unknown) {
+        console.warn(`[notifEngine] ⚠️ Meta Cloud API exception: ${metaErr instanceof Error ? metaErr.message : String(metaErr)} — falling back to BotBee`);
+      }
+    }
+
     // ── Priority 1: Production BotBee templates with Meta {{1}}…{{5}} variables ──
     // Templates must be created on BotBee dashboard using {{1}}, {{2}} etc.
     // (NOT #!system-appointment-*!# placeholders which are BotBee-internal).

@@ -696,9 +696,78 @@ router.get("/webhook/meta", async (req, res) => {
 router.post("/webhook/meta", async (req, res) => {
   res.json({ ok: true });
   try {
+    // Optional webhook signature verification
+    const sig = req.headers["x-hub-signature-256"] as string | undefined;
+    if (sig) {
+      try {
+        const { verifyMetaWebhookSignature } = await import("../lib/metaWapi.js");
+        const rawBody = JSON.stringify(req.body);
+        if (!verifyMetaWebhookSignature(rawBody, sig)) {
+          console.warn("[SocialMedia] Meta webhook signature mismatch — processing anyway (configure META_WEBHOOK_SECRET to enforce)");
+        }
+      } catch {}
+    }
+
     const body = req.body;
     const object = body.object;
     for (const entry of (body.entry || [])) {
+      // ── WhatsApp Cloud API: delivery status + incoming messages ─────────────
+      for (const change of (entry.changes || [])) {
+        if (change.field === "messages" && change.value?.messaging_product === "whatsapp") {
+          // Delivery status callbacks: sent, delivered, read, failed
+          const statuses = change.value.statuses || [];
+          if (statuses.length > 0) {
+            try {
+              const { updateMetaDeliveryStatus } = await import("../lib/metaWapi.js");
+              for (const st of statuses) {
+                await updateMetaDeliveryStatus(
+                  st.id,
+                  st.status,
+                  st.timestamp,
+                  st.conversation?.id,
+                  st.errors?.[0]?.code,
+                  st.errors?.[0]?.title,
+                  st
+                ).catch(() => {});
+                console.log(`[MetaWebhook] delivery: wamid=${st.id} status=${st.status}`);
+              }
+            } catch (e: any) { console.error("[MetaWebhook] delivery status error:", e.message); }
+          }
+          // Incoming WhatsApp messages (log for CRM)
+          const messages = change.value.messages || [];
+          for (const msg of messages) {
+            await pool.query(`
+              INSERT INTO social_messages (platform, message_id, sender_id, message_text, message_type, raw_data, direction)
+              VALUES ('whatsapp_cloud', $1, $2, $3, $4, $5, 'incoming')
+              ON CONFLICT DO NOTHING
+            `, [
+              msg.id || String(Date.now()),
+              String(msg.from || "unknown"),
+              msg.text?.body || msg.caption || "[attachment]",
+              msg.type || "text",
+              JSON.stringify(msg),
+            ]).catch(() => {});
+          }
+          continue; // handled — don't fall through to leadgen check
+        }
+
+        // Lead Ads
+        if (change.field === "leadgen" && change.value) {
+          const insertR = await pool.query(`
+            INSERT INTO social_messages (platform,message_id,sender_id,message_text,message_type,raw_data,direction)
+            VALUES ($1,$2,$3,$4,$5,$6,'incoming') ON CONFLICT DO NOTHING RETURNING id
+          `, ["facebook_leads", String(change.value.leadgen_id||Date.now()),
+              String(change.value.page_id||"unknown"), `Lead from form ${change.value.form_id}`, "lead", JSON.stringify(change.value)]);
+          if (insertR.rows[0]) {
+            await autoCreateLeadFromMessage({
+              id: insertR.rows[0].id, platform: "facebook_leads",
+              sender_id: String(change.value.page_id||Date.now()),
+              message_text: `Facebook Lead Ad submission — Form ${change.value.form_id}`,
+            });
+          }
+        }
+      }
+
       // Messenger / Instagram DMs
       for (const event of (entry.messaging || [])) {
         if (!event.message) continue;
@@ -715,23 +784,6 @@ router.post("/webhook/meta", async (req, res) => {
             sender_name: undefined,
             message_text: event.message.text || "[attachment]",
           });
-        }
-      }
-      // Lead Ads
-      for (const change of (entry.changes || [])) {
-        if (change.field === "leadgen" && change.value) {
-          const insertR = await pool.query(`
-            INSERT INTO social_messages (platform,message_id,sender_id,message_text,message_type,raw_data,direction)
-            VALUES ($1,$2,$3,$4,$5,$6,'incoming') ON CONFLICT DO NOTHING RETURNING id
-          `, ["facebook_leads", String(change.value.leadgen_id||Date.now()),
-              String(change.value.page_id||"unknown"), `Lead from form ${change.value.form_id}`, "lead", JSON.stringify(change.value)]);
-          if (insertR.rows[0]) {
-            await autoCreateLeadFromMessage({
-              id: insertR.rows[0].id, platform: "facebook_leads",
-              sender_id: String(change.value.page_id||Date.now()),
-              message_text: `Facebook Lead Ad submission — Form ${change.value.form_id}`,
-            });
-          }
         }
       }
     }

@@ -76,6 +76,7 @@ import hrOpsRouter, { ensureHROopsTables } from "./hr-ops.js";
 import executiveDashRouter from "./executive-dashboard.js";
 import { ensureCommEventsTable } from "../lib/eventBus.js";
 import { requireAdmin } from "../lib/auth.js";
+import metaRouter from "./meta.js";
 
 const router: IRouter = Router();
 
@@ -86,7 +87,7 @@ router.get("/", (_req, res) => {
 });
 
 // ── Build fingerprint — confirms which bundle is running on VPS (no auth needed) ──
-const BUILD_STAMP = "2026-07-25-v29.1-enterprise-stable";
+const BUILD_STAMP = "2026-07-25-v30.0-meta-production";
 // Init tables on startup
 ensureCommEventsTable().catch(() => {});
 ensureCommissionTables().catch(() => {});
@@ -913,6 +914,9 @@ router.get("/migrate/inspect-sms-config", async (req: any, res: any) => {
     res.status(500).json({ ok: false, error: String(e?.message || e) });
   }
 });
+
+// ── Meta WhatsApp Cloud API v30.0 ────────────────────────────────────────────
+router.use("/meta", metaRouter);
 
 // ── Fix BotBee phone_number_id typo (96591219661113 → 965912196611113) ────────
 router.post("/migrate/fix-botbee-phone-id", async (req: any, res: any) => {

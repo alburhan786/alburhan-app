@@ -1856,6 +1856,107 @@ async function runMigrations() {
     console.log("[Migration] notification_retry_queue table ensured");
   } catch (err) { console.error("[Migration] notification_retry_queue migration failed:", err); }
 
+  // ── meta_messages: outbound Meta Cloud API WhatsApp messages (v30.0) ─────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS meta_messages (
+        id TEXT PRIMARY KEY,
+        wamid TEXT UNIQUE,
+        recipient TEXT NOT NULL,
+        template_name TEXT,
+        event_type TEXT,
+        booking_id TEXT,
+        customer_id TEXT,
+        status TEXT NOT NULL DEFAULT 'queued',
+        http_status INTEGER,
+        error_message TEXT,
+        retry_count INTEGER NOT NULL DEFAULT 0,
+        next_retry_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_meta_messages_status ON meta_messages(status, next_retry_at)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_meta_messages_wamid ON meta_messages(wamid)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_meta_messages_booking ON meta_messages(booking_id)`);
+    console.log("[Migration] meta_messages table ensured");
+  } catch (err) { console.error("[Migration] meta_messages migration failed:", err); }
+
+  // ── meta_delivery_logs: delivery/read/failed callbacks from Meta webhook ─────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS meta_delivery_logs (
+        id TEXT PRIMARY KEY,
+        wamid TEXT,
+        status TEXT,
+        timestamp TIMESTAMPTZ,
+        conversation_id TEXT,
+        error_code INTEGER,
+        error_title TEXT,
+        raw_payload JSONB,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_meta_delivery_wamid ON meta_delivery_logs(wamid)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_meta_delivery_status ON meta_delivery_logs(status, created_at)`);
+    console.log("[Migration] meta_delivery_logs table ensured");
+  } catch (err) { console.error("[Migration] meta_delivery_logs migration failed:", err); }
+
+  // ── meta_templates: synced from Meta WABA API ─────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS meta_templates (
+        id TEXT PRIMARY KEY,
+        template_name TEXT UNIQUE NOT NULL,
+        status TEXT,
+        category TEXT,
+        language TEXT DEFAULT 'en',
+        components JSONB,
+        variable_count INTEGER DEFAULT 0,
+        event_type TEXT,
+        synced_at TIMESTAMPTZ DEFAULT NOW(),
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_meta_templates_event ON meta_templates(event_type)`);
+    console.log("[Migration] meta_templates table ensured");
+  } catch (err) { console.error("[Migration] meta_templates migration failed:", err); }
+
+  // ── meta_token_status: token validation results ───────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS meta_token_status (
+        id TEXT PRIMARY KEY DEFAULT 'current',
+        token_valid BOOLEAN DEFAULT false,
+        phone_number TEXT,
+        verified_name TEXT,
+        waba_id TEXT,
+        permissions TEXT,
+        token_expires_at TIMESTAMPTZ,
+        error_message TEXT,
+        last_checked_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    console.log("[Migration] meta_token_status table ensured");
+  } catch (err) { console.error("[Migration] meta_token_status migration failed:", err); }
+
+  // ── meta_media_cache: uploaded media IDs (expires 29 days) ───────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS meta_media_cache (
+        id TEXT PRIMARY KEY,
+        media_id TEXT NOT NULL,
+        filename TEXT,
+        content_type TEXT,
+        file_hash TEXT UNIQUE,
+        expires_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_meta_media_hash ON meta_media_cache(file_hash)`);
+    console.log("[Migration] meta_media_cache table ensured");
+  } catch (err) { console.error("[Migration] meta_media_cache migration failed:", err); }
+
   // ── customer_push_tokens: Firebase Cloud Messaging device tokens ────────────
   try {
     await pool.query(`
@@ -2427,6 +2528,31 @@ async function start() {
     syncBotBeeTemplates();
     setInterval(syncBotBeeTemplates, 10 * 60 * 1000);
     console.log("[BotBee] Template auto-sync scheduled every 10 minutes");
+
+    // ── Meta Cloud API v30.0: retry queue processor (runs every 60s) ─────────
+    ;(async () => {
+      try {
+        const { processMetaRetryQueue, isMetaWapiConfigured, syncMetaTemplates } = await import("./lib/metaWapi.js");
+        if (isMetaWapiConfigured()) {
+          // Sync templates on startup
+          setTimeout(async () => {
+            console.log("[Meta] Running startup template sync…");
+            const syncResult = await syncMetaTemplates().catch((e: any) => ({ ok: false, synced: 0, errors: [String(e?.message)] }));
+            console.log(`[Meta] Template sync: ok=${syncResult.ok} synced=${syncResult.synced} errors=${syncResult.errors.length}`);
+          }, 8000);
+          // Retry queue — every 60 seconds
+          setInterval(async () => {
+            const r = await processMetaRetryQueue().catch(() => ({ processed: 0, succeeded: 0 }));
+            if (r.processed > 0) console.log(`[Meta] Retry queue processed=${r.processed} succeeded=${r.succeeded}`);
+          }, 60 * 1000);
+          console.log("[Meta] Cloud API retry queue scheduler active (60s interval)");
+        } else {
+          console.log("[Meta] META_ACCESS_TOKEN not configured — Cloud API inactive (BotBee remains primary)");
+        }
+      } catch (e: any) {
+        console.warn("[Meta] Failed to start retry scheduler:", e?.message);
+      }
+    })();
 
     // ── Load any stored template ID overrides from api_settings ─────────────
     // Admin calls POST /api/migrate/activate-new-templates after recreating templates

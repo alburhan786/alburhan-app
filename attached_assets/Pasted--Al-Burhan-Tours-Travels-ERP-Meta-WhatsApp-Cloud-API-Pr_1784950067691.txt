@@ -1,0 +1,552 @@
+# Al Burhan Tours & Travels ERP – Meta WhatsApp Cloud API Production Integration (v30)
+
+You are working on the LIVE production ERP for Al Burhan Tours & Travels.
+
+This is a production system. Do NOT break any existing functionality.
+
+==================================================
+PRIMARY GOAL
+==================================================
+
+Complete the Meta WhatsApp Cloud API production integration and make Meta Cloud API the PRIMARY WhatsApp provider.
+
+Keep BotBee as automatic fallback.
+
+Priority order:
+
+1. Meta WhatsApp Cloud API
+2. BotBee
+3. SMS
+4. Email
+
+==================================================
+DO NOT CHANGE
+==================================================
+
+Do NOT break:
+
+• Customer Dashboard
+• Admin Dashboard
+• Branch Dashboard
+• Agent Dashboard
+• Booking
+• CRM
+• Finance
+• Accounting
+• Commission
+• Purchase
+• Reports
+• Visa
+• Hotel
+• Flight
+• Agreement
+• Invoice
+• Room Allocation
+• Workflow Engine
+• Queue Engine
+• Retry Engine
+• Notification Engine
+• Customer Timeline
+• Audit Logs
+• SMS
+• Email
+• Push Notifications
+
+==================================================
+VERIFY ENVIRONMENT VARIABLES
+==================================================
+
+Verify these secrets exist.
+
+META_ACCESS_TOKEN
+
+META_PHONE_NUMBER_ID
+
+META_BUSINESS_ACCOUNT_ID
+
+META_WABA_ID
+
+META_APP_ID
+
+META_APP_SECRET
+
+META_VERIFY_TOKEN
+
+META_WEBHOOK_SECRET
+
+META_API_VERSION=v20.0
+
+If any are missing:
+
+• report them
+• never hardcode values
+• never expose secrets
+• never print secrets in logs
+
+==================================================
+TOKEN VALIDATION
+==================================================
+
+Before deployment verify:
+
+✓ Access Token
+
+✓ Phone Number ID
+
+✓ Business Account
+
+✓ WABA
+
+✓ Token Expiry
+
+✓ Permissions
+
+Required permissions:
+
+whatsapp_business_management
+
+whatsapp_business_messaging
+
+business_management
+
+Abort deployment if permissions are invalid.
+
+==================================================
+WEBHOOK
+==================================================
+
+Verify webhook:
+
+https://alburhantravels.com/api/social-media/webhook/meta
+
+Validate:
+
+• GET verify challenge
+
+• POST webhook
+
+• Status callback
+
+• Delivery callback
+
+• Read callback
+
+• Failure callback
+
+• Template callback
+
+Automatically repair webhook subscription if possible.
+
+==================================================
+WHATSAPP TEMPLATE MANAGEMENT
+==================================================
+
+Synchronize approved templates.
+
+Map templates automatically.
+
+booking_confirmation
+
+booking_approved
+
+payment_received
+
+partial_payment
+
+payment_reminder
+
+invoice_ready
+
+agreement_ready
+
+agreement_signed
+
+visa_received
+
+visa_approved
+
+visa_rejected
+
+passport_required
+
+flight_assigned
+
+hotel_assigned
+
+room_allocated
+
+departure_reminder
+
+arrival_reminder
+
+otp_login
+
+agent_notification
+
+branch_notification
+
+refund_processed
+
+booking_cancelled
+
+support_reply
+
+Refresh template list every hour.
+
+==================================================
+MESSAGE ENGINE
+==================================================
+
+All notifications must flow:
+
+Workflow
+
+↓
+
+Notification Queue
+
+↓
+
+Meta Cloud API
+
+↓
+
+Status Tracking
+
+↓
+
+Audit Log
+
+Never bypass the queue.
+
+==================================================
+DELIVERY STATUS
+==================================================
+
+Track:
+
+Queued
+
+Sent
+
+Delivered
+
+Read
+
+Failed
+
+Retrying
+
+Expired
+
+Store:
+
+Message ID
+
+Conversation ID
+
+Template ID
+
+Timestamp
+
+==================================================
+RETRY ENGINE
+==================================================
+
+Retry automatically:
+
+1 minute
+
+5 minutes
+
+15 minutes
+
+30 minutes
+
+1 hour
+
+24 hours
+
+Prevent duplicate sends.
+
+==================================================
+MEDIA SUPPORT
+==================================================
+
+Support:
+
+PDF
+
+Invoice
+
+Agreement
+
+Ticket
+
+Visa
+
+Voucher
+
+Passport
+
+Image
+
+QR Code
+
+Document
+
+Automatically upload media.
+
+Reuse media IDs when possible.
+
+==================================================
+OTP
+==================================================
+
+Use Meta Cloud API first.
+
+Fallback:
+
+SMS
+
+Email
+
+Retry automatically.
+
+==================================================
+CUSTOMER TIMELINE
+==================================================
+
+Every WhatsApp event must appear in:
+
+Customer Timeline
+
+Notification History
+
+Audit Log
+
+==================================================
+ADMIN DASHBOARD
+==================================================
+
+Create Meta Dashboard.
+
+Show:
+
+Connection
+
+Webhook
+
+Phone Number
+
+Business Account
+
+Templates
+
+Queue
+
+Retries
+
+Delivery %
+
+Read %
+
+Failure %
+
+Recent Errors
+
+Token Expiry
+
+==================================================
+HEALTH CHECK
+==================================================
+
+Create:
+
+/admin/meta-health
+
+Return:
+
+Token
+
+Webhook
+
+Templates
+
+Permissions
+
+Queue
+
+Retry
+
+Media
+
+OTP
+
+Status Callback
+
+Overall Score (0-100)
+
+==================================================
+API HEALTH
+==================================================
+
+Create:
+
+/api/meta/health
+
+Return JSON:
+
+Connection
+
+Webhook
+
+Templates
+
+Queue
+
+Delivery Rate
+
+Failure Rate
+
+Read Rate
+
+Retry Count
+
+Token Expiry
+
+Version
+
+==================================================
+SECURITY
+==================================================
+
+Never expose secrets.
+
+Mask tokens.
+
+Validate Meta webhook signature.
+
+Reject invalid requests.
+
+Encrypt sensitive credentials.
+
+==================================================
+DATABASE
+==================================================
+
+Only create if missing:
+
+meta_messages
+
+meta_templates
+
+meta_delivery_logs
+
+meta_webhooks
+
+meta_token_status
+
+Do NOT duplicate existing tables.
+
+==================================================
+AUTOMATED TESTS
+==================================================
+
+Run production tests for:
+
+✓ Booking Created
+
+✓ Booking Approved
+
+✓ Payment Received
+
+✓ Invoice Generated
+
+✓ Agreement Generated
+
+✓ Agreement Signed
+
+✓ Visa Approved
+
+✓ Visa Rejected
+
+✓ Flight Assigned
+
+✓ Hotel Assigned
+
+✓ Room Allocated
+
+✓ OTP Login
+
+✓ Refund
+
+✓ Cancellation
+
+✓ Support Reply
+
+Verify:
+
+Queue
+
+Delivery
+
+Audit Logs
+
+Retry
+
+Timeline
+
+==================================================
+BACKWARD COMPATIBILITY
+==================================================
+
+Keep BotBee operational.
+
+Keep SMS operational.
+
+Keep Email operational.
+
+Keep Push operational.
+
+Keep Queue operational.
+
+No regressions.
+
+==================================================
+DEPLOYMENT
+==================================================
+
+Deploy as:
+
+v30.0-meta-production
+
+Generate:
+
+• Meta Integration Report
+
+• Webhook Verification Report
+
+• Template Sync Report
+
+• Delivery Report
+
+• Queue Health Report
+
+• Security Audit Report
+
+• Performance Report
+
+• Final Enterprise Readiness Score
+
+Deployment is successful only if:
+
+✓ Existing ERP modules continue working.
+
+✓ Meta Cloud API is the primary WhatsApp provider.
+
+✓ BotBee automatically works as fallback.
+
+✓ No regressions are introduced.
+
+✓ Production Health Score ≥ 95/100.

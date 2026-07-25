@@ -78,9 +78,16 @@ async function buildAll() {
     "SMTP_PASS",
     "SMTP_FROM",
     "SMTP_FROM_NAME",
-    // Meta WhatsApp Cloud API — add META_ACCESS_TOKEN secret to unlock proper WABA template delivery
+    // Meta WhatsApp Cloud API v30.0 — primary WhatsApp provider (BotBee is fallback)
     "META_ACCESS_TOKEN",
     "META_PHONE_NUMBER_ID",
+    "META_WABA_ID",
+    "META_BUSINESS_ACCOUNT_ID",
+    "META_APP_ID",
+    "META_APP_SECRET",
+    "META_VERIFY_TOKEN",
+    "META_WEBHOOK_SECRET",
+    "META_API_VERSION",
   ];
   for (const key of injectKeys) {
     const val = process.env[key];

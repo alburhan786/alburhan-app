@@ -704,6 +704,164 @@ function PermissionsChecklist({ scopes }: { scopes: string[] }) {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
+// ── WhatsApp Cloud API v30.0 status panel ─────────────────────────────────────
+
+type MetaCloudHealth = {
+  ok: boolean; configured: boolean; connection: string; connectionDetail: string;
+  webhook: string; phoneNumber?: string; verifiedName?: string;
+  templates: { approved: number; mapped: number };
+  token: { valid: boolean; expiresAt?: string; lastChecked?: string; permissions: string[] };
+  queue: Record<string, number>;
+  deliveryRate: number; failureRate: number; readRate: number; retryCount: number;
+  score: number; missingSecrets: string[]; version: string;
+};
+
+function MetaCloudPanel({ api }: { api: string }) {
+  const [data, setData]         = useState<MetaCloudHealth | null>(null);
+  const [loading, setLoading]   = useState(false);
+  const [syncing, setSyncing]   = useState(false);
+  const [validating, setValidating] = useState(false);
+  const { toast } = useToast();
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const r = await fetch(`${api}/api/meta/health`);
+      const d = await r.json();
+      setData(d);
+    } catch {}
+    finally { setLoading(false); }
+  };
+
+  const syncTemplates = async () => {
+    setSyncing(true);
+    try {
+      const r = await fetch(`${api}/api/meta/sync-templates`, { method: "POST", credentials: "include" });
+      const d = await r.json();
+      if (d.ok) { toast({ title: `✅ Synced ${d.synced} templates` }); load(); }
+      else toast({ title: "Sync failed", description: d.errors?.[0] || "Check WABA ID", variant: "destructive" });
+    } catch (e: any) { toast({ title: "Error", description: e.message, variant: "destructive" }); }
+    finally { setSyncing(false); }
+  };
+
+  const validateToken = async () => {
+    setValidating(true);
+    try {
+      const r = await fetch(`${api}/api/meta/validate-token`, { method: "POST", credentials: "include" });
+      const d = await r.json();
+      if (d.ok) { toast({ title: `✅ Token valid — ${d.phoneNumber}` }); load(); }
+      else toast({ title: "Token invalid", description: d.errorMessage, variant: "destructive" });
+    } catch (e: any) { toast({ title: "Error", description: e.message, variant: "destructive" }); }
+    finally { setValidating(false); }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const statusColor = !data?.configured ? "border-gray-200 bg-gray-50"
+    : data.connection === "ok" ? "border-green-200 bg-green-50/40"
+    : data.connection === "degraded" ? "border-amber-200 bg-amber-50/40"
+    : "border-red-200 bg-red-50/40";
+
+  const scoreColor = (data?.score ?? 0) >= 80 ? "text-green-700" : (data?.score ?? 0) >= 50 ? "text-amber-700" : "text-red-700";
+
+  return (
+    <div className={`border rounded-xl p-4 space-y-4 ${statusColor} transition-colors`}>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="text-lg">💬</span>
+            <p className="text-sm font-bold text-gray-900">WhatsApp Cloud API v30.0</p>
+            <Badge variant={data?.configured && data.connection === "ok" ? "default" : "secondary"} className="text-[10px]">
+              {loading ? "checking…" : data?.configured ? (data.connection === "ok" ? "✅ Connected" : data.connection === "degraded" ? "⚠️ Degraded" : "❌ Down") : "Not Configured"}
+            </Badge>
+            {data?.score !== undefined && (
+              <span className={`text-[11px] font-semibold ${scoreColor}`}>Score: {data.score}/100</span>
+            )}
+          </div>
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            {data?.connectionDetail || "Meta Cloud API — primary WhatsApp provider (BotBee is automatic fallback)"}
+          </p>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={load} disabled={loading}>
+            {loading ? <Spin /> : "↻ Refresh"}
+          </Button>
+          <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={validateToken} disabled={validating}>
+            {validating ? <Spin /> : "🔑 Validate Token"}
+          </Button>
+          <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={syncTemplates} disabled={syncing}>
+            {syncing ? <Spin /> : "🔄 Sync Templates"}
+          </Button>
+        </div>
+      </div>
+
+      {/* Missing secrets alert */}
+      {data?.missingSecrets && data.missingSecrets.length > 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <p className="text-[11px] font-semibold text-amber-800 mb-1">⚠️ {data.missingSecrets.length} secrets missing — add these in Replit Secrets to activate Meta Cloud API:</p>
+          <div className="flex flex-wrap gap-1">
+            {data.missingSecrets.map(s => (
+              <code key={s} className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200">{s}</code>
+            ))}
+          </div>
+          <p className="text-[10px] text-amber-700 mt-1.5">BotBee remains active as the fallback provider until META_ACCESS_TOKEN is configured.</p>
+        </div>
+      )}
+
+      {data && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {[
+            { label: "Templates", val: `${data.templates.approved} approved / ${data.templates.mapped} mapped`, cls: "bg-blue-50 border-blue-200 text-blue-700" },
+            { label: "Delivery Rate", val: `${data.deliveryRate}%`, cls: data.deliveryRate > 80 ? "bg-green-50 border-green-200 text-green-700" : "bg-amber-50 border-amber-200 text-amber-700" },
+            { label: "Failure Rate", val: `${data.failureRate}%`, cls: data.failureRate < 10 ? "bg-green-50 border-green-200 text-green-700" : "bg-red-50 border-red-200 text-red-700" },
+            { label: "Retry Queue", val: String(data.retryCount), cls: data.retryCount === 0 ? "bg-gray-50 border-gray-200 text-gray-600" : "bg-amber-50 border-amber-200 text-amber-700" },
+          ].map(({ label, val, cls }) => (
+            <div key={label} className={`border rounded-lg p-2 text-center ${cls}`}>
+              <p className="text-base font-bold">{val}</p>
+              <p className="text-[9px] mt-0.5">{label}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {data && (
+        <div className="grid grid-cols-2 gap-3 text-[11px]">
+          <div className="space-y-1">
+            <p className="font-semibold text-gray-700">Connection</p>
+            <p className="text-gray-600">Phone: {data.phoneNumber || "—"}</p>
+            <p className="text-gray-600">Name: {data.verifiedName || "—"}</p>
+            <p className="text-gray-600">Version: {data.version}</p>
+            <p className="text-gray-600">Webhook: <span className="font-mono text-[9px]">…/webhook/meta</span></p>
+          </div>
+          <div className="space-y-1">
+            <p className="font-semibold text-gray-700">Message Queue (7d)</p>
+            {Object.entries(data.queue).filter(([k]) => k !== "total").map(([k, v]) => (
+              <p key={k} className="text-gray-600">{k}: <span className="font-semibold">{v}</span></p>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {data?.token && data.token.expiresAt && (
+        <p className="text-[10px] text-gray-500">
+          Token expires: {new Date(data.token.expiresAt).toLocaleDateString("en-IN")} ·
+          Permissions: {data.token.permissions.length > 0 ? data.token.permissions.join(", ") : "not validated"}
+        </p>
+      )}
+
+      <div className="text-[10px] text-gray-500 border-t pt-2">
+        Priority: <span className="font-semibold text-green-700">Meta Cloud API</span> →
+        <span className="font-semibold text-blue-600"> BotBee</span> →
+        <span className="text-gray-600"> SMS</span> →
+        <span className="text-gray-600"> Email</span>
+        {data?.token?.lastChecked && (
+          <span className="ml-2">· Last checked: {new Date(data.token.lastChecked).toLocaleTimeString("en-IN")}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function MetaHealth() {
   const { can } = usePermissions();
   const { toast } = useToast();
@@ -821,6 +979,9 @@ export default function MetaHealth() {
             )}
           </div>
         </div>
+
+        {/* ── WhatsApp Cloud API v30.0 Status Panel ── */}
+        <MetaCloudPanel api={API} />
 
         {/* ── Summary bar ── */}
         {summary && (

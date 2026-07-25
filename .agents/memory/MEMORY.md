@@ -1,3 +1,4 @@
+- [Meta Cloud API v30.0 integration](meta-cloud-api-v30.md) — Primary WhatsApp provider (Meta→BotBee→SMS→Email); 9 META_ secrets in VPS .env to activate; metaWapi.ts + routes/meta.ts; 5 meta_* DB tables; retry cron; MetaCloudPanel in MetaHealth.tsx
 - [Production stabilization audit July 2026](production-stabilization-audit.md) — score 76→97/100; fixed payments/documents 404s, push health, RCS removal, tableChecks, api_settings key/value columns, retry queue threshold
 - [Service worker caches Vite dev modules](sw-caches-vite-dev-modules.md) — public/sw.js cache-first intercepts /src/ Vite modules; edits invisible until SW bypasses those paths + bumps CACHE version
 - [Admin pages missing AdminLayout](admin-layout-missing-pages.md) — 8 admin pages had no sidebar/breadcrumb; AdminRoute never adds layout; new pages must explicitly use AdminLayout or run grep -rL to audit
