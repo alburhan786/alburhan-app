@@ -673,24 +673,50 @@ router.post("/webhook/telegram", async (req, res) => {
 
 // ── Webhook: Meta (Facebook / Instagram) ────────────────────────────────────
 router.get("/webhook/meta", async (req, res) => {
+  const mode      = req.query["hub.mode"]         as string | undefined;
+  const token     = req.query["hub.verify_token"] as string | undefined;
+  const challenge = req.query["hub.challenge"]    as string | undefined;
+
+  if (!mode || !token || !challenge) {
+    return void res.status(400).send("Missing hub parameters");
+  }
+  if (mode !== "subscribe") {
+    return void res.status(403).send("Forbidden");
+  }
+
+  // ── Primary: compare against META_VERIFY_TOKEN env var ────────────────────
+  const envToken = (process.env.META_VERIFY_TOKEN || "").trim();
+  if (envToken && token === envToken) {
+    // Mark all whatsapp_meta configs verified in DB (best-effort, non-blocking)
+    pool.query(
+      `UPDATE social_platform_configs SET webhook_verified=true WHERE platform='whatsapp_meta'`
+    ).catch(() => {});
+    res.setHeader("Content-Type", "text/plain");
+    return void res.status(200).send(challenge);
+  }
+
+  // ── Secondary: compare against DB-stored webhook_verify_token ─────────────
   try {
-    const mode = req.query["hub.mode"];
-    const token = req.query["hub.verify_token"];
-    const challenge = req.query["hub.challenge"];
     const rows = await pool.query(
-      `SELECT extra_fields_encrypted FROM social_platform_configs WHERE platform IN ('facebook_page','facebook_messenger','facebook_leads','instagram','instagram_dm','whatsapp_meta') AND enabled=true`
+      `SELECT extra_fields_encrypted FROM social_platform_configs
+       WHERE platform IN ('facebook_page','facebook_messenger','facebook_leads','instagram','instagram_dm','whatsapp_meta')
+       AND enabled=true`
     );
-    let verified = false;
     for (const row of rows.rows) {
       const extra = decryptExtra(row.extra_fields_encrypted);
-      if (mode === "subscribe" && token && token === extra.webhook_verify_token) { verified = true; break; }
+      if (token === extra?.webhook_verify_token) {
+        await pool.query(
+          `UPDATE social_platform_configs SET webhook_verified=true
+           WHERE platform IN ('facebook_page','facebook_messenger','facebook_leads','instagram','instagram_dm','whatsapp_meta')
+           AND enabled=true`
+        );
+        res.setHeader("Content-Type", "text/plain");
+        return void res.status(200).send(challenge);
+      }
     }
-    if (verified) {
-      await pool.query(`UPDATE social_platform_configs SET webhook_verified=true WHERE platform IN ('facebook_page','facebook_messenger','facebook_leads','instagram','instagram_dm','whatsapp_meta') AND enabled=true`);
-      return void res.status(200).send(challenge);
-    }
-    res.status(403).json({ error: "Verification failed" });
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (_) {}
+
+  res.status(403).send("Forbidden");
 });
 
 router.post("/webhook/meta", async (req, res) => {
