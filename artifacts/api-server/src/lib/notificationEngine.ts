@@ -996,7 +996,14 @@ export async function fireNotificationEvent(
   }
 
   const enabled = await getEnabledChannels(eventType);
-  const orderedChannels = CHANNEL_PRIORITY.filter(c => enabled.includes(c));
+  const orderedChannels = CHANNEL_PRIORITY.filter(c => {
+    if (!enabled.includes(c)) return false;
+    // Skip email when customer has no email address (prevents "failed" noise in logs)
+    if (c === "email" && !ctx.customerEmail) return false;
+    // Skip RCS globally — provider is non-functional (0% success); disabled in notification_settings
+    if (c === "rcs") return false;
+    return true;
+  });
   console.log(`[notifEngine] ${eventType}: enabled channels = [${orderedChannels.join(", ")}] (of [${enabled.join(", ")}])`);
 
   if (orderedChannels.length === 0) {

@@ -290,6 +290,30 @@ export async function sendTemplate(
   // - All ERP-initiated outbound notifications must use forceTemplateApi:true to guarantee
   //   delivery and a real wamid.
   if (templateBody && !opts?.forceTemplateApi) {
+    // ── Meta Cloud API first: sends approved templates outside 24-hour session window ─
+    try {
+      const { isMetaWapiConfigured, sendMetaTemplate } = await import("./metaWapi.js");
+      if (isMetaWapiConfigured()) {
+        // Reverse-map numeric template ID → approved Meta template name
+        const tplEntry = Object.values(ABT_TEMPLATES).find(v => v.id === templateId);
+        const templateName = tplEntry?.name || templateId;
+        const varValues = namedVars ? Object.values(namedVars).map(v => String(v ?? "-")) : [];
+        const metaResult = await sendMetaTemplate(to, templateName, varValues, {
+          eventType: opts?.eventType,
+          bookingId: opts?.bookingId,
+          customerId: opts?.customerId,
+          customerName: opts?.customerName,
+        });
+        if (metaResult.ok) {
+          console.log(`[BotBee] Meta Cloud API ✅ ${templateName} → ${to} (wamid=${metaResult.messageId})`);
+          return { ok: true, provider: "MetaCloudAPI" as any, endpoint: metaResult.endpoint, messageId: metaResult.messageId };
+        }
+        console.warn(`[BotBee] Meta Cloud API failed (${metaResult.errorMessage}), falling back to BotBee text API`);
+      }
+    } catch (metaErr: any) {
+      console.warn(`[BotBee] Meta Cloud API import/call error:`, metaErr?.message);
+    }
+    // ── Existing BotBee text API path (session-based fallback) ───────────────────
     const rendered = namedVars ? renderTemplateBody(templateBody, namedVars) : templateBody;
 
     // Sanity check: warn if any placeholders remain unsubstituted (#!Var!# or {{N}})

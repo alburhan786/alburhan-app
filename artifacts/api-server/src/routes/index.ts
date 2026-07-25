@@ -77,7 +77,7 @@ router.get("/", (_req, res) => {
 });
 
 // ── Build fingerprint — confirms which bundle is running on VPS (no auth needed) ──
-const BUILD_STAMP = "2026-07-25-v27.7-comms-engine-complete";
+const BUILD_STAMP = "2026-07-25-v27.8-meta-wapi-rcs-disabled";
 // Init Communication Engine tables on startup
 ensureCommEventsTable().catch(() => {});
 router.get("/version", (_req, res) => {
