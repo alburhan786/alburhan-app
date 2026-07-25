@@ -1,0 +1,198 @@
+Al Burhan Tours & Travels ERP v29 – Travel Operations & HR Enterprise Upgrade
+
+Do NOT modify or break any existing modules.
+
+Keep Booking, CRM, Finance, Accounting, Commission, Purchase, Reports, Customer Dashboard, Admin Dashboard, WhatsApp Cloud API, SMS, Email, Workflow Engine, Queue Engine, Retry Engine, Audit Logs, and Notification Engine fully operational.
+
+Build the following new enterprise modules:
+
+1. Flight Operations
+
+* Airline master
+* Flight schedules
+* PNR management
+* Ticket issuance
+* Ticket cancellation
+* Seat allocation
+* Baggage tracking
+* Flight manifest
+* Auto passenger list
+* Flight change notifications
+
+2. Hotel Operations
+
+* Hotel master
+* Room inventory
+* Room allocation
+* Room occupancy
+* Hotel contracts
+* Hotel payment tracking
+* Voucher generation
+* Check-in/check-out management
+
+3. Visa Processing
+
+* Visa application tracker
+* Passport collection
+* Document verification
+* Biometrics appointment
+* Visa approval/rejection
+* Visa expiry alerts
+* Passport return tracking
+
+4. Hajj & Umrah Group Management
+
+* Group creation
+* Group leader assignment
+* Bus allocation
+* Mina tent allocation
+* Maktab allocation
+* Pilgrim manifest
+* Room sharing matrix
+* Package assignment
+* Group WhatsApp broadcast
+
+5. Transport Management
+
+* Vehicle master
+* Driver management
+* Route planning
+* Airport transfers
+* Bus schedules
+* Fuel tracking
+* Maintenance logs
+
+6. HR & Payroll
+
+* Employee master
+* Attendance
+* Leave management
+* Salary processing
+* Payroll slips
+* Staff performance
+* Department hierarchy
+
+7. Document Management System
+
+* Passport storage
+* Visa copies
+* Aadhaar
+* PAN
+* Customer agreements
+* Receipts
+* Invoices
+* Flight tickets
+* Hotel vouchers
+* Version history
+* OCR search
+
+8. Customer Portal Upgrade
+
+Allow customers to:
+
+* Track booking progress
+* View payment history
+* Download invoices
+* Download agreements
+* Download tickets
+* Download visa
+* Download vouchers
+* Upload missing documents
+* Raise support tickets
+* Live chat
+* Push notifications
+
+9. AI Dashboard
+
+* Booking predictions
+* Revenue forecasting
+* Outstanding payment prediction
+* Customer behaviour analytics
+* Agent performance analytics
+* Branch performance analytics
+
+10. Executive Dashboard
+
+Display:
+
+* Total Revenue
+* Total Profit
+* Daily Bookings
+* Active Pilgrims
+* Flights Today
+* Visa Pending
+* Room Allocation Status
+* Agent Ranking
+* Branch Ranking
+* Collection Summary
+* Cash Flow
+* Monthly Growth
+
+11. Mobile App APIs
+
+Create secure REST APIs for:
+
+* Android App
+* iOS App
+* Customer App
+* Agent App
+* Branch App
+* Admin App
+
+12. Digital Verification
+
+* QR Code verification
+* Booking verification page
+* Agreement verification
+* Invoice verification
+* Ticket verification
+* Visa verification
+
+13. Automation
+
+Automatically send via WhatsApp Cloud API, Email, SMS, and Push Notification:
+
+* Booking confirmation
+* Payment received
+* Payment reminder
+* Agreement ready
+* Visa approved
+* Flight assigned
+* Hotel assigned
+* Room allocated
+* Group assigned
+* Departure reminder
+* Return reminder
+
+14. Security
+
+* Two-factor authentication
+* Device management
+* Login history
+* Session management
+* IP restrictions
+* Audit logs
+* Encryption
+
+15. Business Intelligence
+
+Interactive dashboards with:
+
+* Charts
+* Heatmaps
+* Maps
+* Drill-down reports
+* Export to PDF
+* Export to Excel
+* Export to CSV
+
+Final Requirements
+
+* Do not duplicate routes or components.
+* Reuse existing modules where possible.
+* Follow the current React architecture.
+* Keep PostgreSQL schema normalized.
+* Use transactions for all financial operations.
+* Ensure zero regressions.
+* Deploy as v29.0 Enterprise Travel Operations ERP.
+* After deployment, generate a deployment report and automatically run health checks for all modules.

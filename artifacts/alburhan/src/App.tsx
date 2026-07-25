@@ -174,6 +174,11 @@ import SecurityDashboard from "@/pages/admin/SecurityDashboard";
 import CommissionManager from "@/pages/admin/CommissionManager";
 import PurchaseManager from "@/pages/admin/PurchaseManager";
 import AdvancedReportsCenter from "@/pages/admin/AdvancedReportsCenter";
+import FlightOpsCenter from "@/pages/admin/FlightOpsCenter";
+import HotelOpsCenter from "@/pages/admin/HotelOpsCenter";
+import GroupOpsCenter from "@/pages/admin/GroupOpsCenter";
+import TransportOpsCenter from "@/pages/admin/TransportOpsCenter";
+import HROpsCenter from "@/pages/admin/HROpsCenter";
 import BackupDashboard from "@/pages/admin/BackupDashboard";
 import IntegrationsDashboard from "@/pages/admin/IntegrationsDashboard";
 import AgreementSigning from "@/pages/customer/AgreementSigning";
@@ -387,6 +392,11 @@ function Router() {
       <Route path="/admin/agent-dashboard" component={() => <AdminRoute component={AgentDashboard} />} />
       <Route path="/admin/commissions" component={() => <AdminRoute component={CommissionManager} />} />
       <Route path="/admin/purchase" component={() => <AdminRoute component={PurchaseManager} />} />
+      <Route path="/admin/flight-ops" component={() => <AdminRoute component={FlightOpsCenter} />} />
+      <Route path="/admin/hotel-ops" component={() => <AdminRoute component={HotelOpsCenter} />} />
+      <Route path="/admin/group-ops" component={() => <AdminRoute component={GroupOpsCenter} />} />
+      <Route path="/admin/transport-ops" component={() => <AdminRoute component={TransportOpsCenter} />} />
+      <Route path="/admin/hr-ops" component={() => <AdminRoute component={HROpsCenter} />} />
       <Route path="/knowledge" component={KnowledgeCenter} />
       <Route path="/admin/agreements" component={() => <AdminRoute component={AgreementCenter} />} />
       <Route path="/admin/audit-logs" component={() => <AdminRoute component={AuditLogs} />} />

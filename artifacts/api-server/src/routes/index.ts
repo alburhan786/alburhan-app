@@ -68,6 +68,12 @@ import commsEngineRouter from "./comms-engine.js";
 import commissionsRouter, { ensureCommissionTables } from "./commissions.js";
 import purchaseRouter, { ensurePurchaseTables } from "./purchase.js";
 import financeReportsRouter from "./finance-reports.js";
+import flightOpsRouter, { ensureFlightOpsTables } from "./flight-ops.js";
+import hotelOpsRouter, { ensureHotelOpsTables } from "./hotel-ops.js";
+import groupOpsRouter, { ensureGroupOpsTables } from "./group-ops.js";
+import transportOpsRouter, { ensureTransportOpsTables } from "./transport-ops.js";
+import hrOpsRouter, { ensureHROopsTables } from "./hr-ops.js";
+import executiveDashRouter from "./executive-dashboard.js";
 import { ensureCommEventsTable } from "../lib/eventBus.js";
 import { requireAdmin } from "../lib/auth.js";
 
@@ -80,11 +86,16 @@ router.get("/", (_req, res) => {
 });
 
 // ── Build fingerprint — confirms which bundle is running on VPS (no auth needed) ──
-const BUILD_STAMP = "2026-07-25-v28.0-enterprise-erp";
+const BUILD_STAMP = "2026-07-25-v29.0-enterprise-travel-ops";
 // Init tables on startup
 ensureCommEventsTable().catch(() => {});
 ensureCommissionTables().catch(() => {});
 ensurePurchaseTables().catch(() => {});
+ensureFlightOpsTables().catch(() => {});
+ensureHotelOpsTables().catch(() => {});
+ensureGroupOpsTables().catch(() => {});
+ensureTransportOpsTables().catch(() => {});
+ensureHROopsTables().catch(() => {});
 router.get("/version", (_req, res) => {
   res.json({
     build: BUILD_STAMP,
@@ -364,6 +375,12 @@ router.use("/comms", commsEngineRouter);
 router.use("/commissions", commissionsRouter);
 router.use("/purchase", purchaseRouter);
 router.use("/finance-reports", financeReportsRouter);
+router.use("/flight-ops", flightOpsRouter);
+router.use("/hotel-ops", hotelOpsRouter);
+router.use("/group-ops", groupOpsRouter);
+router.use("/transport-ops", transportOpsRouter);
+router.use("/hr-ops", hrOpsRouter);
+router.use("/executive", executiveDashRouter);
 import inboxRouter from "./inbox.js";
 router.use("/inbox", inboxRouter);
 import customer360Router from "./customer360.js";
