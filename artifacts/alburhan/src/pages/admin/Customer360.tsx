@@ -633,6 +633,23 @@ export default function Customer360() {
                       );
                     })()}
 
+                    {/* Quick-link Cards */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {[
+                        { label: "Bookings",   count: data.bookings.length,    icon: Package,   tab: "bookings",   color: "bg-emerald-50 text-emerald-700 border-emerald-100" },
+                        { label: "Invoices",   count: data.invoices.length,    icon: Receipt,   tab: "payments",   color: "bg-blue-50 text-blue-700 border-blue-100" },
+                        { label: "Agreements", count: data.agreements.length,  icon: FileText,  tab: "payments",   color: "bg-purple-50 text-purple-700 border-purple-100" },
+                        { label: "Documents",  count: data.documents.length,   icon: Shield,    tab: "documents",  color: "bg-orange-50 text-orange-700 border-orange-100" },
+                      ].map(({ label, count, icon: Icon, tab, color }) => (
+                        <button key={label} onClick={() => setActiveTab(tab)}
+                          className={`flex flex-col items-center justify-center gap-1.5 rounded-2xl border p-4 text-center hover:shadow-md transition-all ${color}`}>
+                          <Icon size={20} />
+                          <span className="text-lg font-bold">{count}</span>
+                          <span className="text-xs font-medium">{label}</span>
+                        </button>
+                      ))}
+                    </div>
+
                     {/* Loyalty Card */}
                     {data.loyalty && (
                       <div className={`rounded-2xl p-5 ${tierColor(data.loyalty.tier)} border`}>

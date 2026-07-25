@@ -77,7 +77,7 @@ router.get("/", (_req, res) => {
 });
 
 // ── Build fingerprint — confirms which bundle is running on VPS (no auth needed) ──
-const BUILD_STAMP = "2026-07-24-v27.3-comms-engine-eventbus";
+const BUILD_STAMP = "2026-07-25-v27.4-customer360-sidebar-search";
 // Init Communication Engine tables on startup
 ensureCommEventsTable().catch(() => {});
 router.get("/version", (_req, res) => {
