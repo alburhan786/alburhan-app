@@ -1,0 +1,131 @@
+The ERP infrastructure, Meta API integration, health endpoint, Meta Status page, notification engine, E2E workflows, VPS deployment, and production build are complete.
+
+Do NOT make any more architectural or UI changes.
+
+Complete the FINAL Production Go-Live process.
+
+OBJECTIVES
+
+1. Verify every required Meta production secret exists.
+2. If any secret is missing, stop the deployment gracefully and list exactly which secret is missing.
+3. Never generate fake values.
+4. Never use placeholder credentials.
+5. Do not overwrite existing production secrets.
+
+Required production secrets:
+
+- META_ACCESS_TOKEN
+- META_PHONE_NUMBER_ID
+- META_WABA_ID
+- META_BUSINESS_ACCOUNT_ID
+- META_APP_ID
+- META_APP_SECRET
+- META_VERIFY_TOKEN
+- META_API_VERSION
+
+After secrets are present:
+
+• Validate META_ACCESS_TOKEN using Graph API
+• Verify Phone Number ID
+• Verify WABA ownership
+• Verify Business Account
+• Verify webhook subscription
+• Verify webhook challenge
+• Sync approved WhatsApp templates
+• Verify template language
+• Verify template namespace
+• Verify template IDs
+
+Run production test:
+
+POST /api/meta/test-send
+
+Verify:
+
+✓ HTTP 200
+✓ Meta Message ID
+✓ Queue Success
+✓ Delivery callback
+✓ Read callback
+✓ Timeline updated
+✓ Audit log
+✓ Customer notification history
+
+Run full production workflow:
+
+✓ OTP Login
+✓ Customer Registration
+✓ New Booking
+✓ Booking Approval
+✓ Payment Received
+✓ Partial Payment
+✓ Invoice Generated
+✓ Agreement Generated
+✓ Agreement Signed
+✓ Visa Approved
+✓ Visa Rejected
+✓ Flight Assigned
+✓ Hotel Assigned
+✓ Room Allocation
+✓ Passport Upload
+✓ Broadcast Message
+✓ Reminder Message
+
+BotBee must remain the automatic fallback whenever Meta Cloud API returns any error.
+
+Update the Admin Meta Status dashboard with:
+
+• ERP Version
+• Build Number
+• VPS Version
+• Environment
+• Meta Connection
+• Token Status
+• Token Expiry
+• Phone Number
+• WABA ID
+• Business Account ID
+• Webhook Status
+• Template Count
+• Queue Health
+• Retry Queue
+• Delivery Success %
+• Failed Messages
+• Last Successful Message
+• Last Failed Message
+• Current Provider
+• Security Status
+• Missing Secrets
+
+Finally generate:
+
+=========================
+AL BURHAN TOURS & TRAVELS
+META CLOUD API
+FINAL PRODUCTION CERTIFICATION
+=========================
+
+Include:
+
+• ERP Version
+• Build Version
+• VPS Version
+• Production Health Score
+• WhatsApp Cloud API Status
+• Queue Status
+• Retry Status
+• Security Status
+• Template Status
+• Webhook Status
+• Remaining Issues
+
+If production secrets are missing, DO NOT continue pretending deployment is complete.
+
+Instead output ONLY:
+
+READY FOR GO-LIVE
+
+Missing Secrets:
+(list each missing secret)
+
+Waiting for Production Meta Credentials.
