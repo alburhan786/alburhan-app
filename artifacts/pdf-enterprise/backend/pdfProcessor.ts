@@ -4,6 +4,8 @@ import path from "path";
 import { fileURLToPath } from "url";
 import QRCode from "qrcode";
 import crypto from "crypto";
+import os from "os";
+import { execFileSync } from "child_process";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -377,12 +379,37 @@ export function validatePdfBuffer(buf: Buffer): boolean {
   return tail.includes("%%EOF");
 }
 
+/**
+ * Run qpdf --decrypt on pdfBytes with the given password.
+ * Returns the decrypted buffer, or throws on failure.
+ */
+function qpdfDecrypt(pdfBytes: Buffer, password: string): Buffer {
+  const tag = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  const tmpIn  = path.join(os.tmpdir(), `pdf_in_${tag}.pdf`);
+  const tmpOut = path.join(os.tmpdir(), `pdf_out_${tag}.pdf`);
+  try {
+    fs.writeFileSync(tmpIn, pdfBytes);
+    execFileSync("qpdf", [
+      "--decrypt",
+      `--password=${password}`,
+      tmpIn,
+      tmpOut,
+    ], { timeout: 30_000 });
+    return fs.readFileSync(tmpOut);
+  } finally {
+    try { fs.unlinkSync(tmpIn);  } catch (_) {}
+    try { fs.unlinkSync(tmpOut); } catch (_) {}
+  }
+}
+
 export async function unlockPdf(pdfBytes: Buffer): Promise<Buffer> {
   if (!pdfBytes || pdfBytes.length === 0) throw new Error("Empty PDF buffer");
 
-  // Stage 1 — try known passwords (covers owner-restricted + common user passwords)
+  // ── Stage 1: qpdf with password list ─────────────────────────────────────
+  // qpdf --decrypt fully removes /Encrypt, all permission flags, and all
+  // content encryption — producing a PDF that is 100% editable in every viewer.
   const passwords = [
-    "",            // owner-restricted PDFs have empty user password
+    "",           // owner-restricted PDFs (most common — blocks edit/copy/print)
     "password", "Password", "PASSWORD",
     "1234", "12345", "123456", "1234567890",
     "admin", "Admin", "user", "User",
@@ -390,6 +417,15 @@ export async function unlockPdf(pdfBytes: Buffer): Promise<Buffer> {
     "document", "test", "qwerty", "abc123", "letmein",
   ];
 
+  for (const pw of passwords) {
+    try {
+      const out = qpdfDecrypt(pdfBytes, pw);
+      if (out.length > 100) return out;
+    } catch (_) {}
+  }
+
+  // ── Stage 2: pdf-lib with same password list ──────────────────────────────
+  // Fallback for edge cases where qpdf isn't in PATH.
   for (const pw of passwords) {
     try {
       const doc = await PDFDocument.load(pdfBytes, { password: pw });
@@ -400,12 +436,10 @@ export async function unlockPdf(pdfBytes: Buffer): Promise<Buffer> {
     } catch (_) {}
   }
 
-  // Stage 2 — strip the /Encrypt dictionary via ignoreEncryption.
-  // This removes the password requirement so no viewer will ask for a password.
-  // For owner-restricted PDFs whose user-password isn't in the list above, the
-  // content decrypts correctly. For PDFs with a strong AES user password the
-  // content streams stay encrypted internally, but the PDF opens without asking
-  // for a password — which is the user's primary requirement.
+  // ── Stage 3: strip /Encrypt via ignoreEncryption ──────────────────────────
+  // Last resort: removes the password prompt so no viewer asks for a password.
+  // For strong AES user-password PDFs the content streams stay encrypted, but
+  // the file will at least open without asking for a password.
   try {
     const doc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
     const bytes = await doc.save({ useObjectStreams: false });
