@@ -34,8 +34,8 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
       id: u.id,
       mobile: u.mobile,
       role: u.role,
-      // Default to 'read_only' (least-privilege) when admin_role is missing
-      adminRole: (u.admin_role || "read_only") as AdminRole,
+      // Default admin/super_admin users to 'admin' role when admin_role is not set in DB
+      adminRole: (u.admin_role || (u.role === "admin" ? "admin" : "read_only")) as AdminRole,
       name: u.name,
       email: u.email,
       assignedGroupIds: Array.isArray(u.assigned_group_ids) ? u.assigned_group_ids : [],

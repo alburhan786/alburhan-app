@@ -12,8 +12,9 @@ const router = Router();
 
 // Super Admin only guard
 function requireSuperAdmin(req: any, res: any, next: any) {
-  if (req.user?.adminRole !== "super_admin") {
-    return void res.status(403).json({ message: "Super Admin access required" });
+  const role = req.user?.adminRole;
+  if (role !== "super_admin" && role !== "admin") {
+    return void res.status(403).json({ message: "Admin access required" });
   }
   next();
 }

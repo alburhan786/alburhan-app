@@ -36,6 +36,30 @@ async function seedSMSTemplates() {
   console.log("[notification-center] seeded", SMS_SEED.length, "DLT templates");
 }
 
+const EMAIL_SEED = [
+  { id: "tpl_email_booking_confirm", name: "Booking Confirmation Email", event_type: "booking_approved", subject: "Your Hajj Booking is Confirmed — Al Burhan Tours & Travels", body: "Dear {customer_name},\n\nAssalamu Alaikum!\n\nYour Hajj booking #{booking_number} for {package_name} has been confirmed.\n\nTotal Amount: ₹{total_amount}\nPaid: ₹{paid_amount}\nBalance: ₹{outstanding_amount}\n\nFor any queries, call us at +91 9893225590.\n\nJazak Allah Khair,\nAl Burhan Tours & Travels" },
+  { id: "tpl_email_payment_receipt", name: "Payment Receipt Email",      event_type: "payment_received", subject: "Payment Received — Invoice #{invoice_number}", body: "Dear {customer_name},\n\nWe have received your payment of ₹{amount} against booking #{booking_number}.\n\nInvoice No: {invoice_number}\nPayment Mode: {payment_mode}\nDate: {payment_date}\n\nRemaining Balance: ₹{outstanding_amount}\n\nJazak Allah Khair,\nAl Burhan Tours & Travels" },
+  { id: "tpl_email_invoice",         name: "Invoice Email",              event_type: "invoice_generated", subject: "Invoice #{invoice_number} from Al Burhan Tours & Travels", body: "Dear {customer_name},\n\nPlease find your invoice #{invoice_number} attached.\n\nAmount Due: ₹{total_amount}\nDue Date: {due_date}\n\nPayment link: {payment_link}\n\nJazak Allah Khair,\nAl Burhan Tours & Travels" },
+  { id: "tpl_email_departure_remind",name: "Departure Reminder Email",   event_type: "departure_reminder", subject: "Your Hajj Departure in {days_remaining} Days — Action Required", body: "Dear {customer_name},\n\nAssalamu Alaikum!\n\nThis is a reminder that your Hajj departure is in {days_remaining} days.\n\nPlease ensure:\n• All travel documents are ready\n• Passport is valid\n• Visa is in order\n• You have completed all medical requirements\n\nDeparture Date: {departure_date}\nFlight: {flight_number}\nGroup: {group_name}\n\nMay Allah accept your Hajj. Ameen.\n\nAl Burhan Tours & Travels" },
+  { id: "tpl_email_agreement_ready", name: "Agreement Ready Email",       event_type: "agreement_ready", subject: "Your Hajj Agreement is Ready for Signing — Al Burhan", body: "Dear {customer_name},\n\nYour Hajj agreement for booking #{booking_number} is ready for your digital signature.\n\nPlease login to your portal to review and sign the agreement at your earliest convenience.\n\nPortal: {portal_link}\n\nFor assistance, contact us at +91 9893225590.\n\nJazak Allah Khair,\nAl Burhan Tours & Travels" },
+  { id: "tpl_email_otp",             name: "OTP / Verification Email",   event_type: "otp", subject: "Your OTP for Al Burhan Tours & Travels", body: "Dear Customer,\n\nYour One-Time Password (OTP) is: {otp}\n\nThis OTP is valid for 10 minutes. Do not share it with anyone.\n\nAl Burhan Tours & Travels" },
+];
+
+async function seedEmailTemplates() {
+  const ex = await pool.query(`SELECT COUNT(*) FROM notification_templates WHERE channel='email'`);
+  if (Number(ex.rows[0]?.count) > 0) return;
+  for (const t of EMAIL_SEED) {
+    await pool.query(
+      `INSERT INTO notification_templates
+         (id, name, event_type, channel, body, provider, variable_count, priority, enabled, created_at, updated_at)
+       VALUES ($1,$2,$3,'email',$4,'smtp',0,0,true,NOW(),NOW())
+       ON CONFLICT (id) DO NOTHING`,
+      [t.id, t.name, t.event_type, t.body]
+    ).catch((e: any) => console.error("[email-seed]", t.id, e.message));
+  }
+  console.log("[notification-center] seeded", EMAIL_SEED.length, "email templates");
+}
+
 (async () => {
   try {
     await pool.query(`
@@ -46,6 +70,7 @@ async function seedSMSTemplates() {
       ALTER TABLE notification_templates ADD COLUMN IF NOT EXISTS last_failure_reason TEXT;
     `);
     await seedSMSTemplates();
+    await seedEmailTemplates();
   } catch (e) { console.error("[notification-center] init:", e); }
 })();
 

@@ -1,0 +1,324 @@
+Transform PDF Enterprise into a complete desktop-grade PDF editor similar to PDF-XChange Editor.
+
+Do NOT build only PDF tools.
+
+Build a real PDF editor.
+
+========================
+MAIN EDITOR
+========================
+
+When a PDF is opened:
+
+• Multi-page thumbnail panel
+• Main PDF viewing canvas
+• Zoom 10%–800%
+• Continuous scrolling
+• Single page
+• Two page
+• Full screen
+• Night mode
+• Rotate pages
+• Drag pages
+• Search text
+• Search + Replace
+• Bookmarks
+• Layers
+• Attachments
+• Comments panel
+
+========================
+FILE MENU
+========================
+
+New
+Open
+Recent Files
+Save
+Save As
+Save Copy
+Export
+Print
+Close
+
+========================
+EDIT
+========================
+
+Select text
+
+Edit existing text
+
+Add text
+
+Delete text
+
+Move text
+
+Resize text
+
+Change font
+
+Bold
+
+Italic
+
+Underline
+
+Text color
+
+Background color
+
+Paragraph alignment
+
+Insert image
+
+Replace image
+
+Crop image
+
+Delete image
+
+========================
+ANNOTATIONS
+========================
+
+Highlight
+
+Underline
+
+Strikeout
+
+Rectangle
+
+Circle
+
+Arrow
+
+Freehand drawing
+
+Sticky notes
+
+Typewriter
+
+Callout
+
+Stamp
+
+Measurement tools
+
+========================
+FORMS
+========================
+
+Textbox
+
+Checkbox
+
+Radio button
+
+Dropdown
+
+Date picker
+
+Digital signature
+
+Buttons
+
+========================
+PAGE TOOLS
+========================
+
+Insert page
+
+Delete page
+
+Duplicate page
+
+Extract pages
+
+Split
+
+Merge
+
+Rotate
+
+Reorder
+
+Crop
+
+Resize pages
+
+========================
+OCR
+========================
+
+OCR scanned PDF
+
+Convert image to text
+
+Search scanned PDFs
+
+Edit OCR text
+
+========================
+SECURITY
+========================
+
+Password protect
+
+Owner password
+
+User password
+
+AES-256 encryption
+
+Permission control
+
+Remove owner restrictions (when authorized)
+
+Digital signatures
+
+Certificate validation
+
+========================
+EXPORT
+========================
+
+Word
+
+Excel
+
+PowerPoint
+
+Images
+
+HTML
+
+TXT
+
+RTF
+
+PDF/A
+
+========================
+VIEW
+========================
+
+Tabs
+
+Multiple PDFs
+
+Compare documents
+
+Side-by-side
+
+Split screen
+
+Rulers
+
+Grid
+
+Snap
+
+========================
+TOOLS
+========================
+
+Header/Footer
+
+Watermark
+
+Bates numbering
+
+QR code
+
+Barcode
+
+Metadata editor
+
+Page numbering
+
+Compress
+
+Optimize
+
+Repair PDF
+
+========================
+WORKSPACE
+========================
+
+Recent documents
+
+Autosave
+
+Version history
+
+Undo/Redo unlimited
+
+Keyboard shortcuts
+
+Drag-and-drop upload
+
+========================
+PERFORMANCE
+========================
+
+Open PDFs up to 2 GB
+
+Open 10+ PDFs simultaneously
+
+Fast rendering
+
+Background save
+
+========================
+UI
+========================
+
+Professional ribbon interface
+
+Dark mode
+
+Light mode
+
+Dockable panels
+
+Resizable sidebars
+
+Context menus
+
+Professional icons
+
+Smooth animations
+
+========================
+QUALITY
+========================
+
+Every tool must actually modify the PDF.
+
+Saving must preserve all edits.
+
+Downloaded PDFs must open correctly in:
+
+Adobe Acrobat
+
+PDF-XChange Editor
+
+Foxit
+
+macOS Preview
+
+Google Chrome
+
+Microsoft Edge
+
+No placeholder UI.
+
+No fake buttons.
+
+No demo functions.
+
+Everything must be fully functional and production ready.

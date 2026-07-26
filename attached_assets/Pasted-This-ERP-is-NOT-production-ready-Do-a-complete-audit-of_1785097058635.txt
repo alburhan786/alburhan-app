@@ -1,0 +1,144 @@
+This ERP is NOT production ready.
+
+Do a complete audit of every Admin Portal and fix every broken module.
+
+Priority 1 - Super Admin Dashboard
+- Remove the PENDING status.
+- Make the portal open correctly.
+- Display live KPIs:
+  • Total Bookings
+  • Active Customers
+  • Revenue
+  • Outstanding Amount
+  • Today's Collections
+  • Branches
+  • Staff
+  • Guides
+  • Notifications
+  • System Health
+- Fix routing and permissions.
+
+Priority 2 - Accounting Dashboard
+Currently every tab returns HTTP 500.
+
+Fix all backend APIs and database queries for:
+- Journal Entries
+- Payment Entries
+- Customer Ledger
+- General Ledger
+- Outstanding
+- Trial Balance
+- Profit & Loss
+- Balance Sheet
+- Bank Book
+- Cash Book
+- Cash Flow
+- Bank Reconciliation
+
+Every page must:
+- Load successfully
+- Show real database data
+- Support filters
+- Export to Excel
+- Export to PDF
+- Paginate correctly
+- Never return Error 500
+
+Priority 3 - Guide Panel
+- Load guide groups from the database.
+- Show assigned pilgrims.
+- Attendance tracking.
+- Room allocation.
+- Hotel check-in.
+- Contact pilgrims.
+- WhatsApp broadcast.
+- Emergency alerts.
+- Offline sync.
+
+Priority 4 - Customer 360
+- Search by:
+  • Booking ID
+  • Mobile
+  • Passport
+  • Email
+  • Customer Name
+
+Display:
+- Profile
+- Passport
+- Visa
+- Flight
+- Hotel
+- Payments
+- Invoices
+- Agreement
+- Documents
+- WhatsApp history
+- SMS history
+- Email history
+- Audit Log
+- Timeline
+
+Priority 5 - Email Template Manager
+Create default templates:
+- Booking Approved
+- Payment Received
+- Invoice Ready
+- Agreement Ready
+- Visa Ready
+- Flight Ticket Ready
+- Hotel Voucher Ready
+- Departure Reminder
+- Welcome Saudi
+- Arrival India
+- Refund
+- Booking Cancelled
+
+Add:
+- HTML editor
+- Live preview
+- Variable picker
+- Send test email
+- Duplicate
+- Version history
+
+Priority 6 - Communication Center
+Fix provider connectivity:
+- WhatsApp
+- SMS
+- Email
+- Firebase Push
+- RCS
+
+The Test button must actually perform a live API test and report:
+- Connected
+- Authentication
+- Response time
+- Error details
+- Last successful send
+
+Priority 7 - Navigation
+Check every menu item in the ERP.
+No page should return:
+- 404
+- 500
+- Blank page
+- Infinite loading
+- Permission denied (for Super Admin)
+
+Priority 8 - QA
+Automatically crawl every admin page.
+Test every API endpoint.
+Repair every broken route.
+Repair every database query.
+Repair every React component.
+Repair every permission issue.
+Repair every missing service.
+
+Do not finish until:
+- Every page opens.
+- Every dashboard loads.
+- Every API returns HTTP 200.
+- No Error 500 exists.
+- No placeholder data remains.
+- ERP is production ready.

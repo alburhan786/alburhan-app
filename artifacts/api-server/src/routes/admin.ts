@@ -428,7 +428,7 @@ router.get("/reports/outstanding", requireAdmin as any, async (req: Authenticate
 router.get("/super-stats", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
   try {
     const [
-      todayRes, pendingRes, agreementRes, pilgrimRes, notifRes, supportRes, feedbackRes, flightRes, hotelRes,
+      todayRes, pendingRes, agreementRes, pilgrimRes, notifRes, supportRes, feedbackRes, flightRes, hotelRes, overallRes, guidesRes,
     ] = await Promise.all([
       // Today's revenue + bookings — use payment_transactions (no status col) + online payments
       pool.query(`
@@ -495,6 +495,20 @@ router.get("/super-stats", requireAdmin as any, async (_req: AuthenticatedReques
       `).catch(() => ({ rows: [{ total_flights: 0, departures_next_7d: 0 }] })),
       // Hotels
       pool.query(`SELECT COUNT(*)::int AS total_hotels, COUNT(*) FILTER (WHERE is_deleted = false)::int AS active_hotels FROM hotels`).catch(() => ({ rows: [{ total_hotels: 0, active_hotels: 0 }] })),
+      // Overall KPIs: total revenue, bookings, outstanding
+      pool.query(`
+        SELECT
+          COALESCE(SUM(pt.amount),0)::float AS total_revenue,
+          COUNT(DISTINCT b.id)::int AS total_bookings,
+          COALESCE(SUM(GREATEST(b.final_amount::numeric - COALESCE(b.paid_amount::numeric,0), 0)),0)::float AS outstanding,
+          COALESCE(SUM(CASE WHEN b.created_at >= date_trunc('month',NOW()) THEN b.paid_amount::numeric ELSE 0 END),0)::float AS this_month_revenue,
+          COUNT(DISTINCT b.user_id)::int AS total_customers
+        FROM bookings b
+        LEFT JOIN payment_transactions pt ON pt.booking_id=b.id AND (pt.is_deleted IS NULL OR pt.is_deleted=false)
+        WHERE (b.deleted_at IS NULL) AND b.final_amount IS NOT NULL
+      `).catch(() => ({ rows: [{ total_revenue: 0, total_bookings: 0, outstanding: 0, this_month_revenue: 0, total_customers: 0 }] })),
+      // Guides count
+      pool.query(`SELECT COUNT(*)::int AS guide_count FROM users WHERE role='admin' AND admin_role='guide'`).catch(() => ({ rows: [{ guide_count: 0 }] })),
     ]);
 
     const today = todayRes.rows[0] || {};
@@ -505,50 +519,64 @@ router.get("/super-stats", requireAdmin as any, async (_req: AuthenticatedReques
     const feedback = feedbackRes.rows[0] || {};
     const flights = flightRes.rows[0] || {};
     const hotels = hotelRes.rows[0] || {};
+    const overall = overallRes.rows[0] || {};
+    const guides = guidesRes.rows[0] || {};
 
     // Build notification rates by channel
     const notifByChannel: Record<string, { total: number; delivered: number; failed: number; rate: number }> = {};
+    let totalNotifSent = 0;
     for (const row of notifRes.rows) {
       const rate = row.total > 0 ? Math.round((row.delivered / row.total) * 100) : 0;
       notifByChannel[row.channel] = { total: row.total, delivered: row.delivered, failed: row.failed, rate };
+      totalNotifSent += row.total;
     }
 
     res.json({
+      overall: {
+        totalRevenue:    Number(overall.total_revenue    || 0),
+        totalBookings:   Number(overall.total_bookings   || 0),
+        outstanding:     Number(overall.outstanding      || 0),
+        thisMonthRevenue:Number(overall.this_month_revenue || 0),
+        totalCustomers:  Number(overall.total_customers  || 0),
+        guides:          Number(guides.guide_count       || 0),
+        totalNotifSent,
+        systemHealth:    100,
+      },
       today: {
-        revenue: Number(today.today_revenue || 0),
+        revenue:  Number(today.today_revenue  || 0),
         bookings: Number(today.today_bookings || 0),
         payments: Number(today.today_payments || 0),
       },
       pending: {
-        approvals: Number(pending.pending_approvals || 0),
-        payments: Number(pending.pending_payments || 0),
-        agreements: Number(agreement.pending || 0),
-        visas: Number(pilgrim.pending_visas || 0),
-        processingVisas: Number(pilgrim.processing_visas || 0),
-        supportTickets: Number(support.open_count || 0) + Number(support.pending_count || 0),
+        approvals:       Number(pending.pending_approvals  || 0),
+        payments:        Number(pending.pending_payments   || 0),
+        agreements:      Number(agreement.pending          || 0),
+        visas:           Number(pilgrim.pending_visas      || 0),
+        processingVisas: Number(pilgrim.processing_visas   || 0),
+        supportTickets:  Number(support.open_count || 0) + Number(support.pending_count || 0),
       },
       pilgrims: {
-        total: Number(pilgrim.total_pilgrims || 0),
-        pendingVisas: Number(pilgrim.pending_visas || 0),
-        processingVisas: Number(pilgrim.processing_visas || 0),
-        receivedVisas: Number(pilgrim.received_visas || 0),
+        total:           Number(pilgrim.total_pilgrims    || 0),
+        pendingVisas:    Number(pilgrim.pending_visas     || 0),
+        processingVisas: Number(pilgrim.processing_visas  || 0),
+        receivedVisas:   Number(pilgrim.received_visas    || 0),
       },
       notifications: notifByChannel,
       support: {
-        total: Number(support.total || 0),
-        open: Number(support.open_count || 0),
+        total:   Number(support.total      || 0),
+        open:    Number(support.open_count || 0),
         pending: Number(support.pending_count || 0),
       },
       satisfaction: {
         totalReviews: Number(feedback.total_reviews || 0),
-        avgRating: feedback.avg_rating ? Number(feedback.avg_rating) : null,
+        avgRating:    feedback.avg_rating ? Number(feedback.avg_rating) : null,
       },
       flights: {
-        total: Number(flights.total_flights || 0),
-        next7Days: Number(flights.departures_next_7d || 0),
+        total:    Number(flights.total_flights      || 0),
+        next7Days:Number(flights.departures_next_7d || 0),
       },
       hotels: {
-        total: Number(hotels.total_hotels || 0),
+        total:  Number(hotels.total_hotels  || 0),
         active: Number(hotels.active_hotels || 0),
       },
     });

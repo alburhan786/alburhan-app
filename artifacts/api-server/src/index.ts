@@ -2343,18 +2343,23 @@ async function runMigrations() {
     console.log("[Migration] sender_ids table ensured (5 approved DLT sender IDs seeded)");
   } catch (err) { console.error("[Migration] sender_ids migration failed:", err); }
 
-  // v29.1 — Performance indexes for high-frequency query columns
-  try {
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_attendance_logs_event_id ON attendance_logs(event_id)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_pilgrims_barcode_id ON pilgrims(barcode_id)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_pilgrims_family_id ON pilgrims(family_id)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_pilgrims_mobile_india ON pilgrims(mobile_india)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_payment_transactions_created_at ON payment_transactions(created_at DESC)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_notification_logs_channel ON notification_logs(channel)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_reminder_logs_booking_id ON reminder_logs(booking_id)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_reminder_logs_created_at ON reminder_logs(created_at DESC)`);
-    console.log("[Migration] v29.1 performance indexes ensured");
-  } catch (err) { console.error("[Migration] v29.1 index migration failed:", err); }
+  // v29.1 — Performance indexes for high-frequency query columns (each independent)
+  const v291Indexes: [string, string][] = [
+    ["idx_attendance_logs_event_id",        "CREATE INDEX IF NOT EXISTS idx_attendance_logs_event_id ON attendance_logs(event_id)"],
+    ["idx_pilgrims_barcode_id",             "CREATE INDEX IF NOT EXISTS idx_pilgrims_barcode_id ON pilgrims(barcode_id)"],
+    ["idx_pilgrims_family_id",              "CREATE INDEX IF NOT EXISTS idx_pilgrims_family_id ON pilgrims(family_id)"],
+    ["idx_pilgrims_mobile_india",           "CREATE INDEX IF NOT EXISTS idx_pilgrims_mobile_india ON pilgrims(mobile_india)"],
+    ["idx_payment_transactions_created_at", "CREATE INDEX IF NOT EXISTS idx_payment_transactions_created_at ON payment_transactions(created_at DESC)"],
+    ["idx_notification_logs_channel",       "CREATE INDEX IF NOT EXISTS idx_notification_logs_channel ON notification_logs(channel)"],
+    ["idx_reminder_logs_booking_id",        "CREATE INDEX IF NOT EXISTS idx_reminder_logs_booking_id ON reminder_logs(booking_id)"],
+    ["idx_reminder_logs_sent_at",           "CREATE INDEX IF NOT EXISTS idx_reminder_logs_sent_at ON reminder_logs(sent_at DESC)"],
+  ];
+  let v291ok = 0;
+  for (const [name, sql] of v291Indexes) {
+    try { await pool.query(sql); v291ok++; }
+    catch (err: any) { console.warn(`[Migration] v29.1 index ${name} skipped: ${err.message}`); }
+  }
+  console.log(`[Migration] v29.1 performance indexes: ${v291ok}/${v291Indexes.length} ensured`);
 }
 
 const rawPort = process.env["PORT"];

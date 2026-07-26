@@ -2,6 +2,9 @@
 - [Production stabilization audit July 2026](production-stabilization-audit.md) — score 76→97/100; fixed payments/documents 404s, push health, RCS removal, tableChecks, api_settings key/value columns, retry queue threshold
 - [Service worker caches Vite dev modules](sw-caches-vite-dev-modules.md) — public/sw.js cache-first intercepts /src/ Vite modules; edits invisible until SW bypasses those paths + bumps CACHE version
 - [Admin pages missing AdminLayout](admin-layout-missing-pages.md) — 8 admin pages had no sidebar/breadcrumb; AdminRoute never adds layout; new pages must explicitly use AdminLayout or run grep -rL to audit
+- [adminRole null → read_only root cause](adminrole-null-fix.md) — admin users with NULL admin_role get "read_only" by default, blocking all requireModuleAccess routes; fix: default to "admin" when role="admin" in auth.ts requireAuth
+- [api-settings requireSuperAdmin scope](api-settings-superadmin-scope.md) — requireSuperAdmin in api-settings.ts must accept "admin" OR "super_admin"; strict super_admin-only blocks all admin users from Communication Center tests
+- [reminder_logs timestamp column](reminder-logs-sent-at.md) — reminder_logs uses sent_at (NOT created_at); any index on reminder_logs timestamp must reference sent_at DESC
 - [Lead Intelligence module](lead-intelligence.md) — leads table has score/score_factors/dedup cols; computeLeadScore in enterprise.ts; GET /leads does LEFT JOIN social_messages for conversation_count; lead_assignment_rules table for auto-assign
 - [DB pool init — override guard](db-pool-init-override.md) — lib/db Pool created at module-init; env reader must use unconditional `process.env[key]=val` (not !process.env[key]) or PM2's 16-char placeholder wins
 - [BotBee variable substitution — definitive](botbee-named-variables.md) — send NAMED OBJECT matching variable_map keys; flat arrays get wamid but #!Name!# stays unsubstituted; forceTemplateApi:true required in all ERP sends

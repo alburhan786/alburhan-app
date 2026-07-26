@@ -42,7 +42,7 @@ const MODULES: { section: string; color: string; items: Module[] }[] = [
     section: "Portals",
     color: "from-violet-600 to-violet-800",
     items: [
-      { label: "Super Admin Dashboard",     sub: "Command center",              icon: Sparkles,       href: "/admin/super",            kpiKey: "totalPending",   kpiLabel: "pending",   color: "bg-violet-100",  textColor: "text-violet-700",  borderHover: "hover:border-violet-400" },
+      { label: "Super Admin Dashboard",     sub: "Command center",              icon: Sparkles,       href: "/admin/super",            kpiKey: "totalBookings",  kpiLabel: "bookings",  color: "bg-violet-100",  textColor: "text-violet-700",  borderHover: "hover:border-violet-400" },
       { label: "Branch Dashboard",          sub: "Branch performance",          icon: Building2,      href: "/admin/branch-dashboard", kpiKey: "branches",       kpiLabel: "branches",  color: "bg-blue-100",    textColor: "text-blue-700",    borderHover: "hover:border-blue-400" },
       { label: "Branch Login Management",   sub: "Branch login & access",       icon: KeyRound,       href: "/admin/branch-login",     kpiKey: "branches",       kpiLabel: "branches",  color: "bg-indigo-100",  textColor: "text-indigo-700",  borderHover: "hover:border-indigo-400" },
       { label: "Agent Dashboard",           sub: "Agent analytics",             icon: UserCheck,      href: "/admin/agent-dashboard",  kpiKey: "agents",         kpiLabel: "agents",    color: "bg-cyan-100",    textColor: "text-cyan-700",    borderHover: "hover:border-cyan-400" },
@@ -283,47 +283,73 @@ export default function SuperDashboard() {
 
   // ── Build KPI map for cards ────────────────────────────────────────────────
   const kpis: Record<string, string | number> = {
-    totalPending:   (stats.pending?.approvals || 0) + (stats.pending?.payments || 0) + (stats.pending?.visas || 0),
-    branches:       extra.branches  || 0,
-    agents:         extra.agents    || 0,
-    staff:          extra.staff     || 0,
-    customers:      extra.customers || 0,
-    totalRevenue:   fmt(stats.overall?.totalRevenue || 0),
-    pendingPayments:stats.pending?.payments || 0,
-    todayPayments:  stats.today?.payments   || 0,
-    invoices:       stats.overall?.totalBookings || 0,
-    receipts:       stats.overall?.totalBookings || 0,
-    leads:          extra.leads    || 0,
-    vendors:        extra.vendors  || 0,
-    suppliers:      extra.vendors  || 0,
-    broadcasts:     0,
-    staff2:         extra.staff    || 0,
-    assets:         extra.assets   || 0,
-    expenses:       extra.expenses || 0,
-    pendingVisas:   stats.pending?.visas || 0,
-    flights:        stats.flights?.total  || 0,
-    hotels:         stats.hotels?.total   || 0,
-    buses:          0,
-    allocations:    0,
-    documents:      0,
-    agreements:     extra.agreements || 0,
-    reportCount:    0,
-    biCount:        0,
-    aiCount:        0,
-    whatsappSent:   stats.notifications?.whatsapp?.total || 0,
-    smsSent:        stats.notifications?.sms?.total      || 0,
-    emailSent:      stats.notifications?.email?.total    || 0,
-    cmsPages:       0,
-    appUsers:       0,
-    adminUsers:     extra.adminUsers || 0,
-    roles:          0,
-    auditLogs:      0,
-    activityLogs:   0,
-    securityEvents: 0,
-    backups:        0,
-    apiKeys:        0,
-    integrations:   0,
-    settings:       0,
+    totalPending:    (stats.pending?.approvals || 0) + (stats.pending?.payments || 0) + (stats.pending?.visas || 0),
+    totalBookings:   stats.overall?.totalBookings   || 0,
+    totalRevenue:    fmt(stats.overall?.totalRevenue || 0),
+    branches:        extra.branches   || 0,
+    agents:          extra.agents     || 0,
+    staff:           extra.staff      || 0,
+    customers:       extra.customers  || 0,
+    guides:          stats.overall?.guides           || 0,
+    pendingPayments: stats.pending?.payments         || 0,
+    todayPayments:   stats.today?.payments           || 0,
+    invoices:        stats.overall?.totalBookings    || 0,
+    receipts:        stats.overall?.totalBookings    || 0,
+    leads:           extra.leads    || 0,
+    vendors:         extra.vendors  || 0,
+    suppliers:       extra.vendors  || 0,
+    broadcasts:      0,
+    staff2:          extra.staff    || 0,
+    assets:          extra.assets   || 0,
+    expenses:        extra.expenses || 0,
+    pendingVisas:    stats.pending?.visas            || 0,
+    flights:         stats.flights?.total            || 0,
+    hotels:          stats.hotels?.total             || 0,
+    buses:           0,
+    allocations:     0,
+    documents:       extra.documents || 0,
+    agreements:      extra.agreements || 0,
+    reportCount:     0,
+    prodReports:     0,
+    biCount:         0,
+    aiCount:         0,
+    aiOpsCount:      0,
+    whatsappSent:    stats.notifications?.whatsapp?.total || 0,
+    smsSent:         stats.notifications?.sms?.total      || 0,
+    emailSent:       stats.notifications?.email?.total    || 0,
+    cmsPages:        0,
+    appUsers:        0,
+    socialPosts:     0,
+    inboxCount:      0,
+    automations:     0,
+    commCount:       stats.notifications?.whatsapp?.total || 0,
+    notifHealth:     100,
+    chatSessions:    0,
+    workflows:       0,
+    tasks:           0,
+    supportTickets:  stats.pending?.supportTickets   || 0,
+    groups:          0,
+    pilgrims:        stats.pilgrims?.total           || 0,
+    offlineBookings: 0,
+    kycPending:      0,
+    certificates:    0,
+    ziyarats:        0,
+    printJobs:       0,
+    qrScans:         0,
+    adminUsers:      extra.adminUsers || 0,
+    roles:           0,
+    auditLogs:       0,
+    activityLogs:    0,
+    securityEvents:  0,
+    healthScore:     100,
+    backups:         0,
+    apiKeys:         0,
+    integrations:    0,
+    settings:        0,
+    billing:         0,
+    searchCount:     0,
+    aiQueries:       0,
+    gstFiled:        0,
   };
 
   return (
@@ -360,12 +386,17 @@ export default function SuperDashboard() {
         </div>
 
         {/* ── Live KPI Bar ───────────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          <HeroKpi label="Total Revenue"    value={`₹${fmt(stats.overall?.totalRevenue || 0)}`} icon={IndianRupee} color="border-emerald-200" />
-          <HeroKpi label="Total Bookings"   value={String(stats.overall?.totalBookings || 0)}   icon={BookOpen}    color="border-blue-200" />
-          <HeroKpi label="Today's Revenue"  value={`₹${fmt(stats.today?.revenue || 0)}`}        icon={TrendingUp}  color="border-violet-200" />
-          <HeroKpi label="Pending Actions"  value={String((stats.pending?.approvals || 0) + (stats.pending?.payments || 0))} icon={AlertCircle} color="border-amber-200" />
-          <HeroKpi label="Customers"        value={String(extra.customers || 0)}                icon={Users}       color="border-rose-200" />
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 xl:grid-cols-10 gap-3">
+          <HeroKpi label="Total Revenue"       value={`₹${fmt(stats.overall?.totalRevenue || 0)}`}               icon={IndianRupee} color="border-emerald-200" />
+          <HeroKpi label="Total Bookings"      value={String(stats.overall?.totalBookings || 0)}                 icon={BookOpen}    color="border-blue-200" />
+          <HeroKpi label="Outstanding"         value={`₹${fmt(stats.overall?.outstanding || 0)}`}                icon={AlertCircle} color="border-amber-200" />
+          <HeroKpi label="Today's Collections" value={`₹${fmt(stats.today?.revenue || 0)}`}                     icon={TrendingUp}  color="border-violet-200" />
+          <HeroKpi label="Customers"           value={String(extra.customers || stats.overall?.totalCustomers || 0)} icon={Users}   color="border-rose-200" />
+          <HeroKpi label="Branches"            value={String(extra.branches || 0)}                               icon={Building2}   color="border-cyan-200" />
+          <HeroKpi label="Staff"               value={String(extra.staff || 0)}                                  icon={Users2}      color="border-sky-200" />
+          <HeroKpi label="Guides"              value={String(stats.overall?.guides || 0)}                        icon={Compass}     color="border-teal-200" />
+          <HeroKpi label="Notifications"       value={String(stats.overall?.totalNotifSent || 0)}               icon={Bell}        color="border-purple-200" />
+          <HeroKpi label="System Health"       value={`${stats.overall?.systemHealth ?? 100}%`}                  icon={Activity}    color="border-green-200" />
         </div>
 
         {/* ── Module Grid ────────────────────────────────────────────────── */}
