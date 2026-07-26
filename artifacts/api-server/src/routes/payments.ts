@@ -1796,78 +1796,164 @@ router.post("/reminders/disable", requireAdmin as any, async (req: Authenticated
 
 /**
  * POST /api/payments/resend-notification/:bookingId
- * Admin-only: fire (or re-fire) the full payment notification pipeline for a
- * booking. Useful when a customer did not receive WhatsApp/SMS/Email after
- * their payment. Since payment_received dedup window is now 0, this always
- * fires a fresh notification regardless of prior logs.
+ * Admin-only "Resend All" — fires every applicable notification for the booking.
+ * Skips payment-gated items (Invoice PDF, Receipt PDF, Payment template) when
+ * no payment has been recorded instead of returning an error.
+ * Returns a per-channel summary so the UI can display sent/skipped/failed status.
  */
 router.post("/resend-notification/:bookingId", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   const { bookingId } = req.params;
   try {
-    const result = await pool.query(
+    const qr = await pool.query(
       `SELECT b.*, u.email AS customer_email
        FROM bookings b
        LEFT JOIN users u ON u.id = b.customer_id
-       WHERE b.id = $1
-       LIMIT 1`,
+       WHERE b.id = $1 LIMIT 1`,
       [bookingId]
     );
-    const row = result.rows[0];
-    if (!row) {
-      res.status(404).json({ success: false, message: "Booking not found" });
-      return;
-    }
+    const row = qr.rows[0];
+    if (!row) { res.status(404).json({ success: false, message: "Booking not found" }); return; }
 
-    const paidAmount   = Number(row.paid_amount || 0);
-    const finalAmount  = Number(row.final_amount || 0);
-    const isFullyPaid  = paidAmount >= finalAmount && finalAmount > 0;
-    const remaining    = Math.max(0, finalAmount - paidAmount);
+    const { randomUUID } = await import("crypto");
+    const paidAmount  = Number(row.paid_amount  || 0);
+    const finalAmount = Number(row.final_amount  || row.total_amount || 0);
+    const hasPayment  = paidAmount > 0;
+    const email       = row.customer_email || null;
+    const siteBase    = "https://alburhantravels.com";
+    const invoiceLink = row.booking_number ? `${siteBase}/invoice/${row.booking_number}` : siteBase;
 
-    if (paidAmount <= 0) {
-      res.status(400).json({ success: false, message: "No payment recorded for this booking — nothing to resend" });
-      return;
-    }
+    type SummaryItem = { key: string; label: string; status: "sent" | "failed" | "skipped"; reason?: string };
+    const summary: SummaryItem[] = [];
 
-    const booking = {
-      id:                row.id,
-      bookingNumber:     row.booking_number,
-      customerName:      row.customer_name,
-      customerMobile:    row.customer_mobile,
-      customerEmail:     row.customer_email || row.customer_email_field || null,
-      customerId:        row.customer_id,
-      packageName:       row.package_name,
-      numberOfPilgrims:  row.number_of_pilgrims,
-      finalAmount:       row.final_amount,
+    const logEntry = async (eventType: string, channel: string, recipient: string, msg: string, status: string) => {
+      await pool.query(
+        `INSERT INTO notification_logs
+           (id, event_type, channel, recipient, customer_name, booking_id, booking_number, message, status, sent_at, retry_count)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW(),0)`,
+        [randomUUID(), eventType, channel, recipient, row.customer_name, row.id, row.booking_number, msg, status]
+      ).catch(() => {});
     };
 
-    console.log(`[resend-notification] Admin ${req.user?.email || req.user?.mobile} firing payment notification for booking ${booking.bookingNumber}`);
+    console.log(`[resend-all] booking=${row.booking_number} | paidAmt=${paidAmount} | admin=${req.user?.email || req.user?.mobile}`);
 
-    await processPaymentSuccessNotifications({
-      booking,
-      isFullyPaid,
-      thisPaymentAmount: paidAmount,
-      newPaidAmount: paidAmount,
-      remainingBalance: remaining,
-      invoiceNumber: row.invoice_number || null,
-      paymentRef: row.razorpay_payment_id || "manual-resend",
-    });
+    // ── 1. WhatsApp (always) ───────────────────────────────────────────────────
+    try {
+      const { sendApprovalTemplate, sendBookingSubmittedTemplate } = await import("../lib/botbee.js");
+      const bookingRef = row.booking_number || row.id;
+      const isPending  = row.status === "pending" || row.status === "submitted";
+      const waResult   = isPending
+        ? await sendBookingSubmittedTemplate(row.customer_mobile,
+            { customerName: row.customer_name, packageName: row.package_name || "Hajj/Umrah Package", bookingId: bookingRef },
+            { eventType: "new_booking", bookingId: row.id, customerId: row.customer_id })
+        : await sendApprovalTemplate(row.customer_mobile,
+            { customerName: row.customer_name, packageName: row.package_name || "Hajj/Umrah Package", bookingId: bookingRef, amount: paidAmount, invoiceUrl: invoiceLink },
+            { eventType: "booking_approved", bookingId: row.id, customerId: row.customer_id });
+      await logEntry("booking_approved", "whatsapp", row.customer_mobile, `Resend All: WhatsApp`, waResult.ok ? "sent" : "failed");
+      summary.push({ key: "whatsapp", label: "WhatsApp", status: waResult.ok ? "sent" : "failed", reason: waResult.ok ? undefined : (waResult.errorMessage || "Send failed") });
+    } catch (err: any) {
+      summary.push({ key: "whatsapp", label: "WhatsApp", status: "failed", reason: err.message });
+    }
 
-    res.json({
-      success: true,
-      message: `Payment notification re-fired for booking ${booking.bookingNumber}`,
-      booking: {
-        id: booking.id,
-        bookingNumber: booking.bookingNumber,
-        customerName: booking.customerName,
-        customerMobile: booking.customerMobile,
-        isFullyPaid,
-        paidAmount,
-        remainingBalance: remaining,
-      },
-    });
+    // ── 2. SMS (always) ───────────────────────────────────────────────────────
+    try {
+      const { sendBookingConfirmed, sendPaymentReceived } = await import("../lib/sms.js");
+      const smsCtx = { mobile: row.customer_mobile, customerName: row.customer_name, bookingNumber: row.booking_number, bookingId: row.id, customerId: row.customer_id ?? undefined };
+      const smsResult = hasPayment
+        ? await sendPaymentReceived({ ...smsCtx, amount: String(Math.round(paidAmount)), invoiceUrl: invoiceLink })
+        : await sendBookingConfirmed(smsCtx);
+      await logEntry("booking_approved", "sms", row.customer_mobile, `Resend All: SMS`, smsResult.ok ? "sent" : "failed");
+      summary.push({ key: "sms", label: "SMS", status: smsResult.ok ? "sent" : "failed", reason: smsResult.ok ? undefined : (smsResult.errorMessage || "Send failed") });
+    } catch (err: any) {
+      summary.push({ key: "sms", label: "SMS", status: "failed", reason: err.message });
+    }
+
+    // ── 3. Email (if address on file) ─────────────────────────────────────────
+    if (!email) {
+      summary.push({ key: "email", label: "Email", status: "skipped", reason: "No email on file" });
+    } else {
+      try {
+        const { sendEmail } = await import("../lib/notifications.js");
+        const pkg  = row.package_name || "Hajj/Umrah Package";
+        const body = `Dear ${row.customer_name},<br><br>Thank you for choosing Al Burhan Tours &amp; Travels.<br><br>Your booking has been confirmed.<br><br><strong>Booking ID:</strong> ${row.booking_number}<br><br><strong>Package:</strong> ${pkg}<br><br>If you have any questions, please contact us.<br><br>Regards,<br>Al Burhan Tours &amp; Travels`;
+        const emailResult = await sendEmail(email, `Booking Confirmed – Al Burhan Tours & Travels`, body);
+        await logEntry("booking_approved", "email", email, `Resend All: Email`, emailResult.ok ? "sent" : "failed");
+        summary.push({ key: "email", label: "Email", status: emailResult.ok ? "sent" : "failed", reason: emailResult.ok ? undefined : (emailResult.errorMessage || "Send failed") });
+      } catch (err: any) {
+        summary.push({ key: "email", label: "Email", status: "failed", reason: err.message });
+      }
+    }
+
+    // ── 4. Invoice PDF & Receipt PDF (payment-gated) ───────────────────────────
+    if (!hasPayment) {
+      summary.push({ key: "invoice", label: "Invoice PDF", status: "skipped", reason: "No payment recorded" });
+      summary.push({ key: "receipt", label: "Receipt PDF", status: "skipped", reason: "No payment recorded" });
+    } else {
+      const totalAmt   = finalAmount;
+      const balanceAmt = Math.max(0, totalAmt - paidAmount);
+      const docOpts    = {
+        customerName: row.customer_name, customerMobile: row.customer_mobile,
+        customerEmail: email ?? undefined,
+        bookingNumber: row.booking_number, invoiceNumber: row.invoice_number ?? undefined,
+        packageName: row.package_name ?? "Hajj/Umrah Package",
+        numberOfPilgrims: row.number_of_pilgrims,
+        totalAmount: totalAmt, paidAmount, balanceAmount: balanceAmt,
+        gstAmount: Number(row.gst_amount || 0),
+        paymentDate: row.updated_at || new Date(),
+        razorpayPaymentId: row.razorpay_payment_id ?? undefined,
+      };
+
+      // Invoice PDF
+      try {
+        const { generateInvoicePdfBuffer } = await import("../lib/paymentDocs.js");
+        const { sendPDFDocument } = await import("../lib/botbee.js");
+        const pdfBuf  = await generateInvoicePdfBuffer(docOpts);
+        const invResult = await sendPDFDocument(row.customer_mobile, pdfBuf, `Invoice-${row.booking_number}.pdf`,
+          `Your Tax Invoice – Al Burhan Tours & Travels (Booking: ${row.booking_number})`,
+          { eventType: "invoice_ready", bookingId: row.id, customerId: row.customer_id ?? undefined });
+        await logEntry("invoice_ready", "whatsapp", row.customer_mobile, `Resend All: Invoice PDF`, invResult.ok ? "sent" : "failed");
+        summary.push({ key: "invoice", label: "Invoice PDF", status: invResult.ok ? "sent" : "failed", reason: invResult.ok ? undefined : (invResult.errorMessage || "Send failed") });
+      } catch (err: any) {
+        summary.push({ key: "invoice", label: "Invoice PDF", status: "failed", reason: err.message });
+      }
+
+      // Receipt PDF
+      try {
+        const { generateReceiptPdfBuffer } = await import("../lib/paymentDocs.js");
+        const { sendPDFDocument } = await import("../lib/botbee.js");
+        const pdfBuf  = await generateReceiptPdfBuffer(docOpts);
+        const rcptResult = await sendPDFDocument(row.customer_mobile, pdfBuf, `Receipt-${row.booking_number}.pdf`,
+          `Your Payment Receipt – Al Burhan Tours & Travels (Booking: ${row.booking_number})`,
+          { eventType: "payment_received", bookingId: row.id, customerId: row.customer_id ?? undefined });
+        await logEntry("payment_received", "whatsapp", row.customer_mobile, `Resend All: Receipt PDF`, rcptResult.ok ? "sent" : "failed");
+        summary.push({ key: "receipt", label: "Receipt PDF", status: rcptResult.ok ? "sent" : "failed", reason: rcptResult.ok ? undefined : (rcptResult.errorMessage || "Send failed") });
+      } catch (err: any) {
+        summary.push({ key: "receipt", label: "Receipt PDF", status: "failed", reason: err.message });
+      }
+    }
+
+    // ── 5. Agreement (if one exists for this booking) ─────────────────────────
+    try {
+      const agrQ = await pool.query(
+        `SELECT id, agreement_number FROM agreements WHERE booking_id=$1 AND status NOT IN ('cancelled','rejected') ORDER BY created_at DESC LIMIT 1`,
+        [row.id]
+      );
+      if (agrQ.rows.length > 0) {
+        const agr = agrQ.rows[0];
+        const { sendAgreementReadyTemplate } = await import("../lib/botbee.js");
+        const agrResult = await sendAgreementReadyTemplate(row.customer_mobile, {
+          customerName: row.customer_name, bookingId: row.booking_number,
+          agreementNumber: agr.agreement_number,
+          agreementUrl: `${siteBase}/agreement/${row.booking_number}`,
+        }, { eventType: "agreement_ready", bookingId: row.id, customerId: row.customer_id ?? undefined });
+        summary.push({ key: "agreement", label: "Agreement", status: agrResult.ok ? "sent" : "failed", reason: agrResult.ok ? undefined : (agrResult.errorMessage || "Send failed") });
+      }
+      // No entry in summary if agreement not applicable
+    } catch { /* agreement check failure is non-fatal */ }
+
+    res.json({ success: true, summary, bookingNumber: row.booking_number });
   } catch (err: any) {
-    console.error("[resend-notification] failed:", err?.message);
-    res.status(500).json({ success: false, message: err?.message || "Failed to resend notification" });
+    console.error("[resend-all] failed:", err?.message);
+    res.status(500).json({ success: false, message: err?.message || "Failed to resend notifications" });
   }
 });
 

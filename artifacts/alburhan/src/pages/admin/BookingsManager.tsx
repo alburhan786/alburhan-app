@@ -1117,10 +1117,27 @@ function BookingDetailModal({ booking, open, onClose }: { booking: Booking | nul
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Resend failed");
-      toast({ title: "Full notification pipeline fired", description: "WhatsApp template, SMS, Email + Invoice & Receipt PDFs are being sent." });
-      setTimeout(() => { fetchConfirmStatus(booking.id); loadNotifLogs(booking.id); }, 8000);
+
+      const summary: Array<{ key: string; label: string; status: "sent" | "failed" | "skipped"; reason?: string }> = data.summary || [];
+      const sentCount    = summary.filter(s => s.status === "sent").length;
+      const failedCount  = summary.filter(s => s.status === "failed").length;
+      const skippedCount = summary.filter(s => s.status === "skipped").length;
+
+      const statusIcon = (s: string) => s === "sent" ? "✓" : s === "skipped" ? "⊘" : "✗";
+      const lines = summary.map(s =>
+        `${statusIcon(s.status)} ${s.label}: ${s.status === "sent" ? "Sent" : s.status === "skipped" ? `Skipped${s.reason ? ` (${s.reason})` : ""}` : `Failed${s.reason ? ` — ${s.reason.slice(0, 60)}` : ""}`}`
+      ).join("\n");
+
+      toast({
+        title: failedCount > 0
+          ? `Resend All — ${sentCount} sent, ${failedCount} failed, ${skippedCount} skipped`
+          : `Resend All — ${sentCount} sent${skippedCount > 0 ? `, ${skippedCount} skipped` : ""}`,
+        description: lines,
+      });
+
+      setTimeout(() => { fetchConfirmStatus(booking.id); loadNotifLogs(booking.id); }, 4000);
     } catch (err: any) {
-      toast({ title: "Resend all failed", description: err.message, variant: "destructive" });
+      toast({ title: "Resend All failed", description: err.message, variant: "destructive" });
     } finally {
       setResendingAll(false);
     }
