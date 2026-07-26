@@ -65,7 +65,7 @@ async function main() {
     // Use Vite dev server in middleware mode
     const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { middlewareMode: true, allowedHosts: true, hmr: true },
       appType: "spa",
       base: "/pdf/",
       configFile: path.join(__dirname, "vite.config.ts"),
