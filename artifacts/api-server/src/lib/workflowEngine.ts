@@ -1,5 +1,6 @@
 import { pool } from "@workspace/db";
 import { fireNotificationEvent, type NotificationContext } from "./notificationEngine.js";
+import { sendPushForBooking } from "./fcm.js";
 
 export type WorkflowTrigger =
   | "new_booking" | "booking_approved" | "booking_rejected" | "booking_completed"
@@ -349,6 +350,11 @@ export async function triggerWorkflow(
       await fireNotificationEvent(eventType as any, ctx as any);
     } else {
       console.warn(`[workflow] ⚠ ${triggerType}: SKIPPED notification (eventType="${eventType}" mobile="${ctx.customerMobile || "MISSING"}")`);
+    }
+
+    // Fire-and-forget FCM push to customer's registered devices
+    if (ctx.customerId) {
+      sendPushForBooking(ctx.customerId, triggerType, ctx as any).catch(() => {});
     }
 
     const ms = Date.now() - start;

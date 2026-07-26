@@ -14,6 +14,8 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { useAdminNotifications } from "@/hooks/useAdminNotifications";
 import { AdminNotificationCenter } from "@/components/admin/AdminNotificationCenter";
 import { BookingNotificationPopup } from "@/components/admin/BookingNotificationPopup";
+import { FCMBell } from "@/components/FCMBell";
+import { FCMAutoInit } from "@/components/FCMAutoInit";
 import { buildNavSections } from "@/config/navigation";
 import { CommandPalette } from "@/components/ui/CommandPalette";
 
@@ -201,6 +203,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
           {subtitle || "Admin Portal"}
         </div>
       </div>
+      <FCMBell iconSize={15} />
       <AdminNotificationCenter
         notifications={notifications}
         unreadCount={unreadCount}
@@ -300,6 +303,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
         </div>
       </main>
 
+      <FCMAutoInit />
       {popupNotif && (
         <BookingNotificationPopup notif={popupNotif} onDismiss={dismissPopup} />
       )}

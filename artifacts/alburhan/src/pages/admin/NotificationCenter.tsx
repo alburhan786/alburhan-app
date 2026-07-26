@@ -38,13 +38,20 @@ interface FCMStatus {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const AUDIENCE_FILTERS = [
-  { value: "all",              label: "All Customers",        icon: "👥" },
-  { value: "hajj",             label: "Hajj Packages",        icon: "🕋" },
-  { value: "umrah",            label: "Umrah Packages",       icon: "🌙" },
-  { value: "payment_pending",  label: "Payment Pending",      icon: "💰" },
-  { value: "visa_ready",       label: "Visa Ready",           icon: "🛂" },
-  { value: "ticket_issued",    label: "Ticket Issued",        icon: "✈️" },
-  { value: "agreement_signed", label: "Agreement Signed",     icon: "📝" },
+  { value: "all",              label: "Everyone",             icon: "🌐", group: "all" },
+  { value: "customers",        label: "All Customers",        icon: "👥", group: "users" },
+  { value: "admin",            label: "Admin Team",           icon: "🛡️", group: "users" },
+  { value: "staff",            label: "Staff",                icon: "👔", group: "users" },
+  { value: "agent",            label: "Agents",               icon: "🤝", group: "users" },
+  { value: "branch_manager",   label: "Branch Managers",      icon: "🏢", group: "users" },
+  { value: "finance",          label: "Finance Team",         icon: "💼", group: "users" },
+  { value: "individual",       label: "Specific Person",      icon: "👤", group: "users" },
+  { value: "hajj",             label: "Hajj Pilgrims",        icon: "🕋", group: "travel" },
+  { value: "umrah",            label: "Umrah Pilgrims",       icon: "🌙", group: "travel" },
+  { value: "payment_pending",  label: "Payment Pending",      icon: "💰", group: "travel" },
+  { value: "visa_ready",       label: "Visa Ready",           icon: "🛂", group: "travel" },
+  { value: "ticket_issued",    label: "Ticket Issued",        icon: "✈️", group: "travel" },
+  { value: "agreement_signed", label: "Agreement Signed",     icon: "📝", group: "travel" },
 ];
 
 const CHANNEL_ICONS: Record<string, React.ReactNode> = {
@@ -199,6 +206,12 @@ export default function NotificationCenter() {
     filter: "all",
   });
 
+  // ── Individual user search state ─────────────────────────────────────────────
+  const [indSearch, setIndSearch]   = useState("");
+  const [indResults, setIndResults] = useState<Array<{ id: string; name: string; mobile: string; role: string; token_count: number }>>([]);
+  const [indUser, setIndUser]       = useState<{ id: string; name: string; mobile: string; role: string } | null>(null);
+  const [indSearching, setIndSearching] = useState(false);
+
   // ── Logs state ──────────────────────────────────────────────────────────────
   const [logs, setLogs] = useState<NotifLog[]>([]);
   const [total, setTotal] = useState(0);
@@ -239,6 +252,20 @@ export default function NotificationCenter() {
     }, 400);
   }, [pushForm.filter]);
 
+  // ── Individual user search ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (pushForm.filter !== "individual") { setIndResults([]); return; }
+    if (!indSearch.trim() || indSearch.trim().length < 2) { setIndResults([]); return; }
+    const t = setTimeout(async () => {
+      setIndSearching(true);
+      try {
+        const res = await fetch(`${API}/api/push/search-users?q=${encodeURIComponent(indSearch.trim())}`, { credentials: "include" });
+        if (res.ok) { const d = await res.json(); setIndResults(d.users || []); }
+      } catch {} finally { setIndSearching(false); }
+    }, 350);
+    return () => clearTimeout(t);
+  }, [indSearch, pushForm.filter]);
+
   // ── Send push ───────────────────────────────────────────────────────────────
   const handleSend = async () => {
     if (!pushForm.title.trim() || !pushForm.body.trim()) {
@@ -255,7 +282,7 @@ export default function NotificationCenter() {
         body: JSON.stringify({
           title: pushForm.title, body: pushForm.body,
           url:   pushForm.url   || undefined,
-          filter: pushForm.filter,
+          filter: pushForm.filter === "individual" && indUser ? `individual:${indUser.id}` : pushForm.filter,
           data:  pushForm.imageUrl ? { imageUrl: pushForm.imageUrl } : undefined,
         }),
       });
@@ -494,6 +521,55 @@ export default function NotificationCenter() {
                     </button>
                   ))}
                 </div>
+
+                {/* Individual person search — shown when "Specific Person" is selected */}
+                {pushForm.filter === "individual" && (
+                  <div className="mt-3 space-y-2">
+                    <div className="relative">
+                      <input
+                        value={indSearch}
+                        onChange={e => { setIndSearch(e.target.value); if (!e.target.value) { setIndUser(null); } }}
+                        placeholder="Search by name or mobile number…"
+                        className="w-full border border-indigo-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 bg-indigo-50/30"
+                      />
+                      {indSearching && <span className="absolute right-3 top-2.5 text-[11px] text-gray-400 animate-pulse">Searching…</span>}
+                    </div>
+                    {indResults.length > 0 && (
+                      <div className="border border-gray-200 rounded-lg overflow-hidden shadow-sm max-h-40 overflow-y-auto">
+                        {indResults.map(u => (
+                          <button
+                            key={u.id}
+                            onClick={() => { setIndUser(u); setIndResults([]); setIndSearch(u.name); }}
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-indigo-50 border-b last:border-0 flex items-center justify-between gap-2"
+                          >
+                            <span>
+                              <span className="font-medium">{u.name}</span>
+                              <span className="text-gray-400 text-xs ml-2">{u.mobile}</span>
+                              <span className="text-[10px] text-gray-400 ml-1 capitalize">({u.role})</span>
+                            </span>
+                            {u.token_count > 0
+                              ? <span className="text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-medium flex-shrink-0">✓ {u.token_count} device{u.token_count > 1 ? "s" : ""}</span>
+                              : <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded flex-shrink-0">No device</span>}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {indUser && (
+                      <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2 text-sm">
+                        <span>👤</span>
+                        <span className="font-medium">{indUser.name}</span>
+                        <span className="text-gray-400 text-xs">{indUser.mobile}</span>
+                        <button onClick={() => { setIndUser(null); setIndSearch(""); }} className="ml-auto text-gray-400 hover:text-red-400 text-xs">✕ Clear</button>
+                      </div>
+                    )}
+                    {!indUser && !indSearching && indSearch.length >= 2 && indResults.length === 0 && (
+                      <p className="text-xs text-gray-400 text-center py-1">No results for "{indSearch}"</p>
+                    )}
+                    {!indSearch && !indUser && (
+                      <p className="text-xs text-gray-400 text-center py-1">Type a name or mobile number to search</p>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Title + Body */}

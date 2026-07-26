@@ -81,3 +81,4 @@
 - [FCM implementation pattern](fcm-implementation.md) — use REST + crypto JWT (no firebase-admin); FIREBASE_PRIVATE_KEY needs .replace(/\\n/g,"\n"); existing sw.js handles both FCM+legacy push
 - [Invoice & payment status architecture](invoice-payment-status-arch.md) — deriveStatusFromAmounts is the canonical status fn; paidAmount (not advanceAmount) is source of truth; receipt PDF has full fields; admin report includes partially_paid
 - [Agreement fires for all payments](agreement-all-payments.md) — autoGenerateAgreement must NOT be gated on isFullyPaid; partial payers need agreement too; agreements.ts already handles partially_paid status
+- [FCM multi-role push integration](fcm-multi-role.md) — customer_push_tokens stores user_id+user_type (not just customer_id); getTokensByFilter supports admin/staff/agent/branch/individual; sendPushForBooking injected in triggerWorkflow

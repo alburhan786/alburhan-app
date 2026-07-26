@@ -2013,6 +2013,20 @@ async function runMigrations() {
     console.log("[Migration] customer_push_tokens device_info + updated_at ensured");
   } catch (err: any) { console.warn("[Migration] customer_push_tokens column additions (non-fatal):", err.message); }
 
+  // ── customer_push_tokens: extended device metadata + multi-role support ───
+  try {
+    await pool.query(`ALTER TABLE customer_push_tokens ADD COLUMN IF NOT EXISTS user_id TEXT`);
+    await pool.query(`ALTER TABLE customer_push_tokens ADD COLUMN IF NOT EXISTS user_type TEXT DEFAULT 'customer'`);
+    await pool.query(`ALTER TABLE customer_push_tokens ADD COLUMN IF NOT EXISTS browser TEXT`);
+    await pool.query(`ALTER TABLE customer_push_tokens ADD COLUMN IF NOT EXISTS operating_system TEXT`);
+    await pool.query(`ALTER TABLE customer_push_tokens ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ DEFAULT NOW()`);
+    await pool.query(`UPDATE customer_push_tokens SET user_id = customer_id WHERE user_id IS NULL`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_push_tokens_user_id   ON customer_push_tokens(user_id)   WHERE user_id IS NOT NULL`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_push_tokens_user_type ON customer_push_tokens(user_type)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_push_tokens_last_seen ON customer_push_tokens(last_seen DESC)`);
+    console.log("[Migration] customer_push_tokens user_id/user_type/browser/os/last_seen ensured");
+  } catch (err: any) { console.warn("[Migration] customer_push_tokens extended columns (non-fatal):", err.message); }
+
   // ── VAPID keys: ensure api_settings row exists (webPush.ts generates on first use) ───
   // No seeding needed — webPush.ts generates + persists VAPID keys on first call.
 

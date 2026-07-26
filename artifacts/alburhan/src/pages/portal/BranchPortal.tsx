@@ -7,6 +7,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/use-auth";
+import { FCMAutoInit } from "@/components/FCMAutoInit";
+import { FCMBell } from "@/components/FCMBell";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -199,6 +201,7 @@ export default function BranchPortal() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Toast */}
+      <FCMAutoInit userType="branch_manager" />
       {toastMsg && (
         <div className="fixed top-4 right-4 z-50 bg-emerald-600 text-white px-4 py-2.5 rounded-xl shadow-lg text-sm flex items-center gap-2">
           <Check size={14} /> {toastMsg}
@@ -236,6 +239,7 @@ export default function BranchPortal() {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground hidden sm:block">{user?.mobile}</span>
+            <FCMBell iconSize={14} />
             <Button variant="outline" size="sm" className="gap-1.5" onClick={() => logout()}>
               <LogOut size={13} /> Logout
             </Button>

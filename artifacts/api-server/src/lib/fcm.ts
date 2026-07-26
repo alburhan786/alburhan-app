@@ -111,7 +111,7 @@ export async function sendFCMToToken(
   }
 }
 
-// ── Send to multiple tokens (batch via sequential calls — FCM v1 has no multicast) ──
+// ── Send to multiple tokens (10-at-a-time concurrency) ───────────────────────
 export async function sendFCMBatch(
   tokens: string[],
   payload: { title: string; body: string; url?: string; icon?: string; data?: Record<string, string> }
@@ -148,92 +148,224 @@ export async function cleanupInvalidTokens(invalidTokens: string[]): Promise<voi
   } catch {}
 }
 
-// ── Token filters ─────────────────────────────────────────────────────────────
+// ── Token filters (all user types) ───────────────────────────────────────────
 export async function getTokensByFilter(
   filter: string
-): Promise<Array<{ customerId: string; token: string; customerName?: string }>> {
+): Promise<Array<{ userId: string; token: string; customerName?: string; userType?: string }>> {
   let sql: string;
   const params: any[] = [];
 
+  // individual:userId — send to one specific user
+  if (filter.startsWith("individual:")) {
+    const uid = filter.split(":")[1];
+    sql = `SELECT DISTINCT ON (cpt.user_id) cpt.user_id, cpt.token, u.name AS customer_name, cpt.user_type
+           FROM customer_push_tokens cpt
+           LEFT JOIN users u ON u.id = cpt.user_id
+           WHERE cpt.token IS NOT NULL AND length(cpt.token) > 10
+             AND (cpt.user_id = $1 OR cpt.customer_id = $1)
+           ORDER BY cpt.user_id, cpt.last_seen DESC NULLS LAST`;
+    params.push(uid);
+    const res = await pool.query(sql, params);
+    return res.rows.map((r: any) => ({ userId: r.user_id || uid, token: r.token, customerName: r.customer_name, userType: r.user_type }));
+  }
+
   switch (filter) {
     case "all":
-      sql = `SELECT DISTINCT ON (cpt.customer_id) cpt.customer_id, cpt.token, u.name AS customer_name
+      sql = `SELECT DISTINCT ON (cpt.user_id) cpt.user_id, cpt.token, u.name AS customer_name, cpt.user_type
              FROM customer_push_tokens cpt
-             LEFT JOIN users u ON u.id = cpt.customer_id
+             LEFT JOIN users u ON u.id = cpt.user_id
              WHERE cpt.token IS NOT NULL AND length(cpt.token) > 10
-             ORDER BY cpt.customer_id, cpt.created_at DESC`;
+             ORDER BY cpt.user_id, cpt.last_seen DESC NULLS LAST`;
+      break;
+    case "customers":
+    case "customer":
+      sql = `SELECT DISTINCT ON (cpt.user_id) cpt.user_id, cpt.token, u.name AS customer_name, cpt.user_type
+             FROM customer_push_tokens cpt
+             LEFT JOIN users u ON u.id = cpt.user_id
+             WHERE cpt.token IS NOT NULL AND length(cpt.token) > 10
+               AND (cpt.user_type = 'customer' OR cpt.user_type IS NULL)
+             ORDER BY cpt.user_id, cpt.last_seen DESC NULLS LAST`;
+      break;
+    case "admin":
+      sql = `SELECT DISTINCT ON (cpt.user_id) cpt.user_id, cpt.token, u.name AS customer_name, cpt.user_type
+             FROM customer_push_tokens cpt
+             LEFT JOIN users u ON u.id = cpt.user_id
+             WHERE cpt.token IS NOT NULL AND length(cpt.token) > 10
+               AND cpt.user_type IN ('admin','super_admin')
+             ORDER BY cpt.user_id, cpt.last_seen DESC NULLS LAST`;
+      break;
+    case "staff":
+      sql = `SELECT DISTINCT ON (cpt.user_id) cpt.user_id, cpt.token, u.name AS customer_name, cpt.user_type
+             FROM customer_push_tokens cpt
+             LEFT JOIN users u ON u.id = cpt.user_id
+             WHERE cpt.token IS NOT NULL AND length(cpt.token) > 10
+               AND cpt.user_type = 'staff'
+             ORDER BY cpt.user_id, cpt.last_seen DESC NULLS LAST`;
+      break;
+    case "agent":
+      sql = `SELECT DISTINCT ON (cpt.user_id) cpt.user_id, cpt.token, u.name AS customer_name, cpt.user_type
+             FROM customer_push_tokens cpt
+             LEFT JOIN users u ON u.id = cpt.user_id
+             WHERE cpt.token IS NOT NULL AND length(cpt.token) > 10
+               AND cpt.user_type = 'agent'
+             ORDER BY cpt.user_id, cpt.last_seen DESC NULLS LAST`;
+      break;
+    case "branch_manager":
+    case "branch":
+      sql = `SELECT DISTINCT ON (cpt.user_id) cpt.user_id, cpt.token, u.name AS customer_name, cpt.user_type
+             FROM customer_push_tokens cpt
+             LEFT JOIN users u ON u.id = cpt.user_id
+             WHERE cpt.token IS NOT NULL AND length(cpt.token) > 10
+               AND cpt.user_type = 'branch_manager'
+             ORDER BY cpt.user_id, cpt.last_seen DESC NULLS LAST`;
+      break;
+    case "finance":
+      sql = `SELECT DISTINCT ON (cpt.user_id) cpt.user_id, cpt.token, u.name AS customer_name, cpt.user_type
+             FROM customer_push_tokens cpt
+             LEFT JOIN users u ON u.id = cpt.user_id
+             WHERE cpt.token IS NOT NULL AND length(cpt.token) > 10
+               AND cpt.user_type IN ('admin','super_admin','staff')
+             ORDER BY cpt.user_id, cpt.last_seen DESC NULLS LAST`;
       break;
     case "hajj":
-      sql = `SELECT DISTINCT ON (cpt.customer_id) cpt.customer_id, cpt.token, u.name AS customer_name
+      sql = `SELECT DISTINCT ON (cpt.user_id) cpt.user_id, cpt.token, u.name AS customer_name, cpt.user_type
              FROM customer_push_tokens cpt
-             JOIN bookings b ON b.customer_id = cpt.customer_id
-             LEFT JOIN users u ON u.id = cpt.customer_id
+             JOIN bookings b ON b.customer_id = cpt.user_id
+             LEFT JOIN users u ON u.id = cpt.user_id
              WHERE cpt.token IS NOT NULL AND length(cpt.token) > 10
                AND (b.package_type ILIKE '%hajj%' OR b.package_name ILIKE '%hajj%')
                AND b.status NOT IN ('cancelled','rejected')
-             ORDER BY cpt.customer_id, cpt.created_at DESC`;
+             ORDER BY cpt.user_id, cpt.last_seen DESC NULLS LAST`;
       break;
     case "umrah":
-      sql = `SELECT DISTINCT ON (cpt.customer_id) cpt.customer_id, cpt.token, u.name AS customer_name
+      sql = `SELECT DISTINCT ON (cpt.user_id) cpt.user_id, cpt.token, u.name AS customer_name, cpt.user_type
              FROM customer_push_tokens cpt
-             JOIN bookings b ON b.customer_id = cpt.customer_id
-             LEFT JOIN users u ON u.id = cpt.customer_id
+             JOIN bookings b ON b.customer_id = cpt.user_id
+             LEFT JOIN users u ON u.id = cpt.user_id
              WHERE cpt.token IS NOT NULL AND length(cpt.token) > 10
                AND (b.package_type ILIKE '%umrah%' OR b.package_name ILIKE '%umrah%')
                AND b.status NOT IN ('cancelled','rejected')
-             ORDER BY cpt.customer_id, cpt.created_at DESC`;
+             ORDER BY cpt.user_id, cpt.last_seen DESC NULLS LAST`;
       break;
     case "payment_pending":
-      sql = `SELECT DISTINCT ON (cpt.customer_id) cpt.customer_id, cpt.token, u.name AS customer_name
+      sql = `SELECT DISTINCT ON (cpt.user_id) cpt.user_id, cpt.token, u.name AS customer_name, cpt.user_type
              FROM customer_push_tokens cpt
-             JOIN bookings b ON b.customer_id = cpt.customer_id
-             LEFT JOIN users u ON u.id = cpt.customer_id
+             JOIN bookings b ON b.customer_id = cpt.user_id
+             LEFT JOIN users u ON u.id = cpt.user_id
              WHERE cpt.token IS NOT NULL AND length(cpt.token) > 10
                AND COALESCE(b.paid_amount, 0) < COALESCE(b.final_amount, b.total_amount, 0)
                AND b.status NOT IN ('cancelled','rejected')
-             ORDER BY cpt.customer_id, cpt.created_at DESC`;
+             ORDER BY cpt.user_id, cpt.last_seen DESC NULLS LAST`;
       break;
     case "visa_ready":
-      sql = `SELECT DISTINCT ON (cpt.customer_id) cpt.customer_id, cpt.token, u.name AS customer_name
+      sql = `SELECT DISTINCT ON (cpt.user_id) cpt.user_id, cpt.token, u.name AS customer_name, cpt.user_type
              FROM customer_push_tokens cpt
-             JOIN bookings b ON b.customer_id = cpt.customer_id
-             LEFT JOIN users u ON u.id = cpt.customer_id
+             JOIN bookings b ON b.customer_id = cpt.user_id
+             LEFT JOIN users u ON u.id = cpt.user_id
              WHERE cpt.token IS NOT NULL AND length(cpt.token) > 10
                AND b.journey_status = 'visa_ready'
-             ORDER BY cpt.customer_id, cpt.created_at DESC`;
+             ORDER BY cpt.user_id, cpt.last_seen DESC NULLS LAST`;
       break;
     case "ticket_issued":
-      sql = `SELECT DISTINCT ON (cpt.customer_id) cpt.customer_id, cpt.token, u.name AS customer_name
+      sql = `SELECT DISTINCT ON (cpt.user_id) cpt.user_id, cpt.token, u.name AS customer_name, cpt.user_type
              FROM customer_push_tokens cpt
-             JOIN bookings b ON b.customer_id = cpt.customer_id
-             LEFT JOIN users u ON u.id = cpt.customer_id
+             JOIN bookings b ON b.customer_id = cpt.user_id
+             LEFT JOIN users u ON u.id = cpt.user_id
              WHERE cpt.token IS NOT NULL AND length(cpt.token) > 10
                AND b.journey_status = 'ticket_issued'
-             ORDER BY cpt.customer_id, cpt.created_at DESC`;
+             ORDER BY cpt.user_id, cpt.last_seen DESC NULLS LAST`;
       break;
     case "agreement_signed":
-      sql = `SELECT DISTINCT ON (cpt.customer_id) cpt.customer_id, cpt.token, u.name AS customer_name
+      sql = `SELECT DISTINCT ON (cpt.user_id) cpt.user_id, cpt.token, u.name AS customer_name, cpt.user_type
              FROM customer_push_tokens cpt
-             JOIN agreements ag ON ag.customer_id = cpt.customer_id AND ag.status = 'signed'
-             LEFT JOIN users u ON u.id = cpt.customer_id
+             JOIN agreements ag ON ag.customer_id = cpt.user_id AND ag.status = 'signed'
+             LEFT JOIN users u ON u.id = cpt.user_id
              WHERE cpt.token IS NOT NULL AND length(cpt.token) > 10
-             ORDER BY cpt.customer_id, cpt.created_at DESC`;
+             ORDER BY cpt.user_id, cpt.last_seen DESC NULLS LAST`;
       break;
     default:
-      // package-wise
-      sql = `SELECT DISTINCT ON (cpt.customer_id) cpt.customer_id, cpt.token, u.name AS customer_name
+      // package-wise search
+      sql = `SELECT DISTINCT ON (cpt.user_id) cpt.user_id, cpt.token, u.name AS customer_name, cpt.user_type
              FROM customer_push_tokens cpt
-             JOIN bookings b ON b.customer_id = cpt.customer_id
-             LEFT JOIN users u ON u.id = cpt.customer_id
+             JOIN bookings b ON b.customer_id = cpt.user_id
+             LEFT JOIN users u ON u.id = cpt.user_id
              WHERE cpt.token IS NOT NULL AND length(cpt.token) > 10
                AND b.package_name ILIKE $1
                AND b.status NOT IN ('cancelled','rejected')
-             ORDER BY cpt.customer_id, cpt.created_at DESC`;
+             ORDER BY cpt.user_id, cpt.last_seen DESC NULLS LAST`;
       params.push(`%${filter}%`);
   }
 
   const res = await pool.query(sql, params);
-  return res.rows.map((r: any) => ({ customerId: r.customer_id, token: r.token, customerName: r.customer_name }));
+  return res.rows.map((r: any) => ({
+    userId: r.user_id,
+    token: r.token,
+    customerName: r.customer_name,
+    userType: r.user_type,
+  }));
+}
+
+// ── Auto push for booking events (called from workflowEngine) ────────────────
+const PUSH_MESSAGES: Record<string, (ctx: any) => { title: string; body: string; url?: string }> = {
+  new_booking:              ctx => ({ title: "📋 Booking Received",      body: `Your booking${ctx.bookingNumber ? ` #${ctx.bookingNumber}` : ""} has been submitted. We'll confirm shortly!`, url: "/customer/dashboard" }),
+  booking_submitted:        ctx => ({ title: "📋 Booking Received",      body: `Your booking${ctx.bookingNumber ? ` #${ctx.bookingNumber}` : ""} has been submitted. We'll confirm shortly!`, url: "/customer/dashboard" }),
+  booking_approved:         ctx => ({ title: "✅ Booking Confirmed!",    body: `Great news${ctx.customerName ? `, ${ctx.customerName.split(" ")[0]}` : ""}! Your ${ctx.packageName || "package"} booking is confirmed.`, url: "/customer/dashboard" }),
+  payment_received:         ctx => ({ title: "💰 Payment Received",      body: `₹${ctx.amount ? Number(ctx.amount).toLocaleString("en-IN") : ""} received for ${ctx.bookingNumber || "your booking"}. Thank you!`, url: "/customer/dashboard" }),
+  partial_payment_received: ctx => ({ title: "💳 Partial Payment Noted", body: `Partial payment received for ${ctx.bookingNumber || "your booking"}. Balance due: ₹${ctx.balanceDue ? Number(ctx.balanceDue).toLocaleString("en-IN") : "pending"}.`, url: "/customer/dashboard" }),
+  invoice_generated:        ctx => ({ title: "🧾 Invoice Ready",         body: `Your invoice for ${ctx.bookingNumber || "your booking"} is ready to view and download.`, url: "/customer/dashboard" }),
+  agreement_generated:      ctx => ({ title: "📝 Agreement Ready",       body: `Your travel agreement for ${ctx.bookingNumber || "your booking"} is ready. Please review and sign.`, url: "/customer/dashboard" }),
+  agreement_signed:         ctx => ({ title: "✍️ Agreement Signed",      body: `Your agreement for ${ctx.bookingNumber || "your booking"} has been signed successfully!`, url: "/customer/dashboard" }),
+  visa_approved:            ctx => ({ title: "🛂 Visa Approved!",        body: `Great news! Your visa for ${ctx.packageName || "your package"} has been approved.`, url: "/customer/dashboard" }),
+  visa_issued:              ctx => ({ title: "🛂 Visa Ready",            body: `Your visa for ${ctx.bookingNumber || "your booking"} is ready! Journey status updated.`, url: "/customer/dashboard" }),
+  ticket_issued:            ctx => ({ title: "✈️ Flight Ticket Uploaded", body: `Your flight ticket for ${ctx.bookingNumber || "your booking"} is now available to download.`, url: "/customer/dashboard" }),
+  hotel_voucher_uploaded:   ctx => ({ title: "🏨 Hotel Voucher Ready",   body: `Your hotel voucher for ${ctx.bookingNumber || "your booking"} has been uploaded.`, url: "/customer/dashboard" }),
+  departure_reminder:       ctx => ({ title: "⏰ Departure Reminder",    body: `Your ${ctx.packageName || "journey"} departs soon. Check all documents are ready!`, url: "/customer/dashboard" }),
+  payment_due:              ctx => ({ title: "💰 Payment Reminder",      body: `Balance payment reminder for ${ctx.bookingNumber || "your booking"}. Please ensure timely payment.`, url: "/customer/dashboard" }),
+  balance_reminder:         ctx => ({ title: "💰 Balance Due",           body: `Reminder: balance payment for ${ctx.bookingNumber || "your booking"} is due soon.`, url: "/customer/dashboard" }),
+};
+
+/**
+ * Called by workflowEngine after each trigger — fire-and-forget FCM push to customer devices.
+ * ctx must have customerId or customerMobile.
+ */
+export async function sendPushForBooking(
+  customerId: string,
+  trigger: string,
+  ctx: Record<string, any>
+): Promise<void> {
+  try {
+    if (!customerId) return;
+    // Look up configured? (quick check to avoid DB lookup when not configured)
+    const projectId = process.env.FIREBASE_PROJECT_ID;
+    if (!projectId) return;
+
+    const msgFn = PUSH_MESSAGES[trigger];
+    if (!msgFn) return; // no push for this trigger
+
+    const { title, body, url } = msgFn(ctx);
+
+    const tokensRes = await pool.query(
+      `SELECT token FROM customer_push_tokens
+       WHERE (user_id = $1 OR customer_id = $1)
+         AND token IS NOT NULL AND length(token) > 10
+       ORDER BY last_seen DESC NULLS LAST LIMIT 5`,
+      [customerId]
+    );
+    if (!tokensRes.rows.length) return;
+
+    const results = await Promise.allSettled(
+      tokensRes.rows.map((r: any) => sendFCMToToken(r.token, { title, body, url }))
+    );
+    const sent   = results.filter(r => r.status === "fulfilled" && r.value.ok).length;
+    const invalid = results
+      .filter(r => r.status === "fulfilled" && r.value.ok === false && r.value.invalidToken)
+      .map((r, i) => tokensRes.rows[i]?.token)
+      .filter(Boolean);
+    await cleanupInvalidTokens(invalid);
+    if (sent > 0) console.log(`[FCM] Auto-push "${trigger}" → customer=${customerId} sent=${sent}`);
+  } catch (err: any) {
+    console.warn(`[FCM] sendPushForBooking failed for trigger=${trigger}:`, err?.message);
+  }
 }
 
 // ── Log a push campaign result ────────────────────────────────────────────────

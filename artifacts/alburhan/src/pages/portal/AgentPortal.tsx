@@ -9,6 +9,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/use-auth";
+import { FCMAutoInit } from "@/components/FCMAutoInit";
+import { FCMBell } from "@/components/FCMBell";
+import { PushNotificationSetting } from "@/components/PushNotificationSetting";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -447,6 +450,7 @@ export default function AgentPortal() {
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Toast */}
+      <FCMAutoInit userType="agent" />
       {toast.msg && (
         <div className={`fixed top-4 right-4 z-50 px-4 py-2.5 rounded-xl shadow-lg text-sm flex items-center gap-2 text-white ${toast.type === "ok" ? "bg-blue-600" : "bg-red-500"}`}>
           {toast.type === "ok" ? <Check size={14} /> : <AlertCircle size={14} />} {toast.msg}
@@ -466,10 +470,11 @@ export default function AgentPortal() {
           <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center flex-shrink-0">
             <UserCircle size={18} className="text-white" />
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="font-bold text-sm leading-tight truncate">Al Burhan Travels</p>
             <p className="text-xs text-blue-600 font-medium">Agent Portal</p>
           </div>
+          <FCMBell iconSize={14} />
         </div>
 
         {/* Agent info */}
@@ -1253,8 +1258,9 @@ export default function AgentPortal() {
                       <Badge className="bg-emerald-100 text-emerald-700 text-xs">Active</Badge>
                     </div>
                   ))}
+                  <PushNotificationSetting />
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">Contact your branch manager to change notification settings.</p>
+                <p className="text-xs text-muted-foreground mt-2">Contact your branch manager to change WhatsApp/Email notification settings.</p>
               </div>
               <div className="rounded-xl border bg-white p-5">
                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">Account</p>

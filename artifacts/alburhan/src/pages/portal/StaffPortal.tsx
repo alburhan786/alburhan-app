@@ -8,6 +8,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/use-auth";
+import { FCMAutoInit } from "@/components/FCMAutoInit";
+import { FCMBell } from "@/components/FCMBell";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -89,6 +91,7 @@ export default function StaffPortal() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <FCMAutoInit userType="staff" />
       {/* Header */}
       <header className="bg-gradient-to-r from-slate-800 to-slate-700 text-white sticky top-0 z-20 shadow-lg">
         <div className="max-w-2xl mx-auto px-4 py-3">
@@ -103,6 +106,7 @@ export default function StaffPortal() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <FCMBell iconSize={14} />
               <button onClick={load} disabled={loading} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors">
                 <RefreshCw size={14} className={loading ? "animate-spin text-slate-300" : "text-slate-300"} />
               </button>

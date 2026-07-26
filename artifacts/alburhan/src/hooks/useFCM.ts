@@ -1,10 +1,11 @@
 /**
- * useFCM — Firebase Cloud Messaging hook for customer push notifications.
- * Requests permission, gets FCM token, registers with server, listens for foreground messages.
- * Uses existing sw.js (service worker) with the serviceWorkerRegistration option.
+ * useFCM — Firebase Cloud Messaging hook for all user types.
+ * Auto-registers if permission already granted.
+ * Detects browser/OS/device for rich token metadata.
+ * Sends heartbeat every 30 min to keep last_seen fresh.
  */
 import { useState, useEffect, useCallback, useRef } from "react";
-import { isFirebaseAvailable, getFirebaseApp, getFirebaseMessagingInstance } from "@/lib/firebase";
+import { isFirebaseAvailable, getFirebaseMessagingInstance } from "@/lib/firebase";
 
 const API = import.meta.env.VITE_API_URL || "";
 const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY || "";
@@ -27,53 +28,90 @@ export interface UseFCMReturn {
   unregister: () => Promise<void>;
 }
 
-async function saveTokenToServer(fcmToken: string): Promise<void> {
-  const platform = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
-    ? "android_chrome"
-    : /Edg\//i.test(navigator.userAgent)
-    ? "edge"
-    : "web_chrome";
+// ── Device/Browser/OS detection ───────────────────────────────────────────────
+function detectEnvironment() {
+  const ua = navigator.userAgent;
+  const platform = navigator.platform || "";
+
+  const browser =
+    /Edg\//i.test(ua)    ? "Edge" :
+    /OPR\//i.test(ua)    ? "Opera" :
+    /Chrome\//i.test(ua) ? "Chrome" :
+    /Firefox\//i.test(ua)? "Firefox" :
+    /Safari\//i.test(ua) ? "Safari" : "Browser";
+
+  const operatingSystem =
+    /Android/i.test(ua)             ? "Android" :
+    /iPhone|iPad|iPod/i.test(ua)    ? "iOS" :
+    /Win/.test(platform)            ? "Windows" :
+    /Mac/.test(platform)            ? "macOS" :
+    /Linux/.test(platform)          ? "Linux" : "Unknown";
+
+  const devicePlatform =
+    /Android/i.test(ua)          ? "android_chrome" :
+    /iPhone|iPad|iPod/i.test(ua) ? "ios" :
+    /Edg\//i.test(ua)            ? "edge" : "web_chrome";
+
+  const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
+
+  return {
+    browser,
+    operatingSystem,
+    platform: devicePlatform,
+    deviceInfo: ua.slice(0, 250),
+    isMobile,
+  };
+}
+
+async function saveTokenToServer(fcmToken: string, userType = "customer"): Promise<void> {
+  const env = detectEnvironment();
   await fetch(`${API}/api/push/register-token`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
     body: JSON.stringify({
       token: fcmToken,
-      platform,
-      deviceInfo: navigator.userAgent.slice(0, 250),
+      userType,
+      platform: env.platform,
+      browser: env.browser,
+      operatingSystem: env.operatingSystem,
+      deviceInfo: env.deviceInfo,
     }),
   });
 }
 
-export function useFCM(): UseFCMReturn {
+async function sendHeartbeat(token: string): Promise<void> {
+  await fetch(`${API}/api/push/heartbeat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ token }),
+  }).catch(() => {});
+}
+
+export function useFCM(userType = "customer"): UseFCMReturn {
   const [permission, setPermission] = useState<FCMPermission>("loading");
   const [token, setToken] = useState<string | null>(null);
   const [isRegistered, setIsRegistered] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const unsubRef = useRef<(() => void) | null>(null);
+  const unsubRef  = useRef<(() => void) | null>(null);
+  const heartbeat = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // On mount: check environment support and auto-register if already granted
   useEffect(() => {
     let cancelled = false;
 
     async function init() {
-      // Browser support check
       if (!("Notification" in window) || !("serviceWorker" in navigator)) {
         if (!cancelled) setPermission("unsupported");
         return;
       }
-      // Firebase configured check
       if (!isFirebaseAvailable()) {
         if (!cancelled) setPermission("not_configured");
         return;
       }
-
       const perm = Notification.permission;
-      if (perm === "denied") {
-        if (!cancelled) setPermission("denied");
-        return;
-      }
+      if (perm === "denied") { if (!cancelled) setPermission("denied"); return; }
       if (perm === "granted") {
         if (!cancelled) setPermission("granted");
         await autoRegisterToken(cancelled);
@@ -86,8 +124,9 @@ export function useFCM(): UseFCMReturn {
     return () => {
       cancelled = true;
       if (unsubRef.current) { unsubRef.current(); unsubRef.current = null; }
+      if (heartbeat.current) { clearInterval(heartbeat.current); heartbeat.current = null; }
     };
-  }, []);
+  }, [userType]);
 
   async function autoRegisterToken(cancelled: boolean) {
     try {
@@ -103,11 +142,18 @@ export function useFCM(): UseFCMReturn {
       });
       if (!fcmToken || cancelled) return;
       if (!cancelled) { setToken(fcmToken); setIsRegistered(true); }
-      await saveTokenToServer(fcmToken);
+      await saveTokenToServer(fcmToken, userType);
+      startHeartbeat(fcmToken);
       subscribeToForeground(messaging, cancelled);
     } catch {
-      // Silent — auto register shouldn't surface errors
+      // silent
     }
+  }
+
+  function startHeartbeat(fcmToken: string) {
+    if (heartbeat.current) clearInterval(heartbeat.current);
+    // Heartbeat every 30 minutes
+    heartbeat.current = setInterval(() => sendHeartbeat(fcmToken), 30 * 60 * 1000);
   }
 
   function subscribeToForeground(messaging: any, cancelled: boolean) {
@@ -122,11 +168,7 @@ export function useFCM(): UseFCMReturn {
         if (title && "Notification" in window && Notification.permission === "granted") {
           try {
             const notif = new Notification(title, { body, icon: n.icon || "/opengraph.jpg" });
-            notif.onclick = () => {
-              window.focus();
-              window.location.href = url;
-              notif.close();
-            };
+            notif.onclick = () => { window.focus(); window.location.href = url; notif.close(); };
           } catch {}
         }
       });
@@ -158,10 +200,11 @@ export function useFCM(): UseFCMReturn {
         vapidKey: VAPID_KEY,
         serviceWorkerRegistration: sw,
       });
-      if (!fcmToken) throw new Error("Could not get push token. Check VAPID key configuration.");
+      if (!fcmToken) throw new Error("Could not get FCM token. Check VAPID key.");
       setToken(fcmToken);
-      await saveTokenToServer(fcmToken);
+      await saveTokenToServer(fcmToken, userType);
       setIsRegistered(true);
+      startHeartbeat(fcmToken);
       subscribeToForeground(messaging, false);
     } catch (err: any) {
       setError(err.message);
@@ -171,10 +214,11 @@ export function useFCM(): UseFCMReturn {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [userType]);
 
   const unregister = useCallback(async () => {
-    if (unsubRef.current) { unsubRef.current(); unsubRef.current = null; }
+    if (unsubRef.current)  { unsubRef.current(); unsubRef.current = null; }
+    if (heartbeat.current) { clearInterval(heartbeat.current); heartbeat.current = null; }
     if (token) {
       await fetch(`${API}/api/push/unregister-token`, {
         method: "POST",
@@ -185,9 +229,7 @@ export function useFCM(): UseFCMReturn {
       setToken(null);
       setIsRegistered(false);
     }
-    if ("Notification" in window && Notification.permission !== "denied") {
-      setPermission("default");
-    }
+    if ("Notification" in window && Notification.permission !== "denied") setPermission("default");
   }, [token]);
 
   return { permission, token, isRegistered, isLoading, error, requestPermission, unregister };
