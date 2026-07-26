@@ -284,36 +284,68 @@ export async function getMetadata(pdfBytes: Buffer): Promise<Record<string, stri
   };
 }
 
+/**
+ * Validate that a buffer is a structurally sound PDF.
+ * Checks %PDF- header and %%EOF trailer.
+ */
+export function validatePdfBuffer(buf: Buffer): boolean {
+  if (!buf || buf.length < 100) return false;
+  if (!buf.slice(0, 5).toString("ascii").startsWith("%PDF-")) return false;
+  // %%EOF should appear within the last 1 KB
+  const tail = buf.slice(-1024).toString("binary");
+  return tail.includes("%%EOF");
+}
+
 export async function unlockPdf(pdfBytes: Buffer): Promise<Buffer> {
-  // Common passwords to try for bypass
-  const attempts = ["", "password", "1234", "12345", "123456", "admin", "user", "pdf", "document", "owner"];
+  if (!pdfBytes || pdfBytes.length === 0) throw new Error("Empty PDF buffer");
 
-  // First try: load with no password (handles owner-only restricted PDFs)
-  try {
-    const doc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
-    const bytes = await doc.save();
-    return Buffer.from(bytes);
-  } catch (_) {}
+  // IMPORTANT: ignoreEncryption:true must NOT be used here.
+  // It loads the doc with content streams still encrypted (RC4/AES bytes),
+  // then save() writes those encrypted bytes without /Encrypt — producing a
+  // PDF with no encryption dict but unreadable page streams. Every viewer fails.
+  //
+  // The correct approach: supply the actual password so pdf-lib fully decrypts
+  // all content streams before save().  For owner-only restricted PDFs the
+  // user password is always "" (empty string), so that covers ~95% of cases.
 
-  // Second try: empty password
-  try {
-    const doc = await PDFDocument.load(pdfBytes, { password: "" });
-    const bytes = await doc.save();
-    return Buffer.from(bytes);
-  } catch (_) {}
+  const passwords = [
+    "",            // owner-restricted PDFs always have empty user password
+    "password", "Password", "PASSWORD",
+    "1234", "12345", "123456", "1234567890",
+    "admin", "Admin", "user", "User",
+    "pdf", "PDF", "owner", "Owner",
+    "document", "test", "qwerty", "abc123", "letmein",
+  ];
 
-  // Third try: common passwords
-  for (const pw of attempts) {
+  let lastError = "Unknown error";
+
+  for (const pw of passwords) {
     try {
       const doc = await PDFDocument.load(pdfBytes, { password: pw });
-      const bytes = await doc.save();
-      return Buffer.from(bytes);
-    } catch (_) {}
+
+      // Verify we got real pages (not an empty shell)
+      const pageCount = doc.getPageCount();
+      if (pageCount === 0) continue;
+
+      // Save without encryption — use cross-reference table (not object streams)
+      // so the output is maximally compatible across all PDF viewers.
+      const bytes = await doc.save({ useObjectStreams: false });
+      const result = Buffer.from(bytes);
+
+      if (!validatePdfBuffer(result)) {
+        throw new Error("save() produced invalid PDF bytes");
+      }
+
+      return result;
+    } catch (err: any) {
+      lastError = err.message || String(err);
+    }
   }
 
-  // Last resort: strip encryption metadata using raw buffer manipulation
-  // Many "protected" PDFs are only owner-password locked — ignoreEncryption handles them
-  throw new Error("Could not bypass PDF password. The file uses strong user-password encryption.");
+  throw new Error(
+    `Cannot unlock this PDF — it uses strong user-password encryption. ` +
+    `Last error: ${lastError}`
+  );
 }
 
 export async function protectPdf(
@@ -356,7 +388,7 @@ export async function extractText(pdfBytes: Buffer): Promise<string> {
 export async function comparePdfs(
   pdfBytesA: Buffer,
   pdfBytesB: Buffer
-): Promise<{ added: string[]; removed: string[]; unchanged: number; similarity: number }> {
+): Promise<{ onlyInA: string[]; onlyInB: string[]; unchanged: number; similarity: number }> {
   const textA = await extractText(pdfBytesA);
   const textB = await extractText(pdfBytesB);
 
@@ -366,14 +398,14 @@ export async function comparePdfs(
   const setA = new Set(linesA);
   const setB = new Set(linesB);
 
-  const added = linesB.filter((l) => !setA.has(l));
-  const removed = linesA.filter((l) => !setB.has(l));
+  const onlyInA = linesA.filter((l) => !setB.has(l));
+  const onlyInB = linesB.filter((l) => !setA.has(l));
   const unchanged = linesA.filter((l) => setB.has(l)).length;
 
   const total = Math.max(linesA.length, linesB.length) || 1;
   const similarity = Math.round((unchanged / total) * 100);
 
-  return { added, removed, unchanged, similarity };
+  return { onlyInA, onlyInB, unchanged, similarity };
 }
 
 export function generateTamperHash(pdfBytes: Buffer): string {

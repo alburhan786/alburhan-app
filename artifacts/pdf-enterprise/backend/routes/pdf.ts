@@ -9,6 +9,7 @@ import { decryptBuffer, encryptBuffer, computeChecksum, getStoragePath, getTempP
 import { requirePdfAuth, requireRole } from "../middleware.js";
 import { logAudit } from "../audit.js";
 import * as PDF from "../pdfProcessor.js";
+import { validatePdfBuffer } from "../pdfProcessor.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const router = Router();
@@ -33,6 +34,28 @@ async function saveProcessedPdf(
   userId: string,
   saveAs?: string
 ): Promise<any> {
+  // ── Output validation ─────────────────────────────────────────────────────
+  if (!pdfBytes || pdfBytes.length < 100) {
+    throw Object.assign(
+      new Error(`${operation}: processing produced empty output (${pdfBytes?.length ?? 0} bytes)`),
+      { status: 500 }
+    );
+  }
+  const header = pdfBytes.slice(0, 8).toString("ascii");
+  if (!header.startsWith("%PDF-")) {
+    throw Object.assign(
+      new Error(`${operation}: output is not a valid PDF (header: "${header.slice(0, 8)}")`),
+      { status: 500 }
+    );
+  }
+  if (!validatePdfBuffer(pdfBytes)) {
+    throw Object.assign(
+      new Error(`${operation}: output PDF is missing %%EOF trailer — file would be corrupt`),
+      { status: 500 }
+    );
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
   const checksum = computeChecksum(pdfBytes);
   const encrypted = encryptBuffer(pdfBytes);
   let pageCount = 0;
@@ -276,11 +299,17 @@ router.post("/unlock/:fileId", async (req, res) => {
   try {
     const { bytes, file } = await readPdfBytes(req.params.fileId, user.id, user.role);
     const unlocked = await PDF.unlockPdf(bytes);
-    const saved = await saveProcessedPdf(unlocked, file, "unlock", user.id);
+
+    // Name the output  example_unlocked.pdf  (not  example.pdf)
+    const baseName = file.name.replace(/\.pdf$/i, "");
+    const unlockName = `${baseName}_unlocked.pdf`;
+
+    const saved = await saveProcessedPdf(unlocked, file, "unlock", user.id, unlockName);
     await pool.query(`UPDATE pdf_files SET has_password = false WHERE id = $1`, [file.id]);
     await logAudit({ userId: user.id, username: user.username, action: "pdf_unlock", resourceType: "file", resourceId: req.params.fileId, severity: "warning", req });
     res.json(saved);
   } catch (err: any) {
+    console.error("unlock error:", err);
     res.status(400).json({ error: err.message || "Could not bypass PDF password protection" });
   }
 });

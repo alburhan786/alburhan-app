@@ -181,10 +181,23 @@ router.get("/:id/download", async (req, res) => {
 
     await logAudit({ userId: user.id, username: user.username, action: "file_download", resourceType: "file", resourceId: req.params.id, resourceName: rows[0].name, req });
 
+    // Validate the decrypted bytes before sending
+    if (!pdfBytes || pdfBytes.length < 100) {
+      return res.status(500).json({ error: "Stored file is empty or corrupt" });
+    }
+    const pdfHeader = pdfBytes.slice(0, 5).toString("ascii");
+    if (!pdfHeader.startsWith("%PDF-")) {
+      console.error(`Download ${req.params.id}: invalid header "${pdfHeader}"`);
+      return res.status(500).json({ error: "Stored file has invalid PDF header" });
+    }
+
+    // Use 'name' (display name) so processed files (e.g. example_unlocked.pdf) download correctly
+    const downloadName = rows[0].name || rows[0].original_name;
     res.set({
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${rows[0].original_name}"`,
+      "Content-Disposition": `attachment; filename="${downloadName}"`,
       "Content-Length": String(pdfBytes.length),
+      "Cache-Control": "no-store",
     });
     res.send(pdfBytes);
   } catch (err) {
