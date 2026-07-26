@@ -5,7 +5,7 @@ import {
   sendRCS,
   sendEmail,
 } from "./notifications.js";
-import { sendTemplate as sendBotBeeTemplate } from "./botbee.js";
+import { sendTemplate as sendBotBeeTemplate, is24hWindowError } from "./botbee.js";
 import { sendMetaEventTemplate, isMetaWapiConfigured, META_EVENT_TEMPLATE_MAP } from "./metaWapi.js";
 
 export type EventType =
@@ -819,12 +819,19 @@ async function sendWhatsAppForEvent(eventType: EventType, ctx: NotificationConte
     }
 
     // ── Last-resort: free-form session message (only for non-ABT events, inside 24h window) ──
+    // ABT events (the 6 mapped templates + others) must always use approved templates.
+    // They are blocked here to prevent plain-text sends that Meta silently drops outside 24h.
     if (ABT_TEMPLATE_EVENTS.has(eventType)) {
-      // ABT events must use templates — session messages are always rejected outside 24h window
       console.warn(`[notificationEngine] ABT event ${eventType} reached session fallback — returning failed (no template in wa_templates table either).`);
       return { status: "failed", providerResponse: { ok: false, provider: "BotBee", errorMessage: `No template configured for ${eventType}. Add it to wa_templates or configure BotBee dashboard.` } };
     }
     const result = await sendWhatsApp(ctx.customerMobile, message);
+    if (!result.ok && is24hWindowError(result)) {
+      console.warn(
+        `[notificationEngine] ⚠️ 24h session window detected for non-ABT event "${eventType}" → ${ctx.customerMobile}.` +
+        ` Plain-text not delivered. Add this event to ABT_TEMPLATE_EVENTS and map it to an approved template.`
+      );
+    }
     return { status: result.ok ? "sent" : "failed", providerResponse: result };
   } catch (err: unknown) {
     return { status: "failed", providerResponse: { ok: false, provider: "BotBee", errorMessage: err instanceof Error ? err.message : String(err) } };

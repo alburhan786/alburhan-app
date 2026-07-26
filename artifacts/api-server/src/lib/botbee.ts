@@ -59,6 +59,39 @@ export interface BotBeeResult {
   messageId?: string;
 }
 
+/**
+ * Returns true when BotBee's /whatsapp/send failed because the Meta 24-hour
+ * session window has expired — i.e. the customer has not replied to the business
+ * number within the last 24 hours.
+ *
+ * When this is detected, callers must retry with an approved WhatsApp template
+ * via /whatsapp/send/template (which bypasses the session restriction) instead
+ * of sending plain text.
+ *
+ * Known BotBee / Meta error signatures for the 24h window:
+ *   - status 0, message contains "24 hour", "session", "window", "expired"
+ *   - Meta error code 131026 (message outside 24h session window)
+ *   - Meta error code 131047 (message expired / re-engagement required)
+ */
+export function is24hWindowError(result: BotBeeResult): boolean {
+  if (result.ok) return false;
+  const raw = [
+    result.errorMessage || "",
+    JSON.stringify(result.responsePayload ?? ""),
+  ].join(" ").toLowerCase();
+  return (
+    raw.includes("24 hour") ||
+    raw.includes("24h") ||
+    raw.includes("session expired") ||
+    (raw.includes("session") && raw.includes("expired")) ||
+    raw.includes("outside window") ||
+    raw.includes("window expired") ||
+    raw.includes("not in session") ||
+    raw.includes("131026") ||   // Meta: outside 24h session window
+    raw.includes("131047")      // Meta: message expired / re-engagement required
+  );
+}
+
 // Known-correct Meta Phone Number ID from BotBee dashboard.
 // Overrides the env/DB value to guard against typos in the secret.
 const CORRECT_PHONE_NUMBER_ID = "965912196611113";
@@ -342,21 +375,34 @@ export async function sendTemplate(
       skipLog: true,  // sendTemplate owns the log; suppress intermediate text-send log
     });
 
-    // Log the result and return regardless of ok/fail.
-    // NOTE: BotBee's /send/template endpoint returns "WhatsApp account not found" for
-    // this account — it is non-functional. Do NOT fall through to it.
-    // When /whatsapp/send returns "outside 24h window", that is a Meta session policy
-    // restriction, not an error we can work around via /send/template.
-    if (opts?.eventType && !opts?.noInternalLog) {
-      await logToDb({ eventType: opts.eventType, channel: "whatsapp", recipient: to, bookingId: opts.bookingId, customerId: opts.customerId, customerName: opts.customerName, templateId, message: `[tpl:${templateId}] ${rendered.substring(0, 250)}`, status: textResult.ok ? "sent" : "failed", result: textResult });
+    // ── 24h session window detection ────────────────────────────────────────────
+    // BotBee's /whatsapp/send is session-based: it only works when the customer
+    // has messaged the business number within the last 24 hours.  When that window
+    // has expired, automatically fall through to the template API below which
+    // sends an approved WhatsApp template and bypasses the session restriction.
+    // For any other outcome (success or non-window failure) return immediately.
+    if (!textResult.ok && is24hWindowError(textResult)) {
+      console.warn(
+        `[BotBee] sendTemplate: 24h session window detected` +
+        ` (error="${(textResult.errorMessage || "").slice(0, 100)}")` +
+        ` → falling through to approved template API (templateId=${templateId})`
+      );
+      // Do NOT log the text-send attempt here — the template API path below
+      // owns the final log entry so only one outcome appears in notification_logs.
+    } else {
+      // Success or non-window failure — log the final result and return.
+      if (opts?.eventType && !opts?.noInternalLog) {
+        await logToDb({ eventType: opts.eventType, channel: "whatsapp", recipient: to, bookingId: opts.bookingId, customerId: opts.customerId, customerName: opts.customerName, templateId, message: `[tpl:${templateId}] ${rendered.substring(0, 250)}`, status: textResult.ok ? "sent" : "failed", result: textResult });
+      }
+      return textResult;
     }
-    return textResult;
   }
 
-  // ── FALLBACK PATH: use BotBee template API (for templates not in local store,
-  //    or when the 24h window blocks the text send for known templates) ──
-  // NOTE: BotBee's template API does NOT substitute variables for known ABT templates.
-  // This path only fires for template IDs not in TEMPLATE_BODIES above.
+  // ── FALLBACK PATH: approved WhatsApp template API ────────────────────────────
+  // Reached when: (a) templateBody is absent from TEMPLATE_BODIES (unrecognised ID),
+  // or (b) the 24h session window was detected above and we must send a template
+  // instead of a plain-text session message.
+  // Variables are sent as a flat positional array: index 0 → {{1}}, index 1 → {{2}}.
   const { apiToken, phone_number_id, business_id, baseUrl } = getCredentials();
   const endpoint = `${baseUrl}/whatsapp/send/template`;
   if (!apiToken || !phone_number_id) return { ok: false, provider: "BotBee", endpoint, errorMessage: "BotBee credentials not configured" };
@@ -519,9 +565,14 @@ export async function sendInvoice(to: string, ctx: {
   customerName: string; bookingNumber: string; invoiceNumber?: string;
   amount?: number; invoiceUrl?: string; bookingId?: string; customerId?: string;
 }): Promise<BotBeeResult> {
-  const url = ctx.invoiceUrl || `https://alburhantravels.com/invoice/${ctx.bookingNumber}`;
-  const message = `Assalamu Alaikum ${ctx.customerName},\n\n📄 Your invoice${ctx.invoiceNumber ? ` #${ctx.invoiceNumber}` : ""} for booking #${ctx.bookingNumber} is ready.\n\n📎 View/Download:\n${url}${ctx.amount ? `\n\n💰 Total: ₹${ctx.amount.toLocaleString("en-IN")}` : ""}\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 9893225590`;
-  const result = await sendText(to, message, { eventType: "invoice_generated", bookingId: ctx.bookingId, customerId: ctx.customerId });
+  // Route through the approved template (works inside AND outside the 24h window)
+  const result = await sendInvoiceReadyTemplate(to, {
+    customerName: ctx.customerName,
+    bookingId: ctx.bookingNumber,
+    invoiceNumber: ctx.invoiceNumber,
+    amount: ctx.amount,
+    invoiceUrl: ctx.invoiceUrl || `https://alburhantravels.com/invoice/${ctx.bookingNumber}`,
+  }, { eventType: "invoice_generated", bookingId: ctx.bookingId, customerId: ctx.customerId });
   if (!result.ok) await smsFallback(to, ctx.bookingId, ctx.customerId);
   return result;
 }
@@ -530,8 +581,13 @@ export async function sendTicket(to: string, ctx: {
   customerName: string; bookingNumber: string; flightNumber?: string;
   airline?: string; departureDate?: string; bookingId?: string; customerId?: string;
 }): Promise<BotBeeResult> {
-  const message = `Assalamu Alaikum ${ctx.customerName},\n\n✈️ Your flight ticket for booking #${ctx.bookingNumber} has been issued!\n\nAirline: ${ctx.airline || "TBA"}\nFlight No: ${ctx.flightNumber || "TBA"}\nDeparture: ${ctx.departureDate || "TBA"}\n\nPlease check-in 3 hours before departure.\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 9893225590`;
-  const result = await sendText(to, message, { eventType: "ticket_issued", bookingId: ctx.bookingId, customerId: ctx.customerId });
+  // Route through the approved template (works inside AND outside the 24h window)
+  const result = await sendFlightTemplate(to, {
+    customerName: ctx.customerName,
+    bookingId: ctx.bookingNumber,
+    flightNumber: ctx.flightNumber,
+    departureDate: ctx.departureDate,
+  }, { eventType: "ticket_issued", bookingId: ctx.bookingId, customerId: ctx.customerId });
   if (!result.ok) await smsFallback(to, ctx.bookingId, ctx.customerId);
   return result;
 }
@@ -540,8 +596,13 @@ export async function sendVisa(to: string, ctx: {
   customerName: string; bookingNumber: string; visaNumber?: string;
   packageName?: string; bookingId?: string; customerId?: string;
 }): Promise<BotBeeResult> {
-  const message = `Assalamu Alaikum ${ctx.customerName},\n\nAlhamdulillah! 🕌 Your Visa for booking #${ctx.bookingNumber} (${ctx.packageName || "Hajj/Umrah"}) has been APPROVED${ctx.visaNumber ? `.\nVisa No: ${ctx.visaNumber}` : ""}.\n\nPlease visit our office to collect your documents.\n\nPhone: +91 9893225590\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
-  const result = await sendText(to, message, { eventType: "visa_ready", bookingId: ctx.bookingId, customerId: ctx.customerId });
+  // Route through the approved template (works inside AND outside the 24h window)
+  const result = await sendVisaIssuedTemplate(to, {
+    customerName: ctx.customerName,
+    bookingId: ctx.bookingNumber,
+    packageName: ctx.packageName,
+    visaNumber: ctx.visaNumber,
+  }, { eventType: "visa_ready", bookingId: ctx.bookingId, customerId: ctx.customerId });
   if (!result.ok) await smsFallback(to, ctx.bookingId, ctx.customerId);
   return result;
 }
