@@ -88,6 +88,16 @@ async function buildAll() {
     "META_VERIFY_TOKEN",
     "META_WEBHOOK_SECRET",
     "META_API_VERSION",
+    // Firebase Cloud Messaging (Admin SDK — baked into bundle for VPS)
+    "FIREBASE_PROJECT_ID",
+    "FIREBASE_CLIENT_EMAIL",
+    "FIREBASE_PRIVATE_KEY",
+    // Firebase web config (served via /api/push/firebase-web-config for SW init)
+    "VITE_FIREBASE_API_KEY",
+    "VITE_FIREBASE_AUTH_DOMAIN",
+    "VITE_FIREBASE_MESSAGING_SENDER_ID",
+    "VITE_FIREBASE_APP_ID",
+    "VITE_FIREBASE_VAPID_KEY",
   ];
   for (const key of injectKeys) {
     const val = process.env[key];

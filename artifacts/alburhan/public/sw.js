@@ -1,39 +1,31 @@
-// Al Burhan Tours & Travels — Service Worker v4.0 (with Web Push)
-const CACHE = "alburhan-v3";
+// Al Burhan Tours & Travels — Service Worker v5.0 (Caching + FCM Push)
+const CACHE = "alburhan-v5";
 const STATIC = ["/manifest.json"];
 
-// Install — cache static shell (NOT index.html — it must always be fresh)
+// Install — cache static shell
 self.addEventListener("install", e => {
   e.waitUntil(
     caches.open(CACHE).then(c => c.addAll(STATIC)).then(() => self.skipWaiting())
   );
 });
 
-// Activate — wipe ALL old caches (alburhan-v1, alburhan-v2, …)
+// Activate — wipe old caches
 self.addEventListener("activate", e => {
   e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    ).then(() => self.clients.claim())
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(() => self.clients.claim())
   );
 });
 
-// Fetch strategy:
-// - API calls:        network-first (always fresh data)
-// - index.html:       network-first with cache fallback (never serve stale app shell)
-// - hashed JS/CSS:    cache-first (content-addressed, safe to cache forever)
-// - everything else:  network-first with cache fallback
+// Fetch strategy
 self.addEventListener("fetch", e => {
   const url = new URL(e.request.url);
-
-  // Skip non-GET and cross-origin
   if (e.request.method !== "GET" || !url.origin.includes(self.location.hostname)) return;
 
-  // Vite dev server / source files: always network (never cache)
   const devPaths = ["/@vite", "/@react-refresh", "/@fs", "/src/", "/node_modules/", "/__vite"];
   if (devPaths.some(p => url.pathname.startsWith(p))) return;
 
-  // API: network-first, no cache
   if (url.pathname.startsWith("/api/")) {
     e.respondWith(
       fetch(e.request).catch(() =>
@@ -45,7 +37,6 @@ self.addEventListener("fetch", e => {
     return;
   }
 
-  // index.html (and SPA routes): NETWORK-FIRST — must always load the latest app shell
   const isHtml = url.pathname === "/" || url.pathname === "/index.html" ||
     (!url.pathname.includes(".") && !url.pathname.startsWith("/api/"));
   if (isHtml) {
@@ -62,7 +53,6 @@ self.addEventListener("fetch", e => {
     return;
   }
 
-  // Hashed static assets (JS/CSS with content hash in filename): cache-first, safe forever
   const isHashedAsset = /\.[0-9a-f]{8,}\.(js|css|woff2?|png|jpg|svg|ico)$/i.test(url.pathname);
   if (isHashedAsset) {
     e.respondWith(
@@ -78,7 +68,6 @@ self.addEventListener("fetch", e => {
     return;
   }
 
-  // Everything else: network-first with cache fallback
   e.respondWith(
     fetch(e.request, { cache: "no-cache" })
       .then(resp => {
@@ -90,32 +79,58 @@ self.addEventListener("fetch", e => {
   );
 });
 
-// ── Web Push Notifications ─────────────────────────────────────────────────
+// ── Push Notifications (VAPID + Firebase FCM) ────────────────────────────────
+// FCM sends: { notification: { title, body, icon }, data: { url } }
+// Legacy VAPID sends: { title, body, url, icon }
 self.addEventListener("push", event => {
-  let data = { title: "Al Burhan Tours & Travels", body: "You have a new notification.", url: "/customer/dashboard" };
-  try { if (event.data) data = { ...data, ...event.data.json() }; } catch { /* ignore parse error */ }
+  if (!event.data) return;
+
+  let raw = {};
+  try { raw = event.data.json(); } catch { return; }
+
+  // Normalize both FCM nested format and flat legacy format
+  const notif  = (raw.notification && typeof raw.notification === "object") ? raw.notification : {};
+  const dat    = (raw.data && typeof raw.data === "object") ? raw.data : {};
+
+  const title = notif.title || raw.title || "Al Burhan Tours & Travels";
+  const body  = notif.body  || raw.body  || "You have a new notification.";
+  const url   = dat.url     || raw.url   || notif.click_action || "/customer/dashboard";
+  const icon  = notif.icon  || dat.icon  || raw.icon || "/opengraph.jpg";
+
+  const options = {
+    body,
+    icon,
+    badge: "/favicon.ico",
+    tag: dat.tag || raw.tag || "alburhan",
+    renotify: true,
+    requireInteraction: false,
+    data: { url },
+  };
+  if (notif.image) options.image = notif.image;
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// ── Notification click: open correct page ─────────────────────────────────────
+self.addEventListener("notificationclick", event => {
+  event.notification.close();
+  const url = event.notification.data?.url || "/customer/dashboard";
+
   event.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: data.icon || "/imagesopengraph.jpg",
-      badge: "/favicon.ico",
-      tag: data.tag || "alburhan",
-      renotify: true,
-      requireInteraction: false,
-      data: { url: data.url || "/customer/dashboard" },
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then(list => {
+      // Focus existing window at that path
+      const target = list.find(c => c.url.includes(new URL(url, self.location.origin).pathname));
+      if (target && "focus" in target) { target.focus(); return; }
+      // Focus any open window and navigate
+      const any = list.find(c => "focus" in c);
+      if (any) { any.focus(); if ("navigate" in any) any.navigate(url); return; }
+      // Open new window
+      return clients.openWindow(url);
     })
   );
 });
 
-self.addEventListener("notificationclick", event => {
-  event.notification.close();
-  const url = event.notification.data?.url || "/customer/dashboard";
-  event.waitUntil(
-    clients.matchAll({ type: "window", includeUncontrolled: true }).then(clientList => {
-      for (const client of clientList) {
-        if ("focus" in client) { client.focus(); return; }
-      }
-      return clients.openWindow(url);
-    })
-  );
+// Message from main thread (e.g. SKIP_WAITING)
+self.addEventListener("message", event => {
+  if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
 });

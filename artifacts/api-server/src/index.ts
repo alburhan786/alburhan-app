@@ -1984,6 +1984,35 @@ async function runMigrations() {
     console.log("[Migration] customer_push_tokens.subscription column ensured");
   } catch (err) { console.error("[Migration] push subscription column failed:", err); }
 
+  // ── push_campaigns: FCM batch send history ────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS push_campaigns (
+        id           TEXT PRIMARY KEY,
+        title        TEXT NOT NULL,
+        body         TEXT,
+        url          TEXT,
+        filter       TEXT DEFAULT 'all',
+        total_tokens INT  DEFAULT 0,
+        sent         INT  DEFAULT 0,
+        failed       INT  DEFAULT 0,
+        status       TEXT DEFAULT 'completed',
+        sent_by      TEXT,
+        error        TEXT,
+        sent_at      TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_push_campaigns_sent_at ON push_campaigns(sent_at DESC)`);
+    console.log("[Migration] push_campaigns table ensured");
+  } catch (err) { console.error("[Migration] push_campaigns migration failed:", err); }
+
+  // ── customer_push_tokens: device_info + updated_at columns ───────────────
+  try {
+    await pool.query(`ALTER TABLE customer_push_tokens ADD COLUMN IF NOT EXISTS device_info TEXT`);
+    await pool.query(`ALTER TABLE customer_push_tokens ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()`);
+    console.log("[Migration] customer_push_tokens device_info + updated_at ensured");
+  } catch (err: any) { console.warn("[Migration] customer_push_tokens column additions (non-fatal):", err.message); }
+
   // ── VAPID keys: ensure api_settings row exists (webPush.ts generates on first use) ───
   // No seeding needed — webPush.ts generates + persists VAPID keys on first call.
 
