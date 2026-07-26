@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useLocation } from "wouter";
 import Layout from "@/components/Layout";
 import PdfDropZone, { UploadedFile } from "@/components/PdfDropZone";
 import { pdf as pdfApi } from "@/lib/api";
@@ -95,6 +96,19 @@ export default function ToolsPage() {
   const [processing, setProcessing] = useState(false);
   const [result, setResult] = useState<ToolResult | null>(null);
   const sigRef = useRef<any>(null);
+  const [, navigate] = useLocation();
+
+  // Tools whose primary action is editing in the editor (upload → navigate to editor with tool/dialog open)
+  const EDITOR_DIALOG_MAP: Record<string, string> = {
+    annotate:     "?tool=text",
+    signature:    "?dialog=signature",
+    watermark:    "?dialog=watermark",
+    qrcode:       "?dialog=qrcode",
+    headerfooter: "?dialog=headerfooter",
+    pagenumbers:  "?dialog=pagenumbers",
+    metadata:     "?dialog=metadata",
+    unlock:       "?dialog=unlock",
+  };
 
   // Tool-specific state
   const [splitRanges, setSplitRanges] = useState([{ start: 1, end: 1, name: "" }]);
@@ -263,7 +277,11 @@ export default function ToolsPage() {
       }
       if (r) {
         setResult(r);
-        if (r.type === "file") setTimeout(() => dl(r.id, r.name), 300);
+        // For single-file results, open in editor instead of auto-downloading
+        if (r.type === "file") {
+          toast.success("Opening result in editor…");
+          setTimeout(() => navigate(`/editor/${r.id}`), 500);
+        }
       }
     } catch (err: any) {
       toast.error(err.message || "Operation failed");
@@ -551,33 +569,53 @@ export default function ToolsPage() {
                     <Loader2 size={15} className="animate-spin" /> Uploading files… please wait
                   </div>
                 ) : (
-                  <button
-                    onClick={run}
-                    disabled={!canRun || processing}
-                    style={{
-                      width: "100%", padding: "11px 0", borderRadius: 8, border: "none",
-                      background: canRun && !processing
-                        ? `linear-gradient(135deg, ${tool?.color || "#3b82f6"}, ${tool?.color || "#3b82f6"}cc)`
-                        : "#1e2433",
-                      color: canRun && !processing ? "#fff" : "#374151",
-                      fontWeight: 700, fontSize: 14, cursor: canRun && !processing ? "pointer" : "not-allowed",
-                      display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                      boxShadow: canRun && !processing ? `0 2px 12px ${tool?.color || "#3b82f6"}44` : "none",
-                      transition: "all 0.2s",
-                    }}
-                  >
-                    {processing ? (
-                      <><Loader2 size={16} className="animate-spin" /> Processing…</>
-                    ) : !canRun && files.length === 0 ? (
-                      <>Upload a PDF file to begin</>
-                    ) : !canRun && activeTool === "merge" && readyIds.length < 2 ? (
-                      <>Upload at least 2 files to merge</>
-                    ) : !canRun && needsB && readyIdsB.length < 1 ? (
-                      <>Upload both documents to compare</>
-                    ) : (
-                      <>{tool?.label}</>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {/* Primary action: Open in Editor (for visual/editing tools) */}
+                    {activeTool && EDITOR_DIALOG_MAP[activeTool] && readyIds.length > 0 && (
+                      <button
+                        onClick={() => navigate(`/editor/${readyIds[0]}${EDITOR_DIALOG_MAP[activeTool!]}`)}
+                        style={{
+                          width: "100%", padding: "11px 0", borderRadius: 8, border: "none",
+                          background: "linear-gradient(135deg, #2563eb, #1d4ed8)",
+                          color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer",
+                          display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                          boxShadow: "0 2px 12px #2563eb44",
+                        }}
+                      >
+                        ✏ Open in Editor with {tool?.label}
+                      </button>
                     )}
-                  </button>
+                    {/* Secondary / only action for processing tools */}
+                    <button
+                      onClick={run}
+                      disabled={!canRun || processing}
+                      style={{
+                        width: "100%", padding: "11px 0", borderRadius: 8, border: "none",
+                        background: canRun && !processing
+                          ? `linear-gradient(135deg, ${tool?.color || "#3b82f6"}, ${tool?.color || "#3b82f6"}cc)`
+                          : "#1e2433",
+                        color: canRun && !processing ? "#fff" : "#374151",
+                        fontWeight: 700, fontSize: 14, cursor: canRun && !processing ? "pointer" : "not-allowed",
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                        boxShadow: canRun && !processing ? `0 2px 12px ${tool?.color || "#3b82f6"}44` : "none",
+                        transition: "all 0.2s",
+                      }}
+                    >
+                      {processing ? (
+                        <><Loader2 size={16} className="animate-spin" /> Processing…</>
+                      ) : !canRun && files.length === 0 ? (
+                        <>Upload a PDF file to begin</>
+                      ) : !canRun && activeTool === "merge" && readyIds.length < 2 ? (
+                        <>Upload at least 2 files to merge</>
+                      ) : !canRun && needsB && readyIdsB.length < 1 ? (
+                        <>Upload both documents to compare</>
+                      ) : activeTool && EDITOR_DIALOG_MAP[activeTool] ? (
+                        <>Process & Download</>
+                      ) : (
+                        <>{tool?.label}</>
+                      )}
+                    </button>
+                  </div>
                 )}
               </div>
 
@@ -595,32 +633,55 @@ export default function ToolsPage() {
                   </div>
 
                   {result.type === "file" && (
-                    <button
-                      onClick={() => dl(result.id, result.name)}
-                      style={{
-                        display: "flex", alignItems: "center", gap: 8, padding: "9px 18px",
-                        background: "#10b981", color: "#fff", border: "none", borderRadius: 8,
-                        cursor: "pointer", fontWeight: 700, fontSize: 13, marginTop: 10,
-                      }}
-                    >
-                      <Download size={15} /> Download {result.name}
-                    </button>
+                    <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                      <button
+                        onClick={() => navigate(`/editor/${result.id}`)}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 8, padding: "9px 18px",
+                          background: "#2563eb", color: "#fff", border: "none", borderRadius: 8,
+                          cursor: "pointer", fontWeight: 700, fontSize: 13,
+                        }}
+                      >
+                        ✏ Open in Editor
+                      </button>
+                      <button
+                        onClick={() => dl(result.id, result.name)}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 8, padding: "9px 18px",
+                          background: "#10b981", color: "#fff", border: "none", borderRadius: 8,
+                          cursor: "pointer", fontWeight: 700, fontSize: 13,
+                        }}
+                      >
+                        <Download size={15} /> Download
+                      </button>
+                    </div>
                   )}
 
                   {result.type === "files" && (
                     <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
                       {result.items.map((item) => (
-                        <button
-                          key={item.id}
-                          onClick={() => dl(item.id, item.name)}
-                          style={{
-                            display: "flex", alignItems: "center", gap: 8, padding: "8px 14px",
-                            background: "#0d1117", border: "1px solid #166534", borderRadius: 7,
-                            cursor: "pointer", fontWeight: 600, fontSize: 13, color: "#4ade80",
-                          }}
-                        >
-                          <Download size={14} /> {item.name}
-                        </button>
+                        <div key={item.id} style={{ display: "flex", gap: 6 }}>
+                          <button
+                            onClick={() => navigate(`/editor/${item.id}`)}
+                            style={{
+                              display: "flex", alignItems: "center", gap: 6, padding: "8px 12px",
+                              background: "#2563eb", border: "none", borderRadius: 7,
+                              cursor: "pointer", fontWeight: 600, fontSize: 12, color: "#fff",
+                            }}
+                          >
+                            ✏ Editor
+                          </button>
+                          <button
+                            onClick={() => dl(item.id, item.name)}
+                            style={{
+                              flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "8px 14px",
+                              background: "#0d1117", border: "1px solid #166534", borderRadius: 7,
+                              cursor: "pointer", fontWeight: 600, fontSize: 13, color: "#4ade80",
+                            }}
+                          >
+                            <Download size={14} /> {item.name}
+                          </button>
+                        </div>
                       ))}
                     </div>
                   )}

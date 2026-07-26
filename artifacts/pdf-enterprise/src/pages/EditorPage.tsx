@@ -5,6 +5,7 @@ import { v4 as uuid } from "uuid";
 import { loadPdfFromArrayBuffer, searchText, getPageDimensions, renderThumb, type PdfDocument } from "@/lib/pdfjs";
 import { type Annotation } from "@/components/editor/drawAnnotation";
 import PageView from "@/components/editor/PageView";
+import SignatureCanvas from "react-signature-canvas";
 
 const BASE = import.meta.env.BASE_URL + "api";
 
@@ -147,6 +148,11 @@ export default function EditorPage() {
   const { fileId } = useParams<{ fileId:string }>();
   const [, navigate] = useLocation();
 
+  // URL param auto-open (navigated from ToolsPage with ?dialog=X or ?tool=X)
+  const _initialUrlDialog = useRef(new URLSearchParams(window.location.search).get("dialog"));
+  const _initialUrlTool   = useRef(new URLSearchParams(window.location.search).get("tool"));
+  const _urlApplied       = useRef(false);
+
   // Core state
   const [pdfDoc,    setPdfDoc]    = useState<PdfDocument|null>(null);
   const [fileName,  setFileName]  = useState("Document");
@@ -242,6 +248,12 @@ export default function EditorPage() {
         setHistIdx(0);
         setIsDirty(false);
         setLoading(false);
+        // Auto-open dialog/tool from URL params on first load
+        if (!_urlApplied.current) {
+          _urlApplied.current = true;
+          if (_initialUrlDialog.current) setDialog(_initialUrlDialog.current);
+          if (_initialUrlTool.current)   setActiveTool(_initialUrlTool.current);
+        }
       } catch(e:any) {
         if (e.name==="AbortError") return;
         setError(e.message); setLoading(false);
@@ -977,6 +989,9 @@ export default function EditorPage() {
             <RibbonGroup label="Erase">
               <button style={btnStyle(activeTool==="eraser")} onClick={()=>setActiveTool("eraser")}>⌫<span style={{fontSize:9}}>Eraser</span></button>
             </RibbonGroup>
+            <RibbonGroup label="Signature">
+              <button style={btnStyle()} onClick={()=>setDialog("signature")}>✍<span style={{fontSize:9}}>Signature</span></button>
+            </RibbonGroup>
           </>}
         </div>
       </div>
@@ -1294,6 +1309,10 @@ export default function EditorPage() {
       {dialog==="shortcuts" && (
         <ShortcutsDialog onClose={()=>setDialog(null)}/>
       )}
+      {dialog==="signature" && (
+        <SignatureDialog fileId={fileId!} BASE={BASE} onClose={()=>setDialog(null)}
+          onDone={(dataUrl,page,x,y)=>{ setDialog(null); pdfTool("signature",{signatureDataUrl:dataUrl,page,x,y,timestamp:true},"Signature"); }}/>
+      )}
 
       <style>{`
         @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
@@ -1607,6 +1626,51 @@ function SplitDialog({ totalPages, BASE, fileId, onClose }: { totalPages:number;
       </InputRow>
       <div style={{display:"flex",gap:8}}>
         <Btn variant="primary" onClick={apply} disabled={loading}>{loading?"Splitting…":"Split"}</Btn>
+        <Btn onClick={onClose}>Cancel</Btn>
+      </div>
+    </Modal>
+  );
+}
+
+function SignatureDialog({ fileId, BASE, onClose, onDone }: {
+  fileId:string; BASE:string; onClose:()=>void;
+  onDone:(dataUrl:string, page:number, x:number, y:number)=>void;
+}) {
+  const sigRef = useRef<any>(null);
+  const [page, setPage] = useState(1);
+  const [x, setX] = useState(50);
+  const [y, setY] = useState(50);
+  return (
+    <Modal title="✍ Draw & Embed Signature" onClose={onClose} width={560}>
+      <p style={{fontSize:12,color:"#8b9ab5",marginBottom:10}}>
+        Draw your signature below, then click Insert to embed it into the PDF.
+      </p>
+      <div style={{border:"1px solid #374151",borderRadius:6,overflow:"hidden",background:"#fff",marginBottom:10}}>
+        <SignatureCanvas
+          ref={sigRef}
+          penColor="#0f172a"
+          canvasProps={{ width:520, height:130, style:{ width:"100%", height:130 } }}
+        />
+      </div>
+      <div style={{display:"flex",gap:8,marginBottom:12}}>
+        <Btn onClick={()=>sigRef.current?.clear()}>Clear</Btn>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:12}}>
+        <InputRow label="Page">
+          <StyledInput type="number" min={1} value={page} onChange={e=>setPage(+e.target.value)}/>
+        </InputRow>
+        <InputRow label="X (pts from left)">
+          <StyledInput type="number" value={x} onChange={e=>setX(+e.target.value)}/>
+        </InputRow>
+        <InputRow label="Y (pts from bottom)">
+          <StyledInput type="number" value={y} onChange={e=>setY(+e.target.value)}/>
+        </InputRow>
+      </div>
+      <div style={{display:"flex",gap:8}}>
+        <Btn variant="primary" onClick={()=>{
+          if (sigRef.current?.isEmpty()) { toast.error("Draw a signature first"); return; }
+          onDone(sigRef.current.toDataURL("image/png"), page, x, y);
+        }}>Insert Signature</Btn>
         <Btn onClick={onClose}>Cancel</Btn>
       </div>
     </Modal>
