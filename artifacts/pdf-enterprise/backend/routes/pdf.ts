@@ -14,7 +14,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const router = Router();
 router.use(requirePdfAuth);
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 500 * 1024 * 1024 } });
 
 // Helper: read decrypted PDF bytes by file ID
 async function readPdfBytes(fileId: string, userId: string, role: string): Promise<{ bytes: Buffer; file: any }> {

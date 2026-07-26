@@ -18,7 +18,7 @@ router.use(requirePdfAuth);
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 100 * 1024 * 1024 }, // 100 MB
+  limits: { fileSize: 500 * 1024 * 1024 }, // 500 MB
   fileFilter: (req, file, cb) => {
     if (file.mimetype === "application/pdf" || file.originalname.endsWith(".pdf")) {
       cb(null, true);

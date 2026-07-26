@@ -1,63 +1,102 @@
 import { useEffect, useRef, useState } from "react";
 import Layout from "@/components/Layout";
-import { files as filesApi, pdf as pdfApi } from "@/lib/api";
-import { useAuth } from "@/contexts/AuthContext";
+import PdfDropZone, { UploadedFile } from "@/components/PdfDropZone";
+import { pdf as pdfApi } from "@/lib/api";
 import {
   Layers, Scissors, Minimize2, RotateCcw, Droplets, PenTool,
   QrCode, Type, Tag, Lock, GitCompare, FileSearch, ArrowUpDown,
-  Hash, FileText, ChevronRight, X, Check, Download, AlertTriangle,
+  Hash, FileText, Download, X, Plus, CheckCircle2, Loader2,
+  RefreshCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 import SignatureCanvas from "react-signature-canvas";
 
-type Tool = {
-  id: string; icon: any; label: string; desc: string; color: string; minRole?: string;
-};
+const BASE = import.meta.env.BASE_URL + "api";
 
-const TOOLS: Tool[] = [
-  { id: "merge", icon: Layers, label: "Merge PDFs", desc: "Combine multiple PDFs into one document", color: "#3b82f6" },
-  { id: "split", icon: Scissors, label: "Split PDF", desc: "Split a PDF into multiple parts by page range", color: "#10b981" },
-  { id: "compress", icon: Minimize2, label: "Compress PDF", desc: "Reduce file size by optimizing object streams", color: "#8b5cf6" },
-  { id: "rotate", icon: RotateCcw, label: "Rotate Pages", desc: "Rotate specific pages or the entire document", color: "#f59e0b" },
-  { id: "reorder", icon: ArrowUpDown, label: "Reorder Pages", desc: "Drag pages into a new order", color: "#ec4899" },
-  { id: "watermark", icon: Droplets, label: "Add Watermark", desc: "Add text watermark to all or selected pages", color: "#06b6d4" },
-  { id: "signature", icon: PenTool, label: "Digital Signature", desc: "Draw and embed a signature on a PDF page", color: "#10b981" },
-  { id: "qrcode", icon: QrCode, label: "Add QR Code", desc: "Generate and embed a QR code into a page", color: "#6366f1" },
-  { id: "annotate", icon: Type, label: "Add Annotation", desc: "Add a text annotation at any position on a page", color: "#f59e0b" },
-  { id: "metadata", icon: Tag, label: "Edit Metadata", desc: "View and update PDF title, author, subject, keywords", color: "#3b82f6" },
-  { id: "unlock", icon: Lock, label: "Unlock PDF", desc: "Automatically bypass & remove PDF password protection — no password needed", color: "#ef4444" },
-  { id: "compare", icon: GitCompare, label: "Compare PDFs", desc: "Compare text content between two PDFs", color: "#8b5cf6" },
-  { id: "extract", icon: FileSearch, label: "Extract Text", desc: "Extract all readable text from a PDF", color: "#10b981" },
-  { id: "pagenumbers", icon: Hash, label: "Page Numbers", desc: "Add page numbers to a PDF document", color: "#f59e0b" },
-  { id: "headerfooter", icon: FileText, label: "Header & Footer", desc: "Add header and/or footer text to every page", color: "#06b6d4" },
+const TOOLS = [
+  { id: "merge",       icon: Layers,      label: "Merge PDFs",       desc: "Combine multiple PDFs into one",               color: "#3b82f6", multi: true  },
+  { id: "split",       icon: Scissors,    label: "Split PDF",        desc: "Split into parts by page ranges",              color: "#10b981", multi: false },
+  { id: "compress",    icon: Minimize2,   label: "Compress PDF",     desc: "Reduce file size by optimizing streams",       color: "#8b5cf6", multi: false },
+  { id: "rotate",      icon: RotateCcw,   label: "Rotate Pages",     desc: "Rotate specific pages or all pages",           color: "#f59e0b", multi: false },
+  { id: "reorder",     icon: ArrowUpDown, label: "Reorder Pages",    desc: "Rearrange pages into a new order",             color: "#ec4899", multi: false },
+  { id: "watermark",   icon: Droplets,    label: "Add Watermark",    desc: "Stamp text watermark on every page",           color: "#06b6d4", multi: false },
+  { id: "signature",   icon: PenTool,     label: "Digital Signature",desc: "Draw and embed your signature",                color: "#10b981", multi: false },
+  { id: "qrcode",      icon: QrCode,      label: "Add QR Code",      desc: "Embed a QR code on a page",                   color: "#6366f1", multi: false },
+  { id: "annotate",    icon: Type,        label: "Add Annotation",   desc: "Insert text annotation at any position",       color: "#f59e0b", multi: false },
+  { id: "metadata",    icon: Tag,         label: "Edit Metadata",    desc: "Update title, author, subject, keywords",      color: "#3b82f6", multi: false },
+  { id: "unlock",      icon: Lock,        label: "Unlock PDF",       desc: "Auto-bypass password protection",              color: "#ef4444", multi: false },
+  { id: "compare",     icon: GitCompare,  label: "Compare PDFs",     desc: "Compare text content between two PDFs",        color: "#8b5cf6", multi: false },
+  { id: "extract",     icon: FileSearch,  label: "Extract Text",     desc: "Extract all readable text from a PDF",         color: "#10b981", multi: false },
+  { id: "pagenumbers", icon: Hash,        label: "Page Numbers",     desc: "Add page numbers to the document",             color: "#f59e0b", multi: false },
+  { id: "headerfooter",icon: FileText,    label: "Header & Footer",  desc: "Add header and/or footer to every page",       color: "#06b6d4", multi: false },
 ];
 
-function FileSelect({ label, value, onChange, fileList }: { label: string; value: string; onChange: (v: string) => void; fileList: any[] }) {
+type ToolResult =
+  | { type: "file";    id: string; name: string; message?: string }
+  | { type: "files";   items: { id: string; name: string }[]; message: string }
+  | { type: "text";    text: string; wordCount?: number }
+  | { type: "compare"; similarity: number; onlyInA: string[]; onlyInB: string[] };
+
+function dl(fileId: string, name: string) {
+  const a = document.createElement("a");
+  a.href = `${BASE}/files/${fileId}/download`;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => document.body.removeChild(a), 200);
+}
+
+function Section({ title, children }: { title?: string; children: React.ReactNode }) {
   return (
-    <div>
-      <label>{label}</label>
-      <select value={value} onChange={(e) => onChange(e.target.value)}>
-        <option value="">— Select a file —</option>
-        {fileList.map((f) => (
-          <option key={f.id} value={f.id}>{f.name} ({f.page_count}p)</option>
-        ))}
-      </select>
+    <div style={{ background: "#111827", border: "1px solid #1e2433", borderRadius: 10, padding: "1.2rem", marginBottom: 12 }}>
+      {title && <div style={{ fontSize: 12, fontWeight: 700, color: "#4a5568", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>{title}</div>}
+      {children}
     </div>
   );
 }
 
+function Label({ children }: { children: React.ReactNode }) {
+  return <div style={{ fontSize: 12, fontWeight: 600, color: "#8b9ab5", marginBottom: 5 }}>{children}</div>;
+}
+
+function Inp(props: React.InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <input
+      {...props}
+      style={{
+        width: "100%", padding: "7px 10px", background: "#0d1117",
+        border: "1px solid #2a3347", borderRadius: 6, color: "#d4d8e1",
+        fontSize: 13, boxSizing: "border-box",
+        ...(props.style || {}),
+      }}
+    />
+  );
+}
+
+function Sel(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
+  return (
+    <select
+      {...props}
+      style={{
+        width: "100%", padding: "7px 10px", background: "#0d1117",
+        border: "1px solid #2a3347", borderRadius: 6, color: "#d4d8e1", fontSize: 13,
+        ...(props.style || {}),
+      }}
+    />
+  );
+}
+
 export default function ToolsPage() {
-  const { user } = useAuth();
   const [activeTool, setActiveTool] = useState<string | null>(null);
-  const [fileList, setFileList] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [dzKey, setDzKey] = useState(0);
+  const [dzKeyB, setDzKeyB] = useState(0);
+  const [files, setFiles] = useState<UploadedFile[]>([]);
+  const [filesB, setFilesB] = useState<UploadedFile[]>([]);
+  const [processing, setProcessing] = useState(false);
+  const [result, setResult] = useState<ToolResult | null>(null);
   const sigRef = useRef<any>(null);
 
-  // Tool states
-  const [selFileId, setSelFileId] = useState("");
-  const [selFileIdB, setSelFileIdB] = useState("");
-  const [mergeFileIds, setMergeFileIds] = useState<string[]>(["", ""]);
+  // Tool-specific state
   const [splitRanges, setSplitRanges] = useState([{ start: 1, end: 1, name: "" }]);
   const [rotations, setRotations] = useState([{ page: 1, angle: 90 as 0 | 90 | 180 | 270 }]);
   const [reorderStr, setReorderStr] = useState("");
@@ -79,183 +118,202 @@ export default function ToolsPage() {
   const [sigX, setSigX] = useState(50);
   const [sigY, setSigY] = useState(50);
   const [meta, setMeta] = useState<any>({});
-  const [extractedText, setExtractedText] = useState("");
-  const [compareResult, setCompareResult] = useState<any>(null);
   const [pnStart, setPnStart] = useState(1);
+  const [pnPosition, setPnPosition] = useState("bottom-center");
   const [hfHeader, setHfHeader] = useState("");
   const [hfFooter, setHfFooter] = useState("");
 
-  useEffect(() => {
-    filesApi.list({ limit: "200" }).then((r) => setFileList(r.files || [])).catch(() => {});
-  }, []);
+  const readyIds = files.filter((f) => f.status === "done").map((f) => f.fileId!);
+  const readyIdsB = filesB.filter((f) => f.status === "done").map((f) => f.fileId!);
+  const uploading = files.some((f) => f.status === "uploading");
+  const uploadingB = filesB.some((f) => f.status === "uploading");
+  const tool = TOOLS.find((t) => t.id === activeTool);
 
-  async function handleLoadMeta() {
-    if (!selFileId) return;
-    try {
-      const m = await pdfApi.getMetadata(selFileId);
-      setMeta(m);
-    } catch (err: any) { toast.error(err.message); }
+  function changeTool(id: string) {
+    setActiveTool(id);
+    setDzKey((k) => k + 1);
+    setDzKeyB((k) => k + 1);
+    setFiles([]);
+    setFilesB([]);
+    setResult(null);
+    setMeta({});
   }
 
+  // Auto-load metadata when file is uploaded
+  useEffect(() => {
+    if (activeTool === "metadata" && readyIds.length > 0) {
+      pdfApi.getMetadata(readyIds[0]).then(setMeta).catch(() => {});
+    }
+  }, [activeTool, readyIds[0]]);
+
+  const minFiles = activeTool === "merge" ? 2 : 1;
+  const needsB = activeTool === "compare";
+  const canRun =
+    readyIds.length >= minFiles &&
+    !uploading &&
+    !processing &&
+    (!needsB || (readyIdsB.length >= 1 && !uploadingB));
+
   async function run() {
-    setLoading(true);
+    setProcessing(true);
     setResult(null);
-    setExtractedText("");
-    setCompareResult(null);
     try {
-      let r: any;
+      let r: ToolResult | null = null;
       switch (activeTool) {
         case "merge": {
-          if (mergeFileIds.filter(Boolean).length < 2) throw new Error("Select at least 2 files");
           const fd = new FormData();
           fd.append("outputName", "merged.pdf");
-          mergeFileIds.filter(Boolean).forEach((id) => fd.append("fileIds", id));
-          r = await pdfApi.merge(fd);
-          toast.success("PDFs merged successfully!");
+          readyIds.forEach((id) => fd.append("fileIds", id));
+          const res = await pdfApi.merge(fd);
+          r = { type: "file", id: res.id, name: res.name, message: `Merged ${readyIds.length} PDFs successfully` };
+          toast.success(`Merged ${readyIds.length} PDFs!`);
           break;
         }
         case "split": {
-          if (!selFileId) throw new Error("Select a file");
-          r = await pdfApi.split(selFileId, splitRanges);
-          toast.success(`Split into ${r.length} parts`);
+          const res: any[] = await pdfApi.split(readyIds[0], splitRanges);
+          r = { type: "files", items: res.map((f: any) => ({ id: f.id, name: f.name })), message: `Split into ${res.length} file${res.length > 1 ? "s" : ""}` };
+          toast.success(`Split into ${res.length} parts`);
           break;
         }
         case "compress": {
-          if (!selFileId) throw new Error("Select a file");
-          r = await pdfApi.compress(selFileId);
-          toast.success(`Compressed! Saved ~${r.reduction}%`);
+          const res = await pdfApi.compress(readyIds[0]);
+          r = { type: "file", id: res.id, name: res.name, message: `Compressed — saved ~${res.reduction ?? 0}%` };
+          toast.success(`Compressed! Saved ~${res.reduction ?? 0}%`);
           break;
         }
         case "rotate": {
-          if (!selFileId) throw new Error("Select a file");
-          r = await pdfApi.rotate(selFileId, rotations);
+          const res = await pdfApi.rotate(readyIds[0], rotations);
+          r = { type: "file", id: res.id, name: res.name, message: "Pages rotated" };
           toast.success("Pages rotated");
           break;
         }
         case "reorder": {
-          if (!selFileId) throw new Error("Select a file");
           const order = reorderStr.split(",").map((n) => parseInt(n.trim())).filter((n) => !isNaN(n));
-          if (order.length === 0) throw new Error("Enter page order like: 3,1,2");
-          r = await pdfApi.reorder(selFileId, order);
+          if (!order.length) throw new Error("Enter page order, e.g. 3, 1, 2");
+          const res = await pdfApi.reorder(readyIds[0], order);
+          r = { type: "file", id: res.id, name: res.name, message: "Pages reordered" };
           toast.success("Pages reordered");
           break;
         }
         case "watermark": {
-          if (!selFileId) throw new Error("Select a file");
-          r = await pdfApi.watermark(selFileId, { text: wmText, opacity: wmOpacity, angle: wmAngle, fontSize: wmFontSize });
-          toast.success("Watermark added");
+          if (!wmText.trim()) throw new Error("Enter watermark text");
+          const res = await pdfApi.watermark(readyIds[0], { text: wmText, opacity: wmOpacity, angle: wmAngle, fontSize: wmFontSize });
+          r = { type: "file", id: res.id, name: res.name, message: "Watermark applied" };
+          toast.success("Watermark applied");
           break;
         }
         case "signature": {
-          if (!selFileId) throw new Error("Select a file");
           if (sigRef.current?.isEmpty()) throw new Error("Draw a signature first");
           const dataUrl = sigRef.current.toDataURL("image/png");
-          r = await pdfApi.addSignature(selFileId, { signatureDataUrl: dataUrl, page: sigPage, x: sigX, y: sigY, timestamp: true });
+          const res = await pdfApi.addSignature(readyIds[0], { signatureDataUrl: dataUrl, page: sigPage, x: sigX, y: sigY, timestamp: true });
+          r = { type: "file", id: res.id, name: res.name, message: "Signature embedded" };
           toast.success("Signature embedded");
           break;
         }
         case "qrcode": {
-          if (!selFileId) throw new Error("Select a file");
-          if (!qrContent) throw new Error("Enter QR code content");
-          r = await pdfApi.addQRCode(selFileId, { content: qrContent, page: qrPage, x: qrX, y: qrY, size: qrSize });
-          toast.success("QR code embedded");
+          if (!qrContent.trim()) throw new Error("Enter QR code content");
+          const res = await pdfApi.addQRCode(readyIds[0], { content: qrContent, page: qrPage, x: qrX, y: qrY, size: qrSize });
+          r = { type: "file", id: res.id, name: res.name, message: "QR code embedded" };
+          toast.success("QR code added");
           break;
         }
         case "annotate": {
-          if (!selFileId) throw new Error("Select a file");
-          if (!annText) throw new Error("Enter annotation text");
-          r = await pdfApi.annotate(selFileId, { text: annText, page: annPage, x: annX, y: annY, fontSize: annSize });
+          if (!annText.trim()) throw new Error("Enter annotation text");
+          const res = await pdfApi.annotate(readyIds[0], { text: annText, page: annPage, x: annX, y: annY, fontSize: annSize });
+          r = { type: "file", id: res.id, name: res.name, message: "Annotation added" };
           toast.success("Annotation added");
           break;
         }
         case "metadata": {
-          if (!selFileId) throw new Error("Select a file");
-          r = await pdfApi.updateMetadata(selFileId, meta);
-          toast.success("Metadata updated");
+          const res = await pdfApi.updateMetadata(readyIds[0], meta);
+          r = { type: "file", id: res.id, name: res.name, message: "Metadata updated" };
+          toast.success("Metadata saved");
           break;
         }
         case "unlock": {
-          if (!selFileId) throw new Error("Select a file");
-          r = await pdfApi.unlock(selFileId);
-          toast.success("PDF password bypassed and saved");
+          const res = await pdfApi.unlock(readyIds[0]);
+          r = { type: "file", id: res.id, name: res.name, message: "Password bypassed — PDF is now unlocked" };
+          toast.success("PDF unlocked!");
           break;
         }
         case "extract": {
-          if (!selFileId) throw new Error("Select a file");
-          const res = await pdfApi.extractText(selFileId);
-          setExtractedText(res.text);
+          const res = await pdfApi.extractText(readyIds[0]);
+          r = { type: "text", text: res.text, wordCount: res.wordCount };
           toast.success(`Extracted ${res.wordCount} words`);
-          return;
+          break;
         }
         case "compare": {
-          if (!selFileId || !selFileIdB) throw new Error("Select both files");
-          const res = await pdfApi.compare(selFileId, selFileIdB);
-          setCompareResult(res);
-          return;
+          const res = await pdfApi.compare(readyIds[0], readyIdsB[0]);
+          r = { type: "compare", similarity: res.similarity, onlyInA: res.onlyInA ?? [], onlyInB: res.onlyInB ?? [] };
+          break;
         }
         case "pagenumbers": {
-          if (!selFileId) throw new Error("Select a file");
-          r = await pdfApi.addPageNumbers(selFileId, { startFrom: pnStart, position: "bottom-center" });
+          const res = await pdfApi.addPageNumbers(readyIds[0], { startFrom: pnStart, position: pnPosition });
+          r = { type: "file", id: res.id, name: res.name, message: "Page numbers added" };
           toast.success("Page numbers added");
           break;
         }
         case "headerfooter": {
-          if (!selFileId) throw new Error("Select a file");
-          r = await pdfApi.addHeaderFooter(selFileId, { header: hfHeader || undefined, footer: hfFooter || undefined });
-          toast.success("Header/footer added");
+          const res = await pdfApi.addHeaderFooter(readyIds[0], { header: hfHeader || undefined, footer: hfFooter || undefined });
+          r = { type: "file", id: res.id, name: res.name, message: "Header/footer applied" };
+          toast.success("Header/footer applied");
           break;
         }
       }
-      setResult(r);
+      if (r) {
+        setResult(r);
+        if (r.type === "file") setTimeout(() => dl(r.id, r.name), 300);
+      }
     } catch (err: any) {
       toast.error(err.message || "Operation failed");
-    } finally { setLoading(false); }
+    } finally {
+      setProcessing(false);
+    }
   }
-
-  const tool = TOOLS.find((t) => t.id === activeTool);
 
   return (
     <Layout>
       <div style={{ display: "flex", height: "100vh", overflow: "hidden" }}>
-        {/* Tool list */}
-        <div style={{ width: 260, borderRight: "1px solid #1e2433", overflowY: "auto", padding: "12px 8px", flexShrink: 0 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: "#4a5568", textTransform: "uppercase", letterSpacing: "0.05em", padding: "4px 8px", marginBottom: 8 }}>
+        {/* ── Sidebar ── */}
+        <div style={{ width: 240, borderRight: "1px solid #1e2433", overflowY: "auto", padding: "10px 6px", flexShrink: 0 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: "0.08em", padding: "4px 8px", marginBottom: 6 }}>
             PDF Tools
           </div>
           {TOOLS.map((t) => (
             <button
               key={t.id}
-              onClick={() => { setActiveTool(t.id); setResult(null); setExtractedText(""); setCompareResult(null); }}
+              onClick={() => changeTool(t.id)}
               style={{
-                width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "9px 10px",
-                borderRadius: 8, background: activeTool === t.id ? "#1a2a4a" : "transparent",
+                width: "100%", display: "flex", alignItems: "center", gap: 9,
+                padding: "8px 9px", borderRadius: 7, cursor: "pointer", textAlign: "left",
+                background: activeTool === t.id ? "#1a2a4a" : "transparent",
                 border: `1px solid ${activeTool === t.id ? "#3b82f6" : "transparent"}`,
-                marginBottom: 2, cursor: "pointer", textAlign: "left",
+                marginBottom: 2,
               }}
             >
-              <div style={{ width: 28, height: 28, background: `${t.color}20`, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <t.icon size={13} color={t.color} />
+              <div style={{ width: 26, height: 26, background: `${t.color}18`, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <t.icon size={12} color={t.color} />
               </div>
               <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#d4d8e1" }}>{t.label}</div>
-                <div style={{ fontSize: 10, color: "#4a5568", lineHeight: "1.3" }}>{t.desc.slice(0, 40)}…</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: activeTool === t.id ? "#d4d8e1" : "#8b9ab5" }}>{t.label}</div>
               </div>
             </button>
           ))}
         </div>
 
-        {/* Tool workspace */}
+        {/* ── Workspace ── */}
         <div style={{ flex: 1, overflowY: "auto", padding: "1.5rem" }}>
           {!activeTool ? (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", flexDirection: "column", gap: 12 }}>
-              <div style={{ fontSize: 36 }}>🛠️</div>
-              <p style={{ color: "#4a5568", fontSize: 15 }}>Select a tool from the left panel</p>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", flexDirection: "column", gap: 12, opacity: 0.5 }}>
+              <div style={{ fontSize: 40 }}>🛠</div>
+              <div style={{ color: "#4a5568", fontSize: 14 }}>Select a tool from the left panel</div>
             </div>
           ) : (
-            <div style={{ maxWidth: 620 }}>
-              <div className="flex items-center gap-3 mb-6">
-                <div style={{ width: 40, height: 40, background: `${tool?.color}20`, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  {tool && <tool.icon size={18} color={tool.color} />}
+            <div style={{ maxWidth: 680 }}>
+              {/* Header */}
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+                <div style={{ width: 44, height: 44, background: `${tool?.color}18`, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  {tool && <tool.icon size={20} color={tool.color} />}
                 </div>
                 <div>
                   <h2 style={{ fontSize: 18, fontWeight: 800, color: "#d4d8e1", margin: 0 }}>{tool?.label}</h2>
@@ -263,278 +321,348 @@ export default function ToolsPage() {
                 </div>
               </div>
 
-              {/* Tool-specific UI */}
-              <div className="card" style={{ marginBottom: "1rem" }}>
-                {/* MERGE */}
-                {activeTool === "merge" && (
-                  <div className="flex flex-col gap-4">
-                    <p style={{ fontSize: 13, color: "#8b9ab5", margin: 0 }}>Select 2 or more files to merge in order:</p>
-                    {mergeFileIds.map((id, i) => (
-                      <div key={i} className="flex items-center gap-2">
-                        <div style={{ flex: 1 }}>
-                          <label>File {i + 1}</label>
-                          <select value={id} onChange={(e) => { const n = [...mergeFileIds]; n[i] = e.target.value; setMergeFileIds(n); }}>
-                            <option value="">— Select —</option>
-                            {fileList.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-                          </select>
-                        </div>
-                        {mergeFileIds.length > 2 && (
-                          <button className="btn-danger" style={{ marginTop: 20, padding: "6px 8px" }} onClick={() => setMergeFileIds(mergeFileIds.filter((_, j) => j !== i))}>
-                            <X size={12} />
-                          </button>
-                        )}
+              {/* Drop Zone */}
+              {activeTool === "compare" ? (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                  <Section title="Document A">
+                    <PdfDropZone key={`dzA-${dzKey}`} onFilesChange={setFiles} maxFiles={1} allowReorder={false} label="Drop Document A" />
+                  </Section>
+                  <Section title="Document B">
+                    <PdfDropZone key={`dzB-${dzKeyB}`} onFilesChange={setFilesB} maxFiles={1} allowReorder={false} label="Drop Document B" />
+                  </Section>
+                </div>
+              ) : (
+                <Section title={activeTool === "merge" ? "Files to Merge (drag to reorder)" : "Upload PDF"}>
+                  <PdfDropZone
+                    key={`dz-${dzKey}`}
+                    onFilesChange={setFiles}
+                    maxFiles={activeTool === "merge" ? undefined : 1}
+                    allowReorder={activeTool === "merge"}
+                    label={activeTool === "merge" ? "Drop PDF files to merge (drag to reorder)" : undefined}
+                  />
+                </Section>
+              )}
+
+              {/* ── Tool-specific options ── */}
+              {activeTool === "split" && (
+                <Section title="Page Ranges">
+                  {splitRanges.map((r, i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                      <div style={{ flex: "0 0 80px" }}>
+                        <Label>From</Label>
+                        <Inp type="number" min="1" value={r.start} onChange={(e) => { const n = [...splitRanges]; n[i].start = +e.target.value; setSplitRanges(n); }} />
                       </div>
-                    ))}
-                    <button className="btn-secondary" style={{ alignSelf: "flex-start", padding: "6px 12px", fontSize: 12 }} onClick={() => setMergeFileIds([...mergeFileIds, ""])}>
-                      + Add File
-                    </button>
-                  </div>
-                )}
-
-                {/* SPLIT */}
-                {activeTool === "split" && (
-                  <div className="flex flex-col gap-4">
-                    <FileSelect label="Source File" value={selFileId} onChange={setSelFileId} fileList={fileList} />
-                    <div>
-                      <label>Page Ranges</label>
-                      {splitRanges.map((r, i) => (
-                        <div key={i} className="flex items-center gap-2 mb-2">
-                          <input type="number" min="1" value={r.start} onChange={(e) => { const n = [...splitRanges]; n[i].start = +e.target.value; setSplitRanges(n); }} placeholder="From" style={{ width: 70 }} />
-                          <span style={{ color: "#4a5568" }}>to</span>
-                          <input type="number" min="1" value={r.end} onChange={(e) => { const n = [...splitRanges]; n[i].end = +e.target.value; setSplitRanges(n); }} placeholder="To" style={{ width: 70 }} />
-                          <input type="text" value={r.name} onChange={(e) => { const n = [...splitRanges]; n[i].name = e.target.value; setSplitRanges(n); }} placeholder="Output name (optional)" style={{ flex: 1 }} />
-                          {splitRanges.length > 1 && <button className="btn-danger" style={{ padding: "5px 8px" }} onClick={() => setSplitRanges(splitRanges.filter((_, j) => j !== i))}><X size={11} /></button>}
-                        </div>
-                      ))}
-                      <button className="btn-secondary" style={{ fontSize: 12, padding: "5px 10px" }} onClick={() => setSplitRanges([...splitRanges, { start: 1, end: 1, name: "" }])}>+ Add Range</button>
-                    </div>
-                  </div>
-                )}
-
-                {/* COMPRESS */}
-                {activeTool === "compress" && (
-                  <div className="flex flex-col gap-4">
-                    <FileSelect label="File to Compress" value={selFileId} onChange={setSelFileId} fileList={fileList} />
-                    <p style={{ fontSize: 12, color: "#4a5568", margin: 0 }}>ℹ️ Compression optimizes object streams and removes redundant data.</p>
-                  </div>
-                )}
-
-                {/* ROTATE */}
-                {activeTool === "rotate" && (
-                  <div className="flex flex-col gap-4">
-                    <FileSelect label="File to Rotate" value={selFileId} onChange={setSelFileId} fileList={fileList} />
-                    {rotations.map((r, i) => (
-                      <div key={i} className="flex items-center gap-2">
-                        <div style={{ flex: 1 }}><label>Page</label><input type="number" min="1" value={r.page} onChange={(e) => { const n = [...rotations]; n[i].page = +e.target.value; setRotations(n); }} /></div>
-                        <div style={{ flex: 1 }}><label>Angle</label>
-                          <select value={r.angle} onChange={(e) => { const n = [...rotations]; n[i].angle = +e.target.value as any; setRotations(n); }}>
-                            <option value={90}>90° CW</option><option value={180}>180°</option><option value={270}>270° CW</option><option value={0}>0° (reset)</option>
-                          </select>
-                        </div>
-                        {rotations.length > 1 && <button className="btn-danger" style={{ marginTop: 20, padding: "5px 8px" }} onClick={() => setRotations(rotations.filter((_, j) => j !== i))}><X size={11} /></button>}
+                      <div style={{ flex: "0 0 80px" }}>
+                        <Label>To</Label>
+                        <Inp type="number" min="1" value={r.end} onChange={(e) => { const n = [...splitRanges]; n[i].end = +e.target.value; setSplitRanges(n); }} />
                       </div>
-                    ))}
-                    <button className="btn-secondary" style={{ fontSize: 12, padding: "5px 10px", alignSelf: "flex-start" }} onClick={() => setRotations([...rotations, { page: 1, angle: 90 }])}>+ Add Page</button>
-                  </div>
-                )}
-
-                {/* REORDER */}
-                {activeTool === "reorder" && (
-                  <div className="flex flex-col gap-4">
-                    <FileSelect label="File to Reorder" value={selFileId} onChange={setSelFileId} fileList={fileList} />
-                    <div>
-                      <label>New Page Order (comma-separated page numbers)</label>
-                      <input type="text" value={reorderStr} onChange={(e) => setReorderStr(e.target.value)} placeholder="e.g. 3, 1, 2, 4, 5" />
-                      <p style={{ fontSize: 11, color: "#4a5568", marginTop: 4 }}>Enter all page numbers in the desired order.</p>
+                      <div style={{ flex: 1 }}>
+                        <Label>Output name (optional)</Label>
+                        <Inp type="text" value={r.name} onChange={(e) => { const n = [...splitRanges]; n[i].name = e.target.value; setSplitRanges(n); }} placeholder="part-1.pdf" />
+                      </div>
+                      {splitRanges.length > 1 && (
+                        <button onClick={() => setSplitRanges(splitRanges.filter((_, j) => j !== i))} style={{ background: "none", border: "none", cursor: "pointer", color: "#ef4444", marginTop: 20, padding: 4 }}><X size={14} /></button>
+                      )}
                     </div>
-                  </div>
-                )}
+                  ))}
+                  <button onClick={() => setSplitRanges([...splitRanges, { start: 1, end: 1, name: "" }])}
+                    style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", background: "#1e2433", border: "1px solid #2a3347", borderRadius: 6, color: "#8b9ab5", cursor: "pointer", fontSize: 12 }}>
+                    <Plus size={12} /> Add Range
+                  </button>
+                </Section>
+              )}
 
-                {/* WATERMARK */}
-                {activeTool === "watermark" && (
-                  <div className="flex flex-col gap-4">
-                    <FileSelect label="File to Watermark" value={selFileId} onChange={setSelFileId} fileList={fileList} />
-                    <div><label>Watermark Text</label><input type="text" value={wmText} onChange={(e) => setWmText(e.target.value)} placeholder="CONFIDENTIAL" /></div>
-                    <div className="grid gap-3" style={{ gridTemplateColumns: "1fr 1fr 1fr" }}>
-                      <div><label>Opacity (0-1)</label><input type="number" min="0" max="1" step="0.05" value={wmOpacity} onChange={(e) => setWmOpacity(+e.target.value)} /></div>
-                      <div><label>Angle (°)</label><input type="number" value={wmAngle} onChange={(e) => setWmAngle(+e.target.value)} /></div>
-                      <div><label>Font Size</label><input type="number" min="12" max="200" value={wmFontSize} onChange={(e) => setWmFontSize(+e.target.value)} /></div>
+              {activeTool === "rotate" && (
+                <Section title="Rotations">
+                  {rotations.map((r, i) => (
+                    <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center" }}>
+                      <div style={{ flex: 1 }}>
+                        <Label>Page</Label>
+                        <Inp type="number" min="1" value={r.page} onChange={(e) => { const n = [...rotations]; n[i].page = +e.target.value; setRotations(n); }} />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <Label>Rotation</Label>
+                        <Sel value={r.angle} onChange={(e) => { const n = [...rotations]; n[i].angle = +e.target.value as any; setRotations(n); }}>
+                          <option value={90}>90° Clockwise</option>
+                          <option value={180}>180°</option>
+                          <option value={270}>270° Clockwise</option>
+                          <option value={0}>Reset to 0°</option>
+                        </Sel>
+                      </div>
+                      {rotations.length > 1 && (
+                        <button onClick={() => setRotations(rotations.filter((_, j) => j !== i))} style={{ background: "none", border: "none", cursor: "pointer", color: "#ef4444", marginTop: 20, padding: 4 }}><X size={14} /></button>
+                      )}
                     </div>
-                  </div>
-                )}
+                  ))}
+                  <button onClick={() => setRotations([...rotations, { page: 1, angle: 90 }])}
+                    style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", background: "#1e2433", border: "1px solid #2a3347", borderRadius: 6, color: "#8b9ab5", cursor: "pointer", fontSize: 12 }}>
+                    <Plus size={12} /> Add Page
+                  </button>
+                </Section>
+              )}
 
-                {/* SIGNATURE */}
-                {activeTool === "signature" && (
-                  <div className="flex flex-col gap-4">
-                    <FileSelect label="File to Sign" value={selFileId} onChange={setSelFileId} fileList={fileList} />
-                    <div>
-                      <label>Draw your signature below</label>
-                      <SignatureCanvas
-                        ref={sigRef}
-                        penColor="#1e3a5f"
-                        canvasProps={{ width: 500, height: 120, className: "signature-canvas", style: { width: "100%", maxWidth: 500 } }}
-                      />
-                      <button className="btn-secondary" style={{ marginTop: 6, padding: "5px 10px", fontSize: 12 }} onClick={() => sigRef.current?.clear()}>Clear</button>
-                    </div>
-                    <div className="grid gap-3" style={{ gridTemplateColumns: "1fr 1fr 1fr" }}>
-                      <div><label>Page</label><input type="number" min="1" value={sigPage} onChange={(e) => setSigPage(+e.target.value)} /></div>
-                      <div><label>X Position</label><input type="number" value={sigX} onChange={(e) => setSigX(+e.target.value)} /></div>
-                      <div><label>Y Position</label><input type="number" value={sigY} onChange={(e) => setSigY(+e.target.value)} /></div>
-                    </div>
+              {activeTool === "reorder" && (
+                <Section title="New Page Order">
+                  <Label>Enter all page numbers in the new order (comma-separated)</Label>
+                  <Inp type="text" value={reorderStr} onChange={(e) => setReorderStr(e.target.value)} placeholder="e.g. 3, 1, 2, 4, 5" />
+                  <div style={{ fontSize: 11, color: "#4a5568", marginTop: 6 }}>
+                    Enter every page number. Example: for a 5-page PDF reversed, type: 5, 4, 3, 2, 1
                   </div>
-                )}
+                </Section>
+              )}
 
-                {/* QR CODE */}
-                {activeTool === "qrcode" && (
-                  <div className="flex flex-col gap-4">
-                    <FileSelect label="Target File" value={selFileId} onChange={setSelFileId} fileList={fileList} />
-                    <div><label>QR Code Content (URL, text, etc.)</label><input type="text" value={qrContent} onChange={(e) => setQrContent(e.target.value)} /></div>
-                    <div className="grid gap-3" style={{ gridTemplateColumns: "1fr 1fr 1fr 1fr" }}>
-                      <div><label>Page</label><input type="number" min="1" value={qrPage} onChange={(e) => setQrPage(+e.target.value)} /></div>
-                      <div><label>X</label><input type="number" value={qrX} onChange={(e) => setQrX(+e.target.value)} /></div>
-                      <div><label>Y</label><input type="number" value={qrY} onChange={(e) => setQrY(+e.target.value)} /></div>
-                      <div><label>Size (px)</label><input type="number" min="50" value={qrSize} onChange={(e) => setQrSize(+e.target.value)} /></div>
-                    </div>
+              {activeTool === "watermark" && (
+                <Section title="Watermark Options">
+                  <div style={{ marginBottom: 10 }}>
+                    <Label>Watermark Text</Label>
+                    <Inp type="text" value={wmText} onChange={(e) => setWmText(e.target.value)} placeholder="CONFIDENTIAL" />
                   </div>
-                )}
-
-                {/* ANNOTATE */}
-                {activeTool === "annotate" && (
-                  <div className="flex flex-col gap-4">
-                    <FileSelect label="Target File" value={selFileId} onChange={setSelFileId} fileList={fileList} />
-                    <div><label>Annotation Text</label><textarea value={annText} onChange={(e) => setAnnText(e.target.value)} rows={3} placeholder="Enter text to annotate…" /></div>
-                    <div className="grid gap-3" style={{ gridTemplateColumns: "1fr 1fr 1fr 1fr" }}>
-                      <div><label>Page</label><input type="number" min="1" value={annPage} onChange={(e) => setAnnPage(+e.target.value)} /></div>
-                      <div><label>X</label><input type="number" value={annX} onChange={(e) => setAnnX(+e.target.value)} /></div>
-                      <div><label>Y</label><input type="number" value={annY} onChange={(e) => setAnnY(+e.target.value)} /></div>
-                      <div><label>Font Size</label><input type="number" min="8" max="72" value={annSize} onChange={(e) => setAnnSize(+e.target.value)} /></div>
-                    </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+                    <div><Label>Opacity (0–1)</Label><Inp type="number" min="0.05" max="1" step="0.05" value={wmOpacity} onChange={(e) => setWmOpacity(+e.target.value)} /></div>
+                    <div><Label>Angle (°)</Label><Inp type="number" value={wmAngle} onChange={(e) => setWmAngle(+e.target.value)} /></div>
+                    <div><Label>Font Size</Label><Inp type="number" min="12" max="200" value={wmFontSize} onChange={(e) => setWmFontSize(+e.target.value)} /></div>
                   </div>
-                )}
+                </Section>
+              )}
 
-                {/* METADATA */}
-                {activeTool === "metadata" && (
-                  <div className="flex flex-col gap-4">
-                    <FileSelect label="Target File" value={selFileId} onChange={setSelFileId} fileList={fileList} />
-                    <button className="btn-secondary" style={{ alignSelf: "flex-start", padding: "6px 12px", fontSize: 12 }} onClick={handleLoadMeta}>Load Current Metadata</button>
+              {activeTool === "signature" && (
+                <Section title="Signature">
+                  <Label>Draw your signature below</Label>
+                  <div style={{ border: "1px solid #2a3347", borderRadius: 8, overflow: "hidden", background: "#fff", marginBottom: 8 }}>
+                    <SignatureCanvas
+                      ref={sigRef}
+                      penColor="#0f172a"
+                      canvasProps={{ width: 600, height: 130, style: { width: "100%", maxWidth: 600, height: 130 } }}
+                    />
+                  </div>
+                  <button onClick={() => sigRef.current?.clear()}
+                    style={{ fontSize: 12, padding: "4px 12px", background: "#1e2433", border: "1px solid #2a3347", borderRadius: 5, color: "#8b9ab5", cursor: "pointer", marginBottom: 12 }}>
+                    Clear Signature
+                  </button>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+                    <div><Label>Page</Label><Inp type="number" min="1" value={sigPage} onChange={(e) => setSigPage(+e.target.value)} /></div>
+                    <div><Label>X Position</Label><Inp type="number" value={sigX} onChange={(e) => setSigX(+e.target.value)} /></div>
+                    <div><Label>Y Position</Label><Inp type="number" value={sigY} onChange={(e) => setSigY(+e.target.value)} /></div>
+                  </div>
+                </Section>
+              )}
+
+              {activeTool === "qrcode" && (
+                <Section title="QR Code Options">
+                  <div style={{ marginBottom: 10 }}>
+                    <Label>Content (URL, text, email, etc.)</Label>
+                    <Inp type="text" value={qrContent} onChange={(e) => setQrContent(e.target.value)} />
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10 }}>
+                    <div><Label>Page</Label><Inp type="number" min="1" value={qrPage} onChange={(e) => setQrPage(+e.target.value)} /></div>
+                    <div><Label>X</Label><Inp type="number" value={qrX} onChange={(e) => setQrX(+e.target.value)} /></div>
+                    <div><Label>Y</Label><Inp type="number" value={qrY} onChange={(e) => setQrY(+e.target.value)} /></div>
+                    <div><Label>Size (px)</Label><Inp type="number" min="50" value={qrSize} onChange={(e) => setQrSize(+e.target.value)} /></div>
+                  </div>
+                </Section>
+              )}
+
+              {activeTool === "annotate" && (
+                <Section title="Annotation">
+                  <div style={{ marginBottom: 10 }}>
+                    <Label>Text</Label>
+                    <textarea
+                      value={annText}
+                      onChange={(e) => setAnnText(e.target.value)}
+                      rows={3}
+                      placeholder="Enter annotation text…"
+                      style={{ width: "100%", padding: "7px 10px", background: "#0d1117", border: "1px solid #2a3347", borderRadius: 6, color: "#d4d8e1", fontSize: 13, resize: "vertical", boxSizing: "border-box" }}
+                    />
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10 }}>
+                    <div><Label>Page</Label><Inp type="number" min="1" value={annPage} onChange={(e) => setAnnPage(+e.target.value)} /></div>
+                    <div><Label>X</Label><Inp type="number" value={annX} onChange={(e) => setAnnX(+e.target.value)} /></div>
+                    <div><Label>Y</Label><Inp type="number" value={annY} onChange={(e) => setAnnY(+e.target.value)} /></div>
+                    <div><Label>Font Size</Label><Inp type="number" min="8" max="72" value={annSize} onChange={(e) => setAnnSize(+e.target.value)} /></div>
+                  </div>
+                </Section>
+              )}
+
+              {activeTool === "metadata" && (
+                <Section title="Metadata Fields">
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                     {["title", "author", "subject", "keywords", "producer", "creator"].map((k) => (
-                      <div key={k}><label style={{ textTransform: "capitalize" }}>{k}</label>
-                        <input type="text" value={meta[k] || ""} onChange={(e) => setMeta({ ...meta, [k]: e.target.value })} placeholder={`PDF ${k}`} />
+                      <div key={k}>
+                        <Label>{k.charAt(0).toUpperCase() + k.slice(1)}</Label>
+                        <Inp type="text" value={meta[k] || ""} onChange={(e) => setMeta({ ...meta, [k]: e.target.value })} placeholder={`PDF ${k}`} />
                       </div>
                     ))}
                   </div>
-                )}
+                  {readyIds.length > 0 && (
+                    <button
+                      onClick={() => pdfApi.getMetadata(readyIds[0]).then(setMeta).catch((e) => toast.error(e.message))}
+                      style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 5, padding: "5px 12px", background: "#1e2433", border: "1px solid #2a3347", borderRadius: 6, color: "#8b9ab5", cursor: "pointer", fontSize: 12 }}>
+                      <RefreshCcw size={12} /> Reload from file
+                    </button>
+                  )}
+                </Section>
+              )}
 
-                {/* UNLOCK */}
-                {activeTool === "unlock" && (
-                  <div className="flex flex-col gap-4">
-                    <div style={{ background: "#052e16", border: "1px solid #166534", borderRadius: 8, padding: "10px 14px", fontSize: 12, color: "#4ade80" }}>
-                      <strong>🔓 Auto-Bypass:</strong> Automatically removes PDF password protection without needing the password. Works on owner-restricted and commonly-protected PDFs.
+              {activeTool === "unlock" && (
+                <Section>
+                  <div style={{ background: "#052e16", border: "1px solid #166534", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#4ade80" }}>
+                    🔓 <strong>Auto-Bypass:</strong> Automatically removes PDF password protection. No password required. Works on owner-restricted and commonly-protected PDFs.
+                  </div>
+                </Section>
+              )}
+
+              {activeTool === "pagenumbers" && (
+                <Section title="Page Number Options">
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    <div><Label>Start Numbering From</Label><Inp type="number" min="1" value={pnStart} onChange={(e) => setPnStart(+e.target.value)} /></div>
+                    <div>
+                      <Label>Position</Label>
+                      <Sel value={pnPosition} onChange={(e) => setPnPosition(e.target.value)}>
+                        <option value="bottom-center">Bottom Center</option>
+                        <option value="bottom-right">Bottom Right</option>
+                        <option value="bottom-left">Bottom Left</option>
+                        <option value="top-center">Top Center</option>
+                        <option value="top-right">Top Right</option>
+                        <option value="top-left">Top Left</option>
+                      </Sel>
                     </div>
-                    <FileSelect label="Password-Protected File" value={selFileId} onChange={setSelFileId} fileList={fileList} />
                   </div>
-                )}
+                </Section>
+              )}
 
-                {/* COMPARE */}
-                {activeTool === "compare" && (
-                  <div className="flex flex-col gap-4">
-                    <FileSelect label="Document A" value={selFileId} onChange={setSelFileId} fileList={fileList} />
-                    <FileSelect label="Document B" value={selFileIdB} onChange={setSelFileIdB} fileList={fileList} />
+              {activeTool === "headerfooter" && (
+                <Section title="Header & Footer Text">
+                  <div style={{ marginBottom: 10 }}>
+                    <Label>Header Text (leave blank to skip)</Label>
+                    <Inp type="text" value={hfHeader} onChange={(e) => setHfHeader(e.target.value)} placeholder="e.g. Company Confidential" />
                   </div>
-                )}
-
-                {/* EXTRACT TEXT */}
-                {activeTool === "extract" && (
-                  <FileSelect label="Source File" value={selFileId} onChange={setSelFileId} fileList={fileList} />
-                )}
-
-                {/* PAGE NUMBERS */}
-                {activeTool === "pagenumbers" && (
-                  <div className="flex flex-col gap-4">
-                    <FileSelect label="Target File" value={selFileId} onChange={setSelFileId} fileList={fileList} />
-                    <div><label>Start Number</label><input type="number" min="1" value={pnStart} onChange={(e) => setPnStart(+e.target.value)} /></div>
+                  <div>
+                    <Label>Footer Text (leave blank to skip)</Label>
+                    <Inp type="text" value={hfFooter} onChange={(e) => setHfFooter(e.target.value)} placeholder="e.g. Page {n} of {total}" />
                   </div>
-                )}
+                </Section>
+              )}
 
-                {/* HEADER FOOTER */}
-                {activeTool === "headerfooter" && (
-                  <div className="flex flex-col gap-4">
-                    <FileSelect label="Target File" value={selFileId} onChange={setSelFileId} fileList={fileList} />
-                    <div><label>Header Text (blank = none)</label><input type="text" value={hfHeader} onChange={(e) => setHfHeader(e.target.value)} placeholder="Al Burhan Tours & Travels" /></div>
-                    <div><label>Footer Text (blank = none)</label><input type="text" value={hfFooter} onChange={(e) => setHfFooter(e.target.value)} placeholder="Confidential" /></div>
+              {/* ── Run Button ── */}
+              <div style={{ marginBottom: 16 }}>
+                {uploading || uploadingB ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: "#0f172a", borderRadius: 8, fontSize: 13, color: "#60a5fa" }}>
+                    <Loader2 size={15} className="animate-spin" /> Uploading files… please wait
                   </div>
+                ) : (
+                  <button
+                    onClick={run}
+                    disabled={!canRun || processing}
+                    style={{
+                      width: "100%", padding: "11px 0", borderRadius: 8, border: "none",
+                      background: canRun && !processing
+                        ? `linear-gradient(135deg, ${tool?.color || "#3b82f6"}, ${tool?.color || "#3b82f6"}cc)`
+                        : "#1e2433",
+                      color: canRun && !processing ? "#fff" : "#374151",
+                      fontWeight: 700, fontSize: 14, cursor: canRun && !processing ? "pointer" : "not-allowed",
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                      boxShadow: canRun && !processing ? `0 2px 12px ${tool?.color || "#3b82f6"}44` : "none",
+                      transition: "all 0.2s",
+                    }}
+                  >
+                    {processing ? (
+                      <><Loader2 size={16} className="animate-spin" /> Processing…</>
+                    ) : !canRun && files.length === 0 ? (
+                      <>Upload a PDF file to begin</>
+                    ) : !canRun && activeTool === "merge" && readyIds.length < 2 ? (
+                      <>Upload at least 2 files to merge</>
+                    ) : !canRun && needsB && readyIdsB.length < 1 ? (
+                      <>Upload both documents to compare</>
+                    ) : (
+                      <>{tool?.label}</>
+                    )}
+                  </button>
                 )}
               </div>
 
-              <button
-                className="btn-primary flex items-center gap-2"
-                style={{ padding: "10px 24px", width: "100%" }}
-                onClick={run}
-                disabled={loading}
-              >
-                {loading ? (
-                  <><div style={{ width: 16, height: 16, border: "2px solid white", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} /> Processing…</>
-                ) : (
-                  <><Check size={16} /> Apply {tool?.label}</>
-                )}
-              </button>
-
-              {/* Results */}
+              {/* ── Result ── */}
               {result && (
-                <div className="card" style={{ marginTop: "1rem", borderColor: "#14532d" }}>
-                  <div className="flex items-center gap-2 mb-3" style={{ color: "#4ade80" }}>
-                    <Check size={16} /> <span style={{ fontWeight: 700 }}>Operation Complete</span>
+                <div style={{ background: "#052e16", border: "1px solid #166534", borderRadius: 10, padding: "1.2rem", marginBottom: 16 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: result.type === "text" || result.type === "compare" ? 12 : 0 }}>
+                    <CheckCircle2 size={18} color="#10b981" />
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "#10b981" }}>
+                      {result.type === "file" ? result.message || "Done!" :
+                       result.type === "files" ? result.message :
+                       result.type === "text" ? `Extracted ${result.wordCount?.toLocaleString()} words` :
+                       "Comparison complete"}
+                    </span>
                   </div>
-                  {result.reduction !== undefined && (
-                    <p style={{ color: "#8b9ab5", fontSize: 13 }}>Size reduced by {result.reduction}%</p>
+
+                  {result.type === "file" && (
+                    <button
+                      onClick={() => dl(result.id, result.name)}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 8, padding: "9px 18px",
+                        background: "#10b981", color: "#fff", border: "none", borderRadius: 8,
+                        cursor: "pointer", fontWeight: 700, fontSize: 13, marginTop: 10,
+                      }}
+                    >
+                      <Download size={15} /> Download {result.name}
+                    </button>
                   )}
-                  {Array.isArray(result) ? (
-                    <div>
-                      <p style={{ color: "#8b9ab5", fontSize: 13 }}>{result.length} files created. Go to Workspace to view them.</p>
+
+                  {result.type === "files" && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
+                      {result.items.map((item) => (
+                        <button
+                          key={item.id}
+                          onClick={() => dl(item.id, item.name)}
+                          style={{
+                            display: "flex", alignItems: "center", gap: 8, padding: "8px 14px",
+                            background: "#0d1117", border: "1px solid #166534", borderRadius: 7,
+                            cursor: "pointer", fontWeight: 600, fontSize: 13, color: "#4ade80",
+                          }}
+                        >
+                          <Download size={14} /> {item.name}
+                        </button>
+                      ))}
                     </div>
-                  ) : (
-                    <p style={{ color: "#8b9ab5", fontSize: 13 }}>File updated: <strong style={{ color: "#d4d8e1" }}>{result.name}</strong> (v{result.current_version})</p>
                   )}
-                </div>
-              )}
 
-              {extractedText && (
-                <div className="card" style={{ marginTop: "1rem" }}>
-                  <div className="flex items-center justify-between mb-3">
-                    <span style={{ fontWeight: 700, color: "#d4d8e1" }}>Extracted Text</span>
-                  </div>
-                  <textarea
-                    readOnly
-                    value={extractedText}
-                    rows={12}
-                    style={{ width: "100%", fontSize: 12, fontFamily: "monospace", background: "#0d1117", resize: "vertical" }}
-                  />
-                </div>
-              )}
-
-              {compareResult && (
-                <div className="card" style={{ marginTop: "1rem" }}>
-                  <div className="flex items-center justify-between mb-4">
-                    <span style={{ fontWeight: 700, color: "#d4d8e1" }}>Comparison Results</span>
-                    <span className="badge badge-blue">{compareResult.similarity}% similar</span>
-                  </div>
-                  <div className="grid gap-4" style={{ gridTemplateColumns: "1fr 1fr" }}>
+                  {result.type === "text" && (
                     <div>
-                      <label style={{ color: "#f87171" }}>Removed Lines ({compareResult.removed?.length})</label>
-                      <div style={{ background: "#450a0a", borderRadius: 6, padding: "8px 10px", fontSize: 12, maxHeight: 200, overflowY: "auto" }}>
-                        {compareResult.removed?.slice(0, 30).map((l: string, i: number) => <div key={i} style={{ color: "#fca5a5" }}>- {l}</div>)}
-                        {compareResult.removed?.length > 30 && <div style={{ color: "#4a5568" }}>…{compareResult.removed.length - 30} more</div>}
+                      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 6 }}>
+                        <button
+                          onClick={() => { navigator.clipboard.writeText(result.text); toast.success("Copied!"); }}
+                          style={{ padding: "4px 10px", background: "#1e2433", border: "1px solid #2a3347", borderRadius: 5, color: "#8b9ab5", cursor: "pointer", fontSize: 12 }}>
+                          Copy All
+                        </button>
+                      </div>
+                      <textarea
+                        readOnly
+                        value={result.text}
+                        rows={12}
+                        style={{ width: "100%", padding: "10px", background: "#0d1117", border: "1px solid #2a3347", borderRadius: 8, color: "#d4d8e1", fontSize: 12, resize: "vertical", boxSizing: "border-box", fontFamily: "monospace" }}
+                      />
+                    </div>
+                  )}
+
+                  {result.type === "compare" && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <div style={{ fontSize: 36, fontWeight: 800, color: "#4ade80" }}>{Math.round(result.similarity * 100)}%</div>
+                        <div>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: "#d4d8e1" }}>Similarity Score</div>
+                          <div style={{ fontSize: 12, color: "#4a5568" }}>Based on unique word overlap</div>
+                        </div>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                        <div style={{ background: "#0d1117", borderRadius: 7, padding: "10px 12px" }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: "#4a5568", marginBottom: 6 }}>ONLY IN DOCUMENT A ({result.onlyInA.length} words)</div>
+                          <div style={{ fontSize: 12, color: "#d4d8e1", maxHeight: 80, overflowY: "auto" }}>{result.onlyInA.slice(0, 30).join(", ") || "—"}{result.onlyInA.length > 30 ? "…" : ""}</div>
+                        </div>
+                        <div style={{ background: "#0d1117", borderRadius: 7, padding: "10px 12px" }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: "#4a5568", marginBottom: 6 }}>ONLY IN DOCUMENT B ({result.onlyInB.length} words)</div>
+                          <div style={{ fontSize: 12, color: "#d4d8e1", maxHeight: 80, overflowY: "auto" }}>{result.onlyInB.slice(0, 30).join(", ") || "—"}{result.onlyInB.length > 30 ? "…" : ""}</div>
+                        </div>
                       </div>
                     </div>
-                    <div>
-                      <label style={{ color: "#4ade80" }}>Added Lines ({compareResult.added?.length})</label>
-                      <div style={{ background: "#14532d", borderRadius: 6, padding: "8px 10px", fontSize: 12, maxHeight: 200, overflowY: "auto" }}>
-                        {compareResult.added?.slice(0, 30).map((l: string, i: number) => <div key={i} style={{ color: "#86efac" }}>+ {l}</div>)}
-                        {compareResult.added?.length > 30 && <div style={{ color: "#4a5568" }}>…{compareResult.added.length - 30} more</div>}
-                      </div>
-                    </div>
-                  </div>
-                  <p style={{ fontSize: 12, color: "#4a5568", marginTop: 10 }}>{compareResult.unchanged} lines unchanged</p>
+                  )}
                 </div>
               )}
             </div>
