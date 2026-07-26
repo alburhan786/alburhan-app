@@ -296,7 +296,7 @@ export default function BroadcastManager() {
                         <Input
                           value={rcsUrl}
                           onChange={e => setRcsUrl(e.target.value)}
-                          placeholder="https://alburhantravels.com/invoice/INV123"
+                          placeholder="https://alburhantravels.online/invoice/INV123"
                           className="text-sm border-violet-200 focus:ring-violet-400"
                         />
                         <p className="text-[10px] text-violet-600 mt-1">Invoice, hotel map, ticket download link, etc.</p>

@@ -460,7 +460,7 @@ router.put("/platforms/:platform", requireAdmin as any, async (req, res) => {
     const encExtra = encrypt(JSON.stringify(newExtra));
     const apiKey = newExtra.bot_token || newExtra.access_token || newExtra.page_access_token || newExtra.api_key;
     const encKey = apiKey ? encrypt(apiKey) : existingRow?.api_key_encrypted ?? null;
-    const webhookBase = `https://alburhantravels.com`;
+    const webhookBase = `https://alburhantravels.online`;
     const meta = PLATFORM_META[platform as keyof typeof PLATFORM_META];
     const webhookUrl = meta?.webhookPath ? `${webhookBase}${meta.webhookPath}` : null;
     const isEnabled = enabled !== undefined ? Boolean(enabled) : (existingRow?.enabled ?? false);
@@ -824,7 +824,7 @@ router.post("/telegram/set-webhook", requireAdmin as any, async (req, res) => {
     const extra = decryptExtra(r.rows[0].extra_fields_encrypted);
     const token = extra.bot_token;
     if (!token) return void res.status(400).json({ ok: false, message: "Bot token not configured" });
-    const webhookUrl = "https://alburhantravels.com/api/social-media/webhook/telegram";
+    const webhookUrl = "https://alburhantravels.online/api/social-media/webhook/telegram";
     const resp = await axios.post(`https://api.telegram.org/bot${token}/setWebhook`, {
       url: webhookUrl,
       secret_token: extra.webhook_secret || undefined,
@@ -844,7 +844,7 @@ router.post("/telegram/set-webhook", requireAdmin as any, async (req, res) => {
 // and returns status_code, raw_response, error_code, error_type, and a fix hint.
 router.get("/meta/health", requireAdmin as any, async (_req, res) => {
   const GRAPH = "https://graph.facebook.com/v19.0";
-  const WEBHOOK_URL = "https://alburhantravels.com/api/social-media/webhook/meta";
+  const WEBHOOK_URL = "https://alburhantravels.online/api/social-media/webhook/meta";
   const TO = 10000;
 
   // ── Load all Meta platform configs ─────────────────────────────────────────
@@ -1370,7 +1370,7 @@ router.post("/meta/quick-configure", requireAdmin as any, async (req, res) => {
     next_steps: [
       `✅ Token saved to ${PLATFORMS_TO_UPDATE.length} platforms`,
       `Set verify token "${verTok}" in: Meta App Dashboard → Products → Webhooks → Edit Subscription → Verify Token`,
-      `Webhook URL to register: https://alburhantravels.com/api/social-media/webhook/meta`,
+      `Webhook URL to register: https://alburhantravels.online/api/social-media/webhook/meta`,
       `Then click "Subscribe All Webhook Fields" on this page`,
       !igId ? "Instagram not linked — in Instagram app: Settings → Account → Switch to Professional, then link to your Facebook Page" : `Instagram Account ID ${igId} saved`,
     ],
@@ -1421,7 +1421,7 @@ router.post("/meta/test-message", requireAdmin as any, async (req, res) => {
 // webhook re-subscription, challenge verification. Returns a full repair log.
 router.post("/meta/auto-repair", requireAdmin as any, async (_req, res) => {
   const GRAPH = "https://graph.facebook.com/v19.0";
-  const WEBHOOK_URL = "https://alburhantravels.com/api/social-media/webhook/meta";
+  const WEBHOOK_URL = "https://alburhantravels.online/api/social-media/webhook/meta";
   const TO = 10000;
   const repairs: any[] = [];
 
@@ -1843,7 +1843,7 @@ router.get("/meta/platform/:platform", requireAdmin as any, async (req, res) => 
     } else if (platform === "webhooks") {
       // Challenge self-test
       const verifyOk = !!webhookVerifyToken && !webhookVerifyToken.startsWith("http");
-      const WEBHOOK_URL = "https://alburhantravels.com/api/social-media/webhook/meta";
+      const WEBHOOK_URL = "https://alburhantravels.online/api/social-media/webhook/meta";
       if (verifyOk) {
         const r = await gfetch(`${WEBHOOK_URL}?hub.mode=subscribe&hub.verify_token=${encodeURIComponent(webhookVerifyToken!)}&hub.challenge=platform_test_99887`);
         const raw = r.data?._raw ?? "";
@@ -2034,7 +2034,7 @@ router.post("/website-inquiry", async (req, res) => {
 // OAUTH HUB — Real OAuth flows for Meta, Google, Telegram
 // ═══════════════════════════════════════════════════════════════════════════
 
-const OAUTH_REDIRECT_BASE = "https://alburhantravels.com/api/social-media/oauth";
+const OAUTH_REDIRECT_BASE = "https://alburhantravels.online/api/social-media/oauth";
 
 // ── Ensure oauth_connections table ───────────────────────────────────────────
 async function ensureOAuthTable() {

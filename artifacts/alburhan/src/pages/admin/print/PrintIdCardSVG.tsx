@@ -20,7 +20,7 @@ const DEFAULT_DATA = {
   hotelAziziah: "Hilton Towers Makkah",
   serial: "001",
   year: "2026",
-  qrValue: "https://alburhantravels.com/verify/sample",
+  qrValue: "https://alburhantravels.online/verify/sample",
   barcodeValue: "A1234567",
   address: "Shop No. 8, Khanka Masjid Complex, Shanwara Road, Burhanpur",
   phone1: "9893989786",

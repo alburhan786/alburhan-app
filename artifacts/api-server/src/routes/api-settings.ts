@@ -533,7 +533,7 @@ router.post("/lemin/set-webhook", requireAdmin as any, requireSuperAdmin, async 
     }
     const userId = decryptedKey || extraFields.user_id || "";
     if (!userId) return void res.json({ ok: false, message: "Developer API Key not set — save settings first" });
-    const webhookUrl = req.body?.url || "https://alburhantravels.com/api/webhook/rcs";
+    const webhookUrl = req.body?.url || "https://alburhantravels.online/api/webhook/rcs";
     const payload = { url: webhookUrl, agent: "jio", active: true, user_id: userId };
     const resp = await axios.post("https://rcs.leminai.com/api/webhook/set", payload, {
       headers: { "Content-Type": "application/json" },

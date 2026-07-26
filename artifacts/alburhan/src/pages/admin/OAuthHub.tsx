@@ -283,8 +283,8 @@ export default function OAuthHub() {
         {/* Callback URL info */}
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-xs text-gray-600 space-y-1">
           <div className="font-semibold text-gray-700 mb-2">OAuth Callback URLs (add to your app settings)</div>
-          <div><strong>Meta:</strong> <code className="bg-white border rounded px-1">https://alburhantravels.com/api/social-media/oauth/meta/callback</code></div>
-          <div><strong>Google:</strong> <code className="bg-white border rounded px-1">https://alburhantravels.com/api/social-media/oauth/google/callback</code></div>
+          <div><strong>Meta:</strong> <code className="bg-white border rounded px-1">https://alburhantravels.online/api/social-media/oauth/meta/callback</code></div>
+          <div><strong>Google:</strong> <code className="bg-white border rounded px-1">https://alburhantravels.online/api/social-media/oauth/google/callback</code></div>
         </div>
       </div>
     </AdminLayout>

@@ -7,7 +7,7 @@ import { getCompanyById } from "@/lib/companies";
 
 const API  = import.meta.env.VITE_API_URL || "";
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "") || "";
-const PROD_DOMAIN   = "https://alburhantravels.com";
+const PROD_DOMAIN   = "https://alburhantravels.online";
 const MASHARIQ_EN   = "Mashariq Al-Masiyah Company";
 const MASHARIQ_AR   = "شركة مشارق الماسية";
 const INDIA_PHONES  = ["9893989786", "9893225590"];

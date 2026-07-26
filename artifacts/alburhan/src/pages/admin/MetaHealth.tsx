@@ -600,7 +600,7 @@ function QuickConfigurePanel({ onConfigured }: { onConfigured: () => void }) {
                       ))}
                     </ol>
                     <div className="mt-2 bg-white rounded p-2 border border-blue-200">
-                      <p className="font-mono text-[10px] text-gray-600">Webhook URL: <strong>https://alburhantravels.com/api/social-media/webhook/meta</strong></p>
+                      <p className="font-mono text-[10px] text-gray-600">Webhook URL: <strong>https://alburhantravels.online/api/social-media/webhook/meta</strong></p>
                       <p className="font-mono text-[10px] text-gray-600">Verify Token: <strong>{result.verify_token}</strong></p>
                     </div>
                   </div>
@@ -617,7 +617,7 @@ function QuickConfigurePanel({ onConfigured }: { onConfigured: () => void }) {
             <ol className="text-[11px] text-gray-700 space-y-1">
               <li><strong>1.</strong> Go to <a href="https://developers.facebook.com/apps/" target="_blank" rel="noopener noreferrer" className="underline text-blue-600">Meta App Dashboard ↗</a> → your app → <strong>Products → Messenger → Webhooks</strong></li>
               <li><strong>2.</strong> Click <strong>"Edit Subscription"</strong></li>
-              <li><strong>3.</strong> Callback URL: <code className="bg-gray-200 px-1 rounded text-[10px]">https://alburhantravels.com/api/social-media/webhook/meta</code></li>
+              <li><strong>3.</strong> Callback URL: <code className="bg-gray-200 px-1 rounded text-[10px]">https://alburhantravels.online/api/social-media/webhook/meta</code></li>
               <li><strong>4.</strong> Verify Token: <code className="bg-gray-200 px-1 rounded text-[10px]">{verifyTok || "alburhan2026"}</code></li>
               <li><strong>5.</strong> Click <strong>"Verify and Save"</strong> — the server will auto-respond to the challenge</li>
               <li><strong>6.</strong> Then click <strong>"Subscribe All Webhook Fields"</strong> button below on this page</li>
@@ -1095,7 +1095,7 @@ export default function MetaHealth() {
               ["WhatsApp — phone number not found (code 100 / 803)",
                 "Open Meta Business Manager → WhatsApp Manager → Phone Numbers. Copy the numeric Phone Number ID (not the phone number). Save it in WhatsApp Meta settings."],
               ["No webhook events in DB",
-                "(1) Register webhook URL https://alburhantravels.com/api/social-media/webhook/meta in Meta App → Products → Messenger → Webhooks. (2) Click Subscribe All Webhook Fields. (3) Send a test message to your Page from another account."],
+                "(1) Register webhook URL https://alburhantravels.online/api/social-media/webhook/meta in Meta App → Products → Messenger → Webhooks. (2) Click Subscribe All Webhook Fields. (3) Send a test message to your Page from another account."],
               ["WhatsApp test message fails — 'Not a valid phone number'",
                 "Phone number must include the country code with no + or spaces. For India: 919876543210 (91 + 10-digit number). Only numbers that have WhatsApp installed can receive text messages; for others, use a template."],
             ].map(([title, body]) => (

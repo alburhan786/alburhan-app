@@ -200,7 +200,7 @@ export default function ScanPilgrim() {
         </div>
 
         <div style={{ textAlign: "center", color: "#bbb", fontSize: "11px", marginBottom: "24px" }}>
-          Al Burhan Tours & Travels · alburhantravels.com
+          Al Burhan Tours & Travels · alburhantravels.online
         </div>
       </div>
     </div>

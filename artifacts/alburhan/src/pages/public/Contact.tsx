@@ -173,7 +173,7 @@ export default function Contact() {
                     <div className="bg-white/10 p-3 rounded-full shrink-0"><Mail className="text-accent w-5 h-5" /></div>
                     <div>
                       <p className="text-sm text-white/70 mb-1">Email</p>
-                      <p className="font-semibold text-sm">info@alburhantravels.com</p>
+                      <p className="font-semibold text-sm">info@alburhantravels.online</p>
                     </div>
                   </div>
 

@@ -8,7 +8,7 @@ const GOLD    = "#D4AF37";
 const LIGHT   = "#F0FAF4";
 const WHITE   = "#FFFFFF";
 const COMPANY = getCompanyById("alburhan");
-const WEBSITE = "https://alburhantravels.com";
+const WEBSITE = "https://alburhantravels.online";
 const PHONE_IN = "+91 9893989786";
 const PHONE_SA1 = "0547090786";
 const PHONE_SA2 = "0568780786";
@@ -228,7 +228,7 @@ function SprayLabel() {
               <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
               <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
             </svg>
-            <span style={{ fontSize: "8pt", fontWeight: 900, color: WHITE, letterSpacing: "0.3px" }}>www.alburhantravels.com</span>
+            <span style={{ fontSize: "8pt", fontWeight: 900, color: WHITE, letterSpacing: "0.3px" }}>www.alburhantravels.online</span>
           </div>
         </div>
 

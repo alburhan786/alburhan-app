@@ -75,7 +75,7 @@ router.post("/test-abt-template", requireAdmin as any, async (req: Authenticated
       departureAirport: "BOM - Mumbai",
       hotelName: "Dar Al Eiman Royal",
       reportingTime: "4 hours before departure",
-      invoiceUrl: `https://alburhantravels.com/invoice/${bookingId || "TEST-001"}`,
+      invoiceUrl: `https://alburhantravels.online/invoice/${bookingId || "TEST-001"}`,
     };
 
     if (bookingId) {
@@ -100,7 +100,7 @@ router.post("/test-abt-template", requireAdmin as any, async (req: Authenticated
           finalAmount: b.final_amount || b.total_amount || ctx.finalAmount,
           flightNumber: b.flight_number || ctx.flightNumber,
           departureDate: b.departure_date || ctx.departureDate,
-          invoiceUrl: `https://alburhantravels.com/invoice/${b.booking_number || bookingId}`,
+          invoiceUrl: `https://alburhantravels.online/invoice/${b.booking_number || bookingId}`,
         };
       }
     }

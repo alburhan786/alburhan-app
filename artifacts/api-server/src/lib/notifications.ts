@@ -583,7 +583,7 @@ function buildHtmlEmail(bodyText: string): string {
   </td></tr>
   <tr><td style="background:#f8f8f8;padding:16px 32px;text-align:center;border-top:1px solid #eee;">
     <p style="margin:0;font-size:12px;color:#888888;">Al Burhan Tours &amp; Travels | Bhopal, India</p>
-    <p style="margin:4px 0 0;font-size:12px;color:#888888;">📞 +91 9893225590 | ✉ info@alburhantravels.com</p>
+    <p style="margin:4px 0 0;font-size:12px;color:#888888;">📞 +91 9893225590 | ✉ info@alburhantravels.online</p>
     <p style="margin:4px 0 0;font-size:11px;color:#aaaaaa;">This is an automated notification. Please do not reply to this email.</p>
   </td></tr>
 </table>
@@ -610,7 +610,7 @@ export async function sendEmail(to: string, subject: string, body: string, htmlB
   // Use the auth user as the sender; set replyTo to the business address
   const smtpUser = smtpCfg.extra.user || process.env.SMTP_USER || "";
   const fromDisplay = smtpCfg.extra.from_name || "Al Burhan Tours & Travels";
-  const replyTo = smtpCfg.extra.from_email || "info@alburhantravels.com";
+  const replyTo = smtpCfg.extra.from_email || "info@alburhantravels.online";
   const from = `${fromDisplay} <${smtpUser}>`;
 
   // Strip HTML tags from body text for plain-text version
@@ -749,7 +749,7 @@ export async function sendAdminPaymentAlert(opts: {
   const label = opts.isFullyPaid ? "Full Payment Received — Booking CONFIRMED" : "Partial Payment Received";
   const adminMsg = `💰 ${label}\n\nBooking: #${opts.bookingNumber}\nCustomer: ${opts.customerName}\nMobile: ${opts.mobile}\nAmount: Rs.${opts.amount}${opts.balance ? `\nBalance: Rs.${opts.balance}` : ""}${opts.invoiceNumber ? `\nInvoice: ${opts.invoiceNumber}` : ""}`;
   const adminNumbers = ["9893989786", "8989701701"];
-  const adminEmails = ["admin@alburhantravels.com", "altaf@alburhantravels.com"];
+  const adminEmails = ["admin@alburhantravels.online", "altaf@alburhantravels.online"];
 
   const [waResults, emailResults] = await Promise.all([
     Promise.all(adminNumbers.map((n) => sendWhatsApp(n, adminMsg))),
@@ -828,8 +828,8 @@ export async function sendCustomerDocumentUploadNotification(opts: {
 }
 
 const ADMIN_NOTIFICATION_EMAILS = [
-  "admin@alburhantravels.com",
-  "altaf@alburhantravels.com",
+  "admin@alburhantravels.online",
+  "altaf@alburhantravels.online",
 ];
 
 export async function sendAdminNewBookingEmail(opts: {
@@ -848,11 +848,11 @@ export async function sendAdminNewBookingEmail(opts: {
     console.log("[AdminEmail] SMTP not configured — skipping admin booking email");
     return;
   }
-  const from = process.env.SMTP_USER || "info@alburhantravels.com";
+  const from = process.env.SMTP_USER || "info@alburhantravels.online";
   const subject = opts.isOffline
     ? `[Al Burhan] New Offline Booking — ${opts.customerName}`
     : `[Al Burhan] New Booking Request — ${opts.customerName}`;
-  const dashLink = `https://alburhantravels.com/admin/bookings`;
+  const dashLink = `https://alburhantravels.online/admin/bookings`;
   const amountLine = opts.finalAmount
     ? `₹${Number(opts.finalAmount).toLocaleString("en-IN")}`
     : "To be calculated";
@@ -885,7 +885,7 @@ export async function sendAdminNewBookingEmail(opts: {
       </a>
     </div>
   </div>
-  <p style="color:#aaa;font-size:11px;text-align:center;margin-top:16px">Al Burhan Tours &amp; Travels · admin@alburhantravels.com</p>
+  <p style="color:#aaa;font-size:11px;text-align:center;margin-top:16px">Al Burhan Tours &amp; Travels · admin@alburhantravels.online</p>
 </body>
 </html>`;
 
@@ -928,21 +928,21 @@ export async function sendAdminDocumentReadyNotification(opts: {
     smsKey ? docSmsMap[smsKey]() : smsSendInvoiceCreated({ mobile: opts.mobile, customerName: opts.customerName, bookingNumber: opts.bookingNumber }),
     sendWhatsApp(opts.mobile, message),
     opts.email ? sendEmail(opts.email, `Your ${docLabel} is Ready – Al Burhan Tours & Travels`, message) : Promise.resolve(),
-    sendRCS(opts.mobile, opts.customerName, message, { active: true, url: "https://www.alburhantravels.com/dashboard", agent: "jio" }),
+    sendRCS(opts.mobile, opts.customerName, message, { active: true, url: "https://www.alburhantravels.online/dashboard", agent: "jio" }),
   ]);
 }
 
 const JOURNEY_STATUS_MESSAGES: Record<string, { title: string; body: (name: string, bn: string) => string }> = {
   booking_requested:  { title: "Booking Submitted",     body: (n, b) => `Assalamu Alaikum ${n},\n\nYour booking #${b} has been submitted. Our team will review shortly and notify you once approved.\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 8989701701` },
-  documents_pending:  { title: "Documents Required",    body: (n, b) => `Assalamu Alaikum ${n},\n\n📄 We need your documents for booking #${b}.\n\nPlease upload: Passport, Aadhaar, PAN Card & Photo in your dashboard.\n\nLogin: alburhantravels.com\n\nAl Burhan Tours & Travels\n+91 8989701701` },
+  documents_pending:  { title: "Documents Required",    body: (n, b) => `Assalamu Alaikum ${n},\n\n📄 We need your documents for booking #${b}.\n\nPlease upload: Passport, Aadhaar, PAN Card & Photo in your dashboard.\n\nLogin: alburhantravels.online\n\nAl Burhan Tours & Travels\n+91 8989701701` },
   documents_received: { title: "Documents Received",    body: (n, b) => `Assalamu Alaikum ${n},\n\n✅ Documents received for booking #${b}.\n\nWe are reviewing your documents. You will be notified once verification is complete.\n\nAl Burhan Tours & Travels` },
   admin_verification: { title: "Under Verification",    body: (n, b) => `Assalamu Alaikum ${n},\n\n🔍 Booking #${b} is currently under admin verification.\n\nWe will notify you as soon as the process is complete.\n\nAl Burhan Tours & Travels` },
-  payment_pending:    { title: "Payment Pending",        body: (n, b) => `Assalamu Alaikum ${n},\n\n💰 Payment pending for booking #${b}.\n\nPlease login to complete your payment and secure your seat.\n\nLogin: alburhantravels.com\n\nAl Burhan Tours & Travels\n+91 8989701701` },
+  payment_pending:    { title: "Payment Pending",        body: (n, b) => `Assalamu Alaikum ${n},\n\n💰 Payment pending for booking #${b}.\n\nPlease login to complete your payment and secure your seat.\n\nLogin: alburhantravels.online\n\nAl Burhan Tours & Travels\n+91 8989701701` },
   payment_received:   { title: "Payment Received",       body: (n, b) => `Assalamu Alaikum ${n},\n\n✅ Payment received for booking #${b}.\n\nJazak Allah Khair! Your seat is now confirmed.\n\nAl Burhan Tours & Travels` },
-  invoice_generated:  { title: "Invoice Generated",      body: (n, b) => `Assalamu Alaikum ${n},\n\n🧾 Your invoice for booking #${b} is ready.\n\nLogin to download it from your dashboard.\n\nalburhantravels.com\n\nAl Burhan Tours & Travels` },
+  invoice_generated:  { title: "Invoice Generated",      body: (n, b) => `Assalamu Alaikum ${n},\n\n🧾 Your invoice for booking #${b} is ready.\n\nLogin to download it from your dashboard.\n\nalburhantravels.online\n\nAl Burhan Tours & Travels` },
   visa_processing:    { title: "Visa Processing",        body: (n, b) => `Assalamu Alaikum ${n},\n\n🛂 Your visa application for booking #${b} has been submitted.\n\nWe will notify you as soon as the visa is approved, Insha'Allah.\n\nAl Burhan Tours & Travels` },
   visa_approved:      { title: "Visa Approved",          body: (n, b) => `Assalamu Alaikum ${n},\n\nAlhamdulillah! 🎉 Your VISA is APPROVED for booking #${b}.\n\nPlease visit our office to collect your travel documents.\n\nAl Burhan Tours & Travels\n+91 8989701701` },
-  flight_confirmed:   { title: "Flight Ticket Issued",   body: (n, b) => `Assalamu Alaikum ${n},\n\n✈️ Flight ticket issued for booking #${b}.\n\nYour flight is confirmed. Login to view your e-ticket.\n\nalburhantravels.com\n\nAl Burhan Tours & Travels` },
+  flight_confirmed:   { title: "Flight Ticket Issued",   body: (n, b) => `Assalamu Alaikum ${n},\n\n✈️ Flight ticket issued for booking #${b}.\n\nYour flight is confirmed. Login to view your e-ticket.\n\nalburhantravels.online\n\nAl Burhan Tours & Travels` },
   hotel_confirmed:    { title: "Hotel Confirmed",        body: (n, b) => `Assalamu Alaikum ${n},\n\n🏨 Hotel confirmed for booking #${b}.\n\nYour accommodation has been booked. Login to view details.\n\nAl Burhan Tours & Travels` },
   bus_allocated:      { title: "Bus Allocated",          body: (n, b) => `Assalamu Alaikum ${n},\n\n🚌 Bus details assigned for booking #${b}.\n\nYour bus has been allocated. Login to view your bus number and schedule.\n\nAl Burhan Tours & Travels` },
   room_allocated:     { title: "Room Allocated",         body: (n, b) => `Assalamu Alaikum ${n},\n\n🛏️ Room allocated for booking #${b}.\n\nYour room assignment is ready. Login to view details.\n\nAl Burhan Tours & Travels` },
@@ -1059,13 +1059,13 @@ Please log in to your customer dashboard to:
 • View Journey Status
 
 Dashboard:
-https://www.alburhantravels.com/dashboard
+https://www.alburhantravels.online/dashboard
 
 Need Help?
 
 📞 +91 9893225590
-📧 info@alburhantravels.com
-🌐 https://www.alburhantravels.com
+📧 info@alburhantravels.online
+🌐 https://www.alburhantravels.online
 
 May Allah accept your pilgrimage.
 
@@ -1086,7 +1086,7 @@ Departure:
 ${dep}
 
 Login:
-https://www.alburhantravels.com/dashboard
+https://www.alburhantravels.online/dashboard
 
 Support:
 +91 9893225590`;
@@ -1131,7 +1131,7 @@ Support:
 
           <!-- CTA Button -->
           <div style="text-align:center;margin-bottom:28px">
-            <a href="https://www.alburhantravels.com/dashboard" style="background:#0B3D2E;color:#fff;padding:14px 36px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:15px;display:inline-block">
+            <a href="https://www.alburhantravels.online/dashboard" style="background:#0B3D2E;color:#fff;padding:14px 36px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:15px;display:inline-block">
               🕋 Login to Your Dashboard
             </a>
           </div>
@@ -1151,8 +1151,8 @@ Support:
           <!-- Contact -->
           <div style="border-top:1px solid #e5e7eb;padding-top:20px;text-align:center">
             <p style="color:#6b7280;font-size:13px;margin:0 0 6px">Need Help? We're here for you.</p>
-            <p style="color:#374151;font-size:13px;margin:0">📞 +91 9893225590 &nbsp;|&nbsp; 📧 info@alburhantravels.com</p>
-            <p style="color:#374151;font-size:13px;margin:4px 0 0">🌐 <a href="https://www.alburhantravels.com" style="color:#0B3D2E">www.alburhantravels.com</a></p>
+            <p style="color:#374151;font-size:13px;margin:0">📞 +91 9893225590 &nbsp;|&nbsp; 📧 info@alburhantravels.online</p>
+            <p style="color:#374151;font-size:13px;margin:4px 0 0">🌐 <a href="https://www.alburhantravels.online" style="color:#0B3D2E">www.alburhantravels.online</a></p>
           </div>
         </td></tr>
         <!-- Footer -->
@@ -1186,7 +1186,7 @@ Support:
       : Promise.resolve({ ok: false, provider: "SMTP", endpoint: "smtp", errorMessage: "No email provided" } as SendResult),
 
     // ── RCS (Lemin AI / Jio) ──────────────────────────────────────────────────
-    sendRCS(opts.mobile, opts.customerName, smsMsg, { active: true, url: "https://www.alburhantravels.com/dashboard", agent: "jio" }),
+    sendRCS(opts.mobile, opts.customerName, smsMsg, { active: true, url: "https://www.alburhantravels.online/dashboard", agent: "jio" }),
   ]);
 
   let dashboardResult: { ok: boolean; errorMessage?: string } = { ok: false, errorMessage: "No bookingId" };

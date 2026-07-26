@@ -171,7 +171,7 @@ function FrontSticker({ p, group, company, groupColor, groupLabel, photoDataUrls
           {/* Footer band */}
           <div style={{ position: "relative", zIndex: 2, background: DARK, padding: "1mm 2mm", display: "flex", alignItems: "center", justifyContent: "center", gap: "1.5mm" }}>
             <svg viewBox="0 0 24 24" width="10" height="10" fill="none"><path d="M8 11V7a4 4 0 0 1 8 0v4" stroke={GOLD} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none" /><rect x="4.5" y="10.5" width="15" height="11" rx="2.5" fill={GOLD} /><circle cx="12" cy="16.2" r="1.9" fill={DARK} /></svg>
-            <div style={{ fontSize: "7.5pt", fontWeight: 900, color: "#fff" }}>www.alburhantravels.com</div>
+            <div style={{ fontSize: "7.5pt", fontWeight: 900, color: "#fff" }}>www.alburhantravels.online</div>
           </div>
           <div style={{ position: "relative", zIndex: 2, background: "#FFC107", color: RED, padding: "0.6mm 2mm", fontSize: "6pt", textAlign: "center", fontWeight: 900, textTransform: "uppercase" }}>BAGGAGE TAG</div>
         </div>
@@ -250,7 +250,7 @@ function FrontSticker({ p, group, company, groupColor, groupLabel, photoDataUrls
         </div>
         <div style={{ position: "relative", zIndex: 2, background: DARK, padding: "1.5mm 3mm", display: "flex", alignItems: "center", justifyContent: "center", gap: "2.5mm" }}>
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none"><path d="M8 11V7a4 4 0 0 1 8 0v4" stroke={GOLD} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none" /><rect x="4.5" y="10.5" width="15" height="11" rx="2.5" fill={GOLD} /><circle cx="12" cy="16.2" r="1.9" fill={DARK} /></svg>
-          <div style={{ fontSize: "9.5pt", fontWeight: 900, color: "#fff" }}>www.alburhantravels.com</div>
+          <div style={{ fontSize: "9.5pt", fontWeight: 900, color: "#fff" }}>www.alburhantravels.online</div>
         </div>
         <div style={{ position: "relative", zIndex: 2, background: "#FFC107", color: RED, padding: "1mm 3mm", fontSize: "7.5pt", textAlign: "center", fontWeight: 900, textTransform: "uppercase" }}>BAGGAGE TAG</div>
       </div>

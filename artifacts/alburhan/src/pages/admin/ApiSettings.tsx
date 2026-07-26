@@ -126,8 +126,8 @@ const PROVIDERS: ProviderDef[] = [
     apiKeyPlaceholder: "Enter SMTP password / app password",
     extraFields: [
       { key: "port", label: "SMTP Port", placeholder: "587", type: "number", isExtra: true },
-      { key: "user", label: "SMTP Username / Email", placeholder: "info@alburhantravels.com", isExtra: true },
-      { key: "from_email", label: "From Email", placeholder: "info@alburhantravels.com", isExtra: true },
+      { key: "user", label: "SMTP Username / Email", placeholder: "info@alburhantravels.online", isExtra: true },
+      { key: "from_email", label: "From Email", placeholder: "info@alburhantravels.online", isExtra: true },
       { key: "from_name", label: "From Name", placeholder: "Al Burhan Tours & Travels", isExtra: true },
     ],
     testMessageFields: [
@@ -387,7 +387,7 @@ export default function ApiSettings() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ url: "https://alburhantravels.com/api/webhook/rcs" }),
+        body: JSON.stringify({ url: "https://alburhantravels.online/api/webhook/rcs" }),
       });
       const data = await res.json();
       setWebhookResult(data);

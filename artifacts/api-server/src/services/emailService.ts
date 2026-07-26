@@ -11,7 +11,7 @@
  *   SMTP_PORT      — 587  (TLS) or 465 (SSL)
  *   SMTP_USER      — Your MSG91 username / domain email
  *   SMTP_PASS      — Your MSG91 SMTP password
- *   SMTP_FROM      — Sender address  (info@alburhantravels.com)
+ *   SMTP_FROM      — Sender address  (info@alburhantravels.online)
  *   SMTP_FROM_NAME — Display name    (Al Burhan Tours & Travels)
  *
  * Exported functions (all return { ok: boolean, messageId?, error? }):
@@ -34,12 +34,12 @@ const BRAND = {
   midGreen:   "#0d7a4e",
   gold:       "#C8A951",
   goldLight:  "#f5e9c0",
-  website:    "https://alburhantravels.com",
-  dashboard:  "https://alburhantravels.com/dashboard",
+  website:    "https://alburhantravels.online",
+  dashboard:  "https://alburhantravels.online/dashboard",
   phone1:     "+91 9893225590",
   phone2:     "+91 9893989786",
   whatsapp:   "https://wa.me/919893225590",
-  email:      "info@alburhantravels.com",
+  email:      "info@alburhantravels.online",
   address:    "Bhopal, Madhya Pradesh, India",
 };
 
@@ -426,7 +426,7 @@ function buildTemplate(
         <p style="margin:0 0 10px;font-size:12px;color:#777;font-family:Arial,sans-serif;">
           ✉&nbsp;<a href="mailto:${BRAND.email}" style="color:${BRAND.darkGreen};text-decoration:none;">${BRAND.email}</a>
           &nbsp;|&nbsp;
-          🌐&nbsp;<a href="${BRAND.website}" style="color:${BRAND.darkGreen};text-decoration:none;">www.alburhantravels.com</a>
+          🌐&nbsp;<a href="${BRAND.website}" style="color:${BRAND.darkGreen};text-decoration:none;">www.alburhantravels.online</a>
         </p>
         <p style="margin:0;font-size:10px;color:#aaa;line-height:1.6;font-family:Arial,sans-serif;">
           This is an automated notification. Do not reply to this email.<br>

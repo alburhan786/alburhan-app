@@ -116,7 +116,7 @@ export async function sendDocumentToCustomer(input: DocDeliveryInput): Promise<{
   } = input;
 
   const label = DOC_TYPE_LABELS[documentType] || documentType.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
-  const siteBase = process.env.SITE_URL || "https://alburhantravels.com";
+  const siteBase = process.env.SITE_URL || "https://alburhantravels.online";
   const dashboardUrl = `${siteBase}/dashboard`;
   const pkgLine = packageName ? `\nPackage:\n${packageName}` : "";
 

@@ -733,7 +733,7 @@ export default function MetaStatus() {
 
               <p className="text-[9px] text-gray-400 text-center pt-3 border-t">
                 Al Burhan Tours & Travels ERP · {vps?.build || "v30.0-meta-production"} · PID {vps?.pid || "—"} · Node {vps?.node || "v20"} ·
-                Report generated {certTime} · alburhantravels.com
+                Report generated {certTime} · alburhantravels.online
               </p>
             </div>
           </div>

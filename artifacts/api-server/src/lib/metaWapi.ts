@@ -133,7 +133,7 @@ export function buildMetaVariables(eventType: string, ctx: Record<string, any>):
   const airline = ctx.airline         || "-";
   const visa    = ctx.visaNumber      || "-";
   const inv     = ctx.invoiceNumber   || booking;
-  const siteBase = "https://alburhantravels.com";
+  const siteBase = "https://alburhantravels.online";
   const invUrl  = ctx.invoiceUrl || (booking !== "-" ? `${siteBase}/invoice/${booking}` : siteBase);
   const payUrl  = booking !== "-" ? `${siteBase}/pay/${booking}` : siteBase;
 

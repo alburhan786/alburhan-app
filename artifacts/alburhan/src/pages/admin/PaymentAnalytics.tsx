@@ -727,7 +727,7 @@ function ReceiptDialog({ txn, booking, onClose }: { txn: PaymentTxn; booking: Bo
         <div class="row"><span class="label">Total Paid</span><span class="value" style="color:#059669">₹${booking.paidAmount.toLocaleString("en-IN")}</span></div>
         <div class="row"><span class="label">Balance Due</span><span class="value" style="color:${(booking.remainingAmount ?? 0) > 0 ? "#d97706" : "#059669"}">${(booking.remainingAmount ?? 0) > 0 ? `₹${(booking.remainingAmount ?? 0).toLocaleString("en-IN")}` : "Paid in Full ✓"}</span></div>
       </div>
-      <div class="footer">Receipt generated on ${new Date().toLocaleString("en-IN")} • Al Burhan Tours & Travels — alburhantravels.com</div>
+      <div class="footer">Receipt generated on ${new Date().toLocaleString("en-IN")} • Al Burhan Tours & Travels — alburhantravels.online</div>
       </body></html>`);
     w.document.close();
     setTimeout(() => { w.print(); }, 400);

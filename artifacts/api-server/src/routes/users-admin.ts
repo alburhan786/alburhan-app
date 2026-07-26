@@ -31,7 +31,7 @@ async function sendCredentials(
   password: string,
   email?: string | null
 ) {
-  const loginUrl = "https://alburhantravels.com/login";
+  const loginUrl = "https://alburhantravels.online/login";
   const msg =
     `Welcome to Al Burhan Tours & Travels!\n\n` +
     `Your login credentials:\n` +
@@ -328,13 +328,13 @@ router.post(
       await pool.query(`UPDATE users SET password_hash=$1, updated_at=NOW() WHERE id=$2`, [hash, req.params.id]);
 
       if (doSend !== false) {
-        const msg = `Al Burhan Tours: Your password has been reset.\nMobile: ${mobile}\nNew Password: ${password}\nLogin: https://alburhantravels.com/login`;
+        const msg = `Al Burhan Tours: Your password has been reset.\nMobile: ${mobile}\nNew Password: ${password}\nLogin: https://alburhantravels.online/login`;
         sendWhatsApp(mobile, msg).catch(() => {});
         if (email) {
           sendGenericEmail({
             to: email,
             subject: "Password Reset — Al Burhan Tours",
-            html: `<p>Dear ${name || "User"},</p><p>Your password has been reset.<br><strong>New Password:</strong> <code>${password}</code></p><p>Login at <a href="https://alburhantravels.com/login">alburhantravels.com/login</a></p>`,
+            html: `<p>Dear ${name || "User"},</p><p>Your password has been reset.<br><strong>New Password:</strong> <code>${password}</code></p><p>Login at <a href="https://alburhantravels.online/login">alburhantravels.online/login</a></p>`,
           }).catch(() => {});
         }
       }

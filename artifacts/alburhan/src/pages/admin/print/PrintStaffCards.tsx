@@ -4,7 +4,7 @@ import { downloadAsPdf, downloadAsJpg, downloadAsPng, fetchAsDataUrl, downloadPe
 import { COMPANIES, getCompanyById } from "@/lib/companies";
 
 const API = import.meta.env.VITE_API_URL || "";
-const PROD_DOMAIN = "https://alburhantravels.com";
+const PROD_DOMAIN = "https://alburhantravels.online";
 
 interface HajjGroup { id: string; groupName: string; }
 

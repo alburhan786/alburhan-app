@@ -109,7 +109,7 @@ export default function ToolsPage() {
   const [annX, setAnnX] = useState(50);
   const [annY, setAnnY] = useState(700);
   const [annSize, setAnnSize] = useState(12);
-  const [qrContent, setQrContent] = useState("https://alburhantravels.com");
+  const [qrContent, setQrContent] = useState("https://alburhantravels.online");
   const [qrPage, setQrPage] = useState(1);
   const [qrX, setQrX] = useState(400);
   const [qrY, setQrY] = useState(50);

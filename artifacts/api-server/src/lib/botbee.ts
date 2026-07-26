@@ -248,7 +248,7 @@ export const TEMPLATE_BODIES: Record<string, string> = {
   "410026": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {{1}}\n\nYour departure date is approaching.\n\n📋 Booking ID: {{2}}\n📅 Departure:{{3}}\n🛄 Reporting Time: {{4}}\n🏢 Airport {{5}}\n\nPlease carry your Passport, Visa, Flight Ticket, ID Card, and other required documents.\n\nMay Allah (SWT) bless your journey.\n\nAl Burhan Tours & Travels",
   "410030": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {{1}}\n\nWelcome to the Kingdom of Saudi Arabia.\n\nAlhamdulillah, we pray that your Hajj/Umrah journey is filled with peace, blessings, and acceptance.\n\nIf you require any assistance during your stay, please contact our team.\n\nJazak Allah Khair.\n\nAl Burhan Tours & Travels",
   "410031": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {{1}}\n\nAlhamdulillah!\n\nWelcome back to India.\n\nWe pray that Allah (SWT) accepts your Hajj/Umrah, forgives your sins, and grants you countless blessings.\n\nThank you for travelling with Al Burhan Tours & Travels.\n\nJazak Allah Khair.",
-  "410040": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {{1}}\n\n🕌 Hajj {{2}} Bookings Are Now Open!\n\nBook your Hajj journey with Al Burhan Tours & Travels.\n\n✅ Government Approved Services\n✅ Comfortable Accommodation\n✅ Experienced Tour Guides\n✅ Complete Visa & Travel Assistance\n\n📞 Contact: +91 9893225590\n🌐 www.alburhantravels.com\n\nReserve your seat today and begin your sacred journey with confidence.\n\nJazak Allah Khair.\n\nAl Burhan Tours & Travels",
+  "410040": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {{1}}\n\n🕌 Hajj {{2}} Bookings Are Now Open!\n\nBook your Hajj journey with Al Burhan Tours & Travels.\n\n✅ Government Approved Services\n✅ Comfortable Accommodation\n✅ Experienced Tour Guides\n✅ Complete Visa & Travel Assistance\n\n📞 Contact: +91 9893225590\n🌐 www.alburhantravels.online\n\nReserve your seat today and begin your sacred journey with confidence.\n\nJazak Allah Khair.\n\nAl Burhan Tours & Travels",
 };
 
 /**
@@ -611,7 +611,7 @@ export async function sendInvoice(to: string, ctx: {
     bookingId: ctx.bookingNumber,
     invoiceNumber: ctx.invoiceNumber,
     amount: ctx.amount,
-    invoiceUrl: ctx.invoiceUrl || `https://alburhantravels.com/invoice/${ctx.bookingNumber}`,
+    invoiceUrl: ctx.invoiceUrl || `https://alburhantravels.online/invoice/${ctx.bookingNumber}`,
   }, { eventType: "invoice_generated", bookingId: ctx.bookingId, customerId: ctx.customerId });
   if (!result.ok) await smsFallback(to, ctx.bookingId, ctx.customerId);
   return result;
@@ -847,7 +847,7 @@ function bodyParams(texts: (string | null | undefined)[]): object[] {
 //   410031 arrival_india        : {{1}}=name                                                              (1)
 //   410040 hajj_package_launch  : {{1}}=name {{2}}=year                                                  (2)
 
-const SITE = "https://alburhantravels.com";
+const SITE = "https://alburhantravels.online";
 function fmtAmount(v: string | number | undefined | null): string {
   // Return the raw number WITHOUT ₹ symbol — template bodies already have "₹ #!Amount!#"
   // so including ₹ here would produce "₹ ₹1,89,000" (double rupee).

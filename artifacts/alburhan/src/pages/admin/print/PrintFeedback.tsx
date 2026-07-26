@@ -4,7 +4,7 @@ import { downloadAsPdf } from "@/lib/downloadUtils";
 import { PrintHeader } from "./PrintHeader";
 import { COMPANIES, getCompanyById } from "@/lib/companies";
 const API = import.meta.env.VITE_API_URL || "";
-const PROD_DOMAIN = "https://alburhantravels.com";
+const PROD_DOMAIN = "https://alburhantravels.online";
 
 function QrImg({ value, size = 80 }: { value: string; size?: number }) {
   const src = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(value)}&color=0d5040&bgcolor=ffffff&margin=2`;

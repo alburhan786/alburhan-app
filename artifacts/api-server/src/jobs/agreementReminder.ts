@@ -11,7 +11,7 @@ import { fireNotificationEvent } from "../lib/notificationEngine.js";
 // Stops automatically once agreement is signed.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const SITE = "https://alburhantravels.com";
+const SITE = "https://alburhantravels.online";
 const REMINDER_HOURS = [24, 48, 72] as const;
 const SLOT_WINDOW_HOURS = 5;    // ±5 h around each slot
 const DEDUP_WINDOW_HOURS = 20;  // Don't re-send within 20 h window per slot

@@ -7,7 +7,7 @@ import { COMPANIES, getCompanyById, type CompanyInfo } from "@/lib/companies";
 
 const API  = import.meta.env.VITE_API_URL || "";
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "") || "";
-const PROD_DOMAIN = "https://alburhantravels.com";
+const PROD_DOMAIN = "https://alburhantravels.online";
 
 interface Pilgrim {
   id: string; serialNumber: number; fullName: string; passportNumber?: string;

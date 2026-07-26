@@ -108,7 +108,7 @@ function InvoiceDoc({ booking, invoiceNumber }: { booking: Booking; invoiceNumbe
   const cgst = gstAmount / 2;
   const sgst = gstAmount / 2;
 
-  const invoiceUrl = `https://alburhantravels.com/invoice/${booking.bookingNumber}`;
+  const invoiceUrl = `https://alburhantravels.online/invoice/${booking.bookingNumber}`;
 
   return (
     <div className="bg-white text-black" style={{ fontFamily: "Arial, Helvetica, sans-serif", fontSize: "12px" }}>
@@ -547,7 +547,7 @@ function ActionMenu({
   };
 
   const handleSendEmail = () => {
-    const url = `https://alburhantravels.com/invoice/${booking.bookingNumber}`;
+    const url = `https://alburhantravels.online/invoice/${booking.bookingNumber}`;
     const subject = encodeURIComponent(`Invoice ${invoiceNumber} – Al Burhan Tours & Travels`);
     const body = encodeURIComponent(`Dear ${booking.customerName},\n\nPlease find your invoice at:\n${url}\n\nJazak Allah Khair,\nAl Burhan Tours & Travels`);
     const mail = booking.customerEmail

@@ -65,7 +65,7 @@ export default function About() {
                   </li>
                   <li className="flex items-center gap-3">
                     <span className="text-accent">✉️</span>
-                    <span><strong>Email:</strong> info@alburhantravels.com</span>
+                    <span><strong>Email:</strong> info@alburhantravels.online</span>
                   </li>
                 </ul>
               </div>

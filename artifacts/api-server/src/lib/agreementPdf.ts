@@ -60,7 +60,7 @@ function drawHeader(doc: any, subtitle: string, agreementNum?: string, bookingNu
   doc.fill(GOLD).font("Helvetica-Bold").fontSize(15).text("AL BURHAN TOURS & TRAVELS", M + 74, 12, { width: CW - 74 });
   doc.fill("white").font("Helvetica").fontSize(7).text("Regd. Hajj & Umrah Travel Agency  |  Est. 2008  |  GSTIN: 23AAVFA3223C1ZW", M + 74, 31, { width: CW - 74 });
   doc.fill("rgba(255,255,255,0.75)").font("Helvetica").fontSize(6.5)
-    .text("5/8 Khanka Masjid Complex, Shanwara Road, Burhanpur 450331, M.P.  |  +91 9893989786  |  alburhantravels.com", M + 74, 42, { width: CW - 74 });
+    .text("5/8 Khanka Masjid Complex, Shanwara Road, Burhanpur 450331, M.P.  |  +91 9893989786  |  alburhantravels.online", M + 74, 42, { width: CW - 74 });
   doc.fill(GOLD).font("Helvetica-Bold").fontSize(9.5).text(subtitle, M + 74, 56, { width: CW - 74 });
   if (agreementNum) {
     doc.fill("rgba(201,162,63,0.7)").font("Helvetica").fontSize(7)

@@ -58,7 +58,7 @@ const DEFAULT_HTML = `<!DOCTYPE html>
     <p>Departure: <strong>{{departure_date}}</strong></p>
     <p>Total Amount: <strong>{{amount}}</strong></p>
     <div class="footer">
-      Al Burhan Tours &amp; Travels · alburhantravels.com<br/>
+      Al Burhan Tours &amp; Travels · alburhantravels.online<br/>
       For support, call +91 XXXXX XXXXX
     </div>
   </div>

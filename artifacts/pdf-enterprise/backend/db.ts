@@ -156,7 +156,7 @@ export async function setupDb() {
     const hash = await bcrypt.hash("Admin@2024!", 12);
     await pool.query(
       `INSERT INTO pdf_users (id, username, email, password_hash, role) VALUES ($1, $2, $3, $4, 'admin')`,
-      [uuidv4(), "admin", "admin@alburhantravels.com", hash]
+      [uuidv4(), "admin", "admin@alburhantravels.online", hash]
     );
     console.log("[PDF-DB] ✅ Default admin user created: admin / Admin@2024!");
   }

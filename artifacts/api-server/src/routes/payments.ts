@@ -156,7 +156,7 @@ export async function processPaymentSuccessNotifications(opts: {
   const finalAmountNum = Number(booking.finalAmount || 0);
   const siteBase = process.env.REPLIT_DEV_DOMAIN
     ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-    : (process.env.SITE_URL || "https://alburhantravels.com");
+    : (process.env.SITE_URL || "https://alburhantravels.online");
   const invoiceUrl = invoiceNumber ? `${siteBase}/invoice/${booking.bookingNumber}` : undefined;
 
   // Auto receipt number: RCP-{bookingNumber}-{last6 of ms timestamp}
@@ -592,7 +592,7 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
 
   const siteBase = process.env.REPLIT_DEV_DOMAIN
     ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-    : (process.env.SITE_URL || "https://alburhantravels.com");
+    : (process.env.SITE_URL || "https://alburhantravels.online");
   const invoiceUrl = finalInvoiceNumber ? `${siteBase}/invoice/${booking.bookingNumber}` : null;
 
   res.json({
@@ -1586,7 +1586,7 @@ router.post("/verify-public", async (req, res) => {
 
   console.log(`${logPfx} ✅ DB updated: ${updated.bookingNumber} → ${newStatus}`);
 
-  const siteBase = process.env.SITE_URL || "https://alburhantravels.com";
+  const siteBase = process.env.SITE_URL || "https://alburhantravels.online";
   const invoiceUrl = invoiceNumber ? `${siteBase}/invoice/${booking.bookingNumber}` : null;
 
   // Respond immediately — customer sees success without waiting for pipeline
@@ -1819,7 +1819,7 @@ router.post("/resend-notification/:bookingId", requireAdmin as any, async (req: 
     const finalAmount = Number(row.final_amount  || row.total_amount || 0);
     const hasPayment  = paidAmount > 0;
     const email       = row.customer_email || null;
-    const siteBase    = "https://alburhantravels.com";
+    const siteBase    = "https://alburhantravels.online";
     const invoiceLink = row.booking_number ? `${siteBase}/invoice/${row.booking_number}` : siteBase;
 
     type SummaryItem = { key: string; label: string; status: "sent" | "failed" | "skipped"; reason?: string };

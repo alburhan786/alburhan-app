@@ -120,7 +120,7 @@ export default function PrintFamilySheet() {
               style={{ height: "46px", objectFit: "contain", marginBottom: "4px" }}
               onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
             />
-            <div style={{ fontSize: "10px", color: "#888" }}>Al Burhan Tours &amp; Travels · alburhantravels.com</div>
+            <div style={{ fontSize: "10px", color: "#888" }}>Al Burhan Tours &amp; Travels · alburhantravels.online</div>
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ fontSize: "14px", fontWeight: 700, color: "#333" }}>{group?.groupName} {group?.year}</div>
@@ -207,7 +207,7 @@ export default function PrintFamilySheet() {
 
         {/* Footer */}
         <div style={{ marginTop: "28px", paddingTop: "10px", borderTop: `1px solid ${GOLD}40`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ fontSize: "9px", color: "#bbb" }}>Al Burhan Tours &amp; Travels · www.alburhantravels.com</div>
+          <div style={{ fontSize: "9px", color: "#bbb" }}>Al Burhan Tours &amp; Travels · www.alburhantravels.online</div>
           <div style={{ fontSize: "9px", color: "#bbb" }}>Printed: {new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</div>
         </div>
       </div>

@@ -14,7 +14,7 @@ import * as XLSX from "xlsx";
 
 const API = import.meta.env.VITE_API_URL || "";
 const COMPANY = "Al Burhan Tours & Travels";
-const COMPANY_ADDRESS = "Contact: +91 98939 89786 | alburhantravels.com";
+const COMPANY_ADDRESS = "Contact: +91 98939 89786 | alburhantravels.online";
 
 function fmtCurr(n: number) {
   return "₹" + Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
