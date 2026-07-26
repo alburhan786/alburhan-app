@@ -159,6 +159,7 @@ export function buildNavSections(openComplaints = 0): NavSection[] {
     {
       section: "Marketing",
       items: [
+        { icon: LayoutDashboard, label: "📊 Comms & Marketing Hub",      href: "/admin/comms-dashboard",         require: ["customers", "view"], aliases: ["comms dashboard", "communication dashboard", "marketing hub", "channel stats", "lead stats", "conversion"] },
         { icon: Inbox,         label: "Omnichannel Inbox",              href: "/admin/inbox",                   require: ["customers", "edit"], aliases: ["omni", "inbox", "multichannel", "omnichannel", "unified inbox", "all channels", "whatsapp", "social"] },
         { icon: Share2,        label: "Social Media Integration",       href: "/admin/social-media",            require: ["settings",  "view"], aliases: ["social", "facebook", "fb", "instagram", "ig", "telegram", "tg", "messenger", "channels", "social media"] },
         { icon: Activity,      label: "Meta Connection Health",          href: "/admin/meta-health",             require: ["settings",  "view"], aliases: ["meta", "meta health", "facebook health", "instagram health", "whatsapp meta", "meta audit", "token", "oauth"] },

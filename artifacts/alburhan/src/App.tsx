@@ -135,6 +135,7 @@ import E2ETestRunner from "@/pages/admin/E2ETestRunner";
 import ErrorLogs from "@/pages/admin/ErrorLogs";
 import PerformanceMonitor from "@/pages/admin/PerformanceMonitor";
 import CommsCenterNew from "@/pages/admin/CommsCenterNew";
+import CommsDashboard from "@/pages/admin/CommsDashboard";
 import AutomationBuilder from "@/pages/admin/AutomationBuilder";
 import WhatsAppHistory from "@/pages/admin/WhatsAppHistory";
 import SMSTemplateManager from "@/pages/admin/SMSTemplateManager";
@@ -423,6 +424,7 @@ function Router() {
       <Route path="/admin/e2e-test" component={() => <AdminRoute component={E2ETestRunner} />} />
       <Route path="/admin/error-logs" component={() => <AdminRoute component={ErrorLogs} />} />
       <Route path="/admin/performance" component={() => <AdminRoute component={PerformanceMonitor} />} />
+      <Route path="/admin/comms-dashboard" component={() => <AdminRoute component={CommsDashboard} />} />
       <Route path="/admin/comms-engine" component={() => <AdminRoute component={CommsCenterNew} />} />
       <Route path="/admin/automation-builder" component={() => <AdminRoute component={AutomationBuilder} />} />
       <Route path="/admin/whatsapp-templates" component={() => <AdminRoute component={WhatsAppTemplateManager} />} />

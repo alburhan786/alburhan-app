@@ -20,7 +20,10 @@ ensureCommEventsTable().catch(() => {});
 router.get("/summary", async (_req, res) => {
   try {
     const today = new Date().toISOString().slice(0, 10);
-    const [notifStats, queueStats, workflowStats, eventStats, dlqStats] = await Promise.all([
+    const [
+      notifStats, queueStats, workflowStats, eventStats, dlqStats,
+      channelStats, fbLeads, igLeads, leadsStats, bookingsStats,
+    ] = await Promise.all([
       pool.query(`
         SELECT
           COUNT(*)::int                                               AS total,
@@ -51,13 +54,70 @@ router.get("/summary", async (_req, res) => {
           rows: [{ total: 0, processed: 0, failed: 0, today: 0 }]
         })),
       pool.query(`SELECT COUNT(*)::int AS cnt FROM notification_retry_queue WHERE status='failed'`),
+
+      // ── Per-channel breakdown (30d) ─────────────────────────────────────
+      pool.query(`
+        SELECT channel,
+               COUNT(*)::int                                         AS total,
+               COUNT(*) FILTER (WHERE status='sent')::int           AS sent,
+               COUNT(*) FILTER (WHERE status='failed')::int         AS failed,
+               COUNT(*) FILTER (WHERE status='delivered')::int      AS delivered
+        FROM notification_logs
+        WHERE created_at >= NOW() - INTERVAL '30 days'
+        GROUP BY channel`),
+
+      // ── Facebook leads (social_messages 30d) ────────────────────────────
+      pool.query(`
+        SELECT COUNT(*)::int AS cnt FROM social_messages
+        WHERE platform IN ('facebook_leads','facebook_messenger','facebook_page')
+          AND created_at >= NOW() - INTERVAL '30 days'`).catch(() => ({ rows: [{ cnt: 0 }] })),
+
+      // ── Instagram leads (social_messages 30d) ───────────────────────────
+      pool.query(`
+        SELECT COUNT(*)::int AS cnt FROM social_messages
+        WHERE platform IN ('instagram','instagram_dm')
+          AND created_at >= NOW() - INTERVAL '30 days'`).catch(() => ({ rows: [{ cnt: 0 }] })),
+
+      // ── Leads table totals ───────────────────────────────────────────────
+      pool.query(`
+        SELECT
+          COUNT(*)::int                                              AS total,
+          COUNT(*) FILTER (WHERE DATE(created_at) = CURRENT_DATE)::int AS today,
+          COUNT(*) FILTER (WHERE status = 'converted')::int         AS converted,
+          COUNT(*) FILTER (WHERE source = 'facebook')::int          AS from_facebook,
+          COUNT(*) FILTER (WHERE source = 'instagram')::int         AS from_instagram,
+          COUNT(*) FILTER (WHERE source = 'whatsapp')::int          AS from_whatsapp,
+          COUNT(*) FILTER (WHERE source = 'website')::int           AS from_website
+        FROM leads
+        WHERE created_at >= NOW() - INTERVAL '30 days'`).catch(() => ({
+          rows: [{ total: 0, today: 0, converted: 0, from_facebook: 0, from_instagram: 0, from_whatsapp: 0, from_website: 0 }]
+        })),
+
+      // ── Bookings (for conversion rate) ──────────────────────────────────
+      pool.query(`
+        SELECT COUNT(*)::int AS cnt FROM bookings
+        WHERE created_at >= NOW() - INTERVAL '30 days'
+          AND status NOT IN ('cancelled','rejected')`).catch(() => ({ rows: [{ cnt: 0 }] })),
     ]);
 
     const ns = notifStats.rows[0] || {};
     const ws = workflowStats.rows[0] || {};
     const es = eventStats.rows[0] || {};
+    const ls = leadsStats.rows[0] || {};
     const queueMap: Record<string,number> = {};
     for (const r of queueStats.rows) queueMap[r.status] = r.cnt;
+
+    // Build per-channel map
+    const chMap: Record<string, { total: number; sent: number; failed: number; delivered: number }> = {};
+    for (const r of channelStats.rows) {
+      chMap[r.channel] = { total: r.total, sent: r.sent, failed: r.failed, delivered: r.delivered };
+    }
+    const ch = (name: string) => chMap[name] || { total: 0, sent: 0, failed: 0, delivered: 0 };
+
+    const totalLeads = Number(ls.total || 0);
+    const converted  = Number(ls.converted || 0);
+    const bookings   = Number(bookingsStats.rows[0]?.cnt || 0);
+    const conversionRate = totalLeads > 0 ? Math.round(converted / totalLeads * 100) : 0;
 
     res.json({
       notifications: {
@@ -78,6 +138,30 @@ router.get("/summary", async (_req, res) => {
         total: es.total || 0, processed: es.processed || 0, failed: es.failed || 0, today: es.today || 0,
       },
       dlq: { total: dlqStats.rows[0]?.cnt || 0 },
+      // ── Per-channel stats (30d) ──
+      channels: {
+        whatsapp: ch("whatsapp"),
+        sms:      ch("sms"),
+        email:    ch("email"),
+        push:     ch("push"),
+        rcs:      ch("rcs"),
+      },
+      // ── Social & Lead stats (30d) ──
+      social: {
+        facebook_leads:  Number(fbLeads.rows[0]?.cnt || 0),
+        instagram_leads: Number(igLeads.rows[0]?.cnt || 0),
+      },
+      leads: {
+        total:        totalLeads,
+        today:        Number(ls.today || 0),
+        converted,
+        from_facebook:  Number(ls.from_facebook  || 0),
+        from_instagram: Number(ls.from_instagram || 0),
+        from_whatsapp:  Number(ls.from_whatsapp  || 0),
+        from_website:   Number(ls.from_website   || 0),
+      },
+      bookings:         bookings,
+      conversion_rate:  conversionRate,
       generatedAt: new Date().toISOString(),
     });
   } catch (e: any) {

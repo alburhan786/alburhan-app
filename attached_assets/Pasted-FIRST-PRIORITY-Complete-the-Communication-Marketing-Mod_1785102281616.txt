@@ -1,0 +1,130 @@
+FIRST PRIORITY: Complete the Communication & Marketing Module before adding any new features.
+
+Implement and test every module until it is fully functional.
+
+1. WhatsApp Business
+- Integrate Meta WhatsApp Cloud API.
+- Send OTP.
+- Booking confirmation.
+- Payment confirmation.
+- Agreement PDF.
+- Visa copy.
+- Flight ticket.
+- Hotel voucher.
+- Reminder messages.
+- Payment due reminders.
+- Automatic retry for failed messages.
+- Delivery status.
+- Read receipts.
+- Message history.
+
+2. SMS
+- Integrate Fast2SMS (or configured provider).
+- OTP SMS.
+- Booking SMS.
+- Payment SMS.
+- Reminder SMS.
+- Delivery reports.
+- Retry failed SMS.
+
+3. Email
+- Configure SMTP/Resend.
+- Professional HTML templates.
+- Booking confirmation.
+- Invoice.
+- Agreement.
+- Visa.
+- Ticket.
+- Hotel voucher.
+- Payment receipt.
+- Marketing campaigns.
+- Delivery tracking.
+
+4. Push Notifications (Firebase)
+- Configure Firebase Cloud Messaging.
+- Save FCM tokens.
+- Browser notifications.
+- Android notifications.
+- iPhone PWA notifications.
+- Real-time notification bell.
+- Notification history.
+
+5. Facebook Integration
+- Connect Meta App.
+- Facebook Lead Ads.
+- Messenger integration.
+- Auto-create CRM lead.
+- Auto-assign to staff.
+- Conversation history.
+- Reply from ERP.
+
+6. Instagram Integration
+- Instagram Messaging API.
+- Instagram Lead Ads.
+- Auto-import leads.
+- CRM integration.
+- Auto-reply.
+- Conversation history.
+
+7. Unified Social Inbox
+- WhatsApp.
+- Facebook Messenger.
+- Instagram.
+- SMS.
+- Email.
+- Single inbox.
+- Search.
+- Labels.
+- Assign chats.
+- Internal notes.
+- Attachments.
+
+8. Lead Management
+- Every lead automatically enters CRM.
+- Source:
+   - Website
+   - Facebook
+   - Instagram
+   - WhatsApp
+   - SMS
+   - Manual
+- Pipeline:
+   New → Contacted → Interested → Booking → Confirmed → Completed.
+- Lead scoring.
+- Follow-up reminders.
+- Auto-assignment.
+- Duplicate detection.
+
+9. Automation Center
+- Workflow builder.
+- Trigger-based automation.
+- Scheduled campaigns.
+- Birthday messages.
+- Hajj reminders.
+- Umrah reminders.
+- Payment reminders.
+- Visa reminders.
+- Travel reminders.
+
+10. Dashboard
+Show live statistics:
+- WhatsApp Sent
+- Delivered
+- Failed
+- SMS Sent
+- Email Sent
+- Push Sent
+- Facebook Leads
+- Instagram Leads
+- Total Leads
+- Conversion Rate
+
+11. Testing
+Run complete end-to-end testing for every communication channel.
+Fix all errors.
+No 404.
+No 500.
+No runtime errors.
+No pending status.
+
+Only mark the Communication & Marketing module as COMPLETE after every feature is working in production.

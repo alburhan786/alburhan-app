@@ -1,12 +1,14 @@
 // @ts-nocheck
 import { Router } from "express";
-import { requireAuth } from "../lib/auth.js";
+import { requireAuth, requireAdmin } from "../lib/auth.js";
 import {
   getVapidPublicKey,
   storeSubscription,
   removeSubscription,
   getSubscriptionCount,
+  sendPushToAllCustomers,
 } from "../lib/webPush.js";
+import { pool } from "@workspace/db";
 
 const router = Router();
 
@@ -67,6 +69,53 @@ router.get("/status", requireAuth as any, async (req, res) => {
     const count = await getSubscriptionCount(userId);
     res.json({ subscribed: count > 0, count });
   } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Admin endpoints ─────────────────────────────────────────────────────────
+
+// GET /api/push/admin/stats — subscriber counts and recent sends
+router.get("/admin/stats", requireAdmin as any, async (_req, res) => {
+  try {
+    const [subCount, byPlatform, recentSent] = await Promise.all([
+      pool.query(`
+        SELECT COUNT(DISTINCT customer_id)::int AS unique_subscribers,
+               COUNT(*)::int                    AS total_tokens
+        FROM customer_push_subscriptions`).catch(() => ({ rows: [{ unique_subscribers: 0, total_tokens: 0 }] })),
+      pool.query(`
+        SELECT platform, COUNT(*)::int AS cnt
+        FROM customer_push_subscriptions
+        GROUP BY platform ORDER BY cnt DESC`).catch(() => ({ rows: [] })),
+      pool.query(`
+        SELECT COUNT(*)::int AS sent_24h,
+               COUNT(*) FILTER (WHERE status='failed')::int AS failed_24h
+        FROM notification_logs
+        WHERE channel='push' AND created_at >= NOW() - INTERVAL '24 hours'`).catch(() => ({ rows: [{ sent_24h: 0, failed_24h: 0 }] })),
+    ]);
+    res.json({
+      unique_subscribers: subCount.rows[0]?.unique_subscribers || 0,
+      total_tokens:       subCount.rows[0]?.total_tokens       || 0,
+      by_platform:        byPlatform.rows,
+      sent_24h:           recentSent.rows[0]?.sent_24h  || 0,
+      failed_24h:         recentSent.rows[0]?.failed_24h || 0,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/push/admin/broadcast — send push notification to all subscribers
+router.post("/admin/broadcast", requireAdmin as any, async (req, res) => {
+  const { title, body, url } = req.body;
+  if (!title || !body) return res.status(400).json({ error: "title and body required" });
+
+  try {
+    const result = await sendPushToAllCustomers({ title, body, url: url || "/" });
+    console.log(`[push] Admin broadcast: sent=${result.sent} failed=${result.failed}`);
+    res.json({ ok: true, sent: result.sent, failed: result.failed });
+  } catch (err: any) {
+    console.error("[push] broadcast error:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
