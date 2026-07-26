@@ -472,6 +472,280 @@ app.get("/api/migrate/net-diag", async (req, res) => {
   res.json(report);
 });
 
+// POST /api/migrate/test-resend — end-to-end resend diagnostic (migration-key auth, no session needed)
+// Picks the best real booking from DB (prefers one with payment + docs + agreement),
+// runs every resend path (WhatsApp, SMS, Email, Invoice PDF, Receipt PDF, Agreement,
+// each uploaded travel document), and returns a detailed JSON report.
+app.post("/api/migrate/test-resend", async (req: any, res: any) => {
+  const key = (req.body?.key || req.query.key) as string;
+  if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
+
+  const { pool } = await import("@workspace/db");
+  const { randomUUID } = await import("crypto");
+
+  // ── Pick best test booking ─────────────────────────────────────────────────
+  // Priority: has payment + docs + agreement. Fallback: any approved booking.
+  let booking: any = null;
+  const selectors = [
+    // Best: has payment, has docs, has agreement
+    `SELECT b.*, u.email AS customer_email FROM bookings b
+     LEFT JOIN users u ON u.id = b.customer_id
+     WHERE b.status IN ('approved','confirmed')
+       AND COALESCE(b.paid_amount,0) > 0
+       AND EXISTS (SELECT 1 FROM documents d WHERE d.booking_id = b.id)
+       AND EXISTS (SELECT 1 FROM agreements a WHERE a.booking_id = b.id AND a.status NOT IN ('cancelled','rejected'))
+     ORDER BY b.created_at DESC LIMIT 1`,
+    // Good: has payment + docs
+    `SELECT b.*, u.email AS customer_email FROM bookings b
+     LEFT JOIN users u ON u.id = b.customer_id
+     WHERE b.status IN ('approved','confirmed') AND COALESCE(b.paid_amount,0) > 0
+       AND EXISTS (SELECT 1 FROM documents d WHERE d.booking_id = b.id)
+     ORDER BY b.created_at DESC LIMIT 1`,
+    // OK: has payment
+    `SELECT b.*, u.email AS customer_email FROM bookings b
+     LEFT JOIN users u ON u.id = b.customer_id
+     WHERE b.status IN ('approved','confirmed') AND COALESCE(b.paid_amount,0) > 0
+     ORDER BY b.created_at DESC LIMIT 1`,
+    // Fallback: any booking
+    `SELECT b.*, u.email AS customer_email FROM bookings b
+     LEFT JOIN users u ON u.id = b.customer_id
+     ORDER BY b.created_at DESC LIMIT 1`,
+  ];
+  for (const sql of selectors) {
+    const r = await pool.query(sql).catch(() => ({ rows: [] }));
+    if (r.rows[0]) { booking = r.rows[0]; break; }
+  }
+  if (!booking) return void res.json({ error: "No bookings found in DB — nothing to test" });
+
+  const paidAmount  = Number(booking.paid_amount  || 0);
+  const finalAmount = Number(booking.final_amount  || booking.total_amount || 0);
+  const hasPayment  = paidAmount > 0;
+  const email       = booking.customer_email || null;
+  const siteBase    = "https://alburhantravels.com";
+  const invoiceLink = `${siteBase}/invoice/${booking.booking_number}`;
+
+  type R = { status: "ok" | "fail" | "skip"; detail?: string; ms?: number };
+  const report: Record<string, R> = {};
+
+  const run = async (key: string, fn: () => Promise<R>): Promise<void> => {
+    const t0 = Date.now();
+    try {
+      const r = await fn();
+      report[key] = { ...r, ms: Date.now() - t0 };
+    } catch (e: any) {
+      report[key] = { status: "fail", detail: e?.message || String(e), ms: Date.now() - t0 };
+    }
+  };
+
+  // ── 1. WhatsApp ─────────────────────────────────────────────────────────────
+  await run("whatsapp", async () => {
+    const { sendApprovalTemplate, sendBookingSubmittedTemplate } = await import("./routes/../lib/botbee.js");
+    const isPending = booking.status === "pending" || booking.status === "submitted";
+    const bookingRef = booking.booking_number || booking.id;
+    const r = isPending
+      ? await sendBookingSubmittedTemplate(booking.customer_mobile,
+          { customerName: booking.customer_name, packageName: booking.package_name || "Hajj/Umrah Package", bookingId: bookingRef },
+          { eventType: "new_booking", bookingId: booking.id, customerId: booking.customer_id })
+      : await sendApprovalTemplate(booking.customer_mobile,
+          { customerName: booking.customer_name, packageName: booking.package_name || "Hajj/Umrah Package", bookingId: bookingRef, amount: paidAmount, invoiceUrl: invoiceLink },
+          { eventType: "booking_approved", bookingId: booking.id, customerId: booking.customer_id });
+    return { status: r.ok ? "ok" : "fail", detail: r.ok ? `wamid=${r.wamid || "—"}` : (r.errorMessage || "no wamid") };
+  });
+
+  // ── 2. SMS ──────────────────────────────────────────────────────────────────
+  await run("sms", async () => {
+    const { sendPaymentReceived, sendBookingConfirmed } = await import("./routes/../lib/sms.js");
+    const smsCtx = { mobile: booking.customer_mobile, customerName: booking.customer_name, bookingNumber: booking.booking_number, bookingId: booking.id, customerId: booking.customer_id ?? undefined };
+    const r = hasPayment
+      ? await sendPaymentReceived({ ...smsCtx, amount: String(Math.round(paidAmount)), invoiceUrl: invoiceLink })
+      : await sendBookingConfirmed(smsCtx);
+    return { status: r.ok ? "ok" : "fail", detail: r.ok ? "sent" : (r.errorMessage || "sms failed") };
+  });
+
+  // ── 3. Email ─────────────────────────────────────────────────────────────────
+  await run("email", async () => {
+    if (!email) return { status: "skip", detail: "no email on file" };
+    const { sendEmail } = await import("./routes/../lib/notifications.js");
+    const r = await sendEmail(email, `Booking Confirmed – Al Burhan (test resend) [${booking.booking_number}]`,
+      `<p>Test resend diagnostic for booking ${booking.booking_number}.</p>`);
+    return { status: r.ok ? "ok" : "fail", detail: r.ok ? `sent to ${email}` : (r.errorMessage || "email failed") };
+  });
+
+  // ── 4. Invoice PDF ──────────────────────────────────────────────────────────
+  await run("invoice_pdf", async () => {
+    const { generateInvoicePdfBuffer } = await import("./routes/../lib/paymentDocs.js");
+    const { sendPDFDocument } = await import("./routes/../lib/botbee.js");
+    const docOpts = {
+      customerName: booking.customer_name, customerMobile: booking.customer_mobile,
+      customerEmail: email ?? undefined,
+      bookingNumber: booking.booking_number, invoiceNumber: booking.invoice_number ?? undefined,
+      packageName: booking.package_name ?? "Hajj/Umrah Package",
+      numberOfPilgrims: booking.number_of_pilgrims,
+      totalAmount: finalAmount, paidAmount,
+      balanceAmount: Math.max(0, finalAmount - paidAmount),
+      gstAmount: Number(booking.gst_amount || 0),
+      paymentDate: booking.updated_at || new Date(),
+      razorpayPaymentId: booking.razorpay_payment_id ?? undefined,
+    };
+    const buf = await generateInvoicePdfBuffer(docOpts);
+    const r   = await sendPDFDocument(booking.customer_mobile, buf, `Invoice-${booking.booking_number}.pdf`,
+      `[TEST] Invoice – Booking ${booking.booking_number}`,
+      { eventType: "invoice_ready", bookingId: booking.id, customerId: booking.customer_id ?? undefined });
+    return { status: r.ok ? "ok" : "fail", detail: r.ok ? `wamid=${r.wamid || "—"} bufSize=${buf.length}` : (r.errorMessage || "pdf/send failed") };
+  });
+
+  // ── 5. Receipt PDF (only if payment exists) ──────────────────────────────────
+  await run("receipt_pdf", async () => {
+    if (!hasPayment) return { status: "skip", detail: "no payment recorded — correct behaviour" };
+    const { generateReceiptPdfBuffer } = await import("./routes/../lib/paymentDocs.js");
+    const { sendPDFDocument } = await import("./routes/../lib/botbee.js");
+    const docOpts = {
+      customerName: booking.customer_name, customerMobile: booking.customer_mobile,
+      customerEmail: email ?? undefined,
+      bookingNumber: booking.booking_number, invoiceNumber: booking.invoice_number ?? undefined,
+      packageName: booking.package_name ?? "Hajj/Umrah Package",
+      numberOfPilgrims: booking.number_of_pilgrims,
+      totalAmount: finalAmount, paidAmount,
+      balanceAmount: Math.max(0, finalAmount - paidAmount),
+      gstAmount: Number(booking.gst_amount || 0),
+      paymentDate: booking.updated_at || new Date(),
+      razorpayPaymentId: booking.razorpay_payment_id ?? undefined,
+    };
+    const buf = await generateReceiptPdfBuffer(docOpts);
+    const r   = await sendPDFDocument(booking.customer_mobile, buf, `Receipt-${booking.booking_number}.pdf`,
+      `[TEST] Receipt – Booking ${booking.booking_number}`,
+      { eventType: "payment_received", bookingId: booking.id, customerId: booking.customer_id ?? undefined });
+    return { status: r.ok ? "ok" : "fail", detail: r.ok ? `wamid=${r.wamid || "—"} bufSize=${buf.length}` : (r.errorMessage || "pdf/send failed") };
+  });
+
+  // ── 6. Agreement ─────────────────────────────────────────────────────────────
+  await run("agreement", async () => {
+    const agQ = await pool.query(
+      `SELECT id, agreement_number FROM agreements WHERE booking_id=$1 AND status NOT IN ('cancelled','rejected') ORDER BY created_at DESC LIMIT 1`,
+      [booking.id]
+    );
+    if (!agQ.rows[0]) return { status: "skip", detail: "no agreement exists for this booking" };
+    const agr = agQ.rows[0];
+    const { sendAgreementReadyTemplate } = await import("./routes/../lib/botbee.js");
+    const r = await sendAgreementReadyTemplate(booking.customer_mobile, {
+      customerName: booking.customer_name, bookingId: booking.booking_number,
+      agreementNumber: agr.agreement_number,
+      agreementUrl: `${siteBase}/agreement/${booking.booking_number}`,
+    }, { eventType: "agreement_ready", bookingId: booking.id, customerId: booking.customer_id ?? undefined });
+    return { status: r.ok ? "ok" : "fail", detail: r.ok ? `wamid=${r.wamid || "—"} agr=${agr.agreement_number}` : (r.errorMessage || "template failed") };
+  });
+
+  // ── 7. Travel documents (Visa, Ticket, Hotel Voucher, etc.) ──────────────────
+  // Search the primary test booking first; if it has no docs, find any booking in DB with docs.
+  const RESEND_DOC_TYPES = ["visa", "flight_ticket", "hotel_voucher", "room_allotment", "bus_allotment", "tour_itinerary", "ziyarat_schedule", "insurance", "model_contract"];
+  let docsQ = await pool.query(
+    `SELECT d.id, d.document_type, d.file_name, d.file_url, d.mime_type,
+            d.booking_id AS doc_booking_id,
+            b.booking_number AS doc_booking_number, b.customer_name AS doc_customer_name,
+            b.customer_mobile AS doc_customer_mobile, b.customer_id AS doc_customer_id,
+            b.package_name AS doc_package_name,
+            u.email AS doc_customer_email
+     FROM documents d
+     JOIN bookings b ON b.id = d.booking_id
+     LEFT JOIN users u ON u.id = b.customer_id
+     WHERE d.booking_id=$1 AND d.document_type = ANY($2::text[])
+     ORDER BY d.document_type, d.created_at DESC`,
+    [booking.id, RESEND_DOC_TYPES]
+  ).catch(() => ({ rows: [] as any[] }));
+
+  // If primary booking has no docs, search all bookings for any uploaded travel doc
+  if (docsQ.rows.length === 0) {
+    docsQ = await pool.query(
+      `SELECT d.id, d.document_type, d.file_name, d.file_url, d.mime_type,
+              d.booking_id AS doc_booking_id,
+              b.booking_number AS doc_booking_number, b.customer_name AS doc_customer_name,
+              b.customer_mobile AS doc_customer_mobile, b.customer_id AS doc_customer_id,
+              b.package_name AS doc_package_name,
+              u.email AS doc_customer_email
+       FROM documents d
+       JOIN bookings b ON b.id = d.booking_id
+       LEFT JOIN users u ON u.id = b.customer_id
+       WHERE d.document_type = ANY($1::text[]) AND d.file_url IS NOT NULL
+       ORDER BY d.document_type, d.created_at DESC
+       LIMIT 5`,
+      [RESEND_DOC_TYPES]
+    ).catch(() => ({ rows: [] as any[] }));
+  }
+
+  const seenDocTypes = new Set<string>();
+  for (const doc of docsQ.rows) {
+    if (seenDocTypes.has(doc.document_type)) continue;
+    seenDocTypes.add(doc.document_type);
+    const docKey = `doc_${doc.document_type}`;
+    // Use the doc's own booking fields (it may come from a different booking than primary)
+    const docBookingId     = doc.doc_booking_id     || booking.id;
+    const docBookingNumber = doc.doc_booking_number  || booking.booking_number;
+    const docCustomerName  = doc.doc_customer_name   || booking.customer_name;
+    const docCustomerMobile= doc.doc_customer_mobile || booking.customer_mobile;
+    const docCustomerId    = doc.doc_customer_id     || booking.customer_id;
+    const docEmail         = doc.doc_customer_email  || email;
+    const docPackage       = doc.doc_package_name    || booking.package_name;
+    await run(docKey, async () => {
+      const { sendDocumentToCustomer } = await import("./routes/../lib/documentDelivery.js");
+      const r = await sendDocumentToCustomer({
+        docId:          doc.id,
+        bookingId:      docBookingId,
+        bookingNumber:  docBookingNumber,
+        customerId:     docCustomerId ?? undefined,
+        customerName:   docCustomerName,
+        customerMobile: docCustomerMobile,
+        customerEmail:  docEmail ?? undefined,
+        documentType:   doc.document_type,
+        fileName:       doc.file_name,
+        fileUrl:        doc.file_url,
+        mimeType:       doc.mime_type ?? undefined,
+        packageName:    docPackage ?? undefined,
+      });
+      const anyOk = r.whatsapp || r.sms || r.email;
+      return {
+        status: anyOk ? "ok" : "fail",
+        detail: `wa=${r.whatsapp} sms=${r.sms} email=${r.email} file=${doc.file_name} booking=${docBookingNumber}`,
+      };
+    });
+  }
+
+  // ── 8. Customer dashboard notification ──────────────────────────────────────
+  // Schema: (id, customer_id, title, message, type, is_read, category, created_at)
+  await run("customer_dashboard", async () => {
+    if (!booking.customer_id) return { status: "skip", detail: "no customer_id on booking" };
+    const msgId = `cn_test_${Date.now()}`;
+    await pool.query(
+      `INSERT INTO customer_notifications (id, customer_id, title, message, type, is_read, category, created_at)
+       VALUES ($1, $2, $3, $4, $5, false, $6, NOW()) ON CONFLICT (id) DO NOTHING`,
+      [msgId, booking.customer_id,
+       "Notification Test", `[TEST] Resend diagnostic — booking ${booking.booking_number}`,
+       "booking_approved", "booking"]
+    );
+    return { status: "ok", detail: `inserted id=${msgId} for customer=${booking.customer_id}` };
+  });
+
+  // ── Summary ──────────────────────────────────────────────────────────────────
+  const keys     = Object.keys(report);
+  const okCount  = keys.filter(k => report[k].status === "ok").length;
+  const failKeys = keys.filter(k => report[k].status === "fail");
+  const skipCount = keys.filter(k => report[k].status === "skip").length;
+
+  res.json({
+    ts: new Date().toISOString(),
+    booking_number: booking.booking_number,
+    booking_id:     booking.id,
+    booking_status: booking.status,
+    customer_name:  booking.customer_name,
+    customer_mobile: booking.customer_mobile,
+    paid_amount:    paidAmount,
+    has_payment:    hasPayment,
+    has_email:      !!email,
+    docs_found:     docsQ.rows.length,
+    summary:        { total: keys.length, ok: okCount, skip: skipCount, fail: failKeys.length, failed_keys: failKeys },
+    results:        report,
+  });
+});
+
 // POST /api/migrate/db-init — creates alburhan_db on local Postgres, writes DATABASE_URL, restarts
 app.post("/api/migrate/db-init", async (req, res) => {
   const key = (req.body?.key || req.query.key) as string;

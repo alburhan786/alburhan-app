@@ -764,7 +764,8 @@ router.post("/:id/resend-email", requireAdmin as any, async (req: AuthenticatedR
   })();
 });
 
-// POST /:id/resend-sms — resend payment SMS to customer
+// POST /:id/resend-sms — resend SMS to customer
+// Uses sendPaymentReceived when payment exists; sendBookingConfirmed otherwise.
 router.post("/:id/resend-sms", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   const rows = await pool.query(`SELECT * FROM bookings WHERE id = $1 LIMIT 1`, [req.params.id]);
   if (!rows.rows[0]) { res.status(404).json({ message: "Booking not found" }); return; }
@@ -772,25 +773,20 @@ router.post("/:id/resend-sms", requireAdmin as any, async (req: AuthenticatedReq
   res.json({ message: "Sending SMS...", bookingNumber: b.booking_number });
   (async () => {
     try {
-      const { sendPaymentReceived } = await import("../lib/sms.js");
+      const { sendPaymentReceived, sendBookingConfirmed } = await import("../lib/sms.js");
       const { randomUUID } = await import("crypto");
       const paidAmt = Number(b.paid_amount || 0);
       const siteBase = "https://alburhantravels.com";
       const invoiceLink = b.booking_number ? `${siteBase}/invoice/${b.booking_number}` : siteBase;
-      const result = await sendPaymentReceived({
-        mobile: b.customer_mobile,
-        customerName: b.customer_name,
-        bookingNumber: b.booking_number,
-        amount: String(Math.round(paidAmt)),
-        invoiceUrl: invoiceLink,
-        bookingId: b.id,
-        customerId: b.customer_id ?? undefined,
-      });
+      const smsCtx = { mobile: b.customer_mobile, customerName: b.customer_name, bookingNumber: b.booking_number, bookingId: b.id, customerId: b.customer_id ?? undefined };
+      const result = paidAmt > 0
+        ? await sendPaymentReceived({ ...smsCtx, amount: String(Math.round(paidAmt)), invoiceUrl: invoiceLink })
+        : await sendBookingConfirmed(smsCtx);
       await pool.query(
         `INSERT INTO notification_logs (id, event_type, channel, recipient, customer_name, booking_id, booking_number, message, status, sent_at, retry_count)
-         VALUES ($1,'payment_received','sms',$2,$3,$4,$5,$6,$7,NOW(),0)`,
+         VALUES ($1,'booking_approved','sms',$2,$3,$4,$5,$6,$7,NOW(),0)`,
         [randomUUID(), b.customer_mobile, b.customer_name, b.id, b.booking_number,
-         `SMS resend | mobile=${b.customer_mobile}`, result.ok ? "sent" : "failed"]
+         `SMS resend | mobile=${b.customer_mobile} | hasPay=${paidAmt > 0}`, result.ok ? "sent" : "failed"]
       ).catch(() => {});
     } catch (err) {
       console.error("[resend-sms] error:", err);
@@ -799,12 +795,12 @@ router.post("/:id/resend-sms", requireAdmin as any, async (req: AuthenticatedReq
 });
 
 // POST /:id/resend-invoice — generate Tax Invoice PDF and send via WhatsApp document
+// Invoice is always sendable regardless of payment status (shows balance-due when unpaid).
 router.post("/:id/resend-invoice", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   const rows = await pool.query(`SELECT * FROM bookings WHERE id = $1 LIMIT 1`, [req.params.id]);
   if (!rows.rows[0]) { res.status(404).json({ message: "Booking not found" }); return; }
   const b = rows.rows[0];
   const paidAmt = Number(b.paid_amount || 0);
-  if (paidAmt <= 0) { res.status(400).json({ message: "No payment recorded — invoice cannot be generated" }); return; }
   res.json({ message: "Generating & sending Invoice PDF...", bookingNumber: b.booking_number });
   (async () => {
     try {
