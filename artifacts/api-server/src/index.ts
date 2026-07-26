@@ -2343,6 +2343,12 @@ async function runMigrations() {
     console.log("[Migration] sender_ids table ensured (5 approved DLT sender IDs seeded)");
   } catch (err) { console.error("[Migration] sender_ids migration failed:", err); }
 
+  // v29.1-pre — Ensure payment_transactions has created_at/updated_at (older DBs may be missing it)
+  try {
+    await pool.query(`ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW()`);
+    await pool.query(`ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()`);
+  } catch (err: any) { console.warn("[Migration] v29.1-pre payment_transactions timestamps:", err.message); }
+
   // v29.1 — Performance indexes for high-frequency query columns (each independent)
   const v291Indexes: [string, string][] = [
     ["idx_attendance_logs_event_id",        "CREATE INDEX IF NOT EXISTS idx_attendance_logs_event_id ON attendance_logs(event_id)"],
