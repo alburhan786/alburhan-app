@@ -284,6 +284,87 @@ export async function getMetadata(pdfBytes: Buffer): Promise<Record<string, stri
   };
 }
 
+// ── Encryption detection ───────────────────────────────────────────────────
+
+export interface EncryptionInfo {
+  encrypted: boolean;
+  requiresPassword: boolean; // true = open/user password needed
+  ownerRestricted: boolean;  // true = owner-only restrictions, empty user password
+}
+
+/**
+ * Detect whether a PDF is encrypted and what kind.
+ * - Not encrypted → { encrypted: false, requiresPassword: false, ownerRestricted: false }
+ * - Owner-restricted (empty user password) → { encrypted: true, requiresPassword: false, ownerRestricted: true }
+ * - User-password locked → { encrypted: true, requiresPassword: true, ownerRestricted: false }
+ */
+export async function detectPdfEncryption(pdfBytes: Buffer): Promise<EncryptionInfo> {
+  // First: try loading with no password at all
+  try {
+    const doc = await PDFDocument.load(pdfBytes);
+    // If this succeeds, the PDF is not encrypted (or has no user password)
+    void doc;
+    return { encrypted: false, requiresPassword: false, ownerRestricted: false };
+  } catch (e1: any) {
+    const msg1 = (e1.message || "").toLowerCase();
+
+    // If the error is not about encryption, the file may be corrupt
+    if (!msg1.includes("encrypt") && !msg1.includes("password")) {
+      throw e1;
+    }
+
+    // Second: try empty user password — handles owner-restricted PDFs
+    try {
+      const doc = await PDFDocument.load(pdfBytes, { password: "" });
+      if (doc.getPageCount() > 0) {
+        return { encrypted: true, requiresPassword: false, ownerRestricted: true };
+      }
+    } catch (_) {}
+
+    // Could not open with empty password — needs a real user password
+    return { encrypted: true, requiresPassword: true, ownerRestricted: false };
+  }
+}
+
+/**
+ * Unlock a PDF using an explicit password provided by the user.
+ * Throws { code: "WRONG_PASSWORD" } if the password is incorrect.
+ */
+export async function unlockPdfWithPassword(pdfBytes: Buffer, password: string): Promise<Buffer> {
+  let doc: PDFDocument;
+  try {
+    doc = await PDFDocument.load(pdfBytes, { password });
+  } catch (err: any) {
+    const msg = (err.message || String(err)).toLowerCase();
+    // pdf-lib throws "incorrect password", "invalid user password", etc.
+    if (
+      msg.includes("password") ||
+      msg.includes("encrypt") ||
+      msg.includes("incorrect") ||
+      msg.includes("invalid")
+    ) {
+      const e = new Error("Incorrect password");
+      (e as any).code = "WRONG_PASSWORD";
+      throw e;
+    }
+    throw err;
+  }
+
+  const pageCount = doc.getPageCount();
+  if (pageCount === 0) throw new Error("PDF appears empty after decryption");
+
+  const bytes = await doc.save({ useObjectStreams: false });
+  const result = Buffer.from(bytes);
+
+  if (!validatePdfBuffer(result)) {
+    throw new Error("Decrypted PDF failed output validation");
+  }
+
+  return result;
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+
 /**
  * Validate that a buffer is a structurally sound PDF.
  * Checks %PDF- header and %%EOF trailer.

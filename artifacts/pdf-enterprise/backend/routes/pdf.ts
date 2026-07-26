@@ -9,7 +9,7 @@ import { decryptBuffer, encryptBuffer, computeChecksum, getStoragePath, getTempP
 import { requirePdfAuth, requireRole } from "../middleware.js";
 import { logAudit } from "../audit.js";
 import * as PDF from "../pdfProcessor.js";
-import { validatePdfBuffer } from "../pdfProcessor.js";
+import { validatePdfBuffer, detectPdfEncryption, unlockPdfWithPassword } from "../pdfProcessor.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const router = Router();
@@ -293,14 +293,36 @@ router.put("/metadata/:fileId", async (req, res) => {
   }
 });
 
-// POST /pdf/api/pdf/unlock/:fileId — bypass PDF password protection automatically
-router.post("/unlock/:fileId", async (req, res) => {
+// GET /pdf/api/pdf/detect/:fileId — detect encryption type without modifying the file
+router.get("/detect/:fileId", async (req, res) => {
   const user = (req as any).pdfUser;
   try {
-    const { bytes, file } = await readPdfBytes(req.params.fileId, user.id, user.role);
-    const unlocked = await PDF.unlockPdf(bytes);
+    const { bytes } = await readPdfBytes(req.params.fileId, user.id, user.role);
+    const info = await detectPdfEncryption(bytes);
+    res.json(info);
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message || "Detection failed" });
+  }
+});
 
-    // Name the output  example_unlocked.pdf  (not  example.pdf)
+// POST /pdf/api/pdf/unlock/:fileId — remove PDF password protection
+// Body: { password?: string }  — omit for auto-bypass (owner-restricted PDFs)
+//                              — provide for user-password-encrypted PDFs
+router.post("/unlock/:fileId", async (req, res) => {
+  const user = (req as any).pdfUser;
+  const { password } = req.body ?? {};
+  try {
+    const { bytes, file } = await readPdfBytes(req.params.fileId, user.id, user.role);
+
+    let unlocked: Buffer;
+    if (typeof password === "string") {
+      // Explicit password provided — try it directly (do not auto-bypass)
+      unlocked = await unlockPdfWithPassword(bytes, password);
+    } else {
+      // Auto-bypass for owner-restricted PDFs (common passwords list)
+      unlocked = await PDF.unlockPdf(bytes);
+    }
+
     const baseName = file.name.replace(/\.pdf$/i, "");
     const unlockName = `${baseName}_unlocked.pdf`;
 
@@ -310,7 +332,10 @@ router.post("/unlock/:fileId", async (req, res) => {
     res.json(saved);
   } catch (err: any) {
     console.error("unlock error:", err);
-    res.status(400).json({ error: err.message || "Could not bypass PDF password protection" });
+    if ((err as any).code === "WRONG_PASSWORD") {
+      return res.status(401).json({ error: "Incorrect password", code: "WRONG_PASSWORD" });
+    }
+    res.status(400).json({ error: err.message || "Could not unlock PDF" });
   }
 });
 

@@ -6,7 +6,7 @@ import {
   Layers, Scissors, Minimize2, RotateCcw, Droplets, PenTool,
   QrCode, Type, Tag, Lock, GitCompare, FileSearch, ArrowUpDown,
   Hash, FileText, Download, X, Plus, CheckCircle2, Loader2,
-  RefreshCcw,
+  RefreshCcw, Eye, EyeOff, AlertCircle, ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import SignatureCanvas from "react-signature-canvas";
@@ -24,7 +24,7 @@ const TOOLS = [
   { id: "qrcode",      icon: QrCode,      label: "Add QR Code",      desc: "Embed a QR code on a page",                   color: "#6366f1", multi: false },
   { id: "annotate",    icon: Type,        label: "Add Annotation",   desc: "Insert text annotation at any position",       color: "#f59e0b", multi: false },
   { id: "metadata",    icon: Tag,         label: "Edit Metadata",    desc: "Update title, author, subject, keywords",      color: "#3b82f6", multi: false },
-  { id: "unlock",      icon: Lock,        label: "Unlock PDF",       desc: "Auto-bypass password protection",              color: "#ef4444", multi: false },
+  { id: "unlock",      icon: Lock,        label: "Unlock PDF",       desc: "Detect & remove PDF password protection",      color: "#ef4444", multi: false },
   { id: "compare",     icon: GitCompare,  label: "Compare PDFs",     desc: "Compare text content between two PDFs",        color: "#8b5cf6", multi: false },
   { id: "extract",     icon: FileSearch,  label: "Extract Text",     desc: "Extract all readable text from a PDF",         color: "#10b981", multi: false },
   { id: "pagenumbers", icon: Hash,        label: "Page Numbers",     desc: "Add page numbers to the document",             color: "#f59e0b", multi: false },
@@ -123,6 +123,15 @@ export default function ToolsPage() {
   const [hfHeader, setHfHeader] = useState("");
   const [hfFooter, setHfFooter] = useState("");
 
+  // Unlock-specific state
+  const [unlockDetection, setUnlockDetection] = useState<null | {
+    encrypted: boolean; requiresPassword: boolean; ownerRestricted: boolean;
+  }>(null);
+  const [unlockPassword, setUnlockPassword] = useState("");
+  const [unlockPwVisible, setUnlockPwVisible] = useState(false);
+  const [unlockPwError, setUnlockPwError] = useState("");
+  const [detecting, setDetecting] = useState(false);
+
   const readyIds = files.filter((f) => f.status === "done").map((f) => f.fileId!);
   const readyIdsB = filesB.filter((f) => f.status === "done").map((f) => f.fileId!);
   const uploading = files.some((f) => f.status === "uploading");
@@ -137,6 +146,10 @@ export default function ToolsPage() {
     setFilesB([]);
     setResult(null);
     setMeta({});
+    setUnlockDetection(null);
+    setUnlockPassword("");
+    setUnlockPwError("");
+    setDetecting(false);
   }
 
   // Auto-load metadata when file is uploaded
@@ -146,12 +159,34 @@ export default function ToolsPage() {
     }
   }, [activeTool, readyIds[0]]);
 
+  // Auto-detect encryption when unlock tool receives a file
+  const firstReadyId = readyIds[0] ?? null;
+  useEffect(() => {
+    if (activeTool !== "unlock" || !firstReadyId) {
+      if (activeTool === "unlock") setUnlockDetection(null);
+      return;
+    }
+    setDetecting(true);
+    setUnlockDetection(null);
+    setUnlockPassword("");
+    setUnlockPwError("");
+    (pdfApi as any).detect(firstReadyId)
+      .then((info: any) => setUnlockDetection(info))
+      .catch(() => setUnlockDetection({ encrypted: false, requiresPassword: false, ownerRestricted: false }))
+      .finally(() => setDetecting(false));
+  }, [activeTool, firstReadyId]);
+
   const minFiles = activeTool === "merge" ? 2 : 1;
   const needsB = activeTool === "compare";
+  const unlockNeedsPassword = activeTool === "unlock" && unlockDetection?.requiresPassword === true;
+  const unlockPasswordOk = !unlockNeedsPassword || unlockPassword.trim().length > 0;
+  const unlockReady = activeTool !== "unlock" || !detecting;
   const canRun =
     readyIds.length >= minFiles &&
     !uploading &&
     !processing &&
+    unlockPasswordOk &&
+    unlockReady &&
     (!needsB || (readyIdsB.length >= 1 && !uploadingB));
 
   async function run() {
@@ -231,9 +266,24 @@ export default function ToolsPage() {
           break;
         }
         case "unlock": {
-          const res = await pdfApi.unlock(readyIds[0]);
-          r = { type: "file", id: res.id, name: res.name, message: "Password bypassed — PDF is now unlocked" };
-          toast.success("PDF unlocked!");
+          const pw = unlockDetection?.requiresPassword ? unlockPassword : undefined;
+          let unlockRes: any;
+          let wrongPw = false;
+          try {
+            unlockRes = await pdfApi.unlock(readyIds[0], pw);
+          } catch (err: any) {
+            if (err.message === "Incorrect password") {
+              setUnlockPwError("Incorrect password. Please check and try again.");
+              wrongPw = true;
+            } else {
+              throw err;
+            }
+          }
+          if (!wrongPw) {
+            r = { type: "file", id: unlockRes.id, name: unlockRes.name, message: "Password removed — PDF is now fully accessible" };
+            toast.success("PDF unlocked!");
+            setUnlockPwError("");
+          }
           break;
         }
         case "extract": {
@@ -504,11 +554,101 @@ export default function ToolsPage() {
               )}
 
               {activeTool === "unlock" && (
-                <Section>
-                  <div style={{ background: "#052e16", border: "1px solid #166534", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#4ade80" }}>
-                    🔓 <strong>Auto-Bypass:</strong> Automatically removes PDF password protection. No password required. Works on owner-restricted and commonly-protected PDFs.
-                  </div>
-                </Section>
+                <>
+                  {/* Analyzing spinner — shows while detection is in progress */}
+                  {detecting && readyIds.length > 0 && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 14px", background: "#0c1524", border: "1px solid #1e3a5f", borderRadius: 8, marginBottom: 12, color: "#60a5fa", fontSize: 13 }}>
+                      <Loader2 size={14} style={{ animation: "spin 1s linear infinite", flexShrink: 0 }} /> Analyzing encryption…
+                    </div>
+                  )}
+
+                  {/* Detection result — shows once detection finishes */}
+                  {!detecting && unlockDetection && (
+                    <Section>
+                      {/* Case 1: Not encrypted */}
+                      {!unlockDetection.encrypted && (
+                        <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                          <CheckCircle2 size={18} color="#10b981" style={{ flexShrink: 0, marginTop: 1 }} />
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: 13, color: "#10b981" }}>No password protection</div>
+                            <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
+                              This PDF has no encryption. Processing will produce a clean, fully accessible copy with all text, fonts, images, and metadata preserved.
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Case 2: Owner-restricted (empty user password) */}
+                      {unlockDetection.encrypted && unlockDetection.ownerRestricted && (
+                        <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                          <ShieldCheck size={18} color="#f59e0b" style={{ flexShrink: 0, marginTop: 1 }} />
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: 13, color: "#f59e0b" }}>Owner-restricted PDF</div>
+                            <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
+                              This PDF has usage restrictions (print, copy, edit) but requires no open password. Auto-bypass will remove all restrictions while preserving full content.
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Case 3: User password required */}
+                      {unlockDetection.requiresPassword && (
+                        <div>
+                          <div style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 16 }}>
+                            <Lock size={18} color="#ef4444" style={{ flexShrink: 0, marginTop: 1 }} />
+                            <div>
+                              <div style={{ fontWeight: 700, fontSize: 13, color: "#ef4444" }}>Open password required</div>
+                              <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
+                                This PDF is encrypted with a user password. Enter the correct password to unlock it. All content — text, fonts, images, annotations, signatures, bookmarks, and metadata — will be preserved exactly.
+                              </div>
+                            </div>
+                          </div>
+
+                          <Label>PDF Password</Label>
+                          <div style={{ position: "relative" }}>
+                            <Inp
+                              type={unlockPwVisible ? "text" : "password"}
+                              value={unlockPassword}
+                              onChange={(e) => { setUnlockPassword(e.target.value); setUnlockPwError(""); }}
+                              onKeyDown={(e) => { if (e.key === "Enter" && unlockPassword.trim() && !processing) run(); }}
+                              placeholder="Enter the PDF open password"
+                              style={{
+                                paddingRight: 42,
+                                borderColor: unlockPwError ? "#ef4444" : undefined,
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setUnlockPwVisible((v) => !v)}
+                              style={{
+                                position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
+                                background: "none", border: "none", cursor: "pointer", color: "#4a5568",
+                                padding: 2, display: "flex", alignItems: "center",
+                              }}
+                            >
+                              {unlockPwVisible ? <EyeOff size={14} /> : <Eye size={14} />}
+                            </button>
+                          </div>
+                          {unlockPwError && (
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, color: "#ef4444", fontSize: 12, fontWeight: 600 }}>
+                              <AlertCircle size={13} /> {unlockPwError}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </Section>
+                  )}
+
+                  {/* Default info — shown before any file is uploaded */}
+                  {!unlockDetection && !detecting && readyIds.length === 0 && (
+                    <Section>
+                      <div style={{ background: "#0c1524", border: "1px solid #1e3a5f", borderRadius: 8, padding: "11px 14px", fontSize: 13, color: "#60a5fa", lineHeight: 1.5 }}>
+                        <strong>Smart Unlock:</strong> Upload a PDF and the tool will automatically detect its encryption type.
+                        Owner-restricted PDFs are auto-bypassed instantly. PDFs with an open password will prompt you to enter it.
+                      </div>
+                    </Section>
+                  )}
+                </>
               )}
 
               {activeTool === "pagenumbers" && (
@@ -573,6 +713,12 @@ export default function ToolsPage() {
                       <>Upload at least 2 files to merge</>
                     ) : !canRun && needsB && readyIdsB.length < 1 ? (
                       <>Upload both documents to compare</>
+                    ) : !canRun && activeTool === "unlock" && detecting ? (
+                      <>Analyzing…</>
+                    ) : !canRun && unlockNeedsPassword && !unlockPassword ? (
+                      <>Enter password above to unlock</>
+                    ) : activeTool === "unlock" && unlockNeedsPassword ? (
+                      <>Unlock with Password</>
                     ) : (
                       <>{tool?.label}</>
                     )}
@@ -645,7 +791,7 @@ export default function ToolsPage() {
                   {result.type === "compare" && (
                     <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                        <div style={{ fontSize: 36, fontWeight: 800, color: "#4ade80" }}>{Math.round(result.similarity * 100)}%</div>
+                        <div style={{ fontSize: 36, fontWeight: 800, color: "#4ade80" }}>{result.similarity}%</div>
                         <div>
                           <div style={{ fontSize: 14, fontWeight: 600, color: "#d4d8e1" }}>Similarity Score</div>
                           <div style={{ fontSize: 12, color: "#4a5568" }}>Based on unique word overlap</div>
