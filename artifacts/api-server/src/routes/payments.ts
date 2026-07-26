@@ -1844,10 +1844,10 @@ router.post("/resend-notification/:bookingId", requireAdmin as any, async (req: 
       const waResult   = isPending
         ? await sendBookingSubmittedTemplate(row.customer_mobile,
             { customerName: row.customer_name, packageName: row.package_name || "Hajj/Umrah Package", bookingId: bookingRef },
-            { eventType: "new_booking", bookingId: row.id, customerId: row.customer_id })
+            { eventType: "new_booking", bookingId: row.id, customerId: row.customer_id, forceTemplateApi: true })
         : await sendApprovalTemplate(row.customer_mobile,
             { customerName: row.customer_name, packageName: row.package_name || "Hajj/Umrah Package", bookingId: bookingRef, amount: paidAmount, invoiceUrl: invoiceLink },
-            { eventType: "booking_approved", bookingId: row.id, customerId: row.customer_id });
+            { eventType: "booking_approved", bookingId: row.id, customerId: row.customer_id, forceTemplateApi: true });
       await logEntry("booking_approved", "whatsapp", row.customer_mobile, `Resend All: WhatsApp`, waResult.ok ? "sent" : "failed");
       summary.push({ key: "whatsapp", label: "WhatsApp", status: waResult.ok ? "sent" : "failed", reason: waResult.ok ? undefined : (waResult.errorMessage || "Send failed") });
     } catch (err: any) {
@@ -1952,7 +1952,7 @@ router.post("/resend-notification/:bookingId", requireAdmin as any, async (req: 
           customerName: row.customer_name, bookingId: row.booking_number,
           agreementNumber: agr.agreement_number,
           agreementUrl: `${siteBase}/agreement/${row.booking_number}`,
-        }, { eventType: "agreement_ready", bookingId: row.id, customerId: row.customer_id ?? undefined });
+        }, { eventType: "agreement_ready", bookingId: row.id, customerId: row.customer_id ?? undefined, forceTemplateApi: true });
         summary.push({ key: "agreement", label: "Agreement", status: agrResult.ok ? "sent" : "failed", reason: agrResult.ok ? undefined : (agrResult.errorMessage || "Send failed") });
       }
       // No entry in summary if no agreement exists

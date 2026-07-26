@@ -545,10 +545,10 @@ app.post("/api/migrate/test-resend", async (req: any, res: any) => {
     const r = isPending
       ? await sendBookingSubmittedTemplate(booking.customer_mobile,
           { customerName: booking.customer_name, packageName: booking.package_name || "Hajj/Umrah Package", bookingId: bookingRef },
-          { eventType: "new_booking", bookingId: booking.id, customerId: booking.customer_id })
+          { eventType: "new_booking", bookingId: booking.id, customerId: booking.customer_id, forceTemplateApi: true })
       : await sendApprovalTemplate(booking.customer_mobile,
           { customerName: booking.customer_name, packageName: booking.package_name || "Hajj/Umrah Package", bookingId: bookingRef, amount: paidAmount, invoiceUrl: invoiceLink },
-          { eventType: "booking_approved", bookingId: booking.id, customerId: booking.customer_id });
+          { eventType: "booking_approved", bookingId: booking.id, customerId: booking.customer_id, forceTemplateApi: true });
     return { status: r.ok ? "ok" : "fail", detail: r.ok ? `wamid=${r.wamid || "—"}` : (r.errorMessage || "no wamid") };
   });
 
@@ -631,7 +631,7 @@ app.post("/api/migrate/test-resend", async (req: any, res: any) => {
       customerName: booking.customer_name, bookingId: booking.booking_number,
       agreementNumber: agr.agreement_number,
       agreementUrl: `${siteBase}/agreement/${booking.booking_number}`,
-    }, { eventType: "agreement_ready", bookingId: booking.id, customerId: booking.customer_id ?? undefined });
+    }, { eventType: "agreement_ready", bookingId: booking.id, customerId: booking.customer_id ?? undefined, forceTemplateApi: true });
     return { status: r.ok ? "ok" : "fail", detail: r.ok ? `wamid=${r.wamid || "—"} agr=${agr.agreement_number}` : (r.errorMessage || "template failed") };
   });
 

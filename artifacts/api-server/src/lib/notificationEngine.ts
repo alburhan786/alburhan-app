@@ -550,10 +550,12 @@ export async function sendBotBeeEventTemplate(
     (ctx.bookingNumber ? `${siteBase}/invoice/${ctx.bookingNumber}` : `${siteBase}`);
   const paymentUrl = ctx.bookingNumber
     ? `${siteBase}/pay/${ctx.bookingNumber}` : `${siteBase}`;
-  // Do NOT use forceTemplateApi:true — BotBee's /send/template endpoint returns
-  // "WhatsApp account not found" for this account. The text endpoint /whatsapp/send
-  // works correctly; sendTemplate() renders TEMPLATE_BODIES locally and sends via that path.
-  const opts = { eventType, bookingId, customerId, customerName: ctx.customerName, skipFailureLog: true, noInternalLog: true };
+  // forceTemplateApi:true — bypasses the 24h session window check and goes directly to
+  // BotBee's /whatsapp/send/template endpoint. This guarantees delivery for all customers
+  // regardless of whether they have an active WhatsApp session with the business number.
+  // Variables MUST be a named object matching variable_map keys (not a flat array) so that
+  // BotBee substitutes #!VarName!# placeholders correctly in the delivered message.
+  const opts = { eventType, bookingId, customerId, customerName: ctx.customerName, skipFailureLog: true, noInternalLog: true, forceTemplateApi: true };
 
   switch (eventType) {
     // ── Booking ───────────────────────────────────────────────────────────────

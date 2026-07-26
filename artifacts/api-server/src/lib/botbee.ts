@@ -229,9 +229,10 @@ export async function sendText(
 // ── Template body store (from BotBee body_content / template_json, fetched 2026-07-18) ────────────
 // These are the EXACT bodies registered on Meta ({{1}}, {{2}}, … positional variables).
 // PRIMARY PATH: renderTemplateBody() substitutes {{N}} with Object.values(vars) → sendText().
-// FALLBACK PATH (outside 24h window): BotBee template API receives variables as flat positional
-// array (Object.values(namedVars)) so BotBee maps index 0→{{1}}, index 1→{{2}} correctly on Meta.
-// variable_map.body (BotBee): {"1":"#!Name!#","2":"#!BookingID!#",...} — insertion order matches sender function variable order.
+// FALLBACK / TEMPLATE-API PATH: BotBee substitutes #!VarName!# in mixed_body_text when variables
+// are sent as a NAMED OBJECT matching the template's variable_map keys exactly.
+// ⚠️  Flat positional arrays get HTTP 200 + wamid but are NOT substituted — recipient sees #!Name!#.
+// variable_map.body (BotBee): {"1":"#!Name!#","2":"#!BookingID!#",...} — key names must match exactly.
 export const TEMPLATE_BODIES: Record<string, string> = {
   "409950": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {{1}}\nAlhamdulillah! ✅\n\nYour booking has been APPROVED.\n\n📋 Booking ID: {{2}}\n📦 Package: {{3}}\n💰 Amount: ₹ {{4}}\n\nPlease complete your payment using the link below.\n\n🔗 {{5}}\n\n📞 +91 9893225590\n\nJazak Allah Khair.\nAl Burhan Tours & Travels",
   "409953": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {{1}}\n\nAlhamdulillah! 🎉\n\nWe have successfully received your payment.\n\n📋 Booking ID:{{2}}\n🧾 Invoice No: {{3}}\n💰 Amount Received: ₹ {{4}}\n\nYour booking is confirmed.\n\nJazak Allah Khair.\n\nAl Burhan Tours & Travels",
@@ -400,9 +401,16 @@ export async function sendTemplate(
 
   // ── FALLBACK PATH: approved WhatsApp template API ────────────────────────────
   // Reached when: (a) templateBody is absent from TEMPLATE_BODIES (unrecognised ID),
-  // or (b) the 24h session window was detected above and we must send a template
-  // instead of a plain-text session message.
-  // Variables are sent as a flat positional array: index 0 → {{1}}, index 1 → {{2}}.
+  // or (b) the 24h session window was detected above, or (c) forceTemplateApi:true.
+  //
+  // VARIABLE FORMAT — BotBee substitutes #!VarName!# in mixed_body_text ONLY when
+  // variables are sent as a NAMED OBJECT whose keys match variable_map exactly.
+  // Example: { Name:"Mohammed", BookingID:"ABT26421971", Amount:"94,500", ... }
+  // Flat positional arrays ([val1, val2, ...]) are silently accepted (HTTP 200 + wamid)
+  // but #!Name!# etc. remain UNSUBSTITUTED in the delivered message.
+  //
+  // We ALSO include the Meta-style components array so BotBee can route via Meta Cloud API
+  // and substitute {{1}}, {{2}}, ... in body_content when its Meta integration is active.
   const { apiToken, phone_number_id, business_id, baseUrl } = getCredentials();
   const endpoint = `${baseUrl}/whatsapp/send/template`;
   if (!apiToken || !phone_number_id) return { ok: false, provider: "BotBee", endpoint, errorMessage: "BotBee credentials not configured" };
@@ -419,22 +427,54 @@ export async function sendTemplate(
     return result;
   }
 
-  // Pass variables as a flat positional array so BotBee maps index 0 → {{1}}, index 1 → {{2}}.
-  // Sender functions build the variable object in exact insertion order matching variable_map positions.
-  const positionalVars = namedVars ? Object.values(namedVars) : undefined;
+  // ── Variable validation ───────────────────────────────────────────────────────
+  // Block the send if any variable value still contains an unresolved placeholder
+  // (#!VarName!# or {{N}}). Log a warning if any value is empty / defaulted to "-".
+  if (namedVars && Object.keys(namedVars).length > 0) {
+    const unresolvedEntries = Object.entries(namedVars)
+      .filter(([, v]) => /#![^!]+!#|\{\{\d+\}\}/.test(String(v ?? "")));
+    if (unresolvedEntries.length > 0) {
+      const detail = unresolvedEntries.map(([k, v]) => `${k}="${v}"`).join(", ");
+      const errMsg = `Template ${templateId} blocked: variable values contain unresolved placeholders — ${detail}`;
+      console.error(`[BotBee] sendTemplate BLOCKED: ${errMsg}`);
+      const blocked: BotBeeResult = { ok: false, provider: "BotBee", endpoint, errorMessage: errMsg };
+      if (opts?.eventType && !opts?.noInternalLog) {
+        await logToDb({ eventType: opts.eventType, channel: "whatsapp", recipient: to, bookingId: opts.bookingId, customerId: opts.customerId, customerName: opts.customerName, templateId, message: errMsg, status: "failed", result: blocked });
+      }
+      return blocked;
+    }
+    const emptyKeys = Object.entries(namedVars)
+      .filter(([, v]) => v === undefined || v === null || String(v).trim() === "" || String(v) === "-")
+      .map(([k]) => k);
+    if (emptyKeys.length > 0) {
+      console.warn(`[BotBee] sendTemplate WARN: template ${templateId} has empty/defaulted variables: [${emptyKeys.join(", ")}] — message will show "-" for those slots`);
+    }
+  } else if (!namedVars) {
+    console.warn(`[BotBee] sendTemplate WARN: template ${templateId} sent with NO variables — all #!VarName!# placeholders will remain unsubstituted`);
+  }
+
+  // Named object for BotBee CRM substitution of #!VarName!# in mixed_body_text.
+  // Components array for BotBee's Meta Cloud API routing ({{N}} substitution in body_content).
+  const flatValues = namedVars ? Object.values(namedVars).map(v => String(v ?? "-")) : undefined;
+  const components = flatValues?.length ? [{
+    type: "body",
+    parameters: flatValues.map(text => ({ type: "text", text })),
+  }] : undefined;
 
   const payload: Record<string, unknown> = {
     apiToken, phone_number_id, phone_number: phone,
     ...(business_id ? { business_id } : {}),
     ...(isNumericId ? { template_id: Number(templateId) } : { template_name: templateId }),
-    ...(positionalVars ? { variables: positionalVars } : {}),
+    ...(namedVars ? { variables: namedVars } : {}),
+    ...(components ? { components } : {}),
   };
 
   const reqPayload: Record<string, unknown> = {
     phone_number_id, phone_number: phone,
     ...(business_id ? { business_id } : {}),
     ...(isNumericId ? { template_id: Number(templateId) } : { template_name: templateId }),
-    ...(positionalVars ? { variables: positionalVars } : {}),
+    ...(namedVars ? { variables: namedVars } : {}),
+    ...(components ? { components } : {}),
   };
 
   console.log("[BotBee] sendTemplate REQUEST →", JSON.stringify(reqPayload));
