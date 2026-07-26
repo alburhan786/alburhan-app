@@ -44,6 +44,9 @@ const _envKeys = [
   "BOTBEE_API_KEY",
   "BOTBEE_PHONE_NUMBER_ID",
   "NODE_ENV",
+  "FIREBASE_PROJECT_ID",
+  "FIREBASE_CLIENT_EMAIL",
+  "FIREBASE_PRIVATE_KEY",
 ];
 for (const k of _envKeys) {
   const v = process.env[k];

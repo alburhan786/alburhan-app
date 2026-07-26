@@ -186,6 +186,7 @@ export function buildNavSections(openComplaints = 0): NavSection[] {
         { icon: FileText,      label: "DLT Template Manager",           href: "/admin/dlt-templates",           require: ["settings",  "view"], aliases: ["dlt", "sms dlt", "template manager", "telecom"] },
         { icon: Smartphone,    label: "Sender ID Management",           href: "/admin/sms-settings",            require: ["settings",  "view"], aliases: ["sender id", "sms settings", "sender"] },
         { icon: TestTube2,     label: "SMS Test Center",                href: "/admin/sms-test",                require: ["settings",  "view"], aliases: ["sms test", "test sms", "test message"] },
+        { icon: Bell,          label: "Push Center",                    href: "/admin/push-center",             require: ["settings",  "view"], aliases: ["push center", "fcm", "firebase", "push notification", "push test", "send push", "device notification", "mobile push"] },
         { icon: TestTube2,     label: "Test Notifications",             href: "/admin/test-notifications",      require: ["settings",  "view"], aliases: ["test notification", "test alert", "test push"] },
         { icon: History,       label: "Notification Logs",              href: "/admin/notification-logs",       require: ["settings",  "view"], aliases: ["notification log", "message log", "delivery log"] },
         { icon: FileText,      label: "Notification Templates",         href: "/admin/notification-templates",  require: ["settings",  "view"], aliases: ["notification template", "alert template"] },

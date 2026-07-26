@@ -144,6 +144,7 @@ import SmsProductionReport from "@/pages/admin/SmsProductionReport";
 import RCSTemplateManager from "@/pages/admin/RCSTemplateManager";
 import EmailTemplateManager from "@/pages/admin/EmailTemplateManager";
 import TestNotifications from "@/pages/admin/TestNotifications";
+import PushCenter from "@/pages/admin/PushCenter";
 import WorkflowCenter from "@/pages/admin/WorkflowCenter";
 import ZiyaratManager from "@/pages/admin/ZiyaratManager";
 import LuggageManager from "@/pages/admin/LuggageManager";
@@ -435,6 +436,7 @@ function Router() {
       <Route path="/admin/rcs-templates" component={() => <AdminRoute component={RCSTemplateManager} />} />
       <Route path="/admin/email-templates" component={() => <AdminRoute component={EmailTemplateManager} />} />
       <Route path="/admin/test-notifications" component={() => <AdminRoute component={TestNotifications} />} />
+      <Route path="/admin/push-center" component={() => <AdminRoute component={PushCenter} />} />
       <Route path="/admin/workflow-center" component={() => <AdminRoute component={WorkflowCenter} />} />
       <Route path="/admin/ziyarat" component={() => <AdminRoute component={ZiyaratManager} />} />
       <Route path="/admin/luggage" component={() => <AdminRoute component={LuggageManager} />} />
