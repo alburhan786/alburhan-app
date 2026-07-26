@@ -89,8 +89,8 @@ export const pdf = {
   getMetadata: (fileId: string) => request(`/pdf/metadata/${fileId}`),
   updateMetadata: (fileId: string, meta: any) =>
     request(`/pdf/metadata/${fileId}`, { method: "PUT", body: JSON.stringify(meta) }),
-  unlock: (fileId: string, password: string) =>
-    request(`/pdf/unlock/${fileId}`, { method: "POST", body: JSON.stringify({ password }) }),
+  unlock: (fileId: string) =>
+    request(`/pdf/unlock/${fileId}`, { method: "POST" }),
   extractText: (fileId: string) =>
     request(`/pdf/extract-text/${fileId}`, { method: "POST" }),
   compare: (fileIdA: string, fileIdB: string) =>

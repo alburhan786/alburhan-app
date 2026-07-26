@@ -270,23 +270,18 @@ router.put("/metadata/:fileId", async (req, res) => {
   }
 });
 
-// POST /pdf/api/pdf/unlock/:fileId — open password-protected PDF
+// POST /pdf/api/pdf/unlock/:fileId — bypass PDF password protection automatically
 router.post("/unlock/:fileId", async (req, res) => {
   const user = (req as any).pdfUser;
-  const { password } = req.body;
-  if (!password) return res.status(400).json({ error: "Password required" });
   try {
     const { bytes, file } = await readPdfBytes(req.params.fileId, user.id, user.role);
-    const unlocked = await PDF.unlockPdf(bytes, password);
+    const unlocked = await PDF.unlockPdf(bytes);
     const saved = await saveProcessedPdf(unlocked, file, "unlock", user.id);
     await pool.query(`UPDATE pdf_files SET has_password = false WHERE id = $1`, [file.id]);
     await logAudit({ userId: user.id, username: user.username, action: "pdf_unlock", resourceType: "file", resourceId: req.params.fileId, severity: "warning", req });
     res.json(saved);
   } catch (err: any) {
-    if (err.message?.includes("password") || err.message?.includes("encrypt")) {
-      return res.status(400).json({ error: "Incorrect password or file not password-protected" });
-    }
-    res.status(err.status || 500).json({ error: err.message || "Unlock failed" });
+    res.status(400).json({ error: err.message || "Could not bypass PDF password protection" });
   }
 });
 

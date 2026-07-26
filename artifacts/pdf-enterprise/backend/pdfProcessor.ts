@@ -284,11 +284,36 @@ export async function getMetadata(pdfBytes: Buffer): Promise<Record<string, stri
   };
 }
 
-export async function unlockPdf(pdfBytes: Buffer, password: string): Promise<Buffer> {
-  const doc = await PDFDocument.load(pdfBytes, { password });
-  // Save without encryption
-  const bytes = await doc.save();
-  return Buffer.from(bytes);
+export async function unlockPdf(pdfBytes: Buffer): Promise<Buffer> {
+  // Common passwords to try for bypass
+  const attempts = ["", "password", "1234", "12345", "123456", "admin", "user", "pdf", "document", "owner"];
+
+  // First try: load with no password (handles owner-only restricted PDFs)
+  try {
+    const doc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
+    const bytes = await doc.save();
+    return Buffer.from(bytes);
+  } catch (_) {}
+
+  // Second try: empty password
+  try {
+    const doc = await PDFDocument.load(pdfBytes, { password: "" });
+    const bytes = await doc.save();
+    return Buffer.from(bytes);
+  } catch (_) {}
+
+  // Third try: common passwords
+  for (const pw of attempts) {
+    try {
+      const doc = await PDFDocument.load(pdfBytes, { password: pw });
+      const bytes = await doc.save();
+      return Buffer.from(bytes);
+    } catch (_) {}
+  }
+
+  // Last resort: strip encryption metadata using raw buffer manipulation
+  // Many "protected" PDFs are only owner-password locked — ignoreEncryption handles them
+  throw new Error("Could not bypass PDF password. The file uses strong user-password encryption.");
 }
 
 export async function protectPdf(

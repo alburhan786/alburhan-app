@@ -25,7 +25,7 @@ const TOOLS: Tool[] = [
   { id: "qrcode", icon: QrCode, label: "Add QR Code", desc: "Generate and embed a QR code into a page", color: "#6366f1" },
   { id: "annotate", icon: Type, label: "Add Annotation", desc: "Add a text annotation at any position on a page", color: "#f59e0b" },
   { id: "metadata", icon: Tag, label: "Edit Metadata", desc: "View and update PDF title, author, subject, keywords", color: "#3b82f6" },
-  { id: "unlock", icon: Lock, label: "Unlock PDF", desc: "Open a password-protected PDF with the correct password", color: "#ef4444" },
+  { id: "unlock", icon: Lock, label: "Unlock PDF", desc: "Automatically bypass & remove PDF password protection — no password needed", color: "#ef4444" },
   { id: "compare", icon: GitCompare, label: "Compare PDFs", desc: "Compare text content between two PDFs", color: "#8b5cf6" },
   { id: "extract", icon: FileSearch, label: "Extract Text", desc: "Extract all readable text from a PDF", color: "#10b981" },
   { id: "pagenumbers", icon: Hash, label: "Page Numbers", desc: "Add page numbers to a PDF document", color: "#f59e0b" },
@@ -79,7 +79,6 @@ export default function ToolsPage() {
   const [sigX, setSigX] = useState(50);
   const [sigY, setSigY] = useState(50);
   const [meta, setMeta] = useState<any>({});
-  const [unlockPw, setUnlockPw] = useState("");
   const [extractedText, setExtractedText] = useState("");
   const [compareResult, setCompareResult] = useState<any>(null);
   const [pnStart, setPnStart] = useState(1);
@@ -177,9 +176,8 @@ export default function ToolsPage() {
         }
         case "unlock": {
           if (!selFileId) throw new Error("Select a file");
-          if (!unlockPw) throw new Error("Enter the PDF password");
-          r = await pdfApi.unlock(selFileId, unlockPw);
-          toast.success("PDF unlocked and saved");
+          r = await pdfApi.unlock(selFileId);
+          toast.success("PDF password bypassed and saved");
           break;
         }
         case "extract": {
@@ -430,11 +428,10 @@ export default function ToolsPage() {
                 {/* UNLOCK */}
                 {activeTool === "unlock" && (
                   <div className="flex flex-col gap-4">
-                    <div style={{ background: "#451a03", border: "1px solid #78350f", borderRadius: 8, padding: "10px 14px", fontSize: 12, color: "#fbbf24" }}>
-                      <strong>⚠ Security Note:</strong> This tool opens password-protected PDFs using the <em>correct password you provide</em>. PDF cracking/bypassing without a password is not supported.
+                    <div style={{ background: "#052e16", border: "1px solid #166534", borderRadius: 8, padding: "10px 14px", fontSize: 12, color: "#4ade80" }}>
+                      <strong>🔓 Auto-Bypass:</strong> Automatically removes PDF password protection without needing the password. Works on owner-restricted and commonly-protected PDFs.
                     </div>
                     <FileSelect label="Password-Protected File" value={selFileId} onChange={setSelFileId} fileList={fileList} />
-                    <div><label>PDF Password</label><input type="password" value={unlockPw} onChange={(e) => setUnlockPw(e.target.value)} placeholder="Enter the correct PDF password" /></div>
                   </div>
                 )}
 
