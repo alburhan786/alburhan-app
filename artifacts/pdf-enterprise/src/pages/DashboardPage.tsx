@@ -75,7 +75,7 @@ export default function DashboardPage() {
           </div>
           <button
             className="btn-primary flex items-center gap-2"
-            onClick={() => navigate("/pdf/workspace")}
+            onClick={() => navigate("/workspace")}
             style={{ padding: "10px 18px" }}
           >
             <Plus size={16} /> Upload PDF
@@ -104,10 +104,10 @@ export default function DashboardPage() {
         {/* Quick actions */}
         <div className="grid gap-4 mb-8" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
           {[
-            { label: "Upload & Manage", desc: "Browse and manage your PDFs", icon: FileText, href: "/pdf/workspace", color: "#3b82f6" },
-            { label: "PDF Tools", desc: "Merge, split, compress and more", icon: Upload, href: "/pdf/tools", color: "#10b981" },
-            { label: "ERP Bridge", desc: "Import agreements & invoices", icon: ArrowRight, href: "/pdf/erp", color: "#8b5cf6" },
-            { label: "Audit Log", desc: "Review security events", icon: ShieldCheck, href: "/pdf/audit", color: "#f59e0b" },
+            { label: "Upload & Manage", desc: "Browse and manage your PDFs", icon: FileText, href: "/workspace", color: "#3b82f6" },
+            { label: "PDF Tools", desc: "Merge, split, compress and more", icon: Upload, href: "/tools", color: "#10b981" },
+            { label: "ERP Bridge", desc: "Import agreements & invoices", icon: ArrowRight, href: "/erp", color: "#8b5cf6" },
+            { label: "Audit Log", desc: "Review security events", icon: ShieldCheck, href: "/audit", color: "#f59e0b" },
           ].map((item) => (
             <button
               key={item.href}
@@ -129,7 +129,7 @@ export default function DashboardPage() {
             <h2 style={{ fontSize: 16, fontWeight: 700, color: "#d4d8e1", margin: 0 }}>Recent Files</h2>
             <button
               style={{ fontSize: 12, color: "#3b82f6", background: "none", padding: "4px 8px" }}
-              onClick={() => navigate("/pdf/workspace")}
+              onClick={() => navigate("/workspace")}
             >
               View all →
             </button>
@@ -156,7 +156,7 @@ export default function DashboardPage() {
                     <tr
                       key={f.id}
                       style={{ cursor: "pointer" }}
-                      onClick={() => navigate("/pdf/workspace")}
+                      onClick={() => navigate("/workspace")}
                     >
                       <td>
                         <div className="flex items-center gap-2">

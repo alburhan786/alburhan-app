@@ -24,7 +24,7 @@ export default function AdminPage() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", flexDirection: "column", gap: 12 }}>
           <Shield size={48} color="#4a5568" />
           <p style={{ color: "#4a5568" }}>Admin access required</p>
-          <button className="btn-primary" onClick={() => navigate("/pdf/")}>← Dashboard</button>
+          <button className="btn-primary" onClick={() => navigate("/")}>← Dashboard</button>
         </div>
       </Layout>
     );

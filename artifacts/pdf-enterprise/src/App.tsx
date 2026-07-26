@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Router, Switch, Route } from "wouter";
 import { Toaster } from "sonner";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import LoginPage from "@/pages/LoginPage";
@@ -15,11 +15,9 @@ function AppRoutes() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-muted-foreground">Loading Al Burhan PDF Enterprise…</p>
-        </div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", flexDirection: "column", gap: 16 }}>
+        <div style={{ width: 36, height: 36, border: "3px solid #3b82f6", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+        <p style={{ color: "#4a5568", fontSize: 14 }}>Loading PDF Enterprise…</p>
       </div>
     );
   }
@@ -28,28 +26,25 @@ function AppRoutes() {
 
   return (
     <Switch>
-      <Route path="/pdf/" component={DashboardPage} />
-      <Route path="/pdf/workspace" component={WorkspacePage} />
-      <Route path="/pdf/tools" component={ToolsPage} />
-      <Route path="/pdf/erp" component={ERPBridgePage} />
-      <Route path="/pdf/audit" component={AuditPage} />
-      <Route path="/pdf/admin" component={AdminPage} />
-      <Route path="/pdf/profile" component={ProfilePage} />
-      <Route>
-        {() => {
-          window.location.href = "/pdf/";
-          return null;
-        }}
-      </Route>
+      <Route path="/" component={DashboardPage} />
+      <Route path="/workspace" component={WorkspacePage} />
+      <Route path="/tools" component={ToolsPage} />
+      <Route path="/erp" component={ERPBridgePage} />
+      <Route path="/audit" component={AuditPage} />
+      <Route path="/admin" component={AdminPage} />
+      <Route path="/profile" component={ProfilePage} />
+      <Route component={DashboardPage} />
     </Switch>
   );
 }
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppRoutes />
-      <Toaster richColors position="top-right" />
-    </AuthProvider>
+    <Router base="/pdf">
+      <AuthProvider>
+        <AppRoutes />
+        <Toaster richColors position="top-right" />
+      </AuthProvider>
+    </Router>
   );
 }

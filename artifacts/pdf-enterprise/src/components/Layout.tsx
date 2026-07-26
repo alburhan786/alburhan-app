@@ -8,15 +8,15 @@ import {
 } from "lucide-react";
 
 const NAV = [
-  { href: "/pdf/", icon: LayoutDashboard, label: "Dashboard" },
-  { href: "/pdf/workspace", icon: FolderOpen, label: "Workspace" },
-  { href: "/pdf/tools", icon: Wrench, label: "PDF Tools" },
-  { href: "/pdf/erp", icon: Link2, label: "ERP Bridge" },
-  { href: "/pdf/audit", icon: ScrollText, label: "Audit Log" },
+  { href: "/", icon: LayoutDashboard, label: "Dashboard" },
+  { href: "/workspace", icon: FolderOpen, label: "Workspace" },
+  { href: "/tools", icon: Wrench, label: "PDF Tools" },
+  { href: "/erp", icon: Link2, label: "ERP Bridge" },
+  { href: "/audit", icon: ScrollText, label: "Audit Log" },
 ];
 
 const ADMIN_NAV = [
-  { href: "/pdf/admin", icon: Users, label: "Users & Admin" },
+  { href: "/admin", icon: Users, label: "Users & Admin" },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -25,7 +25,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
 
   function isActive(href: string) {
-    if (href === "/pdf/") return location === "/pdf/" || location === "/pdf";
+    if (href === "/") return location === "/" || location === "";
     return location.startsWith(href);
   }
 
@@ -123,7 +123,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div style={{ borderTop: "1px solid #1e2433", padding: "10px 8px" }}>
           <button
             className="sidebar-item"
-            onClick={() => navigate("/pdf/profile")}
+            onClick={() => navigate("/profile")}
             style={{ width: "100%", justifyContent: sidebarOpen ? "flex-start" : "center" }}
             title={!sidebarOpen ? "Profile" : undefined}
           >
