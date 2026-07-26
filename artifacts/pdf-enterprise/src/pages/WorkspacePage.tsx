@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
+import { useLocation } from "wouter";
 import Layout from "@/components/Layout";
 import { files as filesApi, pdf as pdfApi } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   FileText, Upload, Search, Trash2, Download, Eye, ChevronRight,
   FolderPlus, Clock, Shield, AlertTriangle, CheckCircle, X,
-  RefreshCw, Tag, Info, RotateCcw, History
+  RefreshCw, Tag, Info, RotateCcw, History, Edit3
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -35,6 +36,7 @@ type PdfFile = {
 
 export default function WorkspacePage() {
   const { user } = useAuth();
+  const [, navigate] = useLocation();
   const [fileList, setFileList] = useState<PdfFile[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -211,6 +213,13 @@ export default function WorkspacePage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2" style={{ flexShrink: 0 }}>
+                  <button
+                    className="btn-primary flex items-center gap-1"
+                    style={{ padding: "6px 14px", fontSize: 12, fontWeight: 700 }}
+                    onClick={() => navigate(`/editor/${selectedFile.id}`)}
+                  >
+                    <Edit3 size={13} /> Open in Editor
+                  </button>
                   <a
                     href={filesApi.downloadUrl(selectedFile.id)}
                     download={selectedFile.original_name}

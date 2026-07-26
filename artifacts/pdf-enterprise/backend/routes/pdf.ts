@@ -408,4 +408,152 @@ router.get("/page-info/:fileId", async (req, res) => {
   }
 });
 
+
+// POST /pdf/api/pdf/save-annotations/:fileId — bake annotation overlay into PDF
+router.post("/save-annotations/:fileId", async (req, res) => {
+  const user = (req as any).pdfUser;
+  try {
+    const { bytes, file } = await readPdfBytes(req.params.fileId, user.id, user.role);
+    const { annotations = [], name } = req.body;
+    const processed = await PDF.bakeAnnotations(bytes, annotations);
+    const saved = await saveProcessedPdf(processed, file, "save_annotations", user.id, name);
+    await logAudit({ userId: user.id, username: user.username, action: "pdf_save_annotations", details: { fileId: req.params.fileId, count: annotations.length }, req });
+    res.json({ success: true, fileId: saved.id || req.params.fileId, version: file.current_version + 1 });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message || "Save failed" });
+  }
+});
+
+// POST /pdf/api/pdf/protect/:fileId — password protect PDF (AES-256)
+router.post("/protect/:fileId", async (req, res) => {
+  const user = (req as any).pdfUser;
+  try {
+    const { bytes, file } = await readPdfBytes(req.params.fileId, user.id, user.role);
+    const { userPassword, ownerPassword } = req.body;
+    if (!userPassword) return res.status(400).json({ error: "userPassword required" });
+    const processed = await PDF.protectPdf(bytes, userPassword, ownerPassword || userPassword + "_owner");
+    await saveProcessedPdf(processed, file, "protect", user.id);
+    await logAudit({ userId: user.id, username: user.username, action: "pdf_protect", details: { fileId: req.params.fileId }, req });
+    res.json({ success: true, message: "PDF password-protected (AES-256)" });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message || "Protection failed" });
+  }
+});
+
+// POST /pdf/api/pdf/insert-page/:fileId — insert blank page
+router.post("/insert-page/:fileId", async (req, res) => {
+  const user = (req as any).pdfUser;
+  try {
+    const { bytes, file } = await readPdfBytes(req.params.fileId, user.id, user.role);
+    const { afterIndex = 0, width = 595, height = 842 } = req.body;
+    const processed = await PDF.insertBlankPage(bytes, afterIndex, width, height);
+    await saveProcessedPdf(processed, file, "insert_page", user.id);
+    await logAudit({ userId: user.id, username: user.username, action: "pdf_insert_page", details: { fileId: req.params.fileId, afterIndex }, req });
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message || "Insert failed" });
+  }
+});
+
+// POST /pdf/api/pdf/delete-pages/:fileId — delete pages
+router.post("/delete-pages/:fileId", async (req, res) => {
+  const user = (req as any).pdfUser;
+  try {
+    const { bytes, file } = await readPdfBytes(req.params.fileId, user.id, user.role);
+    const { pageNumbers = [] } = req.body;
+    if (!pageNumbers.length) return res.status(400).json({ error: "pageNumbers required" });
+    const processed = await PDF.deletePages(bytes, pageNumbers);
+    await saveProcessedPdf(processed, file, "delete_pages", user.id);
+    await logAudit({ userId: user.id, username: user.username, action: "pdf_delete_pages", details: { fileId: req.params.fileId, pageNumbers }, req });
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message || "Delete failed" });
+  }
+});
+
+// POST /pdf/api/pdf/duplicate-page/:fileId
+router.post("/duplicate-page/:fileId", async (req, res) => {
+  const user = (req as any).pdfUser;
+  try {
+    const { bytes, file } = await readPdfBytes(req.params.fileId, user.id, user.role);
+    const { pageNum = 1 } = req.body;
+    const processed = await PDF.duplicatePage(bytes, pageNum);
+    await saveProcessedPdf(processed, file, "duplicate_page", user.id);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message || "Duplicate failed" });
+  }
+});
+
+// POST /pdf/api/pdf/crop-page/:fileId
+router.post("/crop-page/:fileId", async (req, res) => {
+  const user = (req as any).pdfUser;
+  try {
+    const { bytes, file } = await readPdfBytes(req.params.fileId, user.id, user.role);
+    const { pageNum = 1, x = 0, y = 0, w = 595, h = 842 } = req.body;
+    const processed = await PDF.cropPage(bytes, pageNum, x, y, w, h);
+    await saveProcessedPdf(processed, file, "crop_page", user.id);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message || "Crop failed" });
+  }
+});
+
+// POST /pdf/api/pdf/resize-pages/:fileId
+router.post("/resize-pages/:fileId", async (req, res) => {
+  const user = (req as any).pdfUser;
+  try {
+    const { bytes, file } = await readPdfBytes(req.params.fileId, user.id, user.role);
+    const { targetWidth = 595, targetHeight = 842, pages } = req.body;
+    const processed = await PDF.resizePages(bytes, targetWidth, targetHeight, pages);
+    await saveProcessedPdf(processed, file, "resize_pages", user.id);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message || "Resize failed" });
+  }
+});
+
+// GET /pdf/api/pdf/text-content/:fileId/:page — extract text with positions for search
+router.get("/text-content/:fileId/:page", async (req, res) => {
+  const user = (req as any).pdfUser;
+  try {
+    const { bytes } = await readPdfBytes(req.params.fileId, user.id, user.role);
+    const text = await PDF.extractText(bytes);
+    res.json({ text, page: parseInt(req.params.page) });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message || "Failed" });
+  }
+});
+
+
+
+// POST /pdf/api/pdf/extract-pages — extract specific pages into new file
+router.post("/extract-pages", async (req, res) => {
+  const user = (req as any).pdfUser;
+  const { fileId, pageNumbers = [] } = req.body;
+  if (!fileId || !pageNumbers.length) return res.status(400).json({ error: "fileId + pageNumbers required" });
+  try {
+    const { bytes, file } = await readPdfBytes(fileId, user.id, user.role);
+    const processed = await PDF.extractPages(bytes, pageNumbers);
+    const extractName = `${file.name.replace(".pdf", "")}_pages_${pageNumbers.join("-")}.pdf`;
+    // Create as new file
+    const { v4: uuidv4 } = await import("uuid");
+    const { encryptBuffer, computeChecksum, getStoragePath } = await import("../crypto.js");
+    const { logAudit: _logAudit } = await import("../audit.js");
+    const { writeFileSync } = await import("fs");
+    const checksum = computeChecksum(processed);
+    const encrypted = encryptBuffer(processed);
+    const storageName = `${uuidv4()}.enc`;
+    writeFileSync(getStoragePath(storageName), encrypted);
+    const { rows } = await pool.query(
+      `INSERT INTO pdf_files (id, name, original_name, storage_path, size_bytes, page_count, owner_id, checksum, current_version) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,1) RETURNING id`,
+      [uuidv4(), extractName, extractName, storageName, processed.length, pageNumbers.length, user.id, checksum]
+    );
+    await logAudit({ userId: user.id, username: user.username, action: "pdf_extract_pages", details: { fileId, pages: pageNumbers }, req });
+    res.json({ success: true, fileId: rows[0].id, name: extractName });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message || "Extract failed" });
+  }
+});
+
 export default router;
