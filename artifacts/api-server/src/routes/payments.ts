@@ -1797,8 +1797,8 @@ router.post("/reminders/disable", requireAdmin as any, async (req: Authenticated
 /**
  * POST /api/payments/resend-notification/:bookingId
  * Admin-only "Resend All" — fires every applicable notification for the booking.
- * Skips payment-gated items (Invoice PDF, Receipt PDF, Payment template) when
- * no payment has been recorded instead of returning an error.
+ * Never blocks on payment — only Payment Receipt PDF is gated on paidAmount > 0.
+ * Also resends any uploaded travel documents (Visa, Flight Ticket, Hotel Voucher, etc.).
  * Returns a per-channel summary so the UI can display sent/skipped/failed status.
  */
 router.post("/resend-notification/:bookingId", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
@@ -1883,44 +1883,52 @@ router.post("/resend-notification/:bookingId", requireAdmin as any, async (req: 
       }
     }
 
-    // ── 4. Invoice PDF & Receipt PDF (payment-gated) ───────────────────────────
-    if (!hasPayment) {
-      summary.push({ key: "invoice", label: "Invoice PDF", status: "skipped", reason: "No payment recorded" });
-      summary.push({ key: "receipt", label: "Receipt PDF", status: "skipped", reason: "No payment recorded" });
-    } else {
-      const totalAmt   = finalAmount;
-      const balanceAmt = Math.max(0, totalAmt - paidAmount);
-      const docOpts    = {
+    // ── 4. Invoice PDF (always — shows balance due when no payment) ───────────
+    try {
+      const { generateInvoicePdfBuffer } = await import("../lib/paymentDocs.js");
+      const { sendPDFDocument } = await import("../lib/botbee.js");
+      const docOpts = {
         customerName: row.customer_name, customerMobile: row.customer_mobile,
         customerEmail: email ?? undefined,
         bookingNumber: row.booking_number, invoiceNumber: row.invoice_number ?? undefined,
         packageName: row.package_name ?? "Hajj/Umrah Package",
         numberOfPilgrims: row.number_of_pilgrims,
-        totalAmount: totalAmt, paidAmount, balanceAmount: balanceAmt,
+        totalAmount: finalAmount, paidAmount,
+        balanceAmount: Math.max(0, finalAmount - paidAmount),
         gstAmount: Number(row.gst_amount || 0),
         paymentDate: row.updated_at || new Date(),
         razorpayPaymentId: row.razorpay_payment_id ?? undefined,
       };
+      const pdfBuf    = await generateInvoicePdfBuffer(docOpts);
+      const invResult = await sendPDFDocument(row.customer_mobile, pdfBuf, `Invoice-${row.booking_number}.pdf`,
+        `Your Invoice – Al Burhan Tours & Travels (Booking: ${row.booking_number})`,
+        { eventType: "invoice_ready", bookingId: row.id, customerId: row.customer_id ?? undefined });
+      await logEntry("invoice_ready", "whatsapp", row.customer_mobile, `Resend All: Invoice PDF`, invResult.ok ? "sent" : "failed");
+      summary.push({ key: "invoice", label: "Invoice PDF", status: invResult.ok ? "sent" : "failed", reason: invResult.ok ? undefined : (invResult.errorMessage || "Send failed") });
+    } catch (err: any) {
+      summary.push({ key: "invoice", label: "Invoice PDF", status: "failed", reason: err.message });
+    }
 
-      // Invoice PDF
-      try {
-        const { generateInvoicePdfBuffer } = await import("../lib/paymentDocs.js");
-        const { sendPDFDocument } = await import("../lib/botbee.js");
-        const pdfBuf  = await generateInvoicePdfBuffer(docOpts);
-        const invResult = await sendPDFDocument(row.customer_mobile, pdfBuf, `Invoice-${row.booking_number}.pdf`,
-          `Your Tax Invoice – Al Burhan Tours & Travels (Booking: ${row.booking_number})`,
-          { eventType: "invoice_ready", bookingId: row.id, customerId: row.customer_id ?? undefined });
-        await logEntry("invoice_ready", "whatsapp", row.customer_mobile, `Resend All: Invoice PDF`, invResult.ok ? "sent" : "failed");
-        summary.push({ key: "invoice", label: "Invoice PDF", status: invResult.ok ? "sent" : "failed", reason: invResult.ok ? undefined : (invResult.errorMessage || "Send failed") });
-      } catch (err: any) {
-        summary.push({ key: "invoice", label: "Invoice PDF", status: "failed", reason: err.message });
-      }
-
-      // Receipt PDF
+    // ── 5. Receipt PDF (payment-gated — only makes sense when paid) ───────────
+    if (!hasPayment) {
+      summary.push({ key: "receipt", label: "Receipt PDF", status: "skipped", reason: "No payment recorded" });
+    } else {
       try {
         const { generateReceiptPdfBuffer } = await import("../lib/paymentDocs.js");
         const { sendPDFDocument } = await import("../lib/botbee.js");
-        const pdfBuf  = await generateReceiptPdfBuffer(docOpts);
+        const docOpts = {
+          customerName: row.customer_name, customerMobile: row.customer_mobile,
+          customerEmail: email ?? undefined,
+          bookingNumber: row.booking_number, invoiceNumber: row.invoice_number ?? undefined,
+          packageName: row.package_name ?? "Hajj/Umrah Package",
+          numberOfPilgrims: row.number_of_pilgrims,
+          totalAmount: finalAmount, paidAmount,
+          balanceAmount: Math.max(0, finalAmount - paidAmount),
+          gstAmount: Number(row.gst_amount || 0),
+          paymentDate: row.updated_at || new Date(),
+          razorpayPaymentId: row.razorpay_payment_id ?? undefined,
+        };
+        const pdfBuf     = await generateReceiptPdfBuffer(docOpts);
         const rcptResult = await sendPDFDocument(row.customer_mobile, pdfBuf, `Receipt-${row.booking_number}.pdf`,
           `Your Payment Receipt – Al Burhan Tours & Travels (Booking: ${row.booking_number})`,
           { eventType: "payment_received", bookingId: row.id, customerId: row.customer_id ?? undefined });
@@ -1931,7 +1939,7 @@ router.post("/resend-notification/:bookingId", requireAdmin as any, async (req: 
       }
     }
 
-    // ── 5. Agreement (if one exists for this booking) ─────────────────────────
+    // ── 6. Agreement (if one exists for this booking) ─────────────────────────
     try {
       const agrQ = await pool.query(
         `SELECT id, agreement_number FROM agreements WHERE booking_id=$1 AND status NOT IN ('cancelled','rejected') ORDER BY created_at DESC LIMIT 1`,
@@ -1947,8 +1955,51 @@ router.post("/resend-notification/:bookingId", requireAdmin as any, async (req: 
         }, { eventType: "agreement_ready", bookingId: row.id, customerId: row.customer_id ?? undefined });
         summary.push({ key: "agreement", label: "Agreement", status: agrResult.ok ? "sent" : "failed", reason: agrResult.ok ? undefined : (agrResult.errorMessage || "Send failed") });
       }
-      // No entry in summary if agreement not applicable
-    } catch { /* agreement check failure is non-fatal */ }
+      // No entry in summary if no agreement exists
+    } catch { /* non-fatal */ }
+
+    // ── 7. Uploaded travel documents (Visa, Flight Ticket, Hotel Voucher, etc.) ─
+    try {
+      const RESEND_DOC_TYPES = ["visa", "flight_ticket", "hotel_voucher", "room_allotment", "bus_allotment", "tour_itinerary", "ziyarat_schedule", "insurance", "model_contract"];
+      const docsQ = await pool.query(
+        `SELECT id, document_type, file_name, file_url, mime_type
+         FROM documents
+         WHERE booking_id=$1 AND document_type = ANY($2::text[])
+         ORDER BY document_type, created_at DESC`,
+        [row.id, RESEND_DOC_TYPES]
+      );
+      if (docsQ.rows.length > 0) {
+        const { sendDocumentToCustomer, DOC_TYPE_LABELS } = await import("../lib/documentDelivery.js");
+        // De-duplicate: send only the latest file per document type
+        const seen = new Set<string>();
+        for (const doc of docsQ.rows) {
+          if (seen.has(doc.document_type)) continue;
+          seen.add(doc.document_type);
+          const label = DOC_TYPE_LABELS[doc.document_type] || doc.document_type;
+          try {
+            const result = await sendDocumentToCustomer({
+              docId: doc.id,
+              bookingId: row.id,
+              bookingNumber: row.booking_number,
+              customerId: row.customer_id ?? undefined,
+              customerName: row.customer_name,
+              customerMobile: row.customer_mobile,
+              customerEmail: email ?? undefined,
+              documentType: doc.document_type,
+              fileName: doc.file_name,
+              fileUrl: doc.file_url,
+              mimeType: doc.mime_type ?? undefined,
+              packageName: row.package_name ?? undefined,
+            });
+            const sent = result.whatsapp || result.sms || result.email;
+            await logEntry(doc.document_type, "whatsapp", row.customer_mobile, `Resend All: ${label}`, sent ? "sent" : "failed");
+            summary.push({ key: `doc_${doc.document_type}`, label, status: sent ? "sent" : "failed" });
+          } catch (docErr: any) {
+            summary.push({ key: `doc_${doc.document_type}`, label, status: "failed", reason: docErr.message });
+          }
+        }
+      }
+    } catch { /* non-fatal — travel doc resend is best-effort */ }
 
     res.json({ success: true, summary, bookingNumber: row.booking_number });
   } catch (err: any) {
