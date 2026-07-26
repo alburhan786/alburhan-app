@@ -6,7 +6,7 @@ import {
   Layers, Scissors, Minimize2, RotateCcw, Droplets, PenTool,
   QrCode, Type, Tag, Lock, GitCompare, FileSearch, ArrowUpDown,
   Hash, FileText, Download, X, Plus, CheckCircle2, Loader2,
-  RefreshCcw,
+  RefreshCcw, Eye, EyeOff,
 } from "lucide-react";
 import { toast } from "sonner";
 import SignatureCanvas from "react-signature-canvas";
@@ -122,6 +122,11 @@ export default function ToolsPage() {
   const [pnPosition, setPnPosition] = useState("bottom-center");
   const [hfHeader, setHfHeader] = useState("");
   const [hfFooter, setHfFooter] = useState("");
+  // Unlock fallback — shown only after auto-bypass fails
+  const [unlockFailed, setUnlockFailed] = useState(false);
+  const [unlockFallbackPw, setUnlockFallbackPw] = useState("");
+  const [unlockFallbackVisible, setUnlockFallbackVisible] = useState(false);
+  const [unlockFallbackError, setUnlockFallbackError] = useState("");
 
 
   const readyIds = files.filter((f) => f.status === "done").map((f) => f.fileId!);
@@ -138,6 +143,9 @@ export default function ToolsPage() {
     setFilesB([]);
     setResult(null);
     setMeta({});
+    setUnlockFailed(false);
+    setUnlockFallbackPw("");
+    setUnlockFallbackError("");
   }
 
   // Auto-load metadata when file is uploaded
@@ -232,9 +240,19 @@ export default function ToolsPage() {
           break;
         }
         case "unlock": {
-          const res = await pdfApi.unlock(readyIds[0]);
-          r = { type: "file", id: res.id, name: res.name, message: "Password removed — PDF is now fully accessible" };
-          toast.success("PDF unlocked!");
+          try {
+            const res = await pdfApi.unlock(readyIds[0]);
+            r = { type: "file", id: res.id, name: res.name, message: "Password removed — PDF is now fully accessible" };
+            toast.success("PDF unlocked!");
+            setUnlockFailed(false);
+          } catch (_) {
+            // Auto-bypass failed — show password fallback inline, don't toast
+            setUnlockFailed(true);
+            setUnlockFallbackPw("");
+            setUnlockFallbackError("");
+            setProcessing(false);
+            return;
+          }
           break;
         }
         case "extract": {
@@ -267,6 +285,28 @@ export default function ToolsPage() {
       }
     } catch (err: any) {
       toast.error(err.message || "Operation failed");
+    } finally {
+      setProcessing(false);
+    }
+  }
+
+  async function runUnlockWithPassword() {
+    if (!unlockFallbackPw.trim() || !readyIds[0] || processing) return;
+    setProcessing(true);
+    setUnlockFallbackError("");
+    try {
+      const res = await pdfApi.unlock(readyIds[0], unlockFallbackPw);
+      const r: ToolResult = { type: "file", id: res.id, name: res.name, message: "Password removed — PDF is now fully accessible" };
+      setResult(r);
+      setUnlockFailed(false);
+      setTimeout(() => dl(r.id, r.name), 300);
+      toast.success("PDF unlocked!");
+    } catch (err: any) {
+      if (err.message === "Incorrect password") {
+        setUnlockFallbackError("Incorrect password — please check and try again.");
+      } else {
+        toast.error(err.message || "Failed to unlock");
+      }
     } finally {
       setProcessing(false);
     }
@@ -504,12 +544,56 @@ export default function ToolsPage() {
                 </Section>
               )}
 
-              {activeTool === "unlock" && (
+              {activeTool === "unlock" && !unlockFailed && (
                 <Section>
                   <div style={{ background: "#052e16", border: "1px solid #166534", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#4ade80", lineHeight: 1.5 }}>
                     🔓 <strong>Auto-Bypass:</strong> Automatically removes PDF password protection — no password required.
                     Works on owner-restricted PDFs and commonly-protected files. All content (text, fonts, images, annotations, metadata) is preserved.
                   </div>
+                </Section>
+              )}
+
+              {activeTool === "unlock" && unlockFailed && (
+                <Section>
+                  <div style={{ background: "#1c0a00", border: "1px solid #92400e", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#fbbf24", lineHeight: 1.6, marginBottom: 14 }}>
+                    ⚠️ <strong>Auto-bypass didn't work.</strong> This PDF uses a custom user password that couldn't be cracked automatically.
+                    Enter the document's password below to unlock it.
+                  </div>
+                  <Label>Document Password</Label>
+                  <div style={{ position: "relative" }}>
+                    <Inp
+                      type={unlockFallbackVisible ? "text" : "password"}
+                      value={unlockFallbackPw}
+                      onChange={(e) => { setUnlockFallbackPw(e.target.value); setUnlockFallbackError(""); }}
+                      onKeyDown={(e) => { if (e.key === "Enter") runUnlockWithPassword(); }}
+                      placeholder="Enter PDF password"
+                      style={{ paddingRight: 42, borderColor: unlockFallbackError ? "#ef4444" : undefined }}
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setUnlockFallbackVisible((v) => !v)}
+                      style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#4a5568", padding: 2, display: "flex", alignItems: "center" }}
+                    >
+                      {unlockFallbackVisible ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  </div>
+                  {unlockFallbackError && (
+                    <div style={{ color: "#ef4444", fontSize: 12, fontWeight: 600, marginTop: 6 }}>⚠ {unlockFallbackError}</div>
+                  )}
+                  <button
+                    onClick={runUnlockWithPassword}
+                    disabled={!unlockFallbackPw.trim() || processing}
+                    style={{
+                      marginTop: 12, width: "100%", padding: "10px 0", borderRadius: 8, border: "none",
+                      background: unlockFallbackPw.trim() && !processing ? "linear-gradient(135deg, #ef4444, #b91c1c)" : "#1e2433",
+                      color: unlockFallbackPw.trim() && !processing ? "#fff" : "#374151",
+                      fontWeight: 700, fontSize: 13, cursor: unlockFallbackPw.trim() && !processing ? "pointer" : "not-allowed",
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                    }}
+                  >
+                    {processing ? <><Loader2 size={14} className="animate-spin" /> Unlocking…</> : <><Lock size={14} /> Unlock with Password</>}
+                  </button>
                 </Section>
               )}
 
