@@ -78,6 +78,10 @@ import executiveDashRouter from "./executive-dashboard.js";
 import { ensureCommEventsTable } from "../lib/eventBus.js";
 import { requireAdmin } from "../lib/auth.js";
 import metaRouter from "./meta.js";
+import crmRouter from "./crm.js";
+import { leadEngineRouter } from "./lead-engine.js";
+import inboxRouter from "./inbox.js";
+import customer360Router from "./customer360.js";
 
 const router: IRouter = Router();
 
@@ -367,10 +371,7 @@ router.use("/customer/journey", customerJourneyRouter);
 router.use("/support", supportRouter);
 router.use("/enterprise", enterpriseRouter);
 router.use("/marketing", enterpriseRouter);
-import crmRouter from "./crm.js";
 router.use("/crm", crmRouter);
-import { leadEngineRouter } from "./lead-engine.js";
-router.use("/leads", leadEngineRouter);
 router.use("/portal", portalRouter);
 router.use("/sms-settings", smsSettingsRouter);
 router.use("/social-media", socialMediaRouter);
@@ -388,12 +389,6 @@ router.use("/group-ops", groupOpsRouter);
 router.use("/transport-ops", transportOpsRouter);
 router.use("/hr-ops", hrOpsRouter);
 router.use("/executive", executiveDashRouter);
-import inboxRouter from "./inbox.js";
-router.use("/inbox", inboxRouter);
-import customer360Router from "./customer360.js";
-router.use("/customer360", customer360Router);
-// Spec contract: GET /api/customers/:id/timeline-full
-router.use("/customers", customer360Router);
 router.use("/webhook", webhooksRouter);
 router.use(storageRouter);
 

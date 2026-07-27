@@ -329,4 +329,162 @@ router.get("/unread-count", requireAdmin as any, async (_req, res) => {
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+//  PHASE B — CONVERSATION REPLY & TIMELINE
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── GET /api/inbox/conversation/:leadId ──────────────────────────────────────
+// Full message thread for a lead (both directions)
+router.get("/conversation/:leadId", requireAdmin as any, async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT sm.*, 
+             CASE WHEN sm.replied_by IS NOT NULL THEN u.name ELSE NULL END as replied_by_name
+      FROM social_messages sm
+      LEFT JOIN users u ON u.id = sm.replied_by
+      WHERE sm.lead_text_id = $1
+      ORDER BY sm.created_at ASC
+      LIMIT 300
+    `, [req.params.leadId]);
+
+    // Mark all as read
+    await pool.query(
+      `UPDATE social_messages SET status='read', read_at=NOW() WHERE lead_text_id=$1 AND status='unread'`,
+      [req.params.leadId],
+    );
+    await pool.query(
+      `UPDATE leads SET unread_count=0 WHERE id=$1`,
+      [req.params.leadId],
+    );
+
+    res.json(rows);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ── POST /api/inbox/conversation/:leadId/reply ────────────────────────────────
+// Send a WhatsApp/SMS reply to a lead from the admin
+router.post("/conversation/:leadId/reply", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { message, channel = "whatsapp" } = req.body;
+    if (!message) return res.status(400).json({ error: "message required" });
+
+    const leadRes = await pool.query(`SELECT * FROM leads WHERE id=$1`, [req.params.leadId]);
+    if (!leadRes.rows[0]) return res.status(404).json({ error: "Lead not found" });
+    const lead = leadRes.rows[0];
+
+    if (!lead.mobile) return res.status(400).json({ error: "Lead has no mobile number" });
+
+    let sent = false;
+    let errorMsg = "";
+
+    if (channel === "sms") {
+      try {
+        await sendDLTSMS(lead.mobile, "custom_sms", { message });
+        sent = true;
+      } catch (e: any) { errorMsg = e.message; }
+    } else {
+      try {
+        await sendWhatsApp(lead.mobile, message);
+        sent = true;
+      } catch (e: any) { errorMsg = e.message; }
+    }
+
+    // Save outbound message to social_messages regardless of send status
+    const insertRes = await pool.query(`
+      INSERT INTO social_messages 
+        (platform, message_text, message_type, lead_text_id, sender_name, sender_phone, 
+         direction, status, replied_by, delivery_status, created_at)
+      VALUES ($1, $2, 'text', $3, $4, $5, 'outgoing', 'sent', $6, $7, NOW())
+      RETURNING id
+    `, [
+      channel === "sms" ? "fast2sms" : "whatsapp_botbee",
+      message, req.params.leadId,
+      req.user?.name || "Admin", null,
+      req.user?.id?.toString() || null,
+      sent ? "delivered" : "failed",
+    ]);
+
+    // Log activity on lead
+    await pool.query(`
+      INSERT INTO lead_activities (id, lead_id, type, content, metadata, performed_by, performed_by_name)
+      VALUES (gen_random_uuid()::text, $1, 'message_sent', $2, $3, $4, $5)
+    `, [
+      req.params.leadId,
+      `Sent ${channel.toUpperCase()} reply: ${message.slice(0, 100)}`,
+      JSON.stringify({ channel, sent, message_id: insertRes.rows[0].id }),
+      req.user?.id?.toString(),
+      req.user?.name || "Admin",
+    ]);
+
+    res.json({ ok: true, sent, messageId: insertRes.rows[0].id, error: errorMsg || undefined });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ── POST /api/inbox/conversation/:leadId/note ─────────────────────────────────
+// Add an internal note to a lead's conversation (not sent to customer)
+router.post("/conversation/:leadId/note", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { note } = req.body;
+    if (!note) return res.status(400).json({ error: "note required" });
+
+    const insertRes = await pool.query(`
+      INSERT INTO social_messages
+        (platform, message_text, message_type, lead_text_id, sender_name,
+         direction, status, replied_by, is_internal_note, created_at)
+      VALUES ('internal', $1, 'text', $2, $3, 'outgoing', 'read', $4, true, NOW())
+      RETURNING id
+    `, [note, req.params.leadId, req.user?.name || "Admin", req.user?.id?.toString()]);
+
+    res.json({ ok: true, messageId: insertRes.rows[0].id });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ── PATCH /api/inbox/lead/:leadId/read ────────────────────────────────────────
+router.patch("/lead/:leadId/read", requireAdmin as any, async (req, res) => {
+  try {
+    await pool.query(`UPDATE social_messages SET status='read', read_at=NOW() WHERE lead_text_id=$1 AND status='unread'`, [req.params.leadId]);
+    await pool.query(`UPDATE leads SET unread_count=0 WHERE id=$1`, [req.params.leadId]);
+    res.json({ ok: true });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ── GET /api/inbox/leads ──────────────────────────────────────────────────────
+// Inbox-style lead list sorted by latest message / unread first
+router.get("/leads", requireAdmin as any, async (req, res) => {
+  try {
+    const search = req.query.search ? `%${req.query.search}%` : null;
+    const status = req.query.status || "open";
+    const page   = Math.max(0, parseInt(String(req.query.page || "0")));
+    const limit  = 30;
+
+    let where = `l.status NOT IN ('spam','cancelled')`;
+    const params: any[] = [];
+
+    if (status !== "all") { params.push(status); where += ` AND l.inbox_status = $${params.length}`; }
+    if (search) { params.push(search); where += ` AND (l.name ILIKE $${params.length} OR l.mobile ILIKE $${params.length} OR l.email ILIKE $${params.length})`; }
+
+    params.push(limit, page * limit);
+    const { rows } = await pool.query(`
+      SELECT l.id, l.lead_number, l.name, l.mobile, l.email, l.source, l.stage,
+             l.priority, l.unread_count, l.inbox_status, l.score, l.ai_score,
+             l.ai_next_action, l.assigned_to,
+             u.name as assigned_to_name,
+             sm.message_text as last_message, sm.created_at as last_message_at,
+             sm.direction as last_direction
+      FROM leads l
+      LEFT JOIN users u ON u.id = l.assigned_to
+      LEFT JOIN LATERAL (
+        SELECT message_text, created_at, direction FROM social_messages
+        WHERE lead_text_id = l.id ORDER BY created_at DESC LIMIT 1
+      ) sm ON true
+      WHERE ${where}
+      ORDER BY COALESCE(l.unread_count,0) DESC, COALESCE(sm.created_at, l.created_at) DESC
+      LIMIT $${params.length - 1} OFFSET $${params.length}
+    `, params);
+
+    const countRes = await pool.query(`SELECT COUNT(*)::int as total FROM leads l WHERE ${where}`, params.slice(0, -2));
+    res.json({ leads: rows, total: countRes.rows[0]?.total || 0, page, limit });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
 export default router;

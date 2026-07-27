@@ -198,6 +198,9 @@ import BranchOverview from "@/pages/admin/BranchOverview";
 import BranchLoginManager from "@/pages/admin/BranchLoginManager";
 import AgentLoginManager from "@/pages/admin/AgentLoginManager";
 import CRMDashboard from "@/pages/admin/CRMDashboard";
+import LeadInbox from "@/pages/admin/LeadInbox";
+import CRMReporting from "@/pages/admin/CRMReporting";
+import WebFormBuilder from "@/pages/admin/WebFormBuilder";
 import SRMDashboard from "@/pages/admin/SRMDashboard";
 import HRDashboard from "@/pages/admin/HRDashboard";
 import InventoryDashboard from "@/pages/admin/InventoryDashboard";
@@ -455,6 +458,9 @@ function Router() {
       <Route path="/admin/customer360"       component={() => <AdminRoute component={Customer360} />} />
       <Route path="/admin/crm"              component={() => <AdminRoute component={CRMDashboard} />} />
       <Route path="/admin/lead-pipeline"    component={() => <AdminRoute component={LeadPipeline} />} />
+      <Route path="/admin/lead-inbox"       component={() => <AdminRoute component={LeadInbox} />} />
+      <Route path="/admin/crm-reporting"    component={() => <AdminRoute component={CRMReporting} />} />
+      <Route path="/admin/web-forms"        component={() => <AdminRoute component={WebFormBuilder} />} />
       <Route path="/admin/comment-automation" component={() => <AdminRoute component={CommentAutomation} />} />
       <Route path="/admin/srm"              component={() => <AdminRoute component={SRMDashboard} />} />
       <Route path="/admin/hr"               component={() => <AdminRoute component={HRDashboard} />} />

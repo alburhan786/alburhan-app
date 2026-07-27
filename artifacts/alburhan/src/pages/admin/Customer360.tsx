@@ -203,6 +203,11 @@ export default function Customer360() {
   const [taskNotes, setTaskNotes] = useState("");
   const [creatingTask, setCreatingTask] = useState(false);
 
+  const [convMessages, setConvMessages] = useState<any[]>([]);
+  const [loadingConv, setLoadingConv] = useState(false);
+  const [convReplyText, setConvReplyText] = useState("");
+  const [sendingConvReply, setSendingConvReply] = useState(false);
+
   const loadProfile = useCallback(async (type: "user" | "lead", id: string) => {
     setLoading(true);
     setData(null);
@@ -309,6 +314,38 @@ export default function Customer360() {
       .finally(() => setTasksLoading(false));
   }, [activeTab, data?.user?.mobile]);
 
+  useEffect(() => {
+    if (activeTab !== "conversation") return;
+    const leadId = data?.leads?.[0]?.id;
+    if (!leadId) return;
+    setLoadingConv(true);
+    fetch(`${API}/api/inbox/conversation/${leadId}`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setConvMessages(d?.messages || []))
+      .catch(() => {})
+      .finally(() => setLoadingConv(false));
+  }, [activeTab, data?.leads]);
+
+  const sendConvReply = async () => {
+    const leadId = data?.leads?.[0]?.id;
+    if (!convReplyText.trim() || !leadId) return;
+    setSendingConvReply(true);
+    try {
+      const res = await fetch(`${API}/api/inbox/conversation/${leadId}/reply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ message: convReplyText, channel: "whatsapp" })
+      });
+      if (res.ok) {
+        const newMsg = await res.json();
+        setConvMessages(prev => [...prev, newMsg]);
+        setConvReplyText("");
+      }
+    } catch (e) { }
+    setSendingConvReply(false);
+  };
+
   // ── AI suggestions (rule-based) ──────────────────────────────────────────
   const aiSuggestions = data ? (() => {
     const tips: { icon: string; color: string; text: string }[] = [];
@@ -347,6 +384,7 @@ export default function Customer360() {
 
   const tabs = [
     { id: "overview",   label: "Overview",        icon: User },
+    { id: "conversation",label: "Conversation",    icon: MessageSquare },
     { id: "bookings",   label: "Bookings",         icon: Package,       badge: data?.bookings.length },
     { id: "payments",   label: "Payments",         icon: CreditCard,    badge: data?.payments.length },
     { id: "comms",      label: "Communication",    icon: MessageSquare, badge: data?.communications.length },
@@ -562,6 +600,70 @@ export default function Customer360() {
               </div>
 
               <div className="p-5">
+                {/* ── CONVERSATION ── */}
+                {activeTab === "conversation" && (
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col h-[calc(100vh-220px)]">
+                    <div className="p-4 border-b border-gray-100 bg-gray-50 flex items-center gap-2 shrink-0">
+                      <MessageSquare size={16} className="text-gray-500" />
+                      <h3 className="font-semibold text-gray-800">Two-way Conversation</h3>
+                      {!data?.leads?.[0]?.id && (
+                        <span className="ml-auto text-xs bg-red-100 text-red-700 px-2 py-1 rounded-md">No linked Lead ID found</span>
+                      )}
+                    </div>
+                    
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50/50">
+                      {loadingConv ? (
+                        <div className="flex items-center justify-center h-full text-gray-400"><RefreshCw className="animate-spin" /></div>
+                      ) : !data?.leads?.[0]?.id ? (
+                        <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                          <AlertCircle size={40} className="mb-2 opacity-20" />
+                          <p>Customer is not linked to an active lead.</p>
+                        </div>
+                      ) : convMessages.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                          <MessageSquare size={40} className="mb-2 opacity-20" />
+                          <p>No messages yet. Send a message to start the conversation.</p>
+                        </div>
+                      ) : (
+                        convMessages.map((msg: any, i: number) => {
+                          const isIncoming = msg.direction === 'incoming';
+                          return (
+                            <div key={i} className={`flex flex-col max-w-[80%] ${isIncoming ? 'items-start self-start' : 'items-end self-end ml-auto'}`}>
+                              <div className={`px-4 py-2.5 rounded-2xl text-sm shadow-sm ${isIncoming ? 'bg-white border text-gray-800 rounded-tl-sm' : 'bg-emerald-600 text-white rounded-tr-sm'}`}>
+                                {msg.text || msg.message}
+                              </div>
+                              <div className="text-[10px] text-gray-400 mt-1 flex items-center gap-1.5 px-1">
+                                <span>{fmtTime(msg.created_at || msg.timestamp)}</span>
+                                <span>• {msg.platform || msg.channel || 'System'}</span>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                    
+                    <div className="p-4 border-t border-gray-100 bg-white shrink-0">
+                      <div className="flex gap-2 relative">
+                        <input
+                          disabled={!data?.leads?.[0]?.id || sendingConvReply}
+                          value={convReplyText}
+                          onChange={e => setConvReplyText(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') sendConvReply(); }}
+                          placeholder="Type a WhatsApp message..."
+                          className="flex-1 rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50"
+                        />
+                        <button
+                          disabled={!data?.leads?.[0]?.id || !convReplyText.trim() || sendingConvReply}
+                          onClick={sendConvReply}
+                          className="w-10 h-10 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          {sendingConvReply ? <RefreshCw size={16} className="animate-spin" /> : <Send size={16} className="ml-1" />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* ── OVERVIEW ── */}
                 {activeTab === "overview" && (
                   <div className="space-y-5">

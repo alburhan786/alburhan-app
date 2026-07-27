@@ -521,6 +521,262 @@ router.delete("/:id", requireAdmin, async (req: AuthenticatedRequest, res) => {
   }
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+//  PHASE B ROUTES
+// ═══════════════════════════════════════════════════════════════════════════
+import {
+  aiScoreLead,
+  createBookingFromLead,
+  exportLeadsToExcel,
+  importLeadsFromExcel,
+  syncFbAdsData,
+  getReportPipelineVelocity,
+  getReportSourceROI,
+  getReportAgentPerformance,
+  getReportConversionFunnel,
+  listWebForms,
+  createWebForm,
+  updateWebForm,
+  getWebFormEmbed,
+  submitWebForm,
+  getLeadAuditLog,
+  ensureLeadEnginePhaseBSchema,
+} from "../lib/leadEnginePhaseB.js";
+import multer from "multer";
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+
+// Run Phase B schema on load
+ensureLeadEnginePhaseBSchema().catch(e => console.error("[LeadEnginePhaseB] Schema error:", e));
+
+// ── AI Scoring ───────────────────────────────────────────────────────────────
+router.post("/:id/ai-score", requireAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    const result = await aiScoreLead(req.params.id);
+    res.json({ ok: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ── Create Booking from Lead ─────────────────────────────────────────────────
+router.post("/:id/create-booking", requireAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    const result = await createBookingFromLead(req.params.id, req.user?.id?.toString() || "");
+    res.json({ ok: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ── Audit Log ────────────────────────────────────────────────────────────────
+router.get("/:id/audit-log", requireAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    const log = await getLeadAuditLog(req.params.id);
+    res.json(log);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Export ───────────────────────────────────────────────────────────────────
+router.get("/export/excel", requireAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    const filters: any = {};
+    if (req.query.source)     filters.source     = String(req.query.source);
+    if (req.query.stage)      filters.stage      = String(req.query.stage);
+    if (req.query.status)     filters.status     = String(req.query.status);
+    if (req.query.assignedTo) filters.assignedTo = String(req.query.assignedTo);
+    if (req.query.from)       filters.from       = String(req.query.from);
+    if (req.query.to)         filters.to         = String(req.query.to);
+
+    const buf = await exportLeadsToExcel(filters);
+    const date = new Date().toISOString().slice(0, 10);
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="leads-${date}.xlsx"`);
+    res.send(buf);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Import ───────────────────────────────────────────────────────────────────
+router.post("/import/excel", requireAdmin, upload.single("file"), async (req: AuthenticatedRequest, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    const result = await importLeadsFromExcel(req.file.buffer);
+    res.json({ ok: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ── Reports ──────────────────────────────────────────────────────────────────
+router.get("/reports/pipeline", requireAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    const from = String(req.query.from || new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10));
+    const to   = String(req.query.to   || new Date().toISOString().slice(0, 10));
+    res.json(await getReportPipelineVelocity(from, to));
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.get("/reports/source-roi", requireAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    const from = String(req.query.from || new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10));
+    const to   = String(req.query.to   || new Date().toISOString().slice(0, 10));
+    res.json(await getReportSourceROI(from, to));
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.get("/reports/agent-performance", requireAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    const from = String(req.query.from || new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10));
+    const to   = String(req.query.to   || new Date().toISOString().slice(0, 10));
+    res.json(await getReportAgentPerformance(from, to));
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.get("/reports/conversion-funnel", requireAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    const from = String(req.query.from || new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10));
+    const to   = String(req.query.to   || new Date().toISOString().slice(0, 10));
+    res.json(await getReportConversionFunnel(from, to));
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ── FB Ads ───────────────────────────────────────────────────────────────────
+router.post("/fb-ads/sync", requireAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { access_token, ad_account_id, since, until } = req.body;
+    if (!access_token || !ad_account_id) return res.status(400).json({ error: "access_token and ad_account_id required" });
+    const from = since || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+    const to   = until || new Date().toISOString().slice(0, 10);
+    const result = await syncFbAdsData(access_token, ad_account_id, from, to);
+    res.json({ ok: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+router.get("/fb-ads/data", requireAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    const from = String(req.query.from || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10));
+    const to   = String(req.query.to   || new Date().toISOString().slice(0, 10));
+    const result = await pool.query(
+      `SELECT campaign_name, SUM(spend)::numeric(10,2) as spend, SUM(leads_count)::int as leads,
+              SUM(clicks)::int as clicks, AVG(cpl)::numeric(10,2) as cpl, MIN(date)::text as from_date, MAX(date)::text as to_date
+       FROM fb_ads_sync WHERE date BETWEEN $1 AND $2 GROUP BY campaign_name ORDER BY spend DESC`,
+      [from, to],
+    );
+    res.json(result.rows);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ── Web Forms ────────────────────────────────────────────────────────────────
+router.get("/web-forms", requireAdmin, async (_req, res) => {
+  try { res.json(await listWebForms()); }
+  catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.post("/web-forms", requireAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    const form = await createWebForm(req.body, req.user?.id?.toString() || "");
+    res.status(201).json(form);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.put("/web-forms/:formId", requireAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    const form = await updateWebForm(req.params.formId, req.body);
+    res.json(form);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.get("/web-forms/:formId/embed", requireAdmin, async (req, res) => {
+  try {
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    const result = await getWebFormEmbed(req.params.formId, baseUrl);
+    res.json(result);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// Public submit endpoint — no auth
+router.post("/web-forms/:formId/submit", async (req, res) => {
+  try {
+    const ip = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "");
+    const ua = String(req.headers["user-agent"] || "");
+    const result = await submitWebForm(req.params.formId, req.body, ip, ua);
+    res.json(result);
+  } catch (err: any) {
+    res.status(err.message.includes("not found") ? 404 : 500).json({ error: err.message });
+  }
+});
+
+// Public form preview HTML (for iframe embed)
+router.get("/web-forms/:formId/preview", async (req, res) => {
+  try {
+    const { rows } = await pool.query(`SELECT * FROM lead_web_forms WHERE id=$1 AND is_active=true`, [req.params.formId]);
+    if (!rows[0]) return res.status(404).send("<p>Form not found</p>");
+    const form = rows[0];
+    const fields: any[] = form.fields || [];
+    const color = form.theme_color || "#0A3D2A";
+    const submitUrl = `/api/leads/web-forms/${form.id}/submit`;
+
+    const fieldsHtml = fields.map(f => {
+      const label = f.label || f.name;
+      const name  = f.name || f.label?.toLowerCase().replace(/\s+/g, "_");
+      const required = f.required ? "required" : "";
+      if (f.type === "select" && f.options?.length) {
+        const opts = f.options.map((o: string) => `<option value="${o}">${o}</option>`).join("");
+        return `<div class="field"><label>${label}${f.required ? " *" : ""}</label><select name="${name}" ${required}><option value="">Select...</option>${opts}</select></div>`;
+      }
+      if (f.type === "textarea") {
+        return `<div class="field"><label>${label}${f.required ? " *" : ""}</label><textarea name="${name}" rows="3" placeholder="${f.placeholder || ""}" ${required}></textarea></div>`;
+      }
+      return `<div class="field"><label>${label}${f.required ? " *" : ""}</label><input type="${f.type || "text"}" name="${name}" placeholder="${f.placeholder || ""}" ${required}/></div>`;
+    }).join("\n");
+
+    res.setHeader("Content-Type", "text/html");
+    res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}
+body{padding:20px;background:#fff}
+h2{color:${color};margin-bottom:16px;font-size:18px}
+.field{margin-bottom:14px}
+label{display:block;font-size:13px;font-weight:600;color:#333;margin-bottom:4px}
+input,select,textarea{width:100%;padding:10px 12px;border:1.5px solid #ddd;border-radius:6px;font-size:14px;outline:none;transition:border-color .2s}
+input:focus,select:focus,textarea:focus{border-color:${color}}
+button{width:100%;padding:12px;background:${color};color:#fff;border:none;border-radius:6px;font-size:15px;font-weight:700;cursor:pointer;margin-top:4px}
+button:hover{opacity:.9}
+.success{color:green;font-weight:600;text-align:center;padding:16px;display:none}
+.error{color:red;font-size:13px;margin-top:8px;display:none}
+</style></head><body>
+<h2>${form.name}</h2>
+${form.description ? `<p style="color:#666;font-size:13px;margin-bottom:16px">${form.description}</p>` : ""}
+<form id="lf" onsubmit="submitForm(event)">
+${fieldsHtml}
+<div class="error" id="err"></div>
+<button type="submit" id="btn">Submit Enquiry</button>
+</form>
+<div class="success" id="ok">${form.success_message}</div>
+<script>
+async function submitForm(e){
+  e.preventDefault();
+  const btn=document.getElementById('btn');
+  const err=document.getElementById('err');
+  btn.disabled=true; btn.textContent='Sending...'; err.style.display='none';
+  const data=Object.fromEntries(new FormData(e.target));
+  try{
+    const r=await fetch('${submitUrl}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+    const j=await r.json();
+    if(j.success){document.getElementById('lf').style.display='none';document.getElementById('ok').style.display='block';}
+    else{err.textContent=j.error||'Submission failed';err.style.display='block';btn.disabled=false;btn.textContent='Submit Enquiry';}
+  }catch(ex){err.textContent='Network error, please try again';err.style.display='block';btn.disabled=false;btn.textContent='Submit Enquiry';}
+}
+</script></body></html>`);
+  } catch (err: any) { res.status(500).send("<p>Error loading form</p>"); }
+});
+
 // Named export bypasses esbuild CJS default-export interop issue
 export { router as leadEngineRouter };
 export default router;

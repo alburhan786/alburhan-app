@@ -95,6 +95,7 @@ import { startTicketDepartureReminderCron } from "./jobs/ticketDepartureReminder
 import { startDepartureReminderCron, startDocumentExpiryCron, startReturnAndFeedbackCron, startBalanceReminderCron, startDocumentReminderCron, startZiyaratReminderCron, startAgreementIntegrityCron, startVisaReminderCron, startDailyAdminReportCron } from "./lib/workflowEngine.js";
 import { DEFAULT_RULES } from "./routes/workflows.js";
 import { runFollowupCron } from "./lib/leadEngine.js";
+import { ensureLeadEnginePhaseBSchema, runLeadReminderCron } from "./lib/leadEnginePhaseB.js";
 
 async function runMigrations() {
   // Session table — must exist BEFORE connect-pg-simple initializes
@@ -2606,6 +2607,12 @@ async function start() {
       runFollowupCron().catch(e => console.error("[LeadEngine] Initial cron error:", e));
       setInterval(() => runFollowupCron().catch(e => console.error("[LeadEngine] Cron error:", e)), 5 * 60 * 1000);
     }, 30 * 1000); // 30s startup delay
+    // Phase B — lead reminder cron (overdue & upcoming follow-up alerts)
+    ensureLeadEnginePhaseBSchema().catch(e => console.error("[LeadEnginePhaseB] Schema error:", e));
+    setTimeout(() => {
+      runLeadReminderCron().catch(e => console.error("[LeadReminder] Initial error:", e));
+      setInterval(() => runLeadReminderCron().catch(e => console.error("[LeadReminder] Cron error:", e)), 60 * 60 * 1000);
+    }, 45 * 1000); // 45s startup delay
     const scheduleAuditRetention = () => {
       const now = new Date();
       const nextRun = new Date(now);

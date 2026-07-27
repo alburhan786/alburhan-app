@@ -12,6 +12,7 @@ import {
   Flame, TrendingUp, BarChart3, Users, Star, Calendar, Clock,
   CheckCircle, AlertTriangle, Zap, Send, Filter, Download,
   UserCheck, ArrowUpDown, Eye, Activity, Tag, Globe,
+  Upload, Brain, History
 } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -405,12 +406,13 @@ function LeadDetailPanel({ lead, onClose, onUpdated }:{
   const { toast } = useToast();
   const [detail, setDetail] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"overview"|"activity"|"tasks"|"edit">("overview");
+  const [tab, setTab] = useState<"overview"|"activity"|"tasks"|"edit"|"audit">("overview");
   const [stage, setStage] = useState(lead.pipeline_stage||"new_lead");
   const [savingStage, setSavingStage] = useState(false);
   const [scoring, setScoring] = useState(false);
   const [score, setScore] = useState({ score: lead.score||"cold" });
   const [converting, setConverting] = useState(false);
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
 
   useEffect(()=>{
     setLoading(true);
@@ -419,6 +421,14 @@ function LeadDetailPanel({ lead, onClose, onUpdated }:{
       .catch(()=>{ setDetail({ lead }); })
       .finally(()=>setLoading(false));
   },[lead.id]);
+
+  useEffect(() => {
+    if (tab === "audit") {
+      apiFetch(`/api/leads/${lead.id}/audit-log`)
+        .then(d => setAuditLogs(Array.isArray(d) ? d : []))
+        .catch(() => setAuditLogs([]));
+    }
+  }, [tab, lead.id]);
 
   const updateStage = async (newStage:string) => {
     setSavingStage(true);
@@ -440,7 +450,7 @@ function LeadDetailPanel({ lead, onClose, onUpdated }:{
       const d = await apiFetch(`/api/leads/${lead.id}/score`,{ method:"POST" });
       setScore(d);
       toast({ title:`Lead score: ${d.score} (${d.score_points} pts)` });
-      onUpdated({ ...lead, score: d.score });
+      onUpdated({ ...lead, score: d.score, ai_score: d.ai_score, ai_next_action: d.ai_next_action });
     } catch(e:any){ toast({ title:"Error", description:e.message, variant:"destructive" }); }
     setScoring(false);
   };
@@ -448,19 +458,19 @@ function LeadDetailPanel({ lead, onClose, onUpdated }:{
   const convertToBooking = async () => {
     setConverting(true);
     try {
-      await apiFetch(`/api/leads/${lead.id}/convert`,{
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({ notes: "Converted from Lead Manager" }),
+      const d = await apiFetch(`/api/leads/${lead.id}/create-booking`,{
+        method:"POST", headers:{"Content-Type":"application/json"}
       });
       toast({ title:"Lead converted to booking" });
-      onUpdated({ ...lead, status:"converted" });
-      onClose();
+      onUpdated({ ...lead, status:"converted", converted_booking_id: d.bookingId || d.id });
+      window.location.href = `/admin/bookings?open=${d.bookingId || d.id}`;
     } catch(e:any){ toast({ title:"Error", description:e.message, variant:"destructive" }); }
     setConverting(false);
   };
 
   const L = detail?.lead || lead;
   const scoreMeta = SCORE_META[score.score] || SCORE_META.cold;
+  const canConvert = ["qualified","proposal","negotiation","won"].includes(stage) && !L.converted_booking_id;
 
   return (
     <div className="fixed inset-0 z-50 flex items-stretch justify-end bg-black/40" onClick={onClose}>
@@ -496,10 +506,12 @@ function LeadDetailPanel({ lead, onClose, onUpdated }:{
           <Button size="sm" variant="outline" className="h-7 text-xs gap-1 ml-auto" onClick={recomputeScore} disabled={scoring}>
             {scoring?<RefreshCw size={11} className="animate-spin"/>:<Target size={11}/>} Score
           </Button>
-          <Button size="sm" className="h-7 text-xs gap-1 bg-green-600 hover:bg-green-700" onClick={convertToBooking} disabled={converting||L.status==="converted"}>
-            {converting?<RefreshCw size={11} className="animate-spin"/>:<CheckCircle size={11}/>}
-            {L.status==="converted"?"Converted":"Convert"}
-          </Button>
+          {canConvert && (
+            <Button size="sm" className="h-7 text-xs gap-1 bg-[#0A3D2A] hover:bg-[#0A3D2A]/90 text-[#C9A84C]" onClick={convertToBooking} disabled={converting}>
+              {converting?<RefreshCw size={11} className="animate-spin"/>:<Plus size={11}/>}
+              Create Booking
+            </Button>
+          )}
         </div>
 
         {/* Stage selector */}
@@ -514,10 +526,10 @@ function LeadDetailPanel({ lead, onClose, onUpdated }:{
 
         {/* Tabs */}
         <div className="flex border-b">
-          {(["overview","activity","tasks","edit"] as const).map(t=>(
+          {(["overview","activity","tasks","edit","audit"] as const).map(t=>(
             <button key={t} onClick={()=>setTab(t)}
               className={`flex-1 py-2.5 text-xs font-medium transition-colors ${tab===t?"border-b-2 border-primary text-primary":"text-muted-foreground hover:text-foreground"}`}>
-              {t==="overview"?"Overview":t==="activity"?"Activity":t==="tasks"?"Tasks":"Edit"}
+              {t==="overview"?"Overview":t==="activity"?"Activity":t==="tasks"?"Tasks":t==="audit"?"Audit Log":"Edit"}
             </button>
           ))}
         </div>
@@ -526,6 +538,36 @@ function LeadDetailPanel({ lead, onClose, onUpdated }:{
         <div className="flex-1 overflow-y-auto p-4">
           {loading ? (
             <div className="flex items-center justify-center h-32 text-muted-foreground text-sm"><RefreshCw size={20} className="animate-spin mr-2"/>Loading…</div>
+          ) : tab==="audit" ? (
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold flex items-center gap-2"><History size={16} /> Audit Timeline</h3>
+              {auditLogs.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">No audit logs found.</p>
+              ) : (
+                <div className="space-y-4 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-muted before:to-transparent">
+                  {auditLogs.map((log: any, i) => (
+                    <div key={i} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
+                      <div className="flex items-center justify-center w-10 h-10 rounded-full border bg-white text-muted-foreground shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2">
+                        <Activity size={16} />
+                      </div>
+                      <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] p-3 rounded border bg-white shadow-sm">
+                        <div className="flex items-center justify-between space-x-2 mb-1">
+                          <div className="font-bold text-sm">{log.user || "System"}</div>
+                          <time className="text-xs font-medium text-muted-foreground">{fmtTime(log.timestamp)}</time>
+                        </div>
+                        <div className="text-sm text-muted-foreground">{log.action}</div>
+                        {(log.old || log.new) && (
+                          <div className="mt-2 text-xs bg-muted/50 p-2 rounded flex flex-col gap-1">
+                            {log.old && <div className="text-red-600 line-through truncate">{log.old}</div>}
+                            {log.new && <div className="text-green-600 truncate">{log.new}</div>}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           ) : tab==="overview" ? (
             <div className="space-y-4">
               {/* Score card */}
@@ -669,8 +711,33 @@ function EditLeadInline({ lead, onSaved }:{ lead:any; onSaved:(l:any)=>void }) {
 }
 
 // ── Lead Card ──────────────────────────────────────────────────────────────────
-function LeadCard({ lead, onSelect, onDelete }:{ lead:any; onSelect:(l:any)=>void; onDelete:(id:string)=>void }) {
+function LeadCard({ lead, onSelect, onDelete, onUpdated }:{ lead:any; onSelect:(l:any)=>void; onDelete:(id:string)=>void; onUpdated:(l:any)=>void }) {
+  const { toast } = useToast();
+  const [scoring, setScoring] = useState(false);
   const overdue = lead.followup_due_at && new Date(lead.followup_due_at) < new Date();
+
+  const handleAiScore = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setScoring(true);
+    try {
+      const res = await fetch(`${API}/api/leads/${lead.id}/ai-score`, { method: "POST", credentials: "include" });
+      if (!res.ok) throw new Error("Failed to get AI score");
+      const data = await res.json();
+      toast({ title: `AI Score: ${data.ai_score}` });
+      onUpdated({ ...lead, ai_score: data.ai_score, ai_next_action: data.ai_next_action });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+    setScoring(false);
+  };
+
+  const getAiScoreColor = (score: number) => {
+    if (!score) return "bg-gray-100 text-gray-700 border-gray-200";
+    if (score >= 70) return "bg-green-100 text-green-700 border-green-200";
+    if (score >= 45) return "bg-amber-100 text-amber-700 border-amber-200";
+    return "bg-red-100 text-red-700 border-red-200";
+  };
+
   return (
     <div className={`rounded-2xl border bg-background p-4 hover:shadow-md transition-all cursor-pointer group ${overdue?"border-red-200 bg-red-50/30":""}`}
       onClick={()=>onSelect(lead)}>
@@ -683,6 +750,22 @@ function LeadCard({ lead, onSelect, onDelete }:{ lead:any; onSelect:(l:any)=>voi
             <span className="font-semibold text-sm truncate">{lead.name}</span>
             <ScoreBadge score={lead.score}/>
             <PriorityBadge priority={lead.priority}/>
+            {lead.ai_score ? (
+              <div className="relative group/ai">
+                <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold border ${getAiScoreColor(lead.ai_score)}`}>
+                  <Brain size={10} className="mr-1"/> {lead.ai_score}
+                </span>
+                {lead.ai_next_action && (
+                  <div className="absolute z-10 bottom-full left-1/2 -translate-x-1/2 mb-1 w-48 p-2 text-xs bg-black text-white rounded opacity-0 group-hover/ai:opacity-100 pointer-events-none transition-opacity">
+                    {lead.ai_next_action}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[10px] gap-1 hover:bg-muted" onClick={handleAiScore} disabled={scoring}>
+                {scoring ? <RefreshCw size={10} className="animate-spin" /> : <Brain size={10} />} Score
+              </Button>
+            )}
           </div>
           <div className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-2 flex-wrap">
             {lead.lead_number && <span className="font-mono text-primary/70">{lead.lead_number}</span>}
@@ -832,6 +915,32 @@ export default function LeadManager() {
     else { setSortBy(field); setSortDir("desc"); }
   };
 
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const res = await fetch(`${API}/api/leads/import/excel`, {
+        method: "POST",
+        credentials: "include",
+        body: formData
+      });
+      if (!res.ok) throw new Error("Import failed");
+      const data = await res.json();
+      toast({ title: `Imported ${data.imported || 0} leads, skipped ${data.skipped || 0}` });
+      loadLeads(1);
+      loadStats();
+    } catch (err: any) {
+      toast({ title: "Error importing", description: err.message, variant: "destructive" });
+    }
+    e.target.value = "";
+  };
+
+  const handleExport = () => {
+    window.location.href = `${API}/api/leads/export/excel`;
+  };
+
   return (
     <AdminLayout>
       <div className="space-y-4 p-4 max-w-[1400px] mx-auto">
@@ -843,10 +952,21 @@ export default function LeadManager() {
             <p className="text-sm text-muted-foreground">{total.toLocaleString("en-IN")} leads · Smart assignment · Auto follow-up</p>
           </div>
           <div className="flex gap-2">
+            <Label htmlFor="import-excel" className="cursor-pointer">
+              <div className="flex h-8 items-center justify-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm font-medium shadow-sm hover:bg-accent hover:text-accent-foreground">
+                <Upload size={13} /> Import
+              </div>
+            </Label>
+            <input id="import-excel" type="file" accept=".xlsx,.csv" className="hidden" onChange={handleImport} />
+            
+            <Button size="sm" variant="outline" className="gap-1.5 h-8" onClick={handleExport}>
+              <Download size={13}/> Export
+            </Button>
+            
             <Button size="sm" variant="outline" className="gap-1.5 h-8" onClick={()=>{ loadLeads(page); loadStats(); }}>
               <RefreshCw size={13}/> Refresh
             </Button>
-            <Button size="sm" className="gap-1.5 h-8" onClick={()=>setShowForm(v=>!v)}>
+            <Button size="sm" className="gap-1.5 h-8 bg-[#0A3D2A] hover:bg-[#0A3D2A]/90 text-[#C9A84C]" onClick={()=>setShowForm(v=>!v)}>
               <Plus size={13}/> New Lead
             </Button>
           </div>
